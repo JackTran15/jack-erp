@@ -1128,6 +1128,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/document-numbers/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DocumentNumberingController_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/customers": {
         parameters: {
             query?: never;
@@ -4952,136 +4968,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/inventory/issue-reasons": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["IssueReasonController_list"];
-        put?: never;
-        post: operations["IssueReasonController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/inventory/issue-reasons/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["IssueReasonController_getById"];
-        put?: never;
-        post?: never;
-        delete: operations["IssueReasonController_remove"];
-        options?: never;
-        head?: never;
-        patch: operations["IssueReasonController_update"];
-        trace?: never;
-    };
-    "/goods-receipts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["GoodsReceiptController_list"];
-        put?: never;
-        post: operations["GoodsReceiptController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/goods-receipts/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["GoodsReceiptController_getById"];
-        put?: never;
-        post?: never;
-        delete: operations["GoodsReceiptController_cancel"];
-        options?: never;
-        head?: never;
-        patch: operations["GoodsReceiptController_update"];
-        trace?: never;
-    };
-    "/goods-receipts/{id}/post": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["GoodsReceiptController_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v2/goods-receipts/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["GoodsReceiptV2Controller_search_v2"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v2/goods-receipts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Create a DRAFT goods receipt (v2, with Đối tượng) */
-        post: operations["GoodsReceiptCommandV2Controller_create_v2"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v2/goods-receipts/{id}/post": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Post a v2 DRAFT goods receipt (DRAFT → POSTED) */
-        post: operations["GoodsReceiptCommandV2Controller_post_v2"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/inventory/transfer-orders": {
         parameters: {
             query?: never;
@@ -5224,6 +5110,136 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/goods-receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsReceiptController_list"];
+        put?: never;
+        post: operations["GoodsReceiptController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/goods-receipts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsReceiptController_getById"];
+        put?: never;
+        post?: never;
+        delete: operations["GoodsReceiptController_cancel"];
+        options?: never;
+        head?: never;
+        patch: operations["GoodsReceiptController_update"];
+        trace?: never;
+    };
+    "/goods-receipts/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["GoodsReceiptController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/goods-receipts/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["GoodsReceiptV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/goods-receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a DRAFT goods receipt (v2, with Đối tượng) */
+        post: operations["GoodsReceiptCommandV2Controller_create_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/goods-receipts/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post a v2 DRAFT goods receipt (DRAFT → POSTED) */
+        post: operations["GoodsReceiptCommandV2Controller_post_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/issue-reasons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["IssueReasonController_list"];
+        put?: never;
+        post: operations["IssueReasonController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/issue-reasons/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["IssueReasonController_getById"];
+        put?: never;
+        post?: never;
+        delete: operations["IssueReasonController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["IssueReasonController_update"];
         trace?: never;
     };
     "/reports/inventory/stock-summary": {
@@ -6344,7 +6360,7 @@ export interface components {
             branchId?: string;
         };
         CreateMembershipCardInlineDto: {
-            cardNumber: string;
+            cardNumber?: string;
             /** @enum {string} */
             tier?: "none" | "silver" | "gold" | "diamond";
             issuedAt?: string;
@@ -6353,7 +6369,7 @@ export interface components {
             lomasTier?: string;
         };
         CreateCustomerDto: {
-            code: string;
+            code?: string;
             name: string;
             /** Format: email */
             email?: string;
@@ -6531,6 +6547,7 @@ export interface components {
         };
         CreateBranchDto: {
             name: string;
+            code?: string;
             address?: string;
             phone?: string;
             /** Format: email */
@@ -6540,6 +6557,7 @@ export interface components {
         };
         BranchEntity: {
             name: string;
+            code?: string | null;
             address?: string;
             phone?: string;
             email?: string;
@@ -6571,6 +6589,7 @@ export interface components {
         };
         UpdateBranchDto: {
             name?: string;
+            code?: string;
             address?: string;
             phone?: string;
             /** Format: email */
@@ -9261,253 +9280,6 @@ export interface components {
             occurredAt?: string;
             lines: components["schemas"]["GoodsIssueV2LineDto"][];
         };
-        CreateIssueReasonDto: {
-            /**
-             * @description Mã lý do (slug). Tự sinh từ name nếu không cung cấp.
-             * @example HONG_BAO_QUAN
-             */
-            code?: string;
-            /**
-             * @description Tên lý do
-             * @example Hàng hỏng do bảo quản chưa tốt
-             */
-            name: string;
-            /**
-             * @description Nhóm lý do (OTHER hoặc DISPOSAL)
-             * @enum {string}
-             */
-            purpose: "OTHER" | "DISPOSAL";
-            /** @default true */
-            isActive: boolean;
-        };
-        UpdateIssueReasonDto: {
-            /**
-             * @description Mã lý do (slug). Tự sinh từ name nếu không cung cấp.
-             * @example HONG_BAO_QUAN
-             */
-            code?: string;
-            /**
-             * @description Tên lý do
-             * @example Hàng hỏng do bảo quản chưa tốt
-             */
-            name?: string;
-            /**
-             * @description Nhóm lý do (OTHER hoặc DISPOSAL)
-             * @enum {string}
-             */
-            purpose?: "OTHER" | "DISPOSAL";
-            /** @default true */
-            isActive: boolean;
-        };
-        GoodsReceiptLineDto: {
-            /** Format: uuid */
-            itemId: string;
-            /** Format: uuid */
-            locationId: string;
-            /** Format: uuid */
-            binId?: string;
-            uomCode: string;
-            quantity: number;
-            unitPrice: number;
-            note?: string;
-        };
-        CashSettlementDto: {
-            method: Record<string, never>;
-            amount: number;
-            /** Format: uuid */
-            cashAccountId?: string;
-            description?: string;
-        };
-        CreateGoodsReceiptDto: {
-            /** @enum {string} */
-            purpose: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
-            /** Format: uuid */
-            providerId?: string;
-            /**
-             * @description Đối tượng kind (supplier | customer | employee). When set, the service
-             *      validates the counterparty and routes supplier→provider_id, customer /
-             *      employee→counterparty cols (provider_id null).
-             * @enum {string}
-             */
-            counterpartyKind?: "supplier" | "customer" | "employee";
-            /** Format: uuid */
-            counterpartyId?: string;
-            deliveredBy?: string;
-            reason?: string;
-            description?: string;
-            /** Format: uuid */
-            referenceId?: string;
-            /** @enum {string} */
-            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE";
-            /** @description Source branch for transfer-in. Stored separately from referenceId. */
-            sourceBranchId?: string;
-            receivedAt: string;
-            /** Format: uuid */
-            locationId: string;
-            attachmentIds?: string[];
-            /** @description FE-supplied reference codes shown as Tham chiếu. */
-            references?: string[];
-            lines: components["schemas"]["GoodsReceiptLineDto"][];
-            /**
-             * @description Settlement on post: CASH posts a cash movement + auto Phiếu chi; CREDIT posts a payable JE.
-             * @enum {string}
-             */
-            paymentMethod?: "CASH" | "CREDIT";
-            /**
-             * Format: uuid
-             * @description Cash account to pay from — required when paymentMethod=CASH.
-             */
-            cashAccountId?: string;
-            cashPayment?: components["schemas"]["CashSettlementDto"];
-            cashReceipt?: components["schemas"]["CashSettlementDto"];
-        };
-        GoodsReceiptEntity: {
-            documentNumber?: string;
-            /** @enum {string} */
-            status: "DRAFT" | "POSTED" | "CANCELLED" | "REVERSED";
-            /** @enum {string} */
-            purpose: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
-            providerId?: string;
-            /** @enum {string|null} */
-            counterpartyKind?: "supplier" | "customer" | "employee" | null;
-            counterpartyId?: string | null;
-            deliveredBy?: string;
-            reason?: string;
-            description?: string;
-            referenceId?: string;
-            /** @enum {string} */
-            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE";
-            /** @description Convenience: source branch for TRANSFER_IN — orthogonal to referenceId (which points to a stock-transfer doc). */
-            sourceBranchId?: string;
-            /** Format: date-time */
-            receivedAt: string;
-            locationId: string;
-            attachmentIds: string[];
-            references: string[];
-            /** @enum {string} */
-            paymentMethod?: "CASH" | "CREDIT";
-            cashAccountId?: string;
-            journalEntryId?: string;
-            cashPaymentId?: string;
-            cashReceiptId?: string;
-            /** Format: date-time */
-            postedAt?: string;
-            postedBy?: string;
-            /** Format: date-time */
-            deletedAt?: string;
-            lines: components["schemas"]["GoodsReceiptLineEntity"][];
-            provider?: components["schemas"]["ProviderEntity"];
-            location?: components["schemas"]["LocationEntity"];
-            /**
-             * @description Transient (not a column): the resolved "Đối tượng" { kind, id, code, name }
-             *     inlined by the v2 search handler / getById so the FE renders supplier,
-             *     customer and employee counterparties alike (provider_id is null for the
-             *     latter two).
-             */
-            counterparty?: Record<string, never> | null;
-            id: string;
-            /** @description Tenant isolation key — every row belongs to exactly one organization. */
-            organizationId: string;
-            /** @description Optional branch scope; null for org-wide records. */
-            branchId?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description UUID of the user who created this record. */
-            createdBy: string;
-        };
-        GoodsReceiptLineEntity: {
-            id: string;
-            organizationId: string;
-            branchId?: string;
-            goodsReceiptId: string;
-            itemId: string;
-            locationId: string;
-            binId?: string;
-            uomCode: string;
-            quantity: string;
-            unitPrice: string;
-            lineTotal: string;
-            note?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            createdBy: string;
-            goodsReceipt: components["schemas"]["GoodsReceiptEntity"];
-            item?: components["schemas"]["ItemEntity"];
-            location?: components["schemas"]["LocationEntity"];
-        };
-        UpdateGoodsReceiptDto: {
-            /** @enum {string} */
-            purpose?: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
-            /** Format: uuid */
-            providerId?: string;
-            /** @enum {string} */
-            counterpartyKind?: "supplier" | "customer" | "employee";
-            /** Format: uuid */
-            counterpartyId?: string;
-            deliveredBy?: string;
-            reason?: string;
-            description?: string;
-            /** Format: uuid */
-            referenceId?: string;
-            /** @enum {string} */
-            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE";
-            sourceBranchId?: string;
-            receivedAt?: string;
-            /** Format: uuid */
-            locationId?: string;
-            attachmentIds?: string[];
-            lines?: components["schemas"]["GoodsReceiptLineDto"][];
-            cashPayment?: components["schemas"]["CashSettlementDto"];
-            cashReceipt?: components["schemas"]["CashSettlementDto"];
-        };
-        GoodsReceiptSearchV2Dto: {
-            /** @default 1 */
-            page: number;
-            /** @default 20 */
-            limit: number;
-            /** @description Số phiếu nhập (document number) */
-            documentNumber?: components["schemas"]["StringFilterDto"];
-            /** @description Đối tượng (counterparty — matches provider.name) */
-            party?: components["schemas"]["StringFilterDto"];
-            /** @description Diễn giải (description) */
-            description?: components["schemas"]["StringFilterDto"];
-            /** @description Lý do (reason) */
-            reason?: components["schemas"]["StringFilterDto"];
-            /** @description Loại chứng từ (purpose enum: OTHER | TRANSFER_IN) */
-            purpose?: components["schemas"]["EnumFilterDto"];
-            /** @description Ngày (received date range) */
-            date?: components["schemas"]["DateRangeFilterDto"];
-            /** @description Tổng tiền (computed line total: SUM(quantity * unit_price)) */
-            totalAmount?: components["schemas"]["CompareFilterDto"];
-        };
-        CreateGoodsReceiptV2Dto: {
-            /** @enum {string} */
-            purpose?: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
-            /** @enum {string} */
-            counterpartyKind?: "supplier" | "customer" | "employee";
-            /** Format: uuid */
-            counterpartyId?: string;
-            receivedAt: string;
-            /**
-             * Format: uuid
-             * @description Header location; derived from the first line when omitted.
-             */
-            locationId?: string;
-            deliveredBy?: string;
-            reason?: string;
-            description?: string;
-            references?: string[];
-            attachmentIds?: string[];
-            /** @enum {string} */
-            paymentMethod?: "CASH" | "CREDIT";
-            /** Format: uuid */
-            cashAccountId?: string;
-            lines: components["schemas"]["GoodsReceiptLineDto"][];
-        };
         CreateTransferOrderDto: Record<string, never>;
         TransferOrderEntity: {
             documentNumber?: string;
@@ -9594,6 +9366,10 @@ export interface components {
             notes?: string;
             /** Format: uuid */
             providerId?: string;
+            /** @enum {string} */
+            counterpartyKind?: "supplier" | "customer" | "employee";
+            /** Format: uuid */
+            counterpartyId?: string;
             deliverer?: string;
             references?: string[];
             /** Format: date-time */
@@ -9610,12 +9386,267 @@ export interface components {
             notes?: string;
             /** Format: uuid */
             providerId?: string;
+            /** @enum {string} */
+            counterpartyKind?: "supplier" | "customer" | "employee";
+            /** Format: uuid */
+            counterpartyId?: string;
             deliverer?: string;
             references?: string[];
             /** Format: date-time */
             occurredAt?: string;
         };
         ImportTransferOrderDto: Record<string, never>;
+        GoodsReceiptLineDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            binId?: string;
+            uomCode: string;
+            quantity: number;
+            unitPrice: number;
+            note?: string;
+        };
+        CashSettlementDto: {
+            method: Record<string, never>;
+            amount: number;
+            /** Format: uuid */
+            cashAccountId?: string;
+            description?: string;
+        };
+        CreateGoodsReceiptDto: {
+            /** @enum {string} */
+            purpose: "PURCHASE" | "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
+            /** Format: uuid */
+            providerId?: string;
+            /**
+             * @description Đối tượng kind (supplier | customer | employee). When set, the service
+             *      validates the counterparty and routes supplier→provider_id, customer /
+             *      employee→counterparty cols (provider_id null).
+             * @enum {string}
+             */
+            counterpartyKind?: "supplier" | "customer" | "employee";
+            /** Format: uuid */
+            counterpartyId?: string;
+            deliveredBy?: string;
+            reason?: string;
+            description?: string;
+            /** Format: uuid */
+            referenceId?: string;
+            /** @enum {string} */
+            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE";
+            /** @description Source branch for transfer-in. Stored separately from referenceId. */
+            sourceBranchId?: string;
+            receivedAt: string;
+            /** Format: uuid */
+            locationId: string;
+            attachmentIds?: string[];
+            /** @description FE-supplied reference codes shown as Tham chiếu. */
+            references?: string[];
+            lines: components["schemas"]["GoodsReceiptLineDto"][];
+            /**
+             * @description Settlement on post: CASH posts a cash movement + auto Phiếu chi; CREDIT posts a payable JE.
+             * @enum {string}
+             */
+            paymentMethod?: "CASH" | "CREDIT";
+            /**
+             * Format: uuid
+             * @description Cash account to pay from; defaults to the branch cash fund when omitted.
+             */
+            cashAccountId?: string;
+            cashPayment?: components["schemas"]["CashSettlementDto"];
+            cashReceipt?: components["schemas"]["CashSettlementDto"];
+        };
+        GoodsReceiptEntity: {
+            documentNumber?: string;
+            /** @enum {string} */
+            status: "DRAFT" | "POSTED" | "CANCELLED" | "REVERSED";
+            /** @enum {string} */
+            purpose: "PURCHASE" | "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
+            providerId?: string;
+            /** @enum {string|null} */
+            counterpartyKind?: "supplier" | "customer" | "employee" | null;
+            counterpartyId?: string | null;
+            deliveredBy?: string;
+            reason?: string;
+            description?: string;
+            referenceId?: string;
+            /** @enum {string} */
+            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE";
+            /** @description Convenience: source branch for TRANSFER_IN — orthogonal to referenceId (which points to a stock-transfer doc). */
+            sourceBranchId?: string;
+            /** Format: date-time */
+            receivedAt: string;
+            locationId: string;
+            attachmentIds: string[];
+            references: string[];
+            /** @enum {string} */
+            paymentMethod?: "CASH" | "CREDIT";
+            cashAccountId?: string;
+            journalEntryId?: string;
+            cashPaymentId?: string;
+            cashReceiptId?: string;
+            /** Format: date-time */
+            postedAt?: string;
+            postedBy?: string;
+            /** Format: date-time */
+            deletedAt?: string;
+            lines: components["schemas"]["GoodsReceiptLineEntity"][];
+            provider?: components["schemas"]["ProviderEntity"];
+            location?: components["schemas"]["LocationEntity"];
+            /**
+             * @description Transient (not a column): the resolved "Đối tượng" { kind, id, code, name }
+             *     inlined by the v2 search handler / getById so the FE renders supplier,
+             *     customer and employee counterparties alike (provider_id is null for the
+             *     latter two).
+             */
+            counterparty?: Record<string, never> | null;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        GoodsReceiptLineEntity: {
+            id: string;
+            organizationId: string;
+            branchId?: string;
+            goodsReceiptId: string;
+            itemId: string;
+            locationId: string;
+            binId?: string;
+            uomCode: string;
+            quantity: string;
+            unitPrice: string;
+            lineTotal: string;
+            note?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            createdBy: string;
+            goodsReceipt: components["schemas"]["GoodsReceiptEntity"];
+            item?: components["schemas"]["ItemEntity"];
+            location?: components["schemas"]["LocationEntity"];
+        };
+        UpdateGoodsReceiptDto: {
+            /** @enum {string} */
+            purpose?: "PURCHASE" | "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
+            /** Format: uuid */
+            providerId?: string;
+            /** @enum {string} */
+            counterpartyKind?: "supplier" | "customer" | "employee";
+            /** Format: uuid */
+            counterpartyId?: string;
+            deliveredBy?: string;
+            reason?: string;
+            description?: string;
+            /** Format: uuid */
+            referenceId?: string;
+            /** @enum {string} */
+            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE";
+            sourceBranchId?: string;
+            receivedAt?: string;
+            /** Format: uuid */
+            locationId?: string;
+            attachmentIds?: string[];
+            lines?: components["schemas"]["GoodsReceiptLineDto"][];
+            cashPayment?: components["schemas"]["CashSettlementDto"];
+            cashReceipt?: components["schemas"]["CashSettlementDto"];
+        };
+        GoodsReceiptSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /** @description Số phiếu nhập (document number) */
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            /** @description Đối tượng (counterparty — matches provider.name) */
+            party?: components["schemas"]["StringFilterDto"];
+            /** @description Diễn giải (description) */
+            description?: components["schemas"]["StringFilterDto"];
+            /** @description Lý do (reason) */
+            reason?: components["schemas"]["StringFilterDto"];
+            /** @description Loại chứng từ (purpose enum: PURCHASE | OTHER | TRANSFER_IN | STOCK_TAKE) */
+            purpose?: components["schemas"]["EnumFilterDto"];
+            /** @description Explicit purpose allow-list, used by separated Mua hàng / Kho hàng menus. */
+            purposes?: ("PURCHASE" | "OTHER" | "TRANSFER_IN" | "STOCK_TAKE")[];
+            /** @description Purpose deny-list, used so Kho hàng does not show Mua hàng documents. */
+            excludePurposes?: ("PURCHASE" | "OTHER" | "TRANSFER_IN" | "STOCK_TAKE")[];
+            /** @description Ngày (received date range) */
+            date?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Tổng tiền (computed line total: SUM(quantity * unit_price)) */
+            totalAmount?: components["schemas"]["CompareFilterDto"];
+        };
+        CreateGoodsReceiptV2Dto: {
+            /** @enum {string} */
+            purpose?: "PURCHASE" | "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
+            /** @enum {string} */
+            counterpartyKind?: "supplier" | "customer" | "employee";
+            /** Format: uuid */
+            counterpartyId?: string;
+            receivedAt: string;
+            /**
+             * Format: uuid
+             * @description Header location; derived from the first line when omitted.
+             */
+            locationId?: string;
+            deliveredBy?: string;
+            reason?: string;
+            description?: string;
+            references?: string[];
+            attachmentIds?: string[];
+            /** @enum {string} */
+            paymentMethod?: "CASH" | "CREDIT";
+            /** Format: uuid */
+            cashAccountId?: string;
+            lines: components["schemas"]["GoodsReceiptLineDto"][];
+        };
+        CreateIssueReasonDto: {
+            /**
+             * @description Mã lý do (slug). Tự sinh từ name nếu không cung cấp.
+             * @example HONG_BAO_QUAN
+             */
+            code?: string;
+            /**
+             * @description Tên lý do
+             * @example Hàng hỏng do bảo quản chưa tốt
+             */
+            name: string;
+            /**
+             * @description Nhóm lý do (OTHER hoặc DISPOSAL)
+             * @enum {string}
+             */
+            purpose: "OTHER" | "DISPOSAL";
+            /** @default true */
+            isActive: boolean;
+        };
+        UpdateIssueReasonDto: {
+            /**
+             * @description Mã lý do (slug). Tự sinh từ name nếu không cung cấp.
+             * @example HONG_BAO_QUAN
+             */
+            code?: string;
+            /**
+             * @description Tên lý do
+             * @example Hàng hỏng do bảo quản chưa tốt
+             */
+            name?: string;
+            /**
+             * @description Nhóm lý do (OTHER hoặc DISPOSAL)
+             * @enum {string}
+             */
+            purpose?: "OTHER" | "DISPOSAL";
+            /** @default true */
+            isActive: boolean;
+        };
         CustomerSearchV2Dto: {
             /** @default 1 */
             page: number;
@@ -11943,6 +11974,29 @@ export interface operations {
         };
     };
     DocumentNumberingController_generate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateDocumentNumberDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string;
+                };
+            };
+        };
+    };
+    DocumentNumberingController_preview: {
         parameters: {
             query?: never;
             header?: never;
@@ -18723,316 +18777,6 @@ export interface operations {
             };
         };
     };
-    IssueReasonController_list: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                sortBy?: string;
-                sortOrder?: "asc" | "desc";
-                search?: string;
-                filters?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    IssueReasonController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateIssueReasonDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IssueReasonEntity"];
-                };
-            };
-        };
-    };
-    IssueReasonController_getById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IssueReasonEntity"];
-                };
-            };
-        };
-    };
-    IssueReasonController_remove: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    IssueReasonController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateIssueReasonDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IssueReasonEntity"];
-                };
-            };
-        };
-    };
-    GoodsReceiptController_list: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                sortBy?: string;
-                sortOrder?: "asc" | "desc";
-                search?: string;
-                filters?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    GoodsReceiptController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateGoodsReceiptDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GoodsReceiptEntity"];
-                };
-            };
-        };
-    };
-    GoodsReceiptController_getById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GoodsReceiptEntity"];
-                };
-            };
-        };
-    };
-    GoodsReceiptController_cancel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    GoodsReceiptController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateGoodsReceiptDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GoodsReceiptEntity"];
-                };
-            };
-        };
-    };
-    GoodsReceiptController_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GoodsReceiptEntity"];
-                };
-            };
-        };
-    };
-    GoodsReceiptV2Controller_search_v2: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GoodsReceiptSearchV2Dto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    GoodsReceiptCommandV2Controller_create_v2: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateGoodsReceiptV2Dto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    GoodsReceiptCommandV2Controller_post_v2: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
     TransferOrderController_list: {
         parameters: {
             query?: {
@@ -19294,6 +19038,316 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TransferOrderEntity"];
+                };
+            };
+        };
+    };
+    GoodsReceiptController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GoodsReceiptController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGoodsReceiptDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsReceiptEntity"];
+                };
+            };
+        };
+    };
+    GoodsReceiptController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsReceiptEntity"];
+                };
+            };
+        };
+    };
+    GoodsReceiptController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GoodsReceiptController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateGoodsReceiptDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsReceiptEntity"];
+                };
+            };
+        };
+    };
+    GoodsReceiptController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsReceiptEntity"];
+                };
+            };
+        };
+    };
+    GoodsReceiptV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoodsReceiptSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoodsReceiptCommandV2Controller_create_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGoodsReceiptV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GoodsReceiptCommandV2Controller_post_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    IssueReasonController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    IssueReasonController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateIssueReasonDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueReasonEntity"];
+                };
+            };
+        };
+    };
+    IssueReasonController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueReasonEntity"];
+                };
+            };
+        };
+    };
+    IssueReasonController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    IssueReasonController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateIssueReasonDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueReasonEntity"];
                 };
             };
         };

@@ -8,6 +8,11 @@ export class CreateBranchDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(30)
+  code?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(500)
   address?: string;
 

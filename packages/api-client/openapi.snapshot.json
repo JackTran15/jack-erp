@@ -3446,6 +3446,37 @@
         ]
       }
     },
+    "/document-numbers/preview": {
+      "post": {
+        "operationId": "DocumentNumberingController_preview",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateDocumentNumberDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DocumentNumbering"
+        ]
+      }
+    },
     "/customers": {
       "post": {
         "operationId": "CustomerController_create",
@@ -14816,505 +14847,6 @@
         ]
       }
     },
-    "/inventory/issue-reasons": {
-      "get": {
-        "operationId": "IssueReasonController_list",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20,
-              "type": "number"
-            }
-          },
-          {
-            "name": "sortBy",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "sortOrder",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "asc",
-              "type": "string",
-              "enum": [
-                "asc",
-                "desc"
-              ]
-            }
-          },
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "filters",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Inventory · Issue Reasons"
-        ]
-      },
-      "post": {
-        "operationId": "IssueReasonController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateIssueReasonDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IssueReasonEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Inventory · Issue Reasons"
-        ]
-      }
-    },
-    "/inventory/issue-reasons/{id}": {
-      "get": {
-        "operationId": "IssueReasonController_getById",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IssueReasonEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Inventory · Issue Reasons"
-        ]
-      },
-      "patch": {
-        "operationId": "IssueReasonController_update",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateIssueReasonDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IssueReasonEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Inventory · Issue Reasons"
-        ]
-      },
-      "delete": {
-        "operationId": "IssueReasonController_remove",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Inventory · Issue Reasons"
-        ]
-      }
-    },
-    "/goods-receipts": {
-      "post": {
-        "operationId": "GoodsReceiptController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateGoodsReceiptDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GoodsReceiptEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "GoodsReceipt"
-        ]
-      },
-      "get": {
-        "operationId": "GoodsReceiptController_list",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20,
-              "type": "number"
-            }
-          },
-          {
-            "name": "sortBy",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "sortOrder",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "asc",
-              "type": "string",
-              "enum": [
-                "asc",
-                "desc"
-              ]
-            }
-          },
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "filters",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "GoodsReceipt"
-        ]
-      }
-    },
-    "/goods-receipts/{id}": {
-      "get": {
-        "operationId": "GoodsReceiptController_getById",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GoodsReceiptEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "GoodsReceipt"
-        ]
-      },
-      "patch": {
-        "operationId": "GoodsReceiptController_update",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateGoodsReceiptDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GoodsReceiptEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "GoodsReceipt"
-        ]
-      },
-      "delete": {
-        "operationId": "GoodsReceiptController_cancel",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "GoodsReceipt"
-        ]
-      }
-    },
-    "/goods-receipts/{id}/post": {
-      "post": {
-        "operationId": "GoodsReceiptController_post",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GoodsReceiptEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "GoodsReceipt"
-        ]
-      }
-    },
-    "/v2/goods-receipts/search": {
-      "post": {
-        "operationId": "GoodsReceiptV2Controller_search_v2",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GoodsReceiptSearchV2Dto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "GoodsReceiptV2"
-        ]
-      }
-    },
-    "/v2/goods-receipts": {
-      "post": {
-        "operationId": "GoodsReceiptCommandV2Controller_create_v2",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateGoodsReceiptV2Dto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "Create a DRAFT goods receipt (v2, with Đối tượng)",
-        "tags": [
-          "inventory/goods-receipts"
-        ]
-      }
-    },
-    "/v2/goods-receipts/{id}/post": {
-      "post": {
-        "operationId": "GoodsReceiptCommandV2Controller_post_v2",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Post a v2 DRAFT goods receipt (DRAFT → POSTED)",
-        "tags": [
-          "inventory/goods-receipts"
-        ]
-      }
-    },
     "/inventory/transfer-orders": {
       "post": {
         "operationId": "TransferOrderController_create",
@@ -15722,6 +15254,505 @@
         },
         "tags": [
           "TransferOrder"
+        ]
+      }
+    },
+    "/goods-receipts": {
+      "post": {
+        "operationId": "GoodsReceiptController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGoodsReceiptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoodsReceiptEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "GoodsReceipt"
+        ]
+      },
+      "get": {
+        "operationId": "GoodsReceiptController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filters",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GoodsReceipt"
+        ]
+      }
+    },
+    "/goods-receipts/{id}": {
+      "get": {
+        "operationId": "GoodsReceiptController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoodsReceiptEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "GoodsReceipt"
+        ]
+      },
+      "patch": {
+        "operationId": "GoodsReceiptController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGoodsReceiptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoodsReceiptEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "GoodsReceipt"
+        ]
+      },
+      "delete": {
+        "operationId": "GoodsReceiptController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GoodsReceipt"
+        ]
+      }
+    },
+    "/goods-receipts/{id}/post": {
+      "post": {
+        "operationId": "GoodsReceiptController_post",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoodsReceiptEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "GoodsReceipt"
+        ]
+      }
+    },
+    "/v2/goods-receipts/search": {
+      "post": {
+        "operationId": "GoodsReceiptV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoodsReceiptSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "GoodsReceiptV2"
+        ]
+      }
+    },
+    "/v2/goods-receipts": {
+      "post": {
+        "operationId": "GoodsReceiptCommandV2Controller_create_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGoodsReceiptV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a DRAFT goods receipt (v2, with Đối tượng)",
+        "tags": [
+          "inventory/goods-receipts"
+        ]
+      }
+    },
+    "/v2/goods-receipts/{id}/post": {
+      "post": {
+        "operationId": "GoodsReceiptCommandV2Controller_post_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Post a v2 DRAFT goods receipt (DRAFT → POSTED)",
+        "tags": [
+          "inventory/goods-receipts"
+        ]
+      }
+    },
+    "/inventory/issue-reasons": {
+      "get": {
+        "operationId": "IssueReasonController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filters",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory · Issue Reasons"
+        ]
+      },
+      "post": {
+        "operationId": "IssueReasonController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIssueReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueReasonEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Inventory · Issue Reasons"
+        ]
+      }
+    },
+    "/inventory/issue-reasons/{id}": {
+      "get": {
+        "operationId": "IssueReasonController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueReasonEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Inventory · Issue Reasons"
+        ]
+      },
+      "patch": {
+        "operationId": "IssueReasonController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateIssueReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueReasonEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Inventory · Issue Reasons"
+        ]
+      },
+      "delete": {
+        "operationId": "IssueReasonController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory · Issue Reasons"
         ]
       }
     },
@@ -19835,7 +19866,6 @@
         "type": "object",
         "properties": {
           "documentType": {
-            "type": "string",
             "enum": [
               "INVOICE",
               "SALE",
@@ -19865,7 +19895,8 @@
               "SUPPLIER",
               "DELIVERY_PARTNER",
               "WAREHOUSE"
-            ]
+            ],
+            "type": "string"
           },
           "branchId": {
             "type": "string"
@@ -19903,17 +19934,13 @@
           "lomasTier": {
             "type": "string"
           }
-        },
-        "required": [
-          "cardNumber"
-        ]
+        }
       },
       "CreateCustomerDto": {
         "type": "object",
         "properties": {
           "code": {
             "type": "string",
-            "minLength": 1,
             "maxLength": 50
           },
           "name": {
@@ -19972,7 +19999,6 @@
           }
         },
         "required": [
-          "code",
           "name"
         ]
       },
@@ -20482,6 +20508,10 @@
             "minLength": 2,
             "maxLength": 200
           },
+          "code": {
+            "type": "string",
+            "maxLength": 30
+          },
           "address": {
             "type": "string",
             "maxLength": 500
@@ -20508,6 +20538,10 @@
         "properties": {
           "name": {
             "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
           },
           "address": {
             "type": "string"
@@ -20609,6 +20643,10 @@
             "type": "string",
             "minLength": 2,
             "maxLength": 200
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 30
           },
           "address": {
             "type": "string",
@@ -29034,727 +29072,6 @@
           "lines"
         ]
       },
-      "CreateIssueReasonDto": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 64,
-            "pattern": "^[A-Z0-9_]+$",
-            "description": "Mã lý do (slug). Tự sinh từ name nếu không cung cấp.",
-            "example": "HONG_BAO_QUAN"
-          },
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 255,
-            "description": "Tên lý do",
-            "example": "Hàng hỏng do bảo quản chưa tốt"
-          },
-          "purpose": {
-            "enum": [
-              "OTHER",
-              "DISPOSAL"
-            ],
-            "type": "string",
-            "description": "Nhóm lý do (OTHER hoặc DISPOSAL)"
-          },
-          "isActive": {
-            "type": "boolean",
-            "default": true
-          }
-        },
-        "required": [
-          "name",
-          "purpose"
-        ]
-      },
-      "UpdateIssueReasonDto": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 64,
-            "pattern": "^[A-Z0-9_]+$",
-            "description": "Mã lý do (slug). Tự sinh từ name nếu không cung cấp.",
-            "example": "HONG_BAO_QUAN"
-          },
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 255,
-            "description": "Tên lý do",
-            "example": "Hàng hỏng do bảo quản chưa tốt"
-          },
-          "purpose": {
-            "enum": [
-              "OTHER",
-              "DISPOSAL"
-            ],
-            "type": "string",
-            "description": "Nhóm lý do (OTHER hoặc DISPOSAL)"
-          },
-          "isActive": {
-            "type": "boolean",
-            "default": true
-          }
-        }
-      },
-      "GoodsReceiptLineDto": {
-        "type": "object",
-        "properties": {
-          "itemId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "locationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "binId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "uomCode": {
-            "type": "string",
-            "maxLength": 50
-          },
-          "quantity": {
-            "type": "number",
-            "minimum": 0.001
-          },
-          "unitPrice": {
-            "type": "number",
-            "minimum": 0
-          },
-          "note": {
-            "type": "string",
-            "maxLength": 500
-          }
-        },
-        "required": [
-          "itemId",
-          "locationId",
-          "uomCode",
-          "quantity",
-          "unitPrice"
-        ]
-      },
-      "CashSettlementDto": {
-        "type": "object",
-        "properties": {
-          "method": {
-            "type": "object"
-          },
-          "amount": {
-            "type": "number",
-            "minimum": 0.01
-          },
-          "cashAccountId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "description": {
-            "type": "string",
-            "maxLength": 500
-          }
-        },
-        "required": [
-          "method",
-          "amount"
-        ]
-      },
-      "CreateGoodsReceiptDto": {
-        "type": "object",
-        "properties": {
-          "purpose": {
-            "type": "string",
-            "enum": [
-              "OTHER",
-              "TRANSFER_IN",
-              "STOCK_TAKE"
-            ]
-          },
-          "providerId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "counterpartyKind": {
-            "type": "string",
-            "description": "Đối tượng kind (supplier | customer | employee). When set, the service\n validates the counterparty and routes supplier→provider_id, customer /\n employee→counterparty cols (provider_id null).",
-            "enum": [
-              "supplier",
-              "customer",
-              "employee"
-            ]
-          },
-          "counterpartyId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "deliveredBy": {
-            "type": "string",
-            "maxLength": 200
-          },
-          "reason": {
-            "type": "string",
-            "maxLength": 500
-          },
-          "description": {
-            "type": "string",
-            "maxLength": 2000
-          },
-          "referenceId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "referenceType": {
-            "type": "string",
-            "enum": [
-              "PURCHASE_ORDER",
-              "STOCK_TRANSFER",
-              "STOCK_TAKE"
-            ]
-          },
-          "sourceBranchId": {
-            "type": "string",
-            "description": "Source branch for transfer-in. Stored separately from referenceId."
-          },
-          "receivedAt": {
-            "type": "string"
-          },
-          "locationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "attachmentIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          "references": {
-            "description": "FE-supplied reference codes shown as Tham chiếu.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "lines": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/GoodsReceiptLineDto"
-            }
-          },
-          "paymentMethod": {
-            "type": "string",
-            "description": "Settlement on post: CASH posts a cash movement + auto Phiếu chi; CREDIT posts a payable JE.",
-            "enum": [
-              "CASH",
-              "CREDIT"
-            ]
-          },
-          "cashAccountId": {
-            "type": "string",
-            "description": "Cash account to pay from — required when paymentMethod=CASH.",
-            "format": "uuid"
-          },
-          "cashPayment": {
-            "$ref": "#/components/schemas/CashSettlementDto"
-          },
-          "cashReceipt": {
-            "$ref": "#/components/schemas/CashSettlementDto"
-          }
-        },
-        "required": [
-          "purpose",
-          "receivedAt",
-          "locationId",
-          "lines"
-        ]
-      },
-      "GoodsReceiptEntity": {
-        "type": "object",
-        "properties": {
-          "documentNumber": {
-            "type": "string"
-          },
-          "status": {
-            "enum": [
-              "DRAFT",
-              "POSTED",
-              "CANCELLED",
-              "REVERSED"
-            ],
-            "type": "string"
-          },
-          "purpose": {
-            "enum": [
-              "OTHER",
-              "TRANSFER_IN",
-              "STOCK_TAKE"
-            ],
-            "type": "string"
-          },
-          "providerId": {
-            "type": "string"
-          },
-          "counterpartyKind": {
-            "nullable": true,
-            "enum": [
-              "supplier",
-              "customer",
-              "employee"
-            ],
-            "type": "string"
-          },
-          "counterpartyId": {
-            "type": "string",
-            "nullable": true
-          },
-          "deliveredBy": {
-            "type": "string"
-          },
-          "reason": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "referenceId": {
-            "type": "string"
-          },
-          "referenceType": {
-            "enum": [
-              "PURCHASE_ORDER",
-              "STOCK_TRANSFER",
-              "STOCK_TAKE"
-            ],
-            "type": "string"
-          },
-          "sourceBranchId": {
-            "type": "string",
-            "description": "Convenience: source branch for TRANSFER_IN — orthogonal to referenceId (which points to a stock-transfer doc)."
-          },
-          "receivedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "locationId": {
-            "type": "string"
-          },
-          "attachmentIds": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "references": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "paymentMethod": {
-            "enum": [
-              "CASH",
-              "CREDIT"
-            ],
-            "type": "string"
-          },
-          "cashAccountId": {
-            "type": "string"
-          },
-          "journalEntryId": {
-            "type": "string"
-          },
-          "cashPaymentId": {
-            "type": "string"
-          },
-          "cashReceiptId": {
-            "type": "string"
-          },
-          "postedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "postedBy": {
-            "type": "string"
-          },
-          "deletedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "lines": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/GoodsReceiptLineEntity"
-            }
-          },
-          "provider": {
-            "$ref": "#/components/schemas/ProviderEntity"
-          },
-          "location": {
-            "$ref": "#/components/schemas/LocationEntity"
-          },
-          "counterparty": {
-            "type": "object",
-            "nullable": true,
-            "description": "Transient (not a column): the resolved \"Đối tượng\" { kind, id, code, name }\ninlined by the v2 search handler / getById so the FE renders supplier,\ncustomer and employee counterparties alike (provider_id is null for the\nlatter two)."
-          },
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string",
-            "description": "Tenant isolation key — every row belongs to exactly one organization."
-          },
-          "branchId": {
-            "type": "string",
-            "description": "Optional branch scope; null for org-wide records."
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "UUID of the user who created this record."
-          }
-        },
-        "required": [
-          "status",
-          "purpose",
-          "receivedAt",
-          "locationId",
-          "attachmentIds",
-          "references",
-          "lines",
-          "id",
-          "organizationId",
-          "createdAt",
-          "updatedAt",
-          "createdBy"
-        ]
-      },
-      "GoodsReceiptLineEntity": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string"
-          },
-          "branchId": {
-            "type": "string"
-          },
-          "goodsReceiptId": {
-            "type": "string"
-          },
-          "itemId": {
-            "type": "string"
-          },
-          "locationId": {
-            "type": "string"
-          },
-          "binId": {
-            "type": "string"
-          },
-          "uomCode": {
-            "type": "string"
-          },
-          "quantity": {
-            "type": "string"
-          },
-          "unitPrice": {
-            "type": "string"
-          },
-          "lineTotal": {
-            "type": "string"
-          },
-          "note": {
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string"
-          },
-          "goodsReceipt": {
-            "$ref": "#/components/schemas/GoodsReceiptEntity"
-          },
-          "item": {
-            "$ref": "#/components/schemas/ItemEntity"
-          },
-          "location": {
-            "$ref": "#/components/schemas/LocationEntity"
-          }
-        },
-        "required": [
-          "id",
-          "organizationId",
-          "goodsReceiptId",
-          "itemId",
-          "locationId",
-          "uomCode",
-          "quantity",
-          "unitPrice",
-          "lineTotal",
-          "createdAt",
-          "updatedAt",
-          "createdBy",
-          "goodsReceipt"
-        ]
-      },
-      "UpdateGoodsReceiptDto": {
-        "type": "object",
-        "properties": {
-          "purpose": {
-            "type": "string",
-            "enum": [
-              "OTHER",
-              "TRANSFER_IN",
-              "STOCK_TAKE"
-            ]
-          },
-          "providerId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "counterpartyKind": {
-            "type": "string",
-            "enum": [
-              "supplier",
-              "customer",
-              "employee"
-            ]
-          },
-          "counterpartyId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "deliveredBy": {
-            "type": "string",
-            "maxLength": 200
-          },
-          "reason": {
-            "type": "string",
-            "maxLength": 500
-          },
-          "description": {
-            "type": "string",
-            "maxLength": 2000
-          },
-          "referenceId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "referenceType": {
-            "type": "string",
-            "enum": [
-              "PURCHASE_ORDER",
-              "STOCK_TRANSFER",
-              "STOCK_TAKE"
-            ]
-          },
-          "sourceBranchId": {
-            "type": "string"
-          },
-          "receivedAt": {
-            "type": "string"
-          },
-          "locationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "attachmentIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          "lines": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/GoodsReceiptLineDto"
-            }
-          },
-          "cashPayment": {
-            "$ref": "#/components/schemas/CashSettlementDto"
-          },
-          "cashReceipt": {
-            "$ref": "#/components/schemas/CashSettlementDto"
-          }
-        }
-      },
-      "GoodsReceiptSearchV2Dto": {
-        "type": "object",
-        "properties": {
-          "page": {
-            "type": "number",
-            "default": 1,
-            "minimum": 1
-          },
-          "limit": {
-            "type": "number",
-            "default": 20,
-            "minimum": 1,
-            "maximum": 100
-          },
-          "documentNumber": {
-            "description": "Số phiếu nhập (document number)",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/StringFilterDto"
-              }
-            ]
-          },
-          "party": {
-            "description": "Đối tượng (counterparty — matches provider.name)",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/StringFilterDto"
-              }
-            ]
-          },
-          "description": {
-            "description": "Diễn giải (description)",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/StringFilterDto"
-              }
-            ]
-          },
-          "reason": {
-            "description": "Lý do (reason)",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/StringFilterDto"
-              }
-            ]
-          },
-          "purpose": {
-            "description": "Loại chứng từ (purpose enum: OTHER | TRANSFER_IN)",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/EnumFilterDto"
-              }
-            ]
-          },
-          "date": {
-            "description": "Ngày (received date range)",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/DateRangeFilterDto"
-              }
-            ]
-          },
-          "totalAmount": {
-            "description": "Tổng tiền (computed line total: SUM(quantity * unit_price))",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/CompareFilterDto"
-              }
-            ]
-          }
-        }
-      },
-      "CreateGoodsReceiptV2Dto": {
-        "type": "object",
-        "properties": {
-          "purpose": {
-            "type": "string",
-            "enum": [
-              "OTHER",
-              "TRANSFER_IN",
-              "STOCK_TAKE"
-            ]
-          },
-          "counterpartyKind": {
-            "type": "string",
-            "enum": [
-              "supplier",
-              "customer",
-              "employee"
-            ]
-          },
-          "counterpartyId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "receivedAt": {
-            "type": "string"
-          },
-          "locationId": {
-            "type": "string",
-            "description": "Header location; derived from the first line when omitted.",
-            "format": "uuid"
-          },
-          "deliveredBy": {
-            "type": "string",
-            "maxLength": 200
-          },
-          "reason": {
-            "type": "string",
-            "maxLength": 500
-          },
-          "description": {
-            "type": "string",
-            "maxLength": 2000
-          },
-          "references": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "attachmentIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          "paymentMethod": {
-            "type": "string",
-            "enum": [
-              "CASH",
-              "CREDIT"
-            ]
-          },
-          "cashAccountId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "lines": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/GoodsReceiptLineDto"
-            }
-          }
-        },
-        "required": [
-          "receivedAt",
-          "lines"
-        ]
-      },
       "CreateTransferOrderDto": {
         "type": "object",
         "properties": {}
@@ -30004,6 +29321,18 @@
             "type": "string",
             "format": "uuid"
           },
+          "counterpartyKind": {
+            "type": "string",
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ]
+          },
+          "counterpartyId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "deliverer": {
             "type": "string"
           },
@@ -30054,6 +29383,18 @@
             "type": "string",
             "format": "uuid"
           },
+          "counterpartyKind": {
+            "type": "string",
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ]
+          },
+          "counterpartyId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "deliverer": {
             "type": "string"
           },
@@ -30072,6 +29413,757 @@
       "ImportTransferOrderDto": {
         "type": "object",
         "properties": {}
+      },
+      "GoodsReceiptLineDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "binId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "uomCode": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0.001
+          },
+          "unitPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "itemId",
+          "locationId",
+          "uomCode",
+          "quantity",
+          "unitPrice"
+        ]
+      },
+      "CashSettlementDto": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "object"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "cashAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "method",
+          "amount"
+        ]
+      },
+      "CreateGoodsReceiptDto": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "PURCHASE",
+              "OTHER",
+              "TRANSFER_IN",
+              "STOCK_TAKE"
+            ]
+          },
+          "providerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "counterpartyKind": {
+            "type": "string",
+            "description": "Đối tượng kind (supplier | customer | employee). When set, the service\n validates the counterparty and routes supplier→provider_id, customer /\n employee→counterparty cols (provider_id null).",
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ]
+          },
+          "counterpartyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deliveredBy": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "referenceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "referenceType": {
+            "type": "string",
+            "enum": [
+              "PURCHASE_ORDER",
+              "STOCK_TRANSFER",
+              "STOCK_TAKE"
+            ]
+          },
+          "sourceBranchId": {
+            "type": "string",
+            "description": "Source branch for transfer-in. Stored separately from referenceId."
+          },
+          "receivedAt": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "references": {
+            "description": "FE-supplied reference codes shown as Tham chiếu.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoodsReceiptLineDto"
+            }
+          },
+          "paymentMethod": {
+            "type": "string",
+            "description": "Settlement on post: CASH posts a cash movement + auto Phiếu chi; CREDIT posts a payable JE.",
+            "enum": [
+              "CASH",
+              "CREDIT"
+            ]
+          },
+          "cashAccountId": {
+            "type": "string",
+            "description": "Cash account to pay from; defaults to the branch cash fund when omitted.",
+            "format": "uuid"
+          },
+          "cashPayment": {
+            "$ref": "#/components/schemas/CashSettlementDto"
+          },
+          "cashReceipt": {
+            "$ref": "#/components/schemas/CashSettlementDto"
+          }
+        },
+        "required": [
+          "purpose",
+          "receivedAt",
+          "locationId",
+          "lines"
+        ]
+      },
+      "GoodsReceiptEntity": {
+        "type": "object",
+        "properties": {
+          "documentNumber": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "POSTED",
+              "CANCELLED",
+              "REVERSED"
+            ],
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "PURCHASE",
+              "OTHER",
+              "TRANSFER_IN",
+              "STOCK_TAKE"
+            ],
+            "type": "string"
+          },
+          "providerId": {
+            "type": "string"
+          },
+          "counterpartyKind": {
+            "nullable": true,
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ],
+            "type": "string"
+          },
+          "counterpartyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveredBy": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "referenceId": {
+            "type": "string"
+          },
+          "referenceType": {
+            "enum": [
+              "PURCHASE_ORDER",
+              "STOCK_TRANSFER",
+              "STOCK_TAKE"
+            ],
+            "type": "string"
+          },
+          "sourceBranchId": {
+            "type": "string",
+            "description": "Convenience: source branch for TRANSFER_IN — orthogonal to referenceId (which points to a stock-transfer doc)."
+          },
+          "receivedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "paymentMethod": {
+            "enum": [
+              "CASH",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "cashAccountId": {
+            "type": "string"
+          },
+          "journalEntryId": {
+            "type": "string"
+          },
+          "cashPaymentId": {
+            "type": "string"
+          },
+          "cashReceiptId": {
+            "type": "string"
+          },
+          "postedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "postedBy": {
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoodsReceiptLineEntity"
+            }
+          },
+          "provider": {
+            "$ref": "#/components/schemas/ProviderEntity"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationEntity"
+          },
+          "counterparty": {
+            "type": "object",
+            "nullable": true,
+            "description": "Transient (not a column): the resolved \"Đối tượng\" { kind, id, code, name }\ninlined by the v2 search handler / getById so the FE renders supplier,\ncustomer and employee counterparties alike (provider_id is null for the\nlatter two)."
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "status",
+          "purpose",
+          "receivedAt",
+          "locationId",
+          "attachmentIds",
+          "references",
+          "lines",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "GoodsReceiptLineEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "goodsReceiptId": {
+            "type": "string"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "binId": {
+            "type": "string"
+          },
+          "uomCode": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "string"
+          },
+          "unitPrice": {
+            "type": "string"
+          },
+          "lineTotal": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "goodsReceipt": {
+            "$ref": "#/components/schemas/GoodsReceiptEntity"
+          },
+          "item": {
+            "$ref": "#/components/schemas/ItemEntity"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationEntity"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "goodsReceiptId",
+          "itemId",
+          "locationId",
+          "uomCode",
+          "quantity",
+          "unitPrice",
+          "lineTotal",
+          "createdAt",
+          "updatedAt",
+          "createdBy",
+          "goodsReceipt"
+        ]
+      },
+      "UpdateGoodsReceiptDto": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "PURCHASE",
+              "OTHER",
+              "TRANSFER_IN",
+              "STOCK_TAKE"
+            ]
+          },
+          "providerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "counterpartyKind": {
+            "type": "string",
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ]
+          },
+          "counterpartyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deliveredBy": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "referenceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "referenceType": {
+            "type": "string",
+            "enum": [
+              "PURCHASE_ORDER",
+              "STOCK_TRANSFER",
+              "STOCK_TAKE"
+            ]
+          },
+          "sourceBranchId": {
+            "type": "string"
+          },
+          "receivedAt": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoodsReceiptLineDto"
+            }
+          },
+          "cashPayment": {
+            "$ref": "#/components/schemas/CashSettlementDto"
+          },
+          "cashReceipt": {
+            "$ref": "#/components/schemas/CashSettlementDto"
+          }
+        }
+      },
+      "GoodsReceiptSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "documentNumber": {
+            "description": "Số phiếu nhập (document number)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "party": {
+            "description": "Đối tượng (counterparty — matches provider.name)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "description": {
+            "description": "Diễn giải (description)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "reason": {
+            "description": "Lý do (reason)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "purpose": {
+            "description": "Loại chứng từ (purpose enum: PURCHASE | OTHER | TRANSFER_IN | STOCK_TAKE)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnumFilterDto"
+              }
+            ]
+          },
+          "purposes": {
+            "type": "array",
+            "description": "Explicit purpose allow-list, used by separated Mua hàng / Kho hàng menus.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "PURCHASE",
+                "OTHER",
+                "TRANSFER_IN",
+                "STOCK_TAKE"
+              ]
+            }
+          },
+          "excludePurposes": {
+            "type": "array",
+            "description": "Purpose deny-list, used so Kho hàng does not show Mua hàng documents.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "PURCHASE",
+                "OTHER",
+                "TRANSFER_IN",
+                "STOCK_TAKE"
+              ]
+            }
+          },
+          "date": {
+            "description": "Ngày (received date range)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "totalAmount": {
+            "description": "Tổng tiền (computed line total: SUM(quantity * unit_price))",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          }
+        }
+      },
+      "CreateGoodsReceiptV2Dto": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "PURCHASE",
+              "OTHER",
+              "TRANSFER_IN",
+              "STOCK_TAKE"
+            ]
+          },
+          "counterpartyKind": {
+            "type": "string",
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ]
+          },
+          "counterpartyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receivedAt": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string",
+            "description": "Header location; derived from the first line when omitted.",
+            "format": "uuid"
+          },
+          "deliveredBy": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "CASH",
+              "CREDIT"
+            ]
+          },
+          "cashAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoodsReceiptLineDto"
+            }
+          }
+        },
+        "required": [
+          "receivedAt",
+          "lines"
+        ]
+      },
+      "CreateIssueReasonDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Z0-9_]+$",
+            "description": "Mã lý do (slug). Tự sinh từ name nếu không cung cấp.",
+            "example": "HONG_BAO_QUAN"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "Tên lý do",
+            "example": "Hàng hỏng do bảo quản chưa tốt"
+          },
+          "purpose": {
+            "enum": [
+              "OTHER",
+              "DISPOSAL"
+            ],
+            "type": "string",
+            "description": "Nhóm lý do (OTHER hoặc DISPOSAL)"
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "name",
+          "purpose"
+        ]
+      },
+      "UpdateIssueReasonDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Z0-9_]+$",
+            "description": "Mã lý do (slug). Tự sinh từ name nếu không cung cấp.",
+            "example": "HONG_BAO_QUAN"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "Tên lý do",
+            "example": "Hàng hỏng do bảo quản chưa tốt"
+          },
+          "purpose": {
+            "enum": [
+              "OTHER",
+              "DISPOSAL"
+            ],
+            "type": "string",
+            "description": "Nhóm lý do (OTHER hoặc DISPOSAL)"
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": true
+          }
+        }
       },
       "CustomerSearchV2Dto": {
         "type": "object",

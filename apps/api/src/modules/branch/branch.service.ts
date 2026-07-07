@@ -50,6 +50,18 @@ export class BranchService {
       );
     }
 
+    const code = dto.code?.trim();
+    if (code) {
+      const dupCode = await this.branchRepo.findOne({
+        where: { organizationId: actor.organizationId, code },
+      });
+      if (dupCode) {
+        throw new ConflictException(
+          `Branch code "${code}" already exists in this organization`,
+        );
+      }
+    }
+
     if (dto.parentBranchId) {
       const parent = await this.branchRepo.findOne({
         where: { id: dto.parentBranchId, organizationId: actor.organizationId },
