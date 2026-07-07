@@ -4,6 +4,7 @@ import { HttpExceptionFilter } from './filters/http-exception.filter';
 import { RequestIdInterceptor } from './interceptors/request-id.interceptor';
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
 import { IdempotencyInterceptor } from './interceptors/idempotency.interceptor';
+import { MetricsInterceptor } from '../modules/metrics/metrics.interceptor';
 import { AuthGuard } from './guards/auth.guard';
 
 @Global()
@@ -12,6 +13,7 @@ import { AuthGuard } from './guards/auth.guard';
     { provide: APP_INTERCEPTOR, useClass: RequestIdInterceptor },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
     { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: MetricsInterceptor },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
   ],

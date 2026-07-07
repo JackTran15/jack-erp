@@ -142,10 +142,33 @@ flowchart LR
 
 - Structured logs with request ID, actor ID, branch ID, module, and action.
 - Audit log stream for critical mutations.
-- Metrics:
-  - API latency and error rates
-  - Broker publish/consume lag and retry counts
-  - Redis hit ratio and eviction rates
-  - Checkout duration
-  - Import success/failure rates
-  - Reconciliation mismatches
+
+### Metrics (Prometheus / `prom-client`) — implemented
+
+The API exposes Prometheus metrics at `GET /metrics` (public, excluded from Swagger). A single
+registry is owned by `MetricsService` (`modules/metrics/`, global module); the rest of the code
+depends on `MetricsService` helpers, never on `prom-client` directly. Toggle collection with
+`METRICS_ENABLED` (default `true`); all metric names carry `METRICS_PREFIX` (default `erp_`).
+
+Collected series:
+
+- **Default Node/process** via `collectDefaultMetrics` — CPU, memory (`erp_process_resident_memory_bytes`), GC, event-loop lag.
+- **HTTP** (global `MetricsInterceptor`) — `erp_http_request_duration_seconds` (histogram) and
+  `erp_http_requests_total` (counter), labelled `method` / `route` / `status_code`. The `route`
+  label is the matched route **pattern** (e.g. `/pos/invoices/:id`), falling back to `unmatched`,
+  to keep cardinality bounded.
+- **Kafka publish** (`EventPublisher`) — `erp_kafka_events_published_total`,
+  `erp_kafka_publish_duration_seconds`, `erp_kafka_publish_errors_total` (label `topic`).
+- **Redis cache** (`CacheService`) — `erp_redis_cache_hits_total`, `erp_redis_cache_misses_total`
+  (hit ratio derivable in Grafana).
+- **POS checkout** (`CheckoutInvoiceService`) — `erp_pos_checkout_duration_seconds`,
+  `erp_pos_checkout_total` (label `result`).
+- **CSV import** (`CsvImportService`) — `erp_inventory_import_rows_total`,
+  `erp_inventory_import_jobs_total` (label `result`).
+
+Local stack: `docker compose up -d prometheus grafana` starts Prometheus (`:9090`, scrapes the
+host API at `:4000/metrics`) and Grafana (`:3002`, provisioned Prometheus datasource + the
+"ERP API" starter dashboard).
+
+Not yet implemented: broker consume lag / retry counts, Redis eviction rates, reconciliation
+mismatches, and structured JSON logging.

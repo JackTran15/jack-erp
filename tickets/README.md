@@ -89,6 +89,7 @@ flowchart LR
 - [EPIC-003 Inventory and CSV](./epics/EPIC-003-inventory-and-csv.md)
 - [EPIC-004 POS and Accounting](./epics/EPIC-004-pos-and-accounting.md)
 - [EPIC-005 Reporting and Hardening](./epics/EPIC-005-reporting-and-hardening.md)
+- [EPIC-07072026 API monitoring — Prometheus metrics](./epics/EPIC-07072026-api-metrics-monitoring.md)
 
 ## Tickets
 
@@ -1452,5 +1453,28 @@ flowchart LR
   R2["RFF-02 FE UI swap @erp/ui"] --> R4
   R3["RFF-03 registry store-line by mode"] --> R4
   R4 --> R5["RFF-05 Verify + DoD"]
+```
+
+### EPIC-07072026 API monitoring — Prometheus metrics (`prom-client`)
+
+- [EPIC-07072026 API monitoring — Prometheus metrics](./epics/EPIC-07072026-api-metrics-monitoring.md)
+- `@erp/api` chưa có metrics. Thêm `prom-client`: endpoint `GET /metrics` (`@Public` + `@ApiExcludeEndpoint`) do `MetricsModule` (`@Global`, 1 `Registry` trong `MetricsService`) phục vụ. Thu **default Node/process metrics** (`collectDefaultMetrics`) + **HTTP metrics** (global `MetricsInterceptor`: `http_request_duration_seconds`/`http_requests_total`, label `route` = pattern để chặn cardinality) + **domain metrics** (Kafka publish, Redis hit/miss, checkout duration, CSV import). Thêm **Prometheus + Grafana** vào root `docker-compose.yml`. Kill switch `METRICS_ENABLED`; không migration/permission/contract change.
+
+| Ticket | Mô tả |
+| ------ | ----- |
+| [TKT-MON-01](./tickets/TKT-MON-01-metrics-module-endpoint.md) | BE: prom-client + MetricsModule + `/metrics` endpoint + default metrics |
+| [TKT-MON-02](./tickets/TKT-MON-02-http-metrics-interceptor.md) | BE: global HTTP metrics interceptor (histogram + counter) |
+| [TKT-MON-03](./tickets/TKT-MON-03-domain-metrics.md) | BE: domain metrics (events / redis / pos / csv) |
+| [TKT-MON-04](./tickets/TKT-MON-04-prometheus-grafana-compose.md) | Infra: Prometheus + Grafana trong docker-compose |
+| [TKT-MON-05](./tickets/TKT-MON-05-tests-and-docs.md) | Tests + docs |
+
+```mermaid
+flowchart LR
+  M1["MON-01 Module + endpoint + defaults"] --> M2["MON-02 HTTP interceptor"]
+  M1 --> M3["MON-03 Domain metrics"]
+  M1 --> M4["MON-04 Prometheus + Grafana"]
+  M2 --> M5["MON-05 Tests + docs"]
+  M3 --> M5
+  M4 --> M5
 ```
 
