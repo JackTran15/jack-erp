@@ -26,7 +26,7 @@ export function PosPaginationBar({
   totalPages,
   pageSize,
   total,
-  pageSizeOptions = [50, 100, 200],
+  pageSizeOptions = [50, 100],
   onPageChange,
   onPageSizeChange,
   onRefresh,

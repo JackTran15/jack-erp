@@ -212,6 +212,11 @@ export function ItemLocationDetailsPage() {
     () => Array.from(new Set(selectedTransferRows.map((row) => row.item.id))),
     [selectedTransferRows],
   );
+  // Chỉ ngừng theo dõi được khi selection còn ít nhất 1 hàng đang theo dõi.
+  const canStopTracking = useMemo(
+    () => selectedTransferRows.some((row) => row.item.isActive),
+    [selectedTransferRows],
+  );
 
   const onModeChange = (fieldKey: string, mode: ColumnFilterMode) => {
     setFilters((prev) => ({
@@ -364,12 +369,13 @@ export function ItemLocationDetailsPage() {
       buildItemLocationToolbarItems({
         isFetching,
         hasSelection,
+        canStopTracking,
         onReload: reload,
         onStopTracking: () => setStopConfirmOpen(true),
         onOpenArrange: () => setArrangeOpen(true),
         onOpenTransfer: () => setTransferOpen(true),
       }),
-    [isFetching, hasSelection, reload],
+    [isFetching, hasSelection, canStopTracking, reload],
   );
 
   return (
@@ -400,7 +406,6 @@ export function ItemLocationDetailsPage() {
               setPageSize(n);
               setPage(1);
             }}
-            pageSizeOptions={[20, 50, 100, 200]}
             onRefresh={reload}
           />
         }

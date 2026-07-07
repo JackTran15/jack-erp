@@ -56,8 +56,6 @@ import {
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
-  Eye,
-  EyeOff,
 } from "lucide-react";
 import { flattenCategoryTree, collectParentIds } from "./itemCategoryTree";
 import { useItemCategoryTree } from "./useItemCategoryTree";
@@ -110,8 +108,6 @@ interface CrudListPageProps {
     onExportInventorySelected?: (
       context: CrudListInventoryActionContext,
     ) => void;
-    onStopTracking?: (context: CrudListInventoryActionContext) => void;
-    onResumeTracking?: (context: CrudListInventoryActionContext) => void;
     renderDialogs?: (context: CrudListInventoryActionContext) => ReactNode;
   };
 }
@@ -837,26 +833,6 @@ export function CrudListPage({
         onClick: () => setCollapsedIds(new Set(collectParentIds(treeNodes))),
       },
     );
-  }
-
-  // Bulk ngừng theo dõi / sử dụng lại — acts on the current selection.
-  if (inventoryConfig?.onStopTracking) {
-    toolbarItems.push({
-      id: "inventory-stop-tracking",
-      label: "Ngừng theo dõi",
-      icon: EyeOff,
-      onClick: () => inventoryConfig.onStopTracking?.(inventoryActionContext),
-      disabled: selectedRows.length === 0,
-    });
-  }
-  if (inventoryConfig?.onResumeTracking) {
-    toolbarItems.push({
-      id: "inventory-resume-tracking",
-      label: "Sử dụng lại",
-      icon: Eye,
-      onClick: () => inventoryConfig.onResumeTracking?.(inventoryActionContext),
-      disabled: selectedRows.length === 0,
-    });
   }
 
   const breadcrumbs = resolveBackofficeBreadcrumbs(location.pathname);
