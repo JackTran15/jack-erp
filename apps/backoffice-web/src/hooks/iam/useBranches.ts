@@ -5,6 +5,8 @@ import { erpApi, requireErpData } from "../../lib/erp-api";
 export interface BranchOption {
   id: string;
   name: string;
+  /** Mã cửa hàng (vd "CM") — in ở cột phải của tem. */
+  code?: string;
 }
 
 interface BranchListResponse {

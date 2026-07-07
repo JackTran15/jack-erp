@@ -6,6 +6,8 @@ export interface ActorContext {
   userId: string;
   organizationId: string;
   branchId?: string;
+  /** Every branch the user is assigned to (JWT `branchIds`); empty = no branch access. */
+  branchIds?: string[];
   roles: string[];
   permissions?: string[];
   search?: string;
@@ -29,6 +31,7 @@ export const Actor = createParamDecorator(
       organizationId: user?.organizationId ?? 'default',
       // always: jwt > header > jwtList
       branchId: fromJwt ?? fromHeader ?? fromJwtList,
+      branchIds: allowed,
       roles: user?.roles ?? [],
     };
   },

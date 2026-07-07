@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ReportTemplateColumn } from "@erp/shared-interfaces";
 import { AppModal, Button } from "@erp/ui";
 import { HelpCircle, Save, X } from "lucide-react";
+import { toast } from "sonner";
 import type { ReportColumnConfig } from "../../../../../../constants/reports/report.interface";
 import { getReportTypeLabel } from "../../../../../../constants/reports/report-type.constant";
+import { getUserFacingApiErrorMessage } from "../../../../../../lib/user-facing-api-error";
 import { useReportStore } from "../../../../../../store/page-stores/report/report.context";
 import { useTableStore } from "../../../../../../store/common/table-store/table.context";
+import { useReportColumnTemplate } from "../../../_api/report-template.api";
 import {
   ColumnConfigTable,
   type ColumnConfigRow,
@@ -241,11 +245,38 @@ export function ColumnConfigDialog({ open, onClose }: Props) {
     if (next) setDraft(next);
   };
 
-  const handleSave = () => {
+  // Persistence backend ("Hiển thị cột" lưu qua templates API) — hiện bật cho báo cáo kho.
+  const { enabled: templateEnabled, saveMutation } = useReportColumnTemplate();
+
+  const applyDraftLocally = () => {
     columnsActions.setOrder(draft.order);
     columnsActions.setVisibility(draft.visibility);
     columnsActions.setPinning(draft.pinning);
-    onClose();
+  };
+
+  const handleSave = () => {
+    if (!templateEnabled) {
+      applyDraftLocally();
+      onClose();
+      return;
+    }
+    // order chốt theo vị trí mảng (backend tự stamp lại từ index).
+    const records: ReportTemplateColumn[] = draft.order.map((col, index) => ({
+      col,
+      displayName: null,
+      visible: draft.visibility[col] !== false,
+      frozen: isPinned(draft, col),
+      order: index,
+    }));
+    saveMutation.mutate(records, {
+      onSuccess: () => {
+        applyDraftLocally();
+        onClose();
+      },
+      onError: (err) => {
+        toast.error(getUserFacingApiErrorMessage(err));
+      },
+    });
   };
 
   const handleResetDefault = () => {

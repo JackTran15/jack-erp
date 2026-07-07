@@ -39,7 +39,8 @@ export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCat
   },
   [REPORT_CATEGORY.INVENTORY]: {
     label: "Kho",
-    url: "reports/storage/stock-summary",
+    // Trang ReportPage generic (contract v2); trang legacy /reports/storage/* vẫn truy cập trực tiếp được.
+    url: "/reports/inventory",
     configs: {
       // 8 báo cáo kho đã cấu hình (registry + fetcher).
       [STORE_TYPE.SINGLE]: { listReport: STORAGE_REPORTS },

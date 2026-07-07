@@ -175,11 +175,14 @@ export class CreateExchangeInvoiceService {
       manager,
       itemIds,
       actor,
+      { showroomOnly: true },
     );
 
     return newLines.map((line, index) => {
       const catalog = priceMap.get(line.itemId);
-      const resolvedLocationId = line.locationId ?? itemLocationMap.get(line.itemId);
+      // Prefer the resolved showroom location over the FE-supplied shelf so a
+      // "Mua thêm" line deducts from the showroom, like every other sale path.
+      const resolvedLocationId = itemLocationMap.get(line.itemId) ?? line.locationId;
       return manager.create(InvoiceItemEntity, {
         organizationId: actor.organizationId,
         branchId: actor.branchId,

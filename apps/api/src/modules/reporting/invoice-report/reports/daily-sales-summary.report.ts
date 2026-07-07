@@ -13,7 +13,8 @@ import {
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { FilterBuilder } from '../../../../common/filters/filter.builder';
 import { PaymentAccountEntity } from '../../../accounting/payment-accounts/payment-account.entity';
-import { InvoiceEntity } from '../../../pos/entities/invoice.entity';
+import { PaymentAccountMethod } from '../../../accounting/payment-accounts/enums';
+import { InvoiceEntity, RefundMethod } from '../../../pos/entities/invoice.entity';
 import { InvoicePaymentEntity } from '../../../pos/entities/invoice-payment.entity';
 import { InvoicePromotionEntity } from '../../../promotion/invoice-promotion.entity';
 import { RbacService } from '../../../rbac/rbac.service';
@@ -40,7 +41,9 @@ import {
   applyBranchScope,
   applyInvoiceStatusFilter,
   CONSOLIDATED_PERMISSION,
+  invoiceTypeSign,
   resolveBranchIds,
+  signedGoods,
 } from '../report-query.util';
 import { ReportDefinition } from '../report-definition';
 
@@ -107,9 +110,13 @@ export class DailySalesSummaryReport implements ReportDefinition {
       throw new BadRequestException('filters.issuedAt.from is required');
     }
 
-    const activeAccountIds = new Set(
-      (await this.activeAccounts(actor)).map((a) => a.accountId),
-    );
+    const accounts = await this.activeAccounts(actor);
+    const activeAccountIds = new Set(accounts.map((a) => a.accountId));
+    // The org's cash COA account (MISA-style single cash fund); used to net cash
+    // refunds out of the cash columns. Null when no active cash account exists.
+    const cashAccountId = accounts.find(
+      (a) => a.paymentMethod === PaymentAccountMethod.CASH,
+    )?.accountId;
     const referenced = [
       ...dto.columns,
       ...(dto.columnFilters ?? []).map((f) => f.col),
@@ -147,16 +154,30 @@ export class DailySalesSummaryReport implements ReportDefinition {
       .applyEnum('invoice.type', dto.filters.type?.value);
     const invoiceRows = await qb.getMany();
 
+    // Sign each invoice's contribution by type so returns/exchanges net instead
+    // of inflating totals. Goods use the net line value (SALE +subtotal, RETURN
+    // −subtotal, EXCHANGE newSubtotal−returnSubtotal); the header money fields and
+    // payments/promotions are signed by type (RETURN negates). Signing lives here
+    // (not the aggregator) so the cash-refund netting in TKT-RPT-03 composes.
+    const signByInvoice = new Map<string, number>();
     const invoiceInputs: InvoiceAggInput[] = invoiceRows
       .filter((i) => i.issuedAt)
-      .map((i) => ({
-        id: i.id,
-        day: i.issuedAt!.toISOString().slice(0, 10),
-        subtotal: Number(i.subtotal ?? 0),
-        discountAmount: Number(i.discountAmount ?? 0),
-        pointsDiscountAmount: Number(i.pointsDiscountAmount ?? 0),
-        totalPaid: Number(i.totalPaid ?? 0),
-      }));
+      .map((i) => {
+        const sign = invoiceTypeSign(i.type);
+        signByInvoice.set(i.id, sign);
+        // A cash refund is captured on the header (refundedAmount + refundMethod),
+        // never in invoice_payments, so net it out of actual revenue (Σ totalPaid).
+        const cashRefund =
+          i.refundMethod === RefundMethod.CASH ? Number(i.refundedAmount ?? 0) : 0;
+        return {
+          id: i.id,
+          day: i.issuedAt!.toISOString().slice(0, 10),
+          subtotal: signedGoods(i),
+          discountAmount: sign * Number(i.discountAmount ?? 0),
+          pointsDiscountAmount: sign * Number(i.pointsDiscountAmount ?? 0),
+          totalPaid: sign * Number(i.totalPaid ?? 0) - cashRefund,
+        };
+      });
 
     const needsPayments = referenced.some(
       (c) => c === 'revenue.cash' || isDynamicColumnKey(c),
@@ -171,7 +192,7 @@ export class DailySalesSummaryReport implements ReportDefinition {
           ).map((p) => ({
             invoiceId: p.invoiceId,
             paymentMethod: p.paymentMethod,
-            amount: Number(p.amount ?? 0),
+            amount: (signByInvoice.get(p.invoiceId) ?? 1) * Number(p.amount ?? 0),
             accountId: p.accountId,
           }))
         : [];
@@ -182,11 +203,39 @@ export class DailySalesSummaryReport implements ReportDefinition {
           ).map((pr) => ({
             invoiceId: pr.invoiceId,
             promotionType: pr.promotionType,
-            discountAmount: Number(pr.discountAmount ?? 0),
+            discountAmount:
+              (signByInvoice.get(pr.invoiceId) ?? 1) *
+              Number(pr.discountAmount ?? 0),
           }))
         : [];
 
-    const buckets = aggregateByDay(invoiceInputs, paymentInputs, promotionInputs);
+    // Cash refunds live on the invoice header, not invoice_payments, so add a
+    // synthetic negative cash payment per cash-refund invoice. One input nets
+    // both cash columns: the method-keyed `revenue.cash` and the dynamic
+    // `payment.method.<cashAccountId>`. Nets on the refund invoice's own day.
+    const refundInputs: PaymentAggInput[] = needsPayments
+      ? invoiceRows
+          .filter(
+            (i) =>
+              i.issuedAt &&
+              i.refundMethod === RefundMethod.CASH &&
+              Number(i.refundedAmount ?? 0) > 0,
+          )
+          .map((i) => ({
+            invoiceId: i.id,
+            paymentMethod: 'cash',
+            amount: -Number(i.refundedAmount ?? 0),
+            // revenue.cash nets via the method key even with no active cash
+            // account; the per-account column split is skipped when unresolved.
+            accountId: cashAccountId ?? '',
+          }))
+      : [];
+
+    const buckets = aggregateByDay(
+      invoiceInputs,
+      [...paymentInputs, ...refundInputs],
+      promotionInputs,
+    );
 
     let days = [...buckets.keys()].sort();
     if (dto.columnFilters?.length) {

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev-api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@erp/api", "dev"],
+      "port": 4000
+    },
+    {
+      "name": "dev-backoffice",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@erp/backoffice-web", "dev"],
+      "port": 3000
+    }
+  ]
+}

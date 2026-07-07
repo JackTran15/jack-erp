@@ -85,6 +85,22 @@ import type {
   InventoryItem,
   PaginatedResponse,
 } from "./goods-issue-shared";
+import { hasPermission } from "../../lib/permissions";
+
+/**
+ * Purposes the current user is allowed to create. "Điều chuyển" (TRANSFER_OUT)
+ * is always available; "Xuất khác" (OTHER) and "Hủy hàng" (DISPOSAL) are gated
+ * behind their permission keys, mirroring the server check in the goods-issue
+ * create path.
+ */
+function creatablePurposes(): GoodsIssuePurposeUI[] {
+  return MANUAL_PURPOSES.filter(
+    (p) =>
+      p === "TRANSFER_OUT" ||
+      (p === "OTHER" && hasPermission("inventory.goods-issue.other-issue")) ||
+      (p === "DISPOSAL" && hasPermission("inventory.goods-issue.disposal")),
+  );
+}
 
 async function getInstantAverageCost(itemId: string): Promise<number> {
   const { data } = await apiClient.get<InstantAverageCost>(
@@ -275,11 +291,18 @@ export function GoodsIssueFormDialog({
     : "";
   const [storageId, setStorageId] = useState(initialStorageId);
   const [storageQuery, setStorageQuery] = useState(initialStorageName);
-  const [purpose, setPurpose] = useState<GoodsIssuePurposeUI>(
+  const [purpose, setPurpose] = useState<GoodsIssuePurposeUI>(() =>
     initial?.purpose && MANUAL_PURPOSES.includes(initial.purpose)
       ? initial.purpose
-      : "OTHER",
+      : creatablePurposes()[0] ?? "TRANSFER_OUT",
   );
+  // Options shown in the purpose dropdown: the creatable set, plus the current
+  // purpose when viewing/editing an issue whose purpose the user can't create,
+  // so the <select> never holds an out-of-range value.
+  const visiblePurposes = useMemo<GoodsIssuePurposeUI[]>(() => {
+    const allowed = creatablePurposes();
+    return allowed.includes(purpose) ? allowed : [...allowed, purpose];
+  }, [purpose]);
   const [reasonId, setReasonId] = useState(initial?.reasonId ?? "");
   const [reasonLabel, setReasonLabel] = useState(
     initial?.reasonId ? initial?.reason ?? "" : "",
@@ -1251,7 +1274,7 @@ export function GoodsIssueFormDialog({
               }
               disabled={isView || sourceTransferOrderId !== null}
             >
-              {MANUAL_PURPOSES.map((p) => (
+              {visiblePurposes.map((p) => (
                 <option key={p} value={p}>
                   {PURPOSE_LABELS[p]}
                 </option>

@@ -89,6 +89,7 @@ flowchart LR
 - [EPIC-003 Inventory and CSV](./epics/EPIC-003-inventory-and-csv.md)
 - [EPIC-004 POS and Accounting](./epics/EPIC-004-pos-and-accounting.md)
 - [EPIC-005 Reporting and Hardening](./epics/EPIC-005-reporting-and-hardening.md)
+- [EPIC-07072026 API monitoring — Prometheus metrics](./epics/EPIC-07072026-api-metrics-monitoring.md)
 
 ## Tickets
 
@@ -1371,5 +1372,109 @@ flowchart LR
 ```mermaid
 flowchart LR
   S1["SDS-01 BE fix precedence + spec (DONE)"] -.dropped.-> S2["SDS-02 E2E (DROPPED)"]
+```
+
+### EPIC-05072026 Inventory & report corrections (items #3, #8, #10)
+
+- [EPIC-05072026 Inventory & report corrections](./epics/EPIC-05072026-inventory-report-corrections.md)
+- Batch of three independent correctness fixes. **#3** Phân quyền phiếu xuất: "Xuất khác" (OTHER) và "Hủy hàng" (DISPOSAL) chỉ account có quyền mới tạo được; "Điều chuyển" (TRANSFER_OUT) luôn mở. `PermissionGuard` không đọc được `dto.purpose` → inject `RbacService` kiểm tra trong create handler (giống precedent ở `reporting.service.ts`). **#8** Đổi trả — dòng "Mua thêm" (exchange new lines) đang trừ **kho lưu trữ** thay vì showroom: `create-exchange-invoice.service.ts` thiếu `{ showroomOnly: true }` + precedence sai (`line.locationId ?? resolved`). Đây là dòng còn sót của cùng lỗi đã fix cho path SALE ở [EPIC-27062026](#epic-27062026-pos-bán-hàng--sale_issue-phải-trừ-tại-showroom-sửa-double-trừ-kho-lưu-trữ). **#10** Báo cáo chưa trừ đơn đổi/trả → doanh thu lệch: 4 report cộng dương mọi hóa đơn, bỏ qua `InvoiceType.RETURN/EXCHANGE` và line `ItemDirection.IN`. Sửa: net theo **line direction** (OUT `+`, IN `−`) trong aggregators in-memory. **RPT-03** khép nốt phần tiền: hoàn tiền mặt cho đơn đổi/trả **không** ghi vào `invoice_payments` (chỉ ghi khi khách trả thêm) → cột `Tiền mặt`/`Thực thu` trên `daily-sales-summary` vẫn để nguyên tổng gộp; lấy hoàn tiền từ `refundedAmount`/`refundMethod` trên header hóa đơn để trừ. Không migration, không `openapi:generate` (chỉ đổi giá trị tính toán). Legacy dashboard (`reporting.service.ts`, bảng không tồn tại) **out of scope**.
+
+| Ticket                                                                                  | Mô tả                                                                    |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [TKT-GIP-01](./tickets/TKT-GIP-01-seed-goods-issue-purpose-permissions.md)              | Seed 2 permission keys (`other-issue`, `disposal`) + role grants         |
+| [TKT-GIP-02](./tickets/TKT-GIP-02-enforce-goods-issue-purpose-permission.md)            | BE: body-based purpose permission check (v2 + legacy create paths)       |
+| [TKT-GIP-03](./tickets/TKT-GIP-03-fe-filter-goods-issue-purpose.md)                     | FE: lọc option "Mục đích xuất kho" theo `hasPermission`                   |
+| [TKT-EXL-01](./tickets/TKT-EXL-01-fix-exchange-new-line-showroom.md)                    | BE: exchange new-line resolve showroom (`showroomOnly` + đảo precedence)  |
+| [TKT-RPT-01](./tickets/TKT-RPT-01-net-returns-line-grain-reports.md)                    | BE: net returns line-grain reports (revenue-by-item, item-revenue-detail) |
+| [TKT-RPT-02](./tickets/TKT-RPT-02-net-returns-header-grain-reports.md)                  | BE: net returns header-grain reports (daily-summary, order-listing)       |
+| [TKT-RPT-03](./tickets/TKT-RPT-03-net-cash-refunds-daily-sales-summary.md)              | BE: net **cash refunds** (Tiền mặt/Thực thu) on daily-sales-summary        |
+
+```mermaid
+flowchart LR
+  G1["GIP-01 Seed perms"] --> G2["GIP-02 BE enforce"]
+  G2 --> G3["GIP-03 FE filter"]
+  E1["EXL-01 Exchange location (standalone)"]
+  R1["RPT-01 Line reports"]
+  R2["RPT-02 Header reports"]
+  R2 --> R3["RPT-03 Cash-refund netting"]
+### EPIC-06072026 Báo cáo kho hàng theo structure báo cáo bán hàng (inventory-report v2)
+
+- [EPIC-06072026 Inventory Report v2](./epics/EPIC-06072026-inventory-report-v2.md)
+- Đưa 8 báo cáo kho lên **cùng contract 3-API** như 4 báo cáo bán hàng (EPIC-24062026): `GET /reports/inventory/columns` (catalog giàu metadata), `POST /reports/inventory/search` (rows keyed + columnFilters + totals toàn dataset), `GET /reports/inventory/filter-options` (dropdown thật), + template "Hiển thị cột" lưu backend. Registry song song `InventoryReportRegistry` trong module `inventory-reports` sẵn có, tái dùng nguyên 5 engine services; **1 migration duy nhất**: rename `invoice_report_templates` → `report_templates` (bảng template generic). FE: xoá 8 custom fetcher + mock, route generic theo `backendSource`. Legacy `GET /reports/inventory/*` + trang `/reports/storage/*` giữ nguyên. Đắp cột có nguồn thật (brand/color/size/transferOut/incoming/supplier/group); cột không nghiệp vụ backing → null. Sửa bug map `inOutDiffQty` (#6) — số liệu hiển thị thay đổi đúng.
+
+| Ticket | Mô tả |
+| ------ | ----- |
+| [TKT-IVR-01](./tickets/TKT-IVR-01-shared-interfaces-inventory-report-contract.md) | shared-interfaces: label maps VI + payloads + `WAREHOUSE` option type |
+| [TKT-IVR-02](./tickets/TKT-IVR-02-report-core-generalization.md) | BE: generic `ReportDefinition<TDto>`/`ReportRegistry` + extract `matchColumnFilter` (zero behavior change) |
+| [TKT-IVR-03](./tickets/TKT-IVR-03-be-registry-endpoints-pilot-report.md) | BE: registry + DTOs + v2 controller (columns/search/filter-options) + pilot #1 Tổng hợp NXT |
+| [TKT-IVR-04](./tickets/TKT-IVR-04-be-stockperiod-document-temp-reports.md) | BE: reports #2 bảng kê phiếu, #3 chi tiết SL, #4 NXT theo cửa hàng, #8 xuất kho tạm |
+| [TKT-IVR-05](./tickets/TKT-IVR-05-be-transfer-pivot-reports.md) | BE: reports #6 NX điều chuyển (bug-fix mapping), #7 điều chuyển theo cửa hàng, #5 pivot cột động `branch.qty.<id>` |
+| [TKT-IVR-06](./tickets/TKT-IVR-06-be-report-templates-rename-crud.md) | BE: migration rename `report_templates` + `ReportTemplateEntity` (report-core) + inventory templates CRUD |
+| [TKT-IVR-07](./tickets/TKT-IVR-07-openapi-regen.md) | openapi:generate + api-client snapshot |
+| [TKT-IVR-08](./tickets/TKT-IVR-08-fe-generic-wiring.md) | FE: backendSource routing + dropdown thật + xoá adapter/mock |
+| [TKT-IVR-09](./tickets/TKT-IVR-09-fe-template-persistence.md) | FE: "Hiển thị cột" lưu/khôi phục qua templates API |
+| [TKT-IVR-10](./tickets/TKT-IVR-10-tests-e2e-dod.md) | Tests + E2E + legacy regression + DoD gate |
+
+```mermaid
+flowchart LR
+  V1["IVR-01 shared-interfaces"] --> V3["IVR-03 Registry + endpoints + pilot #1"]
+  V2["IVR-02 report-core generalization"] --> V3
+  V3 --> V4["IVR-04 Reports #2 #3 #4 #8"]
+  V3 --> V5["IVR-05 Reports #6 #7 + pivot #5"]
+  V3 --> V6["IVR-06 report_templates rename + CRUD"]
+  V4 --> V7["IVR-07 openapi regen"]
+  V5 --> V7
+  V6 --> V7
+  V7 --> V8["IVR-08 FE generic wiring"]
+  V7 --> V9["IVR-09 FE template persistence"]
+  V6 --> V9
+  V4 --> V10["IVR-10 Tests + E2E + DoD"]
+  V5 --> V10
+  V8 --> V10
+  V9 --> V10
+```
+
+### EPIC-06072026 Report filter theo mode (chain/single) + kho phụ thuộc cửa hàng + đồng nhất control @erp/ui
+
+- [EPIC-06072026 Report filter store→warehouse](./epics/EPIC-06072026-report-filter-store-warehouse.md)
+- Panel filter báo cáo kho phản ánh **mode chi nhánh** (selector ở ERP header, `useIsChainSelected()`): **CHAIN** → dòng "Cửa hàng" multi-select, Kho + số liệu theo cửa hàng đã chọn; **SINGLE** → không có dòng Cửa hàng, cửa hàng = chi nhánh header, Kho + số liệu scope theo chi nhánh đó (FE inject `store=[headerBranchId]`). Dropdown "Kho" chỉ lấy kho của (các) cửa hàng đang hiệu lực (thêm `branchIds` vào `filter-options?type=warehouse`; reset khi đổi cửa hàng). **Quyền chi nhánh (backend hard-gate)**: scope luôn ⊆ `actor.branchIds` (expose branchIds trên ActorContext; clamp trong `resolveInventoryBranchIds` + filter-options; 403 khi ngoài quyền). Split `single_`/`chain_` registry cho #1/#2/#3/#6 (thêm STORE cho #3 chain). Thay control thô → `@erp/ui` `SingleSelect`/`DateTimeField`. Kho single-select.
+
+| Ticket | Mô tả |
+| ------ | ----- |
+| [TKT-RFF-01](./tickets/TKT-RFF-01-be-warehouse-options-by-branch.md) | BE: options theo `branchIds` + clamp scope theo quyền chi nhánh (`actor.branchIds`) + spec/e2e + openapi |
+| [TKT-RFF-02](./tickets/TKT-RFF-02-fe-ui-erp-ui-controls.md) | FE: swap `<select>`/date thô → @erp/ui `SingleSelect`/`DateTimeField` |
+| [TKT-RFF-03](./tickets/TKT-RFF-03-fe-registry-store-line-by-mode.md) | FE: registry single/chain — dòng Cửa hàng theo mode (+ STORE cho #3 chain) |
+| [TKT-RFF-04](./tickets/TKT-RFF-04-fe-mode-scoping-warehouse-cascade.md) | FE: mode-aware scoping (inject single-branch store) + warehouse cascade + extend hook + reset |
+| [TKT-RFF-05](./tickets/TKT-RFF-05-verify-dod.md) | Verify (browser, 2 mode) + DoD gate |
+
+```mermaid
+flowchart LR
+  R1["RFF-01 BE options by branch + openapi"] --> R4["RFF-04 mode scoping + cascade"]
+  R2["RFF-02 FE UI swap @erp/ui"] --> R4
+  R3["RFF-03 registry store-line by mode"] --> R4
+  R4 --> R5["RFF-05 Verify + DoD"]
+```
+
+### EPIC-07072026 API monitoring — Prometheus metrics (`prom-client`)
+
+- [EPIC-07072026 API monitoring — Prometheus metrics](./epics/EPIC-07072026-api-metrics-monitoring.md)
+- `@erp/api` chưa có metrics. Thêm `prom-client`: endpoint `GET /metrics` (`@Public` + `@ApiExcludeEndpoint`) do `MetricsModule` (`@Global`, 1 `Registry` trong `MetricsService`) phục vụ. Thu **default Node/process metrics** (`collectDefaultMetrics`) + **HTTP metrics** (global `MetricsInterceptor`: `http_request_duration_seconds`/`http_requests_total`, label `route` = pattern để chặn cardinality) + **domain metrics** (Kafka publish, Redis hit/miss, checkout duration, CSV import). Thêm **Prometheus + Grafana** vào root `docker-compose.yml`. Kill switch `METRICS_ENABLED`; không migration/permission/contract change.
+
+| Ticket | Mô tả |
+| ------ | ----- |
+| [TKT-MON-01](./tickets/TKT-MON-01-metrics-module-endpoint.md) | BE: prom-client + MetricsModule + `/metrics` endpoint + default metrics |
+| [TKT-MON-02](./tickets/TKT-MON-02-http-metrics-interceptor.md) | BE: global HTTP metrics interceptor (histogram + counter) |
+| [TKT-MON-03](./tickets/TKT-MON-03-domain-metrics.md) | BE: domain metrics (events / redis / pos / csv) |
+| [TKT-MON-04](./tickets/TKT-MON-04-prometheus-grafana-compose.md) | Infra: Prometheus + Grafana trong docker-compose |
+| [TKT-MON-05](./tickets/TKT-MON-05-tests-and-docs.md) | Tests + docs |
+
+```mermaid
+flowchart LR
+  M1["MON-01 Module + endpoint + defaults"] --> M2["MON-02 HTTP interceptor"]
+  M1 --> M3["MON-03 Domain metrics"]
+  M1 --> M4["MON-04 Prometheus + Grafana"]
+  M2 --> M5["MON-05 Tests + docs"]
+  M3 --> M5
+  M4 --> M5
 ```
 

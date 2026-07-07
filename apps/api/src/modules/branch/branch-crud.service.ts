@@ -273,12 +273,13 @@ export const BRANCH_ENTITY_CONFIG: CrudEntityConfig = {
   idField: "id",
   fields: [
     { key: "name", label: "Tên", type: "string", required: true },
+    { key: "code", label: "Mã cửa hàng", type: "string" },
     { key: "address", label: "Địa chỉ", type: "string" },
     { key: "phone", label: "Điện thoại", type: "string", hideInList: true },
     { key: "email", label: "Email", type: "string", hideInList: true },
     { key: "status", label: "Trạng thái", type: "string", readOnly: true },
   ],
-  searchableFields: ["name", "address"],
+  searchableFields: ["name", "code", "address"],
   filterDefinitions: [],
   permissions: {
     create: "branch.write",

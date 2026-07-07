@@ -7,6 +7,7 @@ import {
   getRevenueByItemColumnDef,
   RevenueByItemDimension,
 } from './revenue-by-item.columns';
+import { ItemDirection } from '../../pos/entities/invoice-item.entity';
 
 /**
  * Internal row grain. Public `statBy` is item|parent|group; `statisticByBrand`
@@ -32,6 +33,8 @@ export interface RevenueByItemRowInput {
   itemCategory: string | null;
   brand: string | null;
   unit: string | null;
+  /** Line movement direction — OUT adds to revenue, IN (return leg) subtracts. */
+  direction: ItemDirection;
   quantity: number;
   unitPrice: number;
   lineDiscount: number;
@@ -158,10 +161,12 @@ export function aggregateByItem(
       };
       byKey.set(d.key, agg);
     }
-    agg.quantity += r.quantity;
-    agg.goods += r.quantity * r.unitPrice;
-    agg.discount += r.lineDiscount;
-    agg.total += r.lineTotal;
+    // Net returns/exchanges via line direction: OUT adds, IN (return leg) subtracts.
+    const sign = r.direction === ItemDirection.IN ? -1 : 1;
+    agg.quantity += sign * r.quantity;
+    agg.goods += sign * r.quantity * r.unitPrice;
+    agg.discount += sign * r.lineDiscount;
+    agg.total += sign * r.lineTotal;
   }
   return [...byKey.values()]
     .map((a) => ({

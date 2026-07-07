@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { MetricsService } from '../../metrics/metrics.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
@@ -163,6 +164,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: MetricsService, useValue: { incCacheHit() {}, incCacheMiss() {}, observeCheckout() {}, incImportRows() {}, incImportJob() {}, observeKafkaPublish() {}, incKafkaPublishError() {}, observeHttp() {} } },
         CheckoutInvoiceService,
         { provide: getRepositoryToken(InvoiceEntity),     useValue: invoiceRepo },
         { provide: getRepositoryToken(InvoiceItemEntity), useValue: itemRepo },

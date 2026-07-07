@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { MetricsService } from '../../metrics/metrics.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { CsvImportService } from './csv-import.service';
@@ -56,6 +57,7 @@ describe('CsvImportService.validateExcelItemRow', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: MetricsService, useValue: { incCacheHit() {}, incCacheMiss() {}, observeCheckout() {}, incImportRows() {}, incImportJob() {}, observeKafkaPublish() {}, incKafkaPublishError() {}, observeHttp() {} } },
         CsvImportService,
         { provide: getRepositoryToken(InventoryImportJobEntity), useValue: noopRepo },
         { provide: getRepositoryToken(InventoryImportJobRowEntity), useValue: noopRepo },
