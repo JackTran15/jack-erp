@@ -1,5 +1,7 @@
-import { getReportBackendKey } from "../../../../constants/reports/report-type.constant";
-import { REPORT_TYPE_INVENTORY } from "../../../../constants/reports/report-type.constant";
+import {
+  getReportBackendKey,
+  getReportBackendSource,
+} from "../../../../constants/reports/report-type.constant";
 import type { STORE_TYPE } from "../../../../constants/store.constant";
 import type {
   ReportColumnFilter,
@@ -12,20 +14,16 @@ import {
   type ReportRow,
 } from "./invoice-report.api";
 import {
-  fetchStockByBranch,
-  fetchStockDocumentDetails,
-  fetchStockQuantityDetails,
-  fetchStockSummary,
-  fetchStockSummaryByBranch,
-  fetchTemporaryWarehouseOutGoods,
-  fetchTransferByBranch,
-  fetchTransferSummary,
-} from "./inventory-report.api";
+  buildInventorySearchFilters,
+  fetchInventoryReportData,
+} from "./inventory-report-v2.api";
 
 // Tham số chuẩn hóa truyền cho mọi fetcher data của report.
 export interface ReportDataArgs {
   reportType: string;
   branch: STORE_TYPE;
+  /** Chi nhánh đang chọn ở ERP header (null khi mode Chuỗi). */
+  activeBranchId?: string | null;
   filters: Partial<ReportFilterValues>;
   columnFilters: Record<string, ReportColumnFilter>;
   columns: string[];
@@ -42,7 +40,7 @@ export interface ReportDataResult {
 
 export type ReportDataFetcher = (args: ReportDataArgs) => Promise<ReportDataResult>;
 
-// Mặc định: report đi qua backend report invoice generic (theo backendKey).
+// Báo cáo bán hàng: backend report invoice generic (theo backendKey).
 const invoiceDataFetcher: ReportDataFetcher = async (args) => {
   const backendKey = getReportBackendKey(args.reportType);
   const res = await fetchReportData({
@@ -60,29 +58,35 @@ const invoiceDataFetcher: ReportDataFetcher = async (args) => {
   };
 };
 
-// Report kho dùng endpoint riêng (mỗi report 1 fetcher).
-const CUSTOM_FETCHERS: Record<string, ReportDataFetcher> = {
-  [REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_SUMMARY]: fetchStockSummary,
-  [REPORT_TYPE_INVENTORY.WAREHOUSE_VOUCHER_DETAIL_LIST]: fetchStockDocumentDetails,
-  [REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_QUANTITY_DETAIL]:
-    fetchStockQuantityDetails,
-  [REPORT_TYPE_INVENTORY.STORE_INVENTORY_IN_OUT_STOCK_SUMMARY]:
-    fetchStockSummaryByBranch,
-  [REPORT_TYPE_INVENTORY.STOCK_QUANTITY_BY_STORE]: fetchStockByBranch,
-  [REPORT_TYPE_INVENTORY.TRANSFER_IN_OUT_SUMMARY]: fetchTransferSummary,
-  [REPORT_TYPE_INVENTORY.TRANSFERRED_GOODS_SUMMARY_BY_STORE]:
-    fetchTransferByBranch,
-  [REPORT_TYPE_INVENTORY.TEMPORARY_WAREHOUSE_OUT_GOODS]:
-    fetchTemporaryWarehouseOutGoods,
+// Báo cáo kho: cùng contract nhưng qua bộ endpoint /reports/inventory/*.
+const inventoryDataFetcher: ReportDataFetcher = async (args) => {
+  const backendKey = getReportBackendKey(args.reportType) as string;
+  const res = await fetchInventoryReportData({
+    reportType: backendKey,
+    columns: args.columns,
+    filters: buildInventorySearchFilters(args.filters, {
+      branch: args.branch,
+      activeBranchId: args.activeBranchId,
+      backendKey,
+    }),
+    columnFilters: buildColumnFilters(args.columnFilters, args.numericCols),
+    page: args.page,
+    limit: args.limit,
+  });
+  return {
+    rows: res.rows,
+    totals: res.totals ?? {},
+    total: res.total ?? 0,
+  };
 };
 
-// Chọn nguồn data theo report type:
-// fetcher riêng (kho) → ưu tiên; else có backendKey → invoice; else undefined (chưa hỗ trợ).
+// Chọn nguồn data theo report type: backendKey quyết định BE có hỗ trợ không,
+// backendSource quyết định bộ endpoint (invoice vs inventory).
 export function getReportDataFetcher(
   reportType: string,
 ): ReportDataFetcher | undefined {
-  const custom = CUSTOM_FETCHERS[reportType];
-  if (custom) return custom;
-  if (getReportBackendKey(reportType)) return invoiceDataFetcher;
-  return undefined;
+  if (!getReportBackendKey(reportType)) return undefined;
+  return getReportBackendSource(reportType) === "inventory"
+    ? inventoryDataFetcher
+    : invoiceDataFetcher;
 }

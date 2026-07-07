@@ -1,27 +1,22 @@
 import { PERIOD_PRESET_OPTIONS } from "@erp/ui";
+import { ReportSelectField } from "../ReportSelectField/ReportSelectField";
 
 interface Props {
   value: string;
   onChange: (value: string) => void;
 }
 
-const selectClass =
-  "h-9 w-full rounded-[4px] border border-[#CCCCCC] bg-white px-3 text-xs text-[#333333] outline-none focus:border-[#3B6FE5]";
-
 export function PeriodSelect({ value, onChange }: Props) {
+  // Kỳ báo cáo luôn có giá trị (default "Tháng này") → không cần option placeholder.
   return (
-    <select
-      className={selectClass}
+    <ReportSelectField
       value={value}
-      onChange={(e) => onChange(e.target.value)}
-      aria-label="Kỳ báo cáo"
-    >
-      <option value="">— Kỳ báo cáo —</option>
-      {PERIOD_PRESET_OPTIONS.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
+      options={PERIOD_PRESET_OPTIONS.map((opt) => ({
+        value: opt.value,
+        label: opt.label,
+      }))}
+      hidePlaceholder
+      onChange={onChange}
+    />
   );
 }

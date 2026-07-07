@@ -1,10 +1,7 @@
-import { Button, PERIOD_PRESET_OPTIONS } from "@erp/ui";
+import { Button, DateTimeField, PERIOD_PRESET_OPTIONS, SingleSelect } from "@erp/ui";
 import { Filter } from "lucide-react";
 import { REPORT_FILTERS_LINE } from "../../../../../constants/reports/report-filters.constant";
 import { useReportStore } from "../../../../../store/page-stores/report/report.context";
-
-const controlClass =
-  "h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none";
 
 export function ReportPageHeaderFilter() {
   const applyFilters = useReportStore((s) => s.actions.applyFilters);
@@ -17,25 +14,22 @@ export function ReportPageHeaderFilter() {
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <select
-        className={`${controlClass} w-[120px]`}
+      <SingleSelect
+        className="h-9 w-[150px] px-3 text-sm"
+        options={PERIOD_PRESET_OPTIONS.map((opt) => ({
+          value: opt.value,
+          label: opt.label,
+        }))}
         value={period}
-        onChange={(e) =>
-          setFilterValue(REPORT_FILTERS_LINE.REPORT_PERIOD, e.target.value)
+        onValueChange={(v) =>
+          setFilterValue(REPORT_FILTERS_LINE.REPORT_PERIOD, v)
         }
-      >
-        <option value="">— Kỳ báo cáo —</option>
-        {PERIOD_PRESET_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+        placeholder="Kỳ báo cáo"
+      />
 
       <label className="text-xs text-muted-foreground">Từ ngày</label>
-      <input
-        type="date"
-        className={`${controlClass} w-[140px]`}
+      <DateTimeField
+        className="h-9 w-[150px] text-sm"
         value={range.fromDate}
         onChange={(e) =>
           setFilterValue(REPORT_FILTERS_LINE.RANGE_DATE, {
@@ -47,9 +41,8 @@ export function ReportPageHeaderFilter() {
       />
 
       <label className="text-xs text-muted-foreground">Đến ngày</label>
-      <input
-        type="date"
-        className={`${controlClass} w-[140px]`}
+      <DateTimeField
+        className="h-9 w-[150px] text-sm"
         value={range.toDate}
         onChange={(e) =>
           setFilterValue(REPORT_FILTERS_LINE.RANGE_DATE, {

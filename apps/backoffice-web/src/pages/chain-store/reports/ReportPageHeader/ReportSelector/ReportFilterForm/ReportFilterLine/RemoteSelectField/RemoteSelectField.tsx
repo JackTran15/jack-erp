@@ -7,6 +7,8 @@ interface Props {
   value: string;
   placeholder?: string;
   hidePlaceholder?: boolean;
+  /** Hide these values from the option list (e.g. exclude the already-selected "Cửa hàng xuất" from "Cửa hàng nhận"). */
+  excludeValues?: string[];
   onChange: (value: string) => void;
 }
 
@@ -16,13 +18,17 @@ export function RemoteSelectField({
   value,
   placeholder,
   hidePlaceholder,
+  excludeValues,
   onChange,
 }: Props) {
   const { data: options = [] } = useReportFilterOptions(type);
+  const visibleOptions = excludeValues?.length
+    ? options.filter((o) => !excludeValues.includes(String(o.value)))
+    : options;
   return (
     <ReportSelectField
       value={value}
-      options={options.map((o) => ({ value: String(o.value), label: o.label }))}
+      options={visibleOptions.map((o) => ({ value: String(o.value), label: o.label }))}
       placeholder={placeholder}
       hidePlaceholder={hidePlaceholder}
       onChange={onChange}

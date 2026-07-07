@@ -21,15 +21,24 @@ import { DataSource } from 'typeorm';
  *   - `goods_receipts` has `reference_id` (UUID) — no `reference_number`
  *     column. We pass it through as text so the FE has *something* to
  *     show; resolving the PO/invoice number is Phase 2.
- *   - `goods_issues` has no customer_name / customer_id column today.
- *     Counterparty is the `provider_id` ("Đối tượng" — supplier/partner).
- *     We surface `providers.name` as `customer_name`.
  *   - `goods_issue_lines` has no `location_id` — we use the header
  *     `goods_issues.location_id` instead.
  *   - `stock_transfer_lines.source_location_id` is nullable on legacy
  *     rows; falls back to the header `source_location_id` via COALESCE.
  *   - `branches` table has no `code` column (mirrors how
  *     `transfer-report.service.ts` returns `branchCode: null`).
+ *
+ * "Đối tượng" (customer_name) — resolved from `counterparty_kind` +
+ * `counterparty_id` on goods_receipts/goods_issues (supplier → providers,
+ * customer → customers, employee → users), falling back to the legacy
+ * `provider_id` FK for rows written before that column existed. Mirrors
+ * `counterparty-name.util.ts`'s CASE shape. Stock transfers have no
+ * external counterparty (inter-branch) — stays NULL.
+ *
+ * "Giá bán" (in/out sale price) — no per-line selling price is captured at
+ * document time (goods_receipt_lines / goods_issue_lines only store the
+ * cost `unit_price`); we surface `items.selling_price` (the item's current
+ * catalog price) on whichever band matches the row's movement direction.
  */
 
 export interface DocumentDetailRow {
@@ -122,12 +131,12 @@ export class DocumentDetailService {
           grl.quantity::numeric AS in_qty,
           grl.unit_price::numeric AS in_unit_price,
           (grl.quantity::numeric * grl.unit_price::numeric) AS in_value,
-          NULL::numeric AS in_sale_price,
           0::numeric AS out_qty,
           0::numeric AS out_unit_price,
           0::numeric AS out_value,
-          NULL::numeric AS out_sale_price,
-          NULL::text AS customer_name,
+          gr.counterparty_kind::text AS counterparty_kind,
+          gr.counterparty_id::text AS counterparty_id,
+          gr.provider_id::text AS provider_id,
           grl.note AS notes
         FROM goods_receipts gr
         JOIN goods_receipt_lines grl ON grl.goods_receipt_id = gr.id
@@ -151,16 +160,15 @@ export class DocumentDetailService {
           0::numeric AS in_qty,
           0::numeric AS in_unit_price,
           0::numeric AS in_value,
-          NULL::numeric AS in_sale_price,
           gil.quantity::numeric AS out_qty,
           gil.unit_price::numeric AS out_unit_price,
           (gil.quantity::numeric * gil.unit_price::numeric) AS out_value,
-          NULL::numeric AS out_sale_price,
-          p.name AS customer_name,
+          gi.counterparty_kind::text AS counterparty_kind,
+          gi.counterparty_id::text AS counterparty_id,
+          gi.provider_id::text AS provider_id,
           gil.notes
         FROM goods_issues gi
         JOIN goods_issue_lines gil ON gil.goods_issue_id = gi.id
-        LEFT JOIN inventory_providers p ON p.id = gi.provider_id
         WHERE gi.organization_id = $1
           AND gi.status = 'POSTED'
           AND gi.posted_at >= $2 AND gi.posted_at < $3
@@ -181,12 +189,12 @@ export class DocumentDetailService {
           0::numeric AS in_qty,
           0::numeric AS in_unit_price,
           0::numeric AS in_value,
-          NULL::numeric AS in_sale_price,
           stl.quantity::numeric AS out_qty,
           COALESCE(i_st.purchase_price, 0)::numeric AS out_unit_price,
           (stl.quantity::numeric * COALESCE(i_st.purchase_price, 0)::numeric) AS out_value,
-          NULL::numeric AS out_sale_price,
-          NULL::text AS customer_name,
+          NULL::text AS counterparty_kind,
+          NULL::text AS counterparty_id,
+          NULL::text AS provider_id,
           stl.notes
         FROM stock_transfers st
         JOIN stock_transfer_lines stl ON stl.transfer_id = st.id
@@ -238,12 +246,22 @@ export class DocumentDetailService {
         l.in_qty,
         l.in_unit_price,
         l.in_value,
-        l.in_sale_price,
+        (CASE WHEN l.doc_kind = 'GOODS_RECEIPT' THEN i.selling_price ELSE 0 END) AS in_sale_price,
         l.out_qty,
         l.out_unit_price,
         l.out_value,
-        l.out_sale_price,
-        l.customer_name,
+        (CASE WHEN l.doc_kind <> 'GOODS_RECEIPT' THEN i.selling_price ELSE 0 END) AS out_sale_price,
+        (CASE
+           WHEN l.counterparty_kind = 'supplier' THEN
+             (SELECT p.name FROM inventory_providers p WHERE p.id::text = l.counterparty_id AND p.organization_id = $1)
+           WHEN l.counterparty_kind = 'customer' THEN
+             (SELECT c.name FROM customers c WHERE c.id::text = l.counterparty_id AND c.organization_id = $1)
+           WHEN l.counterparty_kind = 'employee' THEN
+             (SELECT (u.first_name || ' ' || u.last_name) FROM users u WHERE u.id::text = l.counterparty_id AND u.organization_id = $1::uuid)
+           WHEN l.provider_id IS NOT NULL THEN
+             (SELECT p2.name FROM inventory_providers p2 WHERE p2.id::text = l.provider_id AND p2.organization_id = $1)
+           ELSE NULL
+         END) AS customer_name,
         l.notes
       FROM lines l
       JOIN items i ON i.id = l.item_id AND i.organization_id = $1

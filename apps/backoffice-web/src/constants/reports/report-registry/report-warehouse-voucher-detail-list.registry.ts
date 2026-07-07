@@ -67,11 +67,12 @@ const tableConfig: ReportTableConfig = { summaryLabel: "Tổng", columns };
 export const single_tableRegistryReportWarehouseVoucherDetailList = tableConfig;
 export const chain_tableRegistryReportWarehouseVoucherDetailList = tableConfig;
 
-const filterLines = [
-  REPORT_FILTERS_LINE.STORE,
+// SINGLE: cửa hàng cố định theo header → không có dòng Cửa hàng; CHAIN: có.
+const singleFilterLines = [
   REPORT_FILTERS_LINE.PRODUCT_GROUP,
   REPORT_FILTERS_LINE.REPORT_PERIOD,
   REPORT_FILTERS_LINE.RANGE_DATE,
 ];
-export const single_filterRegistryReportWarehouseVoucherDetailList = filterLines;
-export const chain_filterRegistryReportWarehouseVoucherDetailList = filterLines;
+const chainFilterLines = [REPORT_FILTERS_LINE.STORE, ...singleFilterLines];
+export const single_filterRegistryReportWarehouseVoucherDetailList = singleFilterLines;
+export const chain_filterRegistryReportWarehouseVoucherDetailList = chainFilterLines;

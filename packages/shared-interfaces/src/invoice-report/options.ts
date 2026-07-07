@@ -30,6 +30,8 @@ export enum ReportFilterOptionType {
   PRODUCT_GROUP = 'productGroup',
   BRAND = 'brand',
   UNIT = 'unit',
+  /** Org-scoped storages (kho) — inventory reports only. */
+  WAREHOUSE = 'warehouse',
   // Static enums
   INVOICE_STATUS = 'invoiceStatus',
   STAT_DATE_TYPE = 'statDateType',

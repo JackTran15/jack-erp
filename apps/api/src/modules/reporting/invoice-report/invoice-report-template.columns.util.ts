@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { ReportTemplateColumn } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { ReportTemplateColumnDto } from './dto/report-template-column.dto';
-import { ReportRegistry } from './report-definition';
+import { ReportRegistry } from '../report-core/report-definition';
 
 /**
  * Full set of accepted column keys for a report type — its catalog (fixed

@@ -11,6 +11,8 @@ export interface MultiSelectChipsProps {
   onValueChange: (value: string[]) => void;
   placeholder?: string;
   className?: string;
+  /** Extra classes for the dropdown option rows (e.g. "text-xs" for dense filters). */
+  contentClassName?: string;
   disabled?: boolean;
 }
 
@@ -20,6 +22,7 @@ function MultiSelectChips({
   onValueChange,
   placeholder = "Chọn…",
   className,
+  contentClassName,
   disabled,
 }: MultiSelectChipsProps) {
   const [open, setOpen] = React.useState(false);
@@ -182,7 +185,12 @@ function MultiSelectChips({
       >
         <ScrollArea className="max-h-60">
           {availableOptions.length === 0 ? (
-            <div className="px-2 py-1.5 text-sm text-muted-foreground">
+            <div
+              className={cn(
+                "px-2 py-1.5 text-sm text-muted-foreground",
+                contentClassName,
+              )}
+            >
               {q !== "" ? "Không tìm thấy" : "Đã chọn tất cả"}
             </div>
           ) : (
@@ -196,11 +204,12 @@ function MultiSelectChips({
                 className={cn(
                   "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors",
                   index === activeIndex ? "bg-accent" : "hover:bg-accent",
+                  contentClassName,
                 )}
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => add(opt.value)}
               >
-                <span>{opt.label}</span>
+                <span className="min-w-0 truncate text-left">{opt.label}</span>
               </button>
             ))
           )}

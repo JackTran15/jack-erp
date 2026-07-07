@@ -14,3 +14,4 @@ export * from './websocket';
 export * from './crud';
 export * from './reporting';
 export * from './invoice-report';
+export * from './inventory-report';

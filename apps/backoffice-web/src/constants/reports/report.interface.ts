@@ -46,11 +46,16 @@ export interface ReportTableConfig {
   summaryLabel?: string;            // nhãn ô đầu dòng footer, vd "Tổng"
 }
 
+// Domain backend phục vụ report type (chọn bộ endpoint columns/search/filter-options/templates).
+export type ReportBackendSource = "invoice" | "inventory";
+
 // Metadata của một loại report: nhãn + filter + table config (theo từng loại view).
 export interface ReportTypeMetadata {
   label?: string;
   // Khóa report type phía backend (kebab) — chỉ type được BE hỗ trợ mới có.
   backendKey?: string;
+  // Domain backend; mặc định "invoice" khi có backendKey mà không khai báo.
+  backendSource?: ReportBackendSource;
   filterConfig?: Partial<Record<STORE_TYPE, REPORT_FILTERS_LINE[]>>;
   tableConfig?: Partial<Record<STORE_TYPE, ReportTableConfig>>;
 }

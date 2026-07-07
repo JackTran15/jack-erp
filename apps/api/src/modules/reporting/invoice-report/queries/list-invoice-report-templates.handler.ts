@@ -2,8 +2,8 @@ import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InvoiceReportTemplateView } from '@erp/shared-interfaces';
-import { InvoiceReportTemplateEntity } from '../invoice-report-template.entity';
-import { toTemplateView } from '../invoice-report-template.view';
+import { ReportTemplateEntity } from '../../report-core/report-template.entity';
+import { toTemplateView } from '../../report-core/report-template.view';
 import { ListInvoiceReportTemplatesQuery } from './list-invoice-report-templates.query';
 
 @QueryHandler(ListInvoiceReportTemplatesQuery)
@@ -11,8 +11,8 @@ export class ListInvoiceReportTemplatesHandler
   implements IQueryHandler<ListInvoiceReportTemplatesQuery>
 {
   constructor(
-    @InjectRepository(InvoiceReportTemplateEntity)
-    private readonly repo: Repository<InvoiceReportTemplateEntity>,
+    @InjectRepository(ReportTemplateEntity)
+    private readonly repo: Repository<ReportTemplateEntity>,
   ) {}
 
   async execute({

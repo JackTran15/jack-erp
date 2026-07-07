@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useBranchStore } from "../../../../store/common/branch/branch.store";
 import { useTableStore } from "../../../../store/common/table-store/table.context";
 import { useReportStore } from "../../../../store/page-stores/report/report.context";
 import { getReportDataFetcher } from "../_api/report-data-source";
@@ -12,6 +13,7 @@ export function ReportPageTable() {
   const appliedRequest = useReportStore((s) => s.appliedRequest);
   const reloadNonce = useReportStore((s) => s.reloadNonce);
   const branch = useReportStore((s) => s.branch);
+  const activeBranchId = useBranchStore((s) => s.branchId);
 
   const columnIds = useMemo(
     () => config.columns.map((c) => c.column),
@@ -40,6 +42,7 @@ export function ReportPageTable() {
       appliedRequest,
       reloadNonce,
       branch,
+      activeBranchId,
       columnIds,
       pagination.pageIndex,
       pagination.pageSize,
@@ -48,6 +51,7 @@ export function ReportPageTable() {
       fetcher!({
         reportType: appliedRequest!.reportType,
         branch,
+        activeBranchId,
         filters: appliedRequest!.filters,
         columnFilters: appliedRequest!.columnFilters,
         columns: columnIds,
