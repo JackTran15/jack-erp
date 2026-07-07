@@ -66,6 +66,8 @@ export interface BalanceQuery extends PaginationQuery {
   belowMin?: boolean;
   /** When true, only balances at the virtual "Chưa xếp" (unassigned) location. */
   unassigned?: boolean;
+  /** Filter by item tracking status; omit to include both đang/ngừng theo dõi. */
+  isActive?: boolean;
   organizationId: string;
 
   // Per-column string filters (server-side)
@@ -378,6 +380,9 @@ export class StockLedgerService {
     }
     if (query.belowMin) {
       qb.andWhere('th.min_qty IS NOT NULL AND sb.quantity < th.min_qty');
+    }
+    if (query.isActive !== undefined) {
+      qb.andWhere('item.is_active = :isActive', { isActive: query.isActive });
     }
 
     // Inline closures over `qb` keep the queryBuilder mutation local and avoid

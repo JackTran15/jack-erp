@@ -35,5 +35,10 @@ export function buildQuery(
       extra.quantityOp = "eq";
     }
   }
+  // Trạng thái: mặc định chỉ hiện hàng đang theo dõi; "" (Tất cả) bỏ lọc.
+  const status = filters.isActive?.value;
+  if (status === "false") extra.isActive = false;
+  else if (status === "true") extra.isActive = true;
+  else if (status === undefined) extra.isActive = true;
   return { page, pageSize, ...extra };
 }

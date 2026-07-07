@@ -1671,6 +1671,7 @@ export function GoodsIssueFormDialog({
       {productPickerOpen && (
         <ProductSelectDialog
           open
+          activeOnly
           onOpenChange={setProductPickerOpen}
           showQuantityPrice
           defaultUnitPriceSource="none"

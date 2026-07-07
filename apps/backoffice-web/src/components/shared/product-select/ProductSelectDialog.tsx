@@ -55,6 +55,7 @@ interface Props {
   resolveSelectedLines?: boolean;
   defaultUnitPriceSource?: UnitPriceSource;
   defaultQuantity?: number;
+  activeOnly?: boolean;
   onConfirm: (result: ProductSelectResult) => void;
 }
 
@@ -111,6 +112,7 @@ export function ProductSelectDialog({
   showQuantityPrice = false,
   defaultUnitPriceSource = "none",
   defaultQuantity = 1,
+  activeOnly = false,
   onConfirm,
 }: Props) {
   const [categoryId, setCategoryId] = useState("");
@@ -144,6 +146,7 @@ export function ProductSelectDialog({
     pageSize,
     search: committedSearch || undefined,
     categoryId: categoryId || undefined,
+    isActive: activeOnly || undefined,
   });
 
   const rows = groupsQuery.data?.data ?? [];
@@ -654,6 +657,7 @@ export function ProductSelectDialog({
                       onToggleExpand={toggleExpand}
                       onProductCheckChange={handleProductCheckChange}
                       onToggleItem={toggleItem}
+                      activeOnly={activeOnly}
                       onVariantsAutoLoaded={onVariantsAutoLoaded}
                       variantCache={variantCache}
                       itemDataById={itemDataById}
@@ -709,6 +713,7 @@ export function ProductSelectDialog({
 interface RowSharedProps {
   selectedItemIds: Set<string>;
   onToggleItem: (id: string, checked: boolean) => void;
+  activeOnly: boolean;
   showQuantityPrice: boolean;
   getQty: (id: string) => number;
   getPrice: (id: string, data: SelectedProduct) => number;
@@ -792,6 +797,7 @@ function ProductOrOrphanRow({
   onToggleExpand,
   onProductCheckChange,
   onToggleItem,
+  activeOnly,
   onVariantsAutoLoaded,
   onGroupQuickEntry,
   variantCache,
@@ -914,6 +920,7 @@ function ProductOrOrphanRow({
           autoSelect={autoSelect}
           selectedItemIds={selectedItemIds}
           onToggleItem={onToggleItem}
+          activeOnly={activeOnly}
           onVariantsAutoLoaded={onVariantsAutoLoaded}
           variantCache={variantCache}
           itemDataById={itemDataById}
@@ -946,6 +953,7 @@ function VariantRowsWithCache({
   autoSelect,
   selectedItemIds,
   onToggleItem,
+  activeOnly,
   onVariantsAutoLoaded,
   variantCache,
   itemDataById,
@@ -958,7 +966,12 @@ function VariantRowsWithCache({
   const [page, setPage] = useState(1);
 
   const query = useProductVariants(
-    { productId, page, pageSize: VARIANT_PAGE_SIZE },
+    {
+      productId,
+      page,
+      pageSize: VARIANT_PAGE_SIZE,
+      isActive: activeOnly || undefined,
+    },
     true,
   );
 

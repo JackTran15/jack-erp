@@ -189,6 +189,65 @@ export class InventoryItemCrudService extends BaseCrudService<
     throw new NotFoundException(`Record ${id} not found`);
   }
 
+  /** Bulk toggle is_active for org-scoped items ("Ngừng theo dõi" / "Sử dụng lại"). */
+  async setActiveStatus(
+    ids: string[],
+    isActive: boolean,
+    actor: ActorContext,
+  ): Promise<{ updated: number }> {
+    if (!ids?.length) return { updated: 0 };
+    // Rule: hàng hóa đang ở kho Showroom không được ngừng theo dõi — phải chuyển
+    // hàng khỏi Showroom trước. Chỉ chặn khi tắt theo dõi (kích hoạt lại luôn cho phép).
+    if (!isActive) {
+      const inShowroom = await this.dataSource.query<Array<{ code: string }>>(
+        `SELECT DISTINCT i.code AS code
+           FROM stock_balances sb
+           JOIN locations loc ON loc.id = sb.location_id
+           JOIN storages s    ON s.id = loc.storage_id
+           JOIN items i       ON i.id = sb.item_id
+          WHERE sb.organization_id = $1
+            AND sb.item_id = ANY($2::uuid[])
+            AND s.is_main_storage = true
+          ORDER BY i.code`,
+        [actor.organizationId, ids],
+      );
+      if (inShowroom.length) {
+        const codes = inShowroom.slice(0, 5).map((r) => r.code).join(", ");
+        const more = inShowroom.length > 5 ? "…" : "";
+        throw new BadRequestException(
+          `Không thể ngừng theo dõi hàng hóa đang ở Showroom (${codes}${more}).`,
+        );
+      }
+    }
+    const result = await this.repository
+      .createQueryBuilder()
+      .update(ItemEntity)
+      .set({ isActive })
+      .where("id IN (:...ids)", { ids })
+      .andWhere("organization_id = :orgId", { orgId: actor.organizationId })
+      .execute();
+    return { updated: result.affected ?? 0 };
+  }
+
+  /** Block hard-delete once an item has posted movements — MISA parity: use "Ngừng theo dõi" instead. */
+  protected override async beforeDelete(
+    id: string,
+    actor: ActorContext,
+  ): Promise<void> {
+    const rows = await this.dataSource.query<Array<{ exists: boolean }>>(
+      `SELECT EXISTS (
+         SELECT 1 FROM stock_ledger_entries
+         WHERE item_id = $1 AND organization_id = $2
+       ) AS exists`,
+      [id, actor.organizationId],
+    );
+    if (rows[0]?.exists) {
+      throw new BadRequestException(
+        "Hàng hóa đã phát sinh chứng từ nên không thể xóa. Hãy dùng 'Ngừng theo dõi'.",
+      );
+    }
+  }
+
   /**
    * Full create: split nested arrays from the item payload, save the item,
    * then upsert providers / units / threshold / initial stock —
@@ -1170,11 +1229,12 @@ export class InventoryItemCrudService extends BaseCrudService<
     actor: ActorContext,
     query: ProductGroupsQueryDto,
   ): Promise<{ data: ProductGroupRow[]; total: number }> {
-    const { page = 1, pageSize = 20, search, categoryId } = query;
+    const { page = 1, pageSize = 20, search, categoryId, isActive } = query;
     const orgId = actor.organizationId;
     const offset = (page - 1) * pageSize;
     const searchParam = search?.trim() ? `%${search.trim()}%` : null;
     const catParam = categoryId ?? null;
+    const isActiveParam = isActive ?? null;
 
     const dataSql = `
       WITH combined AS (
@@ -1197,6 +1257,7 @@ export class InventoryItemCrudService extends BaseCrudService<
         INNER JOIN items i
           ON i.product_id = p.id
           AND i.organization_id = $1
+          AND ($6::boolean IS NULL OR i.is_active = $6)
         LEFT JOIN inventory_item_categories ic
           ON ic.id = i.category_id
         WHERE p.organization_id = $1
@@ -1228,6 +1289,7 @@ export class InventoryItemCrudService extends BaseCrudService<
           AND i.product_id IS NULL
           AND ($2::text IS NULL OR i.code ILIKE $2 OR i.name ILIKE $2 OR ic.name ILIKE $2)
           AND ($3::uuid IS NULL OR ic.id = $3::uuid)
+          AND ($6::boolean IS NULL OR i.is_active = $6)
       )
       SELECT * FROM combined ORDER BY code ASC
       LIMIT $4 OFFSET $5
@@ -1238,6 +1300,7 @@ export class InventoryItemCrudService extends BaseCrudService<
         SELECT p.id
         FROM products p
         INNER JOIN items i ON i.product_id = p.id AND i.organization_id = $1
+          AND ($4::boolean IS NULL OR i.is_active = $4)
         LEFT JOIN inventory_item_categories ic ON ic.id = i.category_id
         WHERE p.organization_id = $1
           AND ($2::text IS NULL OR p.code ILIKE $2 OR p.name ILIKE $2 OR ic.name ILIKE $2)
@@ -1252,17 +1315,22 @@ export class InventoryItemCrudService extends BaseCrudService<
         WHERE i.organization_id = $1 AND i.product_id IS NULL
           AND ($2::text IS NULL OR i.code ILIKE $2 OR i.name ILIKE $2 OR ic.name ILIKE $2)
           AND ($3::uuid IS NULL OR ic.id = $3::uuid)
+          AND ($4::boolean IS NULL OR i.is_active = $4)
       )
       SELECT COUNT(*)::int AS total FROM combined
     `;
 
     const baseParams = [orgId, searchParam, catParam];
     const [countResult, data] = await Promise.all([
-      this.dataSource.query<{ total: number }[]>(countSql, baseParams),
+      this.dataSource.query<{ total: number }[]>(countSql, [
+        ...baseParams,
+        isActiveParam,
+      ]),
       this.dataSource.query<ProductGroupRow[]>(dataSql, [
         ...baseParams,
         pageSize,
         offset,
+        isActiveParam,
       ]),
     ]);
 
@@ -1426,6 +1494,10 @@ export class InventoryItemCrudService extends BaseCrudService<
       .orderBy("i.code", "ASC")
       .skip(offset)
       .take(pageSize);
+
+    if (query.isActive !== undefined) {
+      qb.andWhere("i.isActive = :isActive", { isActive: query.isActive });
+    }
 
     const [items, total] = await qb.getManyAndCount();
 

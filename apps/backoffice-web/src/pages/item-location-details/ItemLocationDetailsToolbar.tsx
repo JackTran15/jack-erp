@@ -11,6 +11,7 @@ interface ToolbarOptions {
   isFetching: boolean;
   hasSelection: boolean;
   onReload: () => void;
+  onStopTracking: () => void;
   onOpenArrange: () => void;
   onOpenTransfer: () => void;
 }
@@ -19,6 +20,7 @@ export function buildItemLocationToolbarItems({
   isFetching,
   hasSelection,
   onReload,
+  onStopTracking,
   onOpenArrange,
   onOpenTransfer,
 }: ToolbarOptions): ToolbarItem[] {
@@ -37,9 +39,9 @@ export function buildItemLocationToolbarItems({
       id: "stop-watch",
       label: "Ngừng theo dõi",
       icon: EyeOff,
-      onClick: () => {},
-      disabled: true,
-      tooltip: selectionTooltip,
+      onClick: onStopTracking,
+      disabled: !hasSelection,
+      tooltip: hasSelection ? undefined : "Chọn dòng để dùng tính năng này",
     },
     {
       id: "arrange",

@@ -2,9 +2,20 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { DocumentListShell, PageToolbar } from "@erp/ui";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DocumentListShell,
+  PageToolbar,
+} from "@erp/ui";
 import type { StockByLocationItem } from "@erp/shared-interfaces";
 import { buildItemLocationToolbarItems } from "./ItemLocationDetailsToolbar";
+import { setItemsActiveStatus } from "../../api/inventory-items";
 import { BaseDataTable } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import type { ColumnFilter, ColumnFilterMode } from "../../components/table/pagination.dto";
@@ -64,12 +75,16 @@ export function ItemLocationDetailsPage() {
   const [searchParams] = useSearchParams();
   const locationId = searchParams.get("locationId")?.trim() || "";
   const isLocationDetail = Boolean(locationId);
-  const [filters, setFilters] = useState<Record<string, ColumnFilter>>({});
+  const [filters, setFilters] = useState<Record<string, ColumnFilter>>({
+    isActive: { mode: "equals", value: "true" },
+  });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [arrangeOpen, setArrangeOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [stopConfirmOpen, setStopConfirmOpen] = useState(false);
+  const [stopSubmitting, setStopSubmitting] = useState(false);
   const activeBranchId = getActiveBranch();
 
   useEffect(() => {
@@ -172,6 +187,7 @@ export function ItemLocationDetailsPage() {
             name: row.name,
             unit: row.unit,
             categoryName: row.categoryName,
+            isActive: row.isActive,
           },
           location: {
             id: location.id,
@@ -190,6 +206,12 @@ export function ItemLocationDetailsPage() {
     selectedIds,
     stockRows,
   ]);
+
+  // Ngừng theo dõi áp dụng cấp item; một item ở nhiều vị trí → dedupe theo item id.
+  const selectedItemIds = useMemo(
+    () => Array.from(new Set(selectedTransferRows.map((row) => row.item.id))),
+    [selectedTransferRows],
+  );
 
   const onModeChange = (fieldKey: string, mode: ColumnFilterMode) => {
     setFilters((prev) => ({
@@ -321,12 +343,29 @@ export function ItemLocationDetailsPage() {
     [qc, isLocationDetail],
   );
 
+  const confirmStopTracking = useCallback(async () => {
+    if (selectedItemIds.length === 0) return;
+    setStopSubmitting(true);
+    try {
+      await setItemsActiveStatus(selectedItemIds, false);
+      toast.success(`Đã ngừng theo dõi ${selectedItemIds.length} hàng hóa.`);
+      setSelectedIds(new Set());
+      void reload();
+      setStopConfirmOpen(false);
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    } finally {
+      setStopSubmitting(false);
+    }
+  }, [selectedItemIds, reload]);
+
   const toolbarItems = useMemo(
     () =>
       buildItemLocationToolbarItems({
         isFetching,
         hasSelection,
         onReload: reload,
+        onStopTracking: () => setStopConfirmOpen(true),
         onOpenArrange: () => setArrangeOpen(true),
         onOpenTransfer: () => setTransferOpen(true),
       }),
@@ -399,6 +438,32 @@ export function ItemLocationDetailsPage() {
         onSaved={reload}
         selectedRows={selectedTransferRows}
       />
+      <Dialog open={stopConfirmOpen} onOpenChange={setStopConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ngừng theo dõi hàng hóa</DialogTitle>
+            <DialogDescription>
+              {`Bạn có chắc muốn ngừng theo dõi ${selectedItemIds.length} hàng hóa trong vị trí đã chọn?`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setStopConfirmOpen(false)}
+            >
+              Huỷ
+            </Button>
+            <Button
+              type="button"
+              disabled={stopSubmitting}
+              onClick={() => void confirmStopTracking()}
+            >
+              {stopSubmitting ? "Đang xử lý..." : "Ngừng theo dõi"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

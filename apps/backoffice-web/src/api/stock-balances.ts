@@ -22,6 +22,7 @@ export interface StockBalanceRow {
     name: string;
     unit: string;
     categoryName: string | null;
+    isActive: boolean;
   };
   location: {
     id: string;
@@ -56,6 +57,7 @@ export interface StockBalancesQuery {
   itemId?: string;
   locationId?: string;
   storageId?: string;
+  isActive?: boolean;
   // Per-column symbol filters
   locationCode?: string;
   locationCodeMode?: StringFilterMode;

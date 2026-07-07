@@ -811,6 +811,7 @@ export class InventoryLocationService {
   async getLocationById(id: string, actor: ActorContext): Promise<LocationEntity> {
     const location = await this.locationRepo.findOne({
       where: { id, organizationId: actor.organizationId },
+      relations: { storage: true },
     });
     if (!location) {
       throw new NotFoundException(`Location ${id} not found`);
@@ -829,6 +830,14 @@ export class InventoryLocationService {
     if (location.isUnassigned) {
       throw new BadRequestException('Không thể sửa vị trí hệ thống "Chưa xếp".');
     }
+    if (
+      dto.isActive === false &&
+      (location.isDefault || location.storage?.isMainStorage)
+    ) {
+      throw new BadRequestException(
+        'Không thể ngừng hoạt động vị trí showroom mặc định.',
+      );
+    }
 
     const codeChanged = dto.code != null && dto.code !== location.code;
     const storageChanged =
@@ -839,7 +848,7 @@ export class InventoryLocationService {
     // entries belong to). Block it — move the stock with a transfer first.
     if (storageChanged) {
       const target = await this.getStorageById(dto.storageId!, actor);
-      if (target.branchId !== location.branchId) {
+      if (target.branchId !== location.storage?.branchId) {
         throw new BadRequestException(
           'Không thể chuyển vị trí sang kho thuộc chi nhánh khác.',
         );

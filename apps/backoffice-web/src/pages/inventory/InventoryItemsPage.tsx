@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { CrudListPage } from "../../components/crud/CrudListPage";
+import {
+  CrudListPage,
+  type CrudListInventoryActionContext,
+} from "../../components/crud/CrudListPage";
 import { ProductSelectDialog } from "../../components/shared/product-select/ProductSelectDialog";
+import { setItemsActiveStatus } from "../../api/inventory-items";
 import { ImportInventoryDialog } from "./_components/import/ImportInventoryDialog";
 import {
   downloadInventoryExport,
@@ -11,6 +15,28 @@ import {
 export function InventoryItemsPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [exportSelectOpen, setExportSelectOpen] = useState(false);
+
+  const applyTracking = (
+    ctx: CrudListInventoryActionContext,
+    isActive: boolean,
+  ) => {
+    if (ctx.selectedRecordIds.length === 0) return;
+    const count = ctx.selectedRecordIds.length;
+    setItemsActiveStatus(ctx.selectedRecordIds, isActive)
+      .then(() => {
+        toast.success(
+          isActive
+            ? `Đã sử dụng lại ${count} hàng hoá.`
+            : `Đã ngừng theo dõi ${count} hàng hoá.`,
+        );
+        ctx.refetchRecords();
+      })
+      .catch((err: unknown) =>
+        toast.error(
+          err instanceof Error ? err.message : "Cập nhật trạng thái thất bại",
+        ),
+      );
+  };
 
   return (
     <CrudListPage
@@ -29,6 +55,8 @@ export function InventoryItemsPage() {
             );
         },
         onExportInventorySelected: () => setExportSelectOpen(true),
+        onStopTracking: (ctx) => applyTracking(ctx, false),
+        onResumeTracking: (ctx) => applyTracking(ctx, true),
         exportOptions: [
           {
             id: "inventory-export-all",

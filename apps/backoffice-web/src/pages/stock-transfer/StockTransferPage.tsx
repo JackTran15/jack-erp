@@ -1604,6 +1604,7 @@ function TransferFormDialog({
       {productPickerOpen && (
         <ProductSelectDialog
           open
+          activeOnly
           onOpenChange={setProductPickerOpen}
           showQuantityPrice
           defaultUnitPriceSource="none"

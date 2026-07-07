@@ -5411,6 +5411,15 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Chỉ lấy hàng đang theo dõi (is_active). Bỏ trống = lấy tất cả.",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -5497,6 +5506,15 @@
                 "asc",
                 "desc"
               ]
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Chỉ lấy hàng đang theo dõi (is_active). Bỏ trống = lấy tất cả.",
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -21272,7 +21290,7 @@
           },
           "quantity": {
             "type": "number",
-            "minimum": 0.000001,
+            "minimum": 1e-06,
             "description": "Số lượng cần xếp. Bỏ trống để lấy toàn bộ tồn ở vị trí \"Chưa xếp\"."
           }
         },
@@ -24108,7 +24126,7 @@
           },
           "quantity": {
             "type": "number",
-            "minimum": 0.000001,
+            "minimum": 1e-06,
             "description": "Quantity to transfer (must be > 0)"
           },
           "sourceLocationId": {

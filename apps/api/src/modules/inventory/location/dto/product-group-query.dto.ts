@@ -1,6 +1,15 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsInt, Min, Max, IsString, IsIn, IsUUID } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsInt, Min, Max, IsString, IsIn, IsUUID, IsBoolean } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
+
+function parseBool(value: unknown): boolean | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value === 'boolean') return value;
+  const v = String(value).toLowerCase();
+  if (v === 'true' || v === '1') return true;
+  if (v === 'false' || v === '0') return false;
+  return undefined;
+}
 
 export class ProductGroupsQueryDto {
   @ApiPropertyOptional({ minimum: 1, default: 1 })
@@ -37,6 +46,14 @@ export class ProductGroupsQueryDto {
   @IsOptional()
   @IsUUID()
   categoryId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Chỉ lấy hàng đang theo dõi (is_active). Bỏ trống = lấy tất cả.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => parseBool(value))
+  @IsBoolean()
+  isActive?: boolean;
 }
 
 export class ProductItemsQueryDto {
@@ -59,6 +76,14 @@ export class ProductItemsQueryDto {
   @IsOptional()
   @IsIn(['asc', 'desc'])
   sortOrder?: 'asc' | 'desc' = 'asc';
+
+  @ApiPropertyOptional({
+    description: 'Chỉ lấy hàng đang theo dõi (is_active). Bỏ trống = lấy tất cả.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => parseBool(value))
+  @IsBoolean()
+  isActive?: boolean;
 }
 
 export interface ProductGroupRow {

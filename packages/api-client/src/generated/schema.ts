@@ -13114,6 +13114,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 categoryId?: string;
+                /** @description Chỉ lấy hàng đang theo dõi (is_active). Bỏ trống = lấy tất cả. */
+                isActive?: boolean;
             };
             header?: never;
             path?: never;
@@ -13156,6 +13158,8 @@ export interface operations {
                 page?: number;
                 pageSize?: number;
                 sortOrder?: "asc" | "desc";
+                /** @description Chỉ lấy hàng đang theo dõi (is_active). Bỏ trống = lấy tất cả. */
+                isActive?: boolean;
             };
             header?: never;
             path: {

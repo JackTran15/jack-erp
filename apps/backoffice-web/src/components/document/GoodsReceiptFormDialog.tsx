@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Button,
   DocumentFormDialog,
@@ -146,6 +147,7 @@ export function PurchaseOrderFormDialog({
   documentKind?: "warehouse-receipt" | "purchase-import";
 }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isView = mode === "view";
   const canEdit = isView && initial?.status === "DRAFT";
   const isPurchaseImport = documentKind === "purchase-import";
@@ -974,6 +976,9 @@ export function PurchaseOrderFormDialog({
             occurredAt: receivedAtIso,
           },
         );
+        await queryClient.invalidateQueries({
+          queryKey: ["inventory-transfer-orders-importable-count"],
+        });
       } else if (initial && mode === "edit") {
         await apiClient.patch(`/goods-receipts/${initial.id}`, payload);
       } else {
@@ -1017,6 +1022,7 @@ export function PurchaseOrderFormDialog({
     initial,
     mode,
     onSaved,
+    queryClient,
   ]);
 
   const requestClose = () => {
@@ -2051,6 +2057,7 @@ export function PurchaseOrderFormDialog({
       {productPickerOpen && (
         <ProductSelectDialog
           open
+          activeOnly
           onOpenChange={setProductPickerOpen}
           showQuantityPrice
           defaultUnitPriceSource="purchasePrice"
