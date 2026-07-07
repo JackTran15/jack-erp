@@ -27,7 +27,7 @@ function contextFor(user: unknown, headerBranchId?: string): ExecutionContext {
 describe('@Actor() branch resolution', () => {
   const factory = getActorFactory();
 
-  it('prefers a validated X-Branch-Id header over a stale JWT branch', () => {
+  it('prefers the active JWT branch over a different X-Branch-Id header', () => {
     const ctx = contextFor(
       {
         userId: 'user-1',
@@ -39,7 +39,7 @@ describe('@Actor() branch resolution', () => {
       'branch-1',
     );
 
-    expect(factory(undefined, ctx).branchId).toBe('branch-1');
+    expect(factory(undefined, ctx).branchId).toBe('branch-2');
   });
 
   it('falls back to a validated X-Branch-Id header when the JWT has no active branch', () => {

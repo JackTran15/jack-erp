@@ -5378,6 +5378,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/inventory/columns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Column catalog of one inventory report type */
+        get: operations["InventoryReportV2Controller_getColumns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/filter-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dropdown options for the report filters */
+        get: operations["InventoryReportV2Controller_getFilterOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run one inventory report (keyed rows + totals) */
+        post: operations["InventoryReportV2Controller_search"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List saved inventory report templates */
+        get: operations["InventoryReportV2Controller_listTemplates"];
+        put?: never;
+        post: operations["InventoryReportV2Controller_createTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryReportV2Controller_getTemplate"];
+        put?: never;
+        post?: never;
+        delete: operations["InventoryReportV2Controller_deleteTemplate"];
+        options?: never;
+        head?: never;
+        patch: operations["InventoryReportV2Controller_updateTemplate"];
+        trace?: never;
+    };
     "/v2/customers/search": {
         parameters: {
             query?: never;
@@ -9646,6 +9730,73 @@ export interface components {
             purpose?: "OTHER" | "DISPOSAL";
             /** @default true */
             isActive: boolean;
+        };
+        InventoryReportFilterDto: {
+            /**
+             * @description Period preset; used when `period` is absent. Default: this_month.
+             * @enum {string}
+             */
+            preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
+            /**
+             * @description Item-dimension grain (default item).
+             * @enum {string}
+             */
+            statBy?: "item" | "parent" | "group";
+            /** @description Custom period (inclusive ISO dates). Wins over `preset` when set. */
+            period?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Multi-store scope. Absent or scope="all" ⇒ org-wide (legacy parity). */
+            store?: components["schemas"]["StoreScopeDto"];
+            /** @description Storage (warehouse) ids — resolved to their locations by the backend. */
+            warehouseIds?: string[];
+            /**
+             * Format: uuid
+             * @description Item category (product group) filter.
+             */
+            categoryId?: string;
+            /** @description Filter by unit name — applied in-memory on result rows. */
+            unit?: string;
+            /** @description Filter by denormalized item brand — applied in-memory on result rows. */
+            brand?: string;
+            /**
+             * Format: uuid
+             * @description transfer-by-store only — source branch; default = actor's branch.
+             */
+            sourceStoreId?: string;
+            /** @description transfer-by-store only — destination branches. */
+            receivingStoreIds?: string[];
+            /** @description Hide rows with all-zero measures (stock-period reports; default true). */
+            hideZeroRows?: boolean;
+            /** @description Free-text search on item code/name. */
+            search?: string;
+        };
+        InventoryReportSearchDto: {
+            /** @description Which backend report definition to run (see INVENTORY_REPORT_KEYS). */
+            reportType: string;
+            /** @description Selected column keys (fixed keys + dynamic `branch.qty.<branchId>` for the pivot). */
+            columns: string[];
+            filters: components["schemas"]["InventoryReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+        };
+        CreateInventoryReportTemplateDto: {
+            reportType: string;
+            name: string;
+            description?: string;
+            columns: components["schemas"]["ReportTemplateColumnDto"][];
+            filters?: components["schemas"]["InventoryReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            sortOrder?: number;
+        };
+        UpdateInventoryReportTemplateDto: {
+            name?: string;
+            description?: string;
+            columns?: components["schemas"]["ReportTemplateColumnDto"][];
+            filters?: components["schemas"]["InventoryReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            sortOrder?: number;
         };
         CustomerSearchV2Dto: {
             /** @default 1 */
@@ -18290,7 +18441,7 @@ export interface operations {
         parameters: {
             query: {
                 /** @description Which dropdown to load (store, cashier, invoiceStatus, …). */
-                type: "store" | "cashier" | "salesperson" | "customer" | "productGroup" | "brand" | "unit" | "invoiceStatus" | "statDateType" | "productType" | "statBy";
+                type: "store" | "cashier" | "salesperson" | "customer" | "productGroup" | "brand" | "unit" | "warehouse" | "invoiceStatus" | "statDateType" | "productType" | "statBy";
                 /** @description Optional case-insensitive partial search (dynamic types only). */
                 search?: string;
                 page?: number;
@@ -19623,6 +19774,189 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    InventoryReportV2Controller_getColumns: {
+        parameters: {
+            query: {
+                reportType: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InventoryReportV2Controller_getFilterOptions: {
+        parameters: {
+            query: {
+                /** @description Branch ids to restrict warehouse options to */
+                branchIds?: string[];
+                /** @description Which dropdown to load (store, warehouse, productGroup, …). */
+                type: "store" | "cashier" | "salesperson" | "customer" | "productGroup" | "brand" | "unit" | "warehouse" | "invoiceStatus" | "statDateType" | "productType" | "statBy";
+                /** @description Optional case-insensitive partial search (dynamic types only). */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InventoryReportV2Controller_search: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryReportSearchDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InventoryReportV2Controller_listTemplates: {
+        parameters: {
+            query?: {
+                reportType?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InventoryReportV2Controller_createTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInventoryReportTemplateDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InventoryReportV2Controller_getTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InventoryReportV2Controller_deleteTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InventoryReportV2Controller_updateTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateInventoryReportTemplateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };

@@ -14063,6 +14063,7 @@
                 "productGroup",
                 "brand",
                 "unit",
+                "warehouse",
                 "invoiceStatus",
                 "statDateType",
                 "productType",
@@ -16841,6 +16842,313 @@
           }
         },
         "summary": "Hàng hóa điều chuyển theo cửa hàng",
+        "tags": [
+          "inventory-reports"
+        ]
+      }
+    },
+    "/reports/inventory/columns": {
+      "get": {
+        "operationId": "InventoryReportV2Controller_getColumns",
+        "parameters": [
+          {
+            "name": "reportType",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Column catalog of one inventory report type",
+        "tags": [
+          "inventory-reports"
+        ]
+      }
+    },
+    "/reports/inventory/filter-options": {
+      "get": {
+        "operationId": "InventoryReportV2Controller_getFilterOptions",
+        "parameters": [
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Branch ids to restrict warehouse options to",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "description": "Which dropdown to load (store, warehouse, productGroup, …).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "store",
+                "cashier",
+                "salesperson",
+                "customer",
+                "productGroup",
+                "brand",
+                "unit",
+                "warehouse",
+                "invoiceStatus",
+                "statDateType",
+                "productType",
+                "statBy"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Optional case-insensitive partial search (dynamic types only).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Dropdown options for the report filters",
+        "tags": [
+          "inventory-reports"
+        ]
+      }
+    },
+    "/reports/inventory/search": {
+      "post": {
+        "operationId": "InventoryReportV2Controller_search",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryReportSearchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Run one inventory report (keyed rows + totals)",
+        "tags": [
+          "inventory-reports"
+        ]
+      }
+    },
+    "/reports/inventory/templates": {
+      "get": {
+        "operationId": "InventoryReportV2Controller_listTemplates",
+        "parameters": [
+          {
+            "name": "reportType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List saved inventory report templates",
+        "tags": [
+          "inventory-reports"
+        ]
+      },
+      "post": {
+        "operationId": "InventoryReportV2Controller_createTemplate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInventoryReportTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "inventory-reports"
+        ]
+      }
+    },
+    "/reports/inventory/templates/{id}": {
+      "get": {
+        "operationId": "InventoryReportV2Controller_getTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "inventory-reports"
+        ]
+      },
+      "patch": {
+        "operationId": "InventoryReportV2Controller_updateTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInventoryReportTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "inventory-reports"
+        ]
+      },
+      "delete": {
+        "operationId": "InventoryReportV2Controller_deleteTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
         "tags": [
           "inventory-reports"
         ]
@@ -30162,6 +30470,210 @@
           "isActive": {
             "type": "boolean",
             "default": true
+          }
+        }
+      },
+      "InventoryReportFilterDto": {
+        "type": "object",
+        "properties": {
+          "preset": {
+            "type": "string",
+            "description": "Period preset; used when `period` is absent. Default: this_month.",
+            "enum": [
+              "today",
+              "this_week",
+              "last_week",
+              "this_month",
+              "last_month",
+              "this_quarter",
+              "this_year",
+              "custom"
+            ]
+          },
+          "statBy": {
+            "type": "string",
+            "description": "Item-dimension grain (default item).",
+            "enum": [
+              "item",
+              "parent",
+              "group"
+            ]
+          },
+          "period": {
+            "description": "Custom period (inclusive ISO dates). Wins over `preset` when set.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "store": {
+            "description": "Multi-store scope. Absent or scope=\"all\" ⇒ org-wide (legacy parity).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StoreScopeDto"
+              }
+            ]
+          },
+          "warehouseIds": {
+            "description": "Storage (warehouse) ids — resolved to their locations by the backend.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "Item category (product group) filter.",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string",
+            "description": "Filter by unit name — applied in-memory on result rows."
+          },
+          "brand": {
+            "type": "string",
+            "description": "Filter by denormalized item brand — applied in-memory on result rows."
+          },
+          "sourceStoreId": {
+            "type": "string",
+            "description": "transfer-by-store only — source branch; default = actor's branch.",
+            "format": "uuid"
+          },
+          "receivingStoreIds": {
+            "description": "transfer-by-store only — destination branches.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "hideZeroRows": {
+            "type": "boolean",
+            "description": "Hide rows with all-zero measures (stock-period reports; default true)."
+          },
+          "search": {
+            "type": "string",
+            "description": "Free-text search on item code/name."
+          }
+        }
+      },
+      "InventoryReportSearchDto": {
+        "type": "object",
+        "properties": {
+          "reportType": {
+            "type": "string",
+            "description": "Which backend report definition to run (see INVENTORY_REPORT_KEYS)."
+          },
+          "columns": {
+            "description": "Selected column keys (fixed keys + dynamic `branch.qty.<branchId>` for the pivot).",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "$ref": "#/components/schemas/InventoryReportFilterDto"
+          },
+          "columnFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFilterDto"
+            }
+          },
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 500
+          }
+        },
+        "required": [
+          "reportType",
+          "columns",
+          "filters"
+        ]
+      },
+      "CreateInventoryReportTemplateDto": {
+        "type": "object",
+        "properties": {
+          "reportType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string"
+          },
+          "columns": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportTemplateColumnDto"
+            }
+          },
+          "filters": {
+            "$ref": "#/components/schemas/InventoryReportFilterDto"
+          },
+          "columnFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFilterDto"
+            }
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "reportType",
+          "name",
+          "columns"
+        ]
+      },
+      "UpdateInventoryReportTemplateDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string"
+          },
+          "columns": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportTemplateColumnDto"
+            }
+          },
+          "filters": {
+            "$ref": "#/components/schemas/InventoryReportFilterDto"
+          },
+          "columnFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFilterDto"
+            }
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 0
           }
         }
       },

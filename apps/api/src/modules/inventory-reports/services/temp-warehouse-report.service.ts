@@ -7,11 +7,27 @@ import { DataSource } from 'typeorm';
  * Mỗi dòng = một **cặp xuất↔trả đã ghép** (data-cleaning), KHÔNG phải per-line.
  * Hệ thống ghép lần xuất (warehouse_to_showroom) với lần trả
  * (showroom_to_warehouse) của **cùng item + cùng người vận chuyển (carrier)**,
- * ghép FIFO theo thời gian (`row_number` theo `created_at`):
- *   - Xuất chưa trả        → outQty=1, returnQty=0, status "Xuất không bán".
- *   - Xuất đã được trả lại → outQty=1, returnQty=1, status rỗng (cân bằng,
- *     SL trả === SL xuất nên không gắn label trạng thái).
- *   - Trả lẻ (không khớp xuất nào) → outQty=0, returnQty=1, status "Trả hàng trưng bày".
+ * ghép FIFO theo thời gian (`row_number` theo `created_at`).
+ *
+ * `temp_warehouse_lines` chuyển sang status TRANSFERRED (+ `transfer_id` tới
+ * `stock_transfers`) qua 2 luồng độc lập (xem `TempWarehouseService`):
+ *   - POS checkout tiêu thụ dòng xuất đang staged → set CẢ `transfer_id` LẪN
+ *     `invoice_id`/`invoice_number` cùng lúc.
+ *   - Nút "Xử lý chuyển kho" (tab Xuất đi / Trả lại) → chỉ set `transfer_id`,
+ *     `invoice_id` luôn NULL. Vì vậy `invoice_id IS NOT NULL` mới là tín hiệu
+ *     "đã bán" đáng tin cậy; `transfer_id IS NOT NULL` (khi đã loại bán hàng)
+ *     nghĩa là dòng đó được xử lý chuyển kho thủ công, không phải nhập/trả
+ *     bình thường.
+ *
+ * Trạng thái (ưu tiên theo thứ tự, dừng ở nhánh khớp đầu tiên):
+ *   - Dòng xuất có invoice_id           → "Bán hàng trưng bày".
+ *   - Dòng xuất có transfer_id (không bán) → "Chuyển kho xuất đi".
+ *   - Dòng trả có transfer_id           → "Chuyển kho trả lại" (kiểm tra
+ *     trước cả nhánh cân bằng, vì 1 cặp ghép FIFO có thể vẫn "cân bằng" số
+ *     lượng dù phía trả đã được xử lý chuyển kho thay vì trả thường).
+ *   - Ghép cặp cân bằng (SL trả === SL xuất, không cờ nào ở trên) → rỗng.
+ *   - Trả lẻ (không khớp xuất nào)      → "Trả hàng trưng bày".
+ *   - Còn lại (xuất chưa trả, chưa bán, chưa chuyển) → "Xuất không bán".
  *
  * Mapping cột → dữ liệu:
  *   - date/time    : thời điểm xuất (COALESCE xuất → trả).
@@ -119,6 +135,7 @@ export class TempWarehouseReportService {
           l.direction,
           l.invoice_id,
           l.invoice_number,
+          l.transfer_id,
           s.showroom_location_id
         FROM temp_warehouse_lines l
         JOIN temp_warehouse_sessions s ON s.id = l.session_id
@@ -155,7 +172,12 @@ export class TempWarehouseReportService {
           (r.id IS NOT NULL)::int AS return_qty,
           -- Only an issue (warehouse_to_showroom) carries the consuming invoice.
           e.invoice_id AS invoice_id,
-          e.invoice_number AS invoice_number
+          e.invoice_number AS invoice_number,
+          -- transfer_id is set on EITHER side by "Xử lý chuyển kho"; tracked
+          -- separately per side since it distinguishes chuyển-kho-xuất-đi
+          -- (exp side) from chuyển-kho-trả-lại (ret side).
+          e.transfer_id AS exp_transfer_id,
+          r.transfer_id AS ret_transfer_id
         FROM exp e
         FULL OUTER JOIN ret r
           ON e.item_id = r.item_id
@@ -199,6 +221,9 @@ export class TempWarehouseReportService {
         (p.invoice_id IS NOT NULL)::int AS sale_qty,
         COALESCE(sb.quantity, 0) AS remaining_qty,
         CASE
+          WHEN p.invoice_id IS NOT NULL THEN 'Bán hàng trưng bày'
+          WHEN p.exp_transfer_id IS NOT NULL THEN 'Chuyển kho xuất đi'
+          WHEN p.ret_transfer_id IS NOT NULL THEN 'Chuyển kho trả lại'
           WHEN p.return_qty = p.out_qty THEN ''
           WHEN p.return_qty = 1 THEN 'Trả hàng trưng bày'
           ELSE 'Xuất không bán'

@@ -240,21 +240,21 @@ export const navConfig: NavModule[] = [
           label: category.label,
         }))
       },
-      {
-        id: "reports-overview",
-        label: "Tổng hợp",
-        children: [{ to: "/reports", label: "Bảng tổng hợp", end: true }],
-      },
-      {
-        id: "reports-detail",
-        label: "Chi tiết",
-        children: [
-          // { to: "/reports/sales", label: "Doanh số" },
-          { to: "/reports/inventory", label: "Tồn kho" },
-          { to: "/reports/aging", label: "Công nợ" },
-          { to: "/reports/cash", label: "Tiền mặt" },
-        ],
-      },
+      // {
+      //   id: "reports-overview",
+      //   label: "Tổng hợp",
+      //   children: [{ to: "/reports", label: "Bảng tổng hợp", end: true }],
+      // },
+      // {
+      //   id: "reports-detail",
+      //   label: "Chi tiết",
+      //   children: [
+      //     // { to: "/reports/sales", label: "Doanh số" },
+      //     { to: "/reports/inventory", label: "Tồn kho" },
+      //     { to: "/reports/aging", label: "Công nợ" },
+      //     { to: "/reports/cash", label: "Tiền mặt" },
+      //   ],
+      // },
       // {
       //   id: "storage-reports",
       //   label: "Báo cáo kho",

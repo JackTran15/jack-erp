@@ -42,6 +42,17 @@ export function createReportStore(
               toDate: range.to,
             };
           }
+          // Đổi cửa hàng -> kho đã chọn có thể thuộc cửa hàng khác: reset.
+          if (line === REPORT_FILTERS_LINE.STORE) {
+            filters[REPORT_FILTERS_LINE.WAREHOUSE] = "";
+          }
+          // Đổi cửa hàng xuất -> nếu trùng cửa hàng nhận đang chọn, reset về "Tất cả".
+          if (
+            line === REPORT_FILTERS_LINE.SOURCE_STORE &&
+            s.filters[REPORT_FILTERS_LINE.RECEIVING_STORE] === value
+          ) {
+            filters[REPORT_FILTERS_LINE.RECEIVING_STORE] = "";
+          }
           // eslint-disable-next-line no-console
           console.log("[report-filter] change", {
             filters,

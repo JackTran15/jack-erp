@@ -44,6 +44,10 @@ export interface TreeSelectInputProps {
   error?: string;
   disabled?: boolean;
   inputId?: string;
+  /** Extra classes for the text input (e.g. "h-9 text-xs" in dense filter rows). */
+  inputClassName?: string;
+  /** Render a pinned "all/none" option at the top that selects the empty value. */
+  allOptionLabel?: string;
   onSelectItem?: (item: RawItem) => void;
 }
 
@@ -164,6 +168,8 @@ export function TreeSelectInput({
   error,
   disabled,
   inputId,
+  inputClassName,
+  allOptionLabel,
   onSelectItem,
 }: TreeSelectInputProps) {
   const fallbackId = useId();
@@ -191,8 +197,8 @@ export function TreeSelectInput({
   useEffect(() => {
     setPaging({ page: 0, total: 0, loaded: 0, query: "" });
     setAllItems([]);
-    setInputText("");
-  }, [entityKey]);
+    setInputText(allOptionLabel ?? "");
+  }, [entityKey, allOptionLabel]);
 
   const fetchRecord = useCallback(
     async (recordId: string): Promise<RawItem | null> => {
@@ -293,7 +299,7 @@ export function TreeSelectInput({
   // Sync display text when value changes externally (edit prefill)
   useEffect(() => {
     if (!value) {
-      setInputText("");
+      setInputText(allOptionLabel ?? "");
       return;
     }
     const found = allItemsRef.current.find((i) => i.id === value);
@@ -316,14 +322,19 @@ export function TreeSelectInput({
     const handler = (e: MouseEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
         setOpen(false);
+        if (!value) setInputText(allOptionLabel ?? "");
       }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  }, [open, value, allOptionLabel]);
 
   const handleFocus = () => {
     if (!disabled) {
+      // inputText may hold the "all" display label rather than a real search
+      // query — clear it so opening the dropdown loads the full tree instead
+      // of searching for a category literally named e.g. "Tất cả nhóm".
+      if (!value) setInputText("");
       setOpen(true);
     }
   };
@@ -350,7 +361,7 @@ export function TreeSelectInput({
 
   const handleClear = () => {
     onChange("");
-    setInputText("");
+    setInputText(allOptionLabel ?? "");
   };
 
   const showDropdown = open;
@@ -380,7 +391,7 @@ export function TreeSelectInput({
             if (e.target.value === "") onChange("");
           }}
           onFocus={handleFocus}
-          className="pr-7"
+          className={["pr-7", inputClassName].filter(Boolean).join(" ")}
         />
         {value && !disabled && (
           <button
@@ -401,7 +412,7 @@ export function TreeSelectInput({
             <div className="px-3 py-2 text-sm text-muted-foreground">
               Đang tải…
             </div>
-          ) : displayNodes.length === 0 ? (
+          ) : displayNodes.length === 0 && !allOptionLabel ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">
               {query ? "Không tìm thấy." : "Không có nhóm nào."}
             </div>
@@ -411,6 +422,23 @@ export function TreeSelectInput({
               onScroll={handleDropdownScroll}
             >
               <ul role="listbox" className="py-1">
+                {allOptionLabel ? (
+                  <li
+                    role="option"
+                    aria-selected={!value}
+                    className={[
+                      "cursor-pointer px-3 py-1.5 text-sm",
+                      !value ? "bg-primary/10" : "hover:bg-muted",
+                    ].join(" ")}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleClear();
+                      setOpen(false);
+                    }}
+                  >
+                    {allOptionLabel}
+                  </li>
+                ) : null}
                 {displayNodes.map((node) => (
                   <li
                     key={node.id}

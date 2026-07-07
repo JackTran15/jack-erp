@@ -189,13 +189,8 @@ export function App() {
                   path="/reports/sales"
                   element={<ReportPage category={REPORT_CATEGORY.SALES} />}
                 />
-                
                 <Route
                   path="/reports/inventory"
-                  element={<InventoryReportPage />}
-                />
-                <Route
-                  path="/reports/chain-inventory"
                   element={<ReportPage category={REPORT_CATEGORY.INVENTORY} />}
                 />
                 

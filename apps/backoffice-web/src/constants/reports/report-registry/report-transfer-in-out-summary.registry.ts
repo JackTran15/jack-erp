@@ -55,10 +55,11 @@ const tableConfig: ReportTableConfig = { summaryLabel: "Tổng", columns };
 export const single_tableRegistryReportTransferInOutSummary = tableConfig;
 export const chain_tableRegistryReportTransferInOutSummary = tableConfig;
 
-const filterLines = [
-  REPORT_FILTERS_LINE.STORE,
+// SINGLE: cửa hàng cố định theo header → không có dòng Cửa hàng; CHAIN: có.
+const singleFilterLines = [
   REPORT_FILTERS_LINE.REPORT_PERIOD,
   REPORT_FILTERS_LINE.RANGE_DATE,
 ];
-export const single_filterRegistryReportTransferInOutSummary = filterLines;
-export const chain_filterRegistryReportTransferInOutSummary = filterLines;
+const chainFilterLines = [REPORT_FILTERS_LINE.STORE, ...singleFilterLines];
+export const single_filterRegistryReportTransferInOutSummary = singleFilterLines;
+export const chain_filterRegistryReportTransferInOutSummary = chainFilterLines;

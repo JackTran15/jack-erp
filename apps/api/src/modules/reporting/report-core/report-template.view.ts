@@ -3,11 +3,11 @@ import {
   InvoiceReportFilterPayload,
   InvoiceReportTemplateView,
 } from '@erp/shared-interfaces';
-import { InvoiceReportTemplateEntity } from './invoice-report-template.entity';
+import { ReportTemplateEntity } from './report-template.entity';
 
 /** Map a template entity to its API view, splitting the persisted `filters` blob into scope filters + columnFilters. */
 export function toTemplateView(
-  e: InvoiceReportTemplateEntity,
+  e: ReportTemplateEntity,
 ): InvoiceReportTemplateView {
   const blob = (e.filters ?? {}) as Record<string, unknown>;
   const { columnFilters, ...scope } = blob;
