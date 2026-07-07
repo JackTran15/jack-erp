@@ -6631,6 +6631,7 @@ export interface components {
         };
         CreateBranchDto: {
             name: string;
+            code?: string;
             address?: string;
             phone?: string;
             /** Format: email */
@@ -6640,6 +6641,7 @@ export interface components {
         };
         BranchEntity: {
             name: string;
+            code?: string | null;
             address?: string;
             phone?: string;
             email?: string;
@@ -6671,6 +6673,7 @@ export interface components {
         };
         UpdateBranchDto: {
             name?: string;
+            code?: string;
             address?: string;
             phone?: string;
             /** Format: email */

@@ -29,6 +29,7 @@ import { TreasuryCashCountPage } from "./pages/treasury/cash/TreasuryCashCountPa
 import { TreasuryWipPage } from "./pages/treasury/TreasuryWipPage";
 import { InventoryManagementPage } from "./pages/inventory/InventoryManagementPage";
 import { InventoryItemsPage } from "./pages/inventory/InventoryItemsPage";
+import { InventoryItemBarcodesPage } from "./pages/inventory-item-barcodes/InventoryItemBarcodesPage";
 import { InventoryStoragesPage } from "./pages/inventory/InventoryStoragesPage";
 import { ItemLocationDetailsPage } from "./pages/item-location-details/ItemLocationDetailsPage";
 import { StockTakesPage } from "./pages/stock-takes/StockTakesPage";
@@ -103,6 +104,10 @@ export function App() {
                 <Route
                   path="/admin/inventory-items"
                   element={<InventoryItemsPage />}
+                />
+                <Route
+                  path="/admin/inventory-item-barcodes"
+                  element={<InventoryItemBarcodesPage />}
                 />
                 <Route
                   path="/admin/inventory-storages"

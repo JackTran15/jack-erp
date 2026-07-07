@@ -20816,6 +20816,10 @@
             "minLength": 2,
             "maxLength": 200
           },
+          "code": {
+            "type": "string",
+            "maxLength": 30
+          },
           "address": {
             "type": "string",
             "maxLength": 500
@@ -20842,6 +20846,10 @@
         "properties": {
           "name": {
             "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
           },
           "address": {
             "type": "string"
@@ -20943,6 +20951,10 @@
             "type": "string",
             "minLength": 2,
             "maxLength": 200
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 30
           },
           "address": {
             "type": "string",

@@ -24,6 +24,8 @@ export interface Branch {
   id: string;
   organizationId: string;
   name: string;
+  /** Store code unique per organization — printed on barcode labels. */
+  code?: string;
   address?: string;
   status: BranchStatus;
   createdAt: string;
