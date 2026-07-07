@@ -6,9 +6,7 @@ import type { BarcodePrintSettingsState } from "./barcode-print-settings.interfa
 export const useBarcodePrintSettingsStore = create<BarcodePrintSettingsState>()(
   persist(
     (set) => ({
-      standard: "CODE128",
       paper: DEFAULT_PAPER_CONFIG,
-      setStandard: (standard) => set({ standard }),
       setPaper: (patch) =>
         set((state) => ({ paper: { ...state.paper, ...patch } })),
       resetPaper: () => set({ paper: DEFAULT_PAPER_CONFIG }),
@@ -16,7 +14,6 @@ export const useBarcodePrintSettingsStore = create<BarcodePrintSettingsState>()(
     {
       name: "bo-barcode-print-settings",
       partialize: (state) => ({
-        standard: state.standard,
         paper: state.paper,
       }),
     },

@@ -2,11 +2,6 @@ import JsBarcode from "jsbarcode";
 import { useEffect, useRef } from "react";
 import type { BarcodeLabelRow } from "../../_lib/barcode-label-row.type";
 import { formatBatchCode } from "../../_lib/render-barcode-labels-html";
-import {
-  isValidEan13,
-  resolveBarcodeFormat,
-} from "../../_lib/render-barcode-svg";
-import { useBarcodePrintSettingsStore } from "../../../../store/page-stores/inventory-item-barcodes/barcode-print-settings.store";
 
 const priceFormatter = new Intl.NumberFormat("vi-VN");
 
@@ -26,11 +21,9 @@ interface Props {
 
 /** "Xem trước": một tem live theo layout MISA (SKU/barcode/giá + vị trí/chi nhánh/ngày). */
 export function BarcodeLabelPreview({ row, branchCode }: Props) {
-  const standard = useBarcodePrintSettingsStore((s) => s.standard);
   const svgRef = useRef<SVGSVGElement>(null);
 
   const data = row ?? SAMPLE;
-  const ean13Fallback = standard === "EAN13" && !isValidEan13(data.sku);
   const batchCode = formatBatchCode(new Date());
 
   useEffect(() => {
@@ -38,10 +31,9 @@ export function BarcodeLabelPreview({ row, branchCode }: Props) {
     if (!el || !data.sku) return;
     try {
       JsBarcode(el, data.sku, {
-        format: resolveBarcodeFormat(data.sku, standard),
+        format: "CODE128",
         displayValue: false,
-        // Đồng bộ với renderBarcodeSvg (bản in): quiet zone 10 module mỗi bên,
-        // vạch kéo cao kín vùng barcode.
+        // Quiet zone 10 module mỗi bên, vạch kéo cao kín vùng barcode.
         marginLeft: 14,
         marginRight: 14,
         marginTop: 0,
@@ -55,7 +47,7 @@ export function BarcodeLabelPreview({ row, branchCode }: Props) {
     } catch {
       // Giá trị không vẽ được — giữ SVG trống.
     }
-  }, [data.sku, standard]);
+  }, [data.sku]);
 
   return (
     <div>
@@ -87,11 +79,6 @@ export function BarcodeLabelPreview({ row, branchCode }: Props) {
           </div>
         </div>
       </div>
-      {ean13Fallback ? (
-        <p className="mt-1.5 text-xs text-muted-foreground">
-          Mã không hợp lệ với chuẩn EAN-13 — tem sẽ được in bằng Code 128.
-        </p>
-      ) : null}
     </div>
   );
 }

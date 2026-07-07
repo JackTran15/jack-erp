@@ -1,6 +1,4 @@
-import { Button } from "@erp/ui";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, HelpCircle, LayoutGrid, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -17,8 +15,7 @@ import {
   makeEmptyRow,
   type BarcodeLabelRow,
 } from "./_lib/barcode-label-row.type";
-import { isValidEan13 } from "./_lib/render-barcode-svg";
-import { renderBarcodeLabelsHtml } from "./_lib/render-barcode-labels-html";
+import { renderBarcodeLabelsPdf } from "./_lib/render-barcode-labels-pdf";
 import { printBarcodeLabels } from "./_lib/print-barcode-labels";
 import { resolveItemLocations } from "./_lib/resolve-item-locations";
 import {
@@ -63,12 +60,10 @@ export function InventoryItemBarcodesPage() {
     makeEmpty: makeEmptyRow,
   });
   const [filters, setFilters] = useState<Record<string, string>>({});
-  const [scanMode, setScanMode] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const focusedRowIdRef = useRef<string | null>(null);
 
-  const standard = useBarcodePrintSettingsStore((s) => s.standard);
   const paper = useBarcodePrintSettingsStore((s) => s.paper);
 
   // ─── Reference data ────────────────────────────────────────────────
@@ -198,21 +193,6 @@ export function InventoryItemBarcodesPage() {
     [],
   );
 
-  const handleScanSubmit = useCallback(
-    async (rowId: string, code: string) => {
-      try {
-        const { data } = await apiClient.get<{
-          itemId: string;
-          item: BarcodeItemOption;
-        }>(`/inventory/barcodes/lookup?code=${encodeURIComponent(code)}`);
-        handleSelectItem(rowId, { ...data.item, id: data.itemId });
-      } catch {
-        toast.info(`Không tìm thấy mã vạch "${code}" — thử tìm theo mã hoặc tên hàng`);
-      }
-    },
-    [handleSelectItem],
-  );
-
   /** Thêm các dòng chọn từ dialog "Chọn hàng hóa" (pattern GoodsReceiptFormDialog). */
   const addRowsFromPicker = useCallback(
     (result: ProductSelectResult) => {
@@ -254,13 +234,13 @@ export function InventoryItemBarcodesPage() {
     [rows, resolveRowsLocations],
   );
 
-  const handleCopyRow = useCallback((rowId: string) => {
+  const handleCopyQuantityDown = useCallback((rowId: string) => {
     setRows((prev) => {
-      const source = prev.find((r) => r.rowId === rowId);
-      if (!source || !source.itemId) return prev;
       const index = prev.findIndex((r) => r.rowId === rowId);
-      const clone = { ...source, rowId: crypto.randomUUID() };
-      return [...prev.slice(0, index + 1), clone, ...prev.slice(index + 1)];
+      if (index === -1) return prev;
+      const { quantity } = prev[index];
+      // Chỉ áp cho các dòng bên dưới đã chọn hàng (bỏ qua dòng nhập liệu trống cuối).
+      return prev.map((r, i) => (i > index && r.itemId ? { ...r, quantity } : r));
     });
   }, []);
 
@@ -384,93 +364,38 @@ export function InventoryItemBarcodesPage() {
       toast.error("Chưa có tem nào để in — thêm hàng hóa và số lượng tem");
       return;
     }
-    if (standard === "EAN13") {
-      const invalid = printable.filter((r) => !isValidEan13(r.sku));
-      if (invalid.length) {
-        toast.warning(
-          `${invalid.length} mã không hợp lệ chuẩn EAN-13, sẽ in bằng Code 128`,
-        );
-      }
-    }
     setPrinting(true);
     try {
-      const html = renderBarcodeLabelsHtml(printable, {
-        standard,
+      const pdf = renderBarcodeLabelsPdf(printable, {
         paper,
         printedAt: new Date(),
         branchCode,
       });
-      await printBarcodeLabels(html);
+      await printBarcodeLabels(pdf);
     } finally {
       setPrinting(false);
     }
-  }, [rows, standard, paper, branchCode]);
+  }, [rows, paper, branchCode]);
 
   return (
     <div className="flex min-h-0 w-full flex-1 gap-2.5 overflow-hidden">
       {/* ─── Panel trái: bảng hàng hoá ─────────────────────────────── */}
       <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md border bg-background">
-        {/* Tab bar + link hướng dẫn */}
-        <div className="flex items-stretch justify-between border-b bg-muted/40">
-          <div className="flex">
-            <button
-              type="button"
-              className="border-b-2 border-primary bg-background px-5 py-2.5 text-sm font-bold text-primary"
-            >
-              In tem mã thường
-            </button>
-            <button
-              type="button"
-              className="px-5 py-2.5 text-sm text-muted-foreground hover:text-foreground"
-              onClick={() => toast.info("Chưa hỗ trợ in tem mã khuyến mại")}
-            >
-              In tem mã khuyến mại
-            </button>
-          </div>
-          <div className="flex items-center gap-1.5 px-4 text-sm text-foreground">
-            <HelpCircle className="h-4 w-4 text-muted-foreground" />
-            <span>Xem hướng dẫn in tem</span>
-            <button
-              type="button"
-              className="text-primary hover:underline"
-              onClick={() => toast.info("Tài liệu hướng dẫn chưa sẵn sàng")}
-            >
-              tại đây
-            </button>
-          </div>
-        </div>
-
-        {/* Toolbar */}
-        <div className="flex items-center justify-between gap-4 border-b px-4 py-2">
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="h-4 w-4 shrink-0 accent-primary"
-              checked={scanMode}
-              onChange={(e) => setScanMode(e.target.checked)}
-            />
-            Quét mã vạch để tìm kiếm hàng hóa
-          </label>
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-              onClick={() => toast.info("Chưa hỗ trợ chọn bảng giá")}
-            >
-              <LayoutGrid className="h-4 w-4" />
-              Chọn bảng giá
-            </button>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-9 gap-2 border-primary text-primary"
-              onClick={() => toast.info("Chưa có tiện ích khả dụng")}
-            >
-              <Wrench className="h-4 w-4" />
-              Tiện ích
-              <ChevronDown className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+        {/* Tab bar */}
+        <div className="flex items-stretch border-b bg-muted/40">
+          <button
+            type="button"
+            className="border-b-2 border-primary bg-background px-5 py-2.5 text-sm font-bold text-primary"
+          >
+            In tem mã thường
+          </button>
+          <button
+            type="button"
+            className="px-5 py-2.5 text-sm text-muted-foreground hover:text-foreground"
+            onClick={() => toast.info("Chưa hỗ trợ in tem mã khuyến mại")}
+          >
+            In tem mã khuyến mại
+          </button>
         </div>
 
         {/* Bảng */}
@@ -482,10 +407,8 @@ export function InventoryItemBarcodesPage() {
             searchItems={searchItems}
             onSkuTextChange={handleSkuTextChange}
             onSelectItem={handleSelectItem}
-            onScanSubmit={handleScanSubmit}
-            scanMode={scanMode}
             onQuantityChange={handleQuantityChange}
-            onCopyRow={handleCopyRow}
+            onCopyQuantityDown={handleCopyQuantityDown}
             onDeleteRow={handleDeleteRow}
             onRowFocus={handleRowFocus}
             onOpenProductPicker={() => setProductPickerOpen(true)}

@@ -4,8 +4,8 @@ import type { BarcodePaperConfig } from "./barcode-print-settings.interface";
 export const DEFAULT_PAPER_CONFIG: BarcodePaperConfig = {
   marginTop: 1.05,
   marginBottom: 1.5,
-  marginLeft: 0,
-  marginRight: 0,
+  marginLeft: 2,
+  marginRight: 2,
   paperHeight: 23,
   paperWidth: 104,
   columnWidth: 50,

@@ -1,5 +1,3 @@
-export type BarcodeStandard = "CODE128" | "EAN13";
-
 /** Khổ giấy in tem, mọi giá trị tính bằng mm. */
 export interface BarcodePaperConfig {
   marginTop: number;
@@ -17,9 +15,7 @@ export interface BarcodePaperConfig {
 }
 
 export interface BarcodePrintSettingsState {
-  standard: BarcodeStandard;
   paper: BarcodePaperConfig;
-  setStandard: (standard: BarcodeStandard) => void;
   setPaper: (patch: Partial<BarcodePaperConfig>) => void;
   resetPaper: () => void;
 }

@@ -1,63 +1,24 @@
+import { toast } from "sonner";
+
 /**
- * In một tài liệu HTML tự chứa qua iframe ẩn để `window.print()` mở hộp
- * thoại in mà không dính popup blocker. Port từ BrowserWindowInvoicePrinter
- * của pos-web.
+ * Mở PDF tem trong một tab mới qua blob URL (giống MISA): tạo object URL từ Blob
+ * `application/pdf` rồi window.open → trình xem PDF của trình duyệt. Người dùng tự in.
  */
-export function printBarcodeLabels(html: string): Promise<void> {
-  return new Promise((resolve) => {
-    if (typeof document === "undefined" || typeof window === "undefined") {
-      resolve();
-      return;
-    }
+export function printBarcodeLabels(pdf: Blob): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
 
-    const iframe = document.createElement("iframe");
-    iframe.setAttribute("aria-hidden", "true");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    iframe.style.visibility = "hidden";
-    document.body.appendChild(iframe);
+  const url = URL.createObjectURL(pdf);
+  // window.open phải chạy đồng bộ trong cùng user-gesture của click (handlePrint
+  // không await gì trước khi gọi hàm này) để không bị popup blocker chặn.
+  const tab = window.open(url, "_blank");
 
-    const cleanup = () => {
-      if (iframe.isConnected) iframe.remove();
-      resolve();
-    };
+  if (!tab) {
+    URL.revokeObjectURL(url);
+    toast.error("Trình duyệt đã chặn cửa sổ in — hãy cho phép popup rồi in lại.");
+    return Promise.resolve();
+  }
 
-    const triggerPrint = () => {
-      const win = iframe.contentWindow;
-      if (!win) {
-        cleanup();
-        return;
-      }
-      win.onafterprint = cleanup;
-      try {
-        win.focus();
-        win.print();
-      } catch {
-        cleanup();
-        return;
-      }
-      // Một số browser không bắn onafterprint.
-      setTimeout(cleanup, 60_000);
-    };
-
-    iframe.onload = triggerPrint;
-
-    const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
-    if (!doc) {
-      cleanup();
-      return;
-    }
-    doc.open();
-    doc.write(html);
-    doc.close();
-
-    // Nếu iframe đã complete trước khi gắn onload thì kích hoạt in trực tiếp.
-    if (iframe.contentDocument?.readyState === "complete") {
-      triggerPrint();
-    }
-  });
+  // Tab đã load xong giữ tài liệu; thu hồi URL sau 60s chỉ giải phóng bộ nhớ.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  return Promise.resolve();
 }

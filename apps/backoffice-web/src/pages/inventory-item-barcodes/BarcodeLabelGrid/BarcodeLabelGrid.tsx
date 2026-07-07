@@ -1,5 +1,5 @@
 import { LineItemGrid, type LineColumn } from "@erp/ui";
-import { Copy, Loader2 } from "lucide-react";
+import { ArrowDownToLine, Loader2 } from "lucide-react";
 import { useMemo } from "react";
 import { LookupField } from "../../../components/forms/LookupField";
 import type { BarcodeLabelRow } from "../_lib/barcode-label-row.type";
@@ -37,11 +37,9 @@ interface Props {
   /** Text tự do trong ô SKU của dòng trống (chưa chọn item). */
   onSkuTextChange: (rowId: string, text: string) => void;
   onSelectItem: (rowId: string, item: BarcodeItemOption) => void;
-  /** Enter trong ô SKU khi bật chế độ quét mã vạch. */
-  onScanSubmit: (rowId: string, code: string) => void;
-  scanMode: boolean;
   onQuantityChange: (rowId: string, quantity: number) => void;
-  onCopyRow: (rowId: string) => void;
+  /** Áp số lượng tem của dòng này xuống các dòng bên dưới. */
+  onCopyQuantityDown: (rowId: string) => void;
   onDeleteRow: (rowId: string) => void;
   onRowFocus: (rowId: string) => void;
   /** Mở dialog "Chọn hàng hóa" (icon kính lúp trong ô SKU / Ctrl+F3). */
@@ -56,10 +54,8 @@ export function BarcodeLabelGrid({
   searchItems,
   onSkuTextChange,
   onSelectItem,
-  onScanSubmit,
-  scanMode,
   onQuantityChange,
-  onCopyRow,
+  onCopyQuantityDown,
   onDeleteRow,
   onRowFocus,
   onOpenProductPicker,
@@ -97,23 +93,12 @@ export function BarcodeLabelGrid({
               {row.sku}
             </span>
           ) : (
-            <div
-              className="flex h-full items-center"
-              onKeyDownCapture={(e) => {
-                if (scanMode && e.key === "Enter" && row.sku.trim()) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onScanSubmit(row.rowId, row.sku.trim());
-                }
-              }}
-            >
+            <div className="flex h-full items-center">
               <LookupField
                 inputId={
                   rowIndex === lastRowIndex ? BARCODE_SKU_INPUT_ID : undefined
                 }
-                placeholder={
-                  scanMode ? "Quét mã vạch..." : "Tìm mã hoặc tên hàng hóa"
-                }
+                placeholder="Tìm mã hoặc tên hàng hóa"
                 value={row.sku}
                 onValueChange={(text) => onSkuTextChange(row.rowId, text)}
                 onSelect={(item) => onSelectItem(row.rowId, item)}
@@ -240,10 +225,10 @@ export function BarcodeLabelGrid({
             <button
               type="button"
               className="inline-flex h-8 w-8 items-center justify-center text-primary transition-colors hover:bg-primary/10"
-              onClick={() => onCopyRow(row.rowId)}
-              aria-label="Nhân bản dòng"
+              onClick={() => onCopyQuantityDown(row.rowId)}
+              aria-label="Sao chép số lượng xuống các dòng dưới"
             >
-              <Copy className="h-3.5 w-3.5" />
+              <ArrowDownToLine className="h-3.5 w-3.5" />
             </button>
           ) : (
             <span />
@@ -252,14 +237,12 @@ export function BarcodeLabelGrid({
     ],
     [
       lastRowIndex,
-      onCopyRow,
+      onCopyQuantityDown,
       onOpenProductPicker,
       onQuantityChange,
       onRowFocus,
-      onScanSubmit,
       onSelectItem,
       onSkuTextChange,
-      scanMode,
       searchItems,
     ],
   );
