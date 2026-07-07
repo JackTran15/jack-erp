@@ -4,11 +4,17 @@ import type {
 } from "../../components/table/BaseDataTable";
 import type { StockBalanceRow } from "../../api/stock-balances";
 import type { StockByLocationItem } from "@erp/shared-interfaces";
+import { ActiveStatusBadge } from "../../components/status/StatusBadge";
 
 function displayLocationName(row: StockBalanceRow): string {
   if (row.location.code === "__UNASSIGNED__") return "Chưa xếp";
   return row.location.name || "—";
 }
+
+const STATUS_FILTER_OPTIONS: ColumnFilterSelectOption[] = [
+  { value: "true", label: "Đang theo dõi" },
+  { value: "false", label: "Ngừng theo dõi" },
+];
 
 export function buildItemLocationColumns(
   rowIndexMap: Map<string, number>,
@@ -76,6 +82,20 @@ export function buildItemLocationColumns(
       filterKind: "select",
       filterOptions: storageOptions,
       render: (r) => r.location.storageName,
+    },
+    {
+      key: "isActive",
+      label: "Trạng thái",
+      width: 140,
+      filterKind: "select",
+      filterOptions: STATUS_FILTER_OPTIONS,
+      render: (r) => (
+        <ActiveStatusBadge
+          active={r.item.isActive}
+          activeLabel="Đang theo dõi"
+          inactiveLabel="Ngừng theo dõi"
+        />
+      ),
     },
   ];
 }

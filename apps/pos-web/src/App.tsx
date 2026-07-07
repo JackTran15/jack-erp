@@ -3,6 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster } from "sonner";
 import { queryClient } from "@erp/pos/lib/common/query-client";
+import { PosBranchHandoff } from "./components/common/PosBranchHandoff/PosBranchHandoff";
 import { PosRequireAuth } from "./components/common/PosRequireAuth/PosRequireAuth";
 import { PosRequireBranch } from "./components/common/PosRequireBranch/PosRequireBranch";
 import { PosLayout } from "./components/layout/PosLayout/PosLayout";
@@ -36,6 +37,7 @@ export function App() {
         }}
       >
         <BrowserRouter basename={import.meta.env.BASE_URL}>
+          <PosBranchHandoff />
           <Routes>
             <Route path="/dang-nhap" element={<PosLoginPage />} />
             <Route path="/ui" element={<UiCatalogPage />} />

@@ -747,9 +747,11 @@ export class StockSummaryService {
     if (typeof query.unit === "string" && query.unit.trim()) {
       qb.andWhere("item.unit = :unit", { unit: query.unit.trim() });
     }
-    if (query.isActive !== undefined) {
-      qb.andWhere("item.is_active = :isActive", { isActive: query.isActive });
-    }
+    // Tổng hợp tồn kho mặc định không thống kê hàng đã ngừng theo dõi; vẫn cho xem
+    // khi client truyền isActive=false tường minh.
+    qb.andWhere("item.is_active = :isActive", {
+      isActive: query.isActive ?? true,
+    });
     if (query.isPosVisible !== undefined) {
       qb.andWhere("item.is_pos_visible = :isPosVisible", {
         isPosVisible: query.isPosVisible,

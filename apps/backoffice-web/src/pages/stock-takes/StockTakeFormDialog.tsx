@@ -1873,6 +1873,7 @@ export function StockTakeFormDialog({
       {productPickerOpen && (
         <ProductSelectDialog
           open
+          activeOnly
           onOpenChange={setProductPickerOpen}
           onConfirm={(r) => void addItemsFromPicker(r)}
         />

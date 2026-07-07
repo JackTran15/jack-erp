@@ -9,6 +9,7 @@ import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { PosMenuTile } from "./PosMenuTile/PosMenuTile";
 import { APP_MENU_ITEMS } from "@erp/pos/constants/pos-menu.constant";
+import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { PosMenuItem, resolveSelectedPosMenuItemId } from "../PosLayout";
 
 export interface PosMenuPopoverProps {
@@ -86,6 +87,15 @@ export function PosMenuPopover({
   if (!open || !position) return null;
 
   const handleSelect = (item: PosMenuItem) => {
+    if (item.externalUrl) {
+      const branchId = usePosBranchStore.getState().branchId;
+      const url = branchId
+        ? `${item.externalUrl}?branchId=${encodeURIComponent(branchId)}`
+        : item.externalUrl;
+      window.open(url, "_blank", "noopener,noreferrer");
+      onClose();
+      return;
+    }
     if (item.route) navigate(item.route);
     onClose();
   };

@@ -10,7 +10,10 @@ import type { ToolbarItem } from "@erp/ui";
 interface ToolbarOptions {
   isFetching: boolean;
   hasSelection: boolean;
+  /** True khi selection có ít nhất 1 hàng đang theo dõi (còn ngừng theo dõi được). */
+  canStopTracking: boolean;
   onReload: () => void;
+  onStopTracking: () => void;
   onOpenArrange: () => void;
   onOpenTransfer: () => void;
 }
@@ -18,7 +21,9 @@ interface ToolbarOptions {
 export function buildItemLocationToolbarItems({
   isFetching,
   hasSelection,
+  canStopTracking,
   onReload,
+  onStopTracking,
   onOpenArrange,
   onOpenTransfer,
 }: ToolbarOptions): ToolbarItem[] {
@@ -37,9 +42,13 @@ export function buildItemLocationToolbarItems({
       id: "stop-watch",
       label: "Ngừng theo dõi",
       icon: EyeOff,
-      onClick: () => {},
-      disabled: true,
-      tooltip: selectionTooltip,
+      onClick: onStopTracking,
+      disabled: !canStopTracking,
+      tooltip: !hasSelection
+        ? "Chọn dòng để dùng tính năng này"
+        : canStopTracking
+          ? undefined
+          : "Hàng đã ngừng theo dõi",
     },
     {
       id: "arrange",

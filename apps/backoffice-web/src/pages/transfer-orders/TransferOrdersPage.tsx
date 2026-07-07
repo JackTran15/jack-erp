@@ -1504,6 +1504,7 @@ function TransferOrderFormDialog({
       {productPickerOpen && (
         <ProductSelectDialog
           open
+          activeOnly
           onOpenChange={setProductPickerOpen}
           onConfirm={addLinesFromPicker}
         />

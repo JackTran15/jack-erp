@@ -6,4 +6,5 @@ interface ImportMetaEnv {
   readonly VITE_DEV_ORG_ID?: string;
   readonly VITE_DEV_LOGIN_EMAIL?: string;
   readonly VITE_DEV_LOGIN_PASSWORD?: string;
+  readonly VITE_BACKOFFICE_WEB_URL?: string;
 }

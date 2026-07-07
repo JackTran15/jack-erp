@@ -39,7 +39,7 @@ export const posPaginationBarEntry: CatalogEntry = {
     { name: "totalPages", type: "number", required: true, description: "Tổng số trang." },
     { name: "pageSize", type: "number", required: true, description: "Số dòng mỗi trang." },
     { name: "total", type: "number", required: true, description: "Tổng số bản ghi." },
-    { name: "pageSizeOptions", type: "number[]", required: false, defaultValue: "[50, 100, 200]", description: "Các lựa chọn số dòng/trang." },
+    { name: "pageSizeOptions", type: "number[]", required: false, defaultValue: "[50, 100]", description: "Các lựa chọn số dòng/trang." },
     { name: "onPageChange", type: "(page: number) => void", required: false, description: "Gọi khi đổi trang." },
     { name: "onPageSizeChange", type: "(size: number) => void", required: false, description: "Gọi khi đổi số dòng/trang." },
     { name: "onRefresh", type: "() => void", required: false, description: "Gọi khi bấm làm mới." },

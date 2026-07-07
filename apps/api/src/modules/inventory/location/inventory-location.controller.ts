@@ -26,6 +26,7 @@ import { ItemStockThresholdService } from './item-stock-threshold.service';
 import { LinkItemProviderDto } from './dto/link-item-provider.dto';
 import { CreateItemBarcodeDto } from './dto/create-item-barcode.dto';
 import { SetStockThresholdDto } from './dto/set-stock-threshold.dto';
+import { SetItemsStatusDto } from './dto/set-items-status.dto';
 import { ProductGroupsQueryDto, ProductItemsQueryDto } from './dto/product-group-query.dto';
 import { InventoryItemCrudService } from './item-crud.service';
 import {
@@ -119,6 +120,16 @@ export class InventoryLocationController {
     @Actor() actor: ActorContext,
   ) {
     return this.service.getItemById(id, actor);
+  }
+
+  // Bulk toggle is_active. MUST stay before items/:id so ':id' doesn't capture "status".
+  @Patch('items/status')
+  @RequirePermission('inventory.write')
+  setItemsStatus(
+    @Body() dto: SetItemsStatusDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.itemCrudService.setActiveStatus(dto.ids, dto.isActive, actor);
   }
 
   @Patch('items/:id')

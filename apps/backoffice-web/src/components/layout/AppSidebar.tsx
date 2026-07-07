@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Store } from "lucide-react";
 import {
   cn,
   Collapsible,
@@ -23,6 +23,8 @@ import {
 } from "./navConfig";
 import { useLayout } from "./LayoutContext";
 import { MegaMenuPanel } from "./MegaMenuPanel";
+import { resolvePosWebUrl } from "../../lib/pos-url";
+import { getActiveBranch } from "../../lib/auth-storage";
 import { useCurrentView } from "../../store/common/branch/branch.store";
 import { useImportableTransferOrderCount } from "../../hooks/useImportableTransferOrderCount";
 
@@ -130,6 +132,8 @@ export function AppSidebar() {
           </nav>
         </ScrollArea>
 
+        <PosLaunchButton collapsed={sidebarCollapsed} />
+
         <Separator className="bg-gray-700" />
 
         <CollapseToggle collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
@@ -144,6 +148,45 @@ export function AppSidebar() {
         />
       )}
     </TooltipProvider>
+  );
+}
+
+// ─── "Bán hàng" — switch to the POS app ───────────────────────────────────────
+
+function PosLaunchButton({ collapsed }: { collapsed: boolean }) {
+  const posUrl = resolvePosWebUrl();
+  // Carry the active branch so POS opens on the same chi nhánh.
+  const branchId = getActiveBranch();
+  const href = posUrl
+    ? branchId
+      ? `${posUrl}?branchId=${encodeURIComponent(branchId)}`
+      : posUrl
+    : undefined;
+  const link = (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(
+        "mx-2 mb-1 mt-2 flex h-10 items-center rounded-md bg-emerald-600 font-medium text-white transition-colors hover:bg-emerald-500",
+        collapsed ? "justify-center" : "gap-2 px-3",
+      )}
+      aria-label="Bán hàng (mở POS)"
+    >
+      <Store className="h-5 w-5 shrink-0" />
+      {!collapsed && <span className="truncate text-sm">Bán hàng</span>}
+    </a>
+  );
+
+  if (!collapsed) return link;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{link}</TooltipTrigger>
+      <TooltipContent side="right" sideOffset={8}>
+        Bán hàng (POS)
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

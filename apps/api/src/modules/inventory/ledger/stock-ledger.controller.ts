@@ -88,6 +88,14 @@ export class BalanceQueryDto extends PaginationQueryDto {
   @IsBoolean()
   unassigned?: boolean;
 
+  @ApiPropertyOptional({
+    description: 'Lọc theo trạng thái theo dõi hàng hóa (item.is_active). Bỏ trống = tất cả.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => parseBool(value))
+  @IsBoolean()
+  isActive?: boolean;
+
   // Per-column string filters
   @ApiPropertyOptional()
   @IsOptional()

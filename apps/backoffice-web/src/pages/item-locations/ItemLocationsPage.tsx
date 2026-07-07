@@ -56,6 +56,7 @@ interface InventoryLocation {
   type: LocationType;
   description?: string | null;
   isActive: boolean;
+  isDefault?: boolean;
   hasItems?: boolean;
 }
 
@@ -272,6 +273,10 @@ export function ItemLocationsPage() {
     () => (locations?.data ?? []).find((l) => l.id === selectedId) ?? null,
     [locations, selectedId],
   );
+  const selectedStorage = useMemo(
+    () => storages.find((s) => s.id === selected?.storageId) ?? null,
+    [selected?.storageId, storages],
+  );
   const selectedArrangeLocation = useMemo(
     () =>
       selected
@@ -426,7 +431,11 @@ export function ItemLocationsPage() {
       label: "Xóa",
       icon: Trash2,
       variant: "danger",
-      disabled: !selected || !selected.isActive,
+      disabled:
+        !selected ||
+        !selected.isActive ||
+        selected.isDefault === true ||
+        selectedStorage?.isMainStorage === true,
       onClick: () => selected && setConfirmDelete(selected),
     },
     {
