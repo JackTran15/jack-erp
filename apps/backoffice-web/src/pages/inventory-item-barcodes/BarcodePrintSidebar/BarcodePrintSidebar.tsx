@@ -9,6 +9,8 @@ interface Props {
   previewRow: BarcodeLabelRow | null;
   /** Mã chi nhánh in trên tem. */
   branchCode: string;
+  /** Hiện mã chi nhánh + vị trí trên tem xem trước. Tắt ở chuỗi cửa hàng. */
+  showStoreInfo: boolean;
   printing: boolean;
   onPrint: () => void;
   onCancel: () => void;
@@ -18,6 +20,7 @@ interface Props {
 export function BarcodePrintSidebar({
   previewRow,
   branchCode,
+  showStoreInfo,
   printing,
   onPrint,
   onCancel,
@@ -27,7 +30,11 @@ export function BarcodePrintSidebar({
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
         <PaperCustomizationSection />
 
-        <BarcodeLabelPreview row={previewRow} branchCode={branchCode} />
+        <BarcodeLabelPreview
+          row={previewRow}
+          branchCode={branchCode}
+          showStoreInfo={showStoreInfo}
+        />
 
         <p className="text-xs text-muted-foreground">
           Khi in, chọn tỉ lệ 100% (không "Fit to page") để tem đúng kích thước.

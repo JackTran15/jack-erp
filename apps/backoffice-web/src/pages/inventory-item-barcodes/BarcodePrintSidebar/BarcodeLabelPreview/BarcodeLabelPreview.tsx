@@ -17,10 +17,12 @@ interface Props {
   row: BarcodeLabelRow | null;
   /** Mã chi nhánh in trên tem. */
   branchCode: string;
+  /** Hiện mã chi nhánh + vị trí. Tắt ở chuỗi cửa hàng. */
+  showStoreInfo: boolean;
 }
 
 /** "Xem trước": một tem live theo layout MISA (SKU/barcode/giá + vị trí/chi nhánh/ngày). */
-export function BarcodeLabelPreview({ row, branchCode }: Props) {
+export function BarcodeLabelPreview({ row, branchCode, showStoreInfo }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
 
   const data = row ?? SAMPLE;
@@ -68,10 +70,10 @@ export function BarcodeLabelPreview({ row, branchCode }: Props) {
           </div>
           <div className="flex w-[22%] shrink-0 flex-col items-center justify-between text-center">
             <span className="text-[10px] font-bold leading-tight">
-              {data.locationCode}
+              {showStoreInfo ? data.locationCode : ""}
             </span>
             <span className="text-[14px] font-bold leading-tight">
-              {branchCode}
+              {showStoreInfo ? branchCode : ""}
             </span>
             <span className="text-[10px] font-bold leading-tight">
               {batchCode}

@@ -13,6 +13,8 @@ export interface RenderLabelsSettings {
   printedAt: Date;
   /** Mã chi nhánh in ở cột phải của tem (vd "CM"). */
   branchCode: string;
+  /** Hiện thông tin gắn với cửa hàng (mã chi nhánh + vị trí). Tắt ở chuỗi cửa hàng. */
+  showStoreInfo: boolean;
 }
 
 /**

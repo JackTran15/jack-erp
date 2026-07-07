@@ -60,11 +60,14 @@ function drawLabel(
   y: number,
   width: number,
   height: number,
+  showStoreInfo: boolean,
 ): void {
   const padX = 0.6; // lề trong tem
   const left = x + padX;
   const right = x + width - padX;
-  const sideWidth = width * 0.24; // cột phải cho mã chi nhánh
+  // Luôn chừa cột phải (kể cả khi ẩn mã CN/vị trí ở chuỗi cửa hàng) — barcode không
+  // kéo sát mép tem, khoảng trống này tách rõ các tem cạnh nhau, dễ đọc/phân biệt.
+  const sideWidth = width * 0.24; // cột phải cho mã chi nhánh (để trống ở chuỗi cửa hàng)
   const barWidth = width - sideWidth - padX;
 
   // 3 hàng (SKU · barcode · giá) xếp sát nhau thành một nhóm, canh giữa theo
@@ -78,23 +81,25 @@ function drawLabel(
   doc.setFont("helvetica", "bold");
   doc.setTextColor(0, 0, 0);
 
-  // ── Hàng 1: SKU trái · vị trí phải ────────────────────────────────
+  // ── Hàng 1: SKU trái · vị trí phải (vị trí ẩn ở chuỗi cửa hàng) ────
   doc.setFontSize(FONT.sku);
   doc.text(row.sku, left, top, { baseline: "top", align: "left" });
-  if (row.locationCode) {
+  if (showStoreInfo && row.locationCode) {
     doc.setFontSize(FONT.location);
     doc.text(row.locationCode, right, top, { baseline: "top", align: "right" });
   }
 
-  // ── Hàng 2: barcode trái · mã chi nhánh lớn phải ──────────────────
+  // ── Hàng 2: barcode trái · mã chi nhánh lớn phải (ẩn ở chuỗi cửa hàng) ─
   const barTop = top + skuH + ROW_GAP;
   const png = barcodePng(row.sku);
   if (png) doc.addImage(png, "PNG", left, barTop, barWidth, barH);
-  doc.setFontSize(FONT.branch);
-  doc.text(branchCode, x + width - sideWidth / 2, barTop + barH / 2, {
-    baseline: "middle",
-    align: "center",
-  });
+  if (showStoreInfo) {
+    doc.setFontSize(FONT.branch);
+    doc.text(branchCode, x + width - sideWidth / 2, barTop + barH / 2, {
+      baseline: "middle",
+      align: "center",
+    });
+  }
 
   // ── Hàng 3: giá trái · mã đợt phải ────────────────────────────────
   const priceTop = barTop + barH + ROW_GAP;
@@ -119,7 +124,7 @@ export function renderBarcodeLabelsPdf(
   rows: BarcodeLabelRow[],
   settings: RenderLabelsSettings,
 ): Blob {
-  const { paper, branchCode } = settings;
+  const { paper, branchCode, showStoreInfo } = settings;
   const batchCode = formatBatchCode(settings.printedAt);
   const cols = labelsPerRow(paper);
   const labelHeight = Math.max(
@@ -151,6 +156,7 @@ export function renderBarcodeLabelsPdf(
       paper.marginTop,
       paper.columnWidth,
       labelHeight,
+      showStoreInfo,
     );
   });
 

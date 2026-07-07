@@ -44,6 +44,8 @@ interface Props {
   onRowFocus: (rowId: string) => void;
   /** Mở dialog "Chọn hàng hóa" (icon kính lúp trong ô SKU / Ctrl+F3). */
   onOpenProductPicker: () => void;
+  /** Ẩn cột Kho + Vị trí (chuỗi cửa hàng — dữ liệu gắn với 1 chi nhánh). */
+  hideLocationColumns: boolean;
 }
 
 /** Bảng hàng hoá in tem — cấu hình cột trên LineItemGrid. */
@@ -59,12 +61,13 @@ export function BarcodeLabelGrid({
   onDeleteRow,
   onRowFocus,
   onOpenProductPicker,
+  hideLocationColumns,
 }: Props) {
   // Nhiều dòng chưa chọn hàng có thể cùng render LookupField — chỉ dòng cuối
   // (dòng nhập liệu) mang id làm target cho phím tắt Ctrl+Insert / Ctrl+F3.
   const lastRowIndex = rows.length - 1;
 
-  const columns = useMemo<LineColumn<BarcodeLabelRow>[]>(
+  const allColumns = useMemo<LineColumn<BarcodeLabelRow>[]>(
     () => [
       {
         key: "stt",
@@ -245,6 +248,17 @@ export function BarcodeLabelGrid({
       onSkuTextChange,
       searchItems,
     ],
+  );
+
+  // Chuỗi cửa hàng: bỏ cột Kho + Vị trí (dữ liệu gắn với 1 chi nhánh cụ thể).
+  const columns = useMemo(
+    () =>
+      hideLocationColumns
+        ? allColumns.filter(
+            (c) => c.key !== "storageName" && c.key !== "locationCode",
+          )
+        : allColumns,
+    [allColumns, hideLocationColumns],
   );
 
   return (

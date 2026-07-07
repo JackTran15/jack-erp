@@ -10,6 +10,7 @@ import { apiClient } from "../../lib/api-axios";
 import { getActiveBranch } from "../../lib/auth-storage";
 import { useBarcodePrintSettingsStore } from "../../store/page-stores/inventory-item-barcodes/barcode-print-settings.store";
 import { useMyBranches } from "../../hooks/iam/useBranches";
+import { useIsChainSelected } from "../../store/common/branch/branch.store";
 import {
   isEmptyRow,
   makeEmptyRow,
@@ -65,11 +66,15 @@ export function InventoryItemBarcodesPage() {
   const focusedRowIdRef = useRef<string | null>(null);
 
   const paper = useBarcodePrintSettingsStore((s) => s.paper);
+  // Chuỗi cửa hàng: ẩn Kho/Vị trí + không in mã CN/vị trí trên tem, và không gọi
+  // các endpoint theo chi nhánh (Kho/Vị trí gắn với 1 chi nhánh cụ thể).
+  const isChain = useIsChainSelected();
 
   // ─── Reference data ────────────────────────────────────────────────
   const branchId = getActiveBranch();
   const { data: storages } = useQuery({
     queryKey: ["inventory-storages", branchId],
+    enabled: !isChain,
     queryFn: async () => {
       const params = new URLSearchParams({ page: "1", pageSize: "200" });
       if (branchId) params.set("branchId", branchId);
@@ -84,11 +89,11 @@ export function InventoryItemBarcodesPage() {
     [storages],
   );
 
-  // Mã chi nhánh in trên tem: đọc từ branch đang chọn; BranchEntity chưa có
-  // cột `code` nên tạm fallback "MT" cho tới khi backend bổ sung.
+  // Mã cửa hàng in trên tem: lấy `code` của chi nhánh đang chọn. Nếu chi nhánh
+  // chưa đặt mã thì để trống (không fallback "MT") — để admin phát hiện & bổ sung.
   const { data: myBranches } = useMyBranches();
   const branchCode = useMemo(
-    () => myBranches?.find((b) => b.id === branchId)?.code || "MT",
+    () => myBranches?.find((b) => b.id === branchId)?.code ?? "",
     [myBranches, branchId],
   );
 
@@ -114,8 +119,9 @@ export function InventoryItemBarcodesPage() {
           ),
         );
       };
+      // Chuỗi cửa hàng: không gợi ý Kho/Vị trí (cột đã ẩn, không gọi endpoint theo chi nhánh).
       const activeBranch = getActiveBranch();
-      if (!activeBranch) {
+      if (isChain || !activeBranch) {
         clearLoading();
         return;
       }
@@ -146,7 +152,7 @@ export function InventoryItemBarcodesPage() {
         toast.warning("Không lấy được Kho/Vị trí gợi ý cho hàng hóa vừa thêm");
       }
     },
-    [storageNameById],
+    [storageNameById, isChain],
   );
 
   const handleSelectItem = useCallback(
@@ -370,12 +376,13 @@ export function InventoryItemBarcodesPage() {
         paper,
         printedAt: new Date(),
         branchCode,
+        showStoreInfo: !isChain,
       });
       await printBarcodeLabels(pdf);
     } finally {
       setPrinting(false);
     }
-  }, [rows, paper, branchCode]);
+  }, [rows, paper, branchCode, isChain]);
 
   return (
     <div className="flex min-h-0 w-full flex-1 gap-2.5 overflow-hidden">
@@ -412,6 +419,7 @@ export function InventoryItemBarcodesPage() {
             onDeleteRow={handleDeleteRow}
             onRowFocus={handleRowFocus}
             onOpenProductPicker={() => setProductPickerOpen(true)}
+            hideLocationColumns={isChain}
           />
         </div>
 
@@ -428,6 +436,7 @@ export function InventoryItemBarcodesPage() {
       <BarcodePrintSidebar
         previewRow={previewRow}
         branchCode={branchCode}
+        showStoreInfo={!isChain}
         printing={printing}
         onPrint={handlePrint}
         onCancel={handleCancel}

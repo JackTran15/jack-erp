@@ -9,5 +9,6 @@ export const DEFAULT_PAPER_CONFIG: BarcodePaperConfig = {
   paperHeight: 23,
   paperWidth: 104,
   columnWidth: 50,
-  columnGap: 0.3,
+  // Khe giữa 2 tem trong một hàng — 2 + 2×50 + 1.5 = 103.5 ≤ 104 nên vẫn xếp 2 tem/hàng.
+  columnGap: 1.5,
 };
