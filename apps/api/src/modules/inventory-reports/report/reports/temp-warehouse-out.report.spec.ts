@@ -43,6 +43,9 @@ describe('TempWarehouseOutReport', () => {
     expect(status.filterOptions!.map((o) => o.value)).toEqual([
       'Xuất không bán',
       'Trả hàng trưng bày',
+      'Bán hàng trưng bày',
+      'Chuyển kho xuất đi',
+      'Chuyển kho trả lại',
     ]);
     expect(cols.find((c) => c.col === 'time')!.filterKind).toBe('time');
     expect(cols.find((c) => c.col === 'date')!.filterKind).toBe('date');

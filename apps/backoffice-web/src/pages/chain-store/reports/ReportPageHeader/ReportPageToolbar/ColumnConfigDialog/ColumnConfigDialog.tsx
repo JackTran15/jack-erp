@@ -5,6 +5,7 @@ import { HelpCircle, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import type { ReportColumnConfig } from "../../../../../../constants/reports/report.interface";
 import { getReportTypeLabel } from "../../../../../../constants/reports/report-type.constant";
+import { getUserFacingApiErrorMessage } from "../../../../../../lib/user-facing-api-error";
 import { useReportStore } from "../../../../../../store/page-stores/report/report.context";
 import { useTableStore } from "../../../../../../store/common/table-store/table.context";
 import { useReportColumnTemplate } from "../../../_api/report-template.api";
@@ -272,8 +273,8 @@ export function ColumnConfigDialog({ open, onClose }: Props) {
         applyDraftLocally();
         onClose();
       },
-      onError: () => {
-        toast.error("Không thể lưu cấu hình cột. Vui lòng thử lại.");
+      onError: (err) => {
+        toast.error(getUserFacingApiErrorMessage(err));
       },
     });
   };

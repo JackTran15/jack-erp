@@ -29,8 +29,8 @@ export const Actor = createParamDecorator(
     return {
       userId: user?.userId ?? 'system',
       organizationId: user?.organizationId ?? 'default',
-      // always: jwt > header > jwtList
-      branchId: fromJwt ?? fromHeader ?? fromJwtList,
+      // always: header (current branch switch) > jwt > jwtList
+      branchId: fromHeader ?? fromJwt ?? fromJwtList,
       branchIds: allowed,
       roles: user?.roles ?? [],
     };

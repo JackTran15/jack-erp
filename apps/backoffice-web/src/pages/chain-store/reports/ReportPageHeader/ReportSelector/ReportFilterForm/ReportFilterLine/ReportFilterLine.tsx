@@ -252,17 +252,20 @@ export function ReportFilterLine({ line }: Props) {
             }
           />
         );
-      case REPORT_FILTERS_LINE.RECEIVING_STORE:
+      case REPORT_FILTERS_LINE.RECEIVING_STORE: {
+        const sourceStore = filters[REPORT_FILTERS_LINE.SOURCE_STORE];
         return (
           <RemoteSelectField
             type={ReportFilterOptionType.STORE}
             value={filters[REPORT_FILTERS_LINE.RECEIVING_STORE] ?? ""}
             placeholder="Tất cả"
+            excludeValues={sourceStore ? [sourceStore] : undefined}
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.RECEIVING_STORE, v)
             }
           />
         );
+      }
       default:
         return null;
     }

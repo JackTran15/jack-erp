@@ -63,14 +63,18 @@ export const single_tableRegistryReportStoreInventoryInOutStockSummary =
 export const chain_tableRegistryReportStoreInventoryInOutStockSummary =
   tableConfig;
 
-const filterLines = [
+// SINGLE (chi nhánh): cửa hàng cố định theo header → không có dòng Cửa hàng;
+// CHAIN (chuỗi): thêm dòng Cửa hàng multi-select ở đầu.
+const singleFilterLines = [
   REPORT_FILTERS_LINE.PRODUCT_GROUP,
   REPORT_FILTERS_LINE.STATISTIC_BY,
   REPORT_FILTERS_LINE.UNIT,
   REPORT_FILTERS_LINE.REPORT_PERIOD,
   REPORT_FILTERS_LINE.RANGE_DATE,
 ];
+const chainFilterLines = [REPORT_FILTERS_LINE.STORE, ...singleFilterLines];
+
 export const single_filterRegistryReportStoreInventoryInOutStockSummary =
-  filterLines;
+  singleFilterLines;
 export const chain_filterRegistryReportStoreInventoryInOutStockSummary =
-  filterLines;
+  chainFilterLines;

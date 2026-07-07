@@ -87,14 +87,33 @@ export interface TransferByBranchResult {
 }
 
 /**
- * Báo cáo 6 + 7 — derived from `stock_transfers` + `stock_transfer_lines`.
+ * Báo cáo 6 + 7 — inter-branch transfer activity, from TWO independent
+ * document sources (both must be unioned — neither alone is complete):
  *
- * We deliberately read the transfer document tables (not the ledger) so
- * "value" reflects the cost basis at transfer time via `items.purchase_price`
- * — same convention the rest of inventory reports use when ledger
- * `line_value` isn't queried directly.
+ *   1. `stock_transfers` + `stock_transfer_lines` — the legacy single-phase
+ *      flow (DRAFT → APPROVED → POSTED). POSTED moves both legs atomically.
+ *      This table ALSO holds intra-branch (same source/destination branch)
+ *      inter-warehouse moves — those are deliberately excluded here since
+ *      this report is about flow *between* branches, not within one.
+ *   2. `goods_issues` (purpose = TRANSFER_OUT) + `goods_receipts`
+ *      (purpose = TRANSFER_IN) — the two-phase `transfer_orders` flow
+ *      (DRAFT → IN_PROGRESS after source exports → COMPLETED only once the
+ *      destination branch posts its own GoodsReceipt). `transfer_orders`
+ *      itself is never queried directly: it doesn't carry actual
+ *      shipped/received qty (only `requested_qty`), and never links back to
+ *      `stock_transfers` (`executed_transfer_id` stays null for this flow).
+ *      Critically, the IN leg only exists once the destination has ACTUALLY
+ *      posted its GoodsReceipt — so a branch that hasn't confirmed receipt
+ *      yet correctly shows zero incoming, unlike reading `transfer_orders`
+ *      by itself would.
  *
- * Filter is `status = 'POSTED'` + `posted_at IN [startDate, endDate)`.
+ * "value" reflects the cost basis at transfer time — `items.purchase_price`
+ * for the legacy flow (no per-line price stored), the line's own
+ * `unit_price` for the two-phase flow (real transaction price is captured).
+ *
+ * Filter is `status = 'POSTED'` + `posted_at IN [startDate, endDate)` on
+ * whichever document represents that leg (the transfer, the GoodsIssue, or
+ * the GoodsReceipt) — not `transfer_orders.created_at`.
  */
 @Injectable()
 export class TransferReportService {
@@ -107,58 +126,135 @@ export class TransferReportService {
     const branchIds =
       query.branchIds && query.branchIds.length > 0 ? query.branchIds : null;
 
-    // Per-branch IN/OUT aggregates from posted transfers in the period.
-    //   OUT side  → source_branch_id contributes qty/value
-    //   IN side   → destination_branch_id contributes qty/value
-    // The `branches_in_scope` CTE bounds the result set to branches that
-    // actually moved stock in the period (or that pass the filter).
+    // Per-branch IN/OUT/RECEIVED aggregates from posted inter-branch
+    // transfers in the period, unioned across both document sources (see
+    // class doc comment). `source_branch_id <> destination_branch_id` /
+    // `branch_id <> target_branch_id` / `branch_id <> source_branch_id`
+    // excludes intra-branch inter-warehouse moves from this cross-branch
+    // report.
+    //
+    // `received_qty`/`received_value` are attributed to the SHIPMENT'S
+    // SOURCE branch (not the receiving branch) — they answer "of what THIS
+    // branch shipped out, how much have the destinations confirmed as
+    // received", which is a different question from `in_qty` ("how much did
+    // THIS branch itself receive from others"). For the legacy flow POSTED
+    // is atomic so received always equals out (diff = 0, always healthy).
+    // For the two-phase flow, received is only counted once the destination
+    // has actually posted its GoodsReceipt — a shipment still in transit
+    // (GoodsIssue posted, no GoodsReceipt yet) correctly leaves the source
+    // branch's diff negative (shipped, not yet confirmed received).
     const sql = `
-      WITH out_side AS (
+      WITH movements AS (
         SELECT
-          st.source_branch_id AS branch_id,
-          SUM(stl.quantity) AS qty,
-          SUM(stl.quantity * COALESCE(i.purchase_price, 0)) AS value
+          st.source_branch_id::text AS branch_id,
+          0::numeric AS in_qty, 0::numeric AS in_value,
+          stl.quantity::numeric AS out_qty,
+          (stl.quantity::numeric * COALESCE(i.purchase_price, 0)) AS out_value,
+          0::numeric AS received_qty, 0::numeric AS received_value
         FROM stock_transfers st
         JOIN stock_transfer_lines stl ON stl.transfer_id = st.id
         JOIN items i ON i.id = stl.item_id AND i.organization_id = st.organization_id
         WHERE st.organization_id = $1
           AND st.status = 'POSTED'
           AND st.posted_at >= $2 AND st.posted_at < $3
-        GROUP BY st.source_branch_id
-      ),
-      in_side AS (
+          AND st.source_branch_id <> st.destination_branch_id
+
+        UNION ALL
+
         SELECT
-          st.destination_branch_id AS branch_id,
-          SUM(stl.quantity) AS qty,
-          SUM(stl.quantity * COALESCE(i.purchase_price, 0)) AS value
+          st.destination_branch_id::text AS branch_id,
+          stl.quantity::numeric AS in_qty,
+          (stl.quantity::numeric * COALESCE(i.purchase_price, 0)) AS in_value,
+          0::numeric AS out_qty, 0::numeric AS out_value,
+          0::numeric AS received_qty, 0::numeric AS received_value
         FROM stock_transfers st
         JOIN stock_transfer_lines stl ON stl.transfer_id = st.id
         JOIN items i ON i.id = stl.item_id AND i.organization_id = st.organization_id
         WHERE st.organization_id = $1
           AND st.status = 'POSTED'
           AND st.posted_at >= $2 AND st.posted_at < $3
-        GROUP BY st.destination_branch_id
-      ),
-      combined AS (
+          AND st.source_branch_id <> st.destination_branch_id
+
+        UNION ALL
+
         SELECT
-          COALESCE(o.branch_id, i.branch_id) AS branch_id,
-          COALESCE(i.qty, 0) AS in_qty,
-          COALESCE(i.value, 0) AS in_value,
-          COALESCE(o.qty, 0) AS out_qty,
-          COALESCE(o.value, 0) AS out_value
-        FROM out_side o
-        FULL OUTER JOIN in_side i ON o.branch_id = i.branch_id
+          st.source_branch_id::text AS branch_id,
+          0::numeric AS in_qty, 0::numeric AS in_value,
+          0::numeric AS out_qty, 0::numeric AS out_value,
+          stl.quantity::numeric AS received_qty,
+          (stl.quantity::numeric * COALESCE(i.purchase_price, 0)) AS received_value
+        FROM stock_transfers st
+        JOIN stock_transfer_lines stl ON stl.transfer_id = st.id
+        JOIN items i ON i.id = stl.item_id AND i.organization_id = st.organization_id
+        WHERE st.organization_id = $1
+          AND st.status = 'POSTED'
+          AND st.posted_at >= $2 AND st.posted_at < $3
+          AND st.source_branch_id <> st.destination_branch_id
+
+        UNION ALL
+
+        SELECT
+          gi.branch_id AS branch_id,
+          0::numeric AS in_qty, 0::numeric AS in_value,
+          gil.quantity::numeric AS out_qty,
+          (gil.quantity::numeric * gil.unit_price::numeric) AS out_value,
+          0::numeric AS received_qty, 0::numeric AS received_value
+        FROM goods_issues gi
+        JOIN goods_issue_lines gil ON gil.goods_issue_id = gi.id
+        WHERE gi.organization_id = $1
+          AND gi.status = 'POSTED'
+          AND gi.purpose = 'TRANSFER_OUT'
+          AND gi.posted_at >= $2 AND gi.posted_at < $3
+          AND gi.target_branch_id IS NOT NULL
+          AND gi.branch_id <> gi.target_branch_id::text
+
+        UNION ALL
+
+        SELECT
+          gr.branch_id AS branch_id,
+          grl.quantity::numeric AS in_qty,
+          (grl.quantity::numeric * grl.unit_price::numeric) AS in_value,
+          0::numeric AS out_qty, 0::numeric AS out_value,
+          0::numeric AS received_qty, 0::numeric AS received_value
+        FROM goods_receipts gr
+        JOIN goods_receipt_lines grl ON grl.goods_receipt_id = gr.id
+        WHERE gr.organization_id = $1
+          AND gr.status = 'POSTED'
+          AND gr.purpose = 'TRANSFER_IN'
+          AND gr.posted_at >= $2 AND gr.posted_at < $3
+          AND gr.source_branch_id IS NOT NULL
+          AND gr.branch_id <> gr.source_branch_id
+
+        UNION ALL
+
+        SELECT
+          gr.source_branch_id AS branch_id,
+          0::numeric AS in_qty, 0::numeric AS in_value,
+          0::numeric AS out_qty, 0::numeric AS out_value,
+          grl.quantity::numeric AS received_qty,
+          (grl.quantity::numeric * grl.unit_price::numeric) AS received_value
+        FROM goods_receipts gr
+        JOIN goods_receipt_lines grl ON grl.goods_receipt_id = gr.id
+        WHERE gr.organization_id = $1
+          AND gr.status = 'POSTED'
+          AND gr.purpose = 'TRANSFER_IN'
+          AND gr.posted_at >= $2 AND gr.posted_at < $3
+          AND gr.source_branch_id IS NOT NULL
+          AND gr.branch_id <> gr.source_branch_id
       )
       SELECT
         b.id AS branch_id,
         b.name AS branch_name,
-        c.in_qty,
-        c.in_value,
-        c.out_qty,
-        c.out_value
-      FROM combined c
-      JOIN branches b ON b.id = c.branch_id AND b.organization_id = $1
-      WHERE ($4::uuid[] IS NULL OR c.branch_id = ANY($4))
+        COALESCE(SUM(m.in_qty), 0) AS in_qty,
+        COALESCE(SUM(m.in_value), 0) AS in_value,
+        COALESCE(SUM(m.out_qty), 0) AS out_qty,
+        COALESCE(SUM(m.out_value), 0) AS out_value,
+        COALESCE(SUM(m.received_qty), 0) AS received_qty,
+        COALESCE(SUM(m.received_value), 0) AS received_value
+      FROM movements m
+      JOIN branches b ON b.id::text = m.branch_id AND b.organization_id = $1
+      WHERE ($4::uuid[] IS NULL OR b.id = ANY($4))
+      GROUP BY b.id, b.name
       ORDER BY b.name ASC
     `;
 
@@ -174,10 +270,11 @@ export class TransferReportService {
       const inValue = Number(r.in_value ?? 0);
       const outQty = Number(r.out_qty ?? 0);
       const outValue = Number(r.out_value ?? 0);
-      // Healthy ledger: what we shipped out IS what destinations received.
-      // We surface both as separate metrics; difference highlights mismatch.
-      const qtyReceived = inQty;
-      const valueReceived = inValue;
+      // qtyReceived is attributed to THIS branch as shipment source (see SQL
+      // comment) — 0 in a healthy ledger means every unit shipped out has
+      // been confirmed received at its destination.
+      const qtyReceived = Number(r.received_qty ?? 0);
+      const valueReceived = Number(r.received_value ?? 0);
       return {
         branchId: r.branch_id,
         branchCode: null,
@@ -212,42 +309,92 @@ export class TransferReportService {
     const pageSize = Math.max(1, query.pageSize);
     const offset = (page - 1) * pageSize;
 
-    // Base CTEs — always aggregate at item level first.
+    // Base CTEs — always aggregate at item level first. Each leg unions the
+    // legacy `stock_transfers` flow with the two-phase `transfer_orders`
+    // flow (via its GoodsIssue/GoodsReceipt documents) then re-aggregates,
+    // since the same (item, other_branch) pair could otherwise appear once
+    // per source and break the `combined` CTE's join uniqueness. Both
+    // exclude intra-branch moves (source = destination) — see the class doc
+    // comment on why `transfer_orders` itself is never queried directly.
     // Parameters:
     //   $1 orgId  $2 startDate  $3 endDate  $4 sourceBranchId
     //   $5 destinationBranchIds  $6 categoryIds  $7 search
     const baseCtes = `
       out_leg AS (
-        SELECT
-          stl.item_id,
-          st.destination_branch_id AS other_branch_id,
-          SUM(stl.quantity)                                   AS qty,
-          SUM(stl.quantity * COALESCE(i.purchase_price, 0))  AS value
-        FROM stock_transfers st
-        JOIN stock_transfer_lines stl ON stl.transfer_id = st.id
-        JOIN items i ON i.id = stl.item_id AND i.organization_id = st.organization_id
-        WHERE st.organization_id = $1
-          AND st.status = 'POSTED'
-          AND st.posted_at >= $2 AND st.posted_at < $3
-          AND st.source_branch_id = $4
-          AND ($5::uuid[] IS NULL OR st.destination_branch_id = ANY($5))
-        GROUP BY stl.item_id, st.destination_branch_id
+        SELECT item_id, other_branch_id, SUM(qty) AS qty, SUM(value) AS value
+        FROM (
+          SELECT
+            stl.item_id,
+            st.destination_branch_id AS other_branch_id,
+            stl.quantity AS qty,
+            stl.quantity * COALESCE(i.purchase_price, 0) AS value
+          FROM stock_transfers st
+          JOIN stock_transfer_lines stl ON stl.transfer_id = st.id
+          JOIN items i ON i.id = stl.item_id AND i.organization_id = st.organization_id
+          WHERE st.organization_id = $1
+            AND st.status = 'POSTED'
+            AND st.posted_at >= $2 AND st.posted_at < $3
+            AND st.source_branch_id = $4
+            AND st.source_branch_id <> st.destination_branch_id
+            AND ($5::uuid[] IS NULL OR st.destination_branch_id = ANY($5))
+
+          UNION ALL
+
+          SELECT
+            gil.item_id,
+            gi.target_branch_id AS other_branch_id,
+            gil.quantity AS qty,
+            gil.quantity * gil.unit_price AS value
+          FROM goods_issues gi
+          JOIN goods_issue_lines gil ON gil.goods_issue_id = gi.id
+          WHERE gi.organization_id = $1
+            AND gi.status = 'POSTED'
+            AND gi.purpose = 'TRANSFER_OUT'
+            AND gi.posted_at >= $2 AND gi.posted_at < $3
+            AND gi.branch_id = $4::text
+            AND gi.target_branch_id IS NOT NULL
+            AND gi.branch_id <> gi.target_branch_id::text
+            AND ($5::uuid[] IS NULL OR gi.target_branch_id = ANY($5))
+        ) combined_out
+        GROUP BY item_id, other_branch_id
       ),
       in_leg AS (
-        SELECT
-          stl.item_id,
-          st.source_branch_id AS other_branch_id,
-          SUM(stl.quantity)                                   AS qty,
-          SUM(stl.quantity * COALESCE(i.purchase_price, 0))  AS value
-        FROM stock_transfers st
-        JOIN stock_transfer_lines stl ON stl.transfer_id = st.id
-        JOIN items i ON i.id = stl.item_id AND i.organization_id = st.organization_id
-        WHERE st.organization_id = $1
-          AND st.status = 'POSTED'
-          AND st.posted_at >= $2 AND st.posted_at < $3
-          AND st.destination_branch_id = $4
-          AND ($5::uuid[] IS NULL OR st.source_branch_id = ANY($5))
-        GROUP BY stl.item_id, st.source_branch_id
+        SELECT item_id, other_branch_id, SUM(qty) AS qty, SUM(value) AS value
+        FROM (
+          SELECT
+            stl.item_id,
+            st.source_branch_id AS other_branch_id,
+            stl.quantity AS qty,
+            stl.quantity * COALESCE(i.purchase_price, 0) AS value
+          FROM stock_transfers st
+          JOIN stock_transfer_lines stl ON stl.transfer_id = st.id
+          JOIN items i ON i.id = stl.item_id AND i.organization_id = st.organization_id
+          WHERE st.organization_id = $1
+            AND st.status = 'POSTED'
+            AND st.posted_at >= $2 AND st.posted_at < $3
+            AND st.destination_branch_id = $4
+            AND st.source_branch_id <> st.destination_branch_id
+            AND ($5::uuid[] IS NULL OR st.source_branch_id = ANY($5))
+
+          UNION ALL
+
+          SELECT
+            grl.item_id,
+            gr.source_branch_id::uuid AS other_branch_id,
+            grl.quantity AS qty,
+            grl.quantity * grl.unit_price AS value
+          FROM goods_receipts gr
+          JOIN goods_receipt_lines grl ON grl.goods_receipt_id = gr.id
+          WHERE gr.organization_id = $1
+            AND gr.status = 'POSTED'
+            AND gr.purpose = 'TRANSFER_IN'
+            AND gr.posted_at >= $2 AND gr.posted_at < $3
+            AND gr.branch_id = $4::text
+            AND gr.source_branch_id IS NOT NULL
+            AND gr.branch_id <> gr.source_branch_id
+            AND ($5::uuid[] IS NULL OR gr.source_branch_id::uuid = ANY($5))
+        ) combined_in
+        GROUP BY item_id, other_branch_id
       ),
       combined AS (
         SELECT
@@ -438,6 +585,8 @@ interface RawTransferSummaryRow {
   in_value: string | number | null;
   out_qty: string | number | null;
   out_value: string | number | null;
+  received_qty: string | number | null;
+  received_value: string | number | null;
 }
 
 interface RawTransferByBranchRow {

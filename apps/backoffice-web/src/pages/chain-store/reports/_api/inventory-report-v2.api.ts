@@ -18,7 +18,9 @@ const SINGLE_MODE_HEADER_STORE_REPORTS = new Set([
   "inventory-stock-summary",
   "inventory-document-detail",
   "inventory-stock-quantity-detail",
+  "inventory-stock-summary-by-store",
   "inventory-transfer-summary",
+  "inventory-temp-warehouse-out",
 ]);
 
 export interface InventorySearchContext {

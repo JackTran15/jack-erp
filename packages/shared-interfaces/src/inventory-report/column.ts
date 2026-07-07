@@ -266,6 +266,9 @@ export const INVENTORY_DOC_KIND_LABELS_VI: Record<string, string> = {
 export const TEMP_WAREHOUSE_OUT_STATUS_OPTIONS: ReportFilterOption[] = [
   { value: 'Xuất không bán', label: 'Xuất không bán' },
   { value: 'Trả hàng trưng bày', label: 'Trả hàng trưng bày' },
+  { value: 'Bán hàng trưng bày', label: 'Bán hàng trưng bày' },
+  { value: 'Chuyển kho xuất đi', label: 'Chuyển kho xuất đi' },
+  { value: 'Chuyển kho trả lại', label: 'Chuyển kho trả lại' },
 ];
 
 /** Dynamic per-branch pivot column key: `branch.qty.<branchId>`. */
