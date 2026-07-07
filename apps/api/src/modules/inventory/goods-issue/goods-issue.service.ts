@@ -27,8 +27,10 @@ import { BranchEntity } from '../../branch/branch.entity';
 import { resolveDocCounterparty } from '../location/services/resolve-doc-counterparty.util';
 import { attachCounterparties } from '../location/services/counterparty-name.util';
 import { TransferOrderService } from '../transfer-order/transfer-order.service';
+import { RbacService } from '../../rbac/rbac.service';
 import { GoodsIssueEntity } from './goods-issue.entity';
 import { GoodsIssueLineEntity } from './goods-issue-line.entity';
+import { assertPurposePermission } from './assert-purpose-permission';
 
 export interface CreateGoodsIssueDto {
   locationId: string;
@@ -90,6 +92,7 @@ export class GoodsIssueService {
     private readonly documentNumberingService: DocumentNumberingService,
     @Inject(forwardRef(() => TransferOrderService))
     private readonly transferOrderService: TransferOrderService,
+    private readonly rbac: RbacService,
   ) {}
 
   async create(dto: CreateGoodsIssueDto, actor: ActorContext): Promise<GoodsIssueEntity> {
@@ -104,6 +107,10 @@ export class GoodsIssueService {
     }
 
     const purpose = dto.purpose ?? GoodsIssuePurpose.OTHER;
+    // Body-based defense-in-depth behind the FE filter: gate OTHER/DISPOSAL
+    // behind their dedicated permission keys. Covers both the v2 CQRS handler
+    // and the legacy createAndPost path, which both funnel through create().
+    await assertPurposePermission(this.rbac, actor, purpose);
     const { reasonText, reasonId, targetBranchId } = await this.resolveReasonContext(
       purpose,
       dto,

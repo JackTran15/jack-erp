@@ -4,6 +4,7 @@ import {
   buildItemTotals,
   itemCellValue,
 } from './invoice-item-revenue.aggregator';
+import { ItemDirection } from '../../pos/entities/invoice-item.entity';
 
 const row = (over: Partial<InvoiceItemRowInput> = {}): InvoiceItemRowInput => ({
   invoiceId: 'i1',
@@ -14,6 +15,7 @@ const row = (over: Partial<InvoiceItemRowInput> = {}): InvoiceItemRowInput => ({
   itemCode: 'SKU001',
   itemName: 'Giày thể thao',
   unit: 'đôi',
+  direction: ItemDirection.OUT,
   quantity: 2,
   unitPrice: 1200000,
   lineDiscount: 200000,
@@ -105,5 +107,16 @@ describe('buildItemTotals', () => {
     // per-unit price is not a meaningful total
     expect(totals['unitPrice']).toBeNull();
     expect(totals['lineRevenue']).toBe(5200000);
+  });
+
+  it('nets IN (return) lines out of the footer total by direction', () => {
+    // OUT qty 3 / 300k, IN (return) qty 1 / 100k → footer qty 2 / 200k.
+    const rows = [
+      row({ direction: ItemDirection.OUT, quantity: 3, lineTotal: 300 }),
+      row({ direction: ItemDirection.IN, quantity: 1, lineTotal: 100 }),
+    ];
+    const totals = buildItemTotals(['quantity', 'lineRevenue'], rows);
+    expect(totals['quantity']).toBe(2);
+    expect(totals['lineRevenue']).toBe(200);
   });
 });

@@ -27,10 +27,10 @@ import { ActorContext } from '../../../common/decorators/actor-context.decorator
  * line closed rather than deducting from elsewhere.
  *
  * With `showroomOnly`, warehouse (non-main) shelf rows are ignored entirely, so
- * a POS sale never resolves a warehouse location: an item shelved only in a
+ * a POS movement never resolves a warehouse location: an item shelved only in a
  * warehouse falls through to the showroom's default location (or is omitted when
- * none exists). Used by the POS sale path so sales always deduct from the
- * showroom; other callers (e.g. exchange OUT lines) keep the default behavior.
+ * none exists). Used by every POS deduction path (sale, return, and both
+ * exchange legs) so stock always leaves the showroom.
  */
 export async function resolveBranchItemLocations(
   manager: EntityManager,
@@ -45,9 +45,6 @@ export async function resolveBranchItemLocations(
     organizationId: actor.organizationId,
   });
   if (storages.length === 0) return new Map();
-
-
-  console.log("s",storages,)
 
   const mainStorageIds = new Set(
     storages.filter((s) => s.isMainStorage).map((s) => s.id),
