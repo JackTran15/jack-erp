@@ -218,6 +218,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
         pointsDiscountAmount,
         voucherCode: appliedVoucher?.voucherCode,
         printDuplicate: p.printDuplicate,
+        isReturnExchange: isReturnFlow,
       });
 
       try {

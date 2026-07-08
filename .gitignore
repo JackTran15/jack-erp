@@ -17,3 +17,8 @@ test_logs/
 # Added by code-review-graph
 .code-review-graph/
 graphify-out
+CLAUDE.local.md
+personal_note_run.txt
+**.md
+
+local/
