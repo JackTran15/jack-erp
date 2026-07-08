@@ -96,7 +96,7 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
     totals.itemDiscountTotal != null ||
     totals.invoiceDiscountTotal != null ||
     totals.voucherDiscount != null
-      ? `${amountRow("Khuyến mãi", kmSubRows, "bold-italic")}${amountRow(
+      ? `${amountRow("Khuyến mãi", kmSubRows, "italic")}${amountRow(
           "KM theo mặt hàng",
           totals.itemDiscountTotal,
           "sub italic",
@@ -114,7 +114,7 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
   // Khối trả hàng (return / exchange) — ẩn hoàn toàn khi không có hàng trả.
   const returnBlock =
     totals.returnNet != null
-      ? `${amountRow("Tiền hàng trả lại", totals.returnGross, "italic")}${amountRow(
+      ? `${amountRow("Tiền hàng trả lại", totals.returnGross, "bold-italic")}${amountRow(
           "KM",
           totals.returnDiscount,
           "sub italic",
@@ -131,7 +131,7 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
         )}${amountRow("Nợ tăng", totals.customerDebtIssued, "italic")}${amountRow(
           "Dư nợ sau",
           totals.debtAfter,
-          "bold-italic",
+          "bold-italic divider",
         )}`
       : "";
 
@@ -151,8 +151,6 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
         font-family: Arial, Helvetica, sans-serif;
         font-size: 11px;
         line-height: 1.45;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
       }
       .receipt { width: 72mm; margin: 0 auto; padding: 2mm 0 4mm; }
       /* In nhiều liên: mỗi liên 1 trang riêng để máy in nhiệt cắt giữa các liên. */
@@ -173,9 +171,6 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
 
       .doc-title {
         text-align: center;
-        background: #f0f0f0;
-        border-top: 1px solid #ccc;
-        border-bottom: 1px solid #ccc;
         padding: 3px 0;
         margin-top: 4px;
       }
@@ -190,13 +185,11 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
         font-size: 10.5px;
         padding: 2px 0;
         margin: 0;
-        border-bottom: 1px solid #ccc;
       }
       .date-line .label { font-weight: 700; }
 
       .info-row {
         padding: 2px 0;
-        border-bottom: 1px solid #ccc;
         word-break: break-word;
       }
       .info-row .label { font-weight: 700; }
@@ -232,16 +225,15 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
         justify-content: space-between;
         gap: 8px;
         padding: 2px 0;
-        border-bottom: 1px solid #ccc;
       }
       .row .value { font-variant-numeric: tabular-nums; white-space: nowrap; }
       .row.bold, .row.bold .value { font-weight: 700; }
       .row.italic { font-style: italic; }
       .row.bold-italic, .row.bold-italic .value { font-weight: 700; font-style: italic; }
       .row.sub { padding-left: 10px; }
+      /* Kẻ ngang CHỈ dưới: Tổng thanh toán, Trả lại khách, Còn phải thu, Dư nợ sau. */
+      .row.divider { border-bottom: 1px solid #ccc; }
       .row.grand-total {
-        border-top: 2px solid #000;
-        border-bottom: 1px solid #ccc;
         padding: 3px 0;
         font-weight: 700;
         font-size: 14px;
@@ -334,7 +326,7 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
       )}${amountRow(
         "Tổng thanh toán:",
         totals.grandTotal,
-        "grand-total",
+        "grand-total divider",
       )}${amountRow("Đối trả", totals.exchangeOffset)}${amountRow(
         "Đặt cọc",
         totals.depositAmount,
@@ -346,7 +338,7 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
       )}${paymentRows}${amountRow("Giảm nợ", totals.debtReduction)}${amountRow(
         "Trả lại khách",
         totals.change,
-        "bold",
+        "bold divider",
       )}${amountRow(
         "Khách không lấy tiền thừa",
         totals.keptChange,
@@ -362,7 +354,7 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
       )}${amountRow("Thu hộ", totals.collectedOnBehalf, "bold-italic")}${amountRow(
         "Còn phải thu",
         totals.remainingReceivable,
-        "bold-italic",
+        "bold-italic divider",
       )}${debtBlock}</section>
 
       <section class="policy">
