@@ -13,7 +13,7 @@ export function CheckoutPage() {
   useCheckoutHotkeys({ refs: focus.refs });
 
   return (
-    <div className="flex h-screen w-full flex-col bg-gray-100 text-gray-900">
+    <div className="flex grow flex-col bg-gray-100 text-gray-900 overflow-hidden">
       <CheckoutAnnouncer />
       <div className="flex flex-1 overflow-hidden">
         <CheckoutLeftPane
