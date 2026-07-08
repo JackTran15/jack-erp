@@ -5,15 +5,17 @@ import { CheckoutRightPane } from "@erp/pos/components/page-components/Checkout/
 import { useCheckoutBootstrap } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-bootstrap";
 import { useCheckoutFocusManager } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-focus-manager";
 import { useCheckoutHotkeys } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-hotkeys";
+import { useSyncCartOnHand } from "@erp/pos/hooks/page-hooks/checkout/use-sync-cart-on-hand";
 
 export function CheckoutPage() {
   const focus = useCheckoutFocusManager();
 
   useCheckoutBootstrap();
   useCheckoutHotkeys({ refs: focus.refs });
+  useSyncCartOnHand();
 
   return (
-    <div className="flex h-screen w-full flex-col bg-gray-100 text-gray-900">
+    <div className="flex grow flex-col bg-gray-100 text-gray-900 overflow-hidden">
       <CheckoutAnnouncer />
       <div className="flex flex-1 overflow-hidden">
         <CheckoutLeftPane

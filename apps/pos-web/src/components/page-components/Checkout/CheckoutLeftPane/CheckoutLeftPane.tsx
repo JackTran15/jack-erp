@@ -60,7 +60,7 @@ export function CheckoutLeftPane({
           {catalogProductsLoading ? (
             <p className="px-3 py-6 text-[13px] text-gray-500">Đang tải…</p>
           ) : catalogProducts.length === 0 ? (
-            <p className="px-3 py-6 text-[13px] text-gray-500">
+            <p className="px-3 py-6 text-[13px] text-gray-500 min-h-[250px] flex justify-center items-center">
               Chưa có hàng phù hợp.
             </p>
           ) : (

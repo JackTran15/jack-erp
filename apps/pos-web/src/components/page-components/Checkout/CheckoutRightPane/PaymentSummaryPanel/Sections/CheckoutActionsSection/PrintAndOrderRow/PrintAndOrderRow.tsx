@@ -12,8 +12,14 @@ import {
  * (state per-tab nằm trong session draft). "Đặt hàng" chỉ ở tab bán (sale).
  */
 export function PrintAndOrderRow() {
-  const { printInvoice, setPrintInvoice, preorder, setPreorder } =
-    useCheckoutPayment();
+  const {
+    printInvoice,
+    setPrintInvoice,
+    printDuplicate,
+    setPrintDuplicate,
+    preorder,
+    setPreorder,
+  } = useCheckoutPayment();
   const isReturnExchange = usePosCheckoutSessionStore(
     selectIsReturnExchangeInvoice,
   );
@@ -27,6 +33,20 @@ export function PrintAndOrderRow() {
           onChange={setPrintInvoice}
           ariaLabel="In hóa đơn"
         />
+      </label>
+      <label
+        className={`inline-flex items-center gap-2 text-[13px] text-gray-700 ${
+          printInvoice ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+        }`}
+        title="In 2 liên trong 1 lệnh in — 1 cho khách, 1 cửa hàng lưu"
+      >
+        <PosCheckbox
+          checked={printDuplicate}
+          onChange={setPrintDuplicate}
+          disabled={!printInvoice}
+          ariaLabel="In 2 liên"
+        />
+        In 2 liên
       </label>
       {isReturnExchange ? null : (
         <label className="inline-flex cursor-pointer items-center gap-2">

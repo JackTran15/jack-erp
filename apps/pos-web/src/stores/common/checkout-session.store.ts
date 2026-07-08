@@ -18,6 +18,7 @@ import type {
   DraftInvoice,
 } from "@erp/pos/interfaces/checkout.interface";
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
+import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import { coerceCheckoutVariant } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
@@ -157,6 +158,13 @@ interface PosCheckoutSessionState {
     sessionId: string,
     updater: (prev: CartLine[]) => CartLine[],
   ) => void;
+  /**
+   * Đồng bộ snapshot tồn (`maxQty`) của dòng bán trong `purchaseCart` (mọi
+   * session) theo catalog mới nhất — icon cảnh báo vượt tồn phản ánh tồn kho
+   * hiện tại. Bỏ qua dòng `isReturnCredit` (maxQty = SL được phép trả) và
+   * `returnCart` (maxQty là trần SL trả của quick-exchange).
+   */
+  syncPurchaseCartOnHand: (catalog: PosCatalogLine[]) => void;
   setSelectedLinePurchaseId: (id: string | null) => void;
   setSelectedLineReturnId: (id: string | null) => void;
 
@@ -317,6 +325,30 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
               : s,
           ),
         });
+      },
+
+      syncPurchaseCartOnHand: (catalog) => {
+        const byItemId = new Map(catalog.map((p) => [p.itemId, p]));
+        let changed = false;
+        const sessions = get().sessions.map((s) => {
+          let cartChanged = false;
+          const purchaseCart = s.purchaseCart.map((l) => {
+            if (l.isReturnCredit) return l;
+            const product = byItemId.get(l.itemId);
+            if (!product) return l;
+            // `quantityOnHand` = SUM tồn toàn chi nhánh — con số chuẩn cho cảnh
+            // báo vượt tồn. KHÔNG dùng locations[] (breakdown per-location có
+            // thể chứa cặp +/− bù trừ do BE trừ kho ở vị trí showroom mặc định).
+            const fresh = product.quantityOnHand;
+            if (fresh === l.maxQty) return l;
+            cartChanged = true;
+            return { ...l, maxQty: fresh };
+          });
+          if (!cartChanged) return s;
+          changed = true;
+          return { ...s, purchaseCart };
+        });
+        if (changed) set({ sessions });
       },
 
       setSelectedLinePurchaseId: (id) => {

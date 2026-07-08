@@ -30,13 +30,6 @@ export function formatOnHand(n: number, unit: string): string {
   return `${qtyFormatter.format(n)} ${unit}`.trim();
 }
 
-export function locationQtyFor(product: PosCatalogLine): number {
-  return (
-    product.locations.find((l) => l.locationId === product.defaultLocationId)
-      ?.quantity ?? 0
-  );
-}
-
 /**
  * Tính tiền giảm KM cho 1 dòng. `percent` → % của gross (làm tròn về số nguyên);
  * `amount` → cố định, cap không vượt gross & không âm. Trả 0 nếu không có KM.

@@ -14,6 +14,30 @@ export interface InvoiceStoreInfo {
   phone: string;
 }
 
+/**
+ * Khối info rows dưới tiêu đề hóa đơn (KH / SĐT / NV Thu ngân / NVBH / Ghi
+ * chú…). Mọi field optional — renderer ẩn dòng khi thiếu giá trị, nên các
+ * trường chưa có nguồn dữ liệu (slot) cứ để undefined cho tới khi BE nối.
+ */
+export interface InvoiceInfoData {
+  /** "Trả hàng cho hóa đơn: <số HĐ gốc>" — slot, hiện chỉ có UUID nội bộ. */
+  returnForInvoiceRef?: string;
+  /** "KH:" — tên khách hàng đã chọn. */
+  customerName?: string;
+  /** "SĐT:" — số điện thoại khách. */
+  customerPhone?: string;
+  /** "NV Thu ngân:" — user đang đăng nhập. */
+  cashierName?: string;
+  /** "NVBH:" — nhân viên bán hàng đã chọn. */
+  salespersonName?: string;
+  /** "Ngày giao hàng:" — slot, chưa có nguồn dữ liệu. */
+  deliveryDate?: string;
+  /** "Đ/c:" (địa chỉ giao hàng) — slot, chưa có nguồn dữ liệu. */
+  deliveryAddress?: string;
+  /** "Ghi chú:" — ghi chú hóa đơn từ payment draft. */
+  note?: string;
+}
+
 export interface InvoiceLineData {
   /** 1-based row index as it appears on the receipt. */
   index: number;
@@ -66,6 +90,47 @@ export interface InvoiceTotals {
   debtReduction?: number;
   /** Optional line: unpaid balance booked to customer debt (sale + debt). */
   customerDebtIssued?: number;
+
+  // ── Khối trả hàng (return / exchange) ────────────────────────────────────
+  /** "Tiền hàng trả lại" — gross hàng trả trước KM (độ lớn dương). */
+  returnGross?: number;
+  /** "KM:" trong khối trả — tổng KM dòng của hàng trả. */
+  returnDiscount?: number;
+  /** "Giá trị trả lại" = returnGross − returnDiscount. Khối trả ẩn khi thiếu. */
+  returnNet?: number;
+  /** "Phí đổi trả" — từ payment draft. */
+  returnFee?: number;
+
+  // ── Khuyến mãi hóa đơn / voucher (slot — BE chưa trả amount) ─────────────
+  /** "KM theo hóa đơn" — slot, `appliedPromotion` chưa có amount. */
+  invoiceDiscountTotal?: number;
+  /** "Mã ưu đãi (<code>)" / dòng "Voucher" — slot, voucher chưa có amount. */
+  voucherDiscount?: number;
+
+  // ── Điểm tích lũy ────────────────────────────────────────────────────────
+  /** Số điểm khách dùng — n trong "Điểm (n)". */
+  pointsRedeemed?: number;
+  /** Tiền giảm từ điểm (VND) — value của dòng "Điểm (n)". */
+  pointsDiscountAmount?: number;
+
+  // ── Slot chưa có nguồn dữ liệu (ẩn cho tới khi BE nối) ───────────────────
+  /** "Phí giao hàng". */
+  deliveryFee?: number;
+  /** "Thuế GTGT". */
+  vatAmount?: number;
+  /**
+   * "Đối trả" — phần giá trị trả cấn vào đơn mua. Lưu ý: bật dòng này đòi hỏi
+   * đổi "Tổng thanh toán" sang purchase-only vì grandTotal hiện đã net trừ trả.
+   */
+  exchangeOffset?: number;
+  /** "Thu hộ". */
+  collectedOnBehalf?: number;
+  /** "Còn phải thu". */
+  remainingReceivable?: number;
+  /** "Dư nợ trước" — khối dư nợ chỉ render khi field này có giá trị. */
+  debtBefore?: number;
+  /** "Dư nợ sau". */
+  debtAfter?: number;
 }
 
 export interface InvoicePolicy {

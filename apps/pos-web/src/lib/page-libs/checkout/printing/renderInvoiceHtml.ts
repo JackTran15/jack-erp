@@ -19,16 +19,46 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
+/** "Label: value" info row — trả "" khi thiếu giá trị để ẩn dòng. */
+function infoRow(label: string, value?: string): string {
+  if (!value) return "";
+  return `
+        <div class="info-row"><span class="label">${escapeHtml(label)}:</span> <span>${escapeHtml(value)}</span></div>`;
+}
+
+/** Dòng tiền label-trái / value-phải — trả "" khi amount undefined. */
+function amountRow(
+  label: string,
+  amount: number | undefined,
+  cls = "",
+): string {
+  if (amount == null) return "";
+  return `
+        <div class="row${cls ? ` ${cls}` : ""}">
+          <span>${escapeHtml(label)}</span>
+          <span class="value">${formatVnd(amount)}</span>
+        </div>`;
+}
+
 /**
  * Render the invoice payload into a fully-self-contained HTML document.
- * Visual spec: `task/Invoice_description.md` — Times New Roman, b/w, A5 width,
- * black-bg table header, totals block, return policy, closing message.
+ * Khổ A80 (giấy nhiệt 80mm, cuộn liên tục) — layout theo mẫu Misa eShop
+ * (`local/images/invoice_a80_1.png` / `invoice_a80_2.png`): header giữa,
+ * băng tiêu đề, info rows kẻ mảnh, bảng sản phẩm viền đen header sáng,
+ * khối totals / settlement / dư nợ, quy định đổi trả, lời cảm ơn.
+ *
+ * Mọi dòng optional ẩn khi thiếu dữ liệu — các field "slot" trong
+ * `InvoiceTotals` / `InvoiceInfoData` chưa có nguồn sẽ tự hiện khi được nối.
  *
  * Returned string is suitable for `iframe.contentDocument.write(...)` or for
  * dropping into a server-side PDF renderer (the spec is print-friendly).
  */
 export function renderInvoiceHtml(invoice: InvoicePayload): string {
-  const { store, invoiceNumber, issuedAt, lines, totals, payments } = invoice;
+  const { store, invoiceNumber, issuedAt, info, lines, totals, payments } =
+    invoice;
+
+  // Số liên trong 1 lệnh in ("In 2 liên": 1 cho khách, 1 cửa hàng lưu).
+  const copyCount = Math.max(1, Math.floor(invoice.copies ?? 1));
 
   const rows = lines
     .map(
@@ -53,14 +83,57 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
   // when the cashier split the payment across methods; collapses to a single
   // row when only one method was used.
   const paymentRows = payments
-    .map(
-      (p) => `
-        <div class="summary-row">
-          <span>${escapeHtml(p.label)}</span>
-          <span class="value">${formatVnd(p.amount)}</span>
-        </div>`,
-    )
+    .map((p) => amountRow(p.label, p.amount))
     .join("");
+
+  // Khối KM: chỉ render khi có ít nhất 1 sub-row có dữ liệu. Tổng "Khuyến mãi"
+  // = tổng các sub-row hiện có.
+  const kmSubRows =
+    (totals.itemDiscountTotal ?? 0) +
+    (totals.invoiceDiscountTotal ?? 0) +
+    (totals.voucherDiscount ?? 0);
+  const promoBlock =
+    totals.itemDiscountTotal != null ||
+    totals.invoiceDiscountTotal != null ||
+    totals.voucherDiscount != null
+      ? `${amountRow("Khuyến mãi", kmSubRows, "bold-italic")}${amountRow(
+          "KM theo mặt hàng",
+          totals.itemDiscountTotal,
+          "sub italic",
+        )}${amountRow(
+          "KM theo hóa đơn",
+          totals.invoiceDiscountTotal,
+          "sub italic",
+        )}${amountRow(
+          `Mã ưu đãi${invoice.voucherCode ? ` (${invoice.voucherCode})` : ""}`,
+          totals.voucherDiscount,
+          "sub italic",
+        )}`
+      : "";
+
+  // Khối trả hàng (return / exchange) — ẩn hoàn toàn khi không có hàng trả.
+  const returnBlock =
+    totals.returnNet != null
+      ? `${amountRow("Tiền hàng trả lại", totals.returnGross, "italic")}${amountRow(
+          "KM",
+          totals.returnDiscount,
+          "sub italic",
+        )}${amountRow("Giá trị trả lại", totals.returnNet, "bold-italic")}`
+      : "";
+
+  // Khối dư nợ — chỉ render khi có "Dư nợ trước" (slot, chưa có nguồn dữ liệu).
+  const debtBlock =
+    totals.debtBefore != null
+      ? `${amountRow("Dư nợ trước", totals.debtBefore, "bold-italic")}${amountRow(
+          "Nợ giảm",
+          totals.debtReduction,
+          "italic",
+        )}${amountRow("Nợ tăng", totals.customerDebtIssued, "italic")}${amountRow(
+          "Dư nợ sau",
+          totals.debtAfter,
+          "bold-italic",
+        )}`
+      : "";
 
   return `<!doctype html>
 <html lang="vi">
@@ -68,126 +141,144 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
     <meta charset="utf-8" />
     <title>Hóa đơn ${escapeHtml(invoiceNumber)}</title>
     <style>
-      @page { size: A5; margin: 12mm; }
+      @page { size: 80mm auto; margin: 0; }
       * { box-sizing: border-box; }
       html, body {
         margin: 0;
         padding: 0;
         background: #ffffff;
         color: #000000;
-        font-family: "Times New Roman", Times, serif;
-        font-size: 13px;
-        line-height: 1.5;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 11px;
+        line-height: 1.45;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
       }
-      .receipt { padding: 16px 24px; max-width: 595px; margin: 0 auto; }
+      .receipt { width: 72mm; margin: 0 auto; padding: 2mm 0 4mm; }
+      /* In nhiều liên: mỗi liên 1 trang riêng để máy in nhiệt cắt giữa các liên. */
+      .receipt + .receipt { page-break-before: always; break-before: page; }
 
-      .header { text-align: center; margin-bottom: 8px; }
+      .header { text-align: center; margin-bottom: 4px; }
       .logo {
-        width: 64px; height: 64px;
+        width: 40px; height: 40px;
         border: 2px solid #000;
         border-radius: 9999px;
-        margin: 0 auto 4px auto;
+        margin: 0 auto 2px auto;
         display: flex; align-items: center; justify-content: center;
-        font-weight: 700; font-size: 18px;
-        font-family: "Times New Roman", Times, serif;
+        font-weight: 700; font-size: 14px;
       }
-      .logo-caption { font-weight: 700; font-size: 12px; letter-spacing: 0.05em; }
-      .store-name { font-weight: 700; font-size: 14px; margin-top: 4px; }
-      .store-meta { font-size: 12px; }
+      .logo-caption { font-weight: 700; font-size: 10px; letter-spacing: 0.05em; }
+      .store-name { font-weight: 700; font-size: 13px; margin-top: 2px; }
+      .store-meta { font-size: 10.5px; }
 
-      .doc-title { text-align: center; padding: 8px 0; }
+      .doc-title {
+        text-align: center;
+        background: #f0f0f0;
+        border-top: 1px solid #ccc;
+        border-bottom: 1px solid #ccc;
+        padding: 3px 0;
+        margin-top: 4px;
+      }
       .doc-title h1 {
-        margin: 0; font-size: 16px; font-weight: 700;
-        text-transform: uppercase; letter-spacing: 0.05em;
+        margin: 0; font-size: 14px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.03em;
       }
-      .doc-title .doc-number { font-size: 13px; font-weight: 400; margin-top: 4px; }
+      .doc-title .doc-number { font-size: 11.5px; font-weight: 700; margin-top: 1px; }
 
-      .date-line { font-size: 12px; padding: 4px 0; margin: 0 0 8px 0; }
+      .date-line {
+        text-align: right;
+        font-size: 10.5px;
+        padding: 2px 0;
+        margin: 0;
+        border-bottom: 1px solid #ccc;
+      }
+      .date-line .label { font-weight: 700; }
+
+      .info-row {
+        padding: 2px 0;
+        border-bottom: 1px solid #ccc;
+        word-break: break-word;
+      }
+      .info-row .label { font-weight: 700; }
+      /* Slot chèn thêm info row khi có nguồn dữ liệu:
+         "Sinh hóa đơn giao hàng" / "Giao hàng từ hóa đơn". */
 
       table.product-table {
         width: 100%;
         border-collapse: collapse;
         border: 1px solid #000;
-        margin: 0 0 8px 0;
+        margin: 4px 0;
       }
       .product-table th, .product-table td {
         border: 1px solid #000;
-        padding: 4px 8px;
-        font-size: 13px;
+        padding: 2px 3px;
+        font-size: 10.5px;
+        vertical-align: top;
       }
       .product-table thead th {
-        background: #000;
-        color: #fff;
         font-weight: 700;
         text-align: center;
       }
-      .product-table .col-idx { text-align: center; width: 32px; color: #000; }
-      .product-table .col-name { text-align: left; color: #000; }
-      .product-table .col-name .line-sub { font-size: 11px; font-style: italic; }
-      .product-table .col-qty { text-align: center; width: 48px; color: #000; }
-      .product-table .col-price { text-align: right; width: 96px; font-variant-numeric: tabular-nums; color: #000; }
-      .product-table .col-total { text-align: right; width: 96px; font-variant-numeric: tabular-nums; color: #000; }
+      .product-table .col-idx { text-align: center; width: 8%; }
+      .product-table .col-name { text-align: left; word-break: break-word; }
+      .product-table .col-name .line-sub { font-size: 9.5px; font-style: italic; }
+      .product-table .col-qty { text-align: center; width: 11%; }
+      .product-table .col-price { text-align: right; width: 21%; font-variant-numeric: tabular-nums; }
+      .product-table .col-total { text-align: right; width: 23%; font-variant-numeric: tabular-nums; }
 
-      .summary {
-        border-top: 1px solid #000;
-        padding: 4px 0;
-        font-size: 13px;
-      }
-      .summary-row {
+      .summary { font-size: 11px; }
+      .row {
         display: flex;
         justify-content: space-between;
-        gap: 16px;
+        gap: 8px;
         padding: 2px 0;
+        border-bottom: 1px solid #ccc;
       }
-      .summary-row .value { font-variant-numeric: tabular-nums; }
-      .summary-row.bold { font-weight: 700; }
-      .summary-row.bold .value { font-weight: 700; }
-      .summary-row.grand-total {
-        border-top: 1px solid #000;
-        padding-top: 4px;
-        margin-top: 2px;
+      .row .value { font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .row.bold, .row.bold .value { font-weight: 700; }
+      .row.italic { font-style: italic; }
+      .row.bold-italic, .row.bold-italic .value { font-weight: 700; font-style: italic; }
+      .row.sub { padding-left: 10px; }
+      .row.grand-total {
+        border-top: 2px solid #000;
+        border-bottom: 1px solid #ccc;
+        padding: 3px 0;
         font-weight: 700;
         font-size: 14px;
       }
-      .summary-row.change .value { font-style: italic; }
-      .summary-row.forgiven { font-weight: 700; font-style: italic; }
-      .summary-row.forgiven .value { font-weight: 700; }
+      .row.grand-total .value { font-weight: 700; }
 
-      .summary-row.km-sub { padding-left: 16px; }
-
-      .policy { padding: 8px 0; text-align: center; }
+      .policy { padding: 6px 0 0; text-align: center; }
       .policy-title {
         font-weight: 700;
-        font-size: 12px;
+        font-size: 10px;
         text-transform: uppercase;
         letter-spacing: 0.05em;
-        margin-bottom: 4px;
+        margin-bottom: 2px;
       }
-      .policy-body { font-size: 11px; line-height: 1.5; text-align: justify; }
+      .policy-body { font-size: 9.5px; line-height: 1.45; text-align: justify; }
 
       .closing {
         text-align: center;
         font-weight: 700;
-        font-size: 12px;
-        padding: 4px 0;
-        margin-top: 8px;
+        font-size: 11px;
+        padding: 4px 0 0;
+        margin: 0;
       }
 
       @media print {
         body { margin: 0; }
-        .receipt { padding: 0; }
-        table.product-table { page-break-inside: avoid; }
       }
     </style>
   </head>
-  <body>
+  <body>${Array.from({ length: copyCount }, () => `
     <div class="receipt">
       <header class="header">
         <div class="logo" aria-hidden="true">MT'</div>
         <div class="logo-caption">GIÀY MT</div>
         <div class="store-name">${escapeHtml(store.name)}</div>
-        <div class="store-meta">Địa: ${escapeHtml(store.address)}</div>
-        <div class="store-meta">Sdt: ${escapeHtml(store.phone)}</div>
+        <div class="store-meta">Đ/c: ${escapeHtml(store.address)}</div>
+        <div class="store-meta">Số điện thoại: ${escapeHtml(store.phone)}</div>
       </header>
 
       <section class="doc-title">
@@ -195,7 +286,21 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
         <div class="doc-number">Số: ${escapeHtml(invoiceNumber)}</div>
       </section>
 
-      <p class="date-line">Ngày: ${escapeHtml(formatViDateTime(issuedAt, { separator: "space" }))}</p>
+      <p class="date-line"><span class="label">Ngày:</span> ${escapeHtml(formatViDateTime(issuedAt, { separator: "space" }))}</p>
+
+      <section class="info">${infoRow(
+        "Trả hàng cho hóa đơn",
+        info.returnForInvoiceRef,
+      )}${infoRow("KH", info.customerName)}${infoRow(
+        "SĐT",
+        info.customerPhone,
+      )}${infoRow("NV Thu ngân", info.cashierName)}${infoRow(
+        "NVBH",
+        info.salespersonName,
+      )}${infoRow("Ngày giao hàng", info.deliveryDate)}${infoRow(
+        "Đ/c",
+        info.deliveryAddress,
+      )}${infoRow("Ghi chú", info.note)}</section>
 
       <table class="product-table">
         <thead>
@@ -210,77 +315,55 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
         <tbody>${rows}</tbody>
       </table>
 
-      <section class="summary">
-        <div class="summary-row bold">
-          <span>Tổng SL mua</span>
-          <span class="value">${formatVnd(totals.totalQty)}</span>
-        </div>
-        <div class="summary-row">
-          <span>Tiền hàng</span>
-          <span class="value">${formatVnd(totals.subtotal)}</span>
-        </div>
-        ${
-          totals.itemDiscountTotal != null && totals.itemDiscountTotal > 0
-            ? `<div class="summary-row bold">
-          <span>Khuyến mãi</span>
-          <span class="value">${formatVnd(totals.itemDiscountTotal)}</span>
-        </div>
-        <div class="summary-row km-sub">
-          <span>KM theo mặt hàng</span>
-          <span class="value">${formatVnd(totals.itemDiscountTotal)}</span>
-        </div>`
-            : ""
-        }
-        <div class="summary-row grand-total">
-          <span>Tổng thanh toán:</span>
-          <span class="value">${formatVnd(totals.grandTotal)}</span>
-        </div>
-        ${
-          totals.depositAmount != null && totals.depositAmount > 0
-            ? `<div class="summary-row">
-          <span>Đặt cọc</span>
-          <span class="value">${formatVnd(totals.depositAmount)}</span>
-        </div>`
-            : ""
-        }
-        ${paymentRows}
-        <div class="summary-row change">
-          <span>Trả lại khách</span>
-          <span class="value">${formatVnd(totals.change)}</span>
-        </div>
-        ${
-          totals.keptChange != null && totals.keptChange > 0
-            ? `<div class="summary-row forgiven">
-          <span>Khách không lấy tiền thừa</span>
-          <span class="value">${formatVnd(totals.keptChange)}</span>
-        </div>`
-            : ""
-        }
-        ${
-          totals.forgivenShortage != null && totals.forgivenShortage > 0
-            ? `<div class="summary-row forgiven">
-          <span>Bớt tiền lẻ cho khách</span>
-          <span class="value">${formatVnd(totals.forgivenShortage)}</span>
-        </div>`
-            : ""
-        }
-        ${
-          totals.debtReduction != null && totals.debtReduction > 0
-            ? `<div class="summary-row forgiven">
-          <span>Giảm nợ</span>
-          <span class="value">${formatVnd(totals.debtReduction)}</span>
-        </div>`
-            : ""
-        }
-        ${
-          totals.customerDebtIssued != null && totals.customerDebtIssued > 0
-            ? `<div class="summary-row forgiven">
-          <span>Khách nợ</span>
-          <span class="value">${formatVnd(totals.customerDebtIssued)}</span>
-        </div>`
-            : ""
-        }
-      </section>
+      <section class="summary">${amountRow(
+        "Tổng SL mua",
+        totals.totalQty,
+        "bold",
+      )}${returnBlock}${amountRow(
+        "Tiền hàng",
+        totals.subtotal,
+        "bold-italic",
+      )}${promoBlock}${amountRow(
+        "Phí giao hàng",
+        totals.deliveryFee,
+        "sub italic",
+      )}${amountRow("Phí đổi trả", totals.returnFee, "sub italic")}${amountRow(
+        "Thuế GTGT",
+        totals.vatAmount,
+        "sub italic",
+      )}${amountRow(
+        "Tổng thanh toán:",
+        totals.grandTotal,
+        "grand-total",
+      )}${amountRow("Đối trả", totals.exchangeOffset)}${amountRow(
+        "Đặt cọc",
+        totals.depositAmount,
+      )}${amountRow(
+        totals.pointsRedeemed != null
+          ? `Điểm (${formatVnd(totals.pointsRedeemed)})`
+          : "Điểm",
+        totals.pointsDiscountAmount,
+      )}${paymentRows}${amountRow("Giảm nợ", totals.debtReduction)}${amountRow(
+        "Trả lại khách",
+        totals.change,
+        "bold",
+      )}${amountRow(
+        "Khách không lấy tiền thừa",
+        totals.keptChange,
+        "bold-italic",
+      )}${amountRow(
+        "Bớt tiền lẻ cho khách",
+        totals.forgivenShortage,
+        "bold-italic",
+      )}${amountRow(
+        "Khách nợ",
+        totals.customerDebtIssued,
+        "bold-italic",
+      )}${amountRow("Thu hộ", totals.collectedOnBehalf, "bold-italic")}${amountRow(
+        "Còn phải thu",
+        totals.remainingReceivable,
+        "bold-italic",
+      )}${debtBlock}</section>
 
       <section class="policy">
         <div class="policy-title">${escapeHtml(invoice.policy.title)}</div>
@@ -288,7 +371,7 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
       </section>
 
       <p class="closing">${escapeHtml(invoice.closingMessage)}</p>
-    </div>
+    </div>`).join("")}
   </body>
 </html>`;
 }

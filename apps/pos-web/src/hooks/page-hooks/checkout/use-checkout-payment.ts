@@ -41,6 +41,9 @@ interface UseCheckoutPaymentResult {
   setNote: (value: Updater<string>) => void;
   printInvoice: boolean;
   setPrintInvoice: (value: Updater<boolean>) => void;
+  /** In 2 liên trong 1 lệnh in (1 cho khách, 1 cửa hàng lưu). */
+  printDuplicate: boolean;
+  setPrintDuplicate: (value: Updater<boolean>) => void;
   preorder: boolean;
   setPreorder: (value: Updater<boolean>) => void;
   selectedSuggestionId: string | null;
@@ -93,6 +96,7 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
     debt,
     note,
     printInvoice,
+    printDuplicate,
     preorder,
     selectedSuggestionId,
     deposit,
@@ -156,6 +160,14 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
       updateDraftSlice("payment", (p) => ({
         ...p,
         printInvoice: apply(p.printInvoice, value),
+      })),
+    [updateDraftSlice],
+  );
+  const setPrintDuplicate = useCallback(
+    (value: Updater<boolean>) =>
+      updateDraftSlice("payment", (p) => ({
+        ...p,
+        printDuplicate: apply(p.printDuplicate, value),
       })),
     [updateDraftSlice],
   );
@@ -290,6 +302,9 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
     setNote,
     printInvoice,
     setPrintInvoice,
+    // Persisted draft cũ chưa có field → coerce về false cho checkbox controlled.
+    printDuplicate: printDuplicate ?? false,
+    setPrintDuplicate,
     preorder,
     setPreorder,
     selectedSuggestionId,
