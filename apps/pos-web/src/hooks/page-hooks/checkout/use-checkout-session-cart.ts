@@ -182,19 +182,25 @@ export function useCheckoutSessionCart() {
       const splitLine =
         selectCatalogDraft(usePosCheckoutSessionStore.getState()).toolbar
           .splitLine === true;
+      // KHÔNG merge vào dòng đổi trả (INVOICE_RETURN, isReturnCredit) — dòng
+      // đó bất biến theo hóa đơn gốc; sản phẩm trùng phải thành dòng mua riêng.
       const existing = splitLine
         ? undefined
-        : targetList.find((l) => l.itemId === product.itemId);
+        : targetList.find(
+            (l) => l.itemId === product.itemId && !l.isReturnCredit,
+          );
       const affectedLineId = existing ? existing.lineId : crypto.randomUUID();
 
       const apply = (prev: CartLine[]) => {
         const existingInPrev = splitLine
           ? undefined
-          : prev.find((l) => l.itemId === product.itemId);
+          : prev.find((l) => l.itemId === product.itemId && !l.isReturnCredit);
         if (existingInPrev) {
           setCartError("");
           return prev.map((l) =>
-            l.itemId === product.itemId ? { ...l, qty: l.qty + delta } : l,
+            l.lineId === existingInPrev.lineId
+              ? { ...l, qty: l.qty + delta }
+              : l,
           );
         }
         const newLine: CartLine = {
