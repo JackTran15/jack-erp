@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { toast } from "sonner";
 
 import { useInvoicePrinter } from "@erp/pos/hooks/page-hooks/checkout/use-invoice-printer";
+import { useCurrentUserQuery } from "@erp/pos/hooks/react-query/use-query-user";
 import {
   useCheckoutInvoiceMutation,
   useCheckoutReturnMutation,
@@ -56,6 +57,7 @@ import {
   selectMetaDraft,
   selectPaymentDraft,
   selectPointsDiscountAmount,
+  selectPromotionDraft,
   selectPurchaseCart,
   selectReturnCart,
   usePosCheckoutSessionStore,
@@ -102,6 +104,9 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
   // Đơn trả/đổi bắt buộc gửi `revenueAccountId` (BE chưa tự resolve cho luồng
   // này như SALE). Lấy tài khoản doanh thu đầu tiên (ưu tiên code "511…").
   const revenueQuery = useRevenueAccountsQuery();
+  // "NV Thu ngân" trên bản in — user đang đăng nhập.
+  const currentUserQuery = useCurrentUserQuery();
+  const currentUser = currentUserQuery.data;
 
   const printReceiptIfNeeded = useCallback(
     async (payload: InvoicePayload | null) => {
@@ -175,6 +180,21 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
         return;
       }
 
+      const note = p.note || undefined;
+      const session = selectActiveSession(sessionState);
+      const variant = session?.checkoutVariant ?? CheckoutVariantEnum.SALE;
+      const isReturnFlow = variant !== CheckoutVariantEnum.SALE;
+      // INVOICE_RETURN: credits + hàng mua mới cùng nằm trong purchaseCart.
+      // QUICK_EXCHANGE: hàng trả ở returnCart, hàng mua mới ở purchaseCart.
+      const returnLines =
+        variant === CheckoutVariantEnum.QUICK_EXCHANGE
+          ? selectReturnCart(sessionState)
+          : purchaseCart.filter((l) => l.isReturnCredit);
+      const cashierName = currentUser
+        ? `${currentUser.firstName} ${currentUser.lastName}`.trim()
+        : (sessionState.cashierDisplayName ?? undefined);
+      const appliedVoucher = selectPromotionDraft(sessionState).appliedVoucher;
+
       const receiptPayload = buildCheckoutInvoicePayload({
         printInvoice: p.printInvoice,
         cart: computeReceiptLines(sessionState),
@@ -187,12 +207,17 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
         methods: PAYMENT_METHODS,
         keepChange: p.keepChange,
         debt: p.debt,
+        customerName: selectedCustomer?.name,
+        customerPhone: selectedCustomer?.phone,
+        cashierName,
+        salespersonName: selectedSalesperson?.name,
+        note,
+        returnLines: isReturnFlow ? returnLines : [],
+        returnFee: p.returnFee,
+        pointsRedeemed: pointsToRedeem,
+        pointsDiscountAmount,
+        voucherCode: appliedVoucher?.voucherCode,
       });
-
-      const note = p.note || undefined;
-      const session = selectActiveSession(sessionState);
-      const variant = session?.checkoutVariant ?? CheckoutVariantEnum.SALE;
-      const isReturnFlow = variant !== CheckoutVariantEnum.SALE;
 
       try {
         if (!isReturnFlow) {
@@ -249,12 +274,6 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
           });
         } else {
           // ── RETURN / EXCHANGE ─────────────────────────────────────────────
-          // INVOICE_RETURN: credits + hàng mua mới cùng nằm trong purchaseCart.
-          // QUICK_EXCHANGE: hàng trả ở returnCart, hàng mua mới ở purchaseCart.
-          const returnLines =
-            variant === CheckoutVariantEnum.QUICK_EXCHANGE
-              ? selectReturnCart(sessionState)
-              : purchaseCart.filter((l) => l.isReturnCredit);
           const newLines =
             variant === CheckoutVariantEnum.QUICK_EXCHANGE
               ? purchaseCart
@@ -389,6 +408,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       createExchangeMutation,
       checkoutReturnMutation,
       revenueQuery.data,
+      currentUser,
       printReceiptIfNeeded,
     ],
   );

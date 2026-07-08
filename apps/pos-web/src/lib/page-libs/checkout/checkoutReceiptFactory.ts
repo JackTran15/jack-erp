@@ -55,6 +55,36 @@ interface BuildCheckoutInvoicePayloadInput {
   debt: boolean;
   /** Bản tạm tính (chưa checkout) → renderer in tiêu đề "HÓA ĐƠN TẠM TÍNH". */
   provisional?: boolean;
+  /** "KH:" trên hóa đơn. */
+  customerName?: string | null;
+  /** "SĐT:" trên hóa đơn. */
+  customerPhone?: string | null;
+  /** "NV Thu ngân:" — user đang đăng nhập. */
+  cashierName?: string | null;
+  /** "NVBH:" — nhân viên bán hàng đã chọn. */
+  salespersonName?: string | null;
+  /** "Ghi chú:" — ghi chú hóa đơn. */
+  note?: string;
+  /**
+   * Dòng trả trong `cart` (QUICK_EXCHANGE: returnCart — KHÔNG mang
+   * `isReturnCredit`; INVOICE_RETURN: purchaseCart lọc `isReturnCredit`).
+   * Nhận diện theo `lineId` để tách khối "Tiền hàng trả lại" / đảo dấu dòng in.
+   */
+  returnLines?: CartLine[];
+  /** "Phí đổi trả" — từ payment draft. */
+  returnFee?: number;
+  /** Số điểm khách dùng — n trong "Điểm (n)". */
+  pointsRedeemed?: number;
+  /** Tiền giảm từ điểm (VND). */
+  pointsDiscountAmount?: number;
+  /** Mã voucher đã chọn — renderer chỉ in khi có `voucherDiscount`. */
+  voucherCode?: string | null;
+}
+
+/** Trim + rỗng → undefined, cho các field info ẩn được trên bản in. */
+function trimmedOrUndefined(value?: string | null): string | undefined {
+  const v = value?.trim();
+  return v ? v : undefined;
 }
 
 export function buildCheckoutInvoicePayload({
@@ -70,21 +100,48 @@ export function buildCheckoutInvoicePayload({
   keepChange,
   debt,
   provisional,
+  customerName,
+  customerPhone,
+  cashierName,
+  salespersonName,
+  note,
+  returnLines,
+  returnFee,
+  pointsRedeemed,
+  pointsDiscountAmount,
+  voucherCode,
 }: BuildCheckoutInvoicePayloadInput): InvoicePayload | null {
   if (!printInvoice || cart.length === 0) return null;
 
+  // Dòng trả nhận diện theo lineId (returnCart của quick-exchange không mang
+  // `isReturnCredit`) — union với flag cho luồng INVOICE_RETURN.
+  const returnLineIds = new Set((returnLines ?? []).map((l) => l.lineId));
+  const isReturnLine = (l: CartLine): boolean =>
+    Boolean(l.isReturnCredit) || returnLineIds.has(l.lineId);
+  const purchaseOnly = cart.filter((l) => !isReturnLine(l));
+  const returnOnly = cart.filter(isReturnLine);
+
   const totalQty = cart.reduce(
-    (sum, l) => sum + (l.isReturnCredit ? Math.abs(l.qty) : l.qty),
+    (sum, l) => sum + (isReturnLine(l) ? Math.abs(l.qty) : l.qty),
     0,
   );
-  // "Tiền hàng" = gross trước KM; "Khuyến mãi" = tổng KM theo mặt hàng. Cùng dấu
-  // với lineTotal nên grossSubtotal − itemDiscountTotal === grandTotal (net).
-  const grossSubtotal = cart.reduce(
-    (sum, l) => sum + (l.isReturnCredit ? -1 : 1) * l.unitPrice * l.qty,
+  // "Tiền hàng" = gross hàng mua trước KM; "Khuyến mãi" = KM theo mặt hàng của
+  // hàng mua. Khối trả tách riêng nên purchaseNet − returnNet === grandTotal.
+  const grossSubtotal = purchaseOnly.reduce(
+    (sum, l) => sum + l.unitPrice * l.qty,
     0,
   );
-  const itemDiscountTotal = cart.reduce(
-    (sum, l) => sum + (l.isReturnCredit ? -1 : 1) * lineDiscountAmount(l),
+  const itemDiscountTotal = purchaseOnly.reduce(
+    (sum, l) => sum + lineDiscountAmount(l),
+    0,
+  );
+  // Khối "Tiền hàng trả lại / KM / Giá trị trả lại" — độ lớn dương.
+  const returnGross = returnOnly.reduce(
+    (sum, l) => sum + l.unitPrice * Math.abs(l.qty),
+    0,
+  );
+  const returnDiscount = returnOnly.reduce(
+    (sum, l) => sum + lineDiscountAmount(l),
     0,
   );
   // Bản in phản ánh đúng số khách trả: khi "Tính vào công nợ", phần đã trả (nếu
@@ -112,15 +169,29 @@ export function buildCheckoutInvoicePayload({
     store: STORE_INFO,
     invoiceNumber: generateInvoiceNumber(new Date()),
     issuedAt: new Date(),
-    lines: cart.map((l, i) => ({
-      index: i + 1,
-      name: l.name,
-      qty: l.isReturnCredit ? -l.qty : l.qty,
-      unitPrice: l.unitPrice,
-      lineTotal: lineTotal(l),
-      discountLabel: l.lineDiscount ? formatLineDiscountLabel(l) : undefined,
-      note: l.note?.trim() ? l.note.trim() : undefined,
-    })),
+    info: {
+      customerName: trimmedOrUndefined(customerName),
+      customerPhone: trimmedOrUndefined(customerPhone),
+      cashierName: trimmedOrUndefined(cashierName),
+      salespersonName: trimmedOrUndefined(salespersonName),
+      note: trimmedOrUndefined(note),
+    },
+    voucherCode: trimmedOrUndefined(voucherCode),
+    lines: cart.map((l, i) => {
+      // lineTotal() chỉ đảo dấu theo isReturnCredit — dòng returnCart của
+      // quick-exchange phải đảo tay để in số âm như hàng trả.
+      const signedTotal =
+        isReturnLine(l) && !l.isReturnCredit ? -lineTotal(l) : lineTotal(l);
+      return {
+        index: i + 1,
+        name: l.name,
+        qty: isReturnLine(l) ? -Math.abs(l.qty) : l.qty,
+        unitPrice: l.unitPrice,
+        lineTotal: signedTotal,
+        discountLabel: l.lineDiscount ? formatLineDiscountLabel(l) : undefined,
+        note: l.note?.trim() ? l.note.trim() : undefined,
+      };
+    }),
     totals: {
       totalQty,
       subtotal: grossSubtotal,
@@ -133,6 +204,16 @@ export function buildCheckoutInvoicePayload({
       forgivenShortage: t.forgivenShortage,
       debtReduction: t.debtReduction,
       customerDebtIssued: t.customerDebtIssued,
+      returnGross: returnOnly.length > 0 ? returnGross : undefined,
+      returnDiscount:
+        returnOnly.length > 0 && returnDiscount > 0 ? returnDiscount : undefined,
+      returnNet:
+        returnOnly.length > 0 ? returnGross - returnDiscount : undefined,
+      returnFee: returnFee && returnFee > 0 ? returnFee : undefined,
+      pointsRedeemed:
+        pointsRedeemed && pointsRedeemed > 0 ? pointsRedeemed : undefined,
+      pointsDiscountAmount:
+        pointsRedeemed && pointsRedeemed > 0 ? pointsDiscountAmount : undefined,
     },
     payments,
     provisional,

@@ -1,8 +1,10 @@
 import { useCallback, useState } from "react";
 
 import { useInvoicePrinter } from "@erp/pos/hooks/page-hooks/checkout/use-invoice-printer";
+import { useCurrentUserQuery } from "@erp/pos/hooks/react-query/use-query-user";
 import { buildCheckoutInvoicePayload } from "@erp/pos/lib/page-libs/checkout/checkoutReceiptFactory";
 import { deriveSettlement } from "@erp/pos/lib/page-libs/checkout/checkoutSettlement";
+import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import {
   PAYMENT_METHODS,
   PaymentMethodEnum,
@@ -13,10 +15,17 @@ import {
 } from "@erp/pos/constants/checkout-messages.constant";
 import {
   computeReceiptLines,
+  selectActiveSession,
+  selectCustomerDraft,
+  selectEffectivePointsRedeemed,
   selectGrandTotal,
   selectHasAnyCartLines,
+  selectMetaDraft,
   selectPaymentDraft,
   selectPointsDiscountAmount,
+  selectPromotionDraft,
+  selectPurchaseCart,
+  selectReturnCart,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
@@ -35,7 +44,9 @@ export interface UseCheckoutEstimateResult {
  */
 export function useCheckoutEstimate(): UseCheckoutEstimateResult {
   const invoicePrinter = useInvoicePrinter();
+  const currentUserQuery = useCurrentUserQuery();
   const [isPrinting, setIsPrinting] = useState(false);
+  const currentUser = currentUserQuery.data;
 
   const printEstimate = useCallback(async () => {
     const sessionState = usePosCheckoutSessionStore.getState();
@@ -49,6 +60,25 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
     const p = selectPaymentDraft(sessionState);
     const grandTotal = selectGrandTotal(sessionState);
     const pointsDiscountAmount = selectPointsDiscountAmount(sessionState);
+    const pointsRedeemed = selectEffectivePointsRedeemed(sessionState);
+    const selectedCustomer = selectCustomerDraft(sessionState).selectedCustomer;
+    const selectedSalesperson =
+      selectMetaDraft(sessionState).selectedSalesperson;
+    const appliedVoucher = selectPromotionDraft(sessionState).appliedVoucher;
+    // Dòng trả để tách khối "Tiền hàng trả lại" trên bản in (cùng quy tắc với
+    // finalize: QUICK_EXCHANGE dùng returnCart, INVOICE_RETURN lọc credits).
+    const variant =
+      selectActiveSession(sessionState)?.checkoutVariant ??
+      CheckoutVariantEnum.SALE;
+    const returnLines =
+      variant === CheckoutVariantEnum.QUICK_EXCHANGE
+        ? selectReturnCart(sessionState)
+        : variant === CheckoutVariantEnum.INVOICE_RETURN
+          ? selectPurchaseCart(sessionState).filter((l) => l.isReturnCredit)
+          : [];
+    const cashierName = currentUser
+      ? `${currentUser.firstName} ${currentUser.lastName}`.trim()
+      : (sessionState.cashierDisplayName ?? undefined);
     const { totalPaid, settlementGrandTotal } = deriveSettlement({
       grandTotal,
       deposit: p.deposit,
@@ -76,6 +106,16 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
       methods: PAYMENT_METHODS,
       keepChange: p.keepChange,
       debt: p.debt,
+      customerName: selectedCustomer?.name,
+      customerPhone: selectedCustomer?.phone,
+      cashierName,
+      salespersonName: selectedSalesperson?.name,
+      note: p.note || undefined,
+      returnLines,
+      returnFee: p.returnFee,
+      pointsRedeemed,
+      pointsDiscountAmount,
+      voucherCode: appliedVoucher?.voucherCode,
     });
     if (!receiptPayload) return;
 
@@ -89,7 +129,7 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
       setIsPrinting(false);
     }
     ui.setAnnouncement(CHECKOUT_ANNOUNCEMENTS.estimatePrinted);
-  }, [invoicePrinter]);
+  }, [invoicePrinter, currentUser]);
 
   return { printEstimate, isPrinting };
 }

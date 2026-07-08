@@ -1,4 +1,5 @@
 import type {
+  InvoiceInfoData,
   InvoiceLineData,
   InvoicePaymentEntry,
   InvoicePolicy,
@@ -12,6 +13,10 @@ export interface InvoicePayload {
   invoiceNumber: string;
   /** When the receipt was issued. Renderer formats to vi-VN DD/MM/YYYY HH:mm. */
   issuedAt: Date;
+  /** Info rows dưới tiêu đề (KH/SĐT/NV…). Field rỗng → renderer ẩn dòng. */
+  info: InvoiceInfoData;
+  /** Mã voucher đã chọn — chỉ in khi `totals.voucherDiscount` có giá trị. */
+  voucherCode?: string;
   lines: InvoiceLineData[];
   totals: InvoiceTotals;
   /** Per-method payment breakdown — one row per entry on the receipt. */
