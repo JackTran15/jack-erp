@@ -117,6 +117,7 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
       pointsDiscountAmount,
       voucherCode: appliedVoucher?.voucherCode,
       printDuplicate: p.printDuplicate,
+      isReturnExchange: variant !== CheckoutVariantEnum.SALE,
     });
     if (!receiptPayload) return;
 

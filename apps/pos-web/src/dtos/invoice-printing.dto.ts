@@ -24,6 +24,11 @@ export interface InvoicePayload {
   /** Bản tạm tính (chưa checkout) → tiêu đề "HÓA ĐƠN TẠM TÍNH". */
   provisional?: boolean;
   /**
+   * Hóa đơn đổi/trả hàng → tiêu đề "HÓA ĐƠN ĐỔI TRẢ" (khi không phải bản
+   * tạm tính — `provisional` ưu tiên hơn).
+   */
+  isReturnExchange?: boolean;
+  /**
    * Số liên in trong 1 lệnh in (mỗi liên 1 trang, máy in nhiệt cắt giữa các
    * liên). Bỏ trống / ≤ 1 → in 1 liên.
    */

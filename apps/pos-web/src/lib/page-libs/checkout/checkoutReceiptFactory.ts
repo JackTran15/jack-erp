@@ -81,6 +81,8 @@ interface BuildCheckoutInvoicePayloadInput {
   voucherCode?: string | null;
   /** In 2 liên trong 1 lệnh in (1 cho khách, 1 cửa hàng lưu). */
   printDuplicate?: boolean;
+  /** Hóa đơn đổi/trả hàng → tiêu đề "HÓA ĐƠN ĐỔI TRẢ". */
+  isReturnExchange?: boolean;
 }
 
 /** Trim + rỗng → undefined, cho các field info ẩn được trên bản in. */
@@ -113,6 +115,7 @@ export function buildCheckoutInvoicePayload({
   pointsDiscountAmount,
   voucherCode,
   printDuplicate,
+  isReturnExchange,
 }: BuildCheckoutInvoicePayloadInput): InvoicePayload | null {
   if (!printInvoice || cart.length === 0) return null;
 
@@ -220,6 +223,7 @@ export function buildCheckoutInvoicePayload({
     },
     payments,
     provisional,
+    isReturnExchange,
     copies: printDuplicate ? 2 : undefined,
     policy: RETURN_POLICY,
     closingMessage: CLOSING_MESSAGE,
