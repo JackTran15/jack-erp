@@ -13,10 +13,7 @@ import type {
   CatalogProduct,
 } from "@erp/pos/interfaces/checkout.interface";
 import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
-import {
-  isCartLineWarning,
-  locationQtyFor,
-} from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
+import { isCartLineWarning } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
   clampPosCheckoutQtyNumber,
   POS_CHECKOUT_QTY_MIN,
@@ -164,10 +161,12 @@ export function useCheckoutSessionCart() {
   const addProduct = useCallback(
     (product: PosCatalogLine, qtyToAdd = 1): string | null => {
       if (!session) return null;
-      // Cho phép bán khống: KHÔNG chặn khi hết tồn. `atLocation` chỉ còn dùng làm
+      // Cho phép bán khống: KHÔNG chặn khi hết tồn. `onHand` chỉ còn dùng làm
       // `maxQty` (snapshot tồn) để đánh dấu cảnh báo vượt tồn + bật dialog xác nhận
-      // bán khống lúc thanh toán.
-      const atLocation = locationQtyFor(product);
+      // bán khống lúc thanh toán. Dùng `quantityOnHand` (SUM toàn chi nhánh) —
+      // KHÔNG dùng tồn per-location: BE trừ kho ở vị trí showroom mặc định nên
+      // breakdown locations[] có thể chứa cặp +/− bù trừ, chỉ SUM là chuẩn.
+      const onHand = product.quantityOnHand;
       const delta = clampPosCheckoutQtyNumber(Number(qtyToAdd) || 0);
 
       // Read the latest cart state from the store so we can compute the
@@ -197,9 +196,11 @@ export function useCheckoutSessionCart() {
           : prev.find((l) => l.itemId === product.itemId && !l.isReturnCredit);
         if (existingInPrev) {
           setCartError("");
+          // Refresh luôn snapshot tồn (`maxQty`) theo catalog mới nhất — dòng
+          // merge giữ snapshot từ lần thêm đầu sẽ báo vượt tồn sai.
           return prev.map((l) =>
             l.lineId === existingInPrev.lineId
-              ? { ...l, qty: l.qty + delta }
+              ? { ...l, qty: l.qty + delta, maxQty: onHand }
               : l,
           );
         }
@@ -212,7 +213,7 @@ export function useCheckoutSessionCart() {
           unitPrice: product.sellingPrice ?? 0,
           qty: delta,
           locationId: product.defaultLocationId,
-          maxQty: atLocation,
+          maxQty: onHand,
         };
         if (activeCheckoutPane === CheckoutPane.RETURN) {
           if (variant === CheckoutVariantEnum.QUICK_EXCHANGE) {

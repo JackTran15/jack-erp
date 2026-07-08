@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 
 import {
+  CATALOG_KEYS,
   CUSTOMER_KEYS,
   INVOICE_KEYS,
 } from "@erp/pos/constants/react-query-key.constant";
@@ -89,6 +90,9 @@ export function useCheckoutInvoiceMutation(): UseMutationResult<
     mutationFn: ({ id, body }) => invoiceService.checkout(id, body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: INVOICE_KEYS.ALL });
+      // Bán hàng trừ tồn — refetch catalog để snapshot tồn (`maxQty`) của lần
+      // thêm sản phẩm kế tiếp phản ánh đúng tồn mới (icon cảnh báo vượt tồn).
+      void qc.invalidateQueries({ queryKey: CATALOG_KEYS.ALL });
     },
   });
 }
@@ -347,6 +351,8 @@ export function useCheckoutReturnMutation(): UseMutationResult<
     mutationFn: ({ id, body }) => invoiceService.checkoutReturn(id, body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: INVOICE_KEYS.ALL });
+      // Trả/đổi hàng thay đổi tồn kho — refetch catalog như checkout bán.
+      void qc.invalidateQueries({ queryKey: CATALOG_KEYS.ALL });
     },
   });
 }
