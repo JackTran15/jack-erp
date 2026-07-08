@@ -23,6 +23,11 @@ export interface InvoicePayload {
   payments: InvoicePaymentEntry[];
   /** Bản tạm tính (chưa checkout) → tiêu đề "HÓA ĐƠN TẠM TÍNH". */
   provisional?: boolean;
+  /**
+   * Số liên in trong 1 lệnh in (mỗi liên 1 trang, máy in nhiệt cắt giữa các
+   * liên). Bỏ trống / ≤ 1 → in 1 liên.
+   */
+  copies?: number;
   policy: InvoicePolicy;
   /** Last centered line, e.g. "Giày MT hân hạnh phục vụ quý khách!". */
   closingMessage: string;

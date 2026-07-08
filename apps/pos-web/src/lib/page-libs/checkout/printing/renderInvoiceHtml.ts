@@ -57,6 +57,9 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
   const { store, invoiceNumber, issuedAt, info, lines, totals, payments } =
     invoice;
 
+  // Số liên trong 1 lệnh in ("In 2 liên": 1 cho khách, 1 cửa hàng lưu).
+  const copyCount = Math.max(1, Math.floor(invoice.copies ?? 1));
+
   const rows = lines
     .map(
       (l) => `
@@ -152,6 +155,8 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
         print-color-adjust: exact;
       }
       .receipt { width: 72mm; margin: 0 auto; padding: 2mm 0 4mm; }
+      /* In nhiều liên: mỗi liên 1 trang riêng để máy in nhiệt cắt giữa các liên. */
+      .receipt + .receipt { page-break-before: always; break-before: page; }
 
       .header { text-align: center; margin-bottom: 4px; }
       .logo {
@@ -266,7 +271,7 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
       }
     </style>
   </head>
-  <body>
+  <body>${Array.from({ length: copyCount }, () => `
     <div class="receipt">
       <header class="header">
         <div class="logo" aria-hidden="true">MT'</div>
@@ -366,7 +371,7 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
       </section>
 
       <p class="closing">${escapeHtml(invoice.closingMessage)}</p>
-    </div>
+    </div>`).join("")}
   </body>
 </html>`;
 }

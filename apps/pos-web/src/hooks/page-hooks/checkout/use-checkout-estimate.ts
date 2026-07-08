@@ -116,6 +116,7 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
       pointsRedeemed,
       pointsDiscountAmount,
       voucherCode: appliedVoucher?.voucherCode,
+      printDuplicate: p.printDuplicate,
     });
     if (!receiptPayload) return;
 

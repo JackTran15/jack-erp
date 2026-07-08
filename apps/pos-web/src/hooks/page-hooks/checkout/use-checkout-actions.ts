@@ -217,6 +217,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
         pointsRedeemed: pointsToRedeem,
         pointsDiscountAmount,
         voucherCode: appliedVoucher?.voucherCode,
+        printDuplicate: p.printDuplicate,
       });
 
       try {

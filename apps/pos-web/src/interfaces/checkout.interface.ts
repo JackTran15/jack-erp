@@ -172,6 +172,8 @@ export interface CheckoutPaymentDraft {
   debt: boolean;
   note: string;
   printInvoice: boolean;
+  /** In 2 liên trong 1 lệnh in (1 cho khách, 1 cửa hàng lưu). */
+  printDuplicate: boolean;
   preorder: boolean;
   selectedSuggestionId: string | null;
   deposit: number;

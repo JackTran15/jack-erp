@@ -26,6 +26,7 @@ export function initialCheckoutDraft(): CheckoutDraft {
       debt: false,
       note: "",
       printInvoice: true,
+      printDuplicate: false,
       preorder: false,
       selectedSuggestionId: null,
       deposit: 0,
