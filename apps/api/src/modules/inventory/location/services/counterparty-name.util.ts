@@ -152,8 +152,8 @@ export async function attachPurchasingEmployees<T extends HasPurchasingEmployee>
   }
   for (const r of rows) {
     r.purchasingEmployee = r.purchasingEmployeeId
-      ? byId.get(r.purchasingEmployeeId) ?? null
-      : null;
+      ? byId.get(r.purchasingEmployeeId)
+      : undefined;
   }
   return rows;
 }
