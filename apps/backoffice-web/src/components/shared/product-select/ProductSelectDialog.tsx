@@ -56,6 +56,8 @@ interface Props {
   defaultUnitPriceSource?: UnitPriceSource;
   defaultQuantity?: number;
   activeOnly?: boolean;
+  /** Include "ngừng theo dõi" (inactive) goods in the search results. */
+  includeInactive?: boolean;
   onConfirm: (result: ProductSelectResult) => void;
 }
 
@@ -113,6 +115,7 @@ export function ProductSelectDialog({
   defaultUnitPriceSource = "none",
   defaultQuantity = 1,
   activeOnly = false,
+  includeInactive = false,
   onConfirm,
 }: Props) {
   const [categoryId, setCategoryId] = useState("");
@@ -147,6 +150,7 @@ export function ProductSelectDialog({
     search: committedSearch || undefined,
     categoryId: categoryId || undefined,
     isActive: activeOnly || undefined,
+    includeInactive: includeInactive || undefined,
   });
 
   const rows = groupsQuery.data?.data ?? [];
@@ -416,6 +420,8 @@ export function ProductSelectDialog({
       productId,
       page: 1,
       pageSize: VARIANT_PAGE_SIZE,
+      isActive: activeOnly || undefined,
+      includeInactive: includeInactive || undefined,
     });
     let all = [...first.data];
     let p = 2;
@@ -424,6 +430,8 @@ export function ProductSelectDialog({
         productId,
         page: p,
         pageSize: VARIANT_PAGE_SIZE,
+        isActive: activeOnly || undefined,
+        includeInactive: includeInactive || undefined,
       });
       if (next.data.length === 0) break;
       all = all.concat(next.data);
@@ -658,6 +666,7 @@ export function ProductSelectDialog({
                       onProductCheckChange={handleProductCheckChange}
                       onToggleItem={toggleItem}
                       activeOnly={activeOnly}
+                      includeInactive={includeInactive}
                       onVariantsAutoLoaded={onVariantsAutoLoaded}
                       variantCache={variantCache}
                       itemDataById={itemDataById}
@@ -714,6 +723,7 @@ interface RowSharedProps {
   selectedItemIds: Set<string>;
   onToggleItem: (id: string, checked: boolean) => void;
   activeOnly: boolean;
+  includeInactive: boolean;
   showQuantityPrice: boolean;
   getQty: (id: string) => number;
   getPrice: (id: string, data: SelectedProduct) => number;
@@ -798,6 +808,7 @@ function ProductOrOrphanRow({
   onProductCheckChange,
   onToggleItem,
   activeOnly,
+  includeInactive,
   onVariantsAutoLoaded,
   onGroupQuickEntry,
   variantCache,
@@ -921,6 +932,7 @@ function ProductOrOrphanRow({
           selectedItemIds={selectedItemIds}
           onToggleItem={onToggleItem}
           activeOnly={activeOnly}
+          includeInactive={includeInactive}
           onVariantsAutoLoaded={onVariantsAutoLoaded}
           variantCache={variantCache}
           itemDataById={itemDataById}
@@ -954,6 +966,7 @@ function VariantRowsWithCache({
   selectedItemIds,
   onToggleItem,
   activeOnly,
+  includeInactive,
   onVariantsAutoLoaded,
   variantCache,
   itemDataById,
@@ -971,6 +984,7 @@ function VariantRowsWithCache({
       page,
       pageSize: VARIANT_PAGE_SIZE,
       isActive: activeOnly || undefined,
+      includeInactive: includeInactive || undefined,
     },
     true,
   );

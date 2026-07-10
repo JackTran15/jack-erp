@@ -47,6 +47,11 @@ export class CreateGoodsReceiptV2Dto {
   @MaxLength(200)
   deliveredBy?: string;
 
+  /** Nhân viên mua hàng — user (users.id) responsible for the purchase. */
+  @IsOptional()
+  @IsUUID()
+  purchasingEmployeeId?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(500)

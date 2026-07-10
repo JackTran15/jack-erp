@@ -151,11 +151,14 @@ export class InventoryItemCrudService extends BaseCrudService<
     actor: ActorContext,
   ): Promise<PaginatedResponse<any>> {
     const categoryId = filters?.categoryId as string | undefined;
+    const includeInactive =
+      filters?.includeInactive === true || filters?.includeInactive === "true";
     const result = await this.listProductGroups(actor, {
       page: query.page,
       pageSize: query.pageSize,
       search: query.search,
       categoryId,
+      includeInactive,
       sortOrder: query.sortOrder,
     });
     return { ...result, page: query.page, pageSize: query.pageSize };
@@ -1194,7 +1197,10 @@ export class InventoryItemCrudService extends BaseCrudService<
     const offset = (page - 1) * pageSize;
     const searchParam = search?.trim() ? `%${search.trim()}%` : null;
     const catParam = categoryId ?? null;
-    const isActiveParam = isActive ?? null;
+    // Default-hide discontinued groups unless the caller opts in (includeInactive)
+    // or filters isActive explicitly. null = no filter (include both).
+    const isActiveParam =
+      query.includeInactive === true ? (isActive ?? null) : (isActive ?? true);
 
     const dataSql = `
       WITH combined AS (
@@ -1455,8 +1461,12 @@ export class InventoryItemCrudService extends BaseCrudService<
       .skip(offset)
       .take(pageSize);
 
+    // Default-hide discontinued variants unless the caller opts in
+    // (includeInactive) or filters isActive explicitly.
     if (query.isActive !== undefined) {
       qb.andWhere("i.isActive = :isActive", { isActive: query.isActive });
+    } else if (query.includeInactive !== true) {
+      qb.andWhere("i.isActive = true");
     }
 
     const [items, total] = await qb.getManyAndCount();

@@ -36,7 +36,7 @@ async function fetchSupplierOpenDebtsRaw(
 ): Promise<SupplierDebtApiRow[]> {
   const { data } = await apiClient.get<SupplierDebtsResponse>(
     "/cash-vouchers/partners/supplier-debts",
-    { params: { supplierId, status: "OPEN" } },
+    { params: { supplierId, status: "open" } },
   );
   return data?.data ?? [];
 }

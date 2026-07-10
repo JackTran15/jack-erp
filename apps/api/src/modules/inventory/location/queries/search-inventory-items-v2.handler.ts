@@ -106,6 +106,13 @@ export class SearchInventoryItemsV2Handler
     this.applyBool(where, params, '"isPosVisible"', dto.isPosVisible);
     this.applyBool(where, params, '"isActive"', dto.isActive);
 
+    // Default-hide discontinued items unless the caller opts in (includeInactive)
+    // or filters isActive explicitly. The literal predicate needs no param, so
+    // the LIMIT/OFFSET placeholders keep their offset.
+    if (dto.includeInactive !== true && dto.isActive === undefined) {
+      where.push('"isActive" = true');
+    }
+
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
     const dataSql = `

@@ -13,6 +13,7 @@ import { assertProductUniformLocation } from '../../location/services/product-lo
 import { ItemEntity } from '../../location/item.entity';
 import { ProviderEntity } from '../../location/provider.entity';
 import { CustomerEntity } from '../../../customer/customer.entity';
+import { UserEntity } from '../../../auth/user.entity';
 import { GoodsReceiptEntity } from '../goods-receipt.entity';
 import { GoodsReceiptLineEntity } from '../goods-receipt-line.entity';
 import { CreateGoodsReceiptV2Command } from './create-goods-receipt-v2.command';
@@ -37,6 +38,7 @@ export class CreateGoodsReceiptV2Handler
     const orgId = actor.organizationId;
 
     await this.validateCounterparty(manager, dto, orgId);
+    await this.validatePurchasingEmployee(manager, dto.purchasingEmployeeId, orgId);
 
     // Resolve each line's product so siblings can be checked for a uniform location.
     const itemIds = [...new Set(dto.lines.map((l) => l.itemId))];
@@ -77,6 +79,7 @@ export class CreateGoodsReceiptV2Handler
       counterpartyKind: dto.counterpartyKind ?? null,
       counterpartyId: dto.counterpartyId ?? null,
       deliveredBy: dto.deliveredBy,
+      purchasingEmployeeId: dto.purchasingEmployeeId ?? null,
       reason: dto.reason,
       description: dto.description,
       receivedAt: new Date(dto.receivedAt),
@@ -131,6 +134,20 @@ export class CreateGoodsReceiptV2Handler
       if (!customer) {
         throw new BadRequestException('Customer counterparty not found in organization');
       }
+    }
+  }
+
+  private async validatePurchasingEmployee(
+    manager: EntityManager,
+    purchasingEmployeeId: string | undefined,
+    orgId: string,
+  ): Promise<void> {
+    if (!purchasingEmployeeId) return;
+    const user = await manager.findOne(UserEntity, {
+      where: { id: purchasingEmployeeId, organizationId: orgId, isActive: true },
+    });
+    if (!user) {
+      throw new BadRequestException('Purchasing employee not found in organization');
     }
   }
 }

@@ -118,3 +118,42 @@ export async function attachCounterparties<T extends HasCounterparty>(
   }
   return rows;
 }
+
+/** Anything carrying a purchasing-employee reference (goods receipt). */
+export interface HasPurchasingEmployee {
+  purchasingEmployeeId?: string | null;
+  purchasingEmployee?: { id: string; name: string } | null;
+}
+
+/**
+ * Batch-resolve `purchasingEmployeeId` (users.id) and inline a
+ * `purchasingEmployee` { id, name } object onto each row (mutates in place).
+ * Single query for all ids — no N+1.
+ */
+export async function attachPurchasingEmployees<T extends HasPurchasingEmployee>(
+  manager: EntityManager,
+  rows: T[],
+  organizationId: string,
+): Promise<T[]> {
+  const ids = [
+    ...new Set(rows.map((r) => r.purchasingEmployeeId).filter(Boolean)),
+  ] as string[];
+  const byId = new Map<string, { id: string; name: string }>();
+  if (ids.length) {
+    const users = await manager.find(UserEntity, {
+      where: ids.map((id) => ({ id, organizationId })),
+    });
+    for (const u of users) {
+      byId.set(u.id, {
+        id: u.id,
+        name: `${u.firstName} ${u.lastName}`.trim(),
+      });
+    }
+  }
+  for (const r of rows) {
+    r.purchasingEmployee = r.purchasingEmployeeId
+      ? byId.get(r.purchasingEmployeeId) ?? null
+      : null;
+  }
+  return rows;
+}

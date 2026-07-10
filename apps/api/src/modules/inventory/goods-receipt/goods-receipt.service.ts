@@ -48,7 +48,11 @@ import {
 } from "./dto/create-goods-receipt.dto";
 import { UpdateGoodsReceiptDto } from "./dto/update-goods-receipt.dto";
 import { resolveDocCounterparty } from "../location/services/resolve-doc-counterparty.util";
-import { attachCounterparties } from "../location/services/counterparty-name.util";
+import {
+  attachCounterparties,
+  attachPurchasingEmployees,
+} from "../location/services/counterparty-name.util";
+import { UserEntity } from "../../auth/user.entity";
 
 export interface GoodsReceiptQuery extends PaginationQuery {
   status?: GoodsReceiptStatus;
@@ -83,6 +87,10 @@ export class GoodsReceiptService {
     actor: ActorContext,
   ): Promise<GoodsReceiptEntity> {
     this.validateBusinessRules(dto, actor.branchId);
+    await this.assertPurchasingEmployee(
+      dto.purchasingEmployeeId,
+      actor.organizationId,
+    );
     const counterparty = await resolveDocCounterparty(
       this.dataSource.manager,
       dto,
@@ -105,6 +113,7 @@ export class GoodsReceiptService {
       counterpartyKind: counterparty.counterpartyKind,
       counterpartyId: counterparty.counterpartyId,
       deliveredBy: dto.deliveredBy,
+      purchasingEmployeeId: dto.purchasingEmployeeId ?? null,
       reason: dto.reason,
       description: dto.description,
       referenceId: dto.referenceId,
@@ -203,6 +212,13 @@ export class GoodsReceiptService {
       receipt.providerId = dto.providerId;
     }
     if (dto.deliveredBy !== undefined) receipt.deliveredBy = dto.deliveredBy;
+    if (dto.purchasingEmployeeId !== undefined) {
+      await this.assertPurchasingEmployee(
+        dto.purchasingEmployeeId,
+        actor.organizationId,
+      );
+      receipt.purchasingEmployeeId = dto.purchasingEmployeeId ?? null;
+    }
     if (dto.reason !== undefined) receipt.reason = dto.reason;
     if (dto.description !== undefined) receipt.description = dto.description;
     if (dto.referenceId !== undefined) receipt.referenceId = dto.referenceId;
@@ -583,7 +599,28 @@ export class GoodsReceiptService {
       [receipt],
       actor.organizationId,
     );
+    await attachPurchasingEmployees(
+      this.receiptRepo.manager,
+      [receipt],
+      actor.organizationId,
+    );
     return receipt;
+  }
+
+  /** Validate a purchasing-employee reference (users.id) belongs to the org. */
+  private async assertPurchasingEmployee(
+    purchasingEmployeeId: string | undefined,
+    organizationId: string,
+  ): Promise<void> {
+    if (!purchasingEmployeeId) return;
+    const user = await this.receiptRepo.manager.findOne(UserEntity, {
+      where: { id: purchasingEmployeeId, organizationId, isActive: true },
+    });
+    if (!user) {
+      throw new BadRequestException(
+        "Purchasing employee not found in organization",
+      );
+    }
   }
 
   async list(
