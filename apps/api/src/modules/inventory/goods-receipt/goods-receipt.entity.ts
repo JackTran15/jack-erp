@@ -62,6 +62,14 @@ export class GoodsReceiptEntity extends BaseEntity {
   @Column({ name: 'delivered_by', length: 200, nullable: true })
   deliveredBy?: string;
 
+  @Column({
+    name: 'purchasing_employee_id',
+    type: 'uuid',
+    nullable: true,
+    comment: 'User (users.id) responsible for the purchase; distinct from createdBy',
+  })
+  purchasingEmployeeId?: string | null;
+
   @Column({ length: 500, nullable: true })
   reason?: string;
 
@@ -146,4 +154,7 @@ export class GoodsReceiptEntity extends BaseEntity {
    * latter two).
    */
   counterparty?: CounterpartyDisplay | null;
+
+  /** Transient (not a column): resolved { id, name } of purchasingEmployeeId, inlined on read. */
+  purchasingEmployee?: { id: string; name: string } | null;
 }

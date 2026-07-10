@@ -5,6 +5,7 @@ import { FilterBuilder } from "../../../../common/filters/filter.builder";
 import { GoodsReceiptEntity } from "../goods-receipt.entity";
 import {
   attachCounterparties,
+  attachPurchasingEmployees,
   counterpartyNameSql,
 } from "../../location/services/counterparty-name.util";
 import { SearchGoodsReceiptsV2Query } from "./search-goods-receipts-v2.query";
@@ -75,6 +76,11 @@ export class SearchGoodsReceiptsV2Handler implements IQueryHandler<SearchGoodsRe
     // Inline the resolved "Đối tượng" so customer/employee counterparties (no
     // provider join) render their name instead of "—".
     await attachCounterparties(this.repo.manager, data, actor.organizationId);
+    await attachPurchasingEmployees(
+      this.repo.manager,
+      data,
+      actor.organizationId,
+    );
 
     return { data, total, page, limit };
   }

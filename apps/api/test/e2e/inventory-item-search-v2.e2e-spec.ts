@@ -93,12 +93,13 @@ describe('Inventory item grouped search v2 (E2E)', () => {
   const codesOf = (body: { data: Array<{ code: string }> }) =>
     body.data.map((r) => r.code);
 
-  it('groups variants per product, joins barcodes, averages prices; envelope {data,total,page,limit}, org-scoped', async () => {
+  it('groups variants per product, joins barcodes, averages prices; envelope {data,total,page,limit}, org-scoped; hides discontinued by default', async () => {
     const res = await search({}).expect(201);
 
-    expect(res.body).toMatchObject({ page: 1, limit: 20, total: 2 });
+    // Default-hide: the inactive orphan LAPTOP-15 is excluded, leaving only GELLI.
+    expect(res.body).toMatchObject({ page: 1, limit: 20, total: 1 });
     // Sorted by code ASC; cross-tenant row excluded.
-    expect(codesOf(res.body)).toEqual(['GELLI', 'LAPTOP-15']);
+    expect(codesOf(res.body)).toEqual(['GELLI']);
 
     expect(res.body.data[0]).toMatchObject({
       type: 'product',
@@ -114,6 +115,13 @@ describe('Inventory item grouped search v2 (E2E)', () => {
       isActive: true,
       itemCount: 2,
     });
+  });
+
+  it('includes discontinued items when includeInactive=true', async () => {
+    const res = await search({ includeInactive: true }).expect(201);
+
+    expect(res.body.total).toBe(2);
+    expect(codesOf(res.body)).toEqual(['GELLI', 'LAPTOP-15']);
     expect(res.body.data[1]).toMatchObject({
       type: 'orphan',
       code: 'LAPTOP-15',
@@ -140,6 +148,7 @@ describe('Inventory item grouped search v2 (E2E)', () => {
   it('filters by name (contains)', async () => {
     const res = await search({
       name: { operator: '*', value: 'laptop' },
+      includeInactive: true,
     }).expect(201);
     expect(codesOf(res.body)).toEqual(['LAPTOP-15']);
   });
@@ -151,16 +160,31 @@ describe('Inventory item grouped search v2 (E2E)', () => {
     expect(codesOf(res.body)).toEqual(['GELLI']);
   });
 
-  it('filters by isActive', async () => {
+  it('filters by isActive explicitly (bypasses default-hide)', async () => {
     const res = await search({ isActive: false }).expect(201);
     expect(codesOf(res.body)).toEqual(['LAPTOP-15']);
   });
 
+  it('returns only inactive when includeInactive=true and isActive=false', async () => {
+    const res = await search({ includeInactive: true, isActive: false }).expect(
+      201,
+    );
+    expect(codesOf(res.body)).toEqual(['LAPTOP-15']);
+  });
+
   it('paginates', async () => {
-    const p1 = await search({ page: 1, limit: 1 }).expect(201);
+    const p1 = await search({
+      page: 1,
+      limit: 1,
+      includeInactive: true,
+    }).expect(201);
     expect(codesOf(p1.body)).toEqual(['GELLI']);
     expect(p1.body.total).toBe(2);
-    const p2 = await search({ page: 2, limit: 1 }).expect(201);
+    const p2 = await search({
+      page: 2,
+      limit: 1,
+      includeInactive: true,
+    }).expect(201);
     expect(codesOf(p2.body)).toEqual(['LAPTOP-15']);
   });
 
