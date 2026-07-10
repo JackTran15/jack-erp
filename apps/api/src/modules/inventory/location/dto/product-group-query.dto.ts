@@ -54,6 +54,17 @@ export class ProductGroupsQueryDto {
   @Transform(({ value }) => parseBool(value))
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    default: false,
+    description:
+      'Include discontinued (is_active=false) items. Defaults to false, so ' +
+      'discontinued items are hidden unless the caller opts in.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => parseBool(value))
+  @IsBoolean()
+  includeInactive?: boolean;
 }
 
 export class ProductItemsQueryDto {
@@ -84,6 +95,17 @@ export class ProductItemsQueryDto {
   @Transform(({ value }) => parseBool(value))
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    default: false,
+    description:
+      'Include discontinued (is_active=false) variants. Defaults to false, so ' +
+      'discontinued variants are hidden unless the caller opts in.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => parseBool(value))
+  @IsBoolean()
+  includeInactive?: boolean;
 }
 
 export interface ProductGroupRow {

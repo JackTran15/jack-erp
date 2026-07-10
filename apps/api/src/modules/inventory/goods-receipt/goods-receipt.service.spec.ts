@@ -6,6 +6,7 @@ describe('GoodsReceiptService', () => {
     create: jest.fn(),
     save: jest.fn(),
     findOne: jest.fn(),
+    manager: { findOne: jest.fn() },
   };
   const documentNumberingService = {
     generate: jest.fn(),
@@ -89,6 +90,34 @@ describe('GoodsReceiptService', () => {
       ),
     ).rejects.toThrow('Cửa hàng nguồn phải khác cửa hàng hiện tại');
 
+    expect(receiptRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('rejects a purchasing employee not in the organization', async () => {
+    receiptRepo.manager.findOne.mockResolvedValue(null);
+
+    await expect(
+      service.create(
+        {
+          purpose: GoodsReceiptPurpose.OTHER,
+          purchasingEmployeeId: 'nv-x',
+          receivedAt: '2026-06-10T00:00:00.000Z',
+          locationId: 'loc-A01',
+          lines: [
+            {
+              itemId: 'item-1',
+              locationId: 'loc-A01',
+              uomCode: 'pcs',
+              quantity: 1,
+              unitPrice: 100,
+            },
+          ],
+        },
+        actor,
+      ),
+    ).rejects.toThrow('Purchasing employee not found in organization');
+
+    expect(documentNumberingService.generate).not.toHaveBeenCalled();
     expect(receiptRepo.save).not.toHaveBeenCalled();
   });
 

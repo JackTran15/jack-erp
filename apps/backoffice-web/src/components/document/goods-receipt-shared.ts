@@ -44,6 +44,10 @@ export interface GoodsReceipt {
   } | null;
   paymentMethod?: "CASH" | "CREDIT" | null;
   deliveredBy?: string | null;
+  /** Nhân viên mua hàng — user (users.id) responsible for the purchase. */
+  purchasingEmployeeId?: string | null;
+  /** Resolved { id, name } of purchasingEmployeeId, inlined by the API. */
+  purchasingEmployee?: { id: string; name: string } | null;
   reason?: string | null;
   description?: string | null;
   referenceId?: string | null;

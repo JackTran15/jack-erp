@@ -41,6 +41,8 @@ interface ProductGroupsParams {
   categoryId?: string;
   /** Only "đang theo dõi" items. Omit to include ngừng-theo-dõi items too. */
   isActive?: boolean;
+  /** Include "ngừng theo dõi" (isActive=false) items when isActive is omitted. */
+  includeInactive?: boolean;
 }
 
 interface ProductItemsParams {
@@ -48,6 +50,8 @@ interface ProductItemsParams {
   page: number;
   pageSize: number;
   isActive?: boolean;
+  /** Include "ngừng theo dõi" (isActive=false) variants when isActive is omitted. */
+  includeInactive?: boolean;
 }
 
 interface PaginatedResult<T> {
@@ -69,6 +73,7 @@ export async function fetchProductGroups(
             search: params.search || undefined,
             categoryId: params.categoryId || undefined,
             isActive: params.isActive,
+            includeInactive: params.includeInactive,
           },
         },
       },
@@ -89,6 +94,7 @@ export async function fetchProductVariants(
             page: params.page,
             pageSize: params.pageSize,
             isActive: params.isActive,
+            includeInactive: params.includeInactive,
           },
         },
       },
@@ -107,6 +113,7 @@ export function productVariantsQueryKey(params: ProductItemsParams) {
     params.page,
     params.pageSize,
     params.isActive ?? null,
+    params.includeInactive ?? null,
   ] as const;
 }
 
