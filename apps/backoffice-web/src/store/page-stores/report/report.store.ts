@@ -53,11 +53,6 @@ export function createReportStore(
           ) {
             filters[REPORT_FILTERS_LINE.RECEIVING_STORE] = "";
           }
-          // eslint-disable-next-line no-console
-          console.log("[report-filter] change", {
-            filters,
-            columnFilters: s.columnFilters,
-          });
           return { filters };
         }),
 
@@ -68,9 +63,19 @@ export function createReportStore(
             ...s.columnFilters,
             [columnId]: { ...existing, ...patch },
           };
-          // eslint-disable-next-line no-console
-          console.log("[report-filter] change", { filters: s.filters, columnFilters });
           return { columnFilters };
+        }),
+
+      // Áp dụng filter cột (dòng đầu bảng) ngay, không cần bấm "Lấy dữ liệu".
+      // Chỉ chạy khi report đã tải (appliedRequest != null) và columnFilters đổi so với snapshot.
+      commitColumnFilters: () =>
+        set((s) => {
+          if (!s.appliedRequest) return {};
+          if (s.appliedRequest.columnFilters === s.columnFilters) return {}; // chưa đổi -> bỏ qua
+          return {
+            appliedRequest: { ...s.appliedRequest, columnFilters: s.columnFilters },
+            reloadNonce: s.reloadNonce + 1,
+          };
         }),
 
       // Chốt filter hiện tại → appliedRequest (table sẽ fetch data theo snapshot này).

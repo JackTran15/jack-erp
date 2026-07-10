@@ -71,6 +71,8 @@ export interface ReportActions {
     value: ReportFilterValues[K],
   ) => void;
   setColumnFilter: (columnId: string, patch: Partial<ReportColumnFilter>) => void;
+  // Áp dụng ngay filter cột (dòng đầu bảng) mà không bấm "Lấy dữ liệu".
+  commitColumnFilters: () => void;
   // Chốt filter hiện tại → appliedRequest (kích hoạt fetch data).
   applyFilters: () => void;
   resetFilters: () => void;
