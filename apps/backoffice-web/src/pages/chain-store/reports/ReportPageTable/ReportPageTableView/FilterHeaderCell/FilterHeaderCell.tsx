@@ -85,7 +85,12 @@ export function FilterHeaderCell({
           <input
             className={inputClass}
             value={value}
-            onChange={(e) => onValueChange(e.target.value)}
+            onChange={(e) => {
+              // Toán tử mặc định chỉ hiển thị (fallback) -> chốt vào state khi nhập
+              // để buildColumnFilters serialize đúng (nếu không sẽ bị bỏ qua).
+              if (!operator) onOperatorChange(DEFAULT_COLUMN_FILTER_MODE);
+              onValueChange(e.target.value);
+            }}
             aria-label={`Lọc ${label}`}
           />
         </div>
@@ -115,7 +120,12 @@ export function FilterHeaderCell({
               : "",
           ].join(" ")}
           value={value}
-          onChange={(e) => onValueChange(e.target.value)}
+          onChange={(e) => {
+            // Toán tử so sánh mặc định ("=") chỉ là fallback hiển thị -> chốt vào
+            // state khi nhập để date/number filter không bị bỏ qua lúc serialize.
+            if (!operator) onOperatorChange(DEFAULT_COLUMN_COMPARE_OP);
+            onValueChange(e.target.value);
+          }}
           aria-label={`Lọc ${label}`}
         />
       </div>

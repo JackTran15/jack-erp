@@ -12,6 +12,7 @@ import { buildInitialReportState } from "../../../store/page-stores/report/repor
 import { InvoiceDetailDialog } from "./InvoiceDetailDialog/InvoiceDetailDialog";
 import { ReportPageHeader } from "./ReportPageHeader/ReportPageHeader";
 import { ReportPageTable } from "./ReportPageTable/ReportPageTable";
+import { ReportColumnFilterSync } from "./ReportColumnFilterSync/ReportColumnFilterSync";
 import { ReportTableConfigSync } from "./ReportTableConfigSync/ReportTableConfigSync";
 import { ReportUrlSync } from "./ReportUrlSync/ReportUrlSync";
 import { STORE_TYPE } from "../../../constants/store.constant";
@@ -72,6 +73,7 @@ export function ReportPage({ category, reportType }: Props) {
       >
         <ReportTableConfigSync />
         <ReportUrlSync />
+        <ReportColumnFilterSync />
         <div className="flex h-full min-h-0 flex-col bg-background px-2">
           <ReportPageHeader />
           <ReportPageTable />
