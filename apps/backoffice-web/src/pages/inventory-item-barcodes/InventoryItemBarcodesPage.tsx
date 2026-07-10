@@ -18,7 +18,9 @@ import {
 } from "./_lib/barcode-label-row.type";
 import { renderBarcodeLabelsPdf } from "./_lib/render-barcode-labels-pdf";
 import { printBarcodeLabels } from "./_lib/print-barcode-labels";
+import { capLabels } from "./_lib/cap-labels";
 import { resolveItemLocations } from "./_lib/resolve-item-locations";
+import { PrintConfirmDialog } from "./PrintConfirmDialog/PrintConfirmDialog";
 import {
   BARCODE_SKU_INPUT_ID,
   BarcodeLabelGrid,
@@ -62,6 +64,7 @@ export function InventoryItemBarcodesPage() {
   });
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [printing, setPrinting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const focusedRowIdRef = useRef<string | null>(null);
 
@@ -364,25 +367,40 @@ export function InventoryItemBarcodesPage() {
   );
 
   // ─── Print ─────────────────────────────────────────────────────────
-  const handlePrint = useCallback(async () => {
+  // Nút "In tem" mở dialog cảnh báo; việc in thực sự chạy ở doPrint theo lựa chọn.
+  const handleOpenPrintConfirm = useCallback(() => {
     const printable = rows.filter((r) => r.itemId && r.quantity > 0);
     if (!printable.length) {
       toast.error("Chưa có tem nào để in — thêm hàng hóa và số lượng tem");
       return;
     }
-    setPrinting(true);
-    try {
-      const pdf = renderBarcodeLabelsPdf(printable, {
-        paper,
-        printedAt: new Date(),
-        branchCode,
-        showStoreInfo: !isChain,
-      });
-      await printBarcodeLabels(pdf);
-    } finally {
-      setPrinting(false);
-    }
-  }, [rows, paper, branchCode, isChain]);
+    setConfirmOpen(true);
+  }, [rows]);
+
+  const doPrint = useCallback(
+    (mode: "test" | "bulk") => {
+      const printable = rows.filter((r) => r.itemId && r.quantity > 0);
+      if (!printable.length) return;
+      // In thử: tối đa 2 tem để người dùng quét kiểm tra trước khi in hàng loạt.
+      const toPrint = mode === "test" ? capLabels(printable, 2) : printable;
+      setPrinting(true);
+      try {
+        const pdf = renderBarcodeLabelsPdf(toPrint, {
+          paper,
+          printedAt: new Date(),
+          branchCode,
+          showStoreInfo: !isChain,
+        });
+        // Không await trước window.open (bên trong printBarcodeLabels) để giữ
+        // user-gesture, tránh popup blocker.
+        void printBarcodeLabels(pdf);
+      } finally {
+        setPrinting(false);
+      }
+      setConfirmOpen(false);
+    },
+    [rows, paper, branchCode, isChain],
+  );
 
   return (
     <div className="flex min-h-0 w-full flex-1 gap-2.5 overflow-hidden">
@@ -438,8 +456,16 @@ export function InventoryItemBarcodesPage() {
         branchCode={branchCode}
         showStoreInfo={!isChain}
         printing={printing}
-        onPrint={handlePrint}
+        onPrint={handleOpenPrintConfirm}
         onCancel={handleCancel}
+      />
+
+      <PrintConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        printing={printing}
+        onTestPrint={() => doPrint("test")}
+        onBulkPrint={() => doPrint("bulk")}
       />
 
       {productPickerOpen ? (
