@@ -36,7 +36,7 @@ export class SearchCustomersV2Handler
       qb.andWhere('customer.branchId = :branchId', { branchId: dto.branchId });
     }
 
-    qb.orderBy('customer.createdAt', 'DESC')
+    qb.orderBy('customer.code', 'ASC')
       .skip((page - 1) * limit)
       .take(limit);
 

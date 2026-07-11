@@ -7,19 +7,39 @@ import {
   buildImportReviewPreviewColumns,
   toImportReviewRows,
 } from "./import-review-columns";
-import type { ImportJob, ImportJobRow } from "./import-inventory.types";
-import { BaseDataTable } from "../../../../components/table/BaseDataTable";
+import type {
+  ImportJob,
+  ImportJobRow,
+  ImportReviewRow,
+} from "./import-inventory.types";
+import {
+  BaseDataTable,
+  type TableColumn,
+} from "../../../../components/table/BaseDataTable";
 
 interface Props {
   job: ImportJob;
   rows: ImportJobRow[];
   rowsTruncated?: boolean;
+  /** Override the review grid columns (defaults to the inventory item columns). */
+  columns?: TableColumn<ImportReviewRow>[];
+  /** Override the error-rows download (defaults to the inventory endpoint). */
+  onDownloadErrors?: (jobId: string) => Promise<void>;
 }
 
-export function ImportStepDataReview({ job, rows, rowsTruncated }: Props) {
+export function ImportStepDataReview({
+  job,
+  rows,
+  rowsTruncated,
+  columns: columnsProp,
+  onDownloadErrors,
+}: Props) {
   const [isDownloadingErrors, setIsDownloadingErrors] = useState(false);
   const reviewRows = useMemo(() => toImportReviewRows(rows), [rows]);
-  const columns = useMemo(() => buildImportReviewPreviewColumns(), []);
+  const columns = useMemo(
+    () => columnsProp ?? buildImportReviewPreviewColumns(),
+    [columnsProp],
+  );
   const validCount = job.validRows ?? 0;
   const errorCount = job.errorRows ?? 0;
   const total = job.totalRows ?? rows.length;
@@ -27,7 +47,7 @@ export function ImportStepDataReview({ job, rows, rowsTruncated }: Props) {
   const handleDownloadErrors = async () => {
     try {
       setIsDownloadingErrors(true);
-      await downloadImportErrorRowsExcel(job.id);
+      await (onDownloadErrors ?? downloadImportErrorRowsExcel)(job.id);
     } catch {
       toast.error("Không thể tải file lỗi. Vui lòng thử lại.");
     } finally {

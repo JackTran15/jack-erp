@@ -133,6 +133,24 @@ export class CustomerService extends BaseCrudService<
       );
     }
 
+    if (payload.code !== undefined) {
+      const code = payload.code.trim();
+      if (!code) {
+        // Code is required and system-issued — an empty edit keeps the current one.
+        delete payload.code;
+      } else {
+        const taken = await this.repository.findOne({
+          where: { code, organizationId: actor.organizationId, id: Not(id) },
+        });
+        if (taken) {
+          throw new ConflictException(
+            `Mã khách hàng "${code}" đã tồn tại trong tổ chức.`,
+          );
+        }
+        payload.code = code;
+      }
+    }
+
     if (payload.email !== undefined || payload.phone !== undefined) {
       await this.checkDuplicates(
         payload.email,
@@ -323,6 +341,7 @@ export const CUSTOMER_ENTITY_CONFIG: CrudEntityConfig = {
   apiResource: 'customers',
   idField: 'id',
   fields: [
+    { key: 'code', label: 'Mã khách hàng', type: 'string' },
     { key: 'name', label: 'Tên khách hàng', type: 'string', required: true },
     { key: 'email', label: 'Email', type: 'string' },
     { key: 'phone', label: 'Điện thoại', type: 'string' },

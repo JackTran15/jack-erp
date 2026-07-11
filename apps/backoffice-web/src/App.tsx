@@ -47,6 +47,7 @@ import { ProductDetailPage } from "./pages/products/ProductDetailPage";
 import { EmployeesPage } from "./pages/employees/EmployeesPage";
 import { RoleManagementPage } from "./pages/role-management/RoleManagementPage";
 import { CustomerDetailPage } from "./pages/customers/CustomerDetailPage";
+import { CustomersPage } from "./pages/customers/CustomersPage";
 import { DynamicStoreView } from "./pages/dynamic-store-view";
 import { REPORT_TYPE_INVENTORY } from "./constants/reports/report-type.constant";
 import { InventoryReportPage } from "./pages/reports/InventoryReportPage";
@@ -97,6 +98,7 @@ export function App() {
                   path="/admin/customers/:id"
                   element={<CustomerDetailPage />}
                 />
+                <Route path="/admin/customers" element={<CustomersPage />} />
                 <Route
                   path="/admin/:entityKey/:id"
                   element={<CrudDetailPage />}
