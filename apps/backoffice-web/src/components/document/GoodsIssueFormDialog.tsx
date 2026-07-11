@@ -414,6 +414,7 @@ export function GoodsIssueFormDialog({
         const branchId = getActiveBranchId();
         const params = new URLSearchParams({ page: "1", pageSize: "200" });
         if (branchId) params.set("branchId", branchId);
+        params.set("activeOnly", "true");
         const { data } = await apiClient.get<
           PaginatedResponse<{ id: string; name: string; branchId: string }>
         >(`/inventory/storages?${params}`);
@@ -534,9 +535,10 @@ export function GoodsIssueFormDialog({
   const searchStorages = useCallback(
     async (query: string, page: number, pageSize?: number) => {
       const q = query.trim().toLowerCase();
+      const active = storages.filter((s) => s.isActive !== false);
       const filtered = q
-        ? storages.filter((s) => s.name.toLowerCase().includes(q))
-        : storages;
+        ? active.filter((s) => s.name.toLowerCase().includes(q))
+        : active;
       const effectivePageSize = pageSize ?? 8;
       const start = (page - 1) * effectivePageSize;
       const items = filtered.slice(start, start + effectivePageSize);
@@ -558,6 +560,7 @@ export function GoodsIssueFormDialog({
         pageSize: String(effectivePageSize),
         search: query.trim(),
         storageId: storageIdArg,
+        activeOnly: "true",
       });
       const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
         `/inventory/locations?${params}`,
@@ -682,7 +685,7 @@ export function GoodsIssueFormDialog({
           let fb = fallbackByStorage.get(l.storageId);
           if (fb === undefined) {
             const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
-              `/inventory/locations?page=1&pageSize=50&storageId=${encodeURIComponent(l.storageId)}&includeUnassigned=true`,
+              `/inventory/locations?page=1&pageSize=50&storageId=${encodeURIComponent(l.storageId)}&includeUnassigned=true&activeOnly=true`,
             );
             const first =
               data.data.find((loc) => loc.isUnassigned === true) ??

@@ -283,6 +283,8 @@ export class GoodsReceiptService {
           notes: `Huỷ phiếu nhập kho ${receipt.documentNumber ?? receipt.id}`,
           actorContext: actor,
           unitCost: Number(line.unitPrice),
+          // Đảo bút huỷ phiếu đã posted: cho phép kể cả khi kho đã ngừng hoạt động.
+          skipInactiveStorageGuard: true,
         }));
         const reversalEntries = await this.stockLedger.recordBatchMovements(
           reversals,

@@ -166,6 +166,7 @@ export function TransferLocationDialog({
     const branchId = getActiveBranch();
     if (query.trim()) params.set("search", query.trim());
     if (branchId) params.set("branchId", branchId);
+    params.set("activeOnly", "true");
     const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
       `/inventory/storages?${params}`,
     );
@@ -179,6 +180,7 @@ export function TransferLocationDialog({
       if (query.trim()) params.set("search", query.trim());
       if (sid) params.set("storageId", sid);
       if (branchId) params.set("branchId", branchId);
+      params.set("activeOnly", "true");
       const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
         `/inventory/locations?${params}`,
       );
@@ -712,29 +714,29 @@ export function TransferLocationDialog({
               : "Chọn kho và vị trí hiện tại để bắt đầu."}
           </div>
         ) : (
-          <table className="w-full border-collapse text-sm">
+          <table className="w-full min-w-[1360px] table-fixed border-collapse text-sm">
             <thead className="sticky top-0 z-10 bg-muted text-left [&_th]:bg-muted">
               <tr>
                 <th className="w-8 border-b px-2 py-2 text-center text-xs font-medium text-muted-foreground">#</th>
                 <th className="w-44 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Mã SKU</th>
-                <th className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">Tên hàng hóa</th>
-                <th className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">Kho</th>
-                <th className="w-52 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
+                <th className="w-48 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Tên hàng hóa</th>
+                <th className="w-52 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Kho</th>
+                <th className="w-48 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
                   Vị trí hiện tại <span className="text-destructive">*</span>
                 </th>
-                <th className="w-16 border-b px-3 py-2 text-right text-xs font-medium text-muted-foreground">
+                <th className="w-20 border-b px-3 py-2 text-right text-xs font-medium text-muted-foreground">
                   Đơn vị tính
                 </th>
                 <th className="w-24 border-b px-3 py-2 text-right text-xs font-medium text-muted-foreground">
                   Số lượng tồn
                 </th>
-                <th className="w-52 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
+                <th className="w-48 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
                   Vị trí chuyển đến <span className="text-destructive">*</span>
                 </th>
-                <th className="w-32 border-b px-3 py-2 text-right text-xs font-medium text-muted-foreground">
+                <th className="w-28 border-b px-3 py-2 text-right text-xs font-medium text-muted-foreground">
                   Số lượng chuyển <span className="text-destructive">*</span>
                 </th>
-                <th className="w-16 border-b px-2 py-2" />
+                <th className="w-20 border-b px-2 py-2" />
               </tr>
             </thead>
             <tbody>

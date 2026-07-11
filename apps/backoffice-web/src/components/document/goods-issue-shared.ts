@@ -108,6 +108,8 @@ export interface InventoryStorage {
   branchId: string;
   isMainStorage?: boolean;
   isDefaultReceiving?: boolean;
+  /** false = kho đã ngừng hoạt động → ẩn khỏi picker chọn kho. */
+  isActive?: boolean;
 }
 
 /** Active branch id used as X-Branch-Id (set by api-axios from localStorage). */

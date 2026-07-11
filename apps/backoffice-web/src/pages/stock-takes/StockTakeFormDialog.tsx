@@ -412,6 +412,7 @@ export function StockTakeFormDialog({
         pageSize: String(pageSize ?? 20),
         search: query.trim(),
         storageId: effectiveStorageId,
+        activeOnly: "true",
       });
       const { data } = await apiClient.get<PaginatedResponse<LocationOption>>(
         `/inventory/locations?${params}`,
@@ -478,6 +479,7 @@ export function StockTakeFormDialog({
         page: "1",
         pageSize: "1",
         storageId: effectiveStorageId,
+        activeOnly: "true",
       });
       const { data } = await apiClient.get<PaginatedResponse<LocationOption>>(
         `/inventory/locations?${params}`,

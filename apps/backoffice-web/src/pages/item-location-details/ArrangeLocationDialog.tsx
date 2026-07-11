@@ -6,7 +6,11 @@ import { LookupField } from "../../components/forms/LookupField";
 import { apiClient } from "../../lib/api-axios";
 import { getActiveBranch } from "../../lib/auth-storage";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
-import { assignArrange, type ArrangeLine } from "../../api/stock-balances";
+import {
+  assignArrange,
+  type ArrangeLine,
+  type StockBalanceRow,
+} from "../../api/stock-balances";
 import { getPreferredShelfBatch } from "../../api/inventory-location-preferences";
 import { useTrailingEmptyRow } from "../../hooks/useTrailingEmptyRow";
 import {
@@ -15,15 +19,6 @@ import {
 } from "../../components/shared/product-select/ProductSelectDialog";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-interface ProductGroupSearchResult {
-  type: "product" | "orphan";
-  id: string;
-  code: string;
-  name: string;
-  unit: string;
-  itemCount: number;
-}
 
 interface ProductVariantSearchResult {
   id: string;
@@ -71,6 +66,8 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
+  /** Hàng đã chọn ở bảng — điền sẵn vào dialog (giống Chuyển vị trí). */
+  selectedRows?: StockBalanceRow[];
   initialLocation?: {
     id: string;
     code: string;
@@ -113,6 +110,7 @@ export function ArrangeLocationDialog({
   open,
   onOpenChange,
   onSaved,
+  selectedRows = [],
   initialLocation = null,
 }: Props): ReactElement {
   const [rows, setRows] = useState<ArrangeRow[]>(() => [emptyRow()]);
@@ -129,7 +127,7 @@ export function ArrangeLocationDialog({
   }, [open]);
 
   useEffect(() => {
-    if (!open || !initialLocation) return;
+    if (!open || !initialLocation || selectedRows.length > 0) return;
     setRows([
       {
         ...emptyRow(),
@@ -139,7 +137,27 @@ export function ArrangeLocationDialog({
         locationCode: `${initialLocation.code} · ${initialLocation.name}`,
       },
     ]);
-  }, [open, initialLocation]);
+  }, [open, initialLocation, selectedRows.length]);
+
+  // Auto fill selected rows from the table into the dialog.
+  useEffect(() => {
+    if (!open || selectedRows.length === 0) return;
+    setRows(
+      selectedRows.map<ArrangeRow>((r) => ({
+        uid: crypto.randomUUID(),
+        groupId: r.itemId,
+        groupType: "orphan",
+        itemIds: [r.itemId],
+        itemCode: r.item.code,
+        itemName: r.item.name,
+        unit: r.item.unit,
+        storageId: r.location.storageId,
+        storageName: r.location.storageName,
+        locationId: null,
+        locationCode: "",
+      })),
+    );
+  }, [open, selectedRows]);
 
   // Always keep exactly one blank trailing row (unified grid rule).
   useTrailingEmptyRow(rows, setRows, {
@@ -149,20 +167,31 @@ export function ArrangeLocationDialog({
 
   // ─── Search functions ─────────────────────────────────────────────────────
 
-  const searchProductGroups = useCallback(async (query: string) => {
-    const params = new URLSearchParams({ page: "1", pageSize: "12" });
-    if (query.trim()) params.set("search", query.trim());
-    const { data: res } = await apiClient.get<
-      PaginatedResponse<ProductGroupSearchResult>
-    >(`/inventory/items/products?${params}`);
-    return res.data;
-  }, []);
+  const searchItems = useCallback(
+    async (query: string, page: number, pageSize = 20) => {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+      });
+      if (query.trim()) params.set("search", query.trim());
+      const { data: res } = await apiClient.get<
+        PaginatedResponse<ProductVariantSearchResult>
+      >(`/inventory/items?${params}`);
+      return {
+        items: res.data,
+        hasMore: page * pageSize < res.total,
+        total: res.total,
+      };
+    },
+    [],
+  );
 
   const searchStorages = useCallback(async (query: string) => {
     const params = new URLSearchParams({ page: "1", pageSize: "20" });
     const branchId = getActiveBranch();
     if (query.trim()) params.set("search", query.trim());
     if (branchId) params.set("branchId", branchId);
+    params.set("activeOnly", "true");
     const { data: res } = await apiClient.get<
       PaginatedResponse<InventoryStorage>
     >(`/inventory/storages?${params}`);
@@ -176,6 +205,7 @@ export function ArrangeLocationDialog({
       if (query.trim()) params.set("search", query.trim());
       if (storageId) params.set("storageId", storageId);
       if (branchId) params.set("branchId", branchId);
+      params.set("activeOnly", "true");
       const { data: res } = await apiClient.get<
         PaginatedResponse<InventoryLocation>
       >(`/inventory/locations?${params}`);
@@ -337,6 +367,8 @@ export function ArrangeLocationDialog({
       title="Xếp vị trí hàng hóa"
       defaultWidth={1000}
       defaultHeight={600}
+      bodyClassName="flex min-h-0 flex-1 flex-col overflow-hidden"
+      showFooter={false}
     >
       {/* Header bar */}
       <div className="flex flex-wrap items-center justify-end gap-4 border-b px-4 py-3">
@@ -356,18 +388,18 @@ export function ArrangeLocationDialog({
                 #
               </th>
               <th className="w-48 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
-                Mã nhóm/SKU
+                Mã SKU
               </th>
               <th className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">
                 Hàng hóa
               </th>
-              <th className="w-44 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
+              <th className="w-60 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
                 Kho
               </th>
-              <th className="w-28 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
+              <th className="w-20 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
                 Đơn vị tính
               </th>
-              <th className="w-48 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
+              <th className="w-52 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
                 Vị trí
               </th>
               <th className="w-10 border-b px-2 py-2" />
@@ -383,10 +415,10 @@ export function ArrangeLocationDialog({
                   {idx + 1}
                 </td>
 
-                {/* Mã nhóm/SKU — LookupField */}
+                {/* Mã SKU — LookupField: mọi biến thể, lazy-load + search backend */}
                 <td className="border-b px-2 py-2">
-                  <LookupField<ProductGroupSearchResult>
-                    placeholder="Tìm nhóm hoặc SKU"
+                  <LookupField<ProductVariantSearchResult>
+                    placeholder="Tìm mã hoặc tên"
                     value={row.itemCode}
                     onValueChange={(v) =>
                       updateRow(row.uid, {
@@ -401,39 +433,28 @@ export function ArrangeLocationDialog({
                     onSelect={(item) =>
                       updateRow(row.uid, {
                         groupId: item.id,
-                        groupType: item.type,
-                        itemIds: item.type === "orphan" ? [item.id] : [item.id],
+                        groupType: "orphan",
+                        itemIds: [item.id],
                         itemCode: item.code,
                         itemName: item.name,
                         unit: item.unit,
                       })
                     }
-                    search={searchProductGroups}
+                    search={searchItems}
                     itemKey={(item) => item.id}
                     renderItem={(item) => item.name}
-                    renderMeta={(item) =>
-                      item.type === "product"
-                        ? `${item.code} · ${item.itemCount} biến thể`
-                        : item.code
-                    }
+                    renderMeta={(item) => item.code}
                     columns={[
                       {
                         key: "code",
-                        label: "Mã",
-                        className: "w-[110px] font-mono text-xs",
+                        label: "Mã SKU",
+                        className: "w-[130px] font-mono text-xs",
                         render: (item) => item.code,
                       },
                       {
                         key: "name",
                         label: "Tên hàng hóa",
                         render: (item) => item.name,
-                      },
-                      {
-                        key: "itemCount",
-                        label: "Biến thể",
-                        className: "w-[80px] text-right",
-                        render: (item) =>
-                          item.type === "product" ? item.itemCount : 1,
                       },
                     ]}
                     onSearchButtonClick={() => setProductPickerRowId(row.uid)}

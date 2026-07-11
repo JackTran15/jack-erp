@@ -57,6 +57,7 @@ export function CreateStockTakeDialog({ onClose, onPicked }: Props) {
         const params = new URLSearchParams({ page: "1", pageSize: "200" });
         const branchId = getActiveBranchId();
         if (branchId) params.set("branchId", branchId);
+        params.set("activeOnly", "true");
         const { data } = await apiClient.get<PaginatedResponse<StorageOption>>(
           `/inventory/storages?${params}`,
         );

@@ -72,6 +72,7 @@ export class StockDeductionConsumer {
           roles: [],
         },
         unitCost,
+        skipInactiveStorageGuard: true,
       },
     ]);
 

@@ -189,46 +189,6 @@ export class InventoryItemCrudService extends BaseCrudService<
     throw new NotFoundException(`Record ${id} not found`);
   }
 
-  /** Bulk toggle is_active for org-scoped items ("Ngừng theo dõi" / "Sử dụng lại"). */
-  async setActiveStatus(
-    ids: string[],
-    isActive: boolean,
-    actor: ActorContext,
-  ): Promise<{ updated: number }> {
-    if (!ids?.length) return { updated: 0 };
-    // Rule: hàng hóa đang ở kho Showroom không được ngừng theo dõi — phải chuyển
-    // hàng khỏi Showroom trước. Chỉ chặn khi tắt theo dõi (kích hoạt lại luôn cho phép).
-    if (!isActive) {
-      const inShowroom = await this.dataSource.query<Array<{ code: string }>>(
-        `SELECT DISTINCT i.code AS code
-           FROM stock_balances sb
-           JOIN locations loc ON loc.id = sb.location_id
-           JOIN storages s    ON s.id = loc.storage_id
-           JOIN items i       ON i.id = sb.item_id
-          WHERE sb.organization_id = $1
-            AND sb.item_id = ANY($2::uuid[])
-            AND s.is_main_storage = true
-          ORDER BY i.code`,
-        [actor.organizationId, ids],
-      );
-      if (inShowroom.length) {
-        const codes = inShowroom.slice(0, 5).map((r) => r.code).join(", ");
-        const more = inShowroom.length > 5 ? "…" : "";
-        throw new BadRequestException(
-          `Không thể ngừng theo dõi hàng hóa đang ở Showroom (${codes}${more}).`,
-        );
-      }
-    }
-    const result = await this.repository
-      .createQueryBuilder()
-      .update(ItemEntity)
-      .set({ isActive })
-      .where("id IN (:...ids)", { ids })
-      .andWhere("organization_id = :orgId", { orgId: actor.organizationId })
-      .execute();
-    return { updated: result.affected ?? 0 };
-  }
-
   /** Block hard-delete once an item has posted movements — MISA parity: use "Ngừng theo dõi" instead. */
   protected override async beforeDelete(
     id: string,

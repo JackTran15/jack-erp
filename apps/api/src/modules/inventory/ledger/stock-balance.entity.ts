@@ -28,4 +28,11 @@ export class StockBalanceEntity extends BaseEntity {
 
   @Column({ name: 'last_movement_at', type: 'timestamptz', nullable: true, comment: 'Timestamp of the most recent stock movement affecting this balance' })
   lastMovementAt?: Date;
+
+  @Column({
+    name: 'is_tracked',
+    default: true,
+    comment: 'Per-(item, location) "đang theo dõi" flag. false = ngừng theo dõi vị trí này (hidden from stock summary, excluded from arrange defaults) but item stays active.',
+  })
+  isTracked: boolean;
 }

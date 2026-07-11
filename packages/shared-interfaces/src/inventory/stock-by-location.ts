@@ -25,6 +25,7 @@ export interface StockByLocationItem {
   variantLabel: string | null;
   isPosVisible: boolean;
   isActive: boolean;
+  isTracked: boolean;
   sellingPrice: number;
   purchasePrice: number;
   barcodes: string[];

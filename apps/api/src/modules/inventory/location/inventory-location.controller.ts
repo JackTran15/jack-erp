@@ -26,7 +26,6 @@ import { ItemStockThresholdService } from './item-stock-threshold.service';
 import { LinkItemProviderDto } from './dto/link-item-provider.dto';
 import { CreateItemBarcodeDto } from './dto/create-item-barcode.dto';
 import { SetStockThresholdDto } from './dto/set-stock-threshold.dto';
-import { SetItemsStatusDto } from './dto/set-items-status.dto';
 import { ProductGroupsQueryDto, ProductItemsQueryDto } from './dto/product-group-query.dto';
 import { InventoryItemCrudService } from './item-crud.service';
 import {
@@ -120,16 +119,6 @@ export class InventoryLocationController {
     @Actor() actor: ActorContext,
   ) {
     return this.service.getItemById(id, actor);
-  }
-
-  // Bulk toggle is_active. MUST stay before items/:id so ':id' doesn't capture "status".
-  @Patch('items/status')
-  @RequirePermission('inventory.write')
-  setItemsStatus(
-    @Body() dto: SetItemsStatusDto,
-    @Actor() actor: ActorContext,
-  ) {
-    return this.itemCrudService.setActiveStatus(dto.ids, dto.isActive, actor);
   }
 
   @Patch('items/:id')
@@ -351,10 +340,15 @@ export class InventoryLocationController {
   @Get('storages')
   @RequirePermission('inventory.read')
   listStorages(
-    @Query() query: PaginationQueryDto & { branchId?: string },
+    @Query()
+    query: PaginationQueryDto & { branchId?: string; activeOnly?: string },
     @Actor() actor: ActorContext,
   ) {
-    return this.service.listStorages(query, actor);
+    const activeOnly =
+      query.activeOnly === 'true' ||
+      (query.activeOnly as unknown) === true ||
+      query.activeOnly === '1';
+    return this.service.listStorages({ ...query, activeOnly }, actor);
   }
 
   @Get('storages/:id')
@@ -436,6 +430,7 @@ export class InventoryLocationController {
       storageId?: string;
       branchId?: string;
       includeUnassigned?: string;
+      activeOnly?: string;
     },
     @Actor() actor: ActorContext,
   ) {
@@ -443,7 +438,14 @@ export class InventoryLocationController {
       query.includeUnassigned === 'true' ||
       (query.includeUnassigned as unknown) === true ||
       query.includeUnassigned === '1';
-    return this.service.listLocations({ ...query, includeUnassigned }, actor);
+    const activeOnly =
+      query.activeOnly === 'true' ||
+      (query.activeOnly as unknown) === true ||
+      query.activeOnly === '1';
+    return this.service.listLocations(
+      { ...query, includeUnassigned, activeOnly },
+      actor,
+    );
   }
 
   @Get('locations/:id')

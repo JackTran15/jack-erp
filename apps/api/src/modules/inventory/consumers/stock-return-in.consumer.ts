@@ -78,6 +78,8 @@ export class StockReturnInConsumer {
       referenceId: returnInvoiceId,
       actorContext: actor,
       unitCost: itemCostByItemId.get(line.itemId) ?? 0,
+      // POS nhận trả hàng không bị chặn bởi trạng thái ngừng hoạt động kho.
+      skipInactiveStorageGuard: true,
     }));
 
     await this.stockLedgerService.recordBatchMovements(movements);
