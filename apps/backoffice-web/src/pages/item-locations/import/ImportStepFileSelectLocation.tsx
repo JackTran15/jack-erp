@@ -1,12 +1,12 @@
 import { ImportDuplicateMode } from "@erp/shared-interfaces";
 import { toast } from "sonner";
 import { RadioGroup } from "../../../components/forms/RadioGroup";
-import { ImportFilePicker } from "../../inventory/_components/import/ImportFilePicker";
+import { ImportFilePicker } from "../../../components/shared/import-wizard/ImportFilePicker";
 import {
   DUPLICATE_MODE_OPTIONS,
   IMPORT_FILE_ACCEPT,
   isSupportedImportFile,
-} from "../../inventory/_components/import/import-file-utils";
+} from "../../../components/shared/import-wizard/import-file-utils";
 import { downloadLocationTemplate } from "./import-location.api";
 
 interface Props {

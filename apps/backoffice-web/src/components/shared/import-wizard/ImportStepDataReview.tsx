@@ -2,44 +2,33 @@ import { useMemo, useState } from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { INVENTORY_IMPORT_PREVIEW_ROWS_LIMIT } from "@erp/shared-interfaces";
-import { downloadImportErrorRowsExcel } from "./import-inventory.api";
 import {
-  buildImportReviewPreviewColumns,
   toImportReviewRows,
-} from "./import-review-columns";
-import type {
-  ImportJob,
-  ImportJobRow,
-  ImportReviewRow,
-} from "./import-inventory.types";
-import {
-  BaseDataTable,
-  type TableColumn,
-} from "../../../../components/table/BaseDataTable";
+  type ImportJob,
+  type ImportJobRow,
+  type ImportReviewRow,
+} from "./types";
+import { BaseDataTable, type TableColumn } from "../../table/BaseDataTable";
 
 interface Props {
   job: ImportJob;
   rows: ImportJobRow[];
   rowsTruncated?: boolean;
-  /** Override the review grid columns (defaults to the inventory item columns). */
-  columns?: TableColumn<ImportReviewRow>[];
-  /** Override the error-rows download (defaults to the inventory endpoint). */
-  onDownloadErrors?: (jobId: string) => Promise<void>;
+  /** Review grid columns for the importing domain. */
+  columns: TableColumn<ImportReviewRow>[];
+  /** Error-rows download for the importing domain. */
+  onDownloadErrors: (jobId: string) => Promise<void>;
 }
 
 export function ImportStepDataReview({
   job,
   rows,
   rowsTruncated,
-  columns: columnsProp,
+  columns,
   onDownloadErrors,
 }: Props) {
   const [isDownloadingErrors, setIsDownloadingErrors] = useState(false);
   const reviewRows = useMemo(() => toImportReviewRows(rows), [rows]);
-  const columns = useMemo(
-    () => columnsProp ?? buildImportReviewPreviewColumns(),
-    [columnsProp],
-  );
   const validCount = job.validRows ?? 0;
   const errorCount = job.errorRows ?? 0;
   const total = job.totalRows ?? rows.length;
@@ -47,7 +36,7 @@ export function ImportStepDataReview({
   const handleDownloadErrors = async () => {
     try {
       setIsDownloadingErrors(true);
-      await (onDownloadErrors ?? downloadImportErrorRowsExcel)(job.id);
+      await onDownloadErrors(job.id);
     } catch {
       toast.error("Không thể tải file lỗi. Vui lòng thử lại.");
     } finally {

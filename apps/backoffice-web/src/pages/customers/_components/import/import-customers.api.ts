@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+
 import { ImportDuplicateMode } from "@erp/shared-interfaces";
 import { apiClient } from "../../../../lib/api-axios";
 import { triggerBlobDownload } from "../../../../lib/download";
@@ -7,7 +7,7 @@ import type {
   ImportValidateResponse,
 } from "./import-customers.types";
 
-async function validateImportFile(
+export async function validateCustomersImportFile(
   file: File,
   duplicateMode: ImportDuplicateMode,
 ): Promise<ImportValidateResponse> {
@@ -20,31 +20,13 @@ async function validateImportFile(
   return data;
 }
 
-async function commitImportJob(
+export async function commitCustomersImportJob(
   jobId: string,
 ): Promise<CustomerImportCommitResponse> {
   const { data } = await apiClient.post<CustomerImportCommitResponse>(
     `/customers/imports/commit?jobId=${encodeURIComponent(jobId)}`,
   );
   return data;
-}
-
-export function useValidateCustomersImport() {
-  return useMutation({
-    mutationFn: ({
-      file,
-      duplicateMode,
-    }: {
-      file: File;
-      duplicateMode: ImportDuplicateMode;
-    }) => validateImportFile(file, duplicateMode),
-  });
-}
-
-export function useCommitCustomersImport() {
-  return useMutation({
-    mutationFn: (jobId: string) => commitImportJob(jobId),
-  });
 }
 
 /** Hủy job validate (bước 2 → quay lại): xóa job trên server, cho phép upload lại. */

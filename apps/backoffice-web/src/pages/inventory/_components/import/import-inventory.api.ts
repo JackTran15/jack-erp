@@ -1,4 +1,3 @@
-import { useMutation } from "@tanstack/react-query";
 import { apiClient } from "../../../../lib/api-axios";
 import {
   ImportDuplicateMode,
@@ -6,7 +5,7 @@ import {
   type ImportValidateResponse,
 } from "./import-inventory.types";
 
-async function validateImportFile(
+export async function validateImportFile(
   file: File,
   duplicateMode: ImportDuplicateMode,
 ): Promise<ImportValidateResponse> {
@@ -19,29 +18,13 @@ async function validateImportFile(
   return data;
 }
 
-async function commitImportJob(jobId: string): Promise<ImportCommitResponse> {
+export async function commitImportJob(
+  jobId: string,
+): Promise<ImportCommitResponse> {
   const { data } = await apiClient.post<ImportCommitResponse>(
     `/inventory/imports/items/commit?jobId=${encodeURIComponent(jobId)}`,
   );
   return data;
-}
-
-export function useValidateImport() {
-  return useMutation({
-    mutationFn: ({
-      file,
-      duplicateMode,
-    }: {
-      file: File;
-      duplicateMode: ImportDuplicateMode;
-    }) => validateImportFile(file, duplicateMode),
-  });
-}
-
-export function useCommitImport() {
-  return useMutation({
-    mutationFn: (jobId: string) => commitImportJob(jobId),
-  });
 }
 
 /** Hủy job validate (bước 2 → quay lại): xóa job trên server, cho phép upload lại. */

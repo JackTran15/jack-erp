@@ -3444,6 +3444,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/imports/item-categories/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_validateItemCategories"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/item-categories/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_commitItemCategories"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/item-categories/import-template.xls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_downloadItemCategoryTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/item-categories/jobs/{id}/error-rows.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_exportItemCategoryJobErrorRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/imports/locations/validate": {
         parameters: {
             query?: never;
@@ -3900,6 +3964,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["CsvExportController_exportLocationsExcel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/exports/item-categories/excel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvExportController_exportItemCategoriesExcel"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6864,7 +6944,7 @@ export interface components {
         };
         InventoryImportJobEntity: {
             /** @enum {string} */
-            type: "ITEMS" | "OPENING_BALANCES" | "ADJUSTMENTS" | "STOCK_TAKE" | "LOCATIONS" | "GOODS_RECEIPT" | "GOODS_ISSUE" | "STOCK_TRANSFER" | "TRANSFER_ORDER" | "CUSTOMERS";
+            type: "ITEMS" | "OPENING_BALANCES" | "ADJUSTMENTS" | "STOCK_TAKE" | "LOCATIONS" | "GOODS_RECEIPT" | "GOODS_ISSUE" | "STOCK_TRANSFER" | "TRANSFER_ORDER" | "CUSTOMERS" | "CATEGORIES";
             referenceId?: string | null;
             fileName: string;
             fileChecksum: string;
@@ -16534,6 +16614,80 @@ export interface operations {
             };
         };
     };
+    CsvImportController_validateItemCategories: {
+        parameters: {
+            query?: {
+                duplicateMode?: unknown;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_commitItemCategories: {
+        parameters: {
+            query: {
+                jobId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_downloadItemCategoryTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_exportItemCategoryJobErrorRows: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     CsvImportController_validateLocations: {
         parameters: {
             query?: {
@@ -17152,6 +17306,23 @@ export interface operations {
         };
     };
     CsvExportController_exportLocationsExcel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvExportController_exportItemCategoriesExcel: {
         parameters: {
             query?: never;
             header?: never;

@@ -29,6 +29,7 @@ import {
 import { Type } from "class-transformer";
 import { CsvExportService } from "./csv-export.service";
 import { LocationExportService } from "./location-export.service";
+import { CategoryExportService } from "./category-export.service";
 
 class ExportQueryDto extends PaginationQueryDto {
   @IsOptional()
@@ -79,6 +80,7 @@ export class CsvExportController {
   constructor(
     private readonly csvExportService: CsvExportService,
     private readonly locationExportService: LocationExportService,
+    private readonly categoryExportService: CategoryExportService,
   ) {}
 
   @Get("items")
@@ -166,6 +168,17 @@ export class CsvExportController {
   async exportLocationsExcel(@Res() res: Response, @Actor() actor: ActorContext) {
     const buffer = await this.locationExportService.exportLocationsExcelBuffer(actor);
     this.sendExcel(res, buffer, "danh-sach-vi-tri-hang-hoa.xlsx");
+  }
+
+  @Get("item-categories/excel")
+  @RequirePermission("inventory.read")
+  async exportItemCategoriesExcel(
+    @Res() res: Response,
+    @Actor() actor: ActorContext,
+  ) {
+    const buffer =
+      await this.categoryExportService.exportCategoriesExcelBuffer(actor);
+    this.sendExcel(res, buffer, "danh-muc-nhom-hang-hoa.xlsx");
   }
 
   private sendCsv(res: Response, csv: string, filename: string): void {

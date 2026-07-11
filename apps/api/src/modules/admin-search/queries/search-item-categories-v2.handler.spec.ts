@@ -18,6 +18,7 @@ function makeQb(result: [unknown[], number]) {
     where: jest.fn(() => qb),
     andWhere: jest.fn(() => qb),
     orderBy: jest.fn(() => qb),
+    addOrderBy: jest.fn(() => qb),
     skip: jest.fn(() => qb),
     take: jest.fn(() => qb),
     getManyAndCount: jest.fn().mockResolvedValue(result),
@@ -42,14 +43,15 @@ describe('SearchItemCategoriesV2Handler', () => {
     handler = module.get(SearchItemCategoriesV2Handler);
   }
 
-  it('scopes by organizationId and orders by createdAt DESC', async () => {
+  it('scopes by organizationId and orders by code ASC', async () => {
     await build([]);
     await handler.execute(new SearchItemCategoriesV2Query({}, actor));
 
     expect(qb.where).toHaveBeenCalledWith('category.organizationId = :orgId', {
       orgId: 'org-1',
     });
-    expect(qb.orderBy).toHaveBeenCalledWith('category.createdAt', 'DESC');
+    expect(qb.orderBy).toHaveBeenCalledWith('category.code', 'ASC');
+    expect(qb.addOrderBy).toHaveBeenCalledWith('category.name', 'ASC');
   });
 
   it('applies code and name string filters', async () => {

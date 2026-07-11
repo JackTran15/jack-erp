@@ -1,35 +1,66 @@
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ImportDuplicateMode } from "@erp/shared-interfaces";
 import { AppModal } from "@erp/ui";
-import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ImportSuccessIllustration } from "../../../components/shared/import-wizard/ImportSuccessIllustration";
-import { ImportWizardFooter } from "../../../components/shared/import-wizard/ImportWizardFooter";
-import { ImportWizardStepper } from "../../../components/shared/import-wizard/ImportWizardStepper";
-import { ImportStepDataReviewLocation } from "./ImportStepDataReviewLocation";
-import { ImportStepFileSelectLocation } from "./ImportStepFileSelectLocation";
-import {
-  useCancelLocationImport,
-  useCommitLocationImport,
-  useValidateLocationImport,
-} from "./import-location.api";
+import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
+import type { TableColumn } from "../../table/BaseDataTable";
+import { ImportStepDataReview } from "./ImportStepDataReview";
+import { ImportWizardFileSelect } from "./ImportWizardFileSelect";
+import { ImportWizardFooter } from "./ImportWizardFooter";
+import { ImportWizardStepper } from "./ImportWizardStepper";
 import {
   ImportWizardStep,
   type ImportJob,
-  type LocationImportJobRow,
-} from "./import-location.types";
+  type ImportJobRow,
+  type ImportReviewRow,
+  type ImportValidateResponse,
+} from "./types";
 
-interface Props {
+export interface ImportWizardApi<TCommit extends ImportValidateResponse> {
+  validate: (
+    file: File,
+    duplicateMode: ImportDuplicateMode,
+  ) => Promise<ImportValidateResponse>;
+  commit: (jobId: string) => Promise<TCommit>;
+  /** Hủy job validate (đóng dialog / quay lại bước chọn file). */
+  cancelJob: (jobId: string) => Promise<void>;
+  downloadErrorRows: (jobId: string) => Promise<void>;
+  downloadTemplate: () => Promise<void>;
+}
+
+interface Props<TCommit extends ImportValidateResponse> {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCommitted?: () => void;
+  title: string;
+  introTitle: string;
+  introBullets: string[];
+  /** Noun in "Khi gặp <noun> đã tồn tại:". */
+  duplicateNoun: string;
+  api: ImportWizardApi<TCommit>;
+  reviewColumns: TableColumn<ImportReviewRow>[];
+  /** Step-3 content built from the commit response. */
+  renderComplete: (result: TCommit) => ReactNode;
 }
 
-export function ImportLocationDialog({
+/**
+ * 3-step MISA-style import wizard (chọn tệp → kiểm tra → hoàn thành) shared
+ * by the item/customer/category imports. Domain specifics come in via props;
+ * the state machine (auto-validate on file pick with a request-id guard
+ * against stale responses, job cancellation on back/close) lives here once.
+ */
+export function ImportWizardDialog<TCommit extends ImportValidateResponse>({
   open,
   onOpenChange,
   onCommitted,
-}: Props) {
+  title,
+  introTitle,
+  introBullets,
+  duplicateNoun,
+  api,
+  reviewColumns,
+  renderComplete,
+}: Props<TCommit>) {
   const [step, setStep] = useState<ImportWizardStep>(
     ImportWizardStep.FileSelect,
   );
@@ -38,25 +69,15 @@ export function ImportLocationDialog({
   );
   const [file, setFile] = useState<File | null>(null);
   const [job, setJob] = useState<ImportJob | null>(null);
-  const [rows, setRows] = useState<LocationImportJobRow[]>([]);
+  const [rows, setRows] = useState<ImportJobRow[]>([]);
   const [rowsTruncated, setRowsTruncated] = useState(false);
-  const [locationsCommitted, setLocationsCommitted] = useState(0);
-
-  const {
-    mutateAsync: validateFile,
-    isPending: isValidating,
-    reset: resetValidate,
-  } = useValidateLocationImport();
-  const {
-    mutateAsync: commitJob,
-    isPending: isCommitting,
-    reset: resetCommit,
-  } = useCommitLocationImport();
-  const { mutateAsync: cancelJob } = useCancelLocationImport();
+  const [isValidating, setIsValidating] = useState(false);
+  const [isCommitting, setIsCommitting] = useState(false);
+  const [commitResult, setCommitResult] = useState<TCommit | null>(null);
 
   const validateRequestIdRef = useRef(0);
-  const validateFileRef = useRef(validateFile);
-  validateFileRef.current = validateFile;
+  const apiRef = useRef(api);
+  apiRef.current = api;
 
   const reset = useCallback(() => {
     validateRequestIdRef.current += 1;
@@ -66,10 +87,10 @@ export function ImportLocationDialog({
     setJob(null);
     setRows([]);
     setRowsTruncated(false);
-    setLocationsCommitted(0);
-    resetValidate();
-    resetCommit();
-  }, [resetCommit, resetValidate]);
+    setIsValidating(false);
+    setIsCommitting(false);
+    setCommitResult(null);
+  }, []);
 
   const handleClose = useCallback(
     (nextOpen: boolean) => {
@@ -78,7 +99,7 @@ export function ImportLocationDialog({
           step === ImportWizardStep.DataReview && job ? job.id : null;
         reset();
         if (pendingJobId) {
-          void cancelJob(pendingJobId).catch(() => undefined);
+          void apiRef.current.cancelJob(pendingJobId).catch(() => undefined);
         }
       }
       onOpenChange(nextOpen);
@@ -88,11 +109,13 @@ export function ImportLocationDialog({
 
   useEffect(() => {
     if (!open || !file) return;
+
     const requestId = ++validateRequestIdRef.current;
+    setIsValidating(true);
 
     void (async () => {
       try {
-        const result = await validateFileRef.current({ file, duplicateMode });
+        const result = await apiRef.current.validate(file, duplicateMode);
         if (requestId !== validateRequestIdRef.current) return;
         setJob(result.job);
         setRows(result.rows);
@@ -102,11 +125,16 @@ export function ImportLocationDialog({
         if (requestId !== validateRequestIdRef.current) return;
         setJob(null);
         setRows([]);
+        setRowsTruncated(false);
         toast.error(
           err instanceof Error
             ? err.message
             : "Không thể kiểm tra tệp nhập khẩu",
         );
+      } finally {
+        if (requestId === validateRequestIdRef.current) {
+          setIsValidating(false);
+        }
       }
     })();
 
@@ -124,7 +152,7 @@ export function ImportLocationDialog({
     setRowsTruncated(false);
     setStep(ImportWizardStep.FileSelect);
     if (pendingJobId) {
-      void cancelJob(pendingJobId).catch(() => {
+      void apiRef.current.cancelJob(pendingJobId).catch(() => {
         toast.error("Không thể hủy phiên kiểm tra. Vui lòng thử lại.");
       });
     }
@@ -132,13 +160,16 @@ export function ImportLocationDialog({
 
   const handleCommit = async () => {
     if (!job) return;
+    setIsCommitting(true);
     try {
-      const result = await commitJob(job.id);
-      setLocationsCommitted(result.locationsCommitted);
+      const result = await api.commit(job.id);
+      setCommitResult(result);
       setStep(ImportWizardStep.Complete);
       onCommitted?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Nhập khẩu thất bại");
+    } finally {
+      setIsCommitting(false);
     }
   };
 
@@ -147,6 +178,7 @@ export function ImportLocationDialog({
   let footerActions: Parameters<typeof ImportWizardFooter>[0]["actions"] = [];
 
   if (step === ImportWizardStep.DataReview && job) {
+    const validCount = job.validRows ?? 0;
     footerActions = [
       {
         key: "back",
@@ -161,7 +193,7 @@ export function ImportLocationDialog({
         key: "continue",
         label: "Tiếp tục",
         onClick: () => void handleCommit(),
-        disabled: (job.validRows ?? 0) === 0 || isCommitting || isValidating,
+        disabled: validCount === 0 || isCommitting || isValidating,
         loading: isCommitting,
         variant: "primary",
         icon: ArrowRight,
@@ -185,9 +217,9 @@ export function ImportLocationDialog({
     <AppModal
       open
       onOpenChange={handleClose}
-      title="Nhập khẩu vị trí hàng hóa"
-      defaultWidth={820}
-      defaultHeight={600}
+      title={title}
+      defaultWidth={920}
+      defaultHeight={650}
       bodyClassName="flex flex-col overflow-hidden"
       showFooter
       footer={
@@ -209,7 +241,11 @@ export function ImportLocationDialog({
         ) : null}
 
         {step === ImportWizardStep.FileSelect || (isValidating && !job) ? (
-          <ImportStepFileSelectLocation
+          <ImportWizardFileSelect
+            introTitle={introTitle}
+            introBullets={introBullets}
+            duplicateNoun={duplicateNoun}
+            onDownloadTemplate={api.downloadTemplate}
             duplicateMode={duplicateMode}
             onDuplicateModeChange={setDuplicateMode}
             file={file}
@@ -218,27 +254,18 @@ export function ImportLocationDialog({
         ) : null}
 
         {step === ImportWizardStep.DataReview && job && !isValidating ? (
-          <ImportStepDataReviewLocation
+          <ImportStepDataReview
             job={job}
             rows={rows}
             rowsTruncated={rowsTruncated}
+            columns={reviewColumns}
+            onDownloadErrors={api.downloadErrorRows}
           />
         ) : null}
 
-        {step === ImportWizardStep.Complete ? (
-          <div className="flex flex-col items-center justify-center gap-5 py-10">
-            <ImportSuccessIllustration />
-            <p className="text-base text-muted-foreground">
-              Nhập khẩu thành công
-            </p>
-            <p>
-              <strong className="text-xl font-semibold text-[#2563eb]">
-                {locationsCommitted}
-              </strong>{" "}
-              vị trí hàng hóa
-            </p>
-          </div>
-        ) : null}
+        {step === ImportWizardStep.Complete && commitResult
+          ? renderComplete(commitResult)
+          : null}
       </div>
     </AppModal>
   );

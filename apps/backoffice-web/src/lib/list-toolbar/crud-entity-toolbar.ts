@@ -130,6 +130,9 @@ export function buildCrudEntityToolbarSpecs(
     case "customers":
       return [...baseCrud(ctx, sel), refresh(ctx), ...importExport(ctx)];
 
+    case "inventory-item-categories":
+      return [...baseCrud(ctx, sel), refresh(ctx), ...importExport(ctx)];
+
     default:
       return baseCrud(ctx, sel);
   }

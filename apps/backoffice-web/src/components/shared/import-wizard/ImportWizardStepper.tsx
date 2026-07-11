@@ -3,7 +3,7 @@ import { cn } from "@erp/ui";
 import {
   ImportWizardStep,
   IMPORT_WIZARD_STEP_TITLES,
-} from "./import-inventory.types";
+} from "./types";
 
 const MISA_NAVY = "bg-[#1e3a6e] text-white";
 const MISA_PENDING = "border border-gray-300 bg-white text-gray-500";

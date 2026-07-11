@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { ImportFilePicker } from "../../inventory/_components/import/ImportFilePicker";
+import { ImportFilePicker } from "../../../components/shared/import-wizard/ImportFilePicker";
 import {
   downloadGoodsReceiptTemplate,
   getGoodsReceiptImportErrorMessage,

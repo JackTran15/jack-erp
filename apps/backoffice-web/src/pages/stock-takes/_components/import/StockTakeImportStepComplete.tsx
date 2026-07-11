@@ -1,4 +1,4 @@
-import { ImportSuccessIllustration } from "../../../inventory/_components/import/ImportSuccessIllustration";
+import { ImportSuccessIllustration } from "../../../../components/shared/import-wizard/ImportSuccessIllustration";
 
 interface Props {
   importedRows: number;

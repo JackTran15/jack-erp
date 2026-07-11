@@ -10551,6 +10551,87 @@
         ]
       }
     },
+    "/inventory/imports/item-categories/validate": {
+      "post": {
+        "operationId": "CsvImportController_validateItemCategories",
+        "parameters": [
+          {
+            "name": "duplicateMode",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/item-categories/commit": {
+      "post": {
+        "operationId": "CsvImportController_commitItemCategories",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/item-categories/import-template.xls": {
+      "get": {
+        "operationId": "CsvImportController_downloadItemCategoryTemplate",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/item-categories/jobs/{id}/error-rows.xlsx": {
+      "get": {
+        "operationId": "CsvImportController_exportItemCategoryJobErrorRows",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
     "/inventory/imports/locations/validate": {
       "post": {
         "operationId": "CsvImportController_validateLocations",
@@ -11677,6 +11758,20 @@
     "/inventory/exports/locations/excel": {
       "get": {
         "operationId": "CsvExportController_exportLocationsExcel",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvExport"
+        ]
+      }
+    },
+    "/inventory/exports/item-categories/excel": {
+      "get": {
+        "operationId": "CsvExportController_exportItemCategoriesExcel",
         "parameters": [],
         "responses": {
           "200": {
@@ -21489,7 +21584,8 @@
               "GOODS_ISSUE",
               "STOCK_TRANSFER",
               "TRANSFER_ORDER",
-              "CUSTOMERS"
+              "CUSTOMERS",
+              "CATEGORIES"
             ],
             "type": "string"
           },

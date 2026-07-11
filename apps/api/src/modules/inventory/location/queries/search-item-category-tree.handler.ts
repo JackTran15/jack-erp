@@ -24,7 +24,10 @@ export class SearchItemCategoryTreeHandler implements IQueryHandler<SearchItemCa
     };
     if (dto.status) where.status = dto.status;
 
-    const all = await this.repo.find({ where, order: { name: "ASC" } });
+    const all = await this.repo.find({
+      where,
+      order: { code: "ASC", name: "ASC" },
+    });
     const byId = new Map(all.map((c) => [c.id, c]));
 
     const search = dto.search?.trim().toLowerCase();

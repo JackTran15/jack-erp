@@ -20,6 +20,10 @@ import { CsvExportController } from "./csv-export.controller";
 import { LocationImportService } from "./location-import.service";
 import { LocationExportService } from "./location-export.service";
 import { LocationImportWorkbookService } from "./location-import-workbook.service";
+import { CategoryImportService } from "./category-import.service";
+import { CategoryExportService } from "./category-export.service";
+import { CategoryImportWorkbookService } from "./category-import-workbook.service";
+import { ItemCategoryEntity } from "../location/item-category.entity";
 import { ItemEntity } from "../location/item.entity";
 import { StorageEntity } from "../location/storage.entity";
 import { LocationEntity } from "../location/location.entity";
@@ -50,6 +54,7 @@ import { StockLedgerEntryEntity } from "../ledger/stock-ledger-entry.entity";
       StockLedgerEntryEntity,
       StorageEntity,
       LocationEntity,
+      ItemCategoryEntity,
     ]),
     InventoryLocationModule,
     ProductModule,
@@ -70,6 +75,9 @@ import { StockLedgerEntryEntity } from "../ledger/stock-ledger-entry.entity";
     LocationImportWorkbookService,
     LocationImportService,
     LocationExportService,
+    CategoryImportWorkbookService,
+    CategoryImportService,
+    CategoryExportService,
   ],
   exports: [CsvImportService, CsvExportService],
 })
