@@ -23,6 +23,7 @@ import {
   buildCrudEntityToolbarSpecs,
   buildListToolbar,
 } from "../../lib/list-toolbar";
+import { TOOLBAR_ACTION } from "../../constants";
 import { isNotFoundHttpError } from "../../lib/not-found-http-error";
 import { HttpErrorView } from "../../pages/errors/HttpErrorPage";
 import {
@@ -818,9 +819,10 @@ export function CrudListPage({
     ),
   );
 
-  // Tree view gets expand-all / collapse-all actions appended to the toolbar.
+  // Tree view gets expand-all / collapse-all actions, placed before the
+  // import/export pair when present.
   if (isCategoryTree) {
-    toolbarItems.push(
+    const treeActions = [
       {
         id: "category-expand-all",
         label: "Mở rộng",
@@ -833,7 +835,15 @@ export function CrudListPage({
         icon: ChevronsDownUp,
         onClick: () => setCollapsedIds(new Set(collectParentIds(treeNodes))),
       },
+    ];
+    const importIndex = toolbarItems.findIndex(
+      (item) => item.id === TOOLBAR_ACTION.import,
     );
+    if (importIndex >= 0) {
+      toolbarItems.splice(importIndex, 0, ...treeActions);
+    } else {
+      toolbarItems.push(...treeActions);
+    }
   }
 
   const breadcrumbs = resolveBackofficeBreadcrumbs(location.pathname);
