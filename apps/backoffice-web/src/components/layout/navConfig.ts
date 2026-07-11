@@ -4,7 +4,6 @@ import {
   Warehouse,
   BarChart3,
   ClipboardCheck,
-  Users,
   ShoppingCart,
   PackageOpen,
   PackageMinus,
@@ -156,18 +155,6 @@ export const navConfig: NavModule[] = [
       {
         id: "purchases-main",
         children: [{ to: "/purchases/imports", label: "Nhập hàng" }],
-      },
-    ],
-  },
-  {
-    id: "customers",
-    label: "Khách hàng",
-    icon: Users,
-    defaultPath: "/admin/customers",
-    sections: [
-      {
-        id: "customers-main",
-        children: [{ to: "/admin/customers", label: "Danh sách khách hàng" }],
       },
     ],
   },
@@ -339,7 +326,6 @@ export const navConfig: NavModule[] = [
             label: "Bảng giá",
           },
           { to: "/admin/inventory-storages", label: "Kho hàng", views: [STORE_TYPE.SINGLE] },
-          { to: "/admin/inventory-stock-balances", label: "Tồn kho" , views: [STORE_TYPE.SINGLE] },
         ],
       },
       {
