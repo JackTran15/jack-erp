@@ -21,6 +21,11 @@ export interface FieldDefinition {
   readOnly?: boolean;
   /** When true, field is hidden from the list/table view but still shown in create/edit forms. */
   hideInList?: boolean;
+  /**
+   * When true, the value is NOT copied into the "Nhân bản" (duplicate) form —
+   * for unique-per-org fields (code, phone, email) that must differ per record.
+   */
+  skipOnDuplicate?: boolean;
   enumValues?: string[];
   relationEntity?: string;
 }
