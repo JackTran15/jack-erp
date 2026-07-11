@@ -208,6 +208,11 @@ export class InventoryLocationStockService {
             quantity: 0,
             createdBy: actor.userId,
           });
+        } else if (existing.isTracked === false) {
+          // Xếp lại một vị trí đã ngừng theo dõi → bật lại "Đang theo dõi".
+          await manager.update(StockBalanceEntity, existing.id, {
+            isTracked: true,
+          });
         }
       }
     });
@@ -675,6 +680,7 @@ export class InventoryLocationStockService {
       variantLabel: item.variantLabel ?? null,
       isPosVisible: item.isPosVisible,
       isActive: item.isActive,
+      isTracked: sb.isTracked,
       sellingPrice: Number(item.sellingPrice) || 0,
       purchasePrice: Number(item.purchasePrice) || 0,
       barcodes,

@@ -128,6 +128,8 @@ interface InventoryStorage {
   id: string;
   name: string;
   branchId: string;
+  /** false = kho đã ngừng hoạt động → ẩn khỏi picker chọn kho nguồn. */
+  isActive?: boolean;
 }
 
 interface InventoryItem {
@@ -831,7 +833,10 @@ function TransferOrderFormDialog({
   }, [sourceBranchId, sourceStorageId, storages]);
 
   const sourceStorageOptions = useMemo(
-    () => storages.filter((s) => s.branchId === sourceBranchId),
+    () =>
+      storages.filter(
+        (s) => s.branchId === sourceBranchId && s.isActive !== false,
+      ),
     [storages, sourceBranchId],
   );
 

@@ -1,7 +1,9 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
+  Patch,
   Query,
   ParseUUIDPipe,
   UseInterceptors,
@@ -15,6 +17,7 @@ import { BranchScopeGuard } from '../../rbac/branch-scope.guard';
 import { AuditInterceptor } from '../../crud/audit.interceptor';
 import { PaginationQueryDto } from '../../crud/dto';
 import { StockLedgerService } from './stock-ledger.service';
+import { SetBalanceTrackingDto } from './dto/set-balance-tracking.dto';
 import { StockMovementType } from '@erp/shared-interfaces';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -95,6 +98,15 @@ export class BalanceQueryDto extends PaginationQueryDto {
   @Transform(({ value }) => parseBool(value))
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Lọc theo trạng thái theo dõi vị trí (stock_balances.is_tracked). Bỏ trống = tất cả.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => parseBool(value))
+  @IsBoolean()
+  isTracked?: boolean;
 
   // Per-column string filters
   @ApiPropertyOptional()
@@ -225,6 +237,18 @@ export class StockLedgerController {
       // Actor.branchId is resolved from the validated X-Branch-Id/JWT authentication context.
       branchId: actor.branchId,
     });
+  }
+
+  // Bulk toggle location-level tracking (stock_balances.is_tracked) for the
+  // Chi tiết vị trí screen — "Ngừng theo dõi" / bật lại. Does NOT touch item.is_active.
+  @Patch('balances/tracking')
+  @RequirePermission('inventory.write')
+  @RequireBranchScope()
+  setBalanceTracking(
+    @Body() dto: SetBalanceTrackingDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.setBalanceTracking(dto.entries, dto.isTracked, actor);
   }
 
   @Get('items/:itemId/average-cost')

@@ -567,7 +567,7 @@ export class InventoryLocationService {
   }
 
   async listStorages(
-    query: PaginationQuery & { branchId?: string },
+    query: PaginationQuery & { branchId?: string; activeOnly?: boolean },
     actor: ActorContext,
   ): Promise<PaginatedResponse<StorageEntity>> {
     const where: Record<string, unknown> = {
@@ -575,6 +575,10 @@ export class InventoryLocationService {
     };
     if (query.branchId) {
       where.branchId = query.branchId;
+    }
+    // Ẩn kho đã ngừng hoạt động khỏi các picker chứng từ.
+    if (query.activeOnly) {
+      where.isActive = true;
     }
 
     const [data, total] = await this.storageRepo.findAndCount({
@@ -736,6 +740,7 @@ export class InventoryLocationService {
       storageId?: string;
       branchId?: string;
       includeUnassigned?: boolean;
+      activeOnly?: boolean;
     },
     actor: ActorContext,
   ): Promise<PaginatedResponse<LocationEntity>> {
@@ -757,6 +762,11 @@ export class InventoryLocationService {
     // Hide the virtual "Chưa xếp" location from shelf pickers by default.
     if (!query.includeUnassigned) {
       qb.andWhere('location.isUnassigned = false');
+    }
+    if (query.activeOnly) {
+      qb.andWhere('location.isActive = true');
+      // Vị trí thuộc kho đã ngừng hoạt động cũng bị ẩn khỏi picker.
+      qb.andWhere('storage.isActive = true');
     }
 
     const sortColumns: Record<string, string> = {

@@ -14,6 +14,8 @@ import { toast } from "sonner";
 export interface ChooseWarehouseOption {
   id: string;
   name: string;
+  /** false = kho đã ngừng hoạt động → ẩn khỏi picker. Bỏ trống coi như đang hoạt động. */
+  isActive?: boolean;
 }
 
 interface Props {
@@ -37,8 +39,11 @@ export function ChooseWarehouseDialog({
 }: Props) {
   const [storageId, setStorageId] = useState(defaultStorageId);
 
+  // Ẩn kho đã ngừng hoạt động (isActive === false) khỏi picker.
+  const activeStorages = storages.filter((s) => s.isActive !== false);
+
   const handleConfirm = () => {
-    const storage = storages.find((s) => s.id === storageId);
+    const storage = activeStorages.find((s) => s.id === storageId);
     if (!storage) {
       toast.error("Vui lòng chọn kho.");
       return;
@@ -71,7 +76,7 @@ export function ChooseWarehouseDialog({
             autoFocus
           >
             <option value="">— Chọn kho —</option>
-            {storages.map((s) => (
+            {activeStorages.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>

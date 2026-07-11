@@ -552,6 +552,7 @@ export class StockTransferService {
         notes: `Transfer edit reversal in: ${transfer.documentNumber}`,
         actorContext: actor,
         unitCost,
+        skipInactiveStorageGuard: true,
       });
       movements.push({
         itemId: line.itemId,
@@ -565,6 +566,7 @@ export class StockTransferService {
         notes: `Transfer edit reversal out: ${transfer.documentNumber}`,
         actorContext: actor,
         unitCost,
+        skipInactiveStorageGuard: true,
       });
     }
 
@@ -861,6 +863,7 @@ export class StockTransferService {
           notes: `Transfer reversal in: ${transfer.documentNumber}`,
           actorContext: actor,
           unitCost,
+          skipInactiveStorageGuard: true,
         });
         movements.push({
           itemId: line.itemId,
@@ -874,6 +877,7 @@ export class StockTransferService {
           notes: `Transfer reversal out: ${transfer.documentNumber}`,
           actorContext: actor,
           unitCost,
+          skipInactiveStorageGuard: true,
         });
       }
 
@@ -1184,6 +1188,20 @@ export class StockTransferService {
         const entries = await this.ledgerService.recordBatchMovements(
           movements,
           manager,
+        );
+
+        // Xếp/Chuyển hàng vào một vị trí bật lại theo dõi cho cặp (item, vị trí đích)
+        const destItemIds = lines.map((l) => l.itemId);
+        const destLocationIds = lines.map((l) => l.destinationLocationId);
+        await manager.query(
+          `UPDATE stock_balances sb
+              SET is_tracked = true
+             FROM unnest($2::uuid[], $3::uuid[]) AS d(item_id, location_id)
+            WHERE sb.organization_id = $1
+              AND sb.item_id = d.item_id
+              AND sb.location_id = d.location_id
+              AND sb.is_tracked = false`,
+          [actor.organizationId, destItemIds, destLocationIds],
         );
 
         return { transferId: savedTransfer.id, ledgerEntries: entries };

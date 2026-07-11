@@ -232,9 +232,11 @@ export function PurchaseOrderFormDialog({
   const activeBranchId = getActiveBranchId();
   const receivingStorages = useMemo(
     () =>
-      activeBranchId
-        ? storages.filter((storage) => storage.branchId === activeBranchId)
-        : storages,
+      storages.filter(
+        (storage) =>
+          storage.isActive !== false &&
+          (!activeBranchId || storage.branchId === activeBranchId),
+      ),
     [activeBranchId, storages],
   );
   const defaultStorage = useMemo(
@@ -464,6 +466,7 @@ export function PurchaseOrderFormDialog({
         const params = new URLSearchParams({ page: "1", pageSize: "200" });
         const branchId = getActiveBranchId();
         if (branchId) params.set("branchId", branchId);
+        params.set("activeOnly", "true");
         const { data } = await apiClient.get<
           PaginatedResponse<{ id: string; name: string; branchId: string }>
         >(`/inventory/storages?${params}`);
@@ -569,7 +572,7 @@ export function PurchaseOrderFormDialog({
               const { data } = await apiClient.get<
                 PaginatedResponse<InventoryLocation>
               >(
-                `/inventory/locations?page=1&pageSize=50&storageId=${encodeURIComponent(targetStorageId)}&includeUnassigned=true`,
+                `/inventory/locations?page=1&pageSize=50&storageId=${encodeURIComponent(targetStorageId)}&includeUnassigned=true&activeOnly=true`,
               );
               const locs = data.data ?? [];
               const pick =
@@ -781,6 +784,7 @@ export function PurchaseOrderFormDialog({
         pageSize: String(effectivePageSize),
         search: query.trim(),
         storageId: storageIdArg,
+        activeOnly: "true",
       });
       const { data } = await apiClient.get<
         PaginatedResponse<InventoryLocation>
@@ -896,7 +900,7 @@ export function PurchaseOrderFormDialog({
             const { data } = await apiClient.get<
               PaginatedResponse<InventoryLocation>
             >(
-              `/inventory/locations?page=1&pageSize=50&storageId=${encodeURIComponent(l.storageId)}&includeUnassigned=true`,
+              `/inventory/locations?page=1&pageSize=50&storageId=${encodeURIComponent(l.storageId)}&includeUnassigned=true&activeOnly=true`,
             );
             const locations = data.data;
             if (!locations || locations.length === 0) {

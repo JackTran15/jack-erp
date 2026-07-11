@@ -36,6 +36,12 @@ export interface RecordMovementParams {
   actorContext: ActorContext;
   skipLocationAssignment?: boolean;
   /**
+   * Bỏ qua guard "kho đã ngừng hoạt động" cho movement này. Chỉ set true cho
+   * reversal của chứng từ đã POSTED (huỷ/sửa) và các consumer POS bán/trả hàng —
+   * những luồng đó phải chạy được kể cả khi kho bị ngừng hoạt động sau này.
+   */
+  skipInactiveStorageGuard?: boolean;
+  /**
    * Cost snapshot at posting time (positive number). When provided, the ledger
    * entry will persist both `unit_cost` and a signed `line_value = quantity *
    * unit_cost` (positive=in, negative=out). Callers should derive this from
@@ -68,6 +74,8 @@ export interface BalanceQuery extends PaginationQuery {
   unassigned?: boolean;
   /** Filter by item tracking status; omit to include both đang/ngừng theo dõi. */
   isActive?: boolean;
+  /** Filter by location-level tracking (stock_balances.is_tracked); omit = tất cả. */
+  isTracked?: boolean;
   organizationId: string;
 
   // Per-column string filters (server-side)
@@ -98,6 +106,7 @@ export interface StockBalanceSummaryRow {
   locationId: string;
   quantity: number;
   lastMovementAt?: Date | null;
+  isTracked: boolean;
   item: {
     id: string;
     code: string;
@@ -156,6 +165,7 @@ export class StockLedgerService {
     }
 
     const entry = await this.dataSource.transaction(async (manager) => {
+      await this.assertStoragesActive(manager, [params]);
       const { unitCost, lineValue } = this.deriveCostFields(params);
       const ledgerEntry = manager.create(StockLedgerEntryEntity, {
         itemId: params.itemId,
@@ -384,6 +394,12 @@ export class StockLedgerService {
     if (query.isActive !== undefined) {
       qb.andWhere('item.is_active = :isActive', { isActive: query.isActive });
     }
+    if (query.isTracked !== undefined) {
+      qb.andWhere('sb.is_tracked = :isTracked', { isTracked: query.isTracked });
+    }
+    // Kho đã ngừng hoạt động không hiển thị ở Chi tiết vị trí hàng hóa (giống
+    // Tổng hợp tồn kho). Số liệu vẫn còn ở Báo cáo tồn kho (ledger).
+    qb.andWhere('storage.is_active = true');
 
     // Inline closures over `qb` keep the queryBuilder mutation local and avoid
     // passing it as a parameter. If `getBalances` grows further, consider extracting
@@ -447,6 +463,7 @@ export class StockLedgerService {
       'sb.location_id AS "locationId"',
       'sb.quantity AS quantity',
       'sb.last_movement_at AS "lastMovementAt"',
+      'sb.is_tracked AS "isTracked"',
       'item.code AS "itemCode"',
       'item.name AS "itemName"',
       'item.unit AS "itemUnit"',
@@ -497,6 +514,7 @@ export class StockLedgerService {
         locationId: String(r.locationId),
         quantity,
         lastMovementAt: r.lastMovementAt ? new Date(r.lastMovementAt as string) : null,
+        isTracked: Boolean(r.isTracked),
         item: {
           id: String(r.itemId),
           code: String(r.itemCode),
@@ -519,6 +537,58 @@ export class StockLedgerService {
     });
 
     return { data, total, page, pageSize };
+  }
+
+  /**
+   * Bulk toggle location-level tracking (`stock_balances.is_tracked`) for a set of
+   * (item × location) pairs — "Ngừng theo dõi" / bật lại ở trang Chi tiết vị trí.
+   * Does NOT touch item.is_active, so the item stays findable everywhere.
+   * Rule: cặp thuộc kho Showroom (is_main_storage) không được ngừng theo dõi.
+   */
+  async setBalanceTracking(
+    entries: Array<{ itemId: string; locationId: string }>,
+    isTracked: boolean,
+    actor: ActorContext,
+  ): Promise<{ updated: number }> {
+    if (!entries?.length) return { updated: 0 };
+    const itemIds = entries.map((e) => e.itemId);
+    const locationIds = entries.map((e) => e.locationId);
+
+    if (!isTracked) {
+      const inShowroom = await this.balanceRepo.manager.query<
+        Array<{ code: string }>
+      >(
+        `SELECT DISTINCT i.code AS code
+           FROM unnest($2::uuid[], $3::uuid[]) AS e(item_id, location_id)
+           JOIN locations loc ON loc.id = e.location_id
+           JOIN storages s    ON s.id = loc.storage_id
+           JOIN items i       ON i.id = e.item_id
+          WHERE loc.organization_id = $1
+            AND s.is_main_storage = true
+          ORDER BY i.code`,
+        [actor.organizationId, itemIds, locationIds],
+      );
+      if (inShowroom.length) {
+        const codes = inShowroom.slice(0, 5).map((r) => r.code).join(', ');
+        const more = inShowroom.length > 5 ? '…' : '';
+        throw new BadRequestException(
+          `Không thể ngừng theo dõi vị trí thuộc kho Showroom (${codes}${more}).`,
+        );
+      }
+    }
+
+    const rows = await this.balanceRepo.manager.query<Array<{ id: string }>>(
+      `UPDATE stock_balances sb
+          SET is_tracked = $4
+         FROM unnest($2::uuid[], $3::uuid[]) AS e(item_id, location_id)
+        WHERE sb.organization_id = $1
+          AND sb.item_id = e.item_id
+          AND sb.location_id = e.location_id
+          AND sb.is_tracked <> $4
+      RETURNING sb.id`,
+      [actor.organizationId, itemIds, locationIds, isTracked],
+    );
+    return { updated: rows.length };
   }
 
   async getLedgerEntries(
@@ -570,10 +640,43 @@ export class StockLedgerService {
 
   // ─── Private helpers ──────────────────────────────────────────────
 
+  /**
+   * Chặn phát sinh chuyển động kho vào vị trí thuộc kho đã ngừng hoạt động
+   * (storage.is_active = false). Movement có skipInactiveStorageGuard = true
+   * (reversal chứng từ đã posted, POS) được bỏ qua.
+   */
+  private async assertStoragesActive(
+    manager: EntityManager,
+    movements: RecordMovementParams[],
+  ): Promise<void> {
+    const locationIds = [
+      ...new Set(
+        movements
+          .filter((m) => !m.skipInactiveStorageGuard)
+          .map((m) => m.locationId),
+      ),
+    ];
+    if (locationIds.length === 0) return;
+    const rows = await manager.query<{ name: string }[]>(
+      `SELECT DISTINCT s.name
+         FROM locations loc
+         JOIN storages s ON s.id = loc.storage_id
+        WHERE loc.id = ANY($1::uuid[]) AND s.is_active = false`,
+      [locationIds],
+    );
+    if (rows.length > 0) {
+      const names = rows.map((r) => r.name).join(', ');
+      throw new BadRequestException(
+        `Không thể thao tác trên kho đã ngừng hoạt động: ${names}. Hãy kích hoạt lại kho trước khi nhập/xuất/chuyển.`,
+      );
+    }
+  }
+
   private async writeBatchMovements(
     manager: EntityManager,
     movements: RecordMovementParams[],
   ): Promise<StockLedgerEntryEntity[]> {
+    await this.assertStoragesActive(manager, movements);
     const savedEntries: StockLedgerEntryEntity[] = [];
     const now = new Date();
 

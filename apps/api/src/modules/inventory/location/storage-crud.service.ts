@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository, SelectQueryBuilder } from 'typeorm';
 import {
@@ -25,6 +25,7 @@ export const INVENTORY_STORAGE_ENTITY_CONFIG: CrudEntityConfig = {
     { key: 'description',        label: 'Diễn giải',               type: 'string',  hideInList: true },
     { key: 'branchName',         label: 'Tên cửa hàng',            type: 'string',  readOnly: true },
     { key: 'isDefaultReceiving', label: 'Kho nhập hàng mặc định',  type: 'boolean', readOnly: true },
+    { key: 'isActive',           label: 'Trạng thái',              type: 'boolean', readOnly: true },
     { key: 'isMainStorage',      label: 'Kho showroom',            type: 'boolean', readOnly: true, hideInList: true },
     { key: 'createdAt',          label: 'Ngày tạo',                type: 'date',    readOnly: true },
   ],
@@ -37,6 +38,15 @@ export const INVENTORY_STORAGE_ENTITY_CONFIG: CrudEntityConfig = {
       options: [
         { label: 'Có', value: 'true' },
         { label: 'Không', value: 'false' },
+      ],
+    },
+    {
+      key: 'isActive',
+      label: 'Trạng thái',
+      type: 'select',
+      options: [
+        { label: 'Đang hoạt động', value: 'true' },
+        { label: 'Ngừng hoạt động', value: 'false' },
       ],
     },
   ],
@@ -111,12 +121,28 @@ export class InventoryStorageCrudService extends BaseCrudService<
    * so a plain PATCH cannot bypass that rule and trip the partial unique index.
    */
   protected async beforeUpdate(
-    _id: string,
+    id: string,
     payload: Record<string, any>,
-    _actor: ActorContext,
+    actor: ActorContext,
   ): Promise<Record<string, any>> {
     if (payload && 'isDefaultReceiving' in payload) {
       delete payload.isDefaultReceiving;
+    }
+    // Inactive storage: block the showroom storage and the default receiving storage of the branch.
+    if (payload && payload.isActive === false) {
+      const storage = await this.repository.findOne({
+        where: { id, organizationId: actor.organizationId },
+      });
+      if (storage?.isMainStorage) {
+        throw new BadRequestException(
+          'Không thể ngừng hoạt động kho showroom (kho bán hàng mặc định).',
+        );
+      }
+      if (storage?.isDefaultReceiving) {
+        throw new BadRequestException(
+          'Không thể ngừng hoạt động kho nhập hàng mặc định. Hãy đặt kho khác làm kho nhập mặc định trước.',
+        );
+      }
     }
     return payload;
   }

@@ -84,14 +84,14 @@ export function buildItemLocationColumns(
       render: (r) => r.location.storageName,
     },
     {
-      key: "isActive",
+      key: "isTracked",
       label: "Trạng thái",
       width: 140,
       filterKind: "select",
       filterOptions: STATUS_FILTER_OPTIONS,
       render: (r) => (
         <ActiveStatusBadge
-          active={r.item.isActive}
+          active={r.isTracked}
           activeLabel="Đang theo dõi"
           inactiveLabel="Ngừng theo dõi"
         />
@@ -159,6 +159,19 @@ export function buildLocationStockItemColumns(
       width: 80,
       filterKind: "none",
       render: (r) => r.unit,
+    },
+    {
+      key: "isTracked",
+      label: "Trạng thái",
+      width: 140,
+      filterKind: "none",
+      render: (r) => (
+        <ActiveStatusBadge
+          active={r.isTracked}
+          activeLabel="Đang theo dõi"
+          inactiveLabel="Ngừng theo dõi"
+        />
+      ),
     },
   ];
 }

@@ -7,7 +7,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  FormField,
   Input,
   MoneyInput,
   Textarea,
@@ -211,8 +210,11 @@ export function CrudRecordDialog({
   // Storage: the default-receiving flag is toggled through a dedicated endpoint
   // (one-per-branch invariant), not the generic PATCH — track it separately.
   const [storageDefaultReceiving, setStorageDefaultReceiving] = useState(false);
+  // Ngừng hoạt động (isActive=false) — không cho tắt kho showroom / kho nhập mặc định.
+  const [storageInactive, setStorageInactive] = useState(false);
   const wasStorageDefault = isStorage && Boolean(record?.isDefaultReceiving);
-  console.log("wasStorageDefault", wasStorageDefault, record);
+  const cannotDeactivate =
+    isStorage && (Boolean(record?.isMainStorage) || wasStorageDefault);
 
   useEffect(() => {
     if (!config) return;
@@ -226,13 +228,19 @@ export function CrudRecordDialog({
         }
       }
       setValues(next);
-      if (isStorage) setStorageDefaultReceiving(Boolean(record.isDefaultReceiving));
+      if (isStorage) {
+        setStorageDefaultReceiving(Boolean(record.isDefaultReceiving));
+        setStorageInactive(record.isActive === false);
+      }
     } else {
       const defaults: Record<string, unknown> = {};
       editableFields.forEach((f) => { defaults[f.key] = f.type === "boolean" ? false : ""; });
       if (isSupplier) defaults.type = "organization";
       setValues(defaults);
-      if (isStorage) setStorageDefaultReceiving(false);
+      if (isStorage) {
+        setStorageDefaultReceiving(false);
+        setStorageInactive(false);
+      }
     }
     setErrors({});
   }, [open, record, config, editableFields, isEdit, isSupplier, isStorage]);
@@ -256,7 +264,12 @@ export function CrudRecordDialog({
       if (isEdit) delete payload.code;
       return payload;
     }
-    return Object.fromEntries(editableFields.map((f) => [f.key, values[f.key]]));
+    const payload = Object.fromEntries(
+      editableFields.map((f) => [f.key, values[f.key]]),
+    );
+    // Ngừng hoạt động kho đi qua generic PATCH (isDefaultReceiving vẫn bị strip ở backend).
+    if (isStorage) payload.isActive = !storageInactive;
+    return payload;
   };
 
   const save = async (andNew = false) => {
@@ -290,7 +303,10 @@ export function CrudRecordDialog({
         editableFields.forEach((f) => { defaults[f.key] = f.type === "boolean" ? false : ""; });
         if (isSupplier) defaults.type = "organization";
         setValues(defaults);
-        if (isStorage) setStorageDefaultReceiving(false);
+        if (isStorage) {
+          setStorageDefaultReceiving(false);
+          setStorageInactive(false);
+        }
         setErrors({});
       } else {
         onClose();
@@ -357,7 +373,7 @@ export function CrudRecordDialog({
                 onClick={onClose}
                 disabled={isSaving}
               >
-                × Hủy bỏ
+                Hủy bỏ
               </Button>
             </div>
           </DialogFooter>
@@ -385,7 +401,7 @@ export function CrudRecordDialog({
           </Button>
         )}
         <Button variant="outline" type="button" onClick={onClose} disabled={isSaving}>
-          × Hủy bỏ
+          Hủy bỏ
         </Button>
       </div>
     </div>
@@ -398,7 +414,7 @@ export function CrudRecordDialog({
       title={title}
       footer={modalFooter}
       defaultWidth={isSupplier ? 720 : 560}
-      defaultHeight={isSupplier ? 620 : isStorage ? 540 : 480}
+      defaultHeight={isSupplier ? 620 : isStorage ? (isEdit ? 470 : 400) : 480}
       preventOutsideClose={isSaving}
       bodyClassName="overflow-auto"
     >
@@ -415,63 +431,129 @@ export function CrudRecordDialog({
           />
         ) : (
           <>
-            <div className="grid gap-4 md:grid-cols-2">
-              {isStorage && (
-                <FormField label="Mã kho" htmlFor="dialog-storage-code">
+            {isStorage ? (
+              <div className="space-y-4">
+                {/* Mã kho — hệ thống cấp, chỉ đọc */}
+                <div className="grid grid-cols-[140px_1fr] items-center gap-3">
+                  <label
+                    htmlFor="dialog-storage-code"
+                    className="text-sm font-medium text-muted-foreground"
+                  >
+                    Mã kho
+                  </label>
                   <Input
                     id="dialog-storage-code"
                     type="text"
                     value={isEdit ? String(record?.code ?? "") : ""}
                     disabled
                   />
-                </FormField>
-              )}
-              {editableFields.map((field) => (
-                <CrudFieldInput
-                  key={field.key}
-                  inputIdPrefix="dialog"
-                  field={field}
-                  value={values[field.key]}
-                  error={errors[field.key]}
-                  entityKey={entityKey}
-                  currentRecordId={recordId ?? undefined}
-                  onChange={(v) => {
-                    setValues((p) => ({ ...p, [field.key]: v }));
-                    setErrors((p) => { const n = { ...p }; delete n[field.key]; return n; });
-                  }}
-                />
-              ))}
-            </div>
-            {isStorage && (
-              <div className="mt-4 space-y-3 border-t border-border pt-4">
+                </div>
+                {/* Tên kho */}
+                <div className="grid grid-cols-[140px_1fr] items-start gap-3">
+                  <label
+                    htmlFor="dialog-storage-name"
+                    className="pt-2 text-sm font-medium"
+                  >
+                    Tên kho <span className="text-destructive">*</span>
+                  </label>
+                  <div>
+                    <Input
+                      id="dialog-storage-name"
+                      type="text"
+                      value={String(values.name ?? "")}
+                      aria-invalid={Boolean(errors.name)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setValues((p) => ({ ...p, name: v }));
+                        setErrors((p) => { const n = { ...p }; delete n.name; return n; });
+                      }}
+                    />
+                    {errors.name && (
+                      <p className="mt-1 text-xs text-destructive">{errors.name}</p>
+                    )}
+                  </div>
+                </div>
+                {/* Diễn giải */}
+                <div className="grid grid-cols-[140px_1fr] items-start gap-3">
+                  <label
+                    htmlFor="dialog-storage-desc"
+                    className="pt-2 text-sm font-medium text-muted-foreground"
+                  >
+                    Diễn giải
+                  </label>
+                  <Textarea
+                    id="dialog-storage-desc"
+                    rows={3}
+                    value={String(values.description ?? "")}
+                    onChange={(e) =>
+                      setValues((p) => ({ ...p, description: e.target.value }))
+                    }
+                  />
+                </div>
+                {/* Loại kho — chỉ hiển thị khi sửa */}
                 {isEdit && (
-                  <div className="grid grid-cols-[140px_1fr] items-start gap-3">
-                    <span className="text-sm font-medium leading-snug text-muted-foreground">
+                  <div className="grid grid-cols-[140px_1fr] items-center gap-3">
+                    <span className="text-sm font-medium text-muted-foreground">
                       Loại kho
                     </span>
-                    <span className="text-sm leading-snug">
+                    <span className="text-sm">
                       {record?.isMainStorage ? "Bán hàng" : "Kho lưu trữ"}
                     </span>
                   </div>
                 )}
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="h-5 w-5 shrink-0 cursor-pointer rounded border-2 border-input accent-primary disabled:cursor-not-allowed disabled:opacity-70"
-                    checked={storageDefaultReceiving}
-                    disabled={wasStorageDefault}
-                    onChange={(e) => setStorageDefaultReceiving(e.target.checked)}
+                {/* Cờ trạng thái */}
+                <div className="space-y-3 border-t border-border pt-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="h-5 w-5 shrink-0 cursor-pointer rounded border-2 border-input accent-primary disabled:cursor-not-allowed disabled:opacity-70"
+                      checked={storageDefaultReceiving}
+                      disabled={wasStorageDefault}
+                      onChange={(e) => setStorageDefaultReceiving(e.target.checked)}
+                    />
+                    <span className="cursor-pointer select-none font-medium">
+                      Kho nhập hàng mặc định
+                    </span>
+                  </label>
+                  {wasStorageDefault && (
+                    <p className="text-xs text-muted-foreground">
+                      Đây đang là kho nhập hàng mặc định của chi nhánh. Để đổi, hãy
+                      mở một kho khác và tích chọn ô này.
+                    </p>
+                  )}
+                  {/* Ngừng hoạt động: chỉ khi SỬA và kho được phép (giống MISA) */}
+                  {isEdit && !cannotDeactivate && (
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="h-5 w-5 shrink-0 cursor-pointer rounded border-2 border-input accent-primary"
+                        checked={storageInactive}
+                        onChange={(e) => setStorageInactive(e.target.checked)}
+                      />
+                      <span className="cursor-pointer select-none font-medium">
+                        Ngừng hoạt động
+                      </span>
+                    </label>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {editableFields.map((field) => (
+                  <CrudFieldInput
+                    key={field.key}
+                    inputIdPrefix="dialog"
+                    field={field}
+                    value={values[field.key]}
+                    error={errors[field.key]}
+                    entityKey={entityKey}
+                    currentRecordId={recordId ?? undefined}
+                    onChange={(v) => {
+                      setValues((p) => ({ ...p, [field.key]: v }));
+                      setErrors((p) => { const n = { ...p }; delete n[field.key]; return n; });
+                    }}
                   />
-                  <span className="cursor-pointer select-none font-medium">
-                    Kho nhập hàng mặc định
-                  </span>
-                </label>
-                {wasStorageDefault && (
-                  <p className="text-xs text-muted-foreground">
-                    Đây đang là kho nhập hàng mặc định của chi nhánh. Để đổi, hãy
-                    mở một kho khác và tích chọn ô này.
-                  </p>
-                )}
+                ))}
               </div>
             )}
           </>

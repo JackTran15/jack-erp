@@ -15,7 +15,6 @@ import {
 } from "@erp/ui";
 import type { StockByLocationItem } from "@erp/shared-interfaces";
 import { buildItemLocationToolbarItems } from "./ItemLocationDetailsToolbar";
-import { setItemsActiveStatus } from "../../api/inventory-items";
 import { BaseDataTable } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import type { ColumnFilter, ColumnFilterMode } from "../../components/table/pagination.dto";
@@ -23,6 +22,8 @@ import { InventoryPageTitle, InventoryTabBar } from "../../components/document/i
 import {
   listLocationStockItems,
   listStockBalances,
+  setBalancesTracking,
+  type BalanceTrackingEntry,
   type PaginatedResponse,
   type StockBalanceRow,
 } from "../../api/stock-balances";
@@ -76,7 +77,7 @@ export function ItemLocationDetailsPage() {
   const locationId = searchParams.get("locationId")?.trim() || "";
   const isLocationDetail = Boolean(locationId);
   const [filters, setFilters] = useState<Record<string, ColumnFilter>>({
-    isActive: { mode: "equals", value: "true" },
+    isTracked: { mode: "equals", value: "true" },
   });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -112,6 +113,7 @@ export function ItemLocationDetailsPage() {
     queryFn: async () => {
       const params = new URLSearchParams({ page: "1", pageSize: "200" });
       if (activeBranchId) params.set("branchId", activeBranchId);
+      params.set("activeOnly", "true");
       const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
         `/inventory/storages?${params}`,
       );
@@ -181,6 +183,7 @@ export function ItemLocationDetailsPage() {
           locationId: location.id,
           quantity: row.quantity,
           lastMovementAt: row.lastMovementAt,
+          isTracked: row.isTracked,
           item: {
             id: row.itemId,
             code: row.code,
@@ -207,14 +210,21 @@ export function ItemLocationDetailsPage() {
     stockRows,
   ]);
 
-  // Ngừng theo dõi áp dụng cấp item; một item ở nhiều vị trí → dedupe theo item id.
-  const selectedItemIds = useMemo(
-    () => Array.from(new Set(selectedTransferRows.map((row) => row.item.id))),
-    [selectedTransferRows],
-  );
-  // Chỉ ngừng theo dõi được khi selection còn ít nhất 1 hàng đang theo dõi.
+  // Ngừng theo dõi áp dụng cấp vị trí: mỗi cặp (hàng hóa × vị trí) là một dòng riêng.
+  const selectedTrackingEntries = useMemo<BalanceTrackingEntry[]>(() => {
+    const seen = new Set<string>();
+    const entries: BalanceTrackingEntry[] = [];
+    for (const row of selectedTransferRows) {
+      const key = `${row.itemId}:${row.locationId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      entries.push({ itemId: row.itemId, locationId: row.locationId });
+    }
+    return entries;
+  }, [selectedTransferRows]);
+  // Chỉ ngừng theo dõi được khi selection còn ít nhất 1 vị trí đang theo dõi.
   const canStopTracking = useMemo(
-    () => selectedTransferRows.some((row) => row.item.isActive),
+    () => selectedTransferRows.some((row) => row.isTracked),
     [selectedTransferRows],
   );
 
@@ -349,11 +359,13 @@ export function ItemLocationDetailsPage() {
   );
 
   const confirmStopTracking = useCallback(async () => {
-    if (selectedItemIds.length === 0) return;
+    if (selectedTrackingEntries.length === 0) return;
     setStopSubmitting(true);
     try {
-      await setItemsActiveStatus(selectedItemIds, false);
-      toast.success(`Đã ngừng theo dõi ${selectedItemIds.length} hàng hóa.`);
+      await setBalancesTracking(selectedTrackingEntries, false);
+      toast.success(
+        `Đã ngừng theo dõi ${selectedTrackingEntries.length} vị trí hàng hóa.`,
+      );
       setSelectedIds(new Set());
       void reload();
       setStopConfirmOpen(false);
@@ -362,7 +374,7 @@ export function ItemLocationDetailsPage() {
     } finally {
       setStopSubmitting(false);
     }
-  }, [selectedItemIds, reload]);
+  }, [selectedTrackingEntries, reload]);
 
   const toolbarItems = useMemo(
     () =>
@@ -436,6 +448,7 @@ export function ItemLocationDetailsPage() {
         open={arrangeOpen}
         onOpenChange={setArrangeOpen}
         onSaved={reload}
+        selectedRows={selectedTransferRows}
       />
       <TransferLocationDialog
         open={transferOpen}
@@ -446,9 +459,9 @@ export function ItemLocationDetailsPage() {
       <Dialog open={stopConfirmOpen} onOpenChange={setStopConfirmOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Ngừng theo dõi hàng hóa</DialogTitle>
+            <DialogTitle>Ngừng theo dõi vị trí hàng hóa</DialogTitle>
             <DialogDescription>
-              {`Bạn có chắc muốn ngừng theo dõi ${selectedItemIds.length} hàng hóa trong vị trí đã chọn?`}
+              {`Bạn có chắc muốn ngừng theo dõi ${selectedTrackingEntries.length} vị trí đã chọn? Hàng hóa vẫn được theo dõi ở các vị trí khác và vẫn tìm được.`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

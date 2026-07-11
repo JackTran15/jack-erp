@@ -106,6 +106,8 @@ export interface InventoryStorage {
   branchId: string;
   isMainStorage?: boolean;
   isDefaultReceiving?: boolean;
+  /** false = kho đã ngừng hoạt động → ẩn khỏi picker chọn kho. */
+  isActive?: boolean;
 }
 
 /** Active branch — same source the axios client uses for the X-Branch-Id header. */

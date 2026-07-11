@@ -307,6 +307,8 @@ export class GoodsIssueService {
           notes: `Huỷ phiếu xuất kho ${gi.documentNumber ?? gi.id}`,
           actorContext: actor,
           unitCost: Number(line.unitPrice ?? 0),
+          // Đảo bút huỷ phiếu đã posted: cho phép kể cả khi kho đã ngừng hoạt động.
+          skipInactiveStorageGuard: true,
         }));
         return this.ledgerService.recordBatchMovements(reversals, manager);
       });

@@ -1015,6 +1015,9 @@ function formatCell(
       />
     );
   }
+  if (entityKey === "inventory-storages" && field.key === "isActive") {
+    return <ActiveStatusBadge active={Boolean(value)} />;
+  }
   if (field.type === "boolean") {
     return (
       <input
