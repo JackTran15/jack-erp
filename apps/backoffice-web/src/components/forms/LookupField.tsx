@@ -93,6 +93,8 @@ export interface LookupFieldProps<T> {
   searchModalPlaceholder?: string;
   /** When set, the trailing search button calls this instead of opening the inline list or default modal. */
   onSearchButtonClick?: () => void;
+  /** Hide the trailing search button entirely, leaving only the chevron (open-list) affordance. */
+  hideSearchButton?: boolean;
 }
 
 interface PopoverRect {
@@ -132,6 +134,7 @@ export function LookupField<T>({
   searchModalTitle,
   searchModalPlaceholder,
   onSearchButtonClick,
+  hideSearchButton,
 }: LookupFieldProps<T>) {
   const fallbackId = useId();
   const resolvedId = inputId ?? fallbackId;
@@ -554,27 +557,29 @@ export function LookupField<T>({
           <ChevronDown className="h-4 w-4" />
         </button>
       </div>
-      <button
-        type="button"
-        aria-label="Tìm kiếm"
-        disabled={disabled}
-        onClick={() => {
-          if (onSearchButtonClick) {
-            setOpen(false);
-            onSearchButtonClick();
-            return;
-          }
-          if (enableSearchModal) {
-            setOpen(false);
-            setSearchModalOpen(true);
-          } else {
-            openAndLoad();
-          }
-        }}
-        className="-ml-px flex items-center justify-center border border-input bg-background px-2 text-muted-foreground hover:bg-accent disabled:opacity-50"
-      >
-        <Search className="h-4 w-4" />
-      </button>
+      {hideSearchButton ? null : (
+        <button
+          type="button"
+          aria-label="Tìm kiếm"
+          disabled={disabled}
+          onClick={() => {
+            if (onSearchButtonClick) {
+              setOpen(false);
+              onSearchButtonClick();
+              return;
+            }
+            if (enableSearchModal) {
+              setOpen(false);
+              setSearchModalOpen(true);
+            } else {
+              openAndLoad();
+            }
+          }}
+          className="-ml-px flex items-center justify-center border border-input bg-background px-2 text-muted-foreground hover:bg-accent disabled:opacity-50"
+        >
+          <Search className="h-4 w-4" />
+        </button>
+      )}
       {createMenuItems && createMenuItems.length > 0 ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

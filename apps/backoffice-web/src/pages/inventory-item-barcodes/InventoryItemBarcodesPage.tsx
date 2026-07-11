@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -20,6 +20,13 @@ import { renderBarcodeLabelsPdf } from "./_lib/render-barcode-labels-pdf";
 import { printBarcodeLabels } from "./_lib/print-barcode-labels";
 import { capLabels } from "./_lib/cap-labels";
 import { resolveItemLocations } from "./_lib/resolve-item-locations";
+import {
+  fetchItemStockBalances,
+  toLocationOptions,
+  toStorageOptions,
+  type ItemLocationOption,
+  type ItemStorageOption,
+} from "./_lib/item-stock-locations";
 import { PrintConfirmDialog } from "./PrintConfirmDialog/PrintConfirmDialog";
 import {
   BARCODE_SKU_INPUT_ID,
@@ -40,6 +47,7 @@ interface PaginatedResponse<T> {
 interface InventoryStorageOption {
   id: string;
   name: string;
+  code?: string;
   branchId: string;
 }
 
@@ -72,6 +80,7 @@ export function InventoryItemBarcodesPage() {
   // Chuỗi cửa hàng: ẩn Kho/Vị trí + không in mã CN/vị trí trên tem, và không gọi
   // các endpoint theo chi nhánh (Kho/Vị trí gắn với 1 chi nhánh cụ thể).
   const isChain = useIsChainSelected();
+  const queryClient = useQueryClient();
 
   // ─── Reference data ────────────────────────────────────────────────
   const branchId = getActiveBranch();
@@ -91,6 +100,10 @@ export function InventoryItemBarcodesPage() {
     () => new Map((storages ?? []).map((s) => [s.id, s.name])),
     [storages],
   );
+  const storageCodeById = useMemo(
+    () => new Map((storages ?? []).map((s) => [s.id, s.code ?? ""])),
+    [storages],
+  );
 
   // Mã cửa hàng in trên tem: lấy `code` của chi nhánh đang chọn. Nếu chi nhánh
   // chưa đặt mã thì để trống (không fallback "MT") — để admin phát hiện & bổ sung.
@@ -108,6 +121,86 @@ export function InventoryItemBarcodesPage() {
       );
     },
     [],
+  );
+
+  // ─── Chọn Kho / Vị trí theo tồn của hàng hóa ───────────────────────
+  /** Lấy (có cache) tồn của một hàng hóa để suy ra danh sách Kho + Vị trí. */
+  const loadItemBalances = useCallback(
+    (itemId: string) =>
+      queryClient.fetchQuery({
+        queryKey: ["item-stock-balances", itemId, branchId],
+        queryFn: () => fetchItemStockBalances(itemId, branchId),
+        staleTime: 60_000,
+      }),
+    [queryClient, branchId],
+  );
+
+  const searchItemStorages = useCallback(
+    async (itemId: string, query: string) => {
+      const balances = await loadItemBalances(itemId);
+      const needle = query.trim().toLowerCase();
+      const items = toStorageOptions(balances)
+        .map((o) => ({ ...o, code: storageCodeById.get(o.storageId) ?? "" }))
+        .filter(
+          (o) =>
+            !needle ||
+            o.storageName.toLowerCase().includes(needle) ||
+            o.code.toLowerCase().includes(needle),
+        );
+      return { items, hasMore: false, total: items.length };
+    },
+    [loadItemBalances, storageCodeById],
+  );
+
+  const searchItemLocations = useCallback(
+    async (itemId: string, storageId: string, query: string) => {
+      if (!storageId) return { items: [], hasMore: false, total: 0 };
+      const balances = await loadItemBalances(itemId);
+      const needle = query.trim().toLowerCase();
+      const items = toLocationOptions(balances, storageId).filter(
+        (o) =>
+          !needle ||
+          o.code.toLowerCase().includes(needle) ||
+          o.name.toLowerCase().includes(needle),
+      );
+      return { items, hasMore: false, total: items.length };
+    },
+    [loadItemBalances],
+  );
+
+  const handleSelectStorage = useCallback(
+    (rowId: string, s: ItemStorageOption) =>
+      // Đổi Kho thì reset Vị trí (vị trí thuộc về kho vừa chọn).
+      patchRow(rowId, {
+        storageId: s.storageId,
+        storageName: s.storageName,
+        locationId: "",
+        locationCode: "",
+      }),
+    [patchRow],
+  );
+
+  const handleStorageTextChange = useCallback(
+    (rowId: string, text: string) =>
+      patchRow(rowId, {
+        storageName: text,
+        storageId: "",
+        locationId: "",
+        locationCode: "",
+      }),
+    [patchRow],
+  );
+
+  const handleSelectLocation = useCallback(
+    (rowId: string, loc: ItemLocationOption) =>
+      patchRow(rowId, { locationId: loc.locationId, locationCode: loc.code }),
+    [patchRow],
+  );
+
+  const handleLocationTextChange = useCallback(
+    (rowId: string, text: string) =>
+      patchRow(rowId, { locationCode: text, locationId: "" }),
+    [patchRow],
   );
 
   /** Resolve Kho/Vị trí gợi ý cho một loạt row vừa thêm — một call duy nhất. */
@@ -140,12 +233,18 @@ export function InventoryItemBarcodesPage() {
             const itemId = itemIdByRowId.get(row.rowId);
             if (!itemId) return row;
             const match = byItemId.get(itemId);
+            // Chỉ điền khi có chi tiết vị trí thật (kệ ưu tiên / có tồn). Trường hợp
+            // fallback kho default/showroom ("default"/"none") để trống cho người dùng tự chọn.
+            const detail =
+              match?.source === "preferred" || match?.source === "stock"
+                ? match
+                : undefined;
             return {
               ...row,
-              storageId: match?.storageId ?? "",
-              storageName: storageNameById.get(match?.storageId ?? "") ?? "",
-              locationId: match?.locationId ?? "",
-              locationCode: match?.locationCode ?? "",
+              storageId: detail?.storageId ?? "",
+              storageName: storageNameById.get(detail?.storageId ?? "") ?? "",
+              locationId: detail?.locationId ?? "",
+              locationCode: detail?.locationCode ?? "",
               locationLoading: false,
             };
           }),
@@ -432,6 +531,12 @@ export function InventoryItemBarcodesPage() {
             searchItems={searchItems}
             onSkuTextChange={handleSkuTextChange}
             onSelectItem={handleSelectItem}
+            searchItemStorages={searchItemStorages}
+            searchItemLocations={searchItemLocations}
+            onSelectStorage={handleSelectStorage}
+            onStorageTextChange={handleStorageTextChange}
+            onSelectLocation={handleSelectLocation}
+            onLocationTextChange={handleLocationTextChange}
             onQuantityChange={handleQuantityChange}
             onCopyQuantityDown={handleCopyQuantityDown}
             onDeleteRow={handleDeleteRow}
