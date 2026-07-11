@@ -46,7 +46,15 @@ export class SearchReturnableInvoicesV2Handler
       )
       .where('inv.organizationId = :orgId', { orgId: actor.organizationId })
       .andWhere('inv.type = :type', { type: InvoiceType.SALE })
-      .andWhere('inv.status = :status', { status: InvoiceStatus.PAID })
+      // Paid sales plus outstanding-debt sales (DEBT / PARTIAL_DEBT) are all
+      // returnable — a debt invoice's return offsets its own customer debt.
+      .andWhere('inv.status IN (:...statuses)', {
+        statuses: [
+          InvoiceStatus.PAID,
+          InvoiceStatus.DEBT,
+          InvoiceStatus.PARTIAL_DEBT,
+        ],
+      })
       .andWhere('inv.isDraft = false')
       // Hide fully-returned invoices: keep only those with at least one sold
       // (OUT) line that still has un-returned quantity. Partially-returned

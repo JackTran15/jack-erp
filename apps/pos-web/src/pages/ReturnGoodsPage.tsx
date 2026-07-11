@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ReturnInvoiceTable } from "@erp/pos/components/page-components/ReturnGoods/ReturnInvoiceTable/ReturnInvoiceTable";
 import { ReturnItemsDialog } from "@erp/pos/components/page-components/ReturnGoods/ReturnItemsDialog/ReturnItemsDialog";
+import { InvoiceReceiptDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/InvoiceReceiptDialog/InvoiceReceiptDialog";
 import { RETURN_GOODS_DEFAULT_PAGE_SIZE } from "@erp/pos/constants/return-goods.constant";
 import { useReturnGoods } from "@erp/pos/hooks/page-hooks/return-goods/use-return-goods";
 
@@ -32,6 +33,9 @@ export function ReturnGoodsPage() {
     toggleAllItems,
     setReturnQty,
     confirmReturn,
+    detailInvoiceId,
+    openInvoiceDetail,
+    closeInvoiceDetail,
   } = useReturnGoods();
 
   const dateLabel = formatViDateTime(pageDate, { separator: "space" }).split(
@@ -67,6 +71,7 @@ export function ReturnGoodsPage() {
               filters={filters}
               onFilterChange={setFilter}
               onReturn={openInvoice}
+              onOpenInvoice={openInvoiceDetail}
             />
           </div>
 
@@ -91,6 +96,12 @@ export function ReturnGoodsPage() {
         onChangeQty={setReturnQty}
         onConfirm={confirmReturn}
         onClose={closeDialog}
+      />
+
+      <InvoiceReceiptDialog
+        open={detailInvoiceId !== null}
+        invoiceId={detailInvoiceId}
+        onClose={closeInvoiceDetail}
       />
     </div>
   );

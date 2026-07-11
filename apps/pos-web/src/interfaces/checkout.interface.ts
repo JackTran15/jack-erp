@@ -104,10 +104,13 @@ export interface Salesperson {
   code: string;
 }
 
-/** Nhóm hàng hoá (catalog group filter). Tạm dùng option tĩnh — chờ API. */
+/** Nhóm hàng hoá (catalog group filter) — phẳng hoá từ cây nhóm hàng hóa để hiển thị thụt lề. */
 export interface ProductGroup {
   id: string;
   name: string;
+  /** Độ sâu trong cây (0 = gốc / "Tất cả") để thụt lề khi render. */
+  depth?: number;
+  parentGroupId?: string | null;
 }
 
 /**
@@ -170,6 +173,12 @@ export interface CheckoutPaymentDraft {
   paymentLines: PaymentLine[];
   keepChange: boolean;
   debt: boolean;
+  /**
+   * Chỉ dùng ở luồng hoàn tiền (return/exchange net<0): tích "Tính vào công nợ"
+   * để bù trừ khoản hoàn vào công nợ hóa đơn gốc (refundMethod=OFFSET) thay vì
+   * chi tiền mặt. Optional cho draft cũ đã persist (coerce về false khi đọc).
+   */
+  refundToDebt?: boolean;
   note: string;
   printInvoice: boolean;
   /** In 2 liên trong 1 lệnh in (1 cho khách, 1 cửa hàng lưu). */

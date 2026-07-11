@@ -9,6 +9,8 @@ import { LocationEntity } from '../../inventory/location/location.entity';
 import { ShowroomEntity } from '../../inventory/location/showroom.entity';
 import { ProductAttributeDefinitionEntity } from '../../inventory/product/product-attribute-definition.entity';
 import { ItemAttributeValueEntity } from '../../inventory/product/item-attribute-value.entity';
+import { ItemCategoryEntity } from '../../inventory/location/item-category.entity';
+import { CacheService } from '../../redis/cache.service';
 import { PosCatalogProductService } from './pos-catalog-product.service';
 
 const actor: ActorContext = {
@@ -18,8 +20,26 @@ const actor: ActorContext = {
   roles: ['cashier'],
 };
 
-type RepoMock = { find: jest.Mock; findOne: jest.Mock };
-const repoMock = (): RepoMock => ({ find: jest.fn(), findOne: jest.fn() });
+type RepoMock = {
+  find: jest.Mock;
+  findOne: jest.Mock;
+  createQueryBuilder: jest.Mock;
+};
+const repoMock = (): RepoMock => ({
+  find: jest.fn(),
+  findOne: jest.fn(),
+  createQueryBuilder: jest.fn(),
+});
+
+/** Chainable query-builder stub whose getMany() resolves to the given rows. */
+const queryBuilderMock = (rows: unknown[]) => {
+  const qb: Record<string, jest.Mock> = {};
+  for (const method of ['leftJoin', 'select', 'where', 'andWhere']) {
+    qb[method] = jest.fn(() => qb);
+  }
+  qb.getMany = jest.fn().mockResolvedValue(rows);
+  return qb;
+};
 
 // Product "Áo" with two variants; standalone item "Bút".
 const product = { id: 'P1', name: 'Áo', description: 'Áo thun cotton', isActive: true };
@@ -86,6 +106,8 @@ describe('PosCatalogProductService', () => {
   let showroomRepo: RepoMock;
   let attrDefRepo: RepoMock;
   let itemAttrValueRepo: RepoMock;
+  let categoryRepo: RepoMock;
+  let cacheService: { getOrSet: jest.Mock; invalidate: jest.Mock };
 
   beforeEach(async () => {
     itemRepo = repoMock();
@@ -95,6 +117,12 @@ describe('PosCatalogProductService', () => {
     showroomRepo = repoMock();
     attrDefRepo = repoMock();
     itemAttrValueRepo = repoMock();
+    categoryRepo = repoMock();
+    // Pass-through cache: always rebuild via the fetch fn so buildOrgCards runs.
+    cacheService = {
+      getOrSet: jest.fn((_ns, _key, fetchFn) => fetchFn()),
+      invalidate: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -106,6 +134,8 @@ describe('PosCatalogProductService', () => {
         { provide: getRepositoryToken(ShowroomEntity), useValue: showroomRepo },
         { provide: getRepositoryToken(ProductAttributeDefinitionEntity), useValue: attrDefRepo },
         { provide: getRepositoryToken(ItemAttributeValueEntity), useValue: itemAttrValueRepo },
+        { provide: getRepositoryToken(ItemCategoryEntity), useValue: categoryRepo },
+        { provide: CacheService, useValue: cacheService },
       ],
     }).compile();
 
@@ -114,7 +144,10 @@ describe('PosCatalogProductService', () => {
 
   describe('listProducts', () => {
     beforeEach(() => {
-      itemRepo.find.mockResolvedValue([variantS, variantM, standalone]);
+      // buildOrgCards loads the whole org via the query builder (no category filter).
+      itemRepo.createQueryBuilder.mockReturnValue(
+        queryBuilderMock([variantS, variantM, standalone]),
+      );
       balanceRepo.find.mockResolvedValue(balances);
       locationRepo.find.mockResolvedValue(locations);
     });
@@ -149,6 +182,17 @@ describe('PosCatalogProductService', () => {
       });
     });
 
+    it('serves the cached skeleton but merges live branch stock', async () => {
+      // First call warms the cache; the pass-through mock still rebuilds, but the
+      // stock query is always run live regardless of the cached skeleton.
+      await service.listProducts('branch-1', actor, { page: 1, pageSize: 20 } as any);
+      balanceRepo.find.mockResolvedValue([{ itemId: 'I1', locationId: 'L1', quantity: 99 }]);
+
+      const res = await service.listProducts('branch-1', actor, { page: 1, pageSize: 20 } as any);
+      expect(cacheService.getOrSet).toHaveBeenCalled();
+      expect(res.data.find((c) => c.id === 'P1')?.quantityOnHand).toBe(99);
+    });
+
     it('paginates the grouped cards in memory', async () => {
       const res = await service.listProducts('branch-1', actor, { page: 1, pageSize: 1 } as any);
       expect(res.total).toBe(2);
@@ -166,8 +210,8 @@ describe('PosCatalogProductService', () => {
       expect(res.data[0].id).toBe('I3');
     });
 
-    it('pushes categoryId into the item query (DB-level filter)', async () => {
-      itemRepo.find.mockResolvedValue([variantS, variantM]); // DB already filtered to C1
+    it('filters by category (exact leaf) in memory over the cached skeleton', async () => {
+      categoryRepo.find.mockResolvedValue([{ id: 'C1', parentGroupId: null }]);
 
       const res = await service.listProducts('branch-1', actor, {
         page: 1,
@@ -175,11 +219,24 @@ describe('PosCatalogProductService', () => {
         categoryId: 'C1',
       } as any);
 
-      expect(itemRepo.find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ categoryId: 'C1' }),
-        }),
-      );
+      // Standalone "Bút" (no category) is excluded; only the C1 product remains.
+      expect(res.total).toBe(1);
+      expect(res.data[0].id).toBe('P1');
+    });
+
+    it('includes descendant categories when a parent group is selected', async () => {
+      // Parent C0 → child C1 (the variants live under C1).
+      categoryRepo.find.mockResolvedValue([
+        { id: 'C0', parentGroupId: null },
+        { id: 'C1', parentGroupId: 'C0' },
+      ]);
+
+      const res = await service.listProducts('branch-1', actor, {
+        page: 1,
+        pageSize: 20,
+        categoryId: 'C0',
+      } as any);
+
       expect(res.total).toBe(1);
       expect(res.data[0].id).toBe('P1');
     });

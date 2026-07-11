@@ -26,7 +26,10 @@ import { CustomerCreditService } from '../../customer/services/customer-credit.s
 import { MembershipCardService } from '../../customer/services/membership-card.service';
 import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
 import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
-import { PaymentAccountMethod } from '../../accounting/payment-accounts/enums';
+import {
+  AccountingDefaultAccountRole,
+  PaymentAccountMethod,
+} from '../../accounting/payment-accounts/enums';
 import {
   InvoiceEntity,
   InvoicePaymentMethod,
@@ -82,6 +85,8 @@ export class CheckoutReturnService {
     private readonly itemRepo: Repository<InvoiceItemEntity>,
     @InjectRepository(PosSessionEntity)
     private readonly sessionRepo: Repository<PosSessionEntity>,
+    @InjectRepository(InvoiceDebtEntity)
+    private readonly debtRepo: Repository<InvoiceDebtEntity>,
     private readonly dataSource: DataSource,
     private readonly numbering: DocumentNumberingService,
     private readonly wsEmitter: WebSocketEmitterService,
@@ -139,7 +144,58 @@ export class CheckoutReturnService {
     }
 
     const totals = this.computeTotals(items);
-    this.validateRefundMatrix(invoice, dto, totals);
+
+    // Load the original invoice up-front — needed for OFFSET (settling the
+    // original's debt) and the loyalty re-credit below.
+    let originalInvoice: InvoiceEntity | null = null;
+    if (invoice.originalInvoiceId) {
+      originalInvoice = await this.invoiceRepo.findOne({
+        where: {
+          id: invoice.originalInvoiceId,
+          organizationId: actor.organizationId,
+        },
+      });
+    }
+
+    // The refund method is the operator's explicit choice (FE sends OFFSET only
+    // when they tick "Tính vào công nợ"). When they opt into OFFSET but the
+    // original invoice has no outstanding debt to settle, fall back to a cash
+    // refund rather than silently doing nothing.
+    const wantsOffset =
+      dto.refundMethod === RefundMethod.OFFSET && totals.refundedAmount > 0;
+    let originalDebt: InvoiceDebtEntity | null = null;
+    if (wantsOffset && originalInvoice) {
+      originalDebt = await this.debtRepo.findOne({
+        where: {
+          invoiceId: originalInvoice.id,
+          organizationId: actor.organizationId,
+        },
+      });
+    }
+    const canOffset =
+      wantsOffset &&
+      !!originalDebt &&
+      originalDebt.status !== DebtStatus.PAID &&
+      Number(originalDebt.remainingAmount) > 0;
+    const effectiveRefundMethod =
+      dto.refundMethod === RefundMethod.OFFSET
+        ? canOffset
+          ? RefundMethod.OFFSET
+          : RefundMethod.CASH
+        : dto.refundMethod;
+
+    this.validateRefundMatrix(invoice, dto, totals, effectiveRefundMethod);
+
+    // When settling debt via OFFSET, resolve the AR (receivable) COA account
+    // server-side (branch override → org default) so the FE never supplies it.
+    const receivableAccountId =
+      effectiveRefundMethod === RefundMethod.OFFSET && totals.refundedAmount > 0
+        ? (dto.receivableAccountId ??
+          (await this.accountResolver.resolveDefaultAccount(
+            AccountingDefaultAccountRole.RECEIVABLE,
+            actor,
+          )))
+        : dto.receivableAccountId;
 
     const realCode = await this.numbering.generate(
       DocumentType.RETURN,
@@ -150,7 +206,8 @@ export class CheckoutReturnService {
     // One cash fund per branch: resolve it only when a cash movement is needed
     // (a cash refund, or an exchange with a positive net paid in cash).
     const needsCashFund =
-      (dto.refundMethod === RefundMethod.CASH && totals.refundedAmount > 0) ||
+      (effectiveRefundMethod === RefundMethod.CASH &&
+        totals.refundedAmount > 0) ||
       (totals.netAmount > 0 && this.hasCashPayments(dto));
     const resolvedCashAccountId = needsCashFund
       ? await this.cashFundResolver.resolveBranchCashFund(
@@ -183,15 +240,6 @@ export class CheckoutReturnService {
     }
 
     const now = new Date();
-    let originalInvoice: InvoiceEntity | null = null;
-    if (invoice.originalInvoiceId) {
-      originalInvoice = await this.invoiceRepo.findOne({
-        where: {
-          id: invoice.originalInvoiceId,
-          organizationId: actor.organizationId,
-        },
-      });
-    }
 
     const posted = await this.dataSource.transaction(async (manager) => {
       invoice.isDraft = false;
@@ -201,7 +249,7 @@ export class CheckoutReturnService {
       invoice.subtotal = totals.newSubtotal || totals.returnSubtotal;
       invoice.amountDue = Math.max(totals.netAmount, 0);
       invoice.totalPaid = totals.netAmount > 0 ? totals.netAmount : 0;
-      invoice.refundMethod = dto.refundMethod;
+      invoice.refundMethod = effectiveRefundMethod;
       invoice.refundedAmount = totals.refundedAmount;
       invoice.netAmount = totals.netAmount;
       if (dto.note) invoice.note = dto.note;
@@ -247,7 +295,7 @@ export class CheckoutReturnService {
 
       // STORE_CREDIT issuance.
       if (
-        dto.refundMethod === RefundMethod.STORE_CREDIT &&
+        effectiveRefundMethod === RefundMethod.STORE_CREDIT &&
         totals.refundedAmount > 0
       ) {
         await this.customerCredit.issue(
@@ -259,7 +307,7 @@ export class CheckoutReturnService {
 
       // OFFSET against original DEBT invoice.
       if (
-        dto.refundMethod === RefundMethod.OFFSET &&
+        effectiveRefundMethod === RefundMethod.OFFSET &&
         totals.refundedAmount > 0 &&
         originalInvoice &&
         (originalInvoice.status === InvoiceStatus.DEBT ||
@@ -311,6 +359,8 @@ export class CheckoutReturnService {
       items,
       totals,
       dto,
+      effectiveRefundMethod,
+      receivableAccountId,
       resolvedCashAccountId,
       actor,
     );
@@ -332,7 +382,7 @@ export class CheckoutReturnService {
     });
 
     this.logger.log(
-      `Checked out ${invoice.type} invoice ${id} code=${realCode} method=${dto.refundMethod} refunded=${totals.refundedAmount} net=${totals.netAmount}`,
+      `Checked out ${invoice.type} invoice ${id} code=${realCode} method=${effectiveRefundMethod} refunded=${totals.refundedAmount} net=${totals.netAmount}`,
     );
 
     return posted.invoice;
@@ -360,6 +410,7 @@ export class CheckoutReturnService {
     invoice: InvoiceEntity,
     dto: CheckoutReturnDto,
     totals: ComputedTotals,
+    effectiveRefundMethod: RefundMethod,
   ): void {
     const { netAmount, refundedAmount } = totals;
 
@@ -382,29 +433,32 @@ export class CheckoutReturnService {
     } else if (netAmount < 0) {
       // RETURN or EXCHANGE refund.
       if (
-        dto.refundMethod !== RefundMethod.CASH &&
-        dto.refundMethod !== RefundMethod.STORE_CREDIT &&
-        dto.refundMethod !== RefundMethod.OFFSET
+        effectiveRefundMethod !== RefundMethod.CASH &&
+        effectiveRefundMethod !== RefundMethod.STORE_CREDIT &&
+        effectiveRefundMethod !== RefundMethod.OFFSET
       ) {
         throw new BadRequestException(
-          `refundMethod ${dto.refundMethod} không hợp lệ khi netAmount<0`,
+          `refundMethod ${effectiveRefundMethod} không hợp lệ khi netAmount<0`,
         );
       }
-      if (dto.refundMethod === RefundMethod.STORE_CREDIT && !invoice.customerId) {
+      if (
+        effectiveRefundMethod === RefundMethod.STORE_CREDIT &&
+        !invoice.customerId
+      ) {
         throw new BadRequestException(
           'STORE_CREDIT yêu cầu invoice có customerId',
         );
       }
-      if (dto.refundMethod === RefundMethod.STORE_CREDIT && !dto.creditLiabilityAccountId) {
+      if (
+        effectiveRefundMethod === RefundMethod.STORE_CREDIT &&
+        !dto.creditLiabilityAccountId
+      ) {
         throw new BadRequestException(
           'STORE_CREDIT yêu cầu creditLiabilityAccountId',
         );
       }
-      if (dto.refundMethod === RefundMethod.OFFSET && !dto.receivableAccountId) {
-        throw new BadRequestException(
-          'OFFSET yêu cầu receivableAccountId (để bù vào công nợ gốc)',
-        );
-      }
+      // OFFSET receivableAccountId is resolved server-side (org AR default) —
+      // the FE no longer needs to supply it.
       if (dto.payments && dto.payments.length > 0) {
         throw new BadRequestException(
           'payments không được cung cấp khi netAmount <= 0',
@@ -412,7 +466,7 @@ export class CheckoutReturnService {
       }
     } else {
       // netAmount === 0 — pure EXCHANGE swap.
-      if (dto.refundMethod !== RefundMethod.OFFSET) {
+      if (effectiveRefundMethod !== RefundMethod.OFFSET) {
         throw new BadRequestException(
           'netAmount = 0 → refundMethod phải là OFFSET',
         );
@@ -486,6 +540,8 @@ export class CheckoutReturnService {
     items: InvoiceItemEntity[],
     totals: ComputedTotals,
     dto: CheckoutReturnDto,
+    effectiveRefundMethod: RefundMethod,
+    receivableAccountId: string | undefined,
     resolvedCashAccountId: string | undefined,
     actor: ActorContext,
   ): Promise<void> {
@@ -528,12 +584,12 @@ export class CheckoutReturnService {
         returnInvoiceId: invoice.id,
         returnInvoiceCode: invoice.code,
         source: invoice.type === InvoiceType.EXCHANGE ? 'EXCHANGE' : 'RETURN',
-        refundMethod: dto.refundMethod,
+        refundMethod: effectiveRefundMethod,
         refundedAmount: totals.refundedAmount,
         netAmount: totals.netAmount,
         revenueAccountId: dto.revenueAccountId,
         cashAccountId: resolvedCashAccountId,
-        receivableAccountId: dto.receivableAccountId,
+        receivableAccountId: receivableAccountId,
         creditLiabilityAccountId: dto.creditLiabilityAccountId,
         branchId,
       },
@@ -542,7 +598,7 @@ export class CheckoutReturnService {
 
     // 4. CASH_REFUND — only refundMethod=CASH AND refundedAmount > 0.
     if (
-      dto.refundMethod === RefundMethod.CASH &&
+      effectiveRefundMethod === RefundMethod.CASH &&
       totals.refundedAmount > 0 &&
       resolvedCashAccountId
     ) {

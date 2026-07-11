@@ -116,7 +116,9 @@ export function ProductCatalogHeader({ inputRef }: ProductCatalogHeaderProps) {
           setGroupQuery("");
         }}
         itemKey={(g) => g.id}
-        renderItem={(g) => g.name}
+        renderItem={(g) => (
+          <span style={{ paddingLeft: (g.depth ?? 0) * 14 }}>{g.name}</span>
+        )}
         placeholder="Lọc theo nhóm hàng hóa"
         ariaLabel="Lọc theo nhóm hàng hóa"
         // type="text" để bỏ nút clear (X) native của input search — chỉ giữ nút
@@ -125,6 +127,9 @@ export function ProductCatalogHeader({ inputRef }: ProductCatalogHeaderProps) {
         variant="boxed"
         leadingIcon={<BoxIcon size={16} className="text-gray-500" />}
         minChars={0}
+        // Đây là bộ lọc nhóm hàng (danh sách hữu hạn) — hiện đủ mọi nhóm, không
+        // giới hạn 8 gợi ý mặc định như ô tìm kiếm sản phẩm.
+        maxSuggestions={meta.productGroups.length}
         containerClassName="min-w-[220px]"
       />
     </div>
