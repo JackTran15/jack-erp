@@ -97,6 +97,11 @@ interface BuildCheckoutReturnPayloadInput {
   /** Tổng tiền hàng mua mới (Σ unitPrice × qty của new lines, 0 nếu trả thuần). */
   newSubtotal: number;
   paymentLines: PaymentLine[];
+  /**
+   * Operator tích "Tính vào công nợ" (chỉ ở luồng hoàn tiền, net<0) → bù trừ
+   * khoản hoàn vào công nợ hóa đơn gốc (OFFSET). Mặc định false ⇒ chi tiền mặt.
+   */
+  offsetToDebt?: boolean;
   note?: string;
 }
 
@@ -105,7 +110,9 @@ interface BuildCheckoutReturnPayloadInput {
  * `netAmount = newSubtotal − returnSubtotal` (đúng ma trận BE):
  *   - net > 0  → khách trả thêm: CASH + `payments` (map từ dòng thanh toán).
  *   - net = 0  → bù trừ ngang: OFFSET.
- *   - net < 0  → hoàn tiền khách: CASH (mặc định, không kèm payments).
+ *   - net < 0  → hoàn tiền khách: OFFSET nếu operator tích "Tính vào công nợ",
+ *     ngược lại CASH (mặc định, không kèm payments). BE tự chuyển OFFSET→CASH
+ *     nếu hóa đơn gốc không còn công nợ để bù trừ.
  * `revenueAccountId` luôn bắt buộc; `cashAccountId` để trống ⇒ BE lấy theo ca quỹ.
  */
 export function buildCheckoutReturnPayload(
@@ -142,7 +149,8 @@ export function buildCheckoutReturnPayload(
   return {
     ok: true,
     body: {
-      refundMethod: net === 0 ? "OFFSET" : "CASH",
+      refundMethod:
+        net === 0 ? "OFFSET" : input.offsetToDebt ? "OFFSET" : "CASH",
       revenueAccountId: input.revenueAccountId,
       note: input.note,
     },

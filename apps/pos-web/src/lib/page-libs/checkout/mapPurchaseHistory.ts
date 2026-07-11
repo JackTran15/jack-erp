@@ -1,5 +1,6 @@
 import { PurchaseHistoryStatusEnum } from "@erp/pos/constants/checkout.constant";
 import type { PurchaseHistoryStatus } from "@erp/pos/constants/checkout.constant";
+import { getInvoiceSignedTotal } from "@erp/pos/lib/common/invoiceAmount";
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
 import type { PurchaseHistoryEntry } from "@erp/pos/interfaces/customer-detail.interface";
 
@@ -9,7 +10,9 @@ import type { PurchaseHistoryEntry } from "@erp/pos/interfaces/customer-detail.i
  * (loại draft/pending/cancelled — không phải giao dịch mua hoàn tất).
  *
  * `storeName` lấy từ `inv.branch.name` (BE join trả inline); fallback `branchName`
- * khi thiếu. "Tổng thanh toán" = `totalPaid`.
+ * khi thiếu. "Tổng thanh toán" dùng `getInvoiceSignedTotal`: đơn bán (kể cả ghi
+ * nợ) = `amountDue` (tổng hoá đơn, không phải số đã trả nên đơn nợ không ra 0);
+ * đơn đổi/trả (RETURN/EXCHANGE) = `netAmount` có dấu (âm = hoàn tiền khách).
  */
 const STATUS_MAP: Partial<Record<InvoiceRow["status"], PurchaseHistoryStatus>> = {
   paid: PurchaseHistoryStatusEnum.PAID,
@@ -32,7 +35,7 @@ export function mapInvoicesToPurchaseHistory(
       invoiceNumber: inv.code,
       storeName: inv.branch?.name ?? branchName ?? "",
       status,
-      totalAmount: Number(inv.totalPaid) || 0,
+      totalAmount: getInvoiceSignedTotal(inv),
       note: inv.note,
     });
   }

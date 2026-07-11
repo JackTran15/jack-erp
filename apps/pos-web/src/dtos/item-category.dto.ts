@@ -4,3 +4,9 @@ export interface ListItemCategoriesParams {
   pageSize?: number;
   search?: string;
 }
+
+/** Body cho `itemCategoryService.tree` (`POST /v2/inventory/item-categories/tree`). */
+export interface SearchItemCategoryTreeParams {
+  search?: string;
+  status?: string;
+}

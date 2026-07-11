@@ -12,6 +12,8 @@ import {
   InvoiceItemEntity,
   LineDiscountType,
 } from '../entities/invoice-item.entity';
+import { InvoicePaymentEntity } from '../entities/invoice-payment.entity';
+import { InvoiceDebtEntity } from '../entities/invoice-debt.entity';
 import { ItemEntity } from '../../inventory/location/item.entity';
 import { LocationEntity } from '../../inventory/location/location.entity';
 import { CustomerEntity } from '../../customer/customer.entity';
@@ -35,6 +37,10 @@ export class InvoiceService {
     private readonly locationRepo: Repository<LocationEntity>,
     @InjectRepository(CustomerEntity)
     private readonly customerRepo: Repository<CustomerEntity>,
+    @InjectRepository(InvoicePaymentEntity)
+    private readonly paymentRepo: Repository<InvoicePaymentEntity>,
+    @InjectRepository(InvoiceDebtEntity)
+    private readonly debtRepo: Repository<InvoiceDebtEntity>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -294,6 +300,8 @@ export class InvoiceService {
     InvoiceEntity & {
       customer: CustomerEntity | null;
       items: Array<InvoiceItemEntity & { location: LocationEntity | null }>;
+      payments: InvoicePaymentEntity[];
+      remainingDebt: number | null;
     }
   > {
     const invoice = await this.findOne(id, actor);
@@ -306,7 +314,22 @@ export class InvoiceService {
     const itemsWithLocation = await this.attachLocations(items, actor);
     const [invoiceWithCustomer] = await this.attachCustomers([invoice], actor);
 
-    return Object.assign(invoiceWithCustomer, { items: itemsWithLocation });
+    // Per-method payment breakdown (Tiền mặt / Chuyển khoản / Card) and the
+    // outstanding debt for this invoice (Công nợ) — needed for the full receipt.
+    const payments = await this.paymentRepo.find({
+      where: { invoiceId: id, organizationId: actor.organizationId },
+      order: { createdAt: 'ASC' },
+    });
+    const debt = await this.debtRepo.findOne({
+      where: { invoiceId: id, organizationId: actor.organizationId },
+    });
+    const remainingDebt = debt ? Number(debt.remainingAmount) : null;
+
+    return Object.assign(invoiceWithCustomer, {
+      items: itemsWithLocation,
+      payments,
+      remainingDebt,
+    });
   }
 
   async update(

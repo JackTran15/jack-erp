@@ -36,6 +36,12 @@ interface UseCheckoutPaymentResult {
     next: boolean,
     selectedCustomer: CustomerRow | null,
   ) => void;
+  refundToDebt: boolean;
+  setRefundToDebt: (value: Updater<boolean>) => void;
+  handleRefundToDebtChange: (
+    next: boolean,
+    selectedCustomer: CustomerRow | null,
+  ) => void;
   handleRequireCustomerForDeposit: () => void;
   note: string;
   setNote: (value: Updater<string>) => void;
@@ -94,6 +100,7 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
     paymentLines,
     keepChange,
     debt,
+    refundToDebt,
     note,
     printInvoice,
     printDuplicate,
@@ -144,6 +151,14 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
       updateDraftSlice("payment", (p) => ({
         ...p,
         debt: apply(p.debt, value),
+      })),
+    [updateDraftSlice],
+  );
+  const setRefundToDebt = useCallback(
+    (value: Updater<boolean>) =>
+      updateDraftSlice("payment", (p) => ({
+        ...p,
+        refundToDebt: apply(p.refundToDebt ?? false, value),
       })),
     [updateDraftSlice],
   );
@@ -282,6 +297,21 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
     [setKeepChange, setDebt],
   );
 
+  // Luồng hoàn tiền: "Tính vào công nợ" bù trừ khoản hoàn vào công nợ hóa đơn
+  // gốc → cần đã chọn khách (công nợ theo khách).
+  const handleRefundToDebtChange = useCallback(
+    (next: boolean, selectedCustomer: CustomerRow | null) => {
+      if (next && !selectedCustomer) {
+        usePosCheckoutUiStore
+          .getState()
+          .setCartError(CHECKOUT_ERRORS.CUSTOMER_REQUIRED);
+        return;
+      }
+      setRefundToDebt(next);
+    },
+    [setRefundToDebt],
+  );
+
   const handleRequireCustomerForDeposit = useCallback(() => {
     usePosCheckoutUiStore
       .getState()
@@ -297,6 +327,10 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
     debt,
     setDebt,
     handleDebtChange,
+    // Persisted draft cũ chưa có field → coerce về false cho checkbox controlled.
+    refundToDebt: refundToDebt ?? false,
+    setRefundToDebt,
+    handleRefundToDebtChange,
     handleRequireCustomerForDeposit,
     note,
     setNote,

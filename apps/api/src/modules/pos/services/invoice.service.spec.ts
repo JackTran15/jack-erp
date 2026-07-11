@@ -5,6 +5,8 @@ import { DataSource } from 'typeorm';
 import { InvoiceService } from './invoice.service';
 import { InvoiceEntity, InvoiceStatus } from '../entities/invoice.entity';
 import { InvoiceItemEntity } from '../entities/invoice-item.entity';
+import { InvoicePaymentEntity } from '../entities/invoice-payment.entity';
+import { InvoiceDebtEntity } from '../entities/invoice-debt.entity';
 import { LocationEntity } from '../../inventory/location/location.entity';
 import { CustomerEntity } from '../../customer/customer.entity';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
@@ -74,6 +76,8 @@ describe('InvoiceService', () => {
   let itemRepo: Record<string, jest.Mock>;
   let locationRepo: Record<string, jest.Mock>;
   let customerRepo: Record<string, jest.Mock>;
+  let paymentRepo: Record<string, jest.Mock>;
+  let debtRepo: Record<string, jest.Mock>;
   let dataSource: Record<string, jest.Mock>;
   let mockManager: Record<string, jest.Mock>;
 
@@ -106,6 +110,14 @@ describe('InvoiceService', () => {
       findBy: jest.fn().mockResolvedValue([]),
     };
 
+    paymentRepo = {
+      find: jest.fn().mockResolvedValue([]),
+    };
+
+    debtRepo = {
+      findOne: jest.fn().mockResolvedValue(null),
+    };
+
     dataSource = {
       transaction: jest.fn().mockImplementation((cb) => cb(mockManager)),
     };
@@ -117,6 +129,8 @@ describe('InvoiceService', () => {
         { provide: getRepositoryToken(InvoiceItemEntity), useValue: itemRepo },
         { provide: getRepositoryToken(LocationEntity), useValue: locationRepo },
         { provide: getRepositoryToken(CustomerEntity), useValue: customerRepo },
+        { provide: getRepositoryToken(InvoicePaymentEntity), useValue: paymentRepo },
+        { provide: getRepositoryToken(InvoiceDebtEntity), useValue: debtRepo },
         { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
