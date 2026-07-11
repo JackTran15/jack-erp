@@ -12,6 +12,7 @@ import { ProductAttributeDefinitionEntity } from "../product/product-attribute-d
 import { ProductAttributeOptionEntity } from "../product/product-attribute-option.entity";
 import { ItemAttributeValueEntity } from "../product/item-attribute-value.entity";
 import { StockLedgerService } from "../ledger/stock-ledger.service";
+import { CacheService } from "../../redis/cache.service";
 
 /** Proves createProductWithVariants persists per-variant price/SKU/barcode. */
 describe("InventoryItemCrudService.create (product with variants)", () => {
@@ -144,6 +145,7 @@ describe("InventoryItemCrudService.create (product with variants)", () => {
         },
         { provide: DataSource, useValue: dataSource },
         { provide: StockLedgerService, useValue: stockLedger },
+        { provide: CacheService, useValue: { invalidate: jest.fn(), getOrSet: jest.fn() } },
       ],
     }).compile();
 

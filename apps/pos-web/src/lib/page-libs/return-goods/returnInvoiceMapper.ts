@@ -1,3 +1,4 @@
+import { getInvoiceSignedTotal } from "@erp/pos/lib/common/invoiceAmount";
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
 import type {
   EligibleReturnLine,
@@ -14,7 +15,8 @@ export interface ReturnRowCustomer {
 /**
  * `InvoiceRow` (`POST /v2/invoices/returnable/search`) → dòng hiển thị bảng đổi
  * trả. `customer` + `branchName` nay được BE trả inline (join), không cần enrich
- * riêng. "Tổng thanh toán" = `totalPaid` (về dạng string nên `Number(...)`).
+ * riêng. "Tổng thanh toán" = `getInvoiceSignedTotal` (= `amountDue` tổng hoá đơn;
+ * đơn ghi nợ có `totalPaid`=0 nên không dùng totalPaid, tránh hiển thị 0).
  */
 export function mapInvoiceToReturnRow(
   inv: InvoiceRow,
@@ -29,7 +31,7 @@ export function mapInvoiceToReturnRow(
     customerId: inv.customerId ?? null,
     customerName: customer?.name ?? "",
     customerPhone: customer?.phone ?? "",
-    totalAmount: Number(inv.totalPaid) || 0,
+    totalAmount: getInvoiceSignedTotal(inv),
     branchName,
   };
 }

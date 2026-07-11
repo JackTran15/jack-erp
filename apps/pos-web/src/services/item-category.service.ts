@@ -1,6 +1,12 @@
 import { http } from "@erp/pos/lib/common/http";
-import type { ListItemCategoriesParams } from "@erp/pos/dtos/item-category.dto";
-import type { ItemCategoryRow } from "@erp/pos/interfaces/item-category.interface";
+import type {
+  ListItemCategoriesParams,
+  SearchItemCategoryTreeParams,
+} from "@erp/pos/dtos/item-category.dto";
+import type {
+  ItemCategoryRow,
+  ItemCategoryTreeResponse,
+} from "@erp/pos/interfaces/item-category.interface";
 import type { Paginated } from "@erp/pos/interfaces/paginated.interface";
 
 export const itemCategoryService = {
@@ -16,4 +22,13 @@ export const itemCategoryService = {
       `/admin/entities/inventory-item-categories/records?${qs.toString()}`,
     );
   },
+
+  /** Cây nhóm hàng hóa (parent → child) — `POST /v2/inventory/item-categories/tree`. */
+  tree: (
+    params: SearchItemCategoryTreeParams = {},
+  ): Promise<ItemCategoryTreeResponse> =>
+    http.post<ItemCategoryTreeResponse>(
+      "/v2/inventory/item-categories/tree",
+      params,
+    ),
 };

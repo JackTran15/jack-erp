@@ -1,9 +1,10 @@
 import { useCallback, useMemo } from "react";
 
 import { buildLocalSearch } from "@erp/pos/lib/page-libs/checkout/buildLocalSearch";
+import { flattenItemCategoryTree } from "@erp/pos/lib/page-libs/checkout/flattenItemCategoryTree";
 import { mapSalesmanToSalesperson } from "@erp/pos/lib/page-libs/checkout/mapSalesman";
 import { useSalesmenQuery } from "@erp/pos/hooks/react-query/use-query-sales-hierarchy";
-import { useItemCategoriesQuery } from "@erp/pos/hooks/react-query/use-query-item-category";
+import { useItemCategoryTreeQuery } from "@erp/pos/hooks/react-query/use-query-item-category";
 import { PRICE_BOOK_OPTIONS } from "@erp/pos/constants/checkout.constant";
 import type {
   PriceBook,
@@ -46,14 +47,15 @@ export const useCheckoutMeta = (): CheckoutMeta => {
     [salesmen],
   );
   const priceBooks = PRICE_BOOK_OPTIONS;
-  const { data: categoriesData } = useItemCategoriesQuery();
-  // Option "Tất cả" (id rỗng = không lọc) đứng đầu, sau đó là danh mục thật.
+  const { data: categoryTree } = useItemCategoryTreeQuery();
+  // Option "Tất cả" (id rỗng = không lọc) đứng đầu, sau đó là cây nhóm hàng hóa
+  // đã phẳng hoá (giữ `depth` để thụt lề node con).
   const productGroups = useMemo<ProductGroup[]>(
     () => [
-      { id: "", name: "Tất cả" },
-      ...(categoriesData?.data ?? []).map((c) => ({ id: c.id, name: c.name })),
+      { id: "", name: "Tất cả", depth: 0 },
+      ...flattenItemCategoryTree(categoryTree?.data ?? []),
     ],
-    [categoriesData],
+    [categoryTree],
   );
 
   const { selectedSalesperson, selectedPriceBook } = usePosCheckoutSessionStore(

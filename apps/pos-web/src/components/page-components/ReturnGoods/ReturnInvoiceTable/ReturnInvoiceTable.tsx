@@ -20,6 +20,8 @@ export interface ReturnInvoiceTableProps {
   filters: ReturnInvoiceFilters;
   onFilterChange: (key: keyof ReturnInvoiceFilters, value: string) => void;
   onReturn: (row: ReturnInvoiceRow) => void;
+  /** Mở biên lai chi tiết hóa đơn khi bấm vào số hóa đơn. */
+  onOpenInvoice: (row: ReturnInvoiceRow) => void;
 }
 
 /**
@@ -32,6 +34,7 @@ export function ReturnInvoiceTable({
   filters,
   onFilterChange,
   onReturn,
+  onOpenInvoice,
 }: ReturnInvoiceTableProps) {
   const columns = useMemo<ReadonlyArray<PosDataTableColumn<ReturnInvoiceRow>>>(
     () => [
@@ -41,7 +44,8 @@ export function ReturnInvoiceTable({
         render: (row) => (
           <button
             type="button"
-            className="font-medium text-[#5C6BC0] transition-colors hover:text-[#4338CA]"
+            onClick={() => onOpenInvoice(row)}
+            className="font-medium text-[#5C6BC0] transition-colors hover:text-[#4338CA] focus:outline-none focus-visible:underline"
           >
             {row.invoiceNumber}
           </button>
@@ -139,7 +143,7 @@ export function ReturnInvoiceTable({
         ),
       },
     ],
-    [filters, onFilterChange, onReturn],
+    [filters, onFilterChange, onReturn, onOpenInvoice],
   );
 
   const grandTotal = sumInvoiceTotals(rows);

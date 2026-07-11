@@ -39,20 +39,33 @@ function buildPaymentLines(invoice: InvoiceRow): SummaryLine[] {
   if (invoice.discountAmount > 0) {
     lines.push({ label: "Giảm giá", value: invoice.discountAmount });
   }
-  if (invoice.depositAmount > 0) {
-    lines.push({ label: "Đặt cọc", value: invoice.depositAmount });
-  }
-  if (invoice.paymentMethod) {
+  // Chi tiết thanh toán theo từng phương thức (Tiền mặt / Chuyển khoản / Thẻ);
+  // fallback về `paymentMethod` đơn lẻ cho hoá đơn cũ chưa có mảng `payments`.
+  const payments = invoice.payments ?? [];
+  if (payments.length > 0) {
+    for (const p of payments) {
+      lines.push({
+        label: INVOICE_PAYMENT_METHOD_LABEL[p.paymentMethod],
+        value: Number(p.amount) || 0,
+      });
+    }
+  } else if (invoice.paymentMethod) {
     lines.push({
       label: INVOICE_PAYMENT_METHOD_LABEL[invoice.paymentMethod],
       value: invoice.amountDue,
     });
   }
-  if (invoice.paymentMethod === "cash" && invoice.cashTendered != null) {
-    lines.push({ label: "Tiền khách đưa", value: invoice.cashTendered });
+  if (invoice.depositAmount > 0) {
+    lines.push({ label: "Đặt cọc", value: invoice.depositAmount });
   }
-  if (invoice.paymentMethod === "cash" && invoice.changeAmount != null) {
-    lines.push({ label: "Trả lại khách", value: invoice.changeAmount });
+  if (invoice.remainingDebt != null && invoice.remainingDebt > 0) {
+    lines.push({ label: "Công nợ", value: invoice.remainingDebt });
+  }
+  if (invoice.pointsRedeemed != null && invoice.pointsRedeemed > 0) {
+    lines.push({
+      label: `Điểm thanh toán (${invoice.pointsRedeemed})`,
+      value: Number(invoice.pointsDiscountAmount) || 0,
+    });
   }
   return lines;
 }
@@ -186,11 +199,29 @@ export function InvoiceReceiptDialog({
                           isReturn ? " text-[#E5403A]" : ""
                         }`}
                       >
-                        {formatVnd(
-                          isReturn
-                            ? -Math.abs(Number(it.lineTotal))
-                            : it.lineTotal,
-                        )}
+                        {(() => {
+                          const gross =
+                            Number(it.unitPrice) * Number(it.quantity);
+                          const finalTotal = Number(it.lineTotal);
+                          // Dòng có KM: gạch giá gốc, hiển thị giá sau giảm bên dưới.
+                          if (
+                            !isReturn &&
+                            Number(it.lineDiscount) > 0 &&
+                            gross > finalTotal
+                          ) {
+                            return (
+                              <div className="flex flex-col items-end leading-tight">
+                                <span className="text-[12px] text-[#9CA3AF] line-through">
+                                  {formatVnd(gross)}
+                                </span>
+                                <span>{formatVnd(finalTotal)}</span>
+                              </div>
+                            );
+                          }
+                          return formatVnd(
+                            isReturn ? -Math.abs(finalTotal) : finalTotal,
+                          );
+                        })()}
                       </td>
                     </tr>
                     );

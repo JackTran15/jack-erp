@@ -95,6 +95,8 @@ export const ITEM_CATEGORY_KEYS = {
   ALL: ["item-categories"] as const,
   LIST: (params: Record<string, unknown>) =>
     ["item-categories", "list", params] as const,
+  TREE: (params: Record<string, unknown>) =>
+    ["item-categories", "tree", params] as const,
 } as const;
 
 export const CUSTOMER_GROUP_KEYS = {

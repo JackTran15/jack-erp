@@ -18,6 +18,7 @@ const fakeCustomer: CustomerRow = {
 const baseInput: CheckoutValidationInput = {
   hasAnyCartLines: true,
   debt: false,
+  refundToDebt: false,
   keepChange: false,
   selectedCustomer: null,
   purchaseCart: [],
@@ -105,6 +106,33 @@ describe("validateCheckout", () => {
       expect(result.message).toBe(
         "Bạn chưa nhập đủ số tiền cần trả khách. Vui lòng kiểm tra lại!",
       );
+    }
+  });
+
+  it("refundToDebt + selectedCustomer does not trigger UNDERPAID_RETURN", () => {
+    const result = validateCheckout({
+      ...baseInput,
+      refundToDebt: true,
+      selectedCustomer: fakeCustomer,
+      settlementGrandTotal: -100_000,
+      settlementAbs: 100_000,
+      totalPaid: 0,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("refundToDebt without a customer is blocked (DEBT_REQUIRES_CUSTOMER)", () => {
+    const result = validateCheckout({
+      ...baseInput,
+      refundToDebt: true,
+      selectedCustomer: null,
+      settlementGrandTotal: -100_000,
+      settlementAbs: 100_000,
+      totalPaid: 0,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe(CHECKOUT_ERROR_CODES.DEBT_REQUIRES_CUSTOMER);
     }
   });
 

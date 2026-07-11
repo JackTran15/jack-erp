@@ -22,6 +22,7 @@ import { CashMovementEntity } from '../accounting/cash/cash-movement.entity';
 import { LocationEntity } from '../inventory/location/location.entity';
 import { CustomerEntity } from '../customer/customer.entity';
 import { ItemEntity } from '../inventory/location/item.entity';
+import { ItemCategoryEntity } from '../inventory/location/item-category.entity';
 import { ShowroomEntity } from '../inventory/location/showroom.entity';
 import { ProductEntity } from '../inventory/product/product.entity';
 import { ProductAttributeDefinitionEntity } from '../inventory/product/product-attribute-definition.entity';
@@ -72,6 +73,7 @@ import { StockReturnInPublisher } from './publishers/stock-return-in.publisher';
       LocationEntity,
       CustomerEntity,
       ItemEntity,
+      ItemCategoryEntity,
       ShowroomEntity,
       ProductEntity,
       ProductAttributeDefinitionEntity,

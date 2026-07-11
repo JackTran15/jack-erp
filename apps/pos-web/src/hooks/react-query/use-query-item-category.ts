@@ -17,3 +17,15 @@ export const useItemCategoriesQuery = () => {
     staleTime: STALE_TIME_MS,
   });
 };
+
+/**
+ * Cây nhóm hàng hóa (parent → child) cho tree-select "Lọc theo nhóm hàng hóa".
+ * Scope theo organization ở BE.
+ */
+export const useItemCategoryTreeQuery = () => {
+  return useQuery({
+    queryKey: ITEM_CATEGORY_KEYS.TREE({}),
+    queryFn: () => itemCategoryService.tree(),
+    staleTime: STALE_TIME_MS,
+  });
+};

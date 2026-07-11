@@ -13,6 +13,7 @@ import { ProductAttributeDefinitionEntity } from '../product/product-attribute-d
 import { ProductAttributeOptionEntity } from '../product/product-attribute-option.entity';
 import { ItemAttributeValueEntity } from '../product/item-attribute-value.entity';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
+import { CacheService } from '../../redis/cache.service';
 
 /** Focused coverage for the nested-reconcile + brand-resolve behaviour added to update(). */
 describe('InventoryItemCrudService.update (nested reconcile)', () => {
@@ -85,6 +86,7 @@ describe('InventoryItemCrudService.update (nested reconcile)', () => {
         { provide: getRepositoryToken(ItemAttributeValueEntity), useValue: repoMock() },
         { provide: DataSource, useValue: dataSource },
         { provide: StockLedgerService, useValue: { recordMovement: jest.fn() } },
+        { provide: CacheService, useValue: { invalidate: jest.fn(), getOrSet: jest.fn() } },
       ],
     }).compile();
 
