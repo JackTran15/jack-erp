@@ -257,6 +257,13 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
         padding: 4px 0 0;
         margin: 0;
       }
+      .provisional-note {
+        text-align: center;
+        font-weight: 700;
+        font-size: 11px;
+        padding: 4px 0 0;
+        margin: 0;
+      }
 
       @media print {
         body { margin: 0; }
@@ -268,9 +275,15 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
       <header class="header">
         <div class="logo" aria-hidden="true">MT'</div>
         <div class="logo-caption">GIÀY MT</div>
-        <div class="store-name">${escapeHtml(store.name)}</div>
-        <div class="store-meta">Đ/c: ${escapeHtml(store.address)}</div>
-        <div class="store-meta">Số điện thoại: ${escapeHtml(store.phone)}</div>
+        <div class="store-name">${escapeHtml(store.name)}</div>${
+          store.address
+            ? `\n        <div class="store-meta">Đ/c: ${escapeHtml(store.address)}</div>`
+            : ""
+        }${
+          store.phone
+            ? `\n        <div class="store-meta">Số điện thoại: ${escapeHtml(store.phone)}</div>`
+            : ""
+        }
       </header>
 
       <section class="doc-title">
@@ -368,7 +381,11 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
         <div class="policy-body">${escapeHtml(invoice.policy.body)}</div>
       </section>
 
-      <p class="closing">${escapeHtml(invoice.closingMessage)}</p>
+      <p class="closing">${escapeHtml(invoice.closingMessage)}</p>${
+        invoice.provisionalNote
+          ? `\n      <p class="provisional-note">${escapeHtml(invoice.provisionalNote)}</p>`
+          : ""
+      }
     </div>`).join("")}
   </body>
 </html>`;

@@ -3,6 +3,7 @@ import { toast } from "sonner";
 
 import { useInvoicePrinter } from "@erp/pos/hooks/page-hooks/checkout/use-invoice-printer";
 import { useCurrentUserQuery } from "@erp/pos/hooks/react-query/use-query-user";
+import { useMyBranchesQuery } from "@erp/pos/hooks/react-query/use-query-branch";
 import {
   useCheckoutInvoiceMutation,
   useCheckoutReturnMutation,
@@ -17,7 +18,10 @@ import {
   useRevenueAccountsQuery,
 } from "@erp/pos/hooks/react-query/use-query-account";
 import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
-import { buildCheckoutInvoicePayload } from "@erp/pos/lib/page-libs/checkout/checkoutReceiptFactory";
+import {
+  buildCheckoutInvoicePayload,
+  buildStoreInfoFromBranch,
+} from "@erp/pos/lib/page-libs/checkout/checkoutReceiptFactory";
 import { deriveSettlement } from "@erp/pos/lib/page-libs/checkout/checkoutSettlement";
 import {
   getOversellSaleLines,
@@ -62,6 +66,7 @@ import {
   selectReturnCart,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
+import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface UseCheckoutActionsResult {
@@ -107,6 +112,8 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
   // "NV Thu ngân" trên bản in — user đang đăng nhập.
   const currentUserQuery = useCurrentUserQuery();
   const currentUser = currentUserQuery.data;
+  const branchesQuery = useMyBranchesQuery();
+  const branches = branchesQuery.data;
 
   const printReceiptIfNeeded = useCallback(
     async (payload: InvoicePayload | null) => {
@@ -195,6 +202,10 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
         ? `${currentUser.firstName} ${currentUser.lastName}`.trim()
         : (sessionState.cashierDisplayName ?? undefined);
       const appliedVoucher = selectPromotionDraft(sessionState).appliedVoucher;
+      const activeBranchId = usePosBranchStore.getState().branchId;
+      const store = buildStoreInfoFromBranch(
+        branches?.find((b) => b.id === activeBranchId),
+      );
 
       const receiptPayload = buildCheckoutInvoicePayload({
         printInvoice: p.printInvoice,
@@ -220,6 +231,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
         voucherCode: appliedVoucher?.voucherCode,
         printDuplicate: p.printDuplicate,
         isReturnExchange: isReturnFlow,
+        store,
       });
 
       try {
@@ -420,6 +432,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       checkoutReturnMutation,
       revenueQuery.data,
       currentUser,
+      branches,
       printReceiptIfNeeded,
     ],
   );

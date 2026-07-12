@@ -1,6 +1,11 @@
 import { toast } from "sonner";
+import type { NavigateFunction } from "react-router-dom";
 import type { ToolbarActionOption } from "@erp/ui";
 import { TOOLBAR_ACTION } from "../../constants";
+import {
+  navigateToBarcodePrint,
+  type BarcodePrefillItem,
+} from "../barcode-print-navigation";
 import type { ListToolbarSpec } from "./build-toolbar";
 
 export interface CrudListToolbarContext {
@@ -9,7 +14,7 @@ export interface CrudListToolbarContext {
   handleEdit: () => void;
   handleDeleteSelected: () => void;
   refetchRecords: () => void;
-  navigate: (to: string) => void;
+  navigate: NavigateFunction;
   onImportInventory?: () => void;
   onExportInventory?: () => void;
   onExportInventoryAll?: () => void;
@@ -20,6 +25,8 @@ export interface CrudListToolbarContext {
 export interface CrudListToolbarSelection {
   selectedRecord: Record<string, unknown> | null;
   selectedCount: number;
+  /** Toàn bộ dòng đang chọn (đổ sẵn sang trang In tem mã). */
+  selectedRows?: Record<string, unknown>[];
 }
 
 const soon = (message: string) => () => toast.info(message);
@@ -78,7 +85,22 @@ export function buildCrudEntityToolbarSpecs(
         ...baseCrud(ctx, sel),
         {
           action: TOOLBAR_ACTION.printLabel,
-          onClick: () => ctx.navigate("/admin/inventory-item-barcodes"),
+          onClick: () => {
+            const items: BarcodePrefillItem[] = (sel.selectedRows ?? []).map(
+              (row) => ({
+                itemId: String(row.id ?? ""),
+                sku: String(row.code ?? ""),
+                name: String(row.name ?? ""),
+                unit: String(row.unit ?? ""),
+                sellingPrice: Number(row.sellingPrice) || 0,
+              }),
+            );
+            navigateToBarcodePrint(
+              ctx.navigate,
+              "/admin/inventory-items",
+              items.length ? items : undefined,
+            );
+          },
         },
         {
           action: TOOLBAR_ACTION.utilities,

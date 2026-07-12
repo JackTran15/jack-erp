@@ -35,7 +35,7 @@ function isBlank(v: unknown) {
 }
 
 /** Entities that use the simple horizontal-layout Dialog (not the draggable AppModal). */
-const SIMPLE_DIALOG_ENTITIES = new Set(["inventory-item-units", "provider-groups"]);
+const SIMPLE_DIALOG_ENTITIES = new Set(["provider-groups"]);
 
 // ─── Horizontal form row (label left, control right) ─────────────────────────
 
@@ -176,10 +176,10 @@ export function CrudRecordDialog({
   onClose,
   onSuccess,
 }: Props) {
-  console.log("CrudRecordDialog", { entityKey, recordId, open });
   const isEdit = recordId !== null;
   const isSupplier = entityKey === "inventory-providers";
   const isStorage = entityKey === "inventory-storages";
+  const isUnit = entityKey === "inventory-item-units";
   const isSimple = SIMPLE_DIALOG_ENTITIES.has(entityKey);
 
   const { data: config } = useCrudConfig(entityKey);
@@ -212,6 +212,8 @@ export function CrudRecordDialog({
   const [storageDefaultReceiving, setStorageDefaultReceiving] = useState(false);
   // Ngừng hoạt động (isActive=false) — không cho tắt kho showroom / kho nhập mặc định.
   const [storageInactive, setStorageInactive] = useState(false);
+  // Đơn vị tính: "Ngừng theo dõi" = isActive=false (đảo chiều checkbox).
+  const [unitInactive, setUnitInactive] = useState(false);
   const wasStorageDefault = isStorage && Boolean(record?.isDefaultReceiving);
   const cannotDeactivate =
     isStorage && (Boolean(record?.isMainStorage) || wasStorageDefault);
@@ -232,18 +234,21 @@ export function CrudRecordDialog({
         setStorageDefaultReceiving(Boolean(record.isDefaultReceiving));
         setStorageInactive(record.isActive === false);
       }
+      if (isUnit) setUnitInactive(record.isActive === false);
     } else {
       const defaults: Record<string, unknown> = {};
       editableFields.forEach((f) => { defaults[f.key] = f.type === "boolean" ? false : ""; });
       if (isSupplier) defaults.type = "organization";
+      if (isSupplier) defaults.isActive = true;
       setValues(defaults);
       if (isStorage) {
         setStorageDefaultReceiving(false);
         setStorageInactive(false);
       }
+      if (isUnit) setUnitInactive(false);
     }
     setErrors({});
-  }, [open, record, config, editableFields, isEdit, isSupplier, isStorage]);
+  }, [open, record, config, editableFields, isEdit, isSupplier, isStorage, isUnit]);
 
   const validate = () => {
     const next: Record<string, string> = {};
@@ -269,6 +274,8 @@ export function CrudRecordDialog({
     );
     // Ngừng hoạt động kho đi qua generic PATCH (isDefaultReceiving vẫn bị strip ở backend).
     if (isStorage) payload.isActive = !storageInactive;
+    // Đơn vị tính: tạo/nhân bản luôn active; edit theo checkbox "Ngừng theo dõi".
+    if (isUnit) payload.isActive = !unitInactive;
     return payload;
   };
 
@@ -302,11 +309,13 @@ export function CrudRecordDialog({
         const defaults: Record<string, unknown> = {};
         editableFields.forEach((f) => { defaults[f.key] = f.type === "boolean" ? false : ""; });
         if (isSupplier) defaults.type = "organization";
+      if (isSupplier) defaults.isActive = true;
         setValues(defaults);
         if (isStorage) {
           setStorageDefaultReceiving(false);
           setStorageInactive(false);
         }
+        if (isUnit) setUnitInactive(false);
         setErrors({});
       } else {
         onClose();
@@ -414,7 +423,19 @@ export function CrudRecordDialog({
       title={title}
       footer={modalFooter}
       defaultWidth={isSupplier ? 720 : 560}
-      defaultHeight={isSupplier ? 620 : isStorage ? (isEdit ? 470 : 400) : 480}
+      defaultHeight={
+        isSupplier
+          ? 620
+          : isStorage
+            ? isEdit
+              ? 470
+              : 400
+            : isUnit
+              ? isEdit
+                ? 400
+                : 360
+              : 480
+      }
       preventOutsideClose={isSaving}
       bodyClassName="overflow-auto"
     >
@@ -428,6 +449,7 @@ export function CrudRecordDialog({
             setErrors={setErrors}
             entityKey={entityKey}
             isSaving={isSaving}
+            showStatusToggle={isEdit}
           />
         ) : (
           <>
@@ -536,6 +558,64 @@ export function CrudRecordDialog({
                     </label>
                   )}
                 </div>
+              </div>
+            ) : isUnit ? (
+              <div className="space-y-4">
+                {/* Tên đơn vị tính */}
+                <div className="grid grid-cols-[140px_1fr] items-start gap-3">
+                  <label htmlFor="dialog-unit-name" className="pt-2 text-sm font-medium">
+                    Đơn vị tính <span className="text-destructive">*</span>
+                  </label>
+                  <div>
+                    <Input
+                      id="dialog-unit-name"
+                      type="text"
+                      value={String(values.name ?? "")}
+                      aria-invalid={Boolean(errors.name)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setValues((p) => ({ ...p, name: v }));
+                        setErrors((p) => { const n = { ...p }; delete n.name; return n; });
+                      }}
+                    />
+                    {errors.name && (
+                      <p className="mt-1 text-xs text-destructive">{errors.name}</p>
+                    )}
+                  </div>
+                </div>
+                {/* Diễn giải */}
+                <div className="grid grid-cols-[140px_1fr] items-start gap-3">
+                  <label
+                    htmlFor="dialog-unit-desc"
+                    className="pt-2 text-sm font-medium text-muted-foreground"
+                  >
+                    Diễn giải
+                  </label>
+                  <Textarea
+                    id="dialog-unit-desc"
+                    rows={3}
+                    value={String(values.description ?? "")}
+                    onChange={(e) =>
+                      setValues((p) => ({ ...p, description: e.target.value }))
+                    }
+                  />
+                </div>
+                {/* Ngừng theo dõi: chỉ khi SỬA (isActive=false) */}
+                {isEdit && (
+                  <div className="border-t border-border pt-4">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="h-5 w-5 shrink-0 cursor-pointer rounded border-2 border-input accent-primary"
+                        checked={unitInactive}
+                        onChange={(e) => setUnitInactive(e.target.checked)}
+                      />
+                      <span className="cursor-pointer select-none font-medium">
+                        Ngừng theo dõi
+                      </span>
+                    </label>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2">

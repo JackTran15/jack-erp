@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   ProductSelectDialog,
@@ -18,7 +19,17 @@ import {
 } from "./_lib/barcode-label-row.type";
 import { renderBarcodeLabelsPdf } from "./_lib/render-barcode-labels-pdf";
 import { printBarcodeLabels } from "./_lib/print-barcode-labels";
+import { capLabels } from "./_lib/cap-labels";
+import { readBarcodePrintNavState } from "../../lib/barcode-print-navigation";
 import { resolveItemLocations } from "./_lib/resolve-item-locations";
+import {
+  fetchItemStockBalances,
+  toLocationOptions,
+  toStorageOptions,
+  type ItemLocationOption,
+  type ItemStorageOption,
+} from "./_lib/item-stock-locations";
+import { PrintConfirmDialog } from "./PrintConfirmDialog/PrintConfirmDialog";
 import {
   BARCODE_SKU_INPUT_ID,
   BarcodeLabelGrid,
@@ -38,6 +49,7 @@ interface PaginatedResponse<T> {
 interface InventoryStorageOption {
   id: string;
   name: string;
+  code?: string;
   branchId: string;
 }
 
@@ -55,13 +67,40 @@ function focusSkuInput() {
 
 /** Màn hình "In tem mã": bảng hàng hoá cần in tem + cấu hình tem mã vạch. */
 export function InventoryItemBarcodesPage() {
-  const [rows, setRows] = useState<BarcodeLabelRow[]>(() => [makeEmptyRow()]);
+  const navigate = useNavigate();
+  const routerLocation = useLocation();
+
+  // Đổ sẵn hàng hóa khi vào từ nút "In tem mã" ở trang nguồn (Nhập/Xuất kho, Chi tiết
+  // vị trí, Hàng hóa). Số lượng tem mặc định = 1; giá bán thiếu sẽ resolve ở effect bên dưới.
+  const [rows, setRows] = useState<BarcodeLabelRow[]>(() => {
+    const prefill = readBarcodePrintNavState(routerLocation.state)?.items ?? [];
+    if (!prefill.length) return [makeEmptyRow()];
+    // Kết thúc bằng một dòng trống sẵn: dòng cuối đã rỗng nên useTrailingEmptyRow
+    // không append lúc mount → tránh nhân đôi dòng trống dưới React StrictMode.
+    return [
+      ...prefill.map((p) => ({
+        ...makeEmptyRow(),
+        itemId: p.itemId,
+        sku: p.sku,
+        name: p.name,
+        unit: p.unit ?? "",
+        sellingPrice: Number(p.sellingPrice) || 0,
+        storageId: p.storageId ?? "",
+        storageName: p.storageName ?? "",
+        locationId: p.locationId ?? "",
+        locationCode: p.locationCode ?? "",
+        quantity: 1,
+      })),
+      makeEmptyRow(),
+    ];
+  });
   useTrailingEmptyRow(rows, setRows, {
     isEmpty: isEmptyRow,
     makeEmpty: makeEmptyRow,
   });
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [printing, setPrinting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const focusedRowIdRef = useRef<string | null>(null);
 
@@ -69,6 +108,7 @@ export function InventoryItemBarcodesPage() {
   // Chuỗi cửa hàng: ẩn Kho/Vị trí + không in mã CN/vị trí trên tem, và không gọi
   // các endpoint theo chi nhánh (Kho/Vị trí gắn với 1 chi nhánh cụ thể).
   const isChain = useIsChainSelected();
+  const queryClient = useQueryClient();
 
   // ─── Reference data ────────────────────────────────────────────────
   const branchId = getActiveBranch();
@@ -88,6 +128,10 @@ export function InventoryItemBarcodesPage() {
     () => new Map((storages ?? []).map((s) => [s.id, s.name])),
     [storages],
   );
+  const storageCodeById = useMemo(
+    () => new Map((storages ?? []).map((s) => [s.id, s.code ?? ""])),
+    [storages],
+  );
 
   // Mã cửa hàng in trên tem: lấy `code` của chi nhánh đang chọn. Nếu chi nhánh
   // chưa đặt mã thì để trống (không fallback "MT") — để admin phát hiện & bổ sung.
@@ -105,6 +149,86 @@ export function InventoryItemBarcodesPage() {
       );
     },
     [],
+  );
+
+  // ─── Chọn Kho / Vị trí theo tồn của hàng hóa ───────────────────────
+  /** Lấy (có cache) tồn của một hàng hóa để suy ra danh sách Kho + Vị trí. */
+  const loadItemBalances = useCallback(
+    (itemId: string) =>
+      queryClient.fetchQuery({
+        queryKey: ["item-stock-balances", itemId, branchId],
+        queryFn: () => fetchItemStockBalances(itemId, branchId),
+        staleTime: 60_000,
+      }),
+    [queryClient, branchId],
+  );
+
+  const searchItemStorages = useCallback(
+    async (itemId: string, query: string) => {
+      const balances = await loadItemBalances(itemId);
+      const needle = query.trim().toLowerCase();
+      const items = toStorageOptions(balances)
+        .map((o) => ({ ...o, code: storageCodeById.get(o.storageId) ?? "" }))
+        .filter(
+          (o) =>
+            !needle ||
+            o.storageName.toLowerCase().includes(needle) ||
+            o.code.toLowerCase().includes(needle),
+        );
+      return { items, hasMore: false, total: items.length };
+    },
+    [loadItemBalances, storageCodeById],
+  );
+
+  const searchItemLocations = useCallback(
+    async (itemId: string, storageId: string, query: string) => {
+      if (!storageId) return { items: [], hasMore: false, total: 0 };
+      const balances = await loadItemBalances(itemId);
+      const needle = query.trim().toLowerCase();
+      const items = toLocationOptions(balances, storageId).filter(
+        (o) =>
+          !needle ||
+          o.code.toLowerCase().includes(needle) ||
+          o.name.toLowerCase().includes(needle),
+      );
+      return { items, hasMore: false, total: items.length };
+    },
+    [loadItemBalances],
+  );
+
+  const handleSelectStorage = useCallback(
+    (rowId: string, s: ItemStorageOption) =>
+      // Đổi Kho thì reset Vị trí (vị trí thuộc về kho vừa chọn).
+      patchRow(rowId, {
+        storageId: s.storageId,
+        storageName: s.storageName,
+        locationId: "",
+        locationCode: "",
+      }),
+    [patchRow],
+  );
+
+  const handleStorageTextChange = useCallback(
+    (rowId: string, text: string) =>
+      patchRow(rowId, {
+        storageName: text,
+        storageId: "",
+        locationId: "",
+        locationCode: "",
+      }),
+    [patchRow],
+  );
+
+  const handleSelectLocation = useCallback(
+    (rowId: string, loc: ItemLocationOption) =>
+      patchRow(rowId, { locationId: loc.locationId, locationCode: loc.code }),
+    [patchRow],
+  );
+
+  const handleLocationTextChange = useCallback(
+    (rowId: string, text: string) =>
+      patchRow(rowId, { locationCode: text, locationId: "" }),
+    [patchRow],
   );
 
   /** Resolve Kho/Vị trí gợi ý cho một loạt row vừa thêm — một call duy nhất. */
@@ -137,12 +261,18 @@ export function InventoryItemBarcodesPage() {
             const itemId = itemIdByRowId.get(row.rowId);
             if (!itemId) return row;
             const match = byItemId.get(itemId);
+            // Chỉ điền khi có chi tiết vị trí thật (kệ ưu tiên / có tồn). Trường hợp
+            // fallback kho default/showroom ("default"/"none") để trống cho người dùng tự chọn.
+            const detail =
+              match?.source === "preferred" || match?.source === "stock"
+                ? match
+                : undefined;
             return {
               ...row,
-              storageId: match?.storageId ?? "",
-              storageName: storageNameById.get(match?.storageId ?? "") ?? "",
-              locationId: match?.locationId ?? "",
-              locationCode: match?.locationCode ?? "",
+              storageId: detail?.storageId ?? "",
+              storageName: storageNameById.get(detail?.storageId ?? "") ?? "",
+              locationId: detail?.locationId ?? "",
+              locationCode: detail?.locationCode ?? "",
               locationLoading: false,
             };
           }),
@@ -198,6 +328,34 @@ export function InventoryItemBarcodesPage() {
     },
     [],
   );
+
+  // Resolve giá bán thật cho hàng đổ sẵn từ trang nguồn thiếu giá (Nhập/Xuất kho, Chi tiết
+  // vị trí chế độ tổng quan). Chạy một lần lúc mount trên tập row prefill ban đầu.
+  useEffect(() => {
+    const missing = rows.filter((r) => r.itemId && r.sellingPrice <= 0);
+    if (!missing.length) return;
+    let cancelled = false;
+    void Promise.all(
+      missing.map(async (r) => {
+        try {
+          const { items } = await searchItems(r.sku, 1);
+          const match =
+            items.find((i) => i.id === r.itemId) ??
+            items.find((i) => i.code === r.sku);
+          const price = Number(match?.sellingPrice ?? 0);
+          if (!cancelled && match && price > 0) {
+            patchRow(r.rowId, { sellingPrice: price });
+          }
+        } catch {
+          /* bỏ qua — giữ giá 0 nếu không resolve được */
+        }
+      }),
+    );
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** Thêm các dòng chọn từ dialog "Chọn hàng hóa" (pattern GoodsReceiptFormDialog). */
   const addRowsFromPicker = useCallback(
@@ -276,11 +434,12 @@ export function InventoryItemBarcodesPage() {
     [patchRow],
   );
 
+  // "Hủy bỏ": rời trang — về trang nguồn (Nhập kho/Xuất kho/Chi tiết vị trí) nếu vào
+  // trang in tem từ nút "In tem mã" của các trang đó; ngược lại về trang Hàng hóa.
   const handleCancel = useCallback(() => {
-    setRows([makeEmptyRow()]);
-    setFilters({});
-    focusedRowIdRef.current = null;
-  }, []);
+    const from = (routerLocation.state as { from?: string } | null)?.from;
+    navigate(from ?? "/admin/inventory-items");
+  }, [navigate, routerLocation.state]);
 
   // ─── Keyboard shortcuts ────────────────────────────────────────────
   useEffect(() => {
@@ -364,25 +523,40 @@ export function InventoryItemBarcodesPage() {
   );
 
   // ─── Print ─────────────────────────────────────────────────────────
-  const handlePrint = useCallback(async () => {
+  // Nút "In tem" mở dialog cảnh báo; việc in thực sự chạy ở doPrint theo lựa chọn.
+  const handleOpenPrintConfirm = useCallback(() => {
     const printable = rows.filter((r) => r.itemId && r.quantity > 0);
     if (!printable.length) {
       toast.error("Chưa có tem nào để in — thêm hàng hóa và số lượng tem");
       return;
     }
-    setPrinting(true);
-    try {
-      const pdf = renderBarcodeLabelsPdf(printable, {
-        paper,
-        printedAt: new Date(),
-        branchCode,
-        showStoreInfo: !isChain,
-      });
-      await printBarcodeLabels(pdf);
-    } finally {
-      setPrinting(false);
-    }
-  }, [rows, paper, branchCode, isChain]);
+    setConfirmOpen(true);
+  }, [rows]);
+
+  const doPrint = useCallback(
+    (mode: "test" | "bulk") => {
+      const printable = rows.filter((r) => r.itemId && r.quantity > 0);
+      if (!printable.length) return;
+      // In thử: tối đa 2 tem để người dùng quét kiểm tra trước khi in hàng loạt.
+      const toPrint = mode === "test" ? capLabels(printable, 2) : printable;
+      setPrinting(true);
+      try {
+        const pdf = renderBarcodeLabelsPdf(toPrint, {
+          paper,
+          printedAt: new Date(),
+          branchCode,
+          showStoreInfo: !isChain,
+        });
+        // Không await trước window.open (bên trong printBarcodeLabels) để giữ
+        // user-gesture, tránh popup blocker.
+        void printBarcodeLabels(pdf);
+      } finally {
+        setPrinting(false);
+      }
+      setConfirmOpen(false);
+    },
+    [rows, paper, branchCode, isChain],
+  );
 
   return (
     <div className="flex min-h-0 w-full flex-1 gap-2.5 overflow-hidden">
@@ -414,6 +588,12 @@ export function InventoryItemBarcodesPage() {
             searchItems={searchItems}
             onSkuTextChange={handleSkuTextChange}
             onSelectItem={handleSelectItem}
+            searchItemStorages={searchItemStorages}
+            searchItemLocations={searchItemLocations}
+            onSelectStorage={handleSelectStorage}
+            onStorageTextChange={handleStorageTextChange}
+            onSelectLocation={handleSelectLocation}
+            onLocationTextChange={handleLocationTextChange}
             onQuantityChange={handleQuantityChange}
             onCopyQuantityDown={handleCopyQuantityDown}
             onDeleteRow={handleDeleteRow}
@@ -438,8 +618,16 @@ export function InventoryItemBarcodesPage() {
         branchCode={branchCode}
         showStoreInfo={!isChain}
         printing={printing}
-        onPrint={handlePrint}
+        onPrint={handleOpenPrintConfirm}
         onCancel={handleCancel}
+      />
+
+      <PrintConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        printing={printing}
+        onTestPrint={() => doPrint("test")}
+        onBulkPrint={() => doPrint("bulk")}
       />
 
       {productPickerOpen ? (

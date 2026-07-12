@@ -20,6 +20,7 @@ import {
 
 export function CrudEditPage() {
   const { entityKey, id } = useParams<{ entityKey: string; id: string }>();
+  const isUnit = entityKey === "inventory-item-units";
   const navigate = useNavigate();
   const location = useLocation();
   const listReturnRef = useRef(
@@ -240,26 +241,51 @@ export function CrudEditPage() {
             />
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
-              {editableFields.map((field) => (
-                <div key={field.key} className={field.key === "description" ? "md:col-span-2" : undefined}>
-                  <CrudFieldInput
-                    inputIdPrefix="edit"
-                    field={field}
-                    value={values[field.key]}
-                    error={errors[field.key]}
-                    entityKey={entityKey}
-                    currentRecordId={id}
-                    onChange={(nextValue) => {
-                      setValues((prev) => ({ ...prev, [field.key]: nextValue }));
-                      setErrors((prev) => {
-                        const next = { ...prev };
-                        delete next[field.key];
-                        return next;
-                      });
-                    }}
-                  />
-                </div>
-              ))}
+              {editableFields.map((field) => {
+                // Đơn vị tính: "Trạng thái" đổi thành "Ngừng theo dõi" (đảo isActive),
+                // nhất quán với modal cập nhật đơn vị tính.
+                if (isUnit && field.key === "isActive") {
+                  const inputId = "edit-unit-inactive";
+                  return (
+                    <div key={field.key} className="md:col-span-2">
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          id={inputId}
+                          type="checkbox"
+                          className="h-5 w-5 shrink-0 cursor-pointer rounded border-2 border-input accent-primary"
+                          checked={values.isActive === false}
+                          onChange={(e) =>
+                            setValues((prev) => ({ ...prev, isActive: !e.target.checked }))
+                          }
+                        />
+                        <span className="cursor-pointer select-none font-medium">
+                          Ngừng theo dõi
+                        </span>
+                      </label>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={field.key} className={field.key === "description" ? "md:col-span-2" : undefined}>
+                    <CrudFieldInput
+                      inputIdPrefix="edit"
+                      field={field}
+                      value={values[field.key]}
+                      error={errors[field.key]}
+                      entityKey={entityKey}
+                      currentRecordId={id}
+                      onChange={(nextValue) => {
+                        setValues((prev) => ({ ...prev, [field.key]: nextValue }));
+                        setErrors((prev) => {
+                          const next = { ...prev };
+                          delete next[field.key];
+                          return next;
+                        });
+                      }}
+                    />
+                  </div>
+                );
+              })}
             </div>
           )}
         </form>

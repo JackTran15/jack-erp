@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
+  navigateToBarcodePrint,
+  type BarcodePrefillItem,
+} from "../../lib/barcode-print-navigation";
+import {
   DocumentListShell,
   formatMoneyInteger,
   PageToolbar,
@@ -398,8 +402,29 @@ export function GoodsIssuePage() {
       id: "barcode",
       label: "In tem mã",
       icon: Barcode,
-      disabled: !selectedIssue,
-      onClick: () => toast.info("Tính năng in tem mã sẽ được bổ sung."),
+      onClick: () => {
+        const items: BarcodePrefillItem[] = (selectedIssue?.lines ?? []).map(
+          (line) => {
+            const storageId = line.location?.storageId ?? "";
+            return {
+              itemId: line.itemId,
+              sku: line.item?.code ?? line.itemCode ?? "",
+              name: line.item?.name ?? line.itemName ?? "",
+              unit: line.item?.unit ?? line.unit ?? "",
+              sellingPrice: 0,
+              storageId,
+              storageName: storageId ? (storageNameById.get(storageId) ?? "") : "",
+              locationId: line.locationId ?? line.location?.id ?? "",
+              locationCode: line.location?.code ?? "",
+            };
+          },
+        );
+        navigateToBarcodePrint(
+          navigate,
+          "/inventory/goods-issues",
+          items.length ? items : undefined,
+        );
+      },
     },
   ];
 

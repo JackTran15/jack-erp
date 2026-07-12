@@ -16,6 +16,7 @@ interface ToolbarOptions {
   onStopTracking: () => void;
   onOpenArrange: () => void;
   onOpenTransfer: () => void;
+  onPrintLabel: () => void;
 }
 
 export function buildItemLocationToolbarItems({
@@ -26,10 +27,8 @@ export function buildItemLocationToolbarItems({
   onStopTracking,
   onOpenArrange,
   onOpenTransfer,
+  onPrintLabel,
 }: ToolbarOptions): ToolbarItem[] {
-  const selectionTooltip = hasSelection
-    ? "Chưa khả dụng"
-    : "Chọn dòng để dùng tính năng này";
   return [
     {
       id: "reload",
@@ -66,9 +65,9 @@ export function buildItemLocationToolbarItems({
       id: "print-label",
       label: "In tem mã",
       icon: Printer,
-      onClick: () => {},
-      disabled: true,
-      tooltip: selectionTooltip,
+      onClick: onPrintLabel,
+      disabled: !hasSelection,
+      tooltip: hasSelection ? undefined : "Chọn dòng để dùng tính năng này",
     },
   ];
 }

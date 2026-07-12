@@ -9,6 +9,8 @@ import {
 import { BaseCrudService } from '../../crud/base-crud.service';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { UnitOfMeasureEntity } from './unit-of-measure.entity';
+import { ItemEntity } from './item.entity';
+import { ItemUnitEntity } from './item-unit.entity';
 
 export const UNIT_OF_MEASURE_SERVICE_TOKEN = 'UnitOfMeasureCrudService';
 
@@ -23,6 +25,10 @@ export class UnitOfMeasureCrudService extends BaseCrudService<
   constructor(
     @InjectRepository(UnitOfMeasureEntity)
     protected readonly repository: Repository<UnitOfMeasureEntity>,
+    @InjectRepository(ItemEntity)
+    private readonly itemRepository: Repository<ItemEntity>,
+    @InjectRepository(ItemUnitEntity)
+    private readonly itemUnitRepository: Repository<ItemUnitEntity>,
     protected readonly dataSource: DataSource,
   ) {
     super(dataSource);
@@ -38,16 +44,43 @@ export class UnitOfMeasureCrudService extends BaseCrudService<
   }
 
   protected override async beforeUpdate(
-    _id: string,
+    id: string,
     payload: Record<string, any>,
-    _actor: ActorContext,
+    actor: ActorContext,
   ): Promise<Record<string, any>> {
+    // Không cho ngừng theo dõi (isActive=false) đơn vị tính đang được sử dụng.
+    if (payload.isActive === false) {
+      const existing = await this.repository.findOne({
+        where: { id, organizationId: actor.organizationId },
+      });
+      if (existing && (await this.isUnitInUse(existing.name, actor.organizationId))) {
+        throw new BadRequestException(
+          'Không thể ngừng theo dõi đơn vị tính đang được sử dụng',
+        );
+      }
+    }
+
     if (payload.name !== undefined) {
       const name = typeof payload.name === 'string' ? payload.name.trim() : '';
       if (!name) throw new BadRequestException('Tên đơn vị tính không được để trống');
       return { ...payload, name };
     }
     return payload;
+  }
+
+  /** Đơn vị được coi là "đang dùng" nếu có item lấy nó làm đơn vị gốc
+   *  (ItemEntity.unit) hoặc đơn vị quy đổi (ItemUnitEntity.unitName). */
+  private async isUnitInUse(
+    unitName: string,
+    organizationId: string,
+  ): Promise<boolean> {
+    const [itemCount, itemUnitCount] = await Promise.all([
+      this.itemRepository.count({ where: { organizationId, unit: unitName } }),
+      this.itemUnitRepository.count({
+        where: { organizationId, unitName },
+      }),
+    ]);
+    return itemCount > 0 || itemUnitCount > 0;
   }
 }
 

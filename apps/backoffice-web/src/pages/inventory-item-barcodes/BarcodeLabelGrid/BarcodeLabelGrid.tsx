@@ -3,6 +3,17 @@ import { ArrowDownToLine, Loader2 } from "lucide-react";
 import { useMemo } from "react";
 import { LookupField } from "../../../components/forms/LookupField";
 import type { BarcodeLabelRow } from "../_lib/barcode-label-row.type";
+import type {
+  ItemLocationOption,
+  ItemStorageOption,
+} from "../_lib/item-stock-locations";
+
+/** Kết quả search cho LookupField (Kho / Vị trí). */
+interface LookupResult<T> {
+  items: T[];
+  hasMore: boolean;
+  total: number;
+}
 
 const priceFormatter = new Intl.NumberFormat("vi-VN");
 
@@ -37,6 +48,21 @@ interface Props {
   /** Text tự do trong ô SKU của dòng trống (chưa chọn item). */
   onSkuTextChange: (rowId: string, text: string) => void;
   onSelectItem: (rowId: string, item: BarcodeItemOption) => void;
+  /** Tìm kho có tồn của một hàng hóa. */
+  searchItemStorages: (
+    itemId: string,
+    query: string,
+  ) => Promise<LookupResult<ItemStorageOption>>;
+  /** Tìm vị trí có tồn của một hàng hóa trong một kho. */
+  searchItemLocations: (
+    itemId: string,
+    storageId: string,
+    query: string,
+  ) => Promise<LookupResult<ItemLocationOption>>;
+  onSelectStorage: (rowId: string, storage: ItemStorageOption) => void;
+  onStorageTextChange: (rowId: string, text: string) => void;
+  onSelectLocation: (rowId: string, location: ItemLocationOption) => void;
+  onLocationTextChange: (rowId: string, text: string) => void;
   onQuantityChange: (rowId: string, quantity: number) => void;
   /** Áp số lượng tem của dòng này xuống các dòng bên dưới. */
   onCopyQuantityDown: (rowId: string) => void;
@@ -56,6 +82,12 @@ export function BarcodeLabelGrid({
   searchItems,
   onSkuTextChange,
   onSelectItem,
+  searchItemStorages,
+  searchItemLocations,
+  onSelectStorage,
+  onStorageTextChange,
+  onSelectLocation,
+  onLocationTextChange,
   onQuantityChange,
   onCopyQuantityDown,
   onDeleteRow,
@@ -160,25 +192,84 @@ export function BarcodeLabelGrid({
         key: "storageName",
         label: "Kho",
         width: 150,
-        type: "readonly",
         filterSymbol: "*",
-        renderEditor: (row) => (
-          <span className="block truncate px-2 py-1.5">
-            {row.locationLoading ? (
+        renderEditor: (row) =>
+          !row.itemId ? (
+            <span />
+          ) : row.locationLoading ? (
+            <span className="block px-2 py-1.5">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-            ) : (
-              row.storageName
-            )}
-          </span>
-        ),
+            </span>
+          ) : (
+            <div className="flex h-full items-center">
+              <LookupField<ItemStorageOption>
+                portalToBody
+                hideSearchButton
+                value={row.storageName}
+                onValueChange={(text) => onStorageTextChange(row.rowId, text)}
+                onSelect={(s) => onSelectStorage(row.rowId, s)}
+                search={(q) => searchItemStorages(row.itemId, q)}
+                itemKey={(s) => s.storageId}
+                renderItem={(s) => s.storageName}
+                columns={[
+                  {
+                    key: "code",
+                    label: "Mã kho",
+                    className: "w-[110px] font-mono",
+                    render: (s) => s.code,
+                  },
+                  {
+                    key: "storageName",
+                    label: "Tên kho",
+                    render: (s) => s.storageName,
+                  },
+                ]}
+                className="h-full flex-1"
+              />
+            </div>
+          ),
       },
       {
         key: "locationCode",
         label: "Vị trí",
-        width: 110,
-        type: "readonly",
+        width: 130,
         filterSymbol: "*",
-        getValue: (row) => row.locationCode,
+        renderEditor: (row) =>
+          !row.itemId ? (
+            <span />
+          ) : row.locationLoading ? (
+            <span className="block px-2 py-1.5" />
+          ) : (
+            <div className="flex h-full items-center">
+              <LookupField<ItemLocationOption>
+                portalToBody
+                hideSearchButton
+                disabled={!row.storageId}
+                value={row.locationCode}
+                onValueChange={(text) => onLocationTextChange(row.rowId, text)}
+                onSelect={(loc) => onSelectLocation(row.rowId, loc)}
+                search={(q) =>
+                  searchItemLocations(row.itemId, row.storageId, q)
+                }
+                itemKey={(loc) => loc.locationId}
+                renderItem={(loc) => loc.code}
+                columns={[
+                  {
+                    key: "code",
+                    label: "Mã",
+                    className: "w-[90px] font-mono",
+                    render: (loc) => loc.code,
+                  },
+                  {
+                    key: "name",
+                    label: "Tên vị trí",
+                    render: (loc) => loc.name,
+                  },
+                ]}
+                className="h-full flex-1"
+              />
+            </div>
+          ),
       },
       {
         key: "quantity",
@@ -247,6 +338,12 @@ export function BarcodeLabelGrid({
       onSelectItem,
       onSkuTextChange,
       searchItems,
+      searchItemStorages,
+      searchItemLocations,
+      onSelectStorage,
+      onStorageTextChange,
+      onSelectLocation,
+      onLocationTextChange,
     ],
   );
 
