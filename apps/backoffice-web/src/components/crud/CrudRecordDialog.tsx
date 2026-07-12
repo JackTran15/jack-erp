@@ -239,6 +239,7 @@ export function CrudRecordDialog({
       const defaults: Record<string, unknown> = {};
       editableFields.forEach((f) => { defaults[f.key] = f.type === "boolean" ? false : ""; });
       if (isSupplier) defaults.type = "organization";
+      if (isSupplier) defaults.isActive = true;
       setValues(defaults);
       if (isStorage) {
         setStorageDefaultReceiving(false);
@@ -308,6 +309,7 @@ export function CrudRecordDialog({
         const defaults: Record<string, unknown> = {};
         editableFields.forEach((f) => { defaults[f.key] = f.type === "boolean" ? false : ""; });
         if (isSupplier) defaults.type = "organization";
+      if (isSupplier) defaults.isActive = true;
         setValues(defaults);
         if (isStorage) {
           setStorageDefaultReceiving(false);
@@ -447,6 +449,7 @@ export function CrudRecordDialog({
             setErrors={setErrors}
             entityKey={entityKey}
             isSaving={isSaving}
+            showStatusToggle={isEdit}
           />
         ) : (
           <>

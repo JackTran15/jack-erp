@@ -9,6 +9,12 @@ interface CrudDetailViewProps {
   onClose: () => void;
 }
 
+/** Entities có trạng thái đảo — field isActive hiển thị nhãn "Ngừng theo dõi". */
+const INVERTED_STATUS_ENTITIES = new Set([
+  "inventory-item-units",
+  "inventory-providers",
+]);
+
 export function CrudDetailBody({
   config,
   record,
@@ -19,12 +25,12 @@ export function CrudDetailBody({
   return (
     <dl className="m-0">
       {config.fields.map((f) => {
-        // Đơn vị tính: "Trạng thái" hiển thị là "Ngừng theo dõi" (đảo isActive),
-        // nhất quán với modal/trang sửa đơn vị tính.
-        const isUnitStatus =
-          config.entityKey === "inventory-item-units" && f.key === "isActive";
-        const label = isUnitStatus ? "Ngừng theo dõi" : f.label;
-        const value = isUnitStatus ? record[f.key] === false : record[f.key];
+        // Đơn vị tính / nhà cung cấp: "Trạng thái" hiển thị là "Ngừng theo dõi"
+        // (đảo isActive), nhất quán với modal/trang sửa.
+        const invertStatus =
+          f.key === "isActive" && INVERTED_STATUS_ENTITIES.has(config.entityKey);
+        const label = invertStatus ? "Ngừng theo dõi" : f.label;
+        const value = invertStatus ? record[f.key] === false : record[f.key];
         return (
           <div key={f.key} className="flex border-b border-border/50 py-2.5">
             <dt className="w-[180px] shrink-0 text-xs font-medium text-muted-foreground">

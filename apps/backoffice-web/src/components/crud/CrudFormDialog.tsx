@@ -149,6 +149,12 @@ const SEARCH_FIELD_CONFIG: Record<string, Record<string, SearchFieldConfig<any>>
 const getSearchFieldConfig = (entityKey: string, fieldKey: string) =>
   SEARCH_FIELD_CONFIG[entityKey]?.[fieldKey] ?? null;
 
+/** Entities có trạng thái đảo ("Ngừng theo dõi") — nhân bản ẩn checkbox, luôn active. */
+const HIDE_STATUS_ON_DUPLICATE = new Set([
+  "inventory-item-units",
+  "inventory-providers",
+]);
+
 const getSearchSelectionId = (value: unknown): string => {
   if (typeof value === "string") return value;
   if (value && typeof value === "object" && "id" in value) {
@@ -242,14 +248,14 @@ export function CrudFormDialog({
   const isEdit = record !== null;
   const isDuplicate = Boolean(duplicateSource) && !isEdit;
 
-  const isUnit = config.entityKey === "inventory-item-units";
+  // Nhân bản không hiện checkbox trạng thái (mặc định active) cho các entity này.
+  const hideStatusField = HIDE_STATUS_ON_DUPLICATE.has(config.entityKey);
 
   const editableFields = useMemo(() => {
     const fields = fieldsForFormState(config, record, duplicateSource);
-    // Đơn vị tính: nhân bản không hiện checkbox trạng thái (mặc định active).
-    if (isUnit) return fields.filter((f) => f.key !== "isActive");
+    if (hideStatusField) return fields.filter((f) => f.key !== "isActive");
     return fields;
-  }, [config, record, duplicateSource, isUnit]);
+  }, [config, record, duplicateSource, hideStatusField]);
 
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -319,8 +325,8 @@ export function CrudFormDialog({
       delete payload[config.idField];
       delete payload.createdAt;
       delete payload.updatedAt;
-      // Đơn vị tính nhân bản: luôn active (checkbox trạng thái đã ẩn).
-      if (isUnit) payload.isActive = true;
+      // Nhân bản: luôn active (checkbox trạng thái đã ẩn).
+      if (hideStatusField) payload.isActive = true;
       const mode = saveModeRef.current;
       saveModeRef.current = "save";
       if (mode === "save-and-new" && onSaveAndAddNew) {

@@ -18,6 +18,8 @@ interface Props {
   setErrors: Dispatch<SetStateAction<Record<string, string>>>;
   entityKey: string;
   isSaving?: boolean;
+  /** Checkbox "Ngừng theo dõi" chỉ hiện khi sửa (ẩn ở tạo/nhân bản). */
+  showStatusToggle?: boolean;
 }
 
 interface GroupItem {
@@ -26,7 +28,7 @@ interface GroupItem {
   name: string;
 }
 
-export function SupplierCreateForm({ values, setValues, errors, setErrors }: Props) {
+export function SupplierCreateForm({ values, setValues, errors, setErrors, showStatusToggle = true }: Props) {
   const type = (values.type as ProviderType) ?? "organization";
 
   const [groupSearch, setGroupSearch] = useState("");
@@ -332,15 +334,17 @@ export function SupplierCreateForm({ values, setValues, errors, setErrors }: Pro
               />
               Là khách hàng
             </label>
-            <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={values.isActive === undefined ? true : Boolean(values.isActive)}
-                onChange={(e) => set("isActive", e.target.checked)}
-                className="h-4 w-4 rounded border border-input accent-primary"
-              />
-              Đang theo dõi
-            </label>
+            {showStatusToggle && (
+              <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={values.isActive === false}
+                  onChange={(e) => set("isActive", !e.target.checked)}
+                  className="h-4 w-4 rounded border border-input accent-primary"
+                />
+                Ngừng theo dõi
+              </label>
+            )}
           </div>
         </div>
       </div>
