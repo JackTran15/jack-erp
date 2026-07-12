@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Button,
@@ -74,6 +74,7 @@ function sortLocationRowsBySku(rows: StockByLocationItem[]) {
 export function ItemLocationDetailsPage() {
   const qc = useQueryClient();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const locationId = searchParams.get("locationId")?.trim() || "";
   const isLocationDetail = Boolean(locationId);
   const [filters, setFilters] = useState<Record<string, ColumnFilter>>({
@@ -386,8 +387,12 @@ export function ItemLocationDetailsPage() {
         onStopTracking: () => setStopConfirmOpen(true),
         onOpenArrange: () => setArrangeOpen(true),
         onOpenTransfer: () => setTransferOpen(true),
+        onPrintLabel: () =>
+          navigate("/admin/inventory-item-barcodes", {
+            state: { from: "/inventory/item-location-details" },
+          }),
       }),
-    [isFetching, hasSelection, canStopTracking, reload],
+    [isFetching, hasSelection, canStopTracking, reload, navigate],
   );
 
   return (

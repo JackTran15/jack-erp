@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   ProductSelectDialog,
@@ -81,6 +82,8 @@ export function InventoryItemBarcodesPage() {
   // các endpoint theo chi nhánh (Kho/Vị trí gắn với 1 chi nhánh cụ thể).
   const isChain = useIsChainSelected();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const routerLocation = useLocation();
 
   // ─── Reference data ────────────────────────────────────────────────
   const branchId = getActiveBranch();
@@ -378,11 +381,12 @@ export function InventoryItemBarcodesPage() {
     [patchRow],
   );
 
+  // "Hủy bỏ": rời trang — về trang nguồn (Nhập kho/Xuất kho/Chi tiết vị trí) nếu vào
+  // trang in tem từ nút "In tem mã" của các trang đó; ngược lại về trang Hàng hóa.
   const handleCancel = useCallback(() => {
-    setRows([makeEmptyRow()]);
-    setFilters({});
-    focusedRowIdRef.current = null;
-  }, []);
+    const from = (routerLocation.state as { from?: string } | null)?.from;
+    navigate(from ?? "/admin/inventory-items");
+  }, [navigate, routerLocation.state]);
 
   // ─── Keyboard shortcuts ────────────────────────────────────────────
   useEffect(() => {

@@ -398,8 +398,10 @@ export function GoodsIssuePage() {
       id: "barcode",
       label: "In tem mã",
       icon: Barcode,
-      disabled: !selectedIssue,
-      onClick: () => toast.info("Tính năng in tem mã sẽ được bổ sung."),
+      onClick: () =>
+        navigate("/admin/inventory-item-barcodes", {
+          state: { from: "/inventory/goods-issues" },
+        }),
     },
   ];
 

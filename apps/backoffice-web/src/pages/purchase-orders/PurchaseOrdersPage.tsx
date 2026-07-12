@@ -439,8 +439,10 @@ export function PurchaseOrdersPage({
       id: "barcode",
       label: "In tem mã",
       icon: Barcode,
-      disabled: !selectedOrder,
-      onClick: () => toast.info("Tính năng in tem mã sẽ được bổ sung."),
+      onClick: () =>
+        navigate("/admin/inventory-item-barcodes", {
+          state: { from: "/inventory/purchase-orders" },
+        }),
     },
   ];
 
