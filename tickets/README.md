@@ -1478,3 +1478,24 @@ flowchart LR
   M4 --> M5
 ```
 
+### EPIC-10072026 Hide Discontinued Products From Search & Catalog
+
+- [EPIC-10072026 Hide Discontinued Products](./epics/EPIC-10072026-hide-discontinued-products.md)
+- Hàng **ngừng kinh doanh** (`ItemEntity.isActive = false`) không được xuất hiện trên các API search/catalog; **chỉ** hiện khi export (CSV/Excel — đã có cột `Inactive`). No migration/entity/event. Enforce mặc định `isActive = true` trên `SearchInventoryItemsV2Handler`, `InventoryItemCrudService.listProductGroups`/`listProductItems` với escape hatch `includeInactive=true` cho backoffice quản lý/khôi phục. POS catalog đã lọc sẵn (không đổi); `CsvExportService` cố ý không lọc (giữ nguyên); form sửa (`loadProductVariants`) vẫn thấy variant inactive.
+
+| Ticket | Mô tả |
+| ------ | ----- |
+| [TKT-DIS-01](./tickets/TKT-DIS-01-v2-search-hide-discontinued.md) | BE: v2 search default-hide + `includeInactive` override (handler + DTO) |
+| [TKT-DIS-02](./tickets/TKT-DIS-02-crud-list-variant-hide-discontinued.md) | BE: `listProductGroups`/`listProductItems` default-hide; giữ `loadProductVariants` |
+| [TKT-DIS-03](./tickets/TKT-DIS-03-openapi-fe-toggle.md) | OpenAPI regen + FE toggle "Hiển thị hàng ngừng kinh doanh" + verify export |
+| [TKT-DIS-04](./tickets/TKT-DIS-04-tests-dod.md) | Tests + DoD gate (unit + e2e search/catalog/export) |
+
+```mermaid
+flowchart LR
+  D1["DIS-01 v2 search + DTO"] --> D3["DIS-03 OpenAPI + FE toggle"]
+  D2["DIS-02 CRUD list + variants"] --> D3
+  D1 --> D4["DIS-04 Tests + DoD"]
+  D2 --> D4
+  D3 --> D4
+```
+

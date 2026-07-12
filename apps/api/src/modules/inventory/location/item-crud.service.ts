@@ -28,6 +28,11 @@ import { BaseCrudService } from "../../crud/base-crud.service";
 import { PaginationQueryDto } from "../../crud/dto/pagination-query.dto";
 import type { PaginatedResponse } from "@erp/shared-interfaces";
 import { StockLedgerService } from "../ledger/stock-ledger.service";
+import { CacheService } from "../../redis/cache.service";
+import {
+  CATALOG_CACHE_NAMESPACE,
+  catalogCardsKey,
+} from "../../pos/pos-catalog-cache.constants";
 import { ItemEntity } from "./item.entity";
 import { ItemCategoryEntity } from "./item-category.entity";
 import { BrandEntity } from "./brand.entity";
@@ -95,8 +100,21 @@ export class InventoryItemCrudService extends BaseCrudService<
     private readonly attrValRepo: Repository<ItemAttributeValueEntity>,
     protected readonly dataSource: DataSource,
     private readonly stockLedger: StockLedgerService,
+    private readonly cacheService: CacheService,
   ) {
     super(dataSource);
+  }
+
+  /**
+   * Drop the POS catalog card cache for this org after an item/product write so the
+   * next POS catalog list rebuilds it (name/price/category/visibility feed the cards).
+   * The cache also has a short TTL, so a missed call self-heals within seconds.
+   */
+  private async invalidatePosCatalogCache(actor: ActorContext): Promise<void> {
+    await this.cacheService.invalidate(
+      CATALOG_CACHE_NAMESPACE,
+      catalogCardsKey(actor.organizationId),
+    );
   }
 
   protected override getByIdRelations(): string[] {
@@ -151,11 +169,14 @@ export class InventoryItemCrudService extends BaseCrudService<
     actor: ActorContext,
   ): Promise<PaginatedResponse<any>> {
     const categoryId = filters?.categoryId as string | undefined;
+    const includeInactive =
+      filters?.includeInactive === true || filters?.includeInactive === "true";
     const result = await this.listProductGroups(actor, {
       page: query.page,
       pageSize: query.pageSize,
       search: query.search,
       categoryId,
+      includeInactive,
       sortOrder: query.sortOrder,
     });
     return { ...result, page: query.page, pageSize: query.pageSize };
@@ -189,6 +210,47 @@ export class InventoryItemCrudService extends BaseCrudService<
     throw new NotFoundException(`Record ${id} not found`);
   }
 
+  /** Bulk toggle is_active for org-scoped items ("Ngừng theo dõi" / "Sử dụng lại"). */
+  async setActiveStatus(
+    ids: string[],
+    isActive: boolean,
+    actor: ActorContext,
+  ): Promise<{ updated: number }> {
+    if (!ids?.length) return { updated: 0 };
+    // Rule: hàng hóa đang ở kho Showroom không được ngừng theo dõi — phải chuyển
+    // hàng khỏi Showroom trước. Chỉ chặn khi tắt theo dõi (kích hoạt lại luôn cho phép).
+    if (!isActive) {
+      const inShowroom = await this.dataSource.query<Array<{ code: string }>>(
+        `SELECT DISTINCT i.code AS code
+           FROM stock_balances sb
+           JOIN locations loc ON loc.id = sb.location_id
+           JOIN storages s    ON s.id = loc.storage_id
+           JOIN items i       ON i.id = sb.item_id
+          WHERE sb.organization_id = $1
+            AND sb.item_id = ANY($2::uuid[])
+            AND s.is_main_storage = true
+          ORDER BY i.code`,
+        [actor.organizationId, ids],
+      );
+      if (inShowroom.length) {
+        const codes = inShowroom.slice(0, 5).map((r) => r.code).join(", ");
+        const more = inShowroom.length > 5 ? "…" : "";
+        throw new BadRequestException(
+          `Không thể ngừng theo dõi hàng hóa đang ở Showroom (${codes}${more}).`,
+        );
+      }
+    }
+    const result = await this.repository
+      .createQueryBuilder()
+      .update(ItemEntity)
+      .set({ isActive })
+      .where("id IN (:...ids)", { ids })
+      .andWhere("organization_id = :orgId", { orgId: actor.organizationId })
+      .execute();
+    await this.invalidatePosCatalogCache(actor);
+    return { updated: result.affected ?? 0 };
+  }
+
   /** Block hard-delete once an item has posted movements — MISA parity: use "Ngừng theo dõi" instead. */
   protected override async beforeDelete(
     id: string,
@@ -206,6 +268,13 @@ export class InventoryItemCrudService extends BaseCrudService<
         "Hàng hóa đã phát sinh chứng từ nên không thể xóa. Hãy dùng 'Ngừng theo dõi'.",
       );
     }
+  }
+
+  protected override async afterDelete(
+    _id: string,
+    actor: ActorContext,
+  ): Promise<void> {
+    await this.invalidatePosCatalogCache(actor);
   }
 
   /**
@@ -226,7 +295,9 @@ export class InventoryItemCrudService extends BaseCrudService<
 
     // When colors/sizes arrays are present → create product with variant matrix
     if (Array.isArray(normalized.colors) || Array.isArray(normalized.sizes)) {
-      return this.createProductWithVariants(normalized, actor);
+      const created = await this.createProductWithVariants(normalized, actor);
+      await this.invalidatePosCatalogCache(actor);
+      return created;
     }
 
     const { nested, itemPayload } = this.splitNested(normalized);
@@ -270,6 +341,7 @@ export class InventoryItemCrudService extends BaseCrudService<
     );
 
     this.logger.log(`Created inventory-items id=${saved.id}`);
+    await this.invalidatePosCatalogCache(actor);
     return saved;
   }
 
@@ -299,7 +371,9 @@ export class InventoryItemCrudService extends BaseCrudService<
       where: { id, organizationId: actor.organizationId },
     });
     if (isProductUuid && this.hasProductLevelPatch(normalized)) {
-      return this.updateProductWithVariants(id, normalized, actor);
+      const updated = await this.updateProductWithVariants(id, normalized, actor);
+      await this.invalidatePosCatalogCache(actor);
+      return updated;
     }
 
     // Only reconcile nested collections that were explicitly provided — a patch
@@ -346,6 +420,7 @@ export class InventoryItemCrudService extends BaseCrudService<
       });
     }
 
+    await this.invalidatePosCatalogCache(actor);
     return saved;
   }
 
@@ -1194,7 +1269,10 @@ export class InventoryItemCrudService extends BaseCrudService<
     const offset = (page - 1) * pageSize;
     const searchParam = search?.trim() ? `%${search.trim()}%` : null;
     const catParam = categoryId ?? null;
-    const isActiveParam = isActive ?? null;
+    // Default-hide discontinued groups unless the caller opts in (includeInactive)
+    // or filters isActive explicitly. null = no filter (include both).
+    const isActiveParam =
+      query.includeInactive === true ? (isActive ?? null) : (isActive ?? true);
 
     const dataSql = `
       WITH combined AS (
@@ -1455,8 +1533,12 @@ export class InventoryItemCrudService extends BaseCrudService<
       .skip(offset)
       .take(pageSize);
 
+    // Default-hide discontinued variants unless the caller opts in
+    // (includeInactive) or filters isActive explicitly.
     if (query.isActive !== undefined) {
       qb.andWhere("i.isActive = :isActive", { isActive: query.isActive });
+    } else if (query.includeInactive !== true) {
+      qb.andWhere("i.isActive = true");
     }
 
     const [items, total] = await qb.getManyAndCount();

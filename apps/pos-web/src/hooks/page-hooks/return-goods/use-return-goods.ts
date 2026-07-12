@@ -63,6 +63,10 @@ interface UseReturnGoodsResult {
   toggleAllItems: (next: boolean) => void;
   setReturnQty: (id: string, value: number) => void;
   confirmReturn: () => void;
+  /** Hóa đơn đang xem biên lai chi tiết (null = đóng). */
+  detailInvoiceId: string | null;
+  openInvoiceDetail: (row: ReturnInvoiceRow) => void;
+  closeInvoiceDetail: () => void;
 }
 
 /**
@@ -226,6 +230,13 @@ export function useReturnGoods(): UseReturnGoodsResult {
 
   const selectedTotal = sumSelectedReturnTotal(items, qtyById, selectedIds);
 
+  // Biên lai chi tiết — mở khi bấm số hóa đơn (tách khỏi dialog chọn hàng trả).
+  const [detailInvoiceId, setDetailInvoiceId] = useState<string | null>(null);
+  const openInvoiceDetail = useCallback<
+    UseReturnGoodsResult["openInvoiceDetail"]
+  >((row) => setDetailInvoiceId(row.id), []);
+  const closeInvoiceDetail = useCallback(() => setDetailInvoiceId(null), []);
+
   return {
     dateRange,
     setDateRange,
@@ -249,5 +260,8 @@ export function useReturnGoods(): UseReturnGoodsResult {
     toggleAllItems,
     setReturnQty,
     confirmReturn,
+    detailInvoiceId,
+    openInvoiceDetail,
+    closeInvoiceDetail,
   };
 }

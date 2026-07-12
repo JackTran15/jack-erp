@@ -220,6 +220,14 @@ export function PurchaseOrderFormDialog({
   const [counterpartyKind, setCounterpartyKind] = useState<
     "supplier" | "customer" | "employee" | ""
   >(initial?.counterpartyKind ?? (initial?.providerId ? "supplier" : ""));
+  // Nhân viên mua hàng — user (users.id) responsible for the purchase. The
+  // employee picker has no code, so its lookup value doubles as the display name.
+  const [purchasingEmployeeId, setPurchasingEmployeeId] = useState(
+    initial?.purchasingEmployeeId ?? initial?.purchasingEmployee?.id ?? "",
+  );
+  const [purchasingEmployeeName, setPurchasingEmployeeName] = useState(
+    initial?.purchasingEmployee?.name ?? "",
+  );
   /**
    * Storage = warehouse ("Kho"). The DB still stores a `locationId` (bin) on
    * the receipt header for legacy reasons, but the UI lets users pick a
@@ -939,6 +947,7 @@ export function PurchaseOrderFormDialog({
         paymentMethod:
           receiptPurpose === "PURCHASE" ? settlementMode : undefined,
         deliveredBy: deliveryPerson || undefined,
+        purchasingEmployeeId: purchasingEmployeeId || undefined,
         reason: reason || undefined,
         description: notes || undefined,
         sourceBranchId:
@@ -1740,7 +1749,26 @@ export function PurchaseOrderFormDialog({
             )}
             {isPurchaseImport && purchaseTab === "receipt" ? (
               <FieldRow label="NV mua hàng">
-                <Input disabled />
+                <CounterpartyPickerField
+                  defaultType="employee"
+                  allowedTypes={["employee"]}
+                  dropdownMinWidth={500}
+                  modalTitle="Chọn nhân viên mua hàng"
+                  modalPlaceholder="Nhập mã hoặc tên nhân viên"
+                  placeholder="Chọn nhân viên"
+                  value={purchasingEmployeeName}
+                  onValueChange={(v) => {
+                    setPurchasingEmployeeName(v);
+                    setPurchasingEmployeeId("");
+                    markDirty();
+                  }}
+                  onSelect={(c) => {
+                    setPurchasingEmployeeId(c.id);
+                    setPurchasingEmployeeName(c.name);
+                    markDirty();
+                  }}
+                  disabled={isView}
+                />
               </FieldRow>
             ) : null}
             <FieldRow label="Tham chiếu">

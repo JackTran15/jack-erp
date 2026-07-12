@@ -165,6 +165,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       const result = validateCheckout({
         hasAnyCartLines: selectHasAnyCartLines(sessionState),
         debt: p.debt,
+        refundToDebt: p.refundToDebt ?? false,
         keepChange: p.keepChange,
         selectedCustomer,
         purchaseCart,
@@ -329,6 +330,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             returnSubtotal,
             newSubtotal,
             paymentLines: p.paymentLines,
+            offsetToDebt: p.refundToDebt ?? false,
             note,
           });
           if (!checkoutResolve.ok) {
@@ -368,10 +370,17 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             );
             invoiceId = created.id;
           }
-          await checkoutReturnMutation.mutateAsync({
+          const posted = await checkoutReturnMutation.mutateAsync({
             id: invoiceId,
             body: checkoutResolve.body,
           });
+          // Operator tích "Tính vào công nợ" nhưng hóa đơn gốc không còn nợ để
+          // bù trừ → BE tự chi tiền mặt; báo cho thu ngân biết.
+          if (p.refundToDebt && posted.refundMethod === "CASH") {
+            toast.info(
+              "Khách hàng không còn công nợ — đã chi tiền mặt cho khoản hoàn.",
+            );
+          }
         }
       } catch (err) {
         toast.error(

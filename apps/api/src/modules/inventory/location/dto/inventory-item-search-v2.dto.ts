@@ -87,6 +87,16 @@ export class InventoryItemSearchV2Dto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  /**
+   * Include discontinued (isActive=false) items. Defaults to false, so
+   * discontinued items are hidden from search unless the caller opts in
+   * (e.g. the backoffice management list).
+   */
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  includeInactive?: boolean;
 }
 
 /** A single product-grouped row returned by the v2 search. */

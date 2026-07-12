@@ -1792,6 +1792,22 @@ export interface paths {
         patch: operations["InventoryLocationController_updateItem"];
         trace?: never;
     };
+    "/inventory/items/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["InventoryLocationController_setItemsStatus"];
+        trace?: never;
+    };
     "/inventory/items/{id}/providers": {
         parameters: {
             query?: never;
@@ -7210,6 +7226,11 @@ export interface components {
             /** @description UUID of the user who created this record. */
             createdBy: string;
         };
+        SetItemsStatusDto: {
+            ids: string[];
+            /** @description true = đang theo dõi, false = ngừng theo dõi */
+            isActive: boolean;
+        };
         UpdateItemDto: {
             name?: string;
             description?: string;
@@ -7370,6 +7391,13 @@ export interface components {
             page: number;
             /** @default 20 */
             limit: number;
+            /**
+             * @description Include discontinued (isActive=false) items. Defaults to false, so
+             *     discontinued items are hidden from search unless the caller opts in
+             *     (e.g. the backoffice management list).
+             * @default false
+             */
+            includeInactive: boolean;
             /** @description Mã SKU */
             code?: components["schemas"]["StringFilterDto"];
             /** @description Mã vạch — matches if any barcode of the group matches */
@@ -9514,6 +9542,11 @@ export interface components {
             /** Format: uuid */
             counterpartyId?: string;
             deliveredBy?: string;
+            /**
+             * Format: uuid
+             * @description Nhân viên mua hàng — user (users.id) responsible for the purchase.
+             */
+            purchasingEmployeeId?: string;
             reason?: string;
             description?: string;
             /** Format: uuid */
@@ -9553,6 +9586,7 @@ export interface components {
             counterpartyKind?: "supplier" | "customer" | "employee" | null;
             counterpartyId?: string | null;
             deliveredBy?: string;
+            purchasingEmployeeId?: string | null;
             reason?: string;
             description?: string;
             referenceId?: string;
@@ -9586,6 +9620,10 @@ export interface components {
              *     latter two).
              */
             counterparty?: Record<string, never> | null;
+            purchasingEmployee?: {
+                id: string;
+                name: string;
+            };
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -9630,6 +9668,11 @@ export interface components {
             /** Format: uuid */
             counterpartyId?: string;
             deliveredBy?: string;
+            /**
+             * Format: uuid
+             * @description Nhân viên mua hàng — user (users.id) responsible for the purchase.
+             */
+            purchasingEmployeeId?: string;
             reason?: string;
             description?: string;
             /** Format: uuid */
@@ -9683,6 +9726,11 @@ export interface components {
              */
             locationId?: string;
             deliveredBy?: string;
+            /**
+             * Format: uuid
+             * @description Nhân viên mua hàng — user (users.id) responsible for the purchase.
+             */
+            purchasingEmployeeId?: string;
             reason?: string;
             description?: string;
             references?: string[];
@@ -13321,6 +13369,8 @@ export interface operations {
                 categoryId?: string;
                 /** @description Chỉ lấy hàng đang theo dõi (is_active). Bỏ trống = lấy tất cả. */
                 isActive?: boolean;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -13365,6 +13415,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 /** @description Chỉ lấy hàng đang theo dõi (is_active). Bỏ trống = lấy tất cả. */
                 isActive?: boolean;
+                /** @description Include discontinued (is_active=false) variants. Defaults to false, so discontinued variants are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path: {
@@ -13425,6 +13477,27 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ItemEntity"];
                 };
+            };
+        };
+    };
+    InventoryLocationController_setItemsStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetItemsStatusDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -14281,6 +14354,8 @@ export interface operations {
                 search?: string;
                 filters?: string;
                 unassigned?: boolean;
+                /** @description Lọc theo trạng thái theo dõi hàng hóa (item.is_active). Bỏ trống = tất cả. */
+                isActive?: boolean;
                 locationCode?: string;
                 locationCodeMode?: string;
                 locationName?: string;

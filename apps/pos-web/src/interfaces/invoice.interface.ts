@@ -3,6 +3,7 @@ import type {
   InvoiceStatus,
   InvoiceType,
   ItemDirection,
+  RefundMethod,
 } from "@erp/pos/types/invoice.type";
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 
@@ -54,6 +55,12 @@ export interface InvoiceRow {
   totalPaid: number;
   /** Net = newSubtotal - returnSubtotal; âm = hoàn tiền khách (RETURN/EXCHANGE). 0 cho SALE. */
   netAmount: number;
+  /** Cách hoàn tiền BE đã áp dụng cho đơn trả/đổi (có thể khác giá trị FE gửi khi BE fallback). */
+  refundMethod?: RefundMethod | null;
+  /** Số điểm khách dùng để thanh toán (chỉ có ở chi tiết hoá đơn). */
+  pointsRedeemed?: number;
+  /** Giá trị VND quy đổi từ điểm đã dùng. */
+  pointsDiscountAmount?: number;
   note?: string;
   issuedAt?: string;
   createdAt: string;
@@ -63,6 +70,17 @@ export interface InvoiceRow {
   paymentMethod?: InvoicePaymentMethod | null;
   cashTendered?: number | null;
   changeAmount?: number | null;
+  /** Chi tiết thanh toán theo từng phương thức (Tiền mặt / Chuyển khoản / Thẻ). */
+  payments?: InvoicePaymentRow[];
+  /** Công nợ còn lại của hoá đơn (invoice_debts.remainingAmount); null khi không có nợ. */
+  remainingDebt?: number | null;
+}
+
+/** Một dòng thanh toán theo phương thức, dùng để dựng biên lai chi tiết. */
+export interface InvoicePaymentRow {
+  paymentMethod: InvoicePaymentMethod;
+  amount: number;
+  reference?: string | null;
 }
 
 /**

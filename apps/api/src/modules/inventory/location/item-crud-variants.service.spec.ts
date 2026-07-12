@@ -12,6 +12,7 @@ import { ProductAttributeDefinitionEntity } from "../product/product-attribute-d
 import { ProductAttributeOptionEntity } from "../product/product-attribute-option.entity";
 import { ItemAttributeValueEntity } from "../product/item-attribute-value.entity";
 import { StockLedgerService } from "../ledger/stock-ledger.service";
+import { CacheService } from "../../redis/cache.service";
 
 /** Proves createProductWithVariants persists per-variant price/SKU/barcode. */
 describe("InventoryItemCrudService.create (product with variants)", () => {
@@ -144,6 +145,7 @@ describe("InventoryItemCrudService.create (product with variants)", () => {
         },
         { provide: DataSource, useValue: dataSource },
         { provide: StockLedgerService, useValue: stockLedger },
+        { provide: CacheService, useValue: { invalidate: jest.fn(), getOrSet: jest.fn() } },
       ],
     }).compile();
 
@@ -387,6 +389,50 @@ describe("InventoryItemCrudService.create (product with variants)", () => {
         manageBarcodePerUnit: true,
       }),
     );
+  });
+
+  describe("listProductItems (default-hide discontinued)", () => {
+    const makeListQb = () => {
+      const qb: Record<string, jest.Mock> = {};
+      [
+        "leftJoinAndSelect",
+        "where",
+        "andWhere",
+        "orderBy",
+        "skip",
+        "take",
+      ].forEach((m) => (qb[m] = jest.fn().mockReturnValue(qb)));
+      qb.getManyAndCount = jest.fn().mockResolvedValue([[], 0]);
+      return qb;
+    };
+    const andWhereArgs = (qb: Record<string, jest.Mock>) =>
+      qb.andWhere.mock.calls.map((c) => c[0]);
+
+    it("forces i.isActive = true when neither isActive nor includeInactive is set", async () => {
+      const qb = makeListQb();
+      itemRepo.createQueryBuilder.mockReturnValueOnce(qb);
+      await service.listProductItems(actor, "prod-1", {} as never);
+      expect(andWhereArgs(qb)).toContain("i.isActive = true");
+    });
+
+    it("does not force isActive when includeInactive=true", async () => {
+      const qb = makeListQb();
+      itemRepo.createQueryBuilder.mockReturnValueOnce(qb);
+      await service.listProductItems(actor, "prod-1", {
+        includeInactive: true,
+      } as never);
+      expect(andWhereArgs(qb)).not.toContain("i.isActive = true");
+    });
+
+    it("respects an explicit isActive filter over the default-hide", async () => {
+      const qb = makeListQb();
+      itemRepo.createQueryBuilder.mockReturnValueOnce(qb);
+      await service.listProductItems(actor, "prod-1", {
+        isActive: false,
+      } as never);
+      expect(andWhereArgs(qb)).toContain("i.isActive = :isActive");
+      expect(andWhereArgs(qb)).not.toContain("i.isActive = true");
+    });
   });
 
   it("updates an existing variant row from variants payload by itemId", async () => {

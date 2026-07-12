@@ -5451,6 +5451,16 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -5547,6 +5557,16 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) variants. Defaults to false, so discontinued variants are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -5620,6 +5640,30 @@
                 }
               }
             }
+          }
+        },
+        "tags": [
+          "InventoryLocation"
+        ]
+      }
+    },
+    "/inventory/items/status": {
+      "patch": {
+        "operationId": "InventoryLocationController_setItemsStatus",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetItemsStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
           }
         },
         "tags": [
@@ -6864,6 +6908,15 @@
             "name": "unassigned",
             "required": false,
             "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo trạng thái theo dõi hàng hóa (item.is_active). Bỏ trống = tất cả.",
             "schema": {
               "type": "boolean"
             }
@@ -21636,7 +21689,7 @@
           },
           "quantity": {
             "type": "number",
-            "minimum": 1e-06,
+            "minimum": 0.000001,
             "description": "Số lượng cần xếp. Bỏ trống để lấy toàn bộ tồn ở vị trí \"Chưa xếp\"."
           }
         },
@@ -22721,6 +22774,27 @@
           "createdBy"
         ]
       },
+      "SetItemsStatusDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "true = đang theo dõi, false = ngừng theo dõi"
+          }
+        },
+        "required": [
+          "ids",
+          "isActive"
+        ]
+      },
       "UpdateItemDto": {
         "type": "object",
         "properties": {
@@ -23278,6 +23352,11 @@
             "default": 20,
             "minimum": 1,
             "maximum": 100
+          },
+          "includeInactive": {
+            "type": "boolean",
+            "description": "Include discontinued (isActive=false) items. Defaults to false, so\ndiscontinued items are hidden from search unless the caller opts in\n(e.g. the backoffice management list).",
+            "default": false
           },
           "code": {
             "description": "Mã SKU",
@@ -24472,7 +24551,7 @@
           },
           "quantity": {
             "type": "number",
-            "minimum": 1e-06,
+            "minimum": 0.000001,
             "description": "Quantity to transfer (must be > 0)"
           },
           "sourceLocationId": {
@@ -29837,6 +29916,11 @@
             "type": "string",
             "maxLength": 200
           },
+          "purchasingEmployeeId": {
+            "type": "string",
+            "description": "Nhân viên mua hàng — user (users.id) responsible for the purchase.",
+            "format": "uuid"
+          },
           "reason": {
             "type": "string",
             "maxLength": 500
@@ -29959,6 +30043,10 @@
           "deliveredBy": {
             "type": "string"
           },
+          "purchasingEmployeeId": {
+            "type": "string",
+            "nullable": true
+          },
           "reason": {
             "type": "string"
           },
@@ -30045,6 +30133,21 @@
             "type": "object",
             "nullable": true,
             "description": "Transient (not a column): the resolved \"Đối tượng\" { kind, id, code, name }\ninlined by the v2 search handler / getById so the FE renders supplier,\ncustomer and employee counterparties alike (provider_id is null for the\nlatter two)."
+          },
+          "purchasingEmployee": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
           },
           "id": {
             "type": "string"
@@ -30192,6 +30295,11 @@
           "deliveredBy": {
             "type": "string",
             "maxLength": 200
+          },
+          "purchasingEmployeeId": {
+            "type": "string",
+            "description": "Nhân viên mua hàng — user (users.id) responsible for the purchase.",
+            "format": "uuid"
           },
           "reason": {
             "type": "string",
@@ -30377,6 +30485,11 @@
           "deliveredBy": {
             "type": "string",
             "maxLength": 200
+          },
+          "purchasingEmployeeId": {
+            "type": "string",
+            "description": "Nhân viên mua hàng — user (users.id) responsible for the purchase.",
+            "format": "uuid"
           },
           "reason": {
             "type": "string",

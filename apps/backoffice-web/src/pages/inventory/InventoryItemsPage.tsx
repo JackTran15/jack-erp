@@ -55,6 +55,7 @@ export function InventoryItemsPage() {
                 open
                 onOpenChange={setExportSelectOpen}
                 confirmLabel="Xuất khẩu"
+                includeInactive
                 onConfirm={(result) => {
                   downloadInventoryExportSelected(
                     result.standaloneItemIds,
