@@ -241,6 +241,7 @@ export function StockTransferPage() {
       const branchId = getActiveBranchId();
       const params = new URLSearchParams({ page: "1", pageSize: "200" });
       if (branchId) params.set("branchId", branchId);
+      params.set("activeOnly", "true");
       const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
         `/inventory/storages?${params}`,
       );
@@ -825,6 +826,7 @@ function TransferFormDialog({
           storageId: lineStorageId,
         });
         if (query.trim()) params.set("search", query.trim());
+        params.set("activeOnly", "true");
         const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
           `/inventory/locations?${params}`,
         );

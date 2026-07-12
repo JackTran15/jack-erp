@@ -21,6 +21,9 @@ export class StorageEntity extends BaseEntity {
   @Column({ name: 'is_default_receiving', default: false, comment: "Branch's single default warehouse for inbound goods" })
   isDefaultReceiving: boolean;
 
+  @Column({ name: 'is_active', default: true, comment: 'When false, warehouse is deactivated (Ngừng hoạt động) — hidden from pickers and stock summary; ledger/report data preserved' })
+  isActive: boolean;
+
   @ManyToOne(() => BranchEntity)
   @JoinColumn({ name: 'branch_id' })
   branch?: BranchEntity;

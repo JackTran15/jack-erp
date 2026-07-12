@@ -16,6 +16,7 @@ export interface StockBalanceRow {
   locationId: string;
   quantity: number;
   lastMovementAt?: string | null;
+  isTracked: boolean;
   item: {
     id: string;
     code: string;
@@ -57,7 +58,7 @@ export interface StockBalancesQuery {
   itemId?: string;
   locationId?: string;
   storageId?: string;
-  isActive?: boolean;
+  isTracked?: boolean;
   // Per-column symbol filters
   locationCode?: string;
   locationCodeMode?: StringFilterMode;
@@ -155,6 +156,26 @@ export async function assignArrange(lines: ArrangeLine[]): Promise<ArrangeResult
   const { data } = await apiClient.post<ArrangeResult>(
     "/inventory/locations/arrange",
     { lines },
+  );
+  return data;
+}
+
+export interface BalanceTrackingEntry {
+  itemId: string;
+  locationId: string;
+}
+
+/**
+ * Bật/tắt theo dõi ở cấp vị trí (stock_balances.is_tracked) cho các cặp
+ * (item × location). KHÔNG đụng item.is_active — hàng vẫn tìm được.
+ */
+export async function setBalancesTracking(
+  entries: BalanceTrackingEntry[],
+  isTracked: boolean,
+): Promise<{ updated: number }> {
+  const { data } = await apiClient.patch<{ updated: number }>(
+    "/inventory/stock/balances/tracking",
+    { entries, isTracked },
   );
   return data;
 }
