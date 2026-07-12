@@ -18,14 +18,22 @@ export function CrudDetailBody({
 }) {
   return (
     <dl className="m-0">
-      {config.fields.map((f) => (
-        <div key={f.key} className="flex border-b border-border/50 py-2.5">
-          <dt className="w-[180px] shrink-0 text-xs font-medium text-muted-foreground">
-            {f.label}
-          </dt>
-          <dd className="m-0 text-sm text-foreground">{formatValue(record[f.key], f)}</dd>
-        </div>
-      ))}
+      {config.fields.map((f) => {
+        // Đơn vị tính: "Trạng thái" hiển thị là "Ngừng theo dõi" (đảo isActive),
+        // nhất quán với modal/trang sửa đơn vị tính.
+        const isUnitStatus =
+          config.entityKey === "inventory-item-units" && f.key === "isActive";
+        const label = isUnitStatus ? "Ngừng theo dõi" : f.label;
+        const value = isUnitStatus ? record[f.key] === false : record[f.key];
+        return (
+          <div key={f.key} className="flex border-b border-border/50 py-2.5">
+            <dt className="w-[180px] shrink-0 text-xs font-medium text-muted-foreground">
+              {label}
+            </dt>
+            <dd className="m-0 text-sm text-foreground">{formatValue(value, f)}</dd>
+          </div>
+        );
+      })}
     </dl>
   );
 }

@@ -10,6 +10,7 @@ import {
 const pickerParams = (
   search: string,
   sortBy: string,
+  filters: Record<string, unknown> = {},
 ): {
   page: number;
   pageSize: number;
@@ -23,7 +24,7 @@ const pickerParams = (
   sortBy,
   sortOrder: "asc",
   search,
-  filters: {},
+  filters,
 });
 
 // ─── Thương hiệu (Brand) ───────────────────────────────────────────────
@@ -51,7 +52,12 @@ export function useCreateItemCategory() {
 
 // ─── Đơn vị tính (Unit of measure) ─────────────────────────────────────
 export function useItemUnits(search: string, enabled: boolean) {
-  return useCrudRecords("inventory-item-units", pickerParams(search, "name"), enabled);
+  // Chỉ lấy đơn vị đang theo dõi (isActive=true) — đơn vị đã ngừng không được chọn.
+  return useCrudRecords(
+    "inventory-item-units",
+    pickerParams(search, "name", { isActive: true }),
+    enabled,
+  );
 }
 export function useCreateItemUnit() {
   return useCrudCreate("inventory-item-units");

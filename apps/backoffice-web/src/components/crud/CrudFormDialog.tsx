@@ -242,10 +242,14 @@ export function CrudFormDialog({
   const isEdit = record !== null;
   const isDuplicate = Boolean(duplicateSource) && !isEdit;
 
-  const editableFields = useMemo(
-    () => fieldsForFormState(config, record, duplicateSource),
-    [config, record, duplicateSource],
-  );
+  const isUnit = config.entityKey === "inventory-item-units";
+
+  const editableFields = useMemo(() => {
+    const fields = fieldsForFormState(config, record, duplicateSource);
+    // Đơn vị tính: nhân bản không hiện checkbox trạng thái (mặc định active).
+    if (isUnit) return fields.filter((f) => f.key !== "isActive");
+    return fields;
+  }, [config, record, duplicateSource, isUnit]);
 
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -315,6 +319,8 @@ export function CrudFormDialog({
       delete payload[config.idField];
       delete payload.createdAt;
       delete payload.updatedAt;
+      // Đơn vị tính nhân bản: luôn active (checkbox trạng thái đã ẩn).
+      if (isUnit) payload.isActive = true;
       const mode = saveModeRef.current;
       saveModeRef.current = "save";
       if (mode === "save-and-new" && onSaveAndAddNew) {
