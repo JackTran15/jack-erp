@@ -15,6 +15,20 @@ import { usePosFastStockTransferWorkflowStore } from "@erp/pos/stores/page-store
  * bắt đầu sạch, không dính dữ liệu của user/phiên trước.
  * KHÔNG đụng token — auth do authService quản lý.
  */
+/**
+ * Reset các lựa chọn checkout (giỏ hàng + mọi tab, khách, NVBH, KM, thanh toán,
+ * nhãn in). Dùng khi đổi chi nhánh (dữ liệu gắn theo chi nhánh) và bởi
+ * `resetAppState` lúc đăng nhập/đăng xuất. KHÔNG đụng branch/token/query cache —
+ * caller tự lo phần đó.
+ */
+export function resetCheckoutSelections(): void {
+  // resetSession có persist — set() ghi đè key "pos-checkout-sessions".
+  usePosCheckoutSessionStore.getState().resetSession();
+  usePosCheckoutUiStore.getState().clearAnnouncement();
+  usePosCheckoutUiStore.getState().resetCheckoutUiDraft();
+  usePosCheckoutLabelsStore.getState().resetLabels();
+}
+
 export function resetAppState(): void {
   // React Query: hủy request đang bay (của user/branch cũ) rồi xóa cache.
   void queryClient.cancelQueries();
@@ -22,12 +36,10 @@ export function resetAppState(): void {
 
   // Store có persist — set() làm middleware ghi đè key localStorage bằng state mới.
   usePosBranchStore.getState().clearBranch(); // key "pos-branch"
-  usePosCheckoutSessionStore.getState().resetSession(); // key "pos-checkout-sessions"
 
-  // Store in-memory.
-  usePosCheckoutUiStore.getState().clearAnnouncement();
-  usePosCheckoutUiStore.getState().resetCheckoutUiDraft();
-  usePosCheckoutLabelsStore.getState().resetLabels();
+  // Checkout (giỏ + tab + nhãn) — key "pos-checkout-sessions" + store in-memory.
+  resetCheckoutSelections();
+
   usePosFastStockTransferWorkflowStore.getState().resetWorkflowAll();
   usePosFastStockTransferUiStore.getState().clearPageError();
   usePosFastStockTransferUiStore.getState().resetDialogs();

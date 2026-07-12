@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import { MapPinIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
+import { resetCheckoutSelections } from "@erp/pos/lib/common/reset-app-state";
 import { useMyBranchesQuery } from "@erp/pos/hooks/react-query/use-query-branch";
 import { useSwitchBranchMutation } from "@erp/pos/hooks/react-query/use-query-auth";
 import { parseAccessTokenPayload } from "@erp/pos/lib/common/parseJwt";
@@ -65,6 +66,9 @@ export function PosLocationIndicator() {
         // under the freshly issued token (new actor.branchId) + X-Branch-Id.
         syncedBranchRef.current = branch.id;
         setBranch(branch.id, branch.name);
+        // Giỏ hàng/lựa chọn gắn theo chi nhánh (locationId, tồn, giá) → reset về
+        // trạng thái sạch khi đổi chi nhánh, tránh dùng nhầm dữ liệu chi nhánh cũ.
+        resetCheckoutSelections();
         queryClient.clear();
       },
       onError: () => {
