@@ -792,7 +792,7 @@ export function CrudListPage({
         },
         handleDeleteSelected: () => void handleDeleteSelected(),
         refetchRecords,
-        navigate: (to) => void navigate(to),
+        navigate,
         onImportInventory: inventoryConfig?.onImportInventory
           ? () => inventoryConfig.onImportInventory?.(inventoryActionContext)
           : undefined,
@@ -813,6 +813,7 @@ export function CrudListPage({
       {
         selectedRecord,
         selectedCount: selectedRows.length,
+        selectedRows,
       },
     ),
   );

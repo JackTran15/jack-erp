@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  navigateToBarcodePrint,
+  type BarcodePrefillItem,
+} from "../../lib/barcode-print-navigation";
 import { toast } from "sonner";
 import {
   Button,
@@ -211,6 +215,47 @@ export function ItemLocationDetailsPage() {
     stockRows,
   ]);
 
+  // Hàng đang chọn → đổ sẵn sang trang In tem mã. Chế độ 1-vị-trí giữ được giá bán
+  // (từ locationRows); chế độ tổng quan không có giá → trang in tem tự resolve sau.
+  const barcodePrefillItems = useMemo<BarcodePrefillItem[]>(() => {
+    if (isLocationDetail) {
+      const location = locationQuery.data?.meta.location;
+      if (!location) return [];
+      return locationRows
+        .filter((row) => selectedIds.has(row.itemId))
+        .map((row) => ({
+          itemId: row.itemId,
+          sku: row.code,
+          name: row.name,
+          unit: row.unit,
+          sellingPrice: Number(row.sellingPrice) || 0,
+          storageId: location.storage.id,
+          storageName: location.storage.name,
+          locationId: location.id,
+          locationCode: location.code,
+        }));
+    }
+    return stockRows
+      .filter((row) => selectedIds.has(row.id))
+      .map((row) => ({
+        itemId: row.itemId,
+        sku: row.item.code,
+        name: row.item.name,
+        unit: row.item.unit,
+        sellingPrice: 0,
+        storageId: row.location.storageId,
+        storageName: row.location.storageName,
+        locationId: row.location.id,
+        locationCode: row.location.code,
+      }));
+  }, [
+    isLocationDetail,
+    locationQuery.data?.meta.location,
+    locationRows,
+    selectedIds,
+    stockRows,
+  ]);
+
   // Ngừng theo dõi áp dụng cấp vị trí: mỗi cặp (hàng hóa × vị trí) là một dòng riêng.
   const selectedTrackingEntries = useMemo<BalanceTrackingEntry[]>(() => {
     const seen = new Set<string>();
@@ -388,11 +433,20 @@ export function ItemLocationDetailsPage() {
         onOpenArrange: () => setArrangeOpen(true),
         onOpenTransfer: () => setTransferOpen(true),
         onPrintLabel: () =>
-          navigate("/admin/inventory-item-barcodes", {
-            state: { from: "/inventory/item-location-details" },
-          }),
+          navigateToBarcodePrint(
+            navigate,
+            "/inventory/item-location-details",
+            barcodePrefillItems.length ? barcodePrefillItems : undefined,
+          ),
       }),
-    [isFetching, hasSelection, canStopTracking, reload, navigate],
+    [
+      isFetching,
+      hasSelection,
+      canStopTracking,
+      reload,
+      navigate,
+      barcodePrefillItems,
+    ],
   );
 
   return (

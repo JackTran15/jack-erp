@@ -20,6 +20,7 @@ import {
 import { renderBarcodeLabelsPdf } from "./_lib/render-barcode-labels-pdf";
 import { printBarcodeLabels } from "./_lib/print-barcode-labels";
 import { capLabels } from "./_lib/cap-labels";
+import { readBarcodePrintNavState } from "../../lib/barcode-print-navigation";
 import { resolveItemLocations } from "./_lib/resolve-item-locations";
 import {
   fetchItemStockBalances,
@@ -66,7 +67,33 @@ function focusSkuInput() {
 
 /** Màn hình "In tem mã": bảng hàng hoá cần in tem + cấu hình tem mã vạch. */
 export function InventoryItemBarcodesPage() {
-  const [rows, setRows] = useState<BarcodeLabelRow[]>(() => [makeEmptyRow()]);
+  const navigate = useNavigate();
+  const routerLocation = useLocation();
+
+  // Đổ sẵn hàng hóa khi vào từ nút "In tem mã" ở trang nguồn (Nhập/Xuất kho, Chi tiết
+  // vị trí, Hàng hóa). Số lượng tem mặc định = 1; giá bán thiếu sẽ resolve ở effect bên dưới.
+  const [rows, setRows] = useState<BarcodeLabelRow[]>(() => {
+    const prefill = readBarcodePrintNavState(routerLocation.state)?.items ?? [];
+    if (!prefill.length) return [makeEmptyRow()];
+    // Kết thúc bằng một dòng trống sẵn: dòng cuối đã rỗng nên useTrailingEmptyRow
+    // không append lúc mount → tránh nhân đôi dòng trống dưới React StrictMode.
+    return [
+      ...prefill.map((p) => ({
+        ...makeEmptyRow(),
+        itemId: p.itemId,
+        sku: p.sku,
+        name: p.name,
+        unit: p.unit ?? "",
+        sellingPrice: Number(p.sellingPrice) || 0,
+        storageId: p.storageId ?? "",
+        storageName: p.storageName ?? "",
+        locationId: p.locationId ?? "",
+        locationCode: p.locationCode ?? "",
+        quantity: 1,
+      })),
+      makeEmptyRow(),
+    ];
+  });
   useTrailingEmptyRow(rows, setRows, {
     isEmpty: isEmptyRow,
     makeEmpty: makeEmptyRow,
@@ -82,8 +109,6 @@ export function InventoryItemBarcodesPage() {
   // các endpoint theo chi nhánh (Kho/Vị trí gắn với 1 chi nhánh cụ thể).
   const isChain = useIsChainSelected();
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const routerLocation = useLocation();
 
   // ─── Reference data ────────────────────────────────────────────────
   const branchId = getActiveBranch();
@@ -303,6 +328,34 @@ export function InventoryItemBarcodesPage() {
     },
     [],
   );
+
+  // Resolve giá bán thật cho hàng đổ sẵn từ trang nguồn thiếu giá (Nhập/Xuất kho, Chi tiết
+  // vị trí chế độ tổng quan). Chạy một lần lúc mount trên tập row prefill ban đầu.
+  useEffect(() => {
+    const missing = rows.filter((r) => r.itemId && r.sellingPrice <= 0);
+    if (!missing.length) return;
+    let cancelled = false;
+    void Promise.all(
+      missing.map(async (r) => {
+        try {
+          const { items } = await searchItems(r.sku, 1);
+          const match =
+            items.find((i) => i.id === r.itemId) ??
+            items.find((i) => i.code === r.sku);
+          const price = Number(match?.sellingPrice ?? 0);
+          if (!cancelled && match && price > 0) {
+            patchRow(r.rowId, { sellingPrice: price });
+          }
+        } catch {
+          /* bỏ qua — giữ giá 0 nếu không resolve được */
+        }
+      }),
+    );
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** Thêm các dòng chọn từ dialog "Chọn hàng hóa" (pattern GoodsReceiptFormDialog). */
   const addRowsFromPicker = useCallback(

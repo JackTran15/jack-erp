@@ -66,6 +66,8 @@ export function buildItemLocationToolbarItems({
       label: "In tem mã",
       icon: Printer,
       onClick: onPrintLabel,
+      disabled: !hasSelection,
+      tooltip: hasSelection ? undefined : "Chọn dòng để dùng tính năng này",
     },
   ];
 }

@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
+  navigateToBarcodePrint,
+  type BarcodePrefillItem,
+} from "../../lib/barcode-print-navigation";
+import {
   DocumentListShell,
   formatMoneyInteger,
   PageToolbar,
@@ -439,10 +443,29 @@ export function PurchaseOrdersPage({
       id: "barcode",
       label: "In tem mã",
       icon: Barcode,
-      onClick: () =>
-        navigate("/admin/inventory-item-barcodes", {
-          state: { from: "/inventory/purchase-orders" },
-        }),
+      onClick: () => {
+        const items: BarcodePrefillItem[] = (selectedOrder?.lines ?? []).map(
+          (line) => {
+            const storageId = line.location?.storageId ?? "";
+            return {
+              itemId: line.itemId,
+              sku: line.item?.code ?? "",
+              name: line.item?.name ?? "",
+              unit: line.item?.unit ?? line.uomCode ?? "",
+              sellingPrice: 0,
+              storageId,
+              storageName: storageId ? (storageNameById.get(storageId) ?? "") : "",
+              locationId: line.locationId ?? line.location?.id ?? "",
+              locationCode: line.location?.code ?? "",
+            };
+          },
+        );
+        navigateToBarcodePrint(
+          navigate,
+          "/inventory/purchase-orders",
+          items.length ? items : undefined,
+        );
+      },
     },
   ];
 
