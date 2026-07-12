@@ -36,4 +36,6 @@ export interface InvoicePayload {
   policy: InvoicePolicy;
   /** Last centered line, e.g. "Giày MT hân hạnh phục vụ quý khách!". */
   closingMessage: string;
+  /** Dòng nhắc đậm dưới closing — chỉ hóa đơn tạm tính (provisional). */
+  provisionalNote?: string;
 }

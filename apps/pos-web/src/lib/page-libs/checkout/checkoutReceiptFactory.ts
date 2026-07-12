@@ -1,5 +1,7 @@
 import type { PaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import type { InvoicePayload } from "@erp/pos/dtos/invoice-printing.dto";
+import type { InvoiceStoreInfo } from "@erp/pos/interfaces/invoice-printing.interface";
+import type { BranchRow } from "@erp/pos/interfaces/branch.interface";
 import type {
   CartLine,
   PaymentMethodOption,
@@ -28,11 +30,20 @@ const STORE_INFO = {
 } as const;
 
 const RETURN_POLICY = {
-  title: "QUY ĐỊNH ĐỔI TRẢ",
-  body: "Đổi giày đẹp trong 7 ngày (giá trị đổi phải bằng hoặc cao hơn giá sản phẩm trước). Riêng mẫu vớ kiên tất xách, vớ, dây đã không đổi trả. Sản phẩm đổi trả phải còn tem và chưa qua sử dụng.",
+  // title: "QUY ĐỊNH ĐỔI TRẢ",
+  // body: "Đổi giày đẹp trong 7 ngày (giá trị đổi phải bằng hoặc cao hơn giá sản phẩm trước). Riêng mẫu vớ kiên tất xách, vớ, dây đã không đổi trả. Sản phẩm đổi trả phải còn tem và chưa qua sử dụng.",
+  
+  // Tạm thời ẩn
+  title: "",
+  body: "",
 } as const;
 
 const CLOSING_MESSAGE = "Giày MT hân hạnh phục vụ quý khách!";
+
+const PROVISIONAL_NOTE = {
+  message:
+    "Quý khách vui lòng kiểm tra thông tin trên đơn tạm tính và xác nhận với thu ngân trước khi thanh toán!",
+} as const;
 
 interface BuildCheckoutInvoicePayloadInput {
   printInvoice: boolean;
@@ -83,6 +94,8 @@ interface BuildCheckoutInvoicePayloadInput {
   printDuplicate?: boolean;
   /** Hóa đơn đổi/trả hàng → tiêu đề "HÓA ĐƠN ĐỔI TRẢ". */
   isReturnExchange?: boolean;
+  /** Thông tin cửa hàng (chi nhánh đang chọn); rỗng → fallback STORE_INFO. */
+  store?: InvoiceStoreInfo;
 }
 
 /** Trim + rỗng → undefined, cho các field info ẩn được trên bản in. */
@@ -116,6 +129,7 @@ export function buildCheckoutInvoicePayload({
   voucherCode,
   printDuplicate,
   isReturnExchange,
+  store,
 }: BuildCheckoutInvoicePayloadInput): InvoicePayload | null {
   if (!printInvoice || cart.length === 0) return null;
 
@@ -172,7 +186,7 @@ export function buildCheckoutInvoicePayload({
   });
 
   return {
-    store: STORE_INFO,
+    store: store ?? STORE_INFO,
     invoiceNumber: generateInvoiceNumber(new Date()),
     issuedAt: new Date(),
     info: {
@@ -227,9 +241,25 @@ export function buildCheckoutInvoicePayload({
     copies: printDuplicate ? 2 : undefined,
     policy: RETURN_POLICY,
     closingMessage: CLOSING_MESSAGE,
+    provisionalNote: provisional ? PROVISIONAL_NOTE.message : undefined,
   };
 }
 
 export function calculateDraftTotal(cart: CartLine[]): number {
   return cart.reduce((sum, line) => sum + lineTotal(line), 0);
+}
+
+/**
+ * Store info in hóa đơn lấy từ chi nhánh đang chọn. `undefined` (chưa resolve
+ * được chi nhánh) → factory fallback về STORE_INFO mặc định.
+ */
+export function buildStoreInfoFromBranch(
+  branch?: BranchRow | null,
+): InvoiceStoreInfo | undefined {
+  if (!branch) return undefined;
+  return {
+    name: branch.name,
+    address: branch.address ?? "",
+    phone: branch.phone ?? "",
+  };
 }

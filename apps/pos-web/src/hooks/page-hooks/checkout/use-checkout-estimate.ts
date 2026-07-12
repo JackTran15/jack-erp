@@ -2,7 +2,11 @@ import { useCallback, useState } from "react";
 
 import { useInvoicePrinter } from "@erp/pos/hooks/page-hooks/checkout/use-invoice-printer";
 import { useCurrentUserQuery } from "@erp/pos/hooks/react-query/use-query-user";
-import { buildCheckoutInvoicePayload } from "@erp/pos/lib/page-libs/checkout/checkoutReceiptFactory";
+import { useMyBranchesQuery } from "@erp/pos/hooks/react-query/use-query-branch";
+import {
+  buildCheckoutInvoicePayload,
+  buildStoreInfoFromBranch,
+} from "@erp/pos/lib/page-libs/checkout/checkoutReceiptFactory";
 import { deriveSettlement } from "@erp/pos/lib/page-libs/checkout/checkoutSettlement";
 import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import {
@@ -28,6 +32,7 @@ import {
   selectReturnCart,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
+import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface UseCheckoutEstimateResult {
@@ -45,8 +50,10 @@ export interface UseCheckoutEstimateResult {
 export function useCheckoutEstimate(): UseCheckoutEstimateResult {
   const invoicePrinter = useInvoicePrinter();
   const currentUserQuery = useCurrentUserQuery();
+  const branchesQuery = useMyBranchesQuery();
   const [isPrinting, setIsPrinting] = useState(false);
   const currentUser = currentUserQuery.data;
+  const branches = branchesQuery.data;
 
   const printEstimate = useCallback(async () => {
     const sessionState = usePosCheckoutSessionStore.getState();
@@ -79,6 +86,10 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
     const cashierName = currentUser
       ? `${currentUser.firstName} ${currentUser.lastName}`.trim()
       : (sessionState.cashierDisplayName ?? undefined);
+    const activeBranchId = usePosBranchStore.getState().branchId;
+    const store = buildStoreInfoFromBranch(
+      branches?.find((b) => b.id === activeBranchId),
+    );
     const { totalPaid, settlementGrandTotal } = deriveSettlement({
       grandTotal,
       deposit: p.deposit,
@@ -118,6 +129,7 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
       voucherCode: appliedVoucher?.voucherCode,
       printDuplicate: p.printDuplicate,
       isReturnExchange: variant !== CheckoutVariantEnum.SALE,
+      store,
     });
     if (!receiptPayload) return;
 
@@ -131,7 +143,7 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
       setIsPrinting(false);
     }
     ui.setAnnouncement(CHECKOUT_ANNOUNCEMENTS.estimatePrinted);
-  }, [invoicePrinter, currentUser]);
+  }, [invoicePrinter, currentUser, branches]);
 
   return { printEstimate, isPrinting };
 }
