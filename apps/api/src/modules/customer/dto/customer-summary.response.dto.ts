@@ -13,7 +13,10 @@ export class CustomerDebtSummaryDto {
   @ApiProperty({ description: 'Total remaining balance across open/overdue debts' })
   totalOutstanding: number;
 
-  @ApiProperty({ description: 'Number of outstanding debt documents' })
+  @ApiProperty({
+    description:
+      'Number of debt-ledger documents for the customer (debt rows + collections), matching the Công nợ tab total',
+  })
   documentCount: number;
 }
 

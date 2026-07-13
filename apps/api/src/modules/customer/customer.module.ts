@@ -10,6 +10,7 @@ import { PointHistoryEntity } from './point-history.entity';
 import { CustomerCreditEntity } from './customer-credit.entity';
 import { InvoiceEntity } from '../pos/entities/invoice.entity';
 import { InvoiceDebtEntity } from '../pos/entities/invoice-debt.entity';
+import { DebtPaymentEntity } from '../pos/entities/debt-payment.entity';
 import {
   CustomerService,
   CUSTOMER_SERVICE_TOKEN,
@@ -43,6 +44,7 @@ import { LoyaltyPointsReverseConsumer } from './consumers/loyalty-points-reverse
       CustomerCreditEntity,
       InvoiceEntity,
       InvoiceDebtEntity,
+      DebtPaymentEntity,
     ]),
   ],
   controllers: [CustomerController],

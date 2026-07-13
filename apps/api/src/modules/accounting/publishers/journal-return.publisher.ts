@@ -12,6 +12,9 @@ export interface JournalPostReturnPayload {
   refundMethod: RefundMethod;
   refundedAmount: number;
   netAmount: number;
+  /** EXCHANGE net > 0 portion booked as customer debt (DR receivable / CR revenue).
+   * The cash portion is booked by the cash-from-payment consumer. Defaults to 0. */
+  debtAmount?: number;
   revenueAccountId: string;
   cashAccountId?: string;
   receivableAccountId?: string;
@@ -45,6 +48,7 @@ export class JournalReturnPublisher {
           ...input,
           refundedAmount: Number(input.refundedAmount),
           netAmount: Number(input.netAmount),
+          debtAmount: Number(input.debtAmount ?? 0),
           organizationId: actor.organizationId,
           actorId: actor.userId,
         } satisfies JournalPostReturnPayload,

@@ -1904,22 +1904,6 @@ export interface paths {
         patch: operations["InventoryLocationController_updateItem"];
         trace?: never;
     };
-    "/inventory/items/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["InventoryLocationController_setItemsStatus"];
-        trace?: never;
-    };
     "/inventory/items/{id}/providers": {
         parameters: {
             query?: never;
@@ -2355,6 +2339,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/balances/tracking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["StockLedgerController_setBalanceTracking"];
         trace?: never;
     };
     "/inventory/stock/items/{itemId}/average-cost": {
@@ -6795,7 +6795,7 @@ export interface components {
         CustomerDebtSummaryDto: {
             /** @description Total remaining balance across open/overdue debts */
             totalOutstanding: number;
-            /** @description Number of outstanding debt documents */
+            /** @description Number of debt-ledger documents for the customer (debt rows + collections), matching the Công nợ tab total */
             documentCount: number;
         };
         CustomerMembershipSummaryDto: {
@@ -7319,6 +7319,7 @@ export interface components {
             description?: string;
             isMainStorage: boolean;
             isDefaultReceiving: boolean;
+            isActive: boolean;
             branch?: components["schemas"]["BranchEntity"];
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
@@ -7465,11 +7466,6 @@ export interface components {
             updatedAt: string;
             /** @description UUID of the user who created this record. */
             createdBy: string;
-        };
-        SetItemsStatusDto: {
-            ids: string[];
-            /** @description true = đang theo dõi, false = ngừng theo dõi */
-            isActive: boolean;
         };
         UpdateItemDto: {
             name?: string;
@@ -7783,6 +7779,23 @@ export interface components {
             page: number;
             pageSize: number;
         };
+        BalanceTrackingEntryDto: {
+            /**
+             * Format: uuid
+             * @description Hàng hoá (item)
+             */
+            itemId: string;
+            /**
+             * Format: uuid
+             * @description Vị trí (location)
+             */
+            locationId: string;
+        };
+        SetBalanceTrackingDto: {
+            entries: components["schemas"]["BalanceTrackingEntryDto"][];
+            /** @description true = đang theo dõi, false = ngừng theo dõi */
+            isTracked: boolean;
+        };
         InstantAverageCostDto: {
             /** Format: uuid */
             itemId: string;
@@ -7802,6 +7815,7 @@ export interface components {
             quantity: number;
             /** Format: date-time */
             lastMovementAt?: string;
+            isTracked: boolean;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -8857,11 +8871,34 @@ export interface components {
             /** @description UUID of the user who created this record. */
             createdBy: string;
         };
+        InvoicePaymentEntity: {
+            invoiceId: string;
+            /** @enum {string} */
+            paymentMethod: "cash" | "bank_transfer" | "card";
+            amount: number;
+            accountId: string;
+            reference?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
         DraftInvoiceResponseDto: {
             /** @description Line items belonging to this draft, ordered by sortOrder. */
             items: components["schemas"]["DraftInvoiceItemDto"][];
             /** @description Resolved customer for the invoice (null when no customer is attached). */
             customer: components["schemas"]["CustomerEntity"] | null;
+            /** @description Per-method payment breakdown (cash / bank transfer / card) for the full receipt. */
+            payments: components["schemas"]["InvoicePaymentEntity"][];
+            /** @description Outstanding debt (invoice_debts.remainingAmount) for this invoice; null when there is no debt. */
+            remainingDebt: number | null;
             code: string;
             /** Format: date-time */
             issuedAt?: string;
@@ -8905,6 +8942,65 @@ export interface components {
             /** @description UUID of the user who created this record. */
             createdBy: string;
         };
+        CustomerDebtLedgerRowDto: {
+            /** @description Row id — the debt id for debt rows, the payment id for collections */
+            id: string;
+            /**
+             * @description Whether this row raises debt or collects it
+             * @enum {string}
+             */
+            kind: "debt" | "collection";
+            /** @description Source invoice id, for drill-through to the receipt */
+            invoiceId: string;
+            /** @description Displayed document number — the invoice code, or the Phiếu thu number for collections */
+            referenceCode: string;
+            /**
+             * @description Category of the ledger document
+             * @enum {string}
+             */
+            documentType: "credit_invoice" | "payment_receipt" | "adjustment" | "collect_debt_cash" | "collect_debt_bank";
+            /** @description Signed debt delta — positive raises debt, negative collects it */
+            amount: number;
+            /** @description Running customer debt balance after this row */
+            runningBalance: number;
+            /** @description Ledger date (YYYY-MM-DD) */
+            issuedAt: string;
+            /** @description Row creation timestamp (ISO) — shown as the document date and used for ordering */
+            createdAt: string;
+            /** @description Branch scope of the document */
+            branchId?: string | null;
+            /** @description Display name of the branch */
+            branchName?: string | null;
+            /**
+             * @description Debt collection status (debt rows only)
+             * @enum {string}
+             */
+            status?: "open" | "paid" | "overdue";
+        };
+        DebtPaymentEntity: {
+            debtId: string;
+            amount: number;
+            /** @enum {string} */
+            paymentMethod: "cash" | "bank_transfer";
+            staffId: string;
+            /** Format: date-time */
+            paidAt: string;
+            note?: string;
+            cashReceiptId?: string;
+            journalEntryId?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        CollectDebtPaymentDto: Record<string, never>;
         InvoiceDebtEntity: {
             referenceCode: string;
             invoiceId: string;
@@ -8934,30 +9030,6 @@ export interface components {
             /** @description UUID of the user who created this record. */
             createdBy: string;
         };
-        DebtPaymentEntity: {
-            debtId: string;
-            amount: number;
-            /** @enum {string} */
-            paymentMethod: "cash" | "bank_transfer";
-            staffId: string;
-            /** Format: date-time */
-            paidAt: string;
-            note?: string;
-            cashReceiptId?: string;
-            journalEntryId?: string;
-            id: string;
-            /** @description Tenant isolation key — every row belongs to exactly one organization. */
-            organizationId: string;
-            /** @description Optional branch scope; null for org-wide records. */
-            branchId?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description UUID of the user who created this record. */
-            createdBy: string;
-        };
-        CollectDebtPaymentDto: Record<string, never>;
         UpdateInvoiceItemDto: {
             /** Format: uuid */
             itemId: string;
@@ -9093,8 +9165,18 @@ export interface components {
             creditLiabilityAccountId?: string;
             /** @description Optional expiry date for the issued store credit (ISO date). */
             creditExpiresAt?: string;
-            /** @description Payments — only required for EXCHANGE with netAmount > 0. */
+            /**
+             * @description Payments — for EXCHANGE with netAmount > 0. When their sum is below netAmount
+             *     (and the invoice has a customer) the remainder is booked as customer debt.
+             */
             payments?: components["schemas"]["InvoicePaymentLineDto"][];
+            /**
+             * @description Credit due date (ISO `YYYY-MM-DD`) for the debt booked on an EXCHANGE
+             *     net > 0 that is paid partially/none. Ignored when fully paid.
+             */
+            dueDate?: string;
+            /** @description Credit term in days for the EXCHANGE net > 0 debt (per invoice). */
+            creditDays?: number;
             note?: string;
         };
         EnumFilterDto: {
@@ -10366,6 +10448,8 @@ export interface operations {
                 search?: string;
                 /** @description JSON-encoded filter object */
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path: {
@@ -11215,6 +11299,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -12424,6 +12510,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -13369,6 +13457,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path: {
@@ -13673,6 +13763,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -13852,27 +13944,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ItemEntity"];
                 };
-            };
-        };
-    };
-    InventoryLocationController_setItemsStatus: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SetItemsStatusDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };
@@ -14728,9 +14799,13 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
                 unassigned?: boolean;
                 /** @description Lọc theo trạng thái theo dõi hàng hóa (item.is_active). Bỏ trống = tất cả. */
                 isActive?: boolean;
+                /** @description Lọc theo trạng thái theo dõi vị trí (stock_balances.is_tracked). Bỏ trống = tất cả. */
+                isTracked?: boolean;
                 locationCode?: string;
                 locationCodeMode?: string;
                 locationName?: string;
@@ -14753,6 +14828,27 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StockLedgerController_setBalanceTracking: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetBalanceTrackingDto"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -14814,6 +14910,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -14994,6 +15092,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -15320,6 +15420,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -15524,6 +15626,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -15659,6 +15763,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -15819,6 +15925,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -15929,6 +16037,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -16559,6 +16669,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path: {
@@ -16754,6 +16866,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -16818,6 +16932,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path: {
@@ -16899,6 +17015,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path: {
@@ -16999,6 +17117,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path: {
@@ -17099,6 +17219,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path: {
@@ -17163,6 +17285,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -17187,6 +17311,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -17249,6 +17375,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -17273,6 +17401,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -17348,6 +17478,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
                 status?: "DRAFT" | "POSTED" | "CANCELLED";
                 /** @description Lọc createdAt >= (YYYY-MM-DD) */
                 fromDate?: string;
@@ -17695,6 +17827,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
                 /** @description Restrict the branch stock used for aggregation to warehouse or showroom locations. */
                 direction?: "warehouse" | "showroom";
                 /** @description Restrict results to products/items in this category. */
@@ -18004,7 +18138,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["InvoiceDebtEntity"][];
+                    "application/json": components["schemas"]["CustomerDebtLedgerRowDto"][];
                 };
             };
         };
@@ -19172,6 +19306,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -19307,6 +19443,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -19482,6 +19620,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -19747,6 +19887,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -19945,6 +20087,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
             };
             header?: never;
             path?: never;

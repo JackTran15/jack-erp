@@ -13,6 +13,7 @@ import {
   InvoiceDebtEntity,
   DebtStatus,
 } from '../../pos/entities/invoice-debt.entity';
+import { DebtPaymentEntity } from '../../pos/entities/debt-payment.entity';
 import { CustomerSummaryService } from './customer-summary.service';
 
 const actor: ActorContext = {
@@ -26,6 +27,7 @@ describe('CustomerSummaryService', () => {
   let service: CustomerSummaryService;
   let invoiceRepo: { find: jest.Mock };
   let debtRepo: { find: jest.Mock };
+  let paymentRepo: { count: jest.Mock };
   let cardRepo: { findOne: jest.Mock };
   let historyRepo: { find: jest.Mock };
   let customerService: { findByIdWithMergeCheck: jest.Mock };
@@ -33,6 +35,7 @@ describe('CustomerSummaryService', () => {
   beforeEach(async () => {
     invoiceRepo = { find: jest.fn().mockResolvedValue([]) };
     debtRepo = { find: jest.fn().mockResolvedValue([]) };
+    paymentRepo = { count: jest.fn().mockResolvedValue(0) };
     cardRepo = { findOne: jest.fn().mockResolvedValue(null) };
     historyRepo = { find: jest.fn().mockResolvedValue([]) };
     customerService = {
@@ -44,6 +47,7 @@ describe('CustomerSummaryService', () => {
         CustomerSummaryService,
         { provide: getRepositoryToken(InvoiceEntity), useValue: invoiceRepo },
         { provide: getRepositoryToken(InvoiceDebtEntity), useValue: debtRepo },
+        { provide: getRepositoryToken(DebtPaymentEntity), useValue: paymentRepo },
         { provide: getRepositoryToken(MembershipCardEntity), useValue: cardRepo },
         { provide: getRepositoryToken(PointHistoryEntity), useValue: historyRepo },
         { provide: CustomerService, useValue: customerService },
@@ -87,18 +91,24 @@ describe('CustomerSummaryService', () => {
     expect(result.purchases.invoiceCount).toBe(3);
   });
 
-  it('queries only open/overdue debts and sums remainingAmount', async () => {
+  it('sums remainingAmount over outstanding debts and counts all ledger documents', async () => {
     debtRepo.find.mockResolvedValue([
-      { remainingAmount: 50 },
-      { remainingAmount: '25.5' },
+      { id: 'debt-1', status: DebtStatus.OPEN, remainingAmount: 50 },
+      { id: 'debt-2', status: DebtStatus.OVERDUE, remainingAmount: '25.5' },
+      { id: 'debt-3', status: DebtStatus.PAID, remainingAmount: 0 },
     ]);
+    paymentRepo.count.mockResolvedValue(4);
 
     const result = await service.getSummary('customer-1', actor);
 
+    // Debts are fetched regardless of status (the ledger shows all documents).
     const where = debtRepo.find.mock.calls[0][0].where;
-    expect(where.status.value).toEqual([DebtStatus.OPEN, DebtStatus.OVERDUE]);
+    expect(where).not.toHaveProperty('status');
+    expect(where.customerId).toBe('customer-1');
+    // totalOutstanding only counts open/overdue balances.
     expect(result.debt.totalOutstanding).toBe(75.5);
-    expect(result.debt.documentCount).toBe(2);
+    // 3 debt rows + 4 collections = 7 ledger documents (matches the Công nợ tab).
+    expect(result.debt.documentCount).toBe(7);
   });
 
   it('returns membership null when the customer has no card', async () => {

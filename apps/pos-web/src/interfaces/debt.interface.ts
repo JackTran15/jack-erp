@@ -1,26 +1,26 @@
 import type { DebtDocumentType, DebtStatus } from "@erp/pos/types/debt.type";
 
 /**
- * Một dòng công nợ của khách — raw BE entity từ
- * `GET /invoices/customers/:customerId/debts` (`invoice_debts`).
+ * Một dòng sổ công nợ của khách — từ `GET /invoices/customers/:customerId/debts`.
+ * BE merge chứng từ ghi nợ (`invoice_debts`) với các lần thu nợ / Phiếu thu
+ * (`debt_payments`), sắp xếp cũ → mới kèm số dư chạy.
  *
- * Các cột `numeric(18,2)` (originalAmount / paidAmount / remainingAmount) được
- * TypeORM serialize ra **string** qua JSON — mapper phải `Number(...)` trước khi
- * dùng. `issuedAt` dạng `"YYYY-MM-DD"`.
+ * `amount` có dấu: dương làm tăng nợ, âm là thu nợ. `runningBalance` là "Dư nợ
+ * cuối" sau chứng từ đó. Các cột `numeric(18,2)` được TypeORM serialize ra
+ * **string** qua JSON — mapper phải `Number(...)`. `issuedAt` dạng `"YYYY-MM-DD"`.
  */
 export interface CustomerDebtRow {
   id: string;
-  referenceCode: string;
+  kind: "debt" | "collection";
   invoiceId: string;
-  customerId: string;
+  referenceCode: string;
   documentType: DebtDocumentType;
-  originalAmount: number;
-  paidAmount: number;
-  remainingAmount: number;
+  amount: number;
+  runningBalance: number;
   issuedAt: string;
-  dueDate?: string | null;
-  settledAt?: string | null;
-  status: DebtStatus;
-  note?: string | null;
-  branchId: string;
+  /** Thời điểm tạo chứng từ (ISO) — dùng cho cột "Ngày hóa đơn" và sắp xếp. */
+  createdAt: string;
+  branchId: string | null;
+  branchName?: string | null;
+  status?: DebtStatus;
 }

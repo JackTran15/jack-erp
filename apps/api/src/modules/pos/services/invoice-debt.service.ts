@@ -5,7 +5,13 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, EntityManager } from 'typeorm';
+import {
+  Repository,
+  DataSource,
+  EntityManager,
+  In,
+  FindOptionsWhere,
+} from 'typeorm';
 import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { CashService } from '../../accounting/cash/cash.service';
@@ -22,6 +28,9 @@ import {
   DebtDocumentType,
 } from '../entities/invoice-debt.entity';
 import { DebtPaymentEntity, DebtPaymentMethod } from '../entities/debt-payment.entity';
+import { CashReceiptEntity } from '../../accounting/cash-vouchers/cash-receipts/cash-receipt.entity';
+import { BranchEntity } from '../../branch/branch.entity';
+import { CustomerDebtLedgerRowDto } from '../dto/customer-debt-ledger-row.dto';
 
 export interface CollectPaymentDto {
   amount: number;
@@ -60,6 +69,10 @@ export class InvoiceDebtService {
     private readonly debtRepo: Repository<InvoiceDebtEntity>,
     @InjectRepository(DebtPaymentEntity)
     private readonly paymentRepo: Repository<DebtPaymentEntity>,
+    @InjectRepository(CashReceiptEntity)
+    private readonly cashReceiptRepo: Repository<CashReceiptEntity>,
+    @InjectRepository(BranchEntity)
+    private readonly branchRepo: Repository<BranchEntity>,
     private readonly dataSource: DataSource,
     private readonly cashService: CashService,
     private readonly cashFundResolver: CashFundResolverService,
@@ -126,12 +139,18 @@ export class InvoiceDebtService {
     return saved;
   }
 
+  /**
+   * Customer debt ledger: debt-raising documents (`invoice_debts`) merged with
+   * their collections (`debt_payments`, written by both the POS collect endpoint
+   * and the backoffice Phiếu thu saga). Each row carries a signed `amount`
+   * (+ raises debt, − collects) and a `runningBalance`, ordered oldest-first.
+   */
   async findCustomerDebts(
     customerId: string,
     status: DebtStatus | undefined,
     actor: ActorContext,
-  ): Promise<InvoiceDebtEntity[]> {
-    const where: any = {
+  ): Promise<CustomerDebtLedgerRowDto[]> {
+    const where: FindOptionsWhere<InvoiceDebtEntity> = {
       customerId,
       organizationId: actor.organizationId,
     };
@@ -140,9 +159,112 @@ export class InvoiceDebtService {
       where.status = status;
     }
 
-    return this.debtRepo.find({
+    const debts = await this.debtRepo.find({
       where,
-      order: { issuedAt: 'DESC' },
+      order: { createdAt: 'ASC' },
+    });
+
+    const debtIds = debts.map((d) => d.id);
+    const payments = debtIds.length
+      ? await this.paymentRepo.find({
+          where: { debtId: In(debtIds), organizationId: actor.organizationId },
+          order: { createdAt: 'ASC' },
+        })
+      : [];
+
+    // Resolve the Phiếu thu document numbers so collection rows show the receipt
+    // number (Số chứng từ) rather than the source invoice code.
+    const receiptIds = [
+      ...new Set(
+        payments
+          .map((p) => p.cashReceiptId)
+          .filter((id): id is string => !!id),
+      ),
+    ];
+    const receipts = receiptIds.length
+      ? await this.cashReceiptRepo.find({ where: { id: In(receiptIds) } })
+      : [];
+    const receiptNumberById = new Map(
+      receipts.map((r) => [r.id, r.documentNumber ?? null] as const),
+    );
+    const debtById = new Map(debts.map((d) => [d.id, d] as const));
+
+    // Resolve branch display names for the Chi nhánh column.
+    const branchIds = [
+      ...new Set(
+        [...debts, ...payments]
+          .map((r) => r.branchId)
+          .filter((id): id is string => !!id),
+      ),
+    ];
+    const branches = branchIds.length
+      ? await this.branchRepo.find({
+          where: { id: In(branchIds), organizationId: actor.organizationId },
+        })
+      : [];
+    const branchNameById = new Map(branches.map((b) => [b.id, b.name] as const));
+    const branchNameOf = (branchId?: string | null): string | null =>
+      (branchId && branchNameById.get(branchId)) || null;
+
+    type LedgerRow = CustomerDebtLedgerRowDto & { sortAt: number };
+    const rows: LedgerRow[] = [];
+
+    for (const d of debts) {
+      rows.push({
+        id: d.id,
+        kind: 'debt',
+        invoiceId: d.invoiceId,
+        referenceCode: d.referenceCode,
+        documentType: d.documentType,
+        amount: Number(d.originalAmount),
+        runningBalance: 0,
+        issuedAt: d.issuedAt,
+        createdAt: d.createdAt.toISOString(),
+        branchId: d.branchId ?? null,
+        branchName: branchNameOf(d.branchId),
+        status: d.status,
+        sortAt: d.createdAt.getTime(),
+      });
+    }
+
+    for (const p of payments) {
+      const debt = debtById.get(p.debtId);
+      if (!debt) continue;
+      const paidAt = new Date(p.paidAt);
+      rows.push({
+        id: p.id,
+        kind: 'collection',
+        invoiceId: debt.invoiceId,
+        referenceCode:
+          (p.cashReceiptId && receiptNumberById.get(p.cashReceiptId)) ||
+          debt.referenceCode,
+        documentType:
+          p.paymentMethod === DebtPaymentMethod.CASH
+            ? 'collect_debt_cash'
+            : 'collect_debt_bank',
+        amount: -Number(p.amount),
+        runningBalance: 0,
+        issuedAt: paidAt.toISOString().split('T')[0],
+        createdAt: p.createdAt.toISOString(),
+        branchId: p.branchId ?? null,
+        branchName: branchNameOf(p.branchId),
+        sortAt: p.createdAt.getTime(),
+      });
+    }
+
+    // Oldest-first so the running balance reads top-to-bottom; a debt document
+    // precedes a same-instant collection (you can't collect before it exists).
+    rows.sort((a, b) => {
+      if (a.sortAt !== b.sortAt) return a.sortAt - b.sortAt;
+      if (a.kind !== b.kind) return a.kind === 'debt' ? -1 : 1;
+      return 0;
+    });
+
+    const round = (v: number) => Math.round(v * 100) / 100;
+    let balance = 0;
+    return rows.map(({ sortAt: _sortAt, ...row }) => {
+      balance = round(balance + row.amount);
+      return { ...row, runningBalance: balance };
     });
   }
 

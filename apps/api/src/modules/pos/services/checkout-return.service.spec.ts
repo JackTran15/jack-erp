@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { CheckoutReturnService } from './checkout-return.service';
 import {
   InvoiceEntity,
+  InvoicePaymentMethod,
   InvoiceStatus,
   InvoiceType,
   RefundMethod,
@@ -24,6 +25,7 @@ import { CustomerCreditService } from '../../customer/services/customer-credit.s
 import { MembershipCardService } from '../../customer/services/membership-card.service';
 import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
 import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
+import { InvoiceDebtService } from './invoice-debt.service';
 import { AccountingDefaultAccountRole } from '../../accounting/payment-accounts/enums';
 import { ReturnPostedPublisher } from '../publishers/return-posted.publisher';
 import { StockReturnInPublisher } from '../publishers/stock-return-in.publisher';
@@ -112,6 +114,74 @@ const offsetDto = () => ({
   revenueAccountId: REVENUE_ACCOUNT,
 });
 
+/** Draft EXCHANGE: return a 750k line, buy a 780k line → net = +30k (khách nợ thêm). */
+const exchangeDraftStub = (
+  overrides: Partial<InvoiceEntity> = {},
+): InvoiceEntity =>
+  ({
+    id: 'exc-1',
+    organizationId: 'org-1',
+    branchId: 'branch-1',
+    originalInvoiceId: undefined,
+    code: 'DRAFT-EXC',
+    sessionId: 'session-1',
+    customerId: 'cust-1',
+    isDraft: true,
+    status: InvoiceStatus.DRAFT,
+    type: InvoiceType.EXCHANGE,
+    subtotal: 780000,
+    amountDue: 0,
+    totalPaid: 0,
+    pointsRedeemed: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    staffId: 'user-1',
+    ...overrides,
+  }) as InvoiceEntity;
+
+const exchangeItems = (): InvoiceItemEntity[] => [
+  {
+    id: 'exc-in',
+    organizationId: 'org-1',
+    invoiceId: 'exc-1',
+    itemId: 'item-old',
+    locationId: 'loc-1',
+    itemCode: 'OLD',
+    itemName: 'Old',
+    unit: 'pcs',
+    quantity: 1,
+    unitPrice: 750000,
+    lineTotal: 750000,
+    direction: ItemDirection.IN,
+    sortOrder: 0,
+  } as InvoiceItemEntity,
+  {
+    id: 'exc-out',
+    organizationId: 'org-1',
+    invoiceId: 'exc-1',
+    itemId: 'item-new',
+    locationId: 'loc-1',
+    itemCode: 'NEW',
+    itemName: 'New',
+    unit: 'pcs',
+    quantity: 1,
+    unitPrice: 780000,
+    lineTotal: 780000,
+    direction: ItemDirection.OUT,
+    sortOrder: 1,
+  } as InvoiceItemEntity,
+];
+
+/** net > 0 exchange checkout body (FE sends CASH for the top-up). */
+const exchangeDto = (
+  payments: Array<{ paymentMethod: InvoicePaymentMethod; amount: number }>,
+) => ({
+  refundMethod: RefundMethod.CASH,
+  revenueAccountId: REVENUE_ACCOUNT,
+  payments,
+  creditDays: 30,
+});
+
 describe('CheckoutReturnService — debt offset routing', () => {
   let service: CheckoutReturnService;
   let invoiceRepo: { findOne: jest.Mock };
@@ -126,6 +196,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
   let journalReturnPublisher: { publish: jest.Mock };
   let cashRefundPublisher: { publish: jest.Mock };
   let debtRepo: { findOne: jest.Mock };
+  let invoiceDebtService: { createFromInvoice: jest.Mock };
   let debtRow: Partial<InvoiceDebtEntity>;
 
   beforeEach(async () => {
@@ -169,6 +240,9 @@ describe('CheckoutReturnService — debt offset routing', () => {
     cashRefundPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
     // Up-front debt lookup (only queried when the operator opts into OFFSET).
     debtRepo = { findOne: jest.fn().mockResolvedValue(debtRow) };
+    invoiceDebtService = {
+      createFromInvoice: jest.fn().mockResolvedValue({ id: 'debt-new' }),
+    };
 
     const noop = { publish: jest.fn().mockResolvedValue(undefined) };
     const module: TestingModule = await Test.createTestingModule({
@@ -184,6 +258,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
         { provide: CustomerCreditService, useValue: { issue: jest.fn() } },
         { provide: AccountResolverService, useValue: accountResolver },
         { provide: CashFundResolverService, useValue: cashFundResolver },
+        { provide: InvoiceDebtService, useValue: invoiceDebtService },
         { provide: ReturnPostedPublisher, useValue: noop },
         { provide: StockReturnInPublisher, useValue: noop },
         { provide: StockDeductionPublisher, useValue: noop },
@@ -309,5 +384,104 @@ describe('CheckoutReturnService — debt offset routing', () => {
       expect.objectContaining({ refundMethod: RefundMethod.CASH }),
       actor,
     );
+  });
+
+  describe('EXCHANGE net > 0 → "tính vào công nợ"', () => {
+    beforeEach(() => {
+      invoiceRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(where.id === 'exc-1' ? exchangeDraftStub() : null),
+      );
+      itemRepo.find.mockResolvedValue(exchangeItems());
+      accountResolver.resolvePaymentAccount.mockResolvedValue('pay-acct-1');
+    });
+
+    it('books the full difference as customer debt when no payment is tendered', async () => {
+      const result = await service.checkout('exc-1', exchangeDto([]), actor);
+
+      expect(result.status).toBe(InvoiceStatus.DEBT);
+      expect(result.totalPaid).toBe(0);
+      // AR resolved server-side; debt row created for the full 30k.
+      expect(accountResolver.resolveDefaultAccount).toHaveBeenCalledWith(
+        AccountingDefaultAccountRole.RECEIVABLE,
+        actor,
+      );
+      expect(invoiceDebtService.createFromInvoice).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'exc-1' }),
+        30000,
+        mockManager,
+        expect.objectContaining({ creditDays: 30 }),
+      );
+      expect(journalReturnPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          debtAmount: 30000,
+          receivableAccountId: RECEIVABLE_ACCOUNT,
+        }),
+        actor,
+      );
+      expect(cashRefundPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('books only the unpaid remainder as debt on a partial cash top-up', async () => {
+      const result = await service.checkout(
+        'exc-1',
+        exchangeDto([{ paymentMethod: InvoicePaymentMethod.CASH, amount: 20000 }]),
+        actor,
+      );
+
+      expect(result.status).toBe(InvoiceStatus.PARTIAL_DEBT);
+      expect(result.totalPaid).toBe(20000);
+      expect(invoiceDebtService.createFromInvoice).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'exc-1' }),
+        10000,
+        mockManager,
+        expect.objectContaining({ creditDays: 30 }),
+      );
+      expect(journalReturnPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ debtAmount: 10000 }),
+        actor,
+      );
+    });
+
+    it('creates no debt when the difference is paid in full', async () => {
+      const result = await service.checkout(
+        'exc-1',
+        exchangeDto([{ paymentMethod: InvoicePaymentMethod.CASH, amount: 30000 }]),
+        actor,
+      );
+
+      expect(result.status).toBe(InvoiceStatus.PAID);
+      expect(invoiceDebtService.createFromInvoice).not.toHaveBeenCalled();
+      expect(accountResolver.resolveDefaultAccount).not.toHaveBeenCalled();
+      expect(journalReturnPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ debtAmount: 0 }),
+        actor,
+      );
+    });
+
+    it('rejects an overpayment above netAmount', async () => {
+      await expect(
+        service.checkout(
+          'exc-1',
+          exchangeDto([{ paymentMethod: InvoicePaymentMethod.CASH, amount: 40000 }]),
+          actor,
+        ),
+      ).rejects.toThrow(/vượt netAmount/);
+      expect(invoiceDebtService.createFromInvoice).not.toHaveBeenCalled();
+    });
+
+    it('rejects a debt exchange with no customer on the invoice', async () => {
+      invoiceRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(
+          where.id === 'exc-1'
+            ? exchangeDraftStub({ customerId: undefined })
+            : null,
+        ),
+      );
+
+      await expect(
+        service.checkout('exc-1', exchangeDto([]), actor),
+      ).rejects.toThrow(/customerId/);
+      expect(invoiceDebtService.createFromInvoice).not.toHaveBeenCalled();
+    });
   });
 });
