@@ -45,6 +45,7 @@ import { InvoicePaymentEntity } from '../entities/invoice-payment.entity';
 import {
   InvoiceDebtEntity,
   DebtStatus,
+  DebtDocumentType,
 } from '../entities/invoice-debt.entity';
 import { PosSessionEntity } from '../entities/pos-session.entity';
 import { CheckoutReturnDto } from '../dto/checkout-return.dto';
@@ -313,12 +314,23 @@ export class CheckoutReturnService {
         (originalInvoice.status === InvoiceStatus.DEBT ||
           originalInvoice.status === InvoiceStatus.PARTIAL_DEBT)
       ) {
-        await this.offsetOriginalDebt(
+        const applied = await this.offsetOriginalDebt(
           manager,
           originalInvoice,
           totals.refundedAmount,
           now,
         );
+        // Record the return as its own debt-ledger row so it is visible and
+        // clickable in the customer's debt (Công nợ) tab, keyed on the return id.
+        if (applied > 0) {
+          await this.createReturnDebtAdjustment(
+            manager,
+            savedInvoice,
+            originalInvoice,
+            applied,
+            now,
+          );
+        }
       }
 
       // Re-credit loyalty points that were redeemed on the original sale,
@@ -497,12 +509,16 @@ export class CheckoutReturnService {
     });
   }
 
+  /**
+   * Reduce the original SALE invoice's outstanding debt by the refunded amount.
+   * Returns the amount actually applied (0 when there is no debt to settle).
+   */
   private async offsetOriginalDebt(
     manager: EntityManager,
     originalInvoice: InvoiceEntity,
     refundedAmount: number,
     now: Date,
-  ): Promise<void> {
+  ): Promise<number> {
     const debt = await manager.findOne(InvoiceDebtEntity, {
       where: {
         invoiceId: originalInvoice.id,
@@ -513,13 +529,13 @@ export class CheckoutReturnService {
       this.logger.warn(
         `OFFSET: no debt record found for invoice ${originalInvoice.id} — skipping settlement`,
       );
-      return;
+      return 0;
     }
     if (debt.status === DebtStatus.PAID) {
       this.logger.warn(
         `OFFSET: debt ${debt.id} already PAID — skipping`,
       );
-      return;
+      return 0;
     }
     const applied = Math.min(refundedAmount, Number(debt.remainingAmount));
     debt.paidAmount = Number((Number(debt.paidAmount) + applied).toFixed(2));
@@ -532,6 +548,41 @@ export class CheckoutReturnService {
       debt.settledAt = now;
     }
     await manager.save(debt);
+    return applied;
+  }
+
+  /**
+   * Record a return/exchange OFFSET as its own `invoice_debts` row so the return
+   * invoice is visible and clickable in the customer's debt (Công nợ) tab. This is
+   * a settled reduction marker (documentType=adjustment, negative amount, remaining
+   * 0), NOT an outstanding receivable — the actual debt reduction is applied to the
+   * original sale's debt row by `offsetOriginalDebt`. The unique index on
+   * `invoiceId` keeps this idempotent (the return id differs from the sale id).
+   */
+  private async createReturnDebtAdjustment(
+    manager: EntityManager,
+    returnInvoice: InvoiceEntity,
+    originalInvoice: InvoiceEntity,
+    applied: number,
+    now: Date,
+  ): Promise<void> {
+    const row = manager.create(InvoiceDebtEntity, {
+      organizationId: returnInvoice.organizationId,
+      branchId: returnInvoice.branchId,
+      createdBy: returnInvoice.createdBy,
+      referenceCode: returnInvoice.code,
+      invoiceId: returnInvoice.id,
+      customerId: originalInvoice.customerId!,
+      documentType: DebtDocumentType.ADJUSTMENT,
+      originalAmount: -applied,
+      paidAmount: 0,
+      remainingAmount: 0,
+      issuedAt: now.toISOString().split('T')[0],
+      status: DebtStatus.PAID,
+      settledAt: now,
+      note: `Return offset against original invoice ${originalInvoice.code}`,
+    });
+    await manager.save(row);
   }
 
   private async fanOutEvents(

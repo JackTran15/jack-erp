@@ -15,6 +15,7 @@ import {
 import {
   InvoiceDebtEntity,
   DebtStatus,
+  DebtDocumentType,
 } from '../entities/invoice-debt.entity';
 import { PosSessionEntity } from '../entities/pos-session.entity';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
@@ -74,6 +75,7 @@ const originalStub = (status: InvoiceStatus): InvoiceEntity =>
     organizationId: 'org-1',
     branchId: 'branch-1',
     code: 'INV-ORIG',
+    customerId: 'cust-1',
     status,
     type: InvoiceType.SALE,
     subtotal: 500,
@@ -250,6 +252,41 @@ describe('CheckoutReturnService — debt offset routing', () => {
     expect(cashRefundPublisher.publish).not.toHaveBeenCalled();
   });
 
+  it('records the return as its own adjustment debt row when offsetting', async () => {
+    invoiceRepo.findOne.mockImplementation(({ where }) =>
+      Promise.resolve(
+        where.id === 'ret-1'
+          ? returnDraftStub()
+          : originalStub(InvoiceStatus.DEBT),
+      ),
+    );
+    debtRepo.findOne.mockResolvedValue(debtRow);
+
+    await service.checkout('ret-1', offsetDto(), actor);
+
+    // A second invoice_debts row is created for the RETURN invoice so it is
+    // visible/clickable in the customer's Công nợ tab (keyed on the return id).
+    expect(mockManager.create).toHaveBeenCalledWith(
+      InvoiceDebtEntity,
+      expect.objectContaining({
+        documentType: DebtDocumentType.ADJUSTMENT,
+        invoiceId: 'ret-1',
+        referenceCode: 'RET-0001',
+        customerId: 'cust-1',
+        originalAmount: -200,
+        paidAmount: 0,
+        remainingAmount: 0,
+        status: DebtStatus.PAID,
+      }),
+    );
+    expect(mockManager.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        documentType: DebtDocumentType.ADJUSTMENT,
+        invoiceId: 'ret-1',
+      }),
+    );
+  });
+
   it('falls back to CASH when the operator chose OFFSET but there is no debt to settle', async () => {
     invoiceRepo.findOne.mockImplementation(({ where }) =>
       Promise.resolve(
@@ -262,8 +299,10 @@ describe('CheckoutReturnService — debt offset routing', () => {
 
     await service.checkout('ret-1', offsetDto(), actor);
 
-    // Offset opt-in, but nothing to offset → cash refund, no debt settlement.
+    // Offset opt-in, but nothing to offset → cash refund, no debt settlement,
+    // and no adjustment row (nothing was applied to any debt).
     expect(mockManager.findOne).not.toHaveBeenCalled();
+    expect(mockManager.create).not.toHaveBeenCalled();
     expect(accountResolver.resolveDefaultAccount).not.toHaveBeenCalled();
     expect(cashRefundPublisher.publish).toHaveBeenCalled();
     expect(journalReturnPublisher.publish).toHaveBeenCalledWith(
