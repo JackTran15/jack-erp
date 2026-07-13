@@ -84,11 +84,11 @@ export const CATALOG_KEYS = {
     ["catalog", "products", branchId, categoryId ?? "all"] as const,
   PRODUCT_DETAIL: (branchId: string, id: string, kind?: PosProductKind) =>
     ["catalog", "product-detail", branchId, id, kind ?? "auto"] as const,
-  LOOKUP: (branchId: string, code: string) =>
-    ["catalog", "lookup", branchId, code] as const,
+  LOOKUP: (branchId: string, code: string, includeUntracked = false) =>
+    ["catalog", "lookup", branchId, code, includeUntracked] as const,
   /** Tìm kiếm catalog server-side (name/SKU/mã vạch ILIKE) cho dropdown gợi ý. */
-  SEARCH: (branchId: string, term: string) =>
-    ["catalog", "search", branchId, term] as const,
+  SEARCH: (branchId: string, term: string, includeUntracked = false) =>
+    ["catalog", "search", branchId, term, includeUntracked] as const,
 } as const;
 
 export const ITEM_CATEGORY_KEYS = {

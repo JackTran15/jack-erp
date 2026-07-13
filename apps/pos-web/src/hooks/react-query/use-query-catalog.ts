@@ -130,10 +130,15 @@ export function useInvalidatePosBranchCatalog() {
 export function useLookupCatalogByCode() {
   const queryClient = useQueryClient();
   return useCallback(
-    (branchId: string, code: string): Promise<PosCatalogLine[]> =>
+    (
+      branchId: string,
+      code: string,
+      includeUntracked = false,
+    ): Promise<PosCatalogLine[]> =>
       queryClient.fetchQuery({
-        queryKey: CATALOG_KEYS.LOOKUP(branchId, code),
-        queryFn: () => catalogService.lookupByCode(branchId, code),
+        queryKey: CATALOG_KEYS.LOOKUP(branchId, code, includeUntracked),
+        queryFn: () =>
+          catalogService.lookupByCode(branchId, code, includeUntracked),
         staleTime: 30_000,
       }),
     [queryClient],
@@ -149,10 +154,15 @@ export function useLookupCatalogByCode() {
 export function useSearchCatalog() {
   const queryClient = useQueryClient();
   return useCallback(
-    (branchId: string, term: string): Promise<PosCatalogLine[]> =>
+    (
+      branchId: string,
+      term: string,
+      includeUntracked = false,
+    ): Promise<PosCatalogLine[]> =>
       queryClient.fetchQuery({
-        queryKey: CATALOG_KEYS.SEARCH(branchId, term),
-        queryFn: () => catalogService.fetch(branchId, term),
+        queryKey: CATALOG_KEYS.SEARCH(branchId, term, includeUntracked),
+        queryFn: () =>
+          catalogService.fetch(branchId, term, undefined, includeUntracked),
         staleTime: 30_000,
       }),
     [queryClient],
