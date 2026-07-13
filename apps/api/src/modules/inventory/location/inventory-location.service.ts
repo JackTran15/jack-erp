@@ -107,6 +107,12 @@ export class InventoryLocationService {
       );
     }
 
+    // Hide discontinued items from transaction pickers (warehouse/purchasing)
+    // unless the caller explicitly opts in.
+    if (query.includeInactive !== true) {
+      qb.andWhere('item.isActive = true');
+    }
+
     const field = query.sortBy ?? 'createdAt';
     const order = (query.sortOrder ?? 'desc').toUpperCase() as 'ASC' | 'DESC';
     qb.orderBy(`item.${field}`, order);

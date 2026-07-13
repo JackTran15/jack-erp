@@ -28,7 +28,7 @@ export function VariantMatrixView({ productId }: VariantMatrixViewProps) {
     try {
       const [attrsRes, itemsRes, stockRes] = await Promise.all([
         productsApi.listAttributes(productId),
-        productsApi.listItems(productId, { pageSize: 500 }),
+        productsApi.listItems(productId, { pageSize: 500, includeInactive: true }),
         productsApi.listStockBalances(productId, { pageSize: 500 }),
       ]);
 

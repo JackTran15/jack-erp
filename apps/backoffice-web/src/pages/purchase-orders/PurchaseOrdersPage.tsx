@@ -537,7 +537,8 @@ export function PurchaseOrdersPage({
             key: "buyer",
             label: "NV mua hàng",
             width: 160,
-            render: (row: PurchaseOrder) => row.deliveredBy ?? "",
+            render: (row: PurchaseOrder) =>
+              row.purchasingEmployee?.name ?? row.purchasingEmployeeId ?? "",
           },
         ] satisfies TableColumn<PurchaseOrder>[])
       : []),

@@ -534,7 +534,7 @@ function FieldInput({
         <TreeSelectInput
           inputId={id}
           value={typeof value === "string" ? value : ""}
-          onChange={(selectedId) => onChange(selectedId || undefined)}
+          onChange={(selectedId) => onChange(selectedId || null)}
           entityKey={field.relationEntity}
           excludeId={currentRecordId}
           placeholder={`Tìm ${field.label.toLowerCase()}…`}
