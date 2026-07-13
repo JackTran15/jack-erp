@@ -78,6 +78,7 @@ export class PosCatalogService {
          AND sb.branch_id = $2
          AND i.is_active = true
          AND i.is_pos_visible = true
+         AND l.is_active = true
        ORDER BY i.name ASC, sb.location_id ASC`,
       params,
     );
@@ -120,6 +121,10 @@ export class PosCatalogService {
          ON sb.item_id = i.id
         AND sb.organization_id = i.organization_id
         AND sb.branch_id = $2
+        AND EXISTS (
+          SELECT 1 FROM locations lact
+          WHERE lact.id = sb.location_id AND lact.is_active = true
+        )
        LEFT JOIN locations l
          ON l.id = sb.location_id
        WHERE i.organization_id = $1
@@ -277,6 +282,10 @@ export class PosCatalogService {
          ON sb.item_id = i.id
         AND sb.organization_id = i.organization_id
         AND sb.branch_id = $2
+        AND EXISTS (
+          SELECT 1 FROM locations lact
+          WHERE lact.id = sb.location_id AND lact.is_active = true
+        )
        LEFT JOIN locations l
          ON l.id = sb.location_id
        WHERE i.organization_id = $1

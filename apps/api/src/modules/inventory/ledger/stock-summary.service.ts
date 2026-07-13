@@ -757,6 +757,8 @@ export class StockSummaryService {
     qb.andWhere("sb.is_tracked = true");
     // Không thống kê tồn ở kho đã ngừng hoạt động; số liệu vẫn còn ở Báo cáo tồn kho.
     qb.andWhere("storage.is_active = true");
+    // Không thống kê tồn ở vị trí đã ngừng hoạt động (location.is_active = false).
+    qb.andWhere("loc.is_active = true");
     if (query.isPosVisible !== undefined) {
       qb.andWhere("item.is_pos_visible = :isPosVisible", {
         isPosVisible: query.isPosVisible,

@@ -83,7 +83,7 @@ export class ResolveItemLocationsHandler
 
     // Storage-level fallback location ("Mặc định" first, then "Chưa xếp").
     const defaultLoc = await manager.findOne(LocationEntity, {
-      where: { storageId, organizationId: orgId, isDefault: true },
+      where: { storageId, organizationId: orgId, isDefault: true, isActive: true },
     });
     const fallbackLoc =
       defaultLoc ??
@@ -97,10 +97,19 @@ export class ResolveItemLocationsHandler
       { locationId: string | null; source: ResolvedLocationSource }
     >();
     for (const [key, itemIds] of groups) {
-      // a. Preferred shelf for any sibling in this storage.
-      const isl = await manager.findOne(ItemStorageLocationEntity, {
-        where: { itemId: In(itemIds), storageId, organizationId: orgId },
-      });
+      // a. Preferred shelf for any sibling in this storage (bỏ qua vị trí đã ngừng
+      //    hoạt động — rơi xuống nhánh sau).
+      const isl = await manager
+        .createQueryBuilder(ItemStorageLocationEntity, 'isl')
+        .innerJoin(
+          'locations',
+          'loc',
+          'loc.id = isl.location_id AND loc.is_active = true',
+        )
+        .where('isl.item_id IN (:...itemIds)', { itemIds })
+        .andWhere('isl.storage_id = :storageId', { storageId })
+        .andWhere('isl.organization_id = :orgId', { orgId })
+        .getOne();
       if (isl) {
         groupLocation.set(key, { locationId: isl.locationId, source: 'preferred' });
         continue;
@@ -111,6 +120,7 @@ export class ResolveItemLocationsHandler
         .innerJoin('locations', 'loc', 'loc.id = sb.location_id')
         .where('sb.item_id IN (:...itemIds)', { itemIds })
         .andWhere('loc.storage_id = :storageId', { storageId })
+        .andWhere('loc.is_active = true')
         .andWhere('sb.organization_id = :orgId', { orgId })
         .andWhere('sb.quantity > 0')
         .orderBy('sb.quantity', 'DESC')

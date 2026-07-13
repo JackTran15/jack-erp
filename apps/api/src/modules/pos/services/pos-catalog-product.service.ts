@@ -464,7 +464,7 @@ export class PosCatalogProductService {
 
     const locationIds = [...new Set(balances.map((b) => b.locationId))];
     const locations = await this.locationRepo.find({
-      where: { id: In(locationIds), organizationId: orgId },
+      where: { id: In(locationIds), organizationId: orgId, isActive: true },
     });
     const locById = new Map(locations.map((l) => [l.id, l]));
 
@@ -479,6 +479,8 @@ export class PosCatalogProductService {
     const map = new Map<string, ItemStock>();
     for (const b of balances) {
       const loc = locById.get(b.locationId);
+      // Bỏ qua tồn ở vị trí đã ngừng hoạt động (không có trong locById).
+      if (!loc) continue;
       if (direction && showroomStorageIds) {
         const isShowroom = loc ? showroomStorageIds.has(loc.storageId) : false;
         const wantShowroom = direction === PosCatalogDirection.SHOWROOM;

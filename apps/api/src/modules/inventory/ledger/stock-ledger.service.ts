@@ -746,7 +746,13 @@ export class StockLedgerService {
       await manager.update(
         StockBalanceEntity,
         { id: existing.id },
-        { quantity: newQuantity, lastMovementAt: new Date() },
+        {
+          quantity: newQuantity,
+          lastMovementAt: new Date(),
+          // Bất kỳ giao dịch nào chạm vào một vị trí đã ngừng theo dõi đều bật
+          // lại "Đang theo dõi" (kể cả khi trừ hàng, ví dụ bán qua chuyển kho tạm).
+          ...(existing.isTracked === false ? { isTracked: true } : {}),
+        },
       );
     } else {
       if (Number(params.quantity) < 0) {

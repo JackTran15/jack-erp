@@ -843,6 +843,7 @@ export class InventoryLocationStockService {
         organizationId: actor.organizationId,
         storageId,
         isUnassigned: false,
+        isActive: true,
         ...(actor.branchId ? { storage: { branchId: actor.branchId } } : {}),
       },
       relations: { storage: true },
