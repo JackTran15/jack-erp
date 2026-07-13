@@ -291,10 +291,14 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
       }
       if (next) {
         setKeepChange(false);
+        // Ticking debt hands amount control to the operator: start every payment
+        // line at 0 so the full "Còn phải thu" lands in the debt line; typing a
+        // tendered amount then reduces the booked debt.
+        setPaymentLines((prev) => prev.map((l) => ({ ...l, amount: 0 })));
       }
       setDebt(next);
     },
-    [setKeepChange, setDebt],
+    [setKeepChange, setDebt, setPaymentLines],
   );
 
   // Luồng hoàn tiền: "Tính vào công nợ" bù trừ khoản hoàn vào công nợ hóa đơn
