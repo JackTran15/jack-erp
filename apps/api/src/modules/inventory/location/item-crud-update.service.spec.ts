@@ -66,6 +66,11 @@ describe('InventoryItemCrudService.update (nested reconcile)', () => {
     dataSource = {
       transaction: jest.fn().mockImplementation(async (cb: any) => cb(mockManager)),
       query: jest.fn().mockResolvedValue([]),
+      // update() checks productRepo.exist() to route product-variant patches
+      // differently; every test here targets a plain item, so it's false.
+      getRepository: jest.fn().mockReturnValue({
+        exist: jest.fn().mockResolvedValue(false),
+      }),
     };
 
     const repoMock = () => ({

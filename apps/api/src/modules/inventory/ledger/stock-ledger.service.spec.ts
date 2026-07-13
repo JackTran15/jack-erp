@@ -53,6 +53,9 @@ describe('StockLedgerService', () => {
       save: jest.fn().mockImplementation((_entity, data) => Promise.resolve(data)),
       findOne: jest.fn(),
       update: jest.fn().mockResolvedValue(undefined),
+      // assertStoragesActive() queries for inactive storages before writing —
+      // empty result means none of the test locations are deactivated.
+      query: jest.fn().mockResolvedValue([]),
     };
 
     dataSource = {

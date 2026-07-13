@@ -105,6 +105,9 @@ describe('StockTransferService', () => {
       save: jest.fn().mockImplementation((_entity, data) =>
         Promise.resolve({ id: 'xfer-1', ...data }),
       ),
+      // postIntraWarehouseMoves() re-marks destination balances as tracked
+      // via a raw UPDATE; empty result is fine for these tests.
+      query: jest.fn().mockResolvedValue([]),
     };
 
     dataSource = {
