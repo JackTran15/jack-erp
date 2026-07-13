@@ -54,6 +54,7 @@ export class PosController {
       actor,
       query.search,
       query.direction,
+      query.includeUntracked,
     );
   }
 
@@ -64,7 +65,12 @@ export class PosController {
     @Query() query: PosCatalogLookupQueryDto,
     @Actor() actor: ActorContext,
   ) {
-    return this.catalogService.lookupByCode(branchId, actor, query.code);
+    return this.catalogService.lookupByCode(
+      branchId,
+      actor,
+      query.code,
+      query.includeUntracked,
+    );
   }
 
   @Get('branches/:branchId/catalog/products')

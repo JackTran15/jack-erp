@@ -59,7 +59,8 @@ export function useFastStockTransferProductPicker(): UseFastStockTransferProduct
         return [];
       }
 
-      const rows = await searchCatalog(branchId, normalized);
+      // Chuyển kho tạm cần thấy cả chi tiết đã ngừng theo dõi để dọn hàng.
+      const rows = await searchCatalog(branchId, normalized, true);
       upsertProducts(rows);
 
       return rows
@@ -82,7 +83,7 @@ export function useFastStockTransferProductPicker(): UseFastStockTransferProduct
 
       let lookupRows: PosCatalogLine[];
       try {
-        lookupRows = await lookup(branchId, code);
+        lookupRows = await lookup(branchId, code, true);
       } catch {
         lookupRows = [];
       }

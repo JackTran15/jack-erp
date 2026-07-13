@@ -453,6 +453,8 @@ export class PosCatalogProductService {
     const where: FindOptionsWhere<StockBalanceEntity> = {
       organizationId: orgId,
       branchId,
+      // Bán hàng không hiện tồn ở chi tiết đã ngừng theo dõi.
+      isTracked: true,
     };
     if (itemIds) {
       where.itemId = In(itemIds);

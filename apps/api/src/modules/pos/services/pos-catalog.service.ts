@@ -27,6 +27,7 @@ export class PosCatalogService {
     actor: ActorContext,
     search?: string,
     direction?: PosCatalogDirection,
+    includeUntracked = false,
   ): Promise<PosCatalogLineDto[]> {
     const orgId = actor.organizationId;
     const raw = search?.trim() ?? '';
@@ -38,8 +39,13 @@ export class PosCatalogService {
         orgId,
         `%${safeSearch}%`,
         direction,
+        includeUntracked,
       );
     }
+
+    // Bán hàng ẩn tồn ở chi tiết đã ngừng theo dõi; Chuyển kho tạm truyền
+    // includeUntracked=true để vẫn lấy được nguồn dọn hàng.
+    const trackedFilter = includeUntracked ? '' : 'AND sb.is_tracked = true';
 
     const params: string[] = [orgId, branchId];
 
@@ -79,6 +85,7 @@ export class PosCatalogService {
          AND i.is_active = true
          AND i.is_pos_visible = true
          AND l.is_active = true
+         ${trackedFilter}
        ORDER BY i.name ASC, sb.location_id ASC`,
       params,
     );
@@ -95,7 +102,9 @@ export class PosCatalogService {
     orgId: string,
     pattern: string,
     direction?: PosCatalogDirection,
+    includeUntracked = false,
   ): Promise<PosCatalogLineDto[]> {
+    const trackedFilter = includeUntracked ? '' : 'AND sb.is_tracked = true';
     const rows = await this.dataSource.query(
       `SELECT i.id                  AS "itemId",
               i.product_id          AS "productId",
@@ -121,6 +130,7 @@ export class PosCatalogService {
          ON sb.item_id = i.id
         AND sb.organization_id = i.organization_id
         AND sb.branch_id = $2
+        ${trackedFilter}
         AND EXISTS (
           SELECT 1 FROM locations lact
           WHERE lact.id = sb.location_id AND lact.is_active = true
@@ -252,8 +262,10 @@ export class PosCatalogService {
     branchId: string,
     actor: ActorContext,
     code: string,
+    includeUntracked = false,
   ): Promise<PosCatalogLineDto[]> {
     const orgId = actor.organizationId;
+    const trackedFilter = includeUntracked ? '' : 'AND sb.is_tracked = true';
 
     const rows: Array<{
       itemId: string;
@@ -282,6 +294,7 @@ export class PosCatalogService {
          ON sb.item_id = i.id
         AND sb.organization_id = i.organization_id
         AND sb.branch_id = $2
+        ${trackedFilter}
         AND EXISTS (
           SELECT 1 FROM locations lact
           WHERE lact.id = sb.location_id AND lact.is_active = true
