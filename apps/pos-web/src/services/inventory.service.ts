@@ -35,8 +35,9 @@ export const inventoryService = {
   listBranchStorages: async (
     branchId: string,
   ): Promise<ReadonlyArray<InventoryStorageOption>> => {
+    // POS chỉ chọn kho đang hoạt động — ẩn kho đã ngừng hoạt động khỏi dropdown.
     const result = await http.get<PaginatedResponse<InventoryStorageOption>>(
-      `/inventory/storages?${buildListQuery(branchId)}`,
+      `/inventory/storages?${buildListQuery(branchId)}&activeOnly=true`,
     );
     return result.data;
   },
