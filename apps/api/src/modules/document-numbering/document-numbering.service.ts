@@ -64,6 +64,7 @@ const DEFAULT_DOC_NUMBER_CONFIG: Record<
   [DocumentType.DELIVERY_PARTNER]: { prefix: "DTGH", continuous: true },
   [DocumentType.STOCK_TAKE]: { prefix: "KK", continuous: true },
   [DocumentType.WAREHOUSE]: { prefix: "WH", continuous: true },
+  [DocumentType.CUSTOMER_GROUP]: { prefix: "NKH", continuous: true },
 };
 
 @Injectable()

@@ -13,9 +13,9 @@ import {
   type TableColumn,
 } from "../../../../components/table/BaseDataTable";
 import { StatusBadge } from "../../../../components/status/StatusBadge";
-import { ImportFilePicker } from "../import/ImportFilePicker";
-import { ImportWizardFooter } from "../import/ImportWizardFooter";
-import { ImportWizardStepper } from "../import/ImportWizardStepper";
+import { ImportFilePicker } from "../../../../components/shared/import-wizard/ImportFilePicker";
+import { ImportWizardFooter } from "../../../../components/shared/import-wizard/ImportWizardFooter";
+import { ImportWizardStepper } from "../../../../components/shared/import-wizard/ImportWizardStepper";
 import {
   cancelDocumentLineImport,
   downloadDocumentLineImportErrors,

@@ -1,5 +1,8 @@
-/** Parse semicolon-delimited text (quote-aware, UTF-8 BOM). */
-export function parseSemicolonDelimitedGrid(text: string): string[][] {
+/** Parse delimited text (quote-aware, UTF-8 BOM, newline inside quoted cells). */
+export function parseDelimitedGrid(
+  text: string,
+  delimiter: ';' | ',' = ';',
+): string[][] {
   const normalized = text.replace(/^\uFEFF/, '');
 
   const grid: string[][] = [];
@@ -30,7 +33,7 @@ export function parseSemicolonDelimitedGrid(text: string): string[][] {
       continue;
     }
 
-    if (ch === ';') {
+    if (ch === delimiter) {
       row.push(cur);
       cur = '';
       continue;
@@ -55,6 +58,11 @@ export function parseSemicolonDelimitedGrid(text: string): string[][] {
   grid.push(row);
 
   return trimTrailingEmptyRows(grid);
+}
+
+/** Parse semicolon-delimited text (quote-aware, UTF-8 BOM). */
+export function parseSemicolonDelimitedGrid(text: string): string[][] {
+  return parseDelimitedGrid(text, ';');
 }
 
 export function trimTrailingEmptyRows(grid: string[][]): string[][] {

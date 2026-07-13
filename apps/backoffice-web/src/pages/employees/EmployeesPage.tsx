@@ -98,6 +98,10 @@ export function EmployeesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
+  // Remount key for EmployeeFormModal: the modal stays mounted across
+  // open/close, so bumping this resets its internal state (draft, generated
+  // employee code) for each fresh form session.
+  const [formSessionKey, setFormSessionKey] = useState(0);
   const [formMode, setFormMode] = useState<EmployeeFormMode>("create");
   const [formInitialDraft, setFormInitialDraft] = useState<
     EmployeeFormDraft | undefined
@@ -140,6 +144,7 @@ export function EmployeesPage() {
   }, [listRows, selectedId, userDetail]);
 
   const openCreate = useCallback(() => {
+    setFormSessionKey((k) => k + 1);
     setFormMode("create");
     setEditingId(null);
     setFormInitialDraft(undefined);
@@ -151,6 +156,7 @@ export function EmployeesPage() {
       toast.error("Vui lòng chọn một nhân viên để sửa.");
       return;
     }
+    setFormSessionKey((k) => k + 1);
     setFormMode("edit");
     setEditingId(selectedId);
     setFormInitialDraft(undefined);
@@ -168,6 +174,7 @@ export function EmployeesPage() {
     draft.basic.changePassword = false;
     draft.basic.password = "";
     draft.basic.confirmPassword = "";
+    setFormSessionKey((k) => k + 1);
     setFormMode("create");
     setEditingId(null);
     setFormInitialDraft(draft);
@@ -254,6 +261,7 @@ export function EmployeesPage() {
           await updateUser.mutateAsync(payload);
           toast.success("Đã cập nhật người dùng.");
         }
+        setFormSessionKey((k) => k + 1);
         setEditingId(null);
         setFormMode("create");
         setFormInitialDraft(undefined);
@@ -439,6 +447,7 @@ export function EmployeesPage() {
       </DocumentListShell>
 
       <EmployeeFormModal
+        key={formSessionKey}
         open={formOpen}
         mode={formMode}
         userId={editingId ?? undefined}

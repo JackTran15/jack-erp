@@ -3,9 +3,9 @@ import { AppModal } from "@erp/ui";
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ImportSuccessIllustration } from "../../inventory/_components/import/ImportSuccessIllustration";
-import { ImportWizardFooter } from "../../inventory/_components/import/ImportWizardFooter";
-import { ImportWizardStepper } from "../../inventory/_components/import/ImportWizardStepper";
+import { ImportSuccessIllustration } from "../../../components/shared/import-wizard/ImportSuccessIllustration";
+import { ImportWizardFooter } from "../../../components/shared/import-wizard/ImportWizardFooter";
+import { ImportWizardStepper } from "../../../components/shared/import-wizard/ImportWizardStepper";
 import { ImportStepDataReviewLocation } from "./ImportStepDataReviewLocation";
 import { ImportStepFileSelectLocation } from "./ImportStepFileSelectLocation";
 import {

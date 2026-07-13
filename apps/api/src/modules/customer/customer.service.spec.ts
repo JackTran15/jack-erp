@@ -8,6 +8,7 @@ import {
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { CustomerStatus } from '@erp/shared-interfaces';
+import { DocumentNumberingService } from '../document-numbering/document-numbering.service';
 import { CustomerEntity } from './customer.entity';
 import { MembershipCardEntity, MembershipTier } from './membership-card.entity';
 import { CustomerService } from './customer.service';
@@ -104,6 +105,10 @@ describe('CustomerService', () => {
         { provide: getRepositoryToken(MembershipCardEntity), useValue: membershipCardRepo },
         { provide: EventPublisher, useValue: eventPublisher },
         { provide: DataSource, useValue: dataSource },
+        {
+          provide: DocumentNumberingService,
+          useValue: { generate: jest.fn().mockResolvedValue('KH000001') },
+        },
       ],
     }).compile();
 

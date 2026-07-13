@@ -69,15 +69,7 @@ function formatDisplayValue(
   return text;
 }
 
-export function toImportReviewRows(rows: ImportJobRow[]): ImportReviewRow[] {
-  return rows.map((row) => {
-    const isError = row.status === ImportRowStatus.ERROR;
-    const statusLabel = isError
-      ? (row.errorMessages?.map((e) => e.message).join(" ") ?? "Không hợp lệ")
-      : "Hợp lệ";
-    return { ...row, statusLabel, isError };
-  });
-}
+export { toImportReviewRows } from "../../../../components/shared/import-wizard/types";
 
 function buildColumnsForFields(
   fields: InventoryImportExcelField[],

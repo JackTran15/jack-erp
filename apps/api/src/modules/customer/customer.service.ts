@@ -113,7 +113,35 @@ export class CustomerService extends BaseCrudService<
     actor: ActorContext,
   ): Promise<CreateCustomerDto> {
     if (!payload.code?.trim()) {
-      payload.code = await this.docNumbering.generate(DocumentType.CUSTOMER, actor.branchId, actor);
+      // Seeded/imported customers may hold KH-codes the counter never issued —
+      // skip past collisions instead of failing the insert on the unique index.
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const candidate = await this.docNumbering.generate(
+          DocumentType.CUSTOMER,
+          actor.branchId,
+          actor,
+        );
+        const taken = await this.repository.findOne({
+          where: { code: candidate, organizationId: actor.organizationId },
+        });
+        if (!taken) {
+          payload.code = candidate;
+          break;
+        }
+      }
+      if (!payload.code?.trim()) {
+        throw new ConflictException(
+          'Không thể cấp mã khách hàng mới, vui lòng thử lại.',
+        );
+      }
+    }
+    // Blank phone/email (e.g. from the duplicate form) must be stored as NULL:
+    // the partial unique indexes only exempt NULL, so '' collides org-wide.
+    if (typeof payload.phone === 'string' && !payload.phone.trim()) {
+      payload.phone = undefined;
+    }
+    if (typeof payload.email === 'string' && !payload.email.trim()) {
+      payload.email = undefined;
     }
     await this.checkDuplicates(payload.email, payload.phone, actor.organizationId);
     return payload;
@@ -131,6 +159,24 @@ export class CustomerService extends BaseCrudService<
       throw new BadRequestException(
         'Cannot modify a merged customer. Use the target customer instead.',
       );
+    }
+
+    if (payload.code !== undefined) {
+      const code = payload.code.trim();
+      if (!code) {
+        // Code is required and system-issued — an empty edit keeps the current one.
+        delete payload.code;
+      } else {
+        const taken = await this.repository.findOne({
+          where: { code, organizationId: actor.organizationId, id: Not(id) },
+        });
+        if (taken) {
+          throw new ConflictException(
+            `Mã khách hàng "${code}" đã tồn tại trong tổ chức.`,
+          );
+        }
+        payload.code = code;
+      }
     }
 
     if (payload.email !== undefined || payload.phone !== undefined) {
@@ -323,9 +369,12 @@ export const CUSTOMER_ENTITY_CONFIG: CrudEntityConfig = {
   apiResource: 'customers',
   idField: 'id',
   fields: [
+    // code/phone/email are unique per org — never copied by "Nhân bản"
+    // (blank code is auto-issued by beforeCreate).
+    { key: 'code', label: 'Mã khách hàng', type: 'string', skipOnDuplicate: true },
     { key: 'name', label: 'Tên khách hàng', type: 'string', required: true },
-    { key: 'email', label: 'Email', type: 'string' },
-    { key: 'phone', label: 'Điện thoại', type: 'string' },
+    { key: 'email', label: 'Email', type: 'string', skipOnDuplicate: true },
+    { key: 'phone', label: 'Điện thoại', type: 'string', skipOnDuplicate: true },
     { key: 'address', label: 'Địa chỉ', type: 'string' },
     {
       key: 'status',

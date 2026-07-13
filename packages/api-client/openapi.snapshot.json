@@ -4749,6 +4749,255 @@
         ]
       }
     },
+    "/customers/imports/validate": {
+      "post": {
+        "operationId": "CustomerImportController_validate",
+        "parameters": [
+          {
+            "name": "duplicateMode",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CustomerImport"
+        ]
+      }
+    },
+    "/customers/imports/commit": {
+      "post": {
+        "operationId": "CustomerImportController_commit",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CustomerImport"
+        ]
+      }
+    },
+    "/customers/imports/import-template.xls": {
+      "get": {
+        "operationId": "CustomerImportController_downloadTemplate",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CustomerImport"
+        ]
+      }
+    },
+    "/customers/imports/jobs/{id}": {
+      "get": {
+        "operationId": "CustomerImportController_getJob",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryImportJobEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CustomerImport"
+        ]
+      },
+      "delete": {
+        "operationId": "CustomerImportController_cancelJob",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CustomerImport"
+        ]
+      }
+    },
+    "/customers/imports/jobs/{id}/rows": {
+      "get": {
+        "operationId": "CustomerImportController_listJobRows",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filters",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CustomerImport"
+        ]
+      }
+    },
+    "/customers/imports/jobs/{id}/error-rows.xlsx": {
+      "get": {
+        "operationId": "CustomerImportController_exportJobErrorRows",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CustomerImport"
+        ]
+      }
+    },
+    "/customers/exports/excel": {
+      "get": {
+        "operationId": "CustomerExportController_exportAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CustomerExport"
+        ]
+      },
+      "post": {
+        "operationId": "CustomerExportController_exportSelected",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportCustomersSelectedDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CustomerExport"
+        ]
+      }
+    },
     "/inventory/locations/preferred-shelf": {
       "get": {
         "operationId": "InventoryLocationStockController_getPreferredShelf",
@@ -10302,6 +10551,87 @@
         ]
       }
     },
+    "/inventory/imports/item-categories/validate": {
+      "post": {
+        "operationId": "CsvImportController_validateItemCategories",
+        "parameters": [
+          {
+            "name": "duplicateMode",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/item-categories/commit": {
+      "post": {
+        "operationId": "CsvImportController_commitItemCategories",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/item-categories/import-template.xls": {
+      "get": {
+        "operationId": "CsvImportController_downloadItemCategoryTemplate",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/item-categories/jobs/{id}/error-rows.xlsx": {
+      "get": {
+        "operationId": "CsvImportController_exportItemCategoryJobErrorRows",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
     "/inventory/imports/locations/validate": {
       "post": {
         "operationId": "CsvImportController_validateLocations",
@@ -11428,6 +11758,20 @@
     "/inventory/exports/locations/excel": {
       "get": {
         "operationId": "CsvExportController_exportLocationsExcel",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvExport"
+        ]
+      }
+    },
+    "/inventory/exports/item-categories/excel": {
+      "get": {
+        "operationId": "CsvExportController_exportItemCategoriesExcel",
         "parameters": [],
         "responses": {
           "200": {
@@ -20062,7 +20406,8 @@
               "CUSTOMER",
               "SUPPLIER",
               "DELIVERY_PARTNER",
-              "WAREHOUSE"
+              "WAREHOUSE",
+              "CUSTOMER_GROUP"
             ]
           },
           "branchId": {
@@ -20136,7 +20481,8 @@
               "CUSTOMER",
               "SUPPLIER",
               "DELIVERY_PARTNER",
-              "WAREHOUSE"
+              "WAREHOUSE",
+              "CUSTOMER_GROUP"
             ],
             "type": "string"
           },
@@ -20273,7 +20619,8 @@
               "CUSTOMER",
               "SUPPLIER",
               "DELIVERY_PARTNER",
-              "WAREHOUSE"
+              "WAREHOUSE",
+              "CUSTOMER_GROUP"
             ],
             "type": "string"
           },
@@ -20561,6 +20908,9 @@
       "CustomerGroupEntity": {
         "type": "object",
         "properties": {
+          "code": {
+            "type": "string"
+          },
           "name": {
             "type": "string"
           },
@@ -21219,6 +21569,188 @@
             "maxLength": 2000
           }
         }
+      },
+      "InventoryImportJobEntity": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "ITEMS",
+              "OPENING_BALANCES",
+              "ADJUSTMENTS",
+              "STOCK_TAKE",
+              "LOCATIONS",
+              "GOODS_RECEIPT",
+              "GOODS_ISSUE",
+              "STOCK_TRANSFER",
+              "TRANSFER_ORDER",
+              "CUSTOMERS",
+              "CATEGORIES"
+            ],
+            "type": "string"
+          },
+          "referenceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "fileChecksum": {
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "VALIDATING",
+              "VALIDATED",
+              "IMPORTING",
+              "COMMITTING",
+              "COMMITTED",
+              "COMPLETED",
+              "FAILED"
+            ],
+            "type": "string"
+          },
+          "totalRows": {
+            "type": "number"
+          },
+          "validRows": {
+            "type": "number"
+          },
+          "errorRows": {
+            "type": "number"
+          },
+          "duplicateMode": {
+            "enum": [
+              "UPDATE",
+              "SKIP"
+            ],
+            "type": "string"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryImportJobRowEntity"
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "type",
+          "fileName",
+          "fileChecksum",
+          "idempotencyKey",
+          "status",
+          "totalRows",
+          "validRows",
+          "errorRows",
+          "duplicateMode",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "InventoryImportJobRowEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "jobId": {
+            "type": "string"
+          },
+          "rowNumber": {
+            "type": "number"
+          },
+          "rawData": {
+            "type": "object"
+          },
+          "normalizedData": {
+            "type": "object",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "VALID",
+              "ERROR",
+              "COMMITTED"
+            ]
+          },
+          "errorMessages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "warningMessages": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "job": {
+            "$ref": "#/components/schemas/InventoryImportJobEntity"
+          }
+        },
+        "required": [
+          "id",
+          "jobId",
+          "rowNumber",
+          "rawData",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ExportCustomersSelectedDto": {
+        "type": "object",
+        "properties": {
+          "customerIds": {
+            "description": "Danh sách id khách hàng được chọn để xuất khẩu",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "customerIds"
+        ]
       },
       "PreferredShelfResponseDto": {
         "type": "object",
@@ -25759,171 +26291,6 @@
         },
         "required": [
           "lineIds"
-        ]
-      },
-      "InventoryImportJobEntity": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "enum": [
-              "ITEMS",
-              "OPENING_BALANCES",
-              "ADJUSTMENTS",
-              "STOCK_TAKE",
-              "LOCATIONS",
-              "GOODS_RECEIPT",
-              "GOODS_ISSUE",
-              "STOCK_TRANSFER",
-              "TRANSFER_ORDER"
-            ]
-          },
-          "referenceId": {
-            "type": "string",
-            "nullable": true
-          },
-          "fileName": {
-            "type": "string"
-          },
-          "fileChecksum": {
-            "type": "string"
-          },
-          "idempotencyKey": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "PENDING",
-              "VALIDATING",
-              "VALIDATED",
-              "IMPORTING",
-              "COMMITTING",
-              "COMMITTED",
-              "COMPLETED",
-              "FAILED"
-            ]
-          },
-          "totalRows": {
-            "type": "number"
-          },
-          "validRows": {
-            "type": "number"
-          },
-          "errorRows": {
-            "type": "number"
-          },
-          "duplicateMode": {
-            "type": "string",
-            "enum": [
-              "UPDATE",
-              "SKIP"
-            ]
-          },
-          "rows": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/InventoryImportJobRowEntity"
-            }
-          },
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string",
-            "description": "Tenant isolation key — every row belongs to exactly one organization."
-          },
-          "branchId": {
-            "type": "string",
-            "description": "Optional branch scope; null for org-wide records."
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "UUID of the user who created this record."
-          }
-        },
-        "required": [
-          "type",
-          "fileName",
-          "fileChecksum",
-          "idempotencyKey",
-          "status",
-          "totalRows",
-          "validRows",
-          "errorRows",
-          "duplicateMode",
-          "id",
-          "organizationId",
-          "createdAt",
-          "updatedAt",
-          "createdBy"
-        ]
-      },
-      "InventoryImportJobRowEntity": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "jobId": {
-            "type": "string"
-          },
-          "rowNumber": {
-            "type": "number"
-          },
-          "rawData": {
-            "type": "object"
-          },
-          "normalizedData": {
-            "type": "object",
-            "nullable": true
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "VALID",
-              "ERROR",
-              "COMMITTED"
-            ]
-          },
-          "errorMessages": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "warningMessages": {
-            "type": "object",
-            "nullable": true
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "job": {
-            "$ref": "#/components/schemas/InventoryImportJobEntity"
-          }
-        },
-        "required": [
-          "id",
-          "jobId",
-          "rowNumber",
-          "rawData",
-          "status",
-          "createdAt",
-          "updatedAt"
         ]
       },
       "ExportItemsBodyDto": {

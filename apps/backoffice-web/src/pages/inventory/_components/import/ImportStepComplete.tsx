@@ -1,4 +1,4 @@
-import { ImportSuccessIllustration } from "./ImportSuccessIllustration";
+import { ImportSuccessIllustration } from "../../../../components/shared/import-wizard/ImportSuccessIllustration";
 
 interface Props {
   productsCount: number;

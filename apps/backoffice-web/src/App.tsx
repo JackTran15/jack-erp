@@ -29,6 +29,7 @@ import { TreasuryCashCountPage } from "./pages/treasury/cash/TreasuryCashCountPa
 import { TreasuryWipPage } from "./pages/treasury/TreasuryWipPage";
 import { InventoryManagementPage } from "./pages/inventory/InventoryManagementPage";
 import { InventoryItemsPage } from "./pages/inventory/InventoryItemsPage";
+import { ItemCategoriesPage } from "./pages/inventory/ItemCategoriesPage";
 import { InventoryItemBarcodesPage } from "./pages/inventory-item-barcodes/InventoryItemBarcodesPage";
 import { InventoryStoragesPage } from "./pages/inventory/InventoryStoragesPage";
 import { ItemLocationDetailsPage } from "./pages/item-location-details/ItemLocationDetailsPage";
@@ -47,6 +48,7 @@ import { ProductDetailPage } from "./pages/products/ProductDetailPage";
 import { EmployeesPage } from "./pages/employees/EmployeesPage";
 import { RoleManagementPage } from "./pages/role-management/RoleManagementPage";
 import { CustomerDetailPage } from "./pages/customers/CustomerDetailPage";
+import { CustomersPage } from "./pages/customers/CustomersPage";
 import { DynamicStoreView } from "./pages/dynamic-store-view";
 import { REPORT_TYPE_INVENTORY } from "./constants/reports/report-type.constant";
 import { InventoryReportPage } from "./pages/reports/InventoryReportPage";
@@ -97,6 +99,7 @@ export function App() {
                   path="/admin/customers/:id"
                   element={<CustomerDetailPage />}
                 />
+                <Route path="/admin/customers" element={<CustomersPage />} />
                 <Route
                   path="/admin/:entityKey/:id"
                   element={<CrudDetailPage />}
@@ -104,6 +107,10 @@ export function App() {
                 <Route
                   path="/admin/inventory-items"
                   element={<InventoryItemsPage />}
+                />
+                <Route
+                  path="/admin/inventory-item-categories"
+                  element={<ItemCategoriesPage />}
                 />
                 <Route
                   path="/admin/inventory-item-barcodes"

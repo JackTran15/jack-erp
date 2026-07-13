@@ -221,7 +221,7 @@ function buildInitialValues(
   if (duplicateSource) {
     const initial: Record<string, unknown> = {};
     fields.forEach((f) => {
-      const v = duplicateSource[f.key];
+      const v = f.skipOnDuplicate ? undefined : duplicateSource[f.key];
       if (v === undefined || v === null) {
         initial[f.key] = f.type === "boolean" ? false : "";
       } else {

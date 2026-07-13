@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { DocumentType } from '@erp/shared-interfaces';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
+import { DocumentNumberingService } from '../document-numbering/document-numbering.service';
 import { CustomerGroupEntity } from './customer-group.entity';
 import { CreateCustomerGroupDto } from './dto/create-customer-group.dto';
 
@@ -10,15 +12,22 @@ export class CustomerGroupService {
   constructor(
     @InjectRepository(CustomerGroupEntity)
     private readonly groupRepo: Repository<CustomerGroupEntity>,
+    private readonly docNumbering: DocumentNumberingService,
   ) {}
 
   async create(
     dto: CreateCustomerGroupDto,
     actor: ActorContext,
   ): Promise<CustomerGroupEntity> {
+    const code = await this.docNumbering.generate(
+      DocumentType.CUSTOMER_GROUP,
+      actor.branchId,
+      actor,
+    );
     const group = this.groupRepo.create({
       organizationId: actor.organizationId,
       branchId: actor.branchId, // Todo check business rule need to be org-wide or branch-wide
+      code,
       name: dto.name,
       description: dto.description,
       createdBy: actor.userId,

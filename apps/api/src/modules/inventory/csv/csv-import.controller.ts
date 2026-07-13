@@ -41,6 +41,7 @@ import { ImportJobStatus, ImportRowStatus } from "@erp/shared-interfaces";
 import { ApiQuery } from "@nestjs/swagger";
 import { CsvImportService } from "./csv-import.service";
 import { LocationImportService } from "./location-import.service";
+import { CategoryImportService } from "./category-import.service";
 import { ImportJobType } from "./inventory-import-job.entity";
 import { ExcelImportGoodsReceiptService } from "./excel-import-goods-receipt.service";
 
@@ -73,6 +74,7 @@ export class CsvImportController {
   constructor(
     private readonly csvImportService: CsvImportService,
     private readonly locationImportService: LocationImportService,
+    private readonly categoryImportService: CategoryImportService,
     private readonly goodsReceiptImporter: ExcelImportGoodsReceiptService,
   ) {}
 
@@ -281,6 +283,56 @@ export class CsvImportController {
     res.setHeader(
       "Content-Disposition",
       'attachment; filename="dong-nhap-kho-loi.xlsx"',
+    );
+    res.send(buffer);
+  }
+
+  // ─── Item Categories ──────────────────────────────────────────────
+
+  @Post("item-categories/validate")
+  @RequirePermission("inventory.write")
+  @UseInterceptors(FileInterceptor("file"))
+  validateItemCategories(
+    @UploadedFile() file: Express.Multer.File,
+    @Query("duplicateMode") duplicateMode: string | undefined,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.categoryImportService.validate(file, actor, duplicateMode);
+  }
+
+  @Post("item-categories/commit")
+  @RequirePermission("inventory.write")
+  commitItemCategories(
+    @Query("jobId", ParseUUIDPipe) jobId: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.categoryImportService.commit(jobId, actor);
+  }
+
+  @Get("item-categories/import-template.xls")
+  @RequirePermission("inventory.read")
+  downloadItemCategoryTemplate(@Res() res: Response) {
+    this.sendTemplate(res, "DanhMucNhomHangHoa.xls");
+  }
+
+  @Get("item-categories/jobs/:id/error-rows.xlsx")
+  @RequirePermission("inventory.read")
+  async exportItemCategoryJobErrorRows(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Res() res: Response,
+    @Actor() actor: ActorContext,
+  ) {
+    const buffer = await this.categoryImportService.exportErrorRowsBuffer(
+      id,
+      actor,
+    );
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="nhom-hang-hoa-loi-nhap-khau.xlsx"',
     );
     res.send(buffer);
   }

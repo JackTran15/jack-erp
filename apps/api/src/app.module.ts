@@ -18,6 +18,7 @@ import { SalesHierarchyModule } from './modules/sales-hierarchy/sales-hierarchy.
 import { EventsModule } from './modules/events/events.module';
 import { WebSocketModule } from './modules/websocket/websocket.module';
 import { CustomerModule } from './modules/customer/customer.module';
+import { CustomerCsvModule } from './modules/customer/csv/customer-csv.module';
 import { InventoryLocationModule } from './modules/inventory/location/inventory-location.module';
 import { AccountingModule } from './modules/accounting/accounting.module';
 import { StockLedgerModule } from './modules/inventory/ledger/stock-ledger.module';
@@ -88,6 +89,7 @@ import { CounterpartyModule } from './modules/counterparty/counterparty.module';
     EventsModule,
     WebSocketModule,
     CustomerModule,
+    CustomerCsvModule,
     InventoryLocationModule,
     AccountingModule,
     StockLedgerModule,

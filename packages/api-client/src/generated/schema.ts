@@ -1576,6 +1576,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/customers/imports/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CustomerImportController_validate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/imports/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CustomerImportController_commit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/imports/import-template.xls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerImportController_downloadTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/imports/jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerImportController_getJob"];
+        put?: never;
+        post?: never;
+        delete: operations["CustomerImportController_cancelJob"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/imports/jobs/{id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerImportController_listJobRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/imports/jobs/{id}/error-rows.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerImportController_exportJobErrorRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/exports/excel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerExportController_exportAll"];
+        put?: never;
+        post: operations["CustomerExportController_exportSelected"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/locations/preferred-shelf": {
         parameters: {
             query?: never;
@@ -3332,6 +3444,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/imports/item-categories/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_validateItemCategories"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/item-categories/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_commitItemCategories"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/item-categories/import-template.xls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_downloadItemCategoryTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/item-categories/jobs/{id}/error-rows.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_exportItemCategoryJobErrorRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/imports/locations/validate": {
         parameters: {
             query?: never;
@@ -3788,6 +3964,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["CsvExportController_exportLocationsExcel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/exports/item-categories/excel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvExportController_exportItemCategoriesExcel"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6412,7 +6604,7 @@ export interface components {
         };
         CreateDocumentNumberRuleDto: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP";
             branchId?: string;
             prefix: string;
             suffix?: string;
@@ -6424,7 +6616,7 @@ export interface components {
         };
         DocumentNumberRuleEntity: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP";
             prefix: string;
             suffix?: string;
             includeDate: boolean;
@@ -6456,7 +6648,7 @@ export interface components {
         };
         GenerateDocumentNumberDto: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP";
             branchId?: string;
         };
         CreateMembershipCardInlineDto: {
@@ -6546,6 +6738,7 @@ export interface components {
             description?: string;
         };
         CustomerGroupEntity: {
+            code?: string;
             name: string;
             description?: string;
             id: string;
@@ -6748,6 +6941,53 @@ export interface components {
         };
         IgnoreDeadLetterDto: {
             reason?: string;
+        };
+        InventoryImportJobEntity: {
+            /** @enum {string} */
+            type: "ITEMS" | "OPENING_BALANCES" | "ADJUSTMENTS" | "STOCK_TAKE" | "LOCATIONS" | "GOODS_RECEIPT" | "GOODS_ISSUE" | "STOCK_TRANSFER" | "TRANSFER_ORDER" | "CUSTOMERS" | "CATEGORIES";
+            referenceId?: string | null;
+            fileName: string;
+            fileChecksum: string;
+            idempotencyKey: string;
+            /** @enum {string} */
+            status: "PENDING" | "VALIDATING" | "VALIDATED" | "IMPORTING" | "COMMITTING" | "COMMITTED" | "COMPLETED" | "FAILED";
+            totalRows: number;
+            validRows: number;
+            errorRows: number;
+            /** @enum {string} */
+            duplicateMode: "UPDATE" | "SKIP";
+            rows?: components["schemas"]["InventoryImportJobRowEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        InventoryImportJobRowEntity: {
+            id: string;
+            jobId: string;
+            rowNumber: number;
+            rawData: Record<string, never>;
+            normalizedData?: Record<string, never> | null;
+            /** @enum {string} */
+            status: "VALID" | "ERROR" | "COMMITTED";
+            errorMessages?: string[];
+            warningMessages?: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            job?: components["schemas"]["InventoryImportJobEntity"];
+        };
+        ExportCustomersSelectedDto: {
+            /** @description Danh sách id khách hàng được chọn để xuất khẩu */
+            customerIds: string[];
         };
         PreferredShelfResponseDto: {
             /** Format: uuid */
@@ -8200,49 +8440,6 @@ export interface components {
             lineIds: string[];
             /** @description Free-form note attached to the resulting stock transfer(s). */
             notes?: string;
-        };
-        InventoryImportJobEntity: {
-            /** @enum {string} */
-            type: "ITEMS" | "OPENING_BALANCES" | "ADJUSTMENTS" | "STOCK_TAKE" | "LOCATIONS" | "GOODS_RECEIPT" | "GOODS_ISSUE" | "STOCK_TRANSFER" | "TRANSFER_ORDER";
-            referenceId?: string | null;
-            fileName: string;
-            fileChecksum: string;
-            idempotencyKey: string;
-            /** @enum {string} */
-            status: "PENDING" | "VALIDATING" | "VALIDATED" | "IMPORTING" | "COMMITTING" | "COMMITTED" | "COMPLETED" | "FAILED";
-            totalRows: number;
-            validRows: number;
-            errorRows: number;
-            /** @enum {string} */
-            duplicateMode: "UPDATE" | "SKIP";
-            rows?: components["schemas"]["InventoryImportJobRowEntity"][];
-            id: string;
-            /** @description Tenant isolation key — every row belongs to exactly one organization. */
-            organizationId: string;
-            /** @description Optional branch scope; null for org-wide records. */
-            branchId?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description UUID of the user who created this record. */
-            createdBy: string;
-        };
-        InventoryImportJobRowEntity: {
-            id: string;
-            jobId: string;
-            rowNumber: number;
-            rawData: Record<string, never>;
-            normalizedData?: Record<string, never> | null;
-            /** @enum {string} */
-            status: "VALID" | "ERROR" | "COMMITTED";
-            errorMessages?: string[];
-            warningMessages?: Record<string, never> | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            job?: components["schemas"]["InventoryImportJobEntity"];
         };
         ExportItemsBodyDto: Record<string, never>;
         CreateStockTakeLineDto: {
@@ -13068,6 +13265,184 @@ export interface operations {
             };
         };
     };
+    CustomerImportController_validate: {
+        parameters: {
+            query?: {
+                duplicateMode?: unknown;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CustomerImportController_commit: {
+        parameters: {
+            query: {
+                jobId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CustomerImportController_downloadTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CustomerImportController_getJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryImportJobEntity"];
+                };
+            };
+        };
+    };
+    CustomerImportController_cancelJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CustomerImportController_listJobRows: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CustomerImportController_exportJobErrorRows: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CustomerExportController_exportAll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CustomerExportController_exportSelected: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportCustomersSelectedDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     InventoryLocationStockController_getPreferredShelf: {
         parameters: {
             query: {
@@ -16239,6 +16614,80 @@ export interface operations {
             };
         };
     };
+    CsvImportController_validateItemCategories: {
+        parameters: {
+            query?: {
+                duplicateMode?: unknown;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_commitItemCategories: {
+        parameters: {
+            query: {
+                jobId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_downloadItemCategoryTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_exportItemCategoryJobErrorRows: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     CsvImportController_validateLocations: {
         parameters: {
             query?: {
@@ -16857,6 +17306,23 @@ export interface operations {
         };
     };
     CsvExportController_exportLocationsExcel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvExportController_exportItemCategoriesExcel: {
         parameters: {
             query?: never;
             header?: never;

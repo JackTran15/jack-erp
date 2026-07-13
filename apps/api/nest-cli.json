@@ -7,6 +7,10 @@
       {
         "include": "modules/inventory/csv/templates/**/*",
         "outDir": "dist"
+      },
+      {
+        "include": "modules/customer/csv/templates/**/*",
+        "outDir": "dist"
       }
     ],
     "plugins": [

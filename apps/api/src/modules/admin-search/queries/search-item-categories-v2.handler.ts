@@ -29,7 +29,8 @@ export class SearchItemCategoriesV2Handler
       .applyString('category.name', dto.name)
       .applyDateRange('category.createdAt', dto.createdAt);
 
-    qb.orderBy('category.createdAt', 'DESC')
+    qb.orderBy('category.code', 'ASC')
+      .addOrderBy('category.name', 'ASC')
       .skip((page - 1) * limit)
       .take(limit);
 
