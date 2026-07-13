@@ -15,6 +15,7 @@ import {
 } from "@erp/pos/hooks/react-query/use-query-invoice";
 import {
   pickAccountByCodePrefix,
+  usePaymentAccountsQuery,
   useRevenueAccountsQuery,
 } from "@erp/pos/hooks/react-query/use-query-account";
 import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
@@ -41,6 +42,12 @@ import {
 import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import type { ResolveCheckoutPayloadError } from "@erp/pos/types/checkout.type";
 import type { InvoicePayload } from "@erp/pos/dtos/invoice-printing.dto";
+import type { CheckoutInvoiceBody } from "@erp/pos/dtos/invoice.dto";
+import {
+  createPaymentLine,
+  type PaymentLine,
+} from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
+import type { PaymentAccountRow } from "@erp/pos/interfaces/account.interface";
 import {
   PAYMENT_METHODS,
   PaymentMethodEnum,
@@ -92,6 +99,29 @@ function describeResolveError(error: ResolveCheckoutPayloadError): string {
 }
 
 /**
+ * Đổi trả nhanh ghép 1 phiếu SALE (hàng mua mới) + 1 phiếu RETURN. Panel chỉ thu
+ * phần chênh (net), nên phiếu SALE cần một dòng thanh toán **đủ** `amount` để BE
+ * không auto-book công nợ. Tái dùng tài khoản/nhóm phương thức khách đã chọn ở
+ * panel; nếu panel chưa có dòng nào (khi net≤0) thì fallback tài khoản tiền mặt.
+ * Trả `null` khi không có tài khoản nhận tiền nào để chọn.
+ */
+function buildQuickExchangeSalePayment(
+  panelLines: PaymentLine[],
+  amount: number,
+  accounts: PaymentAccountRow[],
+): PaymentLine | null {
+  const seed =
+    panelLines.find((l) => l.paymentAccountId && l.amount > 0) ??
+    panelLines.find((l) => l.paymentAccountId);
+  if (seed?.paymentAccountId) {
+    return { ...seed, amount };
+  }
+  const cash = accounts.find((a) => a.paymentMethod === "cash") ?? accounts[0];
+  if (!cash) return null;
+  return createPaymentLine(PaymentMethodEnum.CASH, amount, cash.id);
+}
+
+/**
  * Terminal actions của checkout: finalize (validate + 2 API + in + reset),
  * cancel-invoice và oversell-confirm. Toàn bộ đọc state qua `getState()` tại
  * thời điểm click + `deriveSettlement` (không subscribe payment store reactive),
@@ -109,6 +139,8 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
   // Đơn trả/đổi bắt buộc gửi `revenueAccountId` (BE chưa tự resolve cho luồng
   // này như SALE). Lấy tài khoản doanh thu đầu tiên (ưu tiên code "511…").
   const revenueQuery = useRevenueAccountsQuery();
+  // Tài khoản nhận tiền — fallback cho dòng thanh toán phiếu SALE của đổi trả nhanh.
+  const { accounts: paymentAccounts } = usePaymentAccountsQuery();
   // "NV Thu ngân" trên bản in — user đang đăng nhập.
   const currentUserQuery = useCurrentUserQuery();
   const currentUser = currentUserQuery.data;
@@ -325,61 +357,155 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             0,
           );
 
-          const checkoutResolve = buildCheckoutReturnPayload({
-            revenueAccountId,
-            returnSubtotal,
-            newSubtotal,
-            paymentLines: p.paymentLines,
-            offsetToDebt: p.refundToDebt ?? false,
-            note,
-          });
-          if (!checkoutResolve.ok) {
-            toast.error(describeResolveError(checkoutResolve.error));
-            return;
-          }
-
-          let invoiceId: string;
-          if (newLines.length > 0) {
-            // Đổi hàng (trả + mua mới) → bắt buộc có hóa đơn gốc (BE exchange
-            // yêu cầu originalInvoiceId; không có endpoint exchange "nhanh").
-            if (!originalInvoiceId) {
-              toast.error(CHECKOUT_TOASTS.EXCHANGE_NEEDS_ORIGINAL);
+          if (variant === CheckoutVariantEnum.QUICK_EXCHANGE) {
+            // Đổi trả nhanh (không hóa đơn gốc): BE không có endpoint đổi "nhanh"
+            // một chứng từ, nên ghép 1 phiếu SALE (hàng mua mới) + 1 phiếu QUICK
+            // RETURN (hoàn tiền mặt đủ giá trị hàng trả). Panel chỉ thu phần chênh
+            // (net); ở đây tự tổng hợp thanh toán đủ cho từng phiếu.
+            const returnResolve = buildCheckoutReturnPayload({
+              revenueAccountId,
+              returnSubtotal,
+              // Phiếu trả chỉ có dòng IN → net<0 → hoàn tiền mặt, không kèm payments.
+              newSubtotal: 0,
+              paymentLines: [],
+              offsetToDebt: false,
+              note,
+            });
+            if (!returnResolve.ok) {
+              toast.error(describeResolveError(returnResolve.error));
               return;
             }
-            const created = await createExchangeMutation.mutateAsync(
-              buildCreateExchangePayload({
-                sessionId: sessionState.posSessionId,
-                originalInvoiceId,
-                customer: selectedCustomer,
-                reason: note ?? CHECKOUT_RETURN_REASONS.EXCHANGE,
-                returnLines,
-                newLines,
-              }),
-            );
-            invoiceId = created.id;
+
+            let saleCheckoutBody: CheckoutInvoiceBody | null = null;
+            if (newLines.length > 0) {
+              const salePaymentLine = buildQuickExchangeSalePayment(
+                p.paymentLines,
+                newSubtotal,
+                paymentAccounts,
+              );
+              if (!salePaymentLine) {
+                toast.error(CHECKOUT_ERRORS.MISSING_PAYMENT_ACCOUNT);
+                return;
+              }
+              const saleResolve = buildCheckoutInvoiceApiPayload({
+                paymentLines: [salePaymentLine],
+              });
+              if (!saleResolve.ok) {
+                toast.error(describeResolveError(saleResolve.error));
+                return;
+              }
+              saleCheckoutBody = saleResolve.body;
+            }
+
+            // SALE trước — chốt đơn mua xong mới hoàn tiền, tránh hoàn rồi bán lỗi.
+            if (saleCheckoutBody) {
+              try {
+                const createdSale = await createMutation.mutateAsync(
+                  buildCreateInvoicePayload({
+                    sessionId: sessionState.posSessionId,
+                    cart: newLines,
+                    customer: selectedCustomer,
+                    note,
+                    salesperson: selectedSalesperson,
+                  }),
+                );
+                await checkoutMutation.mutateAsync({
+                  id: createdSale.id,
+                  body: saleCheckoutBody,
+                });
+              } catch (err) {
+                toast.error(
+                  err instanceof Error
+                    ? err.message
+                    : CHECKOUT_TOASTS.PAYMENT_FAILED,
+                );
+                return;
+              }
+            }
+
+            // RETURN sau (hai call không atomic — báo rõ nếu hoàn trả lỗi).
+            try {
+              const createdReturn = await createReturnMutation.mutateAsync(
+                buildCreateReturnPayload({
+                  mode: "quick",
+                  sessionId: sessionState.posSessionId,
+                  customer: selectedCustomer,
+                  reason: note ?? CHECKOUT_RETURN_REASONS.RETURN,
+                  returnLines,
+                }),
+              );
+              await checkoutReturnMutation.mutateAsync({
+                id: createdReturn.id,
+                body: returnResolve.body,
+              });
+            } catch (err) {
+              toast.error(
+                saleCheckoutBody
+                  ? CHECKOUT_TOASTS.QUICK_EXCHANGE_RETURN_FAILED_AFTER_SALE
+                  : err instanceof Error
+                    ? err.message
+                    : CHECKOUT_TOASTS.RETURN_FAILED,
+              );
+              return;
+            }
           } else {
-            const created = await createReturnMutation.mutateAsync(
-              buildCreateReturnPayload({
-                mode: originalInvoiceId ? "regular" : "quick",
-                sessionId: sessionState.posSessionId,
-                originalInvoiceId,
-                customer: selectedCustomer,
-                reason: note ?? CHECKOUT_RETURN_REASONS.RETURN,
-                returnLines,
-              }),
-            );
-            invoiceId = created.id;
-          }
-          const posted = await checkoutReturnMutation.mutateAsync({
-            id: invoiceId,
-            body: checkoutResolve.body,
-          });
-          // Operator tích "Tính vào công nợ" nhưng hóa đơn gốc không còn nợ để
-          // bù trừ → BE tự chi tiền mặt; báo cho thu ngân biết.
-          if (p.refundToDebt && posted.refundMethod === "CASH") {
-            toast.info(
-              "Khách hàng không còn công nợ — đã chi tiền mặt cho khoản hoàn.",
-            );
+            // ── INVOICE_RETURN (trả/đổi theo hóa đơn gốc) ──
+            const checkoutResolve = buildCheckoutReturnPayload({
+              revenueAccountId,
+              returnSubtotal,
+              newSubtotal,
+              paymentLines: p.paymentLines,
+              offsetToDebt: p.refundToDebt ?? false,
+              note,
+            });
+            if (!checkoutResolve.ok) {
+              toast.error(describeResolveError(checkoutResolve.error));
+              return;
+            }
+
+            let invoiceId: string;
+            if (newLines.length > 0) {
+              // Đổi hàng (trả + mua mới) → bắt buộc có hóa đơn gốc (BE exchange
+              // yêu cầu originalInvoiceId; không có endpoint exchange "nhanh").
+              if (!originalInvoiceId) {
+                toast.error(CHECKOUT_TOASTS.EXCHANGE_NEEDS_ORIGINAL);
+                return;
+              }
+              const created = await createExchangeMutation.mutateAsync(
+                buildCreateExchangePayload({
+                  sessionId: sessionState.posSessionId,
+                  originalInvoiceId,
+                  customer: selectedCustomer,
+                  reason: note ?? CHECKOUT_RETURN_REASONS.EXCHANGE,
+                  returnLines,
+                  newLines,
+                }),
+              );
+              invoiceId = created.id;
+            } else {
+              const created = await createReturnMutation.mutateAsync(
+                buildCreateReturnPayload({
+                  mode: originalInvoiceId ? "regular" : "quick",
+                  sessionId: sessionState.posSessionId,
+                  originalInvoiceId,
+                  customer: selectedCustomer,
+                  reason: note ?? CHECKOUT_RETURN_REASONS.RETURN,
+                  returnLines,
+                }),
+              );
+              invoiceId = created.id;
+            }
+            const posted = await checkoutReturnMutation.mutateAsync({
+              id: invoiceId,
+              body: checkoutResolve.body,
+            });
+            // Operator tích "Tính vào công nợ" nhưng hóa đơn gốc không còn nợ để
+            // bù trừ → BE tự chi tiền mặt; báo cho thu ngân biết.
+            if (p.refundToDebt && posted.refundMethod === "CASH") {
+              toast.info(
+                "Khách hàng không còn công nợ — đã chi tiền mặt cho khoản hoàn.",
+              );
+            }
           }
         }
       } catch (err) {
@@ -431,6 +557,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       createExchangeMutation,
       checkoutReturnMutation,
       revenueQuery.data,
+      paymentAccounts,
       currentUser,
       branches,
       printReceiptIfNeeded,

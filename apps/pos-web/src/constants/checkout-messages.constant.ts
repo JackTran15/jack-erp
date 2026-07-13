@@ -53,6 +53,8 @@ export const CHECKOUT_TOASTS = {
     "Chưa lấy được tài khoản doanh thu để hạch toán đổi trả. Vui lòng thử lại.",
   EXCHANGE_NEEDS_ORIGINAL:
     "Đổi hàng cần chọn từ hóa đơn gốc — đổi trả nhanh chưa hỗ trợ thêm hàng mua mới.",
+  QUICK_EXCHANGE_RETURN_FAILED_AFTER_SALE:
+    "Đã tạo đơn mua nhưng chưa hoàn được hàng trả — vui lòng thử lại phần hoàn trả.",
   PAYMENT_FAILED: "Không thu được tiền",
   RETURN_FAILED: "Không ghi nhận được đổi trả",
   DRAFT_SAVE_FAILED: "Không lưu được hóa đơn lưu tạm",
