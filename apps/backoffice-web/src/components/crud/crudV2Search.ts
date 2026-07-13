@@ -20,6 +20,8 @@ export type V2FieldKind =
 export interface V2SearchConfig {
   path: string;
   fields: Record<string, V2FieldKind>;
+  /** Constant params always merged into the request body (before filters). */
+  defaults?: Record<string, unknown>;
 }
 
 export const CRUD_V2_SEARCH: Record<string, V2SearchConfig> = {
@@ -69,6 +71,9 @@ export const CRUD_V2_SEARCH: Record<string, V2SearchConfig> = {
   },
   "inventory-items": {
     path: "/v2/inventory-items/search",
+    // Management list shows both active + discontinued; the "all" filter must
+    // not default-hide "Ngừng kinh doanh" items.
+    defaults: { includeInactive: true },
     fields: {
       code: "string",
       barcode: "string",
@@ -126,7 +131,7 @@ export function buildV2Body(
   page: number,
   limit: number,
 ): Record<string, unknown> {
-  const body: Record<string, unknown> = { page, limit };
+  const body: Record<string, unknown> = { page, limit, ...cfg.defaults };
   for (const [key, kind] of Object.entries(cfg.fields)) {
     const f = filters[key];
     if (!f) continue;
