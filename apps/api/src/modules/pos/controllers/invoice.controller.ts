@@ -32,6 +32,7 @@ import { CheckoutInvoiceDto } from '../dto/checkout-invoice.dto';
 import { CancelInvoiceDto } from '../dto/cancel-invoice.dto';
 import { InvoiceQueryDto } from '../dto/invoice-query.dto';
 import { DraftInvoiceResponseDto } from '../dto/draft-invoice.response.dto';
+import { CustomerDebtLedgerRowDto } from '../dto/customer-debt-ledger-row.dto';
 import { CreateReturnInvoiceDto } from '../dto/create-return-invoice.dto';
 import { CreateExchangeInvoiceDto } from '../dto/create-exchange-invoice.dto';
 import { CheckoutReturnDto } from '../dto/checkout-return.dto';
@@ -108,6 +109,7 @@ export class InvoiceController {
 
   @Get('customers/:customerId/debts')
   @RequirePermission('pos.invoice.read')
+  @ApiOkResponse({ type: [CustomerDebtLedgerRowDto] })
   getCustomerDebts(
     @Param('customerId', ParseUUIDPipe) customerId: string,
     @Query('status') status: DebtStatus | undefined,

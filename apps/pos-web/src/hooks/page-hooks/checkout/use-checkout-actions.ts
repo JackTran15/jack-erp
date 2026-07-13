@@ -456,6 +456,11 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
               newSubtotal,
               paymentLines: p.paymentLines,
               offsetToDebt: p.refundToDebt ?? false,
+              // Đơn ĐỔI net>0: tích "Tính vào công nợ" (DebtCheckRow) → ghi phần
+              // chênh chưa thu vào công nợ khách, kèm hạn nợ như đơn bán nợ.
+              putOnDebt: p.debt,
+              dueDate: p.debt ? p.paymentDueDate : null,
+              creditDays: p.debt ? p.creditDays : null,
               note,
             });
             if (!checkoutResolve.ok) {

@@ -279,6 +279,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -1456,6 +1466,16 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -3567,6 +3587,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -4927,6 +4957,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -5586,6 +5626,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -5889,30 +5939,6 @@
                 }
               }
             }
-          }
-        },
-        "tags": [
-          "InventoryLocation"
-        ]
-      }
-    },
-    "/inventory/items/status": {
-      "patch": {
-        "operationId": "InventoryLocationController_setItemsStatus",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SetItemsStatusDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
           }
         },
         "tags": [
@@ -7154,6 +7180,16 @@
             }
           },
           {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
             "name": "unassigned",
             "required": false,
             "in": "query",
@@ -7166,6 +7202,15 @@
             "required": false,
             "in": "query",
             "description": "Lọc theo trạng thái theo dõi hàng hóa (item.is_active). Bỏ trống = tất cả.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "isTracked",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo trạng thái theo dõi vị trí (stock_balances.is_tracked). Bỏ trống = tất cả.",
             "schema": {
               "type": "boolean"
             }
@@ -7309,6 +7354,30 @@
         ]
       }
     },
+    "/inventory/stock/balances/tracking": {
+      "patch": {
+        "operationId": "StockLedgerController_setBalanceTracking",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetBalanceTrackingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "StockLedger"
+        ]
+      }
+    },
     "/inventory/stock/items/{itemId}/average-cost": {
       "get": {
         "operationId": "StockLedgerController_getInstantAverageCost",
@@ -7437,6 +7506,16 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -7874,6 +7953,16 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -8457,6 +8546,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -8781,6 +8880,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -9012,6 +9121,16 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -9285,6 +9404,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -9476,6 +9605,16 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -10493,6 +10632,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -10760,6 +10909,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -10891,6 +11050,16 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -11030,6 +11199,16 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -11193,6 +11372,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -11355,6 +11544,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -11474,6 +11673,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -11546,6 +11755,16 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -11656,6 +11875,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -11728,6 +11957,16 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -11872,6 +12111,16 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           },
           {
@@ -12471,6 +12720,16 @@
             }
           },
           {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
             "name": "direction",
             "required": false,
             "in": "query",
@@ -12990,7 +13249,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/InvoiceDebtEntity"
+                    "$ref": "#/components/schemas/CustomerDebtLedgerRowDto"
                   }
                 }
               }
@@ -14842,6 +15101,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -15073,6 +15342,16 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -15352,6 +15631,16 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -15763,6 +16052,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -16041,6 +16340,16 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -21079,7 +21388,7 @@
           },
           "documentCount": {
             "type": "number",
-            "description": "Number of outstanding debt documents"
+            "description": "Number of debt-ledger documents for the customer (debt rows + collections), matching the Công nợ tab total"
           }
         },
         "required": [
@@ -22852,6 +23161,9 @@
           "isDefaultReceiving": {
             "type": "boolean"
           },
+          "isActive": {
+            "type": "boolean"
+          },
           "branch": {
             "$ref": "#/components/schemas/BranchEntity"
           },
@@ -22883,6 +23195,7 @@
           "name",
           "isMainStorage",
           "isDefaultReceiving",
+          "isActive",
           "id",
           "organizationId",
           "createdAt",
@@ -23304,27 +23617,6 @@
           "createdAt",
           "updatedAt",
           "createdBy"
-        ]
-      },
-      "SetItemsStatusDto": {
-        "type": "object",
-        "properties": {
-          "ids": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          "isActive": {
-            "type": "boolean",
-            "description": "true = đang theo dõi, false = ngừng theo dõi"
-          }
-        },
-        "required": [
-          "ids",
-          "isActive"
         ]
       },
       "UpdateItemDto": {
@@ -24364,6 +24656,45 @@
           "pageSize"
         ]
       },
+      "BalanceTrackingEntryDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Hàng hoá (item)"
+          },
+          "locationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Vị trí (location)"
+          }
+        },
+        "required": [
+          "itemId",
+          "locationId"
+        ]
+      },
+      "SetBalanceTrackingDto": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BalanceTrackingEntryDto"
+            }
+          },
+          "isTracked": {
+            "type": "boolean",
+            "description": "true = đang theo dõi, false = ngừng theo dõi"
+          }
+        },
+        "required": [
+          "entries",
+          "isTracked"
+        ]
+      },
       "InstantAverageCostDto": {
         "type": "object",
         "properties": {
@@ -24423,6 +24754,9 @@
             "format": "date-time",
             "type": "string"
           },
+          "isTracked": {
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },
@@ -24451,6 +24785,7 @@
           "itemId",
           "locationId",
           "quantity",
+          "isTracked",
           "id",
           "organizationId",
           "createdAt",
@@ -27619,6 +27954,65 @@
           "createdBy"
         ]
       },
+      "InvoicePaymentEntity": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank_transfer",
+              "card"
+            ]
+          },
+          "amount": {
+            "type": "number"
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "invoiceId",
+          "paymentMethod",
+          "amount",
+          "accountId",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
       "DraftInvoiceResponseDto": {
         "type": "object",
         "properties": {
@@ -27638,6 +28032,18 @@
                 "$ref": "#/components/schemas/CustomerEntity"
               }
             ]
+          },
+          "payments": {
+            "description": "Per-method payment breakdown (cash / bank transfer / card) for the full receipt.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoicePaymentEntity"
+            }
+          },
+          "remainingDebt": {
+            "type": "number",
+            "nullable": true,
+            "description": "Outstanding debt (invoice_debts.remainingAmount) for this invoice; null when there is no debt."
           },
           "code": {
             "type": "string"
@@ -27764,6 +28170,8 @@
         "required": [
           "items",
           "customer",
+          "payments",
+          "remainingDebt",
           "code",
           "status",
           "type",
@@ -27786,47 +28194,65 @@
           "createdBy"
         ]
       },
-      "InvoiceDebtEntity": {
+      "CustomerDebtLedgerRowDto": {
         "type": "object",
         "properties": {
-          "referenceCode": {
-            "type": "string"
+          "id": {
+            "type": "string",
+            "description": "Row id — the debt id for debt rows, the payment id for collections"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "debt",
+              "collection"
+            ],
+            "description": "Whether this row raises debt or collects it"
           },
           "invoiceId": {
-            "type": "string"
+            "type": "string",
+            "description": "Source invoice id, for drill-through to the receipt"
           },
-          "customerId": {
-            "type": "string"
+          "referenceCode": {
+            "type": "string",
+            "description": "Displayed document number — the invoice code, or the Phiếu thu number for collections"
           },
           "documentType": {
+            "type": "string",
             "enum": [
               "credit_invoice",
               "payment_receipt",
-              "adjustment"
+              "adjustment",
+              "collect_debt_cash",
+              "collect_debt_bank"
             ],
-            "type": "string"
+            "description": "Category of the ledger document"
           },
-          "originalAmount": {
-            "type": "number"
+          "amount": {
+            "type": "number",
+            "description": "Signed debt delta — positive raises debt, negative collects it"
           },
-          "paidAmount": {
-            "type": "number"
-          },
-          "remainingAmount": {
-            "type": "number"
+          "runningBalance": {
+            "type": "number",
+            "description": "Running customer debt balance after this row"
           },
           "issuedAt": {
-            "type": "string"
+            "type": "string",
+            "description": "Ledger date (YYYY-MM-DD)"
           },
-          "dueDate": {
-            "type": "string"
+          "createdAt": {
+            "type": "string",
+            "description": "Row creation timestamp (ISO) — shown as the document date and used for ordering"
           },
-          "creditDays": {
-            "type": "number"
+          "branchId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Branch scope of the document"
           },
-          "settledAt": {
-            "format": "date-time",
-            "type": "string"
+          "branchName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Display name of the branch"
           },
           "status": {
             "enum": [
@@ -27834,50 +28260,20 @@
               "paid",
               "overdue"
             ],
-            "type": "string"
-          },
-          "note": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
             "type": "string",
-            "description": "Tenant isolation key — every row belongs to exactly one organization."
-          },
-          "branchId": {
-            "type": "string",
-            "description": "Optional branch scope; null for org-wide records."
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "UUID of the user who created this record."
+            "description": "Debt collection status (debt rows only)"
           }
         },
         "required": [
-          "referenceCode",
-          "invoiceId",
-          "customerId",
-          "documentType",
-          "originalAmount",
-          "paidAmount",
-          "remainingAmount",
-          "issuedAt",
-          "status",
           "id",
-          "organizationId",
-          "createdAt",
-          "updatedAt",
-          "createdBy"
+          "kind",
+          "invoiceId",
+          "referenceCode",
+          "documentType",
+          "amount",
+          "runningBalance",
+          "issuedAt",
+          "createdAt"
         ]
       },
       "DebtPaymentEntity": {
@@ -27952,6 +28348,100 @@
       "CollectDebtPaymentDto": {
         "type": "object",
         "properties": {}
+      },
+      "InvoiceDebtEntity": {
+        "type": "object",
+        "properties": {
+          "referenceCode": {
+            "type": "string"
+          },
+          "invoiceId": {
+            "type": "string"
+          },
+          "customerId": {
+            "type": "string"
+          },
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "credit_invoice",
+              "payment_receipt",
+              "adjustment"
+            ]
+          },
+          "originalAmount": {
+            "type": "number"
+          },
+          "paidAmount": {
+            "type": "number"
+          },
+          "remainingAmount": {
+            "type": "number"
+          },
+          "issuedAt": {
+            "type": "string"
+          },
+          "dueDate": {
+            "type": "string"
+          },
+          "creditDays": {
+            "type": "number"
+          },
+          "settledAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "paid",
+              "overdue"
+            ]
+          },
+          "note": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "referenceCode",
+          "invoiceId",
+          "customerId",
+          "documentType",
+          "originalAmount",
+          "paidAmount",
+          "remainingAmount",
+          "issuedAt",
+          "status",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
       },
       "UpdateInvoiceItemDto": {
         "type": "object",
@@ -28287,11 +28777,20 @@
             "description": "Optional expiry date for the issued store credit (ISO date)."
           },
           "payments": {
-            "description": "Payments — only required for EXCHANGE with netAmount > 0.",
+            "description": "Payments — for EXCHANGE with netAmount > 0. When their sum is below netAmount\n(and the invoice has a customer) the remainder is booked as customer debt.",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/InvoicePaymentLineDto"
             }
+          },
+          "dueDate": {
+            "type": "string",
+            "description": "Credit due date (ISO `YYYY-MM-DD`) for the debt booked on an EXCHANGE\nnet > 0 that is paid partially/none. Ignored when fully paid."
+          },
+          "creditDays": {
+            "type": "number",
+            "description": "Credit term in days for the EXCHANGE net > 0 debt (per invoice).",
+            "minimum": 0
           },
           "note": {
             "type": "string"

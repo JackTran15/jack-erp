@@ -29,6 +29,7 @@ export class JournalReturnConsumer {
       refundMethod,
       refundedAmount,
       netAmount,
+      debtAmount,
       revenueAccountId,
       cashAccountId,
       receivableAccountId,
@@ -51,6 +52,7 @@ export class JournalReturnConsumer {
 
     const refunded = Number(refundedAmount);
     const net = Number(netAmount);
+    const debt = Number(debtAmount ?? 0);
     const lines: JournalLineInput[] = [];
     let lineOrder = 1;
 
@@ -109,23 +111,25 @@ export class JournalReturnConsumer {
       }
     }
 
-    // EXCHANGE net > 0: customer paid extra for new lines → revenue credit + cash debit
-    if (net > 0) {
-      if (!cashAccountId) {
+    // EXCHANGE net > 0: customer owes the difference. The cash portion (DR cash /
+    // CR revenue) is booked by the cash-from-payment consumer; here we only book
+    // the portion put on customer debt: DR receivable / CR revenue.
+    if (net > 0 && debt > 0) {
+      if (!receivableAccountId) {
         throw new Error(
-          `journal-return ${returnInvoiceCode}: EXCHANGE net>0 without cashAccountId`,
+          `journal-return ${returnInvoiceCode}: EXCHANGE net>0 debt without receivableAccountId`,
         );
       }
       lines.push({
-        accountId: cashAccountId,
-        debitAmount: net,
+        accountId: receivableAccountId,
+        debitAmount: debt,
         creditAmount: 0,
         lineOrder: lineOrder++,
       });
       lines.push({
         accountId: revenueAccountId,
         debitAmount: 0,
-        creditAmount: net,
+        creditAmount: debt,
         lineOrder: lineOrder++,
       });
     }

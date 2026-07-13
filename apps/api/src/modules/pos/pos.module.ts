@@ -19,6 +19,8 @@ import {
 } from './entities';
 import { CashAccountEntity } from '../accounting/cash/cash-account.entity';
 import { CashMovementEntity } from '../accounting/cash/cash-movement.entity';
+import { CashReceiptEntity } from '../accounting/cash-vouchers/cash-receipts/cash-receipt.entity';
+import { BranchEntity } from '../branch/branch.entity';
 import { LocationEntity } from '../inventory/location/location.entity';
 import { CustomerEntity } from '../customer/customer.entity';
 import { ItemEntity } from '../inventory/location/item.entity';
@@ -70,6 +72,8 @@ import { StockReturnInPublisher } from './publishers/stock-return-in.publisher';
       DebtPaymentEntity,
       CashAccountEntity,
       CashMovementEntity,
+      CashReceiptEntity,
+      BranchEntity,
       LocationEntity,
       CustomerEntity,
       ItemEntity,

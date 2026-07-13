@@ -102,6 +102,14 @@ interface BuildCheckoutReturnPayloadInput {
    * khoản hoàn vào công nợ hóa đơn gốc (OFFSET). Mặc định false ⇒ chi tiền mặt.
    */
   offsetToDebt?: boolean;
+  /**
+   * Đơn ĐỔI net>0 (khách nợ thêm): operator tích "Tính vào công nợ" → phần chênh
+   * chưa thu (net − Σpayments) ghi vào công nợ khách. `dueDate`/`creditDays` là hạn
+   * nợ (BE tự resolve tài khoản phải thu). Mặc định false ⇒ ép thu đủ tiền mặt.
+   */
+  putOnDebt?: boolean;
+  dueDate?: string | null;
+  creditDays?: number | null;
   note?: string;
 }
 
@@ -135,12 +143,20 @@ export function buildCheckoutReturnPayload(
         paymentAccountId: line.paymentAccountId,
       });
     }
+    // Tích "Tính vào công nợ" ⇒ chỉ gửi phần đã thu (có thể rỗng), BE ghi phần
+    // chênh còn lại vào công nợ khách kèm hạn nợ. Không tích ⇒ BE ép thu đủ.
     return {
       ok: true,
       body: {
         refundMethod: "CASH",
         revenueAccountId: input.revenueAccountId,
         payments,
+        ...(input.putOnDebt
+          ? {
+              dueDate: input.dueDate ?? undefined,
+              creditDays: input.creditDays ?? undefined,
+            }
+          : {}),
         note: input.note,
       },
     };

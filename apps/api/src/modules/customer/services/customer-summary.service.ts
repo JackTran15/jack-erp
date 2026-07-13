@@ -14,6 +14,7 @@ import {
   InvoiceDebtEntity,
   DebtStatus,
 } from '../../pos/entities/invoice-debt.entity';
+import { DebtPaymentEntity } from '../../pos/entities/debt-payment.entity';
 import { CustomerSummaryResponseDto } from '../dto/customer-summary.response.dto';
 
 /** Invoice statuses that count as a committed sale for spending totals. */
@@ -41,6 +42,8 @@ export class CustomerSummaryService {
     private readonly invoiceRepo: Repository<InvoiceEntity>,
     @InjectRepository(InvoiceDebtEntity)
     private readonly debtRepo: Repository<InvoiceDebtEntity>,
+    @InjectRepository(DebtPaymentEntity)
+    private readonly paymentRepo: Repository<DebtPaymentEntity>,
     @InjectRepository(MembershipCardEntity)
     private readonly cardRepo: Repository<MembershipCardEntity>,
     @InjectRepository(PointHistoryEntity)
@@ -68,7 +71,6 @@ export class CustomerSummaryService {
         where: {
           customerId,
           organizationId: actor.organizationId,
-          status: In(OUTSTANDING_DEBT_STATUSES),
         },
       }),
       this.cardRepo.findOne({
@@ -76,11 +78,23 @@ export class CustomerSummaryService {
       }),
     ]);
 
+    // Collections (Phiếu thu) recorded against these debts count as ledger
+    // documents too, so the summary's documentCount matches the Công nợ tab
+    // total (debt rows + collection rows), not just outstanding debts.
+    const debtIds = debts.map((d) => d.id);
+    const collectionCount = debtIds.length
+      ? await this.paymentRepo.count({
+          where: { debtId: In(debtIds), organizationId: actor.organizationId },
+        })
+      : 0;
+
     const totalSpending = round2(
       invoices.reduce((sum, inv) => sum + Number(inv.amountDue), 0),
     );
     const totalOutstanding = round2(
-      debts.reduce((sum, debt) => sum + Number(debt.remainingAmount), 0),
+      debts
+        .filter((debt) => OUTSTANDING_DEBT_STATUSES.includes(debt.status))
+        .reduce((sum, debt) => sum + Number(debt.remainingAmount), 0),
     );
 
     let membership: CustomerSummaryResponseDto['membership'] = null;
@@ -108,7 +122,7 @@ export class CustomerSummaryService {
       },
       debt: {
         totalOutstanding,
-        documentCount: debts.length,
+        documentCount: debts.length + collectionCount,
       },
       membership,
     };

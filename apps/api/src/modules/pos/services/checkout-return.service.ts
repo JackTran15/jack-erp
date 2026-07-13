@@ -49,6 +49,7 @@ import {
 } from '../entities/invoice-debt.entity';
 import { PosSessionEntity } from '../entities/pos-session.entity';
 import { CheckoutReturnDto } from '../dto/checkout-return.dto';
+import { InvoiceDebtService } from './invoice-debt.service';
 import { ReturnPostedPublisher } from '../publishers/return-posted.publisher';
 import { StockReturnInPublisher } from '../publishers/stock-return-in.publisher';
 
@@ -94,6 +95,7 @@ export class CheckoutReturnService {
     private readonly customerCredit: CustomerCreditService,
     private readonly accountResolver: AccountResolverService,
     private readonly cashFundResolver: CashFundResolverService,
+    private readonly invoiceDebtService: InvoiceDebtService,
     private readonly returnPostedPublisher: ReturnPostedPublisher,
     private readonly stockReturnInPublisher: StockReturnInPublisher,
     private readonly stockDeductionPublisher: StockDeductionPublisher,
@@ -187,16 +189,36 @@ export class CheckoutReturnService {
 
     this.validateRefundMatrix(invoice, dto, totals, effectiveRefundMethod);
 
-    // When settling debt via OFFSET, resolve the AR (receivable) COA account
-    // server-side (branch override → org default) so the FE never supplies it.
-    const receivableAccountId =
-      effectiveRefundMethod === RefundMethod.OFFSET && totals.refundedAmount > 0
-        ? (dto.receivableAccountId ??
-          (await this.accountResolver.resolveDefaultAccount(
-            AccountingDefaultAccountRole.RECEIVABLE,
-            actor,
-          )))
-        : dto.receivableAccountId;
+    // EXCHANGE net > 0: the customer owes the difference. They may pay it in full,
+    // or (with a customer on file) pay part/none and put the remainder on debt —
+    // same model as a debt sale. validateRefundMatrix already enforced the guards.
+    const netPaid =
+      totals.netAmount > 0
+        ? Number(
+            (dto.payments ?? [])
+              .reduce((s, p) => s + Number(p.amount), 0)
+              .toFixed(2),
+          )
+        : 0;
+    const exchangeDebtAmount =
+      totals.netAmount > 0
+        ? Number((totals.netAmount - netPaid).toFixed(2))
+        : 0;
+
+    // Resolve the AR (receivable) COA account server-side (branch override → org
+    // default) so the FE never supplies it — both for an OFFSET refund settling
+    // an existing debt, and for an EXCHANGE net > 0 booked as new customer debt.
+    const needsReceivable =
+      (effectiveRefundMethod === RefundMethod.OFFSET &&
+        totals.refundedAmount > 0) ||
+      exchangeDebtAmount > 0;
+    const receivableAccountId = needsReceivable
+      ? (dto.receivableAccountId ??
+        (await this.accountResolver.resolveDefaultAccount(
+          AccountingDefaultAccountRole.RECEIVABLE,
+          actor,
+        )))
+      : dto.receivableAccountId;
 
     const realCode = await this.numbering.generate(
       DocumentType.RETURN,
@@ -244,12 +266,17 @@ export class CheckoutReturnService {
 
     const posted = await this.dataSource.transaction(async (manager) => {
       invoice.isDraft = false;
-      invoice.status = InvoiceStatus.PAID;
+      invoice.status =
+        exchangeDebtAmount > 0
+          ? netPaid > 0
+            ? InvoiceStatus.PARTIAL_DEBT
+            : InvoiceStatus.DEBT
+          : InvoiceStatus.PAID;
       invoice.issuedAt = now;
       invoice.code = realCode;
       invoice.subtotal = totals.newSubtotal || totals.returnSubtotal;
       invoice.amountDue = Math.max(totals.netAmount, 0);
-      invoice.totalPaid = totals.netAmount > 0 ? totals.netAmount : 0;
+      invoice.totalPaid = totals.netAmount > 0 ? netPaid : 0;
       invoice.refundMethod = effectiveRefundMethod;
       invoice.refundedAmount = totals.refundedAmount;
       invoice.netAmount = totals.netAmount;
@@ -292,6 +319,18 @@ export class CheckoutReturnService {
           }),
         );
         savedPayments = await manager.save(paymentEntities);
+      }
+
+      // EXCHANGE net > 0 paid partially/none → book the remainder as customer
+      // debt (same mechanism as a debt sale). Requires a customer (guarded in
+      // validateRefundMatrix); createFromInvoice is idempotent by invoiceId.
+      if (exchangeDebtAmount > 0) {
+        await this.invoiceDebtService.createFromInvoice(
+          savedInvoice,
+          exchangeDebtAmount,
+          manager,
+          { dueDate: dto.dueDate, creditDays: dto.creditDays },
+        );
       }
 
       // STORE_CREDIT issuance.
@@ -427,13 +466,19 @@ export class CheckoutReturnService {
     const { netAmount, refundedAmount } = totals;
 
     if (netAmount > 0) {
-      // EXCHANGE net > 0 — payments required, refundMethod typically OFFSET (auto pay-through).
+      // EXCHANGE net > 0 — khách trả thêm phần chênh. Thu đủ, hoặc thu một phần /
+      // không thu và ghi phần còn lại vào công nợ (giống đơn bán nợ).
       const paid = Number(
         (dto.payments ?? []).reduce((s, p) => s + Number(p.amount), 0).toFixed(2),
       );
-      if (paid !== netAmount) {
+      if (paid > netAmount) {
         throw new BadRequestException(
-          `Tổng payments (${paid}) phải khớp netAmount (${netAmount})`,
+          `Tổng payments (${paid}) vượt netAmount (${netAmount})`,
+        );
+      }
+      if (paid < netAmount && !invoice.customerId) {
+        throw new BadRequestException(
+          'Ghi phần chênh đổi hàng vào công nợ yêu cầu invoice có customerId',
         );
       }
       if (refundedAmount !== 0) {
@@ -629,7 +674,19 @@ export class CheckoutReturnService {
       );
     }
 
-    // 3. JOURNAL_POST_RETURN — always.
+    // 3. JOURNAL_POST_RETURN — always. For an EXCHANGE net > 0 the cash portion is
+    // booked by the cash-from-payment consumer; the portion put on customer debt is
+    // sent here so journal-return can post DR receivable / CR revenue for it.
+    const netPaid =
+      totals.netAmount > 0
+        ? Number(
+            payments.reduce((s, p) => s + Number(p.amount), 0).toFixed(2),
+          )
+        : 0;
+    const debtAmount =
+      totals.netAmount > 0
+        ? Number((totals.netAmount - netPaid).toFixed(2))
+        : 0;
     await this.journalReturnPublisher.publish(
       {
         returnInvoiceId: invoice.id,
@@ -638,6 +695,7 @@ export class CheckoutReturnService {
         refundMethod: effectiveRefundMethod,
         refundedAmount: totals.refundedAmount,
         netAmount: totals.netAmount,
+        debtAmount,
         revenueAccountId: dto.revenueAccountId,
         cashAccountId: resolvedCashAccountId,
         receivableAccountId: receivableAccountId,

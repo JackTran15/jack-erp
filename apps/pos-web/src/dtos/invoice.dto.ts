@@ -149,6 +149,9 @@ export interface CheckoutReturnBody {
   creditLiabilityAccountId?: string;
   creditExpiresAt?: string;
   payments?: InvoicePaymentLineBody[];
+  /** EXCHANGE net > 0: hạn nợ cho phần chênh khách chưa thanh toán (ghi vào công nợ). */
+  dueDate?: string;
+  creditDays?: number;
   note?: string;
 }
 

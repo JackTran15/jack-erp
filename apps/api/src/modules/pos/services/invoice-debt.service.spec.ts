@@ -5,6 +5,8 @@ import { DataSource } from 'typeorm';
 import { InvoiceDebtService } from './invoice-debt.service';
 import { InvoiceDebtEntity, DebtStatus, DebtDocumentType } from '../entities/invoice-debt.entity';
 import { DebtPaymentEntity, DebtPaymentMethod } from '../entities/debt-payment.entity';
+import { CashReceiptEntity } from '../../accounting/cash-vouchers/cash-receipts/cash-receipt.entity';
+import { BranchEntity } from '../../branch/branch.entity';
 import { InvoiceEntity } from '../entities/invoice.entity';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { CashService } from '../../accounting/cash/cash.service';
@@ -31,8 +33,9 @@ const invoiceStub = (overrides: Partial<InvoiceEntity> = {}): InvoiceEntity =>
     ...overrides,
   }) as InvoiceEntity;
 
-const debtStub = (overrides: Partial<InvoiceDebtEntity> = {}): InvoiceDebtEntity =>
-  ({
+const debtStub = (overrides: Partial<InvoiceDebtEntity> = {}): InvoiceDebtEntity => {
+  const issuedAt = overrides.issuedAt ?? '2026-05-06';
+  return {
     id: 'debt-1',
     organizationId: 'org-1',
     branchId: 'branch-1',
@@ -45,9 +48,13 @@ const debtStub = (overrides: Partial<InvoiceDebtEntity> = {}): InvoiceDebtEntity
     remainingAmount: 500,
     paidAmount: 0,
     status: DebtStatus.OPEN,
-    issuedAt: '2026-05-06',
+    issuedAt,
+    // The ledger orders by createdAt; default it to the issue date so tests that
+    // set `issuedAt` to imply chronology keep working.
+    createdAt: new Date(`${issuedAt}T00:00:00Z`),
     ...overrides,
-  }) as InvoiceDebtEntity;
+  } as InvoiceDebtEntity;
+};
 
 describe('InvoiceDebtService', () => {
   let service: InvoiceDebtService;
@@ -63,6 +70,8 @@ describe('InvoiceDebtService', () => {
     create: jest.Mock;
     save: jest.Mock;
   };
+  let cashReceiptRepo: { find: jest.Mock };
+  let branchRepo: { find: jest.Mock };
   let dataSource: { transaction: jest.Mock };
   let cashService: { recordMovement: jest.Mock };
   let cashFundResolver: { resolveOrDefault: jest.Mock };
@@ -114,10 +123,13 @@ describe('InvoiceDebtService', () => {
 
     paymentRepo = {
       findOne: jest.fn(),
-      find: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
       create: jest.fn((data) => ({ ...data })),
       save: jest.fn((entity) => Promise.resolve(entity)),
     };
+
+    cashReceiptRepo = { find: jest.fn().mockResolvedValue([]) };
+    branchRepo = { find: jest.fn().mockResolvedValue([]) };
 
     dataSource = {
       transaction: jest.fn().mockImplementation((cb) => cb(mockManager)),
@@ -128,6 +140,8 @@ describe('InvoiceDebtService', () => {
         InvoiceDebtService,
         { provide: getRepositoryToken(InvoiceDebtEntity), useValue: debtRepo },
         { provide: getRepositoryToken(DebtPaymentEntity), useValue: paymentRepo },
+        { provide: getRepositoryToken(CashReceiptEntity), useValue: cashReceiptRepo },
+        { provide: getRepositoryToken(BranchEntity), useValue: branchRepo },
         { provide: DataSource, useValue: dataSource },
         { provide: CashService, useValue: cashService },
         { provide: CashFundResolverService, useValue: cashFundResolver },
@@ -316,6 +330,134 @@ describe('InvoiceDebtService', () => {
       const callArg = debtRepo.find.mock.calls[0][0];
       expect(callArg.where).not.toHaveProperty('status');
       expect(result).toHaveLength(2);
+    });
+
+    it('merges collections as signed rows with a running balance', async () => {
+      debtRepo.find.mockResolvedValue([
+        debtStub({ originalAmount: 5_000_000, issuedAt: '2026-07-01' }),
+      ]);
+      paymentRepo.find.mockResolvedValue([
+        {
+          id: 'pay-1',
+          debtId: 'debt-1',
+          amount: 2_000_000,
+          paymentMethod: DebtPaymentMethod.CASH,
+          paidAt: new Date('2026-07-05T03:00:00Z'),
+          createdAt: new Date('2026-07-05T03:00:00Z'),
+          cashReceiptId: 'rcpt-1',
+          branchId: 'branch-1',
+        },
+        {
+          id: 'pay-2',
+          debtId: 'debt-1',
+          amount: 3_000_000,
+          paymentMethod: DebtPaymentMethod.BANK_TRANSFER,
+          paidAt: new Date('2026-07-10T03:00:00Z'),
+          createdAt: new Date('2026-07-10T03:00:00Z'),
+          cashReceiptId: 'rcpt-2',
+          branchId: 'branch-1',
+        },
+      ]);
+      cashReceiptRepo.find.mockResolvedValue([
+        { id: 'rcpt-1', documentNumber: 'PT-010' },
+        { id: 'rcpt-2', documentNumber: 'PT-021' },
+      ]);
+
+      const result = await service.findCustomerDebts('cust-1', undefined, actor);
+
+      expect(
+        result.map((r) => [r.documentType, r.amount, r.runningBalance]),
+      ).toEqual([
+        ['credit_invoice', 5_000_000, 5_000_000],
+        ['collect_debt_cash', -2_000_000, 3_000_000],
+        ['collect_debt_bank', -3_000_000, 0],
+      ]);
+      expect(result[1]).toMatchObject({
+        kind: 'collection',
+        invoiceId: 'inv-1',
+        referenceCode: 'PT-010',
+      });
+    });
+
+    it('falls back to the debt referenceCode when the receipt has no number', async () => {
+      debtRepo.find.mockResolvedValue([
+        debtStub({ referenceCode: 'INV-777', originalAmount: 1_000 }),
+      ]);
+      paymentRepo.find.mockResolvedValue([
+        {
+          id: 'pay-1',
+          debtId: 'debt-1',
+          amount: 400,
+          paymentMethod: DebtPaymentMethod.CASH,
+          paidAt: new Date('2026-07-05T03:00:00Z'),
+          createdAt: new Date('2026-07-05T03:00:00Z'),
+          cashReceiptId: undefined,
+          branchId: 'branch-1',
+        },
+      ]);
+
+      const result = await service.findCustomerDebts('cust-1', undefined, actor);
+
+      expect(cashReceiptRepo.find).not.toHaveBeenCalled();
+      expect(result[1].referenceCode).toBe('INV-777');
+      expect(result[1].runningBalance).toBe(600);
+    });
+
+    it('keeps the running balance correct with a negative return-adjustment marker', async () => {
+      debtRepo.find.mockResolvedValue([
+        debtStub({ id: 'debt-1', originalAmount: 5_000_000, issuedAt: '2026-07-01' }),
+        debtStub({
+          id: 'debt-2',
+          invoiceId: 'inv-2',
+          documentType: DebtDocumentType.ADJUSTMENT,
+          originalAmount: -2_000_000,
+          remainingAmount: 0,
+          status: DebtStatus.PAID,
+          issuedAt: '2026-07-03',
+        }),
+      ]);
+      paymentRepo.find.mockResolvedValue([]);
+
+      const result = await service.findCustomerDebts('cust-1', undefined, actor);
+
+      expect(result.map((r) => r.runningBalance)).toEqual([5_000_000, 3_000_000]);
+    });
+
+    it('resolves the branch display name for ledger rows', async () => {
+      debtRepo.find.mockResolvedValue([debtStub({ branchId: 'branch-1' })]);
+      paymentRepo.find.mockResolvedValue([]);
+      branchRepo.find.mockResolvedValue([{ id: 'branch-1', name: 'Chi nhánh Q1' }]);
+
+      const result = await service.findCustomerDebts('cust-1', undefined, actor);
+
+      expect(result[0].branchName).toBe('Chi nhánh Q1');
+    });
+
+    it('returns createdAt and orders by it when the issue date is identical', async () => {
+      // Same issuedAt (date-only), but createdAt timestamps differ — the ledger
+      // must follow createdAt, newest event last, running balance in that order.
+      debtRepo.find.mockResolvedValue([
+        debtStub({
+          id: 'debt-late',
+          originalAmount: 700,
+          issuedAt: '2026-07-13',
+          createdAt: new Date('2026-07-13T09:00:00Z'),
+        }),
+        debtStub({
+          id: 'debt-early',
+          invoiceId: 'inv-early',
+          originalAmount: 500,
+          issuedAt: '2026-07-13',
+          createdAt: new Date('2026-07-13T05:00:00Z'),
+        }),
+      ]);
+      paymentRepo.find.mockResolvedValue([]);
+
+      const result = await service.findCustomerDebts('cust-1', undefined, actor);
+
+      expect(result.map((r) => r.id)).toEqual(['debt-early', 'debt-late']);
+      expect(result.map((r) => r.runningBalance)).toEqual([500, 1200]);
+      expect(result[0].createdAt).toBe('2026-07-13T05:00:00.000Z');
     });
   });
 
