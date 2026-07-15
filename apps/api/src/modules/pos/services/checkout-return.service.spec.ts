@@ -484,4 +484,54 @@ describe('CheckoutReturnService — debt offset routing', () => {
       expect(invoiceDebtService.createFromInvoice).not.toHaveBeenCalled();
     });
   });
+
+  describe('EXCHANGE net === 0 → đổi hàng ngang giá', () => {
+    // Return a 780k line, buy a 780k line → net = 0, refundedAmount = 0.
+    const equalExchangeItems = (): InvoiceItemEntity[] => [
+      {
+        ...exchangeItems()[0],
+        unitPrice: 780000,
+        lineTotal: 780000,
+      } as InvoiceItemEntity,
+      exchangeItems()[1],
+    ];
+
+    beforeEach(() => {
+      invoiceRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(where.id === 'exc-1' ? exchangeDraftStub() : null),
+      );
+      itemRepo.find.mockResolvedValue(equalExchangeItems());
+    });
+
+    it('checks out an equal-value swap (FE sends OFFSET) with no money movement', async () => {
+      const result = await service.checkout('exc-1', offsetDto(), actor);
+
+      expect(result.status).toBe(InvoiceStatus.PAID);
+      expect(result.netAmount).toBe(0);
+      expect(result.refundedAmount).toBe(0);
+      expect(result.totalPaid).toBe(0);
+      // No refund, no debt, no store credit — refundMethod is a no-op here.
+      expect(cashRefundPublisher.publish).not.toHaveBeenCalled();
+      expect(invoiceDebtService.createFromInvoice).not.toHaveBeenCalled();
+      expect(journalReturnPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ refundedAmount: 0, netAmount: 0, debtAmount: 0 }),
+        actor,
+      );
+    });
+
+    it('rejects payments when netAmount === 0', async () => {
+      await expect(
+        service.checkout(
+          'exc-1',
+          {
+            ...offsetDto(),
+            payments: [
+              { paymentMethod: InvoicePaymentMethod.CASH, amount: 10000 },
+            ],
+          },
+          actor,
+        ),
+      ).rejects.toThrow(/payments không được cung cấp khi netAmount = 0/);
+    });
+  });
 });

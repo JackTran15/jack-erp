@@ -522,12 +522,9 @@ export class CheckoutReturnService {
         );
       }
     } else {
-      // netAmount === 0 — pure EXCHANGE swap.
-      if (effectiveRefundMethod !== RefundMethod.OFFSET) {
-        throw new BadRequestException(
-          'netAmount = 0 → refundMethod phải là OFFSET',
-        );
-      }
+      // netAmount === 0 — đổi hàng ngang giá. refundedAmount = 0 nên không có chuyển
+      // động tiền/công nợ/store-credit nào; refundMethod là no-op ở đây. Chỉ cần chặn
+      // payments vì không có gì để thu.
       if (dto.payments && dto.payments.length > 0) {
         throw new BadRequestException(
           'payments không được cung cấp khi netAmount = 0',
