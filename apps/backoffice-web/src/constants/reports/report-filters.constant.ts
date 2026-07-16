@@ -19,6 +19,16 @@ export enum REPORT_FILTERS_LINE {
     STORE_SINGLE = 'store_single',
     PRODUCT_TYPE = 'product_type',
     CHECKBOX_ALLOCATE_COMBO = 'allocate_combo_revenue',
+
+    // === Công nợ ===
+    CUSTOMER_GROUP = 'customer_group',
+    // "Khách hàng" dạng select search (không có "Tất cả") — dùng cho báo cáo
+    // #2 (Chi tiết công nợ phải thu theo mặt hàng), khách hàng bắt buộc chọn.
+    CUSTOMER_SEARCH = 'customer_search',
+    SUPPLIER = 'supplier',
+    SUPPLIER_GROUP = 'supplier_group',
+    STATISTIC_GROUP_BY_ITEM_OR_TEMPLATE = 'statistic_group_by_item_or_template',
+    STORE_IN_CHAIN_OPTIONAL = 'store_in_chain_optional',
 }
 
 export const REPORT_FILTERS_LINE_METADATA = {
@@ -105,5 +115,31 @@ export const REPORT_FILTERS_LINE_METADATA = {
     },
     [REPORT_FILTERS_LINE.CHECKBOX_ALLOCATE_COMBO]: {
         backendField: 'allocateComboRevenue',
+    },
+    [REPORT_FILTERS_LINE.CUSTOMER_GROUP]: {
+        label: 'nhóm khách hàng',
+        backendField: 'customerGroupId',
+    },
+    [REPORT_FILTERS_LINE.CUSTOMER_SEARCH]: {
+        label: 'khách hàng',
+        isRequired: true,
+        backendField: 'customerId',
+    },
+    [REPORT_FILTERS_LINE.SUPPLIER]: {
+        label: 'nhà cung cấp',
+        isRequired: true,
+        backendField: 'supplierId',
+    },
+    [REPORT_FILTERS_LINE.SUPPLIER_GROUP]: {
+        label: 'nhóm nhà cung cấp',
+        backendField: 'supplierGroupId',
+    },
+    [REPORT_FILTERS_LINE.STATISTIC_GROUP_BY_ITEM_OR_TEMPLATE]: {
+        label: 'thống kê theo',
+        backendField: 'groupBy',
+    },
+    [REPORT_FILTERS_LINE.STORE_IN_CHAIN_OPTIONAL]: {
+        label: 'cửa hàng',
+        backendField: 'branchId',
     },
 }

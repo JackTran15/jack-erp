@@ -12,7 +12,11 @@ import { chain_filterRegistryReportStockQuantityByStore, chain_tableRegistryRepo
 import { chain_filterRegistryReportTransferInOutSummary, chain_tableRegistryReportTransferInOutSummary, single_filterRegistryReportTransferInOutSummary, single_tableRegistryReportTransferInOutSummary } from "./report-registry/report-transfer-in-out-summary.registry";
 import { chain_filterRegistryReportTransferredGoodsSummaryByStore, chain_tableRegistryReportTransferredGoodsSummaryByStore, single_filterRegistryReportTransferredGoodsSummaryByStore, single_tableRegistryReportTransferredGoodsSummaryByStore } from "./report-registry/report-transferred-goods-summary-by-store.registry";
 import { chain_filterRegistryReportTemporaryWarehouseOutGoods, chain_tableRegistryReportTemporaryWarehouseOutGoods, single_filterRegistryReportTemporaryWarehouseOutGoods, single_tableRegistryReportTemporaryWarehouseOutGoods } from "./report-registry/report-temporary-warehouse-out-goods.registry";
-import type { ReportTableConfig, ReportTypeMetadata } from "./report.interface";
+import { chain_filterRegistryReportCustomerDebts, chain_tableRegistryReportCustomerDebts, single_filterRegistryReportCustomerDebts, single_tableRegistryReportCustomerDebts } from "./report-registry/report-customer-debts.registry";
+import { chain_filterRegistryReportReceivablesDetailByProduct, chain_tableRegistryReportReceivablesDetailByProduct, single_filterRegistryReportReceivablesDetailByProduct, single_tableRegistryReportReceivablesDetailByProduct } from "./report-registry/report-receivables-detail-by-product.registry";
+import { chain_filterRegistryReportSupplierDebts, chain_tableRegistryReportSupplierDebts, single_filterRegistryReportSupplierDebts, single_tableRegistryReportSupplierDebts } from "./report-registry/report-supplier-debts.registry";
+import { chain_filterRegistryReportSupplierDebtsDetailByDocumentAndProduct, chain_tableRegistryReportSupplierDebtsDetailByDocumentAndProduct, single_filterRegistryReportSupplierDebtsDetailByDocumentAndProduct, single_tableRegistryReportSupplierDebtsDetailByDocumentAndProduct } from "./report-registry/report-supplier-debts-detail-by-document-and-product.registry";
+import type { ReportBackendSource, ReportTableConfig, ReportTypeMetadata } from "./report.interface";
 
 export enum REPORT_TYPE_SALES {
   DAILY_SALES_SUMMARY = 'daily_sales_summary',
@@ -136,6 +140,7 @@ export enum REPORT_TYPE_INVENTORY {
 }
 
 export enum REPORT_TYPE_DEBTS {
+  CUSTOMER_DEBTS = 'customer_debts',
   RECEIVABLES_DETAIL_BY_PRODUCT = 'receivables_detail_by_product',
   AGING_RECEIVABLES_SUMMARY = 'aging_receivables_summary',
   SUPPLIER_DEBTS = 'supplier_debts',
@@ -294,10 +299,59 @@ export const REPORT_TYPE_INVENTORY_METADATA = {
 };
 
 export const REPORT_TYPE_DEBTS_METADATA = {
-  [REPORT_TYPE_DEBTS.RECEIVABLES_DETAIL_BY_PRODUCT]: { label: 'Chi tiết công nợ phải thu theo mặt hàng' },
+  [REPORT_TYPE_DEBTS.CUSTOMER_DEBTS]: {
+    label: 'Công nợ khách hàng',
+    backendKey: 'customer-debts',
+    backendSource: 'debt' as const,
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportCustomerDebts,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportCustomerDebts,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportCustomerDebts,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportCustomerDebts,
+    },
+  },
+  [REPORT_TYPE_DEBTS.RECEIVABLES_DETAIL_BY_PRODUCT]: {
+    label: 'Chi tiết công nợ phải thu theo mặt hàng',
+    backendKey: 'receivables-detail-by-product',
+    backendSource: 'debt' as const,
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportReceivablesDetailByProduct,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportReceivablesDetailByProduct,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportReceivablesDetailByProduct,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportReceivablesDetailByProduct,
+    },
+  },
   [REPORT_TYPE_DEBTS.AGING_RECEIVABLES_SUMMARY]: { label: 'Tổng hợp công nợ phải thu theo độ tuổi' },
-  [REPORT_TYPE_DEBTS.SUPPLIER_DEBTS]: { label: 'Công nợ nhà cung cấp' },
-  [REPORT_TYPE_DEBTS.SUPPLIER_DEBTS_DETAIL_BY_DOCUMENT_AND_PRODUCT]: { label: 'Chi tiết công nợ nhà cung cấp theo chứng từ và mặt hàng' },
+  [REPORT_TYPE_DEBTS.SUPPLIER_DEBTS]: {
+    label: 'Công nợ nhà cung cấp',
+    backendKey: 'supplier-debts',
+    backendSource: 'debt' as const,
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportSupplierDebts,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportSupplierDebts,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportSupplierDebts,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportSupplierDebts,
+    },
+  },
+  [REPORT_TYPE_DEBTS.SUPPLIER_DEBTS_DETAIL_BY_DOCUMENT_AND_PRODUCT]: {
+    label: 'Chi tiết công nợ nhà cung cấp theo chứng từ và mặt hàng',
+    backendKey: 'supplier-debts-detail-by-document-and-product',
+    backendSource: 'debt' as const,
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportSupplierDebtsDetailByDocumentAndProduct,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportSupplierDebtsDetailByDocumentAndProduct,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportSupplierDebtsDetailByDocumentAndProduct,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportSupplierDebtsDetailByDocumentAndProduct,
+    },
+  },
   [REPORT_TYPE_DEBTS.DELIVERY_PARTNER_DEBTS]: { label: 'Công nợ đối tác giao hàng' },
 };
 
@@ -332,10 +386,10 @@ export function getReportBackendKey(reportType: string): string | undefined {
   return REPORT_TYPE_METADATA[reportType]?.backendKey;
 }
 
-// Domain backend của report type — chọn bộ endpoint (invoice vs inventory).
+// Domain backend của report type — chọn bộ endpoint (invoice / inventory / debt).
 export function getReportBackendSource(
   reportType: string,
-): "invoice" | "inventory" {
+): ReportBackendSource {
   return REPORT_TYPE_METADATA[reportType]?.backendSource ?? "invoice";
 }
 
