@@ -394,12 +394,21 @@ export function ReportPageTableView({ rows, totals }: Props) {
               const rowBg = rowIndex % 2 === 0 ? "bg-background" : "bg-muted/20";
               // Nền đục cho cột cố định (cùng màu với dòng): bg-muted/20 là nền trong suốt,
               // khi cuộn ngang nội dung cột khác sẽ lộ chồng lên — dùng màu đặc để che.
-              const pinnedBg =
+              // Giá trị gốc của --row-bg PHẢI đặt bằng class (không inline style):
+              // inline style luôn thắng mọi CSS class kể cả :hover trên cùng property/
+              // element, nên nếu đặt --row-bg gốc bằng inline thì class hover bên dưới
+              // sẽ không bao giờ ghi đè được. Đặt cả 2 bằng class → hover (2 lớp chọn:
+              // class + :hover) có specificity cao hơn base (1 lớp), luôn thắng đúng như ý.
+              const rowBgVarClass =
                 rowIndex % 2 === 0
-                  ? "hsl(var(--background))"
-                  : "color-mix(in srgb, hsl(var(--muted)) 20%, hsl(var(--background)))";
+                  ? "[--row-bg:hsl(var(--background))]"
+                  : "[--row-bg:color-mix(in_srgb,hsl(var(--muted))_20%,hsl(var(--background)))]";
+              const pinnedBg = "var(--row-bg)";
               return (
-                <tr key={row.id} className={`${rowBg} hover:bg-blue-50/70`}>
+                <tr
+                  key={row.id}
+                  className={`${rowBg} ${rowBgVarClass} hover:bg-blue-50/70 hover:[--row-bg:theme(colors.blue.50)]`}
+                >
                   {cells.map((cell) => {
                     const col = configById.get(cell.column.id);
                     if (!col) return null;

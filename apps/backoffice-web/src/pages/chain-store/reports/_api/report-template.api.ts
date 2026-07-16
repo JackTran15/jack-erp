@@ -10,14 +10,15 @@ import {
 } from "../../../../constants/reports/report-type.constant";
 import { useReportStore } from "../../../../store/page-stores/report/report.context";
 
-type TemplateSource = "invoice" | "inventory";
+type TemplateSource = "invoice" | "inventory" | "debt";
 
 const TEMPLATES_PATH: Record<
   TemplateSource,
-  "/reports/invoices/templates" | "/reports/inventory/templates"
+  "/reports/invoices/templates" | "/reports/inventory/templates" | "/reports/debts/templates"
 > = {
   invoice: "/reports/invoices/templates",
   inventory: "/reports/inventory/templates",
+  debt: "/reports/debts/templates",
 };
 
 // Tên template ngầm định (v1: 1 template / reportType, chưa có UI đặt tên).

@@ -143,6 +143,7 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
   'reporting.invoice.consolidated.read': 'Xem báo cáo hóa đơn (toàn chuỗi)',
   'reporting.invoice-template.manage': 'Quản lý mẫu báo cáo hóa đơn',
   'inventory.reports.read': 'Xem báo cáo nhập xuất tồn kho',
+  'reporting.debts.read': 'Xem báo cáo công nợ',
 
   // Đăng ký
   'org.registration.submit': 'Gửi đăng ký tổ chức',

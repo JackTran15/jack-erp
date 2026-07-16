@@ -4982,6 +4982,87 @@ export interface paths {
         patch: operations["InvoiceReportController_updateTemplate"];
         trace?: never;
     };
+    "/reports/debts/columns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DebtReportController_getColumns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/debts/filter-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Shared dropdown options for the report filters (customerGroup, supplier, …). */
+        get: operations["DebtReportController_getFilterOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/debts/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DebtReportController_search"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/debts/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DebtReportController_listTemplates"];
+        put?: never;
+        post: operations["DebtReportController_createTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/debts/templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DebtReportController_getTemplate"];
+        put?: never;
+        post?: never;
+        delete: operations["DebtReportController_deleteTemplate"];
+        options?: never;
+        head?: never;
+        patch: operations["DebtReportController_updateTemplate"];
+        trace?: never;
+    };
     "/inventory/purchase-orders": {
         parameters: {
             query?: never;
@@ -9497,6 +9578,61 @@ export interface components {
             description?: string;
             columns?: components["schemas"]["ReportTemplateColumnDto"][];
             filters?: components["schemas"]["InvoiceReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            sortOrder?: number;
+        };
+        DebtReportFilterDto: {
+            /**
+             * @description "Thống kê theo" — supplier-debts-detail-by-document-and-product only.
+             * @enum {string}
+             */
+            groupBy?: "item" | "productTemplate";
+            /** @description Report period — enforced present by the report definitions that need it. */
+            period?: components["schemas"]["DateRangeFilterDto"];
+            /**
+             * Format: uuid
+             * @description Narrow to a single branch. Absent = org/chain-wide aggregation (the
+             *     default for every debt report). Customer-debt reports ignore this field
+             *     entirely (they always aggregate across every branch the party traded
+             *     with); supplier-debt reports honor it to narrow from the chain-wide
+             *     default down to one store.
+             */
+            branchId?: string;
+            /** Format: uuid */
+            customerId?: string;
+            /** Format: uuid */
+            customerGroupId?: string;
+            /** Format: uuid */
+            supplierId?: string;
+            /** Format: uuid */
+            supplierGroupId?: string;
+        };
+        DebtReportSearchDto: {
+            /** @description Which backend report definition to run. */
+            reportType: string;
+            /** @description Selected column keys (fixed registry keys only — debt reports have no dynamic columns). */
+            columns: string[];
+            filters: components["schemas"]["DebtReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            limit: number;
+        };
+        CreateDebtReportTemplateDto: {
+            reportType: string;
+            name: string;
+            description?: string;
+            columns: components["schemas"]["ReportTemplateColumnDto"][];
+            filters?: components["schemas"]["DebtReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            sortOrder?: number;
+        };
+        UpdateDebtReportTemplateDto: {
+            name?: string;
+            description?: string;
+            columns?: components["schemas"]["ReportTemplateColumnDto"][];
+            filters?: components["schemas"]["DebtReportFilterDto"];
             columnFilters?: components["schemas"]["ColumnFilterDto"][];
             sortOrder?: number;
         };
@@ -17775,6 +17911,12 @@ export interface operations {
             query?: {
                 search?: string;
                 direction?: "warehouse" | "showroom";
+                /**
+                 * @description Include stock at stop-tracked (is_tracked=false) details. Bán hàng để mặc
+                 *     định false (ẩn hàng ngừng theo dõi); Chuyển kho tạm truyền true để còn lấy
+                 *     được nguồn dọn hàng.
+                 */
+                includeUntracked?: boolean;
             };
             header?: never;
             path: {
@@ -17799,6 +17941,8 @@ export interface operations {
             query: {
                 /** @description Exact barcode or SKU code to look up. */
                 code: string;
+                /** @description Include stock at stop-tracked details (temp-warehouse transfer only). */
+                includeUntracked?: boolean;
             };
             header?: never;
             path: {
@@ -19120,7 +19264,7 @@ export interface operations {
         parameters: {
             query: {
                 /** @description Which dropdown to load (store, cashier, invoiceStatus, …). */
-                type: "store" | "cashier" | "salesperson" | "customer" | "productGroup" | "brand" | "unit" | "warehouse" | "invoiceStatus" | "statDateType" | "productType" | "statBy";
+                type: "store" | "cashier" | "salesperson" | "customer" | "productGroup" | "brand" | "unit" | "warehouse" | "customerGroup" | "supplier" | "supplierGroup" | "invoiceStatus" | "statDateType" | "productType" | "statBy";
                 /** @description Optional case-insensitive partial search (dynamic types only). */
                 search?: string;
                 page?: number;
@@ -19284,6 +19428,188 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UpdateInvoiceReportTemplateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    DebtReportController_getColumns: {
+        parameters: {
+            query: {
+                reportType: string;
+                groupBy?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    DebtReportController_getFilterOptions: {
+        parameters: {
+            query: {
+                /** @description Which dropdown to load (customerGroup, supplier, supplierGroup, …). */
+                type: "store" | "cashier" | "salesperson" | "customer" | "productGroup" | "brand" | "unit" | "warehouse" | "customerGroup" | "supplier" | "supplierGroup" | "invoiceStatus" | "statDateType" | "productType" | "statBy";
+                /** @description Optional case-insensitive partial search. */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    DebtReportController_search: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DebtReportSearchDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    DebtReportController_listTemplates: {
+        parameters: {
+            query?: {
+                reportType?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    DebtReportController_createTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDebtReportTemplateDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    DebtReportController_getTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    DebtReportController_deleteTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    DebtReportController_updateTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDebtReportTemplateDto"];
             };
         };
         responses: {
@@ -20493,7 +20819,7 @@ export interface operations {
                 /** @description Branch ids to restrict warehouse options to */
                 branchIds?: string[];
                 /** @description Which dropdown to load (store, warehouse, productGroup, …). */
-                type: "store" | "cashier" | "salesperson" | "customer" | "productGroup" | "brand" | "unit" | "warehouse" | "invoiceStatus" | "statDateType" | "productType" | "statBy";
+                type: "store" | "cashier" | "salesperson" | "customer" | "productGroup" | "brand" | "unit" | "warehouse" | "customerGroup" | "supplier" | "supplierGroup" | "invoiceStatus" | "statDateType" | "productType" | "statBy";
                 /** @description Optional case-insensitive partial search (dynamic types only). */
                 search?: string;
                 page?: number;

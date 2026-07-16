@@ -66,6 +66,8 @@ export interface LookupFieldProps<T> {
   /** Cap on items for non-paginated `search`. Ignored when search returns `{ items, hasMore }`. */
   maxSuggestions?: number;
   className?: string;
+  /** Extra classes for the underlying `<input>` itself (e.g. to match a smaller filter-bar size). */
+  inputClassName?: string;
   /** Extra classes for the suggestions popover. */
   dropdownClassName?: string;
   /** Force the suggestions popover to be at least this many px wide. */
@@ -127,6 +129,7 @@ export function LookupField<T>({
   debounceMs = 250,
   maxSuggestions = 50,
   className,
+  inputClassName,
   dropdownClassName,
   dropdownMinWidth,
   portalToBody,
@@ -533,7 +536,11 @@ export function LookupField<T>({
           aria-expanded={open && hasSuggestions}
           aria-autocomplete="list"
           aria-controls={listboxId}
-          className={cn("rounded-r-none", value ? "pr-14" : "pr-8")}
+          className={cn(
+            hideSearchButton ? undefined : "rounded-r-none",
+            value ? "pr-14" : "pr-8",
+            inputClassName,
+          )}
         />
         {value && !disabled ? (
           <button
