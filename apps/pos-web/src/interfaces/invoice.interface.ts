@@ -61,6 +61,8 @@ export interface InvoiceRow {
   pointsRedeemed?: number;
   /** Giá trị VND quy đổi từ điểm đã dùng. */
   pointsDiscountAmount?: number;
+  /** Số điểm được tích từ hóa đơn (chỉ có ở chi tiết hoá đơn). */
+  pointsEarned?: number;
   note?: string;
   issuedAt?: string;
   createdAt: string;

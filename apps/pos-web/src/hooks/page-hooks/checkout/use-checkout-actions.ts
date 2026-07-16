@@ -315,10 +315,15 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
               points: pointsToRedeem,
             });
           }
-          await checkoutMutation.mutateAsync({
+          const soldInvoice = await checkoutMutation.mutateAsync({
             id: invoiceId,
             body: checkoutResolve.body,
           });
+          // Điểm được tích do BE tính (floor(amountDue/rate)) — chỉ biết sau khi
+          // checkout xong, nên gắn vào biên lai (dựng trước) trước khi in.
+          if (receiptPayload) {
+            receiptPayload.totals.pointsEarned = soldInvoice.pointsEarned;
+          }
         } else {
           // ── RETURN / EXCHANGE ─────────────────────────────────────────────
           const newLines =
@@ -409,10 +414,14 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
                     salesperson: selectedSalesperson,
                   }),
                 );
-                await checkoutMutation.mutateAsync({
+                const soldExchange = await checkoutMutation.mutateAsync({
                   id: createdSale.id,
                   body: saleCheckoutBody,
                 });
+                if (receiptPayload) {
+                  receiptPayload.totals.pointsEarned =
+                    soldExchange.pointsEarned;
+                }
               } catch (err) {
                 toast.error(
                   err instanceof Error
@@ -504,6 +513,9 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
               id: invoiceId,
               body: checkoutResolve.body,
             });
+            if (receiptPayload) {
+              receiptPayload.totals.pointsEarned = posted.pointsEarned;
+            }
             // Operator tích "Tính vào công nợ" nhưng hóa đơn gốc không còn nợ để
             // bù trừ → BE tự chi tiền mặt; báo cho thu ngân biết.
             if (p.refundToDebt && posted.refundMethod === "CASH") {

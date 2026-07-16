@@ -548,11 +548,63 @@ describe('CheckoutInvoiceService (event-driven)', () => {
         expect.objectContaining({ amountDue: 170 }),
         actor,
       );
+      // Earn base = amountDue (net of the point discount), not the gross subtotal.
+      expect(loyaltyPointsPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ subtotal: 170 }),
+        actor,
+      );
     });
 
     it('does not redeem points when pointsRedeemed = 0', async () => {
       await service.checkout('inv-1', cashPaymentDto(), actor);
       expect(membershipCardService.redeemPointsForInvoice).not.toHaveBeenCalled();
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Loyalty point earning — base = amountDue (net of every discount)
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('loyalty point earning', () => {
+    // 1.000.000đ hàng, đổi điểm giảm 50.000đ → còn 950.000đ → tích floor(950k/10k)=95.
+    const setupBigInvoice = () => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({
+          subtotal: 1_000_000,
+          amountDue: 950_000,
+          pointsRedeemed: 100,
+          pointsDiscountAmount: 50_000,
+        }),
+      );
+      itemRepo.find.mockResolvedValue([
+        invoiceItemStub({ quantity: 1, unitPrice: 1_000_000, lineTotal: 1_000_000 }),
+      ]);
+    };
+
+    it('persists pointsEarned = floor(amountDue / rate) after point redemption', async () => {
+      setupBigInvoice();
+
+      const result = await service.checkout(
+        'inv-1',
+        { payments: [{ paymentMethod: 'cash' as any, amount: 950_000 }] },
+        actor,
+      );
+
+      expect(result.pointsEarned).toBe(95);
+    });
+
+    it('publishes the award event with base = amountDue (950k), not subtotal (1tr)', async () => {
+      setupBigInvoice();
+
+      await service.checkout(
+        'inv-1',
+        { payments: [{ paymentMethod: 'cash' as any, amount: 950_000 }] },
+        actor,
+      );
+
+      expect(loyaltyPointsPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ subtotal: 950_000 }),
+        actor,
+      );
     });
   });
 

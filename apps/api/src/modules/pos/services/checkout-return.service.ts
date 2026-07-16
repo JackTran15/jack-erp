@@ -52,6 +52,7 @@ import { CheckoutReturnDto } from '../dto/checkout-return.dto';
 import { InvoiceDebtService } from './invoice-debt.service';
 import { ReturnPostedPublisher } from '../publishers/return-posted.publisher';
 import { StockReturnInPublisher } from '../publishers/stock-return-in.publisher';
+import { POINT_EARN_VND_PER_POINT } from '../../customer/loyalty.constants';
 
 interface ComputedTotals {
   returnSubtotal: number;
@@ -280,6 +281,12 @@ export class CheckoutReturnService {
       invoice.refundMethod = effectiveRefundMethod;
       invoice.refundedAmount = totals.refundedAmount;
       invoice.netAmount = totals.netAmount;
+      // EXCHANGE net > 0 earns loyalty points on the new-purchase difference
+      // (mirrors the netAmount earn base published below); RETURN/refund earns none.
+      invoice.pointsEarned =
+        totals.netAmount > 0
+          ? Math.floor(totals.netAmount / POINT_EARN_VND_PER_POINT)
+          : 0;
       if (dto.note) invoice.note = dto.note;
       const savedInvoice = await manager.save(invoice);
 
@@ -413,6 +420,7 @@ export class CheckoutReturnService {
       effectiveRefundMethod,
       receivableAccountId,
       resolvedCashAccountId,
+      originalInvoice,
       actor,
     );
 
@@ -636,6 +644,7 @@ export class CheckoutReturnService {
     effectiveRefundMethod: RefundMethod,
     receivableAccountId: string | undefined,
     resolvedCashAccountId: string | undefined,
+    originalInvoice: InvoiceEntity | null,
     actor: ActorContext,
   ): Promise<void> {
     const branchId = invoice.branchId!;
@@ -758,7 +767,17 @@ export class CheckoutReturnService {
           actor,
         );
       } else {
-        const delta = Math.abs(totals.refundedAmount || totals.returnSubtotal);
+        // Reverse the points earned on the ORIGINAL sale, proportional to the
+        // returned value — earn was on the original's amountDue (net of its
+        // discounts/point-redemption), so reverse on that same base to stay
+        // symmetric (full return → floor(amountDue/rate) = points earned). QUICK
+        // returns without an original fall back to the gross returned value.
+        const originalSubtotal = Number(originalInvoice?.subtotal ?? 0);
+        const delta =
+          originalInvoice && originalSubtotal > 0
+            ? (Number(originalInvoice.amountDue) * totals.returnSubtotal) /
+              originalSubtotal
+            : Math.abs(totals.refundedAmount || totals.returnSubtotal);
         if (delta > 0) {
           await this.loyaltyPointsReversePublisher.publish(
             {
