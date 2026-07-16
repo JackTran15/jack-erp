@@ -187,15 +187,18 @@ export const navConfig: NavModule[] = [
         id: "treasury-deposit",
         label: "TIỀN GỬI",
         children: [
+          { to: "/treasury/deposit/receipts-expenses", label: "Thu, chi tiền gửi" },
+          { to: "/treasury/deposit-reconciliation", label: "Đối chiếu tiền gửi" },
+          { to: "/treasury/deposit-period-lock", label: "Khóa sổ tiền gửi" },
+          { to: "/admin/deposit-accounts", label: "Tài khoản tiền gửi" },
           {
-            to: "/treasury/wip/deposit-receipts-expenses",
-            label: "Thu, chi tiền gửi",
+            to: "/admin/deposit-payment-policy",
+            label: "Chính sách thanh toán tiền gửi",
           },
-          {
-            to: "/treasury/wip/deposit-reconciliation",
-            label: "Đối chiếu tiền gửi",
-          },
-          { to: "/treasury/wip/deposit-ledger", label: "Sổ chi tiết tiền gửi" },
+          { to: "/treasury/deposit/ledger", label: "Sổ chi tiết tiền gửi" },
+          { to: "/treasury/deposit-transfers", label: "Chuyển liên chi nhánh" },
+          { to: "/treasury/deposit-in-transit", label: "Tiền đang chuyển" },
+          { to: "/treasury/deposit-dashboard", label: "Số dư toàn hệ thống" },
         ],
       },
       {

@@ -9516,6 +9516,1434 @@
         ]
       }
     },
+    "/deposit-ledger": {
+      "get": {
+        "operationId": "DepositLedgerController_getLedger",
+        "parameters": [
+          {
+            "name": "depositAccountId",
+            "required": true,
+            "in": "query",
+            "description": "Deposit account to show the ledger for (BR-LEDG-03: one account)",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "ILIKE on document number",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DepositLedger"
+        ]
+      }
+    },
+    "/deposit-ledger/export": {
+      "get": {
+        "operationId": "DepositLedgerController_export",
+        "parameters": [
+          {
+            "name": "depositAccountId",
+            "required": true,
+            "in": "query",
+            "description": "Deposit account to show the ledger for (BR-LEDG-03: one account)",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "ILIKE on document number",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "DepositLedger"
+        ]
+      }
+    },
+    "/deposit-audit-log": {
+      "get": {
+        "operationId": "DepositAuditController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "DepositAudit"
+        ]
+      }
+    },
+    "/bank-receipts": {
+      "post": {
+        "operationId": "BankReceiptsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBankReceiptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankReceiptEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "BankReceipts"
+        ]
+      },
+      "get": {
+        "operationId": "BankReceiptsController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "PENDING_APPROVAL",
+                "POSTED",
+                "REVERSED"
+              ]
+            }
+          },
+          {
+            "name": "purpose",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OTHER",
+                "DEBT_COLLECTION",
+                "OTHER_INCOME",
+                "INTER_BRANCH_IN"
+              ]
+            }
+          },
+          {
+            "name": "depositAccountId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "partnerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "ILIKE over document_number, payer_name, reason.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "description": "Filter by origin (maps to reference_type).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DEBT_COLLECTION",
+                "TRANSFER",
+                "MANUAL"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "BankReceipts"
+        ]
+      }
+    },
+    "/bank-receipts/{id}": {
+      "get": {
+        "operationId": "BankReceiptsController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankReceiptEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "BankReceipts"
+        ]
+      },
+      "patch": {
+        "operationId": "BankReceiptsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBankReceiptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankReceiptEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "BankReceipts"
+        ]
+      },
+      "delete": {
+        "operationId": "BankReceiptsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "BankReceipts"
+        ]
+      }
+    },
+    "/bank-receipts/{id}/post": {
+      "post": {
+        "operationId": "BankReceiptsController_post",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankReceiptEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "BankReceipts"
+        ]
+      }
+    },
+    "/bank-receipts/{id}/reverse": {
+      "post": {
+        "operationId": "BankReceiptsController_reverse",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReverseBankReceiptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "BankReceipts"
+        ]
+      }
+    },
+    "/bank-payments": {
+      "post": {
+        "operationId": "BankPaymentsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBankPaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankPaymentEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "BankPayments"
+        ]
+      },
+      "get": {
+        "operationId": "BankPaymentsController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "PENDING_APPROVAL",
+                "POSTED",
+                "REVERSED"
+              ]
+            }
+          },
+          {
+            "name": "purpose",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SUPPLIER_PAYMENT",
+                "PURCHASE",
+                "EXPENSE",
+                "CASH_TRANSFER",
+                "INTER_BRANCH_OUT",
+                "REFUND",
+                "BANK_FEE",
+                "OTHER"
+              ]
+            }
+          },
+          {
+            "name": "depositAccountId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "partnerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "ILIKE over document_number, payee_name, reason.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "description": "Filter by origin (maps to reference_type).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "GOODS_RECEIPT",
+                "EXPENSE",
+                "TRANSFER",
+                "MANUAL"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "BankPayments"
+        ]
+      }
+    },
+    "/bank-payments/{id}": {
+      "get": {
+        "operationId": "BankPaymentsController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankPaymentEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "BankPayments"
+        ]
+      },
+      "patch": {
+        "operationId": "BankPaymentsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBankPaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankPaymentEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "BankPayments"
+        ]
+      },
+      "delete": {
+        "operationId": "BankPaymentsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "BankPayments"
+        ]
+      }
+    },
+    "/bank-payments/{id}/post": {
+      "post": {
+        "operationId": "BankPaymentsController_post",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankPaymentEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "BankPayments"
+        ]
+      }
+    },
+    "/bank-payments/{id}/reverse": {
+      "post": {
+        "operationId": "BankPaymentsController_reverse",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReverseBankPaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "BankPayments"
+        ]
+      }
+    },
+    "/supplier-deposit-payment": {
+      "post": {
+        "operationId": "SupplierDepositPaymentController_pay",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSupplierDepositPaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create + post one or two supplier-payment vouchers (deposit and/or cash,\nBR-BUY-03) that settle the selected supplier debts, atomically. Idempotent\nper X-Idempotency-Key (the frontend always sends one).",
+        "tags": [
+          "SupplierDepositPayment"
+        ]
+      }
+    },
+    "/supplier-deposit-payment/sagas/{id}": {
+      "get": {
+        "operationId": "SupplierDepositPaymentController_getSaga",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierDepositPaymentSagaEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "SupplierDepositPayment"
+        ]
+      }
+    },
+    "/fund-swaps": {
+      "post": {
+        "operationId": "FundSwapsController_swap",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFundSwapDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "FundSwaps"
+        ]
+      }
+    },
+    "/deposit-transfers": {
+      "post": {
+        "operationId": "DepositTransferController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDepositTransferDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositTransferEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DepositTransfer"
+        ]
+      },
+      "get": {
+        "operationId": "DepositTransferController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "DepositTransfer"
+        ]
+      }
+    },
+    "/deposit-transfers/{id}/confirm": {
+      "post": {
+        "operationId": "DepositTransferController_confirm",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmDepositTransferDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositTransferEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DepositTransfer"
+        ]
+      }
+    },
+    "/deposit-transfers/{id}/cancel": {
+      "post": {
+        "operationId": "DepositTransferController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelDepositTransferDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositTransferEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DepositTransfer"
+        ]
+      }
+    },
+    "/deposit-transfers/{id}": {
+      "get": {
+        "operationId": "DepositTransferController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositTransferEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DepositTransfer"
+        ]
+      }
+    },
+    "/deposit-transfers/in-transit": {
+      "get": {
+        "operationId": "DepositDashboardController_inTransit",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "staleDays",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InTransitReportDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DepositDashboard"
+        ]
+      }
+    },
+    "/deposit/dashboard": {
+      "get": {
+        "operationId": "DepositDashboardController_dashboard",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgBalanceDashboardDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DepositDashboard"
+        ]
+      }
+    },
+    "/deposit-recon": {
+      "get": {
+        "operationId": "DepositReconController_list",
+        "parameters": [
+          {
+            "name": "depositAccountId",
+            "required": false,
+            "in": "query",
+            "description": "Số tài khoản — filters to one deposit account",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "reconStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "CHUA",
+              "type": "string",
+              "enum": [
+                "CHUA",
+                "DA",
+                "LECH"
+              ]
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "value_date >=",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "value_date <=",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "docNumber",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "DepositRecon"
+        ]
+      }
+    },
+    "/deposit-recon/export": {
+      "get": {
+        "operationId": "DepositReconController_export",
+        "parameters": [
+          {
+            "name": "depositAccountId",
+            "required": false,
+            "in": "query",
+            "description": "Số tài khoản — filters to one deposit account",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "reconStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "CHUA",
+              "type": "string",
+              "enum": [
+                "CHUA",
+                "DA",
+                "LECH"
+              ]
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "value_date >=",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "value_date <=",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "docNumber",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "DepositRecon"
+        ]
+      }
+    },
+    "/deposit-recon/reconcile": {
+      "post": {
+        "operationId": "DepositReconController_reconcile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "BR-PERM-02: reconcile requires its own permission, distinct from `bank_payment.create`.",
+        "tags": [
+          "DepositRecon"
+        ]
+      }
+    },
+    "/deposit-recon/unreconcile": {
+      "post": {
+        "operationId": "DepositReconController_unreconcile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnreconcileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "BR-PERM-03: Kế toán trưởng only.",
+        "tags": [
+          "DepositRecon"
+        ]
+      }
+    },
+    "/deposit-period-locks": {
+      "get": {
+        "operationId": "DepositPeriodLockController_list",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DepositPeriodLockEntity"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DepositPeriodLock"
+        ]
+      },
+      "post": {
+        "operationId": "DepositPeriodLockController_lock",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LockPeriodDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositPeriodLockEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DepositPeriodLock"
+        ]
+      }
+    },
+    "/deposit-period-locks/{id}/unlock": {
+      "post": {
+        "operationId": "DepositPeriodLockController_unlock",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnlockPeriodDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositPeriodLockEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "BR-PERM-03: Kế toán trưởng only.",
+        "tags": [
+          "DepositPeriodLock"
+        ]
+      }
+    },
     "/inventory/stock/adjustments": {
       "post": {
         "operationId": "StockAdjustmentController_create",
@@ -21141,6 +22569,7 @@
               "EXCHANGE",
               "EXPENSE",
               "CASH_MOVEMENT",
+              "BANK_MOVEMENT",
               "MANUAL",
               "TRANSFER"
             ]
@@ -21183,6 +22612,7 @@
               "EXCHANGE",
               "EXPENSE",
               "CASH_MOVEMENT",
+              "BANK_MOVEMENT",
               "MANUAL",
               "TRANSFER"
             ],
@@ -26825,6 +28255,1602 @@
           "createdAt",
           "updatedAt",
           "createdBy"
+        ]
+      },
+      "BankReceiptLineDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string",
+            "description": "\"Diễn giải\"",
+            "maxLength": 500
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "\"Mục thu\" — references a cash_voucher_categories row.",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "referenceNote": {
+            "type": "string",
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "description",
+          "amount"
+        ]
+      },
+      "CreateBankReceiptDto": {
+        "type": "object",
+        "properties": {
+          "documentNumber": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "depositAccountId": {
+            "type": "string",
+            "description": "\"Tài khoản nhận\" — the deposit fund account (FR-04). Required.",
+            "format": "uuid"
+          },
+          "docDate": {
+            "type": "string",
+            "description": "\"Ngày thu\" (YYYY-MM-DD)."
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "OTHER",
+              "DEBT_COLLECTION",
+              "OTHER_INCOME",
+              "INTER_BRANCH_IN"
+            ]
+          },
+          "partnerType": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ]
+          },
+          "partnerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payerName": {
+            "type": "string",
+            "description": "\"Người nộp\"",
+            "maxLength": 255
+          },
+          "reason": {
+            "type": "string",
+            "description": "\"Lý do nộp\"",
+            "maxLength": 500
+          },
+          "collectedBy": {
+            "type": "string",
+            "description": "Cashier who collected (thủ quỹ).",
+            "format": "uuid"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Free-text bank reference (transfer ref / cheque no).",
+            "maxLength": 255
+          },
+          "affectRevenue": {
+            "type": "boolean",
+            "description": "Whether this receipt affects revenue accounts."
+          },
+          "contraAccountId": {
+            "type": "string",
+            "description": "Optional contra GL account override. Normally the contra account is resolved\nserver-side from {@link purpose}; this is only honoured for cases where the\ncashier explicitly picks the offsetting account (e.g. an inter-branch account).",
+            "format": "uuid"
+          },
+          "totalAmount": {
+            "type": "number",
+            "description": "Denormalized total — must equal sum(lines.amount).",
+            "minimum": 0
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankReceiptLineDto"
+            }
+          }
+        },
+        "required": [
+          "depositAccountId",
+          "docDate",
+          "totalAmount",
+          "lines"
+        ]
+      },
+      "BankReceiptEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "depositAccountId": {
+            "type": "string"
+          },
+          "documentNumber": {
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "OTHER",
+              "DEBT_COLLECTION",
+              "OTHER_INCOME",
+              "INTER_BRANCH_IN"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "PENDING_APPROVAL",
+              "POSTED",
+              "REVERSED"
+            ],
+            "type": "string"
+          },
+          "docDate": {
+            "type": "string"
+          },
+          "partnerType": {
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ],
+            "type": "string"
+          },
+          "partnerId": {
+            "type": "string"
+          },
+          "partnerNameSnapshot": {
+            "type": "string"
+          },
+          "partnerAddressSnapshot": {
+            "type": "string"
+          },
+          "payerName": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "collectedBy": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "affectRevenue": {
+            "type": "boolean"
+          },
+          "contraAccountId": {
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "referenceType": {
+            "enum": [
+              "INVOICE_DEBT",
+              "RECEIVABLE",
+              "TRANSFER",
+              "MANUAL",
+              "REVERSAL"
+            ],
+            "type": "string"
+          },
+          "referenceId": {
+            "type": "string"
+          },
+          "depositMovementId": {
+            "type": "string"
+          },
+          "journalEntryId": {
+            "type": "string"
+          },
+          "reversesVoucherId": {
+            "type": "string"
+          },
+          "reversedByVoucherId": {
+            "type": "string"
+          },
+          "reversalReason": {
+            "type": "string"
+          },
+          "postedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "postedBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankReceiptLineEntity"
+            }
+          },
+          "reversesVoucher": {
+            "$ref": "#/components/schemas/BankReceiptEntity"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "branchId",
+          "depositAccountId",
+          "purpose",
+          "status",
+          "docDate",
+          "affectRevenue",
+          "totalAmount",
+          "attachmentIds",
+          "createdAt",
+          "updatedAt",
+          "createdBy",
+          "lines"
+        ]
+      },
+      "BankReceiptLineEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "bankReceiptId": {
+            "type": "string"
+          },
+          "bankReceipt": {
+            "$ref": "#/components/schemas/BankReceiptEntity"
+          },
+          "lineOrder": {
+            "type": "number"
+          },
+          "description": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "referenceNote": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "branchId",
+          "bankReceiptId",
+          "bankReceipt",
+          "lineOrder",
+          "description",
+          "amount",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "UpdateBankReceiptDto": {
+        "type": "object",
+        "properties": {
+          "depositAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "docDate": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "OTHER",
+              "DEBT_COLLECTION",
+              "OTHER_INCOME",
+              "INTER_BRANCH_IN"
+            ]
+          },
+          "partnerType": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ]
+          },
+          "partnerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payerName": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "collectedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reference": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "affectRevenue": {
+            "type": "boolean"
+          },
+          "contraAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "totalAmount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankReceiptLineDto"
+            }
+          }
+        }
+      },
+      "ReverseBankReceiptDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Reason for the reversal (đảo bút). Stored on the reversal voucher.",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "BankPaymentLineDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string",
+            "description": "\"Diễn giải\"",
+            "maxLength": 500
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "\"Mục chi\" — references a cash_voucher_categories row.",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "referenceNote": {
+            "type": "string",
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "description",
+          "amount"
+        ]
+      },
+      "CreateBankPaymentDto": {
+        "type": "object",
+        "properties": {
+          "documentNumber": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "depositAccountId": {
+            "type": "string",
+            "description": "\"Tài khoản chi\" — the deposit fund account (FR-05). Required.",
+            "format": "uuid"
+          },
+          "docDate": {
+            "type": "string",
+            "description": "\"Ngày chi\" (YYYY-MM-DD)."
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "SUPPLIER_PAYMENT",
+              "PURCHASE",
+              "EXPENSE",
+              "CASH_TRANSFER",
+              "INTER_BRANCH_OUT",
+              "REFUND",
+              "BANK_FEE",
+              "OTHER"
+            ]
+          },
+          "partnerType": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ]
+          },
+          "partnerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payeeName": {
+            "type": "string",
+            "description": "\"Người nhận\"",
+            "maxLength": 255
+          },
+          "reason": {
+            "type": "string",
+            "description": "\"Lý do chi\"",
+            "maxLength": 500
+          },
+          "paidBy": {
+            "type": "string",
+            "description": "Cashier who paid (thủ quỹ).",
+            "format": "uuid"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Free-text bank reference (transfer ref / cheque no).",
+            "maxLength": 255
+          },
+          "affectExpense": {
+            "type": "boolean",
+            "description": "Whether this payment affects expense accounts. Server-side forced to false\nfor fund-move purposes (CASH_TRANSFER / INTER_BRANCH_OUT) — BR-CHI-05."
+          },
+          "contraAccountId": {
+            "type": "string",
+            "description": "Optional contra GL account override. Normally the contra account is resolved\nserver-side from {@link purpose}; this is only honoured for cases where the\ncashier explicitly picks the offsetting account (e.g. a cash / inter-branch\naccount for a fund move).",
+            "format": "uuid"
+          },
+          "totalAmount": {
+            "type": "number",
+            "description": "Denormalized total — must equal sum(lines.amount).",
+            "minimum": 0
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankPaymentLineDto"
+            }
+          }
+        },
+        "required": [
+          "depositAccountId",
+          "docDate",
+          "totalAmount",
+          "lines"
+        ]
+      },
+      "BankPaymentEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "depositAccountId": {
+            "type": "string"
+          },
+          "documentNumber": {
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "SUPPLIER_PAYMENT",
+              "PURCHASE",
+              "EXPENSE",
+              "CASH_TRANSFER",
+              "INTER_BRANCH_OUT",
+              "REFUND",
+              "BANK_FEE",
+              "OTHER"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "PENDING_APPROVAL",
+              "POSTED",
+              "REVERSED"
+            ],
+            "type": "string"
+          },
+          "docDate": {
+            "type": "string"
+          },
+          "partnerType": {
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ],
+            "type": "string"
+          },
+          "partnerId": {
+            "type": "string"
+          },
+          "partnerNameSnapshot": {
+            "type": "string"
+          },
+          "partnerAddressSnapshot": {
+            "type": "string"
+          },
+          "payeeName": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "paidBy": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "affectExpense": {
+            "type": "boolean"
+          },
+          "contraAccountId": {
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "referenceType": {
+            "enum": [
+              "GOODS_RECEIPT",
+              "PAYABLE",
+              "INVOICE",
+              "TRANSFER",
+              "EXPENSE",
+              "MANUAL",
+              "REVERSAL"
+            ],
+            "type": "string"
+          },
+          "referenceId": {
+            "type": "string"
+          },
+          "approvalStatus": {
+            "type": "string"
+          },
+          "approvedBy": {
+            "type": "string"
+          },
+          "approvedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "depositMovementId": {
+            "type": "string"
+          },
+          "journalEntryId": {
+            "type": "string"
+          },
+          "reversesVoucherId": {
+            "type": "string"
+          },
+          "reversedByVoucherId": {
+            "type": "string"
+          },
+          "reversalReason": {
+            "type": "string"
+          },
+          "postedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "postedBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankPaymentLineEntity"
+            }
+          },
+          "reversesVoucher": {
+            "$ref": "#/components/schemas/BankPaymentEntity"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "branchId",
+          "depositAccountId",
+          "purpose",
+          "status",
+          "docDate",
+          "affectExpense",
+          "totalAmount",
+          "attachmentIds",
+          "createdAt",
+          "updatedAt",
+          "createdBy",
+          "lines"
+        ]
+      },
+      "BankPaymentLineEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "bankPaymentId": {
+            "type": "string"
+          },
+          "bankPayment": {
+            "$ref": "#/components/schemas/BankPaymentEntity"
+          },
+          "lineOrder": {
+            "type": "number"
+          },
+          "description": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "referenceNote": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "branchId",
+          "bankPaymentId",
+          "bankPayment",
+          "lineOrder",
+          "description",
+          "amount",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "UpdateBankPaymentDto": {
+        "type": "object",
+        "properties": {
+          "depositAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "docDate": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "SUPPLIER_PAYMENT",
+              "PURCHASE",
+              "EXPENSE",
+              "CASH_TRANSFER",
+              "INTER_BRANCH_OUT",
+              "REFUND",
+              "BANK_FEE",
+              "OTHER"
+            ]
+          },
+          "partnerType": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ]
+          },
+          "partnerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payeeName": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "paidBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reference": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "affectExpense": {
+            "type": "boolean"
+          },
+          "contraAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "totalAmount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankPaymentLineDto"
+            }
+          }
+        }
+      },
+      "ReverseBankPaymentDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Reason for the reversal (đảo bút). Stored on the reversal voucher.",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "SupplierDepositPaymentLegDto": {
+        "type": "object",
+        "properties": {
+          "fund": {
+            "type": "string",
+            "enum": [
+              "CASH",
+              "DEPOSIT"
+            ]
+          },
+          "depositAccountId": {
+            "type": "string",
+            "description": "Required when fund=DEPOSIT.",
+            "format": "uuid"
+          },
+          "cashAccountId": {
+            "type": "string",
+            "description": "Optional when fund=CASH — defaults to the branch's single fund.",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          }
+        },
+        "required": [
+          "fund",
+          "amount"
+        ]
+      },
+      "SupplierDepositPaymentAllocationDto": {
+        "type": "object",
+        "properties": {
+          "supplierDebtId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          }
+        },
+        "required": [
+          "supplierDebtId",
+          "amount"
+        ]
+      },
+      "CreateSupplierDepositPaymentDto": {
+        "type": "object",
+        "properties": {
+          "docDate": {
+            "type": "string",
+            "description": "\"Ngày chi\" (YYYY-MM-DD)."
+          },
+          "partnerType": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ]
+          },
+          "partnerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payeeName": {
+            "type": "string",
+            "description": "\"Người nhận\"",
+            "maxLength": 255
+          },
+          "reason": {
+            "type": "string",
+            "description": "\"Lý do chi\"",
+            "maxLength": 500
+          },
+          "legs": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupplierDepositPaymentLegDto"
+            }
+          },
+          "allocations": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupplierDepositPaymentAllocationDto"
+            }
+          }
+        },
+        "required": [
+          "docDate",
+          "legs",
+          "allocations"
+        ]
+      },
+      "SupplierDepositPaymentSagaEntity": {
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "description": "Client idempotency key (X-Idempotency-Key) — dedupes retries per org."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "COMPLETED",
+              "COMPENSATED",
+              "FAILED"
+            ]
+          },
+          "bankPaymentId": {
+            "type": "string"
+          },
+          "cashPaymentId": {
+            "type": "string"
+          },
+          "contraAccountId": {
+            "type": "string"
+          },
+          "partnerType": {
+            "type": "string",
+            "description": "Denormalized copy for observability — stored as text, not a pg enum.",
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ]
+          },
+          "partnerId": {
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "error": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "idempotencyKey",
+          "status",
+          "contraAccountId",
+          "totalAmount",
+          "allocations",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "CreateFundSwapDto": {
+        "type": "object",
+        "properties": {
+          "direction": {
+            "type": "string",
+            "enum": [
+              "DEPOSIT_TO_CASH",
+              "CASH_TO_DEPOSIT"
+            ]
+          },
+          "depositAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cashAccountId": {
+            "type": "string",
+            "description": "Defaults to the branch's single cash fund when omitted.",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "docDate": {
+            "type": "string",
+            "description": "\"Ngày chứng từ\" (YYYY-MM-DD)."
+          },
+          "feeAmount": {
+            "type": "number",
+            "description": "Withdrawal fee (BR-SWP-03) — only applies to DEPOSIT_TO_CASH. Posted as a\nseparate BANK_FEE bank_payment (its own expense entry); the cash leg still\nreceives the full `amount`.",
+            "minimum": 0.01
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "direction",
+          "depositAccountId",
+          "amount",
+          "docDate"
+        ]
+      },
+      "CreateDepositTransferDto": {
+        "type": "object",
+        "properties": {
+          "toBranchId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Destination branch (B)"
+          },
+          "toAccountId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Destination deposit account (must belong to toBranchId)"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "toBranchId",
+          "toAccountId",
+          "amount"
+        ]
+      },
+      "DepositTransferEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "fromBranchId": {
+            "type": "string"
+          },
+          "toBranchId": {
+            "type": "string"
+          },
+          "fromAccountId": {
+            "type": "string"
+          },
+          "toAccountId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "DANG_CHUYEN",
+              "HOAN_TAT",
+              "DA_HUY"
+            ],
+            "type": "string"
+          },
+          "fromPaymentId": {
+            "type": "string"
+          },
+          "toReceiptId": {
+            "type": "string",
+            "nullable": true
+          },
+          "transferPairId": {
+            "type": "string",
+            "description": "= id; also written to both legs' deposit_movements.transfer_pair_id."
+          },
+          "initiatedBy": {
+            "type": "string"
+          },
+          "initiatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "confirmedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "confirmedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "cancelledBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelledAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "fromBranchId",
+          "toBranchId",
+          "fromAccountId",
+          "toAccountId",
+          "amount",
+          "status",
+          "fromPaymentId",
+          "transferPairId",
+          "initiatedBy",
+          "initiatedAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ConfirmDepositTransferDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "CancelDepositTransferDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "InTransitRowDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "fromBranchId": {
+            "type": "string"
+          },
+          "fromBranchName": {
+            "type": "string",
+            "nullable": true
+          },
+          "toBranchId": {
+            "type": "string"
+          },
+          "toBranchName": {
+            "type": "string",
+            "nullable": true
+          },
+          "fromAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "toAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "initiatedAt": {
+            "type": "string"
+          },
+          "initiatedBy": {
+            "type": "string"
+          },
+          "daysInTransit": {
+            "type": "number"
+          },
+          "isOverdue": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "amount",
+          "fromBranchId",
+          "toBranchId",
+          "initiatedAt",
+          "initiatedBy",
+          "daysInTransit",
+          "isOverdue"
+        ]
+      },
+      "InTransitReportDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "string"
+          },
+          "staleDays": {
+            "type": "number"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InTransitRowDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "staleDays",
+          "data"
+        ]
+      },
+      "AccountBalanceDto": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "balance": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "accountId",
+          "name",
+          "type",
+          "balance"
+        ]
+      },
+      "BranchBalanceDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string"
+          },
+          "branchName": {
+            "type": "string",
+            "nullable": true
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountBalanceDto"
+            }
+          },
+          "branchTotal": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "branchId",
+          "accounts",
+          "branchTotal"
+        ]
+      },
+      "OrgBalanceDashboardDto": {
+        "type": "object",
+        "properties": {
+          "branches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BranchBalanceDto"
+            }
+          },
+          "accountsTotal": {
+            "type": "string"
+          },
+          "inTransitTotal": {
+            "type": "string"
+          },
+          "grandTotal": {
+            "type": "string",
+            "description": "R5 — invariant across create/confirm: Σ(deposit_accounts.balance) + Σ(in-transit)."
+          }
+        },
+        "required": [
+          "branches",
+          "accountsTotal",
+          "inTransitTotal",
+          "grandTotal"
+        ]
+      },
+      "ReconcileDto": {
+        "type": "object",
+        "properties": {
+          "depositAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "movementIds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "stmtTotalAmount": {
+            "type": "number"
+          },
+          "stmtFromDate": {
+            "type": "string"
+          },
+          "stmtToDate": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "description": "Required when the statement total does not match the system total (BR-REC-02).",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "depositAccountId",
+          "movementIds",
+          "stmtTotalAmount",
+          "stmtFromDate",
+          "stmtToDate"
+        ]
+      },
+      "UnreconcileDto": {
+        "type": "object",
+        "properties": {
+          "movementIds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "batchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "DepositPeriodLockEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string",
+            "description": "YYYY-MM"
+          },
+          "status": {
+            "enum": [
+              "LOCKED",
+              "UNLOCKED"
+            ],
+            "type": "string"
+          },
+          "closingBalanceSnapshot": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "lockedBy": {
+            "type": "string"
+          },
+          "lockedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "unlockedBy": {
+            "type": "string"
+          },
+          "unlockedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "unlockReason": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "branchId",
+          "period",
+          "status",
+          "closingBalanceSnapshot",
+          "lockedBy",
+          "lockedAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "LockPeriodDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "period": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "description": "YYYY-MM",
+            "example": "2026-06"
+          },
+          "force": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "branchId",
+          "period"
+        ]
+      },
+      "UnlockPeriodDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "reason"
         ]
       },
       "CreateAdjustmentDto": {

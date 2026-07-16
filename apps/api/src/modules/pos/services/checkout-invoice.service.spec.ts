@@ -17,6 +17,7 @@ import { TempWarehouseFulfillPublisher } from '../../inventory/publishers/temp-w
 import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points.publisher';
 import { JournalSalePublisher } from '../../accounting/publishers/journal-sale.publisher';
 import { CashFromPaymentPublisher } from '../../accounting/publishers/cash-from-payment.publisher';
+import { DepositFromPaymentPublisher } from '../../accounting/deposit/deposit-from-payment.publisher';
 import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
 import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
 import { MembershipCardService } from '../../customer/services/membership-card.service';
@@ -107,6 +108,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
   let loyaltyPointsPublisher: { publish: jest.Mock };
   let journalSalePublisher: { publish: jest.Mock };
   let cashFromPaymentPublisher: { publish: jest.Mock };
+  let depositFromPaymentPublisher: { publish: jest.Mock };
   let cashFundResolver: { resolveBranchCashFund: jest.Mock };
   let membershipCardService: { redeemPointsForInvoice: jest.Mock };
   let accountResolver: {
@@ -142,6 +144,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
     loyaltyPointsPublisher   = { publish: jest.fn().mockResolvedValue(true) };
     journalSalePublisher     = { publish: jest.fn().mockResolvedValue(undefined) };
     cashFromPaymentPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
+    depositFromPaymentPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
     cashFundResolver = {
       resolveBranchCashFund: jest.fn().mockResolvedValue(CASH_FUND),
     };
@@ -180,6 +183,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
         { provide: LoyaltyPointsPublisher,                useValue: loyaltyPointsPublisher },
         { provide: JournalSalePublisher,                  useValue: journalSalePublisher },
         { provide: CashFromPaymentPublisher,              useValue: cashFromPaymentPublisher },
+        { provide: DepositFromPaymentPublisher,           useValue: depositFromPaymentPublisher },
         { provide: AccountResolverService,                useValue: accountResolver },
         { provide: CashFundResolverService,               useValue: cashFundResolver },
         { provide: MembershipCardService,                 useValue: membershipCardService },

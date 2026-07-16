@@ -22,6 +22,7 @@ import { TempWarehouseFulfillPublisher } from '../../inventory/publishers/temp-w
 import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points.publisher';
 import { JournalSalePublisher } from '../../accounting/publishers/journal-sale.publisher';
 import { CashFromPaymentPublisher } from '../../accounting/publishers/cash-from-payment.publisher';
+import { DepositFromPaymentPublisher } from '../../accounting/deposit/deposit-from-payment.publisher';
 import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
 import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
 import {
@@ -77,6 +78,7 @@ export class CheckoutInvoiceService {
     private readonly loyaltyPointsPublisher: LoyaltyPointsPublisher,
     private readonly journalSalePublisher: JournalSalePublisher,
     private readonly cashFromPaymentPublisher: CashFromPaymentPublisher,
+    private readonly depositFromPaymentPublisher: DepositFromPaymentPublisher,
     private readonly accountResolver: AccountResolverService,
     private readonly cashFundResolver: CashFundResolverService,
     private readonly membershipCardService: MembershipCardService,
@@ -376,6 +378,29 @@ export class CheckoutInvoiceService {
           actor,
         );
       }
+    }
+
+    // Publish deposit movement events for NON-CASH payments (bank transfer / card / e-wallet).
+    // The consumer derives the deposit fund from each line's resolved COA (FR-02); lines whose
+    // COA maps to no deposit fund are ignored. Idempotent per (invoice, payment line).
+    const nonCashPayments = savedPayments.filter(
+      (p) => p.paymentMethod !== InvoicePaymentMethod.CASH,
+    );
+    for (const ncp of nonCashPayments) {
+      await this.depositFromPaymentPublisher.publish(
+        {
+          invoiceId: updatedInvoice.id,
+          invoicePaymentId: ncp.id,
+          invoiceCode: realCode,
+          paymentMethod: ncp.paymentMethod,
+          resolvedAccountId: ncp.accountId,
+          contraAccountId: revenueAccountId,
+          amount: Number(ncp.amount),
+          docDate: now.toISOString().slice(0, 10),
+          branchId: updatedInvoice.branchId,
+        },
+        actor,
+      );
     }
 
     await this.eventPublisher.publish(
