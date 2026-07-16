@@ -740,9 +740,9 @@ export function TransferLocationDialog({
             <thead className="sticky top-0 z-10 bg-muted text-left [&_th]:bg-muted">
               <tr>
                 <th className="w-8 border-b px-2 py-2 text-center text-xs font-medium text-muted-foreground">#</th>
-                <th className="w-44 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Mã SKU</th>
+                <th className="w-56 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Mã SKU</th>
                 <th className="w-48 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Tên hàng hóa</th>
-                <th className="w-52 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Kho</th>
+                <th className="w-40 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Kho</th>
                 <th className="w-48 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
                   Vị trí hiện tại <span className="text-destructive">*</span>
                 </th>
