@@ -24,6 +24,7 @@ import {
   Hash,
   Layers,
   LayoutGrid,
+  BadgePercent,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { hasPermission } from "../../lib/permissions";
@@ -214,6 +215,22 @@ export const navConfig: NavModule[] = [
     ],
   },
   {
+    id: "promotions",
+    label: "Khuyến mãi",
+    icon: BadgePercent,
+    defaultPath: "/promotions/programs",
+    flyout: { enabled: true },
+    sections: [
+      {
+        id: "promotions-main",
+        children: [
+          { to: "/promotions/programs", label: "Chương trình khuyến mãi" },
+          { to: "/promotions/vouchers", label: "Thẻ voucher" },
+        ],
+      },
+    ],
+  },
+  {
     id: "reports",
     label: "Báo cáo",
     icon: BarChart3,
@@ -383,6 +400,7 @@ export const navConfig: NavModule[] = [
     label: "Cấu hình",
     icon: Settings,
     defaultPath: "/setup",
+    flyout: { enabled: true },
     sections: [
       {
         id: "settings-main",

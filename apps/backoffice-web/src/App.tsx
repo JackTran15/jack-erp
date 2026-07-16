@@ -27,6 +27,8 @@ import { LedgerCashPage } from "./pages/treasury/ledger-cash/LedgerCashPage";
 import { TreasuryCashReceiptsPage } from "./pages/treasury/cash/receipts-expenses/TreasuryCashReceiptsPage";
 import { TreasuryCashCountPage } from "./pages/treasury/cash/TreasuryCashCountPage";
 import { TreasuryWipPage } from "./pages/treasury/TreasuryWipPage";
+import { ProgramsPage } from "./pages/promotions/programs/ProgramsPage";
+import { VouchersPage } from "./pages/promotions/vouchers/VouchersPage";
 import { InventoryManagementPage } from "./pages/inventory/InventoryManagementPage";
 import { InventoryItemsPage } from "./pages/inventory/InventoryItemsPage";
 import { ItemCategoriesPage } from "./pages/inventory/ItemCategoriesPage";
@@ -222,6 +224,14 @@ export function App() {
                 <Route
                   path="/ledger-cash"
                   element={<Navigate to="/treasury/cash/ledger" replace />}
+                />
+                <Route
+                  path="/promotions/programs"
+                  element={<ProgramsPage />}
+                />
+                <Route
+                  path="/promotions/vouchers"
+                  element={<VouchersPage />}
                 />
                 <Route
                   path="/reports/storage/stock-summary"
