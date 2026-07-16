@@ -354,7 +354,15 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
           ? `Điểm (${formatVnd(totals.pointsRedeemed)})`
           : "Điểm",
         totals.pointsDiscountAmount,
-      )}${paymentRows}${amountRow("Giảm nợ", totals.debtReduction)}${amountRow(
+      )}${
+        totals.pointsEarned != null && totals.pointsEarned > 0
+          ? `
+        <div class="row">
+          <span>Điểm được tích</span>
+          <span class="value">+${totals.pointsEarned}</span>
+        </div>`
+          : ""
+      }${paymentRows}${amountRow("Giảm nợ", totals.debtReduction)}${amountRow(
         "Trả lại khách",
         totals.change,
         "bold divider",

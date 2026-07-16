@@ -30,6 +30,8 @@ interface SummaryLine {
   label: string;
   value: number;
   bold?: boolean;
+  /** Hiển thị thay cho định dạng VND (vd điểm tích: "+95") khi value không phải tiền. */
+  valueText?: string;
 }
 
 function buildPaymentLines(invoice: InvoiceRow): SummaryLine[] {
@@ -65,6 +67,13 @@ function buildPaymentLines(invoice: InvoiceRow): SummaryLine[] {
     lines.push({
       label: `Điểm thanh toán (${invoice.pointsRedeemed})`,
       value: Number(invoice.pointsDiscountAmount) || 0,
+    });
+  }
+  if (invoice.pointsEarned != null && invoice.pointsEarned > 0) {
+    lines.push({
+      label: "Điểm được tích",
+      value: 0,
+      valueText: `+${invoice.pointsEarned}`,
     });
   }
   return lines;
@@ -257,7 +266,7 @@ export function InvoiceReceiptDialog({
                           : "tabular-nums"
                       }
                     >
-                      {formatVnd(line.value)}
+                      {line.valueText ?? formatVnd(line.value)}
                     </span>
                   </div>
                 ))}
