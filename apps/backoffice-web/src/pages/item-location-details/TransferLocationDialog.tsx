@@ -161,8 +161,12 @@ export function TransferLocationDialog({
 
   // ─── Lookup search functions ─────────────────────────────────────────────
 
-  const searchStorages = useCallback(async (query: string) => {
-    const params = new URLSearchParams({ page: "1", pageSize: "20" });
+  const searchStorages = useCallback(async (query: string, page: number, pageSize?: number) => {
+    const effectivePageSize = pageSize ?? 50;
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(effectivePageSize),
+    });
     const branchId = getActiveBranch();
     if (query.trim()) params.set("search", query.trim());
     if (branchId) params.set("branchId", branchId);
@@ -170,21 +174,36 @@ export function TransferLocationDialog({
     const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
       `/inventory/storages?${params}`,
     );
-    return data.data;
+    const fetched = data.page * data.pageSize;
+    return {
+      items: data.data,
+      hasMore: fetched < data.total,
+      total: data.total,
+    };
   }, []);
 
   const searchLocationsInStorage = useCallback(
-    (sid: string) => async (query: string) => {
-      const params = new URLSearchParams({ page: "1", pageSize: "20" });
+    (sid: string) => async (query: string, page: number, pageSize?: number) => {
+      if (!sid) return { items: [], hasMore: false, total: 0 };
+      const effectivePageSize = pageSize ?? 50;
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(effectivePageSize),
+        storageId: sid,
+        activeOnly: "true",
+      });
       const branchId = getActiveBranch();
       if (query.trim()) params.set("search", query.trim());
-      if (sid) params.set("storageId", sid);
       if (branchId) params.set("branchId", branchId);
-      params.set("activeOnly", "true");
       const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
         `/inventory/locations?${params}`,
       );
-      return data.data;
+      const fetched = data.page * data.pageSize;
+      return {
+        items: data.data,
+        hasMore: fetched < data.total,
+        total: data.total,
+      };
     },
     [],
   );
@@ -258,7 +277,10 @@ export function TransferLocationDialog({
       if (!itemId || !locationCode) return;
       try {
         const onHand = await fetchOnHand(itemId, locationCode);
-        patchRow(uid, { quantityOnHand: onHand });
+        patchRow(uid, {
+          quantityOnHand: onHand,
+          qty: onHand > 0 ? String(onHand) : "",
+        });
         if (onHand <= 0) {
           toast.error(`Hàng này không có tồn ở vị trí ${locationCode}`);
         }
@@ -311,7 +333,7 @@ export function TransferLocationDialog({
         destLocationId,
         destLocationLabel,
         quantityOnHand: Number(r.quantity),
-        qty: "",
+        qty: Number(r.quantity) > 0 ? String(Number(r.quantity)) : "",
       }));
       setRows(mapped);
       if (mapped.length === 0) {
