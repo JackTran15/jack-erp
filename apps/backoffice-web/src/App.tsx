@@ -28,6 +28,7 @@ import { TreasuryCashReceiptsPage } from "./pages/treasury/cash/receipts-expense
 import { TreasuryCashCountPage } from "./pages/treasury/cash/TreasuryCashCountPage";
 import { TreasuryWipPage } from "./pages/treasury/TreasuryWipPage";
 import { ProgramsPage } from "./pages/promotions/programs/ProgramsPage";
+import { ProgramFormPage } from "./pages/promotions/programs/ProgramFormPage/ProgramFormPage";
 import { VouchersPage } from "./pages/promotions/vouchers/VouchersPage";
 import { InventoryManagementPage } from "./pages/inventory/InventoryManagementPage";
 import { InventoryItemsPage } from "./pages/inventory/InventoryItemsPage";
@@ -228,6 +229,14 @@ export function App() {
                 <Route
                   path="/promotions/programs"
                   element={<ProgramsPage />}
+                />
+                <Route
+                  path="/promotions/programs/new"
+                  element={<ProgramFormPage />}
+                />
+                <Route
+                  path="/promotions/programs/:id/edit"
+                  element={<ProgramFormPage />}
                 />
                 <Route
                   path="/promotions/vouchers"

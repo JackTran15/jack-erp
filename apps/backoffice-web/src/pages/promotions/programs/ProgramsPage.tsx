@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   DocumentListShell,
@@ -45,6 +46,7 @@ function comparableFor(row: PromotionProgramRow, key: string): string {
 }
 
 export function ProgramsPage() {
+  const navigate = useNavigate();
   const [period, setPeriod] = useState<PeriodValue>(() => ({
     preset: "this_year",
     ...resolvePeriodRange("this_year"),
@@ -155,9 +157,12 @@ export function ProgramsPage() {
     toast.info("Đã nạp lại danh sách.");
   }, []);
 
-  const openEdit = useCallback((row: PromotionProgramRow) => {
-    toast.info(`Sửa chương trình: ${row.name}`);
-  }, []);
+  const openEdit = useCallback(
+    (row: PromotionProgramRow) => {
+      navigate(`/promotions/programs/${row.id}/edit`);
+    },
+    [navigate],
+  );
 
   const toolbarItems = useMemo<ToolbarItem[]>(
     () => [
@@ -167,7 +172,8 @@ export function ProgramsPage() {
         options: ADD_NEW_TYPE_OPTIONS.map((opt) => ({
           id: opt.value,
           label: opt.label,
-          onClick: () => toast.info(`Thêm mới: ${opt.label}`),
+          onClick: () =>
+            navigate(`/promotions/programs/new?type=${opt.value}`),
         })),
       },
       { id: "sep-1", type: "separator" },
@@ -189,7 +195,7 @@ export function ProgramsPage() {
       { id: "sep-2", type: "separator" },
       { ...TOOLBAR_REGISTRY.refresh, onClick: handleRefresh },
     ],
-    [selectedCount, handleRefresh],
+    [selectedCount, handleRefresh, navigate],
   );
 
   return (
