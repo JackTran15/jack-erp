@@ -30,6 +30,7 @@ const TOPIC_SPECS: TopicSpec[] = [
   { topic: ERP_TOPICS.JOURNAL_POST_RETURN, numPartitions: 3, replicationFactor: 1 },
   { topic: ERP_TOPICS.GOODS_RECEIPT_POSTED, numPartitions: 3, replicationFactor: 1 },
   { topic: ERP_TOPICS.DEBT_OVERDUE, numPartitions: 1, replicationFactor: 1 },
+  { topic: ERP_TOPICS.DEPOSIT_LOCKED_PERIOD_BLOCKED, numPartitions: 1, replicationFactor: 1 },
 ];
 
 @Injectable()

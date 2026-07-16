@@ -334,36 +334,61 @@ export class DocumentNumberingService {
    * Atomically increment the counter using SELECT FOR UPDATE to prevent
    * race conditions. If no counter exists for the resetKey, create one
    * starting at 1.
+   *
+   * Two callers racing for the same (ruleId, resetKey) can make Postgres pick
+   * one as the SSI victim under SERIALIZABLE, which surfaces as a 40001
+   * "could not serialize access due to concurrent update" error even though
+   * the pessimistic_write lock alone would have serialized them correctly.
+   * Postgres' own guidance for 40001 is to retry the transaction, so a losing
+   * attempt just retries — the caller sees a slightly slower success, not a 500.
    */
   private async atomicIncrement(
     rule: DocumentNumberRuleEntity,
     resetKey: string,
     actor: ActorContext,
   ): Promise<number> {
-    return this.dataSource.transaction("SERIALIZABLE", async (manager) => {
-      const counterRepo = manager.getRepository(DocumentNumberCounterEntity);
+    const maxAttempts = 5;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await this.dataSource.transaction("SERIALIZABLE", async (manager) => {
+          const counterRepo = manager.getRepository(DocumentNumberCounterEntity);
 
-      let counter = await counterRepo.findOne({
-        where: { ruleId: rule.id, resetKey },
-        lock: { mode: "pessimistic_write" },
-      });
+          let counter = await counterRepo.findOne({
+            where: { ruleId: rule.id, resetKey },
+            lock: { mode: "pessimistic_write" },
+          });
 
-      if (!counter) {
-        counter = counterRepo.create({
-          ruleId: rule.id,
-          organizationId: actor.organizationId,
-          branchId: rule.branchId,
-          resetKey,
-          currentValue: 1,
+          if (!counter) {
+            counter = counterRepo.create({
+              ruleId: rule.id,
+              organizationId: actor.organizationId,
+              branchId: rule.branchId,
+              resetKey,
+              currentValue: 1,
+            });
+            await counterRepo.save(counter);
+            return 1;
+          }
+
+          counter.currentValue = Number(counter.currentValue) + 1;
+          await counterRepo.save(counter);
+          return counter.currentValue;
         });
-        await counterRepo.save(counter);
-        return 1;
+      } catch (err) {
+        if (this.isSerializationFailure(err) && attempt < maxAttempts) {
+          continue;
+        }
+        throw err;
       }
+    }
+    /* istanbul ignore next -- unreachable: the loop always returns or throws */
+    throw new Error("atomicIncrement: exhausted retry attempts");
+  }
 
-      counter.currentValue = Number(counter.currentValue) + 1;
-      await counterRepo.save(counter);
-      return counter.currentValue;
-    });
+  /** Postgres 40001 (serialization_failure) — safe and expected to retry. */
+  private isSerializationFailure(err: unknown): boolean {
+    const e = err as { code?: string; driverError?: { code?: string } };
+    return e?.code === "40001" || e?.driverError?.code === "40001";
   }
 
   private formatDocumentNumber(

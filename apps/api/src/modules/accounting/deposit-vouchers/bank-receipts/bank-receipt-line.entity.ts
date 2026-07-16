@@ -1,0 +1,62 @@
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+import { BankReceiptEntity } from './bank-receipt.entity';
+
+/**
+ * A single line of a deposit-fund receipt voucher. branch_id is NOT NULL and
+ * there is no deleted_at, so columns are declared explicitly (not BaseEntity).
+ * amount is CHECK (> 0) in the DB.
+ */
+@Entity('bank_receipt_lines')
+@Index('IDX_bank_receipt_lines_receipt', ['bankReceiptId'])
+export class BankReceiptLineEntity {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ name: 'organization_id', type: 'varchar' })
+  organizationId: string;
+
+  @Column({ name: 'branch_id', type: 'varchar' })
+  branchId: string;
+
+  @Column({ name: 'bank_receipt_id', type: 'uuid' })
+  bankReceiptId: string;
+
+  @ManyToOne(() => BankReceiptEntity, (receipt) => receipt.lines, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'bank_receipt_id' })
+  bankReceipt: BankReceiptEntity;
+
+  @Column({ name: 'line_order', type: 'int', default: 0 })
+  lineOrder: number;
+
+  @Column({ type: 'varchar', length: 500 })
+  description: string;
+
+  @Column({ name: 'category_id', type: 'uuid', nullable: true })
+  categoryId?: string;
+
+  @Column({ type: 'numeric', precision: 18, scale: 2 })
+  amount: number;
+
+  @Column({ name: 'reference_note', type: 'varchar', length: 255, nullable: true })
+  referenceNote?: string;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
+
+  @Column({ name: 'created_by', type: 'varchar' })
+  createdBy: string;
+}

@@ -15,6 +15,26 @@ export const treasuryQueryKeys = {
   cashCounts: (filters: unknown) => ["cash-counts", filters] as const,
   cashCount: (id: string | undefined) => ["cash-counts", "detail", id] as const,
   cashLedger: (params: unknown) => ["cash-ledger", params] as const,
+  depositLedger: (params: unknown) => ["deposit-ledger", params] as const,
+  depositAccounts: (branchId?: string) =>
+    ["deposit-accounts", branchId] as const,
+  depositPaymentPolicy: (filters?: unknown) =>
+    ["deposit-payment-policy", filters] as const,
+  bankReceipts: (filters: unknown) => ["bank-receipts", filters] as const,
+  bankReceipt: (id: string | undefined) => ["bank-receipts", "detail", id] as const,
+  bankPayments: (filters: unknown) => ["bank-payments", filters] as const,
+  bankPayment: (id: string | undefined) => ["bank-payments", "detail", id] as const,
+  supplierDepositPaymentSaga: (id: string | undefined) =>
+    ["supplier-deposit-payment", "saga", id] as const,
+  depositRecon: (query: unknown) => ["deposit-recon", query] as const,
+  depositPeriodLocks: (branchId: string | undefined) =>
+    ["deposit-period-lock", branchId] as const,
+  depositTransfers: (filters: unknown) => ["deposit-transfers", filters] as const,
+  depositTransfer: (id: string | undefined) =>
+    ["deposit-transfers", "detail", id] as const,
+  depositInTransit: (filters: unknown) => ["deposit-in-transit", filters] as const,
+  depositDashboard: () => ["deposit-dashboard"] as const,
+  banks: () => ["banks"] as const,
   partnerSearch: (type: string, query: string, page: number, pageSize: number) =>
     ["voucher-partners", "search", type, query, page, pageSize] as const,
   partnerById: (partnerType: string | undefined, partnerId: string | undefined) =>

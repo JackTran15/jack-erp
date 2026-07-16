@@ -24,6 +24,13 @@ import { REPORT_CATEGORY } from "./constants/reports/report-category.constant";
 import { AgingReportPage } from "./pages/reports/AgingReportPage";
 import { CashReportPage } from "./pages/reports/CashReportPage";
 import { LedgerCashPage } from "./pages/treasury/ledger-cash/LedgerCashPage";
+import { LedgerDepositPage } from "./pages/treasury/deposit/LedgerDepositPage";
+import { TreasuryDepositReceiptsPage } from "./pages/treasury/deposit/receipts-expenses/TreasuryDepositReceiptsPage";
+import { DepositReconPage } from "./pages/treasury/deposit-recon/DepositReconPage";
+import { DepositPeriodLockPage } from "./pages/treasury/deposit-period-lock/DepositPeriodLockPage";
+import { DepositTransferListPage } from "./pages/treasury/deposit-transfer/DepositTransferListPage";
+import { DepositInTransitPage } from "./pages/treasury/deposit-in-transit/DepositInTransitPage";
+import { DepositBalanceDashboardPage } from "./pages/treasury/deposit-dashboard/DepositBalanceDashboardPage";
 import { TreasuryCashReceiptsPage } from "./pages/treasury/cash/receipts-expenses/TreasuryCashReceiptsPage";
 import { TreasuryCashCountPage } from "./pages/treasury/cash/TreasuryCashCountPage";
 import { TreasuryWipPage } from "./pages/treasury/TreasuryWipPage";
@@ -225,6 +232,34 @@ export function App() {
                 <Route
                   path="/treasury/cash/ledger"
                   element={<LedgerCashPage />}
+                />
+                <Route
+                  path="/treasury/deposit/ledger"
+                  element={<LedgerDepositPage />}
+                />
+                <Route
+                  path="/treasury/deposit/receipts-expenses"
+                  element={<TreasuryDepositReceiptsPage />}
+                />
+                <Route
+                  path="/treasury/deposit-reconciliation"
+                  element={<DepositReconPage />}
+                />
+                <Route
+                  path="/treasury/deposit-period-lock"
+                  element={<DepositPeriodLockPage />}
+                />
+                <Route
+                  path="/treasury/deposit-transfers"
+                  element={<DepositTransferListPage />}
+                />
+                <Route
+                  path="/treasury/deposit-in-transit"
+                  element={<DepositInTransitPage />}
+                />
+                <Route
+                  path="/treasury/deposit-dashboard"
+                  element={<DepositBalanceDashboardPage />}
                 />
                 <Route
                   path="/treasury/wip/:slug"

@@ -17,6 +17,7 @@ export const DEFAULT_COA: DefaultAccount[] = [
   { code: '111', name: 'Tiền mặt', type: AccountType.ASSET },
   { code: '1111', name: 'Tiền Việt Nam', type: AccountType.ASSET, parent: '111' },
   { code: '112', name: 'Tiền gửi ngân hàng', type: AccountType.ASSET },
+  { code: '113', name: 'Tiền đang chuyển', type: AccountType.ASSET },
   { code: '131', name: 'Phải thu khách hàng', type: AccountType.ASSET },
   { code: '156', name: 'Hàng hóa', type: AccountType.ASSET },
 
@@ -36,6 +37,7 @@ export const DEFAULT_COA: DefaultAccount[] = [
   // EXPENSE
   { code: '632', name: 'Giá vốn hàng bán', type: AccountType.EXPENSE },
   { code: '641', name: 'Chi phí bán hàng', type: AccountType.EXPENSE },
+  { code: '6417', name: 'Chi phí dịch vụ ngân hàng', type: AccountType.EXPENSE, parent: '641' },
   { code: '642', name: 'Chi phí quản lý doanh nghiệp', type: AccountType.EXPENSE },
   { code: '811', name: 'Chi phí khác', type: AccountType.EXPENSE },
 
@@ -108,31 +110,38 @@ export class CoaSeederService {
     return DEFAULT_COA.length;
   }
 
-  /** Insert any DEFAULT_COA root accounts the org is missing (idempotent top-up). */
+  /** Insert any DEFAULT_COA accounts (root or child) the org is missing (idempotent top-up). */
   private async ensureMissingAccounts(
     organizationId: string,
     actorId: string,
   ): Promise<void> {
-    const codes = DEFAULT_COA.filter((a) => !a.parent).map((a) => a.code);
     const present = await this.accountRepo.find({
       where: { organizationId },
-      select: ['code'],
+      select: ['id', 'code'],
     });
-    const presentCodes = new Set(present.map((a) => a.code));
+    const codeToId = new Map(present.map((a) => [a.code, a.id]));
 
-    for (const code of codes) {
-      if (presentCodes.has(code)) continue;
-      const def = DEFAULT_COA.find((a) => a.code === code)!;
-      await this.accountRepo.save(
+    // Roots first so a newly-added child can resolve its parentAccountId below.
+    const ordered = [
+      ...DEFAULT_COA.filter((a) => !a.parent),
+      ...DEFAULT_COA.filter((a) => a.parent),
+    ];
+
+    for (const def of ordered) {
+      if (codeToId.has(def.code)) continue;
+      const parentId = def.parent ? codeToId.get(def.parent) : undefined;
+      const saved = await this.accountRepo.save(
         this.accountRepo.create({
           organizationId,
           code: def.code,
           name: def.name,
           type: def.type,
+          parentAccountId: parentId,
           isActive: true,
           createdBy: actorId,
         }),
       );
+      codeToId.set(def.code, saved.id);
       this.logger.log(
         `Added missing COA account ${def.code} (${def.name}) for org ${organizationId}`,
       );
