@@ -15335,6 +15335,309 @@
         ]
       }
     },
+    "/reports/profit/columns": {
+      "get": {
+        "operationId": "ProfitReportController_getColumns",
+        "parameters": [
+          {
+            "name": "reportType",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "statBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/profit"
+        ]
+      }
+    },
+    "/reports/profit/filter-options": {
+      "get": {
+        "operationId": "ProfitReportController_getFilterOptions",
+        "parameters": [
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "description": "Which dropdown to load (store, productGroup, …).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "store",
+                "cashier",
+                "salesperson",
+                "customer",
+                "productGroup",
+                "brand",
+                "unit",
+                "warehouse",
+                "customerGroup",
+                "supplier",
+                "supplierGroup",
+                "invoiceStatus",
+                "statDateType",
+                "productType",
+                "statBy"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Optional case-insensitive partial search.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Shared dropdown options for the report filters (store, productGroup).",
+        "tags": [
+          "reports/profit"
+        ]
+      }
+    },
+    "/reports/profit/search": {
+      "post": {
+        "operationId": "ProfitReportController_search",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfitReportSearchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/profit"
+        ]
+      }
+    },
+    "/reports/profit/templates": {
+      "get": {
+        "operationId": "ProfitReportController_listTemplates",
+        "parameters": [
+          {
+            "name": "reportType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/profit"
+        ]
+      },
+      "post": {
+        "operationId": "ProfitReportController_createTemplate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProfitReportTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/profit"
+        ]
+      }
+    },
+    "/reports/profit/templates/{id}": {
+      "get": {
+        "operationId": "ProfitReportController_getTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/profit"
+        ]
+      },
+      "patch": {
+        "operationId": "ProfitReportController_updateTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfitReportTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/profit"
+        ]
+      },
+      "delete": {
+        "operationId": "ProfitReportController_deleteTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/profit"
+        ]
+      }
+    },
     "/inventory/purchase-orders": {
       "post": {
         "operationId": "PurchaseOrderController_create",
@@ -30264,6 +30567,179 @@
           },
           "filters": {
             "$ref": "#/components/schemas/DebtReportFilterDto"
+          },
+          "columnFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFilterDto"
+            }
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      },
+      "ProfitReportFilterDto": {
+        "type": "object",
+        "properties": {
+          "statBy": {
+            "description": "profit-by-item only — row grain (default item). \"Hàng hoá\" = PARENT, \"Mẫu mã\" = ITEM, \"Nhóm hàng hóa\" = GROUP.",
+            "enum": [
+              "item",
+              "parent",
+              "group"
+            ],
+            "type": "string"
+          },
+          "issuedAt": {
+            "description": "Single date range — profit-by-item / gross-profit-by-invoice.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "previousPeriod": {
+            "description": "Comparison period #1 — business-results only.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "currentPeriod": {
+            "description": "Comparison period #2 (required by business-results) — business-results only.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "store": {
+            "description": "Multi-store consolidation scope; absent ⇒ actor's own branch.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StoreScopeDto"
+              }
+            ]
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Legacy single-branch narrow (back-compat with the existing search API shape).",
+            "format": "uuid"
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "profit-by-item only — filter by item category (Nhóm hàng hóa).",
+            "format": "uuid"
+          }
+        }
+      },
+      "ProfitReportSearchDto": {
+        "type": "object",
+        "properties": {
+          "reportType": {
+            "type": "string",
+            "description": "Which backend report definition to run."
+          },
+          "columns": {
+            "description": "Selected column keys (fixed registry keys only — profit reports have no dynamic columns).",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "$ref": "#/components/schemas/ProfitReportFilterDto"
+          },
+          "columnFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFilterDto"
+            }
+          },
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 500
+          }
+        },
+        "required": [
+          "reportType",
+          "columns",
+          "filters"
+        ]
+      },
+      "CreateProfitReportTemplateDto": {
+        "type": "object",
+        "properties": {
+          "reportType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string"
+          },
+          "columns": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportTemplateColumnDto"
+            }
+          },
+          "filters": {
+            "$ref": "#/components/schemas/ProfitReportFilterDto"
+          },
+          "columnFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFilterDto"
+            }
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "reportType",
+          "name",
+          "columns"
+        ]
+      },
+      "UpdateProfitReportTemplateDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportTemplateColumnDto"
+            }
+          },
+          "filters": {
+            "$ref": "#/components/schemas/ProfitReportFilterDto"
           },
           "columnFilters": {
             "type": "array",

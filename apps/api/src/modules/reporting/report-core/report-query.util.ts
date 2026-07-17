@@ -3,7 +3,17 @@ import { ReportStoreScope } from '@erp/shared-interfaces';
 import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { InvoiceStatus, InvoiceType } from '../../pos/entities/invoice.entity';
-import { InvoiceReportFilterDto } from './dto/invoice-report-filter.dto';
+
+/**
+ * Structural shape `applyInvoiceStatusFilter` needs from a report's filter DTO.
+ * Kept local (not imported from `invoice-report/dto`) so `report-core` stays the
+ * base layer — `invoice-report` and `profit-report` both depend on it, not the
+ * reverse. Any filter DTO with these fields satisfies this by structural typing.
+ */
+export interface InvoiceStatusFilterShape {
+  invoiceStatus?: string[];
+  status?: { value?: string | null };
+}
 
 export const CONSOLIDATED_PERMISSION = 'reporting.invoice.consolidated.read';
 
@@ -103,7 +113,7 @@ export function applyBranchScope<T extends ObjectLiteral>(
 export function applyInvoiceStatusFilter<T extends ObjectLiteral>(
   qb: SelectQueryBuilder<T>,
   alias: string,
-  filters: InvoiceReportFilterDto,
+  filters: InvoiceStatusFilterShape,
 ): void {
   const statuses = filters.invoiceStatus?.length
     ? filters.invoiceStatus
@@ -124,7 +134,7 @@ export function applyInvoiceStatusFilter<T extends ObjectLiteral>(
 /** Which invoice date column the report period filters on (default invoice date). */
 export function statDateColumn(
   alias: string,
-  filters: InvoiceReportFilterDto,
+  filters: { statDateType?: 'invoice_date' | 'created_date' },
 ): string {
   return filters.statDateType === 'created_date'
     ? `${alias}.createdAt`

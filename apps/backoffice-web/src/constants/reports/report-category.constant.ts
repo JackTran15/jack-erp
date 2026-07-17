@@ -1,5 +1,5 @@
 import { STORE_TYPE } from "../store.constant";
-import { REPORT_TYPE_DEBTS, REPORT_TYPE_INVENTORY, REPORT_TYPE_SALES } from "./report-type.constant";
+import { REPORT_TYPE_DEBTS, REPORT_TYPE_INVENTORY, REPORT_TYPE_PROFIT, REPORT_TYPE_SALES } from "./report-type.constant";
 import type { ReportCategoryMetadata } from "./report.interface";
 
 export enum REPORT_CATEGORY {
@@ -20,6 +20,14 @@ const DEBT_REPORTS = [
   REPORT_TYPE_DEBTS.RECEIVABLES_DETAIL_BY_PRODUCT,
   REPORT_TYPE_DEBTS.SUPPLIER_DEBTS,
   REPORT_TYPE_DEBTS.SUPPLIER_DEBTS_DETAIL_BY_DOCUMENT_AND_PRODUCT,
+];
+
+// 3 báo cáo lợi nhuận đã cấu hình (registry + fetcher) — xem EPIC-16072026.
+// "Kết quả kinh doanh theo chi nhánh" tạm hoãn (chưa có backendKey/spec).
+const PROFIT_REPORTS = [
+  REPORT_TYPE_PROFIT.BUSINESS_RESULTS,
+  REPORT_TYPE_PROFIT.PROFIT_BY_PRODUCT,
+  REPORT_TYPE_PROFIT.GROSS_PROFIT_BY_INVOICE,
 ];
 
 // 8 báo cáo kho theo thứ tự hiển thị trong dropdown.
@@ -81,8 +89,12 @@ export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCat
   //   label: "Quỹ tiền mặt",
   //   url: "/reports/cash-fund",
   // },
-  // [REPORT_CATEGORY.PROFIT]: {
-  //   label: "Lợi nhuận",
-  //   url: "/reports/profit",
-  // },
+  [REPORT_CATEGORY.PROFIT]: {
+    label: "Lợi nhuận",
+    url: "/reports/profit",
+    configs: {
+      [STORE_TYPE.SINGLE]: { listReport: PROFIT_REPORTS },
+      [STORE_TYPE.CHAIN]: { listReport: PROFIT_REPORTS },
+    },
+  },
 }

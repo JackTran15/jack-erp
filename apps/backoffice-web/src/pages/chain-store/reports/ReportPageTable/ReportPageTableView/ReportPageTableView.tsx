@@ -404,17 +404,40 @@ export function ReportPageTableView({ rows, totals }: Props) {
                   ? "[--row-bg:hsl(var(--background))]"
                   : "[--row-bg:color-mix(in_srgb,hsl(var(--muted))_20%,hsl(var(--background)))]";
               const pinnedBg = "var(--row-bg)";
+              // "Kết quả kinh doanh": rows là danh mục "Khoản mục" cố định do BE
+              // tính, không phải 1 dòng/1 entity — BE gửi kèm `indentLevel`/`bold`
+              // trên mỗi row (metadata hiển thị, không phải cột theo nghĩa
+              // ReportColumnHeader) để render cây phân cấp. Mọi báo cáo khác
+              // không có 2 field này → indentLevel=0, isBold=false (không đổi).
+              const indentLevel = Number(row.original["indentLevel"] ?? 0);
+              const isBold = Number(row.original["bold"] ?? 0) === 1;
               return (
                 <tr
                   key={row.id}
-                  className={`${rowBg} ${rowBgVarClass} hover:bg-blue-50/70 hover:[--row-bg:theme(colors.blue.50)]`}
+                  className={`${rowBg} ${rowBgVarClass} ${isBold ? "font-semibold" : ""} hover:bg-blue-50/70 hover:[--row-bg:theme(colors.blue.50)]`}
                 >
-                  {cells.map((cell) => {
+                  {cells.map((cell, cellIndex) => {
                     const col = configById.get(cell.column.id);
                     if (!col) return null;
                     const pinned = cell.column.getIsPinned();
                     const width = cell.column.getSize();
                     const raw = cell.getValue() as number | string | undefined;
+                    const content = col.tableConfig?.link ? (
+                      col.column === "invoiceCode" && raw ? (
+                        <a
+                          className="cursor-pointer text-blue-600 hover:underline"
+                          onClick={() => setDetailInvoiceCode(String(raw))}
+                        >
+                          {raw}
+                        </a>
+                      ) : (
+                        raw ?? ""
+                      )
+                    ) : isReportNumberColumn(col) ? (
+                      formatReportNumber(raw)
+                    ) : (
+                      raw ?? ""
+                    );
                     return (
                       <td
                         key={cell.id}
@@ -430,21 +453,10 @@ export function ReportPageTableView({ rows, totals }: Props) {
                           pinned ? "z-10" : "",
                         ].join(" ")}
                       >
-                        {col.tableConfig?.link ? (
-                          col.column === "invoiceCode" && raw ? (
-                            <a
-                              className="cursor-pointer text-blue-600 hover:underline"
-                              onClick={() => setDetailInvoiceCode(String(raw))}
-                            >
-                              {raw}
-                            </a>
-                          ) : (
-                            raw ?? ""
-                          )
-                        ) : isReportNumberColumn(col) ? (
-                          formatReportNumber(raw)
+                        {cellIndex === 0 && indentLevel > 0 ? (
+                          <span style={{ paddingLeft: indentLevel * 16 }}>{content}</span>
                         ) : (
-                          raw ?? ""
+                          content
                         )}
                       </td>
                     );
@@ -454,33 +466,39 @@ export function ReportPageTableView({ rows, totals }: Props) {
             })}
           </tbody>
 
-          <tfoot className="bg-muted text-xs font-semibold">
-            <tr>
-              {orderedLeaf.map((column, idx) => {
-                const col = configById.get(column.id);
-                if (!col) return null;
-                const pinned = column.getIsPinned();
-                const raw = totals[col.column];
-                return (
-                  <td
-                    key={column.id}
-                    style={pinPosition(column)}
-                    className={[
-                      `${cellBorder} h-8 px-2 py-0 align-middle bg-muted`,
-                      getReportCellAlignClass(col),
-                      pinned ? "z-10" : "",
-                    ].join(" ")}
-                  >
-                    {idx === 0
-                      ? config.summaryLabel ?? ""
-                      : isReportNumberColumn(col)
-                        ? formatReportNumber(raw)
-                        : raw ?? ""}
-                  </td>
-                );
-              })}
-            </tr>
-          </tfoot>
+          {/* "Kết quả kinh doanh" không có dòng Tổng ở footer (dòng "IV. Lợi
+              nhuận" trong rows đã là dòng tổng) — registry của báo cáo đó cố
+              tình không set summaryLabel; mọi báo cáo khác giữ nguyên hành vi
+              cũ (luôn có footer, kể cả totals rỗng). */}
+          {config.summaryLabel ? (
+            <tfoot className="bg-muted text-xs font-semibold">
+              <tr>
+                {orderedLeaf.map((column, idx) => {
+                  const col = configById.get(column.id);
+                  if (!col) return null;
+                  const pinned = column.getIsPinned();
+                  const raw = totals[col.column];
+                  return (
+                    <td
+                      key={column.id}
+                      style={pinPosition(column)}
+                      className={[
+                        `${cellBorder} h-8 px-2 py-0 align-middle bg-muted`,
+                        getReportCellAlignClass(col),
+                        pinned ? "z-10" : "",
+                      ].join(" ")}
+                    >
+                      {idx === 0
+                        ? config.summaryLabel ?? ""
+                        : isReportNumberColumn(col)
+                          ? formatReportNumber(raw)
+                          : raw ?? ""}
+                    </td>
+                  );
+                })}
+              </tr>
+            </tfoot>
+          ) : null}
         </table>
       </div>
 

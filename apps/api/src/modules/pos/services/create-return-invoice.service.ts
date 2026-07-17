@@ -23,6 +23,7 @@ import {
 } from '../dto/create-return-invoice.dto';
 import { resolveBranchItemLocations } from './resolve-branch-item-locations';
 import { ReturnEligibilityService } from './return-eligibility.service';
+import { ItemCostSnapshotService } from '../../inventory/location/item-cost-snapshot.service';
 
 @Injectable()
 export class CreateReturnInvoiceService {
@@ -33,12 +34,21 @@ export class CreateReturnInvoiceService {
     private readonly invoiceRepo: Repository<InvoiceEntity>,
     private readonly dataSource: DataSource,
     private readonly eligibility: ReturnEligibilityService,
+    private readonly itemCostSnapshot: ItemCostSnapshotService,
   ) {}
 
   async create(
     dto: CreateReturnInvoiceDto,
     actor: ActorContext,
   ): Promise<InvoiceEntity> {
+    // costPrice per line — REGULAR mode reuses the ORIGINAL sale's cost
+    // snapshot (via originalInvoiceItemId), so a return exactly reverses the
+    // COGS booked at sale time. QUICK mode has no original line to reference,
+    // so it falls back to the item's current purchase price (same fallback
+    // StockReturnInConsumer uses for return-in stock movements).
+    const costPriceByOriginalItemId = new Map<string, number>();
+    let costPriceByItemId = new Map<string, number>();
+
     if (dto.mode === ReturnInvoiceMode.REGULAR) {
       if (!dto.originalInvoiceId) {
         throw new BadRequestException(
@@ -51,10 +61,14 @@ export class CreateReturnInvoiceService {
             'originalInvoiceItemId is required for every line in REGULAR mode',
           );
         }
-        await this.eligibility.assertLineEligible(
+        const originalItem = await this.eligibility.assertLineEligible(
           line.originalInvoiceItemId,
           line.quantity,
           actor,
+        );
+        costPriceByOriginalItemId.set(
+          line.originalInvoiceItemId,
+          Number(originalItem.costPrice ?? 0),
         );
       }
     } else {
@@ -64,6 +78,11 @@ export class CreateReturnInvoiceService {
           'originalInvoiceId must NOT be set in QUICK mode',
         );
       }
+      const itemIds = [...new Set(dto.lines.map((l) => l.itemId))];
+      costPriceByItemId = await this.itemCostSnapshot.snapshotCosts(
+        actor.organizationId,
+        itemIds,
+      );
     }
 
     const subtotal = dto.lines.reduce(
@@ -120,7 +139,9 @@ export class CreateReturnInvoiceService {
           quantity: line.quantity,
           unitPrice: line.unitPrice,
           unitPriceDefault: line.unitPrice,
-          costPrice: 0,
+          costPrice: line.originalInvoiceItemId
+            ? costPriceByOriginalItemId.get(line.originalInvoiceItemId) ?? 0
+            : costPriceByItemId.get(line.itemId) ?? 0,
           lineDiscount: line.lineDiscount ?? 0,
           lineTotal: computeLineTotal(line),
           direction: ItemDirection.IN,
