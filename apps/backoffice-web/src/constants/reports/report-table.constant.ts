@@ -14,6 +14,7 @@ export enum ReportTableColumn {
   PRODUCT_BRAND = 'product_brand',
   PRODUCT_IMAGE = 'product_image',
   UNIT = 'unit',
+  LOCATION = 'location',
   QUANTITY = 'quantity',
   QUANTITY_SOLD = 'quantity_sold',
 
@@ -131,6 +132,22 @@ export enum ReportTableColumn {
   REFERENCE_CODE = 'reference_code',
   CREATED_BY = 'created_by',
   RECEIVER_NAME = 'receiver_name',
+
+  // === Lợi nhuận (báo cáo #1 profit-by-item, #2 gross-profit-by-invoice) ===
+  PRODUCT_GROUP_CODE = 'product_group_code',
+  COST_OF_GOODS = 'cost_of_goods',
+  GROSS_PROFIT = 'gross_profit',
+  PROFIT_PER_UNIT = 'profit_per_unit',
+  MARGIN_ON_REVENUE = 'margin_on_revenue',
+  MARGIN_ON_COST = 'margin_on_cost',
+  GROSS_GOODS_TOTAL = 'gross_goods_total',
+
+  // === Lợi nhuận — Kết quả kinh doanh (#3, dòng "Khoản mục" cố định) ===
+  LINE_ITEM_LABEL = 'line_item_label',
+  PERIOD_PREVIOUS = 'period_previous',
+  PERIOD_CURRENT = 'period_current',
+  PERIOD_CHANGE_PERCENT = 'period_change_percent',
+  PERIOD_CHANGE_AMOUNT = 'period_change_amount',
 }
 
 export enum ReportTableColumnGroup {
@@ -186,6 +203,7 @@ export const ReportTableColumnLabel = {
   [ReportTableColumn.PRODUCT_BRAND]: 'Thương hiệu',
   [ReportTableColumn.PRODUCT_IMAGE]: 'Ảnh sản phẩm',
   [ReportTableColumn.UNIT]: 'Đơn vị',
+  [ReportTableColumn.LOCATION]: 'Vị trí',
   [ReportTableColumn.QUANTITY]: 'Số lượng',
   [ReportTableColumn.QUANTITY_SOLD]: 'Số lượng bán',
 
@@ -290,4 +308,18 @@ export const ReportTableColumnLabel = {
   [ReportTableColumn.REFERENCE_CODE]: 'Mã tham chiếu',
   [ReportTableColumn.CREATED_BY]: 'Người tạo',
   [ReportTableColumn.RECEIVER_NAME]: 'Tên người nhận',
+
+  [ReportTableColumn.PRODUCT_GROUP_CODE]: 'Mã nhóm hàng hóa',
+  [ReportTableColumn.COST_OF_GOODS]: 'Giá vốn (GV)',
+  [ReportTableColumn.GROSS_PROFIT]: 'Lợi nhuận (LN)',
+  [ReportTableColumn.PROFIT_PER_UNIT]: 'Lợi nhuận đơn vị',
+  [ReportTableColumn.MARGIN_ON_REVENUE]: 'Tỷ lệ LN/DT',
+  [ReportTableColumn.MARGIN_ON_COST]: 'Tỷ lệ LN/GV',
+  [ReportTableColumn.GROSS_GOODS_TOTAL]: 'Tổng tiền hàng',
+
+  [ReportTableColumn.LINE_ITEM_LABEL]: 'Khoản mục',
+  [ReportTableColumn.PERIOD_PREVIOUS]: 'Kỳ trước',
+  [ReportTableColumn.PERIOD_CURRENT]: 'Kỳ hiện tại',
+  [ReportTableColumn.PERIOD_CHANGE_PERCENT]: 'Thay đổi (%)',
+  [ReportTableColumn.PERIOD_CHANGE_AMOUNT]: 'Thay đổi (Số tiền)',
 };

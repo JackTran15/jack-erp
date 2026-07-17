@@ -111,6 +111,61 @@ export function ReportFilterLine({ line }: Props) {
             }
           />
         );
+      // "Kết quả kinh doanh" — 2 kỳ song song (kỳ trước/kỳ hiện tại), mỗi kỳ
+      // tái dùng nguyên PeriodSelect + DateRangeField (2 dòng filter riêng,
+      // giống hệt cặp REPORT_PERIOD/RANGE_DATE, chỉ khác nhãn). Xem TKT-PRF-10.
+      case REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS:
+        return (
+          <PeriodSelect
+            value={filters[REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS] ?? ""}
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS, v)
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS_RANGE:
+        return (
+          <DateRangeField
+            value={
+              filters[REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS_RANGE] ?? {
+                fromDate: "",
+                toDate: "",
+              }
+            }
+            onChange={(v) =>
+              actions.setFilterValue(
+                REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS_RANGE,
+                v,
+              )
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT:
+        return (
+          <PeriodSelect
+            value={filters[REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT] ?? ""}
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT, v)
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE:
+        return (
+          <DateRangeField
+            value={
+              filters[REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE] ?? {
+                fromDate: "",
+                toDate: "",
+              }
+            }
+            onChange={(v) =>
+              actions.setFilterValue(
+                REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE,
+                v,
+              )
+            }
+          />
+        );
       case REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND:
         return (
           <StatisticByBranchCheckbox

@@ -16,3 +16,4 @@ export * from './reporting';
 export * from './invoice-report';
 export * from './inventory-report';
 export * from './debt-report';
+export * from './profit-report';

@@ -207,6 +207,10 @@ export function App() {
                   path="/reports/debts"
                   element={<ReportPage category={REPORT_CATEGORY.DEBTS} />}
                 />
+                <Route
+                  path="/reports/profit"
+                  element={<ReportPage category={REPORT_CATEGORY.PROFIT} />}
+                />
 
                 <Route path="/reports/aging" element={<AgingReportPage />} />
                 <Route path="/reports/cash" element={<CashReportPage />} />

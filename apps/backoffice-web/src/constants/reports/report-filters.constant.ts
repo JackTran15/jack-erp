@@ -29,6 +29,16 @@ export enum REPORT_FILTERS_LINE {
     SUPPLIER_GROUP = 'supplier_group',
     STATISTIC_GROUP_BY_ITEM_OR_TEMPLATE = 'statistic_group_by_item_or_template',
     STORE_IN_CHAIN_OPTIONAL = 'store_in_chain_optional',
+
+    // === Lợi nhuận ===
+    // "Kết quả kinh doanh" so sánh 2 kỳ song song trong CÙNG 1 request — chưa
+    // có tiền lệ (mọi báo cáo khác chỉ có 1 cặp REPORT_PERIOD+RANGE_DATE). Mỗi
+    // kỳ tái dùng nguyên logic preset + range hiện có, chỉ nhân đôi filter line
+    // với nhãn riêng ("Kỳ trước"/"Kỳ hiện tại") — không cần component mới.
+    PERIOD_COMPARE_PREVIOUS = 'period_compare_previous',
+    PERIOD_COMPARE_PREVIOUS_RANGE = 'period_compare_previous_range',
+    PERIOD_COMPARE_CURRENT = 'period_compare_current',
+    PERIOD_COMPARE_CURRENT_RANGE = 'period_compare_current_range',
 }
 
 export const REPORT_FILTERS_LINE_METADATA = {
@@ -141,5 +151,27 @@ export const REPORT_FILTERS_LINE_METADATA = {
     [REPORT_FILTERS_LINE.STORE_IN_CHAIN_OPTIONAL]: {
         label: 'cửa hàng',
         backendField: 'branchId',
+    },
+    [REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS]: {
+        label: 'Kỳ trước',
+        backendField: 'previousPeriod',
+    },
+    [REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS_RANGE]: {
+        label: 'Từ ngày',
+        backendField: 'previousFromDate',
+        label2: 'Đến ngày',
+        backendField2: 'previousToDate',
+    },
+    [REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT]: {
+        label: 'Kỳ hiện tại',
+        isRequired: true,
+        backendField: 'currentPeriod',
+    },
+    [REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE]: {
+        label: 'Từ ngày',
+        isRequired: true,
+        backendField: 'currentFromDate',
+        label2: 'Đến ngày',
+        backendField2: 'currentToDate',
     },
 }

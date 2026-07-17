@@ -54,6 +54,10 @@ export interface ReportFilterValues {
   [REPORT_FILTERS_LINE.SUPPLIER_GROUP]: string;
   [REPORT_FILTERS_LINE.STATISTIC_GROUP_BY_ITEM_OR_TEMPLATE]: string;
   [REPORT_FILTERS_LINE.STORE_IN_CHAIN_OPTIONAL]: string;
+  [REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS]: string;
+  [REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS_RANGE]: ReportDateRangeValue;
+  [REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT]: string;
+  [REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE]: ReportDateRangeValue;
 }
 
 // Bộ filter đã "áp dụng" (commit khi bấm Lấy dữ liệu / Đồng ý) — nguồn gọi API data.

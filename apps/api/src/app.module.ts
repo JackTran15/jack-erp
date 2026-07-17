@@ -30,6 +30,7 @@ import { PosModule } from './modules/pos/pos.module';
 import { ReportingModule } from './modules/reporting/reporting.module';
 import { InvoiceReportModule } from './modules/reporting/invoice-report/invoice-report.module';
 import { DebtReportModule } from './modules/reporting/debt-report/debt-report.module';
+import { ProfitReportModule } from './modules/reporting/profit-report/profit-report.module';
 import { PurchaseOrderModule } from './modules/inventory/purchase-order/purchase-order.module';
 import { GoodsIssueModule } from './modules/inventory/goods-issue/goods-issue.module';
 import { IssueReasonModule } from './modules/inventory/issue-reason/issue-reason.module';
@@ -102,6 +103,7 @@ import { CounterpartyModule } from './modules/counterparty/counterparty.module';
     ReportingModule,
     InvoiceReportModule,
     DebtReportModule,
+    ProfitReportModule,
     PurchaseOrderModule,
     GoodsIssueModule,
     IssueReasonModule,

@@ -16,6 +16,9 @@ import { chain_filterRegistryReportCustomerDebts, chain_tableRegistryReportCusto
 import { chain_filterRegistryReportReceivablesDetailByProduct, chain_tableRegistryReportReceivablesDetailByProduct, single_filterRegistryReportReceivablesDetailByProduct, single_tableRegistryReportReceivablesDetailByProduct } from "./report-registry/report-receivables-detail-by-product.registry";
 import { chain_filterRegistryReportSupplierDebts, chain_tableRegistryReportSupplierDebts, single_filterRegistryReportSupplierDebts, single_tableRegistryReportSupplierDebts } from "./report-registry/report-supplier-debts.registry";
 import { chain_filterRegistryReportSupplierDebtsDetailByDocumentAndProduct, chain_tableRegistryReportSupplierDebtsDetailByDocumentAndProduct, single_filterRegistryReportSupplierDebtsDetailByDocumentAndProduct, single_tableRegistryReportSupplierDebtsDetailByDocumentAndProduct } from "./report-registry/report-supplier-debts-detail-by-document-and-product.registry";
+import { chain_filterRegistryReportProfitByItem, chain_tableRegistryReportProfitByItem, single_filterRegistryReportProfitByItem, single_tableRegistryReportProfitByItem } from "./report-registry/report-profit-by-item.registry";
+import { chain_filterRegistryReportGrossProfitByInvoice, chain_tableRegistryReportGrossProfitByInvoice, single_filterRegistryReportGrossProfitByInvoice, single_tableRegistryReportGrossProfitByInvoice } from "./report-registry/report-gross-profit-by-invoice.registry";
+import { chain_filterRegistryReportBusinessResults, chain_tableRegistryReportBusinessResults, single_filterRegistryReportBusinessResults, single_tableRegistryReportBusinessResults } from "./report-registry/report-business-results.registry";
 import type { ReportBackendSource, ReportTableConfig, ReportTypeMetadata } from "./report.interface";
 
 export enum REPORT_TYPE_SALES {
@@ -167,10 +170,47 @@ export enum REPORT_TYPE_PROFIT {
 
 
 export const REPORT_TYPE_PROFIT_METADATA = {
-  [REPORT_TYPE_PROFIT.BUSINESS_RESULTS]: { label: 'Kết quả kinh doanh' },
+  [REPORT_TYPE_PROFIT.BUSINESS_RESULTS]: {
+    label: 'Kết quả kinh doanh',
+    backendKey: 'business-results',
+    backendSource: 'profit' as const,
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportBusinessResults,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportBusinessResults,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportBusinessResults,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportBusinessResults,
+    },
+  },
+  // Chưa có backendKey — ngoài phạm vi epic (EPIC-16072026), thiếu spec sản phẩm.
   [REPORT_TYPE_PROFIT.BUSINESS_RESULTS_BY_BRANCH]: { label: 'Kết quả kinh doanh theo chi nhánh' },
-  [REPORT_TYPE_PROFIT.PROFIT_BY_PRODUCT]: { label: 'Lợi nhuận theo mặt hàng' },
-  [REPORT_TYPE_PROFIT.GROSS_PROFIT_BY_INVOICE]: { label: 'Lợi nhuận gộp theo hóa đơn' },
+  [REPORT_TYPE_PROFIT.PROFIT_BY_PRODUCT]: {
+    label: 'Lợi nhuận theo mặt hàng',
+    backendKey: 'profit-by-item',
+    backendSource: 'profit' as const,
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportProfitByItem,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportProfitByItem,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportProfitByItem,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportProfitByItem,
+    },
+  },
+  [REPORT_TYPE_PROFIT.GROSS_PROFIT_BY_INVOICE]: {
+    label: 'Báo cáo lợi nhuận gộp theo hoá đơn',
+    backendKey: 'gross-profit-by-invoice',
+    backendSource: 'profit' as const,
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportGrossProfitByInvoice,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportGrossProfitByInvoice,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportGrossProfitByInvoice,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportGrossProfitByInvoice,
+    },
+  },
 };
 
 export const REPORT_TYPE_MULTI_CHANNEL_SALES_METADATA = {

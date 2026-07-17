@@ -47,7 +47,7 @@ export interface ReportTableConfig {
 }
 
 // Domain backend phục vụ report type (chọn bộ endpoint columns/search/filter-options/templates).
-export type ReportBackendSource = "invoice" | "inventory" | "debt";
+export type ReportBackendSource = "invoice" | "inventory" | "debt" | "profit";
 
 // Metadata của một loại report: nhãn + filter + table config (theo từng loại view).
 export interface ReportTypeMetadata {
