@@ -42,6 +42,7 @@ import { PromotionApplyService } from '../../promotion/promotion-apply.service';
 import { MembershipCardService } from '../../customer/services/membership-card.service';
 import { computeAmountDue } from './invoice-amount.util';
 import { MetricsService } from '../../metrics/metrics.service';
+import { POINT_EARN_VND_PER_POINT } from '../../customer/loyalty.constants';
 
 /** POS payment method → payment-account config method. Values are identical
  * strings; this map keeps the two enums decoupled at the type level. */
@@ -150,6 +151,12 @@ export class CheckoutInvoiceService {
     const totalPaid = round(dto.payments.reduce((sum, p) => sum + p.amount, 0));
     const remainder = round(amountDue - totalPaid);
 
+    // Loyalty earn is based on the amount actually payable after all discounts
+    // (subtotal − discountAmount − pointsDiscountAmount − depositAmount), so a
+    // point-redemption discount reduces what is earned. Persisted for display and
+    // passed as the async award base so the awarded balance matches this value.
+    const pointsEarned = Math.floor(amountDue / POINT_EARN_VND_PER_POINT);
+
     if (totalPaid > amountDue) {
       throw new BadRequestException(
         `Total payments (${totalPaid}) exceed the amount due (${amountDue})`,
@@ -223,6 +230,7 @@ export class CheckoutInvoiceService {
         invoice.depositAmount = depositAmount;
         invoice.amountDue = amountDue;
         invoice.totalPaid = totalPaid;
+        invoice.pointsEarned = pointsEarned;
 
         const saved = await manager.save(invoice);
 
@@ -314,7 +322,8 @@ export class CheckoutInvoiceService {
       {
         invoiceId: updatedInvoice.id,
         customerId: updatedInvoice.customerId,
-        subtotal,
+        // Earn base = amountDue (net of all discounts, incl. point redemption).
+        subtotal: amountDue,
         issuedAt: updatedInvoice.issuedAt,
         branchId: updatedInvoice.branchId,
       },

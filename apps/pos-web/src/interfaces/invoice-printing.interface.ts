@@ -112,6 +112,8 @@ export interface InvoiceTotals {
   pointsRedeemed?: number;
   /** Tiền giảm từ điểm (VND) — value của dòng "Điểm (n)". */
   pointsDiscountAmount?: number;
+  /** Số điểm được tích từ hóa đơn — dòng "Điểm được tích". */
+  pointsEarned?: number;
 
   // ── Slot chưa có nguồn dữ liệu (ẩn cho tới khi BE nối) ───────────────────
   /** "Phí giao hàng". */
