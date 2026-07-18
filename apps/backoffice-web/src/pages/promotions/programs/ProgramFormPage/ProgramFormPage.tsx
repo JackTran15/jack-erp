@@ -14,6 +14,7 @@ import { DiscountSection } from "./DiscountSection/DiscountSection";
 import { GoodsDiscountSection } from "./GoodsDiscountSection/GoodsDiscountSection";
 import { TieredDiscountSection } from "./TieredDiscountSection/TieredDiscountSection";
 import { GiftSection } from "./GiftSection/GiftSection";
+import { BuyGetSection } from "./BuyGetSection/BuyGetSection";
 import { ConditionSection } from "./ConditionSection/ConditionSection";
 import { ApplicableGoodsTable } from "./ApplicableGoodsTable/ApplicableGoodsTable";
 import { AutoApplyCheckbox } from "./AutoApplyCheckbox/AutoApplyCheckbox";
@@ -91,11 +92,14 @@ export function ProgramFormPage() {
   const isProductDiscount = promotionType === "PRODUCT_DISCOUNT";
   const isTieredDiscount = promotionType === "TIERED_DISCOUNT";
   const isGiftDiscount = promotionType === "GIFT";
+  const isBuyGetDiscount = promotionType === "BUY_M_GET_N";
+  const isSinglePage = isTieredDiscount || isBuyGetDiscount;
   const isSupported =
     isInvoiceDiscount ||
     isProductDiscount ||
     isTieredDiscount ||
-    isGiftDiscount;
+    isGiftDiscount ||
+    isBuyGetDiscount;
 
   return (
     <AdminPageShell>
@@ -108,7 +112,7 @@ export function ProgramFormPage() {
         onSaveAndNew={handleSaveAndNew}
         onCancel={handleCancel}
       />
-      {isTieredDiscount ? null : (
+      {isSinglePage ? null : (
         <Tabs tabs={FORM_TABS} activeTab={activeTab} onTabChange={setActiveTab} />
       )}
 
@@ -123,6 +127,13 @@ export function ProgramFormPage() {
             <TimeSection form={form} onChange={onChange} />
             {isChain ? <StoreScopeSection form={form} onChange={onChange} /> : null}
             <TieredDiscountSection form={form} onChange={onChange} />
+          </div>
+        ) : isBuyGetDiscount ? (
+          <div className="flex flex-col gap-5">
+            <GeneralInfoSection form={form} onChange={onChange} />
+            <TimeSection form={form} onChange={onChange} />
+            {isChain ? <StoreScopeSection form={form} onChange={onChange} /> : null}
+            <BuyGetSection form={form} onChange={onChange} />
           </div>
         ) : activeTab === "km" ? (
           <div className="max-w-5xl flex flex-col gap-5">

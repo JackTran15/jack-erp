@@ -1,6 +1,8 @@
 import type {
   ApplicableGood,
   ApplyScope,
+  BuyGetGiftPolicy,
+  BuyGetRow,
   CalcBasis,
   DayOfWeek,
   GoodsDiscountMethod,
@@ -138,6 +140,24 @@ export function blankGiftProduct(): GiftProduct {
   };
 }
 
+export const BUY_GET_GIFT_POLICY_OPTIONS: {
+  value: BuyGetGiftPolicy;
+  label: string;
+}[] = [
+  { value: "SPECIFIC", label: "Tặng hàng hóa cụ thể" },
+  { value: "CHEAPEST", label: "Tặng hàng hóa rẻ nhất" },
+];
+
+export function blankBuyGetRow(): BuyGetRow {
+  return {
+    id: crypto.randomUUID(),
+    code: "",
+    name: "",
+    unit: "",
+    quantity: "",
+  };
+}
+
 export function buildInitialFormState(): ProgramFormState {
   return {
     name: "",
@@ -165,6 +185,11 @@ export function buildInitialFormState(): ProgramFormState {
     giftMode: "ONE",
     giftProducts: [blankGiftProduct()],
     giftMultiplyByTotal: false,
+    buyGetGiftPolicy: "SPECIFIC",
+    buyGetPurchaseTarget: "PRODUCT",
+    buyGetGiftMode: "ONE",
+    buyGetPurchaseRows: [blankBuyGetRow()],
+    buyGetGiftRows: [blankBuyGetRow()],
     autoApply: true,
     conditionType: "NONE",
     minTotalAmount: 0,

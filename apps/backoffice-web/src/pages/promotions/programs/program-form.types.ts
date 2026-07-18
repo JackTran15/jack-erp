@@ -94,7 +94,20 @@ export interface GiftProduct {
   quantity: number | "";
 }
 
-/** Toàn bộ state của form tạo/sửa chương trình khuyến mãi (giảm giá hóa đơn, hàng hóa, theo mức & tặng hàng). */
+/** Chính sách tặng khi mua m tặng n: tặng hàng cụ thể hoặc tặng hàng rẻ nhất. */
+export type BuyGetGiftPolicy = "SPECIFIC" | "CHEAPEST";
+
+/** Một dòng hàng hóa trong grid mua-m-tặng-n (điều kiện mua hoặc hàng được tặng). */
+export interface BuyGetRow {
+  id: string;
+  code: string;
+  name: string;
+  unit: string;
+  /** SL (điều kiện mua) hoặc SL tặng (hàng được tặng). */
+  quantity: number | "";
+}
+
+/** Toàn bộ state của form tạo/sửa chương trình khuyến mãi (mọi loại khuyến mãi). */
 export interface ProgramFormState {
   name: string;
   description: string;
@@ -123,6 +136,11 @@ export interface ProgramFormState {
   giftMode: GiftMode;
   giftProducts: GiftProduct[];
   giftMultiplyByTotal: boolean;
+  buyGetGiftPolicy: BuyGetGiftPolicy;
+  buyGetPurchaseTarget: TierTarget;
+  buyGetGiftMode: GiftMode;
+  buyGetPurchaseRows: BuyGetRow[];
+  buyGetGiftRows: BuyGetRow[];
   autoApply: boolean;
   conditionType: ConditionType;
   minTotalAmount: number | "";
