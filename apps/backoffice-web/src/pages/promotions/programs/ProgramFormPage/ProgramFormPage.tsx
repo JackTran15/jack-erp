@@ -13,6 +13,7 @@ import { ApplyScopeSection } from "./ApplyScopeSection/ApplyScopeSection";
 import { DiscountSection } from "./DiscountSection/DiscountSection";
 import { GoodsDiscountSection } from "./GoodsDiscountSection/GoodsDiscountSection";
 import { TieredDiscountSection } from "./TieredDiscountSection/TieredDiscountSection";
+import { GiftSection } from "./GiftSection/GiftSection";
 import { ConditionSection } from "./ConditionSection/ConditionSection";
 import { ApplicableGoodsTable } from "./ApplicableGoodsTable/ApplicableGoodsTable";
 import { AutoApplyCheckbox } from "./AutoApplyCheckbox/AutoApplyCheckbox";
@@ -89,8 +90,12 @@ export function ProgramFormPage() {
   const isInvoiceDiscount = promotionType === "INVOICE_DISCOUNT";
   const isProductDiscount = promotionType === "PRODUCT_DISCOUNT";
   const isTieredDiscount = promotionType === "TIERED_DISCOUNT";
+  const isGiftDiscount = promotionType === "GIFT";
   const isSupported =
-    isInvoiceDiscount || isProductDiscount || isTieredDiscount;
+    isInvoiceDiscount ||
+    isProductDiscount ||
+    isTieredDiscount ||
+    isGiftDiscount;
 
   return (
     <AdminPageShell>
@@ -129,13 +134,19 @@ export function ProgramFormPage() {
                 <ApplyScopeSection form={form} onChange={onChange} />
                 <DiscountSection form={form} onChange={onChange} />
               </>
-            ) : (
+            ) : isProductDiscount ? (
               <GoodsDiscountSection form={form} onChange={onChange} />
+            ) : (
+              <GiftSection form={form} onChange={onChange} />
             )}
           </div>
         ) : (
           <div className="max-w-5xl flex flex-col gap-5">
-            <ConditionSection form={form} onChange={onChange} />
+            <ConditionSection
+              form={form}
+              onChange={onChange}
+              showGiftMultiplier={isGiftDiscount}
+            />
             <ApplicableGoodsTable
               value={form.applicableGoods}
               onChange={(goods) => onChange({ applicableGoods: goods })}

@@ -79,7 +79,22 @@ export interface TierGroup {
   tiers: TierRow[];
 }
 
-/** Toàn bộ state của form tạo/sửa chương trình khuyến mãi (giảm giá hóa đơn, hàng hóa & theo mức). */
+/** Hình thức tặng: tặng một trong danh sách hoặc tặng tất cả. */
+export type GiftMode = "ONE" | "ALL";
+
+/** Một dòng hàng hóa quà tặng (grid 5 cột của loại "Tặng hàng hóa"). */
+export interface GiftProduct {
+  id: string;
+  sku: string;
+  name: string;
+  unit: string;
+  /** Giá bán tối đa (prefix ≤). */
+  price: number | "";
+  /** Số lượng tối đa (prefix ≤). */
+  quantity: number | "";
+}
+
+/** Toàn bộ state của form tạo/sửa chương trình khuyến mãi (giảm giá hóa đơn, hàng hóa, theo mức & tặng hàng). */
 export interface ProgramFormState {
   name: string;
   description: string;
@@ -105,6 +120,9 @@ export interface ProgramFormState {
   tierBasis: TierBasis;
   tierTarget: TierTarget;
   tierGroups: TierGroup[];
+  giftMode: GiftMode;
+  giftProducts: GiftProduct[];
+  giftMultiplyByTotal: boolean;
   autoApply: boolean;
   conditionType: ConditionType;
   minTotalAmount: number | "";

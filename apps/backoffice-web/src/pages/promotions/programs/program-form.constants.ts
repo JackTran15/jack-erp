@@ -6,6 +6,8 @@ import type {
   GoodsDiscountMethod,
   GoodsDiscountRow,
   GoodsDiscountScope,
+  GiftMode,
+  GiftProduct,
   ProgramFormState,
   StoreScope,
   TierBasis,
@@ -120,6 +122,22 @@ export function blankTierGroup(index: number): TierGroup {
   };
 }
 
+export const GIFT_MODE_OPTIONS: { value: GiftMode; label: string }[] = [
+  { value: "ONE", label: "Tặng một trong danh sách hàng hóa" },
+  { value: "ALL", label: "Tặng tất cả trong danh sách hàng hóa" },
+];
+
+export function blankGiftProduct(): GiftProduct {
+  return {
+    id: crypto.randomUUID(),
+    sku: "",
+    name: "",
+    unit: "",
+    price: "",
+    quantity: "",
+  };
+}
+
 export function buildInitialFormState(): ProgramFormState {
   return {
     name: "",
@@ -144,6 +162,9 @@ export function buildInitialFormState(): ProgramFormState {
     tierBasis: "PER_ITEM",
     tierTarget: "PRODUCT",
     tierGroups: [blankTierGroup(1)],
+    giftMode: "ONE",
+    giftProducts: [blankGiftProduct()],
+    giftMultiplyByTotal: false,
     autoApply: true,
     conditionType: "NONE",
     minTotalAmount: 0,
