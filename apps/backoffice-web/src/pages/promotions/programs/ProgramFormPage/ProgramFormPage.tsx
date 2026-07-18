@@ -19,7 +19,9 @@ import { ConditionSection } from "./ConditionSection/ConditionSection";
 import { ApplicableGoodsTable } from "./ApplicableGoodsTable/ApplicableGoodsTable";
 import { AutoApplyCheckbox } from "./AutoApplyCheckbox/AutoApplyCheckbox";
 import { buildInitialFormState } from "../program-form.constants";
+import { PROMOTION_FORM_LABELS } from "../programs.constants";
 import type { ProgramFormState } from "../program-form.types";
+import type { PromotionForm } from "../programs.types";
 import { MOCK_PROGRAM_ROWS } from "../_mock/mock-programs";
 
 type FormTab = "km" | "conditions";
@@ -94,6 +96,11 @@ export function ProgramFormPage() {
   const isGiftDiscount = promotionType === "GIFT";
   const isBuyGetDiscount = promotionType === "BUY_M_GET_N";
   const isSinglePage = isTieredDiscount || isBuyGetDiscount;
+
+  const typeLabel =
+    PROMOTION_FORM_LABELS[promotionType as PromotionForm]?.toLowerCase() ??
+    "chương trình khuyến mãi";
+  const pageTitle = `Chương trình KM/ ${isEdit ? "Sửa" : "Thêm mới"} ${typeLabel}`;
   const isSupported =
     isInvoiceDiscount ||
     isProductDiscount ||
@@ -103,9 +110,7 @@ export function ProgramFormPage() {
 
   return (
     <AdminPageShell>
-      <PageHeader
-        title={isEdit ? "Sửa chương trình khuyến mãi" : "Thêm mới chương trình khuyến mãi"}
-      />
+      <PageHeader title={pageTitle} />
       <FormActionBar
         position="top"
         onSave={handleSave}
