@@ -8,6 +8,12 @@ import type {
   GoodsDiscountScope,
   ProgramFormState,
   StoreScope,
+  TierBasis,
+  TierDiscountUnit,
+  TierGroup,
+  TierProduct,
+  TierRow,
+  TierTarget,
 } from "./program-form.types";
 
 /** Bề rộng cột label dùng chung cho các FormField horizontal của form KM. */
@@ -74,6 +80,46 @@ export function blankGoodsDiscountRow(): GoodsDiscountRow {
   };
 }
 
+export const TIER_DISCOUNT_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: "QUANTITY", label: "Số lượng hàng mua" },
+];
+
+export const TIER_DISCOUNT_UNIT_OPTIONS: {
+  value: TierDiscountUnit;
+  label: string;
+}[] = [
+  { value: "PERCENT", label: "Giảm giá theo phần trăm(%)" },
+  { value: "AMOUNT", label: "Giảm giá theo số tiền" },
+];
+
+export const TIER_BASIS_OPTIONS: { value: TierBasis; label: string }[] = [
+  { value: "PER_ITEM", label: "Từng hàng hóa trong nhóm khuyến mại" },
+  { value: "ALL_ITEMS", label: "Tất cả hàng hóa trong nhóm khuyến mại" },
+];
+
+export const TIER_TARGET_OPTIONS: { value: TierTarget; label: string }[] = [
+  { value: "PRODUCT", label: "Hàng hóa" },
+  { value: "VARIANT", label: "Mẫu mã" },
+  { value: "GROUP", label: "Nhóm hàng hóa" },
+];
+
+export function blankTierProduct(): TierProduct {
+  return { id: crypto.randomUUID(), code: "", name: "", unit: "" };
+}
+
+export function blankTierRow(): TierRow {
+  return { id: crypto.randomUUID(), from: "", to: "", value: "" };
+}
+
+export function blankTierGroup(index: number): TierGroup {
+  return {
+    id: crypto.randomUUID(),
+    name: `Nhóm ${index}`,
+    products: [blankTierProduct()],
+    tiers: [blankTierRow()],
+  };
+}
+
 export function buildInitialFormState(): ProgramFormState {
   return {
     name: "",
@@ -94,6 +140,10 @@ export function buildInitialFormState(): ProgramFormState {
     goodsDiscountMethod: "PERCENT",
     goodsFixedPrice: 0,
     goodsDiscountRows: [blankGoodsDiscountRow()],
+    tierDiscountUnit: "PERCENT",
+    tierBasis: "PER_ITEM",
+    tierTarget: "PRODUCT",
+    tierGroups: [blankTierGroup(1)],
     autoApply: true,
     conditionType: "NONE",
     minTotalAmount: 0,

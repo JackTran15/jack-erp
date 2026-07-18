@@ -44,7 +44,42 @@ export interface GoodsDiscountRow {
   value: number | "";
 }
 
-/** Toàn bộ state của form tạo/sửa chương trình khuyến mãi (giảm giá hóa đơn & giảm giá hàng hóa). */
+/** Đơn vị giảm giá theo mức (select 2 của "Loại giảm theo"). */
+export type TierDiscountUnit = "PERCENT" | "AMOUNT";
+
+/** "Tính trên": áp điều kiện số lượng theo từng hàng hóa hay gộp cả nhóm. */
+export type TierBasis = "PER_ITEM" | "ALL_ITEMS";
+
+/** "Giảm giá theo": đối tượng hàng hóa của grid chọn hàng. */
+export type TierTarget = "PRODUCT" | "VARIANT" | "GROUP";
+
+/** Một dòng hàng hóa trong grid chọn hàng của nhóm giảm giá theo mức. */
+export interface TierProduct {
+  id: string;
+  /** Mã SKU / mã mẫu mã / mã nhóm hàng hóa (theo TierTarget). */
+  code: string;
+  name: string;
+  unit: string;
+}
+
+/** Một bậc số lượng: [từ, đến] ứng với một mức giảm. */
+export interface TierRow {
+  id: string;
+  from: number | "";
+  to: number | "";
+  /** % giảm (PERCENT) hoặc số tiền giảm (AMOUNT) theo TierDiscountUnit. */
+  value: number | "";
+}
+
+/** Một nhóm khuyến mại theo mức: gồm grid hàng hóa + grid bậc thang số lượng. */
+export interface TierGroup {
+  id: string;
+  name: string;
+  products: TierProduct[];
+  tiers: TierRow[];
+}
+
+/** Toàn bộ state của form tạo/sửa chương trình khuyến mãi (giảm giá hóa đơn, hàng hóa & theo mức). */
 export interface ProgramFormState {
   name: string;
   description: string;
@@ -66,6 +101,10 @@ export interface ProgramFormState {
   goodsDiscountMethod: GoodsDiscountMethod;
   goodsFixedPrice: number | "";
   goodsDiscountRows: GoodsDiscountRow[];
+  tierDiscountUnit: TierDiscountUnit;
+  tierBasis: TierBasis;
+  tierTarget: TierTarget;
+  tierGroups: TierGroup[];
   autoApply: boolean;
   conditionType: ConditionType;
   minTotalAmount: number | "";

@@ -12,6 +12,7 @@ import { StoreScopeSection } from "./StoreScopeSection/StoreScopeSection";
 import { ApplyScopeSection } from "./ApplyScopeSection/ApplyScopeSection";
 import { DiscountSection } from "./DiscountSection/DiscountSection";
 import { GoodsDiscountSection } from "./GoodsDiscountSection/GoodsDiscountSection";
+import { TieredDiscountSection } from "./TieredDiscountSection/TieredDiscountSection";
 import { ConditionSection } from "./ConditionSection/ConditionSection";
 import { ApplicableGoodsTable } from "./ApplicableGoodsTable/ApplicableGoodsTable";
 import { AutoApplyCheckbox } from "./AutoApplyCheckbox/AutoApplyCheckbox";
@@ -87,7 +88,9 @@ export function ProgramFormPage() {
 
   const isInvoiceDiscount = promotionType === "INVOICE_DISCOUNT";
   const isProductDiscount = promotionType === "PRODUCT_DISCOUNT";
-  const isSupported = isInvoiceDiscount || isProductDiscount;
+  const isTieredDiscount = promotionType === "TIERED_DISCOUNT";
+  const isSupported =
+    isInvoiceDiscount || isProductDiscount || isTieredDiscount;
 
   return (
     <AdminPageShell>
@@ -100,12 +103,21 @@ export function ProgramFormPage() {
         onSaveAndNew={handleSaveAndNew}
         onCancel={handleCancel}
       />
-      <Tabs tabs={FORM_TABS} activeTab={activeTab} onTabChange={setActiveTab} />
+      {isTieredDiscount ? null : (
+        <Tabs tabs={FORM_TABS} activeTab={activeTab} onTabChange={setActiveTab} />
+      )}
 
       <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
         {!isSupported ? (
           <div className="py-10 text-sm text-muted-foreground">
             Loại khuyến mãi này đang được phát triển.
+          </div>
+        ) : isTieredDiscount ? (
+          <div className="max-w-5xl flex flex-col gap-5">
+            <GeneralInfoSection form={form} onChange={onChange} />
+            <TimeSection form={form} onChange={onChange} />
+            {isChain ? <StoreScopeSection form={form} onChange={onChange} /> : null}
+            <TieredDiscountSection form={form} onChange={onChange} />
           </div>
         ) : activeTab === "km" ? (
           <div className="max-w-5xl flex flex-col gap-5">
