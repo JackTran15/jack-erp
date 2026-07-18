@@ -11,6 +11,7 @@ import { TimeSection } from "./TimeSection/TimeSection";
 import { StoreScopeSection } from "./StoreScopeSection/StoreScopeSection";
 import { ApplyScopeSection } from "./ApplyScopeSection/ApplyScopeSection";
 import { DiscountSection } from "./DiscountSection/DiscountSection";
+import { GoodsDiscountSection } from "./GoodsDiscountSection/GoodsDiscountSection";
 import { ConditionSection } from "./ConditionSection/ConditionSection";
 import { ApplicableGoodsTable } from "./ApplicableGoodsTable/ApplicableGoodsTable";
 import { AutoApplyCheckbox } from "./AutoApplyCheckbox/AutoApplyCheckbox";
@@ -85,6 +86,8 @@ export function ProgramFormPage() {
   }, [navigate]);
 
   const isInvoiceDiscount = promotionType === "INVOICE_DISCOUNT";
+  const isProductDiscount = promotionType === "PRODUCT_DISCOUNT";
+  const isSupported = isInvoiceDiscount || isProductDiscount;
 
   return (
     <AdminPageShell>
@@ -100,7 +103,7 @@ export function ProgramFormPage() {
       <Tabs tabs={FORM_TABS} activeTab={activeTab} onTabChange={setActiveTab} />
 
       <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
-        {!isInvoiceDiscount ? (
+        {!isSupported ? (
           <div className="py-10 text-sm text-muted-foreground">
             Loại khuyến mãi này đang được phát triển.
           </div>
@@ -109,8 +112,14 @@ export function ProgramFormPage() {
             <GeneralInfoSection form={form} onChange={onChange} />
             <TimeSection form={form} onChange={onChange} />
             {isChain ? <StoreScopeSection form={form} onChange={onChange} /> : null}
-            <ApplyScopeSection form={form} onChange={onChange} />
-            <DiscountSection form={form} onChange={onChange} />
+            {isInvoiceDiscount ? (
+              <>
+                <ApplyScopeSection form={form} onChange={onChange} />
+                <DiscountSection form={form} onChange={onChange} />
+              </>
+            ) : (
+              <GoodsDiscountSection form={form} onChange={onChange} />
+            )}
           </div>
         ) : (
           <div className="max-w-5xl flex flex-col gap-5">

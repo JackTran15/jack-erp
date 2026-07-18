@@ -3,6 +3,9 @@ import type {
   ApplyScope,
   CalcBasis,
   DayOfWeek,
+  GoodsDiscountMethod,
+  GoodsDiscountRow,
+  GoodsDiscountScope,
   ProgramFormState,
   StoreScope,
 } from "./program-form.types";
@@ -35,6 +38,23 @@ export const CALC_BASIS_OPTIONS: { value: CalcBasis; label: string }[] = [
   { value: "SELECTED_ITEMS", label: "Hàng hóa được chọn" },
 ];
 
+export const GOODS_DISCOUNT_SCOPE_OPTIONS: {
+  value: GoodsDiscountScope;
+  label: string;
+}[] = [
+  { value: "GROUP", label: "Nhóm hàng hóa" },
+  { value: "PRODUCT", label: "Hàng hóa" },
+];
+
+export const GOODS_DISCOUNT_METHOD_OPTIONS: {
+  value: GoodsDiscountMethod;
+  label: string;
+}[] = [
+  { value: "PERCENT", label: "Giảm giá theo %" },
+  { value: "AMOUNT", label: "Giảm giá theo số tiền" },
+  { value: "FIXED_PRICE", label: "Đồng giá" },
+];
+
 export function blankApplicableGood(): ApplicableGood {
   return {
     id: crypto.randomUUID(),
@@ -42,6 +62,15 @@ export function blankApplicableGood(): ApplicableGood {
     name: "",
     unit: "",
     minQuantity: "",
+  };
+}
+
+export function blankGoodsDiscountRow(): GoodsDiscountRow {
+  return {
+    id: crypto.randomUUID(),
+    code: "",
+    name: "",
+    value: "",
   };
 }
 
@@ -61,6 +90,10 @@ export function buildInitialFormState(): ProgramFormState {
     discountType: "PERCENT",
     discountPercent: 0,
     discountAmount: 0,
+    goodsDiscountScope: "GROUP",
+    goodsDiscountMethod: "PERCENT",
+    goodsFixedPrice: 0,
+    goodsDiscountRows: [blankGoodsDiscountRow()],
     autoApply: true,
     conditionType: "NONE",
     minTotalAmount: 0,

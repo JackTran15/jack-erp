@@ -27,7 +27,24 @@ export interface ApplicableGood {
   minQuantity: number | "";
 }
 
-/** Toàn bộ state của form tạo/sửa chương trình khuyến mãi (giảm giá hóa đơn). */
+/** Phạm vi giảm giá hàng hóa: theo nhóm hàng hóa hoặc theo từng hàng hóa. */
+export type GoodsDiscountScope = "GROUP" | "PRODUCT";
+
+/** Phương thức thiết lập giảm giá hàng hóa. */
+export type GoodsDiscountMethod = "PERCENT" | "AMOUNT" | "FIXED_PRICE";
+
+/** Một dòng thiết lập giảm giá hàng hóa (bảng editable). */
+export interface GoodsDiscountRow {
+  id: string;
+  /** Mã nhóm hàng hóa (GROUP) hoặc mã hàng (PRODUCT). */
+  code: string;
+  /** Tên nhóm hàng hóa (GROUP) hoặc tên hàng hóa (PRODUCT). */
+  name: string;
+  /** % giảm (PERCENT) hoặc số tiền giảm (AMOUNT) theo phương thức. */
+  value: number | "";
+}
+
+/** Toàn bộ state của form tạo/sửa chương trình khuyến mãi (giảm giá hóa đơn & giảm giá hàng hóa). */
 export interface ProgramFormState {
   name: string;
   description: string;
@@ -45,6 +62,10 @@ export interface ProgramFormState {
   discountType: DiscountType;
   discountPercent: number | "";
   discountAmount: number | "";
+  goodsDiscountScope: GoodsDiscountScope;
+  goodsDiscountMethod: GoodsDiscountMethod;
+  goodsFixedPrice: number | "";
+  goodsDiscountRows: GoodsDiscountRow[];
   autoApply: boolean;
   conditionType: ConditionType;
   minTotalAmount: number | "";
