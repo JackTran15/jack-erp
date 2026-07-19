@@ -30,6 +30,10 @@ import {
   type ColumnFilterMode,
 } from "../../../components/table/pagination.dto";
 import { StatusBadge } from "../../../components/status/StatusBadge";
+import {
+  DepositTabBar,
+  DepositTabIdEnum,
+} from "../../../components/document/depositTabs";
 import { hasPermission } from "../../../lib/permissions";
 import { useDepositAccounts } from "../../../hooks/treasury/use-deposit-accounts";
 import {
@@ -61,6 +65,7 @@ function toTime(value: string): string {
 
 export function DepositReconPage() {
   const { data: accounts = [] } = useDepositAccounts();
+  // "" = Tất cả quỹ của chi nhánh (mặc định) — BE bỏ qua filter khi param vắng mặt.
   const [accountId, setAccountId] = useState("");
   const [reconStatus, setReconStatus] = useState<ReconStatus>(ReconStatus.CHUA);
   const [period, setPeriod] = useState<PeriodValue>(() => ({
@@ -82,13 +87,6 @@ export function DepositReconPage() {
   const [unreconcileReason, setUnreconcileReason] = useState("");
 
   useEffect(() => {
-    if (!accountId && accounts.length > 0) {
-      const preferred = accounts.find((a) => a.isDefault) ?? accounts[0];
-      setAccountId(preferred.id);
-    }
-  }, [accounts, accountId]);
-
-  useEffect(() => {
     setSelected(new Set());
   }, [accountId, reconStatus]);
 
@@ -98,11 +96,13 @@ export function DepositReconPage() {
   );
 
   const accountOptions = useMemo<SingleSelectOption[]>(
-    () =>
-      accounts.map((a) => ({
+    () => [
+      { value: "", label: "Tất cả" },
+      ...accounts.map((a) => ({
         value: a.id,
         label: a.accountNo ? `${a.name} (${a.accountNo})` : a.name,
       })),
+    ],
     [accounts],
   );
 
@@ -119,7 +119,7 @@ export function DepositReconPage() {
     [accountId, reconStatus, appliedPeriod, appliedDocNumber, page, pageSize],
   );
 
-  const list = useDepositReconList(query, Boolean(accountId));
+  const list = useDepositReconList(query);
   const { reconcile, unreconcile } = useDepositReconMutations();
   const rows = list.data?.data ?? [];
 
@@ -206,7 +206,9 @@ export function DepositReconPage() {
         label: "Ngày ghi có",
         width: 110,
         filterKind: "none",
-        render: (r) => toDate(r.valueDate),
+        // null = cleared immediately (settlement_days=0) — same day as docDate,
+        // not "no data" (see DepositLedgerRow.valueDate).
+        render: (r) => toDate(r.valueDate ?? r.docDate),
       },
       {
         key: "netAmount",
@@ -313,7 +315,10 @@ export function DepositReconPage() {
       id: "reconcile",
       label: "Đối chiếu",
       icon: CheckSquare,
-      disabled: reconStatus !== ReconStatus.CHUA || selected.size === 0,
+      // Đối chiếu khớp với sao kê của MỘT ngân hàng — không hợp lệ ở chế độ "Tất cả"
+      // vì các dòng đã chọn có thể thuộc nhiều tài khoản khác nhau.
+      disabled: reconStatus !== ReconStatus.CHUA || selected.size === 0 || !accountId,
+      tooltip: !accountId ? "Chọn một tài khoản cụ thể để đối chiếu" : undefined,
       onClick: () => setBatchDialogOpen(true),
     },
     {
@@ -347,6 +352,7 @@ export function DepositReconPage() {
     <>
       <DocumentListShell
         title="Đối chiếu tiền gửi"
+        tabs={<DepositTabBar activeId={DepositTabIdEnum.RECONCILIATION} />}
         toolbar={<PageToolbar items={toolbarItems} tone="primary" />}
         filters={
           <div className="flex flex-col gap-2">

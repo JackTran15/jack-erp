@@ -21,6 +21,8 @@ import { CashFundResolverService } from '../../cash/cash-fund-resolver.service';
 import { BankPaymentPurpose, BankPaymentReferenceType, BankReceiptPurpose, BankReceiptReferenceType } from '../enums';
 import { BankPaymentsService } from '../bank-payments/bank-payments.service';
 import { BankReceiptsService } from '../bank-receipts/bank-receipts.service';
+import { PartnerResolverService } from '../../cash-vouchers/shared/partner-resolver.service';
+import { CashVoucherPartnerType } from '../../cash-vouchers/enums';
 import { DepositTransferEntity } from './deposit-transfer.entity';
 import { CreateDepositTransferDto } from './dto/create-deposit-transfer.dto';
 import { ConfirmDepositTransferDto } from './dto/confirm-deposit-transfer.dto';
@@ -54,6 +56,7 @@ export class DepositTransferService {
     private readonly bankReceipts: BankReceiptsService,
     private readonly depositFundResolver: DepositFundResolverService,
     private readonly cashFundResolver: CashFundResolverService,
+    private readonly partnerResolver: PartnerResolverService,
   ) {}
 
   /** Leg A — initiated at branch A. Reduces A's fund immediately (BR-TRF-01). */
@@ -84,6 +87,12 @@ export class DepositTransferService {
         IN_TRANSIT_COA_CODE,
         manager,
       );
+      const partner = await this.partnerResolver.resolve(
+        manager,
+        dto.partnerType as unknown as CashVoucherPartnerType,
+        dto.partnerId,
+        actor.organizationId,
+      );
 
       const payment = await this.bankPayments.createAndPostInternal(
         {
@@ -99,6 +108,12 @@ export class DepositTransferService {
           transferPairId: transferId,
           transferStatus: DepositTransferStatus.DANG_CHUYEN,
           affectExpense: false,
+          partnerType: dto.partnerType,
+          partnerId: dto.partnerId,
+          partnerName: partner?.name ?? undefined,
+          partnerAddress: partner?.address ?? undefined,
+          payeeName: dto.payeeName,
+          paidBy: dto.paidBy,
           reason: dto.note,
           description: 'Chuyển tiền gửi liên chi nhánh',
         },

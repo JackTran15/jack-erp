@@ -5,6 +5,7 @@ import { DepositDashboardService } from './deposit-dashboard.service';
 import { DepositTransferEntity } from '../deposit-transfer/deposit-transfer.entity';
 import { DepositAccountEntity } from '../../deposit/deposit-account.entity';
 import { BranchEntity } from '../../../branch/branch.entity';
+import { BankEntity } from '../../deposit/bank.entity';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 
 const actor: ActorContext = {
@@ -53,6 +54,8 @@ function makeAccount(overrides: Partial<DepositAccountEntity> = {}): DepositAcco
     type: 'BANK_ACCOUNT',
     balance: 1_000_000,
     status: DepositAccountStatus.ACTIVE,
+    bankId: 'bank-1',
+    accountNo: '00112233',
     ...overrides,
   } as DepositAccountEntity;
 }
@@ -61,6 +64,7 @@ async function setup(opts: {
   transfers?: DepositTransferEntity[];
   accounts?: DepositAccountEntity[];
   branches?: Array<{ id: string; name: string }>;
+  banks?: Array<{ id: string; name: string; shortName?: string | null }>;
 } = {}) {
   const transferRepo = {
     find: jest.fn().mockResolvedValue(opts.transfers ?? [makeTransfer()]),
@@ -73,6 +77,9 @@ async function setup(opts: {
       .fn()
       .mockResolvedValue(opts.branches ?? [{ id: 'branch-a', name: 'CN A' }, { id: 'branch-b', name: 'CN B' }]),
   };
+  const bankRepo = {
+    find: jest.fn().mockResolvedValue(opts.banks ?? [{ id: 'bank-1', name: 'Ngân hàng SHB', shortName: 'SHB' }]),
+  };
 
   const module: TestingModule = await Test.createTestingModule({
     providers: [
@@ -80,10 +87,11 @@ async function setup(opts: {
       { provide: getRepositoryToken(DepositTransferEntity), useValue: transferRepo },
       { provide: getRepositoryToken(DepositAccountEntity), useValue: accountRepo },
       { provide: getRepositoryToken(BranchEntity), useValue: branchRepo },
+      { provide: getRepositoryToken(BankEntity), useValue: bankRepo },
     ],
   }).compile();
 
-  return { service: module.get(DepositDashboardService), transferRepo, accountRepo, branchRepo };
+  return { service: module.get(DepositDashboardService), transferRepo, accountRepo, branchRepo, bankRepo };
 }
 
 describe('DepositDashboardService', () => {
@@ -159,6 +167,37 @@ describe('DepositDashboardService', () => {
       expect(dashboard.accountsTotal).toBe('1500000');
       expect(dashboard.inTransitTotal).toBe('200000');
       expect(dashboard.grandTotal).toBe('1700000');
+    });
+
+    it('joins bankName (preferring shortName) and accountNo into each account row', async () => {
+      const { service } = await setup({
+        accounts: [
+          makeAccount({ id: 'a1', branchId: 'branch-a', bankId: 'bank-1', accountNo: '00112233' }),
+        ],
+        banks: [{ id: 'bank-1', name: 'Ngân hàng SHB', shortName: 'SHB' }],
+        transfers: [],
+      });
+      const scopedActor: ActorContext = { ...actor, branchIds: ['branch-a'] };
+
+      const dashboard = await service.getOrgBalance(scopedActor);
+
+      expect(dashboard.branches[0].accounts[0]).toMatchObject({
+        bankName: 'SHB',
+        accountNo: '00112233',
+      });
+    });
+
+    it('falls back to the full bank name when shortName is blank', async () => {
+      const { service } = await setup({
+        accounts: [makeAccount({ id: 'a1', branchId: 'branch-a', bankId: 'bank-2' })],
+        banks: [{ id: 'bank-2', name: 'Ngân hàng Vietcombank', shortName: null }],
+        transfers: [],
+      });
+      const scopedActor: ActorContext = { ...actor, branchIds: ['branch-a'] };
+
+      const dashboard = await service.getOrgBalance(scopedActor);
+
+      expect(dashboard.branches[0].accounts[0].bankName).toBe('Ngân hàng Vietcombank');
     });
 
     it('BR-PERM-01: excludes accounts of a branch the actor is not assigned to', async () => {

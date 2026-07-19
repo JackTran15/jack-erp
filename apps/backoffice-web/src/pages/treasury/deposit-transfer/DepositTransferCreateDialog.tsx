@@ -6,6 +6,7 @@ import { useBranches } from "../../../hooks/iam/useBranches";
 import { useBranchStore } from "../../../store/common/branch/branch.store";
 import { useCreateDepositTransfer } from "../../../hooks/treasury/use-deposit-transfers";
 import { useDepositDashboard } from "../../../hooks/treasury/use-deposit-dashboard";
+import { formatDepositAccountLabel } from "../documents/_shared/voucher-dialog.utils";
 
 interface Props {
   open: boolean;
@@ -60,7 +61,7 @@ export function DepositTransferCreateDialog({ open, onOpenChange }: Props) {
   );
 
   const accountOptions = useMemo<SingleSelectOption[]>(
-    () => toBranchAccounts.map((a) => ({ value: a.accountId, label: a.name })),
+    () => toBranchAccounts.map((a) => ({ value: a.accountId, label: formatDepositAccountLabel(a) })),
     [toBranchAccounts],
   );
 

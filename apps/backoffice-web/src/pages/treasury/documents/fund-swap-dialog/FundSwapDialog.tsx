@@ -35,6 +35,7 @@ export function FundSwapDialog({ open, onOpenChange }: Props) {
   const [feeAmount, setFeeAmount] = useState<number>(0);
   const [docDate, setDocDate] = useState(toIsoDate(new Date()));
   const [reason, setReason] = useState("");
+  const [autoCreateReceipt, setAutoCreateReceipt] = useState(true);
 
   useEffect(() => {
     if (!open) return;
@@ -44,9 +45,14 @@ export function FundSwapDialog({ open, onOpenChange }: Props) {
     setFeeAmount(0);
     setDocDate(toIsoDate(new Date()));
     setReason("");
+    setAutoCreateReceipt(true);
   }, [open]);
 
   const isWithdrawal = direction === FundSwapDirection.DEPOSIT_TO_CASH;
+
+  useEffect(() => {
+    if (!isWithdrawal) setAutoCreateReceipt(true);
+  }, [isWithdrawal]);
 
   const handleConfirm = async () => {
     if (!depositAccountId) {
@@ -65,10 +71,15 @@ export function FundSwapDialog({ open, onOpenChange }: Props) {
       docDate,
       feeAmount: isWithdrawal && feeAmount > 0 ? feeAmount : undefined,
       reason: reason || undefined,
+      autoCreateReceipt: isWithdrawal ? autoCreateReceipt : undefined,
     };
     try {
       await swap.mutateAsync(body);
-      toast.success("Đã chuyển quỹ.");
+      toast.success(
+        isWithdrawal && !autoCreateReceipt
+          ? "Đã chuyển quỹ — chưa tạo phiếu thu tiền mặt."
+          : "Đã chuyển quỹ.",
+      );
       onOpenChange(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Chuyển quỹ thất bại.");
@@ -119,9 +130,27 @@ export function FundSwapDialog({ open, onOpenChange }: Props) {
           <MoneyInput value={amount} onChange={(v) => setAmount(v === "" ? 0 : Number(v))} />
         </FormField>
         {isWithdrawal ? (
-          <FormField label="Phí rút tiền" layout="horizontal" labelWidth="8rem">
-            <MoneyInput value={feeAmount} onChange={(v) => setFeeAmount(v === "" ? 0 : Number(v))} />
-          </FormField>
+          <>
+            <FormField label="Phí rút tiền" layout="horizontal" labelWidth="8rem">
+              <MoneyInput value={feeAmount} onChange={(v) => setFeeAmount(v === "" ? 0 : Number(v))} />
+            </FormField>
+            <div className="flex flex-col gap-1">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={autoCreateReceipt}
+                  onChange={(e) => setAutoCreateReceipt(e.target.checked)}
+                />
+                Tự động sinh phiếu thu tiền ngay sau khi chi
+              </label>
+              {!autoCreateReceipt ? (
+                <p className="pl-6 text-xs text-muted-foreground">
+                  Tiền sẽ treo ở tài khoản "Tiền đang chuyển" — tự tạo Phiếu thu tiền mặt riêng sau khi đã
+                  đếm tiền.
+                </p>
+              ) : null}
+            </div>
+          </>
         ) : null}
         <FormField label="Ngày chứng từ" required layout="horizontal" labelWidth="8rem">
           <DateTimeField value={docDate} onChange={(e) => setDocDate(e.target.value)} includeTime={false} />

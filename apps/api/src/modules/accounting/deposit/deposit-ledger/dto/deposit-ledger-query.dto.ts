@@ -8,12 +8,16 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class DepositLedgerQueryDto {
-  @ApiProperty({ description: 'Deposit account to show the ledger for (BR-LEDG-03: one account)' })
+  @ApiPropertyOptional({
+    description:
+      'Deposit account to show the ledger for. Omit to include every ACTIVE deposit account of the branch (BR-LEDG-03).',
+  })
+  @IsOptional()
   @IsUUID()
-  depositAccountId: string;
+  depositAccountId?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

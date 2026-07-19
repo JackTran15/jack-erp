@@ -19,6 +19,8 @@ import { DepositBalanceService } from './deposit-ledger/deposit-balance.service'
 import { DepositPeriodLockEntity } from '../deposit-period-lock/deposit-period-lock.entity';
 import { DepositPeriodGuardService } from '../deposit-period-lock/deposit-period-guard.service';
 import { DepositAuditModule } from '../deposit-audit/deposit-audit.module';
+import { BankReceiptEntity } from '../deposit-vouchers/bank-receipts/bank-receipt.entity';
+import { BankPaymentEntity } from '../deposit-vouchers/bank-payments/bank-payment.entity';
 import {
   BanksCrudService,
   BANK_SERVICE_TOKEN,
@@ -43,6 +45,8 @@ import {
       DepositMovementEntity,
       DepositPaymentPolicyEntity,
       DepositPeriodLockEntity,
+      BankReceiptEntity,
+      BankPaymentEntity,
     ]),
     JournalModule,
     CashModule,

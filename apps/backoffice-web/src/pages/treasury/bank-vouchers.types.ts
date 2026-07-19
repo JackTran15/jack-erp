@@ -257,4 +257,6 @@ export interface CreateFundSwapBody {
   /** Withdrawal fee (BR-SWP-03) — only applies to DEPOSIT_TO_CASH. */
   feeAmount?: number;
   reason?: string;
+  /** DEPOSIT_TO_CASH only — false skips auto-creating the matching cash receipt. */
+  autoCreateReceipt?: boolean;
 }

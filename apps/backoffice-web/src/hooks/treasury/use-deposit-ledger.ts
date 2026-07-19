@@ -11,17 +11,17 @@ export interface DepositLedgerParams {
   dateTo?: string;
 }
 
-/** Fetch one offset page of the deposit ledger for a single deposit account. */
+/**
+ * Fetch one offset page of the deposit ledger. Omit `depositAccountId` to cover
+ * every ACTIVE deposit account of the branch (BR-LEDG-04) instead of one.
+ */
 export function useDepositLedger(
   params: DepositLedgerParams,
   page: number,
   pageSize: number,
   enabled = true,
 ) {
-  const canQuery =
-    Boolean(params.depositAccountId) &&
-    Boolean(params.dateFrom) &&
-    Boolean(params.dateTo);
+  const canQuery = Boolean(params.dateFrom) && Boolean(params.dateTo);
 
   return useQuery({
     queryKey: treasuryQueryKeys.depositLedger({ ...params, page, pageSize }),
@@ -30,7 +30,7 @@ export function useDepositLedger(
         await erpApi.GET<DepositLedgerResponse>("/deposit-ledger", {
           params: {
             query: {
-              depositAccountId: params.depositAccountId!,
+              depositAccountId: params.depositAccountId,
               dateFrom: params.dateFrom,
               dateTo: params.dateTo,
               page,

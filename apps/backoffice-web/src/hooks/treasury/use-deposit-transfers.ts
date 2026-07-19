@@ -24,6 +24,21 @@ export function useDepositTransfers(query: ListDepositTransfersQuery) {
   });
 }
 
+/** Single transfer by id — used to hydrate toBranchId/toAccountId on an INTER_BRANCH_OUT
+ * bank_payment's view dialog (those fields live only on this entity, not the payment). */
+export function useDepositTransfer(id: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: treasuryQueryKeys.depositTransfer(id),
+    queryFn: async () =>
+      requireErpData(
+        await erpApi.GET<DepositTransfer>("/deposit-transfers/{id}", {
+          params: { path: { id: id! } },
+        }),
+      ),
+    enabled: enabled && Boolean(id),
+  });
+}
+
 function invalidateDepositTransferData(qc: ReturnType<typeof useQueryClient>) {
   // A transfer moves money out of A's fund (create) or into B's fund (confirm/cancel) —
   // invalidate the transfer list itself plus every report that reflects fund balances.

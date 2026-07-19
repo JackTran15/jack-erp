@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   Button,
@@ -22,12 +22,23 @@ import {
 } from "../../../components/table/BaseDataTable";
 import { PaginationControls } from "../../../components/table/PaginationControls";
 import { DEFAULT_PAGINATION } from "../../../components/table/pagination.dto";
+import {
+  DepositTabBar,
+  DepositTabIdEnum,
+} from "../../../components/document/depositTabs";
 import { useDepositAccounts } from "../../../hooks/treasury/use-deposit-accounts";
 import { selectDepositBalances } from "../../../hooks/treasury/use-deposit-balance";
 import {
   downloadDepositLedgerExport,
   useDepositLedger,
 } from "../../../hooks/treasury/use-deposit-ledger";
+import { useBankReceipt } from "../../../hooks/treasury/use-bank-receipts";
+import { useBankPayment } from "../../../hooks/treasury/use-bank-payments";
+import {
+  DepositPaymentVoucherDialog,
+  DepositReceiptVoucherDialog,
+  TreasuryVoucherDialogModeEnum,
+} from "../documents";
 
 const VI_DATE: Intl.DateTimeFormatOptions = {
   day: "2-digit",
@@ -43,6 +54,8 @@ interface DepositLedgerDisplayRow {
   docDate: string | null;
   receiptNo: string;
   paymentNo: string;
+  receiptId: string | null;
+  paymentId: string | null;
   accountNo: string;
   description: string;
   amountIn: number;
@@ -63,6 +76,8 @@ function toDisplayRow(row: DepositLedgerRow): DepositLedgerDisplayRow {
     docDate: row.docDate,
     receiptNo: row.receiptNo ?? "",
     paymentNo: row.paymentNo ?? "",
+    receiptId: row.receiptId ?? null,
+    paymentId: row.paymentId ?? null,
     accountNo: row.depositAccountNo,
     description: row.description ?? "",
     amountIn: toNumber(row.amountIn),
@@ -73,15 +88,22 @@ function toDisplayRow(row: DepositLedgerRow): DepositLedgerDisplayRow {
   };
 }
 
-function buildOpeningRow(openingBalance: string): DepositLedgerDisplayRow {
+function buildOpeningRow(
+  openingBalance: string,
+  isAllAccounts: boolean,
+): DepositLedgerDisplayRow {
   return {
     id: "opening",
     isOpening: true,
     docDate: null,
     receiptNo: "",
     paymentNo: "",
+    receiptId: null,
+    paymentId: null,
     accountNo: "",
-    description: "Số dư đầu kỳ",
+    description: isAllAccounts
+      ? "Số dư đầu kỳ (tất cả tài khoản)"
+      : "Số dư đầu kỳ",
     amountIn: 0,
     amountOut: 0,
     runningBalance: toNumber(openingBalance),
@@ -99,25 +121,23 @@ export function LedgerDepositPage() {
   const [pagination, setPagination] = useState(DEFAULT_PAGINATION);
   const [accountId, setAccountId] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
+  const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
 
   const { data: accounts = [] } = useDepositAccounts();
+  const { data: receiptDetail } = useBankReceipt(selectedReceiptId ?? undefined, Boolean(selectedReceiptId));
+  const { data: paymentDetail } = useBankPayment(selectedPaymentId ?? undefined, Boolean(selectedPaymentId));
 
   const accountOptions = useMemo<SingleSelectOption[]>(
-    () =>
-      accounts.map((a) => ({
+    () => [
+      { value: "", label: "Tất cả" },
+      ...accounts.map((a) => ({
         value: a.id,
         label: a.accountNo ? `${a.name} (${a.accountNo})` : a.name,
       })),
+    ],
     [accounts],
   );
-
-  // Default to the branch's default deposit account (or the first) once loaded.
-  useEffect(() => {
-    if (!accountId && accounts.length > 0) {
-      const preferred = accounts.find((a) => a.isDefault) ?? accounts[0];
-      setAccountId(preferred.id);
-    }
-  }, [accounts, accountId]);
 
   const ledgerParams = useMemo(
     () => ({
@@ -141,9 +161,9 @@ export function LedgerDepositPage() {
     if (!data) return [];
     const movement = data.rows.map(toDisplayRow);
     return pagination.page === 1
-      ? [buildOpeningRow(data.openingBalance), ...movement]
+      ? [buildOpeningRow(data.openingBalance, !accountId), ...movement]
       : movement;
-  }, [data, pagination.page]);
+  }, [data, pagination.page, accountId]);
 
   const columns = useMemo<TableColumn<DepositLedgerDisplayRow>[]>(
     () => [
@@ -215,14 +235,10 @@ export function LedgerDepositPage() {
   }, [period]);
 
   const handleExport = useCallback(async () => {
-    if (!accountId) {
-      toast.info("Vui lòng chọn tài khoản tiền gửi.");
-      return;
-    }
     setExporting(true);
     try {
       await downloadDepositLedgerExport({
-        depositAccountId: accountId,
+        depositAccountId: accountId || undefined,
         dateFrom: appliedPeriod.from,
         dateTo: appliedPeriod.to,
       });
@@ -233,9 +249,15 @@ export function LedgerDepositPage() {
     }
   }, [accountId, appliedPeriod]);
 
+  const handleRowClick = useCallback((row: DepositLedgerDisplayRow) => {
+    if (row.receiptId) setSelectedReceiptId(row.receiptId);
+    else if (row.paymentId) setSelectedPaymentId(row.paymentId);
+  }, []);
+
   return (
     <DocumentListShell
-      title="Tiền gửi"
+      title="Sổ chi tiết tiền gửi"
+      tabs={<DepositTabBar activeId={DepositTabIdEnum.LEDGER} />}
       filters={
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-end gap-4">
@@ -291,6 +313,7 @@ export function LedgerDepositPage() {
             loading={ledger.isLoading}
             emptyLabel="Không có phát sinh trong kỳ."
             getRowKey={(r) => r.id}
+            onRowClick={handleRowClick}
           />
           {data && (
             <div className="flex items-center justify-end gap-6 border-t bg-muted/50 px-4 py-2 text-sm font-semibold">
@@ -327,6 +350,23 @@ export function LedgerDepositPage() {
           )}
         </div>
       </div>
+
+      <DepositReceiptVoucherDialog
+        open={Boolean(selectedReceiptId)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedReceiptId(null);
+        }}
+        mode={TreasuryVoucherDialogModeEnum.VIEW}
+        initial={receiptDetail ?? null}
+      />
+      <DepositPaymentVoucherDialog
+        open={Boolean(selectedPaymentId)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedPaymentId(null);
+        }}
+        mode={TreasuryVoucherDialogModeEnum.VIEW}
+        initial={paymentDetail ?? null}
+      />
     </DocumentListShell>
   );
 }

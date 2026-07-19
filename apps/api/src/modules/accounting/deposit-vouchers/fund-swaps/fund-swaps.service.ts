@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { CashFundResolverService } from '../../cash/cash-fund-resolver.service';
@@ -48,6 +48,12 @@ export class FundSwapsService {
   ) {}
 
   async swap(dto: CreateFundSwapDto, actor: ActorContext): Promise<FundSwapResult> {
+    if (dto.direction === FundSwapDirection.CASH_TO_DEPOSIT && dto.autoCreateReceipt === false) {
+      throw new BadRequestException(
+        'autoCreateReceipt only applies to DEPOSIT_TO_CASH',
+      );
+    }
+
     return this.dataSource.transaction(async (manager) => {
       const clearingAccountId = await this.cashFundResolver.resolveCoaAccountIdByCode(
         actor.organizationId,
@@ -102,6 +108,16 @@ export class FundSwapsService {
             },
             manager,
           );
+        }
+
+        if (dto.autoCreateReceipt === false) {
+          // Leg 2 deliberately skipped — the amount sits in TK 113 "Tiền đang
+          // chuyển" until the cashier records it themselves as a separate cash
+          // receipt once actually counted. No pending state is tracked here.
+          return {
+            bankPaymentId: bankPayment.voucherId,
+            bankFeePaymentId: bankFeePayment?.voucherId,
+          };
         }
 
         // Leg 2 — deposit the same base amount into the branch cash fund.

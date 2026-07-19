@@ -1,5 +1,6 @@
 import { formatMoneyInteger } from "@erp/ui";
 import { useMemo } from "react";
+import type { DepositAccount } from "@erp/shared-interfaces";
 import type { TableColumn } from "../../../../components/table/BaseDataTable";
 import {
   StatusBadge,
@@ -25,6 +26,7 @@ const STATUS_BADGE_VARIANT: Record<BankVoucherStatus, StatusBadgeVariant> = {
 
 export function useReceiptDepositTableColumns(
   onOpenVoucher: (row: ReceiptDepositListItem) => void,
+  accountsById: Map<string, DepositAccount>,
 ) {
   return useMemo(
     (): TableColumn<ReceiptDepositListItem>[] => [
@@ -82,6 +84,17 @@ export function useReceiptDepositTableColumns(
         render: (r) => formatMoneyInteger(r.totalAmount),
       },
       {
+        key: "account",
+        label: "Số tài khoản",
+        width: 200,
+        filterKind: "none",
+        render: (r) => {
+          const acc = accountsById.get(r.depositAccountId);
+          if (!acc) return "—";
+          return acc.accountNo ? `${acc.name} (${acc.accountNo})` : acc.name;
+        },
+      },
+      {
         key: "counterparty",
         label: "Đối tượng nộp/nhận",
         width: 160,
@@ -94,6 +107,6 @@ export function useReceiptDepositTableColumns(
         render: (r) => r.reason,
       },
     ],
-    [onOpenVoucher],
+    [onOpenVoucher, accountsById],
   );
 }
