@@ -1,4 +1,5 @@
 import type { DepositTransfer } from "@erp/shared-interfaces";
+import type { CashVoucherPartnerType } from "../cash-vouchers.types";
 
 /**
  * Hand-rolled mirror of the GĐ4 deposit-transfer backend DTOs (`@erp/api-client`
@@ -35,6 +36,12 @@ export interface CreateDepositTransferBody {
   toAccountId: string;
   amount: number;
   note?: string;
+  partnerType?: CashVoucherPartnerType;
+  partnerId?: string;
+  /** "Người nhận" */
+  payeeName?: string;
+  /** "Nhân viên chi" */
+  paidBy?: string;
 }
 
 export interface ConfirmDepositTransferBody {

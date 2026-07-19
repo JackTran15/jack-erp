@@ -113,6 +113,10 @@ export interface DepositLedgerRow {
   documentNumber?: string | null;
   receiptNo?: string | null; // NTTK
   paymentNo?: string | null; // UNC
+  /** bank_receipts.id — set when receiptNo is, lets the FE open that voucher's detail. */
+  receiptId?: string | null;
+  /** bank_payments.id — set when paymentNo is, lets the FE open that voucher's detail. */
+  paymentId?: string | null;
   depositAccountNo: string;
   description?: string | null;
   amountIn: string;

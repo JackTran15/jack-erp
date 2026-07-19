@@ -16,6 +16,7 @@ import { DocumentType } from "@erp/shared-interfaces";
 import { Pencil, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { useGenerateDocumentNumber } from "../../../../hooks/document-numbering/useGenerateDocumentNumber";
+import { getStoredUserId } from "../../../../lib/auth-storage";
 import { RadioGroup } from "../../../../components/forms/RadioGroup";
 import { BaseDataTable, type TableColumn } from "../../../../components/table/BaseDataTable";
 import {
@@ -70,16 +71,21 @@ const LABELS = {
   titleView: "Phiếu thu tiền gửi",
 } as const;
 
+// OTHER_INCOME / INTER_BRANCH_IN dropped from this selectable list (product
+// decision) — "Mục đích thu" is just Khác/Thu nợ now.
 const RECEIPT_PURPOSE_OPTIONS = [
   { value: BankReceiptPurpose.OTHER, label: "Khác" },
   { value: BankReceiptPurpose.DEBT_COLLECTION, label: "Thu nợ" },
-  { value: BankReceiptPurpose.OTHER_INCOME, label: "Thu nhập khác" },
-  {
-    value: BankReceiptPurpose.INTER_BRANCH_IN,
-    label: "Nhận tiền từ chi nhánh khác (GĐ4)",
-    disabled: true,
-  },
-] as const;
+];
+
+// Defensive display-only labels for the dropped purposes — so a receipt saved
+// before this change (or created directly via API) still shows a real label
+// instead of no radio checked when merely viewed/edited, without making these
+// purposes choosable again for new saves.
+const LEGACY_RECEIPT_PURPOSE_LABELS: Partial<Record<BankReceiptPurpose, string>> = {
+  [BankReceiptPurpose.OTHER_INCOME]: "Thu nhập khác",
+  [BankReceiptPurpose.INTER_BRANCH_IN]: "Nhận tiền từ chi nhánh khác (GĐ4)",
+};
 
 function toIsoDate(d: Date): string {
   const y = d.getFullYear();
@@ -157,6 +163,17 @@ export function DepositReceiptVoucherDialog({
   const isDebtCollection = purpose === BankReceiptPurpose.DEBT_COLLECTION;
   const debtFieldsLocked = isDebtCollection && !readOnly;
 
+  // Append the current purpose as a display-only option when it's one of the
+  // dropped legacy values (see LEGACY_RECEIPT_PURPOSE_LABELS) — keeps an
+  // existing saved receipt from showing no radio checked on view/edit.
+  const purposeOptions = useMemo(() => {
+    if (RECEIPT_PURPOSE_OPTIONS.some((o) => o.value === purpose)) return RECEIPT_PURPOSE_OPTIONS;
+    return [
+      ...RECEIPT_PURPOSE_OPTIONS,
+      { value: purpose, label: LEGACY_RECEIPT_PURPOSE_LABELS[purpose] ?? purpose },
+    ];
+  }, [purpose]);
+
   const resetKey = `deposit-receipt-${mode}-${initial?.id ?? "new"}`;
 
   useEffect(() => {
@@ -228,6 +245,24 @@ export function DepositReceiptVoucherDialog({
       cancelled = true;
     };
   }, [open, mode, generateDocNumber]);
+
+  // Default "Nhân viên thu" to whoever is logged in — still a normal editable
+  // field, the cashier can pick someone else via the lookup/search as before.
+  useEffect(() => {
+    if (!open || mode !== TreasuryVoucherDialogModeEnum.CREATE) return;
+    const userId = getStoredUserId();
+    if (!userId) return;
+    let cancelled = false;
+    void fetchStaffById(userId).then((staff) => {
+      if (cancelled || !staff) return;
+      setStaffId(staff.id);
+      setEmployeeCode(staff.code);
+      setEmployeeName(staff.name);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, mode, fetchStaffById]);
 
   useEffect(() => {
     if (!open) setEntitySearchTarget(null);
@@ -506,7 +541,7 @@ export function DepositReceiptVoucherDialog({
               <RadioGroup
                 name="deposit-receipt-purpose"
                 value={purpose}
-                options={RECEIPT_PURPOSE_OPTIONS}
+                options={purposeOptions}
                 onChange={handlePurposeChange}
                 readOnly={readOnly}
               />

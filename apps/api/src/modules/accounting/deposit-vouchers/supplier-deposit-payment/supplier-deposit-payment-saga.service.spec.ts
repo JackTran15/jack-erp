@@ -9,6 +9,7 @@ import { BankPaymentPurpose, BankPaymentReferenceType } from '../enums';
 import { CashPaymentPurpose } from '../../cash-vouchers/enums';
 import { DebtCollectionSagaStatus } from '../../cash-vouchers/enums';
 import { SupplierDebtStatus } from '../../../inventory/supplier-debt/supplier-debt.entity';
+import { SupplierDebtPaymentEntity } from '../../../inventory/supplier-debt/supplier-debt-payment.entity';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 
 const actor: ActorContext = {
@@ -121,6 +122,15 @@ describe('SupplierDepositPaymentSagaService', () => {
     expect(debt.remainingAmount).toBe(0);
     expect(result.status).toBe(DebtCollectionSagaStatus.COMPLETED);
     expect(result.bankPaymentId).toBe('bp-1');
+
+    // Regression: `supplier_debt_payments.cash_payment_id` FKs to `cash_payments`
+    // only. Writing the DEPOSIT leg's bank_payment id there violates that FK in
+    // Postgres (this mocked manager doesn't enforce it, which is exactly why the
+    // bug shipped) — a deposit-only saga must leave it unset.
+    const instalmentCall = manager.create.mock.calls.find(
+      (call: unknown[]) => call[0] === SupplierDebtPaymentEntity,
+    );
+    expect((instalmentCall?.[1] as { cashPaymentId?: string })?.cashPaymentId).toBeUndefined();
   });
 
   it('BR-BUY-01: rejects when the allocation exceeds the remaining payable', async () => {

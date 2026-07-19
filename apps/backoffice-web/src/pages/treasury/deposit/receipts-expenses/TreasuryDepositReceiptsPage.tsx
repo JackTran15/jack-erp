@@ -27,6 +27,10 @@ import {
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
+import {
+  DepositTabBar,
+  DepositTabIdEnum,
+} from "../../../../components/document/depositTabs";
 import { BaseDataTable } from "../../../../components/table/BaseDataTable";
 import { ConfirmActionModal } from "../../../../components/table/ConfirmActionModal";
 import { PaginationControls } from "../../../../components/table/PaginationControls";
@@ -51,6 +55,8 @@ import {
   useBankReceiptsList,
 } from "../../../../hooks/treasury/use-bank-receipts";
 import { useSupplierDepositPaymentMutation } from "../../../../hooks/treasury/use-supplier-deposit-payment";
+import { useFundSwapMutation } from "../../../../hooks/treasury/use-fund-swap";
+import { useCreateDepositTransfer } from "../../../../hooks/treasury/use-deposit-transfers";
 import { CashVoucherCategoryDirection } from "../../cash-vouchers.types";
 import {
   DepositPaymentVoucherDialog,
@@ -97,9 +103,12 @@ function dialogKindFromItem(item: ReceiptDepositListItem): ReceiptDepositVoucher
 
 export function TreasuryDepositReceiptsPage() {
   const { data: accounts = [] } = useDepositAccounts();
+  // "" = Tất cả quỹ của chi nhánh (mặc định) — BE bỏ qua filter khi param vắng mặt.
   const [depositAccountId, setDepositAccountIdState] = useState("");
-  const effectiveAccountId =
-    depositAccountId || accounts.find((a) => a.isDefault)?.id || accounts[0]?.id || "";
+  const accountsById = useMemo(
+    () => new Map(accounts.map((a) => [a.id, a])),
+    [accounts],
+  );
 
   const [period, setPeriod] = useState<PeriodValue>(() => ({
     preset: "this_month",
@@ -123,18 +132,17 @@ export function TreasuryDepositReceiptsPage() {
 
   const listQuery = useMemo(
     () => ({
-      depositAccountId: effectiveAccountId || undefined,
+      depositAccountId: depositAccountId || undefined,
       dateFrom: appliedPeriod.from,
       dateTo: appliedPeriod.to,
       page: 1,
       pageSize: 100,
     }),
-    [effectiveAccountId, appliedPeriod],
+    [depositAccountId, appliedPeriod],
   );
 
-  const enabled = Boolean(effectiveAccountId);
-  const receiptsList = useBankReceiptsList(listQuery, enabled);
-  const paymentsList = useBankPaymentsList(listQuery, enabled);
+  const receiptsList = useBankReceiptsList(listQuery, true);
+  const paymentsList = useBankPaymentsList(listQuery, true);
   const isLoading = receiptsList.isLoading || paymentsList.isLoading;
 
   const listRows = useMemo(
@@ -183,6 +191,8 @@ export function TreasuryDepositReceiptsPage() {
   const receiptMutations = useBankReceiptMutations();
   const paymentMutations = useBankPaymentMutations();
   const supplierDepositPayment = useSupplierDepositPaymentMutation();
+  const fundSwap = useFundSwapMutation();
+  const createDepositTransfer = useCreateDepositTransfer();
 
   const closeVoucherDialogs = useCallback(() => setVoucherDialog(null), []);
 
@@ -196,7 +206,10 @@ export function TreasuryDepositReceiptsPage() {
     setVoucherDialog({ kind: dialogKindFromItem(item), mode: TreasuryVoucherDialogModeEnum.EDIT });
   }, []);
 
-  const columns = useReceiptDepositTableColumns((row) => openViewVoucher(row));
+  const columns = useReceiptDepositTableColumns(
+    (row) => openViewVoucher(row),
+    accountsById,
+  );
 
   const columnFilterControl = useMemo(
     () => ({
@@ -247,11 +260,13 @@ export function TreasuryDepositReceiptsPage() {
   }, [selectedItem, voucherDialog, openEditVoucher]);
 
   const accountOptions: SingleSelectOption[] = useMemo(
-    () =>
-      accounts.map((a) => ({
+    () => [
+      { value: "", label: "Tất cả" },
+      ...accounts.map((a) => ({
         value: a.id,
         label: a.accountNo ? `${a.name} · ${a.accountNo}` : a.name,
       })),
+    ],
     [accounts],
   );
 
@@ -356,6 +371,17 @@ export function TreasuryDepositReceiptsPage() {
         if (result.kind === "supplierDepositPayment") {
           const saga = await supplierDepositPayment.mutateAsync(result.body);
           if (saga.bankPaymentId) setSelectedId(saga.bankPaymentId);
+        } else if (result.kind === "fundSwap") {
+          // useFundSwapMutation already invalidates the bank-payments/bank-receipts
+          // query keys this page's lists read from — no manual refetch needed.
+          await fundSwap.mutateAsync(result.body);
+        } else if (result.kind === "depositTransfer") {
+          // useCreateDepositTransfer only invalidates deposit-transfer/-dashboard/
+          // -ledger keys, not bank-payments — the INTER_BRANCH_OUT leg it creates
+          // needs an explicit refetch to show up in this page's list right away.
+          await createDepositTransfer.mutateAsync(result.body);
+          void receiptsList.refetch();
+          void paymentsList.refetch();
         } else {
           const body: CreateBankPaymentBody = result.body;
           if (voucherDialog?.mode === TreasuryVoucherDialogModeEnum.CREATE) {
@@ -371,7 +397,17 @@ export function TreasuryDepositReceiptsPage() {
         toast.error(e instanceof Error ? e.message : "Lưu phiếu chi thất bại.");
       }
     },
-    [voucherDialog, selectedId, paymentMutations, supplierDepositPayment, closeVoucherDialogs],
+    [
+      voucherDialog,
+      selectedId,
+      paymentMutations,
+      supplierDepositPayment,
+      fundSwap,
+      createDepositTransfer,
+      receiptsList,
+      paymentsList,
+      closeVoucherDialogs,
+    ],
   );
 
   const handleConfirmReverse = useCallback(async () => {
@@ -410,7 +446,8 @@ export function TreasuryDepositReceiptsPage() {
   return (
     <>
       <DocumentListShell
-        title="Tiền gửi"
+        title="Thu, chi tiền gửi"
+        tabs={<DepositTabBar activeId={DepositTabIdEnum.RECEIPTS_EXPENSES} />}
         toolbar={
           <div className="flex items-stretch">
             <DropdownMenu modal={false}>
@@ -452,7 +489,7 @@ export function TreasuryDepositReceiptsPage() {
               <span className="text-xs font-medium text-muted-foreground">Tài khoản tiền gửi</span>
               <SingleSelect
                 options={accountOptions}
-                value={effectiveAccountId}
+                value={depositAccountId}
                 onValueChange={setDepositAccountIdState}
                 placeholder="Chọn tài khoản"
                 className="w-64"

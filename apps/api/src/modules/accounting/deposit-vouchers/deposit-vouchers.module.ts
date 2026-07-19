@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentNumberingModule } from '../../document-numbering/document-numbering.module';
 import { DepositModule } from '../deposit/deposit.module';
 import { DepositAccountEntity } from '../deposit/deposit-account.entity';
+import { BankEntity } from '../deposit/bank.entity';
 import { BranchEntity } from '../../branch/branch.entity';
 import { PaymentAccountsModule } from '../payment-accounts/payment-accounts.module';
 import { CashModule } from '../cash/cash.module';
@@ -42,6 +43,7 @@ import { DepositDashboardController } from './deposit-dashboard/deposit-dashboar
       DepositTransferEntity,
       DepositAccountEntity,
       BranchEntity,
+      BankEntity,
     ]),
     DepositModule,
     DocumentNumberingModule,

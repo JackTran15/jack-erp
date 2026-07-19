@@ -1691,3 +1691,70 @@ flowchart LR
   DFB05 --> DFB06["DFB-06 E2E"]
 ```
 
+
+### EPIC-19072026 Deposit Screens — Branch Scope & MISA Parity
+
+Ba màn Tiền gửi bỏ ràng buộc "phải chọn một quỹ", mặc định xem toàn bộ quỹ của chi nhánh; thêm sub-nav chuyển nhanh giữa 3 màn; rút nhóm sidebar TIỀN GỬI còn 3 mục vận hành.
+
+| Ticket | Mô tả |
+| ------ | ----- |
+| [TKT-DEP-01](./tickets/TKT-DEP-01-deposit-ledger-branch-scope.md) | `GET /deposit-ledger` bỏ bắt buộc `depositAccountId`; số dư luỹ kế gộp chi nhánh, tách 2 chân chuyển quỹ nội bộ (ticket BE duy nhất) |
+| [TKT-DEP-02](./tickets/TKT-DEP-02-openapi-snapshot.md) | OpenAPI regen + snapshot |
+| [TKT-DEP-03](./tickets/TKT-DEP-03-fe-deposit-tabbar.md) | FE `DepositTabBar` — tái dùng `PageTabBar` + prop `tabs` của `DocumentListShell` |
+| [TKT-DEP-04](./tickets/TKT-DEP-04-fe-receipts-recon-all-accounts.md) | FE Thu-chi & Đối chiếu bỏ gate chọn quỹ, thêm `Tất cả`, thêm cột Số tài khoản (BE đã sẵn sàng) |
+| [TKT-DEP-05](./tickets/TKT-DEP-05-fe-ledger-all-accounts.md) | FE Sổ chi tiết chế độ Tất cả |
+| [TKT-DEP-06](./tickets/TKT-DEP-06-navconfig-regroup.md) | navConfig: TIỀN GỬI còn 3 mục, 6 mục kia chuyển nhóm (giữ route) |
+| [TKT-DEP-07](./tickets/TKT-DEP-07-e2e-test-plan.md) | E2E + checklist QA thủ công |
+
+```mermaid
+flowchart LR
+  DEP01["DEP-01 ledger branch scope"] --> DEP02["DEP-02 openapi"]
+  DEP02 --> DEP05["DEP-05 FE sổ chi tiết"]
+  DEP03["DEP-03 FE tab bar"] --> DEP04["DEP-04 FE thu-chi + đối chiếu"]
+  DEP03 --> DEP05
+  DEP04 --> DEP07["DEP-07 E2E"]
+  DEP05 --> DEP07
+  DEP06["DEP-06 navConfig"] --> DEP07
+```
+
+### EPIC-19072026 Phiếu chi tiền gửi — Hợp nhất theo Mục đích chi (MISA parity)
+
+"Thêm mới Phiếu chi" tiền gửi hợp nhất 3 luồng đã tồn tại rời rạc (chuyển quỹ, chuyển liên chi nhánh, trả nợ NCC) vào một dropdown "Mục đích chi"/"Hình thức chi" 2 cấp, khớp UI MISA. Không entity/migration/endpoint mới — thuần orchestration FE lên 3 saga BE đã có sẵn và đã verify chạy đúng.
+
+| Ticket | Mô tả |
+| ------ | ----- |
+| [TKT-CHI-01](./tickets/TKT-CHI-01-purpose-constants.md) | Constants Mục đích chi/Hình thức chi (tiền gửi) — thêm mới, không đụng constants của Phiếu chi tiền mặt |
+| [TKT-CHI-02](./tickets/TKT-CHI-02-dialog-restructure.md) | DepositPaymentVoucherDialog — UI 2 cấp + nhúng trực tiếp field chuyển quỹ/chuyển liên chi nhánh (ticket lớn nhất) |
+| [TKT-CHI-03](./tickets/TKT-CHI-03-page-wiring.md) | TreasuryDepositReceiptsPage — điều hướng 2 kind kết quả lưu mới tới đúng mutation (bắt buộc đi cùng CHI-02) |
+| [TKT-CHI-04](./tickets/TKT-CHI-04-debt-mode-polish.md) | Trả nợ — polish nhãn "Nhà cung cấp" + khoá Nhân viên chi khớp ảnh MISA |
+| [TKT-CHI-05](./tickets/TKT-CHI-05-manual-test-plan.md) | Checklist QA thủ công 13 bước trên erp_dev thật |
+
+```mermaid
+flowchart LR
+  T1["CHI-01 Constants"] --> T2["CHI-02 Dialog restructure"]
+  T2 --> T3["CHI-03 Page wiring"]
+  T2 --> T4["CHI-04 Trả nợ polish"]
+  T3 --> T5["CHI-05 Manual test plan"]
+  T4 --> T5
+```
+
+### EPIC-19072026 Chuyển quỹ — cho phép bỏ tự động sinh phiếu thu tiền mặt
+
+Checkbox "Tự động sinh phiếu thu tiền ngay sau khi chi" (chiều DEPOSIT_TO_CASH) trở thành tuỳ chọn thật thay vì luôn-tick-disabled — bỏ tick chỉ rút quỹ tiền gửi, tiền treo ở TK 113, không tự sinh phiếu thu tiền mặt (đúng cách MISA làm, không cần màn xác nhận riêng). Áp dụng đồng bộ ở cả 2 điểm vào FE cùng gọi `/fund-swaps`.
+
+| Ticket | Mô tả |
+| ------ | ----- |
+| [TKT-FSW-01](./tickets/TKT-FSW-01-service-dto.md) | `CreateFundSwapDto` + `FundSwapsService` — `autoCreateReceipt` optional, validate CASH_TO_DEPOSIT không áp dụng |
+| [TKT-FSW-02](./tickets/TKT-FSW-02-openapi-fe-type.md) | OpenAPI regen + `CreateFundSwapBody` FE |
+| [TKT-FSW-03](./tickets/TKT-FSW-03-payment-dialog-checkbox.md) | `DepositPaymentVoucherDialog` — checkbox thật (sub-mode Chuyển tiền gửi thành tiền mặt) |
+| [TKT-FSW-04](./tickets/TKT-FSW-04-fund-swap-dialog-checkbox.md) | `FundSwapDialog` độc lập — thêm checkbox mới (trước đây không có) |
+| [TKT-FSW-05](./tickets/TKT-FSW-05-test-plan.md) | Checklist QA thủ công 10 bước + validate lỗi qua curl |
+
+```mermaid
+flowchart LR
+  T1["FSW-01 DTO+Service"] --> T2["FSW-02 OpenAPI+FE type"]
+  T2 --> T3["FSW-03 Payment dialog"]
+  T2 --> T4["FSW-04 FundSwapDialog"]
+  T3 --> T5["FSW-05 Test plan"]
+  T4 --> T5
+```

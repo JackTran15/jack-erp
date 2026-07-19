@@ -26,6 +26,8 @@ export class AccountBalanceDto {
   @ApiProperty() name: string;
   @ApiProperty() type: string;
   @ApiProperty() balance: string;
+  @ApiProperty() bankName: string;
+  @ApiProperty() accountNo: string;
 }
 
 export class BranchBalanceDto {

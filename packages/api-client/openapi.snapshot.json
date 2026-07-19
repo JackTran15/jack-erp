@@ -9522,9 +9522,9 @@
         "parameters": [
           {
             "name": "depositAccountId",
-            "required": true,
+            "required": false,
             "in": "query",
-            "description": "Deposit account to show the ledger for (BR-LEDG-03: one account)",
+            "description": "Deposit account to show the ledger for. Omit to include every ACTIVE deposit account of the branch (BR-LEDG-03).",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -9600,9 +9600,9 @@
         "parameters": [
           {
             "name": "depositAccountId",
-            "required": true,
+            "required": false,
             "in": "query",
-            "description": "Deposit account to show the ledger for (BR-LEDG-03: one account)",
+            "description": "Deposit account to show the ledger for. Omit to include every ACTIVE deposit account of the branch (BR-LEDG-03).",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -29369,6 +29369,10 @@
           "reason": {
             "type": "string",
             "maxLength": 500
+          },
+          "autoCreateReceipt": {
+            "type": "boolean",
+            "description": "DEPOSIT_TO_CASH only. False skips auto-creating the matching cash receipt —\nonly the deposit-withdrawal leg posts, parking the amount in TK 113 \"Tiền\nđang chuyển\" until the cashier creates a separate cash receipt themselves\nonce the money is actually counted (matches MISA; no pending/confirm state\nis tracked for this — unlike the GĐ4 inter-branch transfer). Omitted or\ntrue keeps the current atomic 2-leg behavior."
           }
         },
         "required": [
@@ -29469,13 +29473,21 @@
           },
           "balance": {
             "type": "string"
+          },
+          "bankName": {
+            "type": "string"
+          },
+          "accountNo": {
+            "type": "string"
           }
         },
         "required": [
           "accountId",
           "name",
           "type",
-          "balance"
+          "balance",
+          "bankName",
+          "accountNo"
         ]
       },
       "BranchBalanceDto": {
@@ -29551,6 +29563,29 @@
           "note": {
             "type": "string",
             "maxLength": 500
+          },
+          "partnerType": {
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ],
+            "type": "string"
+          },
+          "partnerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payeeName": {
+            "type": "string",
+            "description": "\"Người nhận\"",
+            "maxLength": 255
+          },
+          "paidBy": {
+            "type": "string",
+            "description": "Cashier who paid (thủ quỹ).",
+            "format": "uuid"
           }
         },
         "required": [

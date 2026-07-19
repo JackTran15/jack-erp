@@ -7,6 +7,8 @@ export interface DashboardAccountBalance {
   name: string;
   type: string;
   balance: string;
+  bankName: string;
+  accountNo: string;
 }
 
 export interface DashboardBranchBalance {

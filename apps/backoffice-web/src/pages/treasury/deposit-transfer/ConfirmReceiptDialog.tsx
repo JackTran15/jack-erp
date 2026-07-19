@@ -39,10 +39,10 @@ export function ConfirmReceiptDialog({ open, onOpenChange, transfer, fromBranchN
       onOpenChange={onOpenChange}
       title="Xác nhận nhận tiền"
       bodyStretch={false}
-      defaultWidth={460}
-      defaultHeight={280}
-      minWidth={380}
-      minHeight={260}
+      defaultWidth={520}
+      defaultHeight={380}
+      minWidth={420}
+      minHeight={320}
       footer={
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

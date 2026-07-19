@@ -166,7 +166,7 @@ export const navConfig: NavModule[] = [
     defaultPath: "/treasury/cash/ledger",
     flyout: {
       enabled: true,
-      splitLeft: ["treasury-cash", "treasury-deposit"],
+      splitLeft: ["treasury-cash", "treasury-deposit", "treasury-deposit-interbranch"],
       splitRight: ["treasury-offset", "treasury-compensation"],
     },
     views: [STORE_TYPE.SINGLE],
@@ -189,13 +189,13 @@ export const navConfig: NavModule[] = [
         children: [
           { to: "/treasury/deposit/receipts-expenses", label: "Thu, chi tiền gửi" },
           { to: "/treasury/deposit-reconciliation", label: "Đối chiếu tiền gửi" },
-          { to: "/treasury/deposit-period-lock", label: "Khóa sổ tiền gửi" },
-          { to: "/admin/deposit-accounts", label: "Tài khoản tiền gửi" },
-          {
-            to: "/admin/deposit-payment-policy",
-            label: "Chính sách thanh toán tiền gửi",
-          },
           { to: "/treasury/deposit/ledger", label: "Sổ chi tiết tiền gửi" },
+        ],
+      },
+      {
+        id: "treasury-deposit-interbranch",
+        label: "TIỀN GỬI LIÊN CHI NHÁNH",
+        children: [
           { to: "/treasury/deposit-transfers", label: "Chuyển liên chi nhánh" },
           { to: "/treasury/deposit-in-transit", label: "Tiền đang chuyển" },
           { to: "/treasury/deposit-dashboard", label: "Số dư toàn hệ thống" },
@@ -354,6 +354,16 @@ export const navConfig: NavModule[] = [
         children: [
           { to: "/admin/accounts", label: "Tài khoản kế toán" },
           { to: "/admin/banks", label: "Ngân hàng" },
+          {
+            to: "/admin/deposit-accounts",
+            label: "Tài khoản tiền gửi",
+            views: [STORE_TYPE.SINGLE],
+          },
+          {
+            to: "/admin/deposit-payment-policy",
+            label: "Chính sách thanh toán tiền gửi",
+            views: [STORE_TYPE.SINGLE],
+          },
           { to: "/admin/payment-accounts", label: "Tài khoản thanh toán" },
           { to: "/admin/payables", label: "Phải trả" },
           { to: "/admin/receivables", label: "Phải thu" },
@@ -412,6 +422,11 @@ export const navConfig: NavModule[] = [
         children: [
           { to: "/setup", label: "Thiết lập chung" },
           { to: "/settings/document-numbering", label: "Đánh số chứng từ", views: [STORE_TYPE.SINGLE] },
+          {
+            to: "/treasury/deposit-period-lock",
+            label: "Khóa sổ tiền gửi",
+            views: [STORE_TYPE.SINGLE],
+          },
           {
             to: "/role-management",
             label: "Quản lý vai trò",

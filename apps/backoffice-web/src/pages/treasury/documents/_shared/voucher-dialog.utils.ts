@@ -17,6 +17,15 @@ export function voucherLineTotal(lines: { amount: number }[]): number {
   return lines.reduce((s, l) => s + (Number(l.amount) || 0), 0);
 }
 
+/** "BANK - Name - STK" — distinguishes deposit accounts sharing the same bank in a picker. */
+export function formatDepositAccountLabel(account: {
+  bankName: string;
+  name: string;
+  accountNo: string;
+}): string {
+  return `${account.bankName} - ${account.name} - ${account.accountNo}`;
+}
+
 import type { CashVoucherPartnerType } from "../../cash-vouchers.types";
 import {
   lookupTypeToPartnerType,

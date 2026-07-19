@@ -362,7 +362,10 @@ export class SupplierDepositPaymentSagaService {
         : SupplierDebtPaymentMethod.CASH,
       staffId: actor.userId,
       paidAt: new Date(),
-      cashPaymentId: saga.bankPaymentId ?? saga.cashPaymentId,
+      // `cash_payment_id` FKs to `cash_payments` only — a deposit leg's voucher lives
+      // in `bank_payments`, a different table, so it can never be written here. Left
+      // null for a deposit-only saga (there is no cash_payments row to point at).
+      cashPaymentId: saga.cashPaymentId,
     });
     return manager.save(instalment);
   }

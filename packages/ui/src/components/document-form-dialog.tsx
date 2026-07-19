@@ -122,7 +122,7 @@ export function DocumentFormDialog({
         ) : null}
 
         {!collapsed ? (
-          <div className="shrink-0 px-2 pt-2">
+          <div className="max-h-[45%] shrink-0 overflow-y-auto px-2 pt-2">
             {headerContent ? (
               headerContent
             ) : (

@@ -12,7 +12,14 @@ import { DepositFundResolverService } from '../../deposit/deposit-fund-resolver.
 import { CashFundResolverService } from '../../cash/cash-fund-resolver.service';
 import { BankPaymentsService } from '../bank-payments/bank-payments.service';
 import { BankReceiptsService } from '../bank-receipts/bank-receipts.service';
-import { BankPaymentPurpose, BankPaymentReferenceType, BankReceiptPurpose, BankReceiptReferenceType } from '../enums';
+import { PartnerResolverService } from '../../cash-vouchers/shared/partner-resolver.service';
+import {
+  BankPaymentPurpose,
+  BankPaymentReferenceType,
+  BankReceiptPurpose,
+  BankReceiptReferenceType,
+  BankVoucherPartnerType,
+} from '../enums';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 
 const actorA: ActorContext = {
@@ -97,6 +104,9 @@ async function setup(opts: { existingTransfer?: DepositTransferEntity | null; fi
   const cashFundResolver = {
     resolveCoaAccountIdByCode: jest.fn().mockResolvedValue('coa-113'),
   };
+  const partnerResolver = {
+    resolve: jest.fn().mockResolvedValue(null),
+  };
 
   const module: TestingModule = await Test.createTestingModule({
     providers: [
@@ -107,6 +117,7 @@ async function setup(opts: { existingTransfer?: DepositTransferEntity | null; fi
       { provide: BankReceiptsService, useValue: bankReceipts },
       { provide: DepositFundResolverService, useValue: depositFundResolver },
       { provide: CashFundResolverService, useValue: cashFundResolver },
+      { provide: PartnerResolverService, useValue: partnerResolver },
     ],
   }).compile();
 
@@ -119,6 +130,7 @@ async function setup(opts: { existingTransfer?: DepositTransferEntity | null; fi
     bankReceipts,
     depositFundResolver,
     cashFundResolver,
+    partnerResolver,
   };
 }
 
@@ -155,6 +167,40 @@ describe('DepositTransferService', () => {
         }),
       );
       expect(result).toBeDefined();
+    });
+
+    it('resolves the partner and threads partnerId/payeeName/paidBy onto the bank_payment leg', async () => {
+      const { service, manager, bankPayments, partnerResolver } = await setup();
+      partnerResolver.resolve.mockResolvedValue({ name: 'Chi nhánh Huế', address: '123 Lê Lợi' });
+
+      await service.create(
+        {
+          ...baseDto,
+          partnerType: BankVoucherPartnerType.CUSTOMER,
+          partnerId: 'partner-1',
+          payeeName: 'Phan Thanh Hà',
+          paidBy: 'staff-1',
+        },
+        actorA,
+      );
+
+      expect(partnerResolver.resolve).toHaveBeenCalledWith(
+        manager,
+        BankVoucherPartnerType.CUSTOMER,
+        'partner-1',
+        'org-1',
+      );
+      expect(bankPayments.createAndPostInternal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          partnerType: BankVoucherPartnerType.CUSTOMER,
+          partnerId: 'partner-1',
+          partnerName: 'Chi nhánh Huế',
+          partnerAddress: '123 Lê Lợi',
+          payeeName: 'Phan Thanh Hà',
+          paidBy: 'staff-1',
+        }),
+        manager,
+      );
     });
 
     it('rejects when the source and destination branch are the same', async () => {

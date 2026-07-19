@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { DepositAccountStatus, DepositTransferStatus } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { BranchEntity } from '../../../branch/branch.entity';
+import { BankEntity } from '../../deposit/bank.entity';
 import { DepositAccountEntity } from '../../deposit/deposit-account.entity';
 import { DepositTransferEntity } from '../deposit-transfer/deposit-transfer.entity';
 import { InTransitQueryDto } from './dto/in-transit-query.dto';
@@ -37,6 +38,8 @@ export class DepositDashboardService {
     private readonly accounts: Repository<DepositAccountEntity>,
     @InjectRepository(BranchEntity)
     private readonly branches: Repository<BranchEntity>,
+    @InjectRepository(BankEntity)
+    private readonly banks: Repository<BankEntity>,
   ) {}
 
   /** BR-TRF-02 / R5 — every transfer still DANG_CHUYEN within the actor's branch scope. */
@@ -108,6 +111,7 @@ export class DepositDashboardService {
       branchesById.set(acc.branchId, list);
     }
     const branchNames = await this.branchNameMap([...branchesById.keys()]);
+    const bankNames = await this.bankNameMap([...new Set(accs.map((a) => a.bankId))]);
 
     const branches: BranchBalanceDto[] = [...branchesById.entries()].map(([branchId, list]) => {
       const accountRows: AccountBalanceDto[] = list.map((a) => ({
@@ -115,6 +119,8 @@ export class DepositDashboardService {
         name: a.name,
         type: a.type,
         balance: String(Number(a.balance)),
+        bankName: bankNames.get(a.bankId) ?? '',
+        accountNo: a.accountNo,
       }));
       return {
         branchId,
@@ -158,5 +164,11 @@ export class DepositDashboardService {
     if (accountIds.length === 0) return new Map();
     const rows = await this.accounts.find({ where: accountIds.map((id) => ({ id })) });
     return new Map(rows.map((a) => [a.id, a.name]));
+  }
+
+  private async bankNameMap(bankIds: string[]): Promise<Map<string, string>> {
+    if (bankIds.length === 0) return new Map();
+    const rows = await this.banks.find({ where: bankIds.map((id) => ({ id })) });
+    return new Map(rows.map((b) => [b.id, b.shortName || b.name]));
   }
 }

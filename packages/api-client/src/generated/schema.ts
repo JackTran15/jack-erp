@@ -9267,6 +9267,15 @@ export interface components {
              */
             feeAmount?: number;
             reason?: string;
+            /**
+             * @description DEPOSIT_TO_CASH only. False skips auto-creating the matching cash receipt —
+             *     only the deposit-withdrawal leg posts, parking the amount in TK 113 "Tiền
+             *     đang chuyển" until the cashier creates a separate cash receipt themselves
+             *     once the money is actually counted (matches MISA; no pending/confirm state
+             *     is tracked for this — unlike the GĐ4 inter-branch transfer). Omitted or
+             *     true keeps the current atomic 2-leg behavior.
+             */
+            autoCreateReceipt?: boolean;
         };
         InTransitRowDto: {
             id: string;
@@ -9292,6 +9301,8 @@ export interface components {
             name: string;
             type: string;
             balance: string;
+            bankName: string;
+            accountNo: string;
         };
         BranchBalanceDto: {
             branchId: string;
@@ -9319,6 +9330,17 @@ export interface components {
             toAccountId: string;
             amount: number;
             note?: string;
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            /** Format: uuid */
+            partnerId?: string;
+            /** @description "Người nhận" */
+            payeeName?: string;
+            /**
+             * Format: uuid
+             * @description Cashier who paid (thủ quỹ).
+             */
+            paidBy?: string;
         };
         DepositTransferEntity: {
             id: string;
@@ -17259,9 +17281,9 @@ export interface operations {
     };
     DepositLedgerController_getLedger: {
         parameters: {
-            query: {
-                /** @description Deposit account to show the ledger for (BR-LEDG-03: one account) */
-                depositAccountId: string;
+            query?: {
+                /** @description Deposit account to show the ledger for. Omit to include every ACTIVE deposit account of the branch (BR-LEDG-03). */
+                depositAccountId?: string;
                 dateFrom?: string;
                 dateTo?: string;
                 /** @description ILIKE on document number */
@@ -17287,9 +17309,9 @@ export interface operations {
     };
     DepositLedgerController_export: {
         parameters: {
-            query: {
-                /** @description Deposit account to show the ledger for (BR-LEDG-03: one account) */
-                depositAccountId: string;
+            query?: {
+                /** @description Deposit account to show the ledger for. Omit to include every ACTIVE deposit account of the branch (BR-LEDG-03). */
+                depositAccountId?: string;
                 dateFrom?: string;
                 dateTo?: string;
                 /** @description ILIKE on document number */

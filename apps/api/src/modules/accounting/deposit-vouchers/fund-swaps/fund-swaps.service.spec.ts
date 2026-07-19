@@ -65,6 +65,7 @@ async function setup() {
 
   return {
     service: module.get(FundSwapsService),
+    dataSource,
     manager,
     bankPayment,
     bankReceipt,
@@ -168,5 +169,63 @@ describe('FundSwapsService', () => {
     );
 
     await expect(service.swap(baseDto, actor)).rejects.toThrow('insufficient cash');
+  });
+
+  describe('autoCreateReceipt', () => {
+    it('false skips the cash-receipt leg entirely, returning only the bank payment', async () => {
+      const { service, bankPayment, cashReceipt } = await setup();
+
+      const result = await service.swap(
+        { ...baseDto, autoCreateReceipt: false },
+        actor,
+      );
+
+      expect(bankPayment.createAndPostInternal).toHaveBeenCalledTimes(1);
+      expect(cashReceipt.createAndPostInternal).not.toHaveBeenCalled();
+      expect(result.bankPaymentId).toBe('bp-1');
+      expect(result.cashReceiptId).toBeUndefined();
+    });
+
+    it('true behaves identically to the omitted-field regression case', async () => {
+      const { service, cashReceipt } = await setup();
+
+      const result = await service.swap(
+        { ...baseDto, autoCreateReceipt: true },
+        actor,
+      );
+
+      expect(cashReceipt.createAndPostInternal).toHaveBeenCalledTimes(1);
+      expect(result.cashReceiptId).toBe('cr-1');
+    });
+
+    it('the withdrawal fee still posts when the receipt leg is skipped', async () => {
+      const { service, bankPayment, cashReceipt } = await setup();
+
+      const result = await service.swap(
+        { ...baseDto, feeAmount: 11_000, autoCreateReceipt: false },
+        actor,
+      );
+
+      expect(bankPayment.createAndPostInternal).toHaveBeenCalledTimes(2);
+      expect(cashReceipt.createAndPostInternal).not.toHaveBeenCalled();
+      expect(result.bankFeePaymentId).toBe('bp-1');
+      expect(result.cashReceiptId).toBeUndefined();
+    });
+
+    it('rejects false combined with CASH_TO_DEPOSIT before opening a transaction', async () => {
+      const { service, dataSource } = await setup();
+
+      await expect(
+        service.swap(
+          {
+            ...baseDto,
+            direction: FundSwapDirection.CASH_TO_DEPOSIT,
+            autoCreateReceipt: false,
+          },
+          actor,
+        ),
+      ).rejects.toThrow(/only applies to DEPOSIT_TO_CASH/);
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
   });
 });
