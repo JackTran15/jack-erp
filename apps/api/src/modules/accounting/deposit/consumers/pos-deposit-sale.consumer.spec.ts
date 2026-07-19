@@ -171,6 +171,20 @@ describe('PosDepositSaleConsumer', () => {
     );
   });
 
+  it('forwards the payload depositAccountId as explicitDepositAccountId (disambiguates a shared COA)', async () => {
+    routing.resolveDepositTarget.mockResolvedValue({
+      fund: TargetFund.DEPOSIT,
+      depositAccountId: 'acc-shb',
+      feeRate: '0',
+      settlementDays: 0,
+    });
+    await consumer.handle(event({ depositAccountId: 'acc-shb' }));
+    expect(routing.resolveDepositTarget).toHaveBeenCalledWith(
+      expect.objectContaining({ explicitDepositAccountId: 'acc-shb' }),
+      expect.anything(),
+    );
+  });
+
   it('swallows a unique-violation replay (no-op)', async () => {
     routing.resolveDepositTarget.mockResolvedValue({
       fund: TargetFund.DEPOSIT,

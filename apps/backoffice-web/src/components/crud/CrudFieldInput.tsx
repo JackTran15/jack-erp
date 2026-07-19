@@ -13,6 +13,30 @@ const TREE_PICKER_CONFIG: Record<string, { entityKey: string; placeholder: strin
     entityKey: "provider-groups",
     placeholder: "Tìm theo mã hoặc tên nhóm NCC…",
   },
+  "deposit-accounts.bankId": {
+    entityKey: "banks",
+    placeholder: "Tìm theo mã hoặc tên ngân hàng…",
+  },
+  "deposit-accounts.accountId": {
+    entityKey: "accounts",
+    placeholder: "Tìm theo mã hoặc tên tài khoản kế toán…",
+  },
+  "deposit-payment-policy.depositAccountId": {
+    entityKey: "deposit-accounts",
+    placeholder: "Tìm theo mã hoặc tên tài khoản tiền gửi…",
+  },
+  "payment-accounts.accountId": {
+    entityKey: "accounts",
+    placeholder: "Tìm theo mã hoặc tên tài khoản kế toán…",
+  },
+  "payment-accounts.depositAccountId": {
+    entityKey: "deposit-accounts",
+    placeholder: "Tìm theo mã hoặc tên tài khoản tiền gửi…",
+  },
+  "payment-accounts.branchId": {
+    entityKey: "branches",
+    placeholder: "Để trống = áp dụng toàn hệ thống; tìm theo tên chi nhánh…",
+  },
 };
 
 function ControlRow({

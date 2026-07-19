@@ -185,25 +185,31 @@ export class CheckoutInvoiceService {
           )
         : undefined;
 
-    // Resolve the receiving COA account per payment line. The client picks a
-    // configured payment_accounts row (paymentAccountId) — e.g. which bank a
-    // transfer went into; the resolver validates it against the actor's branch +
-    // method. Results are index-aligned with dto.payments and cached by the chosen
-    // account (or method, for the unspecified default) to avoid duplicate lookups.
-    const resolvedAccountByKey = new Map<string, string>();
+    // Resolve the receiving COA account (and, when configured, the exact deposit
+    // fund) per payment line. The client picks a configured payment_accounts row
+    // (paymentAccountId) — e.g. which bank a transfer went into; the resolver
+    // validates it against the actor's branch + method. Results are index-aligned
+    // with dto.payments and cached by the chosen account (or method, for the
+    // unspecified default) to avoid duplicate lookups.
+    const resolvedAccountByKey = new Map<
+      string,
+      { accountId: string; depositAccountId?: string }
+    >();
     const resolvedAccountIds: string[] = [];
+    const resolvedDepositAccountIds: Array<string | undefined> = [];
     for (const p of dto.payments) {
       const cacheKey = p.paymentAccountId ?? `default:${p.paymentMethod}`;
-      let accountId = resolvedAccountByKey.get(cacheKey);
-      if (!accountId) {
-        accountId = await this.accountResolver.resolvePaymentAccount(
+      let resolved = resolvedAccountByKey.get(cacheKey);
+      if (!resolved) {
+        resolved = await this.accountResolver.resolvePaymentAccount(
           PAYMENT_METHOD_TO_ACCOUNT_METHOD[p.paymentMethod],
           actor,
           p.paymentAccountId,
         );
-        resolvedAccountByKey.set(cacheKey, accountId);
+        resolvedAccountByKey.set(cacheKey, resolved);
       }
-      resolvedAccountIds.push(accountId);
+      resolvedAccountIds.push(resolved.accountId);
+      resolvedDepositAccountIds.push(resolved.depositAccountId);
     }
 
     const newStatus =
@@ -247,6 +253,7 @@ export class CheckoutInvoiceService {
               paymentMethod: p.paymentMethod,
               amount: p.amount,
               accountId: resolvedAccountIds[idx],
+              depositAccountId: resolvedDepositAccountIds[idx],
               reference: p.reference,
             }),
           );
@@ -394,6 +401,7 @@ export class CheckoutInvoiceService {
           invoiceCode: realCode,
           paymentMethod: ncp.paymentMethod,
           resolvedAccountId: ncp.accountId,
+          depositAccountId: ncp.depositAccountId,
           contraAccountId: revenueAccountId,
           amount: Number(ncp.amount),
           docDate: now.toISOString().slice(0, 10),

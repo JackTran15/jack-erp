@@ -157,9 +157,10 @@ describe('CheckoutInvoiceService (event-driven)', () => {
         ),
       ),
       resolvePaymentAccount: jest.fn().mockImplementation((method) =>
-        Promise.resolve(
-          method === PaymentAccountMethod.CASH ? CASH_ACCOUNT : BANK_ACCOUNT,
-        ),
+        Promise.resolve({
+          accountId: method === PaymentAccountMethod.CASH ? CASH_ACCOUNT : BANK_ACCOUNT,
+          depositAccountId: undefined,
+        }),
       ),
     };
     sessionRepo              = { findOne: jest.fn().mockResolvedValue(null) };
@@ -435,6 +436,45 @@ describe('CheckoutInvoiceService (event-driven)', () => {
           ]),
           revenueAccountId: REVENUE_ACCOUNT,
         }),
+        actor,
+      );
+    });
+  });
+
+  describe('deposit-from-payment publishing (non-cash lines)', () => {
+    const bankDto = (): CheckoutInvoiceDto => ({
+      payments: [{ paymentMethod: 'bank_transfer' as any, amount: 200, paymentAccountId: 'pa-shb' }],
+    });
+
+    it('does not publish for a cash-only checkout', async () => {
+      await service.checkout('inv-1', cashPaymentDto(), actor);
+      expect(depositFromPaymentPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('forwards the resolved depositAccountId when the payment_accounts mapping named one', async () => {
+      accountResolver.resolvePaymentAccount.mockResolvedValue({
+        accountId: BANK_ACCOUNT,
+        depositAccountId: 'dep-shb',
+      });
+      await service.checkout('inv-1', bankDto(), actor);
+      expect(depositFromPaymentPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resolvedAccountId: BANK_ACCOUNT,
+          depositAccountId: 'dep-shb',
+          amount: 200,
+        }),
+        actor,
+      );
+    });
+
+    it('publishes with depositAccountId undefined when the mapping named no deposit fund', async () => {
+      accountResolver.resolvePaymentAccount.mockResolvedValue({
+        accountId: BANK_ACCOUNT,
+        depositAccountId: undefined,
+      });
+      await service.checkout('inv-1', bankDto(), actor);
+      expect(depositFromPaymentPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ depositAccountId: undefined }),
         actor,
       );
     });

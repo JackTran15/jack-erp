@@ -134,6 +134,10 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "accounting.bank.read", module: "accounting" },
   { key: "accounting.bank.update", module: "accounting" },
   { key: "accounting.bank.delete", module: "accounting" },
+  { key: "accounting.payment_account.create", module: "accounting" },
+  { key: "accounting.payment_account.read", module: "accounting" },
+  { key: "accounting.payment_account.update", module: "accounting" },
+  { key: "accounting.payment_account.delete", module: "accounting" },
 
   // Deposit vouchers (Phiếu thu/chi tiền gửi)
   { key: "accounting.bank_receipt.create", module: "accounting" },

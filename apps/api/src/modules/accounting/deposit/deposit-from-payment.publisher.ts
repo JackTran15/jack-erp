@@ -6,9 +6,12 @@ import { EventPublisher } from '../../events/event-publisher.service';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 
 /**
- * Payload for a non-cash POS payment line that may land in a deposit fund. The
- * consumer (PosDepositSaleConsumer) derives the fund from `resolvedAccountId` (the COA
- * already on invoice_payments) and posts the movement; routing is NOT done at checkout.
+ * Payload for a non-cash POS payment line that may land in a deposit fund. When
+ * `depositAccountId` is set (the payment line's `payment_accounts` mapping named
+ * one explicitly), the consumer credits that exact fund directly — no COA
+ * matching involved, so two funds sharing a COA are never ambiguous. When unset,
+ * the consumer falls back to deriving the fund from `resolvedAccountId` (the COA
+ * already on invoice_payments), same as before this field existed.
  */
 export interface DepositMovementFromPaymentPayload {
   invoiceId: string;
@@ -17,6 +20,8 @@ export interface DepositMovementFromPaymentPayload {
   paymentMethod: string;
   /** COA already resolved onto the payment line (invoice_payments.account_id). */
   resolvedAccountId: string;
+  /** Explicit deposit fund from the payment line's payment_accounts mapping, if any. */
+  depositAccountId?: string;
   contraAccountId: string;
   amount: number;
   docDate: string;
@@ -31,6 +36,7 @@ export interface DepositMovementFromPaymentInput {
   invoiceCode: string;
   paymentMethod: string;
   resolvedAccountId: string;
+  depositAccountId?: string;
   contraAccountId: string;
   amount: number;
   docDate: string;
@@ -62,6 +68,7 @@ export class DepositFromPaymentPublisher {
           invoiceCode: input.invoiceCode,
           paymentMethod: input.paymentMethod,
           resolvedAccountId: input.resolvedAccountId,
+          depositAccountId: input.depositAccountId,
           contraAccountId: input.contraAccountId,
           amount: Number(input.amount),
           docDate: input.docDate,

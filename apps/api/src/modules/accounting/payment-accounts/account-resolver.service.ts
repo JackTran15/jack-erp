@@ -86,15 +86,17 @@ export class AccountResolverService {
   }
 
   /**
-   * Resolve the receiving COA account for a POS payment. Mappings are org-wide
-   * (branch_id NULL) by default; a branch override (branch_id = actor.branchId)
-   * wins over the org-wide default for the same method.
+   * Resolve the receiving COA account (and, when configured, the exact deposit
+   * fund) for a POS payment. Mappings are org-wide (branch_id NULL) by default;
+   * a branch override (branch_id = actor.branchId) wins over the org-wide
+   * default for the same method.
    *
    * When `paymentAccountId` is given, the client is selecting a specific configured
    * account (e.g. which bank a transfer went into): the mapping is validated to
    * belong to the actor's org, be the org-wide default or the actor's own branch
-   * override, be active, and match `method`, then its COA account is returned.
-   * Clients never send a COA account id directly — only the whitelisted mapping id.
+   * override, be active, and match `method`, then its COA account (and linked
+   * deposit account, if any) is returned. Clients never send a COA account id
+   * directly — only the whitelisted mapping id.
    *
    * When omitted, it falls back to the single active mapping configured for the
    * method (branch override preferred, else org-wide default). It throws when none
@@ -105,7 +107,7 @@ export class AccountResolverService {
     method: PaymentAccountMethod,
     actor: ActorContext,
     paymentAccountId?: string,
-  ): Promise<string> {
+  ): Promise<{ accountId: string; depositAccountId?: string }> {
     if (!actor.branchId) {
       throw new BadRequestException(
         'Branch scope is required to resolve a payment account',
@@ -132,7 +134,7 @@ export class AccountResolverService {
           `Payment account ${paymentAccountId} is not configured for method ${method}`,
         );
       }
-      return row.accountId;
+      return { accountId: row.accountId, depositAccountId: row.depositAccountId };
     }
 
     const rows = await this.paymentAccountRepo.find({
@@ -160,6 +162,9 @@ export class AccountResolverService {
         `Multiple payment accounts configured for method ${method} (branch ${actor.branchId}); a paymentAccountId must be specified`,
       );
     }
-    return candidates[0].accountId;
+    return {
+      accountId: candidates[0].accountId,
+      depositAccountId: candidates[0].depositAccountId,
+    };
   }
 }

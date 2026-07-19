@@ -65,6 +65,7 @@ export class PosDepositSaleConsumer {
       invoiceCode,
       paymentMethod,
       resolvedAccountId,
+      depositAccountId: explicitDepositAccountId,
       contraAccountId,
       amount,
       docDate,
@@ -77,7 +78,14 @@ export class PosDepositSaleConsumer {
     const actor = { userId: actorId, organizationId, branchId, roles: [] };
 
     const target = await this.depositRouting.resolveDepositTarget(
-      { paymentMethod, cardType: null, resolvedAccountId, branchId, docDate },
+      {
+        paymentMethod,
+        cardType: null,
+        resolvedAccountId,
+        branchId,
+        docDate,
+        explicitDepositAccountId,
+      },
       actor,
     );
     if (target.fund !== TargetFund.DEPOSIT || !target.depositAccountId) {

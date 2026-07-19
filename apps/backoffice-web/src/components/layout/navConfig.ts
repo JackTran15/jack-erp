@@ -353,6 +353,8 @@ export const navConfig: NavModule[] = [
         label: "THU, CHI",
         children: [
           { to: "/admin/accounts", label: "Tài khoản kế toán" },
+          { to: "/admin/banks", label: "Ngân hàng" },
+          { to: "/admin/payment-accounts", label: "Tài khoản thanh toán" },
           { to: "/admin/payables", label: "Phải trả" },
           { to: "/admin/receivables", label: "Phải thu" },
           { to: "/admin/expenses", label: "Chi phí" },

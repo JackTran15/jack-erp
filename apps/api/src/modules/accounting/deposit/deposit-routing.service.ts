@@ -18,6 +18,13 @@ export interface ResolveDepositTargetInput {
   branchId: string;
   /** Invoice/doc date — policies are matched non-retroactively against this (BR-MAP-02). */
   docDate: string;
+  /**
+   * Deposit fund named explicitly by the payment line's `payment_accounts`
+   * mapping (`invoice_payments.deposit_account_id`). When set, it is used
+   * directly — no COA matching, so two funds sharing a COA are never
+   * ambiguous for a line that named one. Still validated ACTIVE + org/branch.
+   */
+  explicitDepositAccountId?: string;
 }
 
 /**
@@ -42,6 +49,33 @@ export class DepositRoutingService {
     input: ResolveDepositTargetInput,
     actor: ActorContext,
   ): Promise<ResolveDepositTargetResult> {
+    // 0. The payment line's own payment_accounts mapping already named an exact
+    // fund — use it directly. Still fetched + checked ACTIVE/org/branch so a
+    // deactivated or cross-branch account can't silently receive funds.
+    if (input.explicitDepositAccountId) {
+      const explicit = await this.accounts.findOne({
+        where: {
+          id: input.explicitDepositAccountId,
+          organizationId: actor.organizationId,
+          branchId: input.branchId,
+          status: DepositAccountStatus.ACTIVE,
+        },
+      });
+      if (!explicit) {
+        throw new BadRequestException(
+          `Deposit account ${input.explicitDepositAccountId} not found or inactive for branch ${input.branchId}`,
+        );
+      }
+      const policy = await this.matchPolicy(input, actor);
+      return {
+        fund: TargetFund.DEPOSIT,
+        depositAccountId: explicit.id,
+        feeRate: policy ? String(policy.feeRate) : '0',
+        feeBearer: policy?.feeBearer ?? null,
+        settlementDays: policy?.settlementDays ?? 0,
+      };
+    }
+
     // 1. COA → ACTIVE deposit funds in the same org+branch.
     const funds = await this.accounts.find({
       where: {
