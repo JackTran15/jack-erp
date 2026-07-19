@@ -40,7 +40,7 @@ import {
   CONSOLIDATED_PERMISSION,
   resolveBranchIds,
   statDateColumn,
-} from '../report-query.util';
+} from '../../report-core/report-query.util';
 import { ReportDefinition } from '../report-definition';
 
 const fullName = (u?: { firstName?: string; lastName?: string }): string | null => {

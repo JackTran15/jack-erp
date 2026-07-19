@@ -22,6 +22,9 @@ import { TreeSelectInput } from "../../../../../../../components/forms/TreeSelec
 import { RemoteSelectField } from "./RemoteSelectField/RemoteSelectField";
 import { ReportSelectField } from "./ReportSelectField/ReportSelectField";
 import { WarehouseSelectField } from "./WarehouseSelectField/WarehouseSelectField";
+import { CustomerSearchSelectField } from "./CustomerSearchSelectField/CustomerSearchSelectField";
+import { SupplierSearchSelectField } from "./SupplierSearchSelectField/SupplierSearchSelectField";
+import { StoreInChainOptionalField } from "./StoreInChainOptionalField/StoreInChainOptionalField";
 
 interface Props {
   line: REPORT_FILTERS_LINE;
@@ -31,6 +34,13 @@ interface Props {
 const WORK_SHIFT_OPTIONS: ReportFilterOption[] = [
   { value: "morning", label: "Ca sáng" },
   { value: "afternoon", label: "Ca chiều" },
+];
+
+// "Thống kê theo" (báo cáo #4) — Hàng hóa (theo SKU/biến thể) hoặc Mẫu mã (gộp
+// theo sản phẩm cha), xem docs/24-debt-reports-spec.md #4.
+const GROUP_BY_ITEM_OR_TEMPLATE_OPTIONS: ReportFilterOption[] = [
+  { value: "item", label: "Hàng hóa" },
+  { value: "productTemplate", label: "Mẫu mã" },
 ];
 
 function capitalize(text: string): string {
@@ -101,6 +111,61 @@ export function ReportFilterLine({ line }: Props) {
             }
           />
         );
+      // "Kết quả kinh doanh" — 2 kỳ song song (kỳ trước/kỳ hiện tại), mỗi kỳ
+      // tái dùng nguyên PeriodSelect + DateRangeField (2 dòng filter riêng,
+      // giống hệt cặp REPORT_PERIOD/RANGE_DATE, chỉ khác nhãn). Xem TKT-PRF-10.
+      case REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS:
+        return (
+          <PeriodSelect
+            value={filters[REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS] ?? ""}
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS, v)
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS_RANGE:
+        return (
+          <DateRangeField
+            value={
+              filters[REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS_RANGE] ?? {
+                fromDate: "",
+                toDate: "",
+              }
+            }
+            onChange={(v) =>
+              actions.setFilterValue(
+                REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS_RANGE,
+                v,
+              )
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT:
+        return (
+          <PeriodSelect
+            value={filters[REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT] ?? ""}
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT, v)
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE:
+        return (
+          <DateRangeField
+            value={
+              filters[REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE] ?? {
+                fromDate: "",
+                toDate: "",
+              }
+            }
+            onChange={(v) =>
+              actions.setFilterValue(
+                REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE,
+                v,
+              )
+            }
+          />
+        );
       case REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND:
         return (
           <StatisticByBranchCheckbox
@@ -143,6 +208,47 @@ export function ReportFilterLine({ line }: Props) {
             placeholder="Tất cả"
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.CUSTOMER, v)
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.CUSTOMER_SEARCH:
+        return (
+          <CustomerSearchSelectField
+            value={filters[REPORT_FILTERS_LINE.CUSTOMER_SEARCH] ?? null}
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.CUSTOMER_SEARCH, v)
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.SUPPLIER:
+        return (
+          <SupplierSearchSelectField
+            value={filters[REPORT_FILTERS_LINE.SUPPLIER] ?? null}
+            onChange={(v) => actions.setFilterValue(REPORT_FILTERS_LINE.SUPPLIER, v)}
+          />
+        );
+      case REPORT_FILTERS_LINE.STORE_IN_CHAIN_OPTIONAL:
+        return (
+          <StoreInChainOptionalField
+            value={filters[REPORT_FILTERS_LINE.STORE_IN_CHAIN_OPTIONAL] ?? ""}
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.STORE_IN_CHAIN_OPTIONAL, v)
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.STATISTIC_GROUP_BY_ITEM_OR_TEMPLATE:
+        return (
+          <ReportSelectField
+            value={
+              filters[REPORT_FILTERS_LINE.STATISTIC_GROUP_BY_ITEM_OR_TEMPLATE] ?? "item"
+            }
+            options={GROUP_BY_ITEM_OR_TEMPLATE_OPTIONS}
+            hidePlaceholder
+            onChange={(v) =>
+              actions.setFilterValue(
+                REPORT_FILTERS_LINE.STATISTIC_GROUP_BY_ITEM_OR_TEMPLATE,
+                v,
+              )
             }
           />
         );

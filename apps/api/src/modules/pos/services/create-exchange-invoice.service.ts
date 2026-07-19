@@ -45,17 +45,25 @@ export class CreateExchangeInvoiceService {
       throw new BadRequestException('EXCHANGE requires at least one newLine');
     }
 
-    // Validate return lines against the original SALE invoice.
+    // Validate return lines against the original SALE invoice, capturing each
+    // original line's costPrice snapshot so the returned (IN) leg reverses
+    // the SAME cost that was booked at sale time (see buildNewLineEntities
+    // for the new/OUT leg, which correctly uses the CURRENT purchase price).
+    const costPriceByOriginalItemId = new Map<string, number>();
     for (const line of dto.returnLines) {
       if (!line.originalInvoiceItemId) {
         throw new BadRequestException(
           'originalInvoiceItemId required on every returnLine',
         );
       }
-      await this.eligibility.assertLineEligible(
+      const originalItem = await this.eligibility.assertLineEligible(
         line.originalInvoiceItemId,
         line.quantity,
         actor,
+      );
+      costPriceByOriginalItemId.set(
+        line.originalInvoiceItemId,
+        Number(originalItem.costPrice ?? 0),
       );
     }
 
@@ -119,7 +127,7 @@ export class CreateExchangeInvoiceService {
           quantity: line.quantity,
           unitPrice: line.unitPrice,
           unitPriceDefault: line.unitPrice,
-          costPrice: 0,
+          costPrice: costPriceByOriginalItemId.get(line.originalInvoiceItemId!) ?? 0,
           lineDiscount: line.lineDiscount ?? 0,
           lineTotal: line.quantity * line.unitPrice - (line.lineDiscount ?? 0),
           direction: ItemDirection.IN,

@@ -19,6 +19,26 @@ export enum REPORT_FILTERS_LINE {
     STORE_SINGLE = 'store_single',
     PRODUCT_TYPE = 'product_type',
     CHECKBOX_ALLOCATE_COMBO = 'allocate_combo_revenue',
+
+    // === Công nợ ===
+    CUSTOMER_GROUP = 'customer_group',
+    // "Khách hàng" dạng select search (không có "Tất cả") — dùng cho báo cáo
+    // #2 (Chi tiết công nợ phải thu theo mặt hàng), khách hàng bắt buộc chọn.
+    CUSTOMER_SEARCH = 'customer_search',
+    SUPPLIER = 'supplier',
+    SUPPLIER_GROUP = 'supplier_group',
+    STATISTIC_GROUP_BY_ITEM_OR_TEMPLATE = 'statistic_group_by_item_or_template',
+    STORE_IN_CHAIN_OPTIONAL = 'store_in_chain_optional',
+
+    // === Lợi nhuận ===
+    // "Kết quả kinh doanh" so sánh 2 kỳ song song trong CÙNG 1 request — chưa
+    // có tiền lệ (mọi báo cáo khác chỉ có 1 cặp REPORT_PERIOD+RANGE_DATE). Mỗi
+    // kỳ tái dùng nguyên logic preset + range hiện có, chỉ nhân đôi filter line
+    // với nhãn riêng ("Kỳ trước"/"Kỳ hiện tại") — không cần component mới.
+    PERIOD_COMPARE_PREVIOUS = 'period_compare_previous',
+    PERIOD_COMPARE_PREVIOUS_RANGE = 'period_compare_previous_range',
+    PERIOD_COMPARE_CURRENT = 'period_compare_current',
+    PERIOD_COMPARE_CURRENT_RANGE = 'period_compare_current_range',
 }
 
 export const REPORT_FILTERS_LINE_METADATA = {
@@ -105,5 +125,53 @@ export const REPORT_FILTERS_LINE_METADATA = {
     },
     [REPORT_FILTERS_LINE.CHECKBOX_ALLOCATE_COMBO]: {
         backendField: 'allocateComboRevenue',
+    },
+    [REPORT_FILTERS_LINE.CUSTOMER_GROUP]: {
+        label: 'nhóm khách hàng',
+        backendField: 'customerGroupId',
+    },
+    [REPORT_FILTERS_LINE.CUSTOMER_SEARCH]: {
+        label: 'khách hàng',
+        isRequired: true,
+        backendField: 'customerId',
+    },
+    [REPORT_FILTERS_LINE.SUPPLIER]: {
+        label: 'nhà cung cấp',
+        isRequired: true,
+        backendField: 'supplierId',
+    },
+    [REPORT_FILTERS_LINE.SUPPLIER_GROUP]: {
+        label: 'nhóm nhà cung cấp',
+        backendField: 'supplierGroupId',
+    },
+    [REPORT_FILTERS_LINE.STATISTIC_GROUP_BY_ITEM_OR_TEMPLATE]: {
+        label: 'thống kê theo',
+        backendField: 'groupBy',
+    },
+    [REPORT_FILTERS_LINE.STORE_IN_CHAIN_OPTIONAL]: {
+        label: 'cửa hàng',
+        backendField: 'branchId',
+    },
+    [REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS]: {
+        label: 'Kỳ trước',
+        backendField: 'previousPeriod',
+    },
+    [REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS_RANGE]: {
+        label: 'Từ ngày',
+        backendField: 'previousFromDate',
+        label2: 'Đến ngày',
+        backendField2: 'previousToDate',
+    },
+    [REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT]: {
+        label: 'Kỳ hiện tại',
+        isRequired: true,
+        backendField: 'currentPeriod',
+    },
+    [REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE]: {
+        label: 'Từ ngày',
+        isRequired: true,
+        backendField: 'currentFromDate',
+        label2: 'Đến ngày',
+        backendField2: 'currentToDate',
     },
 }
