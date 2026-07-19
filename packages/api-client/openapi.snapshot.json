@@ -10391,6 +10391,76 @@
         ]
       }
     },
+    "/deposit-transfers/in-transit": {
+      "get": {
+        "operationId": "DepositDashboardController_inTransit",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "staleDays",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InTransitReportDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DepositDashboard"
+        ]
+      }
+    },
+    "/deposit/dashboard": {
+      "get": {
+        "operationId": "DepositDashboardController_dashboard",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgBalanceDashboardDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DepositDashboard"
+        ]
+      }
+    },
     "/deposit-transfers": {
       "post": {
         "operationId": "DepositTransferController_create",
@@ -10541,76 +10611,6 @@
         },
         "tags": [
           "DepositTransfer"
-        ]
-      }
-    },
-    "/deposit-transfers/in-transit": {
-      "get": {
-        "operationId": "DepositDashboardController_inTransit",
-        "parameters": [
-          {
-            "name": "branchId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "accountId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "staleDays",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 0,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InTransitReportDto"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "DepositDashboard"
-        ]
-      }
-    },
-    "/deposit/dashboard": {
-      "get": {
-        "operationId": "DepositDashboardController_dashboard",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrgBalanceDashboardDto"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "DepositDashboard"
         ]
       }
     },
@@ -29378,6 +29378,159 @@
           "docDate"
         ]
       },
+      "InTransitRowDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "fromBranchId": {
+            "type": "string"
+          },
+          "fromBranchName": {
+            "type": "string",
+            "nullable": true
+          },
+          "toBranchId": {
+            "type": "string"
+          },
+          "toBranchName": {
+            "type": "string",
+            "nullable": true
+          },
+          "fromAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "toAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "initiatedAt": {
+            "type": "string"
+          },
+          "initiatedBy": {
+            "type": "string"
+          },
+          "daysInTransit": {
+            "type": "number"
+          },
+          "isOverdue": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "amount",
+          "fromBranchId",
+          "toBranchId",
+          "initiatedAt",
+          "initiatedBy",
+          "daysInTransit",
+          "isOverdue"
+        ]
+      },
+      "InTransitReportDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "string"
+          },
+          "staleDays": {
+            "type": "number"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InTransitRowDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "staleDays",
+          "data"
+        ]
+      },
+      "AccountBalanceDto": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "balance": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "accountId",
+          "name",
+          "type",
+          "balance"
+        ]
+      },
+      "BranchBalanceDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string"
+          },
+          "branchName": {
+            "type": "string",
+            "nullable": true
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountBalanceDto"
+            }
+          },
+          "branchTotal": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "branchId",
+          "accounts",
+          "branchTotal"
+        ]
+      },
+      "OrgBalanceDashboardDto": {
+        "type": "object",
+        "properties": {
+          "branches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BranchBalanceDto"
+            }
+          },
+          "accountsTotal": {
+            "type": "string"
+          },
+          "inTransitTotal": {
+            "type": "string"
+          },
+          "grandTotal": {
+            "type": "string",
+            "description": "R5 — invariant across create/confirm: Σ(deposit_accounts.balance) + Σ(in-transit)."
+          }
+        },
+        "required": [
+          "branches",
+          "accountsTotal",
+          "inTransitTotal",
+          "grandTotal"
+        ]
+      },
       "CreateDepositTransferDto": {
         "type": "object",
         "properties": {
@@ -29532,159 +29685,6 @@
         },
         "required": [
           "reason"
-        ]
-      },
-      "InTransitRowDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "amount": {
-            "type": "string"
-          },
-          "fromBranchId": {
-            "type": "string"
-          },
-          "fromBranchName": {
-            "type": "string",
-            "nullable": true
-          },
-          "toBranchId": {
-            "type": "string"
-          },
-          "toBranchName": {
-            "type": "string",
-            "nullable": true
-          },
-          "fromAccountName": {
-            "type": "string",
-            "nullable": true
-          },
-          "toAccountName": {
-            "type": "string",
-            "nullable": true
-          },
-          "initiatedAt": {
-            "type": "string"
-          },
-          "initiatedBy": {
-            "type": "string"
-          },
-          "daysInTransit": {
-            "type": "number"
-          },
-          "isOverdue": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "id",
-          "amount",
-          "fromBranchId",
-          "toBranchId",
-          "initiatedAt",
-          "initiatedBy",
-          "daysInTransit",
-          "isOverdue"
-        ]
-      },
-      "InTransitReportDto": {
-        "type": "object",
-        "properties": {
-          "total": {
-            "type": "string"
-          },
-          "staleDays": {
-            "type": "number"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/InTransitRowDto"
-            }
-          }
-        },
-        "required": [
-          "total",
-          "staleDays",
-          "data"
-        ]
-      },
-      "AccountBalanceDto": {
-        "type": "object",
-        "properties": {
-          "accountId": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
-          },
-          "balance": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "accountId",
-          "name",
-          "type",
-          "balance"
-        ]
-      },
-      "BranchBalanceDto": {
-        "type": "object",
-        "properties": {
-          "branchId": {
-            "type": "string"
-          },
-          "branchName": {
-            "type": "string",
-            "nullable": true
-          },
-          "accounts": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AccountBalanceDto"
-            }
-          },
-          "branchTotal": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "branchId",
-          "accounts",
-          "branchTotal"
-        ]
-      },
-      "OrgBalanceDashboardDto": {
-        "type": "object",
-        "properties": {
-          "branches": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/BranchBalanceDto"
-            }
-          },
-          "accountsTotal": {
-            "type": "string"
-          },
-          "inTransitTotal": {
-            "type": "string"
-          },
-          "grandTotal": {
-            "type": "string",
-            "description": "R5 — invariant across create/confirm: Σ(deposit_accounts.balance) + Σ(in-transit)."
-          }
-        },
-        "required": [
-          "branches",
-          "accountsTotal",
-          "inTransitTotal",
-          "grandTotal"
         ]
       },
       "ReconcileDto": {
@@ -31660,6 +31660,9 @@
             "type": "number"
           },
           "accountId": {
+            "type": "string"
+          },
+          "depositAccountId": {
             "type": "string"
           },
           "reference": {

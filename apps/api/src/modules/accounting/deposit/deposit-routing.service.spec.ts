@@ -31,12 +31,12 @@ function fund(id: string): DepositAccountEntity {
 
 describe('DepositRoutingService', () => {
   let service: DepositRoutingService;
-  let accounts: { find: jest.Mock };
+  let accounts: { find: jest.Mock; findOne: jest.Mock };
   let policyRows: DepositPaymentPolicyEntity[];
   let policies: { createQueryBuilder: jest.Mock };
 
   beforeEach(() => {
-    accounts = { find: jest.fn() };
+    accounts = { find: jest.fn(), findOne: jest.fn() };
     policyRows = [];
     const qb: Record<string, jest.Mock> = {};
     ['where', 'andWhere'].forEach((m) => (qb[m] = jest.fn(() => qb)));
@@ -91,5 +91,51 @@ describe('DepositRoutingService', () => {
     const res = await service.resolveDepositTarget(input, actor);
     expect(res.feeRate).toBe('2');
     expect(res.settlementDays).toBe(3);
+  });
+
+  describe('explicitDepositAccountId (payment line named an exact fund)', () => {
+    it('uses it directly, even when the COA is shared by another fund (no ambiguity)', async () => {
+      accounts.findOne.mockResolvedValue(fund('acc-shb'));
+      const res = await service.resolveDepositTarget(
+        { ...input, explicitDepositAccountId: 'acc-shb' },
+        actor,
+      );
+      expect(res.fund).toBe(TargetFund.DEPOSIT);
+      expect(res.depositAccountId).toBe('acc-shb');
+      // Never falls through to the ambiguous-COA matching path.
+      expect(accounts.find).not.toHaveBeenCalled();
+      expect(accounts.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: 'acc-shb',
+            organizationId: actor.organizationId,
+            branchId: input.branchId,
+            status: DepositAccountStatus.ACTIVE,
+          }),
+        }),
+      );
+    });
+
+    it('still applies the fee/settlement policy for the method', async () => {
+      accounts.findOne.mockResolvedValue(fund('acc-shb'));
+      policyRows = [
+        { branchId: 'br1', cardType: null, depositAccountId: undefined, feeRate: 1.1, settlementDays: 0, effectiveFrom: '2026-01-01' } as DepositPaymentPolicyEntity,
+      ];
+      const res = await service.resolveDepositTarget(
+        { ...input, explicitDepositAccountId: 'acc-shb' },
+        actor,
+      );
+      expect(res.feeRate).toBe('1.1');
+    });
+
+    it('throws when the named fund is missing, inactive, or in another branch', async () => {
+      accounts.findOne.mockResolvedValue(null);
+      await expect(
+        service.resolveDepositTarget(
+          { ...input, explicitDepositAccountId: 'acc-deactivated' },
+          actor,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 });

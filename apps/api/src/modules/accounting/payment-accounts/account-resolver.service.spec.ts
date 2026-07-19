@@ -118,7 +118,7 @@ describe('AccountResolverService', () => {
         ]);
         await expect(
           service.resolvePaymentAccount(PaymentAccountMethod.CASH, actor),
-        ).resolves.toBe('cash-coa');
+        ).resolves.toEqual({ accountId: 'cash-coa', depositAccountId: undefined });
         expect(paymentAccountRepo.find).toHaveBeenCalledWith(
           expect.objectContaining({
             where: expect.objectContaining({
@@ -138,7 +138,7 @@ describe('AccountResolverService', () => {
         ]);
         await expect(
           service.resolvePaymentAccount(PaymentAccountMethod.CASH, actor),
-        ).resolves.toBe('branch-cash-coa');
+        ).resolves.toEqual({ accountId: 'branch-cash-coa', depositAccountId: undefined });
       });
 
       it('ignores an override that belongs to another branch', async () => {
@@ -148,7 +148,7 @@ describe('AccountResolverService', () => {
         ]);
         await expect(
           service.resolvePaymentAccount(PaymentAccountMethod.CASH, actor),
-        ).resolves.toBe('org-cash-coa');
+        ).resolves.toEqual({ accountId: 'org-cash-coa', depositAccountId: undefined });
       });
 
       it('throws when no mapping is configured for the method', async () => {
@@ -182,7 +182,7 @@ describe('AccountResolverService', () => {
             actor,
             'pa-tcb',
           ),
-        ).resolves.toBe('bank-tcb-coa');
+        ).resolves.toEqual({ accountId: 'bank-tcb-coa', depositAccountId: undefined });
         expect(paymentAccountRepo.findOne).toHaveBeenCalledWith(
           expect.objectContaining({
             where: expect.objectContaining({
@@ -207,7 +207,26 @@ describe('AccountResolverService', () => {
             actor,
             'pa-branch',
           ),
-        ).resolves.toBe('branch-bank-coa');
+        ).resolves.toEqual({ accountId: 'branch-bank-coa', depositAccountId: undefined });
+      });
+
+      it('returns the linked depositAccountId when the mapping names one', async () => {
+        paymentAccountRepo.findOne.mockResolvedValue({
+          branchId: 'branch-1',
+          accountId: 'branch-bank-coa',
+          depositAccountId: 'deposit-shb-1',
+          paymentMethod: PaymentAccountMethod.BANK_TRANSFER,
+        });
+        await expect(
+          service.resolvePaymentAccount(
+            PaymentAccountMethod.BANK_TRANSFER,
+            actor,
+            'pa-branch',
+          ),
+        ).resolves.toEqual({
+          accountId: 'branch-bank-coa',
+          depositAccountId: 'deposit-shb-1',
+        });
       });
 
       it('throws when the mapping is not found', async () => {

@@ -9,9 +9,9 @@ import type { PaymentAccountRow } from "@erp/pos/interfaces/account.interface";
 import type { CatalogEntry } from "@erp/pos/components/page-components/UiCatalog/ui-catalog.types";
 
 const ACCOUNTS: PaymentAccountRow[] = [
-  { id: "acc-cash", paymentMethod: "cash", label: "Tiền mặt", bankName: null, bankCode: null, accountNumber: null, sortOrder: 0 },
-  { id: "acc-vcb", paymentMethod: "bank_transfer", label: null, bankName: "Vietcombank", bankCode: "VCB", accountNumber: "0123456789", sortOrder: 1 },
-  { id: "acc-tcb", paymentMethod: "bank_transfer", label: null, bankName: "Techcombank", bankCode: "TCB", accountNumber: "0987654321", sortOrder: 2 },
+  { id: "acc-cash", paymentMethod: "cash", label: "Tiền mặt", depositAccountName: null, bankName: null, bankCode: null, accountNumber: null, sortOrder: 0 },
+  { id: "acc-vcb", paymentMethod: "bank_transfer", label: null, depositAccountName: "Quỹ VCB chính", bankName: "Vietcombank", bankCode: "VCB", accountNumber: "0123456789", sortOrder: 1 },
+  { id: "acc-tcb", paymentMethod: "bank_transfer", label: null, depositAccountName: "Quỹ TCB dự phòng", bankName: "Techcombank", bankCode: "TCB", accountNumber: "0987654321", sortOrder: 2 },
 ];
 
 export const PosPaymentMethodRowDemo = () => {
@@ -32,7 +32,7 @@ export const posPaymentMethodRowEntry: CatalogEntry = {
   category: "domain",
   importPath: "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow",
   description:
-    "Dòng phương thức thanh toán (chọn tài khoản tiền + nhập số tiền). PosPaymentMethodList điều phối nhiều dòng: thêm/xoá và tự khoá tài khoản đã dùng ở dòng khác.",
+    "Dòng phương thức thanh toán: select phương thức + ô số tiền ở hàng trên, select tài khoản nhận tiền (lọc theo phương thức) ở hàng dưới. PosPaymentMethodList điều phối nhiều dòng: thêm/xoá và tự khoá tài khoản đã dùng ở dòng khác.",
   props: [
     { name: "[List] lines", type: "PaymentLine[]", required: true, description: "Mảng dòng thanh toán (host là nguồn sự thật)." },
     { name: "[List] accounts", type: "readonly PaymentAccountRow[]", required: true, description: "Danh sách tài khoản nhận tiền đã cấu hình (payment_accounts)." },
@@ -41,13 +41,15 @@ export const posPaymentMethodRowEntry: CatalogEntry = {
     { name: "[List] amountInputRef", type: "Ref<HTMLInputElement>", required: false, description: "Ref tới ô số tiền của dòng đầu (focus phím tắt)." },
     { name: "[Row] line", type: "PaymentLine", required: true, description: "Dữ liệu dòng: { id, method, paymentAccountId, amount }." },
     { name: "[Row] variant", type: '"add" | "remove"', required: true, description: "Icon đầu dòng: thêm (+) hay xoá (×)." },
-    { name: "[Row] onChangeAccount / onChangeAmount", type: "(…) => void", required: true, description: "Cập nhật tài khoản / số tiền của dòng." },
+    { name: "[Row] onChangeMethod / onChangeAccount / onChangeAmount", type: "(…) => void", required: true, description: "Cập nhật phương thức / tài khoản / số tiền của dòng." },
     { name: "[Row] unavailableAccountIds", type: "ReadonlyArray<string>", required: false, description: "Các tài khoản bị khoá (đã dùng ở dòng khác)." },
   ],
   usageNotes: [
     "Thường dùng PosPaymentMethodList (orchestrator); PosPaymentMethodRow là dòng lẻ.",
     "Dùng createPaymentLine(method, amount?, paymentAccountId?) để khởi tạo dòng mới.",
     "Tài khoản đã chọn ở dòng khác sẽ bị disable; hết tài khoản thì nút thêm tự ẩn.",
+    "Select tài khoản chỉ hiện khi phương thức có quỹ tiền gửi (tiền mặt không có).",
+    "Đổi phương thức sẽ tự chọn tài khoản trống đầu tiên của phương thức đó.",
   ],
   code: `const [lines, setLines] = useState<PaymentLine[]>(() => [
   createPaymentLine(PaymentMethodEnum.CASH, 185000, "acc-cash"),

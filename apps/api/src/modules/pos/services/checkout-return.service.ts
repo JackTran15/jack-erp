@@ -252,11 +252,12 @@ export class CheckoutReturnService {
         const cacheKey = p.paymentAccountId ?? `default:${p.paymentMethod}`;
         let accountId = resolvedByKey.get(cacheKey);
         if (!accountId) {
-          accountId = await this.accountResolver.resolvePaymentAccount(
+          const resolved = await this.accountResolver.resolvePaymentAccount(
             PAYMENT_METHOD_TO_ACCOUNT_METHOD[p.paymentMethod],
             actor,
             p.paymentAccountId,
           );
+          accountId = resolved.accountId;
           resolvedByKey.set(cacheKey, accountId);
         }
         resolvedPaymentAccountIds.push(accountId);

@@ -18,6 +18,14 @@ export class InvoicePaymentEntity extends BaseEntity {
   @Column({ name: 'account_id', type: 'uuid', comment: 'GL account to debit for this payment line' })
   accountId: string;
 
+  @Column({
+    name: 'deposit_account_id',
+    type: 'uuid',
+    nullable: true,
+    comment: 'Deposit fund this line resolved to, when its payment_accounts mapping named one explicitly (disambiguates a shared COA)',
+  })
+  depositAccountId?: string;
+
   @Column({ type: 'varchar', length: 255, nullable: true, comment: 'External reference: card auth code, bank transfer ref, etc.' })
   reference?: string;
 }

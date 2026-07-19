@@ -3216,6 +3216,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/deposit-transfers/in-transit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DepositDashboardController_inTransit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deposit/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DepositDashboardController_dashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/deposit-transfers": {
         parameters: {
             query?: never;
@@ -3272,38 +3304,6 @@ export interface paths {
             cookie?: never;
         };
         get: operations["DepositTransferController_getById"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/deposit-transfers/in-transit": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["DepositDashboardController_inTransit"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/deposit/dashboard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["DepositDashboardController_dashboard"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9268,6 +9268,44 @@ export interface components {
             feeAmount?: number;
             reason?: string;
         };
+        InTransitRowDto: {
+            id: string;
+            amount: string;
+            fromBranchId: string;
+            fromBranchName?: string | null;
+            toBranchId: string;
+            toBranchName?: string | null;
+            fromAccountName?: string | null;
+            toAccountName?: string | null;
+            initiatedAt: string;
+            initiatedBy: string;
+            daysInTransit: number;
+            isOverdue: boolean;
+        };
+        InTransitReportDto: {
+            total: string;
+            staleDays: number;
+            data: components["schemas"]["InTransitRowDto"][];
+        };
+        AccountBalanceDto: {
+            accountId: string;
+            name: string;
+            type: string;
+            balance: string;
+        };
+        BranchBalanceDto: {
+            branchId: string;
+            branchName?: string | null;
+            accounts: components["schemas"]["AccountBalanceDto"][];
+            branchTotal: string;
+        };
+        OrgBalanceDashboardDto: {
+            branches: components["schemas"]["BranchBalanceDto"][];
+            accountsTotal: string;
+            inTransitTotal: string;
+            /** @description R5 — invariant across create/confirm: Σ(deposit_accounts.balance) + Σ(in-transit). */
+            grandTotal: string;
+        };
         CreateDepositTransferDto: {
             /**
              * Format: uuid
@@ -9319,44 +9357,6 @@ export interface components {
         };
         CancelDepositTransferDto: {
             reason: string;
-        };
-        InTransitRowDto: {
-            id: string;
-            amount: string;
-            fromBranchId: string;
-            fromBranchName?: string | null;
-            toBranchId: string;
-            toBranchName?: string | null;
-            fromAccountName?: string | null;
-            toAccountName?: string | null;
-            initiatedAt: string;
-            initiatedBy: string;
-            daysInTransit: number;
-            isOverdue: boolean;
-        };
-        InTransitReportDto: {
-            total: string;
-            staleDays: number;
-            data: components["schemas"]["InTransitRowDto"][];
-        };
-        AccountBalanceDto: {
-            accountId: string;
-            name: string;
-            type: string;
-            balance: string;
-        };
-        BranchBalanceDto: {
-            branchId: string;
-            branchName?: string | null;
-            accounts: components["schemas"]["AccountBalanceDto"][];
-            branchTotal: string;
-        };
-        OrgBalanceDashboardDto: {
-            branches: components["schemas"]["BranchBalanceDto"][];
-            accountsTotal: string;
-            inTransitTotal: string;
-            /** @description R5 — invariant across create/confirm: Σ(deposit_accounts.balance) + Σ(in-transit). */
-            grandTotal: string;
         };
         ReconcileDto: {
             /** Format: uuid */
@@ -9995,6 +9995,7 @@ export interface components {
             paymentMethod: "cash" | "bank_transfer" | "card";
             amount: number;
             accountId: string;
+            depositAccountId?: string;
             reference?: string;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
@@ -17722,6 +17723,48 @@ export interface operations {
             };
         };
     };
+    DepositDashboardController_inTransit: {
+        parameters: {
+            query?: {
+                branchId?: string;
+                accountId?: string;
+                staleDays?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InTransitReportDto"];
+                };
+            };
+        };
+    };
+    DepositDashboardController_dashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgBalanceDashboardDto"];
+                };
+            };
+        };
+    };
     DepositTransferController_list: {
         parameters: {
             query?: never;
@@ -17829,48 +17872,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DepositTransferEntity"];
-                };
-            };
-        };
-    };
-    DepositDashboardController_inTransit: {
-        parameters: {
-            query?: {
-                branchId?: string;
-                accountId?: string;
-                staleDays?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InTransitReportDto"];
-                };
-            };
-        };
-    };
-    DepositDashboardController_dashboard: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OrgBalanceDashboardDto"];
                 };
             };
         };
