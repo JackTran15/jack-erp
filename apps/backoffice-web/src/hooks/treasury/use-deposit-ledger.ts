@@ -44,6 +44,30 @@ export function useDepositLedger(
   });
 }
 
+/**
+ * Deposit ledger with per-column filters — `POST /v2/deposit-ledger/search`.
+ *
+ * Same `DepositLedgerResponse` as v1 (opening/closing balance, running balance
+ * and totals all still computed server-side over the identical row stream).
+ */
+export function useDepositLedgerSearch(
+  body: Record<string, unknown>,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: treasuryQueryKeys.depositLedgerSearch(body),
+    queryFn: async () => {
+      const { data } = await apiClient.post<DepositLedgerResponse>(
+        "/v2/deposit-ledger/search",
+        body,
+      );
+      return data;
+    },
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
 /** Download the deposit-ledger Excel export for the given account + date range. */
 export async function downloadDepositLedgerExport(
   params: DepositLedgerParams,

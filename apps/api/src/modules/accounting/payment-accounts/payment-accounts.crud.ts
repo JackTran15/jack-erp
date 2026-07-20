@@ -1,9 +1,17 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
-import { ScopingPolicy, DeletionPolicy, CrudEntityConfig } from '@erp/shared-interfaces';
+import { Repository, DataSource, In } from 'typeorm';
+import {
+  ScopingPolicy,
+  DeletionPolicy,
+  CrudEntityConfig,
+  PaginatedResponse,
+} from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
+import { PaginationQueryDto } from '../../crud/dto/pagination-query.dto';
 import { BaseCrudService, CrudOperation } from '../../crud/base-crud.service';
+import { BranchEntity } from '../../branch/branch.entity';
+import { AccountEntity } from '../coa/account.entity';
 import { DepositAccountEntity } from '../deposit/deposit-account.entity';
 import { PaymentAccountEntity } from './payment-account.entity';
 import { PaymentAccountMethod } from './enums';
@@ -33,9 +41,79 @@ export class PaymentAccountsCrudService extends BaseCrudService<
     protected readonly repository: Repository<PaymentAccountEntity>,
     @InjectRepository(DepositAccountEntity)
     private readonly depositAccountRepo: Repository<DepositAccountEntity>,
+    @InjectRepository(BranchEntity)
+    private readonly branchRepo: Repository<BranchEntity>,
+    @InjectRepository(AccountEntity)
+    private readonly accountRepo: Repository<AccountEntity>,
     protected readonly dataSource: DataSource,
   ) {
     super(dataSource);
+  }
+
+  /**
+   * Inline a human label for each FK so the admin grid shows names instead of
+   * raw UUIDs.
+   *
+   * Done here rather than via `configureListQuery` + `leftJoinAndSelect` (the
+   * usual CRUD recipe) because `payment_accounts.branch_id` is `varchar` while
+   * `branches.id` is `uuid` — a TypeORM relation join would emit
+   * `branch.id = entity.branch_id` and Postgres rejects `uuid = varchar`. The
+   * other hook, `transformListResults`, is synchronous and so cannot do the
+   * lookups either.
+   *
+   * One batched query per lookup table per page (never per row).
+   */
+  override async list(
+    query: PaginationQueryDto,
+    filters: Record<string, any>,
+    actor: ActorContext,
+  ): Promise<PaginatedResponse<PaymentAccountEntity>> {
+    const page = await super.list(query, filters, actor);
+    const rows = page.data;
+    if (rows.length === 0) return page;
+
+    const ids = <T,>(values: (T | null | undefined)[]): T[] => [
+      ...new Set(values.filter((v): v is T => Boolean(v))),
+    ];
+    const branchIds = ids(rows.map((r) => r.branchId));
+    const depositIds = ids(rows.map((r) => r.depositAccountId));
+    const accountIds = ids(rows.map((r) => r.accountId));
+
+    const [branches, deposits, accounts] = await Promise.all([
+      branchIds.length
+        ? this.branchRepo.find({ where: { id: In(branchIds) } })
+        : Promise.resolve([]),
+      depositIds.length
+        ? this.depositAccountRepo.find({ where: { id: In(depositIds) } })
+        : Promise.resolve([]),
+      accountIds.length
+        ? this.accountRepo.find({ where: { id: In(accountIds) } })
+        : Promise.resolve([]),
+    ]);
+
+    const branchById = new Map(branches.map((b) => [b.id, b]));
+    const depositById = new Map(deposits.map((d) => [d.id, d]));
+    const accountById = new Map(accounts.map((a) => [a.id, a]));
+
+    const data = rows.map((r) => {
+      const branch = r.branchId ? branchById.get(r.branchId) : undefined;
+      const deposit = r.depositAccountId ? depositById.get(r.depositAccountId) : undefined;
+      const account = accountById.get(r.accountId);
+      return {
+        ...r,
+        // '—' rather than '' so an org-wide mapping (branchId NULL) reads as
+        // deliberate instead of looking like missing data.
+        branchName: branch?.name ?? '—',
+        depositAccountName: deposit
+          ? deposit.accountNo
+            ? `${deposit.name} (${deposit.accountNo})`
+            : deposit.name
+          : '—',
+        accountName: account ? `${account.code} - ${account.name}` : '—',
+      };
+    }) as PaymentAccountEntity[];
+
+    return { ...page, data };
   }
 
   /**
@@ -128,17 +206,24 @@ export const PAYMENT_ACCOUNT_ENTITY_CONFIG: CrudEntityConfig = {
       required: true,
       enumValues: Object.values(PaymentAccountMethod),
     },
+    // ── Display-only labels (list) ──
+    { key: 'branchName', label: 'Chi nhánh', type: 'string', readOnly: true },
+    { key: 'depositAccountName', label: 'Tài khoản tiền gửi', type: 'string', readOnly: true },
+    { key: 'accountName', label: 'Tài khoản kế toán nhận tiền', type: 'string', readOnly: true },
+    // ── Form-only pickers (the raw FKs) ──
     {
       key: 'branchId',
       label: 'Chi nhánh (bắt buộc nếu có Tài khoản tiền gửi; để trống chỉ hợp lệ cho Tiền mặt)',
       type: 'relation',
       relationEntity: 'branches',
+      hideInList: true,
     },
     {
       key: 'depositAccountId',
       label: 'Tài khoản tiền gửi (bắt buộc — trừ Tiền mặt)',
       type: 'relation',
       relationEntity: 'deposit-accounts',
+      hideInList: true,
     },
     {
       key: 'accountId',
@@ -146,6 +231,7 @@ export const PAYMENT_ACCOUNT_ENTITY_CONFIG: CrudEntityConfig = {
       type: 'relation',
       relationEntity: 'accounts',
       required: true,
+      hideInList: true,
     },
     { key: 'label', label: 'Nhãn hiển thị', type: 'string' },
     { key: 'isActive', label: 'Hoạt động', type: 'boolean' },

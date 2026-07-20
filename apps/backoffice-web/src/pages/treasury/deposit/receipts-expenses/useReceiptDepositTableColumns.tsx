@@ -1,6 +1,5 @@
 import { formatMoneyInteger } from "@erp/ui";
 import { useMemo } from "react";
-import type { DepositAccount } from "@erp/shared-interfaces";
 import type { TableColumn } from "../../../../components/table/BaseDataTable";
 import {
   StatusBadge,
@@ -13,7 +12,10 @@ import {
 } from "../../ledger-cash/ledger-cash.constants";
 import { BANK_VOUCHER_STATUS_LABEL } from "../../bank-vouchers.labels";
 import { BankVoucherStatus } from "../../bank-vouchers.types";
-import { RECEIPT_DEPOSIT_DOCUMENT_TYPE_FILTER_OPTIONS } from "./receipt-deposit.constants";
+import {
+  RECEIPT_DEPOSIT_DOCUMENT_TYPE_FILTER_OPTIONS,
+  RECEIPT_DEPOSIT_STATUS_FILTER_OPTIONS,
+} from "./receipt-deposit.constants";
 import type { ReceiptDepositListItem } from "./receipt-deposit.types";
 import { receiptDepositDocumentTypeLabel } from "./receipt-deposit.utils";
 
@@ -26,14 +28,14 @@ const STATUS_BADGE_VARIANT: Record<BankVoucherStatus, StatusBadgeVariant> = {
 
 export function useReceiptDepositTableColumns(
   onOpenVoucher: (row: ReceiptDepositListItem) => void,
-  accountsById: Map<string, DepositAccount>,
 ) {
   return useMemo(
     (): TableColumn<ReceiptDepositListItem>[] => [
       {
-        key: "documentDate",
+        key: "docDate",
         label: "Ngày",
         width: 110,
+        filterKind: "date-range",
         render: (r) =>
           new Date(`${r.docDate}T12:00:00`).toLocaleDateString(
             "vi-VN",
@@ -41,7 +43,7 @@ export function useReceiptDepositTableColumns(
           ),
       },
       {
-        key: "voucherNo",
+        key: "documentNumber",
         label: "Số chứng từ",
         width: 130,
         render: (r) => (
@@ -58,7 +60,7 @@ export function useReceiptDepositTableColumns(
         ),
       },
       {
-        key: "documentTypeLabel",
+        key: "kind",
         label: "Loại chứng từ",
         width: 200,
         filterKind: "select",
@@ -69,6 +71,8 @@ export function useReceiptDepositTableColumns(
         key: "status",
         label: "Trạng thái",
         width: 120,
+        filterKind: "select",
+        filterOptions: RECEIPT_DEPOSIT_STATUS_FILTER_OPTIONS,
         render: (r) => (
           <StatusBadge variant={STATUS_BADGE_VARIANT[r.status]}>
             {BANK_VOUCHER_STATUS_LABEL[r.status]}
@@ -79,20 +83,21 @@ export function useReceiptDepositTableColumns(
         key: "totalAmount",
         label: "Tổng tiền",
         width: 130,
+        filterKind: "number-range",
         headerClassName: "text-right",
         className: TABLE_NUM_CLASS,
         render: (r) => formatMoneyInteger(r.totalAmount),
       },
       {
-        key: "account",
+        key: "accountLabel",
         label: "Số tài khoản",
         width: 200,
-        filterKind: "none",
-        render: (r) => {
-          const acc = accountsById.get(r.depositAccountId);
-          if (!acc) return "—";
-          return acc.accountNo ? `${acc.name} (${acc.accountNo})` : acc.name;
-        },
+        render: (r) =>
+          r.depositAccountName
+            ? r.depositAccountNo
+              ? `${r.depositAccountName} (${r.depositAccountNo})`
+              : r.depositAccountName
+            : "—",
       },
       {
         key: "counterparty",
@@ -107,6 +112,6 @@ export function useReceiptDepositTableColumns(
         render: (r) => r.reason,
       },
     ],
-    [onOpenVoucher, accountsById],
+    [onOpenVoucher],
   );
 }

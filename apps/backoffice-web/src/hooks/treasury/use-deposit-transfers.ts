@@ -47,6 +47,9 @@ function invalidateDepositTransferData(qc: ReturnType<typeof useQueryClient>) {
   void qc.invalidateQueries({ queryKey: ["deposit-dashboard"] });
   void qc.invalidateQueries({ queryKey: ["deposit-accounts"] });
   void qc.invalidateQueries({ queryKey: ["deposit-ledger"] });
+  // The INTER_BRANCH_OUT leg is a bank_payment, so it shows up in the merged
+  // receipts/expenses list — which used to need a manual refetch on that page.
+  void qc.invalidateQueries({ queryKey: ["deposit-vouchers"] });
 }
 
 export function useCreateDepositTransfer() {

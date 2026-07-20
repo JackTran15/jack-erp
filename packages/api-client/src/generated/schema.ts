@@ -2987,6 +2987,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/deposit-ledger/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search the deposit detail ledger with per-column filters */
+        post: operations["DepositLedgerV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/deposit-ledger": {
         parameters: {
             query?: never;
@@ -3029,6 +3046,23 @@ export interface paths {
         get: operations["DepositAuditController_list"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/deposit-vouchers/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search deposit receipts and payments as one list */
+        post: operations["DepositVoucherV2Controller_search_v2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3216,6 +3250,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/fund-swaps/{swapId}/legs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sibling vouchers of a swap, so a leg can link to its counterpart. */
+        get: operations["FundSwapsController_legs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/deposit-transfers/in-transit": {
         parameters: {
             query?: never;
@@ -3306,6 +3357,23 @@ export interface paths {
         get: operations["DepositTransferController_getById"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/deposit-recon/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search deposit movements for reconciliation */
+        post: operations["DepositReconV2Controller_search_v2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6691,7 +6759,7 @@ export interface components {
             reason?: string;
             staffId?: string;
             /** @enum {string} */
-            referenceType?: "INVOICE" | "INVOICE_DEBT" | "RECEIVABLE" | "MANUAL" | "REVERSAL";
+            referenceType?: "INVOICE" | "INVOICE_DEBT" | "RECEIVABLE" | "MANUAL" | "REVERSAL" | "FUND_SWAP";
             referenceId?: string;
             cashAccountId: string;
             contraAccountId: string;
@@ -6827,7 +6895,7 @@ export interface components {
             reason?: string;
             staffId?: string;
             /** @enum {string} */
-            referenceType?: "INVOICE_DEBT" | "GOODS_RECEIPT" | "EXPENSE" | "SALARY" | "REFUND" | "MANUAL" | "REVERSAL";
+            referenceType?: "INVOICE_DEBT" | "GOODS_RECEIPT" | "EXPENSE" | "SALARY" | "REFUND" | "MANUAL" | "REVERSAL" | "FUND_SWAP";
             referenceId?: string;
             cashAccountId: string;
             contraAccountId: string;
@@ -8894,6 +8962,105 @@ export interface components {
             /** @description UUID of the user who created this record. */
             createdBy: string;
         };
+        DepositLedgerSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /**
+             * Format: uuid
+             * @description Deposit account to show the ledger for. Omit to include every ACTIVE
+             *     deposit account of the branch (BR-LEDG-03).
+             */
+            depositAccountId?: string;
+            /**
+             * @description Reconciliation status.
+             * @enum {string}
+             */
+            reconStatus?: "CHUA" | "DA" | "LECH";
+            /**
+             * @description Document date column, also fed by the period filter. `from` doubles as the
+             *     opening-balance cutoff.
+             */
+            docDate?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Receipt/payment number column — one filter over the shared document number. */
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            /** @description Account number column. */
+            accountNo?: components["schemas"]["StringFilterDto"];
+            /** @description Description column, resolved from the source voucher's reason. */
+            description?: components["schemas"]["StringFilterDto"];
+            /** @description Counterparty column, resolved from the source voucher. */
+            counterparty?: components["schemas"]["StringFilterDto"];
+            /** @description Staff column, resolved from the source voucher's cashier user. */
+            staff?: components["schemas"]["StringFilterDto"];
+            /** @description Money-in column; also constrains the row to inbound movements. */
+            amountIn?: components["schemas"]["CompareFilterDto"];
+            /** @description Money-out column; also constrains the row to outbound movements. */
+            amountOut?: components["schemas"]["CompareFilterDto"];
+        };
+        DepositVoucherSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /**
+             * Format: uuid
+             * @description Restrict to a single deposit account; omitted = every account in scope.
+             */
+            depositAccountId?: string;
+            /**
+             * @description Document type column — RECEIPT or PAYMENT.
+             * @enum {string}
+             */
+            kind?: "RECEIPT" | "PAYMENT";
+            /**
+             * @description Status column.
+             * @enum {string}
+             */
+            status?: "DRAFT" | "PENDING_APPROVAL" | "POSTED" | "REVERSED";
+            /** @description Document date column, also fed by the period (from/to) filter. */
+            docDate?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Document number column. */
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            /** @description Total amount column. */
+            totalAmount?: components["schemas"]["CompareFilterDto"];
+            /** @description Account column — matches the rendered "name (accountNo)" label. */
+            accountLabel?: components["schemas"]["StringFilterDto"];
+            /** @description Payer/payee column, falling back to the partner name snapshot. */
+            counterparty?: components["schemas"]["StringFilterDto"];
+            /** @description Reason column. */
+            reason?: components["schemas"]["StringFilterDto"];
+        };
+        DepositVoucherRowDto: {
+            /** @enum {string} */
+            kind: "RECEIPT" | "PAYMENT";
+            id: string;
+            /** @description ISO date (no time component) */
+            docDate: string;
+            documentNumber: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "POSTED" | "REVERSED";
+            /** @description Money, serialized as a number */
+            totalAmount: number;
+            depositAccountId: string;
+            /** @description Inlined from deposit_accounts ("" when unresolved) */
+            depositAccountName: string;
+            /** @description Inlined from deposit_accounts ("" when unresolved) */
+            depositAccountNo: string;
+            referenceType: string | null;
+            /** @description Payer/payee, falling back to the partner snapshot ("" when none) */
+            counterparty: string;
+            reason: string | null;
+            createdAt: string;
+        };
+        DepositVoucherSearchV2ResponseDto: {
+            data: components["schemas"]["DepositVoucherRowDto"][];
+            total: number;
+            page: number;
+            limit: number;
+            /** @description SUM(total_amount) over every matching row, not only this page */
+            totalAmount: number;
+        };
         BankReceiptLineDto: {
             /** Format: uuid */
             id?: string;
@@ -8972,7 +9139,7 @@ export interface components {
             totalAmount: number;
             attachmentIds: string[];
             /** @enum {string} */
-            referenceType?: "INVOICE_DEBT" | "RECEIVABLE" | "TRANSFER" | "MANUAL" | "REVERSAL";
+            referenceType?: "INVOICE_DEBT" | "RECEIVABLE" | "TRANSFER" | "MANUAL" | "REVERSAL" | "FUND_SWAP";
             referenceId?: string;
             depositMovementId?: string;
             journalEntryId?: string;
@@ -9117,7 +9284,7 @@ export interface components {
             totalAmount: number;
             attachmentIds: string[];
             /** @enum {string} */
-            referenceType?: "GOODS_RECEIPT" | "PAYABLE" | "INVOICE" | "TRANSFER" | "EXPENSE" | "MANUAL" | "REVERSAL";
+            referenceType?: "GOODS_RECEIPT" | "PAYABLE" | "INVOICE" | "TRANSFER" | "EXPENSE" | "MANUAL" | "REVERSAL" | "FUND_SWAP";
             referenceId?: string;
             approvalStatus?: string;
             approvedBy?: string;
@@ -9247,6 +9414,15 @@ export interface components {
             /** @description UUID of the user who created this record. */
             createdBy: string;
         };
+        FundSwapLineDto: {
+            description: string;
+            amount: number;
+            /**
+             * Format: uuid
+             * @description "Mục chi"/"Mục thu" — a cash_voucher_categories id.
+             */
+            categoryId?: string;
+        };
         CreateFundSwapDto: {
             /** @enum {string} */
             direction: "DEPOSIT_TO_CASH" | "CASH_TO_DEPOSIT";
@@ -9276,6 +9452,25 @@ export interface components {
              *     true keeps the current atomic 2-leg behavior.
              */
             autoCreateReceipt?: boolean;
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            /** Format: uuid */
+            partnerId?: string;
+            /** @description "Người nhận"/"Người nộp" — free text, independent of the partner record. */
+            payeeName?: string;
+            /** @description Used only when the partner lookup yields no address of its own. */
+            address?: string;
+            /**
+             * Format: uuid
+             * @description "Nhân viên chi/thu" — a users.id.
+             */
+            paidBy?: string;
+            reference?: string;
+            /**
+             * @description Detail lines of the source leg. When omitted the service falls back to a
+             *     single synthesized line, which is the pre-existing behaviour.
+             */
+            lines?: components["schemas"]["FundSwapLineDto"][];
         };
         InTransitRowDto: {
             id: string;
@@ -9379,6 +9574,93 @@ export interface components {
         };
         CancelDepositTransferDto: {
             reason: string;
+        };
+        DepositReconSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /**
+             * Format: uuid
+             * @description Restrict to a single deposit account; omitted = every account in scope.
+             */
+            depositAccountId?: string;
+            /**
+             * @description Transaction type column.
+             * @enum {string}
+             */
+            type?: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "ADJUSTMENT";
+            /**
+             * @description Reconciliation status column. Defaults to CHUA (unreconciled), as v1 did.
+             * @default CHUA
+             * @enum {string}
+             */
+            reconStatus: "CHUA" | "DA" | "LECH";
+            /** @description Document number column. */
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            /** @description Account column — matches the rendered "name (accountNo)" label. */
+            accountLabel?: components["schemas"]["StringFilterDto"];
+            /**
+             * @description Date column. Matches on COALESCE(value_date, doc_date) — a statement period
+             *     must match the movement's cleared date, not its transaction date (R2,
+             *     TKT-DFR-04), otherwise unsettled funds read as a false discrepancy.
+             */
+            docDate?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Value date (cleared date) column. */
+            valueDate?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Net received amount column. */
+            netAmount?: components["schemas"]["CompareFilterDto"];
+            /** @description Fee column. */
+            feeAmount?: components["schemas"]["CompareFilterDto"];
+            /** @description Gross amount column. */
+            amount?: components["schemas"]["CompareFilterDto"];
+            /** @description Reconciled-by column — matches the resolved user name, not the raw id. */
+            reconciledBy?: components["schemas"]["StringFilterDto"];
+        };
+        DepositReconRowDto: {
+            id: string;
+            documentNumber: string | null;
+            /** @enum {string} */
+            type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "ADJUSTMENT";
+            depositAccountId: string;
+            /** @description Inlined from deposit_accounts ("" when unresolved) */
+            depositAccountName: string;
+            /** @description Inlined from deposit_accounts ("" when unresolved) */
+            depositAccountNo: string;
+            docDate: string;
+            valueDate: string | null;
+            amount: number;
+            feeAmount: number;
+            netAmount: number;
+            /** @enum {string} */
+            reconStatus: "CHUA" | "DA" | "LECH";
+            /** @description Raw user id, kept for compatibility */
+            reconciledBy: string | null;
+            /** @description Resolved "first last" ("" when unresolved) */
+            reconciledByName: string | null;
+            reconciledAt: string | null;
+            createdAt: string;
+            /**
+             * @description Which flow produced this movement; POS_INVOICE rows have no voucher
+             * @enum {string}
+             */
+            source: "POS_INVOICE" | "MANUAL" | "TRANSFER" | "SYSTEM";
+            /** @description Meaning depends on source — invoices.id when source is POS_INVOICE */
+            sourceRefId: string | null;
+            /** @description bank_payments.id this movement posted */
+            bankPaymentId: string | null;
+            /** @description bank_receipts.id this movement posted */
+            bankReceiptId: string | null;
+        };
+        DepositReconSearchV2ResponseDto: {
+            data: components["schemas"]["DepositReconRowDto"][];
+            total: number;
+            page: number;
+            limit: number;
+            /** @description SUM(net_amount) over every matching row, not only this page */
+            totalAmount: number;
+            /** @description Any unreconciled movement older than the stale threshold */
+            hasStaleUnreconciled: boolean;
         };
         ReconcileDto: {
             /** Format: uuid */
@@ -17279,6 +17561,29 @@ export interface operations {
             };
         };
     };
+    DepositLedgerV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DepositLedgerSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     DepositLedgerController_getLedger: {
         parameters: {
             query?: {
@@ -17347,6 +17652,29 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    DepositVoucherV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DepositVoucherSearchV2Dto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositVoucherSearchV2ResponseDto"];
+                };
             };
         };
     };
@@ -17745,6 +18073,27 @@ export interface operations {
             };
         };
     };
+    FundSwapsController_legs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                swapId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
     DepositDashboardController_inTransit: {
         parameters: {
             query?: {
@@ -17894,6 +18243,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DepositTransferEntity"];
+                };
+            };
+        };
+    };
+    DepositReconV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DepositReconSearchV2Dto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositReconSearchV2ResponseDto"];
                 };
             };
         };

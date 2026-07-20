@@ -20,6 +20,8 @@ export enum BankReceiptReferenceType {
   TRANSFER = "TRANSFER",
   MANUAL = "MANUAL",
   REVERSAL = "REVERSAL",
+  /** Counterpart leg of a fund swap; referenceId = the swap id. */
+  FUND_SWAP = "FUND_SWAP",
 }
 
 export enum BankPaymentPurpose {
@@ -41,6 +43,8 @@ export enum BankPaymentReferenceType {
   EXPENSE = "EXPENSE",
   MANUAL = "MANUAL",
   REVERSAL = "REVERSAL",
+  /** Source leg of a fund swap; referenceId = the swap id. */
+  FUND_SWAP = "FUND_SWAP",
 }
 
 export interface BankVoucherLine {
@@ -259,4 +263,22 @@ export interface CreateFundSwapBody {
   reason?: string;
   /** DEPOSIT_TO_CASH only — false skips auto-creating the matching cash receipt. */
   autoCreateReceipt?: boolean;
+  /**
+   * Party/staff carried onto BOTH legs so the generated vouchers are not blank
+   * (MISA parity). Optional — the standalone "Chuyển quỹ" dialog omits them.
+   */
+  partnerType?: CashVoucherPartnerType;
+  partnerId?: string;
+  payeeName?: string;
+  address?: string;
+  paidBy?: string;
+  reference?: string;
+  lines?: Array<{ description: string; amount: number; categoryId?: string }>;
+}
+
+/** One voucher belonging to a fund swap — `GET /fund-swaps/:swapId/legs`. */
+export interface FundSwapLeg {
+  kind: "BANK_PAYMENT" | "BANK_RECEIPT" | "CASH_PAYMENT" | "CASH_RECEIPT";
+  id: string;
+  documentNumber: string | null;
 }

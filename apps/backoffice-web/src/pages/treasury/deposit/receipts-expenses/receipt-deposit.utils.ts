@@ -1,63 +1,34 @@
-import {
-  BankVoucherStatus,
-  type BankPayment,
-  type BankReceipt,
-} from "../../bank-vouchers.types";
+import { BankVoucherStatus } from "../../bank-vouchers.types";
 import { RECEIPT_DEPOSIT_DOCUMENT_TYPE_LABEL } from "./receipt-deposit.constants";
-import { ReceiptDepositKind, type ReceiptDepositListItem } from "./receipt-deposit.types";
+import {
+  ReceiptDepositKind,
+  type DepositVoucherRow,
+  type ReceiptDepositListItem,
+} from "./receipt-deposit.types";
 
-function num(v: unknown): number {
-  return Number(v) || 0;
-}
-
-export function toReceiptDepositListItem(r: BankReceipt): ReceiptDepositListItem {
+/**
+ * Server row → list row. The merge, sort and account lookup that used to happen
+ * here now run in SQL; this only normalises nullable columns and derives the
+ * reversed flag.
+ */
+export function toReceiptDepositListItem(
+  row: DepositVoucherRow,
+): ReceiptDepositListItem {
   return {
-    kind: ReceiptDepositKind.RECEIPT,
-    id: r.id,
-    docDate: r.docDate,
-    documentNumber: r.documentNumber ?? "",
-    status: r.status,
-    totalAmount: num(r.totalAmount),
-    counterparty: (r.payerName?.trim() || r.partnerNameSnapshot?.trim()) ?? "",
-    reason: r.reason ?? "",
-    depositAccountId: r.depositAccountId,
-    referenceType: r.referenceType,
-    isReversed: r.status === BankVoucherStatus.REVERSED,
-    receipt: r,
+    kind: row.kind,
+    id: row.id,
+    docDate: row.docDate,
+    documentNumber: row.documentNumber ?? "",
+    status: row.status,
+    totalAmount: Number(row.totalAmount) || 0,
+    counterparty: row.counterparty ?? "",
+    reason: row.reason ?? "",
+    depositAccountId: row.depositAccountId,
+    depositAccountName: row.depositAccountName ?? "",
+    depositAccountNo: row.depositAccountNo ?? "",
+    referenceType: row.referenceType ?? undefined,
+    isReversed: row.status === BankVoucherStatus.REVERSED,
   };
-}
-
-export function toPaymentDepositListItem(p: BankPayment): ReceiptDepositListItem {
-  return {
-    kind: ReceiptDepositKind.PAYMENT,
-    id: p.id,
-    docDate: p.docDate,
-    documentNumber: p.documentNumber ?? "",
-    status: p.status,
-    totalAmount: num(p.totalAmount),
-    counterparty: (p.payeeName?.trim() || p.partnerNameSnapshot?.trim()) ?? "",
-    reason: p.reason ?? "",
-    depositAccountId: p.depositAccountId,
-    referenceType: p.referenceType,
-    isReversed: p.status === BankVoucherStatus.REVERSED,
-    payment: p,
-  };
-}
-
-export function mergeReceiptDepositLists(
-  receipts: BankReceipt[],
-  payments: BankPayment[],
-): ReceiptDepositListItem[] {
-  const merged = [
-    ...receipts.map(toReceiptDepositListItem),
-    ...payments.map(toPaymentDepositListItem),
-  ];
-  merged.sort((a, b) => {
-    const d = b.docDate.localeCompare(a.docDate);
-    if (d !== 0) return d;
-    return b.id.localeCompare(a.id);
-  });
-  return merged;
 }
 
 export function receiptDepositDocumentTypeLabel(kind: ReceiptDepositKind): string {

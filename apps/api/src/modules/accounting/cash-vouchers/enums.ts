@@ -23,6 +23,8 @@ export enum CashReceiptReferenceType {
   RECEIVABLE = 'RECEIVABLE',
   MANUAL = 'MANUAL',
   REVERSAL = 'REVERSAL',
+  /** Counterpart leg of a fund swap (FR-08); reference_id = the swap id. */
+  FUND_SWAP = 'FUND_SWAP',
 }
 
 export enum CashPaymentPurpose {
@@ -42,6 +44,8 @@ export enum CashPaymentReferenceType {
   REFUND = 'REFUND',
   MANUAL = 'MANUAL',
   REVERSAL = 'REVERSAL',
+  /** Counterpart leg of a fund swap (FR-08); reference_id = the swap id. */
+  FUND_SWAP = 'FUND_SWAP',
 }
 
 export enum CashVoucherPartnerType {

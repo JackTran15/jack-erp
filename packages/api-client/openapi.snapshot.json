@@ -9516,6 +9516,38 @@
         ]
       }
     },
+    "/v2/deposit-ledger/search": {
+      "post": {
+        "operationId": "DepositLedgerV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DepositLedgerSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Search the deposit detail ledger with per-column filters",
+        "tags": [
+          "DepositLedgerV2"
+        ]
+      }
+    },
     "/deposit-ledger": {
       "get": {
         "operationId": "DepositLedgerController_getLedger",
@@ -9676,6 +9708,38 @@
         },
         "tags": [
           "DepositAudit"
+        ]
+      }
+    },
+    "/v2/deposit-vouchers/search": {
+      "post": {
+        "operationId": "DepositVoucherV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DepositVoucherSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositVoucherSearchV2ResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Search deposit receipts and payments as one list",
+        "tags": [
+          "DepositVoucherV2"
         ]
       }
     },
@@ -10391,6 +10455,40 @@
         ]
       }
     },
+    "/fund-swaps/{swapId}/legs": {
+      "get": {
+        "operationId": "FundSwapsController_legs",
+        "parameters": [
+          {
+            "name": "swapId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sibling vouchers of a swap, so a leg can link to its counterpart.",
+        "tags": [
+          "FundSwaps"
+        ]
+      }
+    },
     "/deposit-transfers/in-transit": {
       "get": {
         "operationId": "DepositDashboardController_inTransit",
@@ -10611,6 +10709,38 @@
         },
         "tags": [
           "DepositTransfer"
+        ]
+      }
+    },
+    "/v2/deposit-recon/search": {
+      "post": {
+        "operationId": "DepositReconV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DepositReconSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositReconSearchV2ResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Search deposit movements for reconciliation",
+        "tags": [
+          "DepositReconV2"
         ]
       }
     },
@@ -21184,7 +21314,8 @@
               "INVOICE_DEBT",
               "RECEIVABLE",
               "MANUAL",
-              "REVERSAL"
+              "REVERSAL",
+              "FUND_SWAP"
             ],
             "type": "string"
           },
@@ -21604,7 +21735,8 @@
               "SALARY",
               "REFUND",
               "MANUAL",
-              "REVERSAL"
+              "REVERSAL",
+              "FUND_SWAP"
             ],
             "type": "string"
           },
@@ -28257,6 +28389,295 @@
           "createdBy"
         ]
       },
+      "DepositLedgerSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "depositAccountId": {
+            "type": "string",
+            "description": "Deposit account to show the ledger for. Omit to include every ACTIVE\ndeposit account of the branch (BR-LEDG-03).",
+            "format": "uuid"
+          },
+          "reconStatus": {
+            "type": "string",
+            "description": "Reconciliation status.",
+            "enum": [
+              "CHUA",
+              "DA",
+              "LECH"
+            ]
+          },
+          "docDate": {
+            "description": "Document date column, also fed by the period filter. `from` doubles as the\nopening-balance cutoff.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "documentNumber": {
+            "description": "Receipt/payment number column — one filter over the shared document number.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "accountNo": {
+            "description": "Account number column.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "description": {
+            "description": "Description column, resolved from the source voucher's reason.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "counterparty": {
+            "description": "Counterparty column, resolved from the source voucher.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "staff": {
+            "description": "Staff column, resolved from the source voucher's cashier user.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "amountIn": {
+            "description": "Money-in column; also constrains the row to inbound movements.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "amountOut": {
+            "description": "Money-out column; also constrains the row to outbound movements.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          }
+        }
+      },
+      "DepositVoucherSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "depositAccountId": {
+            "type": "string",
+            "description": "Restrict to a single deposit account; omitted = every account in scope.",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "description": "Document type column — RECEIPT or PAYMENT.",
+            "enum": [
+              "RECEIPT",
+              "PAYMENT"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "Status column.",
+            "enum": [
+              "DRAFT",
+              "PENDING_APPROVAL",
+              "POSTED",
+              "REVERSED"
+            ]
+          },
+          "docDate": {
+            "description": "Document date column, also fed by the period (from/to) filter.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "documentNumber": {
+            "description": "Document number column.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "totalAmount": {
+            "description": "Total amount column.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "accountLabel": {
+            "description": "Account column — matches the rendered \"name (accountNo)\" label.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "counterparty": {
+            "description": "Payer/payee column, falling back to the partner name snapshot.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "reason": {
+            "description": "Reason column.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          }
+        }
+      },
+      "DepositVoucherRowDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "RECEIPT",
+              "PAYMENT"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "docDate": {
+            "type": "string",
+            "description": "ISO date (no time component)"
+          },
+          "documentNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "PENDING_APPROVAL",
+              "POSTED",
+              "REVERSED"
+            ],
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "number",
+            "description": "Money, serialized as a number"
+          },
+          "depositAccountId": {
+            "type": "string"
+          },
+          "depositAccountName": {
+            "type": "string",
+            "description": "Inlined from deposit_accounts (\"\" when unresolved)"
+          },
+          "depositAccountNo": {
+            "type": "string",
+            "description": "Inlined from deposit_accounts (\"\" when unresolved)"
+          },
+          "referenceType": {
+            "type": "string",
+            "nullable": true
+          },
+          "counterparty": {
+            "type": "string",
+            "description": "Payer/payee, falling back to the partner snapshot (\"\" when none)"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "docDate",
+          "documentNumber",
+          "status",
+          "totalAmount",
+          "depositAccountId",
+          "depositAccountName",
+          "depositAccountNo",
+          "referenceType",
+          "counterparty",
+          "reason",
+          "createdAt"
+        ]
+      },
+      "DepositVoucherSearchV2ResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DepositVoucherRowDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "totalAmount": {
+            "type": "number",
+            "description": "SUM(total_amount) over every matching row, not only this page"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit",
+          "totalAmount"
+        ]
+      },
       "BankReceiptLineDto": {
         "type": "object",
         "properties": {
@@ -28472,7 +28893,8 @@
               "RECEIVABLE",
               "TRANSFER",
               "MANUAL",
-              "REVERSAL"
+              "REVERSAL",
+              "FUND_SWAP"
             ],
             "type": "string"
           },
@@ -28916,7 +29338,8 @@
               "TRANSFER",
               "EXPENSE",
               "MANUAL",
-              "REVERSAL"
+              "REVERSAL",
+              "FUND_SWAP"
             ],
             "type": "string"
           },
@@ -29334,6 +29757,28 @@
           "createdBy"
         ]
       },
+      "FundSwapLineDto": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "\"Mục chi\"/\"Mục thu\" — a cash_voucher_categories id.",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "description",
+          "amount"
+        ]
+      },
       "CreateFundSwapDto": {
         "type": "object",
         "properties": {
@@ -29373,6 +29818,46 @@
           "autoCreateReceipt": {
             "type": "boolean",
             "description": "DEPOSIT_TO_CASH only. False skips auto-creating the matching cash receipt —\nonly the deposit-withdrawal leg posts, parking the amount in TK 113 \"Tiền\nđang chuyển\" until the cashier creates a separate cash receipt themselves\nonce the money is actually counted (matches MISA; no pending/confirm state\nis tracked for this — unlike the GĐ4 inter-branch transfer). Omitted or\ntrue keeps the current atomic 2-leg behavior."
+          },
+          "partnerType": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ]
+          },
+          "partnerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payeeName": {
+            "type": "string",
+            "description": "\"Người nhận\"/\"Người nộp\" — free text, independent of the partner record.",
+            "maxLength": 255
+          },
+          "address": {
+            "type": "string",
+            "description": "Used only when the partner lookup yields no address of its own.",
+            "maxLength": 500
+          },
+          "paidBy": {
+            "type": "string",
+            "description": "\"Nhân viên chi/thu\" — a users.id.",
+            "format": "uuid"
+          },
+          "reference": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "lines": {
+            "description": "Detail lines of the source leg. When omitted the service falls back to a\nsingle synthesized line, which is the pre-existing behaviour.",
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FundSwapLineDto"
+            }
           }
         },
         "required": [
@@ -29720,6 +30205,267 @@
         },
         "required": [
           "reason"
+        ]
+      },
+      "DepositReconSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "depositAccountId": {
+            "type": "string",
+            "description": "Restrict to a single deposit account; omitted = every account in scope.",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "description": "Transaction type column.",
+            "enum": [
+              "DEPOSIT",
+              "WITHDRAWAL",
+              "TRANSFER",
+              "ADJUSTMENT"
+            ]
+          },
+          "reconStatus": {
+            "type": "string",
+            "description": "Reconciliation status column. Defaults to CHUA (unreconciled), as v1 did.",
+            "enum": [
+              "CHUA",
+              "DA",
+              "LECH"
+            ],
+            "default": "CHUA"
+          },
+          "documentNumber": {
+            "description": "Document number column.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "accountLabel": {
+            "description": "Account column — matches the rendered \"name (accountNo)\" label.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "docDate": {
+            "description": "Date column. Matches on COALESCE(value_date, doc_date) — a statement period\nmust match the movement's cleared date, not its transaction date (R2,\nTKT-DFR-04), otherwise unsettled funds read as a false discrepancy.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "valueDate": {
+            "description": "Value date (cleared date) column.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "netAmount": {
+            "description": "Net received amount column.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "feeAmount": {
+            "description": "Fee column.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "amount": {
+            "description": "Gross amount column.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "reconciledBy": {
+            "description": "Reconciled-by column — matches the resolved user name, not the raw id.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          }
+        }
+      },
+      "DepositReconRowDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "documentNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "enum": [
+              "DEPOSIT",
+              "WITHDRAWAL",
+              "TRANSFER",
+              "ADJUSTMENT"
+            ],
+            "type": "string"
+          },
+          "depositAccountId": {
+            "type": "string"
+          },
+          "depositAccountName": {
+            "type": "string",
+            "description": "Inlined from deposit_accounts (\"\" when unresolved)"
+          },
+          "depositAccountNo": {
+            "type": "string",
+            "description": "Inlined from deposit_accounts (\"\" when unresolved)"
+          },
+          "docDate": {
+            "type": "string"
+          },
+          "valueDate": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "number"
+          },
+          "feeAmount": {
+            "type": "number"
+          },
+          "netAmount": {
+            "type": "number"
+          },
+          "reconStatus": {
+            "enum": [
+              "CHUA",
+              "DA",
+              "LECH"
+            ],
+            "type": "string"
+          },
+          "reconciledBy": {
+            "type": "string",
+            "nullable": true,
+            "description": "Raw user id, kept for compatibility"
+          },
+          "reconciledByName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Resolved \"first last\" (\"\" when unresolved)"
+          },
+          "reconciledAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "POS_INVOICE",
+              "MANUAL",
+              "TRANSFER",
+              "SYSTEM"
+            ],
+            "type": "string",
+            "description": "Which flow produced this movement; POS_INVOICE rows have no voucher"
+          },
+          "sourceRefId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Meaning depends on source — invoices.id when source is POS_INVOICE"
+          },
+          "bankPaymentId": {
+            "type": "string",
+            "nullable": true,
+            "description": "bank_payments.id this movement posted"
+          },
+          "bankReceiptId": {
+            "type": "string",
+            "nullable": true,
+            "description": "bank_receipts.id this movement posted"
+          }
+        },
+        "required": [
+          "id",
+          "documentNumber",
+          "type",
+          "depositAccountId",
+          "depositAccountName",
+          "depositAccountNo",
+          "docDate",
+          "valueDate",
+          "amount",
+          "feeAmount",
+          "netAmount",
+          "reconStatus",
+          "reconciledBy",
+          "reconciledByName",
+          "reconciledAt",
+          "createdAt",
+          "source",
+          "sourceRefId",
+          "bankPaymentId",
+          "bankReceiptId"
+        ]
+      },
+      "DepositReconSearchV2ResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DepositReconRowDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "totalAmount": {
+            "type": "number",
+            "description": "SUM(net_amount) over every matching row, not only this page"
+          },
+          "hasStaleUnreconciled": {
+            "type": "boolean",
+            "description": "Any unreconciled movement older than the stale threshold"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit",
+          "totalAmount",
+          "hasStaleUnreconciled"
         ]
       },
       "ReconcileDto": {

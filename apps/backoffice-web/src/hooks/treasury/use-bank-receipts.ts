@@ -41,6 +41,7 @@ export function useBankReceiptMutations() {
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["bank-receipts"] });
     void qc.invalidateQueries({ queryKey: ["bank-payments"] });
+    void qc.invalidateQueries({ queryKey: ["deposit-vouchers"] });
     void qc.invalidateQueries({ queryKey: ["deposit-ledger"] });
     void qc.invalidateQueries({ queryKey: ["deposit-accounts"] });
     void qc.invalidateQueries({ queryKey: ["voucher-partners", "customer-debts"] });

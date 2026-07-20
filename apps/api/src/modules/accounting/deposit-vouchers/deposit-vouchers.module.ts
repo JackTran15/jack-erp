@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentNumberingModule } from '../../document-numbering/document-numbering.module';
 import { DepositModule } from '../deposit/deposit.module';
@@ -27,6 +28,8 @@ import { DepositTransferService } from './deposit-transfer/deposit-transfer.serv
 import { DepositTransferController } from './deposit-transfer/deposit-transfer.controller';
 import { DepositDashboardService } from './deposit-dashboard/deposit-dashboard.service';
 import { DepositDashboardController } from './deposit-dashboard/deposit-dashboard.controller';
+import { DepositVoucherV2Controller } from './controllers/deposit-voucher-v2.controller';
+import { SearchDepositVouchersV2Handler } from './queries/search-deposit-vouchers-v2.handler';
 
 /**
  * Deposit vouchers (Phiếu thu/chi tiền gửi) — GĐ2. Document-level receipt/payment
@@ -50,8 +53,10 @@ import { DepositDashboardController } from './deposit-dashboard/deposit-dashboar
     PaymentAccountsModule,
     CashModule,
     CashVouchersModule,
+    CqrsModule,
   ],
   controllers: [
+    DepositVoucherV2Controller,
     BankReceiptsController,
     BankPaymentsController,
     SupplierDepositPaymentController,
@@ -71,6 +76,7 @@ import { DepositDashboardController } from './deposit-dashboard/deposit-dashboar
     FundSwapsService,
     DepositTransferService,
     DepositDashboardService,
+    SearchDepositVouchersV2Handler,
   ],
   exports: [BankReceiptsService, BankPaymentsService],
 })

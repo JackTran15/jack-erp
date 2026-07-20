@@ -1,4 +1,7 @@
+import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsEnum,
   IsISO8601,
@@ -8,11 +11,29 @@ import {
   IsUUID,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { BankVoucherPartnerType } from '../../enums';
 
 export enum FundSwapDirection {
   DEPOSIT_TO_CASH = 'DEPOSIT_TO_CASH',
   CASH_TO_DEPOSIT = 'CASH_TO_DEPOSIT',
+}
+
+/** One detail line, mirroring BankPaymentLineDto so the form round-trips. */
+export class FundSwapLineDto {
+  @IsString()
+  @MaxLength(500)
+  description: string;
+
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
+  amount: number;
+
+  /** "Mục chi"/"Mục thu" — a cash_voucher_categories id. */
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
 }
 
 /**
@@ -65,4 +86,51 @@ export class CreateFundSwapDto {
   @IsOptional()
   @IsBoolean()
   autoCreateReceipt?: boolean;
+
+  // ---------------------------------------------------------------------------
+  // Party / staff carried onto BOTH legs so the generated vouchers are not blank
+  // (MISA parity). All optional — the standalone "Chuyển quỹ" dialog does not
+  // collect them.
+  // ---------------------------------------------------------------------------
+
+  @IsOptional()
+  @IsEnum(BankVoucherPartnerType)
+  partnerType?: BankVoucherPartnerType;
+
+  @IsOptional()
+  @IsUUID()
+  partnerId?: string;
+
+  /** "Người nhận"/"Người nộp" — free text, independent of the partner record. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  payeeName?: string;
+
+  /** Used only when the partner lookup yields no address of its own. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  address?: string;
+
+  /** "Nhân viên chi/thu" — a users.id. */
+  @IsOptional()
+  @IsUUID()
+  paidBy?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  reference?: string;
+
+  /**
+   * Detail lines of the source leg. When omitted the service falls back to a
+   * single synthesized line, which is the pre-existing behaviour.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => FundSwapLineDto)
+  lines?: FundSwapLineDto[];
 }

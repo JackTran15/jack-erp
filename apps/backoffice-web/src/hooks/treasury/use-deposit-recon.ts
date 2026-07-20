@@ -3,6 +3,7 @@ import { erpApi, requireErpData } from "../../lib/erp-api";
 import { apiClient } from "../../lib/api-axios";
 import { triggerBlobDownload } from "../../lib/download";
 import type {
+  DepositReconSearchRow,
   ListReconQuery,
   ListReconResponse,
   ReconcileBody,
@@ -22,6 +23,40 @@ export function useDepositReconList(query: ListReconQuery, enabled = true) {
           params: { query: query as Record<string, unknown> },
         }),
       ),
+    enabled,
+    staleTime: 15_000,
+  });
+}
+
+export interface DepositReconSearchResponse {
+  data: DepositReconSearchRow[];
+  total: number;
+  page: number;
+  limit: number;
+  /** SUM over the whole filtered set, not just this page. */
+  totalAmount: number;
+  hasStaleUnreconciled: boolean;
+}
+
+/**
+ * Grid đối chiếu tiền gửi — `POST /v2/deposit-recon/search`.
+ *
+ * Replaces the v1 query-string list, whose transaction-type filter ran in the
+ * browser after paging, so the grid and the summary bar disagreed.
+ */
+export function useDepositReconSearch(
+  body: Record<string, unknown>,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: treasuryQueryKeys.depositReconSearch(body),
+    queryFn: async () => {
+      const { data } = await apiClient.post<DepositReconSearchResponse>(
+        "/v2/deposit-recon/search",
+        body,
+      );
+      return data;
+    },
     enabled,
     staleTime: 15_000,
   });

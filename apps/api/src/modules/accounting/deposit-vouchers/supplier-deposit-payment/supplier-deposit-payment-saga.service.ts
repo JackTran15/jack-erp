@@ -25,6 +25,8 @@ import {
   DebtCollectionSagaStatus,
 } from '../../cash-vouchers/enums';
 import { CashPaymentsService } from '../../cash-vouchers/cash-payments/cash-payments.service';
+import { PartnerResolverService } from '../../cash-vouchers/shared/partner-resolver.service';
+import { resolvePartySnapshot } from '../../cash-vouchers/shared/voucher-party';
 import { BankPaymentPurpose, BankPaymentReferenceType } from '../enums';
 import { BankPaymentsService } from '../bank-payments/bank-payments.service';
 import {
@@ -72,6 +74,7 @@ export class SupplierDepositPaymentSagaService {
     private readonly bankPayment: BankPaymentsService,
     private readonly cashPayment: CashPaymentsService,
     private readonly cashFundResolver: CashFundResolverService,
+    private readonly partnerResolver: PartnerResolverService,
   ) {}
 
   async pay(
@@ -241,6 +244,29 @@ export class SupplierDepositPaymentSagaService {
 
   // ── internal ───────────────────────────────────────────────────────────────
 
+  /**
+   * Resolve the supplier's name/address snapshot. Previously this flow passed
+   * partnerId without ever resolving it, so partner_name_snapshot stayed NULL
+   * and the voucher showed a blank counterparty everywhere it was listed.
+   */
+  private async party(
+    manager: EntityManager,
+    dto: CreateSupplierDepositPaymentDto,
+    actor: ActorContext,
+  ) {
+    return resolvePartySnapshot(
+      manager,
+      this.partnerResolver,
+      {
+        partnerType: dto.partnerType as unknown as CashVoucherPartnerType,
+        partnerId: dto.partnerId,
+        personName: dto.payeeName,
+        reason: dto.reason,
+      },
+      actor.organizationId,
+    );
+  }
+
   private async payLeg(
     manager: EntityManager,
     leg: SupplierDepositPaymentLegDto,
@@ -253,6 +279,7 @@ export class SupplierDepositPaymentSagaService {
       if (!leg.depositAccountId) {
         throw new BadRequestException('depositAccountId is required for a DEPOSIT leg');
       }
+      const party = await this.party(manager, dto, actor);
       const result = await this.bankPayment.createAndPostInternal(
         {
           purpose: BankPaymentPurpose.SUPPLIER_PAYMENT,
@@ -265,6 +292,8 @@ export class SupplierDepositPaymentSagaService {
           referenceId: saga.id,
           partnerType: dto.partnerType,
           partnerId: dto.partnerId,
+          partnerName: party.partnerName,
+          partnerAddress: party.partnerAddress,
           payeeName: dto.payeeName,
           reason: dto.reason,
           affectExpense: false,
@@ -281,6 +310,7 @@ export class SupplierDepositPaymentSagaService {
       leg.cashAccountId,
       manager,
     );
+    const cashParty = await this.party(manager, dto, actor);
     const result = await this.cashPayment.createAndPostInternal(
       {
         purpose: CashPaymentPurpose.SUPPLIER_PAYMENT,
@@ -295,6 +325,8 @@ export class SupplierDepositPaymentSagaService {
         // type is bridged here in one place (mirrors BankPaymentsService.resolvePartner).
         partnerType: dto.partnerType as unknown as CashVoucherPartnerType,
         partnerId: dto.partnerId,
+        partnerName: cashParty.partnerName,
+        partnerAddress: cashParty.partnerAddress,
         payeeName: dto.payeeName,
         reason: dto.reason,
       },

@@ -37,22 +37,21 @@ import { PaginationControls } from "../../../../components/table/PaginationContr
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
-  applyColumnFilter,
-  toComparableText,
   type ColumnFilter,
   type ColumnFilterMode,
 } from "../../../../components/table/pagination.dto";
+import { buildV2Body } from "../../../../components/crud/crudV2Search";
+import { useDebouncedValue } from "../../../../lib/use-debounced-value";
 import { useDepositAccounts } from "../../../../hooks/treasury/use-deposit-accounts";
 import { useCategoryNameMap } from "../../../../hooks/treasury/use-cash-voucher-categories";
+import { useDepositVoucherSearch } from "../../../../hooks/treasury/use-deposit-vouchers";
 import {
   useBankPayment,
   useBankPaymentMutations,
-  useBankPaymentsList,
 } from "../../../../hooks/treasury/use-bank-payments";
 import {
   useBankReceipt,
   useBankReceiptMutations,
-  useBankReceiptsList,
 } from "../../../../hooks/treasury/use-bank-receipts";
 import { useSupplierDepositPaymentMutation } from "../../../../hooks/treasury/use-supplier-deposit-payment";
 import { useFundSwapMutation } from "../../../../hooks/treasury/use-fund-swap";
@@ -74,6 +73,7 @@ import {
 import { ReceiptDepositDetailPanel } from "./ReceiptDepositDetailPanel";
 import {
   RECEIPT_DEPOSIT_FILTER_KEYS,
+  RECEIPT_DEPOSIT_SEARCH,
   type ReceiptDepositFilterKey,
 } from "./receipt-deposit.constants";
 import {
@@ -82,7 +82,7 @@ import {
   type ReceiptDepositListItem,
   type ReceiptDepositVoucherDialogState,
 } from "./receipt-deposit.types";
-import { mergeReceiptDepositLists } from "./receipt-deposit.utils";
+import { toReceiptDepositListItem } from "./receipt-deposit.utils";
 import { useReceiptDepositTableColumns } from "./useReceiptDepositTableColumns";
 
 function emptyColumnFilters(): Record<ReceiptDepositFilterKey, ColumnFilter> {
@@ -105,10 +105,6 @@ export function TreasuryDepositReceiptsPage() {
   const { data: accounts = [] } = useDepositAccounts();
   // "" = Tất cả quỹ của chi nhánh (mặc định) — BE bỏ qua filter khi param vắng mặt.
   const [depositAccountId, setDepositAccountIdState] = useState("");
-  const accountsById = useMemo(
-    () => new Map(accounts.map((a) => [a.id, a])),
-    [accounts],
-  );
 
   const [period, setPeriod] = useState<PeriodValue>(() => ({
     preset: "this_month",
@@ -130,29 +126,43 @@ export function TreasuryDepositReceiptsPage() {
   const categoryInMap = useCategoryNameMap(CashVoucherCategoryDirection.IN);
   const categoryOutMap = useCategoryNameMap(CashVoucherCategoryDirection.OUT);
 
-  const listQuery = useMemo(
-    () => ({
-      depositAccountId: depositAccountId || undefined,
-      dateFrom: appliedPeriod.from,
-      dateTo: appliedPeriod.to,
-      page: 1,
-      pageSize: 100,
-    }),
-    [depositAccountId, appliedPeriod],
-  );
+  // Debounced so typing in a column filter settles into one request.
+  const debouncedFilters = useDebouncedValue(columnFilters, 300);
 
-  const receiptsList = useBankReceiptsList(listQuery, true);
-  const paymentsList = useBankPaymentsList(listQuery, true);
-  const isLoading = receiptsList.isLoading || paymentsList.isLoading;
+  const searchBody = useMemo(() => {
+    // The period filter feeds the same docDate range the column cell uses.
+    const merged: Record<string, ColumnFilter> = {
+      ...debouncedFilters,
+      docDate: {
+        ...debouncedFilters.docDate,
+        from: debouncedFilters.docDate.from || appliedPeriod.from,
+        to: debouncedFilters.docDate.to || appliedPeriod.to,
+      },
+    };
+    return {
+      ...buildV2Body(
+        RECEIPT_DEPOSIT_SEARCH,
+        merged,
+        pagination.page,
+        pagination.pageSize,
+      ),
+      ...(depositAccountId ? { depositAccountId } : {}),
+    };
+  }, [debouncedFilters, appliedPeriod, pagination, depositAccountId]);
 
-  const listRows = useMemo(
-    () => mergeReceiptDepositLists(receiptsList.data?.data ?? [], paymentsList.data?.data ?? []),
-    [receiptsList.data, paymentsList.data],
+  const search = useDepositVoucherSearch(searchBody);
+  const isLoading = search.isLoading;
+
+  const pagedRows = useMemo(
+    () => (search.data?.data ?? []).map(toReceiptDepositListItem),
+    [search.data],
   );
+  const total = search.data?.total ?? 0;
+  const listTotal = search.data?.totalAmount ?? 0;
 
   const selectedItem = useMemo(
-    () => listRows.find((r) => r.id === selectedId) ?? null,
-    [listRows, selectedId],
+    () => pagedRows.find((r) => r.id === selectedId) ?? null,
+    [pagedRows, selectedId],
   );
 
   const { data: receiptDetail } = useBankReceipt(
@@ -165,28 +175,6 @@ export function TreasuryDepositReceiptsPage() {
   const detailLines: BankVoucherLine[] = receiptDetail?.lines ?? paymentDetail?.lines ?? [];
   const detailCategoryNames =
     selectedItem?.kind === ReceiptDepositKind.PAYMENT ? categoryOutMap : categoryInMap;
-
-  const filteredRows = useMemo(() => {
-    return listRows.filter((row) => {
-      const dateText = new Date(`${row.docDate}T12:00:00`).toLocaleDateString("vi-VN");
-      const typeLabel =
-        row.kind === ReceiptDepositKind.RECEIPT ? "Phiếu thu tiền gửi" : "Phiếu chi tiền gửi";
-      return (
-        applyColumnFilter(toComparableText(dateText), columnFilters.documentDate) &&
-        applyColumnFilter(toComparableText(row.documentNumber), columnFilters.voucherNo) &&
-        applyColumnFilter(toComparableText(typeLabel), columnFilters.documentTypeLabel) &&
-        applyColumnFilter(toComparableText(row.totalAmount), columnFilters.totalAmount) &&
-        applyColumnFilter(toComparableText(row.counterparty), columnFilters.counterparty) &&
-        applyColumnFilter(toComparableText(row.reason), columnFilters.reason)
-      );
-    });
-  }, [listRows, columnFilters]);
-
-  const total = filteredRows.length;
-  const pagedRows = useMemo(() => {
-    const start = (pagination.page - 1) * pagination.pageSize;
-    return filteredRows.slice(start, start + pagination.pageSize);
-  }, [filteredRows, pagination]);
 
   const receiptMutations = useBankReceiptMutations();
   const paymentMutations = useBankPaymentMutations();
@@ -206,44 +194,49 @@ export function TreasuryDepositReceiptsPage() {
     setVoucherDialog({ kind: dialogKindFromItem(item), mode: TreasuryVoucherDialogModeEnum.EDIT });
   }, []);
 
-  const columns = useReceiptDepositTableColumns(
-    (row) => openViewVoucher(row),
-    accountsById,
+  const columns = useReceiptDepositTableColumns((row) => openViewVoucher(row));
+
+  // Any filter change resets to page 1 — otherwise a narrowed result set can
+  // leave the grid stranded on a page that no longer exists.
+  const patchFilter = useCallback(
+    (key: string, patch: Partial<ColumnFilter>) => {
+      setColumnFilters((prev) => ({
+        ...prev,
+        [key as ReceiptDepositFilterKey]: {
+          ...prev[key as ReceiptDepositFilterKey],
+          ...patch,
+        },
+      }));
+      setPagination((p) => ({ ...p, page: 1 }));
+    },
+    [],
   );
 
   const columnFilterControl = useMemo(
     () => ({
       filters: columnFilters as unknown as Record<string, ColumnFilter>,
       onModeChange: (key: string, mode: ColumnFilterMode) =>
-        setColumnFilters((prev) => ({
-          ...prev,
-          [key as ReceiptDepositFilterKey]: { ...prev[key as ReceiptDepositFilterKey], mode },
-        })),
-      onValueChange: (key: string, value: string) =>
-        setColumnFilters((prev) => ({
-          ...prev,
-          [key as ReceiptDepositFilterKey]: { ...prev[key as ReceiptDepositFilterKey], value },
-        })),
+        patchFilter(key, { mode }),
+      onValueChange: (key: string, value: string) => patchFilter(key, { value }),
+      onRangeChange: (key: string, part: "from" | "to", value: string) =>
+        patchFilter(key, { [part]: value }),
     }),
-    [columnFilters],
+    [columnFilters, patchFilter],
   );
 
   const handleApply = useCallback(() => {
     setAppliedPeriod(period);
     setPagination((p) => ({ ...p, page: 1 }));
-    void receiptsList.refetch();
-    void paymentsList.refetch();
     toast.success("Đã nạp dữ liệu.");
-  }, [period, receiptsList, paymentsList]);
+  }, [period]);
 
   const handleReload = useCallback(() => {
-    void receiptsList.refetch();
-    void paymentsList.refetch();
+    void search.refetch();
     setSelectedId(null);
     closeVoucherDialogs();
     setPagination((p) => ({ ...p, page: 1 }));
     toast.success("Đã nạp lại dữ liệu.");
-  }, [receiptsList, paymentsList, closeVoucherDialogs]);
+  }, [search, closeVoucherDialogs]);
 
   const canEditSelected = !!selectedItem && selectedItem.status === BankVoucherStatus.DRAFT;
 
@@ -331,8 +324,6 @@ export function TreasuryDepositReceiptsPage() {
     },
   ];
 
-  const listTotal = useMemo(() => filteredRows.reduce((s, r) => s + r.totalAmount, 0), [filteredRows]);
-
   const openCreateReceipt = useCallback(() => {
     setVoucherDialog({
       kind: ReceiptDepositVoucherDialogKindEnum.RECEIPT,
@@ -376,12 +367,9 @@ export function TreasuryDepositReceiptsPage() {
           // query keys this page's lists read from — no manual refetch needed.
           await fundSwap.mutateAsync(result.body);
         } else if (result.kind === "depositTransfer") {
-          // useCreateDepositTransfer only invalidates deposit-transfer/-dashboard/
-          // -ledger keys, not bank-payments — the INTER_BRANCH_OUT leg it creates
-          // needs an explicit refetch to show up in this page's list right away.
+          // useCreateDepositTransfer now invalidates deposit-vouchers too, so the
+          // INTER_BRANCH_OUT leg appears without an explicit refetch.
           await createDepositTransfer.mutateAsync(result.body);
-          void receiptsList.refetch();
-          void paymentsList.refetch();
         } else {
           const body: CreateBankPaymentBody = result.body;
           if (voucherDialog?.mode === TreasuryVoucherDialogModeEnum.CREATE) {
@@ -404,8 +392,6 @@ export function TreasuryDepositReceiptsPage() {
       supplierDepositPayment,
       fundSwap,
       createDepositTransfer,
-      receiptsList,
-      paymentsList,
       closeVoucherDialogs,
     ],
   );

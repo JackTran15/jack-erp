@@ -8,6 +8,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { numericTransformer } from '../../../../common/utils/numeric.transformer';
 import { BankReceiptEntity } from './bank-receipt.entity';
 
 /**
@@ -45,7 +46,14 @@ export class BankReceiptLineEntity {
   @Column({ name: 'category_id', type: 'uuid', nullable: true })
   categoryId?: string;
 
-  @Column({ type: 'numeric', precision: 18, scale: 2 })
+  // Transformer so the API returns a real number, matching the declared type —
+  // pg hands back `numeric` as a string otherwise.
+  @Column({
+    type: 'numeric',
+    precision: 18,
+    scale: 2,
+    transformer: numericTransformer,
+  })
   amount: number;
 
   @Column({ name: 'reference_note', type: 'varchar', length: 255, nullable: true })
