@@ -164,8 +164,9 @@ export class ItemStorageLocationService {
       where: { itemId, storageId, organizationId },
     });
     if (!mapping) return null;
+    // Location untracked (isActive=false) is not returned; the user must pick a new shelf.
     const location = await this.locationRepo.findOne({
-      where: { id: mapping.locationId, storageId, organizationId },
+      where: { id: mapping.locationId, storageId, organizationId, isActive: true },
     });
     return location ? { locationId: location.id, code: location.code } : null;
   }
