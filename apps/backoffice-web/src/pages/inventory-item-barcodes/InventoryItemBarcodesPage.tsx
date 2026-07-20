@@ -21,6 +21,8 @@ import { renderBarcodeLabelsPdf } from "./_lib/render-barcode-labels-pdf";
 import { printBarcodeLabels } from "./_lib/print-barcode-labels";
 import { capLabels } from "./_lib/cap-labels";
 import { readBarcodePrintNavState } from "../../lib/barcode-print-navigation";
+import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
+import { downloadBarcodeLabelsExcel } from "./_lib/export-barcode-labels.api";
 import { resolveItemLocations } from "./_lib/resolve-item-locations";
 import {
   fetchItemStockBalances,
@@ -71,7 +73,7 @@ export function InventoryItemBarcodesPage() {
   const routerLocation = useLocation();
 
   // Đổ sẵn hàng hóa khi vào từ nút "In tem mã" ở trang nguồn (Nhập/Xuất kho, Chi tiết
-  // vị trí, Hàng hóa). Số lượng tem mặc định = 1; giá bán thiếu sẽ resolve ở effect bên dưới.
+  // vị trí, Hàng hóa). Số lượng tem mặc định = 0; giá bán thiếu sẽ resolve ở effect bên dưới.
   const [rows, setRows] = useState<BarcodeLabelRow[]>(() => {
     const prefill = readBarcodePrintNavState(routerLocation.state)?.items ?? [];
     if (!prefill.length) return [makeEmptyRow()];
@@ -89,7 +91,6 @@ export function InventoryItemBarcodesPage() {
         storageName: p.storageName ?? "",
         locationId: p.locationId ?? "",
         locationCode: p.locationCode ?? "",
-        quantity: 1,
       })),
       makeEmptyRow(),
     ];
@@ -100,6 +101,7 @@ export function InventoryItemBarcodesPage() {
   });
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [printing, setPrinting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const focusedRowIdRef = useRef<string | null>(null);
@@ -297,7 +299,6 @@ export function InventoryItemBarcodesPage() {
                 name: item.name,
                 unit: item.unit ?? "",
                 sellingPrice: Number(item.sellingPrice ?? 0),
-                quantity: r.quantity > 0 ? r.quantity : 1,
                 locationLoading: true,
               }
             : r,
@@ -379,7 +380,7 @@ export function InventoryItemBarcodesPage() {
           storageName: "",
           locationId: "",
           locationCode: "",
-          quantity: s.quantity > 0 ? s.quantity : 1,
+          quantity: s.quantity,
           locationLoading: true,
         }));
       if (!fresh.length) return;
@@ -522,6 +523,26 @@ export function InventoryItemBarcodesPage() {
     [rows],
   );
 
+  // ─── Export ────────────────────────────────────────────────────────
+  // Cùng điều kiện với nút "In tem": chỉ xuất dòng đã chọn hàng hoá và có số
+  // lượng in; file .xlsx do backend dựng.
+  const handleExport = useCallback(async () => {
+    const exportable = rows.filter((r) => r.itemId && r.quantity > 0);
+    if (!exportable.length) {
+      toast.error("Chưa có tem nào để xuất khẩu — thêm hàng hóa và số lượng tem");
+      return;
+    }
+    setExporting(true);
+    try {
+      await downloadBarcodeLabelsExcel(exportable);
+      toast.success("Đã tải tệp xuất khẩu");
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err) || "Xuất khẩu thất bại");
+    } finally {
+      setExporting(false);
+    }
+  }, [rows]);
+
   // ─── Print ─────────────────────────────────────────────────────────
   // Nút "In tem" mở dialog cảnh báo; việc in thực sự chạy ở doPrint theo lựa chọn.
   const handleOpenPrintConfirm = useCallback(() => {
@@ -618,7 +639,9 @@ export function InventoryItemBarcodesPage() {
         branchCode={branchCode}
         showStoreInfo={!isChain}
         printing={printing}
+        exporting={exporting}
         onPrint={handleOpenPrintConfirm}
+        onExport={() => void handleExport()}
         onCancel={handleCancel}
       />
 
@@ -636,7 +659,7 @@ export function InventoryItemBarcodesPage() {
           onOpenChange={setProductPickerOpen}
           showQuantityPrice
           defaultUnitPriceSource="sellingPrice"
-          defaultQuantity={1}
+          defaultQuantity={0}
           onConfirm={addRowsFromPicker}
         />
       ) : null}

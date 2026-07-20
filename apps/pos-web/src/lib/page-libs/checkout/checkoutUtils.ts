@@ -83,9 +83,16 @@ export function formatLineDiscountLabel(line: CartLine): string {
   });
 }
 
-/** Sale line: qty above on-hand snapshot (`maxQty`) — bán vượt tồn / bán khống. */
+/**
+ * Sale line: qty above on-hand snapshot (`maxQty`) — bán vượt tồn / bán khống.
+ * Dòng chưa xác định được tồn (`onHandUnknown`) luôn tính là cần cảnh báo: thà
+ * hỏi thừa còn hơn im lặng cho bán khống (BE không chặn tồn âm — xem
+ * `stock-ledger.service.ts`, FE là lớp bảo vệ duy nhất).
+ */
 export function lineExceedsOnHandSnapshot(line: CartLine): boolean {
-  return Boolean(!line.isReturnCredit && line.qty > line.maxQty);
+  if (line.isReturnCredit) return false;
+  if (line.onHandUnknown) return true;
+  return line.qty > line.maxQty;
 }
 
 export function getOversellSaleLines(lines: CartLine[]): CartLine[] {
@@ -94,6 +101,7 @@ export function getOversellSaleLines(lines: CartLine[]): CartLine[] {
 
 /** Cảnh báo SL: bán vượt tồn hoặc hoàn vượt SL được phép trên hóa đơn gốc (`maxQty`). */
 export function isCartLineWarning(line: CartLine): boolean {
+  if (line.onHandUnknown) return true;
   return line.qty > line.maxQty;
 }
 

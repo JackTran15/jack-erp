@@ -12,8 +12,11 @@ import { useCheckoutMeta } from "@erp/pos/hooks/page-hooks/checkout/use-checkout
 import {
   POS_CHECKOUT_QTY_MIN,
   clampPosCheckoutQtyNumber,
+  isPosQtyRawNegative,
   safePosCheckoutQtyFromRaw,
 } from "@erp/pos/lib/page-libs/checkout/posCheckoutQty";
+import { CHECKOUT_TOASTS } from "@erp/pos/constants/checkout-messages.constant";
+import { toast } from "sonner";
 
 export interface POSToolbarProps {
   productSearchRef: RefObject<HTMLInputElement | null>;
@@ -60,9 +63,15 @@ export function POSToolbar({
         </div>
         <PosQuantityInput
           displayValue={toolbar.qty}
-          onChangeRaw={(raw) =>
-            setToolbar((s) => ({ ...s, qty: safePosCheckoutQtyFromRaw(raw) }))
-          }
+          onChangeRaw={(raw) => {
+            // Ô "SL" luôn là SL bán → số âm bị kẹp, phải báo thay vì đổi ngầm.
+            if (isPosQtyRawNegative(raw)) {
+              toast.warning(CHECKOUT_TOASTS.NEGATIVE_QTY_CLAMPED, {
+                id: "pos-negative-qty",
+              });
+            }
+            setToolbar((s) => ({ ...s, qty: safePosCheckoutQtyFromRaw(raw) }));
+          }}
           onBumpUp={() =>
             setToolbar((s) => ({
               ...s,

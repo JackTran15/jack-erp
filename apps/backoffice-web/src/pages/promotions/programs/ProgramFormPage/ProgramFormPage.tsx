@@ -11,11 +11,17 @@ import { TimeSection } from "./TimeSection/TimeSection";
 import { StoreScopeSection } from "./StoreScopeSection/StoreScopeSection";
 import { ApplyScopeSection } from "./ApplyScopeSection/ApplyScopeSection";
 import { DiscountSection } from "./DiscountSection/DiscountSection";
+import { GoodsDiscountSection } from "./GoodsDiscountSection/GoodsDiscountSection";
+import { TieredDiscountSection } from "./TieredDiscountSection/TieredDiscountSection";
+import { GiftSection } from "./GiftSection/GiftSection";
+import { BuyGetSection } from "./BuyGetSection/BuyGetSection";
 import { ConditionSection } from "./ConditionSection/ConditionSection";
 import { ApplicableGoodsTable } from "./ApplicableGoodsTable/ApplicableGoodsTable";
 import { AutoApplyCheckbox } from "./AutoApplyCheckbox/AutoApplyCheckbox";
 import { buildInitialFormState } from "../program-form.constants";
+import { PROMOTION_FORM_LABELS } from "../programs.constants";
 import type { ProgramFormState } from "../program-form.types";
+import type { PromotionForm } from "../programs.types";
 import { MOCK_PROGRAM_ROWS } from "../_mock/mock-programs";
 
 type FormTab = "km" | "conditions";
@@ -85,36 +91,78 @@ export function ProgramFormPage() {
   }, [navigate]);
 
   const isInvoiceDiscount = promotionType === "INVOICE_DISCOUNT";
+  const isProductDiscount = promotionType === "PRODUCT_DISCOUNT";
+  const isTieredDiscount = promotionType === "TIERED_DISCOUNT";
+  const isGiftDiscount = promotionType === "GIFT";
+  const isBuyGetDiscount = promotionType === "BUY_M_GET_N";
+  const isSinglePage = isTieredDiscount || isBuyGetDiscount;
+
+  const typeLabel =
+    PROMOTION_FORM_LABELS[promotionType as PromotionForm]?.toLowerCase() ??
+    "chương trình khuyến mãi";
+  const pageTitle = `Chương trình KM/ ${isEdit ? "Sửa" : "Thêm mới"} ${typeLabel}`;
+  const isSupported =
+    isInvoiceDiscount ||
+    isProductDiscount ||
+    isTieredDiscount ||
+    isGiftDiscount ||
+    isBuyGetDiscount;
 
   return (
     <AdminPageShell>
-      <PageHeader
-        title={isEdit ? "Sửa chương trình khuyến mãi" : "Thêm mới chương trình khuyến mãi"}
-      />
+      <PageHeader title={pageTitle} />
       <FormActionBar
         position="top"
         onSave={handleSave}
         onSaveAndNew={handleSaveAndNew}
         onCancel={handleCancel}
       />
-      <Tabs tabs={FORM_TABS} activeTab={activeTab} onTabChange={setActiveTab} />
+      {isSinglePage ? null : (
+        <Tabs tabs={FORM_TABS} activeTab={activeTab} onTabChange={setActiveTab} />
+      )}
 
       <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
-        {!isInvoiceDiscount ? (
+        {!isSupported ? (
           <div className="py-10 text-sm text-muted-foreground">
             Loại khuyến mãi này đang được phát triển.
+          </div>
+        ) : isTieredDiscount ? (
+          <div className="max-w-5xl flex flex-col gap-5">
+            <GeneralInfoSection form={form} onChange={onChange} />
+            <TimeSection form={form} onChange={onChange} />
+            {isChain ? <StoreScopeSection form={form} onChange={onChange} /> : null}
+            <TieredDiscountSection form={form} onChange={onChange} />
+          </div>
+        ) : isBuyGetDiscount ? (
+          <div className="flex flex-col gap-5">
+            <GeneralInfoSection form={form} onChange={onChange} />
+            <TimeSection form={form} onChange={onChange} />
+            {isChain ? <StoreScopeSection form={form} onChange={onChange} /> : null}
+            <BuyGetSection form={form} onChange={onChange} />
           </div>
         ) : activeTab === "km" ? (
           <div className="max-w-5xl flex flex-col gap-5">
             <GeneralInfoSection form={form} onChange={onChange} />
             <TimeSection form={form} onChange={onChange} />
             {isChain ? <StoreScopeSection form={form} onChange={onChange} /> : null}
-            <ApplyScopeSection form={form} onChange={onChange} />
-            <DiscountSection form={form} onChange={onChange} />
+            {isInvoiceDiscount ? (
+              <>
+                <ApplyScopeSection form={form} onChange={onChange} />
+                <DiscountSection form={form} onChange={onChange} />
+              </>
+            ) : isProductDiscount ? (
+              <GoodsDiscountSection form={form} onChange={onChange} />
+            ) : (
+              <GiftSection form={form} onChange={onChange} />
+            )}
           </div>
         ) : (
           <div className="max-w-5xl flex flex-col gap-5">
-            <ConditionSection form={form} onChange={onChange} />
+            <ConditionSection
+              form={form}
+              onChange={onChange}
+              showGiftMultiplier={isGiftDiscount}
+            />
             <ApplicableGoodsTable
               value={form.applicableGoods}
               onChange={(goods) => onChange({ applicableGoods: goods })}

@@ -1,4 +1,5 @@
 import { MoneyInput, SingleSelect } from "@erp/ui";
+import { HelpCircle } from "lucide-react";
 import { SectionHeader } from "../SectionHeader/SectionHeader";
 import { CALC_BASIS_OPTIONS } from "../../program-form.constants";
 import type {
@@ -10,9 +11,15 @@ import type {
 interface Props {
   form: ProgramFormState;
   onChange: (patch: Partial<ProgramFormState>) => void;
+  /** Loại "Tặng hàng hóa" hiển thị thêm checkbox cấp số nhân trong cụm MIN_TOTAL. */
+  showGiftMultiplier?: boolean;
 }
 
-export function ConditionSection({ form, onChange }: Props) {
+export function ConditionSection({
+  form,
+  onChange,
+  showGiftMultiplier = false,
+}: Props) {
   const select = (type: ConditionType) => onChange({ conditionType: type });
   const isMinTotal = form.conditionType === "MIN_TOTAL";
 
@@ -57,6 +64,28 @@ export function ConditionSection({ form, onChange }: Props) {
             className="w-72"
           />
         </div>
+
+        {showGiftMultiplier ? (
+          <label
+            className={`ml-6 flex items-center gap-2 ${
+              isMinTotal
+                ? "cursor-pointer text-foreground"
+                : "text-muted-foreground"
+            }`}
+          >
+            <input
+              type="checkbox"
+              className="h-4 w-4 shrink-0 rounded border border-input accent-primary"
+              disabled={!isMinTotal}
+              checked={form.giftMultiplyByTotal}
+              onChange={(e) =>
+                onChange({ giftMultiplyByTotal: e.target.checked })
+              }
+            />
+            Tăng số lượng quà tặng theo cấp số nhân của tổng tiền hóa đơn
+            <HelpCircle className="h-4 w-4 text-muted-foreground" />
+          </label>
+        ) : null}
 
         <label className="flex cursor-pointer items-center gap-2">
           <input

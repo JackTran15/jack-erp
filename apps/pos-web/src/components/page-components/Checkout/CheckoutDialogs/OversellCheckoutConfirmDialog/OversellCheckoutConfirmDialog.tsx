@@ -38,7 +38,10 @@ export function OversellCheckoutConfirmDialog({
         title: "Số lượng tồn",
         align: "right",
         cellClassName: "tabular-nums",
-        render: (line) => qtyFormatter.format(line.maxQty),
+        // Dòng chưa sync được tồn: `maxQty` không đáng tin → hiện "—" thay vì
+        // một con số sai (trước đây là sentinel vô hạn, nay là 0).
+        render: (line) =>
+          line.onHandUnknown ? "—" : qtyFormatter.format(line.maxQty),
       },
       {
         key: "customerOrdered",
@@ -60,6 +63,7 @@ export function OversellCheckoutConfirmDialog({
         align: "right",
         cellClassName: "tabular-nums",
         render: (line) => {
+          if (line.onHandUnknown) return "—";
           const customerOrdered = 0;
           const waitingPickup = 0;
           const available = Math.max(
@@ -91,6 +95,12 @@ export function OversellCheckoutConfirmDialog({
           </span>
           <span>Bạn đang xuất quá số lượng tồn của những hàng hóa sau:</span>
         </p>
+        {lines.some((line) => line.onHandUnknown) ? (
+          <p className="text-sm text-gray-700">
+            Dòng có tồn hiển thị “—” là chưa xác định được tồn kho (hóa đơn lưu
+            tạm hoặc hàng chưa đồng bộ) — hãy kiểm tra lại trước khi bán.
+          </p>
+        ) : null}
         <div className="overflow-x-auto rounded-md border border-gray-200">
           <div className="min-w-[720px]">
             <PosDataTable<CartLine>

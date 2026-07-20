@@ -33,6 +33,22 @@ export function clampPosCheckoutQty(
   return Math.max(POS_CHECKOUT_QTY_MIN, floored);
 }
 
+/**
+ * Raw nhập vào có phải một số âm thực sự không?
+ *
+ * Dùng để phản hồi cho thu ngân khi giá trị bị kẹp: gõ `-5` lặng lẽ thành `1`
+ * dễ khiến người dùng tưởng hệ thống chấp nhận bán số lượng âm.
+ *
+ * Cố tình KHÔNG coi chuỗi rỗng / `-` / rác là âm — `onChangeRaw` bắn theo từng
+ * phím, nên xóa trắng ô để gõ lại sẽ nổ cảnh báo giả.
+ *
+ * Chỉ áp dụng cho dòng BÁN. Dòng trả hiển thị SL âm là đúng nghiệp vụ.
+ */
+export function isPosQtyRawNegative(raw: string): boolean {
+  const n = Number.parseFloat(raw.replace(",", "."));
+  return Number.isFinite(n) && n < 0;
+}
+
 /** Raw qty field → safe stored qty. */
 export function safePosCheckoutQtyFromRaw(
   raw: string,

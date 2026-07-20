@@ -12008,6 +12008,30 @@
         ]
       }
     },
+    "/inventory/exports/barcode-labels/excel": {
+      "post": {
+        "operationId": "CsvExportController_exportBarcodeLabelsExcel",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportBarcodeLabelsBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvExport"
+        ]
+      }
+    },
     "/inventory/exports/item-categories/excel": {
       "get": {
         "operationId": "CsvExportController_exportItemCategoriesExcel",
@@ -27262,6 +27286,10 @@
         "type": "object",
         "properties": {}
       },
+      "ExportBarcodeLabelsBodyDto": {
+        "type": "object",
+        "properties": {}
+      },
       "CreateStockTakeLineDto": {
         "type": "object",
         "properties": {
@@ -28246,6 +28274,9 @@
           "pointsDiscountAmount": {
             "type": "number"
           },
+          "pointsEarned": {
+            "type": "number"
+          },
           "depositAmount": {
             "type": "number"
           },
@@ -28320,6 +28351,7 @@
           "discountAmount",
           "pointsRedeemed",
           "pointsDiscountAmount",
+          "pointsEarned",
           "depositAmount",
           "amountDue",
           "totalPaid",
@@ -28733,6 +28765,9 @@
           "pointsDiscountAmount": {
             "type": "number"
           },
+          "pointsEarned": {
+            "type": "number"
+          },
           "depositAmount": {
             "type": "number"
           },
@@ -28811,6 +28846,7 @@
           "discountAmount",
           "pointsRedeemed",
           "pointsDiscountAmount",
+          "pointsEarned",
           "depositAmount",
           "amountDue",
           "totalPaid",

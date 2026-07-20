@@ -43,6 +43,13 @@ export interface CartLine {
   locationId: string;
   maxQty: number;
   /**
+   * Dòng bán chưa xác định được tồn kho: khôi phục từ hóa đơn nháp / tab đã lưu,
+   * hoặc `syncPurchaseCartOnHand` không tìm thấy item trong catalog. Khi true,
+   * `maxQty` KHÔNG đáng tin và phải coi dòng này là **cần xác minh** trước khi
+   * thanh toán — không mặc định là an toàn. Xóa cờ ngay khi sync được tồn thật.
+   */
+  onHandUnknown?: boolean;
+  /**
    * When true (invoice_return): qty is a positive count of units returned;
    * monetary effect is negative (refund credit). UI shows negative qty / pink row.
    */

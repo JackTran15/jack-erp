@@ -148,6 +148,7 @@ export function InvoiceLineItemRow({
           hasWarning={hasWarning}
           oversell={oversell}
           onHandQty={line.maxQty}
+          onHandUnknown={line.onHandUnknown}
         />
       </td>
       <td className="w-24 px-2 py-2">

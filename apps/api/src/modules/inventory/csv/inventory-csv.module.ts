@@ -23,6 +23,8 @@ import { LocationImportWorkbookService } from "./location-import-workbook.servic
 import { CategoryImportService } from "./category-import.service";
 import { CategoryExportService } from "./category-export.service";
 import { CategoryImportWorkbookService } from "./category-import-workbook.service";
+import { BarcodeLabelExportService } from "./barcode-label-export.service";
+import { BarcodeLabelWorkbookService } from "./barcode-label-workbook.service";
 import { ItemCategoryEntity } from "../location/item-category.entity";
 import { ItemEntity } from "../location/item.entity";
 import { StorageEntity } from "../location/storage.entity";
@@ -78,6 +80,8 @@ import { StockLedgerEntryEntity } from "../ledger/stock-ledger-entry.entity";
     CategoryImportWorkbookService,
     CategoryImportService,
     CategoryExportService,
+    BarcodeLabelWorkbookService,
+    BarcodeLabelExportService,
   ],
   exports: [CsvImportService, CsvExportService],
 })
