@@ -184,7 +184,7 @@ export class InventoryLocationStockService {
         moves,
         actor,
       );
-      transferId = transfer.id;
+      transferId = transfer?.id ?? null;
     }
 
     // A zero-stock item still needs a balance row at the destination so it is

@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { randomUUID } from 'crypto';
 import {
   TransferStatus,
   StockMovementType,
@@ -972,7 +973,7 @@ export class StockTransferService {
   async createIntraWarehouseTransferAndPost(
     dto: CreateIntraWarehouseTransferDto,
     actor: ActorContext,
-  ): Promise<StockTransferEntity> {
+  ): Promise<StockTransferEntity | null> {
     const lines: IntraWarehouseMoveLine[] = dto.lines.map((l, idx) => {
       const sourceLocationId = l.sourceLocationId ?? dto.sourceLocationId;
       const destinationLocationId =
@@ -998,7 +999,8 @@ export class StockTransferService {
       };
     });
 
-    return this.postIntraWarehouseMoves(lines, actor);
+    // Đổi vị trí từ màn hình "Chuyển vị trí" chỉ ghi ledger, không sinh phiếu chuyển kho.
+    return this.postIntraWarehouseMoves(lines, actor, { createDocument: false });
   }
 
   /**
@@ -1017,7 +1019,11 @@ export class StockTransferService {
   async postIntraWarehouseMoves(
     lines: IntraWarehouseMoveLine[],
     actor: ActorContext,
-  ): Promise<StockTransferEntity> {
+    options?: { createDocument?: boolean },
+  ): Promise<StockTransferEntity | null> {
+    // Luồng "Chuyển vị trí" chỉ ghi ledger (createDocument = false); luồng xếp
+    // hàng (arrange) vẫn tạo phiếu chuyển kho như cũ (mặc định = true).
+    const createDocument = options?.createDocument ?? true;
     if (!lines || lines.length === 0) {
       throw new BadRequestException('Cần ít nhất một dòng để chuyển vị trí');
     }
@@ -1029,9 +1035,10 @@ export class StockTransferService {
     }
 
     for (const [idx, line] of lines.entries()) {
-      if (!(line.quantity > 0)) {
+      // Cho phép chuyển 0 (đổi vị trí kể cả khi tồn = 0); chỉ chặn số âm.
+      if (line.quantity < 0) {
         throw new BadRequestException(
-          `Dòng ${idx + 1}: số lượng chuyển phải lớn hơn 0`,
+          `Dòng ${idx + 1}: số lượng chuyển không được âm`,
         );
       }
       if (line.sourceLocationId === line.destinationLocationId) {
@@ -1091,11 +1098,14 @@ export class StockTransferService {
       }
     }
 
-    const documentNumber = await this.documentNumberingService.generate(
-      DocumentType.TRANSFER,
-      actor.branchId,
-      actor,
-    );
+    // Chỉ sinh số chứng từ khi thực sự tạo phiếu.
+    const documentNumber = createDocument
+      ? await this.documentNumberingService.generate(
+          DocumentType.TRANSFER,
+          actor.branchId,
+          actor,
+        )
+      : null;
 
     const { transferId, ledgerEntries } = await this.dataSource.transaction(
       async (manager) => {
@@ -1124,32 +1134,41 @@ export class StockTransferService {
           }
         }
 
-        // Create the posted transfer record within the locked transaction.
-        const transfer = manager.create(StockTransferEntity, {
-          organizationId: actor.organizationId,
-          branchId: actor.branchId,
-          sourceLocationId: lines[0].sourceLocationId,
-          destinationLocationId: lines[0].destinationLocationId,
-          sourceBranchId: actor.branchId,
-          destinationBranchId: actor.branchId,
-          status: TransferStatus.POSTED,
-          documentNumber,
-          createdBy: actor.userId,
-          approvedBy: actor.userId,
-          approvedAt: new Date(),
-          postedBy: actor.userId,
-          postedAt: new Date(),
-          lines: lines.map((l) => {
-            const line = new StockTransferLineEntity();
-            line.itemId = l.itemId;
-            line.quantity = l.quantity;
-            line.sourceLocationId = l.sourceLocationId;
-            line.destinationLocationId = l.destinationLocationId;
-            line.notes = l.notes;
-            return line;
-          }),
-        });
-        const savedTransfer = await manager.save(StockTransferEntity, transfer);
+        // Chỉ tạo phiếu chuyển kho khi createDocument; ngược lại chỉ ghi ledger
+        // và dùng một uuid để nhóm cặp OUT/IN của cùng một lần đổi vị trí.
+        let savedTransfer: StockTransferEntity | null = null;
+        if (createDocument) {
+          const transfer = manager.create(StockTransferEntity, {
+            organizationId: actor.organizationId,
+            branchId: actor.branchId,
+            sourceLocationId: lines[0].sourceLocationId,
+            destinationLocationId: lines[0].destinationLocationId,
+            sourceBranchId: actor.branchId,
+            destinationBranchId: actor.branchId,
+            status: TransferStatus.POSTED,
+            documentNumber: documentNumber!,
+            createdBy: actor.userId,
+            approvedBy: actor.userId,
+            approvedAt: new Date(),
+            postedBy: actor.userId,
+            postedAt: new Date(),
+            lines: lines.map((l) => {
+              const line = new StockTransferLineEntity();
+              line.itemId = l.itemId;
+              line.quantity = l.quantity;
+              line.sourceLocationId = l.sourceLocationId;
+              line.destinationLocationId = l.destinationLocationId;
+              line.notes = l.notes;
+              return line;
+            }),
+          });
+          savedTransfer = await manager.save(StockTransferEntity, transfer);
+        }
+
+        // Tham chiếu bút toán: trỏ về phiếu nếu có, không thì đánh dấu đổi vị trí.
+        const referenceType = createDocument ? 'TRANSFER' : 'LOCATION_CHANGE';
+        const referenceId = savedTransfer?.id ?? randomUUID();
+        const refLabel = documentNumber ?? 'đổi vị trí';
 
         const movements: RecordMovementParams[] = [];
         for (const line of lines) {
@@ -1160,9 +1179,9 @@ export class StockTransferService {
             organizationId: actor.organizationId,
             movementType: StockMovementType.TRANSFER_OUT,
             quantity: -line.quantity,
-            referenceType: 'TRANSFER',
-            referenceId: savedTransfer.id,
-            notes: `Transfer out: ${documentNumber}`,
+            referenceType,
+            referenceId,
+            notes: `Transfer out: ${refLabel}`,
             actorContext: actor,
             // Source & dest are two shelves of the same product/storage — the
             // one-shelf-per-product PSL guard must not run on transfer legs.
@@ -1175,9 +1194,9 @@ export class StockTransferService {
             organizationId: actor.organizationId,
             movementType: StockMovementType.TRANSFER_IN,
             quantity: line.quantity,
-            referenceType: 'TRANSFER',
-            referenceId: savedTransfer.id,
-            notes: `Transfer in: ${documentNumber}`,
+            referenceType,
+            referenceId,
+            notes: `Transfer in: ${refLabel}`,
             actorContext: actor,
             skipLocationAssignment: true,
           });
@@ -1204,11 +1223,19 @@ export class StockTransferService {
           [actor.organizationId, destItemIds, destLocationIds],
         );
 
-        return { transferId: savedTransfer.id, ledgerEntries: entries };
+        return { transferId: savedTransfer?.id ?? null, ledgerEntries: entries };
       },
     );
 
     await this.ledgerService.publishMovementEvents(ledgerEntries);
+
+    // Không tạo phiếu (đổi vị trí): chỉ ghi ledger, không có entity để trả về.
+    if (!transferId) {
+      this.logger.log(
+        `Đổi vị trí ${lines.length} dòng (không sinh phiếu chuyển kho)`,
+      );
+      return null;
+    }
 
     this.logger.log(
       `Intra-warehouse transfer ${transferId} posted as ${documentNumber}`,

@@ -268,9 +268,12 @@ export function ItemLocationDetailsPage() {
     }
     return entries;
   }, [selectedTransferRows]);
-  // Chỉ ngừng theo dõi được khi selection còn ít nhất 1 vị trí đang theo dõi.
+  // Chỉ ngừng theo dõi khi selection còn ít nhất 1 vị trí đang theo dõi VÀ
+  // tất cả vị trí đã chọn đều tồn = 0 — còn tồn thì số liệu sẽ biến mất khỏi báo cáo.
   const canStopTracking = useMemo(
-    () => selectedTransferRows.some((row) => row.isTracked),
+    () =>
+      selectedTransferRows.some((row) => row.isTracked) &&
+      selectedTransferRows.every((row) => Number(row.quantity) === 0),
     [selectedTransferRows],
   );
 
@@ -406,6 +409,16 @@ export function ItemLocationDetailsPage() {
 
   const confirmStopTracking = useCallback(async () => {
     if (selectedTrackingEntries.length === 0) return;
+    // Guard sớm ở FE (backend vẫn là chốt chặn cuối): còn tồn thì không cho ngừng.
+    const stillHasStock = selectedTransferRows.filter(
+      (row) => Number(row.quantity) > 0,
+    );
+    if (stillHasStock.length) {
+      toast.error(
+        `Chỉ được ngừng theo dõi khi tồn = 0. Còn ${stillHasStock.length} vị trí đang có tồn.`,
+      );
+      return;
+    }
     setStopSubmitting(true);
     try {
       await setBalancesTracking(selectedTrackingEntries, false);
@@ -420,7 +433,7 @@ export function ItemLocationDetailsPage() {
     } finally {
       setStopSubmitting(false);
     }
-  }, [selectedTrackingEntries, reload]);
+  }, [selectedTrackingEntries, selectedTransferRows, reload]);
 
   const toolbarItems = useMemo(
     () =>

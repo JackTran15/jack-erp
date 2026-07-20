@@ -31,8 +31,8 @@ import { DataSource } from 'typeorm';
  *
  * Mapping cột → dữ liệu:
  *   - date/time    : thời điểm xuất (COALESCE xuất → trả).
- *   - location     : `locations.code` của showroom (vị trí trưng bày).
- *   - remainingQty : tồn hiện tại (`stock_balances`) tại showroom location.
+ *   - location     : `locations.code` của kho lưu trữ.
+ *   - remainingQty : tồn hiện tại (`stock_balances`) tại vị trí kho lưu trữ.
  *   - staff        : carrier (`users.first_name + last_name`).
  *
  * saleQty / invoice: điền từ liên kết hóa đơn của dòng xuất đã bán
@@ -136,6 +136,7 @@ export class TempWarehouseReportService {
           l.invoice_id,
           l.invoice_number,
           l.transfer_id,
+          s.warehouse_location_id,
           s.showroom_location_id
         FROM temp_warehouse_lines l
         JOIN temp_warehouse_sessions s ON s.id = l.session_id
@@ -166,6 +167,7 @@ export class TempWarehouseReportService {
         SELECT
           COALESCE(e.item_id, r.item_id) AS item_id,
           COALESCE(e.carrier_user_id, r.carrier_user_id) AS carrier_user_id,
+          COALESCE(e.warehouse_location_id, r.warehouse_location_id) AS warehouse_location_id,
           COALESCE(e.showroom_location_id, r.showroom_location_id) AS showroom_location_id,
           COALESCE(e.created_at, r.created_at) AS event_at,
           (e.id IS NOT NULL)::int AS out_qty,
@@ -232,11 +234,11 @@ export class TempWarehouseReportService {
       FROM paired p
       JOIN items i ON i.id = p.item_id AND i.organization_id = $1
       LEFT JOIN users u ON u.id = p.carrier_user_id
-      LEFT JOIN locations loc ON loc.id = p.showroom_location_id
+      LEFT JOIN locations loc ON loc.id = p.warehouse_location_id
       LEFT JOIN stock_balances sb
         ON sb.item_id = p.item_id
         AND sb.organization_id = $1
-        AND sb.location_id = p.showroom_location_id
+        AND sb.location_id = p.warehouse_location_id
       ORDER BY p.event_at DESC
       LIMIT $7 OFFSET $8
       `,

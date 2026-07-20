@@ -575,6 +575,32 @@ export class StockLedgerService {
           `Không thể ngừng theo dõi vị trí thuộc kho Showroom (${codes}${more}).`,
         );
       }
+
+      // Allow untracked balances to be re-tracked.
+      const withStock = await this.balanceRepo.manager.query<
+        Array<{ code: string; locationCode: string; quantity: string }>
+      >(
+        `SELECT i.code AS code, loc.code AS "locationCode", sb.quantity AS quantity
+           FROM unnest($2::uuid[], $3::uuid[]) AS e(item_id, location_id)
+           JOIN stock_balances sb ON sb.organization_id = $1
+                                  AND sb.item_id = e.item_id
+                                  AND sb.location_id = e.location_id
+           JOIN items i          ON i.id = e.item_id
+           JOIN locations loc    ON loc.id = e.location_id
+          WHERE sb.quantity > 0
+          ORDER BY i.code`,
+        [actor.organizationId, itemIds, locationIds],
+      );
+      if (withStock.length) {
+        const detail = withStock
+          .slice(0, 5)
+          .map((r) => `${r.code} tại ${r.locationCode} còn tồn ${Number(r.quantity)}`)
+          .join('; ');
+        const more = withStock.length > 5 ? '…' : '';
+        throw new BadRequestException(
+          `Chỉ được ngừng theo dõi khi tồn = 0. ${detail}${more}.`,
+        );
+      }
     }
 
     const rows = await this.balanceRepo.manager.query<Array<{ id: string }>>(

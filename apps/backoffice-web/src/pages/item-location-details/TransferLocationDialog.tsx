@@ -10,6 +10,10 @@ import {
   TooltipTrigger,
 } from "@erp/ui";
 import { LookupField } from "../../components/forms/LookupField";
+import {
+  ProductSelectDialog,
+  type ProductSelectResult,
+} from "../../components/shared/product-select/ProductSelectDialog";
 import { apiClient } from "../../lib/api-axios";
 import { getActiveBranch } from "../../lib/auth-storage";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
@@ -86,7 +90,6 @@ const FETCH_PAGE_SIZE = 100;
 type RowValidationReason =
   | "missingLocation"
   | "sameLocation"
-  | "noStock"
   | "invalidQuantity"
   | "exceedsStock";
 
@@ -95,10 +98,10 @@ function getRowValidationReason(
 ): RowValidationReason | null {
   if (!row.sourceLocationId || !row.destLocationId) return "missingLocation";
   if (row.sourceLocationId === row.destLocationId) return "sameLocation";
-  if (row.quantityOnHand <= 0) return "noStock";
 
+  // Cho phép chuyển 0 (đổi vị trí kể cả khi hết tồn); chỉ chặn số âm/không hợp lệ.
   const qty = Number(row.qty);
-  if (!Number.isFinite(qty) || qty <= 0) return "invalidQuantity";
+  if (!Number.isFinite(qty) || qty < 0) return "invalidQuantity";
   if (qty > row.quantityOnHand) return "exceedsStock";
   return null;
 }
@@ -106,7 +109,6 @@ function getRowValidationReason(
 const VALIDATION_LABELS: Record<RowValidationReason, string> = {
   missingLocation: "chưa chọn đủ vị trí nguồn/đích",
   sameLocation: "vị trí nguồn trùng vị trí đích",
-  noStock: "không có tồn kho tại vị trí nguồn",
   invalidQuantity: "chưa nhập số lượng chuyển hợp lệ",
   exceedsStock: "số lượng chuyển vượt quá tồn kho",
 };
@@ -159,10 +161,18 @@ export function TransferLocationDialog({
   const [loadingRows, setLoadingRows] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const [productPickerRowId, setProductPickerRowId] = useState<string | null>(
+    null,
+  );
+
   // ─── Lookup search functions ─────────────────────────────────────────────
 
-  const searchStorages = useCallback(async (query: string) => {
-    const params = new URLSearchParams({ page: "1", pageSize: "20" });
+  const searchStorages = useCallback(async (query: string, page: number, pageSize?: number) => {
+    const effectivePageSize = pageSize ?? 50;
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(effectivePageSize),
+    });
     const branchId = getActiveBranch();
     if (query.trim()) params.set("search", query.trim());
     if (branchId) params.set("branchId", branchId);
@@ -170,21 +180,36 @@ export function TransferLocationDialog({
     const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
       `/inventory/storages?${params}`,
     );
-    return data.data;
+    const fetched = data.page * data.pageSize;
+    return {
+      items: data.data,
+      hasMore: fetched < data.total,
+      total: data.total,
+    };
   }, []);
 
   const searchLocationsInStorage = useCallback(
-    (sid: string) => async (query: string) => {
-      const params = new URLSearchParams({ page: "1", pageSize: "20" });
+    (sid: string) => async (query: string, page: number, pageSize?: number) => {
+      if (!sid) return { items: [], hasMore: false, total: 0 };
+      const effectivePageSize = pageSize ?? 50;
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(effectivePageSize),
+        storageId: sid,
+        activeOnly: "true",
+      });
       const branchId = getActiveBranch();
       if (query.trim()) params.set("search", query.trim());
-      if (sid) params.set("storageId", sid);
       if (branchId) params.set("branchId", branchId);
-      params.set("activeOnly", "true");
       const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
         `/inventory/locations?${params}`,
       );
-      return data.data;
+      const fetched = data.page * data.pageSize;
+      return {
+        items: data.data,
+        hasMore: fetched < data.total,
+        total: data.total,
+      };
     },
     [],
   );
@@ -216,7 +241,7 @@ export function TransferLocationDialog({
           destLocationId: "",
           destLocationLabel: "",
           quantityOnHand,
-          qty: quantityOnHand > 0 ? String(quantityOnHand) : "",
+          qty: String(quantityOnHand),
         };
       }),
     );
@@ -258,7 +283,10 @@ export function TransferLocationDialog({
       if (!itemId || !locationCode) return;
       try {
         const onHand = await fetchOnHand(itemId, locationCode);
-        patchRow(uid, { quantityOnHand: onHand });
+        patchRow(uid, {
+          quantityOnHand: onHand,
+          qty: String(onHand),
+        });
         if (onHand <= 0) {
           toast.error(`Hàng này không có tồn ở vị trí ${locationCode}`);
         }
@@ -311,7 +339,7 @@ export function TransferLocationDialog({
         destLocationId,
         destLocationLabel,
         quantityOnHand: Number(r.quantity),
-        qty: "",
+        qty: String(Number(r.quantity)),
       }));
       setRows(mapped);
       if (mapped.length === 0) {
@@ -435,6 +463,75 @@ export function TransferLocationDialog({
     [rows, patchRow, refreshRowOnHand],
   );
 
+  // Select by product: expand ALL variants of the chosen product into multiple rows,
+  // inheriting the source/dest location of the origin row and defaulting qty to on-hand at source.
+  const applyProductSelection = useCallback(
+    async (result: ProductSelectResult) => {
+      if (!productPickerRowId || result.lines.length === 0) return;
+      const target = rows.find((r) => r.uid === productPickerRowId);
+      if (!target) return;
+
+      // Skip variants already present at the same source location to avoid duplicate rows.
+      const existingKeys = new Set(
+        rows
+          .filter((r) => r.uid !== productPickerRowId && r.itemId)
+          .map((r) => `${r.itemId}@${r.sourceLocationId}`),
+      );
+      const uniqueLines = result.lines.filter(
+        (line) => !existingKeys.has(`${line.itemId}@${target.sourceLocationId}`),
+      );
+      if (uniqueLines.length === 0) {
+        toast.warning("Các hàng hoá này đã có trong bảng");
+        setProductPickerRowId(null);
+        return;
+      }
+
+      // Fetch on-hand per variant at the source location (in parallel) to set the default qty.
+      let onHandByItem = new Map<string, number>();
+      if (target.sourceLocationCode) {
+        try {
+          const balances = await Promise.all(
+            uniqueLines.map(async (line) => ({
+              itemId: line.itemId,
+              onHand: await fetchOnHand(line.itemId, target.sourceLocationCode),
+            })),
+          );
+          onHandByItem = new Map(balances.map((b) => [b.itemId, b.onHand]));
+        } catch (err) {
+          toast.error(getUserFacingApiErrorMessage(err));
+        }
+      }
+
+      const newRows = uniqueLines.map<TransferRow>((line) => {
+        const onHand = onHandByItem.get(line.itemId) ?? 0;
+        return {
+          uid: crypto.randomUUID(),
+          itemId: line.itemId,
+          itemCode: line.sku,
+          itemName: line.name,
+          unit: line.unit,
+          storageName: target.storageName,
+          sourceLocationId: target.sourceLocationId,
+          sourceLocationLabel: target.sourceLocationLabel,
+          sourceLocationCode: target.sourceLocationCode,
+          destLocationId: target.destLocationId,
+          destLocationLabel: target.destLocationLabel,
+          quantityOnHand: onHand,
+          qty: String(onHand),
+        };
+      });
+
+      // Replace the origin row with the expanded variant rows (keep its position in the table).
+      setRows((prev) => {
+        const index = prev.findIndex((r) => r.uid === productPickerRowId);
+        if (index < 0) return prev;
+        return [...prev.slice(0, index), ...newRows, ...prev.slice(index + 1)];
+      });
+      setProductPickerRowId(null);
+    },
+    [productPickerRowId, rows, fetchOnHand],
+  );
+
   const selectSourceForRow = useCallback(
     (row: TransferRow, loc: InventoryLocation) => {
       patchRow(row.uid, {
@@ -531,6 +628,7 @@ export function TransferLocationDialog({
     setDestLocationId("");
     setDestLocationLabel("");
     setRows([]);
+    setProductPickerRowId(null);
   }, []);
 
   const handleOpenChange = useCallback(
@@ -557,9 +655,6 @@ export function TransferLocationDialog({
 
   const validRowCount = rows.filter(
     (row) => row.itemId && getRowValidationReason(row) === null,
-  ).length;
-  const zeroStockRowCount = rows.filter(
-    (row) => row.itemId && row.quantityOnHand <= 0,
   ).length;
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -718,9 +813,9 @@ export function TransferLocationDialog({
             <thead className="sticky top-0 z-10 bg-muted text-left [&_th]:bg-muted">
               <tr>
                 <th className="w-8 border-b px-2 py-2 text-center text-xs font-medium text-muted-foreground">#</th>
-                <th className="w-44 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Mã SKU</th>
+                <th className="w-68 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Mã SKU</th>
                 <th className="w-48 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Tên hàng hóa</th>
-                <th className="w-52 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Kho</th>
+                <th className="w-40 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Kho</th>
                 <th className="w-48 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
                   Vị trí hiện tại <span className="text-destructive">*</span>
                 </th>
@@ -773,6 +868,7 @@ export function TransferLocationDialog({
                           { key: "code", label: "Mã", className: "w-[110px] font-mono text-xs", render: (item) => item.code },
                           { key: "name", label: "Tên hàng hóa", render: (item) => item.name },
                         ]}
+                        onSearchButtonClick={() => setProductPickerRowId(row.uid)}
                         className="w-full"
                       />
                     </td>
@@ -853,16 +949,9 @@ export function TransferLocationDialog({
                         min={0}
                         step="any"
                         value={row.qty}
-                        disabled={
-                          !hasItem || !hasSource || row.quantityOnHand <= 0
-                        }
+                        disabled={!hasItem || !hasSource}
                         onChange={(e) => patchRow(row.uid, { qty: e.target.value })}
                         placeholder="0"
-                        title={
-                          row.quantityOnHand <= 0
-                            ? "Hàng hóa không có tồn kho tại vị trí nguồn"
-                            : undefined
-                        }
                         className={[
                           "w-full rounded border px-2 py-1 text-right text-sm tabular-nums",
                           "bg-background focus:outline-none focus:ring-1 focus:ring-ring",
@@ -934,11 +1023,6 @@ export function TransferLocationDialog({
             {validRowCount > 0 && (
               <span className="ml-2 text-foreground">· Sẽ chuyển {validRowCount} dòng</span>
             )}
-            {zeroStockRowCount > 0 ? (
-              <span className="ml-2 text-destructive">
-                · {zeroStockRowCount} dòng tồn kho = 0
-              </span>
-            ) : null}
           </span>
         </div>
         <div className="flex gap-2">
@@ -962,6 +1046,25 @@ export function TransferLocationDialog({
           </Button>
         </div>
       </div>
+
+      {productPickerRowId ? (
+        <ProductSelectDialog
+          open
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setProductPickerRowId(null);
+          }}
+          title="Chọn hàng hóa"
+          resolveSelectedLines
+          initialSelectedIds={
+            new Set(
+              [rows.find((row) => row.uid === productPickerRowId)?.itemId].filter(
+                (id): id is string => Boolean(id),
+              ),
+            )
+          }
+          onConfirm={(result) => void applyProductSelection(result)}
+        />
+      ) : null}
     </AppModal>
   );
 }

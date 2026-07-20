@@ -29,8 +29,9 @@ export interface StockTransferResult {
 
 export async function createIntraWarehouseTransfer(
   payload: CreateIntraWarehouseTransferPayload,
-): Promise<StockTransferResult> {
-  const { data } = await apiClient.post<StockTransferResult>(
+): Promise<StockTransferResult | null> {
+  // Đổi vị trí không sinh phiếu nên response có thể rỗng (null).
+  const { data } = await apiClient.post<StockTransferResult | null>(
     "/inventory/stock/transfers/intra-warehouse",
     payload,
   );

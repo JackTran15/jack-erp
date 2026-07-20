@@ -15,10 +15,10 @@ class IntraWarehouseTransferLineDto {
   @IsUUID()
   itemId!: string;
 
-  @ApiProperty({ description: 'Quantity to transfer (must be > 0)' })
+  @ApiProperty({ description: 'Quantity to transfer (>= 0; 0 = đổi vị trí kể cả khi hết tồn)' })
   @Type(() => Number)
   @IsNumber()
-  @Min(0.000001)
+  @Min(0)
   quantity!: number;
 
   @ApiPropertyOptional({
