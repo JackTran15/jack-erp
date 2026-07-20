@@ -32,6 +32,12 @@ export enum ReportFilterOptionType {
   UNIT = 'unit',
   /** Org-scoped storages (kho) — inventory reports only. */
   WAREHOUSE = 'warehouse',
+  /** Customer groups — debt reports only. */
+  CUSTOMER_GROUP = 'customerGroup',
+  /** Suppliers (inventory_providers) — debt reports only. */
+  SUPPLIER = 'supplier',
+  /** Supplier groups (provider_groups) — debt reports only. */
+  SUPPLIER_GROUP = 'supplierGroup',
   // Static enums
   INVOICE_STATUS = 'invoiceStatus',
   STAT_DATE_TYPE = 'statDateType',

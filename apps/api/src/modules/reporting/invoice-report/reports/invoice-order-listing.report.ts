@@ -49,7 +49,7 @@ import {
   resolveBranchIds,
   signedGoods,
   statDateColumn,
-} from '../report-query.util';
+} from '../../report-core/report-query.util';
 import { ReportDefinition } from '../report-definition';
 
 const band = (id: ListingBandId | null): ReportColumnGroup | null =>

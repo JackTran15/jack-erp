@@ -3,6 +3,7 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentNumberingModule } from '../document-numbering/document-numbering.module';
 import { StockLedgerModule } from '../inventory/ledger/stock-ledger.module';
+import { ItemCostSnapshotModule } from '../inventory/location/item-cost-snapshot.module';
 import { AccountingModule } from '../accounting/accounting.module';
 import { EventsModule } from '../events/events.module';
 import { WebSocketModule } from '../websocket/websocket.module';
@@ -86,6 +87,7 @@ import { StockReturnInPublisher } from './publishers/stock-return-in.publisher';
     ]),
     DocumentNumberingModule,
     StockLedgerModule,
+    ItemCostSnapshotModule,
     AccountingModule,
     EventsModule,
     WebSocketModule,

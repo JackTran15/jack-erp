@@ -1499,3 +1499,53 @@ flowchart LR
   D3 --> D4
 ```
 
+### EPIC-15072026 Báo cáo công nợ (Debt Reports)
+
+- [EPIC-15072026 Báo cáo công nợ](./epics/EPIC-15072026-debt-reports.md)
+- Đặc tả đầy đủ: [`docs/24-debt-reports-spec.md`](../docs/24-debt-reports-spec.md).
+  4 báo cáo: **Công nợ khách hàng** (key mới `CUSTOMER_DEBTS`), **Chi tiết công nợ
+  phải thu theo mặt hàng**, **Công nợ nhà cung cấp**, **Chi tiết công nợ nhà cung
+  cấp theo chứng từ và mặt hàng**. Ngoài phạm vi: "Công nợ đối tác giao hàng" (chưa
+  có entity nguồn) và báo cáo tuổi nợ (thiếu dữ liệu hạn thanh toán). **Không
+  migration/entity mới** — tái dùng toàn bộ entity đã có; cột %CK/Tiền CK/Thuế
+  suất/Tiền thuế ở báo cáo #4 hard-code 0 đến khi có entity riêng. Backend: module
+  mới `reporting/debt-report/` theo pattern 3-API registry-driven (giống
+  `invoice-report/`), `DebtPeriodService` mới (không có sẵn CTE dùng chung cho
+  công nợ). Frontend: thêm `backendSource: "debt"` (giá trị thứ 3, phải wire ở 3
+  chỗ hardcode: `report-data-source.ts`, `report-filter-options.api.ts`,
+  `report-template.api.ts`); category "Công nợ" đã có key nhưng đang comment out —
+  chỉ cần uncomment + thêm route (không cần component riêng, `ReportPage` generic
+  100%). Điểm rủi ro cao nhất: báo cáo #4 dùng **số luỹ kế (cumulative)** cho công
+  nợ tăng/giảm, khác hẳn báo cáo #2 (delta/dòng) — dễ code nhầm nếu copy pattern.
+
+| Ticket | Mô tả |
+| ------ | ----- |
+| [TKT-DBT-01](./tickets/TKT-DBT-01-backend-module-scaffold.md) | BE: module scaffold + `DebtPeriodService` (CTE period-ledger dùng chung) + permission seed |
+| [TKT-DBT-02](./tickets/TKT-DBT-02-be-customer-debts.md) | BE: Công nợ khách hàng — gộp nợ POS + sổ kế toán, luôn cross-branch |
+| [TKT-DBT-03](./tickets/TKT-DBT-03-be-receivables-detail.md) | BE: Chi tiết công nợ phải thu theo mặt hàng — group+subtotal+running balance |
+| [TKT-DBT-04](./tickets/TKT-DBT-04-be-supplier-debts.md) | BE: Công nợ nhà cung cấp — mặc định gộp chuỗi, filter phụ branchId |
+| [TKT-DBT-05](./tickets/TKT-DBT-05-be-supplier-debts-detail.md) | BE: Chi tiết công nợ NCC theo chứng từ và mặt hàng — cumulative, KHÔNG phải delta |
+| [TKT-DBT-06](./tickets/TKT-DBT-06-openapi-regen.md) | OpenAPI regen + api-client snapshot |
+| [TKT-DBT-07](./tickets/TKT-DBT-07-fe-data-layer.md) | FE: `api/debt-reports.ts` + wire `backendSource: "debt"` ở 3 chỗ hardcode |
+| [TKT-DBT-08](./tickets/TKT-DBT-08-fe-constants.md) | FE: enum `CUSTOMER_DEBTS` + `ReportTableColumn`/`REPORT_FILTERS_LINE` mới |
+| [TKT-DBT-09](./tickets/TKT-DBT-09-fe-registries.md) | FE: 4 registry filter/table + wire `REPORT_TYPE_DEBTS_METADATA` |
+| [TKT-DBT-10](./tickets/TKT-DBT-10-fe-nav-route.md) | FE: uncomment category "Công nợ" + route `/reports/debts` |
+| [TKT-DBT-11](./tickets/TKT-DBT-11-test-plan.md) | E2E (4 báo cáo) + regression + DoD gate |
+
+```mermaid
+flowchart LR
+  T1["DBT-01 Module scaffold + DebtPeriodService"] --> T2["DBT-02 Customer debts"]
+  T1 --> T3["DBT-03 Receivables detail"]
+  T1 --> T4["DBT-04 Supplier debts"]
+  T1 --> T5["DBT-05 Supplier debts detail"]
+  T2 --> T6["DBT-06 OpenAPI regen"]
+  T3 --> T6
+  T4 --> T6
+  T5 --> T6
+  T6 --> T7["DBT-07 FE data layer"]
+  T7 --> T8["DBT-08 FE constants"]
+  T8 --> T9["DBT-09 FE registries"]
+  T9 --> T10["DBT-10 FE nav + route"]
+  T10 --> T11["DBT-11 E2E + DoD"]
+```
+
