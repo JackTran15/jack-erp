@@ -1,12 +1,11 @@
 /**
- * Re-sync permission catalogue + assign full catalogue to seeded system admin role.
- * Use when new permissions were added to permissions.seed.ts but role_permissions
- * was not updated (e.g. after EPIC cash vouchers).
+ * Re-sync permission catalogue + re-assign the standard permission set to every
+ * seeded system role, IN EVERY ORGANIZATION (matched by role name, not a
+ * hardcoded org/role id). Use when new permissions were added to
+ * permissions.seed.ts but role_permissions was not updated (e.g. after EPIC
+ * cash vouchers).
  *
  * Run: pnpm --filter @erp/api seed:sync-admin-permissions
- *
- * Dev admin: inventory.admin@erp.local → role "Quản trị hệ thống"
- * (role id 40000000-0000-4000-8000-000000000001)
  */
 import { AppDataSource } from '../data-source';
 import { PERMISSION_SEEDS } from '../../modules/rbac/permissions.seed';
@@ -18,11 +17,12 @@ import {
   SYSTEM_ADMIN_PERMISSION_KEYS,
 } from './org-role-permissions';
 
-const SEED_ORG_ID = '10000000-0000-4000-8000-000000000001';
-const ROLE_SYSTEM_ADMIN = '40000000-0000-4000-8000-000000000001';
-const ROLE_GENERAL_MANAGER = '40000000-0000-4000-8000-000000000003';
-const ROLE_BRANCH_MANAGER = '40000000-0000-4000-8000-000000000004';
-const ROLE_STAFF = '40000000-0000-4000-8000-000000000005';
+const PERMISSION_KEYS_BY_ROLE_NAME: Record<string, string[]> = {
+  [SEED_ROLE_NAMES.SYSTEM_ADMIN]: SYSTEM_ADMIN_PERMISSION_KEYS,
+  [SEED_ROLE_NAMES.GENERAL_MANAGER]: GENERAL_MANAGER_PERMISSION_KEYS,
+  [SEED_ROLE_NAMES.BRANCH_MANAGER]: BRANCH_MANAGER_PERMISSION_KEYS,
+  [SEED_ROLE_NAMES.STAFF]: STAFF_PERMISSION_KEYS,
+};
 
 async function upsertPermissions(): Promise<void> {
   for (const permission of PERMISSION_SEEDS) {
@@ -47,21 +47,19 @@ async function assignPermissionsToRole(
     `DELETE FROM role_permissions WHERE role_id = $1`,
     [roleId],
   );
-  let assigned = 0;
-  for (const key of permissionKeys) {
-    const result = await AppDataSource.query(
-      `
-      INSERT INTO role_permissions (id, role_id, permission_id)
-      SELECT gen_random_uuid(), $1, p.id
-      FROM permissions p
-      WHERE p.key = $2
-      ON CONFLICT (role_id, permission_id) DO NOTHING
-      `,
-      [roleId, key],
-    );
-    if (result[1] > 0) assigned += 1;
-  }
-  return assigned;
+  if (permissionKeys.length === 0) return 0;
+  const result = await AppDataSource.query(
+    `
+    INSERT INTO role_permissions (id, role_id, permission_id)
+    SELECT gen_random_uuid(), $1, p.id
+    FROM permissions p
+    WHERE p.key = ANY($2::text[])
+    ON CONFLICT (role_id, permission_id) DO NOTHING
+    RETURNING id
+    `,
+    [roleId, permissionKeys],
+  );
+  return result.length;
 }
 
 async function run(): Promise<void> {
@@ -70,38 +68,22 @@ async function run(): Promise<void> {
     await upsertPermissions();
     console.log(`Upserted ${PERMISSION_SEEDS.length} permissions from catalogue.`);
 
-    const adminCount = await assignPermissionsToRole(
-      ROLE_SYSTEM_ADMIN,
-      SYSTEM_ADMIN_PERMISSION_KEYS,
-    );
-    console.log(
-      `Role "${SEED_ROLE_NAMES.SYSTEM_ADMIN}" (${ROLE_SYSTEM_ADMIN}): ${adminCount} permission links.`,
-    );
-
-    await assignPermissionsToRole(
-      ROLE_GENERAL_MANAGER,
-      GENERAL_MANAGER_PERMISSION_KEYS,
-    );
-    await assignPermissionsToRole(
-      ROLE_BRANCH_MANAGER,
-      BRANCH_MANAGER_PERMISSION_KEYS,
-    );
-    await assignPermissionsToRole(ROLE_STAFF, STAFF_PERMISSION_KEYS);
-
-    const users = await AppDataSource.query<
-      { email: string; role_name: string }[]
+    const roles = await AppDataSource.query<
+      { id: string; name: string; organization_id: string }[]
     >(
-      `
-      SELECT u.email, r.name AS role_name
-      FROM users u
-      JOIN user_roles ur ON ur.user_id = u.id AND ur.organization_id = u.organization_id
-      JOIN roles r ON r.id = ur.role_id
-      WHERE u.organization_id = $1
-        AND u.email IN ('inventory.admin@erp.local', 'admin@erp.local')
-      `,
-      [SEED_ORG_ID],
+      `SELECT id, name, organization_id FROM roles WHERE name = ANY($1::text[])`,
+      [Object.keys(PERMISSION_KEYS_BY_ROLE_NAME)],
     );
-    console.log('Dev users and roles:', users);
+
+    for (const role of roles) {
+      const count = await assignPermissionsToRole(
+        role.id,
+        PERMISSION_KEYS_BY_ROLE_NAME[role.name],
+      );
+      console.log(
+        `Role "${role.name}" (${role.id}, org ${role.organization_id}): ${count} permission links.`,
+      );
+    }
 
     console.log(
       'Done. Log out and log in again (or wait for access token refresh) to load new permissions.',

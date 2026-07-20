@@ -140,3 +140,59 @@ describe('CreateExchangeInvoiceService.buildNewLineEntities — showroom locatio
     expect(entity.locationId).toBe(LOC_WAREHOUSE);
   });
 });
+
+describe('CreateExchangeInvoiceService.create — costPrice on the returned (IN) line', () => {
+  it('copies the ORIGINAL sale line costPrice onto the returned leg, not 0', async () => {
+    const manager = makeManager({
+      catalog: [{ id: ITEM, organizationId: ORG, sellingPrice: 100, purchasePrice: 60 }],
+      storages: [],
+      isl: [],
+      locations: [],
+    });
+    (manager as unknown as { save: jest.Mock }).save = jest.fn(async (obj: unknown) =>
+      Array.isArray(obj) ? obj : { ...(obj as Record<string, unknown>), id: 'invoice-1' },
+    );
+    const dataSource = { transaction: (cb: (m: EntityManager) => unknown) => cb(manager) };
+    const eligibility = {
+      assertLineEligible: jest.fn(
+        async () => ({ id: 'orig-item-1', costPrice: 45 }) as InvoiceItemEntity,
+      ),
+    };
+
+    const service = new CreateExchangeInvoiceService(
+      {} as never,
+      dataSource as never,
+      eligibility as never,
+    );
+
+    await service.create(
+      {
+        originalInvoiceId: 'orig-invoice-1',
+        sessionId: 'session-1',
+        reason: 'Đổi hàng',
+        returnLines: [
+          {
+            originalInvoiceItemId: 'orig-item-1',
+            itemId: ITEM,
+            itemCode: 'SKU-1',
+            itemName: 'Áo thun',
+            unit: 'cái',
+            locationId: 'loc-fe',
+            quantity: 1,
+            unitPrice: 100,
+          },
+        ],
+        newLines: [newLine],
+      } as never,
+      actor,
+    );
+
+    const saveCalls = (manager as unknown as { save: jest.Mock }).save.mock.calls;
+    // The invoice entity is saved first (a single object), then returnItems
+    // (an array), then the new/OUT lines (another array) — returnItems is the
+    // first array-shaped save call.
+    const [returnItems] = saveCalls.find(([arg]) => Array.isArray(arg))!;
+    expect((returnItems as InvoiceItemEntity[])[0].costPrice).toBe(45);
+    expect((returnItems as InvoiceItemEntity[])[0].direction).toBe(ItemDirection.IN);
+  });
+});

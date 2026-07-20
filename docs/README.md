@@ -41,6 +41,7 @@ This folder contains the enterprise-ready blueprint for building an ERP system w
 - [Document Numbering Rules](./19-document-numbering-rules.md)
 - [Realtime WebSocket Service](./20-realtime-websocket-service.md)
 - [Generic CRUD Platform](./21-generic-crud-platform.md)
+- [Debt Reports Spec](./24-debt-reports-spec.md)
 
 ### Entity Schema Reference
 

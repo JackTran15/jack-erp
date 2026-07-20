@@ -14,6 +14,7 @@ export enum ReportTableColumn {
   PRODUCT_BRAND = 'product_brand',
   PRODUCT_IMAGE = 'product_image',
   UNIT = 'unit',
+  LOCATION = 'location',
   QUANTITY = 'quantity',
   QUANTITY_SOLD = 'quantity_sold',
 
@@ -71,11 +72,38 @@ export enum ReportTableColumn {
   DEBT_CUSTOMER = 'debt_customer',
   DEBT_SUPPLIER = 'debt_supplier',
 
+  // === Công nợ (sổ theo kỳ — báo cáo #1 Công nợ khách hàng, #3 Công nợ nhà cung cấp) ===
+  DEBT_OPENING = 'debt_opening',
+  DEBT_INCREASE = 'debt_increase',
+  DEBT_DECREASE = 'debt_decrease',
+  DEBT_CLOSING = 'debt_closing',
+
+  // === Công nợ (chi tiết theo chứng từ — báo cáo #2, #4) ===
+  DOCUMENT_NUMBER = 'document_number',
+  DOCUMENT_TYPE = 'document_type',
+  DOCUMENT_DESCRIPTION = 'document_description',
+  LINE_TOTAL_AMOUNT = 'line_total_amount',
+  LINE_COLLECTED_AMOUNT = 'line_collected_amount',
+  LINE_DEBT_INCREASE = 'line_debt_increase',
+  LINE_DEBT_DECREASE = 'line_debt_decrease',
+  RUNNING_BALANCE = 'running_balance',
+  CUMULATIVE_DEBT_INCREASE = 'cumulative_debt_increase',
+  CUMULATIVE_DEBT_DECREASE = 'cumulative_debt_decrease',
+  DISCOUNT_PERCENT = 'discount_percent',
+  DISCOUNT_AMOUNT = 'discount_amount',
+  TAX_RATE = 'tax_rate',
+  TAX_AMOUNT = 'tax_amount',
+  PAYMENT_AMOUNT_TOTAL = 'payment_amount_total',
+
   // === Khách hàng ===
   CUSTOMER_CODE = 'customer_code',
   CUSTOMER_NAME = 'customer_name',
   CUSTOMER_PHONE = 'customer_phone',
   CUSTOMER_GROUP = 'customer_group',
+  CUSTOMER_EMAIL = 'customer_email',
+  ADDRESS = 'address',
+  MEMBERSHIP_CARD_NUMBER = 'membership_card_number',
+  MEMBERSHIP_TIER = 'membership_tier',
 
   // === Nhân viên & Thu ngân ===
   CASHIER_CODE = 'cashier_code',
@@ -104,6 +132,22 @@ export enum ReportTableColumn {
   REFERENCE_CODE = 'reference_code',
   CREATED_BY = 'created_by',
   RECEIVER_NAME = 'receiver_name',
+
+  // === Lợi nhuận (báo cáo #1 profit-by-item, #2 gross-profit-by-invoice) ===
+  PRODUCT_GROUP_CODE = 'product_group_code',
+  COST_OF_GOODS = 'cost_of_goods',
+  GROSS_PROFIT = 'gross_profit',
+  PROFIT_PER_UNIT = 'profit_per_unit',
+  MARGIN_ON_REVENUE = 'margin_on_revenue',
+  MARGIN_ON_COST = 'margin_on_cost',
+  GROSS_GOODS_TOTAL = 'gross_goods_total',
+
+  // === Lợi nhuận — Kết quả kinh doanh (#3, dòng "Khoản mục" cố định) ===
+  LINE_ITEM_LABEL = 'line_item_label',
+  PERIOD_PREVIOUS = 'period_previous',
+  PERIOD_CURRENT = 'period_current',
+  PERIOD_CHANGE_PERCENT = 'period_change_percent',
+  PERIOD_CHANGE_AMOUNT = 'period_change_amount',
 }
 
 export enum ReportTableColumnGroup {
@@ -159,6 +203,7 @@ export const ReportTableColumnLabel = {
   [ReportTableColumn.PRODUCT_BRAND]: 'Thương hiệu',
   [ReportTableColumn.PRODUCT_IMAGE]: 'Ảnh sản phẩm',
   [ReportTableColumn.UNIT]: 'Đơn vị',
+  [ReportTableColumn.LOCATION]: 'Vị trí',
   [ReportTableColumn.QUANTITY]: 'Số lượng',
   [ReportTableColumn.QUANTITY_SOLD]: 'Số lượng bán',
 
@@ -211,10 +256,35 @@ export const ReportTableColumnLabel = {
   [ReportTableColumn.DEBT_CUSTOMER]: 'Công nợ khách hàng',
   [ReportTableColumn.DEBT_SUPPLIER]: 'Công nợ nhà cung cấp',
 
+  [ReportTableColumn.DEBT_OPENING]: 'Nợ đầu kỳ',
+  [ReportTableColumn.DEBT_INCREASE]: 'Tăng trong kỳ',
+  [ReportTableColumn.DEBT_DECREASE]: 'Giảm trong kỳ',
+  [ReportTableColumn.DEBT_CLOSING]: 'Nợ cuối kỳ',
+
+  [ReportTableColumn.DOCUMENT_NUMBER]: 'Số chứng từ',
+  [ReportTableColumn.DOCUMENT_TYPE]: 'Loại chứng từ',
+  [ReportTableColumn.DOCUMENT_DESCRIPTION]: 'Diễn giải',
+  [ReportTableColumn.LINE_TOTAL_AMOUNT]: 'Thành tiền',
+  [ReportTableColumn.LINE_COLLECTED_AMOUNT]: 'Đã thu',
+  [ReportTableColumn.LINE_DEBT_INCREASE]: 'Nợ tăng',
+  [ReportTableColumn.LINE_DEBT_DECREASE]: 'Nợ giảm',
+  [ReportTableColumn.RUNNING_BALANCE]: 'Số dư cuối kỳ',
+  [ReportTableColumn.CUMULATIVE_DEBT_INCREASE]: 'Công nợ tăng trong kỳ',
+  [ReportTableColumn.CUMULATIVE_DEBT_DECREASE]: 'Công nợ giảm trong kỳ',
+  [ReportTableColumn.DISCOUNT_PERCENT]: '% CK',
+  [ReportTableColumn.DISCOUNT_AMOUNT]: 'Tiền CK',
+  [ReportTableColumn.TAX_RATE]: 'Thuế suất',
+  [ReportTableColumn.TAX_AMOUNT]: 'Tiền thuế',
+  [ReportTableColumn.PAYMENT_AMOUNT_TOTAL]: 'Tiền thanh toán',
+
   [ReportTableColumn.CUSTOMER_CODE]: 'Mã khách hàng',
   [ReportTableColumn.CUSTOMER_NAME]: 'Tên khách hàng',
   [ReportTableColumn.CUSTOMER_PHONE]: 'Số điện thoại khách hàng',
   [ReportTableColumn.CUSTOMER_GROUP]: 'Nhóm khách hàng',
+  [ReportTableColumn.CUSTOMER_EMAIL]: 'Email',
+  [ReportTableColumn.ADDRESS]: 'Địa chỉ',
+  [ReportTableColumn.MEMBERSHIP_CARD_NUMBER]: 'Mã thẻ thành viên',
+  [ReportTableColumn.MEMBERSHIP_TIER]: 'Hạng thẻ',
 
   [ReportTableColumn.CASHIER_CODE]: 'Mã thu ngân',
   [ReportTableColumn.CASHIER_NAME]: 'Tên thu ngân',
@@ -238,4 +308,18 @@ export const ReportTableColumnLabel = {
   [ReportTableColumn.REFERENCE_CODE]: 'Mã tham chiếu',
   [ReportTableColumn.CREATED_BY]: 'Người tạo',
   [ReportTableColumn.RECEIVER_NAME]: 'Tên người nhận',
+
+  [ReportTableColumn.PRODUCT_GROUP_CODE]: 'Mã nhóm hàng hóa',
+  [ReportTableColumn.COST_OF_GOODS]: 'Giá vốn (GV)',
+  [ReportTableColumn.GROSS_PROFIT]: 'Lợi nhuận (LN)',
+  [ReportTableColumn.PROFIT_PER_UNIT]: 'Lợi nhuận đơn vị',
+  [ReportTableColumn.MARGIN_ON_REVENUE]: 'Tỷ lệ LN/DT',
+  [ReportTableColumn.MARGIN_ON_COST]: 'Tỷ lệ LN/GV',
+  [ReportTableColumn.GROSS_GOODS_TOTAL]: 'Tổng tiền hàng',
+
+  [ReportTableColumn.LINE_ITEM_LABEL]: 'Khoản mục',
+  [ReportTableColumn.PERIOD_PREVIOUS]: 'Kỳ trước',
+  [ReportTableColumn.PERIOD_CURRENT]: 'Kỳ hiện tại',
+  [ReportTableColumn.PERIOD_CHANGE_PERCENT]: 'Thay đổi (%)',
+  [ReportTableColumn.PERIOD_CHANGE_AMOUNT]: 'Thay đổi (Số tiền)',
 };

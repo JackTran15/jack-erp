@@ -35,7 +35,7 @@ import {
   applyInvoiceStatusFilter,
   CONSOLIDATED_PERMISSION,
   resolveBranchIds,
-} from '../report-query.util';
+} from '../../report-core/report-query.util';
 import { ReportDefinition } from '../report-definition';
 
 interface ItemMeta {
