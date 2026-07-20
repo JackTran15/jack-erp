@@ -61,6 +61,9 @@ export const CHECKOUT_TOASTS = {
   ESTIMATE_FAILED: "Không in được hóa đơn tạm tính",
   /** BE 400 khi POST /invoices/:id/redeem-points (thẻ/balance/giá trị đơn). */
   REDEEM_FAILED: "Áp dụng điểm thất bại",
+  /** Thu ngân gõ SL âm ở dòng bán — giá trị bị kẹp về mức tối thiểu. */
+  NEGATIVE_QTY_CLAMPED:
+    "Số lượng bán không thể là số âm — đã đặt về 1. Muốn trả hàng, hãy dùng chức năng đổi/trả.",
 } as const;
 
 /**

@@ -163,6 +163,10 @@ interface PosCheckoutSessionState {
    * session) theo catalog mới nhất — icon cảnh báo vượt tồn phản ánh tồn kho
    * hiện tại. Bỏ qua dòng `isReturnCredit` (maxQty = SL được phép trả) và
    * `returnCart` (maxQty là trần SL trả của quick-exchange).
+   *
+   * Dòng không có trong catalog được đánh dấu `onHandUnknown` (không im lặng bỏ
+   * qua): hàng chưa có `stock_balances` tại chi nhánh = tồn 0, bán ra là bán
+   * khống thật nên phải cảnh báo.
    */
   syncPurchaseCartOnHand: (catalog: PosCatalogLine[]) => void;
   setSelectedLinePurchaseId: (id: string | null) => void;
@@ -335,14 +339,22 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
           const purchaseCart = s.purchaseCart.map((l) => {
             if (l.isReturnCredit) return l;
             const product = byItemId.get(l.itemId);
-            if (!product) return l;
+            if (!product) {
+              // Không có trong catalog (hàng untracked, hoặc nằm ngoài giới hạn
+              // kết quả tìm kiếm) → snapshot tồn KHÔNG đáng tin. Trước đây bỏ
+              // qua im lặng, khiến dòng khôi phục từ nháp không bao giờ được
+              // cảnh báo. Đánh dấu chưa-biết-tồn thay vì lặng lẽ cho qua.
+              if (l.onHandUnknown) return l;
+              cartChanged = true;
+              return { ...l, onHandUnknown: true };
+            }
             // `quantityOnHand` = SUM tồn toàn chi nhánh — con số chuẩn cho cảnh
             // báo vượt tồn. KHÔNG dùng locations[] (breakdown per-location có
             // thể chứa cặp +/− bù trừ do BE trừ kho ở vị trí showroom mặc định).
             const fresh = product.quantityOnHand;
-            if (fresh === l.maxQty) return l;
+            if (fresh === l.maxQty && !l.onHandUnknown) return l;
             cartChanged = true;
-            return { ...l, maxQty: fresh };
+            return { ...l, maxQty: fresh, onHandUnknown: false };
           });
           if (!cartChanged) return s;
           changed = true;

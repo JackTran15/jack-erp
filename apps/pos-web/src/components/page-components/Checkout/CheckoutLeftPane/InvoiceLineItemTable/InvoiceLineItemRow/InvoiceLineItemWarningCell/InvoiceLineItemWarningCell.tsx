@@ -7,6 +7,11 @@ export interface InvoiceLineItemWarningCellProps {
   oversell: boolean;
   /** On-hand snapshot (`maxQty`) shown in oversell tooltip. */
   onHandQty: number;
+  /**
+   * Chưa xác định được tồn (dòng khôi phục từ nháp / chưa sync được catalog).
+   * Khi true, `onHandQty` không đáng tin nên KHÔNG hiển thị con số.
+   */
+  onHandUnknown?: boolean;
 }
 
 function WarningBadge({
@@ -35,6 +40,7 @@ export function InvoiceLineItemWarningCell({
   hasWarning,
   oversell,
   onHandQty,
+  onHandUnknown,
 }: InvoiceLineItemWarningCellProps) {
   if (!hasWarning) return null;
 
@@ -49,12 +55,21 @@ export function InvoiceLineItemWarningCell({
           className="max-w-[240px] border border-gray-200 bg-gray-900/80 px-3 py-2 text-left text-[12px] leading-snug text-white shadow-lg"
         >
           <div className="flex flex-col space-y-1">
-            <p className="font-semibold">Hàng hóa quá số lượng tồn</p>
+            {onHandUnknown ? (
+              <>
+                <p className="font-semibold">Chưa xác định được tồn kho</p>
+                <p>Hãy kiểm tra tồn trước khi bán.</p>
+              </>
+            ) : (
+              <>
+                <p className="font-semibold">Hàng hóa quá số lượng tồn</p>
 
-            <div className="flex items-center gap-2 justify-between">
-              <p>Tồn: {qtyFormatter.format(onHandQty)}</p>
-              <p>Khách đặt: 0</p>
-            </div>
+                <div className="flex items-center gap-2 justify-between">
+                  <p>Tồn: {qtyFormatter.format(onHandQty)}</p>
+                  <p>Khách đặt: 0</p>
+                </div>
+              </>
+            )}
           </div>
         </TooltipContent>
       </Tooltip>

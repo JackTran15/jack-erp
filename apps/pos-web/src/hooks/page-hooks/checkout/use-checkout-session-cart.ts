@@ -16,9 +16,12 @@ import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import { isCartLineWarning } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
   clampPosCheckoutQtyNumber,
+  isPosQtyRawNegative,
   POS_CHECKOUT_QTY_MIN,
   safePosCheckoutQtyFromRaw,
 } from "@erp/pos/lib/page-libs/checkout/posCheckoutQty";
+import { CHECKOUT_TOASTS } from "@erp/pos/constants/checkout-messages.constant";
+import { toast } from "sonner";
 import { clampReturnQty } from "@erp/pos/lib/page-libs/return-goods/returnGoodsMath";
 import { netSessionGrandTotal } from "@erp/pos/lib/page-libs/checkout/checkoutSessionTotals";
 
@@ -200,7 +203,7 @@ export function useCheckoutSessionCart() {
           // merge giữ snapshot từ lần thêm đầu sẽ báo vượt tồn sai.
           return prev.map((l) =>
             l.lineId === existingInPrev.lineId
-              ? { ...l, qty: l.qty + delta, maxQty: onHand }
+              ? { ...l, qty: l.qty + delta, maxQty: onHand, onHandUnknown: false }
               : l,
           );
         }
@@ -266,11 +269,22 @@ export function useCheckoutSessionCart() {
         // SL âm cho mọi dòng hàng trả (QE returnCart hoặc IR return-credit) —
         // theo từng dòng, không theo pane (vì hiển thị gộp).
         const signedReturnUi = isReturnLine(line);
+        // Dòng bán: SL âm bị kẹp về mức tối thiểu — báo cho thu ngân biết thay
+        // vì đổi số im lặng. `id` cố định để gõ liên tục không dồn toast.
+        if (!signedReturnUi && isPosQtyRawNegative(raw)) {
+          toast.warning(CHECKOUT_TOASTS.NEGATIVE_QTY_CLAMPED, {
+            id: "pos-negative-qty",
+          });
+        }
         const safe = safePosCheckoutQtyFromRaw(raw, {
           treatAsSignedReturnMagnitude: signedReturnUi,
         });
         let nextQty = safe;
-        if (line.isReturnCredit) {
+        // Kẹp theo trần SL trả cho MỌI dòng trả — dòng quick-exchange nằm ở
+        // `returnCart` và KHÔNG mang cờ `isReturnCredit`, nên trước đây gõ tay
+        // vượt `maxQty` lọt qua cả chốt này lẫn `validateCheckout`; nút stepper
+        // là chốt duy nhất còn lại và gõ tay thì bypass được nó.
+        if (signedReturnUi) {
           const capped = clampReturnQty(safe, line.maxQty);
           nextQty = capped > 0 ? capped : POS_CHECKOUT_QTY_MIN;
         }
@@ -289,13 +303,14 @@ export function useCheckoutSessionCart() {
         if (!line) return prev;
         let next = line.qty + delta;
         if (next < 1) return prev;
-        if (line.isReturnCredit) {
+        // Cùng lý do với `updateQty`: trần SL trả áp cho mọi dòng trả.
+        if (isReturnLine(line)) {
           next = Math.min(next, Math.max(line.maxQty, 1));
         }
         return prev.map((x) => (x.lineId === lineId ? { ...x, qty: next } : x));
       });
     },
-    [updateCartForLine],
+    [updateCartForLine, isReturnLine],
   );
 
   const updateLineDiscount = useCallback(

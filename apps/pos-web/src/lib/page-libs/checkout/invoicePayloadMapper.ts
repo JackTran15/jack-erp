@@ -2,6 +2,7 @@ import { PAYMENT_METHOD_TO_API_METHOD } from "@erp/pos/constants/checkout.consta
 import type { PaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
+import { clampPosCheckoutQtyNumber } from "@erp/pos/lib/page-libs/checkout/posCheckoutQty";
 import type {
   CheckoutInvoiceBody,
   CreateInvoiceBody,
@@ -156,9 +157,17 @@ export function mapInvoiceRowToDraftInvoice(
       code: item.itemCode,
       unit: item.unit,
       unitPrice: Number(item.unitPrice) || 0,
-      qty: Number(item.quantity) || 0,
+      // Đây là đường DUY NHẤT dựng `CartLine` không đi qua ô nhập SL, nên phải
+      // tự kẹp: dòng nháp lỗi/legacy từng sinh ra `qty: 0` mà không validation
+      // nào bắt được trước lúc submit.
+      qty: clampPosCheckoutQtyNumber(Number(item.quantity) || 0),
       locationId: item.locationId ?? "",
-      maxQty: Number.MAX_SAFE_INTEGER,
+      // Hóa đơn nháp không kèm tồn kho. KHÔNG dùng sentinel vô hạn ở đây —
+      // `qty > maxQty` sẽ vĩnh viễn false và tắt sạch cảnh báo bán vượt tồn.
+      // Đánh dấu chưa-biết-tồn để `syncPurchaseCartOnHand` điền số thật, và để
+      // cảnh báo vẫn bật trong lúc chờ sync.
+      maxQty: 0,
+      onHandUnknown: true,
     };
     if (item.note) line.note = item.note;
     // Chỉ KM thủ công (có type+value+reason) mới dựng lại được CartLineDiscount;
