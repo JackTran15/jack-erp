@@ -89,7 +89,6 @@ export function InventoryItemBarcodesPage() {
         storageName: p.storageName ?? "",
         locationId: p.locationId ?? "",
         locationCode: p.locationCode ?? "",
-        quantity: 1,
       })),
       makeEmptyRow(),
     ];
@@ -297,7 +296,6 @@ export function InventoryItemBarcodesPage() {
                 name: item.name,
                 unit: item.unit ?? "",
                 sellingPrice: Number(item.sellingPrice ?? 0),
-                quantity: r.quantity > 0 ? r.quantity : 1,
                 locationLoading: true,
               }
             : r,
@@ -379,7 +377,7 @@ export function InventoryItemBarcodesPage() {
           storageName: "",
           locationId: "",
           locationCode: "",
-          quantity: s.quantity > 0 ? s.quantity : 1,
+          quantity: s.quantity,
           locationLoading: true,
         }));
       if (!fresh.length) return;
@@ -636,7 +634,7 @@ export function InventoryItemBarcodesPage() {
           onOpenChange={setProductPickerOpen}
           showQuantityPrice
           defaultUnitPriceSource="sellingPrice"
-          defaultQuantity={1}
+          defaultQuantity={0}
           onConfirm={addRowsFromPicker}
         />
       ) : null}
