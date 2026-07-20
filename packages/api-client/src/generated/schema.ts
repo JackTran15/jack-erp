@@ -3972,6 +3972,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/exports/barcode-labels/excel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvExportController_exportBarcodeLabelsExcel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/exports/item-categories/excel": {
         parameters: {
             query?: never;
@@ -8618,6 +8634,7 @@ export interface components {
             notes?: string;
         };
         ExportItemsBodyDto: Record<string, never>;
+        ExportBarcodeLabelsBodyDto: Record<string, never>;
         CreateStockTakeLineDto: {
             itemId: string;
             locationId?: string;
@@ -8933,6 +8950,7 @@ export interface components {
             discountAmount: number;
             pointsRedeemed: number;
             pointsDiscountAmount: number;
+            pointsEarned: number;
             depositAmount: number;
             amountDue: number;
             totalPaid: number;
@@ -9078,6 +9096,7 @@ export interface components {
             discountAmount: number;
             pointsRedeemed: number;
             pointsDiscountAmount: number;
+            pointsEarned: number;
             depositAmount: number;
             amountDue: number;
             totalPaid: number;
@@ -17716,6 +17735,27 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvExportController_exportBarcodeLabelsExcel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportBarcodeLabelsBodyDto"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

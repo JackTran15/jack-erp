@@ -25,11 +25,16 @@ import {
   IsUUID,
   IsArray,
   IsBoolean,
+  IsInt,
+  Min,
+  ArrayNotEmpty,
+  ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
 import { CsvExportService } from "./csv-export.service";
 import { LocationExportService } from "./location-export.service";
 import { CategoryExportService } from "./category-export.service";
+import { BarcodeLabelExportService } from "./barcode-label-export.service";
 
 class ExportQueryDto extends PaginationQueryDto {
   @IsOptional()
@@ -73,6 +78,24 @@ class ExportItemsBodyDto {
   isGetAll: boolean = false;
 }
 
+class BarcodeLabelRowDto {
+  @IsUUID("4")
+  itemId: string;
+
+  @IsInt()
+  @Min(0)
+  @Type(() => Number)
+  quantity: number;
+}
+
+class ExportBarcodeLabelsBodyDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => BarcodeLabelRowDto)
+  rows: BarcodeLabelRowDto[];
+}
+
 @Controller("inventory/exports")
 @UseInterceptors(AuditInterceptor)
 @UseGuards(PermissionGuard, BranchScopeGuard)
@@ -81,6 +104,7 @@ export class CsvExportController {
     private readonly csvExportService: CsvExportService,
     private readonly locationExportService: LocationExportService,
     private readonly categoryExportService: CategoryExportService,
+    private readonly barcodeLabelExportService: BarcodeLabelExportService,
   ) {}
 
   @Get("items")
@@ -168,6 +192,26 @@ export class CsvExportController {
   async exportLocationsExcel(@Res() res: Response, @Actor() actor: ActorContext) {
     const buffer = await this.locationExportService.exportLocationsExcelBuffer(actor);
     this.sendExcel(res, buffer, "danh-sach-vi-tri-hang-hoa.xlsx");
+  }
+
+  // ─── Tem mã vạch ──────────────────────────────────────────────────
+
+  /**
+   * Xuất khẩu danh sách hàng hoá in tem. Danh sách này chỉ tồn tại ở client
+   * (người dùng tự gom trên lưới) nên phải gửi lên qua body.
+   */
+  @Post("barcode-labels/excel")
+  @RequirePermission("inventory.read")
+  async exportBarcodeLabelsExcel(
+    @Body() body: ExportBarcodeLabelsBodyDto,
+    @Res() res: Response,
+    @Actor() actor: ActorContext,
+  ) {
+    const buffer = await this.barcodeLabelExportService.exportExcelBuffer(
+      body.rows,
+      actor,
+    );
+    this.sendExcel(res, buffer, "danh-sach-hang-hoa-in-tem.xlsx");
   }
 
   @Get("item-categories/excel")

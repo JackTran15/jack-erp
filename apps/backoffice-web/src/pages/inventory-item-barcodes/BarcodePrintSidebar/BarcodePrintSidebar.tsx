@@ -12,7 +12,9 @@ interface Props {
   /** Hiện mã chi nhánh + vị trí trên tem xem trước. Tắt ở chuỗi cửa hàng. */
   showStoreInfo: boolean;
   printing: boolean;
+  exporting: boolean;
   onPrint: () => void;
+  onExport: () => void;
   onCancel: () => void;
 }
 
@@ -22,7 +24,9 @@ export function BarcodePrintSidebar({
   branchCode,
   showStoreInfo,
   printing,
+  exporting,
   onPrint,
+  onExport,
   onCancel,
 }: Props) {
   return (
@@ -57,10 +61,14 @@ export function BarcodePrintSidebar({
             type="button"
             variant="outline"
             className="gap-2"
-            disabled
-            title="Chưa hỗ trợ xuất khẩu"
+            onClick={onExport}
+            disabled={exporting}
           >
-            <CloudUpload className="h-4 w-4" />
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CloudUpload className="h-4 w-4" />
+            )}
             Xuất khẩu
           </Button>
           <Button
