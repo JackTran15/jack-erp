@@ -160,6 +160,21 @@ export async function assignArrange(lines: ArrangeLine[]): Promise<ArrangeResult
   return data;
 }
 
+/**
+ * Vị trí (kệ) đang gán của một hàng hoá trong một kho — chỉ trả về khi kệ còn
+ * đang hoạt động. Null = chưa gán kệ nào. Dùng để chặn xếp 1 hàng hoá lên 2 vị trí.
+ */
+export async function resolveAssignedStorageLocation(
+  itemId: string,
+  storageId: string,
+): Promise<{ locationId: string; code: string } | null> {
+  const { data } = await apiClient.get<{ locationId: string; code: string } | null>(
+    "/products/storage-location",
+    { params: { itemId, storageId } },
+  );
+  return data;
+}
+
 export interface BalanceTrackingEntry {
   itemId: string;
   locationId: string;

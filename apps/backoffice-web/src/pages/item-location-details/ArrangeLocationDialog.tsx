@@ -8,6 +8,7 @@ import { getActiveBranch } from "../../lib/auth-storage";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import {
   assignArrange,
+  resolveAssignedStorageLocation,
   type ArrangeLine,
   type StockBalanceRow,
 } from "../../api/stock-balances";
@@ -340,6 +341,46 @@ export function ArrangeLocationDialog({
 
       if (lines.length === 0) {
         toast.error("Chưa có hàng hóa hợp lệ để xếp");
+        return;
+      }
+
+      // Ràng buộc "1 hàng hoá chỉ ở 1 vị trí (mỗi kho)". Gom theo (item, kho) để
+      // vừa chặn tự mâu thuẫn trong phiên, vừa tránh gọi kiểm tra trùng.
+      const byKey = new Map<
+        string,
+        { itemId: string; storageId: string; dests: Set<string> }
+      >();
+      for (const l of lines) {
+        const key = `${l.itemId}::${l.storageId}`;
+        const group = byKey.get(key) ?? {
+          itemId: l.itemId,
+          storageId: l.storageId,
+          dests: new Set<string>(),
+        };
+        group.dests.add(l.destinationLocationId);
+        byKey.set(key, group);
+      }
+      const groups = [...byKey.values()];
+
+      // (a) cùng 1 hàng hoá bị xếp vào nhiều vị trí trong cùng phiên
+      if (groups.some((g) => g.dests.size > 1)) {
+        toast.error(
+          "Mỗi hàng hoá chỉ được xếp vào 1 vị trí. Vui lòng bỏ bớt vị trí trùng.",
+        );
+        return;
+      }
+
+      // (b) hàng hoá đã có kệ đang hoạt động khác đích → yêu cầu ngừng theo dõi trước
+      const assigned = await Promise.all(
+        groups.map((g) => resolveAssignedStorageLocation(g.itemId, g.storageId)),
+      );
+      const conflictIdx = groups.findIndex(
+        (g, i) => assigned[i] && !g.dests.has(assigned[i]!.locationId),
+      );
+      if (conflictIdx >= 0) {
+        toast.error(
+          `Hàng hoá đã ở vị trí ${assigned[conflictIdx]!.code}. Mỗi hàng hoá chỉ được ở 1 vị trí — hãy ngừng theo dõi vị trí cũ trước khi xếp sang vị trí mới.`,
+        );
         return;
       }
 
