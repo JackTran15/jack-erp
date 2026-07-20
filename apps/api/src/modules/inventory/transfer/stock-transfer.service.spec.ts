@@ -342,33 +342,67 @@ describe('StockTransferService', () => {
       lines: [{ itemId: 'item-1', quantity: 3 }],
     };
 
-    it('happy path: same storage → creates and posts transfer directly', async () => {
+    it('happy path: đổi vị trí → chỉ ghi ledger, KHÔNG sinh phiếu chuyển kho', async () => {
       // postIntraWarehouseMoves batch-loads both locations via find().
       locationRepo.find.mockResolvedValue([sourceLocation, destLocation]);
 
-      // The posted transfer is created inside the locked transaction (manager),
-      // then reloaded once via findOrFail at the end.
-      const postedTransfer = {
-        id: 'xfer-1',
-        organizationId: 'org-1',
-        branchId: 'branch-1',
-        sourceBranchId: 'branch-1',
-        destinationBranchId: 'branch-1',
-        sourceLocationId: 'loc-src',
-        destinationLocationId: 'loc-dst',
-        documentNumber: 'TFR-2026-0001',
-        status: TransferStatus.POSTED,
-        lines: [{ itemId: 'item-1', quantity: 3 }],
-      };
-      transferRepo.findOne.mockResolvedValue(postedTransfer);
-
       const result = await service.createIntraWarehouseTransferAndPost(intraDto, actor);
 
-      expect(result.status).toBe(TransferStatus.POSTED);
+      // Đổi vị trí không sinh phiếu → trả null và không cấp số chứng từ.
+      expect(result).toBeNull();
+      expect(docNumbering.generate).not.toHaveBeenCalled();
       expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
         expect.arrayContaining([
-          expect.objectContaining({ movementType: StockMovementType.TRANSFER_OUT }),
-          expect.objectContaining({ movementType: StockMovementType.TRANSFER_IN }),
+          expect.objectContaining({
+            movementType: StockMovementType.TRANSFER_OUT,
+            referenceType: 'LOCATION_CHANGE',
+          }),
+          expect.objectContaining({
+            movementType: StockMovementType.TRANSFER_IN,
+            referenceType: 'LOCATION_CHANGE',
+          }),
+        ]),
+        expect.anything(),
+      );
+    });
+
+    it('cho phép chuyển số lượng 0 (đổi vị trí kể cả khi hết tồn)', async () => {
+      locationRepo.find.mockResolvedValue([sourceLocation, destLocation]);
+
+      const result = await service.createIntraWarehouseTransferAndPost(
+        { ...intraDto, lines: [{ itemId: 'item-1', quantity: 0 }] },
+        actor,
+      );
+
+      expect(result).toBeNull();
+      expect(ledgerService.recordBatchMovements).toHaveBeenCalled();
+    });
+
+    it('luồng arrange (createDocument mặc định) → tạo và post phiếu chuyển kho', async () => {
+      locationRepo.find.mockResolvedValue([sourceLocation, destLocation]);
+      transferRepo.findOne.mockResolvedValue({
+        id: 'xfer-1',
+        status: TransferStatus.POSTED,
+        documentNumber: 'TFR-2026-0001',
+      });
+
+      const result = await service.postIntraWarehouseMoves(
+        [
+          {
+            itemId: 'item-1',
+            quantity: 3,
+            sourceLocationId: 'loc-src',
+            destinationLocationId: 'loc-dst',
+          },
+        ],
+        actor,
+      );
+
+      expect(docNumbering.generate).toHaveBeenCalled();
+      expect(result?.status).toBe(TransferStatus.POSTED);
+      expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ referenceType: 'TRANSFER' }),
         ]),
         expect.anything(),
       );

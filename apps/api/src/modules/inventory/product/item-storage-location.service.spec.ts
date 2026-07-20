@@ -207,6 +207,21 @@ describe('ItemStorageLocationService', () => {
 
       expect(result).toBeNull();
     });
+
+    it('lọc isActive: vị trí đã gán nhưng bị ngừng theo dõi → trả null', async () => {
+      islRepo.findOne.mockResolvedValue({ locationId: 'loc-1' });
+      // Query đã ràng buộc isActive: true nên vị trí tắt không match → null.
+      locationRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.resolveAssignedLocation('item-1', 'storage-1', 'org-1');
+
+      expect(result).toBeNull();
+      expect(locationRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ isActive: true }),
+        }),
+      );
+    });
   });
 
   describe('listByItem', () => {
