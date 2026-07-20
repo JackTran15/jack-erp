@@ -18,6 +18,8 @@ const row = (over: Partial<RevenueByItemRowInput> = {}): RevenueByItemRowInput =
   itemCategory: 'Category 1',
   brand: 'Brand A',
   unit: 'pcs',
+  locationCode: 'A-01',
+  locationName: 'Aisle A',
   direction: ItemDirection.OUT,
   quantity: 2,
   unitPrice: 1000,
@@ -114,6 +116,23 @@ describe('aggregateByItem', () => {
     );
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({ key: 'p1', sku: 'MODEL1', name: 'Model 1', quantity: 4 });
+  });
+
+  it('carries locationCode/locationName through at item grain', () => {
+    const [g] = aggregateByItem([row()], 'item');
+    expect(g).toMatchObject({ locationCode: 'A-01', locationName: 'Aisle A' });
+  });
+
+  it('nulls locationCode/locationName at group/brand/parent grain', () => {
+    const [byGroup] = aggregateByItem([row()], 'group');
+    const [byBrand] = aggregateByItem([row()], 'brand');
+    const [byParent] = aggregateByItem(
+      [row({ parentId: 'p1', parentSku: 'MODEL1', parentName: 'Model 1' })],
+      'parent',
+    );
+    expect(byGroup).toMatchObject({ locationCode: null, locationName: null });
+    expect(byBrand).toMatchObject({ locationCode: null, locationName: null });
+    expect(byParent).toMatchObject({ locationCode: null, locationName: null });
   });
 });
 

@@ -15,7 +15,9 @@ export type RevenueByItemDimension =
   | 'name'
   | 'itemCategory'
   | 'brand'
-  | 'unit';
+  | 'unit'
+  | 'locationCode'
+  | 'locationName';
 
 /** A summed measure off the aggregated group. */
 export type RevenueByItemMeasure = 'quantity' | 'goods' | 'discount' | 'total';
@@ -45,6 +47,8 @@ export const REVENUE_BY_ITEM_COLUMNS: RevenueByItemColumnDef[] = [
   { key: 'itemCategory', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'itemCategory' } },
   { key: 'brand', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'brand' } },
   { key: 'unit', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'unit' } },
+  { key: 'locationCode', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'locationCode' } },
+  { key: 'locationName', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'locationName' } },
   { key: 'quantity', type: ReportColumnDataType.NUMBER, source: { kind: 'measure', field: 'quantity' } },
   { key: 'revenue.goods', type: ReportColumnDataType.CURRENCY, source: { kind: 'measure', field: 'goods' } },
   { key: 'revenue.discount', type: ReportColumnDataType.CURRENCY, source: { kind: 'measure', field: 'discount' } },

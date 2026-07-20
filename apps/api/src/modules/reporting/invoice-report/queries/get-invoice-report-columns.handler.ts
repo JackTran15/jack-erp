@@ -13,11 +13,20 @@ export class GetInvoiceReportColumnsHandler
   async execute({
     reportType,
     actor,
+    statBy,
+    store,
+    branchId,
   }: GetInvoiceReportColumnsQuery): Promise<InvoiceReportColumnsResult> {
     const def = this.registry.get(reportType);
     if (!def) {
       throw new BadRequestException(`Unknown report type: ${reportType}`);
     }
-    return { summaryLabel: 'Tổng', columns: await def.buildColumns(actor) };
+    return {
+      summaryLabel: 'Tổng',
+      columns: await def.buildColumns(
+        actor,
+        statBy || store || branchId ? { statBy, store, branchId } : undefined,
+      ),
+    };
   }
 }

@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { ReportGroupBy } from '@erp/shared-interfaces';
 import {
   Actor,
   ActorContext,
@@ -55,9 +56,21 @@ export class InvoiceReportController {
   getColumns(
     @Query('reportType') reportType: string,
     @Actor() actor: ActorContext,
+    @Query('statBy') statBy?: ReportGroupBy,
+    @Query('storeScope') storeScope?: 'all' | 'group',
+    @Query('storeIds') storeIds?: string,
+    @Query('branchId') branchId?: string,
   ) {
     return this.queryBus.execute(
-      new GetInvoiceReportColumnsQuery(reportType, actor),
+      new GetInvoiceReportColumnsQuery(
+        reportType,
+        actor,
+        statBy,
+        storeScope
+          ? { scope: storeScope, storeIds: storeIds ? storeIds.split(',') : [] }
+          : undefined,
+        branchId,
+      ),
     );
   }
 
