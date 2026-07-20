@@ -129,6 +129,11 @@ export interface DepositLedgerRow {
   valueDate?: string | null;
   /** true when valueDate is null or <= today — money has actually landed. */
   isCleared: boolean;
+  /**
+   * Which flow produced the movement. POS_INVOICE rows have no voucher, so
+   * `documentNumber` is the invoice code and `receiptId`/`paymentId` are null.
+   */
+  source: DepositMovementSource;
 }
 
 /** GĐ4 (TKT-DFB-01) — header linking the two legs of an inter-branch transfer. */

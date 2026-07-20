@@ -4,9 +4,11 @@ import { DepositLedgerService } from './deposit-ledger.service';
 import { DepositBalanceService } from './deposit-balance.service';
 import { DepositAccountEntity } from '../deposit-account.entity';
 import { DepositMovementEntity } from '../deposit-movement.entity';
-import { BankReceiptEntity } from '../../deposit-vouchers/bank-receipts/bank-receipt.entity';
-import { BankPaymentEntity } from '../../deposit-vouchers/bank-payments/bank-payment.entity';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
+import {
+  CompareOperator,
+  StringOperator,
+} from '../../../../common/filters/filter.dto';
 
 const actor = {
   userId: 'u1',
@@ -42,8 +44,6 @@ function buildService(
       string,
       { bookBalance: number; availableBalance: number; pendingClearingAmount: number }
     >;
-    receipts?: Array<{ id: string; depositMovementId: string }>;
-    payments?: Array<{ id: string; depositMovementId: string }>;
   } = {},
 ) {
   const query = jest.fn((sql: string) => {
@@ -67,20 +67,12 @@ function buildService(
       Promise.resolve(opts.balances?.[id] ?? defaultBalances),
     ),
   };
-  const bankReceiptRepo = {
-    find: jest.fn().mockResolvedValue(opts.receipts ?? []),
-  };
-  const bankPaymentRepo = {
-    find: jest.fn().mockResolvedValue(opts.payments ?? []),
-  };
   const service = new DepositLedgerService(
     { query } as unknown as Repository<DepositMovementEntity>,
     accountRepo as unknown as Repository<DepositAccountEntity>,
-    bankReceiptRepo as unknown as Repository<BankReceiptEntity>,
-    bankPaymentRepo as unknown as Repository<BankPaymentEntity>,
     balanceService as unknown as DepositBalanceService,
   );
-  return { service, accountRepo, balanceService, bankReceiptRepo, bankPaymentRepo, query };
+  return { service, accountRepo, balanceService, query };
 }
 
 describe('DepositLedgerService.getLedger — single account (BR-LEDG-03 regression)', () => {
@@ -103,6 +95,7 @@ describe('DepositLedgerService.getLedger — single account (BR-LEDG-03 regressi
           document_number: 'HD1',
           recon_status: 'CHUA',
           signed: '200',
+          account_no: '0011',
         },
       ],
     });
@@ -116,42 +109,45 @@ describe('DepositLedgerService.getLedger — single account (BR-LEDG-03 regressi
     expect(accountRepo.find).not.toHaveBeenCalled();
   });
 
-  it('derives receiptNo/paymentNo from document_number by sign, and joins receiptId/paymentId by depositMovementId', async () => {
-    const { service, bankReceiptRepo, bankPaymentRepo } = buildService(
-      {
-        opening: 0,
-        totalIn: 200,
-        totalOut: 100,
-        count: 2,
-        beforeOffset: 0,
-        rows: [
-          {
-            id: 'm-in',
-            ledger_account_id: 'acc1',
-            type: 'DEPOSIT',
-            amount: '200',
-            doc_date: '2026-05-10',
-            document_number: 'PT000001',
-            recon_status: 'CHUA',
-            signed: '200',
-          },
-          {
-            id: 'm-out',
-            ledger_account_id: 'acc1',
-            type: 'WITHDRAWAL',
-            amount: '100',
-            doc_date: '2026-05-11',
-            document_number: 'UNC000001',
-            recon_status: 'CHUA',
-            signed: '-100',
-          },
-        ],
-      },
-      {
-        receipts: [{ id: 'receipt-1', depositMovementId: 'm-in' }],
-        payments: [{ id: 'payment-1', depositMovementId: 'm-out' }],
-      },
-    );
+  it('derives receiptNo/paymentNo from document_number by sign, and takes receiptId/paymentId from the row', async () => {
+    // The voucher ids now arrive on the row via LEFT JOIN LATERAL, so there is
+    // no separate bank_receipts/bank_payments round-trip to batch.
+    const { service } = buildService({
+      opening: 0,
+      totalIn: 200,
+      totalOut: 100,
+      count: 2,
+      beforeOffset: 0,
+      rows: [
+        {
+          id: 'm-in',
+          ledger_account_id: 'acc1',
+          type: 'DEPOSIT',
+          amount: '200',
+          doc_date: '2026-05-10',
+          document_number: 'PT000001',
+          recon_status: 'CHUA',
+          signed: '200',
+          receipt_id: 'receipt-1',
+          payment_id: null,
+          description: 'Thu tien khach le',
+          counterparty: 'A CHINH',
+          staff: 'Kenzy Nguyen',
+        },
+        {
+          id: 'm-out',
+          ledger_account_id: 'acc1',
+          type: 'WITHDRAWAL',
+          amount: '100',
+          doc_date: '2026-05-11',
+          document_number: 'UNC000001',
+          recon_status: 'CHUA',
+          signed: '-100',
+          receipt_id: null,
+          payment_id: 'payment-1',
+        },
+      ],
+    });
 
     const res = await service.getLedger(q, actor);
 
@@ -167,24 +163,59 @@ describe('DepositLedgerService.getLedger — single account (BR-LEDG-03 regressi
       receiptId: null,
       paymentId: 'payment-1',
     });
-    expect(bankReceiptRepo.find).toHaveBeenCalledTimes(1);
-    expect(bankPaymentRepo.find).toHaveBeenCalledTimes(1);
   });
 
-  it('skips the bank_receipts/bank_payments lookup entirely when a page has no rows', async () => {
-    const { service, bankReceiptRepo, bankPaymentRepo } = buildService({
+  it('populates description/counterparty/staff from the joined voucher, null when absent', async () => {
+    const { service } = buildService({
       opening: 0,
-      totalIn: 0,
+      totalIn: 200,
       totalOut: 0,
-      count: 0,
+      count: 2,
       beforeOffset: 0,
-      rows: [],
+      rows: [
+        {
+          id: 'm-in',
+          ledger_account_id: 'acc1',
+          type: 'DEPOSIT',
+          amount: '200',
+          doc_date: '2026-05-10',
+          document_number: 'PT000001',
+          recon_status: 'CHUA',
+          signed: '200',
+          description: 'Thu tien khach le',
+          counterparty: 'A CHINH',
+          staff: 'Kenzy Nguyen',
+        },
+        {
+          id: 'm-bare',
+          ledger_account_id: 'acc1',
+          type: 'DEPOSIT',
+          amount: '0',
+          doc_date: '2026-05-10',
+          document_number: null,
+          recon_status: 'CHUA',
+          signed: '0',
+          description: null,
+          // COALESCE(..., '') in SQL means "no voucher" arrives as an empty
+          // string, which must surface as null rather than a blank cell value.
+          counterparty: '',
+          staff: '',
+        },
+      ],
     });
 
-    await service.getLedger(q, actor);
+    const res = await service.getLedger(q, actor);
 
-    expect(bankReceiptRepo.find).not.toHaveBeenCalled();
-    expect(bankPaymentRepo.find).not.toHaveBeenCalled();
+    expect(res.rows[0]).toMatchObject({
+      description: 'Thu tien khach le',
+      counterpartyName: 'A CHINH',
+      staffName: 'Kenzy Nguyen',
+    });
+    expect(res.rows[1]).toMatchObject({
+      description: null,
+      counterpartyName: null,
+      staffName: null,
+    });
   });
 
   it('does not miss a transfer received via to_account_id (+amountIn)', async () => {
@@ -326,6 +357,7 @@ describe('DepositLedgerService.getLedger — all accounts of the branch (BR-LEDG
             document_number: 'CQ1',
             recon_status: 'CHUA',
             signed: '-200',
+            account_no: '0011',
           },
           {
             id: 'm5',
@@ -336,6 +368,7 @@ describe('DepositLedgerService.getLedger — all accounts of the branch (BR-LEDG
             document_number: 'CQ1',
             recon_status: 'CHUA',
             signed: '200',
+            account_no: '0022',
           },
         ],
       },
@@ -403,5 +436,116 @@ describe('DepositLedgerService.getLedger — all accounts of the branch (BR-LEDG
     expect(res.bookBalance).toBe('1500');
     expect(res.availableBalance).toBe('1400');
     expect(res.pendingClearingAmount).toBe('100');
+  });
+});
+
+describe('DepositLedgerService.search — v2 per-column filters', () => {
+  const q = { depositAccountId: 'acc1', docDate: { from: '2026-07-01', to: '2026-07-31' } };
+
+  /** Locate the SQL of each of the five query entry points. */
+  const calls = (query: jest.Mock) => {
+    const all = query.mock.calls as [string, unknown[]][];
+    return {
+      all,
+      page: all.find(([sql]) => sql.includes('SELECT id, ledger_account_id'))!,
+      count: all.find(([sql]) => sql.includes('COUNT(*)'))!,
+      inOut: all.find(([sql]) => sql.includes('AS "in"'))!,
+      // The opening-balance query is the only bare SUM(signed) with no in/out split.
+      opening: all.find(
+        ([sql]) => sql.includes('SUM(signed)') && !sql.includes('AS "in"'),
+      )!,
+    };
+  };
+
+  it('orders by doc_date then created_at so same-day rows follow entry order', async () => {
+    const { service, query } = buildService(ZERO_SUMS);
+    await service.search(q, actor);
+    const [sql] = calls(query).page;
+    expect(sql).toContain('ORDER BY doc_date ASC, created_at ASC, id ASC, leg ASC');
+  });
+
+  it('resolves vouchers via LEFT JOIN LATERAL ... LIMIT 1 so rows can never multiply', async () => {
+    const { service, query } = buildService(ZERO_SUMS);
+    await service.search(q, actor);
+    const [sql] = calls(query).page;
+    expect(sql).toContain('LEFT JOIN LATERAL');
+    expect(sql).toContain('r.deposit_movement_id = m.id');
+    expect(sql).toContain('p.deposit_movement_id = m.id');
+    // Both legs of the union carry the joins.
+    expect(sql.match(/LEFT JOIN LATERAL/g)?.length).toBe(4);
+  });
+
+  it('applies a column filter identically to the page, count and in/out queries', async () => {
+    // BR-LEDG-01: if these three ever diverge, the grid and its totals disagree.
+    const { service, query } = buildService(ZERO_SUMS);
+    await service.search(
+      { ...q, counterparty: { operator: StringOperator.CONTAINS, value: 'A CHINH' } },
+      actor,
+    );
+
+    const c = calls(query);
+    for (const [sql, params] of [c.page, c.count, c.inOut]) {
+      expect(sql).toMatch(/COALESCE\(counterparty, ''\) ILIKE/);
+      expect(params).toContain('%A CHINH%');
+    }
+  });
+
+  it('leaves the opening balance unfiltered by column filters', async () => {
+    // The opening balance is the fund's balance entering the period, not a
+    // subtotal of the filtered rows.
+    const { service, query } = buildService(ZERO_SUMS);
+    await service.search(
+      { ...q, description: { operator: StringOperator.CONTAINS, value: 'phi' } },
+      actor,
+    );
+
+    // `description` also names a derived SELECT column, so assert on the
+    // predicate rather than the bare word.
+    const c = calls(query);
+    expect(c.opening[0]).not.toMatch(/COALESCE\(description, ''\) ILIKE/);
+    expect(c.opening[0]).not.toContain('filtered WHERE');
+    expect(c.page[0]).toMatch(/COALESCE\(description, ''\) ILIKE/);
+  });
+
+  it('escapes wildcards in string filter values', async () => {
+    const { service, query } = buildService(ZERO_SUMS);
+    await service.search(
+      { ...q, staff: { operator: StringOperator.CONTAINS, value: '50%_x' } },
+      actor,
+    );
+    expect(calls(query).page[1]).toContain('%50\\%\\_x%');
+  });
+
+  it('constrains amountIn to inbound rows and amountOut to outbound rows', async () => {
+    const { service, query } = buildService(ZERO_SUMS);
+    await service.search(
+      { ...q, amountIn: { operator: CompareOperator.GTE, value: 1000 } },
+      actor,
+    );
+    expect(calls(query).page[0]).toContain('(signed > 0 AND signed >= ');
+
+    const second = buildService(ZERO_SUMS);
+    await second.service.search(
+      { ...q, amountOut: { operator: CompareOperator.LTE, value: 500 } },
+      actor,
+    );
+    expect(calls(second.query).page[0]).toContain('(signed < 0 AND (-signed) <= ');
+  });
+
+  it('maps the v1 search param onto the documentNumber filter', async () => {
+    const { service, query } = buildService(ZERO_SUMS);
+    await service.getLedger(
+      { depositAccountId: 'acc1', dateFrom: '2026-07-01', search: 'UNC' },
+      actor,
+    );
+    const [sql, params] = calls(query).page;
+    expect(sql).toMatch(/COALESCE\(document_number, ''\) ILIKE/);
+    expect(params).toContain('%UNC%');
+  });
+
+  it('omits the outer filter wrapper entirely when no column filter is set', async () => {
+    const { service, query } = buildService(ZERO_SUMS);
+    await service.search(q, actor);
+    expect(calls(query).page[0]).not.toContain('filtered WHERE');
   });
 });

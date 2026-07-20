@@ -24,7 +24,8 @@ import { ReconcileDto } from './dto/reconcile.dto';
 import { UnreconcileDto } from './dto/unreconcile.dto';
 
 /** BR-REC-04: a movement CHUA past this many days is flagged stale on the grid. */
-const STALE_UNRECONCILED_DAYS = 7;
+/** Shared with the v2 search handler so both compute the same stale cutoff. */
+export const STALE_UNRECONCILED_DAYS = 7;
 const BANK_FEE_CATEGORY_CODE = 'BANK_FEE';
 
 const round2 = (v: number): number => Math.round(v * 100) / 100;
@@ -74,8 +75,8 @@ export class DepositReconService {
     const qb = this.buildListQuery(query, actor);
 
     const [data, total] = await qb
-      .orderBy('m.docDate', 'ASC')
-      .addOrderBy('m.id', 'ASC')
+      .orderBy('m.createdAt', 'DESC')
+      .addOrderBy('m.id', 'DESC')
       .skip((page - 1) * pageSize)
       .take(pageSize)
       .getManyAndCount();
@@ -87,7 +88,12 @@ export class DepositReconService {
   }
 
   async exportExcel(query: ListReconDto, actor: ActorContext): Promise<Buffer> {
-    const qb = this.buildListQuery(query, actor).orderBy('m.docDate', 'ASC').take(5000);
+    // Same order as list(); `m.id` is the tiebreaker `createdAt` alone cannot
+    // provide, so two exports of the same range are byte-identical.
+    const qb = this.buildListQuery(query, actor)
+      .orderBy('m.createdAt', 'DESC')
+      .addOrderBy('m.id', 'DESC')
+      .take(5000);
     const rows = await qb.getMany();
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Đối chiếu tiền gửi');

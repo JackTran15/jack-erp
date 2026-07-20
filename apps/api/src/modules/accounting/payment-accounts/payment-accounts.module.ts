@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { EntityRegistryService } from '../../crud/entity-registry.service';
 import { AccountEntity } from '../coa/account.entity';
 import { DepositAccountEntity } from '../deposit/deposit-account.entity';
+import { BranchEntity } from '../../branch/branch.entity';
 import { PaymentAccountEntity } from './payment-account.entity';
 import { AccountingDefaultAccountEntity } from './accounting-default-account.entity';
 import { AccountResolverService } from './account-resolver.service';
@@ -31,6 +32,9 @@ import {
       AccountingDefaultAccountEntity,
       AccountEntity,
       DepositAccountEntity,
+      // Registered so PaymentAccountsCrudService can resolve branch names for
+      // the admin grid.
+      BranchEntity,
     ]),
   ],
   controllers: [PaymentAccountsController],

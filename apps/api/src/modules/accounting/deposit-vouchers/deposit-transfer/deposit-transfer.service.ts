@@ -18,10 +18,18 @@ import { DepositAccountEntity } from '../../deposit/deposit-account.entity';
 import { DepositMovementEntity } from '../../deposit/deposit-movement.entity';
 import { DepositFundResolverService } from '../../deposit/deposit-fund-resolver.service';
 import { CashFundResolverService } from '../../cash/cash-fund-resolver.service';
-import { BankPaymentPurpose, BankPaymentReferenceType, BankReceiptPurpose, BankReceiptReferenceType } from '../enums';
+import {
+  BankPaymentPurpose,
+  BankPaymentReferenceType,
+  BankReceiptPurpose,
+  BankReceiptReferenceType,
+  BankVoucherPartnerType,
+} from '../enums';
+import { BankPaymentEntity } from '../bank-payments/bank-payment.entity';
 import { BankPaymentsService } from '../bank-payments/bank-payments.service';
 import { BankReceiptsService } from '../bank-receipts/bank-receipts.service';
 import { PartnerResolverService } from '../../cash-vouchers/shared/partner-resolver.service';
+import { partySnapshotFromVoucher } from '../../cash-vouchers/shared/voucher-party';
 import { CashVoucherPartnerType } from '../../cash-vouchers/enums';
 import { DepositTransferEntity } from './deposit-transfer.entity';
 import { CreateDepositTransferDto } from './dto/create-deposit-transfer.dto';
@@ -169,6 +177,20 @@ export class DepositTransferService {
         manager,
       );
 
+      // Carry the party from leg A's payment so the destination-branch receipt
+      // is not blank — it is the same counterparty on both sides of a transfer.
+      const outLeg = await manager.findOne(BankPaymentEntity, {
+        where: { id: transfer.fromPaymentId },
+      });
+      const party = partySnapshotFromVoucher({
+        partnerType: outLeg?.partnerType,
+        partnerId: outLeg?.partnerId,
+        partnerNameSnapshot: outLeg?.partnerNameSnapshot,
+        partnerAddressSnapshot: outLeg?.partnerAddressSnapshot,
+        personName: outLeg?.payeeName,
+        staffId: outLeg?.paidBy,
+      });
+
       const receipt = await this.bankReceipts.createAndPostInternal(
         {
           purpose: BankReceiptPurpose.INTER_BRANCH_IN,
@@ -183,6 +205,12 @@ export class DepositTransferService {
           transferPairId: transfer.id,
           transferStatus: DepositTransferStatus.HOAN_TAT,
           affectRevenue: false,
+          partnerType: party.partnerType as unknown as BankVoucherPartnerType,
+          partnerId: party.partnerId,
+          partnerName: party.partnerName,
+          partnerAddress: party.partnerAddress,
+          payerName: party.personName,
+          collectedBy: party.staffId,
           reason: dto.note,
           description: 'Nhận tiền gửi liên chi nhánh',
         },

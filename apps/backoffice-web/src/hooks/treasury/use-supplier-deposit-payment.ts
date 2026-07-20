@@ -33,6 +33,7 @@ export function useSupplierDepositPaymentMutation() {
       ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["bank-payments"] });
+      void qc.invalidateQueries({ queryKey: ["deposit-vouchers"] });
       void qc.invalidateQueries({ queryKey: ["cash-payments"] });
       void qc.invalidateQueries({ queryKey: ["deposit-ledger"] });
       void qc.invalidateQueries({ queryKey: ["deposit-accounts"] });

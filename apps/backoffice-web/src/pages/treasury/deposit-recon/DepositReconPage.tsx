@@ -16,7 +16,7 @@ import {
   type ToolbarItem,
 } from "@erp/ui";
 import { AlertTriangle, CheckSquare, CloudUpload, Lock, RefreshCw, Undo2 } from "lucide-react";
-import { ReconStatus } from "@erp/shared-interfaces";
+import { DepositMovementSource, ReconStatus } from "@erp/shared-interfaces";
 import {
   BaseDataTable,
   type TableColumn,
@@ -24,22 +24,35 @@ import {
 import { PaginationControls } from "../../../components/table/PaginationControls";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
-  applyColumnFilter,
-  toComparableText,
   type ColumnFilter,
   type ColumnFilterMode,
 } from "../../../components/table/pagination.dto";
+import {
+  buildV2Body,
+  type V2SearchConfig,
+} from "../../../components/crud/crudV2Search";
+import { useDebouncedValue } from "../../../lib/use-debounced-value";
 import { StatusBadge } from "../../../components/status/StatusBadge";
 import {
   DepositTabBar,
   DepositTabIdEnum,
 } from "../../../components/document/depositTabs";
 import { hasPermission } from "../../../lib/permissions";
+import { useBankPayment } from "../../../hooks/treasury/use-bank-payments";
+import { useBankReceipt } from "../../../hooks/treasury/use-bank-receipts";
+import { useInvoiceDetailByCode } from "../../../hooks/treasury/use-invoice-detail";
+import {
+  DepositPaymentVoucherDialog,
+  DepositReceiptVoucherDialog,
+  InvoiceDetailDialog,
+  TreasuryVoucherDialogModeEnum,
+  VoucherLink,
+} from "../documents";
 import { useDepositAccounts } from "../../../hooks/treasury/use-deposit-accounts";
 import {
   downloadDepositReconExport,
-  useDepositReconList,
   useDepositReconMutations,
+  useDepositReconSearch,
 } from "../../../hooks/treasury/use-deposit-recon";
 import { LEDGER_CASH_VI_DATE } from "../ledger-cash/ledger-cash.constants";
 import { DepositReconBatchDialog } from "./DepositReconBatchDialog";
@@ -49,10 +62,53 @@ import {
   RECON_STATUS_FILTER_OPTIONS,
   RECON_STATUS_LABEL,
 } from "./deposit-recon.labels";
-import type { DepositReconMovementRow } from "./deposit-recon.types";
+import type { DepositReconSearchRow } from "./deposit-recon.types";
 
 const NUM_CLASS = "text-right tabular-nums";
 const UNRECONCILE_PERMISSION = "accounting.deposit_recon.unreconcile";
+
+/**
+ * Column keys are named after the `POST /v2/deposit-recon/search` request fields
+ * so `buildV2Body` maps the filter state straight onto the body.
+ */
+const DEPOSIT_RECON_FILTER_KEYS = [
+  "documentNumber",
+  "type",
+  "accountLabel",
+  "docDate",
+  "valueDate",
+  "netAmount",
+  "feeAmount",
+  "amount",
+  "reconciledBy",
+] as const;
+
+type DepositReconFilterKey = (typeof DEPOSIT_RECON_FILTER_KEYS)[number];
+
+const DEPOSIT_RECON_SEARCH: V2SearchConfig = {
+  path: "/v2/deposit-recon/search",
+  fields: {
+    documentNumber: "string",
+    type: "enum",
+    accountLabel: "string",
+    docDate: "date-range",
+    valueDate: "date-range",
+    netAmount: "compare",
+    feeAmount: "compare",
+    amount: "compare",
+    reconciledBy: "string",
+  },
+};
+
+function emptyColumnFilters(): Record<DepositReconFilterKey, ColumnFilter> {
+  return DEPOSIT_RECON_FILTER_KEYS.reduce(
+    (acc, k) => {
+      acc[k] = { mode: DEFAULT_COLUMN_FILTER_MODE, value: "" };
+      return acc;
+    },
+    {} as Record<DepositReconFilterKey, ColumnFilter>,
+  );
+}
 
 function toDate(value: string | null | undefined): string {
   if (!value) return "—";
@@ -78,10 +134,8 @@ export function DepositReconPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [typeFilter, setTypeFilter] = useState<ColumnFilter>({
-    mode: DEFAULT_COLUMN_FILTER_MODE,
-    value: "",
-  });
+  const [columnFilters, setColumnFilters] =
+    useState<Record<DepositReconFilterKey, ColumnFilter>>(emptyColumnFilters);
   const [batchDialogOpen, setBatchDialogOpen] = useState(false);
   const [unreconcileOpen, setUnreconcileOpen] = useState(false);
   const [unreconcileReason, setUnreconcileReason] = useState("");
@@ -89,11 +143,6 @@ export function DepositReconPage() {
   useEffect(() => {
     setSelected(new Set());
   }, [accountId, reconStatus]);
-
-  const accountsById = useMemo(
-    () => new Map(accounts.map((a) => [a.id, a])),
-    [accounts],
-  );
 
   const accountOptions = useMemo<SingleSelectOption[]>(
     () => [
@@ -106,40 +155,64 @@ export function DepositReconPage() {
     [accounts],
   );
 
-  const query = useMemo(
+  /** v1-shaped query, kept solely for the Excel export endpoint. */
+  const exportQuery = useMemo(
     () => ({
       depositAccountId: accountId || undefined,
       reconStatus,
       dateFrom: appliedPeriod.from,
       dateTo: appliedPeriod.to,
       docNumber: appliedDocNumber || undefined,
-      page,
-      pageSize,
     }),
-    [accountId, reconStatus, appliedPeriod, appliedDocNumber, page, pageSize],
+    [accountId, reconStatus, appliedPeriod, appliedDocNumber],
   );
 
-  const list = useDepositReconList(query);
+  // Debounced so typing in a column filter settles into one request.
+  const debouncedFilters = useDebouncedValue(columnFilters, 300);
+
+  const searchBody = useMemo(() => {
+    const merged: Record<string, ColumnFilter> = {
+      ...debouncedFilters,
+      // The period filter and the toolbar doc-number input feed the same fields
+      // the column cells do; an explicit column value wins.
+      docDate: {
+        ...debouncedFilters.docDate,
+        from: debouncedFilters.docDate.from || appliedPeriod.from,
+        to: debouncedFilters.docDate.to || appliedPeriod.to,
+      },
+      documentNumber: debouncedFilters.documentNumber.value
+        ? debouncedFilters.documentNumber
+        : { ...debouncedFilters.documentNumber, value: appliedDocNumber },
+    };
+    return {
+      ...buildV2Body(DEPOSIT_RECON_SEARCH, merged, page, pageSize),
+      ...(accountId ? { depositAccountId: accountId } : {}),
+      reconStatus: { value: reconStatus },
+    };
+  }, [
+    debouncedFilters,
+    appliedPeriod,
+    appliedDocNumber,
+    page,
+    pageSize,
+    accountId,
+    reconStatus,
+  ]);
+
+  const list = useDepositReconSearch(searchBody);
   const { reconcile, unreconcile } = useDepositReconMutations();
   const rows = list.data?.data ?? [];
 
-  const filteredRows = useMemo(() => {
-    if (!typeFilter.value.trim()) return rows;
-    return rows.filter((r) =>
-      applyColumnFilter(toComparableText(DEPOSIT_MOVEMENT_TYPE_LABEL[r.type]), typeFilter),
-    );
-  }, [rows, typeFilter]);
-
-  const allSelected = filteredRows.length > 0 && filteredRows.every((r) => selected.has(r.id));
+  const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
 
   const toggleAll = useCallback(() => {
     setSelected((prev) => {
       if (allSelected) return new Set();
       const next = new Set(prev);
-      filteredRows.forEach((r) => next.add(r.id));
+      rows.forEach((r) => next.add(r.id));
       return next;
     });
-  }, [allSelected, filteredRows]);
+  }, [allSelected, rows]);
 
   const toggleOne = useCallback((id: string) => {
     setSelected((prev) => {
@@ -159,14 +232,60 @@ export function DepositReconPage() {
     [selectedRows],
   );
 
-  const columns = useMemo<TableColumn<DepositReconMovementRow>[]>(
+  /**
+   * A recon row is a movement, not a voucher — `r.id` is the movement id. Which
+   * document to open therefore comes from the linkage the search endpoint
+   * inlines: a bank voucher for MANUAL/TRANSFER rows, the invoice for POS rows.
+   * SYSTEM fee legs have neither.
+   */
+  const [openDoc, setOpenDoc] = useState<
+    | { kind: "payment" | "receipt"; id: string }
+    | { kind: "invoice"; code: string }
+    | null
+  >(null);
+
+  const openDocument = useCallback((r: DepositReconSearchRow) => {
+    if (r.bankPaymentId) {
+      setOpenDoc({ kind: "payment", id: r.bankPaymentId });
+      return;
+    }
+    if (r.bankReceiptId) {
+      setOpenDoc({ kind: "receipt", id: r.bankReceiptId });
+      return;
+    }
+    if (r.source === DepositMovementSource.POS_INVOICE && r.documentNumber) {
+      setOpenDoc({ kind: "invoice", code: r.documentNumber });
+      return;
+    }
+    toast.info("Giao dịch này không có chứng từ để mở.");
+  }, []);
+
+  const { data: openPayment } = useBankPayment(
+    openDoc?.kind === "payment" ? openDoc.id : undefined,
+  );
+  const { data: openReceipt } = useBankReceipt(
+    openDoc?.kind === "receipt" ? openDoc.id : undefined,
+  );
+  const { data: openInvoice } = useInvoiceDetailByCode(
+    openDoc?.kind === "invoice" ? openDoc.code : undefined,
+  );
+
+  const columns = useMemo<TableColumn<DepositReconSearchRow>[]>(
     () => [
       {
         key: "documentNumber",
         label: "Số chứng từ",
         width: 130,
-        filterKind: "none",
-        render: (r) => r.documentNumber ?? "—",
+        render: (r) =>
+          r.documentNumber ? (
+            <VoucherLink
+              code={r.documentNumber}
+              clickable
+              onClick={() => openDocument(r)}
+            />
+          ) : (
+            "—"
+          ),
       },
       {
         key: "type",
@@ -177,21 +296,21 @@ export function DepositReconPage() {
         render: (r) => DEPOSIT_MOVEMENT_TYPE_LABEL[r.type],
       },
       {
-        key: "account",
+        key: "accountLabel",
         label: "Số tài khoản",
         width: 200,
-        filterKind: "none",
-        render: (r) => {
-          const acc = accountsById.get(r.depositAccountId);
-          if (!acc) return "—";
-          return acc.accountNo ? `${acc.name} (${acc.accountNo})` : acc.name;
-        },
+        render: (r) =>
+          r.depositAccountName
+            ? r.depositAccountNo
+              ? `${r.depositAccountName} (${r.depositAccountNo})`
+              : r.depositAccountName
+            : "—",
       },
       {
         key: "docDate",
         label: "Ngày",
         width: 100,
-        filterKind: "none",
+        filterKind: "date-range",
         render: (r) => toDate(r.docDate),
       },
       {
@@ -205,7 +324,7 @@ export function DepositReconPage() {
         key: "valueDate",
         label: "Ngày ghi có",
         width: 110,
-        filterKind: "none",
+        filterKind: "date-range",
         // null = cleared immediately (settlement_days=0) — same day as docDate,
         // not "no data" (see DepositLedgerRow.valueDate).
         render: (r) => toDate(r.valueDate ?? r.docDate),
@@ -216,7 +335,7 @@ export function DepositReconPage() {
         width: 140,
         headerClassName: "text-right",
         className: NUM_CLASS,
-        filterKind: "none",
+        filterKind: "number-range",
         render: (r) => formatMoneyInteger(Number(r.netAmount)),
       },
       {
@@ -225,7 +344,7 @@ export function DepositReconPage() {
         width: 100,
         headerClassName: "text-right",
         className: NUM_CLASS,
-        filterKind: "none",
+        filterKind: "number-range",
         render: (r) => formatMoneyInteger(Number(r.feeAmount)),
       },
       {
@@ -234,23 +353,23 @@ export function DepositReconPage() {
         width: 130,
         headerClassName: "text-right",
         className: NUM_CLASS,
-        filterKind: "none",
+        filterKind: "number-range",
         render: (r) => formatMoneyInteger(Number(r.amount)),
       },
       {
-        key: "reconciled",
+        key: "reconciledBy",
         label: "Người/Ngày đối chiếu",
         width: 170,
-        filterKind: "none",
         render: (r) =>
-          r.reconciledBy
-            ? `${r.reconciledBy} · ${new Date(r.reconciledAt!).toLocaleString("vi-VN")}`
+          r.reconciledByName || r.reconciledBy
+            ? `${r.reconciledByName || r.reconciledBy} · ${new Date(r.reconciledAt!).toLocaleString("vi-VN")}`
             : "—",
       },
       {
         key: "status",
         label: "Trạng thái",
         width: 150,
+        // The toolbar dropdown owns this filter — a second control would fight it.
         filterKind: "none",
         render: (r) => (
           <div className="flex items-center gap-1.5">
@@ -264,7 +383,32 @@ export function DepositReconPage() {
         ),
       },
     ],
-    [accountsById],
+    [openDocument],
+  );
+
+  // Any filter change resets to page 1 — a narrowed result set must not leave
+  // the grid stranded on a page that no longer exists.
+  const patchFilter = useCallback((key: string, patch: Partial<ColumnFilter>) => {
+    setColumnFilters((prev) => ({
+      ...prev,
+      [key as DepositReconFilterKey]: {
+        ...prev[key as DepositReconFilterKey],
+        ...patch,
+      },
+    }));
+    setPage(1);
+  }, []);
+
+  const columnFilterControl = useMemo(
+    () => ({
+      filters: columnFilters as unknown as Record<string, ColumnFilter>,
+      onModeChange: (key: string, mode: ColumnFilterMode) =>
+        patchFilter(key, { mode }),
+      onValueChange: (key: string, value: string) => patchFilter(key, { value }),
+      onRangeChange: (key: string, part: "from" | "to", value: string) =>
+        patchFilter(key, { [part]: value }),
+    }),
+    [columnFilters, patchFilter],
   );
 
   const canUnreconcile = hasPermission(UNRECONCILE_PERMISSION);
@@ -285,13 +429,13 @@ export function DepositReconPage() {
   const handleExport = useCallback(async () => {
     setExporting(true);
     try {
-      await downloadDepositReconExport(query);
+      await downloadDepositReconExport(exportQuery);
     } catch {
       toast.error("Xuất khẩu thất bại.");
     } finally {
       setExporting(false);
     }
-  }, [query]);
+  }, [exportQuery]);
 
   const handleUnreconcileConfirm = useCallback(async () => {
     const reason = unreconcileReason.trim();
@@ -404,7 +548,7 @@ export function DepositReconPage() {
               </span>
             ) : null}
             <span className="text-muted-foreground">Số dòng:</span>
-            <span className="font-semibold">{list.data?.rowCount ?? 0}</span>
+            <span className="font-semibold">{list.data?.total ?? 0}</span>
             <span className="text-muted-foreground">Tổng số tiền:</span>
             <span className="text-base font-semibold">
               {formatMoneyInteger(list.data?.totalAmount ?? 0)}
@@ -426,16 +570,11 @@ export function DepositReconPage() {
       >
         <BaseDataTable
           columns={columns}
-          rows={filteredRows}
+          rows={rows}
           loading={list.isLoading}
           emptyLabel="Không có giao dịch phù hợp."
           getRowKey={(r) => r.id}
-          columnFilterControl={{
-            filters: { type: typeFilter },
-            onModeChange: (_key, mode: ColumnFilterMode) =>
-              setTypeFilter((prev) => ({ ...prev, mode })),
-            onValueChange: (_key, value) => setTypeFilter((prev) => ({ ...prev, value })),
-          }}
+          columnFilterControl={columnFilterControl}
           leadingColumn={{
             width: 36,
             header: (
@@ -457,6 +596,32 @@ export function DepositReconPage() {
           }}
         />
       </DocumentListShell>
+
+      <DepositPaymentVoucherDialog
+        open={openDoc?.kind === "payment"}
+        onOpenChange={(o) => {
+          if (!o) setOpenDoc(null);
+        }}
+        mode={TreasuryVoucherDialogModeEnum.VIEW}
+        initial={openPayment ?? null}
+      />
+
+      <DepositReceiptVoucherDialog
+        open={openDoc?.kind === "receipt"}
+        onOpenChange={(o) => {
+          if (!o) setOpenDoc(null);
+        }}
+        mode={TreasuryVoucherDialogModeEnum.VIEW}
+        initial={openReceipt ?? null}
+      />
+
+      <InvoiceDetailDialog
+        open={openDoc?.kind === "invoice"}
+        onOpenChange={(o) => {
+          if (!o) setOpenDoc(null);
+        }}
+        detail={openInvoice ?? null}
+      />
 
       <DepositReconBatchDialog
         open={batchDialogOpen}

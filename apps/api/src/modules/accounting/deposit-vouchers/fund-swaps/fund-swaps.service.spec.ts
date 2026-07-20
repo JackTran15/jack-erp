@@ -8,6 +8,7 @@ import { CashPaymentsService } from '../../cash-vouchers/cash-payments/cash-paym
 import { CashReceiptsService } from '../../cash-vouchers/cash-receipts/cash-receipts.service';
 import { CashFundResolverService } from '../../cash/cash-fund-resolver.service';
 import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
+import { PartnerResolverService } from '../../cash-vouchers/shared/partner-resolver.service';
 import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
 import { BankPaymentPurpose, BankReceiptPurpose } from '../enums';
 import { CashPaymentPurpose, CashReceiptPurpose } from '../../cash-vouchers/enums';
@@ -49,6 +50,8 @@ async function setup() {
   const accountResolver = {
     resolveContraAccount: jest.fn().mockResolvedValue('acc-642'),
   };
+  // Null = untyped/absent partner, matching the real resolver's contract.
+  const partnerResolver = { resolve: jest.fn().mockResolvedValue(null) };
 
   const module: TestingModule = await Test.createTestingModule({
     providers: [
@@ -60,6 +63,7 @@ async function setup() {
       { provide: CashReceiptsService, useValue: cashReceipt },
       { provide: CashFundResolverService, useValue: cashFundResolver },
       { provide: AccountResolverService, useValue: accountResolver },
+      { provide: PartnerResolverService, useValue: partnerResolver },
     ],
   }).compile();
 
@@ -73,6 +77,7 @@ async function setup() {
     cashReceipt,
     cashFundResolver,
     accountResolver,
+    partnerResolver,
   };
 }
 
@@ -227,5 +232,141 @@ describe('FundSwapsService', () => {
       ).rejects.toThrow(/only applies to DEPOSIT_TO_CASH/);
       expect(dataSource.transaction).not.toHaveBeenCalled();
     });
+  });
+});
+
+/**
+ * MISA parity: a fund swap generates its vouchers, so whatever the user typed on
+ * the source form must land on BOTH legs — otherwise the generated voucher opens
+ * with every field blank, which is exactly the UNC000048 bug.
+ */
+describe('FundSwapsService — party carry-over and leg pairing', () => {
+  const partyDto: CreateFundSwapDto = {
+    ...baseDto,
+    partnerType: 'SUPPLIER' as CreateFundSwapDto['partnerType'],
+    partnerId: 'sup-1',
+    payeeName: 'AN BA',
+    address: '3423423',
+    paidBy: 'user-9',
+    reference: 'REF-1',
+    reason: 'Rút tiền gửi về nhập quỹ tiền mặt',
+    lines: [
+      { description: 'Rút tiền gửi về nhập quỹ tiền mặt', amount: 5_000_000, categoryId: 'cat-out-1' },
+    ],
+  };
+
+  it('carries the resolved party onto the deposit leg', async () => {
+    const { service, bankPayment, partnerResolver } = await setup();
+    partnerResolver.resolve.mockResolvedValue({ name: 'NCC số 2', address: '12 Lê Lợi' });
+
+    await service.swap(partyDto, actor);
+
+    expect(bankPayment.createAndPostInternal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        partnerId: 'sup-1',
+        partnerName: 'NCC số 2',
+        partnerAddress: '12 Lê Lợi',
+        payeeName: 'AN BA',
+        paidBy: 'user-9',
+        reference: 'REF-1',
+        reason: 'Rút tiền gửi về nhập quỹ tiền mặt',
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('clones the party onto the cash receipt, mapping payee→payer and paidBy→staffId', async () => {
+    const { service, cashReceipt, partnerResolver } = await setup();
+    partnerResolver.resolve.mockResolvedValue({ name: 'NCC số 2', address: '12 Lê Lợi' });
+
+    await service.swap(partyDto, actor);
+
+    expect(cashReceipt.createAndPostInternal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        partnerId: 'sup-1',
+        partnerName: 'NCC số 2',
+        partnerAddress: '12 Lê Lợi',
+        payerName: 'AN BA',
+        staffId: 'user-9',
+      }),
+      expect.anything(),
+    );
+  });
+
+  // A partner row whose address column is an empty string (not NULL) is the
+  // common case in real data — `??` alone would keep the blank and silently
+  // discard what the user typed.
+  it.each([
+    ['null', null],
+    ['empty string', ''],
+    ['whitespace', '   '],
+  ])('falls back to the supplied address when the partner address is %s', async (_label, address) => {
+    const { service, bankPayment, partnerResolver } = await setup();
+    partnerResolver.resolve.mockResolvedValue({ name: 'AN BA', address });
+
+    await service.swap(partyDto, actor);
+
+    expect(bankPayment.createAndPostInternal).toHaveBeenCalledWith(
+      expect.objectContaining({ partnerAddress: '3423423' }),
+      expect.anything(),
+    );
+  });
+
+  it('gives every leg the same referenceId so each can find its counterpart', async () => {
+    const { service, bankPayment, cashReceipt } = await setup();
+
+    await service.swap({ ...partyDto, feeAmount: 1_000 }, actor);
+
+    const legs = [
+      ...bankPayment.createAndPostInternal.mock.calls,
+      ...cashReceipt.createAndPostInternal.mock.calls,
+    ].map(([args]) => args);
+
+    expect(legs).toHaveLength(3); // payment + fee + receipt
+    const swapIds = new Set(legs.map((a) => a.referenceId));
+    expect(swapIds.size).toBe(1);
+    expect([...swapIds][0]).toEqual(expect.any(String));
+    for (const leg of legs) expect(leg.referenceType).toBe('FUND_SWAP');
+  });
+
+  it('passes the user lines (with Mục chi) to the source leg', async () => {
+    const { service, bankPayment } = await setup();
+
+    await service.swap(partyDto, actor);
+
+    expect(bankPayment.createAndPostInternal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lines: [
+          {
+            description: 'Rút tiền gửi về nhập quỹ tiền mặt',
+            amount: 5_000_000,
+            categoryId: 'cat-out-1',
+          },
+        ],
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('does NOT clone categoryId to the counterpart — categories are direction-scoped', async () => {
+    const { service, cashReceipt } = await setup();
+
+    await service.swap(partyDto, actor);
+
+    const [args] = cashReceipt.createAndPostInternal.mock.calls[0];
+    expect(args.lines).toEqual([
+      { description: 'Rút tiền gửi về nhập quỹ tiền mặt', amount: 5_000_000 },
+    ]);
+    expect(args.lines[0]).not.toHaveProperty('categoryId');
+  });
+
+  it('still synthesizes a single line when the caller sends none (standalone Chuyển quỹ dialog)', async () => {
+    const { service, bankPayment } = await setup();
+
+    await service.swap(baseDto, actor);
+
+    const [args] = bankPayment.createAndPostInternal.mock.calls[0];
+    expect(args.lines).toBeUndefined();
+    expect(args.description).toBe('Rút tiền gửi chuyển quỹ tiền mặt');
   });
 });

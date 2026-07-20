@@ -5,6 +5,7 @@ import { SupplierDepositPaymentFund } from './dto/create-supplier-deposit-paymen
 import { BankPaymentsService } from '../bank-payments/bank-payments.service';
 import { CashPaymentsService } from '../../cash-vouchers/cash-payments/cash-payments.service';
 import { CashFundResolverService } from '../../cash/cash-fund-resolver.service';
+import { PartnerResolverService } from '../../cash-vouchers/shared/partner-resolver.service';
 import { BankPaymentPurpose, BankPaymentReferenceType } from '../enums';
 import { CashPaymentPurpose } from '../../cash-vouchers/enums';
 import { DebtCollectionSagaStatus } from '../../cash-vouchers/enums';
@@ -66,6 +67,12 @@ async function setup(manager: any) {
     resolveCoaAccountIdByCode: jest.fn().mockResolvedValue('acc-331'),
     resolveOrDefault: jest.fn().mockResolvedValue('cash-1'),
   };
+  // The supplier's name/address, frozen onto the voucher as a snapshot.
+  const partnerResolver = {
+    resolve: jest
+      .fn()
+      .mockResolvedValue({ name: 'NCC số 2', address: '12 Lê Lợi' }),
+  };
   const dataSource = { transaction: jest.fn((cb) => cb(manager)), manager };
 
   const module: TestingModule = await Test.createTestingModule({
@@ -75,6 +82,7 @@ async function setup(manager: any) {
       { provide: BankPaymentsService, useValue: bankPayment },
       { provide: CashPaymentsService, useValue: cashPayment },
       { provide: CashFundResolverService, useValue: cashFundResolver },
+      { provide: PartnerResolverService, useValue: partnerResolver },
     ],
   }).compile();
 
@@ -82,6 +90,7 @@ async function setup(manager: any) {
     service: module.get(SupplierDepositPaymentSagaService),
     bankPayment,
     cashPayment,
+    partnerResolver,
   };
 }
 

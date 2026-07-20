@@ -15,9 +15,15 @@ export function parseMoneyIntegerString(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function formatMoneyInteger(value: number): string {
-  if (!Number.isFinite(value)) return "";
-  return moneyFormatter.format(Math.trunc(value));
+/**
+ * Số tiền có thể tới từ API dưới dạng chuỗi (cột `numeric` của Postgres trả về
+ * string), nên phải ép kiểu trước khi kiểm tra — `Number.isFinite("55555.00")`
+ * là `false` và trước đây khiến ô số tiền hiển thị rỗng.
+ */
+export function formatMoneyInteger(value: number | string): string {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "";
+  return moneyFormatter.format(Math.trunc(n));
 }
 
 /** Format integer VND (Vietnamese grouping with `.`), no currency symbol. */

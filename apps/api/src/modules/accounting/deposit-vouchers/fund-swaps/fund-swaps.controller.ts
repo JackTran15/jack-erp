@@ -1,4 +1,13 @@
-import { Body, Controller, Post, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import {
   Actor,
   ActorContext,
@@ -21,5 +30,15 @@ export class FundSwapsController {
   @RequirePermission('accounting.fund_swap.create')
   swap(@Body() dto: CreateFundSwapDto, @Actor() actor: ActorContext) {
     return this.fundSwaps.swap(dto, actor);
+  }
+
+  /** Sibling vouchers of a swap, so a leg can link to its counterpart. */
+  @Get(':swapId/legs')
+  @RequirePermission('accounting.fund_swap.read')
+  legs(
+    @Param('swapId', ParseUUIDPipe) swapId: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.fundSwaps.legs(swapId, actor);
   }
 }

@@ -1,18 +1,33 @@
 import type { TreasuryVoucherDialogModeEnum } from "../../documents";
-import type {
-  BankPayment,
-  BankPaymentReferenceType,
-  BankReceipt,
-  BankReceiptReferenceType,
-  BankVoucherStatus,
-} from "../../bank-vouchers.types";
+import type { BankVoucherStatus } from "../../bank-vouchers.types";
 
 export enum ReceiptDepositKind {
   RECEIPT = "RECEIPT",
   PAYMENT = "PAYMENT",
 }
 
-/** Merged list row for the "Thu/chi tiền gửi" screen. */
+/** Raw row as returned by `POST /v2/deposit-vouchers/search`. */
+export interface DepositVoucherRow {
+  kind: ReceiptDepositKind;
+  id: string;
+  docDate: string;
+  documentNumber: string | null;
+  status: BankVoucherStatus;
+  totalAmount: number;
+  depositAccountId: string;
+  depositAccountName: string;
+  depositAccountNo: string;
+  referenceType: string | null;
+  counterparty: string;
+  reason: string | null;
+  createdAt: string;
+}
+
+/**
+ * List row for the "Thu/chi tiền gửi" screen. The server now merges receipts and
+ * payments into one ordered stream and inlines the deposit account, so nothing
+ * is joined, filtered or sorted client-side any more.
+ */
 export interface ReceiptDepositListItem {
   kind: ReceiptDepositKind;
   id: string;
@@ -23,10 +38,10 @@ export interface ReceiptDepositListItem {
   counterparty: string;
   reason: string;
   depositAccountId: string;
-  referenceType?: BankReceiptReferenceType | BankPaymentReferenceType;
+  depositAccountName: string;
+  depositAccountNo: string;
+  referenceType?: string;
   isReversed: boolean;
-  receipt?: BankReceipt;
-  payment?: BankPayment;
 }
 
 export enum ReceiptDepositVoucherDialogKindEnum {

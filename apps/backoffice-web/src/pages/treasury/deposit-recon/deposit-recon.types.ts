@@ -46,6 +46,36 @@ export interface DepositReconMovementRow {
   createdBy: string;
 }
 
+/**
+ * Row returned by `POST /v2/deposit-recon/search`. Unlike the v1 row, the
+ * deposit account and the reconciling user are resolved server-side and inlined,
+ * and the money columns arrive as numbers rather than numeric-as-string.
+ */
+export interface DepositReconSearchRow {
+  id: string;
+  documentNumber?: string | null;
+  type: DepositMovementType;
+  depositAccountId: string;
+  depositAccountName: string;
+  depositAccountNo: string;
+  docDate: string;
+  valueDate?: string | null;
+  amount: number;
+  feeAmount: number;
+  netAmount: number;
+  reconStatus: ReconStatus;
+  reconciledBy?: string | null;
+  reconciledByName: string;
+  reconciledAt?: string | null;
+  createdAt: string;
+  /** Which flow produced the movement — POS_INVOICE rows have no voucher. */
+  source: DepositMovementSource;
+  /** Meaning depends on `source`; the invoice id when source is POS_INVOICE. */
+  sourceRefId?: string | null;
+  bankPaymentId?: string | null;
+  bankReceiptId?: string | null;
+}
+
 export interface ListReconQuery {
   depositAccountId?: string;
   reconStatus?: ReconStatus;

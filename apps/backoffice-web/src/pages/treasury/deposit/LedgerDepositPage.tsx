@@ -15,13 +15,23 @@ import {
   type SingleSelectOption,
 } from "@erp/ui";
 import { CloudUpload, HelpCircle } from "lucide-react";
-import type { DepositLedgerRow } from "@erp/shared-interfaces";
+import { DepositMovementSource, type DepositLedgerRow } from "@erp/shared-interfaces";
 import {
   BaseDataTable,
   type TableColumn,
 } from "../../../components/table/BaseDataTable";
 import { PaginationControls } from "../../../components/table/PaginationControls";
-import { DEFAULT_PAGINATION } from "../../../components/table/pagination.dto";
+import {
+  DEFAULT_COLUMN_FILTER_MODE,
+  DEFAULT_PAGINATION,
+  type ColumnFilter,
+  type ColumnFilterMode,
+} from "../../../components/table/pagination.dto";
+import {
+  buildV2Body,
+  type V2SearchConfig,
+} from "../../../components/crud/crudV2Search";
+import { useDebouncedValue } from "../../../lib/use-debounced-value";
 import {
   DepositTabBar,
   DepositTabIdEnum,
@@ -30,15 +40,18 @@ import { useDepositAccounts } from "../../../hooks/treasury/use-deposit-accounts
 import { selectDepositBalances } from "../../../hooks/treasury/use-deposit-balance";
 import {
   downloadDepositLedgerExport,
-  useDepositLedger,
+  useDepositLedgerSearch,
 } from "../../../hooks/treasury/use-deposit-ledger";
 import { useBankReceipt } from "../../../hooks/treasury/use-bank-receipts";
 import { useBankPayment } from "../../../hooks/treasury/use-bank-payments";
 import {
   DepositPaymentVoucherDialog,
   DepositReceiptVoucherDialog,
+  InvoiceDetailDialog,
   TreasuryVoucherDialogModeEnum,
+  VoucherLink,
 } from "../documents";
+import { useInvoiceDetailByCode } from "../../../hooks/treasury/use-invoice-detail";
 
 const VI_DATE: Intl.DateTimeFormatOptions = {
   day: "2-digit",
@@ -48,6 +61,50 @@ const VI_DATE: Intl.DateTimeFormatOptions = {
 
 const NUM_CLASS = "text-right tabular-nums";
 
+/**
+ * Column keys are named after the `POST /v2/deposit-ledger/search` request
+ * fields so `buildV2Body` maps the filter state straight onto the body.
+ * `receiptNo`/`paymentNo` are the exception: both render the same underlying
+ * `document_number`, so whichever cell the user fills becomes documentNumber.
+ */
+const LEDGER_FILTER_KEYS = [
+  "docDate",
+  "receiptNo",
+  "paymentNo",
+  "accountNo",
+  "description",
+  "amountIn",
+  "amountOut",
+  "counterparty",
+  "staff",
+] as const;
+
+type LedgerFilterKey = (typeof LEDGER_FILTER_KEYS)[number];
+
+const LEDGER_SEARCH: V2SearchConfig = {
+  path: "/v2/deposit-ledger/search",
+  fields: {
+    docDate: "date-range",
+    documentNumber: "string",
+    accountNo: "string",
+    description: "string",
+    amountIn: "compare",
+    amountOut: "compare",
+    counterparty: "string",
+    staff: "string",
+  },
+};
+
+function emptyColumnFilters(): Record<LedgerFilterKey, ColumnFilter> {
+  return LEDGER_FILTER_KEYS.reduce(
+    (acc, k) => {
+      acc[k] = { mode: DEFAULT_COLUMN_FILTER_MODE, value: "" };
+      return acc;
+    },
+    {} as Record<LedgerFilterKey, ColumnFilter>,
+  );
+}
+
 interface DepositLedgerDisplayRow {
   id: string;
   isOpening: boolean;
@@ -56,6 +113,9 @@ interface DepositLedgerDisplayRow {
   paymentNo: string;
   receiptId: string | null;
   paymentId: string | null;
+  /** Raw movement number — the invoice code on POS_INVOICE rows. */
+  documentNumber: string;
+  source: DepositMovementSource | null;
   accountNo: string;
   description: string;
   amountIn: number;
@@ -78,6 +138,8 @@ function toDisplayRow(row: DepositLedgerRow): DepositLedgerDisplayRow {
     paymentNo: row.paymentNo ?? "",
     receiptId: row.receiptId ?? null,
     paymentId: row.paymentId ?? null,
+    documentNumber: row.documentNumber ?? "",
+    source: row.source ?? null,
     accountNo: row.depositAccountNo,
     description: row.description ?? "",
     amountIn: toNumber(row.amountIn),
@@ -100,6 +162,8 @@ function buildOpeningRow(
     paymentNo: "",
     receiptId: null,
     paymentId: null,
+    documentNumber: "",
+    source: null,
     accountNo: "",
     description: isAllAccounts
       ? "Số dư đầu kỳ (tất cả tài khoản)"
@@ -120,13 +184,17 @@ export function LedgerDepositPage() {
   const [appliedPeriod, setAppliedPeriod] = useState(period);
   const [pagination, setPagination] = useState(DEFAULT_PAGINATION);
   const [accountId, setAccountId] = useState("");
+  const [columnFilters, setColumnFilters] =
+    useState<Record<LedgerFilterKey, ColumnFilter>>(emptyColumnFilters);
   const [exporting, setExporting] = useState(false);
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
+  const [selectedInvoiceCode, setSelectedInvoiceCode] = useState<string | null>(null);
 
   const { data: accounts = [] } = useDepositAccounts();
   const { data: receiptDetail } = useBankReceipt(selectedReceiptId ?? undefined, Boolean(selectedReceiptId));
   const { data: paymentDetail } = useBankPayment(selectedPaymentId ?? undefined, Boolean(selectedPaymentId));
+  const { data: invoiceDetail } = useInvoiceDetailByCode(selectedInvoiceCode ?? undefined);
 
   const accountOptions = useMemo<SingleSelectOption[]>(
     () => [
@@ -148,11 +216,31 @@ export function LedgerDepositPage() {
     [accountId, appliedPeriod],
   );
 
-  const ledger = useDepositLedger(
-    ledgerParams,
-    pagination.page,
-    pagination.pageSize,
-  );
+  // Debounced so typing in a column filter settles into one request.
+  const debouncedFilters = useDebouncedValue(columnFilters, 300);
+
+  const searchBody = useMemo(() => {
+    const merged: Record<string, ColumnFilter> = {
+      ...debouncedFilters,
+      docDate: {
+        ...debouncedFilters.docDate,
+        from: debouncedFilters.docDate.from || appliedPeriod.from,
+        to: debouncedFilters.docDate.to || appliedPeriod.to,
+      },
+      // Both voucher-number columns render document_number; whichever the user
+      // filled wins (no row carries both a receipt and a payment number).
+      documentNumber: debouncedFilters.receiptNo.value
+        ? debouncedFilters.receiptNo
+        : debouncedFilters.paymentNo,
+    };
+    return {
+      ...buildV2Body(LEDGER_SEARCH, merged, pagination.page, pagination.pageSize),
+      ...(accountId ? { depositAccountId: accountId } : {}),
+    };
+  }, [debouncedFilters, appliedPeriod, pagination, accountId]);
+
+  const canQuery = Boolean(appliedPeriod.from) && Boolean(appliedPeriod.to);
+  const ledger = useDepositLedgerSearch(searchBody, canQuery);
   const data = ledger.data;
   const balances = selectDepositBalances(data);
 
@@ -165,20 +253,80 @@ export function LedgerDepositPage() {
       : movement;
   }, [data, pagination.page, accountId]);
 
+  /**
+   * A ledger row is a movement. Vouchers open by their resolved id; POS_INVOICE
+   * rows have no voucher, so they open the invoice by its code — which is what
+   * `documentNumber` holds for them.
+   */
+  const handleRowClick = useCallback((row: DepositLedgerDisplayRow) => {
+    if (row.isOpening) return;
+    if (row.receiptId) setSelectedReceiptId(row.receiptId);
+    else if (row.paymentId) setSelectedPaymentId(row.paymentId);
+    else if (row.source === DepositMovementSource.POS_INVOICE && row.documentNumber) {
+      setSelectedInvoiceCode(row.documentNumber);
+    }
+  }, []);
+
+  /** True when the row has something to open — drives the link affordance. */
+  const isOpenable = useCallback(
+    (row: DepositLedgerDisplayRow) =>
+      !row.isOpening &&
+      Boolean(
+        row.receiptId ||
+          row.paymentId ||
+          (row.source === DepositMovementSource.POS_INVOICE && row.documentNumber),
+      ),
+    [],
+  );
+
   const columns = useMemo<TableColumn<DepositLedgerDisplayRow>[]>(
     () => [
       {
         key: "docDate",
         label: "Ngày chứng từ",
         width: 110,
+        filterKind: "date-range",
         render: (r) =>
           r.docDate
             ? new Date(r.docDate).toLocaleDateString("vi-VN", VI_DATE)
             : "",
       },
-      { key: "receiptNo", label: "Số phiếu thu", width: 120, render: (r) => r.receiptNo },
-      { key: "paymentNo", label: "Số phiếu chi", width: 120, render: (r) => r.paymentNo },
-      { key: "accountNo", label: "Số tài khoản", width: 140, render: (r) => r.accountNo },
+      {
+        key: "receiptNo",
+        label: "Số phiếu thu",
+        width: 120,
+        render: (r) =>
+          r.receiptNo ? (
+            <VoucherLink
+              code={r.receiptNo}
+              clickable={isOpenable(r)}
+              onClick={() => handleRowClick(r)}
+            />
+          ) : (
+            ""
+          ),
+      },
+      {
+        key: "paymentNo",
+        label: "Số phiếu chi",
+        width: 120,
+        render: (r) =>
+          r.paymentNo ? (
+            <VoucherLink
+              code={r.paymentNo}
+              clickable={isOpenable(r)}
+              onClick={() => handleRowClick(r)}
+            />
+          ) : (
+            ""
+          ),
+      },
+      {
+        key: "accountNo",
+        label: "Số tài khoản",
+        width: 140,
+        render: (r) => r.accountNo,
+      },
       {
         key: "description",
         label: "Diễn giải",
@@ -193,6 +341,7 @@ export function LedgerDepositPage() {
         key: "amountIn",
         label: "Thu",
         width: 120,
+        filterKind: "number-range",
         headerClassName: "text-right",
         className: NUM_CLASS,
         render: (r) => (r.amountIn > 0 ? formatMoneyInteger(r.amountIn) : ""),
@@ -201,6 +350,7 @@ export function LedgerDepositPage() {
         key: "amountOut",
         label: "Chi",
         width: 120,
+        filterKind: "number-range",
         headerClassName: "text-right",
         className: NUM_CLASS,
         render: (r) => (r.amountOut > 0 ? formatMoneyInteger(r.amountOut) : ""),
@@ -209,14 +359,48 @@ export function LedgerDepositPage() {
         key: "runningBalance",
         label: "Số tiền còn lại",
         width: 140,
+        // Computed per page from the ordered stream — not a filterable value.
+        filterKind: "none",
         headerClassName: "text-right",
         className: NUM_CLASS,
         render: (r) => formatMoneyInteger(r.runningBalance),
       },
-      { key: "counterparty", label: "Đối tượng", width: 150, render: (r) => r.counterparty },
-      { key: "staff", label: "Nhân viên", width: 140, render: (r) => r.staff },
+      {
+        key: "counterparty",
+        label: "Đối tượng",
+        width: 150,
+        render: (r) => r.counterparty,
+      },
+      {
+        key: "staff",
+        label: "Nhân viên",
+        width: 140,
+        render: (r) => r.staff,
+      },
     ],
-    [],
+    [isOpenable, handleRowClick],
+  );
+
+  // Any filter change resets to page 1 — a narrowed result set must not leave
+  // the grid stranded on a page that no longer exists.
+  const patchFilter = useCallback((key: string, patch: Partial<ColumnFilter>) => {
+    setColumnFilters((prev) => ({
+      ...prev,
+      [key as LedgerFilterKey]: { ...prev[key as LedgerFilterKey], ...patch },
+    }));
+    setPagination((p) => ({ ...p, page: 1 }));
+  }, []);
+
+  const columnFilterControl = useMemo(
+    () => ({
+      filters: columnFilters as unknown as Record<string, ColumnFilter>,
+      onModeChange: (key: string, mode: ColumnFilterMode) =>
+        patchFilter(key, { mode }),
+      onValueChange: (key: string, value: string) => patchFilter(key, { value }),
+      onRangeChange: (key: string, part: "from" | "to", value: string) =>
+        patchFilter(key, { [part]: value }),
+    }),
+    [columnFilters, patchFilter],
   );
 
   const effectiveColumns = useMemo(() => {
@@ -249,10 +433,6 @@ export function LedgerDepositPage() {
     }
   }, [accountId, appliedPeriod]);
 
-  const handleRowClick = useCallback((row: DepositLedgerDisplayRow) => {
-    if (row.receiptId) setSelectedReceiptId(row.receiptId);
-    else if (row.paymentId) setSelectedPaymentId(row.paymentId);
-  }, []);
 
   return (
     <DocumentListShell
@@ -314,6 +494,7 @@ export function LedgerDepositPage() {
             emptyLabel="Không có phát sinh trong kỳ."
             getRowKey={(r) => r.id}
             onRowClick={handleRowClick}
+            columnFilterControl={columnFilterControl}
           />
           {data && (
             <div className="flex items-center justify-end gap-6 border-t bg-muted/50 px-4 py-2 text-sm font-semibold">
@@ -350,6 +531,14 @@ export function LedgerDepositPage() {
           )}
         </div>
       </div>
+
+      <InvoiceDetailDialog
+        open={Boolean(selectedInvoiceCode)}
+        onOpenChange={(o) => {
+          if (!o) setSelectedInvoiceCode(null);
+        }}
+        detail={invoiceDetail ?? null}
+      />
 
       <DepositReceiptVoucherDialog
         open={Boolean(selectedReceiptId)}

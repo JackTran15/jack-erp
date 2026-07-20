@@ -814,8 +814,11 @@ export class BankPaymentsService {
     }
     this.applySourceFilter(qb, query.source);
 
-    qb.orderBy("p.docDate", "DESC")
-      .addOrderBy("p.createdAt", "DESC")
+    // Entry order, newest first. `createdAt` is not unique — vouchers inserted in
+    // one transaction share a statement timestamp — so `id` is the stable
+    // tiebreaker that keeps offset pagination from dropping/repeating rows.
+    qb.orderBy("p.createdAt", "DESC")
+      .addOrderBy("p.id", "DESC")
       .skip((page - 1) * pageSize)
       .take(pageSize);
 

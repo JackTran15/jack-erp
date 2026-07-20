@@ -24,6 +24,8 @@ export enum BankReceiptReferenceType {
   TRANSFER = 'TRANSFER',
   MANUAL = 'MANUAL',
   REVERSAL = 'REVERSAL',
+  /** Counterpart leg of a fund swap (FR-08); reference_id = the swap id. */
+  FUND_SWAP = 'FUND_SWAP',
 }
 
 export enum BankPaymentPurpose {
@@ -45,6 +47,18 @@ export enum BankPaymentReferenceType {
   EXPENSE = 'EXPENSE',
   MANUAL = 'MANUAL',
   REVERSAL = 'REVERSAL',
+  /** Source leg of a fund swap (FR-08); reference_id = the swap id. */
+  FUND_SWAP = 'FUND_SWAP',
+}
+
+/**
+ * Discriminator for the merged receipt+payment voucher stream served by
+ * `POST /v2/deposit-vouchers/search`. Not a stored column — it is derived from
+ * which table a row came from.
+ */
+export enum DepositVoucherKind {
+  RECEIPT = 'RECEIPT',
+  PAYMENT = 'PAYMENT',
 }
 
 export enum BankVoucherPartnerType {
