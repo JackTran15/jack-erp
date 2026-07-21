@@ -87,6 +87,7 @@ export function InventoryItemBarcodesPage() {
         name: p.name,
         unit: p.unit ?? "",
         sellingPrice: Number(p.sellingPrice) || 0,
+        quantity: Number(p.quantity) || 0,
         storageId: p.storageId ?? "",
         storageName: p.storageName ?? "",
         locationId: p.locationId ?? "",

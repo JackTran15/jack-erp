@@ -748,7 +748,6 @@ function TransferFormDialog({
     return isView ? initialLines : normalizeLines(initialLines);
   });
 
-  // Bật/tắt hàng quét mã vạch phía trên bảng dòng.
   const [barcodeMode, setBarcodeMode] = useState(false);
 
   const [saving, setSaving] = useState(false);
@@ -1146,8 +1145,8 @@ function TransferFormDialog({
     if (filledLine) void fillTransferLocations([filledLine]);
   };
 
-  // Quét mã vạch: item đã có -> cộng dồn số lượng; item mới -> thêm dòng (kho
-  // xuất mặc định) rồi tự điền vị trí nguồn/đích như luồng chọn hàng.
+  // Barcode scan: existing item -> accumulate the quantity; new item -> add a line (default
+  // source storage) then auto-fill the source/destination locations like the item-pick flow.
   const handleScanResolved = (item: ItemLookupResult, qty: number) => {
     const existingIdx = lines.findIndex((l) => l.itemId === item.itemId);
     if (existingIdx >= 0) {
@@ -1170,11 +1169,11 @@ function TransferFormDialog({
       sourceStorageId,
       sourceStorageLabel,
       quantity: qty > 0 ? qty : 1,
-      unitPrice: "", // để trống -> server tự tính từ giá vốn (giống addLinesFromPicker)
+      unitPrice: "", // leave empty -> server computes it from cost (same as addLinesFromPicker)
     };
     setLines((prev) => normalizeLines([...getPersistableFormLines(prev), newLine]));
     markDirty();
-    void fillTransferLocations([newLine]); // tự điền vị trí nguồn/đích như luồng picker
+    void fillTransferLocations([newLine]); // auto-fill source/destination locations like the picker flow
   };
 
   const lineColumns: LineColumn<FormLine>[] = [

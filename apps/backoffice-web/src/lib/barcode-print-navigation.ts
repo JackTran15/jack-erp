@@ -10,6 +10,7 @@ export interface BarcodePrefillItem {
   name: string;
   unit: string;
   sellingPrice: number;
+  quantity?: number;
   storageId?: string;
   storageName?: string;
   locationId?: string;

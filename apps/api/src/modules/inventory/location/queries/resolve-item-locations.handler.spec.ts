@@ -35,7 +35,7 @@ function makeHandler(cfg: Cfg, andWhereCalls?: string[]): ResolveItemLocationsHa
       if (entity === LocationEntity) return cfg.locs ?? [];
       return [];
     }),
-    createQueryBuilder: jest.fn(() => {
+    createQueryBuilder: jest.fn((entity: unknown) => {
       const qb: Record<string, unknown> = {};
       for (const m of ['innerJoin', 'where', 'orderBy']) {
         qb[m] = () => qb;
@@ -44,7 +44,12 @@ function makeHandler(cfg: Cfg, andWhereCalls?: string[]): ResolveItemLocationsHa
         andWhereCalls?.push(condition);
         return qb;
       };
-      qb.getOne = async () => cfg.stockBin ?? null;
+      // The preferred branch uses ItemStorageLocationEntity; the stock fallback
+      // branch uses StockBalanceEntity — return results per entity so they don't mix.
+      qb.getOne = async () =>
+        entity === ItemStorageLocationEntity
+          ? (cfg.preferred ?? null)
+          : (cfg.stockBin ?? null);
       return qb;
     }),
   };
@@ -128,10 +133,10 @@ describe('ResolveItemLocationsHandler', () => {
     });
   });
 
-  it('lọc is_tracked=true ở nhánh fallback tồn kho (bỏ vị trí đã ngừng theo dõi)', async () => {
+  it('filters is_tracked=true in the stock fallback branch (skips untracked locations)', async () => {
     const andWhereCalls: string[] = [];
-    // Không set preferred/stockBin để chắc chắn chạy tới nhánh fallback tồn kho;
-    // getOne trả null cũng không sao vì ta chỉ khẳng định điều kiện đã được thêm.
+    // Leave preferred/stockBin unset to be sure we reach the stock fallback branch;
+    // getOne returning null is fine since we only assert the condition was added.
     const handler = makeHandler(
       {
         storage: { id: 'S9' },
@@ -150,7 +155,7 @@ describe('ResolveItemLocationsHandler', () => {
       ),
     );
 
-    // Bộ lọc áp ở tầng SQL nên khẳng định điều kiện được thêm vào query.
+    // The filter is applied at the SQL layer, so assert the condition was added to the query.
     expect(andWhereCalls).toContain('sb.is_tracked = true');
   });
 });

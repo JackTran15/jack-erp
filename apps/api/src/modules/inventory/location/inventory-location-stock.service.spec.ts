@@ -935,6 +935,7 @@ describe('InventoryLocationStockService', () => {
       expect(locationRepo.findOne).toHaveBeenCalledWith({
         where: {
           id: 'loc-other-branch',
+          isActive: true,
           organizationId: 'org-1',
           storageId: 'storage-1',
           isUnassigned: false,
@@ -944,15 +945,15 @@ describe('InventoryLocationStockService', () => {
       });
     });
 
-    it('bỏ vị trí đã ngừng theo dõi, chọn vị trí đang theo dõi dù tồn thấp hơn', async () => {
+    it('skips an untracked location and picks a tracked one even with lower stock', async () => {
       itemRepo.findOne.mockResolvedValue({
         id: 'item-1',
         productId: null,
         organizationId: 'org-1',
       });
 
-      // Vị trí A tồn cao nhưng đã ngừng theo dõi; B tồn thấp hơn, đang theo dõi.
-      // Mock mô phỏng DB: chỉ trả balance khớp where.isTracked, sort quantity DESC.
+      // Location A has higher stock but is untracked; B has lower stock but is tracked.
+      // Mock mimics the DB: return only balances matching where.isTracked, sorted by quantity DESC.
       const balances = [
         { itemId: 'item-1', locationId: 'loc-A', quantity: 20, isTracked: false },
         { itemId: 'item-1', locationId: 'loc-B', quantity: 5, isTracked: true },
@@ -976,7 +977,7 @@ describe('InventoryLocationStockService', () => {
         service.getPreferredShelf('item-1', 'storage-1', actor),
       ).resolves.toEqual({ id: 'loc-B', code: 'B-01', name: 'Kệ B' });
 
-      // Query fallback phải lọc is_tracked=true để không gợi ý vị trí đã ngừng theo dõi.
+      // The fallback query must filter is_tracked=true so it never suggests an untracked location.
       expect(stockBalanceRepo.find).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ isTracked: true }),

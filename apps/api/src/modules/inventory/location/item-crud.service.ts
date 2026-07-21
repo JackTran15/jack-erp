@@ -1262,12 +1262,13 @@ export class InventoryItemCrudService extends BaseCrudService<
   // ─── Product-grouped item queries ────────────────────────────────────
 
   /**
-   * Tra cứu hàng hóa theo mã cho ô quét mã vạch (form Nhập/Xuất/Chuyển kho).
-   * Khớp exact SKU `items.code` HOẶC mã vạch `item_barcodes.code`, chỉ hàng
-   * đang theo dõi (`is_active`), trong tổ chức của actor. Trả mảng 0..n (gần
-   * như luôn 0/1 vì SKU/mã vạch là duy nhất trong org). Khác POS: không lọc
-   * `is_pos_visible` và không trả vị trí/tồn — vị trí do form tự resolve.
-   * DISTINCT để item có nhiều mã vạch không bị nhân dòng qua LEFT JOIN.
+   * Look up an item by code for the barcode-scan field (goods receipt/issue/
+   * transfer forms). Matches an exact SKU `items.code` OR barcode
+   * `item_barcodes.code`, tracked items only (`is_active`), within the actor's
+   * organization. Returns a 0..n array (almost always 0/1, since SKU/barcode is
+   * unique within an org). Unlike POS: does not filter on `is_pos_visible` and
+   * returns no location/stock — the form resolves the location itself.
+   * DISTINCT so an item with multiple barcodes isn't duplicated by the LEFT JOIN.
    */
   async lookupByCode(
     code: string,

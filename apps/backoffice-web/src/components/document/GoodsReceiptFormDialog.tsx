@@ -382,7 +382,6 @@ export function PurchaseOrderFormDialog({
 
     return isView ? initialLines : normalizeFormLines(initialLines);
   });
-  // Bật/tắt hàng quét mã vạch phía trên bảng dòng (checkbox "Quét mã vạch").
   const [barcodeMode, setBarcodeMode] = useState(false);
 
   const [saving, setSaving] = useState(false);
@@ -764,9 +763,9 @@ export function PurchaseOrderFormDialog({
     );
   };
 
-  // Mỗi lần quét resolve đúng một item → cộng dồn nếu đã có dòng, ngược lại
-  // thêm dòng mới. Dùng chung helper với addLinesFromPicker để dòng quét chạy
-  // giống hệt (chuẩn hoá dòng trống đuôi, tự điền vị trí "đã sắp" theo kho).
+  // Each scan resolves exactly one item → accumulate if a line already exists, otherwise
+  // add a new line. Shares the helper with addLinesFromPicker so a scanned line behaves
+  // identically (normalizes the trailing empty row, auto-fills the "đã sắp" location per storage).
   const handleScanResolved = (item: ItemLookupResult, qty: number) => {
     const existingIdx = lines.findIndex((l) => l.itemId === item.itemId);
     if (existingIdx >= 0) {
@@ -1976,7 +1975,7 @@ export function PurchaseOrderFormDialog({
         }
         detail={
           <>
-            {/* Hàng quét mã vạch hiện phía trên bảng dòng khi bật checkbox. */}
+            {/* Barcode-scan row shown above the line grid when the checkbox is on. */}
             {barcodeMode && (
               <BarcodeScanRow
                 lookup={lookupItemByCode}

@@ -753,7 +753,7 @@ function TransferOrderFormDialog({
     initial?.requestedDate ?? new Date().toISOString().slice(0, 10),
   );
   const [status, setStatus] = useState<TOStatus>(initial?.status ?? "DRAFT");
-  // Bật/tắt hàng quét mã vạch phía trên bảng dòng (checkbox "Quét mã vạch").
+  // Toggles the barcode-scan row above the line grid (the "Quét mã vạch" checkbox).
   const [barcodeMode, setBarcodeMode] = useState(false);
   const [lines, setLines] = useState<FormLine[]>(() => {
     if (!initial) return [emptyLine()];
@@ -1166,8 +1166,8 @@ function TransferOrderFormDialog({
     markDirty();
   };
 
-  // Quét mã vạch: item đã có -> cộng dồn số lượng; item mới -> thêm dòng (kho
-  // nguồn để trống, fallback theo kho nguồn ở header như luồng chọn hàng).
+  // Barcode scan: existing item -> accumulate the quantity; new item -> add a line (source
+  // storage left empty, falling back to the header source storage like the item-pick flow).
   const handleScanResolved = (item: ItemLookupResult, qty: number) => {
     const existingIdx = lines.findIndex((l) => l.itemId === item.itemId);
     if (existingIdx >= 0) {

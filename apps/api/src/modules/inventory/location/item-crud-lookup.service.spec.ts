@@ -13,10 +13,10 @@ import { StockLedgerService } from "../ledger/stock-ledger.service";
 import { CacheService } from "../../redis/cache.service";
 
 /**
- * lookupByCode — tra cứu hàng hóa theo SKU/mã vạch cho ô quét mã vạch ERP.
- * Không có DB thật (mock DataSource.query), nên các ràng buộc "khác org không
- * lẫn" và "item inactive bị loại" được kiểm bằng cách khẳng định SQL sinh ra
- * đã scope org + lọc is_active và bind đúng tham số.
+ * lookupByCode — item lookup by SKU/barcode for the ERP barcode-scan field.
+ * There is no real DB (DataSource.query is mocked), so the "no cross-org bleed"
+ * and "inactive items excluded" guarantees are verified by asserting that the
+ * generated SQL scopes by org, filters on is_active, and binds the right params.
  */
 describe("InventoryItemCrudService.lookupByCode", () => {
   let service: InventoryItemCrudService;
@@ -90,7 +90,7 @@ describe("InventoryItemCrudService.lookupByCode", () => {
     expect(result).toEqual([row]);
     expect(queryMock).toHaveBeenCalledTimes(1);
     expect(paramsOf()).toEqual(["org-1", "SKU-1"]);
-    // Cả SKU lẫn mã vạch cùng khớp trên một tham số.
+    // Both the SKU and the barcode match against the same parameter.
     expect(sqlOf()).toContain("(i.code = $2 OR b.code = $2)");
   });
 

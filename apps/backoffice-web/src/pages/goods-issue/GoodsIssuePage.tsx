@@ -412,6 +412,7 @@ export function GoodsIssuePage() {
               name: line.item?.name ?? line.itemName ?? "",
               unit: line.item?.unit ?? line.unit ?? "",
               sellingPrice: 0,
+              quantity: Number(line.quantity) || 0,
               storageId,
               storageName: storageId ? (storageNameById.get(storageId) ?? "") : "",
               locationId: line.locationId ?? line.location?.id ?? "",

@@ -18,6 +18,8 @@ import {
   ProductSelectDialog,
   type ProductSelectResult,
 } from "../../components/shared/product-select/ProductSelectDialog";
+import { BarcodeScanRow } from "../../components/shared/BarcodeScanRow";
+import { lookupItemByCode, type ItemLookupResult } from "../../api/item-lookup";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -115,6 +117,7 @@ export function ArrangeLocationDialog({
   initialLocation = null,
 }: Props): ReactElement {
   const [rows, setRows] = useState<ArrangeRow[]>(() => [emptyRow()]);
+  const [barcodeMode, setBarcodeMode] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [productPickerRowId, setProductPickerRowId] = useState<string | null>(
     null,
@@ -124,6 +127,7 @@ export function ArrangeLocationDialog({
     if (!open) {
       setRows([emptyRow()]);
       setProductPickerRowId(null);
+      setBarcodeMode(false);
     }
   }, [open]);
 
@@ -295,6 +299,64 @@ export function ArrangeLocationDialog({
     [productPickerRowId, rows],
   );
 
+  // Barcode scan: each resolved code -> add one row for the item. The Xếp vị trí form has no
+  // quantity concept, so qty is ignored. Reuse applyProductSelection's preferred-shelf fill
+  // logic for a single item.
+  const handleScanResolved = useCallback(
+    async (item: ItemLookupResult) => {
+      // Dedupe: if the item is already in the list, skip it — do NOT accumulate.
+      if (rows.some((row) => row.itemIds.includes(item.itemId))) {
+        toast.info("Hàng hoá đã có trong danh sách.");
+        return;
+      }
+
+      // Storage context comes from the first row that already has a storage (acts like `target` in
+      // applyProductSelection), used to infer the preferred shelf when no location is chosen yet.
+      const context = rows.find((row) => row.storageId);
+      let shelf: { id: string; code: string; name: string } | null = null;
+      if (context?.storageId && !context.locationId) {
+        try {
+          const [entry] = await getPreferredShelfBatch([
+            { itemId: item.itemId, storageId: context.storageId },
+          ]);
+          shelf = entry?.shelf ?? null;
+        } catch (err) {
+          toast.error(getUserFacingApiErrorMessage(err));
+        }
+      }
+
+      const newRow: ArrangeRow = {
+        ...emptyRow(),
+        groupType: "orphan",
+        itemIds: [item.itemId],
+        itemCode: item.code,
+        itemName: item.name,
+        unit: item.unit,
+        storageId: context?.storageId ?? null,
+        storageName: context?.storageName ?? "",
+        locationId: context?.locationId ?? shelf?.id ?? null,
+        locationCode:
+          context?.locationCode ||
+          (shelf ? `${shelf.code} · ${shelf.name}` : ""),
+      };
+
+      // Replace the first empty row (usually the last one); useTrailingEmptyRow will
+      // add a fresh trailing empty row back. If there's no empty row, append at the end.
+      setRows((prev) => {
+        const emptyIdx = prev.findIndex(isRowEmpty);
+        if (emptyIdx >= 0) {
+          return [
+            ...prev.slice(0, emptyIdx),
+            newRow,
+            ...prev.slice(emptyIdx + 1),
+          ];
+        }
+        return [...prev, newRow];
+      });
+    },
+    [rows],
+  );
+
   const resolveGroupItemIds = useCallback(async (row: ArrangeRow) => {
     if (!row.groupId || row.groupType !== "product") {
       return row.itemIds;
@@ -413,15 +475,30 @@ export function ArrangeLocationDialog({
     >
       {/* Header bar */}
       <div className="flex flex-wrap items-center justify-end gap-4 border-b px-4 py-3">
-        {/* Quét mã vạch (visual only, disabled) */}
-        <label className="flex cursor-not-allowed items-center gap-1.5 text-sm text-muted-foreground opacity-50">
-          <input type="checkbox" disabled />
+        {/* Toggle the barcode-scan row above the line grid */}
+        <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={barcodeMode}
+            onChange={(e) => setBarcodeMode(e.target.checked)}
+          />
           Quét mã vạch
         </label>
       </div>
 
       {/* Grid */}
       <div className="flex-1 overflow-auto">
+        {/* Barcode scan row shown above the line grid when the checkbox is on. */}
+        {barcodeMode && (
+          <BarcodeScanRow
+            lookup={lookupItemByCode}
+            onResolved={handleScanResolved}
+            getSku={(i) => i.code}
+            getName={(i) => i.name}
+            showQty={false}
+            disabled={submitting}
+          />
+        )}
         <table className="w-full border-collapse text-sm">
           <thead className="sticky top-0 z-10 bg-muted text-left [&_th]:bg-muted">
             <tr>

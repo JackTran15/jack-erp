@@ -1,9 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
- * Kết quả tra cứu hàng hóa theo mã (SKU hoặc mã vạch) cho ô quét mã vạch ở
- * form Nhập/Xuất/Chuyển kho. Shape trùng phần lõi của item mà picker trả về
- * (ProductSelectDialog) để form tái dùng đường thêm dòng; vị trí resolve riêng.
+ * Result of an item lookup by code (SKU or barcode) for the barcode-scan field
+ * on the goods receipt/issue/transfer forms. Shape mirrors the core of the item
+ * returned by the picker (ProductSelectDialog) so the form can reuse its add-row
+ * path; the location is resolved separately.
  */
 export class ItemLookupResultDto {
   @ApiProperty({ format: 'uuid' }) itemId: string;
