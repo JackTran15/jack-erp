@@ -3,7 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { DomainEvent, DomainEventType } from '@erp/shared-interfaces';
 import { LoyaltyPointsConsumer } from './loyalty-points.consumer';
 import { MembershipCardService } from '../services/membership-card.service';
-import { PointHistoryEntity } from '../point-history.entity';
+import { PointHistoryEntity, PointType } from '../point-history.entity';
 import { LoyaltyPointsAwardPayload } from '../publishers/loyalty-points.publisher';
 
 const buildEvent = (
@@ -63,6 +63,16 @@ describe('LoyaltyPointsConsumer', () => {
     await consumer.handle(buildEvent());
 
     expect(membershipCardService.awardPointsForInvoice).not.toHaveBeenCalled();
+  });
+
+  it('scopes the idempotency lookup to EARN so a REDEEM row on the same invoice does not block the award', async () => {
+    historyRepo.findOne.mockResolvedValue(null);
+
+    await consumer.handle(buildEvent());
+
+    expect(historyRepo.findOne).toHaveBeenCalledWith({
+      where: { invoiceId: 'inv-1', organizationId: 'org-1', type: PointType.EARN },
+    });
   });
 
   it('propagates errors so Kafka retries', async () => {

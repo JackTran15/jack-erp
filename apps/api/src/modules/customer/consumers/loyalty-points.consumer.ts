@@ -5,7 +5,7 @@ import { DomainEvent } from '@erp/shared-interfaces';
 import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { OnDomainEvent } from '../../events/decorators/on-event.decorator';
 import { MembershipCardService } from '../services/membership-card.service';
-import { PointHistoryEntity } from '../point-history.entity';
+import { PointHistoryEntity, PointType } from '../point-history.entity';
 import { LoyaltyPointsAwardPayload } from '../publishers/loyalty-points.publisher';
 
 @Injectable()
@@ -23,8 +23,11 @@ export class LoyaltyPointsConsumer {
     const { invoiceId, customerId, subtotal, branchId, organizationId, actorId } =
       event.payload;
 
+    // Scoped to EARN: checkout already wrote a REDEEM row against this same
+    // invoiceId when the customer paid with points, so an untyped lookup would
+    // read that as a duplicate award and silently skip the earn.
     const existing = await this.historyRepo.findOne({
-      where: { invoiceId, organizationId },
+      where: { invoiceId, organizationId, type: PointType.EARN },
     });
 
     if (existing) {
