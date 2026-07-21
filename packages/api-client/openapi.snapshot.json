@@ -1587,6 +1587,70 @@
         ]
       }
     },
+    "/v2/cash-vouchers/search": {
+      "post": {
+        "operationId": "CashVoucherV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CashVoucherSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashVoucherSearchV2ResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Search cash receipts and payments as one list",
+        "tags": [
+          "CashVoucherV2"
+        ]
+      }
+    },
+    "/v2/cash-ledger/search": {
+      "post": {
+        "operationId": "CashLedgerV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CashLedgerSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Search the cash detail ledger with per-column filters",
+        "tags": [
+          "CashLedgerV2"
+        ]
+      }
+    },
     "/cash-receipts": {
       "post": {
         "operationId": "CashReceiptsController_create",
@@ -8656,7 +8720,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StockTransferEntity"
+                  "type": "object"
                 }
               }
             }
@@ -10932,14 +10996,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
+            "description": ""
           }
         },
         "summary": "BR-PERM-02: reconcile requires its own permission, distinct from `bank_payment.create`.",
@@ -21140,6 +21197,324 @@
           }
         }
       },
+      "DateRangeFilterDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        }
+      },
+      "StringFilterDto": {
+        "type": "object",
+        "properties": {
+          "operator": {
+            "type": "string",
+            "enum": [
+              "*",
+              "=",
+              "+",
+              "-",
+              "!"
+            ]
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "operator",
+          "value"
+        ]
+      },
+      "CompareFilterDto": {
+        "type": "object",
+        "properties": {
+          "operator": {
+            "type": "string",
+            "enum": [
+              "=",
+              "<",
+              "<=",
+              ">",
+              ">="
+            ]
+          },
+          "value": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "operator",
+          "value"
+        ]
+      },
+      "CashVoucherSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cashAccountId": {
+            "type": "string",
+            "description": "Restrict to a single cash fund; omitted = every fund in branch scope.",
+            "format": "uuid"
+          },
+          "documentKind": {
+            "type": "string",
+            "description": "Document type column — receipt, payment, or goods-receipt payment.",
+            "enum": [
+              "CASH_RECEIPT",
+              "CASH_PAYMENT",
+              "GOODS_RECEIPT_PAYMENT"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "Status column.",
+            "enum": [
+              "DRAFT",
+              "POSTED",
+              "REVERSED"
+            ]
+          },
+          "createdAt": {
+            "description": "Creation-timestamp column, also fed by the period (from/to) filter. The grid\norders on this column too.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "documentNumber": {
+            "description": "Document number column.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "totalAmount": {
+            "description": "Total amount column.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "counterparty": {
+            "description": "Payer/payee column, falling back to the partner name snapshot.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "reason": {
+            "description": "Reason column.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          }
+        }
+      },
+      "CashVoucherRowDto": {
+        "type": "object",
+        "properties": {
+          "documentKind": {
+            "enum": [
+              "CASH_RECEIPT",
+              "CASH_PAYMENT",
+              "GOODS_RECEIPT_PAYMENT"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "RECEIPT",
+              "PAYMENT"
+            ],
+            "type": "string",
+            "description": "Source table — drives which detail endpoint and dialog the row opens"
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "voucherDate": {
+            "type": "string",
+            "description": "ISO date (no time component)"
+          },
+          "documentNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "POSTED",
+              "REVERSED"
+            ],
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "number",
+            "description": "Money, serialized as a number"
+          },
+          "cashAccountId": {
+            "type": "string"
+          },
+          "referenceType": {
+            "type": "string",
+            "nullable": true
+          },
+          "counterparty": {
+            "type": "string",
+            "description": "Payer/payee, falling back to the partner snapshot (\"\" when none)"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "documentKind",
+          "kind",
+          "id",
+          "createdAt",
+          "voucherDate",
+          "documentNumber",
+          "status",
+          "totalAmount",
+          "cashAccountId",
+          "referenceType",
+          "counterparty",
+          "reason"
+        ]
+      },
+      "CashVoucherSearchV2ResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashVoucherRowDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "totalAmount": {
+            "type": "number",
+            "description": "SUM(total_amount) over every matching row, not only this page"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit",
+          "totalAmount"
+        ]
+      },
+      "CashLedgerSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 500
+          },
+          "cashAccountId": {
+            "type": "string",
+            "description": "Omit to use the branch's single cash fund.",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "description": "Movement date column, also fed by the period filter. `cash_movements` has no\ndocument date, so `created_at` is the ledger's date. `from` doubles as the\nopening-balance cutoff.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "documentNumber": {
+            "description": "Receipt/payment number column — one filter over the shared document number.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "description": {
+            "description": "Description column, resolved from the source voucher's reason.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "counterparty": {
+            "description": "Counterparty column, resolved from the source voucher.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "staff": {
+            "description": "Staff column, resolved from the source voucher's staff user.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "amountIn": {
+            "description": "Money-in column; also constrains the row to inbound movements.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "amountOut": {
+            "description": "Money-out column; also constrains the row to outbound movements.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          }
+        }
+      },
       "CashReceiptLineDto": {
         "type": "object",
         "properties": {
@@ -26335,50 +26710,6 @@
           "storageId"
         ]
       },
-      "StringFilterDto": {
-        "type": "object",
-        "properties": {
-          "operator": {
-            "type": "string",
-            "enum": [
-              "*",
-              "=",
-              "+",
-              "-",
-              "!"
-            ]
-          },
-          "value": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "operator",
-          "value"
-        ]
-      },
-      "CompareFilterDto": {
-        "type": "object",
-        "properties": {
-          "operator": {
-            "type": "string",
-            "enum": [
-              "=",
-              "<",
-              "<=",
-              ">",
-              ">="
-            ]
-          },
-          "value": {
-            "type": "object"
-          }
-        },
-        "required": [
-          "operator",
-          "value"
-        ]
-      },
       "InventoryItemSearchV2Dto": {
         "type": "object",
         "properties": {
@@ -27634,8 +27965,8 @@
           },
           "quantity": {
             "type": "number",
-            "minimum": 0.000001,
-            "description": "Quantity to transfer (must be > 0)"
+            "minimum": 0,
+            "description": "Quantity to transfer (>= 0; 0 = đổi vị trí kể cả khi hết tồn)"
           },
           "sourceLocationId": {
             "type": "string",
@@ -27682,17 +28013,6 @@
         "required": [
           "lines"
         ]
-      },
-      "DateRangeFilterDto": {
-        "type": "object",
-        "properties": {
-          "from": {
-            "type": "string"
-          },
-          "to": {
-            "type": "string"
-          }
-        }
       },
       "StockTransferSearchV2Dto": {
         "type": "object",
@@ -30468,7 +30788,7 @@
           "hasStaleUnreconciled"
         ]
       },
-      "ReconcileDto": {
+      "ReconcileGroupDto": {
         "type": "object",
         "properties": {
           "depositAccountId": {
@@ -30486,22 +30806,37 @@
           "stmtTotalAmount": {
             "type": "number"
           },
-          "stmtFromDate": {
-            "type": "string"
-          },
-          "stmtToDate": {
-            "type": "string"
-          },
           "note": {
             "type": "string",
-            "description": "Required when the statement total does not match the system total (BR-REC-02).",
+            "description": "Required when this group's statement total does not match (BR-REC-02).",
             "maxLength": 1000
           }
         },
         "required": [
           "depositAccountId",
           "movementIds",
-          "stmtTotalAmount",
+          "stmtTotalAmount"
+        ]
+      },
+      "ReconcileDto": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReconcileGroupDto"
+            }
+          },
+          "stmtFromDate": {
+            "type": "string"
+          },
+          "stmtToDate": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "groups",
           "stmtFromDate",
           "stmtToDate"
         ]

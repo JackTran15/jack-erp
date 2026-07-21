@@ -10,11 +10,12 @@ import {
   CashPayment,
   CashPaymentReferenceType,
   CashReceipt,
-  CashReceiptReferenceType,
+  CashVoucherDocumentKind,
   CashLedgerRow,
   ReceiptPaymentKind,
   type CashPaymentLine,
   type CashReceiptLine,
+  type CashVoucherRow,
   type ReceiptPaymentListItem,
 } from "./cash-vouchers.types";
 import { inferLookupType } from "./documents/_shared/voucher-partner.constants";
@@ -27,80 +28,29 @@ function num(v: unknown): number {
   return Number(v) || 0;
 }
 
-function counterpartyFromReceipt(r: CashReceipt): string {
-  return (
-    r.payerName?.trim() ||
-    r.partnerNameSnapshot?.trim() ||
-    ""
-  );
-}
-
-function counterpartyFromPayment(p: CashPayment): string {
-  return (
-    p.payeeName?.trim() ||
-    p.partnerNameSnapshot?.trim() ||
-    ""
-  );
-}
-
-export function toReceiptListItem(r: CashReceipt): ReceiptPaymentListItem {
+/**
+ * Server row → list item. The merge, ordering and paging now happen in
+ * `POST /v2/cash-vouchers/search`, so this is a pure field mapping: `kind` and
+ * `isGoodsReceiptPayment` both fall out of the single `documentKind` value.
+ */
+export function toReceiptPaymentListItem(
+  row: CashVoucherRow,
+): ReceiptPaymentListItem {
   return {
-    kind: ReceiptPaymentKind.RECEIPT,
-    id: r.id,
-    voucherDate: r.voucherDate,
-    documentNumber: r.documentNumber ?? "",
-    status: r.status,
-    totalAmount: num(r.totalAmount),
-    counterparty: counterpartyFromReceipt(r),
-    reason: r.reason ?? "",
-    referenceType: r.referenceType,
-    isGoodsReceiptPayment: false,
-    isAutoVoucher: isAutoVoucherReference(r.referenceType),
-    receipt: r,
+    kind: row.kind,
+    id: row.id,
+    createdAt: row.createdAt,
+    voucherDate: row.voucherDate,
+    documentNumber: row.documentNumber ?? "",
+    status: row.status,
+    totalAmount: num(row.totalAmount),
+    counterparty: row.counterparty,
+    reason: row.reason ?? "",
+    referenceType: row.referenceType ?? undefined,
+    isGoodsReceiptPayment:
+      row.documentKind === CashVoucherDocumentKind.GOODS_RECEIPT_PAYMENT,
+    isAutoVoucher: isAutoVoucherReference(row.referenceType ?? undefined),
   };
-}
-
-export function toPaymentListItem(p: CashPayment): ReceiptPaymentListItem {
-  const isGr = p.referenceType === CashPaymentReferenceType.GOODS_RECEIPT;
-  return {
-    kind: ReceiptPaymentKind.PAYMENT,
-    id: p.id,
-    voucherDate: p.voucherDate,
-    documentNumber: p.documentNumber ?? "",
-    status: p.status,
-    totalAmount: num(p.totalAmount),
-    counterparty: counterpartyFromPayment(p),
-    reason: p.reason ?? "",
-    referenceType: p.referenceType,
-    isGoodsReceiptPayment: isGr,
-    isAutoVoucher: isAutoVoucherReference(p.referenceType),
-    payment: p,
-  };
-}
-
-export function mergeReceiptPaymentLists(
-  receipts: CashReceipt[],
-  payments: CashPayment[],
-): ReceiptPaymentListItem[] {
-  const merged = [
-    ...receipts.map(toReceiptListItem),
-    ...payments.map(toPaymentListItem),
-  ];
-  merged.sort((a, b) => {
-    const d = b.voucherDate.localeCompare(a.voucherDate);
-    if (d !== 0) return d;
-    return b.id.localeCompare(a.id);
-  });
-  return merged;
-}
-
-export function filterReceiptPaymentByPeriod(
-  rows: ReceiptPaymentListItem[],
-  fromIso: string | undefined,
-  toIso: string | undefined,
-): ReceiptPaymentListItem[] {
-  if (!fromIso || !toIso) return rows;
-  return rows.filter((r) => r.voucherDate >= fromIso && r.voucherDate <= toIso);
 }
 
 function mapVoucherLines(
@@ -242,22 +192,26 @@ export function buildOpeningLedgerRow(balance: number): LedgerCashRow {
   };
 }
 
+/** Shown when a movement has no voucher — the API returns a null number. */
+const NO_VOUCHER_LABEL = "(Chưa có chứng từ)";
+
 export function cashLedgerRowToUiRow(row: CashLedgerRow): LedgerCashRow {
   const isPt = row.kind === "PT";
   const isPc = row.kind === "PC";
+  const voucherNo = row.voucherNumber ?? NO_VOUCHER_LABEL;
   return {
     id: row.movementId,
     apiVoucherId: row.voucherId ?? undefined,
     apiLedgerKind: row.kind,
     documentDate: new Date(row.date),
-    receiptNo: isPt ? row.voucherNumber : undefined,
-    paymentNo: isPc ? row.voucherNumber : undefined,
+    receiptNo: isPt ? voucherNo : undefined,
+    paymentNo: isPc ? voucherNo : undefined,
     description: row.description ?? "",
     amountIn: num(row.debit),
     amountOut: num(row.credit),
     balance: num(row.balance),
     counterparty: row.partnerName ?? "",
-    employee: "",
+    employee: row.staffName ?? "",
     documentType: isPt
       ? ("cash_receipt" as LedgerCashRow["documentType"])
       : isPc
@@ -270,7 +224,7 @@ export function cashLedgerRowToUiRow(row: CashLedgerRow): LedgerCashRow {
           ? LedgerCashVoucherKindEnum.RECEIPT
           : LedgerCashVoucherKindEnum.PAYMENT,
         purpose: LedgerCashVoucherPurposeEnum.OTHER,
-        voucherNo: row.voucherNumber,
+        voucherNo: voucherNo,
         voucherDate: new Date(row.date),
         counterpartyCode: "",
         counterpartyName: row.partnerName ?? "",

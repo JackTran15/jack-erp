@@ -38,6 +38,7 @@ describe('Deposit Reconcile & Lock (E2E)', () => {
 
   let depositAccountA: string;
   let depositAccountB: string;
+  let depositAccountC: string;
 
   let itemId: string;
   let locationId: string;
@@ -263,6 +264,8 @@ describe('Deposit Reconcile & Lock (E2E)', () => {
       branchId: string;
       code: string;
       balance: number;
+      /** Defaults to COA 1121 — the account POS card/bank_transfer payments route to. */
+      coaAccountId?: string;
     }): Promise<string> => {
       const id = randomUUID();
       await ds.query(
@@ -281,7 +284,7 @@ describe('Deposit Reconcile & Lock (E2E)', () => {
           `ACC-${opts.code}`,
           'ERP Test',
           bankId,
-          coaBankId,
+          opts.coaAccountId ?? coaBankId,
           opts.balance,
           seed.userId,
         ],
@@ -291,6 +294,22 @@ describe('Deposit Reconcile & Lock (E2E)', () => {
 
     // allow_negative=true so UAT-09's seeded movements don't need a real balance.
     depositAccountA = await seedDepositAccount({ branchId: branchAId, code: 'DFR-A', balance: 0 });
+
+    // Second bank account in the SAME branch — reconcile scopes by actor.branchId,
+    // so the multi-group cases cannot reuse branch B's account. It gets its own COA:
+    // two funds of one branch sharing COA 1121 would make POS deposit routing
+    // ambiguous and break UAT-10.
+    await ds.query(
+      `INSERT INTO accounts (id, organization_id, code, name, type, is_active, created_by, created_at, updated_at)
+       VALUES (gen_random_uuid(), $1, '1122', 'Tiền gửi ngân hàng VND 2', 'ASSET', true, $2, NOW(), NOW())`,
+      [seed.organizationId, seed.userId],
+    );
+    depositAccountC = await seedDepositAccount({
+      branchId: branchAId,
+      code: 'DFR-C',
+      balance: 0,
+      coaAccountId: await accountByCode('1122'),
+    });
 
     await ds.query(
       `INSERT INTO branches (id, organization_id, name, status, is_main_branch, created_by, created_at, updated_at)
@@ -330,7 +349,9 @@ describe('Deposit Reconcile & Lock (E2E)', () => {
       })
       .expect(201);
     locationId = locRes.body.id;
-  }, 120000);
+    // Boot + reset + seed regularly needs >2 min locally: the kafkajs consumers
+    // registered by AppModule spend most of it waiting out a group rebalance.
+  }, 300000);
 
   afterAll(async () => {
     await Promise.race([
@@ -371,11 +392,15 @@ describe('Deposit Reconcile & Lock (E2E)', () => {
         .post('/deposit-recon/reconcile')
         .set(headers())
         .send({
-          depositAccountId: depositAccountA,
-          movementIds,
-          stmtTotalAmount: systemTotal - 12485,
           stmtFromDate: '2026-06-01',
           stmtToDate: '2026-06-03',
+          groups: [
+            {
+              depositAccountId: depositAccountA,
+              movementIds,
+              stmtTotalAmount: systemTotal - 12485,
+            },
+          ],
         })
         .expect(400);
 
@@ -383,18 +408,23 @@ describe('Deposit Reconcile & Lock (E2E)', () => {
         .post('/deposit-recon/reconcile')
         .set(headers())
         .send({
-          depositAccountId: depositAccountA,
-          movementIds,
-          stmtTotalAmount: systemTotal - 12485,
           stmtFromDate: '2026-06-01',
           stmtToDate: '2026-06-03',
-          note: 'Chênh lệch phí acquirer thực tế',
+          groups: [
+            {
+              depositAccountId: depositAccountA,
+              movementIds,
+              stmtTotalAmount: systemTotal - 12485,
+              note: 'Chênh lệch phí acquirer thực tế',
+            },
+          ],
         })
         .expect(201);
 
-      expect(res.body.status).toBe('DISCREPANCY');
-      expect(Number(res.body.diffAmount)).toBe(-12485);
-      expect(res.body.proposalId).toBeDefined();
+      const batchResult = res.body.results[0];
+      expect(batchResult.status).toBe('DISCREPANCY');
+      expect(Number(batchResult.diffAmount)).toBe(-12485);
+      expect(batchResult.proposalId).toBeDefined();
 
       const statuses = await ds.query(
         `SELECT recon_status FROM deposit_movements WHERE id = ANY($1::uuid[])`,
@@ -409,7 +439,7 @@ describe('Deposit Reconcile & Lock (E2E)', () => {
       const drafts = await ds.query(
         `SELECT status, purpose, total_amount::text AS total_amount
            FROM bank_payments WHERE id = $1`,
-        [res.body.proposalId],
+        [batchResult.proposalId],
       );
       expect(drafts).toHaveLength(1);
       expect(drafts[0].status).toBe('DRAFT');
@@ -421,13 +451,113 @@ describe('Deposit Reconcile & Lock (E2E)', () => {
         .post('/deposit-recon/reconcile')
         .set(headers())
         .send({
-          depositAccountId: depositAccountA,
-          movementIds,
-          stmtTotalAmount: systemTotal,
           stmtFromDate: '2026-06-01',
           stmtToDate: '2026-06-03',
+          groups: [
+            {
+              depositAccountId: depositAccountA,
+              movementIds,
+              stmtTotalAmount: systemTotal,
+            },
+          ],
         })
         .expect(400);
+    }, 60000);
+
+    it('two accounts in one call → one batch each, movements linked to their own batch', async () => {
+      const a1 = await seedDepositMovement({
+        accountId: depositAccountA,
+        branchId: branchAId,
+        amount: 700_000,
+        netAmount: 700_000,
+        docDate: '2026-06-07',
+      });
+      const c1 = await seedDepositMovement({
+        accountId: depositAccountC,
+        branchId: branchAId,
+        amount: 300_000,
+        netAmount: 300_000,
+        docDate: '2026-06-07',
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/deposit-recon/reconcile')
+        .set(headers())
+        .send({
+          stmtFromDate: '2026-06-07',
+          stmtToDate: '2026-06-07',
+          groups: [
+            {
+              depositAccountId: depositAccountA,
+              movementIds: [a1],
+              stmtTotalAmount: 700_000,
+            },
+            {
+              depositAccountId: depositAccountC,
+              movementIds: [c1],
+              stmtTotalAmount: 295_000,
+              note: 'Phí chuyển khoản chưa hạch toán',
+            },
+          ],
+        })
+        .expect(201);
+
+      expect(res.body.results).toHaveLength(2);
+      expect(res.body.results[0].status).toBe('RECONCILED');
+      expect(res.body.results[1].status).toBe('DISCREPANCY');
+      expect(res.body.results[0].batch.batchNumber).not.toBe(
+        res.body.results[1].batch.batchNumber,
+      );
+
+      const linked = await ds.query(
+        `SELECT id, recon_status, recon_batch_id FROM deposit_movements
+          WHERE id = ANY($1::uuid[]) ORDER BY doc_date, id`,
+        [[a1, c1]],
+      );
+      const rowA = linked.find((r: any) => r.id === a1);
+      const rowC = linked.find((r: any) => r.id === c1);
+      expect(rowA.recon_status).toBe('DA');
+      expect(rowC.recon_status).toBe('LECH');
+      expect(rowA.recon_batch_id).toBe(res.body.results[0].batch.id);
+      expect(rowC.recon_batch_id).toBe(res.body.results[1].batch.id);
+    }, 60000);
+
+    it('a group failing BR-REC-02 rolls back the batch already written for the other account', async () => {
+      const a1 = await seedDepositMovement({
+        accountId: depositAccountA,
+        branchId: branchAId,
+        amount: 400_000,
+        netAmount: 400_000,
+        docDate: '2026-06-08',
+      });
+      const c1 = await seedDepositMovement({
+        accountId: depositAccountC,
+        branchId: branchAId,
+        amount: 400_000,
+        netAmount: 400_000,
+        docDate: '2026-06-08',
+      });
+
+      await request(app.getHttpServer())
+        .post('/deposit-recon/reconcile')
+        .set(headers())
+        .send({
+          stmtFromDate: '2026-06-08',
+          stmtToDate: '2026-06-08',
+          groups: [
+            { depositAccountId: depositAccountA, movementIds: [a1], stmtTotalAmount: 400_000 },
+            // Discrepancy without a note — rejected after group A was written.
+            { depositAccountId: depositAccountC, movementIds: [c1], stmtTotalAmount: 399_000 },
+          ],
+        })
+        .expect(400);
+
+      const after = await ds.query(
+        `SELECT recon_status, recon_batch_id FROM deposit_movements WHERE id = ANY($1::uuid[])`,
+        [[a1, c1]],
+      );
+      expect(after.map((r: any) => r.recon_status)).toEqual(['CHUA', 'CHUA']);
+      expect(after.every((r: any) => r.recon_batch_id === null)).toBe(true);
     }, 60000);
 
     it('unreconcile resets CHUA and records an audit row (BR-PERM-03)', async () => {
@@ -443,14 +573,14 @@ describe('Deposit Reconcile & Lock (E2E)', () => {
         .post('/deposit-recon/reconcile')
         .set(headers())
         .send({
-          depositAccountId: depositAccountA,
-          movementIds: [id],
-          stmtTotalAmount: 500000,
           stmtFromDate: '2026-06-05',
           stmtToDate: '2026-06-05',
+          groups: [
+            { depositAccountId: depositAccountA, movementIds: [id], stmtTotalAmount: 500000 },
+          ],
         })
         .expect(201);
-      expect(reconcileRes.body.status).toBe('RECONCILED');
+      expect(reconcileRes.body.results[0].status).toBe('RECONCILED');
 
       await request(app.getHttpServer())
         .post('/deposit-recon/unreconcile')
@@ -482,11 +612,11 @@ describe('Deposit Reconcile & Lock (E2E)', () => {
       });
       const idemKey = randomUUID();
       const body = {
-        depositAccountId: depositAccountA,
-        movementIds: [id],
-        stmtTotalAmount: 200000,
         stmtFromDate: '2026-06-06',
         stmtToDate: '2026-06-06',
+        groups: [
+          { depositAccountId: depositAccountA, movementIds: [id], stmtTotalAmount: 200000 },
+        ],
       };
 
       const r1 = await request(app.getHttpServer())
@@ -500,10 +630,10 @@ describe('Deposit Reconcile & Lock (E2E)', () => {
         .send(body)
         .expect(201);
 
-      expect(r2.body.batch.id).toBe(r1.body.batch.id);
+      expect(r2.body.results[0].batch.id).toBe(r1.body.results[0].batch.id);
       const batches = await ds.query(
         `SELECT COUNT(*)::int AS c FROM deposit_recon_batch WHERE id = $1`,
-        [r1.body.batch.id],
+        [r1.body.results[0].batch.id],
       );
       expect(batches[0].c).toBe(1);
     });
@@ -525,11 +655,15 @@ describe('Deposit Reconcile & Lock (E2E)', () => {
         .post('/deposit-recon/reconcile')
         .set(headers())
         .send({
-          depositAccountId: depositAccountA,
-          movementIds: [gross.id],
-          stmtTotalAmount: Number(gross.amount) - 12485,
           stmtFromDate: gross.doc_date,
           stmtToDate: gross.doc_date,
+          groups: [
+            {
+              depositAccountId: depositAccountA,
+              movementIds: [gross.id],
+              stmtTotalAmount: Number(gross.amount) - 12485,
+            },
+          ],
         })
         .expect(201);
 
@@ -684,11 +818,15 @@ describe('Deposit Reconcile & Lock (E2E)', () => {
         .post('/deposit-recon/reconcile')
         .set(headers(branchAId))
         .send({
-          depositAccountId: depositAccountB,
-          movementIds: [bMovementId],
-          stmtTotalAmount: 100000,
           stmtFromDate: '2026-06-10',
           stmtToDate: '2026-06-10',
+          groups: [
+            {
+              depositAccountId: depositAccountB,
+              movementIds: [bMovementId],
+              stmtTotalAmount: 100000,
+            },
+          ],
         })
         .expect(400);
     });

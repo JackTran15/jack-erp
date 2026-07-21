@@ -542,6 +542,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/cash-vouchers/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search cash receipts and payments as one list */
+        post: operations["CashVoucherV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/cash-ledger/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search the cash detail ledger with per-column filters */
+        post: operations["CashLedgerV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/cash-receipts": {
         parameters: {
             query?: never;
@@ -6697,6 +6731,114 @@ export interface components {
             parentAccountId?: string;
             isActive?: boolean;
         };
+        DateRangeFilterDto: {
+            from?: string;
+            to?: string;
+        };
+        StringFilterDto: {
+            /** @enum {string} */
+            operator: "*" | "=" | "+" | "-" | "!";
+            value: string;
+        };
+        CompareFilterDto: {
+            /** @enum {string} */
+            operator: "=" | "<" | "<=" | ">" | ">=";
+            value: Record<string, never>;
+        };
+        CashVoucherSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /**
+             * Format: uuid
+             * @description Restrict to a single cash fund; omitted = every fund in branch scope.
+             */
+            cashAccountId?: string;
+            /**
+             * @description Document type column — receipt, payment, or goods-receipt payment.
+             * @enum {string}
+             */
+            documentKind?: "CASH_RECEIPT" | "CASH_PAYMENT" | "GOODS_RECEIPT_PAYMENT";
+            /**
+             * @description Status column.
+             * @enum {string}
+             */
+            status?: "DRAFT" | "POSTED" | "REVERSED";
+            /**
+             * @description Creation-timestamp column, also fed by the period (from/to) filter. The grid
+             *     orders on this column too.
+             */
+            createdAt?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Document number column. */
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            /** @description Total amount column. */
+            totalAmount?: components["schemas"]["CompareFilterDto"];
+            /** @description Payer/payee column, falling back to the partner name snapshot. */
+            counterparty?: components["schemas"]["StringFilterDto"];
+            /** @description Reason column. */
+            reason?: components["schemas"]["StringFilterDto"];
+        };
+        CashVoucherRowDto: {
+            /** @enum {string} */
+            documentKind: "CASH_RECEIPT" | "CASH_PAYMENT" | "GOODS_RECEIPT_PAYMENT";
+            /**
+             * @description Source table — drives which detail endpoint and dialog the row opens
+             * @enum {string}
+             */
+            kind: "RECEIPT" | "PAYMENT";
+            id: string;
+            createdAt: string;
+            /** @description ISO date (no time component) */
+            voucherDate: string;
+            documentNumber: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "POSTED" | "REVERSED";
+            /** @description Money, serialized as a number */
+            totalAmount: number;
+            cashAccountId: string;
+            referenceType: string | null;
+            /** @description Payer/payee, falling back to the partner snapshot ("" when none) */
+            counterparty: string;
+            reason: string | null;
+        };
+        CashVoucherSearchV2ResponseDto: {
+            data: components["schemas"]["CashVoucherRowDto"][];
+            total: number;
+            page: number;
+            limit: number;
+            /** @description SUM(total_amount) over every matching row, not only this page */
+            totalAmount: number;
+        };
+        CashLedgerSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            limit: number;
+            /**
+             * Format: uuid
+             * @description Omit to use the branch's single cash fund.
+             */
+            cashAccountId?: string;
+            /**
+             * @description Movement date column, also fed by the period filter. `cash_movements` has no
+             *     document date, so `created_at` is the ledger's date. `from` doubles as the
+             *     opening-balance cutoff.
+             */
+            createdAt?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Receipt/payment number column — one filter over the shared document number. */
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            /** @description Description column, resolved from the source voucher's reason. */
+            description?: components["schemas"]["StringFilterDto"];
+            /** @description Counterparty column, resolved from the source voucher. */
+            counterparty?: components["schemas"]["StringFilterDto"];
+            /** @description Staff column, resolved from the source voucher's staff user. */
+            staff?: components["schemas"]["StringFilterDto"];
+            /** @description Money-in column; also constrains the row to inbound movements. */
+            amountIn?: components["schemas"]["CompareFilterDto"];
+            /** @description Money-out column; also constrains the row to outbound movements. */
+            amountOut?: components["schemas"]["CompareFilterDto"];
+        };
         CashReceiptLineDto: {
             /** Format: uuid */
             id?: string;
@@ -8282,16 +8424,6 @@ export interface components {
             /** Format: uuid */
             storageId: string;
         };
-        StringFilterDto: {
-            /** @enum {string} */
-            operator: "*" | "=" | "+" | "-" | "!";
-            value: string;
-        };
-        CompareFilterDto: {
-            /** @enum {string} */
-            operator: "=" | "<" | "<=" | ">" | ">=";
-            value: Record<string, never>;
-        };
         InventoryItemSearchV2Dto: {
             /** @default 1 */
             page: number;
@@ -8707,7 +8839,7 @@ export interface components {
              * @description UUID of the inventory item
              */
             itemId: string;
-            /** @description Quantity to transfer (must be > 0) */
+            /** @description Quantity to transfer (>= 0; 0 = đổi vị trí kể cả khi hết tồn) */
             quantity: number;
             /**
              * Format: uuid
@@ -8735,10 +8867,6 @@ export interface components {
             destinationLocationId?: string;
             /** @description Lines to transfer */
             lines: components["schemas"]["IntraWarehouseTransferLineDto"][];
-        };
-        DateRangeFilterDto: {
-            from?: string;
-            to?: string;
         };
         StockTransferSearchV2Dto: {
             /** @default 1 */
@@ -9662,15 +9790,18 @@ export interface components {
             /** @description Any unreconciled movement older than the stale threshold */
             hasStaleUnreconciled: boolean;
         };
-        ReconcileDto: {
+        ReconcileGroupDto: {
             /** Format: uuid */
             depositAccountId: string;
             movementIds: string[];
             stmtTotalAmount: number;
+            /** @description Required when this group's statement total does not match (BR-REC-02). */
+            note?: string;
+        };
+        ReconcileDto: {
+            groups: components["schemas"]["ReconcileGroupDto"][];
             stmtFromDate: string;
             stmtToDate: string;
-            /** @description Required when the statement total does not match the system total (BR-REC-02). */
-            note?: string;
         };
         UnreconcileDto: {
             movementIds?: string[];
@@ -12936,6 +13067,52 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    CashVoucherV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashVoucherSearchV2Dto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashVoucherSearchV2ResponseDto"];
+                };
+            };
+        };
+    };
+    CashLedgerV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashLedgerSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -17057,7 +17234,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StockTransferEntity"];
+                    "application/json": Record<string, never>;
                 };
             };
         };
@@ -18343,9 +18520,7 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": Record<string, never>;
-                };
+                content?: never;
             };
         };
     };

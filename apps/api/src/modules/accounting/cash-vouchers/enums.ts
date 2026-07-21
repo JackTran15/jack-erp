@@ -48,6 +48,23 @@ export enum CashPaymentReferenceType {
   FUND_SWAP = 'FUND_SWAP',
 }
 
+/** Which table a merged voucher row came from (`POST /v2/cash-vouchers/search`). */
+export enum CashVoucherKind {
+  RECEIPT = 'RECEIPT',
+  PAYMENT = 'PAYMENT',
+}
+
+/**
+ * The document type the treasury grid renders. Three values rather than two: a
+ * payment whose reference_type is GOODS_RECEIPT is shown as its own type, so the
+ * filter has to match what the column displays.
+ */
+export enum CashVoucherDocumentKind {
+  CASH_RECEIPT = 'CASH_RECEIPT',
+  CASH_PAYMENT = 'CASH_PAYMENT',
+  GOODS_RECEIPT_PAYMENT = 'GOODS_RECEIPT_PAYMENT',
+}
+
 export enum CashVoucherPartnerType {
   CUSTOMER = 'CUSTOMER',
   SUPPLIER = 'SUPPLIER',

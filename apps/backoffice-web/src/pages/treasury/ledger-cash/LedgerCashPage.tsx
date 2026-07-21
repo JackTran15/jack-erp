@@ -13,11 +13,21 @@ import {
   TreasuryTabBar,
 } from "../../../components/document/treasuryTabs";
 import { PaginationControls } from "../../../components/table/PaginationControls";
-import { DEFAULT_PAGINATION } from "../../../components/table/pagination.dto";
+import {
+  DEFAULT_COLUMN_FILTER_MODE,
+  DEFAULT_PAGINATION,
+  type ColumnFilter,
+  type ColumnFilterMode,
+} from "../../../components/table/pagination.dto";
+import {
+  buildV2Body,
+  type V2SearchConfig,
+} from "../../../components/crud/crudV2Search";
+import { useDebouncedValue } from "../../../lib/use-debounced-value";
 import { useCategoryNameMap } from "../../../hooks/treasury/use-cash-voucher-categories";
 import { useCashPayment } from "../../../hooks/treasury/use-cash-payments";
 import { useCashReceipt } from "../../../hooks/treasury/use-cash-receipts";
-import { useCashLedgerOffsetPage } from "../../../hooks/treasury/use-cash-ledger";
+import { useCashLedgerSearch } from "../../../hooks/treasury/use-cash-ledger";
 import {
   cashPaymentToVoucherDetail,
   cashReceiptToVoucherDetail,
@@ -40,6 +50,48 @@ import {
   type LedgerCashRow,
 } from "./ledger-cash.types";
 
+/**
+ * Column keys are named after the `POST /v2/cash-ledger/search` request fields so
+ * `buildV2Body` maps the filter state straight onto the body. `receiptNo` /
+ * `paymentNo` are the exception: both render the same underlying
+ * `document_number`, so whichever cell the user fills becomes documentNumber.
+ */
+const LEDGER_CASH_FILTER_KEYS = [
+  "createdAt",
+  "receiptNo",
+  "paymentNo",
+  "description",
+  "amountIn",
+  "amountOut",
+  "counterparty",
+  "staff",
+] as const;
+
+type LedgerCashFilterKey = (typeof LEDGER_CASH_FILTER_KEYS)[number];
+
+const LEDGER_CASH_SEARCH: V2SearchConfig = {
+  path: "/v2/cash-ledger/search",
+  fields: {
+    createdAt: "date-range",
+    documentNumber: "string",
+    description: "string",
+    counterparty: "string",
+    staff: "string",
+    amountIn: "compare",
+    amountOut: "compare",
+  },
+};
+
+function emptyColumnFilters(): Record<LedgerCashFilterKey, ColumnFilter> {
+  return LEDGER_CASH_FILTER_KEYS.reduce(
+    (acc, k) => {
+      acc[k] = { mode: DEFAULT_COLUMN_FILTER_MODE, value: "" };
+      return acc;
+    },
+    {} as Record<LedgerCashFilterKey, ColumnFilter>,
+  );
+}
+
 export function LedgerCashPage() {
   const [period, setPeriod] = useState<PeriodValue>(() => ({
     preset: "this_month",
@@ -47,6 +99,8 @@ export function LedgerCashPage() {
   }));
   const [appliedPeriod, setAppliedPeriod] = useState(period);
   const [pagination, setPagination] = useState(DEFAULT_PAGINATION);
+  const [columnFilters, setColumnFilters] =
+    useState<Record<LedgerCashFilterKey, ColumnFilter>>(emptyColumnFilters);
   const [selectedRow, setSelectedRow] = useState<LedgerCashRow | null>(null);
   const [dialogKind, setDialogKind] = useState<LedgerCashDrillDownEnum | null>(
     null,
@@ -54,22 +108,34 @@ export function LedgerCashPage() {
   const [linkedInvoiceDetail, setLinkedInvoiceDetail] =
     useState<LedgerCashInvoiceDetail | null>(null);
 
+  // Debounced so typing in a column filter settles into one request.
+  const debouncedFilters = useDebouncedValue(columnFilters, 300);
+
   // One cash fund per branch: the backend resolves it from the active branch
   // (X-Branch-Id), so no cash-account selection is needed here.
-  const ledgerParams = useMemo(
-    () => ({
-      dateFrom: appliedPeriod.from,
-      dateTo: appliedPeriod.to,
-    }),
-    [appliedPeriod],
-  );
+  const searchBody = useMemo(() => {
+    const merged: Record<string, ColumnFilter> = {
+      ...debouncedFilters,
+      createdAt: {
+        ...debouncedFilters.createdAt,
+        from: debouncedFilters.createdAt.from || appliedPeriod.from,
+        to: debouncedFilters.createdAt.to || appliedPeriod.to,
+      },
+      // Both voucher-number columns render document_number; whichever the user
+      // filled wins (no row carries both a receipt and a payment number).
+      documentNumber: debouncedFilters.receiptNo.value
+        ? debouncedFilters.receiptNo
+        : debouncedFilters.paymentNo,
+    };
+    return buildV2Body(
+      LEDGER_CASH_SEARCH,
+      merged,
+      pagination.page,
+      pagination.pageSize,
+    );
+  }, [debouncedFilters, appliedPeriod, pagination]);
 
-  const ledger = useCashLedgerOffsetPage(
-    ledgerParams,
-    pagination.page,
-    pagination.pageSize,
-    true,
-  );
+  const ledger = useCashLedgerSearch(searchBody);
 
   const categoryInMap = useCategoryNameMap(CashVoucherCategoryDirection.IN);
   const categoryOutMap = useCategoryNameMap(CashVoucherCategoryDirection.OUT);
@@ -104,6 +170,31 @@ export function LedgerCashPage() {
       pagination.page === 1 && pageTx.length >= 0;
     return hasOpeningOnPage ? [openingRow, ...pageTx] : pageTx;
   }, [openingRow, ledger.transactionRows, pagination.page]);
+
+  // Any filter change resets to page 1 — otherwise a narrowed result set can
+  // leave the grid stranded on a page that no longer exists.
+  const patchFilter = useCallback((key: string, patch: Partial<ColumnFilter>) => {
+    setColumnFilters((prev) => ({
+      ...prev,
+      [key as LedgerCashFilterKey]: {
+        ...prev[key as LedgerCashFilterKey],
+        ...patch,
+      },
+    }));
+    setPagination((p) => ({ ...p, page: 1 }));
+  }, []);
+
+  const columnFilterControl = useMemo(
+    () => ({
+      filters: columnFilters as unknown as Record<string, ColumnFilter>,
+      onModeChange: (key: string, mode: ColumnFilterMode) =>
+        patchFilter(key, { mode }),
+      onValueChange: (key: string, value: string) => patchFilter(key, { value }),
+      onRangeChange: (key: string, part: "from" | "to", value: string) =>
+        patchFilter(key, { [part]: value }),
+    }),
+    [columnFilters, patchFilter],
+  );
 
   const openDrillDown = useCallback((row: LedgerCashRow) => {
     if (isOpeningBalanceRow(row)) return;
@@ -186,6 +277,7 @@ export function LedgerCashPage() {
             totalCredit={ledger.totalCredit}
             closingBalance={ledger.closingBalance}
             onDrillDown={openDrillDown}
+            columnFilterControl={columnFilterControl}
           />
         </div>
       </DocumentListShell>

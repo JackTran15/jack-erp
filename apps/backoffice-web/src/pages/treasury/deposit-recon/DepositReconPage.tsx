@@ -133,7 +133,11 @@ export function DepositReconPage() {
   const [appliedDocNumber, setAppliedDocNumber] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Giữ nguyên cả row (không chỉ id): cần `depositAccountId` + `netAmount` để nhóm
+  // theo tài khoản, kể cả những dòng đã chọn ở trang khác.
+  const [selected, setSelected] = useState<Map<string, DepositReconSearchRow>>(
+    () => new Map(),
+  );
   const [columnFilters, setColumnFilters] =
     useState<Record<DepositReconFilterKey, ColumnFilter>>(emptyColumnFilters);
   const [batchDialogOpen, setBatchDialogOpen] = useState(false);
@@ -141,7 +145,7 @@ export function DepositReconPage() {
   const [unreconcileReason, setUnreconcileReason] = useState("");
 
   useEffect(() => {
-    setSelected(new Set());
+    setSelected(new Map());
   }, [accountId, reconStatus]);
 
   const accountOptions = useMemo<SingleSelectOption[]>(
@@ -205,28 +209,26 @@ export function DepositReconPage() {
 
   const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
 
+  // Chỉ đụng tới các dòng của trang hiện tại — lựa chọn ở trang khác giữ nguyên.
   const toggleAll = useCallback(() => {
     setSelected((prev) => {
-      if (allSelected) return new Set();
-      const next = new Set(prev);
-      rows.forEach((r) => next.add(r.id));
+      const next = new Map(prev);
+      if (allSelected) rows.forEach((r) => next.delete(r.id));
+      else rows.forEach((r) => next.set(r.id, r));
       return next;
     });
   }, [allSelected, rows]);
 
-  const toggleOne = useCallback((id: string) => {
+  const toggleOne = useCallback((row: DepositReconSearchRow) => {
     setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      const next = new Map(prev);
+      if (next.has(row.id)) next.delete(row.id);
+      else next.set(row.id, row);
       return next;
     });
   }, []);
 
-  const selectedRows = useMemo(
-    () => rows.filter((r) => selected.has(r.id)),
-    [rows, selected],
-  );
+  const selectedRows = useMemo(() => Array.from(selected.values()), [selected]);
   const selectedNetTotal = useMemo(
     () => selectedRows.reduce((s, r) => s + Number(r.netAmount), 0),
     [selectedRows],
@@ -422,7 +424,7 @@ export function DepositReconPage() {
 
   const handleReload = useCallback(() => {
     void list.refetch();
-    setSelected(new Set());
+    setSelected(new Map());
   }, [list]);
 
   const [exporting, setExporting] = useState(false);
@@ -444,11 +446,11 @@ export function DepositReconPage() {
       return;
     }
     try {
-      await unreconcile.mutateAsync({ movementIds: Array.from(selected), reason });
+      await unreconcile.mutateAsync({ movementIds: Array.from(selected.keys()), reason });
       toast.success("Đã hủy đối chiếu.");
       setUnreconcileOpen(false);
       setUnreconcileReason("");
-      setSelected(new Set());
+      setSelected(new Map());
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Hủy đối chiếu thất bại.");
     }
@@ -459,10 +461,9 @@ export function DepositReconPage() {
       id: "reconcile",
       label: "Đối chiếu",
       icon: CheckSquare,
-      // Đối chiếu khớp với sao kê của MỘT ngân hàng — không hợp lệ ở chế độ "Tất cả"
-      // vì các dòng đã chọn có thể thuộc nhiều tài khoản khác nhau.
-      disabled: reconStatus !== ReconStatus.CHUA || selected.size === 0 || !accountId,
-      tooltip: !accountId ? "Chọn một tài khoản cụ thể để đối chiếu" : undefined,
+      // Filter tài khoản không còn là điều kiện: các dòng đã chọn được nhóm theo
+      // tài khoản trong dialog và mỗi tài khoản thành một lô đối chiếu riêng.
+      disabled: reconStatus !== ReconStatus.CHUA || selected.size === 0,
       onClick: () => setBatchDialogOpen(true),
     },
     {
@@ -589,7 +590,7 @@ export function DepositReconPage() {
               <input
                 type="checkbox"
                 checked={selected.has(r.id)}
-                onChange={() => toggleOne(r.id)}
+                onChange={() => toggleOne(r)}
                 aria-label={`Chọn ${r.documentNumber ?? r.id}`}
               />
             ),
@@ -626,11 +627,9 @@ export function DepositReconPage() {
       <DepositReconBatchDialog
         open={batchDialogOpen}
         onOpenChange={setBatchDialogOpen}
-        depositAccountId={accountId}
-        movementIds={Array.from(selected)}
-        selectedNetTotal={selectedNetTotal}
+        rows={selectedRows}
         reconcile={reconcile}
-        onDone={() => setSelected(new Set())}
+        onDone={() => setSelected(new Map())}
       />
 
       {unreconcileOpen ? (
