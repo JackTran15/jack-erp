@@ -49,6 +49,9 @@ export const treasuryQueryKeys = {
   depositTransfers: (filters: unknown) => ["deposit-transfers", filters] as const,
   depositTransfer: (id: string | undefined) =>
     ["deposit-transfers", "detail", id] as const,
+  cashTransfers: (filters: unknown) => ["cash-transfers", filters] as const,
+  cashTransfer: (id: string | undefined) =>
+    ["cash-transfers", "detail", id] as const,
   depositInTransit: (filters: unknown) => ["deposit-in-transit", filters] as const,
   depositDashboard: () => ["deposit-dashboard"] as const,
   banks: () => ["banks"] as const,

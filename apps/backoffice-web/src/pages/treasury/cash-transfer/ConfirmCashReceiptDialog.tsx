@@ -1,0 +1,92 @@
+import { useEffect, useState } from "react";
+import { AppModal, Button, Textarea, formatMoneyInteger } from "@erp/ui";
+import { toast } from "sonner";
+import { useConfirmCashTransfer } from "../../../hooks/treasury/use-cash-transfers";
+import { CashTransferFundKind } from "../cash-vouchers.types";
+import type { CashTransfer } from "./cash-transfer.types";
+
+interface Props {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  transfer: CashTransfer | null;
+  /** Resolved by the list page (which already maps branchId → name for its columns). */
+  fromBranchName?: string;
+}
+
+export function ConfirmCashReceiptDialog({
+  open,
+  onOpenChange,
+  transfer,
+  fromBranchName,
+}: Props) {
+  const confirm = useConfirmCashTransfer();
+  const [note, setNote] = useState("");
+
+  useEffect(() => {
+    if (open) setNote("");
+  }, [open]);
+
+  const handleConfirm = async () => {
+    if (!transfer) return;
+    try {
+      await confirm.mutateAsync({
+        id: transfer.id,
+        body: { note: note.trim() || undefined },
+      });
+      toast.success("Đã xác nhận nhận tiền — trạng thái Hoàn tất.");
+      onOpenChange(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Xác nhận thất bại.");
+    }
+  };
+
+  if (!open || !transfer) return null;
+
+  const destination =
+    transfer.toFundKind === CashTransferFundKind.CASH
+      ? "quỹ tiền mặt"
+      : "tài khoản tiền gửi";
+
+  return (
+    <AppModal
+      open
+      onOpenChange={onOpenChange}
+      title="Xác nhận nhận tiền"
+      bodyStretch={false}
+      defaultWidth={520}
+      defaultHeight={380}
+      minWidth={420}
+      minHeight={320}
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Quay lại
+          </Button>
+          <Button
+            type="button"
+            disabled={confirm.isPending}
+            onClick={() => void handleConfirm()}
+          >
+            {confirm.isPending ? "Đang xử lý…" : "Xác nhận nhận"}
+          </Button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-2">
+        <p className="text-muted-foreground leading-relaxed">
+          Xác nhận đã nhận <strong>{formatMoneyInteger(Number(transfer.amount))}</strong>
+          {fromBranchName ? ` từ cửa hàng ${fromBranchName}` : ""}. Số tiền sẽ được cộng
+          vào {destination} của chi nhánh này và khoản tiền đang chuyển sẽ được đóng.
+        </p>
+        <label className="text-sm font-medium">Ghi chú</label>
+        <Textarea
+          className="min-h-[64px] resize-none"
+          value={note}
+          maxLength={500}
+          placeholder="Không bắt buộc"
+          onChange={(e) => setNote(e.target.value)}
+        />
+      </div>
+    </AppModal>
+  );
+}

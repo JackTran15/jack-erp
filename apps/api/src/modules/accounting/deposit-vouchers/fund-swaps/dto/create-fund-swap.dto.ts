@@ -76,12 +76,13 @@ export class CreateFundSwapDto {
   reason?: string;
 
   /**
-   * DEPOSIT_TO_CASH only. False skips auto-creating the matching cash receipt —
-   * only the deposit-withdrawal leg posts, parking the amount in TK 113 "Tiền
-   * đang chuyển" until the cashier creates a separate cash receipt themselves
-   * once the money is actually counted (matches MISA; no pending/confirm state
-   * is tracked for this — unlike the GĐ4 inter-branch transfer). Omitted or
-   * true keeps the current atomic 2-leg behavior.
+   * Applies to both directions. False skips auto-creating the counterpart
+   * receipt — only the withdrawal leg posts, parking the amount in TK 113 "Tiền
+   * đang chuyển" until the receiving side records it themselves (the cashier
+   * once the money is counted, or the accountant once the bank confirms the
+   * deposit). Matches MISA; no pending/confirm state is tracked for this —
+   * unlike the GĐ4 inter-branch transfer. Omitted or true keeps the atomic
+   * 2-leg behavior.
    */
   @IsOptional()
   @IsBoolean()

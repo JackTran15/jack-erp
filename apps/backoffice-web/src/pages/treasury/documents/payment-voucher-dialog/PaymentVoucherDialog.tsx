@@ -7,9 +7,11 @@ import {
   Input,
   LineItemGrid,
   MoneyInput,
+  SingleSelect,
   cn,
   formatMoneyInteger,
   type LineColumn,
+  type SingleSelectOption,
   type ToolbarItem,
 } from "@erp/ui";
 import { Pencil, Save, X } from "lucide-react";
@@ -20,8 +22,12 @@ import { useGenerateDocumentNumber } from "../../../../hooks/document-numbering/
 import { useCashVoucherCategories } from "../../../../hooks/treasury/use-cash-voucher-categories";
 import {
   CashPaymentPurpose,
+  CashPaymentReferenceType,
+  CashTransferFundKind,
   CashVoucherCategoryDirection,
 } from "../../cash-vouchers.types";
+import { FundSwapDirection, type CreateFundSwapBody } from "../../bank-vouchers.types";
+import type { CreateCashTransferBody } from "../../cash-transfer/cash-transfer.types";
 import { READONLY_INPUT_CLASS } from "../../ledger-cash/ledger-cash.constants";
 import {
   LedgerCashVoucherPurposeEnum,
@@ -43,6 +49,8 @@ import {
   PAYMENT_OTHER_SUB_OPTIONS,
   PAYMENT_PURPOSE_LABEL,
   PAYMENT_VOUCHER_PURPOSE_RADIO_OPTIONS,
+  TRANSFER_SUB_OPTION_REASON,
+  apiPurposeToSubOption,
   emptyFormLine,
   isTransferSubOption,
   subOptionToApiPurpose,
@@ -50,10 +58,15 @@ import {
   PaymentPurposeRadio,
   type VoucherFormLine,
 } from "../_shared/voucher-dialog.constants";
-import { usePaymentAccounts } from "../../../../hooks/treasury/use-payment-accounts";
+import { DepositAccountSelect } from "../_shared/DepositAccountSelect";
+import { useBranches } from "../../../../hooks/iam/useBranches";
+import { useBranchStore } from "../../../../store/common/branch/branch.store";
+import { useDepositDashboard } from "../../../../hooks/treasury/use-deposit-dashboard";
+import { useCashTransfer } from "../../../../hooks/treasury/use-cash-transfers";
 import { TreasuryVoucherDialogModeEnum } from "../_shared/voucher-dialog.types";
 import {
   buildPaymentDetailFromForm,
+  formatDepositAccountLabel,
   toIsoDate,
   voucherLineTotal,
 } from "../_shared/voucher-dialog.utils";
@@ -63,6 +76,7 @@ import { usePartnerLookup } from "../_shared/voucher-partner-search";
 import {
   PartnerLookupType,
   inferLookupType,
+  lookupTypeToPartnerType,
 } from "../_shared/voucher-partner.constants";
 import { GoodsReceiptPaymentDialog } from "../goods-receipt-payment-dialog/GoodsReceiptPaymentDialog";
 import {
@@ -83,12 +97,27 @@ const LABELS = {
   titleView: "Phiếu chi",
 } as const;
 
+/**
+ * The two transfer sub-modes don't post an ordinary cash payment — they hit
+ * dedicated endpoints that write both legs. The dialog emits which one it built
+ * and the page performs the HTTP call, mirroring `DepositPaymentSaveResult`.
+ */
+export type CashPaymentSaveResult =
+  | { kind: "voucher"; detail: LedgerCashVoucherDetail }
+  | { kind: "fundSwap"; body: CreateFundSwapBody }
+  | { kind: "cashTransfer"; body: CreateCashTransferBody };
+
+const RECEIVING_FUND_OPTIONS: SingleSelectOption[] = [
+  { value: CashTransferFundKind.CASH, label: "Thu tiền mặt" },
+  { value: CashTransferFundKind.DEPOSIT, label: "Thu tiền gửi" },
+];
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: TreasuryVoucherDialogModeEnum;
   initial: LedgerCashVoucherDetail | null;
-  onSave?: (detail: LedgerCashVoucherDetail) => void;
+  onSave?: (result: CashPaymentSaveResult) => void;
   onRequestEdit?: () => void;
 }
 
@@ -145,18 +174,76 @@ export function PaymentVoucherDialog({
   const [paymentSubOption, setPaymentSubOption] = useState(
     PaymentOtherSubOption.OTHER,
   );
+  /** Destination deposit account of "Chuyển tiền mặt thành tiền gửi" (this branch). */
   const [transferAccountId, setTransferAccountId] = useState("");
+  const [autoCreateReceipt, setAutoCreateReceipt] = useState(true);
+  const [toBranchId, setToBranchId] = useState("");
+  const [toFundKind, setToFundKind] = useState<CashTransferFundKind>(
+    CashTransferFundKind.CASH,
+  );
+  const [toAccountId, setToAccountId] = useState("");
 
-  const { data: paymentAccounts = [] } = usePaymentAccounts();
+  const currentBranchId = useBranchStore((s) => s.branchId);
+  const { data: branches = [] } = useBranches();
+  const { data: depositDashboard } = useDepositDashboard();
 
   const isDebtRepayment =
     paymentPurpose === CashPaymentPurpose.SUPPLIER_PAYMENT;
   const purposeRadio: PaymentPurposeRadio = isDebtRepayment
     ? PaymentPurposeRadio.DEBT_GROUP
     : PaymentPurposeRadio.OTHER_GROUP;
-  const showTransferAccount =
-    !isDebtRepayment && isTransferSubOption(paymentSubOption);
+  const isCashToDeposit =
+    !isDebtRepayment && paymentSubOption === PaymentOtherSubOption.CASH_TO_DEPOSIT;
+  const isBranchTransfer =
+    !isDebtRepayment && paymentSubOption === PaymentOtherSubOption.BRANCH_TRANSFER;
+  const isFundMove = isCashToDeposit || isBranchTransfer;
   const debtFieldsLocked = isDebtRepayment && !readOnly;
+  // Both auto-filled sub-modes lock the grid to one row; only Trả nợ also locks Số tiền.
+  const lockRowCount = isDebtRepayment || isFundMove;
+
+  const branchOptions = useMemo<SingleSelectOption[]>(
+    () =>
+      branches
+        .filter((b) => b.id !== currentBranchId)
+        .map((b) => ({ value: b.id, label: b.name })),
+    [branches, currentBranchId],
+  );
+  const toBranchAccounts = useMemo(
+    () => depositDashboard?.branches.find((b) => b.branchId === toBranchId)?.accounts ?? [],
+    [depositDashboard, toBranchId],
+  );
+  const toAccountOptions = useMemo<SingleSelectOption[]>(
+    () =>
+      toBranchAccounts.map((a) => ({
+        value: a.accountId,
+        label: formatDepositAccountLabel(a),
+      })),
+    [toBranchAccounts],
+  );
+  const showToAccountGap =
+    toFundKind === CashTransferFundKind.DEPOSIT &&
+    Boolean(toBranchId) &&
+    toAccountOptions.length === 0;
+
+  // toBranchId/toFundKind/toAccountId live only on the cash_transfer row (not on
+  // the cash_payment itself) — view/edit of an already-created INTER_BRANCH_OUT
+  // voucher must fetch it separately.
+  const linkedTransferId =
+    mode !== TreasuryVoucherDialogModeEnum.CREATE &&
+    initial?.referenceType === CashPaymentReferenceType.TRANSFER
+      ? (initial.referenceId ?? undefined)
+      : undefined;
+  const { data: linkedTransfer } = useCashTransfer(
+    linkedTransferId,
+    Boolean(linkedTransferId),
+  );
+
+  useEffect(() => {
+    if (!linkedTransfer) return;
+    setToBranchId(linkedTransfer.toBranchId);
+    setToFundKind(linkedTransfer.toFundKind);
+    setToAccountId(linkedTransfer.toDepositAccountId ?? "");
+  }, [linkedTransfer]);
 
   const resetKey = `payment-${mode}-${initial?.voucherNo ?? "new"}-${initial?.partnerId ?? ""}`;
 
@@ -166,6 +253,10 @@ export function PaymentVoucherDialog({
       setPaymentPurpose(CashPaymentPurpose.OTHER);
       setPaymentSubOption(PaymentOtherSubOption.OTHER);
       setTransferAccountId("");
+      setAutoCreateReceipt(true);
+      setToBranchId("");
+      setToFundKind(CashTransferFundKind.CASH);
+      setToAccountId("");
       setPartnerKind(PartnerLookupType.SUPPLIER);
       setPartnerId("");
       setCounterpartyCode("");
@@ -186,9 +277,13 @@ export function PaymentVoucherDialog({
       return;
     }
     if (initial && !isGoodsReceiptPaymentVoucher(initial)) {
-      setPaymentPurpose(initial.paymentPurpose ?? CashPaymentPurpose.OTHER);
-      setPaymentSubOption(PaymentOtherSubOption.OTHER);
+      const savedPurpose = initial.paymentPurpose ?? CashPaymentPurpose.OTHER;
+      setPaymentPurpose(savedPurpose);
+      setPaymentSubOption(
+        apiPurposeToSubOption(savedPurpose, initial.referenceType),
+      );
       setTransferAccountId("");
+      setAutoCreateReceipt(true);
       setPartnerKind(
         initial.partnerKind ?? inferLookupType(initial.partnerType),
       );
@@ -254,11 +349,42 @@ export function PaymentVoucherDialog({
     setEmployeeName(item.name);
   }, []);
 
+  /**
+   * Auto-fills "Lý do chi" + the single locked detail line for a transfer
+   * sub-mode. Done here rather than in an effect so re-picking the same option
+   * after manual edits still restores the defaults, and so switching away can't
+   * leave a stale destination behind.
+   */
+  const handleSubOptionChange = useCallback((next: PaymentOtherSubOption) => {
+    setPaymentSubOption(next);
+    setPaymentPurpose(subOptionToApiPurpose(next));
+    setTransferAccountId("");
+    setAutoCreateReceipt(true);
+    setToBranchId("");
+    setToFundKind(CashTransferFundKind.CASH);
+    setToAccountId("");
+    if (!isTransferSubOption(next)) return;
+    const text = TRANSFER_SUB_OPTION_REASON[next];
+    setReason(text);
+    setLines([
+      { description: text, amount: 0, category: "", categoryId: undefined },
+    ]);
+  }, []);
+
+  // Changing the destination branch invalidates the account picked from the old one.
+  useEffect(() => {
+    setToAccountId("");
+  }, [toBranchId]);
+
   const handleRadioChange = useCallback((next: PaymentPurposeRadio) => {
     if (next === PaymentPurposeRadio.DEBT_GROUP) {
       setPaymentPurpose(CashPaymentPurpose.SUPPLIER_PAYMENT);
       setPaymentSubOption(PaymentOtherSubOption.OTHER);
       setTransferAccountId("");
+      setAutoCreateReceipt(true);
+      setToBranchId("");
+      setToFundKind(CashTransferFundKind.CASH);
+      setToAccountId("");
       setPartnerKind(PartnerLookupType.SUPPLIER);
       setPartnerId("");
       setCounterpartyCode("");
@@ -276,6 +402,10 @@ export function PaymentVoucherDialog({
       setPaymentPurpose(CashPaymentPurpose.OTHER);
       setPaymentSubOption(PaymentOtherSubOption.OTHER);
       setTransferAccountId("");
+      setAutoCreateReceipt(true);
+      setToBranchId("");
+      setToFundKind(CashTransferFundKind.CASH);
+      setToAccountId("");
       setDocumentLines([]);
     }
   }, []);
@@ -448,34 +578,95 @@ export function PaymentVoucherDialog({
       toast.error("Vui lòng nhập ít nhất một dòng chi tiết.");
       return;
     }
-    if (voucherLineTotal(validLines) <= 0) {
+    const total = voucherLineTotal(validLines);
+    if (total <= 0) {
       toast.error("Tổng số tiền phải lớn hơn 0.");
       return;
     }
-    onSave(
-      buildPaymentDetailFromForm({
-        purpose: isDebtRepayment
-          ? LedgerCashVoucherPurposeEnum.DEBT_REPAYMENT
-          : LedgerCashVoucherPurposeEnum.OTHER,
-        paymentPurpose,
-        partnerKind,
-        partnerId,
-        counterpartyCode,
-        counterpartyName,
-        payerName: personName,
-        address,
-        reason,
-        staffId,
-        employeeCode,
-        employeeName,
-        reference,
-        voucherNo: voucherNo.trim(),
-        voucherDate,
-        lines: validLines,
-        documentLines,
-        transferAccountId: showTransferAccount ? transferAccountId : undefined,
-      }),
-    );
+
+    const transferLines = validLines.map((l) => ({
+      description: l.description,
+      amount: l.amount,
+      categoryId: l.categoryId,
+    }));
+
+    // "Chuyển tiền mặt thành tiền gửi" — both legs inside this branch, posted by
+    // POST /fund-swaps rather than as an ordinary cash payment.
+    if (isCashToDeposit) {
+      if (!transferAccountId) {
+        toast.error("Vui lòng chọn tài khoản thu.");
+        return;
+      }
+      onSave({
+        kind: "fundSwap",
+        body: {
+          direction: FundSwapDirection.CASH_TO_DEPOSIT,
+          depositAccountId: transferAccountId,
+          amount: total,
+          docDate: voucherDate,
+          reason: reason || undefined,
+          autoCreateReceipt,
+          partnerType: partnerId ? lookupTypeToPartnerType(partnerKind) : undefined,
+          partnerId: partnerId || undefined,
+          payeeName: personName || undefined,
+          address: address || undefined,
+          paidBy: staffId || undefined,
+          lines: transferLines,
+        },
+      });
+    } else if (isBranchTransfer) {
+      if (!toBranchId) {
+        toast.error("Vui lòng chọn cửa hàng nhận.");
+        return;
+      }
+      if (toFundKind === CashTransferFundKind.DEPOSIT && !toAccountId) {
+        toast.error("Vui lòng chọn tài khoản nhận.");
+        return;
+      }
+      onSave({
+        kind: "cashTransfer",
+        body: {
+          toBranchId,
+          toFundKind,
+          toAccountId:
+            toFundKind === CashTransferFundKind.DEPOSIT ? toAccountId : undefined,
+          amount: total,
+          docDate: voucherDate,
+          note: reason || undefined,
+          partnerType: partnerId ? lookupTypeToPartnerType(partnerKind) : undefined,
+          partnerId: partnerId || undefined,
+          payeeName: personName || undefined,
+          address: address || undefined,
+          paidBy: staffId || undefined,
+          lines: transferLines,
+        },
+      });
+    } else {
+      onSave({
+        kind: "voucher",
+        detail: buildPaymentDetailFromForm({
+          purpose: isDebtRepayment
+            ? LedgerCashVoucherPurposeEnum.DEBT_REPAYMENT
+            : LedgerCashVoucherPurposeEnum.OTHER,
+          paymentPurpose,
+          partnerKind,
+          partnerId,
+          counterpartyCode,
+          counterpartyName,
+          payerName: personName,
+          address,
+          reason,
+          staffId,
+          employeeCode,
+          employeeName,
+          reference,
+          voucherNo: voucherNo.trim(),
+          voucherDate,
+          lines: validLines,
+          documentLines,
+        }),
+      });
+    }
     toast.success(
       mode === TreasuryVoucherDialogModeEnum.CREATE
         ? "Đã thêm phiếu chi."
@@ -487,8 +678,13 @@ export function PaymentVoucherDialog({
     voucherNo,
     paymentPurpose,
     isDebtRepayment,
+    isCashToDeposit,
+    isBranchTransfer,
+    autoCreateReceipt,
+    toBranchId,
+    toFundKind,
+    toAccountId,
     documentLines,
-    showTransferAccount,
     transferAccountId,
     partnerKind,
     partnerId,
@@ -562,6 +758,7 @@ export function PaymentVoucherDialog({
   return (
     <>
       <DocumentFormDialog
+        scroll="page"
         open
         onOpenChange={(nextOpen) => {
           if (!nextOpen) handleClose();
@@ -595,23 +792,13 @@ export function PaymentVoucherDialog({
                     <select
                       className="h-9 rounded-md border border-input bg-background px-2 text-sm"
                       value={paymentSubOption}
-                      onChange={(e) => {
-                        const sub = e.target.value as PaymentOtherSubOption;
-                        setPaymentSubOption(sub);
-                        setPaymentPurpose(subOptionToApiPurpose(sub));
-                        if (!isTransferSubOption(sub)) {
-                          setTransferAccountId("");
-                        }
-                      }}
+                      onChange={(e) =>
+                        handleSubOptionChange(
+                          e.target.value as PaymentOtherSubOption,
+                        )
+                      }
                     >
-                      {/* Transfer sub-options (cash→bank, branch transfer) are
-                          hidden: with auto-post they would book to the
-                          purpose-default account. Proper transfer booking
-                          (resolve the destination account, DR asset / CR cash)
-                          is follow-up work. */}
-                      {PAYMENT_OTHER_SUB_OPTIONS.filter(
-                        (o) => !isTransferSubOption(o.value),
-                      ).map((o) => (
+                      {PAYMENT_OTHER_SUB_OPTIONS.map((o) => (
                         <option key={o.value} value={o.value}>
                           {o.label}
                         </option>
@@ -635,6 +822,22 @@ export function PaymentVoucherDialog({
         }
         generalInfo={
           <>
+            {isBranchTransfer ? (
+              <FormField
+                label="Cửa hàng nhận"
+                required
+                layout="horizontal"
+                labelWidth="8rem"
+              >
+                <SingleSelect
+                  options={branchOptions}
+                  value={toBranchId}
+                  onValueChange={setToBranchId}
+                  placeholder="Chọn cửa hàng"
+                  disabled={readOnly}
+                />
+              </FormField>
+            ) : null}
             <VoucherPartnerFields
               label={LABELS.counterparty}
               readOnly={readOnly || isDebtRepayment}
@@ -726,34 +929,82 @@ export function PaymentVoucherDialog({
               onOpenSearchDialog={() => setEntitySearchTarget("staff")}
               onCreateNew={!readOnly ? () => setStaffCreateOpen(true) : undefined}
             />
-            {showTransferAccount ? (
+            {isFundMove ? (
+              <div className="flex flex-col gap-1">
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={isBranchTransfer ? true : autoCreateReceipt}
+                      disabled={readOnly || isBranchTransfer}
+                      onChange={(e) => setAutoCreateReceipt(e.target.checked)}
+                    />
+                    Tự động sinh phiếu thu tiền ngay sau khi chi
+                  </label>
+                  {isBranchTransfer ? (
+                    <SingleSelect
+                      options={RECEIVING_FUND_OPTIONS}
+                      value={toFundKind}
+                      onValueChange={(v) =>
+                        setToFundKind(v as CashTransferFundKind)
+                      }
+                      className="w-40"
+                      disabled={readOnly}
+                    />
+                  ) : null}
+                </div>
+                {isBranchTransfer ? (
+                  <p className="pl-6 text-xs text-muted-foreground">
+                    Chi nhánh đích tự xác nhận nhận tiền sau (trang Chuyển tiền mặt liên
+                    chi nhánh).
+                  </p>
+                ) : !autoCreateReceipt ? (
+                  <p className="pl-6 text-xs text-muted-foreground">
+                    Tiền sẽ treo ở tài khoản "Tiền đang chuyển" — tự tạo Phiếu thu tiền
+                    gửi riêng sau khi ngân hàng báo có.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            {isCashToDeposit ? (
               <FormField
                 label="Tài khoản thu"
+                required
                 layout="horizontal"
                 labelWidth="8rem"
               >
-                {readOnly ? (
-                  <span className="flex h-9 items-center text-sm">
-                    {paymentAccounts.find((a) => a.id === transferAccountId)
-                      ?.label ?? transferAccountId}
-                  </span>
-                ) : (
-                  <select
-                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
-                    value={transferAccountId}
-                    onChange={(e) => setTransferAccountId(e.target.value)}
-                  >
-                    <option value="">-- Chọn tài khoản --</option>
-                    {paymentAccounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {[a.label, a.accountNumber, a.bankName]
-                          .filter(Boolean)
-                          .join(" — ") || a.id}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                <DepositAccountSelect
+                  value={transferAccountId}
+                  onChange={setTransferAccountId}
+                  disabled={readOnly}
+                />
               </FormField>
+            ) : null}
+            {isBranchTransfer && toFundKind === CashTransferFundKind.DEPOSIT ? (
+              <>
+                <FormField
+                  label="Tài khoản nhận"
+                  required
+                  layout="horizontal"
+                  labelWidth="8rem"
+                >
+                  <SingleSelect
+                    options={toAccountOptions}
+                    value={toAccountId}
+                    onValueChange={setToAccountId}
+                    placeholder={
+                      toBranchId ? "Chọn tài khoản" : "Chọn cửa hàng nhận trước"
+                    }
+                    disabled={readOnly || !toBranchId}
+                  />
+                </FormField>
+                {showToAccountGap ? (
+                  <p className="text-xs text-amber-600">
+                    Không thấy tài khoản tiền gửi nào của cửa hàng này — bạn có thể không
+                    được gán quyền xem quỹ chi nhánh đích.
+                  </p>
+                ) : null}
+              </>
             ) : null}
             {reference ? (
               <FormField
@@ -821,8 +1072,9 @@ export function PaymentVoucherDialog({
           </>
         }
         detail={
-          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+          <div className="flex flex-col gap-2">
             <LineItemGrid
+              className="h-auto overflow-visible"
               columns={lineColumns}
               rows={lines}
               onChangeCell={
@@ -848,12 +1100,12 @@ export function PaymentVoucherDialog({
                     }
               }
               onAddRow={
-                readOnly
+                readOnly || lockRowCount
                   ? undefined
                   : () => setLines((prev) => [...prev, emptyFormLine()])
               }
               onDeleteRow={
-                readOnly
+                readOnly || lockRowCount
                   ? undefined
                   : (idx) =>
                       setLines((prev) =>
@@ -862,8 +1114,8 @@ export function PaymentVoucherDialog({
                           : prev,
                       )
               }
-              showAddRow={!readOnly}
-              showRowActions={!readOnly}
+              showAddRow={!readOnly && !lockRowCount}
+              showRowActions={!readOnly && !lockRowCount}
             />
           </div>
         }

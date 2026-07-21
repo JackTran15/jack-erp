@@ -1707,7 +1707,8 @@
                 "OTHER",
                 "DEBT_COLLECTION",
                 "POS_SALE",
-                "OTHER_INCOME"
+                "OTHER_INCOME",
+                "INTER_BRANCH_IN"
               ]
             }
           },
@@ -2015,7 +2016,9 @@
                 "PURCHASE",
                 "EXPENSE",
                 "SALARY",
-                "REFUND"
+                "REFUND",
+                "DEPOSIT_TRANSFER",
+                "INTER_BRANCH_OUT"
               ]
             }
           },
@@ -10776,6 +10779,159 @@
         ]
       }
     },
+    "/cash-transfers": {
+      "post": {
+        "operationId": "CashTransferController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCashTransferDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashTransferEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashTransfer"
+        ]
+      },
+      "get": {
+        "operationId": "CashTransferController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CashTransfer"
+        ]
+      }
+    },
+    "/cash-transfers/{id}/confirm": {
+      "post": {
+        "operationId": "CashTransferController_confirm",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmCashTransferDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashTransferEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashTransfer"
+        ]
+      }
+    },
+    "/cash-transfers/{id}/cancel": {
+      "post": {
+        "operationId": "CashTransferController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelCashTransferDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashTransferEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashTransfer"
+        ]
+      }
+    },
+    "/cash-transfers/{id}": {
+      "get": {
+        "operationId": "CashTransferController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashTransferEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashTransfer"
+        ]
+      }
+    },
     "/v2/deposit-recon/search": {
       "post": {
         "operationId": "DepositReconV2Controller_search_v2",
@@ -16356,6 +16512,38 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "statBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "storeScope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "storeIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -21563,7 +21751,8 @@
               "OTHER",
               "DEBT_COLLECTION",
               "POS_SALE",
-              "OTHER_INCOME"
+              "OTHER_INCOME",
+              "INTER_BRANCH_IN"
             ]
           },
           "partnerType": {
@@ -21652,7 +21841,8 @@
               "OTHER",
               "DEBT_COLLECTION",
               "POS_SALE",
-              "OTHER_INCOME"
+              "OTHER_INCOME",
+              "INTER_BRANCH_IN"
             ],
             "type": "string"
           },
@@ -21690,7 +21880,8 @@
               "RECEIVABLE",
               "MANUAL",
               "REVERSAL",
-              "FUND_SWAP"
+              "FUND_SWAP",
+              "TRANSFER"
             ],
             "type": "string"
           },
@@ -21860,7 +22051,8 @@
               "OTHER",
               "DEBT_COLLECTION",
               "POS_SALE",
-              "OTHER_INCOME"
+              "OTHER_INCOME",
+              "INTER_BRANCH_IN"
             ]
           },
           "partnerType": {
@@ -21980,7 +22172,9 @@
               "PURCHASE",
               "EXPENSE",
               "SALARY",
-              "REFUND"
+              "REFUND",
+              "DEPOSIT_TRANSFER",
+              "INTER_BRANCH_OUT"
             ]
           },
           "partnerType": {
@@ -22071,7 +22265,9 @@
               "PURCHASE",
               "EXPENSE",
               "SALARY",
-              "REFUND"
+              "REFUND",
+              "DEPOSIT_TRANSFER",
+              "INTER_BRANCH_OUT"
             ],
             "type": "string"
           },
@@ -22111,7 +22307,8 @@
               "REFUND",
               "MANUAL",
               "REVERSAL",
-              "FUND_SWAP"
+              "FUND_SWAP",
+              "TRANSFER"
             ],
             "type": "string"
           },
@@ -22283,7 +22480,9 @@
               "PURCHASE",
               "EXPENSE",
               "SALARY",
-              "REFUND"
+              "REFUND",
+              "DEPOSIT_TRANSFER",
+              "INTER_BRANCH_OUT"
             ]
           },
           "partnerType": {
@@ -30137,7 +30336,7 @@
           },
           "autoCreateReceipt": {
             "type": "boolean",
-            "description": "DEPOSIT_TO_CASH only. False skips auto-creating the matching cash receipt —\nonly the deposit-withdrawal leg posts, parking the amount in TK 113 \"Tiền\nđang chuyển\" until the cashier creates a separate cash receipt themselves\nonce the money is actually counted (matches MISA; no pending/confirm state\nis tracked for this — unlike the GĐ4 inter-branch transfer). Omitted or\ntrue keeps the current atomic 2-leg behavior."
+            "description": "Applies to both directions. False skips auto-creating the counterpart\nreceipt — only the withdrawal leg posts, parking the amount in TK 113 \"Tiền\nđang chuyển\" until the receiving side records it themselves (the cashier\nonce the money is counted, or the accountant once the bank confirms the\ndeposit). Matches MISA; no pending/confirm state is tracked for this —\nunlike the GĐ4 inter-branch transfer. Omitted or true keeps the atomic\n2-leg behavior."
           },
           "partnerType": {
             "type": "string",
@@ -30515,6 +30714,250 @@
         }
       },
       "CancelDepositTransferDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "CashTransferLineDto": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "categoryId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "cash_voucher_categories id (direction OUT)"
+          }
+        },
+        "required": [
+          "description",
+          "amount"
+        ]
+      },
+      "CreateCashTransferDto": {
+        "type": "object",
+        "properties": {
+          "toBranchId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Destination branch (B)"
+          },
+          "toFundKind": {
+            "enum": [
+              "CASH",
+              "DEPOSIT"
+            ],
+            "type": "string",
+            "description": "Where the money lands at branch B: its cash fund or a deposit account"
+          },
+          "toAccountId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Destination deposit account — required when toFundKind is DEPOSIT, ignored otherwise. Must belong to toBranchId and be ACTIVE."
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "fromCashAccountId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Source cash fund; defaults to the initiating branch's fund"
+          },
+          "docDate": {
+            "type": "string",
+            "description": "Voucher date of leg A (defaults to today)"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "partnerType": {
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ],
+            "type": "string"
+          },
+          "partnerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payeeName": {
+            "type": "string",
+            "description": "\"Người nhận\"",
+            "maxLength": 255
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "paidBy": {
+            "type": "string",
+            "description": "Cashier who paid (thủ quỹ).",
+            "format": "uuid"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashTransferLineDto"
+            }
+          }
+        },
+        "required": [
+          "toBranchId",
+          "toFundKind",
+          "amount"
+        ]
+      },
+      "CashTransferEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "fromBranchId": {
+            "type": "string"
+          },
+          "toBranchId": {
+            "type": "string"
+          },
+          "fromCashAccountId": {
+            "type": "string",
+            "description": "The initiating branch's cash fund (cash_accounts.id)."
+          },
+          "toFundKind": {
+            "enum": [
+              "CASH",
+              "DEPOSIT"
+            ],
+            "type": "string"
+          },
+          "toCashAccountId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Destination branch's cash fund; set only when toFundKind is CASH."
+          },
+          "toDepositAccountId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Destination branch's deposit account; set only when toFundKind is DEPOSIT."
+          },
+          "amount": {
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "DANG_CHUYEN",
+              "HOAN_TAT",
+              "DA_HUY"
+            ],
+            "type": "string"
+          },
+          "fromPaymentId": {
+            "type": "string"
+          },
+          "toReceiptId": {
+            "type": "string",
+            "nullable": true,
+            "description": "cash_receipts.id or bank_receipts.id, depending on toFundKind."
+          },
+          "transferPairId": {
+            "type": "string",
+            "description": "= id; also written to the destination leg's deposit_movements.transfer_pair_id."
+          },
+          "initiatedBy": {
+            "type": "string"
+          },
+          "initiatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "confirmedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "confirmedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "cancelledBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelledAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "fromBranchId",
+          "toBranchId",
+          "fromCashAccountId",
+          "toFundKind",
+          "amount",
+          "status",
+          "fromPaymentId",
+          "transferPairId",
+          "initiatedBy",
+          "initiatedAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ConfirmCashTransferDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "CancelCashTransferDto": {
         "type": "object",
         "properties": {
           "reason": {

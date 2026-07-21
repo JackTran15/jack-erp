@@ -1,5 +1,6 @@
 export { ReceiptVoucherDialog } from "./receipt-voucher-dialog";
 export { PaymentVoucherDialog } from "./payment-voucher-dialog";
+export type { CashPaymentSaveResult } from "./payment-voucher-dialog";
 export { GoodsReceiptPaymentDialog } from "./goods-receipt-payment-dialog";
 export { InvoiceDetailDialog } from "./invoice-detail-dialog";
 export { DepositReceiptVoucherDialog } from "./deposit-receipt-voucher-dialog";

@@ -1799,3 +1799,32 @@ flowchart LR
   T3 --> T4["CVS-04 FE thu/chi"]
   T3 --> T5["CVS-05 FE sổ quỹ"]
 ```
+
+### EPIC-21072026 Phiếu chi tiền mặt — chuyển thành tiền gửi & chuyển đến cửa hàng khác
+
+- [EPIC-21072026 Cash transfer vouchers](./epics/EPIC-21072026-cash-transfer-vouchers.md)
+
+Màn Thu, chi tiền mặt chỉ tạo được phiếu chi "Chi khác" / "Trả nợ"; hai mục đích "Chuyển tiền mặt thành tiền gửi" và "Chuyển tiền đến cửa hàng khác" đã khai báo sẵn trong `PaymentOtherSubOption` nhưng bị lọc ẩn khỏi dropdown kèm comment "follow-up work". Mục đích 1 chủ yếu là việc FE (`FundSwapsService` chiều `CASH_TO_DEPOSIT` đã có sẵn); mục đích 2 cần backend mới — bảng `cash_transfer` + `CashTransferService` 2 bước `DANG_CHUYEN` → `HOAN_TAT`/`DA_HUY`, chân đích là **phiếu thu tiền mặt hoặc phiếu thu tiền gửi** tuỳ "Hình thức nhận", cả 2 chân bắc cầu qua COA 113. Chiều `CASH_TO_DEPOSIT` cũng được mở khoá bỏ tick "Tự động sinh phiếu thu" cho đối xứng với EPIC-19072026.
+
+| Ticket | Mô tả |
+| ------ | ----- |
+| [TKT-CTF-01](./tickets/TKT-CTF-01-schema-enums.md) | 2 migration viết tay (ALTER TYPE ADD VALUE tách riêng / CREATE TABLE `cash_transfer`) + entity |
+| [TKT-CTF-02](./tickets/TKT-CTF-02-cash-transfer-service.md) | `CashTransferService` create/confirm/cancel/list + DTOs; `CashPaymentsService.reverse` nhận `manager` |
+| [TKT-CTF-03](./tickets/TKT-CTF-03-controller-permissions.md) | `CashTransferController` 5 route + 4 permission key + wiring `DepositVouchersModule` |
+| [TKT-CTF-04](./tickets/TKT-CTF-04-fund-swap-optional-receipt-cash.md) | `FundSwapsService` cho bỏ tick sinh phiếu thu ở chiều `CASH_TO_DEPOSIT` (thay ràng buộc cũ của TKT-FSW-01) |
+| [TKT-CTF-05](./tickets/TKT-CTF-05-openapi-fe-types-hooks.md) | OpenAPI regen + commit snapshot; `use-cash-transfers.ts` + mirror enum FE |
+| [TKT-CTF-06](./tickets/TKT-CTF-06-payment-dialog-submodes.md) | `PaymentVoucherDialog` bật 2 sub-mode + union `CashPaymentSaveResult` |
+| [TKT-CTF-07](./tickets/TKT-CTF-07-cash-transfer-page.md) | Trang `/treasury/cash-transfers` (xác nhận / huỷ) + route + nav |
+| [TKT-CTF-08](./tickets/TKT-CTF-08-tests.md) | Unit + e2e 2 chân + checklist QA thủ công 9 bước |
+
+```mermaid
+flowchart LR
+  T1["CTF-01 Schema+enums"] --> T2["CTF-02 Service"]
+  T2 --> T3["CTF-03 Controller+perms"]
+  T3 --> T5["CTF-05 OpenAPI+FE types"]
+  T4["CTF-04 FundSwap bỏ tick"] --> T5
+  T5 --> T6["CTF-06 PaymentVoucherDialog"]
+  T5 --> T7["CTF-07 Trang theo dõi"]
+  T6 --> T8["CTF-08 Test plan"]
+  T7 --> T8
+```

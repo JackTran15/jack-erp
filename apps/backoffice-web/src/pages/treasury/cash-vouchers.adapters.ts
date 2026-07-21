@@ -119,6 +119,8 @@ export function cashPaymentToVoucherDetail(
     employeeCode: "",
     employeeName: "",
     reference: p.sourceLink?.sourceDocumentNumber ?? undefined,
+    referenceType: p.referenceType,
+    referenceId: p.referenceId,
     lines: mapVoucherLines(p.lines, categoryNames),
     goodsReceipt: isGr
       ? {

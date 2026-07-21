@@ -796,6 +796,7 @@ export function DepositPaymentVoucherDialog({
   return (
     <>
       <DocumentFormDialog
+        scroll="page"
         open
         onOpenChange={(nextOpen) => {
           if (!nextOpen) handleClose();
@@ -1035,7 +1036,7 @@ export function DepositPaymentVoucherDialog({
           </>
         }
         detail={
-          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+          <div className="flex flex-col gap-2">
             {readOnly ? (
               <BaseDataTable
                 columns={lineColumnsView}
@@ -1047,6 +1048,7 @@ export function DepositPaymentVoucherDialog({
               />
             ) : (
               <LineItemGrid
+                className="h-auto overflow-visible"
                 columns={lineColumns}
                 rows={lines}
                 onChangeCell={

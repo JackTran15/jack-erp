@@ -26,6 +26,9 @@ import { FundSwapsController } from './fund-swaps/fund-swaps.controller';
 import { DepositTransferEntity } from './deposit-transfer/deposit-transfer.entity';
 import { DepositTransferService } from './deposit-transfer/deposit-transfer.service';
 import { DepositTransferController } from './deposit-transfer/deposit-transfer.controller';
+import { CashTransferEntity } from './cash-transfer/cash-transfer.entity';
+import { CashTransferService } from './cash-transfer/cash-transfer.service';
+import { CashTransferController } from './cash-transfer/cash-transfer.controller';
 import { DepositDashboardService } from './deposit-dashboard/deposit-dashboard.service';
 import { DepositDashboardController } from './deposit-dashboard/deposit-dashboard.controller';
 import { DepositVoucherV2Controller } from './controllers/deposit-voucher-v2.controller';
@@ -44,6 +47,7 @@ import { SearchDepositVouchersV2Handler } from './queries/search-deposit-voucher
       BankPaymentLineEntity,
       SupplierDepositPaymentSagaEntity,
       DepositTransferEntity,
+      CashTransferEntity,
       DepositAccountEntity,
       BranchEntity,
       BankEntity,
@@ -67,6 +71,7 @@ import { SearchDepositVouchersV2Handler } from './queries/search-deposit-voucher
     // route would otherwise swallow `/in-transit` as an :id (uuid validation fails).
     DepositDashboardController,
     DepositTransferController,
+    CashTransferController,
   ],
   providers: [
     BankReceiptsService,
@@ -75,6 +80,7 @@ import { SearchDepositVouchersV2Handler } from './queries/search-deposit-voucher
     SupplierDepositPaymentSagaService,
     FundSwapsService,
     DepositTransferService,
+    CashTransferService,
     DepositDashboardService,
     SearchDepositVouchersV2Handler,
   ],

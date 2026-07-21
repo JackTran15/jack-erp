@@ -3397,6 +3397,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/cash-transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashTransferController_list"];
+        put?: never;
+        post: operations["CashTransferController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-transfers/{id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CashTransferController_confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-transfers/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CashTransferController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-transfers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashTransferController_getById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v2/deposit-recon/search": {
         parameters: {
             query?: never;
@@ -6857,7 +6921,7 @@ export interface components {
             /** @description "Ngày thu" (YYYY-MM-DD). */
             voucherDate: string;
             /** @enum {string} */
-            purpose?: "OTHER" | "DEBT_COLLECTION" | "POS_SALE" | "OTHER_INCOME";
+            purpose?: "OTHER" | "DEBT_COLLECTION" | "POS_SALE" | "OTHER_INCOME" | "INTER_BRANCH_IN";
             /** @enum {string} */
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
@@ -6891,7 +6955,7 @@ export interface components {
             /** @enum {string} */
             status: "DRAFT" | "POSTED" | "REVERSED";
             /** @enum {string} */
-            purpose: "OTHER" | "DEBT_COLLECTION" | "POS_SALE" | "OTHER_INCOME";
+            purpose: "OTHER" | "DEBT_COLLECTION" | "POS_SALE" | "OTHER_INCOME" | "INTER_BRANCH_IN";
             /** @enum {string} */
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             partnerId?: string;
@@ -6901,7 +6965,7 @@ export interface components {
             reason?: string;
             staffId?: string;
             /** @enum {string} */
-            referenceType?: "INVOICE" | "INVOICE_DEBT" | "RECEIVABLE" | "MANUAL" | "REVERSAL" | "FUND_SWAP";
+            referenceType?: "INVOICE" | "INVOICE_DEBT" | "RECEIVABLE" | "MANUAL" | "REVERSAL" | "FUND_SWAP" | "TRANSFER";
             referenceId?: string;
             cashAccountId: string;
             contraAccountId: string;
@@ -6954,7 +7018,7 @@ export interface components {
         UpdateCashReceiptDto: {
             voucherDate?: string;
             /** @enum {string} */
-            purpose?: "OTHER" | "DEBT_COLLECTION" | "POS_SALE" | "OTHER_INCOME";
+            purpose?: "OTHER" | "DEBT_COLLECTION" | "POS_SALE" | "OTHER_INCOME" | "INTER_BRANCH_IN";
             /** @enum {string} */
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
@@ -6993,7 +7057,7 @@ export interface components {
             /** @description "Ngày chi" (YYYY-MM-DD). */
             voucherDate: string;
             /** @enum {string} */
-            purpose?: "OTHER" | "SUPPLIER_PAYMENT" | "PURCHASE" | "EXPENSE" | "SALARY" | "REFUND";
+            purpose?: "OTHER" | "SUPPLIER_PAYMENT" | "PURCHASE" | "EXPENSE" | "SALARY" | "REFUND" | "DEPOSIT_TRANSFER" | "INTER_BRANCH_OUT";
             /** @enum {string} */
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
@@ -7027,7 +7091,7 @@ export interface components {
             /** @enum {string} */
             status: "DRAFT" | "POSTED" | "REVERSED";
             /** @enum {string} */
-            purpose: "OTHER" | "SUPPLIER_PAYMENT" | "PURCHASE" | "EXPENSE" | "SALARY" | "REFUND";
+            purpose: "OTHER" | "SUPPLIER_PAYMENT" | "PURCHASE" | "EXPENSE" | "SALARY" | "REFUND" | "DEPOSIT_TRANSFER" | "INTER_BRANCH_OUT";
             /** @enum {string} */
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             partnerId?: string;
@@ -7037,7 +7101,7 @@ export interface components {
             reason?: string;
             staffId?: string;
             /** @enum {string} */
-            referenceType?: "INVOICE_DEBT" | "GOODS_RECEIPT" | "EXPENSE" | "SALARY" | "REFUND" | "MANUAL" | "REVERSAL" | "FUND_SWAP";
+            referenceType?: "INVOICE_DEBT" | "GOODS_RECEIPT" | "EXPENSE" | "SALARY" | "REFUND" | "MANUAL" | "REVERSAL" | "FUND_SWAP" | "TRANSFER";
             referenceId?: string;
             cashAccountId: string;
             contraAccountId: string;
@@ -7090,7 +7154,7 @@ export interface components {
         UpdateCashPaymentDto: {
             voucherDate?: string;
             /** @enum {string} */
-            purpose?: "OTHER" | "SUPPLIER_PAYMENT" | "PURCHASE" | "EXPENSE" | "SALARY" | "REFUND";
+            purpose?: "OTHER" | "SUPPLIER_PAYMENT" | "PURCHASE" | "EXPENSE" | "SALARY" | "REFUND" | "DEPOSIT_TRANSFER" | "INTER_BRANCH_OUT";
             /** @enum {string} */
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
@@ -9572,12 +9636,13 @@ export interface components {
             feeAmount?: number;
             reason?: string;
             /**
-             * @description DEPOSIT_TO_CASH only. False skips auto-creating the matching cash receipt —
-             *     only the deposit-withdrawal leg posts, parking the amount in TK 113 "Tiền
-             *     đang chuyển" until the cashier creates a separate cash receipt themselves
-             *     once the money is actually counted (matches MISA; no pending/confirm state
-             *     is tracked for this — unlike the GĐ4 inter-branch transfer). Omitted or
-             *     true keeps the current atomic 2-leg behavior.
+             * @description Applies to both directions. False skips auto-creating the counterpart
+             *     receipt — only the withdrawal leg posts, parking the amount in TK 113 "Tiền
+             *     đang chuyển" until the receiving side records it themselves (the cashier
+             *     once the money is counted, or the accountant once the bank confirms the
+             *     deposit). Matches MISA; no pending/confirm state is tracked for this —
+             *     unlike the GĐ4 inter-branch transfer. Omitted or true keeps the atomic
+             *     2-leg behavior.
              */
             autoCreateReceipt?: boolean;
             /** @enum {string} */
@@ -9701,6 +9766,99 @@ export interface components {
             note?: string;
         };
         CancelDepositTransferDto: {
+            reason: string;
+        };
+        CashTransferLineDto: {
+            description: string;
+            amount: number;
+            /**
+             * Format: uuid
+             * @description cash_voucher_categories id (direction OUT)
+             */
+            categoryId?: string;
+        };
+        CreateCashTransferDto: {
+            /**
+             * Format: uuid
+             * @description Destination branch (B)
+             */
+            toBranchId: string;
+            /**
+             * @description Where the money lands at branch B: its cash fund or a deposit account
+             * @enum {string}
+             */
+            toFundKind: "CASH" | "DEPOSIT";
+            /**
+             * Format: uuid
+             * @description Destination deposit account — required when toFundKind is DEPOSIT, ignored otherwise. Must belong to toBranchId and be ACTIVE.
+             */
+            toAccountId?: string;
+            amount: number;
+            /**
+             * Format: uuid
+             * @description Source cash fund; defaults to the initiating branch's fund
+             */
+            fromCashAccountId?: string;
+            /** @description Voucher date of leg A (defaults to today) */
+            docDate?: string;
+            note?: string;
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            /** Format: uuid */
+            partnerId?: string;
+            /** @description "Người nhận" */
+            payeeName?: string;
+            address?: string;
+            /**
+             * Format: uuid
+             * @description Cashier who paid (thủ quỹ).
+             */
+            paidBy?: string;
+            lines?: components["schemas"]["CashTransferLineDto"][];
+        };
+        CashTransferEntity: {
+            id: string;
+            organizationId: string;
+            fromBranchId: string;
+            toBranchId: string;
+            /** @description The initiating branch's cash fund (cash_accounts.id). */
+            fromCashAccountId: string;
+            /** @enum {string} */
+            toFundKind: "CASH" | "DEPOSIT";
+            /** @description Destination branch's cash fund; set only when toFundKind is CASH. */
+            toCashAccountId?: string | null;
+            /** @description Destination branch's deposit account; set only when toFundKind is DEPOSIT. */
+            toDepositAccountId?: string | null;
+            amount: number;
+            /** @enum {string} */
+            status: "DANG_CHUYEN" | "HOAN_TAT" | "DA_HUY";
+            fromPaymentId: string;
+            /** @description cash_receipts.id or bank_receipts.id, depending on toFundKind. */
+            toReceiptId?: string | null;
+            /** @description = id; also written to the destination leg's deposit_movements.transfer_pair_id. */
+            transferPairId: string;
+            initiatedBy: string;
+            /** Format: date-time */
+            initiatedAt: string;
+            confirmedBy?: string | null;
+            /** Format: date-time */
+            confirmedAt?: string | null;
+            cancelledBy?: string | null;
+            /** Format: date-time */
+            cancelledAt?: string | null;
+            cancelReason?: string | null;
+            note?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            deletedAt?: string;
+        };
+        ConfirmCashTransferDto: {
+            note?: string;
+        };
+        CancelCashTransferDto: {
             reason: string;
         };
         DepositReconSearchV2Dto: {
@@ -13120,7 +13278,7 @@ export interface operations {
         parameters: {
             query?: {
                 status?: "DRAFT" | "POSTED" | "REVERSED";
-                purpose?: "OTHER" | "DEBT_COLLECTION" | "POS_SALE" | "OTHER_INCOME";
+                purpose?: "OTHER" | "DEBT_COLLECTION" | "POS_SALE" | "OTHER_INCOME" | "INTER_BRANCH_IN";
                 cashAccountId?: string;
                 partnerId?: string;
                 dateFrom?: string;
@@ -13284,7 +13442,7 @@ export interface operations {
         parameters: {
             query?: {
                 status?: "DRAFT" | "POSTED" | "REVERSED";
-                purpose?: "OTHER" | "SUPPLIER_PAYMENT" | "PURCHASE" | "EXPENSE" | "SALARY" | "REFUND";
+                purpose?: "OTHER" | "SUPPLIER_PAYMENT" | "PURCHASE" | "EXPENSE" | "SALARY" | "REFUND" | "DEPOSIT_TRANSFER" | "INTER_BRANCH_OUT";
                 cashAccountId?: string;
                 partnerId?: string;
                 dateFrom?: string;
@@ -18424,6 +18582,117 @@ export interface operations {
             };
         };
     };
+    CashTransferController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CashTransferController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCashTransferDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashTransferEntity"];
+                };
+            };
+        };
+    };
+    CashTransferController_confirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmCashTransferDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashTransferEntity"];
+                };
+            };
+        };
+    };
+    CashTransferController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelCashTransferDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashTransferEntity"];
+                };
+            };
+        };
+    };
+    CashTransferController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashTransferEntity"];
+                };
+            };
+        };
+    };
     DepositReconV2Controller_search_v2: {
         parameters: {
             query?: never;
@@ -21714,6 +21983,10 @@ export interface operations {
         parameters: {
             query: {
                 reportType: string;
+                statBy?: string;
+                storeScope?: string;
+                storeIds?: string;
+                branchId?: string;
             };
             header?: never;
             path?: never;

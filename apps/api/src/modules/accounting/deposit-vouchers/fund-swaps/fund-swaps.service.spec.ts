@@ -120,7 +120,7 @@ describe('FundSwapsService', () => {
 
     expect(cashPayment.createAndPostInternal).toHaveBeenCalledWith(
       expect.objectContaining({
-        purpose: CashPaymentPurpose.OTHER,
+        purpose: CashPaymentPurpose.DEPOSIT_TRANSFER,
         cashAccountId: 'cash-1',
         contraAccountId: 'acc-113',
         amount: 5_000_000,
@@ -217,20 +217,35 @@ describe('FundSwapsService', () => {
       expect(result.cashReceiptId).toBeUndefined();
     });
 
-    it('rejects false combined with CASH_TO_DEPOSIT before opening a transaction', async () => {
-      const { service, dataSource } = await setup();
+    it('false skips the bank-receipt leg on CASH_TO_DEPOSIT too', async () => {
+      const { service, cashPayment, bankReceipt } = await setup();
 
-      await expect(
-        service.swap(
-          {
-            ...baseDto,
-            direction: FundSwapDirection.CASH_TO_DEPOSIT,
-            autoCreateReceipt: false,
-          },
-          actor,
-        ),
-      ).rejects.toThrow(/only applies to DEPOSIT_TO_CASH/);
-      expect(dataSource.transaction).not.toHaveBeenCalled();
+      const result = await service.swap(
+        {
+          ...baseDto,
+          direction: FundSwapDirection.CASH_TO_DEPOSIT,
+          autoCreateReceipt: false,
+        },
+        actor,
+      );
+
+      expect(cashPayment.createAndPostInternal).toHaveBeenCalledTimes(1);
+      expect(bankReceipt.createAndPostInternal).not.toHaveBeenCalled();
+      expect(result.cashPaymentId).toBe('cp-1');
+      expect(result.bankReceiptId).toBeUndefined();
+    });
+
+    it('CASH_TO_DEPOSIT with the field omitted still posts both legs', async () => {
+      const { service, cashPayment, bankReceipt } = await setup();
+
+      const result = await service.swap(
+        { ...baseDto, direction: FundSwapDirection.CASH_TO_DEPOSIT },
+        actor,
+      );
+
+      expect(cashPayment.createAndPostInternal).toHaveBeenCalledTimes(1);
+      expect(bankReceipt.createAndPostInternal).toHaveBeenCalledTimes(1);
+      expect(result.bankReceiptId).toBe('br-1');
     });
   });
 });

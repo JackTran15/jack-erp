@@ -630,6 +630,7 @@ export function ReceiptVoucherDialog({
   return (
     <>
       <DocumentFormDialog
+        scroll="page"
         open
         onOpenChange={(nextOpen) => {
           if (!nextOpen) handleClose();
@@ -834,7 +835,7 @@ export function ReceiptVoucherDialog({
           </>
         }
         detail={
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex flex-col">
             {showDetailTabs ? (
               <Tabs
                 tabs={RECEIPT_VOUCHER_DETAIL_TABS}
@@ -867,7 +868,7 @@ export function ReceiptVoucherDialog({
               />
             ) : (
               <LineItemGrid
-                className="min-h-0 flex-1"
+                className="h-auto overflow-visible"
                 columns={lineColumnsWithFooterEdit}
                 rows={lines}
                 onChangeCell={

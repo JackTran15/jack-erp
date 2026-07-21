@@ -167,6 +167,10 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "accounting.deposit_transfer.confirm", module: "accounting" },
   { key: "accounting.deposit_transfer.cancel", module: "accounting" },
   { key: "accounting.deposit_transfer.read", module: "accounting" },
+  { key: "accounting.cash_transfer.create", module: "accounting" },
+  { key: "accounting.cash_transfer.confirm", module: "accounting" },
+  { key: "accounting.cash_transfer.cancel", module: "accounting" },
+  { key: "accounting.cash_transfer.read", module: "accounting" },
   { key: "accounting.deposit_dashboard.read", module: "accounting" },
 
   // Reporting

@@ -77,6 +77,16 @@ export interface DocumentFormDialogProps {
   defaultHeight?: number;
   /** Initial collapsed state of the THÔNG TIN CHUNG section. */
   defaultCollapsed?: boolean;
+  /**
+   * Where the scrollbar lives.
+   * - `sections` (default): the header block and the line grid each scroll on
+   *   their own, so the grid keeps its sticky header/footer. Right for
+   *   inventory documents with hundreds of lines.
+   * - `page`: one scrollbar for everything between the toolbar and the footer
+   *   summary (both stay pinned). Right for voucher forms, whose grid is short
+   *   but whose header grows with the chosen purpose.
+   */
+  scroll?: "sections" | "page";
   className?: string;
 }
 
@@ -96,9 +106,73 @@ export function DocumentFormDialog({
   defaultWidth = 1100,
   defaultHeight = 720,
   defaultCollapsed = false,
+  scroll = "sections",
   className,
 }: DocumentFormDialogProps) {
   const [collapsed, setCollapsed] = React.useState(defaultCollapsed);
+  const pageScroll = scroll === "page";
+
+  const header = !collapsed ? (
+    <div
+      className={cn(
+        "shrink-0 px-2 pt-2",
+        // In page mode the single outer scroller owns the overflow, so the
+        // header must be free to take its natural height.
+        !pageScroll && "max-h-[45%] overflow-y-auto",
+      )}
+    >
+      {headerContent ? (
+        headerContent
+      ) : (
+        <>
+          {purpose ? <div className="mb-3">{purpose}</div> : null}
+          <div className="grid grid-cols-1 gap-x-8 gap-y-2 lg:grid-cols-[7fr_3fr]">
+            <section>
+              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Thông tin chung
+              </h3>
+              <div className="space-y-1">{generalInfo}</div>
+            </section>
+            <section>
+              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Chứng từ
+              </h3>
+              <div className="space-y-1">{documentInfo}</div>
+            </section>
+          </div>
+          {attachments ? (
+            <div className="mt-3 space-y-2">{attachments}</div>
+          ) : null}
+        </>
+      )}
+    </div>
+  ) : null;
+
+  const detailLabel = (
+    <div
+      className={cn(
+        "flex h-9 shrink-0 items-center justify-between border-b px-2",
+        // Keeps the CHI TIẾT caption in view while the single scroller moves.
+        pageScroll && "sticky top-0 z-20 bg-background",
+      )}
+    >
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Chi tiết
+      </h3>
+      {detailActions ? (
+        <div className="flex h-full items-center gap-1 text-sm [&_button]:h-8 [&_button]:rounded-sm [&_button]:px-2 [&_label]:h-8 [&_label]:px-2">
+          {detailActions}
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const collapseBar = (
+    <DocumentFormCollapseBar
+      collapsed={collapsed}
+      onToggle={() => setCollapsed((c) => !c)}
+    />
+  );
 
   return (
     <AppModal
@@ -121,54 +195,25 @@ export function DocumentFormDialog({
           </div>
         ) : null}
 
-        {!collapsed ? (
-          <div className="max-h-[45%] shrink-0 overflow-y-auto px-2 pt-2">
-            {headerContent ? (
-              headerContent
-            ) : (
-              <>
-                {purpose ? <div className="mb-3">{purpose}</div> : null}
-                <div className="grid grid-cols-1 gap-x-8 gap-y-2 lg:grid-cols-[7fr_3fr]">
-                  <section>
-                    <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                      Thông tin chung
-                    </h3>
-                    <div className="space-y-1">{generalInfo}</div>
-                  </section>
-                  <section>
-                    <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                      Chứng từ
-                    </h3>
-                    <div className="space-y-1">{documentInfo}</div>
-                  </section>
-                </div>
-                {attachments ? (
-                  <div className="mt-3 space-y-2">{attachments}</div>
-                ) : null}
-              </>
-            )}
+        {pageScroll ? (
+          // One scroller for header + grid; toolbar above and summary below
+          // stay pinned.
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            {header}
+            {collapseBar}
+            {detailLabel}
+            <div className="flex flex-col">{detail}</div>
           </div>
-        ) : null}
-
-        <DocumentFormCollapseBar
-          collapsed={collapsed}
-          onToggle={() => setCollapsed((c) => !c)}
-        />
-
-        <div className="flex h-9 shrink-0 items-center justify-between border-b px-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Chi tiết
-          </h3>
-          {detailActions ? (
-            <div className="flex h-full items-center gap-1 text-sm [&_button]:h-8 [&_button]:rounded-sm [&_button]:px-2 [&_label]:h-8 [&_label]:px-2">
-              {detailActions}
+        ) : (
+          <>
+            {header}
+            {collapseBar}
+            {detailLabel}
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              {detail}
             </div>
-          ) : null}
-        </div>
-
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {detail}
-        </div>
+          </>
+        )}
 
         {footerSummary ? (
           <div className="shrink-0 border-t bg-muted/40 px-4 py-2 text-sm font-medium">
