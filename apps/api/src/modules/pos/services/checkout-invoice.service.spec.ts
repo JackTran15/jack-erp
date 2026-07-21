@@ -17,6 +17,7 @@ import { TempWarehouseFulfillPublisher } from '../../inventory/publishers/temp-w
 import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points.publisher';
 import { JournalSalePublisher } from '../../accounting/publishers/journal-sale.publisher';
 import { CashFromPaymentPublisher } from '../../accounting/publishers/cash-from-payment.publisher';
+import { DepositFromPaymentPublisher } from '../../accounting/deposit/deposit-from-payment.publisher';
 import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
 import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
 import { MembershipCardService } from '../../customer/services/membership-card.service';
@@ -107,6 +108,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
   let loyaltyPointsPublisher: { publish: jest.Mock };
   let journalSalePublisher: { publish: jest.Mock };
   let cashFromPaymentPublisher: { publish: jest.Mock };
+  let depositFromPaymentPublisher: { publish: jest.Mock };
   let cashFundResolver: { resolveBranchCashFund: jest.Mock };
   let membershipCardService: { redeemPointsForInvoice: jest.Mock };
   let accountResolver: {
@@ -142,6 +144,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
     loyaltyPointsPublisher   = { publish: jest.fn().mockResolvedValue(true) };
     journalSalePublisher     = { publish: jest.fn().mockResolvedValue(undefined) };
     cashFromPaymentPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
+    depositFromPaymentPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
     cashFundResolver = {
       resolveBranchCashFund: jest.fn().mockResolvedValue(CASH_FUND),
     };
@@ -154,9 +157,10 @@ describe('CheckoutInvoiceService (event-driven)', () => {
         ),
       ),
       resolvePaymentAccount: jest.fn().mockImplementation((method) =>
-        Promise.resolve(
-          method === PaymentAccountMethod.CASH ? CASH_ACCOUNT : BANK_ACCOUNT,
-        ),
+        Promise.resolve({
+          accountId: method === PaymentAccountMethod.CASH ? CASH_ACCOUNT : BANK_ACCOUNT,
+          depositAccountId: undefined,
+        }),
       ),
     };
     sessionRepo              = { findOne: jest.fn().mockResolvedValue(null) };
@@ -180,6 +184,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
         { provide: LoyaltyPointsPublisher,                useValue: loyaltyPointsPublisher },
         { provide: JournalSalePublisher,                  useValue: journalSalePublisher },
         { provide: CashFromPaymentPublisher,              useValue: cashFromPaymentPublisher },
+        { provide: DepositFromPaymentPublisher,           useValue: depositFromPaymentPublisher },
         { provide: AccountResolverService,                useValue: accountResolver },
         { provide: CashFundResolverService,               useValue: cashFundResolver },
         { provide: MembershipCardService,                 useValue: membershipCardService },
@@ -431,6 +436,45 @@ describe('CheckoutInvoiceService (event-driven)', () => {
           ]),
           revenueAccountId: REVENUE_ACCOUNT,
         }),
+        actor,
+      );
+    });
+  });
+
+  describe('deposit-from-payment publishing (non-cash lines)', () => {
+    const bankDto = (): CheckoutInvoiceDto => ({
+      payments: [{ paymentMethod: 'bank_transfer' as any, amount: 200, paymentAccountId: 'pa-shb' }],
+    });
+
+    it('does not publish for a cash-only checkout', async () => {
+      await service.checkout('inv-1', cashPaymentDto(), actor);
+      expect(depositFromPaymentPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('forwards the resolved depositAccountId when the payment_accounts mapping named one', async () => {
+      accountResolver.resolvePaymentAccount.mockResolvedValue({
+        accountId: BANK_ACCOUNT,
+        depositAccountId: 'dep-shb',
+      });
+      await service.checkout('inv-1', bankDto(), actor);
+      expect(depositFromPaymentPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resolvedAccountId: BANK_ACCOUNT,
+          depositAccountId: 'dep-shb',
+          amount: 200,
+        }),
+        actor,
+      );
+    });
+
+    it('publishes with depositAccountId undefined when the mapping named no deposit fund', async () => {
+      accountResolver.resolvePaymentAccount.mockResolvedValue({
+        accountId: BANK_ACCOUNT,
+        depositAccountId: undefined,
+      });
+      await service.checkout('inv-1', bankDto(), actor);
+      expect(depositFromPaymentPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ depositAccountId: undefined }),
         actor,
       );
     });

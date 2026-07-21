@@ -4,6 +4,7 @@ export * from './organization';
 export * from './customer';
 export * from './inventory';
 export * from './accounting';
+export * from './deposit';
 export * from './pos';
 export * from './iam';
 import { DocumentType } from './document-numbering';

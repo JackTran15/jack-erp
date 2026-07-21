@@ -35,11 +35,11 @@ import { PaginationControls } from "../../../../components/table/PaginationContr
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
-  applyColumnFilter,
-  toComparableText,
   type ColumnFilter,
   type ColumnFilterMode,
 } from "../../../../components/table/pagination.dto";
+import { buildV2Body } from "../../../../components/crud/crudV2Search";
+import { useDebouncedValue } from "../../../../lib/use-debounced-value";
 import { useMyBranchCashAccount } from "../../../../hooks/treasury/use-cash-accounts";
 import {
   useCashPayment,
@@ -50,10 +50,11 @@ import {
   useCashReceiptMutations,
 } from "../../../../hooks/treasury/use-cash-receipts";
 import { useCategoryNameMap } from "../../../../hooks/treasury/use-cash-voucher-categories";
-import { useMergedReceiptPayments } from "../../../../hooks/treasury/use-merged-receipt-payments";
+import { useCashVoucherSearch } from "../../../../hooks/treasury/use-cash-vouchers";
 import {
   cashPaymentToVoucherDetail,
   cashReceiptToVoucherDetail,
+  toReceiptPaymentListItem,
 } from "../../cash-vouchers.adapters";
 import {
   ledgerDetailToCreatePaymentBody,
@@ -83,6 +84,7 @@ import { MOCK_LEDGER_CASH_ROWS, findLedgerCashInvoiceByCode } from "../../ledger
 import { ReceiptCashDetailPanel } from "./ReceiptCashDetailPanel";
 import {
   RECEIPT_CASH_FILTER_KEYS,
+  RECEIPT_CASH_SEARCH,
   type ReceiptCashFilterKey,
 } from "./receipt-cash.constants";
 import {
@@ -136,29 +138,44 @@ export function TreasuryCashReceiptsPage() {
   const categoryInMap = useCategoryNameMap(CashVoucherCategoryDirection.IN);
   const categoryOutMap = useCategoryNameMap(CashVoucherCategoryDirection.OUT);
 
-  const listQuery = useMemo(
-    () => ({
-      cashAccountId: cashAccountId || undefined,
-      dateFrom: appliedPeriod.from,
-      dateTo: appliedPeriod.to,
-      page: 1,
-      pageSize: 100,
-    }),
-    [cashAccountId, appliedPeriod],
-  );
+  // Debounced so typing in a column filter settles into one request.
+  const debouncedFilters = useDebouncedValue(columnFilters, 300);
 
-  const { merged, isLoading, refetch } = useMergedReceiptPayments(
-    listQuery,
-    listQuery,
-    { from: appliedPeriod.from, to: appliedPeriod.to },
-    Boolean(cashAccountId),
-  );
+  const searchBody = useMemo(() => {
+    // The period filter feeds the same createdAt range the column cell uses.
+    const merged: Record<string, ColumnFilter> = {
+      ...debouncedFilters,
+      createdAt: {
+        ...debouncedFilters.createdAt,
+        from: debouncedFilters.createdAt.from || appliedPeriod.from,
+        to: debouncedFilters.createdAt.to || appliedPeriod.to,
+      },
+    };
+    return {
+      ...buildV2Body(
+        RECEIPT_CASH_SEARCH,
+        merged,
+        pagination.page,
+        pagination.pageSize,
+      ),
+      ...(cashAccountId ? { cashAccountId } : {}),
+    };
+  }, [debouncedFilters, appliedPeriod, pagination, cashAccountId]);
 
-  const listRows = merged.data ?? [];
+  const search = useCashVoucherSearch(searchBody, Boolean(cashAccountId));
+  const isLoading = search.isLoading;
+  const refetch = search.refetch;
+
+  const pagedRows = useMemo(
+    () => (search.data?.data ?? []).map(toReceiptPaymentListItem),
+    [search.data],
+  );
+  const total = search.data?.total ?? 0;
+  const listTotal = search.data?.totalAmount ?? 0;
 
   const selectedItem = useMemo(
-    () => listRows.find((r) => r.id === selectedId) ?? null,
-    [listRows, selectedId],
+    () => pagedRows.find((r) => r.id === selectedId) ?? null,
+    [pagedRows, selectedId],
   );
 
   const { data: receiptDetail } = useCashReceipt(
@@ -183,49 +200,6 @@ export function TreasuryCashReceiptsPage() {
   }, [receiptDetail, paymentDetail, categoryInMap, categoryOutMap]);
 
   const detailLines = selectedVoucher?.lines ?? [];
-
-  const filteredRows = useMemo(() => {
-    return listRows.filter((row) => {
-      const dateText = new Date(
-        `${row.voucherDate}T12:00:00`,
-      ).toLocaleDateString("vi-VN");
-      const typeLabel =
-        row.kind === ReceiptPaymentKind.RECEIPT
-          ? "Phiếu thu tiền mặt"
-          : row.isGoodsReceiptPayment
-            ? "Phiếu nhập hàng - Tiền mặt"
-            : "Phiếu chi tiền mặt";
-      return (
-        applyColumnFilter(
-          toComparableText(dateText),
-          columnFilters.documentDate,
-        ) &&
-        applyColumnFilter(
-          toComparableText(row.documentNumber),
-          columnFilters.voucherNo,
-        ) &&
-        applyColumnFilter(
-          toComparableText(typeLabel),
-          columnFilters.documentTypeLabel,
-        ) &&
-        applyColumnFilter(
-          toComparableText(row.totalAmount),
-          columnFilters.totalAmount,
-        ) &&
-        applyColumnFilter(
-          toComparableText(row.counterparty),
-          columnFilters.counterparty,
-        ) &&
-        applyColumnFilter(toComparableText(row.reason), columnFilters.reason)
-      );
-    });
-  }, [listRows, columnFilters]);
-
-  const total = filteredRows.length;
-  const pagedRows = useMemo(() => {
-    const start = (pagination.page - 1) * pagination.pageSize;
-    return filteredRows.slice(start, start + pagination.pageSize);
-  }, [filteredRows, pagination]);
 
   const receiptMutations = useCashReceiptMutations();
   const paymentMutations = useCashPaymentMutations();
@@ -269,27 +243,30 @@ export function TreasuryCashReceiptsPage() {
 
   const columns = useReceiptCashTableColumns((row) => openViewVoucher(row));
 
+  // Any filter change resets to page 1 — otherwise a narrowed result set can
+  // leave the grid stranded on a page that no longer exists.
+  const patchFilter = useCallback((key: string, patch: Partial<ColumnFilter>) => {
+    setColumnFilters((prev) => ({
+      ...prev,
+      [key as ReceiptCashFilterKey]: {
+        ...prev[key as ReceiptCashFilterKey],
+        ...patch,
+      },
+    }));
+    setPagination((p) => ({ ...p, page: 1 }));
+  }, []);
+
   const columnFilterControl = useMemo(
     () => ({
       filters: columnFilters as unknown as Record<string, ColumnFilter>,
       onModeChange: (key: string, mode: ColumnFilterMode) =>
-        setColumnFilters((prev) => ({
-          ...prev,
-          [key as ReceiptCashFilterKey]: {
-            ...prev[key as ReceiptCashFilterKey],
-            mode,
-          },
-        })),
+        patchFilter(key, { mode }),
       onValueChange: (key: string, value: string) =>
-        setColumnFilters((prev) => ({
-          ...prev,
-          [key as ReceiptCashFilterKey]: {
-            ...prev[key as ReceiptCashFilterKey],
-            value,
-          },
-        })),
+        patchFilter(key, { value }),
+      onRangeChange: (key: string, part: "from" | "to", value: string) =>
+        patchFilter(key, { [part]: value }),
     }),
-    [columnFilters],
+    [columnFilters, patchFilter],
   );
 
   const handleApply = useCallback(() => {
@@ -417,11 +394,6 @@ export function TreasuryCashReceiptsPage() {
       onClick: handleReload,
     },
   ];
-
-  const listTotal = useMemo(
-    () => filteredRows.reduce((s, r) => s + r.totalAmount, 0),
-    [filteredRows],
-  );
 
   const openCreateReceipt = useCallback(() => {
     setShowGoodsPaymentView(false);

@@ -19,6 +19,8 @@ export const ERP_TOPICS = {
   CASH_VOUCHER_NEEDED_GOODS_RECEIPT: 'erp.cash.voucher.needed.goods_receipt',
   CASH_VOUCHER_NEEDED_EXPENSE: 'erp.cash.voucher.needed.expense',
   CASH_VOUCHER_CREATED: 'erp.cash.voucher.created',
+  // POS non-cash sale → consumer creates a deposit movement + JE (Quỹ tiền gửi).
+  DEPOSIT_VOUCHER_NEEDED_POS_SALE: 'erp.deposit.movement.from.payment',
   CUSTOMER_MERGED: 'erp.customer.merged',
   TEMP_WAREHOUSE_TRANSFER_REQUESTED: 'erp.temp-warehouse.transfer-requested',
   TEMP_WAREHOUSE_INVOICE_FULFILL: 'erp.temp-warehouse.invoice-fulfill',
@@ -29,6 +31,8 @@ export const ERP_TOPICS = {
   JOURNAL_POST_RETURN: 'erp.journal.post.return',
   GOODS_RECEIPT_POSTED: 'erp.inventory.goods_receipt.posted',
   DEBT_OVERDUE: 'erp.debt.overdue',
+  // Alert: a POS deposit auto-post landed on a doc_date whose period is locked (BR-LOCK-02).
+  DEPOSIT_LOCKED_PERIOD_BLOCKED: 'erp.deposit.locked_period.blocked',
 } as const;
 
 export type ErpTopic = (typeof ERP_TOPICS)[keyof typeof ERP_TOPICS];

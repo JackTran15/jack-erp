@@ -4,8 +4,20 @@ import {
   type LedgerCashRow,
   type LedgerCashVoucherDetail,
 } from "../../ledger-cash/ledger-cash.types";
+import { CashVoucherDocumentKind } from "../../cash-vouchers.types";
 import { RECEIPT_CASH_DOCUMENT_TYPE_LABEL } from "./receipt-cash.constants";
 import type { ReceiptCashListRow } from "./receipt-cash.types";
+
+/**
+ * The label map is keyed by the API's `documentKind` now that the grid filters
+ * server-side; these row helpers still speak the older ledger document type.
+ */
+const LEDGER_TYPE_TO_DOCUMENT_KIND: Record<string, CashVoucherDocumentKind> = {
+  [LedgerCashDocumentTypeEnum.CASH_RECEIPT]: CashVoucherDocumentKind.CASH_RECEIPT,
+  [LedgerCashDocumentTypeEnum.CASH_PAYMENT]: CashVoucherDocumentKind.CASH_PAYMENT,
+  [LedgerCashDocumentTypeEnum.GOODS_RECEIPT_PAYMENT]:
+    CashVoucherDocumentKind.GOODS_RECEIPT_PAYMENT,
+};
 
 const VOUCHER_DOCUMENT_TYPES = new Set<LedgerCashDocumentTypeEnum>([
   LedgerCashDocumentTypeEnum.CASH_RECEIPT,
@@ -28,14 +40,8 @@ export function getReceiptCashTotalAmount(row: LedgerCashRow): number {
 export function getReceiptCashDocumentTypeLabel(
   documentType: LedgerCashRow["documentType"],
 ): string {
-  if (
-    documentType === LedgerCashDocumentTypeEnum.CASH_RECEIPT ||
-    documentType === LedgerCashDocumentTypeEnum.CASH_PAYMENT ||
-    documentType === LedgerCashDocumentTypeEnum.GOODS_RECEIPT_PAYMENT
-  ) {
-    return RECEIPT_CASH_DOCUMENT_TYPE_LABEL[documentType];
-  }
-  return "";
+  const kind = LEDGER_TYPE_TO_DOCUMENT_KIND[documentType];
+  return kind ? RECEIPT_CASH_DOCUMENT_TYPE_LABEL[kind] : "";
 }
 
 export function toReceiptCashListRow(row: LedgerCashRow): ReceiptCashListRow {

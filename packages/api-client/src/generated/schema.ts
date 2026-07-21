@@ -542,6 +542,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/cash-vouchers/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search cash receipts and payments as one list */
+        post: operations["CashVoucherV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/cash-ledger/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search the cash detail ledger with per-column filters */
+        post: operations["CashLedgerV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/cash-receipts": {
         parameters: {
             query?: never;
@@ -2981,6 +3015,498 @@ export interface paths {
         get: operations["ExpensesController_findById"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/deposit-ledger/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search the deposit detail ledger with per-column filters */
+        post: operations["DepositLedgerV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deposit-ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DepositLedgerController_getLedger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deposit-ledger/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DepositLedgerController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deposit-audit-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DepositAuditController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/deposit-vouchers/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search deposit receipts and payments as one list */
+        post: operations["DepositVoucherV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bank-receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BankReceiptsController_list"];
+        put?: never;
+        post: operations["BankReceiptsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bank-receipts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BankReceiptsController_getById"];
+        put?: never;
+        post?: never;
+        delete: operations["BankReceiptsController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["BankReceiptsController_update"];
+        trace?: never;
+    };
+    "/bank-receipts/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BankReceiptsController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bank-receipts/{id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BankReceiptsController_reverse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bank-payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BankPaymentsController_list"];
+        put?: never;
+        post: operations["BankPaymentsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bank-payments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BankPaymentsController_getById"];
+        put?: never;
+        post?: never;
+        delete: operations["BankPaymentsController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["BankPaymentsController_update"];
+        trace?: never;
+    };
+    "/bank-payments/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BankPaymentsController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bank-payments/{id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BankPaymentsController_reverse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/supplier-deposit-payment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create + post one or two supplier-payment vouchers (deposit and/or cash,
+         *     BR-BUY-03) that settle the selected supplier debts, atomically. Idempotent
+         *     per X-Idempotency-Key (the frontend always sends one).
+         */
+        post: operations["SupplierDepositPaymentController_pay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/supplier-deposit-payment/sagas/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SupplierDepositPaymentController_getSaga"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fund-swaps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["FundSwapsController_swap"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fund-swaps/{swapId}/legs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sibling vouchers of a swap, so a leg can link to its counterpart. */
+        get: operations["FundSwapsController_legs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deposit-transfers/in-transit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DepositDashboardController_inTransit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deposit/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DepositDashboardController_dashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deposit-transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DepositTransferController_list"];
+        put?: never;
+        post: operations["DepositTransferController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deposit-transfers/{id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DepositTransferController_confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deposit-transfers/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DepositTransferController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deposit-transfers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DepositTransferController_getById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/deposit-recon/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search deposit movements for reconciliation */
+        post: operations["DepositReconV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deposit-recon": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DepositReconController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deposit-recon/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DepositReconController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deposit-recon/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** BR-PERM-02: reconcile requires its own permission, distinct from `bank_payment.create`. */
+        post: operations["DepositReconController_reconcile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deposit-recon/unreconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** BR-PERM-03: Kế toán trưởng only. */
+        post: operations["DepositReconController_unreconcile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deposit-period-locks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DepositPeriodLockController_list"];
+        put?: never;
+        post: operations["DepositPeriodLockController_lock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deposit-period-locks/{id}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** BR-PERM-03: Kế toán trưởng only. */
+        post: operations["DepositPeriodLockController_unlock"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6205,6 +6731,114 @@ export interface components {
             parentAccountId?: string;
             isActive?: boolean;
         };
+        DateRangeFilterDto: {
+            from?: string;
+            to?: string;
+        };
+        StringFilterDto: {
+            /** @enum {string} */
+            operator: "*" | "=" | "+" | "-" | "!";
+            value: string;
+        };
+        CompareFilterDto: {
+            /** @enum {string} */
+            operator: "=" | "<" | "<=" | ">" | ">=";
+            value: Record<string, never>;
+        };
+        CashVoucherSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /**
+             * Format: uuid
+             * @description Restrict to a single cash fund; omitted = every fund in branch scope.
+             */
+            cashAccountId?: string;
+            /**
+             * @description Document type column — receipt, payment, or goods-receipt payment.
+             * @enum {string}
+             */
+            documentKind?: "CASH_RECEIPT" | "CASH_PAYMENT" | "GOODS_RECEIPT_PAYMENT";
+            /**
+             * @description Status column.
+             * @enum {string}
+             */
+            status?: "DRAFT" | "POSTED" | "REVERSED";
+            /**
+             * @description Creation-timestamp column, also fed by the period (from/to) filter. The grid
+             *     orders on this column too.
+             */
+            createdAt?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Document number column. */
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            /** @description Total amount column. */
+            totalAmount?: components["schemas"]["CompareFilterDto"];
+            /** @description Payer/payee column, falling back to the partner name snapshot. */
+            counterparty?: components["schemas"]["StringFilterDto"];
+            /** @description Reason column. */
+            reason?: components["schemas"]["StringFilterDto"];
+        };
+        CashVoucherRowDto: {
+            /** @enum {string} */
+            documentKind: "CASH_RECEIPT" | "CASH_PAYMENT" | "GOODS_RECEIPT_PAYMENT";
+            /**
+             * @description Source table — drives which detail endpoint and dialog the row opens
+             * @enum {string}
+             */
+            kind: "RECEIPT" | "PAYMENT";
+            id: string;
+            createdAt: string;
+            /** @description ISO date (no time component) */
+            voucherDate: string;
+            documentNumber: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "POSTED" | "REVERSED";
+            /** @description Money, serialized as a number */
+            totalAmount: number;
+            cashAccountId: string;
+            referenceType: string | null;
+            /** @description Payer/payee, falling back to the partner snapshot ("" when none) */
+            counterparty: string;
+            reason: string | null;
+        };
+        CashVoucherSearchV2ResponseDto: {
+            data: components["schemas"]["CashVoucherRowDto"][];
+            total: number;
+            page: number;
+            limit: number;
+            /** @description SUM(total_amount) over every matching row, not only this page */
+            totalAmount: number;
+        };
+        CashLedgerSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            limit: number;
+            /**
+             * Format: uuid
+             * @description Omit to use the branch's single cash fund.
+             */
+            cashAccountId?: string;
+            /**
+             * @description Movement date column, also fed by the period filter. `cash_movements` has no
+             *     document date, so `created_at` is the ledger's date. `from` doubles as the
+             *     opening-balance cutoff.
+             */
+            createdAt?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Receipt/payment number column — one filter over the shared document number. */
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            /** @description Description column, resolved from the source voucher's reason. */
+            description?: components["schemas"]["StringFilterDto"];
+            /** @description Counterparty column, resolved from the source voucher. */
+            counterparty?: components["schemas"]["StringFilterDto"];
+            /** @description Staff column, resolved from the source voucher's staff user. */
+            staff?: components["schemas"]["StringFilterDto"];
+            /** @description Money-in column; also constrains the row to inbound movements. */
+            amountIn?: components["schemas"]["CompareFilterDto"];
+            /** @description Money-out column; also constrains the row to outbound movements. */
+            amountOut?: components["schemas"]["CompareFilterDto"];
+        };
         CashReceiptLineDto: {
             /** Format: uuid */
             id?: string;
@@ -6267,7 +6901,7 @@ export interface components {
             reason?: string;
             staffId?: string;
             /** @enum {string} */
-            referenceType?: "INVOICE" | "INVOICE_DEBT" | "RECEIVABLE" | "MANUAL" | "REVERSAL";
+            referenceType?: "INVOICE" | "INVOICE_DEBT" | "RECEIVABLE" | "MANUAL" | "REVERSAL" | "FUND_SWAP";
             referenceId?: string;
             cashAccountId: string;
             contraAccountId: string;
@@ -6403,7 +7037,7 @@ export interface components {
             reason?: string;
             staffId?: string;
             /** @enum {string} */
-            referenceType?: "INVOICE_DEBT" | "GOODS_RECEIPT" | "EXPENSE" | "SALARY" | "REFUND" | "MANUAL" | "REVERSAL";
+            referenceType?: "INVOICE_DEBT" | "GOODS_RECEIPT" | "EXPENSE" | "SALARY" | "REFUND" | "MANUAL" | "REVERSAL" | "FUND_SWAP";
             referenceId?: string;
             cashAccountId: string;
             contraAccountId: string;
@@ -6723,7 +7357,7 @@ export interface components {
         };
         PostJournalDto: {
             /** @enum {string} */
-            source: "SALE" | "RETURN" | "EXCHANGE" | "EXPENSE" | "CASH_MOVEMENT" | "MANUAL" | "TRANSFER";
+            source: "SALE" | "RETURN" | "EXCHANGE" | "EXPENSE" | "CASH_MOVEMENT" | "BANK_MOVEMENT" | "MANUAL" | "TRANSFER";
             /** Format: uuid */
             sourceReferenceId?: string;
             description?: string;
@@ -6733,7 +7367,7 @@ export interface components {
         JournalEntryEntity: {
             documentNumber: string;
             /** @enum {string} */
-            source: "SALE" | "RETURN" | "EXCHANGE" | "EXPENSE" | "CASH_MOVEMENT" | "MANUAL" | "TRANSFER";
+            source: "SALE" | "RETURN" | "EXCHANGE" | "EXPENSE" | "CASH_MOVEMENT" | "BANK_MOVEMENT" | "MANUAL" | "TRANSFER";
             sourceReferenceId?: string;
             description?: string;
             notes?: string;
@@ -7790,16 +8424,6 @@ export interface components {
             /** Format: uuid */
             storageId: string;
         };
-        StringFilterDto: {
-            /** @enum {string} */
-            operator: "*" | "=" | "+" | "-" | "!";
-            value: string;
-        };
-        CompareFilterDto: {
-            /** @enum {string} */
-            operator: "=" | "<" | "<=" | ">" | ">=";
-            value: Record<string, never>;
-        };
         InventoryItemSearchV2Dto: {
             /** @default 1 */
             page: number;
@@ -8215,7 +8839,7 @@ export interface components {
              * @description UUID of the inventory item
              */
             itemId: string;
-            /** @description Quantity to transfer (must be > 0) */
+            /** @description Quantity to transfer (>= 0; 0 = đổi vị trí kể cả khi hết tồn) */
             quantity: number;
             /**
              * Format: uuid
@@ -8243,10 +8867,6 @@ export interface components {
             destinationLocationId?: string;
             /** @description Lines to transfer */
             lines: components["schemas"]["IntraWarehouseTransferLineDto"][];
-        };
-        DateRangeFilterDto: {
-            from?: string;
-            to?: string;
         };
         StockTransferSearchV2Dto: {
             /** @default 1 */
@@ -8469,6 +9089,759 @@ export interface components {
             updatedAt: string;
             /** @description UUID of the user who created this record. */
             createdBy: string;
+        };
+        DepositLedgerSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /**
+             * Format: uuid
+             * @description Deposit account to show the ledger for. Omit to include every ACTIVE
+             *     deposit account of the branch (BR-LEDG-03).
+             */
+            depositAccountId?: string;
+            /**
+             * @description Reconciliation status.
+             * @enum {string}
+             */
+            reconStatus?: "CHUA" | "DA" | "LECH";
+            /**
+             * @description Document date column, also fed by the period filter. `from` doubles as the
+             *     opening-balance cutoff.
+             */
+            docDate?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Receipt/payment number column — one filter over the shared document number. */
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            /** @description Account number column. */
+            accountNo?: components["schemas"]["StringFilterDto"];
+            /** @description Description column, resolved from the source voucher's reason. */
+            description?: components["schemas"]["StringFilterDto"];
+            /** @description Counterparty column, resolved from the source voucher. */
+            counterparty?: components["schemas"]["StringFilterDto"];
+            /** @description Staff column, resolved from the source voucher's cashier user. */
+            staff?: components["schemas"]["StringFilterDto"];
+            /** @description Money-in column; also constrains the row to inbound movements. */
+            amountIn?: components["schemas"]["CompareFilterDto"];
+            /** @description Money-out column; also constrains the row to outbound movements. */
+            amountOut?: components["schemas"]["CompareFilterDto"];
+        };
+        DepositVoucherSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /**
+             * Format: uuid
+             * @description Restrict to a single deposit account; omitted = every account in scope.
+             */
+            depositAccountId?: string;
+            /**
+             * @description Document type column — RECEIPT or PAYMENT.
+             * @enum {string}
+             */
+            kind?: "RECEIPT" | "PAYMENT";
+            /**
+             * @description Status column.
+             * @enum {string}
+             */
+            status?: "DRAFT" | "PENDING_APPROVAL" | "POSTED" | "REVERSED";
+            /** @description Document date column, also fed by the period (from/to) filter. */
+            docDate?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Document number column. */
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            /** @description Total amount column. */
+            totalAmount?: components["schemas"]["CompareFilterDto"];
+            /** @description Account column — matches the rendered "name (accountNo)" label. */
+            accountLabel?: components["schemas"]["StringFilterDto"];
+            /** @description Payer/payee column, falling back to the partner name snapshot. */
+            counterparty?: components["schemas"]["StringFilterDto"];
+            /** @description Reason column. */
+            reason?: components["schemas"]["StringFilterDto"];
+        };
+        DepositVoucherRowDto: {
+            /** @enum {string} */
+            kind: "RECEIPT" | "PAYMENT";
+            id: string;
+            /** @description ISO date (no time component) */
+            docDate: string;
+            documentNumber: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "POSTED" | "REVERSED";
+            /** @description Money, serialized as a number */
+            totalAmount: number;
+            depositAccountId: string;
+            /** @description Inlined from deposit_accounts ("" when unresolved) */
+            depositAccountName: string;
+            /** @description Inlined from deposit_accounts ("" when unresolved) */
+            depositAccountNo: string;
+            referenceType: string | null;
+            /** @description Payer/payee, falling back to the partner snapshot ("" when none) */
+            counterparty: string;
+            reason: string | null;
+            createdAt: string;
+        };
+        DepositVoucherSearchV2ResponseDto: {
+            data: components["schemas"]["DepositVoucherRowDto"][];
+            total: number;
+            page: number;
+            limit: number;
+            /** @description SUM(total_amount) over every matching row, not only this page */
+            totalAmount: number;
+        };
+        BankReceiptLineDto: {
+            /** Format: uuid */
+            id?: string;
+            /** @description "Diễn giải" */
+            description: string;
+            /**
+             * Format: uuid
+             * @description "Mục thu" — references a cash_voucher_categories row.
+             */
+            categoryId?: string;
+            amount: number;
+            referenceNote?: string;
+        };
+        CreateBankReceiptDto: {
+            documentNumber?: string;
+            /**
+             * Format: uuid
+             * @description "Tài khoản nhận" — the deposit fund account (FR-04). Required.
+             */
+            depositAccountId: string;
+            /** @description "Ngày thu" (YYYY-MM-DD). */
+            docDate: string;
+            /** @enum {string} */
+            purpose?: "OTHER" | "DEBT_COLLECTION" | "OTHER_INCOME" | "INTER_BRANCH_IN";
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            /** Format: uuid */
+            partnerId?: string;
+            /** @description "Người nộp" */
+            payerName?: string;
+            /** @description "Lý do nộp" */
+            reason?: string;
+            /**
+             * Format: uuid
+             * @description Cashier who collected (thủ quỹ).
+             */
+            collectedBy?: string;
+            /** @description Free-text bank reference (transfer ref / cheque no). */
+            reference?: string;
+            /** @description Whether this receipt affects revenue accounts. */
+            affectRevenue?: boolean;
+            /**
+             * Format: uuid
+             * @description Optional contra GL account override. Normally the contra account is resolved
+             *     server-side from {@link purpose}; this is only honoured for cases where the
+             *     cashier explicitly picks the offsetting account (e.g. an inter-branch account).
+             */
+            contraAccountId?: string;
+            /** @description Denormalized total — must equal sum(lines.amount). */
+            totalAmount: number;
+            attachmentIds?: string[];
+            lines: components["schemas"]["BankReceiptLineDto"][];
+        };
+        BankReceiptEntity: {
+            id: string;
+            organizationId: string;
+            branchId: string;
+            depositAccountId: string;
+            documentNumber?: string;
+            /** @enum {string} */
+            purpose: "OTHER" | "DEBT_COLLECTION" | "OTHER_INCOME" | "INTER_BRANCH_IN";
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "POSTED" | "REVERSED";
+            docDate: string;
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            partnerId?: string;
+            partnerNameSnapshot?: string;
+            partnerAddressSnapshot?: string;
+            payerName?: string;
+            reason?: string;
+            collectedBy?: string;
+            reference?: string;
+            affectRevenue: boolean;
+            contraAccountId?: string;
+            totalAmount: number;
+            attachmentIds: string[];
+            /** @enum {string} */
+            referenceType?: "INVOICE_DEBT" | "RECEIVABLE" | "TRANSFER" | "MANUAL" | "REVERSAL" | "FUND_SWAP";
+            referenceId?: string;
+            depositMovementId?: string;
+            journalEntryId?: string;
+            reversesVoucherId?: string;
+            reversedByVoucherId?: string;
+            reversalReason?: string;
+            /** Format: date-time */
+            postedAt?: string;
+            postedBy?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            deletedAt?: string;
+            createdBy: string;
+            lines: components["schemas"]["BankReceiptLineEntity"][];
+            reversesVoucher?: components["schemas"]["BankReceiptEntity"];
+        };
+        BankReceiptLineEntity: {
+            id: string;
+            organizationId: string;
+            branchId: string;
+            bankReceiptId: string;
+            bankReceipt: components["schemas"]["BankReceiptEntity"];
+            lineOrder: number;
+            description: string;
+            categoryId?: string;
+            amount: number;
+            referenceNote?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            createdBy: string;
+        };
+        UpdateBankReceiptDto: {
+            /** Format: uuid */
+            depositAccountId?: string;
+            docDate?: string;
+            /** @enum {string} */
+            purpose?: "OTHER" | "DEBT_COLLECTION" | "OTHER_INCOME" | "INTER_BRANCH_IN";
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            /** Format: uuid */
+            partnerId?: string;
+            payerName?: string;
+            reason?: string;
+            /** Format: uuid */
+            collectedBy?: string;
+            reference?: string;
+            affectRevenue?: boolean;
+            /** Format: uuid */
+            contraAccountId?: string;
+            totalAmount?: number;
+            attachmentIds?: string[];
+            lines?: components["schemas"]["BankReceiptLineDto"][];
+        };
+        ReverseBankReceiptDto: {
+            /** @description Reason for the reversal (đảo bút). Stored on the reversal voucher. */
+            reason: string;
+        };
+        BankPaymentLineDto: {
+            /** Format: uuid */
+            id?: string;
+            /** @description "Diễn giải" */
+            description: string;
+            /**
+             * Format: uuid
+             * @description "Mục chi" — references a cash_voucher_categories row.
+             */
+            categoryId?: string;
+            amount: number;
+            referenceNote?: string;
+        };
+        CreateBankPaymentDto: {
+            documentNumber?: string;
+            /**
+             * Format: uuid
+             * @description "Tài khoản chi" — the deposit fund account (FR-05). Required.
+             */
+            depositAccountId: string;
+            /** @description "Ngày chi" (YYYY-MM-DD). */
+            docDate: string;
+            /** @enum {string} */
+            purpose?: "SUPPLIER_PAYMENT" | "PURCHASE" | "EXPENSE" | "CASH_TRANSFER" | "INTER_BRANCH_OUT" | "REFUND" | "BANK_FEE" | "OTHER";
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            /** Format: uuid */
+            partnerId?: string;
+            /** @description "Người nhận" */
+            payeeName?: string;
+            /** @description "Lý do chi" */
+            reason?: string;
+            /**
+             * Format: uuid
+             * @description Cashier who paid (thủ quỹ).
+             */
+            paidBy?: string;
+            /** @description Free-text bank reference (transfer ref / cheque no). */
+            reference?: string;
+            /**
+             * @description Whether this payment affects expense accounts. Server-side forced to false
+             *     for fund-move purposes (CASH_TRANSFER / INTER_BRANCH_OUT) — BR-CHI-05.
+             */
+            affectExpense?: boolean;
+            /**
+             * Format: uuid
+             * @description Optional contra GL account override. Normally the contra account is resolved
+             *     server-side from {@link purpose}; this is only honoured for cases where the
+             *     cashier explicitly picks the offsetting account (e.g. a cash / inter-branch
+             *     account for a fund move).
+             */
+            contraAccountId?: string;
+            /** @description Denormalized total — must equal sum(lines.amount). */
+            totalAmount: number;
+            attachmentIds?: string[];
+            lines: components["schemas"]["BankPaymentLineDto"][];
+        };
+        BankPaymentEntity: {
+            id: string;
+            organizationId: string;
+            branchId: string;
+            depositAccountId: string;
+            documentNumber?: string;
+            /** @enum {string} */
+            purpose: "SUPPLIER_PAYMENT" | "PURCHASE" | "EXPENSE" | "CASH_TRANSFER" | "INTER_BRANCH_OUT" | "REFUND" | "BANK_FEE" | "OTHER";
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "POSTED" | "REVERSED";
+            docDate: string;
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            partnerId?: string;
+            partnerNameSnapshot?: string;
+            partnerAddressSnapshot?: string;
+            payeeName?: string;
+            reason?: string;
+            paidBy?: string;
+            reference?: string;
+            affectExpense: boolean;
+            contraAccountId?: string;
+            totalAmount: number;
+            attachmentIds: string[];
+            /** @enum {string} */
+            referenceType?: "GOODS_RECEIPT" | "PAYABLE" | "INVOICE" | "TRANSFER" | "EXPENSE" | "MANUAL" | "REVERSAL" | "FUND_SWAP";
+            referenceId?: string;
+            approvalStatus?: string;
+            approvedBy?: string;
+            /** Format: date-time */
+            approvedAt?: string;
+            depositMovementId?: string;
+            journalEntryId?: string;
+            reversesVoucherId?: string;
+            reversedByVoucherId?: string;
+            reversalReason?: string;
+            /** Format: date-time */
+            postedAt?: string;
+            postedBy?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            deletedAt?: string;
+            createdBy: string;
+            lines: components["schemas"]["BankPaymentLineEntity"][];
+            reversesVoucher?: components["schemas"]["BankPaymentEntity"];
+        };
+        BankPaymentLineEntity: {
+            id: string;
+            organizationId: string;
+            branchId: string;
+            bankPaymentId: string;
+            bankPayment: components["schemas"]["BankPaymentEntity"];
+            lineOrder: number;
+            description: string;
+            categoryId?: string;
+            amount: number;
+            referenceNote?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            createdBy: string;
+        };
+        UpdateBankPaymentDto: {
+            /** Format: uuid */
+            depositAccountId?: string;
+            docDate?: string;
+            /** @enum {string} */
+            purpose?: "SUPPLIER_PAYMENT" | "PURCHASE" | "EXPENSE" | "CASH_TRANSFER" | "INTER_BRANCH_OUT" | "REFUND" | "BANK_FEE" | "OTHER";
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            /** Format: uuid */
+            partnerId?: string;
+            payeeName?: string;
+            reason?: string;
+            /** Format: uuid */
+            paidBy?: string;
+            reference?: string;
+            affectExpense?: boolean;
+            /** Format: uuid */
+            contraAccountId?: string;
+            totalAmount?: number;
+            attachmentIds?: string[];
+            lines?: components["schemas"]["BankPaymentLineDto"][];
+        };
+        ReverseBankPaymentDto: {
+            /** @description Reason for the reversal (đảo bút). Stored on the reversal voucher. */
+            reason: string;
+        };
+        SupplierDepositPaymentLegDto: {
+            /** @enum {string} */
+            fund: "CASH" | "DEPOSIT";
+            /**
+             * Format: uuid
+             * @description Required when fund=DEPOSIT.
+             */
+            depositAccountId?: string;
+            /**
+             * Format: uuid
+             * @description Optional when fund=CASH — defaults to the branch's single fund.
+             */
+            cashAccountId?: string;
+            amount: number;
+        };
+        SupplierDepositPaymentAllocationDto: {
+            /** Format: uuid */
+            supplierDebtId: string;
+            amount: number;
+        };
+        CreateSupplierDepositPaymentDto: {
+            /** @description "Ngày chi" (YYYY-MM-DD). */
+            docDate: string;
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            /** Format: uuid */
+            partnerId?: string;
+            /** @description "Người nhận" */
+            payeeName?: string;
+            /** @description "Lý do chi" */
+            reason?: string;
+            legs: components["schemas"]["SupplierDepositPaymentLegDto"][];
+            allocations: components["schemas"]["SupplierDepositPaymentAllocationDto"][];
+        };
+        SupplierDepositPaymentSagaEntity: {
+            /** @description Client idempotency key (X-Idempotency-Key) — dedupes retries per org. */
+            idempotencyKey: string;
+            /** @enum {string} */
+            status: "PENDING" | "COMPLETED" | "COMPENSATED" | "FAILED";
+            bankPaymentId?: string;
+            cashPaymentId?: string;
+            contraAccountId: string;
+            /**
+             * @description Denormalized copy for observability — stored as text, not a pg enum.
+             * @enum {string}
+             */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            partnerId?: string;
+            totalAmount: number;
+            allocations: Record<string, never>[];
+            error?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        FundSwapLineDto: {
+            description: string;
+            amount: number;
+            /**
+             * Format: uuid
+             * @description "Mục chi"/"Mục thu" — a cash_voucher_categories id.
+             */
+            categoryId?: string;
+        };
+        CreateFundSwapDto: {
+            /** @enum {string} */
+            direction: "DEPOSIT_TO_CASH" | "CASH_TO_DEPOSIT";
+            /** Format: uuid */
+            depositAccountId: string;
+            /**
+             * Format: uuid
+             * @description Defaults to the branch's single cash fund when omitted.
+             */
+            cashAccountId?: string;
+            amount: number;
+            /** @description "Ngày chứng từ" (YYYY-MM-DD). */
+            docDate: string;
+            /**
+             * @description Withdrawal fee (BR-SWP-03) — only applies to DEPOSIT_TO_CASH. Posted as a
+             *     separate BANK_FEE bank_payment (its own expense entry); the cash leg still
+             *     receives the full `amount`.
+             */
+            feeAmount?: number;
+            reason?: string;
+            /**
+             * @description DEPOSIT_TO_CASH only. False skips auto-creating the matching cash receipt —
+             *     only the deposit-withdrawal leg posts, parking the amount in TK 113 "Tiền
+             *     đang chuyển" until the cashier creates a separate cash receipt themselves
+             *     once the money is actually counted (matches MISA; no pending/confirm state
+             *     is tracked for this — unlike the GĐ4 inter-branch transfer). Omitted or
+             *     true keeps the current atomic 2-leg behavior.
+             */
+            autoCreateReceipt?: boolean;
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            /** Format: uuid */
+            partnerId?: string;
+            /** @description "Người nhận"/"Người nộp" — free text, independent of the partner record. */
+            payeeName?: string;
+            /** @description Used only when the partner lookup yields no address of its own. */
+            address?: string;
+            /**
+             * Format: uuid
+             * @description "Nhân viên chi/thu" — a users.id.
+             */
+            paidBy?: string;
+            reference?: string;
+            /**
+             * @description Detail lines of the source leg. When omitted the service falls back to a
+             *     single synthesized line, which is the pre-existing behaviour.
+             */
+            lines?: components["schemas"]["FundSwapLineDto"][];
+        };
+        InTransitRowDto: {
+            id: string;
+            amount: string;
+            fromBranchId: string;
+            fromBranchName?: string | null;
+            toBranchId: string;
+            toBranchName?: string | null;
+            fromAccountName?: string | null;
+            toAccountName?: string | null;
+            initiatedAt: string;
+            initiatedBy: string;
+            daysInTransit: number;
+            isOverdue: boolean;
+        };
+        InTransitReportDto: {
+            total: string;
+            staleDays: number;
+            data: components["schemas"]["InTransitRowDto"][];
+        };
+        AccountBalanceDto: {
+            accountId: string;
+            name: string;
+            type: string;
+            balance: string;
+            bankName: string;
+            accountNo: string;
+        };
+        BranchBalanceDto: {
+            branchId: string;
+            branchName?: string | null;
+            accounts: components["schemas"]["AccountBalanceDto"][];
+            branchTotal: string;
+        };
+        OrgBalanceDashboardDto: {
+            branches: components["schemas"]["BranchBalanceDto"][];
+            accountsTotal: string;
+            inTransitTotal: string;
+            /** @description R5 — invariant across create/confirm: Σ(deposit_accounts.balance) + Σ(in-transit). */
+            grandTotal: string;
+        };
+        CreateDepositTransferDto: {
+            /**
+             * Format: uuid
+             * @description Destination branch (B)
+             */
+            toBranchId: string;
+            /**
+             * Format: uuid
+             * @description Destination deposit account (must belong to toBranchId)
+             */
+            toAccountId: string;
+            amount: number;
+            note?: string;
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            /** Format: uuid */
+            partnerId?: string;
+            /** @description "Người nhận" */
+            payeeName?: string;
+            /**
+             * Format: uuid
+             * @description Cashier who paid (thủ quỹ).
+             */
+            paidBy?: string;
+        };
+        DepositTransferEntity: {
+            id: string;
+            organizationId: string;
+            fromBranchId: string;
+            toBranchId: string;
+            fromAccountId: string;
+            toAccountId: string;
+            amount: number;
+            /** @enum {string} */
+            status: "DANG_CHUYEN" | "HOAN_TAT" | "DA_HUY";
+            fromPaymentId: string;
+            toReceiptId?: string | null;
+            /** @description = id; also written to both legs' deposit_movements.transfer_pair_id. */
+            transferPairId: string;
+            initiatedBy: string;
+            /** Format: date-time */
+            initiatedAt: string;
+            confirmedBy?: string | null;
+            /** Format: date-time */
+            confirmedAt?: string | null;
+            cancelledBy?: string | null;
+            /** Format: date-time */
+            cancelledAt?: string | null;
+            cancelReason?: string | null;
+            note?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            deletedAt?: string;
+        };
+        ConfirmDepositTransferDto: {
+            note?: string;
+        };
+        CancelDepositTransferDto: {
+            reason: string;
+        };
+        DepositReconSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /**
+             * Format: uuid
+             * @description Restrict to a single deposit account; omitted = every account in scope.
+             */
+            depositAccountId?: string;
+            /**
+             * @description Transaction type column.
+             * @enum {string}
+             */
+            type?: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "ADJUSTMENT";
+            /**
+             * @description Reconciliation status column. Defaults to CHUA (unreconciled), as v1 did.
+             * @default CHUA
+             * @enum {string}
+             */
+            reconStatus: "CHUA" | "DA" | "LECH";
+            /** @description Document number column. */
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            /** @description Account column — matches the rendered "name (accountNo)" label. */
+            accountLabel?: components["schemas"]["StringFilterDto"];
+            /**
+             * @description Date column. Matches on COALESCE(value_date, doc_date) — a statement period
+             *     must match the movement's cleared date, not its transaction date (R2,
+             *     TKT-DFR-04), otherwise unsettled funds read as a false discrepancy.
+             */
+            docDate?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Value date (cleared date) column. */
+            valueDate?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Net received amount column. */
+            netAmount?: components["schemas"]["CompareFilterDto"];
+            /** @description Fee column. */
+            feeAmount?: components["schemas"]["CompareFilterDto"];
+            /** @description Gross amount column. */
+            amount?: components["schemas"]["CompareFilterDto"];
+            /** @description Reconciled-by column — matches the resolved user name, not the raw id. */
+            reconciledBy?: components["schemas"]["StringFilterDto"];
+        };
+        DepositReconRowDto: {
+            id: string;
+            documentNumber: string | null;
+            /** @enum {string} */
+            type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "ADJUSTMENT";
+            depositAccountId: string;
+            /** @description Inlined from deposit_accounts ("" when unresolved) */
+            depositAccountName: string;
+            /** @description Inlined from deposit_accounts ("" when unresolved) */
+            depositAccountNo: string;
+            docDate: string;
+            valueDate: string | null;
+            amount: number;
+            feeAmount: number;
+            netAmount: number;
+            /** @enum {string} */
+            reconStatus: "CHUA" | "DA" | "LECH";
+            /** @description Raw user id, kept for compatibility */
+            reconciledBy: string | null;
+            /** @description Resolved "first last" ("" when unresolved) */
+            reconciledByName: string | null;
+            reconciledAt: string | null;
+            createdAt: string;
+            /**
+             * @description Which flow produced this movement; POS_INVOICE rows have no voucher
+             * @enum {string}
+             */
+            source: "POS_INVOICE" | "MANUAL" | "TRANSFER" | "SYSTEM";
+            /** @description Meaning depends on source — invoices.id when source is POS_INVOICE */
+            sourceRefId: string | null;
+            /** @description bank_payments.id this movement posted */
+            bankPaymentId: string | null;
+            /** @description bank_receipts.id this movement posted */
+            bankReceiptId: string | null;
+        };
+        DepositReconSearchV2ResponseDto: {
+            data: components["schemas"]["DepositReconRowDto"][];
+            total: number;
+            page: number;
+            limit: number;
+            /** @description SUM(net_amount) over every matching row, not only this page */
+            totalAmount: number;
+            /** @description Any unreconciled movement older than the stale threshold */
+            hasStaleUnreconciled: boolean;
+        };
+        ReconcileGroupDto: {
+            /** Format: uuid */
+            depositAccountId: string;
+            movementIds: string[];
+            stmtTotalAmount: number;
+            /** @description Required when this group's statement total does not match (BR-REC-02). */
+            note?: string;
+        };
+        ReconcileDto: {
+            groups: components["schemas"]["ReconcileGroupDto"][];
+            stmtFromDate: string;
+            stmtToDate: string;
+        };
+        UnreconcileDto: {
+            movementIds?: string[];
+            /** Format: uuid */
+            batchId?: string;
+            reason: string;
+        };
+        DepositPeriodLockEntity: {
+            id: string;
+            organizationId: string;
+            branchId: string;
+            /** @description YYYY-MM */
+            period: string;
+            /** @enum {string} */
+            status: "LOCKED" | "UNLOCKED";
+            closingBalanceSnapshot: Record<string, never>[];
+            lockedBy: string;
+            /** Format: date-time */
+            lockedAt: string;
+            unlockedBy?: string;
+            /** Format: date-time */
+            unlockedAt?: string;
+            unlockReason?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        LockPeriodDto: {
+            /** Format: uuid */
+            branchId: string;
+            /**
+             * @description YYYY-MM
+             * @example 2026-06
+             */
+            period: string;
+            force?: boolean;
+        };
+        UnlockPeriodDto: {
+            reason: string;
         };
         CreateAdjustmentDto: Record<string, never>;
         StockAdjustmentEntity: {
@@ -9057,6 +10430,7 @@ export interface components {
             paymentMethod: "cash" | "bank_transfer" | "card";
             amount: number;
             accountId: string;
+            depositAccountId?: string;
             reference?: string;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
@@ -11693,6 +13067,52 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    CashVoucherV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashVoucherSearchV2Dto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashVoucherSearchV2ResponseDto"];
+                };
+            };
+        };
+    };
+    CashLedgerV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashLedgerSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -15814,7 +17234,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StockTransferEntity"];
+                    "application/json": Record<string, never>;
                 };
             };
         };
@@ -16314,6 +17734,882 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExpenseEntity"];
+                };
+            };
+        };
+    };
+    DepositLedgerV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DepositLedgerSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    DepositLedgerController_getLedger: {
+        parameters: {
+            query?: {
+                /** @description Deposit account to show the ledger for. Omit to include every ACTIVE deposit account of the branch (BR-LEDG-03). */
+                depositAccountId?: string;
+                dateFrom?: string;
+                dateTo?: string;
+                /** @description ILIKE on document number */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    DepositLedgerController_export: {
+        parameters: {
+            query?: {
+                /** @description Deposit account to show the ledger for. Omit to include every ACTIVE deposit account of the branch (BR-LEDG-03). */
+                depositAccountId?: string;
+                dateFrom?: string;
+                dateTo?: string;
+                /** @description ILIKE on document number */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DepositAuditController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DepositVoucherV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DepositVoucherSearchV2Dto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositVoucherSearchV2ResponseDto"];
+                };
+            };
+        };
+    };
+    BankReceiptsController_list: {
+        parameters: {
+            query?: {
+                status?: "DRAFT" | "PENDING_APPROVAL" | "POSTED" | "REVERSED";
+                purpose?: "OTHER" | "DEBT_COLLECTION" | "OTHER_INCOME" | "INTER_BRANCH_IN";
+                depositAccountId?: string;
+                partnerId?: string;
+                dateFrom?: string;
+                dateTo?: string;
+                /** @description ILIKE over document_number, payer_name, reason. */
+                search?: string;
+                /** @description Filter by origin (maps to reference_type). */
+                source?: "DEBT_COLLECTION" | "TRANSFER" | "MANUAL";
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    BankReceiptsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBankReceiptDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankReceiptEntity"];
+                };
+            };
+        };
+    };
+    BankReceiptsController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankReceiptEntity"];
+                };
+            };
+        };
+    };
+    BankReceiptsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    BankReceiptsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateBankReceiptDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankReceiptEntity"];
+                };
+            };
+        };
+    };
+    BankReceiptsController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankReceiptEntity"];
+                };
+            };
+        };
+    };
+    BankReceiptsController_reverse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReverseBankReceiptDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    BankPaymentsController_list: {
+        parameters: {
+            query?: {
+                status?: "DRAFT" | "PENDING_APPROVAL" | "POSTED" | "REVERSED";
+                purpose?: "SUPPLIER_PAYMENT" | "PURCHASE" | "EXPENSE" | "CASH_TRANSFER" | "INTER_BRANCH_OUT" | "REFUND" | "BANK_FEE" | "OTHER";
+                depositAccountId?: string;
+                partnerId?: string;
+                dateFrom?: string;
+                dateTo?: string;
+                /** @description ILIKE over document_number, payee_name, reason. */
+                search?: string;
+                /** @description Filter by origin (maps to reference_type). */
+                source?: "GOODS_RECEIPT" | "EXPENSE" | "TRANSFER" | "MANUAL";
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    BankPaymentsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBankPaymentDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankPaymentEntity"];
+                };
+            };
+        };
+    };
+    BankPaymentsController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankPaymentEntity"];
+                };
+            };
+        };
+    };
+    BankPaymentsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    BankPaymentsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateBankPaymentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankPaymentEntity"];
+                };
+            };
+        };
+    };
+    BankPaymentsController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankPaymentEntity"];
+                };
+            };
+        };
+    };
+    BankPaymentsController_reverse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReverseBankPaymentDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    SupplierDepositPaymentController_pay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSupplierDepositPaymentDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    SupplierDepositPaymentController_getSaga: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierDepositPaymentSagaEntity"];
+                };
+            };
+        };
+    };
+    FundSwapsController_swap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateFundSwapDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    FundSwapsController_legs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                swapId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    DepositDashboardController_inTransit: {
+        parameters: {
+            query?: {
+                branchId?: string;
+                accountId?: string;
+                staleDays?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InTransitReportDto"];
+                };
+            };
+        };
+    };
+    DepositDashboardController_dashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgBalanceDashboardDto"];
+                };
+            };
+        };
+    };
+    DepositTransferController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DepositTransferController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDepositTransferDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositTransferEntity"];
+                };
+            };
+        };
+    };
+    DepositTransferController_confirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmDepositTransferDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositTransferEntity"];
+                };
+            };
+        };
+    };
+    DepositTransferController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelDepositTransferDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositTransferEntity"];
+                };
+            };
+        };
+    };
+    DepositTransferController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositTransferEntity"];
+                };
+            };
+        };
+    };
+    DepositReconV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DepositReconSearchV2Dto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositReconSearchV2ResponseDto"];
+                };
+            };
+        };
+    };
+    DepositReconController_list: {
+        parameters: {
+            query?: {
+                /** @description Số tài khoản — filters to one deposit account */
+                depositAccountId?: string;
+                reconStatus?: "CHUA" | "DA" | "LECH";
+                /** @description value_date >= */
+                dateFrom?: string;
+                /** @description value_date <= */
+                dateTo?: string;
+                docNumber?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DepositReconController_export: {
+        parameters: {
+            query?: {
+                /** @description Số tài khoản — filters to one deposit account */
+                depositAccountId?: string;
+                reconStatus?: "CHUA" | "DA" | "LECH";
+                /** @description value_date >= */
+                dateFrom?: string;
+                /** @description value_date <= */
+                dateTo?: string;
+                docNumber?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DepositReconController_reconcile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconcileDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DepositReconController_unreconcile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnreconcileDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DepositPeriodLockController_list: {
+        parameters: {
+            query?: {
+                branchId?: unknown;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositPeriodLockEntity"][];
+                };
+            };
+        };
+    };
+    DepositPeriodLockController_lock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LockPeriodDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositPeriodLockEntity"];
+                };
+            };
+        };
+    };
+    DepositPeriodLockController_unlock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnlockPeriodDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositPeriodLockEntity"];
                 };
             };
         };

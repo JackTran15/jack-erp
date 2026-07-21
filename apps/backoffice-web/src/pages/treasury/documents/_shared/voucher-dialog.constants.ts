@@ -58,6 +58,21 @@ export function subOptionToApiPurpose(
   return CashPaymentPurpose.OTHER;
 }
 
+// ── Deposit ("Phiếu chi tiền gửi") top-level purpose split — separate from the
+// CASH constants above; the "Hình thức chi" sub-list itself reuses
+// `BankPaymentPurpose` directly (already has CASH_TRANSFER/INTER_BRANCH_OUT),
+// no parallel sub-option enum needed. ────────────────────────────────────────
+
+export enum DepositPaymentPurposeRadio {
+  OTHER_GROUP = "OTHER_GROUP",
+  DEBT_GROUP = "DEBT_GROUP",
+}
+
+export const DEPOSIT_PAYMENT_PURPOSE_RADIO_OPTIONS = [
+  { value: DepositPaymentPurposeRadio.OTHER_GROUP, label: "Khác" },
+  { value: DepositPaymentPurposeRadio.DEBT_GROUP, label: "Trả nợ" },
+];
+
 export interface VoucherFormLine {
   description: string;
   amount: number;

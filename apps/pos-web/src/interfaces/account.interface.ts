@@ -17,6 +17,8 @@ export interface AccountRow {
 export interface PaymentAccountRow {
   id: string;
   paymentMethod: ApiPaymentMethod;
+  /** Tên quỹ tiền gửi đã liên kết — null với tiền mặt. */
+  depositAccountName: string | null;
   bankName: string | null;
   bankCode: string | null;
   accountNumber: string | null;

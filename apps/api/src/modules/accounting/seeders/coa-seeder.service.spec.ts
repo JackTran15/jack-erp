@@ -21,9 +21,9 @@ describe('CoaSeederService', () => {
       save: jest.fn((entity) =>
         Promise.resolve({ ...entity, id: `acc-${++idCounter}` }),
       ),
-      // Idempotent top-up reads existing codes; default: all root codes present.
+      // Idempotent top-up reads existing codes; default: every account already present.
       find: jest.fn().mockResolvedValue(
-        DEFAULT_COA.filter((a) => !a.parent).map((a) => ({ code: a.code })),
+        DEFAULT_COA.map((a, i) => ({ id: `acc-${i}`, code: a.code })),
       ),
     };
 
@@ -45,6 +45,23 @@ describe('CoaSeederService', () => {
 
       expect(created).toBe(0);
       expect(accountRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('tops up a missing child account and resolves its parentAccountId', async () => {
+      accountRepo.count.mockResolvedValue(DEFAULT_COA.length - 1);
+      accountRepo.find.mockResolvedValue(
+        DEFAULT_COA.filter((a) => a.code !== '6417').map((a, i) => ({
+          id: a.code === '641' ? 'acc-641' : `acc-${i}`,
+          code: a.code,
+        })),
+      );
+
+      await service.seedForOrganization('org-1', 'user-1');
+
+      expect(accountRepo.save).toHaveBeenCalledTimes(1);
+      const created = accountRepo.save.mock.calls[0][0];
+      expect(created.code).toBe('6417');
+      expect(created.parentAccountId).toBe('acc-641');
     });
 
     it('seeds all default accounts in two passes (roots then children)', async () => {

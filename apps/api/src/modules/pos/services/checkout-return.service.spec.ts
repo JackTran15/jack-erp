@@ -394,7 +394,10 @@ describe('CheckoutReturnService — debt offset routing', () => {
         Promise.resolve(where.id === 'exc-1' ? exchangeDraftStub() : null),
       );
       itemRepo.find.mockResolvedValue(exchangeItems());
-      accountResolver.resolvePaymentAccount.mockResolvedValue('pay-acct-1');
+      accountResolver.resolvePaymentAccount.mockResolvedValue({
+        accountId: 'pay-acct-1',
+        depositAccountId: undefined,
+      });
     });
 
     it('books the full difference as customer debt when no payment is tendered', async () => {

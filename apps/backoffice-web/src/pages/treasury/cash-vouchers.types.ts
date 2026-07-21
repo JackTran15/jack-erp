@@ -213,10 +213,12 @@ export interface CashLedgerRow {
   date: string;
   type: string;
   voucherId: string | null;
-  voucherNumber: string;
+  /** Null when the movement has no voucher; the UI supplies the placeholder. */
+  voucherNumber: string | null;
   kind: "PT" | "PC" | "Khác";
   description: string | null;
   partnerName: string | null;
+  staffName: string | null;
   debit: number;
   credit: number;
   balance: number;
@@ -240,10 +242,39 @@ export enum ReceiptPaymentKind {
   PAYMENT = "PAYMENT",
 }
 
+/**
+ * Document type rendered in the "Loại chứng từ" column. Three values, not two:
+ * a payment referencing a goods receipt is its own type, so the server-side
+ * filter matches exactly what the column shows.
+ */
+export enum CashVoucherDocumentKind {
+  CASH_RECEIPT = "CASH_RECEIPT",
+  CASH_PAYMENT = "CASH_PAYMENT",
+  GOODS_RECEIPT_PAYMENT = "GOODS_RECEIPT_PAYMENT",
+}
+
+/** One row of `POST /v2/cash-vouchers/search`. */
+export interface CashVoucherRow {
+  documentKind: CashVoucherDocumentKind;
+  kind: ReceiptPaymentKind;
+  id: string;
+  createdAt: string;
+  voucherDate: string;
+  documentNumber: string | null;
+  status: CashVoucherStatus;
+  totalAmount: number;
+  cashAccountId: string;
+  referenceType: CashReceiptReferenceType | CashPaymentReferenceType | null;
+  counterparty: string;
+  reason: string | null;
+}
+
 /** Merged list row for Thu/chi screen. */
 export interface ReceiptPaymentListItem {
   kind: ReceiptPaymentKind;
   id: string;
+  /** Creation timestamp — the grid's date column and its sort key. */
+  createdAt: string;
   voucherDate: string;
   documentNumber: string;
   status: CashVoucherStatus;

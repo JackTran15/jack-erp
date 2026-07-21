@@ -184,6 +184,12 @@ export const DEFAULT_CASH_VOUCHER_CATEGORIES: DefaultCategory[] = [
     direction: CashVoucherCategoryDirection.OUT,
     displayOrder: 28,
   },
+  {
+    code: "BANK_FEE",
+    name: "Phí ngân hàng",
+    direction: CashVoucherCategoryDirection.OUT,
+    displayOrder: 29,
+  },
 ];
 
 @Injectable()

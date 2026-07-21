@@ -14,7 +14,44 @@ export const treasuryQueryKeys = {
   cashPayment: (id: string | undefined) => ["cash-payments", "detail", id] as const,
   cashCounts: (filters: unknown) => ["cash-counts", filters] as const,
   cashCount: (id: string | undefined) => ["cash-counts", "detail", id] as const,
-  cashLedger: (params: unknown) => ["cash-ledger", params] as const,
+  // Keeps the "cash-ledger" prefix so existing invalidations cover it too.
+  cashLedgerSearch: (body: unknown) => ["cash-ledger", "search", body] as const,
+  /**
+   * Merged receipt+payment stream. A new prefix, so every mutation that used to
+   * invalidate only cash-receipts/cash-payments must invalidate this as well.
+   */
+  cashVouchers: (body: unknown) => ["cash-vouchers", body] as const,
+  depositLedger: (params: unknown) => ["deposit-ledger", params] as const,
+  // Shares the "deposit-ledger" prefix so existing invalidations cover it too.
+  depositLedgerSearch: (body: unknown) =>
+    ["deposit-ledger", "search", body] as const,
+  /**
+   * Merged receipt+payment stream. A new prefix, so every mutation that used to
+   * invalidate only bank-receipts/bank-payments must invalidate this as well.
+   */
+  depositVouchers: (body: unknown) => ["deposit-vouchers", body] as const,
+  depositAccounts: (branchId?: string) =>
+    ["deposit-accounts", branchId] as const,
+  depositPaymentPolicy: (filters?: unknown) =>
+    ["deposit-payment-policy", filters] as const,
+  bankReceipts: (filters: unknown) => ["bank-receipts", filters] as const,
+  bankReceipt: (id: string | undefined) => ["bank-receipts", "detail", id] as const,
+  bankPayments: (filters: unknown) => ["bank-payments", filters] as const,
+  bankPayment: (id: string | undefined) => ["bank-payments", "detail", id] as const,
+  supplierDepositPaymentSaga: (id: string | undefined) =>
+    ["supplier-deposit-payment", "saga", id] as const,
+  depositRecon: (query: unknown) => ["deposit-recon", query] as const,
+  // Shares the "deposit-recon" prefix so existing invalidations cover it too.
+  depositReconSearch: (body: unknown) =>
+    ["deposit-recon", "search", body] as const,
+  depositPeriodLocks: (branchId: string | undefined) =>
+    ["deposit-period-lock", branchId] as const,
+  depositTransfers: (filters: unknown) => ["deposit-transfers", filters] as const,
+  depositTransfer: (id: string | undefined) =>
+    ["deposit-transfers", "detail", id] as const,
+  depositInTransit: (filters: unknown) => ["deposit-in-transit", filters] as const,
+  depositDashboard: () => ["deposit-dashboard"] as const,
+  banks: () => ["banks"] as const,
   partnerSearch: (type: string, query: string, page: number, pageSize: number) =>
     ["voucher-partners", "search", type, query, page, pageSize] as const,
   partnerById: (partnerType: string | undefined, partnerId: string | undefined) =>

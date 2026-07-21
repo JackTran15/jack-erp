@@ -15,10 +15,10 @@ export function useLedgerCashTableColumns(
   return useMemo(
     (): TableColumn<LedgerCashRow>[] => [
       {
-        key: "documentDate",
+        key: "createdAt",
         label: "Ngày chứng từ",
         width: 110,
-        filterKind: "none",
+        filterKind: "date-range",
         render: (r) =>
           isOpeningBalanceRow(r)
             ? ""
@@ -28,7 +28,6 @@ export function useLedgerCashTableColumns(
         key: "receiptNo",
         label: "Số phiếu thu",
         width: 120,
-        filterKind: "none",
         render: (r) => (
           <VoucherLink
             code={r.receiptNo}
@@ -45,7 +44,6 @@ export function useLedgerCashTableColumns(
         key: "paymentNo",
         label: "Số phiếu chi",
         width: 120,
-        filterKind: "none",
         render: (r) => (
           <VoucherLink
             code={r.paymentNo}
@@ -74,6 +72,7 @@ export function useLedgerCashTableColumns(
         key: "amountIn",
         label: "Số tiền thu",
         width: 120,
+        filterKind: "number-range",
         headerClassName: "text-right",
         className: TABLE_NUM_CLASS,
         render: (r) => (r.amountIn > 0 ? formatMoneyInteger(r.amountIn) : ""),
@@ -82,6 +81,7 @@ export function useLedgerCashTableColumns(
         key: "amountOut",
         label: "Số tiền chi",
         width: 120,
+        filterKind: "number-range",
         headerClassName: "text-right",
         className: TABLE_NUM_CLASS,
         render: (r) => (r.amountOut > 0 ? formatMoneyInteger(r.amountOut) : ""),
@@ -90,6 +90,8 @@ export function useLedgerCashTableColumns(
         key: "balance",
         label: "Số tiền còn lại",
         width: 130,
+        // Computed per page from the ordered stream — not a filterable value.
+        filterKind: "none",
         headerClassName: "text-right",
         className: TABLE_NUM_CLASS,
         render: (r) => formatMoneyInteger(r.balance),
@@ -101,7 +103,7 @@ export function useLedgerCashTableColumns(
         render: (r) => r.counterparty,
       },
       {
-        key: "employee",
+        key: "staff",
         label: "Đối tượng thu/chi",
         width: 140,
         render: (r) => r.employee,
