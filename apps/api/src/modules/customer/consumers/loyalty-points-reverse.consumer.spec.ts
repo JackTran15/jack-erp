@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, LessThanOrEqual } from 'typeorm';
 import { DomainEvent, DomainEventType } from '@erp/shared-interfaces';
 import { LoyaltyPointsReverseConsumer } from './loyalty-points-reverse.consumer';
 import { MembershipCardEntity } from '../membership-card.entity';
@@ -82,6 +82,22 @@ describe('LoyaltyPointsReverseConsumer', () => {
       'points',
       40,
     );
+  });
+
+  it('scopes the idempotency lookup to its own negative ADJUST rows so a redeemed-points refund does not block the reversal', async () => {
+    historyRepo.findOne.mockResolvedValue(null);
+    cardRepo.findOne.mockResolvedValue({ id: 'card-1', points: 500 });
+
+    await consumer.handle(buildEvent());
+
+    expect(historyRepo.findOne).toHaveBeenCalledWith({
+      where: {
+        invoiceId: 'ret-1',
+        organizationId: 'org-1',
+        type: PointType.ADJUST,
+        delta: LessThanOrEqual(0),
+      },
+    });
   });
 
   it('skips when the return already has loyalty history (idempotency)', async () => {

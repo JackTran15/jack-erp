@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, LessThanOrEqual, Repository } from 'typeorm';
 import { DomainEvent } from '@erp/shared-interfaces';
 import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { OnDomainEvent } from '../../events/decorators/on-event.decorator';
@@ -28,8 +28,17 @@ export class LoyaltyPointsReverseConsumer {
     const { returnInvoiceId, customerId, subtotalDelta, organizationId, actorId } =
       event.payload;
 
+    // The return transaction may already have written an ADJUST row against this
+    // same id (refundRedeemedPoints, always delta > 0). Only rows this consumer
+    // wrote have delta <= 0, so the sign is what distinguishes them — an untyped
+    // lookup would read the refund as a duplicate and skip the reversal.
     const existing = await this.historyRepo.findOne({
-      where: { invoiceId: returnInvoiceId, organizationId },
+      where: {
+        invoiceId: returnInvoiceId,
+        organizationId,
+        type: PointType.ADJUST,
+        delta: LessThanOrEqual(0),
+      },
     });
     if (existing) {
       this.logger.log(
