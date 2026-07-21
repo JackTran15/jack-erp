@@ -26,19 +26,37 @@ function buildManager(movements: any[]) {
     getRepository: jest.fn((entity: any) => {
       if (entity === DepositMovementEntity) {
         return {
+          // The lock query is filtered the way the DB would filter it (ids +
+          // account + CHUA), so a multi-group call sees only its own rows.
           createQueryBuilder: jest.fn(() => {
+            const params: Record<string, any> = {};
             const qb: any = {
               setLock: jest.fn(() => qb),
-              where: jest.fn(() => qb),
-              andWhere: jest.fn(() => qb),
-              getMany: jest.fn(async () => movements),
+              where: jest.fn((_sql: string, p?: any) => {
+                Object.assign(params, p);
+                return qb;
+              }),
+              andWhere: jest.fn((_sql: string, p?: any) => {
+                Object.assign(params, p);
+                return qb;
+              }),
+              getMany: jest.fn(async () =>
+                movements.filter(
+                  (m) =>
+                    (params.ids as string[]).includes(m.id) &&
+                    m.depositAccountId === params.acc &&
+                    m.reconStatus === params.status,
+                ),
+              ),
             };
             return qb;
           }),
           find: jest.fn(async () => movements),
           update: jest.fn(async (crit: any, patch: any) => {
-            for (const m of movements) Object.assign(m, patch);
-            return { affected: movements.length };
+            const ids: string[] = crit.id?.value ?? [];
+            const target = movements.filter((m) => ids.includes(m.id));
+            for (const m of target) Object.assign(m, patch);
+            return { affected: target.length };
           }),
         };
       }
@@ -58,7 +76,8 @@ function buildManager(movements: any[]) {
 
 async function setup(manager: any) {
   const dataSource = { transaction: jest.fn((cb) => cb(manager)), manager };
-  const docNumbering = { generate: jest.fn().mockResolvedValue('DS-26-00001') };
+  let docSeq = 0;
+  const docNumbering = { generate: jest.fn(async () => `DS-26-0000${++docSeq}`) };
   const cashFundResolver = { resolveCoaAccountIdByCode: jest.fn().mockResolvedValue('acc-6417') };
   const categoryResolver = { resolveId: jest.fn().mockResolvedValue('cat-bank-fee') };
   const bankPayment = {
@@ -104,25 +123,31 @@ function movement(over: Record<string, unknown> = {}) {
 
 describe('DepositReconService', () => {
   describe('reconcile', () => {
+    const dates = { stmtFromDate: '2026-07-01', stmtToDate: '2026-07-15' };
+
     it('diff=0: sets DA + batch RECONCILED, using net_amount (not gross amount)', async () => {
       const mv = movement();
       const manager = buildManager([mv]);
       const { service, bankPayment } = await setup(manager);
 
-      const result = await service.reconcile(
+      const { results } = await service.reconcile(
         {
-          depositAccountId: 'dep-1',
-          movementIds: ['mv-1'],
-          stmtTotalAmount: 1_122_515,
-          stmtFromDate: '2026-07-01',
-          stmtToDate: '2026-07-15',
+          ...dates,
+          groups: [
+            {
+              depositAccountId: 'dep-1',
+              movementIds: ['mv-1'],
+              stmtTotalAmount: 1_122_515,
+            },
+          ],
         },
         actor,
       );
 
-      expect(result.systemTotalAmount).toBe(1_122_515);
-      expect(result.diffAmount).toBe(0);
-      expect(result.status).toBe(DepositReconBatchStatus.RECONCILED);
+      expect(results).toHaveLength(1);
+      expect(results[0].systemTotalAmount).toBe(1_122_515);
+      expect(results[0].diffAmount).toBe(0);
+      expect(results[0].status).toBe(DepositReconBatchStatus.RECONCILED);
       expect(mv.reconStatus).toBe(ReconStatus.DA);
       expect(mv.reconBatchId).toBeDefined();
       expect(bankPayment.createDraftInternal).not.toHaveBeenCalled();
@@ -133,23 +158,26 @@ describe('DepositReconService', () => {
       const manager = buildManager([mv]);
       const { service, bankPayment } = await setup(manager);
 
-      const result = await service.reconcile(
+      const { results } = await service.reconcile(
         {
-          depositAccountId: 'dep-1',
-          movementIds: ['mv-1'],
-          stmtTotalAmount: 1_110_030,
-          stmtFromDate: '2026-07-01',
-          stmtToDate: '2026-07-15',
-          note: 'Chênh lệch phí thực tế',
+          ...dates,
+          groups: [
+            {
+              depositAccountId: 'dep-1',
+              movementIds: ['mv-1'],
+              stmtTotalAmount: 1_110_030,
+              note: 'Chênh lệch phí thực tế',
+            },
+          ],
         },
         actor,
       );
 
-      expect(result.diffAmount).toBe(-12_485);
-      expect(result.status).toBe(DepositReconBatchStatus.DISCREPANCY);
+      expect(results[0].diffAmount).toBe(-12_485);
+      expect(results[0].status).toBe(DepositReconBatchStatus.DISCREPANCY);
       expect(mv.reconStatus).toBe(ReconStatus.LECH);
       expect(bankPayment.createDraftInternal).toHaveBeenCalledTimes(1);
-      expect(result.proposalId).toBe('draft-bp-1');
+      expect(results[0].proposalId).toBe('draft-bp-1');
     });
 
     it('diff!=0 without note: rejects with 400 (BR-REC-02)', async () => {
@@ -159,11 +187,14 @@ describe('DepositReconService', () => {
       await expect(
         service.reconcile(
           {
-            depositAccountId: 'dep-1',
-            movementIds: ['mv-1'],
-            stmtTotalAmount: 1_110_030,
-            stmtFromDate: '2026-07-01',
-            stmtToDate: '2026-07-15',
+            ...dates,
+            groups: [
+              {
+                depositAccountId: 'dep-1',
+                movementIds: ['mv-1'],
+                stmtTotalAmount: 1_110_030,
+              },
+            ],
           },
           actor,
         ),
@@ -179,15 +210,124 @@ describe('DepositReconService', () => {
       await expect(
         service.reconcile(
           {
-            depositAccountId: 'dep-1',
-            movementIds: ['mv-1', 'mv-2'],
-            stmtTotalAmount: 1_122_515,
-            stmtFromDate: '2026-07-01',
-            stmtToDate: '2026-07-15',
+            ...dates,
+            groups: [
+              {
+                depositAccountId: 'dep-1',
+                movementIds: ['mv-1', 'mv-2'],
+                stmtTotalAmount: 1_122_515,
+              },
+            ],
           },
           actor,
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('two accounts: one batch each, only the discrepancy group proposes a fee adjustment', async () => {
+      const a = movement({ id: 'mv-a', depositAccountId: 'dep-1' });
+      const b = movement({ id: 'mv-b', depositAccountId: 'dep-2', netAmount: 500_000 });
+      const manager = buildManager([a, b]);
+      const { service, bankPayment } = await setup(manager);
+
+      const { results } = await service.reconcile(
+        {
+          ...dates,
+          groups: [
+            {
+              depositAccountId: 'dep-1',
+              movementIds: ['mv-a'],
+              stmtTotalAmount: 1_122_515,
+            },
+            {
+              depositAccountId: 'dep-2',
+              movementIds: ['mv-b'],
+              stmtTotalAmount: 499_000,
+              note: 'Phí chuyển khoản chưa hạch toán',
+            },
+          ],
+        },
+        actor,
+      );
+
+      expect(results).toHaveLength(2);
+      expect(results[0].batch.depositAccountId).toBe('dep-1');
+      expect(results[1].batch.depositAccountId).toBe('dep-2');
+      expect(results[0].batch.batchNumber).not.toBe(results[1].batch.batchNumber);
+      expect(results[0].status).toBe(DepositReconBatchStatus.RECONCILED);
+      expect(results[1].status).toBe(DepositReconBatchStatus.DISCREPANCY);
+      expect(a.reconStatus).toBe(ReconStatus.DA);
+      expect(b.reconStatus).toBe(ReconStatus.LECH);
+      expect(a.reconBatchId).not.toBe(b.reconBatchId);
+      expect(bankPayment.createDraftInternal).toHaveBeenCalledTimes(1);
+    });
+
+    it('a movement listed in two groups: rejects with 400 before any batch is written', async () => {
+      const manager = buildManager([movement()]);
+      const { service, docNumbering } = await setup(manager);
+
+      await expect(
+        service.reconcile(
+          {
+            ...dates,
+            groups: [
+              { depositAccountId: 'dep-1', movementIds: ['mv-1'], stmtTotalAmount: 1 },
+              { depositAccountId: 'dep-2', movementIds: ['mv-1'], stmtTotalAmount: 1 },
+            ],
+          },
+          actor,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(docNumbering.generate).not.toHaveBeenCalled();
+    });
+
+    it('the same deposit account in two groups: rejects with 400', async () => {
+      const manager = buildManager([movement()]);
+      const { service } = await setup(manager);
+
+      await expect(
+        service.reconcile(
+          {
+            ...dates,
+            groups: [
+              { depositAccountId: 'dep-1', movementIds: ['mv-1'], stmtTotalAmount: 1 },
+              { depositAccountId: 'dep-1', movementIds: ['mv-2'], stmtTotalAmount: 1 },
+            ],
+          },
+          actor,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('a later group failing BR-REC-02 aborts the whole call (single transaction → rollback)', async () => {
+      const a = movement({ id: 'mv-a', depositAccountId: 'dep-1' });
+      const b = movement({ id: 'mv-b', depositAccountId: 'dep-2', netAmount: 500_000 });
+      const manager = buildManager([a, b]);
+      const { service } = await setup(manager);
+
+      await expect(
+        service.reconcile(
+          {
+            ...dates,
+            groups: [
+              {
+                depositAccountId: 'dep-1',
+                movementIds: ['mv-a'],
+                stmtTotalAmount: 1_122_515,
+              },
+              // Discrepancy without a note — throws inside the transaction, so
+              // the batch already written for dep-1 is rolled back by Postgres.
+              {
+                depositAccountId: 'dep-2',
+                movementIds: ['mv-b'],
+                stmtTotalAmount: 499_000,
+              },
+            ],
+          },
+          actor,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(b.reconStatus).toBe(ReconStatus.CHUA);
     });
   });
 

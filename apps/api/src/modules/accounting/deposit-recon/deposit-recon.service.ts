@@ -20,7 +20,7 @@ import { DepositAuditAction, DepositAuditEntityType } from '../deposit-audit/dep
 import { DepositAuditService } from '../deposit-audit/deposit-audit.service';
 import { DepositReconBatchEntity, DepositReconBatchStatus } from './deposit-recon-batch.entity';
 import { ListReconDto } from './dto/list-recon.dto';
-import { ReconcileDto } from './dto/reconcile.dto';
+import { ReconcileDto, ReconcileGroupDto } from './dto/reconcile.dto';
 import { UnreconcileDto } from './dto/unreconcile.dto';
 
 /** BR-REC-04: a movement CHUA past this many days is flagged stale on the grid. */
@@ -118,88 +118,24 @@ export class DepositReconService {
     return (await workbook.xlsx.writeBuffer()) as unknown as Buffer;
   }
 
-  async reconcile(dto: ReconcileDto, actor: ActorContext): Promise<ReconcileResult> {
+  /**
+   * One batch per deposit account. The whole call shares a single transaction,
+   * so a group rejected by BR-REC-02 or by the CHUA lock query rolls back the
+   * batches already written for the other accounts.
+   */
+  async reconcile(
+    dto: ReconcileDto,
+    actor: ActorContext,
+  ): Promise<{ results: ReconcileResult[] }> {
+    this.assertGroupsDisjoint(dto.groups);
     return this.dataSource.transaction(async (manager) => {
-      const rows = await manager
-        .getRepository(DepositMovementEntity)
-        .createQueryBuilder('m')
-        .setLock('pessimistic_write')
-        .where('m.id IN (:...ids)', { ids: dto.movementIds })
-        .andWhere('m.organizationId = :org', { org: actor.organizationId })
-        .andWhere('m.branchId = :branch', { branch: actor.branchId })
-        .andWhere('m.depositAccountId = :acc', { acc: dto.depositAccountId })
-        .andWhere('m.reconStatus = :status', { status: ReconStatus.CHUA })
-        .getMany();
-      if (rows.length !== dto.movementIds.length) {
-        throw new BadRequestException(
-          'Some movements are already reconciled, deleted, or out of scope',
-        );
+      const results: ReconcileResult[] = [];
+      for (const group of dto.groups) {
+        // Sequential: each group takes its own FOR UPDATE lock and pulls a
+        // document number, both of which must not interleave.
+        results.push(await this.reconcileGroup(group, dto, actor, manager));
       }
-
-      // R1: net_amount (post-fee), not gross amount — matches the bank statement.
-      const systemTotal = round2(rows.reduce((s, r) => s + Number(r.netAmount), 0));
-      const diff = round2(dto.stmtTotalAmount - systemTotal);
-      const status =
-        diff === 0 ? DepositReconBatchStatus.RECONCILED : DepositReconBatchStatus.DISCREPANCY;
-      if (status === DepositReconBatchStatus.DISCREPANCY && !dto.note) {
-        throw new BadRequestException(
-          'note is required when the statement total does not match (BR-REC-02)',
-        );
-      }
-
-      const batchNumber = await this.docNumbering.generate(
-        DocumentType.RECONCILIATION,
-        actor.branchId,
-        actor,
-      );
-      const batch = await manager.getRepository(DepositReconBatchEntity).save(
-        manager.getRepository(DepositReconBatchEntity).create({
-          organizationId: actor.organizationId,
-          branchId: actor.branchId,
-          depositAccountId: dto.depositAccountId,
-          batchNumber,
-          stmtFromDate: dto.stmtFromDate,
-          stmtToDate: dto.stmtToDate,
-          stmtTotalAmount: dto.stmtTotalAmount,
-          systemTotalAmount: systemTotal,
-          diffAmount: diff,
-          status,
-          note: dto.note,
-          reconciledBy: actor.userId,
-          reconciledAt: new Date(),
-        }),
-      );
-
-      const nextReconStatus = diff === 0 ? ReconStatus.DA : ReconStatus.LECH;
-      await manager.getRepository(DepositMovementEntity).update(
-        { id: In(dto.movementIds) },
-        {
-          reconStatus: nextReconStatus,
-          reconBatchId: batch.id,
-          reconciledBy: actor.userId,
-          reconciledAt: new Date(),
-        },
-      );
-
-      let proposalId: string | undefined;
-      if (diff !== 0) {
-        // BR-REC-03: propose only — never auto-adjust the fund balance.
-        const proposal = await this.proposeFeeAdjustment(batch, actor, manager);
-        proposalId = proposal.voucherId;
-      }
-
-      await this.audit.record(
-        {
-          entityType: DepositAuditEntityType.RECON_BATCH,
-          entityId: batch.id,
-          action: DepositAuditAction.RECONCILE,
-          after: batch,
-        },
-        actor,
-        manager,
-      );
-
-      return { batch, systemTotalAmount: systemTotal, diffAmount: diff, status, proposalId };
+      return { results };
     });
   }
 
@@ -274,6 +210,116 @@ export class DepositReconService {
   }
 
   // ── internal ───────────────────────────────────────────────────────────────
+
+  /** Two groups may not claim the same account or the same movement. */
+  private assertGroupsDisjoint(groups: ReconcileGroupDto[]): void {
+    const accountIds = new Set<string>();
+    const movementIds = new Set<string>();
+    for (const group of groups) {
+      if (accountIds.has(group.depositAccountId)) {
+        throw new BadRequestException(
+          `Deposit account ${group.depositAccountId} appears in more than one group`,
+        );
+      }
+      accountIds.add(group.depositAccountId);
+      for (const id of group.movementIds) {
+        if (movementIds.has(id)) {
+          throw new BadRequestException(
+            `Movement ${id} appears in more than one group`,
+          );
+        }
+        movementIds.add(id);
+      }
+    }
+  }
+
+  private async reconcileGroup(
+    group: ReconcileGroupDto,
+    dto: ReconcileDto,
+    actor: ActorContext,
+    manager: EntityManager,
+  ): Promise<ReconcileResult> {
+    const rows = await manager
+      .getRepository(DepositMovementEntity)
+      .createQueryBuilder('m')
+      .setLock('pessimistic_write')
+      .where('m.id IN (:...ids)', { ids: group.movementIds })
+      .andWhere('m.organizationId = :org', { org: actor.organizationId })
+      .andWhere('m.branchId = :branch', { branch: actor.branchId })
+      .andWhere('m.depositAccountId = :acc', { acc: group.depositAccountId })
+      .andWhere('m.reconStatus = :status', { status: ReconStatus.CHUA })
+      .getMany();
+    if (rows.length !== group.movementIds.length) {
+      throw new BadRequestException(
+        'Some movements are already reconciled, deleted, or out of scope',
+      );
+    }
+
+    // R1: net_amount (post-fee), not gross amount — matches the bank statement.
+    const systemTotal = round2(rows.reduce((s, r) => s + Number(r.netAmount), 0));
+    const diff = round2(group.stmtTotalAmount - systemTotal);
+    const status =
+      diff === 0 ? DepositReconBatchStatus.RECONCILED : DepositReconBatchStatus.DISCREPANCY;
+    if (status === DepositReconBatchStatus.DISCREPANCY && !group.note) {
+      throw new BadRequestException(
+        'note is required when the statement total does not match (BR-REC-02)',
+      );
+    }
+
+    const batchNumber = await this.docNumbering.generate(
+      DocumentType.RECONCILIATION,
+      actor.branchId,
+      actor,
+    );
+    const batch = await manager.getRepository(DepositReconBatchEntity).save(
+      manager.getRepository(DepositReconBatchEntity).create({
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        depositAccountId: group.depositAccountId,
+        batchNumber,
+        stmtFromDate: dto.stmtFromDate,
+        stmtToDate: dto.stmtToDate,
+        stmtTotalAmount: group.stmtTotalAmount,
+        systemTotalAmount: systemTotal,
+        diffAmount: diff,
+        status,
+        note: group.note,
+        reconciledBy: actor.userId,
+        reconciledAt: new Date(),
+      }),
+    );
+
+    const nextReconStatus = diff === 0 ? ReconStatus.DA : ReconStatus.LECH;
+    await manager.getRepository(DepositMovementEntity).update(
+      { id: In(group.movementIds) },
+      {
+        reconStatus: nextReconStatus,
+        reconBatchId: batch.id,
+        reconciledBy: actor.userId,
+        reconciledAt: new Date(),
+      },
+    );
+
+    let proposalId: string | undefined;
+    if (diff !== 0) {
+      // BR-REC-03: propose only — never auto-adjust the fund balance.
+      const proposal = await this.proposeFeeAdjustment(batch, actor, manager);
+      proposalId = proposal.voucherId;
+    }
+
+    await this.audit.record(
+      {
+        entityType: DepositAuditEntityType.RECON_BATCH,
+        entityId: batch.id,
+        action: DepositAuditAction.RECONCILE,
+        after: batch,
+      },
+      actor,
+      manager,
+    );
+
+    return { batch, systemTotalAmount: systemTotal, diffAmount: diff, status, proposalId };
+  }
 
   private buildListQuery(query: ListReconDto, actor: ActorContext) {
     const qb = this.movementRepo

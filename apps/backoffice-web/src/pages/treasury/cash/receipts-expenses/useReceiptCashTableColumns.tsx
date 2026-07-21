@@ -18,7 +18,10 @@ import {
   CashVoucherStatus,
   type ReceiptPaymentListItem,
 } from "../../cash-vouchers.types";
-import { RECEIPT_CASH_DOCUMENT_TYPE_FILTER_OPTIONS } from "./receipt-cash.constants";
+import {
+  RECEIPT_CASH_DOCUMENT_TYPE_FILTER_OPTIONS,
+  RECEIPT_CASH_STATUS_FILTER_OPTIONS,
+} from "./receipt-cash.constants";
 
 const STATUS_BADGE_VARIANT: Record<CashVoucherStatus, StatusBadgeVariant> = {
   [CashVoucherStatus.DRAFT]: "neutral",
@@ -32,17 +35,15 @@ export function useReceiptCashTableColumns(
   return useMemo(
     (): TableColumn<ReceiptPaymentListItem>[] => [
       {
-        key: "documentDate",
-        label: "Ngày",
+        key: "createdAt",
+        label: "Ngày tạo",
         width: 110,
+        filterKind: "date-range",
         render: (r) =>
-          new Date(`${r.voucherDate}T12:00:00`).toLocaleDateString(
-            "vi-VN",
-            LEDGER_CASH_VI_DATE,
-          ),
+          new Date(r.createdAt).toLocaleDateString("vi-VN", LEDGER_CASH_VI_DATE),
       },
       {
-        key: "voucherNo",
+        key: "documentNumber",
         label: "Số chứng từ",
         width: 130,
         render: (r) => (
@@ -54,20 +55,19 @@ export function useReceiptCashTableColumns(
         ),
       },
       {
-        key: "documentTypeLabel",
+        key: "documentKind",
         label: "Loại chứng từ",
         width: 200,
         filterKind: "select",
-        filterOptions: RECEIPT_CASH_DOCUMENT_TYPE_FILTER_OPTIONS.map((o) => ({
-          value: o.label,
-          label: o.label,
-        })),
+        filterOptions: RECEIPT_CASH_DOCUMENT_TYPE_FILTER_OPTIONS,
         render: (r) => receiptPaymentDocumentTypeLabel(r.kind, r.referenceType),
       },
       {
         key: "status",
         label: "Trạng thái",
         width: 120,
+        filterKind: "select",
+        filterOptions: RECEIPT_CASH_STATUS_FILTER_OPTIONS,
         render: (r) => (
           <StatusBadge variant={STATUS_BADGE_VARIANT[r.status]}>
             {CASH_VOUCHER_STATUS_LABEL[r.status]}
@@ -78,6 +78,7 @@ export function useReceiptCashTableColumns(
         key: "totalAmount",
         label: "Tổng tiền",
         width: 130,
+        filterKind: "number-range",
         headerClassName: "text-right",
         className: TABLE_NUM_CLASS,
         render: (r) => formatMoneyInteger(r.totalAmount),

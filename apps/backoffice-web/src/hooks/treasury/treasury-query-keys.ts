@@ -14,7 +14,13 @@ export const treasuryQueryKeys = {
   cashPayment: (id: string | undefined) => ["cash-payments", "detail", id] as const,
   cashCounts: (filters: unknown) => ["cash-counts", filters] as const,
   cashCount: (id: string | undefined) => ["cash-counts", "detail", id] as const,
-  cashLedger: (params: unknown) => ["cash-ledger", params] as const,
+  // Keeps the "cash-ledger" prefix so existing invalidations cover it too.
+  cashLedgerSearch: (body: unknown) => ["cash-ledger", "search", body] as const,
+  /**
+   * Merged receipt+payment stream. A new prefix, so every mutation that used to
+   * invalidate only cash-receipts/cash-payments must invalidate this as well.
+   */
+  cashVouchers: (body: unknown) => ["cash-vouchers", body] as const,
   depositLedger: (params: unknown) => ["deposit-ledger", params] as const,
   // Shares the "deposit-ledger" prefix so existing invalidations cover it too.
   depositLedgerSearch: (body: unknown) =>

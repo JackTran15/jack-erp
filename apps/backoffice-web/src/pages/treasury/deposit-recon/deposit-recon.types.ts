@@ -115,23 +115,33 @@ export interface DepositReconBatch {
   updatedAt: string;
 }
 
-export interface ReconcileBody {
+/** One batch = one deposit account: a bank statement belongs to a single bank. */
+export interface ReconcileGroupBody {
   depositAccountId: string;
   movementIds: string[];
   stmtTotalAmount: number;
-  stmtFromDate: string;
-  stmtToDate: string;
-  /** Required when the statement total does not match the system total (BR-REC-02). */
+  /** Required when this group's statement total does not match (BR-REC-02). */
   note?: string;
 }
 
-export interface ReconcileResponse {
+export interface ReconcileBody {
+  groups: ReconcileGroupBody[];
+  stmtFromDate: string;
+  stmtToDate: string;
+}
+
+export interface ReconcileGroupResult {
   batch: DepositReconBatch;
   systemTotalAmount: number;
   diffAmount: number;
   status: DepositReconBatchStatus;
   /** DRAFT bank-fee-adjustment proposal id when the batch is a discrepancy (BR-REC-03). */
   proposalId?: string;
+}
+
+export interface ReconcileResponse {
+  /** Same order as the submitted `groups`. */
+  results: ReconcileGroupResult[];
 }
 
 export interface UnreconcileBody {

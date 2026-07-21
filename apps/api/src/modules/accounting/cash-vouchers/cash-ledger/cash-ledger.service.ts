@@ -1,25 +1,35 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
+import {
+  CompareFilterDto,
+  CompareOperator,
+  StringFilterDto,
+  StringOperator,
+} from '../../../../common/filters/filter.dto';
 import { CashMovementEntity, CashMovementType } from '../../cash/cash-movement.entity';
+import { CashAccountEntity } from '../../cash/cash-account.entity';
 import { CashFundResolverService } from '../../cash/cash-fund-resolver.service';
-import { CashReceiptEntity } from '../cash-receipts/cash-receipt.entity';
-import { CashPaymentEntity } from '../cash-payments/cash-payment.entity';
 import { QueryCashLedgerDto } from './dto/query-cash-ledger.dto';
+import { CashLedgerSearchV2Dto } from './dto/cash-ledger-search-v2.dto';
 
-const NO_VOUCHER_LABEL = '(Chưa có chứng từ)';
 const DEFAULT_PAGE_SIZE = 50;
+// Row order must be identical everywhere so the running balance is deterministic.
+// Ascending is load-bearing: the balance accumulates forward through the period.
+const ROW_ORDER = 'ORDER BY created_at ASC, id ASC';
 
 export interface CashLedgerRow {
   movementId: string;
   date: Date;
   type: CashMovementType;
   voucherId: string | null;
-  voucherNumber: string;
+  /** Null when the movement has no voucher; the label is a display concern. */
+  voucherNumber: string | null;
   kind: 'PT' | 'PC' | 'Khác';
   description: string | null;
   partnerName: string | null;
+  staffName: string | null;
   debit: number;
   credit: number;
   balance: number;
@@ -38,13 +48,94 @@ export interface CashLedgerResult {
   totalCredit: number;
 }
 
-interface VoucherInfo {
-  voucherId: string;
-  voucherNumber: string | null;
-  kind: 'PT' | 'PC';
+interface RawRow {
+  id: string;
+  cash_account_id: string;
+  to_account_id: string | null;
+  type: string;
+  amount: string;
+  created_at: Date;
+  signed: string;
+  receipt_id: string | null;
+  payment_id: string | null;
+  voucher_number: string | null;
   description: string | null;
-  partnerName: string | null;
+  counterparty: string | null;
+  staff: string | null;
 }
+
+/**
+ * Every filter the ledger row stream understands. The same instance must reach
+ * countInRange, sumInOut, sumSignedBeforeOffset and fetchPageRows or the grid
+ * and its totals disagree.
+ *
+ * The date bounds are the exception: the opening and closing balances are the
+ * fund's true balances around the period and are deliberately NOT narrowed by
+ * column filters, so with filters active `opening + debit - credit` no longer
+ * equals the fund's real closing balance.
+ */
+export interface LedgerFilters {
+  dateFromInclusive?: string;
+  dateToInclusive?: string;
+  dateToExclusive?: string;
+  documentNumber?: StringFilterDto;
+  description?: StringFilterDto;
+  counterparty?: StringFilterDto;
+  staff?: StringFilterDto;
+  amountIn?: CompareFilterDto;
+  amountOut?: CompareFilterDto;
+}
+
+const COMPARE_SQL: Record<CompareOperator, string> = {
+  [CompareOperator.EQUALS]: '=',
+  [CompareOperator.LT]: '<',
+  [CompareOperator.LTE]: '<=',
+  [CompareOperator.GT]: '>',
+  [CompareOperator.GTE]: '>=',
+};
+
+/**
+ * Voucher and staff resolution. LEFT JOIN LATERAL ... LIMIT 1 rather than a plain
+ * join: cash_movement_id is 1:1 by contract, but a plain join would silently
+ * multiply ledger rows — and corrupt the running balance — if that ever broke.
+ * Soft-deleted vouchers are excluded, matching the repository `find` this
+ * replaced.
+ *
+ * Payments are coalesced ahead of receipts because the previous in-memory
+ * resolution built the receipt map first and let the payment map overwrite it.
+ */
+const VOUCHER_JOINS = `
+      LEFT JOIN LATERAL (
+        SELECT r.id, r.document_number, r.reason, r.payer_name,
+               r.partner_name_snapshot, r.staff_id
+        FROM cash_receipts r
+        WHERE r.cash_movement_id = m.id AND r.deleted_at IS NULL
+        LIMIT 1
+      ) cr ON true
+      LEFT JOIN LATERAL (
+        SELECT p.id, p.document_number, p.reason, p.payee_name,
+               p.partner_name_snapshot, p.staff_id
+        FROM cash_payments p
+        WHERE p.cash_movement_id = m.id AND p.deleted_at IS NULL
+        LIMIT 1
+      ) cp ON true
+      LEFT JOIN users su
+        ON su.id = COALESCE(cp.staff_id, cr.staff_id)
+       AND su.organization_id::text = m.organization_id`;
+
+/** Columns derived from the joins above. */
+const DERIVED_COLUMNS = `
+        cr.id                                            AS receipt_id,
+        cp.id                                            AS payment_id,
+        COALESCE(cp.document_number, cr.document_number) AS voucher_number,
+        COALESCE(cp.reason, cr.reason, m.notes)          AS description,
+        COALESCE(
+          cp.partner_name_snapshot,
+          cp.payee_name,
+          cr.partner_name_snapshot,
+          cr.payer_name
+        )                                                AS counterparty,
+        btrim(COALESCE(su.first_name, '') || ' ' || COALESCE(su.last_name, '')) AS staff`;
 
 /**
  * Sổ chi tiết tiền mặt (cash detail ledger). Scalar `SUM`/`COUNT` (no GROUP BY /
@@ -53,16 +144,21 @@ interface VoucherInfo {
  * the signed sum of the in-range rows that precede the page. Filters on
  * `(cash_account_id = X OR to_account_id = X)` so internal transfers appear in both
  * the source and destination accounts' ledgers.
+ *
+ * `cash_movements` has no document date, so `created_at` is the ledger's date —
+ * it drives both the period bounds and the row order.
+ *
+ * Voucher, counterparty and staff are resolved in SQL (see VOUCHER_JOINS) rather
+ * than by a post-query map, which is what makes them filterable at all: a filter
+ * applied after the page query would narrow the page instead of the row set.
  */
 @Injectable()
 export class CashLedgerService {
   constructor(
     @InjectRepository(CashMovementEntity)
     private readonly movementRepo: Repository<CashMovementEntity>,
-    @InjectRepository(CashReceiptEntity)
-    private readonly receiptRepo: Repository<CashReceiptEntity>,
-    @InjectRepository(CashPaymentEntity)
-    private readonly paymentRepo: Repository<CashPaymentEntity>,
+    @InjectRepository(CashAccountEntity)
+    private readonly accountRepo: Repository<CashAccountEntity>,
     private readonly cashFundResolver: CashFundResolverService,
   ) {}
 
@@ -78,47 +174,233 @@ export class CashLedgerService {
     END`;
   }
 
+  /**
+   * The scoped row set as a SQL text fragment (no outer SELECT/ORDER/LIMIT —
+   * callers wrap it). `$1` = cash account id, `$2` = organization id; further
+   * bounds and filter params are appended positionally.
+   */
+  private buildRowsSql(
+    accountId: string,
+    org: string,
+    branchId: string | undefined,
+    filters: LedgerFilters,
+  ): { sql: string; params: unknown[] } {
+    const params: unknown[] = [accountId, org];
+    // Movement-level predicates stay on the base table so they can use the
+    // cash_movements indexes.
+    const where: string[] = [
+      'm.organization_id = $2',
+      '(m.cash_account_id = $1 OR m.to_account_id = $1)',
+    ];
+
+    if (branchId) {
+      params.push(branchId);
+      where.push(`m.branch_id = $${params.length}`);
+    }
+    if (filters.dateFromInclusive) {
+      params.push(filters.dateFromInclusive);
+      where.push(`m.created_at >= $${params.length}::date`);
+    }
+    if (filters.dateToInclusive) {
+      params.push(filters.dateToInclusive);
+      where.push(`m.created_at < ($${params.length}::date + INTERVAL '1 day')`);
+    }
+    if (filters.dateToExclusive) {
+      params.push(filters.dateToExclusive);
+      where.push(`m.created_at < $${params.length}::date`);
+    }
+
+    const base = `SELECT m.id, m.cash_account_id, m.to_account_id, m.type, m.amount,
+        m.created_at, ${this.signedCase()} AS signed,${DERIVED_COLUMNS}
+      FROM cash_movements m${VOUCHER_JOINS}
+      WHERE ${where.join(' AND ')}`;
+
+    // Filters on derived columns run outside the base query — they reference the
+    // aliased output, and wrapping here means every caller (page rows, count,
+    // debit/credit sums, sum-before-offset) sees exactly the same row stream.
+    const outer: string[] = [];
+    this.applyString(outer, params, 'voucher_number', filters.documentNumber);
+    this.applyString(outer, params, 'description', filters.description);
+    this.applyString(outer, params, 'counterparty', filters.counterparty);
+    this.applyString(outer, params, 'staff', filters.staff);
+    // amountIn/amountOut are the two signs of `signed`, so each filter also
+    // constrains the direction.
+    this.applyCompare(outer, params, 'signed', filters.amountIn, 'in');
+    this.applyCompare(outer, params, 'signed', filters.amountOut, 'out');
+
+    const sql = outer.length
+      ? `SELECT * FROM (${base}) filtered WHERE ${outer.join(' AND ')}`
+      : base;
+    return { sql, params };
+  }
+
+  /**
+   * String filter on a (possibly null) derived column. Wildcards in the user
+   * value are escaped so they match literally.
+   */
+  private applyString(
+    where: string[],
+    params: unknown[],
+    col: string,
+    filter?: StringFilterDto,
+  ): void {
+    const value = filter?.value?.trim();
+    if (!value) return;
+    const target = `COALESCE(${col}, '')`;
+    const esc = value.replace(/[\\%_]/g, (c) => `\\${c}`);
+
+    switch (filter!.operator) {
+      case StringOperator.CONTAINS:
+        params.push(`%${esc}%`);
+        where.push(`${target} ILIKE $${params.length}`);
+        break;
+      case StringOperator.EQUALS:
+        params.push(value);
+        where.push(`lower(${target}) = lower($${params.length})`);
+        break;
+      case StringOperator.STARTS_WITH:
+        params.push(`${esc}%`);
+        where.push(`${target} ILIKE $${params.length}`);
+        break;
+      case StringOperator.ENDS_WITH:
+        params.push(`%${esc}`);
+        where.push(`${target} ILIKE $${params.length}`);
+        break;
+      case StringOperator.NOT_CONTAINS:
+        params.push(`%${esc}%`);
+        where.push(`${target} NOT ILIKE $${params.length}`);
+        break;
+    }
+  }
+
+  /**
+   * Money comparison against one direction of `signed`. `direction` picks the
+   * sign: 'in' compares `signed` itself, 'out' compares its absolute value.
+   */
+  private applyCompare(
+    where: string[],
+    params: unknown[],
+    col: string,
+    filter: CompareFilterDto | undefined,
+    direction: 'in' | 'out',
+  ): void {
+    if (!filter || filter.value === undefined || filter.value === null || filter.value === '') {
+      return;
+    }
+    const num = Number(filter.value);
+    if (!Number.isFinite(num)) return;
+
+    const op = COMPARE_SQL[filter.operator];
+    if (!op) return;
+    params.push(num);
+    where.push(
+      direction === 'in'
+        ? `(${col} > 0 AND ${col} ${op} $${params.length})`
+        : `(${col} < 0 AND (-${col}) ${op} $${params.length})`,
+    );
+  }
+
+  /**
+   * v1 adapter. Maps the query-string DTO onto the same implementation as the v2
+   * search so the two can never drift. Branch handling is unchanged from the
+   * original endpoint: it narrows only when the caller passes `branchId`.
+   */
   async getLedger(
     query: QueryCashLedgerDto,
     actor: ActorContext,
   ): Promise<CashLedgerResult> {
-    const page = query.page ?? 1;
-    const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE;
+    return this.run(
+      {
+        page: query.page,
+        limit: query.pageSize,
+        cashAccountId: query.cashAccountId,
+        createdAt: { from: query.dateFrom, to: query.dateTo },
+      },
+      actor,
+      query.branchId,
+    );
+  }
+
+  /**
+   * v2 entry point.
+   *
+   * The row set is already pinned to one cash fund, so no `branch_id` predicate is
+   * added — that would drop the destination side of an inter-branch transfer,
+   * whose movement row carries the *source* branch. Instead the requested account
+   * is verified to belong to the actor's branch, which is what actually prevents
+   * reading another branch's fund (mirrors DepositLedgerService.resolveScope).
+   */
+  async search(
+    dto: CashLedgerSearchV2Dto,
+    actor: ActorContext,
+  ): Promise<CashLedgerResult> {
+    if (dto.cashAccountId) {
+      const account = await this.accountRepo.findOne({
+        where: {
+          id: dto.cashAccountId,
+          organizationId: actor.organizationId,
+          branchId: actor.branchId,
+        },
+      });
+      if (!account) {
+        throw new NotFoundException(
+          `Cash account ${dto.cashAccountId} not found for this branch`,
+        );
+      }
+    }
+    return this.run(dto, actor, undefined);
+  }
+
+  private async run(
+    dto: CashLedgerSearchV2Dto,
+    actor: ActorContext,
+    branchIdOverride: string | undefined,
+  ): Promise<CashLedgerResult> {
+    const page = dto.page ?? 1;
+    const pageSize = dto.limit ?? DEFAULT_PAGE_SIZE;
     const offset = (page - 1) * pageSize;
     const org = actor.organizationId;
-    const branchId = query.branchId;
+    const branchId = branchIdOverride;
     // One cash fund per branch: default to the branch fund when no account given.
     const accountId =
-      query.cashAccountId ??
+      dto.cashAccountId ??
       (await this.cashFundResolver.resolveBranchCashFund(
         org,
         branchId ?? actor.branchId,
       ));
 
+    const dateFrom = dto.createdAt?.from;
+    const dateTo = dto.createdAt?.to;
+    const filters: LedgerFilters = {
+      dateFromInclusive: dateFrom,
+      dateToInclusive: dateTo,
+      documentNumber: dto.documentNumber,
+      description: dto.description,
+      counterparty: dto.counterparty,
+      staff: dto.staff,
+      amountIn: dto.amountIn,
+      amountOut: dto.amountOut,
+    };
+
     // --- scalar SUMs / COUNT (no GROUP BY) --------------------------------
+    // Opening and closing are the fund's real balances around the period, so they
+    // take the date bounds only — never the column filters (see LedgerFilters).
     const openingBalance = await this.sumSigned(accountId, org, branchId, {
-      dateToExclusive: query.dateFrom, // movements strictly before the range
+      dateToExclusive: dateFrom, // movements strictly before the range
     });
 
     const closingBalance = await this.sumSigned(accountId, org, branchId, {
-      dateToInclusive: query.dateTo, // everything up to and including dateTo
+      dateToInclusive: dateTo, // everything up to and including dateTo
     });
 
     const { totalDebit, totalCredit } = await this.sumDebitCredit(
       accountId,
       org,
       branchId,
-      query.dateFrom,
-      query.dateTo,
+      filters,
     );
 
-    const total = await this.countInRange(
-      accountId,
-      org,
-      branchId,
-      query.dateFrom,
-      query.dateTo,
-    );
+    const total = await this.countInRange(accountId, org, branchId, filters);
 
     // Δ of in-range rows that precede the current page (the first `offset` rows).
     const pageDelta =
@@ -127,8 +409,7 @@ export class CashLedgerService {
             accountId,
             org,
             branchId,
-            query.dateFrom,
-            query.dateTo,
+            filters,
             offset,
           )
         : 0;
@@ -139,33 +420,27 @@ export class CashLedgerService {
       accountId,
       org,
       branchId,
-      query.dateFrom,
-      query.dateTo,
+      filters,
       pageSize,
       offset,
     );
 
-    const voucherMap = await this.loadVouchers(
-      pageRows.map((r) => r.id),
-      org,
-    );
-
     let running = pageOpeningBalance;
     const rows: CashLedgerRow[] = pageRows.map((r) => {
-      const signed = this.signedJs(r, accountId);
+      const signed = Number(r.signed);
       const debit = signed > 0 ? signed : 0;
       const credit = signed < 0 ? -signed : 0;
       running += signed;
-      const voucher = voucherMap.get(r.id);
       return {
         movementId: r.id,
         date: r.created_at,
         type: r.type as CashMovementType,
-        voucherId: voucher?.voucherId ?? null,
-        voucherNumber: voucher?.voucherNumber ?? NO_VOUCHER_LABEL,
-        kind: voucher?.kind ?? 'Khác',
-        description: voucher?.description ?? r.notes ?? null,
-        partnerName: voucher?.partnerName ?? null,
+        voucherId: r.payment_id ?? r.receipt_id ?? null,
+        voucherNumber: r.voucher_number ?? null,
+        kind: r.payment_id ? 'PC' : r.receipt_id ? 'PT' : 'Khác',
+        description: r.description ?? null,
+        partnerName: r.counterparty ?? null,
+        staffName: r.staff || null,
         debit,
         credit,
         balance: running,
@@ -196,84 +471,40 @@ export class CashLedgerService {
     accountId: string,
     org: string,
     branchId: string | undefined,
-    bounds: {
-      dateFromInclusive?: string;
-      dateToInclusive?: string;
-      dateToExclusive?: string;
-    },
+    bounds: Pick<
+      LedgerFilters,
+      'dateFromInclusive' | 'dateToInclusive' | 'dateToExclusive'
+    >,
   ): Promise<number> {
-    const params: any[] = [accountId, org];
-    const where: string[] = [
-      'm.organization_id = $2',
-      '(m.cash_account_id = $1 OR m.to_account_id = $1)',
-    ];
-
-    if (branchId) {
-      params.push(branchId);
-      where.push(`m.branch_id = $${params.length}`);
-    }
-    if (bounds.dateFromInclusive) {
-      params.push(bounds.dateFromInclusive);
-      where.push(`m.created_at >= $${params.length}::date`);
-    }
-    if (bounds.dateToInclusive) {
-      params.push(bounds.dateToInclusive);
-      where.push(`m.created_at < ($${params.length}::date + INTERVAL '1 day')`);
-    }
-    if (bounds.dateToExclusive) {
-      params.push(bounds.dateToExclusive);
-      where.push(`m.created_at < $${params.length}::date`);
-    }
-
-    const sql = `SELECT COALESCE(SUM(${this.signedCase()}), 0) AS sum
-      FROM cash_movements m
-      WHERE ${where.join(' AND ')}`;
-    const rows = await this.movementRepo.query(sql, params);
+    const { sql, params } = this.buildRowsSql(accountId, org, branchId, bounds);
+    const rows = await this.movementRepo.query(
+      `SELECT COALESCE(SUM(signed), 0) AS sum FROM (${sql}) legs`,
+      params,
+    );
     return Number(rows[0]?.sum ?? 0);
   }
 
   /**
    * Signed sum of the first `offset` in-range rows in ledger order. The inner
-   * ORDER BY matches the page query's total order (`created_at`, then unique `id`),
-   * so these are exactly the rows displayed on the pages preceding the current one.
+   * ORDER BY matches the page query's total order, so these are exactly the rows
+   * displayed on the pages preceding the current one.
    */
   private async sumSignedBeforeOffset(
     accountId: string,
     org: string,
     branchId: string | undefined,
-    dateFrom: string | undefined,
-    dateTo: string | undefined,
+    filters: LedgerFilters,
     offset: number,
   ): Promise<number> {
-    const params: any[] = [accountId, org];
-    const where: string[] = [
-      'm.organization_id = $2',
-      '(m.cash_account_id = $1 OR m.to_account_id = $1)',
-    ];
-    if (branchId) {
-      params.push(branchId);
-      where.push(`m.branch_id = $${params.length}`);
-    }
-    if (dateFrom) {
-      params.push(dateFrom);
-      where.push(`m.created_at >= $${params.length}::date`);
-    }
-    if (dateTo) {
-      params.push(dateTo);
-      where.push(`m.created_at < ($${params.length}::date + INTERVAL '1 day')`);
-    }
+    const { sql, params } = this.buildRowsSql(accountId, org, branchId, filters);
     params.push(offset);
-    const offsetIdx = params.length;
-
-    const sql = `SELECT COALESCE(SUM(sub.s), 0) AS sum
+    const fullSql = `SELECT COALESCE(SUM(sub.s), 0) AS sum
       FROM (
-        SELECT (${this.signedCase()}) AS s
-        FROM cash_movements m
-        WHERE ${where.join(' AND ')}
-        ORDER BY m.created_at ASC, m.id ASC
-        LIMIT $${offsetIdx}
+        SELECT signed AS s FROM (${sql}) legs
+        ${ROW_ORDER}
+        LIMIT $${params.length}
       ) sub`;
-    const rows = await this.movementRepo.query(sql, params);
+    const rows = await this.movementRepo.query(fullSql, params);
     return Number(rows[0]?.sum ?? 0);
   }
 
@@ -281,30 +512,13 @@ export class CashLedgerService {
     accountId: string,
     org: string,
     branchId: string | undefined,
-    dateFrom?: string,
-    dateTo?: string,
+    filters: LedgerFilters,
   ): Promise<number> {
-    const params: any[] = [accountId, org];
-    const where: string[] = [
-      'm.organization_id = $2',
-      '(m.cash_account_id = $1 OR m.to_account_id = $1)',
-    ];
-    if (branchId) {
-      params.push(branchId);
-      where.push(`m.branch_id = $${params.length}`);
-    }
-    if (dateFrom) {
-      params.push(dateFrom);
-      where.push(`m.created_at >= $${params.length}::date`);
-    }
-    if (dateTo) {
-      params.push(dateTo);
-      where.push(`m.created_at < ($${params.length}::date + INTERVAL '1 day')`);
-    }
-    const sql = `SELECT COUNT(*)::int AS total
-      FROM cash_movements m
-      WHERE ${where.join(' AND ')}`;
-    const rows = await this.movementRepo.query(sql, params);
+    const { sql, params } = this.buildRowsSql(accountId, org, branchId, filters);
+    const rows = await this.movementRepo.query(
+      `SELECT COUNT(*)::int AS total FROM (${sql}) legs`,
+      params,
+    );
     return Number(rows[0]?.total ?? 0);
   }
 
@@ -312,33 +526,16 @@ export class CashLedgerService {
     accountId: string,
     org: string,
     branchId: string | undefined,
-    dateFrom?: string,
-    dateTo?: string,
+    filters: LedgerFilters,
   ): Promise<{ totalDebit: number; totalCredit: number }> {
-    const params: any[] = [accountId, org];
-    const where: string[] = [
-      'm.organization_id = $2',
-      '(m.cash_account_id = $1 OR m.to_account_id = $1)',
-    ];
-    if (branchId) {
-      params.push(branchId);
-      where.push(`m.branch_id = $${params.length}`);
-    }
-    if (dateFrom) {
-      params.push(dateFrom);
-      where.push(`m.created_at >= $${params.length}::date`);
-    }
-    if (dateTo) {
-      params.push(dateTo);
-      where.push(`m.created_at < ($${params.length}::date + INTERVAL '1 day')`);
-    }
-    const signed = this.signedCase();
-    const sql = `SELECT
-        COALESCE(SUM(CASE WHEN (${signed}) > 0 THEN (${signed}) ELSE 0 END), 0) AS debit,
-        COALESCE(SUM(CASE WHEN (${signed}) < 0 THEN -(${signed}) ELSE 0 END), 0) AS credit
-      FROM cash_movements m
-      WHERE ${where.join(' AND ')}`;
-    const rows = await this.movementRepo.query(sql, params);
+    const { sql, params } = this.buildRowsSql(accountId, org, branchId, filters);
+    const rows = await this.movementRepo.query(
+      `SELECT
+        COALESCE(SUM(CASE WHEN signed > 0 THEN signed ELSE 0 END), 0) AS debit,
+        COALESCE(SUM(CASE WHEN signed < 0 THEN -signed ELSE 0 END), 0) AS credit
+      FROM (${sql}) legs`,
+      params,
+    );
     return {
       totalDebit: Number(rows[0]?.debit ?? 0),
       totalCredit: Number(rows[0]?.credit ?? 0),
@@ -349,117 +546,20 @@ export class CashLedgerService {
     accountId: string,
     org: string,
     branchId: string | undefined,
-    dateFrom: string | undefined,
-    dateTo: string | undefined,
+    filters: LedgerFilters,
     pageSize: number,
     offset: number,
-  ): Promise<
-    Array<{
-      id: string;
-      cash_account_id: string;
-      to_account_id: string | null;
-      type: string;
-      amount: string;
-      notes: string | null;
-      created_at: Date;
-    }>
-  > {
-    const params: any[] = [accountId, org];
-    const where: string[] = [
-      'm.organization_id = $2',
-      '(m.cash_account_id = $1 OR m.to_account_id = $1)',
-    ];
-    if (branchId) {
-      params.push(branchId);
-      where.push(`m.branch_id = $${params.length}`);
-    }
-    if (dateFrom) {
-      params.push(dateFrom);
-      where.push(`m.created_at >= $${params.length}::date`);
-    }
-    if (dateTo) {
-      params.push(dateTo);
-      where.push(`m.created_at < ($${params.length}::date + INTERVAL '1 day')`);
-    }
+  ): Promise<RawRow[]> {
+    const { sql, params } = this.buildRowsSql(accountId, org, branchId, filters);
     params.push(pageSize);
     const limitIdx = params.length;
     params.push(offset);
     const offsetIdx = params.length;
-
-    const sql = `SELECT m.id, m.cash_account_id, m.to_account_id, m.type, m.amount,
-        m.notes, m.created_at
-      FROM cash_movements m
-      WHERE ${where.join(' AND ')}
-      ORDER BY m.created_at ASC, m.id ASC
+    const fullSql = `SELECT id, cash_account_id, to_account_id, type, amount, created_at,
+        signed, receipt_id, payment_id, voucher_number, description, counterparty, staff
+      FROM (${sql}) legs
+      ${ROW_ORDER}
       LIMIT $${limitIdx} OFFSET $${offsetIdx}`;
-    return this.movementRepo.query(sql, params);
-  }
-
-  private async loadVouchers(
-    movementIds: string[],
-    org: string,
-  ): Promise<Map<string, VoucherInfo>> {
-    const map = new Map<string, VoucherInfo>();
-    if (movementIds.length === 0) return map;
-
-    const receipts = await this.receiptRepo.find({
-      where: movementIds.map((id) => ({
-        cashMovementId: id,
-        organizationId: org,
-      })),
-    });
-    for (const r of receipts) {
-      if (!r.cashMovementId) continue;
-      map.set(r.cashMovementId, {
-        voucherId: r.id,
-        voucherNumber: r.documentNumber ?? null,
-        kind: 'PT',
-        description: r.reason ?? null,
-        partnerName: r.partnerNameSnapshot ?? r.payerName ?? null,
-      });
-    }
-
-    const payments = await this.paymentRepo.find({
-      where: movementIds.map((id) => ({
-        cashMovementId: id,
-        organizationId: org,
-      })),
-    });
-    for (const p of payments) {
-      if (!p.cashMovementId) continue;
-      map.set(p.cashMovementId, {
-        voucherId: p.id,
-        voucherNumber: p.documentNumber ?? null,
-        kind: 'PC',
-        description: p.reason ?? null,
-        partnerName: p.partnerNameSnapshot ?? p.payeeName ?? null,
-      });
-    }
-
-    return map;
-  }
-
-  // ---------------------------------------------------------------------------
-  // misc
-  // ---------------------------------------------------------------------------
-
-  private signedJs(
-    row: { type: string; amount: string; cash_account_id: string; to_account_id: string | null },
-    accountId: string,
-  ): number {
-    const amount = Number(row.amount);
-    switch (row.type) {
-      case CashMovementType.DEPOSIT:
-      case CashMovementType.ADJUSTMENT:
-        return amount;
-      case CashMovementType.WITHDRAWAL:
-        return -amount;
-      case CashMovementType.TRANSFER:
-        if (row.cash_account_id === accountId) return -amount;
-        if (row.to_account_id === accountId) return amount;
-        return 0;
-      default:
-        return 0;
-    }
+    return this.movementRepo.query(fullSql, params);
   }
 }

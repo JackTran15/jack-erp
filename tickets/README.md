@@ -1758,3 +1758,44 @@ flowchart LR
   T3 --> T5["FSW-05 Test plan"]
   T4 --> T5
 ```
+
+### EPIC-21072026 Đối chiếu tiền gửi — cho phép chọn nhiều tài khoản
+
+Nút "Đối chiếu" ở `/treasury/deposit-reconciliation` luôn xám khi filter "Số tài khoản" = Tất cả (`disabled … || !accountId`), và tooltip giải thích cũng không hiện được. Bỏ ràng buộc: `POST /deposit-recon/reconcile` nhận `groups[]` (một group = một tài khoản, có tổng sao kê + ghi chú riêng) và tạo N lô trong **một** transaction; dialog nhập tổng sao kê riêng cho từng tài khoản. Không entity/migration mới.
+
+| Ticket | Mô tả |
+| ------ | ----- |
+| [TKT-MRC-01](./tickets/TKT-MRC-01-reconcile-dto-service-groups.md) | `ReconcileDto.groups[]` + `reconcileGroup()` lặp trong 1 transaction, chặn group chồng lấn |
+| [TKT-MRC-02](./tickets/TKT-MRC-02-openapi-fe-types.md) | OpenAPI regen + `ReconcileBody`/`ReconcileResponse` FE |
+| [TKT-MRC-03](./tickets/TKT-MRC-03-fe-page-dialog-multi-account.md) | Bỏ `!accountId`, chọn dòng bằng `Map<id,row>`, dialog một khối/tài khoản |
+| [TKT-MRC-04](./tickets/TKT-MRC-04-tests-e2e.md) | Unit (2 lô, rollback, group chồng lấn) + E2E UAT-09 shape mới |
+
+```mermaid
+flowchart LR
+  T1["MRC-01 DTO+Service"] --> T2["MRC-02 OpenAPI+FE types"]
+  T2 --> T3["MRC-03 FE page+dialog"]
+  T1 --> T4["MRC-04 Unit+E2E"]
+  T3 --> T4
+```
+
+### EPIC-21072026 Tiền mặt — gộp 1 API tìm kiếm thu/chi + lọc theo cột cho sổ quỹ
+
+- [EPIC-21072026 Cash voucher & ledger search](./epics/EPIC-21072026-cash-voucher-ledger-search.md)
+
+`/treasury/cash/receipts-expenses` đang gọi 2 API (`/cash-receipts` + `/cash-payments`, mỗi cái `pageSize=100`) rồi gộp/lọc/phân trang/cộng tổng trong trình duyệt — nên bộ lọc cột và ô "Tổng tiền" chỉ thấy 100+100 dòng đầu; `/treasury/cash/ledger` thì không lọc được cột nào vì `description`/`counterparty` resolve bằng Map JS sau truy vấn trang. Đưa cả hai về đúng mô hình deposit (commit `b4bf7907`): mỗi màn **một** endpoint CQRS, lọc + sắp xếp + phân trang + tổng tiền chạy ở DB. Cột ngày đổi sang `created_at` (lọc **và** `ORDER BY created_at DESC`); `documentKind` 3 giá trị (thêm `GOODS_RECEIPT_PAYMENT`). Không migration, không permission key mới.
+
+| Ticket | Mô tả |
+| ------ | ----- |
+| [TKT-CVS-01](./tickets/TKT-CVS-01-cash-voucher-search-api.md) | `POST /v2/cash-vouchers/search` — CQRS + UNION ALL CTE trên `cash_receipts` ∪ `cash_payments`, `totalAmount` toàn tập |
+| [TKT-CVS-02](./tickets/TKT-CVS-02-cash-ledger-search-api.md) | Refactor `CashLedgerService` (LATERAL joins thay `loadVouchers`) + `POST /v2/cash-ledger/search`; v1 thành adapter |
+| [TKT-CVS-03](./tickets/TKT-CVS-03-openapi-snapshot.md) | OpenAPI regen + commit snapshot |
+| [TKT-CVS-04](./tickets/TKT-CVS-04-fe-receipts-expenses.md) | FE màn Thu, chi tiền mặt → search server-side; xóa `use-merged-receipt-payments` |
+| [TKT-CVS-05](./tickets/TKT-CVS-05-fe-cash-ledger.md) | FE sổ quỹ tiền mặt → bật bộ lọc theo cột |
+
+```mermaid
+flowchart LR
+  T1["CVS-01 API thu/chi gộp"] --> T3["CVS-03 OpenAPI"]
+  T2["CVS-02 API sổ quỹ + refactor"] --> T3
+  T3 --> T4["CVS-04 FE thu/chi"]
+  T3 --> T5["CVS-05 FE sổ quỹ"]
+```

@@ -1,4 +1,5 @@
 import { Module, OnModuleInit } from '@nestjs/common';
+import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EntityRegistryService } from '../../crud/entity-registry.service';
 import { CashModule } from '../cash/cash.module';
@@ -42,6 +43,10 @@ import { DebtCollectionController } from './debt-collection/debt-collection.cont
 import { SupplierDebtPaymentSagaEntity } from './supplier-debt-payment/supplier-debt-payment-saga.entity';
 import { SupplierDebtPaymentSagaService } from './supplier-debt-payment/supplier-debt-payment-saga.service';
 import { SupplierDebtPaymentController } from './supplier-debt-payment/supplier-debt-payment.controller';
+import { CashVoucherV2Controller } from './controllers/cash-voucher-v2.controller';
+import { SearchCashVouchersV2Handler } from './queries/search-cash-vouchers-v2.handler';
+import { CashLedgerV2Controller } from './cash-ledger/controllers/cash-ledger-v2.controller';
+import { SearchCashLedgerV2Handler } from './cash-ledger/queries/search-cash-ledger-v2.handler';
 
 @Module({
   imports: [
@@ -60,8 +65,11 @@ import { SupplierDebtPaymentController } from './supplier-debt-payment/supplier-
     CashModule,
     PaymentAccountsModule,
     DocumentNumberingModule,
+    CqrsModule,
   ],
   controllers: [
+    CashVoucherV2Controller,
+    CashLedgerV2Controller,
     CashReceiptsController,
     CashPaymentsController,
     CashLedgerController,
@@ -92,6 +100,8 @@ import { SupplierDebtPaymentController } from './supplier-debt-payment/supplier-
     GoodsReceiptCashConsumer,
     ExpenseCashConsumer,
     RefundCashConsumer,
+    SearchCashVouchersV2Handler,
+    SearchCashLedgerV2Handler,
   ],
   exports: [
     CashVoucherCategorySeederService,

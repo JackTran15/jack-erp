@@ -12,6 +12,9 @@ interface Props {
   totalDebit?: number;
   totalCredit?: number;
   closingBalance?: number;
+  columnFilterControl?: React.ComponentProps<
+    typeof BaseDataTable<LedgerCashRow>
+  >["columnFilterControl"];
 }
 
 export function LedgerCashTable({
@@ -22,6 +25,7 @@ export function LedgerCashTable({
   totalDebit,
   totalCredit,
   closingBalance,
+  columnFilterControl,
 }: Props) {
   const columns = useLedgerCashTableColumns(onDrillDown);
 
@@ -58,6 +62,7 @@ export function LedgerCashTable({
         loading={loading}
         emptyLabel="Không có phát sinh trong kỳ."
         getRowKey={(r) => r.id}
+        columnFilterControl={columnFilterControl}
       />
       {closingBalance != null && (
         <div className="flex items-center justify-end border-t bg-muted/50 px-4 py-2 text-sm font-semibold">
