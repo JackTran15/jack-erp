@@ -33,12 +33,25 @@ function makeReport(opts: {
   items?: any[];
   categories?: any[];
   products?: any[];
+  storages?: any[];
+  locations?: any[];
+  itemStorageLocations?: any[];
+  stockBalances?: any[];
   hasConsolidated?: boolean;
 }) {
   const qb: any = {
     where: jest.fn(() => qb),
     andWhere: jest.fn(() => qb),
     getMany: jest.fn(async () => opts.invoices ?? []),
+  };
+  const stockBalanceQb: any = {
+    innerJoin: jest.fn(() => stockBalanceQb),
+    where: jest.fn(() => stockBalanceQb),
+    andWhere: jest.fn(() => stockBalanceQb),
+    orderBy: jest.fn(() => stockBalanceQb),
+    select: jest.fn(() => stockBalanceQb),
+    addSelect: jest.fn(() => stockBalanceQb),
+    getRawMany: jest.fn(async () => []),
   };
   const repo = (rows?: any[]) => ({ find: jest.fn(async () => rows ?? []) });
   return new RevenueByItemReport(
@@ -47,6 +60,13 @@ function makeReport(opts: {
     repo(opts.items) as any,
     repo(opts.categories) as any,
     repo(opts.products) as any,
+    repo(opts.storages) as any,
+    repo(opts.locations) as any,
+    repo(opts.itemStorageLocations) as any,
+    {
+      ...repo(opts.stockBalances),
+      createQueryBuilder: jest.fn(() => stockBalanceQb),
+    } as any,
     { hasPermission: jest.fn(async () => opts.hasConsolidated ?? false) } as any,
   );
 }
@@ -65,6 +85,33 @@ describe('RevenueByItemReport.buildColumns', () => {
     expect(headers.every((h) => h.group === null)).toBe(true);
     expect(headers.map((h) => h.col)).toEqual(
       expect.arrayContaining(['sku', 'itemName', 'brand', 'quantity', 'revenue.total']),
+    );
+  });
+
+  it('includes locationCode/locationName at item grain when exactly one store resolves', async () => {
+    const report = makeReport({});
+    const headers = await report.buildColumns(actor, { statBy: ReportGroupBy.ITEM });
+    expect(headers.map((h) => h.col)).toEqual(
+      expect.arrayContaining(['locationCode', 'locationName']),
+    );
+  });
+
+  it('drops locationCode/locationName when statBy is not item', async () => {
+    const report = makeReport({});
+    const headers = await report.buildColumns(actor, { statBy: ReportGroupBy.PARENT });
+    expect(headers.map((h) => h.col)).not.toEqual(
+      expect.arrayContaining(['locationCode', 'locationName']),
+    );
+  });
+
+  it('drops locationCode/locationName when the store filter resolves to more than one branch', async () => {
+    const report = makeReport({ hasConsolidated: true });
+    const headers = await report.buildColumns(actor, {
+      statBy: ReportGroupBy.ITEM,
+      store: { scope: 'group', storeIds: ['b1', 'b2'] },
+    });
+    expect(headers.map((h) => h.col)).not.toEqual(
+      expect.arrayContaining(['locationCode', 'locationName']),
     );
   });
 });
@@ -115,6 +162,43 @@ describe('RevenueByItemReport.buildData', () => {
     );
     expect(res.total).toBe(1);
     expect(res.rows[0].itemName).toBe('Shoes');
+  });
+
+  it('resolves locationCode/locationName from the item\'s warehouse (non-showroom) location', async () => {
+    const report = makeReport({
+      invoices: [inv()],
+      lines: [line()],
+      items: [{ id: 'it1', categoryId: 'cat1', brand: 'Nike' }],
+      categories: [{ id: 'cat1', name: 'Shoes' }],
+      storages: [{ id: 'wh1', branchId: 'b1', isMainStorage: false, isActive: true }],
+      itemStorageLocations: [{ itemId: 'it1', storageId: 'wh1', locationId: 'loc1' }],
+      locations: [{ id: 'loc1', code: 'A-01', name: 'Aisle A' }],
+    });
+    const res = await report.buildData(
+      baseDto({ columns: ['sku', 'locationCode', 'locationName'] }) as any,
+      actor,
+    );
+    expect(res.rows[0]).toMatchObject({ locationCode: 'A-01', locationName: 'Aisle A' });
+  });
+
+  it('leaves locationCode/locationName null when statBy is not item', async () => {
+    const report = makeReport({
+      invoices: [inv()],
+      lines: [line()],
+      items: [{ id: 'it1', categoryId: 'cat1', brand: 'Nike' }],
+      categories: [{ id: 'cat1', name: 'Shoes' }],
+      storages: [{ id: 'wh1', branchId: 'b1', isMainStorage: false, isActive: true }],
+      itemStorageLocations: [{ itemId: 'it1', storageId: 'wh1', locationId: 'loc1' }],
+      locations: [{ id: 'loc1', code: 'A-01', name: 'Aisle A' }],
+    });
+    const res = await report.buildData(
+      baseDto({
+        columns: ['itemName', 'locationCode', 'locationName'],
+        filters: { issuedAt: { from: '2026-06-01' }, statBy: ReportGroupBy.GROUP },
+      }) as any,
+      actor,
+    );
+    expect(res.rows[0]).toMatchObject({ locationCode: null, locationName: null });
   });
 
   it('filters by brand pre-aggregate', async () => {

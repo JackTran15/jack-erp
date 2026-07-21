@@ -33,6 +33,9 @@ export interface RevenueByItemRowInput {
   itemCategory: string | null;
   brand: string | null;
   unit: string | null;
+  /** Item's current warehouse location (not showroom) — item grain only. */
+  locationCode: string | null;
+  locationName: string | null;
   /** Line movement direction — OUT adds to revenue, IN (return leg) subtracts. */
   direction: ItemDirection;
   quantity: number;
@@ -49,6 +52,8 @@ export interface ItemGroupAggregate {
   itemCategory: string | null;
   brand: string | null;
   unit: string | null;
+  locationCode: string | null;
+  locationName: string | null;
   quantity: number;
   goods: number;
   discount: number;
@@ -64,6 +69,8 @@ interface Dimension {
   itemCategory: string | null;
   brand: string | null;
   unit: string | null;
+  locationCode: string | null;
+  locationName: string | null;
 }
 
 const EMPTY_DIMENSION: Dimension = {
@@ -73,6 +80,8 @@ const EMPTY_DIMENSION: Dimension = {
   itemCategory: null,
   brand: null,
   unit: null,
+  locationCode: null,
+  locationName: null,
 };
 
 /** Resolve the grouping key + dimension display fields for a row at a given grain. */
@@ -87,6 +96,8 @@ function dimensionOf(r: RevenueByItemRowInput, grain: ItemGrain): Dimension {
             itemCategory: r.itemCategory,
             brand: null,
             unit: null,
+            locationCode: null,
+            locationName: null,
           }
         : EMPTY_DIMENSION;
     case 'brand':
@@ -98,10 +109,13 @@ function dimensionOf(r: RevenueByItemRowInput, grain: ItemGrain): Dimension {
             itemCategory: null,
             brand: r.brand,
             unit: null,
+            locationCode: null,
+            locationName: null,
           }
         : EMPTY_DIMENSION;
     case 'parent':
       // Group by parent product (mẫu mã); items without a parent fall back to item grain.
+      // A parent row can span multiple items, so it has no single location.
       return r.parentId
         ? {
             key: r.parentId,
@@ -110,6 +124,8 @@ function dimensionOf(r: RevenueByItemRowInput, grain: ItemGrain): Dimension {
             itemCategory: r.itemCategory,
             brand: r.brand,
             unit: r.unit,
+            locationCode: null,
+            locationName: null,
           }
         : {
             key: r.itemId ?? r.itemCode,
@@ -118,6 +134,8 @@ function dimensionOf(r: RevenueByItemRowInput, grain: ItemGrain): Dimension {
             itemCategory: r.itemCategory,
             brand: r.brand,
             unit: r.unit,
+            locationCode: null,
+            locationName: null,
           };
     case 'item':
     default:
@@ -128,6 +146,8 @@ function dimensionOf(r: RevenueByItemRowInput, grain: ItemGrain): Dimension {
         itemCategory: r.itemCategory,
         brand: r.brand,
         unit: r.unit,
+        locationCode: r.locationCode,
+        locationName: r.locationName,
       };
   }
 }
@@ -154,6 +174,8 @@ export function aggregateByItem(
         itemCategory: d.itemCategory,
         brand: d.brand,
         unit: d.unit,
+        locationCode: d.locationCode,
+        locationName: d.locationName,
         quantity: 0,
         goods: 0,
         discount: 0,
@@ -194,6 +216,10 @@ const dimensionValue = (
       return agg.brand;
     case 'unit':
       return agg.unit;
+    case 'locationCode':
+      return agg.locationCode;
+    case 'locationName':
+      return agg.locationName;
   }
 };
 

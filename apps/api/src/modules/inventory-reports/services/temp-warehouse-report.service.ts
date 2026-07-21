@@ -31,8 +31,23 @@ import { DataSource } from 'typeorm';
  *
  * Mapping cột → dữ liệu:
  *   - date/time    : thời điểm xuất (COALESCE xuất → trả).
- *   - location     : `locations.code` của kho lưu trữ.
- *   - remainingQty : tồn hiện tại (`stock_balances`) tại vị trí kho lưu trữ.
+ *   - location     : vị trí kho lưu trữ (non-showroom) HIỆN TẠI của item
+ *                    trong chi nhánh của dòng xuất — KHÔNG dùng snapshot
+ *                    `warehouse_location_id` lưu trên session (vị trí đó có
+ *                    thể đã bị xếp lại / ngừng theo dõi từ lúc xuất tới nay).
+ *                    Resolve lại mỗi lần load, cùng logic với
+ *                    `ProfitByItemReport.loadItemLocations` /
+ *                    `RevenueByItemReport.loadItemLocations`: ưu tiên vị trí
+ *                    "mặc định" của item tại kho (`item_storage_locations`),
+ *                    fallback về vị trí có tồn kho cao nhất đang
+ *                    "Đang theo dõi" (`stock_balances.is_tracked = true`).
+ *                    Chỉ xét các location đang hoạt động (`is_active = true`)
+ *                    thuộc storage không phải showroom (`is_main_storage =
+ *                    false`, `is_active = true`). Không tìm được vị trí nào
+ *                    thỏa (mọi vị trí đều ngừng hoạt động / ngừng theo dõi /
+ *                    hết hàng) → để trống.
+ *   - remainingQty : tồn kho tại đúng vị trí đã resolve ở trên (0 nếu không
+ *                    resolve được vị trí nào).
  *   - staff        : carrier (`users.first_name + last_name`).
  *
  * saleQty / invoice: điền từ liên kết hóa đơn của dòng xuất đã bán
@@ -136,8 +151,7 @@ export class TempWarehouseReportService {
           l.invoice_id,
           l.invoice_number,
           l.transfer_id,
-          s.warehouse_location_id,
-          s.showroom_location_id
+          l.branch_id
         FROM temp_warehouse_lines l
         JOIN temp_warehouse_sessions s ON s.id = l.session_id
         JOIN items i
@@ -167,8 +181,7 @@ export class TempWarehouseReportService {
         SELECT
           COALESCE(e.item_id, r.item_id) AS item_id,
           COALESCE(e.carrier_user_id, r.carrier_user_id) AS carrier_user_id,
-          COALESCE(e.warehouse_location_id, r.warehouse_location_id) AS warehouse_location_id,
-          COALESCE(e.showroom_location_id, r.showroom_location_id) AS showroom_location_id,
+          COALESCE(e.branch_id, r.branch_id) AS branch_id,
           COALESCE(e.created_at, r.created_at) AS event_at,
           (e.id IS NOT NULL)::int AS out_qty,
           (r.id IS NOT NULL)::int AS return_qty,
@@ -214,14 +227,14 @@ export class TempWarehouseReportService {
         i.code AS sku,
         i.name AS name,
         i.unit AS unit,
-        loc.code AS location,
+        COALESCE(preferred.code, fallback.code) AS location,
         to_char(p.event_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh', 'DD/MM/YYYY') AS date,
         to_char(p.event_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI:SS') AS time,
         TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) AS staff,
         p.out_qty AS out_qty,
         p.return_qty AS return_qty,
         (p.invoice_id IS NOT NULL)::int AS sale_qty,
-        COALESCE(sb.quantity, 0) AS remaining_qty,
+        COALESCE(preferred.quantity, fallback.quantity, 0) AS remaining_qty,
         CASE
           WHEN p.invoice_id IS NOT NULL THEN 'Bán hàng trưng bày'
           WHEN p.exp_transfer_id IS NOT NULL THEN 'Chuyển kho xuất đi'
@@ -234,11 +247,45 @@ export class TempWarehouseReportService {
       FROM paired p
       JOIN items i ON i.id = p.item_id AND i.organization_id = $1
       LEFT JOIN users u ON u.id = p.carrier_user_id
-      LEFT JOIN locations loc ON loc.id = p.warehouse_location_id
-      LEFT JOIN stock_balances sb
-        ON sb.item_id = p.item_id
-        AND sb.organization_id = $1
-        AND sb.location_id = p.warehouse_location_id
+      -- Item's current default shelf in a non-showroom warehouse of the
+      -- line's branch — same priority order as loadItemLocations in
+      -- profit-by-item/revenue-by-item: preferred shelf first.
+      LEFT JOIN LATERAL (
+        SELECT loc.code, sb.quantity
+        FROM item_storage_locations isl
+        JOIN storages st ON st.id = isl.storage_id
+        JOIN locations loc ON loc.id = isl.location_id
+        LEFT JOIN stock_balances sb
+          ON sb.item_id = isl.item_id
+          AND sb.location_id = isl.location_id
+          AND sb.organization_id = $1
+        WHERE isl.item_id = p.item_id
+          AND isl.organization_id = $1
+          AND st.branch_id::text = p.branch_id
+          AND st.is_main_storage = FALSE
+          AND st.is_active = TRUE
+          AND loc.is_active = TRUE
+          AND COALESCE(sb.is_tracked, TRUE) = TRUE
+        LIMIT 1
+      ) preferred ON TRUE
+      -- Fallback: highest-stock tracked location among the branch's
+      -- non-showroom warehouses, when no preferred shelf resolved.
+      LEFT JOIN LATERAL (
+        SELECT loc.code, sb.quantity
+        FROM stock_balances sb
+        JOIN locations loc ON loc.id = sb.location_id
+        JOIN storages st ON st.id = loc.storage_id
+        WHERE sb.item_id = p.item_id
+          AND sb.organization_id = $1
+          AND sb.quantity > 0
+          AND sb.is_tracked = TRUE
+          AND st.branch_id::text = p.branch_id
+          AND st.is_main_storage = FALSE
+          AND st.is_active = TRUE
+          AND loc.is_active = TRUE
+        ORDER BY sb.quantity DESC
+        LIMIT 1
+      ) fallback ON preferred.code IS NULL
       ORDER BY p.event_at DESC
       LIMIT $7 OFFSET $8
       `,

@@ -35,6 +35,10 @@ export function ReportTableConfigSync() {
   // profit-by-item có bộ cột phụ thuộc "Thống kê theo" (tái dùng STATISTIC_BY
   // — cùng filter line revenue-by-item đang dùng); báo cáo lợi nhuận khác bỏ qua.
   const statBy = useReportStore((s) => s.filters[REPORT_FILTERS_LINE.STATISTIC_BY]);
+  // revenue-by-item cần biết đang filter theo (những) cửa hàng nào — cột "Vị
+  // trí"/"Mã vị trí" chỉ hiện khi BE resolve được đúng 1 cửa hàng (xem BE
+  // buildColumns của revenue-by-item); các báo cáo khác bỏ qua giá trị này.
+  const store = useReportStore((s) => s.filters[REPORT_FILTERS_LINE.STORE]);
   const setConfig = useTableStore((s) => s.setConfig);
   const columnsActions = useTableStore((s) => s.columnsActions);
 
@@ -43,7 +47,7 @@ export function ReportTableConfigSync() {
   const { template, isLoading: templateLoading } = useReportColumnTemplate();
 
   const { data: columnsResult } = useQuery({
-    queryKey: ["report-columns", backendSource, backendKey, groupBy, statBy],
+    queryKey: ["report-columns", backendSource, backendKey, groupBy, statBy, store],
     queryFn: () => {
       if (backendSource === "inventory") {
         return fetchInventoryReportColumns(backendKey as string);
@@ -60,7 +64,11 @@ export function ReportTableConfigSync() {
           statBy as "item" | "parent" | "group" | undefined,
         );
       }
-      return fetchReportColumns(backendKey as string);
+      return fetchReportColumns(
+        backendKey as string,
+        statBy as "item" | "parent" | "group" | undefined,
+        store,
+      );
     },
     enabled: Boolean(backendKey),
   });

@@ -29,10 +29,19 @@ export type ReportRow = Record<string, ReportCellValue>;
 
 export async function fetchReportColumns(
   reportType: string,
+  statBy?: "item" | "parent" | "group",
+  store?: { scope: "all" | "group"; storeIds: string[] },
 ): Promise<InvoiceReportColumnsResult> {
   return requireErpData(
     await erpApi.GET<InvoiceReportColumnsResult>("/reports/invoices/columns", {
-      params: { query: { reportType } },
+      params: {
+        query: {
+          reportType,
+          statBy,
+          storeScope: store?.scope,
+          storeIds: store?.storeIds?.length ? store.storeIds.join(",") : undefined,
+        },
+      },
     }),
   );
 }

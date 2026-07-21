@@ -15,6 +15,7 @@ export enum ReportTableColumn {
   PRODUCT_IMAGE = 'product_image',
   UNIT = 'unit',
   LOCATION = 'location',
+  LOCATION_CODE = 'location_code',
   QUANTITY = 'quantity',
   QUANTITY_SOLD = 'quantity_sold',
 
@@ -204,6 +205,7 @@ export const ReportTableColumnLabel = {
   [ReportTableColumn.PRODUCT_IMAGE]: 'Ảnh sản phẩm',
   [ReportTableColumn.UNIT]: 'Đơn vị',
   [ReportTableColumn.LOCATION]: 'Vị trí',
+  [ReportTableColumn.LOCATION_CODE]: 'Mã vị trí',
   [ReportTableColumn.QUANTITY]: 'Số lượng',
   [ReportTableColumn.QUANTITY_SOLD]: 'Số lượng bán',
 

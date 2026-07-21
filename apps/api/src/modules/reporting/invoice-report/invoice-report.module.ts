@@ -12,6 +12,9 @@ import { ProductEntity } from '../../inventory/product/product.entity';
 import { ItemProviderEntity } from '../../inventory/location/item-provider.entity';
 import { LocationEntity } from '../../inventory/location/location.entity';
 import { ProviderEntity } from '../../inventory/location/provider.entity';
+import { StorageEntity } from '../../inventory/location/storage.entity';
+import { ItemStorageLocationEntity } from '../../inventory/product/item-storage-location.entity';
+import { StockBalanceEntity } from '../../inventory/ledger/stock-balance.entity';
 import { InvoiceEntity } from '../../pos/entities/invoice.entity';
 import { InvoiceItemEntity } from '../../pos/entities/invoice-item.entity';
 import { InvoicePaymentEntity } from '../../pos/entities/invoice-payment.entity';
@@ -61,6 +64,9 @@ import { RevenueByItemReport } from './reports/revenue-by-item.report';
       LocationEntity,
       ItemProviderEntity,
       ProviderEntity,
+      StorageEntity,
+      ItemStorageLocationEntity,
+      StockBalanceEntity,
     ]),
   ],
   controllers: [InvoiceReportController],
