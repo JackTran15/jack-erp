@@ -13,6 +13,7 @@ import {
   UseInterceptors,
   UseGuards,
 } from '@nestjs/common';
+import { ApiOkResponse } from '@nestjs/swagger';
 import { Actor, ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { RequirePermission, RequireBranchScope } from '../../auth/decorators';
 import { PermissionGuard } from '../../rbac/permission.guard';
@@ -27,6 +28,7 @@ import { LinkItemProviderDto } from './dto/link-item-provider.dto';
 import { CreateItemBarcodeDto } from './dto/create-item-barcode.dto';
 import { SetStockThresholdDto } from './dto/set-stock-threshold.dto';
 import { ProductGroupsQueryDto, ProductItemsQueryDto } from './dto/product-group-query.dto';
+import { ItemLookupResultDto } from './dto/item-lookup.dto';
 import { InventoryItemCrudService } from './item-crud.service';
 import {
   CreateItemDto,
@@ -110,6 +112,16 @@ export class InventoryLocationController {
     @Actor() actor: ActorContext,
   ) {
     return this.itemCrudService.listProductItems(actor, productId, query);
+  }
+
+  @Get('items/lookup')
+  @RequirePermission('inventory.read')
+  @ApiOkResponse({ type: [ItemLookupResultDto] })
+  lookupItemByCode(
+    @Query('code') code: string,
+    @Actor() actor: ActorContext,
+  ): Promise<ItemLookupResultDto[]> {
+    return this.itemCrudService.lookupByCode(code ?? '', actor);
   }
 
   @Get('items/:id')

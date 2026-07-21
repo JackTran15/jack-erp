@@ -18,7 +18,7 @@ interface Cfg {
   locs?: { id: string; code: string; name: string }[];
 }
 
-function makeHandler(cfg: Cfg): ResolveItemLocationsHandler {
+function makeHandler(cfg: Cfg, andWhereCalls?: string[]): ResolveItemLocationsHandler {
   const manager = {
     findOne: jest.fn(async (entity: unknown, opts: { where: Record<string, unknown> }) => {
       if (entity === StorageEntity) return cfg.storage ?? null;
@@ -37,9 +37,13 @@ function makeHandler(cfg: Cfg): ResolveItemLocationsHandler {
     }),
     createQueryBuilder: jest.fn(() => {
       const qb: Record<string, unknown> = {};
-      for (const m of ['innerJoin', 'where', 'andWhere', 'orderBy']) {
+      for (const m of ['innerJoin', 'where', 'orderBy']) {
         qb[m] = () => qb;
       }
+      qb.andWhere = (condition: string) => {
+        andWhereCalls?.push(condition);
+        return qb;
+      };
       qb.getOne = async () => cfg.stockBin ?? null;
       return qb;
     }),
@@ -122,5 +126,31 @@ describe('ResolveItemLocationsHandler', () => {
       locationId: null,
       source: 'none',
     });
+  });
+
+  it('lọc is_tracked=true ở nhánh fallback tồn kho (bỏ vị trí đã ngừng theo dõi)', async () => {
+    const andWhereCalls: string[] = [];
+    // Không set preferred/stockBin để chắc chắn chạy tới nhánh fallback tồn kho;
+    // getOne trả null cũng không sao vì ta chỉ khẳng định điều kiện đã được thêm.
+    const handler = makeHandler(
+      {
+        storage: { id: 'S9' },
+        items: [{ id: 'v5', productId: 'p4' }],
+        preferred: null,
+        defaultLoc: null,
+        unassignedLoc: null,
+      },
+      andWhereCalls,
+    );
+
+    await handler.execute(
+      new ResolveItemLocationsQuery(
+        { variantItemIds: ['v5'], branchId: 'b1' },
+        actor,
+      ),
+    );
+
+    // Bộ lọc áp ở tầng SQL nên khẳng định điều kiện được thêm vào query.
+    expect(andWhereCalls).toContain('sb.is_tracked = true');
   });
 });

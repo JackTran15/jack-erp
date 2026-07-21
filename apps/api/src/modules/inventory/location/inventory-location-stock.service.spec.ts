@@ -874,6 +874,7 @@ describe('InventoryLocationStockService', () => {
         where: {
           organizationId: 'org-1',
           itemId: 'item-1',
+          isTracked: true,
           branchId: 'branch-1',
         },
         order: {
@@ -941,6 +942,46 @@ describe('InventoryLocationStockService', () => {
         },
         relations: { storage: true },
       });
+    });
+
+    it('bỏ vị trí đã ngừng theo dõi, chọn vị trí đang theo dõi dù tồn thấp hơn', async () => {
+      itemRepo.findOne.mockResolvedValue({
+        id: 'item-1',
+        productId: null,
+        organizationId: 'org-1',
+      });
+
+      // Vị trí A tồn cao nhưng đã ngừng theo dõi; B tồn thấp hơn, đang theo dõi.
+      // Mock mô phỏng DB: chỉ trả balance khớp where.isTracked, sort quantity DESC.
+      const balances = [
+        { itemId: 'item-1', locationId: 'loc-A', quantity: 20, isTracked: false },
+        { itemId: 'item-1', locationId: 'loc-B', quantity: 5, isTracked: true },
+      ];
+      stockBalanceRepo.find.mockImplementation(async (opts: any) => {
+        const wantTracked = opts?.where?.isTracked;
+        return balances
+          .filter(
+            (b) => wantTracked === undefined || b.isTracked === wantTracked,
+          )
+          .sort((a, b) => b.quantity - a.quantity);
+      });
+      locationRepo.findOne.mockImplementation(async (opts: any) => {
+        const id = opts?.where?.id;
+        if (id === 'loc-A') return { id: 'loc-A', code: 'A-01', name: 'Kệ A' };
+        if (id === 'loc-B') return { id: 'loc-B', code: 'B-01', name: 'Kệ B' };
+        return null;
+      });
+
+      await expect(
+        service.getPreferredShelf('item-1', 'storage-1', actor),
+      ).resolves.toEqual({ id: 'loc-B', code: 'B-01', name: 'Kệ B' });
+
+      // Query fallback phải lọc is_tracked=true để không gợi ý vị trí đã ngừng theo dõi.
+      expect(stockBalanceRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ isTracked: true }),
+        }),
+      );
     });
   });
 

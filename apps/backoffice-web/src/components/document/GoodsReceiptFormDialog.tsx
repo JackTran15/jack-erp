@@ -33,6 +33,10 @@ import {
   getPreferredShelfBatch,
 } from "../../api/inventory-location-preferences";
 import {
+  lookupItemByCode,
+  type ItemLookupResult,
+} from "../../api/item-lookup";
+import {
   SelectTransferReceiptDialog,
   type TransferReceiptDetail,
 } from "../../pages/purchase-orders/SelectTransferReceiptDialog";
@@ -61,6 +65,7 @@ import {
   ProductSelectDialog,
   type ProductSelectResult,
 } from "../../components/shared/product-select/ProductSelectDialog";
+import { BarcodeScanRow } from "../shared/BarcodeScanRow";
 import { getActiveBranchId } from "./goods-receipt-shared";
 import type {
   PurchaseOrder,
@@ -377,6 +382,8 @@ export function PurchaseOrderFormDialog({
 
     return isView ? initialLines : normalizeFormLines(initialLines);
   });
+  // Bật/tắt hàng quét mã vạch phía trên bảng dòng (checkbox "Quét mã vạch").
+  const [barcodeMode, setBarcodeMode] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -755,6 +762,46 @@ export function PurchaseOrderFormDialog({
         storageId: line.storageId,
       })),
     );
+  };
+
+  // Mỗi lần quét resolve đúng một item → cộng dồn nếu đã có dòng, ngược lại
+  // thêm dòng mới. Dùng chung helper với addLinesFromPicker để dòng quét chạy
+  // giống hệt (chuẩn hoá dòng trống đuôi, tự điền vị trí "đã sắp" theo kho).
+  const handleScanResolved = (item: ItemLookupResult, qty: number) => {
+    const existingIdx = lines.findIndex((l) => l.itemId === item.itemId);
+    if (existingIdx >= 0) {
+      setLines((prev) =>
+        prev.map((l, i) =>
+          i === existingIdx
+            ? { ...l, orderedQuantity: (l.orderedQuantity || 0) + qty }
+            : l,
+        ),
+      );
+      markDirty();
+      return;
+    }
+    const fallbackStorageId = storageId || defaultStorage?.id || "";
+    const fallbackStorageLabel = storageQuery || defaultStorage?.name || "";
+    const newLine: FormLine = {
+      itemId: item.itemId,
+      itemLabel: item.code,
+      itemName: item.name,
+      unit: item.unit,
+      storageId: fallbackStorageId,
+      storageLabel: fallbackStorageLabel,
+      locationId: "",
+      locationLabel: "",
+      orderedQuantity: qty > 0 ? qty : 1,
+      unitPrice: Number(item.purchasePrice ?? 0) || 0,
+      notes: "",
+    };
+    const base = getPersistableFormLines(lines);
+    const startIdx = base.length;
+    setLines(normalizeFormLines([...base, newLine]));
+    markDirty();
+    fillPreferredShelfBatch([
+      { idx: startIdx, itemId: newLine.itemId, storageId: newLine.storageId },
+    ]);
   };
 
   const searchStorages = useCallback(
@@ -1903,7 +1950,11 @@ export function PurchaseOrderFormDialog({
         detailActions={
           <>
             <label className="flex items-center gap-1.5">
-              <input type="checkbox" disabled />
+              <input
+                type="checkbox"
+                checked={barcodeMode}
+                onChange={(e) => setBarcodeMode(e.target.checked)}
+              />
               <span>Quét mã vạch</span>
             </label>
             <button
@@ -1924,35 +1975,47 @@ export function PurchaseOrderFormDialog({
           </>
         }
         detail={
-          <LineItemGrid
-            columns={lineColumns}
-            rows={lines}
-            // Omitting onChangeCell makes the built-in cells (Số lượng) read-only.
-            onChangeCell={
-              linesLocked
-                ? undefined
-                : (idx, key, value) => {
-                    setLines((prev) =>
-                      prev.map((l, i) =>
-                        i === idx ? { ...l, [key]: value } : l,
-                      ),
-                    );
-                    markDirty();
-                  }
-            }
-            onAddRow={() => {
-              setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
-              markDirty();
-            }}
-            onDeleteRow={(idx) => {
-              setLines((prev) =>
-                normalizeFormLines(prev.filter((_, i) => i !== idx)),
-              );
-              markDirty();
-            }}
-            showAddRow={!linesLocked}
-            showRowActions={!linesLocked}
-          />
+          <>
+            {/* Hàng quét mã vạch hiện phía trên bảng dòng khi bật checkbox. */}
+            {barcodeMode && (
+              <BarcodeScanRow
+                lookup={lookupItemByCode}
+                onResolved={handleScanResolved}
+                getSku={(i) => i.code}
+                getName={(i) => i.name}
+                disabled={linesLocked}
+              />
+            )}
+            <LineItemGrid
+              columns={lineColumns}
+              rows={lines}
+              // Omitting onChangeCell makes the built-in cells (Số lượng) read-only.
+              onChangeCell={
+                linesLocked
+                  ? undefined
+                  : (idx, key, value) => {
+                      setLines((prev) =>
+                        prev.map((l, i) =>
+                          i === idx ? { ...l, [key]: value } : l,
+                        ),
+                      );
+                      markDirty();
+                    }
+              }
+              onAddRow={() => {
+                setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
+                markDirty();
+              }}
+              onDeleteRow={(idx) => {
+                setLines((prev) =>
+                  normalizeFormLines(prev.filter((_, i) => i !== idx)),
+                );
+                markDirty();
+              }}
+              showAddRow={!linesLocked}
+              showRowActions={!linesLocked}
+            />
+          </>
         }
         footerSummary={
           isPurchaseImport ? (
