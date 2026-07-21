@@ -42,6 +42,7 @@ import { LookupField } from "../../components/forms/LookupField";
 import { CounterpartyPickerField } from "../../components/forms/CounterpartyPickerField";
 import { ChooseTransferWarehousesDialog } from "../../components/document/ChooseTransferWarehousesDialog";
 import { getTransferPreferredShelfBatch } from "../../api/inventory-location-preferences";
+import { lookupItemByCode, type ItemLookupResult } from "../../api/item-lookup";
 import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import { useDocumentListSelection } from "../../components/document/useDocumentListSelection";
 import {
@@ -66,6 +67,7 @@ import {
   type ProductSelectResult,
   type SelectedLine,
 } from "../../components/shared/product-select/ProductSelectDialog";
+import { BarcodeScanRow } from "../../components/shared/BarcodeScanRow";
 import type { DocumentLineImportJobRow } from "../inventory/_components/document-import/document-line-import.types";
 
 type TransferStatus = "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
@@ -746,6 +748,9 @@ function TransferFormDialog({
     return isView ? initialLines : normalizeLines(initialLines);
   });
 
+  // Bật/tắt hàng quét mã vạch phía trên bảng dòng.
+  const [barcodeMode, setBarcodeMode] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -1141,6 +1146,37 @@ function TransferFormDialog({
     if (filledLine) void fillTransferLocations([filledLine]);
   };
 
+  // Quét mã vạch: item đã có -> cộng dồn số lượng; item mới -> thêm dòng (kho
+  // xuất mặc định) rồi tự điền vị trí nguồn/đích như luồng chọn hàng.
+  const handleScanResolved = (item: ItemLookupResult, qty: number) => {
+    const existingIdx = lines.findIndex((l) => l.itemId === item.itemId);
+    if (existingIdx >= 0) {
+      setLines((prev) =>
+        prev.map((l, i) =>
+          i === existingIdx ? { ...l, quantity: (l.quantity || 0) + qty } : l,
+        ),
+      );
+      markDirty();
+      return;
+    }
+    const sourceStorageId = defaultStorage?.id ?? "";
+    const sourceStorageLabel = defaultStorage?.name ?? "";
+    const newLine: FormLine = {
+      ...emptyLine(),
+      itemId: item.itemId,
+      itemLabel: item.code,
+      itemName: item.name,
+      unit: item.unit,
+      sourceStorageId,
+      sourceStorageLabel,
+      quantity: qty > 0 ? qty : 1,
+      unitPrice: "", // để trống -> server tự tính từ giá vốn (giống addLinesFromPicker)
+    };
+    setLines((prev) => normalizeLines([...getPersistableFormLines(prev), newLine]));
+    markDirty();
+    void fillTransferLocations([newLine]); // tự điền vị trí nguồn/đích như luồng picker
+  };
+
   const lineColumns: LineColumn<FormLine>[] = [
     {
       key: "itemLabel",
@@ -1528,7 +1564,11 @@ function TransferFormDialog({
           !isView ? (
             <>
               <label className="flex items-center gap-1.5">
-                <input type="checkbox" disabled />
+                <input
+                  type="checkbox"
+                  checked={barcodeMode}
+                  onChange={(e) => setBarcodeMode(e.target.checked)}
+                />
                 <span>Quét mã vạch</span>
               </label>
               <button
@@ -1551,28 +1591,39 @@ function TransferFormDialog({
           ) : undefined
         }
         detail={
-          <LineItemGrid
-            columns={lineColumns}
-            rows={lines}
-            onChangeCell={(idx, key, value) => {
-              setLines((prev) =>
-                prev.map((l, i) => (i === idx ? { ...l, [key]: value } : l)),
-              );
-              markDirty();
-            }}
-            onDeleteRow={(idx) => {
-              setLines((prev) =>
-                normalizeLines(prev.filter((_, i) => i !== idx)),
-              );
-              markDirty();
-            }}
-            onAddRow={() => {
-              setLines((prev) => normalizeLines([...prev, makeEmptyLine()]));
-              markDirty();
-            }}
-            showAddRow={!isView}
-            showRowActions={!isView}
-          />
+          <>
+            {barcodeMode && (
+              <BarcodeScanRow
+                lookup={lookupItemByCode}
+                onResolved={handleScanResolved}
+                getSku={(i) => i.code}
+                getName={(i) => i.name}
+                disabled={isView}
+              />
+            )}
+            <LineItemGrid
+              columns={lineColumns}
+              rows={lines}
+              onChangeCell={(idx, key, value) => {
+                setLines((prev) =>
+                  prev.map((l, i) => (i === idx ? { ...l, [key]: value } : l)),
+                );
+                markDirty();
+              }}
+              onDeleteRow={(idx) => {
+                setLines((prev) =>
+                  normalizeLines(prev.filter((_, i) => i !== idx)),
+                );
+                markDirty();
+              }}
+              onAddRow={() => {
+                setLines((prev) => normalizeLines([...prev, makeEmptyLine()]));
+                markDirty();
+              }}
+              showAddRow={!isView}
+              showRowActions={!isView}
+            />
+          </>
         }
         footerSummary={
           <div className="flex items-center justify-between">

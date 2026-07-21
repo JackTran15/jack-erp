@@ -53,6 +53,7 @@ import type {
   ProductItemsQueryDto,
   ProductVariantRow,
 } from "./dto/product-group-query.dto";
+import type { ItemLookupResultDto } from "./dto/item-lookup.dto";
 
 export const INVENTORY_ITEM_SERVICE_TOKEN = "InventoryItemCrudService";
 
@@ -1259,6 +1260,45 @@ export class InventoryItemCrudService extends BaseCrudService<
   }
 
   // ─── Product-grouped item queries ────────────────────────────────────
+
+  /**
+   * Tra cứu hàng hóa theo mã cho ô quét mã vạch (form Nhập/Xuất/Chuyển kho).
+   * Khớp exact SKU `items.code` HOẶC mã vạch `item_barcodes.code`, chỉ hàng
+   * đang theo dõi (`is_active`), trong tổ chức của actor. Trả mảng 0..n (gần
+   * như luôn 0/1 vì SKU/mã vạch là duy nhất trong org). Khác POS: không lọc
+   * `is_pos_visible` và không trả vị trí/tồn — vị trí do form tự resolve.
+   * DISTINCT để item có nhiều mã vạch không bị nhân dòng qua LEFT JOIN.
+   */
+  async lookupByCode(
+    code: string,
+    actor: ActorContext,
+  ): Promise<ItemLookupResultDto[]> {
+    const trimmed = code?.trim() ?? "";
+    if (!trimmed) return [];
+
+    return this.dataSource.query<ItemLookupResultDto[]>(
+      `SELECT DISTINCT
+              i.id                     AS "itemId",
+              i.product_id             AS "productId",
+              i.code                   AS "code",
+              i.name                   AS "name",
+              i.unit                   AS "unit",
+              i.purchase_price::float  AS "purchasePrice",
+              i.selling_price::float   AS "sellingPrice",
+              i.variant_label          AS "variantLabel",
+              ic.name                  AS "categoryName"
+       FROM items i
+       LEFT JOIN item_barcodes b
+         ON b.item_id = i.id AND b.organization_id = i.organization_id
+       LEFT JOIN inventory_item_categories ic
+         ON ic.id = i.category_id
+       WHERE i.organization_id = $1
+         AND i.is_active = true
+         AND (i.code = $2 OR b.code = $2)
+       ORDER BY i.code ASC`,
+      [actor.organizationId, trimmed],
+    );
+  }
 
   async listProductGroups(
     actor: ActorContext,

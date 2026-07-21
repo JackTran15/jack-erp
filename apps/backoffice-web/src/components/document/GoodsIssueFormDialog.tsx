@@ -66,6 +66,8 @@ import {
   ProductSelectDialog,
   type ProductSelectResult,
 } from "../../components/shared/product-select/ProductSelectDialog";
+import { BarcodeScanRow } from "../shared/BarcodeScanRow";
+import { lookupItemByCode, type ItemLookupResult } from "../../api/item-lookup";
 
 import {
   getActiveBranchId,
@@ -350,6 +352,9 @@ export function GoodsIssueFormDialog({
 
     return isView ? initialLines : normalizeFormLines(initialLines);
   });
+
+  // Bật/tắt hàng quét mã vạch phía trên bảng dòng.
+  const [barcodeMode, setBarcodeMode] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [overstockWarnings, setOverstockWarnings] = useState<
@@ -967,6 +972,59 @@ export function GoodsIssueFormDialog({
     });
   };
 
+  // Máy quét resolve xong một hàng: cộng dồn nếu item đã có dòng, ngược lại
+  // thêm dòng mới rồi tự điền kệ ưu tiên + giá vốn bình quân tức thời — khớp
+  // hệt addLinesFromPicker để dòng quét không khác dòng chọn từ picker.
+  const handleScanResolved = (item: ItemLookupResult, qty: number) => {
+    const existingIdx = lines.findIndex((l) => l.itemId === item.itemId);
+    if (existingIdx >= 0) {
+      setLines((prev) =>
+        prev.map((l, i) =>
+          i === existingIdx ? { ...l, quantity: (l.quantity || 0) + qty } : l,
+        ),
+      );
+      markDirty();
+      return;
+    }
+    const fallbackStorageId = storageId || defaultStorage?.id || "";
+    const fallbackStorageLabel = storageQuery || defaultStorage?.name || "";
+    const newLine: FormLine = {
+      itemId: item.itemId,
+      itemLabel: item.code,
+      itemName: item.name,
+      unit: item.unit,
+      storageId: fallbackStorageId,
+      storageLabel: fallbackStorageLabel,
+      locationId: "",
+      locationLabel: "",
+      quantity: qty > 0 ? qty : 1,
+      unitPrice: 0,
+      notes: "",
+    };
+    const base = getPersistableFormLines(lines);
+    const startIdx = base.length;
+    setLines(normalizeFormLines([...base, newLine]));
+    markDirty();
+    fillPreferredShelfBatch([
+      { idx: startIdx, itemId: newLine.itemId, storageId: newLine.storageId },
+    ]);
+    if (newLine.itemId && newLine.unitPrice <= 0) {
+      void getInstantAverageCost(newLine.itemId)
+        .then((unitCost) => {
+          setLines((current) =>
+            current.map((l, i2) =>
+              i2 === startIdx &&
+              l.itemId === newLine.itemId &&
+              !(l.unitPrice > 0)
+                ? { ...l, unitPrice: unitCost }
+                : l,
+            ),
+          );
+        })
+        .catch(() => {});
+    }
+  };
+
   // Fill the line at `idx` from a selected item — shared by the inline
   // typeahead (onSelect) and the single-fill ProductSelectDialog.
   const fillLineFromItem = (
@@ -1515,7 +1573,11 @@ export function GoodsIssueFormDialog({
           detailLocked ? undefined : (
             <>
               <label className="flex items-center gap-1.5">
-                <input type="checkbox" disabled />
+                <input
+                  type="checkbox"
+                  checked={barcodeMode}
+                  onChange={(e) => setBarcodeMode(e.target.checked)}
+                />
                 <span>Quét mã vạch</span>
               </label>
               <button
@@ -1537,33 +1599,45 @@ export function GoodsIssueFormDialog({
           )
         }
         detail={
-          <LineItemGrid
-            columns={lineColumns}
-            // Omitting onChangeCell makes the built-in cells (Số lượng) read-only.
-            onChangeCell={
-              detailLocked
-                ? undefined
-                : (idx, key, value) => {
-                    setLines((prev) =>
-                      prev.map((l, i) => (i === idx ? { ...l, [key]: value } : l)),
-                    );
-                    markDirty();
-                  }
-            }
-            rows={lines}
-            onAddRow={() => {
-              setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
-              markDirty();
-            }}
-            onDeleteRow={(idx) => {
-              setLines((prev) =>
-                normalizeFormLines(prev.filter((_, i) => i !== idx)),
-              );
-              markDirty();
-            }}
-            showAddRow={!detailLocked}
-            showRowActions={!detailLocked}
-          />
+          <>
+            {/* Hàng quét mã vạch nằm trên bảng dòng, bật bằng checkbox ở detailActions. */}
+            {barcodeMode && (
+              <BarcodeScanRow
+                lookup={lookupItemByCode}
+                onResolved={handleScanResolved}
+                getSku={(i) => i.code}
+                getName={(i) => i.name}
+                disabled={detailLocked}
+              />
+            )}
+            <LineItemGrid
+              columns={lineColumns}
+              // Omitting onChangeCell makes the built-in cells (Số lượng) read-only.
+              onChangeCell={
+                detailLocked
+                  ? undefined
+                  : (idx, key, value) => {
+                      setLines((prev) =>
+                        prev.map((l, i) => (i === idx ? { ...l, [key]: value } : l)),
+                      );
+                      markDirty();
+                    }
+              }
+              rows={lines}
+              onAddRow={() => {
+                setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
+                markDirty();
+              }}
+              onDeleteRow={(idx) => {
+                setLines((prev) =>
+                  normalizeFormLines(prev.filter((_, i) => i !== idx)),
+                );
+                markDirty();
+              }}
+              showAddRow={!detailLocked}
+              showRowActions={!detailLocked}
+            />
+          </>
         }
         footerSummary={
           <div className="flex items-center justify-between">

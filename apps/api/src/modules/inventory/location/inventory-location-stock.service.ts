@@ -725,6 +725,7 @@ export class InventoryLocationStockService {
       where: {
         organizationId: actor.organizationId,
         itemId,
+        isTracked: true,
         ...(actor.branchId ? { branchId: actor.branchId } : {}),
       },
       order: {

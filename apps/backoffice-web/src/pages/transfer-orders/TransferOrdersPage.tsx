@@ -44,6 +44,8 @@ import {
   ProductSelectDialog,
   type ProductSelectResult,
 } from "../../components/shared/product-select/ProductSelectDialog";
+import { BarcodeScanRow } from "../../components/shared/BarcodeScanRow";
+import { lookupItemByCode, type ItemLookupResult } from "../../api/item-lookup";
 import { ChooseWarehouseDialog } from "../../components/document/ChooseWarehouseDialog";
 import {
   InventoryPageTitle,
@@ -751,6 +753,8 @@ function TransferOrderFormDialog({
     initial?.requestedDate ?? new Date().toISOString().slice(0, 10),
   );
   const [status, setStatus] = useState<TOStatus>(initial?.status ?? "DRAFT");
+  // Bật/tắt hàng quét mã vạch phía trên bảng dòng (checkbox "Quét mã vạch").
+  const [barcodeMode, setBarcodeMode] = useState(false);
   const [lines, setLines] = useState<FormLine[]>(() => {
     if (!initial) return [emptyLine()];
 
@@ -1162,6 +1166,33 @@ function TransferOrderFormDialog({
     markDirty();
   };
 
+  // Quét mã vạch: item đã có -> cộng dồn số lượng; item mới -> thêm dòng (kho
+  // nguồn để trống, fallback theo kho nguồn ở header như luồng chọn hàng).
+  const handleScanResolved = (item: ItemLookupResult, qty: number) => {
+    const existingIdx = lines.findIndex((l) => l.itemId === item.itemId);
+    if (existingIdx >= 0) {
+      setLines((prev) =>
+        prev.map((l, i) =>
+          i === existingIdx
+            ? { ...l, requestedQty: (l.requestedQty || 0) + qty }
+            : l,
+        ),
+      );
+      markDirty();
+      return;
+    }
+    const newLine: FormLine = {
+      ...emptyLine(),
+      itemId: item.itemId,
+      itemLabel: item.code,
+      itemName: item.name,
+      unit: item.unit,
+      requestedQty: qty > 0 ? qty : 1,
+    };
+    setLines(normalizeFormLines([...getPersistableFormLines(lines), newLine]));
+    markDirty();
+  };
+
   const lineColumns: LineColumn<FormLine>[] = [
     {
       key: "itemLabel",
@@ -1412,7 +1443,11 @@ function TransferOrderFormDialog({
         detailActions={
           <>
             <label className="flex items-center gap-1.5">
-              <input type="checkbox" disabled />
+              <input
+                type="checkbox"
+                checked={barcodeMode}
+                onChange={(e) => setBarcodeMode(e.target.checked)}
+              />
               <span>Quét mã vạch</span>
             </label>
             <button
@@ -1434,34 +1469,45 @@ function TransferOrderFormDialog({
           </>
         }
         detail={
-          <LineItemGrid
-            columns={lineColumns}
-            rows={lines}
-            onChangeCell={
-              canEditDetails
-                ? (idx, key, value) => {
-                    setLines((prev) =>
-                      prev.map((l, i) =>
-                        i === idx ? { ...l, [key]: value } : l,
-                      ),
-                    );
-                    markDirty();
-                  }
-                : undefined
-            }
-            onAddRow={() => {
-              setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
-              markDirty();
-            }}
-            onDeleteRow={(idx) => {
-              setLines((prev) =>
-                normalizeFormLines(prev.filter((_, i) => i !== idx)),
-              );
-              markDirty();
-            }}
-            showAddRow={canEditDetails}
-            showRowActions={canEditDetails}
-          />
+          <>
+            {barcodeMode && (
+              <BarcodeScanRow
+                lookup={lookupItemByCode}
+                onResolved={handleScanResolved}
+                getSku={(i) => i.code}
+                getName={(i) => i.name}
+                disabled={!canEditDetails}
+              />
+            )}
+            <LineItemGrid
+              columns={lineColumns}
+              rows={lines}
+              onChangeCell={
+                canEditDetails
+                  ? (idx, key, value) => {
+                      setLines((prev) =>
+                        prev.map((l, i) =>
+                          i === idx ? { ...l, [key]: value } : l,
+                        ),
+                      );
+                      markDirty();
+                    }
+                  : undefined
+              }
+              onAddRow={() => {
+                setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
+                markDirty();
+              }}
+              onDeleteRow={(idx) => {
+                setLines((prev) =>
+                  normalizeFormLines(prev.filter((_, i) => i !== idx)),
+                );
+                markDirty();
+              }}
+              showAddRow={canEditDetails}
+              showRowActions={canEditDetails}
+            />
+          </>
         }
         footerSummary={
           <div className="flex items-center justify-between">

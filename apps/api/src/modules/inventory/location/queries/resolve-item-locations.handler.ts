@@ -121,6 +121,7 @@ export class ResolveItemLocationsHandler
         .where('sb.item_id IN (:...itemIds)', { itemIds })
         .andWhere('loc.storage_id = :storageId', { storageId })
         .andWhere('loc.is_active = true')
+        .andWhere('sb.is_tracked = true')
         .andWhere('sb.organization_id = :orgId', { orgId })
         .andWhere('sb.quantity > 0')
         .orderBy('sb.quantity', 'DESC')
