@@ -1,4 +1,8 @@
-import type { CashPaymentPurpose, CashVoucherPartnerType } from "../cash-vouchers.types";
+import type {
+  CashPaymentPurpose,
+  CashPaymentReferenceType,
+  CashVoucherPartnerType,
+} from "../cash-vouchers.types";
 import type { PartnerLookupType } from "../documents/_shared/voucher-partner.constants";
 
 export enum LedgerCashDocumentTypeEnum {
@@ -133,6 +137,14 @@ export interface LedgerCashVoucherDetail {
   employeeName: string;
   staffId?: string;
   reference?: string;
+  /**
+   * Raw link back to the document that produced this voucher. Needed to tell a
+   * fund swap / inter-branch transfer apart from an ordinary payment when the
+   * dialog reopens in VIEW mode — the transfer's destination fields live on
+   * `cash_transfer`, keyed by referenceId.
+   */
+  referenceType?: CashPaymentReferenceType;
+  referenceId?: string;
   lines: LedgerCashVoucherLine[];
   documentLines?: LedgerCashVoucherDocumentLine[];
   skuLines?: LedgerCashVoucherSkuLine[];

@@ -29,6 +29,7 @@ import { TreasuryDepositReceiptsPage } from "./pages/treasury/deposit/receipts-e
 import { DepositReconPage } from "./pages/treasury/deposit-recon/DepositReconPage";
 import { DepositPeriodLockPage } from "./pages/treasury/deposit-period-lock/DepositPeriodLockPage";
 import { DepositTransferListPage } from "./pages/treasury/deposit-transfer/DepositTransferListPage";
+import { CashTransferListPage } from "./pages/treasury/cash-transfer/CashTransferListPage";
 import { DepositInTransitPage } from "./pages/treasury/deposit-in-transit/DepositInTransitPage";
 import { DepositBalanceDashboardPage } from "./pages/treasury/deposit-dashboard/DepositBalanceDashboardPage";
 import { TreasuryCashReceiptsPage } from "./pages/treasury/cash/receipts-expenses/TreasuryCashReceiptsPage";
@@ -252,6 +253,10 @@ export function App() {
                 <Route
                   path="/treasury/deposit-transfers"
                   element={<DepositTransferListPage />}
+                />
+                <Route
+                  path="/treasury/cash-transfers"
+                  element={<CashTransferListPage />}
                 />
                 <Route
                   path="/treasury/deposit-in-transit"

@@ -82,6 +82,11 @@ const PAYMENT_PURPOSE_TO_ROLE: Record<
   [CashPaymentPurpose.SALARY]: AccountingDefaultAccountRole.EXPENSE,
   [CashPaymentPurpose.OTHER]: AccountingDefaultAccountRole.EXPENSE,
   [CashPaymentPurpose.REFUND]: AccountingDefaultAccountRole.REVENUE,
+  // Fund moves always pass an explicit contra (TK 113 "Tiền đang chuyển"), so
+  // these two are unreachable fallbacks kept only to satisfy the exhaustive map
+  // — same as BankPaymentPurpose.CASH_TRANSFER/INTER_BRANCH_OUT.
+  [CashPaymentPurpose.DEPOSIT_TRANSFER]: AccountingDefaultAccountRole.EXPENSE,
+  [CashPaymentPurpose.INTER_BRANCH_OUT]: AccountingDefaultAccountRole.EXPENSE,
 };
 
 /** Derived link back to the source document that auto-created the voucher. */
@@ -317,124 +322,138 @@ export class CashPaymentsService {
     });
   }
 
+  /**
+   * `manager` lets a caller reverse inside its own transaction (the inter-branch
+   * cash transfer cancels leg A and flips the transfer status atomically). Same
+   * shape as BankPaymentsService.reverse.
+   */
   async reverse(
     id: string,
     reason: string,
     actor: ActorContext,
+    manager?: EntityManager,
   ): Promise<ReversePaymentResult> {
-    return this.dataSource.transaction(async (manager) => {
-      const original = await manager
-        .createQueryBuilder(CashPaymentEntity, 'p')
-        .setLock('pessimistic_write')
-        .where('p.id = :id', { id })
-        .andWhere('p.organizationId = :org', { org: actor.organizationId })
-        .getOne();
-      if (!original) {
-        throw new NotFoundException(`Cash payment ${id} not found`);
-      }
-      if (original.status !== CashVoucherStatus.POSTED) {
-        throw new BadRequestException(
-          `Cash payment ${id} is not in POSTED status`,
-        );
-      }
-      if (original.reversedByVoucherId) {
-        throw new BadRequestException(
-          `Cash payment ${id} has already been reversed`,
-        );
-      }
+    const run = (m: EntityManager) => this.reverseInTx(id, reason, actor, m);
+    return manager ? run(manager) : this.dataSource.transaction(run);
+  }
 
-      const originalLines = await manager.find(CashPaymentLineEntity, {
-        where: { cashPaymentId: original.id },
-        order: { lineOrder: 'ASC' },
-      });
-
-      const documentNumber = await this.docNumbering.generate(
-        DocumentType.CASH_PAYMENT,
-        actor.branchId,
-        actor,
+  private async reverseInTx(
+    id: string,
+    reason: string,
+    actor: ActorContext,
+    manager: EntityManager,
+  ): Promise<ReversePaymentResult> {
+    const original = await manager
+      .createQueryBuilder(CashPaymentEntity, 'p')
+      .setLock('pessimistic_write')
+      .where('p.id = :id', { id })
+      .andWhere('p.organizationId = :org', { org: actor.organizationId })
+      .getOne();
+    if (!original) {
+      throw new NotFoundException(`Cash payment ${id} not found`);
+    }
+    if (original.status !== CashVoucherStatus.POSTED) {
+      throw new BadRequestException(
+        `Cash payment ${id} is not in POSTED status`,
       );
-
-      // The opposite movement (DEPOSIT) restores the balance and posts the
-      // reversing journal entry (DR cash / CR contra). Balance increases, so no
-      // insufficient-balance check is needed.
-      const { movement, journalEntryId } = await this.cashService.recordMovement(
-        {
-          cashAccountId: original.cashAccountId,
-          type: CashMovementType.DEPOSIT,
-          amount: Number(original.totalAmount),
-          contraAccountId: original.contraAccountId,
-          reference: documentNumber,
-          notes: `Reversal of ${original.documentNumber}: ${reason}`,
-        },
-        actor,
-        manager,
+    }
+    if (original.reversedByVoucherId) {
+      throw new BadRequestException(
+        `Cash payment ${id} has already been reversed`,
       );
+    }
 
-      const reversal = manager.create(CashPaymentEntity, {
-        organizationId: actor.organizationId,
-        branchId: actor.branchId,
-        createdBy: actor.userId,
-        documentNumber,
-        voucherDate: this.today(),
-        status: CashVoucherStatus.POSTED,
-        purpose: original.purpose,
-        partnerType: original.partnerType,
-        partnerId: original.partnerId,
-        partnerNameSnapshot: original.partnerNameSnapshot,
-        partnerAddressSnapshot: original.partnerAddressSnapshot,
-        payeeName: original.payeeName,
-        reason: original.reason,
-        staffId: original.staffId,
-        referenceType: CashPaymentReferenceType.REVERSAL,
-        referenceId: original.id,
+    const originalLines = await manager.find(CashPaymentLineEntity, {
+      where: { cashPaymentId: original.id },
+      order: { lineOrder: 'ASC' },
+    });
+
+    const documentNumber = await this.docNumbering.generate(
+      DocumentType.CASH_PAYMENT,
+      actor.branchId,
+      actor,
+    );
+
+    // The opposite movement (DEPOSIT) restores the balance and posts the
+    // reversing journal entry (DR cash / CR contra). Balance increases, so no
+    // insufficient-balance check is needed.
+    const { movement, journalEntryId } = await this.cashService.recordMovement(
+      {
         cashAccountId: original.cashAccountId,
+        type: CashMovementType.DEPOSIT,
+        amount: Number(original.totalAmount),
         contraAccountId: original.contraAccountId,
-        totalAmount: Number(original.totalAmount),
-        cashMovementId: movement.id,
-        journalEntryId,
-        reversesVoucherId: original.id,
-        reversalReason: reason,
-        postedAt: new Date(),
-        postedBy: actor.userId,
-      });
-      const savedReversal = await manager.save(reversal);
+        reference: documentNumber,
+        notes: `Reversal of ${original.documentNumber}: ${reason}`,
+      },
+      actor,
+      manager,
+    );
 
-      await this.insertLines(
+    const reversal = manager.create(CashPaymentEntity, {
+      organizationId: actor.organizationId,
+      branchId: actor.branchId,
+      createdBy: actor.userId,
+      documentNumber,
+      voucherDate: this.today(),
+      status: CashVoucherStatus.POSTED,
+      purpose: original.purpose,
+      partnerType: original.partnerType,
+      partnerId: original.partnerId,
+      partnerNameSnapshot: original.partnerNameSnapshot,
+      partnerAddressSnapshot: original.partnerAddressSnapshot,
+      payeeName: original.payeeName,
+      reason: original.reason,
+      staffId: original.staffId,
+      referenceType: CashPaymentReferenceType.REVERSAL,
+      referenceId: original.id,
+      cashAccountId: original.cashAccountId,
+      contraAccountId: original.contraAccountId,
+      totalAmount: Number(original.totalAmount),
+      cashMovementId: movement.id,
+      journalEntryId,
+      reversesVoucherId: original.id,
+      reversalReason: reason,
+      postedAt: new Date(),
+      postedBy: actor.userId,
+    });
+    const savedReversal = await manager.save(reversal);
+
+    await this.insertLines(
+      manager,
+      savedReversal.id,
+      actor,
+      originalLines.map((l) => ({
+        description: l.description,
+        amount: Number(l.amount),
+        categoryId: l.categoryId,
+        referenceNote: l.referenceNote,
+      })),
+    );
+
+    original.status = CashVoucherStatus.REVERSED;
+    original.reversedByVoucherId = savedReversal.id;
+    await manager.save(original);
+
+    // Compensating action for supplier-debt payments: reopen the settled
+    // supplier debts. The saga lookup (by cash_payment_id) no-ops for ordinary
+    // GOODS_RECEIPT cash purchases that have no payment saga.
+    if (original.referenceType === CashPaymentReferenceType.GOODS_RECEIPT) {
+      await this.supplierDebtPaymentSaga.compensate(original.id, manager);
+    }
+
+    this.logger.log(
+      `Reversed cash payment ${original.documentNumber} → ${documentNumber}`,
+    );
+
+    return {
+      original: await this.getByIdInTx(manager, original.id, actor.organizationId),
+      reversal: await this.getByIdInTx(
         manager,
         savedReversal.id,
-        actor,
-        originalLines.map((l) => ({
-          description: l.description,
-          amount: Number(l.amount),
-          categoryId: l.categoryId,
-          referenceNote: l.referenceNote,
-        })),
-      );
-
-      original.status = CashVoucherStatus.REVERSED;
-      original.reversedByVoucherId = savedReversal.id;
-      await manager.save(original);
-
-      // Compensating action for supplier-debt payments: reopen the settled
-      // supplier debts. The saga lookup (by cash_payment_id) no-ops for ordinary
-      // GOODS_RECEIPT cash purchases that have no payment saga.
-      if (original.referenceType === CashPaymentReferenceType.GOODS_RECEIPT) {
-        await this.supplierDebtPaymentSaga.compensate(original.id, manager);
-      }
-
-      this.logger.log(
-        `Reversed cash payment ${original.documentNumber} → ${documentNumber}`,
-      );
-
-      return {
-        original: await this.getByIdInTx(manager, original.id, actor.organizationId),
-        reversal: await this.getByIdInTx(
-          manager,
-          savedReversal.id,
-          actor.organizationId,
-        ),
-      };
-    });
+        actor.organizationId,
+      ),
+    };
   }
 
   // ---------------------------------------------------------------------------

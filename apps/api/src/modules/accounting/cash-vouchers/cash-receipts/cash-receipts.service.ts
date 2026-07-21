@@ -82,6 +82,10 @@ const RECEIPT_PURPOSE_TO_ROLE: Record<
   [CashReceiptPurpose.OTHER_INCOME]: AccountingDefaultAccountRole.OTHER_INCOME,
   [CashReceiptPurpose.POS_SALE]: AccountingDefaultAccountRole.REVENUE,
   [CashReceiptPurpose.DEBT_COLLECTION]: AccountingDefaultAccountRole.RECEIVABLE,
+  // The inter-branch leg always passes an explicit contra (TK 113 "Tiền đang
+  // chuyển"), so this is an unreachable fallback kept only to satisfy the
+  // exhaustive map — same as BankReceiptPurpose.INTER_BRANCH_IN.
+  [CashReceiptPurpose.INTER_BRANCH_IN]: AccountingDefaultAccountRole.OTHER_INCOME,
 };
 
 /** Derived link back to the source document that auto-created the voucher. */

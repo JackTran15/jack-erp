@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
@@ -121,12 +121,6 @@ export class FundSwapsService {
   }
 
   async swap(dto: CreateFundSwapDto, actor: ActorContext): Promise<FundSwapResult> {
-    if (dto.direction === FundSwapDirection.CASH_TO_DEPOSIT && dto.autoCreateReceipt === false) {
-      throw new BadRequestException(
-        'autoCreateReceipt only applies to DEPOSIT_TO_CASH',
-      );
-    }
-
     return this.dataSource.transaction(async (manager) => {
       const clearingAccountId = await this.cashFundResolver.resolveCoaAccountIdByCode(
         actor.organizationId,
@@ -251,7 +245,9 @@ export class FundSwapsService {
       // CASH_TO_DEPOSIT: withdraw cash → deposit into the bank/e-wallet account.
       const cashPayment = await this.cashPayment.createAndPostInternal(
         {
-          purpose: CashPaymentPurpose.OTHER,
+          // Not OTHER: the treasury grid and the payment dialog read the purpose
+          // back to label the voucher "Chuyển tiền mặt thành tiền gửi".
+          purpose: CashPaymentPurpose.DEPOSIT_TRANSFER,
           cashAccountId,
           contraAccountId: clearingAccountId,
           amount: dto.amount,
@@ -271,6 +267,15 @@ export class FundSwapsService {
         },
         manager,
       );
+
+      if (dto.autoCreateReceipt === false) {
+        // Counterpart leg deliberately skipped — the amount sits in TK 113
+        // "Tiền đang chuyển" until the bank confirms the deposit and the
+        // accountant records it as a separate deposit receipt. Mirrors the
+        // DEPOSIT_TO_CASH branch above.
+        return { cashPaymentId: cashPayment.voucherId };
+      }
+
       const bankReceipt = await this.bankReceipt.createAndPostInternal(
         {
           purpose: BankReceiptPurpose.OTHER,

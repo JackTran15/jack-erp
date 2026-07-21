@@ -1,4 +1,7 @@
-import { CashPaymentPurpose } from "../../cash-vouchers.types";
+import {
+  CashPaymentPurpose,
+  CashPaymentReferenceType,
+} from "../../cash-vouchers.types";
 
 export const DEFAULT_VOUCHER_EMPLOYEE_CODE = "0000";
 export const DEFAULT_VOUCHER_EMPLOYEE_NAME = "Phan Thanh Hà";
@@ -13,6 +16,14 @@ export const PAYMENT_PURPOSE_OPTIONS: readonly {
   { value: CashPaymentPurpose.EXPENSE, label: "Chi phí" },
   { value: CashPaymentPurpose.SALARY, label: "Chi lương" },
   { value: CashPaymentPurpose.REFUND, label: "Hoàn tiền" },
+  {
+    value: CashPaymentPurpose.DEPOSIT_TRANSFER,
+    label: "Chuyển tiền mặt thành tiền gửi",
+  },
+  {
+    value: CashPaymentPurpose.INTER_BRANCH_OUT,
+    label: "Chuyển tiền đến cửa hàng khác",
+  },
 ] as const;
 
 export const PAYMENT_PURPOSE_LABEL: Record<CashPaymentPurpose, string> =
@@ -55,8 +66,48 @@ export function isTransferSubOption(sub: PaymentOtherSubOption): boolean {
 export function subOptionToApiPurpose(
   sub: PaymentOtherSubOption,
 ): CashPaymentPurpose {
-  return CashPaymentPurpose.OTHER;
+  switch (sub) {
+    case PaymentOtherSubOption.CASH_TO_DEPOSIT:
+      return CashPaymentPurpose.DEPOSIT_TRANSFER;
+    case PaymentOtherSubOption.BRANCH_TRANSFER:
+      return CashPaymentPurpose.INTER_BRANCH_OUT;
+    default:
+      return CashPaymentPurpose.OTHER;
+  }
 }
+
+/**
+ * Inverse of {@link subOptionToApiPurpose}, for rehydrating a saved voucher.
+ * `referenceType` is the fallback for fund swaps posted before
+ * `DEPOSIT_TRANSFER` existed — those rows carry purpose OTHER.
+ */
+export function apiPurposeToSubOption(
+  purpose: CashPaymentPurpose,
+  referenceType?: CashPaymentReferenceType,
+): PaymentOtherSubOption {
+  switch (purpose) {
+    case CashPaymentPurpose.DEPOSIT_TRANSFER:
+      return PaymentOtherSubOption.CASH_TO_DEPOSIT;
+    case CashPaymentPurpose.INTER_BRANCH_OUT:
+      return PaymentOtherSubOption.BRANCH_TRANSFER;
+    default:
+      break;
+  }
+  if (referenceType === CashPaymentReferenceType.FUND_SWAP) {
+    return PaymentOtherSubOption.CASH_TO_DEPOSIT;
+  }
+  if (referenceType === CashPaymentReferenceType.TRANSFER) {
+    return PaymentOtherSubOption.BRANCH_TRANSFER;
+  }
+  return PaymentOtherSubOption.OTHER;
+}
+
+/** Auto-filled "Lý do chi" + detail line for each transfer sub-mode. */
+export const TRANSFER_SUB_OPTION_REASON: Record<PaymentOtherSubOption, string> = {
+  [PaymentOtherSubOption.OTHER]: "",
+  [PaymentOtherSubOption.CASH_TO_DEPOSIT]: "Chi tiền mặt nhập quỹ tiền gửi",
+  [PaymentOtherSubOption.BRANCH_TRANSFER]: "Chi chuyển tiền sang cửa hàng khác",
+};
 
 // ── Deposit ("Phiếu chi tiền gửi") top-level purpose split — separate from the
 // CASH constants above; the "Hình thức chi" sub-list itself reuses

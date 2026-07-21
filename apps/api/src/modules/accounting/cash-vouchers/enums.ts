@@ -15,6 +15,8 @@ export enum CashReceiptPurpose {
   DEBT_COLLECTION = 'DEBT_COLLECTION',
   POS_SALE = 'POS_SALE',
   OTHER_INCOME = 'OTHER_INCOME',
+  /** Destination leg of an inter-branch cash transfer (see cash_transfer). */
+  INTER_BRANCH_IN = 'INTER_BRANCH_IN',
 }
 
 export enum CashReceiptReferenceType {
@@ -25,6 +27,8 @@ export enum CashReceiptReferenceType {
   REVERSAL = 'REVERSAL',
   /** Counterpart leg of a fund swap (FR-08); reference_id = the swap id. */
   FUND_SWAP = 'FUND_SWAP',
+  /** Destination leg of an inter-branch cash transfer; reference_id = cash_transfer.id. */
+  TRANSFER = 'TRANSFER',
 }
 
 export enum CashPaymentPurpose {
@@ -34,6 +38,10 @@ export enum CashPaymentPurpose {
   EXPENSE = 'EXPENSE',
   SALARY = 'SALARY',
   REFUND = 'REFUND',
+  /** Cash withdrawn from the fund to be paid into a deposit account (fund swap). */
+  DEPOSIT_TRANSFER = 'DEPOSIT_TRANSFER',
+  /** Source leg of an inter-branch cash transfer (see cash_transfer). */
+  INTER_BRANCH_OUT = 'INTER_BRANCH_OUT',
 }
 
 export enum CashPaymentReferenceType {
@@ -46,6 +54,17 @@ export enum CashPaymentReferenceType {
   REVERSAL = 'REVERSAL',
   /** Counterpart leg of a fund swap (FR-08); reference_id = the swap id. */
   FUND_SWAP = 'FUND_SWAP',
+  /** Source leg of an inter-branch cash transfer; reference_id = cash_transfer.id. */
+  TRANSFER = 'TRANSFER',
+}
+
+/**
+ * Where an inter-branch cash transfer lands at the destination branch: that
+ * branch's cash fund, or one of its deposit accounts.
+ */
+export enum CashTransferFundKind {
+  CASH = 'CASH',
+  DEPOSIT = 'DEPOSIT',
 }
 
 /** Which table a merged voucher row came from (`POST /v2/cash-vouchers/search`). */

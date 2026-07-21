@@ -181,6 +181,10 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
   'accounting.deposit_transfer.confirm': 'Xác nhận nhận tiền gửi liên chi nhánh',
   'accounting.deposit_transfer.cancel': 'Hủy chuyển tiền gửi liên chi nhánh',
   'accounting.deposit_transfer.read': 'Xem chuyển tiền gửi liên chi nhánh',
+  'accounting.cash_transfer.create': 'Chuyển tiền mặt liên chi nhánh',
+  'accounting.cash_transfer.confirm': 'Xác nhận nhận tiền mặt liên chi nhánh',
+  'accounting.cash_transfer.cancel': 'Hủy chuyển tiền mặt liên chi nhánh',
+  'accounting.cash_transfer.read': 'Xem chuyển tiền mặt liên chi nhánh',
   'accounting.deposit_dashboard.read': 'Xem báo cáo tiền đang chuyển & dashboard số dư tiền gửi',
 
   // Báo cáo

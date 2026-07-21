@@ -181,6 +181,10 @@ export const navConfig: NavModule[] = [
           },
           { to: "/treasury/cash/count", label: "Kiểm kê tiền mặt" },
           { to: "/treasury/cash/ledger", label: "Sổ chi tiết tiền mặt" },
+          {
+            to: "/treasury/cash-transfers",
+            label: "Chuyển tiền mặt liên chi nhánh",
+          },
         ],
       },
       {

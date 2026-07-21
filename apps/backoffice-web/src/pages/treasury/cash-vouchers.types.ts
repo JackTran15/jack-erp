@@ -9,6 +9,7 @@ export enum CashReceiptPurpose {
   DEBT_COLLECTION = "DEBT_COLLECTION",
   POS_SALE = "POS_SALE",
   OTHER_INCOME = "OTHER_INCOME",
+  INTER_BRANCH_IN = "INTER_BRANCH_IN",
 }
 
 export enum CashReceiptReferenceType {
@@ -17,6 +18,8 @@ export enum CashReceiptReferenceType {
   RECEIVABLE = "RECEIVABLE",
   MANUAL = "MANUAL",
   REVERSAL = "REVERSAL",
+  FUND_SWAP = "FUND_SWAP",
+  TRANSFER = "TRANSFER",
 }
 
 export enum CashPaymentPurpose {
@@ -26,6 +29,8 @@ export enum CashPaymentPurpose {
   EXPENSE = "EXPENSE",
   SALARY = "SALARY",
   REFUND = "REFUND",
+  DEPOSIT_TRANSFER = "DEPOSIT_TRANSFER",
+  INTER_BRANCH_OUT = "INTER_BRANCH_OUT",
 }
 
 export enum CashPaymentReferenceType {
@@ -36,6 +41,14 @@ export enum CashPaymentReferenceType {
   REFUND = "REFUND",
   MANUAL = "MANUAL",
   REVERSAL = "REVERSAL",
+  FUND_SWAP = "FUND_SWAP",
+  TRANSFER = "TRANSFER",
+}
+
+/** Where an inter-branch cash transfer lands at the destination branch. */
+export enum CashTransferFundKind {
+  CASH = "CASH",
+  DEPOSIT = "DEPOSIT",
 }
 
 export enum CashVoucherPartnerType {

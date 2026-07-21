@@ -73,7 +73,10 @@ import {
   PaymentVoucherDialog,
   ReceiptVoucherDialog,
   TreasuryVoucherDialogModeEnum,
+  type CashPaymentSaveResult,
 } from "../../documents";
+import { useFundSwapMutation } from "../../../../hooks/treasury/use-fund-swap";
+import { useCreateCashTransfer } from "../../../../hooks/treasury/use-cash-transfers";
 import {
   LedgerCashVoucherKindEnum,
   LedgerCashVoucherPurposeEnum,
@@ -203,6 +206,8 @@ export function TreasuryCashReceiptsPage() {
 
   const receiptMutations = useCashReceiptMutations();
   const paymentMutations = useCashPaymentMutations();
+  const fundSwapMutation = useFundSwapMutation();
+  const createCashTransfer = useCreateCashTransfer();
 
   const closeVoucherDialogs = useCallback(() => {
     setVoucherDialog(null);
@@ -492,6 +497,38 @@ export function TreasuryCashReceiptsPage() {
     ],
   );
 
+  /**
+   * The payment dialog's two transfer sub-modes post both legs through their own
+   * endpoints instead of creating a plain cash payment; everything else falls
+   * through to the shared voucher handler above.
+   */
+  const handleSavePayment = useCallback(
+    async (result: CashPaymentSaveResult) => {
+      if (result.kind === "voucher") {
+        await handleSaveVoucher(result.detail);
+        return;
+      }
+      try {
+        if (result.kind === "fundSwap") {
+          await fundSwapMutation.mutateAsync(result.body);
+        } else {
+          const created = await createCashTransfer.mutateAsync(result.body);
+          setSelectedId(created.fromPaymentId);
+        }
+        closeVoucherDialogs();
+        toast.success("Đã ghi sổ chứng từ.");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Lưu thất bại.");
+      }
+    },
+    [
+      handleSaveVoucher,
+      fundSwapMutation,
+      createCashTransfer,
+      closeVoucherDialogs,
+    ],
+  );
+
   const handleConfirmReverse = useCallback(async () => {
     if (!reverseItem) return;
     const reason = reverseReason.trim();
@@ -665,7 +702,7 @@ export function TreasuryCashReceiptsPage() {
             : (voucherDialog?.mode ?? TreasuryVoucherDialogModeEnum.VIEW)
         }
         initial={goodsPaymentDetail ?? dialogInitial}
-        onSave={showGoodsPaymentView ? undefined : handleSaveVoucher}
+        onSave={showGoodsPaymentView ? undefined : handleSavePayment}
         onRequestEdit={
           showGoodsPaymentView
             ? undefined
