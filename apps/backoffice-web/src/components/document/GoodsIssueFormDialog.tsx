@@ -353,7 +353,6 @@ export function GoodsIssueFormDialog({
     return isView ? initialLines : normalizeFormLines(initialLines);
   });
 
-  // Bật/tắt hàng quét mã vạch phía trên bảng dòng.
   const [barcodeMode, setBarcodeMode] = useState(false);
 
   const [saving, setSaving] = useState(false);
@@ -972,9 +971,9 @@ export function GoodsIssueFormDialog({
     });
   };
 
-  // Máy quét resolve xong một hàng: cộng dồn nếu item đã có dòng, ngược lại
-  // thêm dòng mới rồi tự điền kệ ưu tiên + giá vốn bình quân tức thời — khớp
-  // hệt addLinesFromPicker để dòng quét không khác dòng chọn từ picker.
+  // The scanner resolves one item: accumulate if the item already has a line, otherwise
+  // add a new line then auto-fill the preferred shelf + instant weighted-average cost — matching
+  // addLinesFromPicker exactly so a scanned line is no different from one picked from the picker.
   const handleScanResolved = (item: ItemLookupResult, qty: number) => {
     const existingIdx = lines.findIndex((l) => l.itemId === item.itemId);
     if (existingIdx >= 0) {
@@ -1600,7 +1599,7 @@ export function GoodsIssueFormDialog({
         }
         detail={
           <>
-            {/* Hàng quét mã vạch nằm trên bảng dòng, bật bằng checkbox ở detailActions. */}
+            {/* Barcode-scan row above the line grid, toggled by the checkbox in detailActions. */}
             {barcodeMode && (
               <BarcodeScanRow
                 lookup={lookupItemByCode}

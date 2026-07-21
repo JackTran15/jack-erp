@@ -32,11 +32,13 @@ import {
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
+import { lookupItemByCode, type ItemLookupResult } from "../../api/item-lookup";
 import { LookupField } from "../../components/forms/LookupField";
 import {
   ProductSelectDialog,
   type ProductSelectResult,
 } from "../../components/shared/product-select/ProductSelectDialog";
+import { BarcodeScanRow } from "../../components/shared/BarcodeScanRow";
 import type { StockTakeDraft } from "./CreateStockTakeDialog";
 import { StockTakeImportDialog } from "./_components/import/StockTakeImportDialog";
 import type {
@@ -652,6 +654,51 @@ export function StockTakeFormDialog({
       }
     },
     [rows, handlePickItem],
+  );
+
+  // Each scan resolves exactly one item → add to "Kiểm kê" when the row already exists;
+  // otherwise add a new row via handlePickItem (resolves the location + "Theo sổ", and
+  // persists in edit mode), then set the counted qty to the scanned qty.
+  const handleScanResolved = useCallback(
+    async (item: ItemLookupResult, qty: number) => {
+      if (isLocked) return;
+      // Item already on the voucher → only add to "Kiểm kê", leave "Theo sổ" untouched.
+      if (rows.some((r) => r.itemId === item.itemId)) {
+        setRows((prev) =>
+          prev.map((r) =>
+            r.itemId === item.itemId
+              ? { ...r, countedQty: (r.countedQty ?? 0) + qty }
+              : r,
+          ),
+        );
+        markDirty();
+        return;
+      }
+      // New item → fill the trailing empty row; handlePickItem handles the location, "Theo sổ",
+      // and (in edit mode) the POST that fetches the id, plus ensureTrailingEmptyRow + markDirty.
+      const trailingIndex = Math.max(0, rows.length - 1);
+      await handlePickItem(
+        {
+          id: item.itemId,
+          code: item.code,
+          name: item.name,
+          unit: item.unit,
+          purchasePrice: item.purchasePrice,
+        },
+        trailingIndex,
+      );
+      // Set the counted qty to qty for the row just added (skip if the add failed).
+      setRows((prev) =>
+        prev.some((r) => r.itemId === item.itemId)
+          ? prev.map((r) =>
+              r.itemId === item.itemId
+                ? { ...r, countedQty: (r.countedQty ?? 0) + qty }
+                : r,
+            )
+          : prev,
+      );
+    },
+    [isLocked, rows, handlePickItem, markDirty],
   );
 
   const handleDeleteRow = useCallback(
@@ -1723,21 +1770,32 @@ export function StockTakeFormDialog({
               ) : null}
             </div>
             {detailTab === "items" ? (
-              <div className="min-h-[190px] flex-1 overflow-hidden">
-                <LineItemGrid
-                  columns={lineColumns}
-                  rows={visibleRows}
-                  filters={filters}
-                  onFilterChange={setFilters}
-                  onDeleteRow={(idx) =>
-                    void handleDeleteRow(sourceIndexForVisible(idx))
-                  }
-                  showRowActions={!isLocked}
-                  showAddRow={false}
-                  onAddRow={handleAddPendingRow}
-                  emptyText="Tìm mã hoặc tên"
-                />
-              </div>
+              <>
+                {scanBarcode && (
+                  <BarcodeScanRow
+                    lookup={lookupItemByCode}
+                    onResolved={handleScanResolved}
+                    getSku={(i) => i.code}
+                    getName={(i) => i.name}
+                    disabled={isLocked}
+                  />
+                )}
+                <div className="min-h-[190px] flex-1 overflow-hidden">
+                  <LineItemGrid
+                    columns={lineColumns}
+                    rows={visibleRows}
+                    filters={filters}
+                    onFilterChange={setFilters}
+                    onDeleteRow={(idx) =>
+                      void handleDeleteRow(sourceIndexForVisible(idx))
+                    }
+                    showRowActions={!isLocked}
+                    showAddRow={false}
+                    onAddRow={handleAddPendingRow}
+                    emptyText="Tìm mã hoặc tên"
+                  />
+                </div>
+              </>
             ) : (
               <div className="min-h-[190px] flex-1 overflow-auto border-b">
                 <table className="w-full border-collapse text-sm">

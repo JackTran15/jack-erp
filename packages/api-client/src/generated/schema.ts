@@ -1922,6 +1922,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/items/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_lookupItemByCode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/items/{id}": {
         parameters: {
             query?: never;
@@ -8342,6 +8358,19 @@ export interface components {
             updatedAt: string;
             /** @description UUID of the user who created this record. */
             createdBy: string;
+        };
+        ItemLookupResultDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            productId?: string | null;
+            code: string;
+            name: string;
+            unit: string;
+            purchasePrice: number;
+            sellingPrice: number;
+            variantLabel?: string | null;
+            categoryName?: string | null;
         };
         UpdateItemDto: {
             name?: string;
@@ -15766,6 +15795,27 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    InventoryLocationController_lookupItemByCode: {
+        parameters: {
+            query: {
+                code: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemLookupResultDto"][];
+                };
             };
         };
     };

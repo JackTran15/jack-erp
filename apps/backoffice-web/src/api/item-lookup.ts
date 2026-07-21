@@ -1,8 +1,8 @@
 import { apiClient } from "../lib/api-axios";
 
-// Kết quả tra cứu hàng hoá theo mã (khớp SKU hoặc mã vạch). Khớp đúng shape
-// ItemLookupResultDto trả về từ GET /inventory/items/lookup, là superset của item
-// mà ProductSelectDialog cần (sku = code).
+// Item lookup result by code (SKU or barcode match). Mirrors the ItemLookupResultDto
+// shape returned by GET /inventory/items/lookup, a superset of the item that
+// ProductSelectDialog needs (sku = code).
 export interface ItemLookupResult {
   itemId: string;
   productId: string | null;
@@ -15,9 +15,9 @@ export interface ItemLookupResult {
   categoryName: string | null;
 }
 
-// Dùng raw axios (không phải erpApi typed) nên không cần regen @erp/api-client;
-// chạy `pnpm openapi:generate` sau để đồng bộ typed client. API trả thẳng mảng
-// (không có interceptor bọc {data}) nên đọc `res.data` trực tiếp.
+// Uses raw axios (not the typed erpApi), so no @erp/api-client regen is needed; run
+// `pnpm openapi:generate` later to sync the typed client. The API returns a bare array
+// (no interceptor wrapping it in {data}), so read `res.data` directly.
 export async function lookupItemByCode(code: string): Promise<ItemLookupResult[]> {
   const trimmed = code.trim();
   if (!trimmed) return [];

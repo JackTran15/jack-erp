@@ -14,6 +14,7 @@ import {
   ProductSelectDialog,
   type ProductSelectResult,
 } from "../../components/shared/product-select/ProductSelectDialog";
+import { BarcodeScanRow } from "../../components/shared/BarcodeScanRow";
 import { apiClient } from "../../lib/api-axios";
 import { getActiveBranch } from "../../lib/auth-storage";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
@@ -23,6 +24,7 @@ import {
   createIntraWarehouseTransfer,
   type IntraWarehouseTransferLine,
 } from "../../api/stock-transfers";
+import { lookupItemByCode, type ItemLookupResult } from "../../api/item-lookup";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -156,6 +158,8 @@ export function TransferLocationDialog({
 
   // Grid rows (all editable per row)
   const [rows, setRows] = useState<TransferRow[]>([]);
+
+  const [barcodeMode, setBarcodeMode] = useState(false);
 
   // Status
   const [loadingRows, setLoadingRows] = useState(false);
@@ -532,6 +536,72 @@ export function TransferLocationDialog({
     [productPickerRowId, rows, fetchOnHand],
   );
 
+  // Barcode scan: accumulate into the row with the same item + same header source location
+  // (matching selectItemForRow/applyProductSelection's duplicate rule: itemId@source), or
+  // add a new row inheriting source/dest from the header, then load on-hand as when picking an item.
+  const handleScanResolved = useCallback(
+    (item: ItemLookupResult, scannedQty: number) => {
+      // A row for this item already exists at the header source location -> accumulate qty, capped
+      // at on-hand (same as getRowValidationReason's exceedsStock constraint).
+      const existing = rows.find(
+        (r) =>
+          r.itemId === item.itemId && r.sourceLocationId === sourceLocationId,
+      );
+      if (existing) {
+        const nextQty = Math.min(
+          (Number(existing.qty) || 0) + scannedQty,
+          existing.quantityOnHand,
+        );
+        patchRow(existing.uid, { qty: String(nextQty) });
+        return;
+      }
+
+      // New row: makeEmptyRow() to inherit the header source/dest, then attach the item info
+      // and scanned qty (clamped to on-hand once it's loaded).
+      const newRow: TransferRow = {
+        ...makeEmptyRow(),
+        itemId: item.itemId,
+        itemCode: item.code,
+        itemName: item.name,
+        unit: item.unit,
+        qty: String(scannedQty),
+      };
+      // Insert right before the trailing empty row (which useTrailingEmptyRow always keeps) so we
+      // don't strand an empty row in the middle of the table.
+      setRows((prev) => {
+        const insertAt =
+          prev.length > 0 && !prev[prev.length - 1]!.itemId
+            ? prev.length - 1
+            : prev.length;
+        return [...prev.slice(0, insertAt), newRow, ...prev.slice(insertAt)];
+      });
+
+      // Load on-hand at the source location (like the item-pick flow), then clamp the scanned qty to it.
+      if (newRow.sourceLocationCode) {
+        void (async () => {
+          try {
+            const onHand = await fetchOnHand(
+              newRow.itemId,
+              newRow.sourceLocationCode,
+            );
+            patchRow(newRow.uid, {
+              quantityOnHand: onHand,
+              qty: String(Math.min(scannedQty, onHand)),
+            });
+            if (onHand <= 0) {
+              toast.warning(
+                `Hàng ${item.code} không có tồn ở vị trí ${newRow.sourceLocationCode}`,
+              );
+            }
+          } catch (err) {
+            toast.error(getUserFacingApiErrorMessage(err));
+          }
+        })();
+      }
+    },
+    [rows, sourceLocationId, makeEmptyRow, patchRow, fetchOnHand],
+  );
+
   const selectSourceForRow = useCallback(
     (row: TransferRow, loc: InventoryLocation) => {
       patchRow(row.uid, {
@@ -788,15 +858,29 @@ export function TransferLocationDialog({
           Lấy dữ liệu
         </Button>
 
-        {/* Quét mã vạch (visual only) */}
-        <label className="ml-auto flex cursor-not-allowed items-center gap-1.5 self-end pb-2 text-sm text-muted-foreground opacity-50">
-          <input type="checkbox" disabled />
+        {/* Barcode scan — toggles the scan row right above the line grid */}
+        <label className="ml-auto flex cursor-pointer items-center gap-1.5 self-end pb-2 text-sm text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={barcodeMode}
+            onChange={(e) => setBarcodeMode(e.target.checked)}
+          />
           Quét mã vạch
         </label>
       </div>
 
       {/* Grid */}
       <div className="flex-1 overflow-auto">
+        {/* Barcode scan row — shown at the top of the grid area when scan mode is on */}
+        {barcodeMode && (
+          <BarcodeScanRow
+            lookup={lookupItemByCode}
+            onResolved={handleScanResolved}
+            getSku={(i) => i.code}
+            getName={(i) => i.name}
+            disabled={submitting || !storageId}
+          />
+        )}
         {loadingRows ? (
           <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />

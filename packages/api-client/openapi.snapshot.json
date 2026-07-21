@@ -5945,6 +5945,39 @@
         ]
       }
     },
+    "/inventory/items/lookup": {
+      "get": {
+        "operationId": "InventoryLocationController_lookupItemByCode",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ItemLookupResultDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "InventoryLocation"
+        ]
+      }
+    },
     "/inventory/items/{id}": {
       "get": {
         "operationId": "InventoryLocationController_getItemById",
@@ -26407,6 +26440,51 @@
           "createdAt",
           "updatedAt",
           "createdBy"
+        ]
+      },
+      "ItemLookupResultDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "purchasePrice": {
+            "type": "number"
+          },
+          "sellingPrice": {
+            "type": "number"
+          },
+          "variantLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "itemId",
+          "code",
+          "name",
+          "unit",
+          "purchasePrice",
+          "sellingPrice"
         ]
       },
       "UpdateItemDto": {

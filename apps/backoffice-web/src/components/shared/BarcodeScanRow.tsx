@@ -3,20 +3,23 @@ import { Input } from "@erp/ui";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-// Hàng quét mã vạch đặt ngay trên bảng dòng (bật/tắt bằng checkbox "Quét mã vạch"
-// ở detailActions). Máy quét USB gõ mã + Enter đuôi, hoặc người dùng dán/gõ tay.
-// Component chỉ lo: resolve mã -> gọi onResolved để cha tự thêm/cộng dồn dòng.
+// Barcode-scan row sitting right above the line grid (toggled by the "Quét mã vạch"
+// checkbox in detailActions). A USB scanner types the code with a trailing Enter, or the
+// user pastes/types it by hand. Its only job: resolve the code -> call onResolved so the
+// parent adds or accumulates the line.
 export interface BarcodeScanRowProps<T> {
-  /** Gọi API resolve mã (khớp SKU hoặc mã vạch) -> danh sách item khớp. */
+  /** Calls the API to resolve a code (SKU or barcode match) -> list of matching items. */
   lookup: (code: string) => Promise<T[]>;
-  /** Cha thêm dòng mới hoặc cộng dồn số lượng cho item đã có. */
+  /** Parent adds a new line or accumulates the quantity for an existing item. */
   onResolved: (item: T, qty: number) => void;
-  /** Trích SKU để hiển thị xác nhận sau khi resolve. */
+  /** Extracts the SKU to show as confirmation after resolving. */
   getSku: (item: T) => string;
-  /** Trích tên hàng để hiển thị xác nhận sau khi resolve. */
+  /** Extracts the item name to show as confirmation after resolving. */
   getName: (item: T) => string;
-  /** Khoá ô quét khi phiếu ở trạng thái chỉ đọc. */
+  /** Locks the scan input when the document is read-only. */
   disabled?: boolean;
+  /** Hides the quantity input (for forms with no quantity concept, e.g. Xếp vị trí). */
+  showQty?: boolean;
 }
 
 const DEBOUNCE_MS = 150;
@@ -27,6 +30,7 @@ export function BarcodeScanRow<T>({
   getSku,
   getName,
   disabled = false,
+  showQty = true,
 }: BarcodeScanRowProps<T>) {
   const [code, setCode] = useState("");
   const [qty, setQty] = useState(1);
@@ -36,15 +40,15 @@ export function BarcodeScanRow<T>({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Chống add trùng: một lần quét (cùng mã) chỉ resolve đúng một lần dù cả
-  // debounce onChange lẫn Enter cùng bắn.
+  // Prevents duplicate adds: a single scan (same code) resolves exactly once even when
+  // both the onChange debounce and Enter fire together.
   const claimRef = useRef<string | null>(null);
-  // Giữ qty hiện tại cho callback resolve mà không phải đưa vào deps.
+  // Holds the current qty for the resolve callback without putting it in deps.
   const qtyRef = useRef(qty);
   qtyRef.current = qty;
 
   useEffect(() => {
-    // Tự focus khi mở hàng quét để quét được ngay.
+    // Auto-focus when the scan row opens so scanning works right away.
     inputRef.current?.focus();
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -55,7 +59,7 @@ export function BarcodeScanRow<T>({
     async (raw: string) => {
       const value = raw.trim();
       if (!value || disabled) return;
-      if (claimRef.current === value) return; // đã xử lý mã này rồi
+      if (claimRef.current === value) return; // this code was already handled
       claimRef.current = value;
 
       setLoading(true);
@@ -66,10 +70,11 @@ export function BarcodeScanRow<T>({
           onResolved(item, qtyRef.current > 0 ? qtyRef.current : 1);
           setResolvedSku(getSku(item));
           setResolvedName(getName(item));
-          setCode(""); // sẵn sàng cho mã kế tiếp; giữ nguyên qty
+          claimRef.current = null;
+          setCode(""); // clear for the next code; keep qty
           inputRef.current?.focus();
         } else if (items.length === 0) {
-          claimRef.current = null; // cho phép quét lại
+          claimRef.current = null; // allow re-scanning
           toast.error(`Không tìm thấy hàng hoá với mã "${value}".`);
           inputRef.current?.select();
         } else {
@@ -90,7 +95,7 @@ export function BarcodeScanRow<T>({
 
   const handleChange = (next: string) => {
     setCode(next);
-    // Người dùng gõ/dán mã mới -> reset guard để mã này được resolve.
+    // User types/pastes a new code -> reset the guard so this code can resolve.
     if (next.trim() !== claimRef.current) claimRef.current = null;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!next.trim()) {
@@ -103,7 +108,7 @@ export function BarcodeScanRow<T>({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== "Enter") return;
-    // Chặn submit form; resolve ngay (đuôi Enter của máy quét).
+    // Prevent form submit; resolve immediately (the scanner's trailing Enter).
     e.preventDefault();
     if (debounceRef.current) clearTimeout(debounceRef.current);
     void resolve(code);
@@ -125,19 +130,21 @@ export function BarcodeScanRow<T>({
         onKeyDown={handleKeyDown}
         aria-label="Mã vạch / SKU"
       />
-      <Input
-        type="number"
-        min={1}
-        step={1}
-        value={qty}
-        disabled={disabled}
-        className="w-20 text-right"
-        onChange={(e) => {
-          const n = Number(e.target.value);
-          setQty(Number.isFinite(n) && n > 0 ? Math.floor(n) : 1);
-        }}
-        aria-label="Số lượng"
-      />
+      {showQty && (
+        <Input
+          type="number"
+          min={1}
+          step={1}
+          value={qty}
+          disabled={disabled}
+          className="w-20 text-right"
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            setQty(Number.isFinite(n) && n > 0 ? Math.floor(n) : 1);
+          }}
+          aria-label="Số lượng"
+        />
+      )}
       <Input
         value={resolvedSku}
         readOnly
