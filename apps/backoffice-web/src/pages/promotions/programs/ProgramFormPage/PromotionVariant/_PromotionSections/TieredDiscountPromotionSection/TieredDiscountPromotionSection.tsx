@@ -11,10 +11,10 @@ import {
   TIER_TARGET_OPTIONS,
   blankTierGroup,
 } from "../../../../program-form.constants";
+import { TierDiscountUnit } from "../../../../program-form.types";
 import type {
   ProgramFormState,
   TierBasis,
-  TierDiscountUnit,
   TierGroup,
   TierProduct,
   TierRow,
@@ -33,7 +33,7 @@ export function TieredDiscountPromotionSection({ form, onChange }: Props) {
   const activeGroup =
     groups.find((g) => g.id === activeId) ?? groups[0] ?? null;
 
-  const isAmount = form.tierDiscountUnit === "AMOUNT";
+  const isAmount = form.tierDiscountUnit === TierDiscountUnit.AMOUNT;
   const valueLabel = isAmount ? "Số tiền giảm" : "% giảm giá";
 
   const setGroups = (next: TierGroup[]) => onChange({ tierGroups: next });

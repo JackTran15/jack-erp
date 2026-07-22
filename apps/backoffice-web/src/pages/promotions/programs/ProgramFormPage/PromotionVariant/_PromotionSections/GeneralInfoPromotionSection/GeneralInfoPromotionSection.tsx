@@ -8,10 +8,8 @@ import {
   CARD_TIER_OPTIONS,
   FORM_LABEL_WIDTH,
 } from "../../../../program-form.constants";
-import type {
-  BirthdayDateMode,
-  ProgramFormState,
-} from "../../../../program-form.types";
+import { BirthdayDateMode } from "../../../../program-form.types";
+import type { ProgramFormState } from "../../../../program-form.types";
 
 interface Props {
   form: ProgramFormState;
@@ -27,7 +25,7 @@ function parseDays(value: string): number | "" {
 export function GeneralInfoPromotionSection({ form, onChange }: Props) {
   const isBirthday = form.applyTo === PromotionApplyTo.HAS_BIRTHDAY;
   const isCardTier = form.applyTo === PromotionApplyTo.HAS_CARD_TIER;
-  const isBirthdayRange = form.birthdayDateMode === "RANGE";
+  const isBirthdayRange = form.birthdayDateMode === BirthdayDateMode.RANGE;
 
   return (
     <section>

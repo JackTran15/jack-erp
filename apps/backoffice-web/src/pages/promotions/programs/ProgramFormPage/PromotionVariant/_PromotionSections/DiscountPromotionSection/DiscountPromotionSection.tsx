@@ -1,5 +1,6 @@
 import { Input, MoneyInput } from "@erp/ui";
-import type { DiscountType, ProgramFormState } from "../../../../program-form.types";
+import { DiscountType } from "../../../../program-form.types";
+import type { ProgramFormState } from "../../../../program-form.types";
 
 interface Props {
   form: ProgramFormState;
@@ -8,8 +9,8 @@ interface Props {
 
 export function DiscountPromotionSection({ form, onChange }: Props) {
   const select = (type: DiscountType) => onChange({ discountType: type });
-  const isPercent = form.discountType === "PERCENT";
-  const isAmount = form.discountType === "AMOUNT";
+  const isPercent = form.discountType === DiscountType.PERCENT;
+  const isAmount = form.discountType === DiscountType.AMOUNT;
 
   return (
     <section>
@@ -24,7 +25,7 @@ export function DiscountPromotionSection({ form, onChange }: Props) {
               name="discount-type"
               className="shrink-0 accent-primary"
               checked={isPercent}
-              onChange={() => select("PERCENT")}
+              onChange={() => select(DiscountType.PERCENT)}
             />
             Giảm giá theo
           </label>
@@ -51,7 +52,7 @@ export function DiscountPromotionSection({ form, onChange }: Props) {
               name="discount-type"
               className="shrink-0 accent-primary"
               checked={isAmount}
-              onChange={() => select("AMOUNT")}
+              onChange={() => select(DiscountType.AMOUNT)}
             />
             Giảm giá theo số tiền
           </label>

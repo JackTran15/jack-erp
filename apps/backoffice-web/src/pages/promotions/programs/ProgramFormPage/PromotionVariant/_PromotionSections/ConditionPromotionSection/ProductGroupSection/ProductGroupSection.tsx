@@ -1,9 +1,7 @@
 import { HelpCircle } from "lucide-react";
 import { ProductGroupsGrid } from "./ProductGroupsGrid/ProductGroupsGrid";
-import type {
-  ProductGroupLogic,
-  ProgramFormState,
-} from "../../../../../program-form.types";
+import { ProductGroupLogic } from "../../../../../program-form.types";
+import type { ProgramFormState } from "../../../../../program-form.types";
 
 interface Props {
   form: ProgramFormState;
@@ -26,8 +24,8 @@ export function ProductGroupSection({ form, onChange }: Props) {
               type="radio"
               name="group-logic"
               className="shrink-0 accent-primary"
-              checked={form.applicableGroupLogic === "ANY"}
-              onChange={() => select("ANY")}
+              checked={form.applicableGroupLogic === ProductGroupLogic.ANY}
+              onChange={() => select(ProductGroupLogic.ANY)}
             />
             Hàng hóa thuộc 1 trong các nhóm sau
             <HelpCircle className="h-4 w-4 text-muted-foreground" />
@@ -37,8 +35,8 @@ export function ProductGroupSection({ form, onChange }: Props) {
               type="radio"
               name="group-logic"
               className="shrink-0 accent-primary"
-              checked={form.applicableGroupLogic === "ALL"}
-              onChange={() => select("ALL")}
+              checked={form.applicableGroupLogic === ProductGroupLogic.ALL}
+              onChange={() => select(ProductGroupLogic.ALL)}
             />
             Hàng hóa thuộc tất cả các nhóm sau
             <HelpCircle className="h-4 w-4 text-muted-foreground" />

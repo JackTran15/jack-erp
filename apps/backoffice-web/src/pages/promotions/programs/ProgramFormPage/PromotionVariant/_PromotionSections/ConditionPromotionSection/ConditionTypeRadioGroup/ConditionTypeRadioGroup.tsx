@@ -1,9 +1,9 @@
 import { MoneyInput, SingleSelect } from "@erp/ui";
 import { HelpCircle } from "lucide-react";
 import { CALC_BASIS_OPTIONS } from "../../../../../program-form.constants";
+import { ConditionType } from "../../../../../program-form.types";
 import type {
   CalcBasis,
-  ConditionType,
   ProgramFormState,
 } from "../../../../../program-form.types";
 
@@ -23,11 +23,11 @@ export function ConditionTypeRadioGroup({
   // được thêm sản phẩm). Chọn lại SPECIFIC_QUANTITY thì giữ nguyên bảng.
   const select = (type: ConditionType) =>
     onChange(
-      type === "SPECIFIC_QUANTITY"
+      type === ConditionType.SPECIFIC_QUANTITY
         ? { conditionType: type }
         : { conditionType: type, applicableGoods: [] },
     );
-  const isMinTotal = form.conditionType === "MIN_TOTAL";
+  const isMinTotal = form.conditionType === ConditionType.MIN_TOTAL;
 
   return (
     <div className="flex flex-col gap-2 text-sm">
@@ -36,8 +36,8 @@ export function ConditionTypeRadioGroup({
           type="radio"
           name="condition-type"
           className="shrink-0 accent-primary"
-          checked={form.conditionType === "NONE"}
-          onChange={() => select("NONE")}
+          checked={form.conditionType === ConditionType.NONE}
+          onChange={() => select(ConditionType.NONE)}
         />
         Không yêu cầu điều kiện
       </label>
@@ -49,7 +49,7 @@ export function ConditionTypeRadioGroup({
             name="condition-type"
             className="shrink-0 accent-primary"
             checked={isMinTotal}
-            onChange={() => select("MIN_TOTAL")}
+            onChange={() => select(ConditionType.MIN_TOTAL)}
           />
           Tổng tiền hàng trên hóa đơn lớn hơn hoặc bằng
         </label>
@@ -94,8 +94,8 @@ export function ConditionTypeRadioGroup({
           type="radio"
           name="condition-type"
           className="shrink-0 accent-primary"
-          checked={form.conditionType === "SPECIFIC_QUANTITY"}
-          onChange={() => select("SPECIFIC_QUANTITY")}
+          checked={form.conditionType === ConditionType.SPECIFIC_QUANTITY}
+          onChange={() => select(ConditionType.SPECIFIC_QUANTITY)}
         />
         Yêu cầu số lượng cụ thể
       </label>

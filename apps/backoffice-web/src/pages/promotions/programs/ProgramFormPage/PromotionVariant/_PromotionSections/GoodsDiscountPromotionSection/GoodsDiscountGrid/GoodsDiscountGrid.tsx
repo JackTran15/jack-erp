@@ -4,8 +4,11 @@ import {
   GOODS_DISCOUNT_METHOD_OPTIONS,
   blankGoodsDiscountRow,
 } from "../../../../../program-form.constants";
-import type {
+import {
   GoodsDiscountMethod,
+  GoodsDiscountScope,
+} from "../../../../../program-form.types";
+import type {
   GoodsDiscountRow,
   ProgramFormState,
 } from "../../../../../program-form.types";
@@ -21,11 +24,11 @@ const CELL_INPUT_CLASS =
 /** Bảng thiết lập giảm giá hàng hóa: hàng "Thiết lập" (phương thức) + bảng dòng hàng hóa. */
 export function GoodsDiscountGrid({ form, onChange }: Props) {
   const rows = form.goodsDiscountRows;
-  const isGroup = form.goodsDiscountScope === "GROUP";
+  const isGroup = form.goodsDiscountScope === GoodsDiscountScope.GROUP;
   const method = form.goodsDiscountMethod;
-  const isPercent = method === "PERCENT";
-  const isAmount = method === "AMOUNT";
-  const isFixedPrice = method === "FIXED_PRICE";
+  const isPercent = method === GoodsDiscountMethod.PERCENT;
+  const isAmount = method === GoodsDiscountMethod.AMOUNT;
+  const isFixedPrice = method === GoodsDiscountMethod.FIXED_PRICE;
 
   const setMethod = (value: GoodsDiscountMethod) =>
     onChange({ goodsDiscountMethod: value });

@@ -6,7 +6,8 @@ import {
   FORM_LABEL_WIDTH,
   STORE_SCOPE_OPTIONS,
 } from "../../../../program-form.constants";
-import type { ProgramFormState, StoreScope } from "../../../../program-form.types";
+import { StoreScope } from "../../../../program-form.types";
+import type { ProgramFormState } from "../../../../program-form.types";
 
 interface Props {
   form: ProgramFormState;
@@ -40,7 +41,7 @@ export function StoreScopePromotionSection({ form, onChange }: Props) {
             options={STORE_SCOPE_OPTIONS}
             onChange={(v: StoreScope) => onChange({ storeScope: v })}
           />
-          {form.storeScope === "SELECTED" ? (
+          {form.storeScope === StoreScope.SELECTED ? (
             <MultiSelectChips
               options={storeOptions}
               value={form.storeIds}

@@ -1,6 +1,7 @@
 import { ConditionTypeRadioGroup } from "./ConditionTypeRadioGroup/ConditionTypeRadioGroup";
 import { ApplicableGoodsGrid } from "./ApplicableGoodsGrid/ApplicableGoodsGrid";
 import { ProductGroupSection } from "./ProductGroupSection/ProductGroupSection";
+import { CalcBasis, ConditionType } from "../../../../program-form.types";
 import type { ProgramFormState } from "../../../../program-form.types";
 
 interface Props {
@@ -27,8 +28,8 @@ export function ConditionPromotionSection({
         showGiftMultiplier={showGiftMultiplier}
       />
 
-      {form.conditionType === "MIN_TOTAL" &&
-      form.calcBasis === "PRODUCT_GROUP" ? (
+      {form.conditionType === ConditionType.MIN_TOTAL &&
+      form.calcBasis === CalcBasis.PRODUCT_GROUP ? (
         <ProductGroupSection form={form} onChange={onChange} />
       ) : (
         <>
@@ -38,7 +39,7 @@ export function ConditionPromotionSection({
           <ApplicableGoodsGrid
             value={form.applicableGoods}
             onChange={(goods) => onChange({ applicableGoods: goods })}
-            disabled={form.conditionType !== "SPECIFIC_QUANTITY"}
+            disabled={form.conditionType !== ConditionType.SPECIFIC_QUANTITY}
           />
         </>
       )}
