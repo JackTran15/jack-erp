@@ -90,6 +90,8 @@ interface BuildCheckoutInvoicePayloadInput {
   pointsDiscountAmount?: number;
   /** Số điểm được tích từ hóa đơn — dòng "Điểm được tích". */
   pointsEarned?: number;
+  /** Số điểm bị thu hồi khi trả/đổi hàng — dòng "Điểm trừ". */
+  pointsReversed?: number;
   /** Mã voucher đã chọn — renderer chỉ in khi có `voucherDiscount`. */
   voucherCode?: string | null;
   /** In 2 liên trong 1 lệnh in (1 cho khách, 1 cửa hàng lưu). */
@@ -129,6 +131,7 @@ export function buildCheckoutInvoicePayload({
   pointsRedeemed,
   pointsDiscountAmount,
   pointsEarned,
+  pointsReversed,
   voucherCode,
   printDuplicate,
   isReturnExchange,
@@ -239,6 +242,8 @@ export function buildCheckoutInvoicePayload({
         pointsRedeemed && pointsRedeemed > 0 ? pointsDiscountAmount : undefined,
       pointsEarned:
         pointsEarned && pointsEarned > 0 ? pointsEarned : undefined,
+      pointsReversed:
+        pointsReversed && pointsReversed > 0 ? pointsReversed : undefined,
     },
     payments,
     provisional,

@@ -443,10 +443,16 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
                   returnLines,
                 }),
               );
-              await checkoutReturnMutation.mutateAsync({
-                id: createdReturn.id,
-                body: returnResolve.body,
-              });
+              const returnedExchange = await checkoutReturnMutation.mutateAsync(
+                {
+                  id: createdReturn.id,
+                  body: returnResolve.body,
+                },
+              );
+              if (receiptPayload) {
+                receiptPayload.totals.pointsReversed =
+                  returnedExchange.pointsReversed;
+              }
             } catch (err) {
               toast.error(
                 saleCheckoutBody
@@ -515,6 +521,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             });
             if (receiptPayload) {
               receiptPayload.totals.pointsEarned = posted.pointsEarned;
+              receiptPayload.totals.pointsReversed = posted.pointsReversed;
             }
             // Operator tích "Tính vào công nợ" nhưng hóa đơn gốc không còn nợ để
             // bù trừ → BE tự chi tiền mặt; báo cho thu ngân biết.

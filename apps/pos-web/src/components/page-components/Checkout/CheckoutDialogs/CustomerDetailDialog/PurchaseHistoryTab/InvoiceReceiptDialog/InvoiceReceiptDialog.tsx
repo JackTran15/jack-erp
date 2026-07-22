@@ -76,6 +76,13 @@ function buildPaymentLines(invoice: InvoiceRow): SummaryLine[] {
       valueText: `+${invoice.pointsEarned}`,
     });
   }
+  if (invoice.pointsReversed != null && invoice.pointsReversed > 0) {
+    lines.push({
+      label: "Điểm trừ",
+      value: 0,
+      valueText: `-${invoice.pointsReversed}`,
+    });
+  }
   return lines;
 }
 

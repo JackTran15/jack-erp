@@ -1,78 +1,105 @@
 import type {
   ApplicableGood,
-  ApplyScope,
-  BuyGetGiftPolicy,
+  ApplicableGroup,
   BuyGetRow,
-  CalcBasis,
-  DayOfWeek,
-  GoodsDiscountMethod,
   GoodsDiscountRow,
-  GoodsDiscountScope,
-  GiftMode,
   GiftProduct,
   ProgramFormState,
-  StoreScope,
-  TierBasis,
-  TierDiscountUnit,
   TierGroup,
   TierProduct,
   TierRow,
+} from "./program-form.types";
+import {
+  ApplyScope,
+  BirthdayDateMode,
+  BuyGetGiftPolicy,
+  CalcBasis,
+  ConditionType,
+  DayOfWeek,
+  DiscountType,
+  GiftMode,
+  GoodsDiscountMethod,
+  GoodsDiscountScope,
+  ProductGroupLogic,
+  StoreScope,
+  TierBasis,
+  TierDiscountUnit,
   TierTarget,
 } from "./program-form.types";
+import { PromotionApplyTo } from "./programs.constants";
 
 /** Bề rộng cột label dùng chung cho các FormField horizontal của form KM. */
 export const FORM_LABEL_WIDTH = "11rem";
 
+export const BIRTHDAY_DATE_MODE_OPTIONS: {
+  value: BirthdayDateMode;
+  label: string;
+}[] = [
+  { value: BirthdayDateMode.WEEK, label: "Trong tuần chứa ngày sinh nhật" },
+  { value: BirthdayDateMode.MONTH, label: "Trong tháng chứa ngày sinh nhật" },
+  { value: BirthdayDateMode.RANGE, label: "Trong khoảng chứa ngày sinh nhật" },
+];
+
+export const CARD_TIER_OPTIONS: { value: string; label: string }[] = [
+  { value: "MEMBER", label: "Thẻ thành viên" },
+];
+
 export const DAY_OF_WEEK_OPTIONS: { value: DayOfWeek; label: string }[] = [
-  { value: "MON", label: "Thứ 2" },
-  { value: "TUE", label: "Thứ 3" },
-  { value: "WED", label: "Thứ 4" },
-  { value: "THU", label: "Thứ 5" },
-  { value: "FRI", label: "Thứ 6" },
-  { value: "SAT", label: "Thứ 7" },
-  { value: "SUN", label: "Chủ nhật" },
+  { value: DayOfWeek.MON, label: "Thứ 2" },
+  { value: DayOfWeek.TUE, label: "Thứ 3" },
+  { value: DayOfWeek.WED, label: "Thứ 4" },
+  { value: DayOfWeek.THU, label: "Thứ 5" },
+  { value: DayOfWeek.FRI, label: "Thứ 6" },
+  { value: DayOfWeek.SAT, label: "Thứ 7" },
+  { value: DayOfWeek.SUN, label: "Chủ nhật" },
 ];
 
 export const STORE_SCOPE_OPTIONS: { value: StoreScope; label: string }[] = [
-  { value: "ALL_CHAIN", label: "Toàn bộ chuỗi cửa hàng" },
-  { value: "SELECTED", label: "Các cửa hàng được chọn" },
+  { value: StoreScope.ALL_CHAIN, label: "Toàn bộ chuỗi cửa hàng" },
+  { value: StoreScope.SELECTED, label: "Các cửa hàng được chọn" },
 ];
 
 export const APPLY_SCOPE_OPTIONS: { value: ApplyScope; label: string }[] = [
-  { value: "NON_PROMO_ONLY", label: "Chỉ hàng hóa chưa áp dụng khuyến mại" },
-  { value: "ALL_ITEMS", label: "Tất cả hàng hóa trong hóa đơn" },
+  { value: ApplyScope.NON_PROMO_ONLY, label: "Chỉ hàng hóa chưa áp dụng khuyến mại" },
+  { value: ApplyScope.ALL_ITEMS, label: "Tất cả hàng hóa trong hóa đơn" },
 ];
 
 export const CALC_BASIS_OPTIONS: { value: CalcBasis; label: string }[] = [
-  { value: "ALL_ITEMS", label: "Tất cả hàng hóa" },
-  { value: "SELECTED_ITEMS", label: "Hàng hóa được chọn" },
+  { value: CalcBasis.ALL_ITEMS, label: "Tất cả hàng hóa" },
+  { value: CalcBasis.NOT_DISCOUNTED, label: "Hàng hóa chưa khuyến mại" },
+  { value: CalcBasis.PRODUCT_GROUP, label: "Hàng hóa thuộc nhóm hàng hóa" },
 ];
 
 export const GOODS_DISCOUNT_SCOPE_OPTIONS: {
   value: GoodsDiscountScope;
   label: string;
 }[] = [
-  { value: "GROUP", label: "Nhóm hàng hóa" },
-  { value: "PRODUCT", label: "Hàng hóa" },
+  { value: GoodsDiscountScope.GROUP, label: "Nhóm hàng hóa" },
+  { value: GoodsDiscountScope.PRODUCT, label: "Hàng hóa" },
 ];
 
 export const GOODS_DISCOUNT_METHOD_OPTIONS: {
   value: GoodsDiscountMethod;
   label: string;
 }[] = [
-  { value: "PERCENT", label: "Giảm giá theo %" },
-  { value: "AMOUNT", label: "Giảm giá theo số tiền" },
-  { value: "FIXED_PRICE", label: "Đồng giá" },
+  { value: GoodsDiscountMethod.PERCENT, label: "Giảm giá theo %" },
+  { value: GoodsDiscountMethod.AMOUNT, label: "Giảm giá theo số tiền" },
+  { value: GoodsDiscountMethod.FIXED_PRICE, label: "Đồng giá" },
 ];
 
 export function blankApplicableGood(): ApplicableGood {
   return {
     id: crypto.randomUUID(),
+    itemId: "",
     sku: "",
     name: "",
     unit: "",
     minQuantity: "",
   };
+}
+
+export function blankApplicableGroup(): ApplicableGroup {
+  return { id: crypto.randomUUID(), groupId: "", code: "", name: "" };
 }
 
 export function blankGoodsDiscountRow(): GoodsDiscountRow {
@@ -92,19 +119,19 @@ export const TIER_DISCOUNT_UNIT_OPTIONS: {
   value: TierDiscountUnit;
   label: string;
 }[] = [
-  { value: "PERCENT", label: "Giảm giá theo phần trăm(%)" },
-  { value: "AMOUNT", label: "Giảm giá theo số tiền" },
+  { value: TierDiscountUnit.PERCENT, label: "Giảm giá theo phần trăm(%)" },
+  { value: TierDiscountUnit.AMOUNT, label: "Giảm giá theo số tiền" },
 ];
 
 export const TIER_BASIS_OPTIONS: { value: TierBasis; label: string }[] = [
-  { value: "PER_ITEM", label: "Từng hàng hóa trong nhóm khuyến mại" },
-  { value: "ALL_ITEMS", label: "Tất cả hàng hóa trong nhóm khuyến mại" },
+  { value: TierBasis.PER_ITEM, label: "Từng hàng hóa trong nhóm khuyến mại" },
+  { value: TierBasis.ALL_ITEMS, label: "Tất cả hàng hóa trong nhóm khuyến mại" },
 ];
 
 export const TIER_TARGET_OPTIONS: { value: TierTarget; label: string }[] = [
-  { value: "PRODUCT", label: "Hàng hóa" },
-  { value: "VARIANT", label: "Mẫu mã" },
-  { value: "GROUP", label: "Nhóm hàng hóa" },
+  { value: TierTarget.PRODUCT, label: "Hàng hóa" },
+  { value: TierTarget.VARIANT, label: "Mẫu mã" },
+  { value: TierTarget.GROUP, label: "Nhóm hàng hóa" },
 ];
 
 export function blankTierProduct(): TierProduct {
@@ -125,8 +152,8 @@ export function blankTierGroup(index: number): TierGroup {
 }
 
 export const GIFT_MODE_OPTIONS: { value: GiftMode; label: string }[] = [
-  { value: "ONE", label: "Tặng một trong danh sách hàng hóa" },
-  { value: "ALL", label: "Tặng tất cả trong danh sách hàng hóa" },
+  { value: GiftMode.ONE, label: "Tặng một trong danh sách hàng hóa" },
+  { value: GiftMode.ALL, label: "Tặng tất cả trong danh sách hàng hóa" },
 ];
 
 export function blankGiftProduct(): GiftProduct {
@@ -144,8 +171,8 @@ export const BUY_GET_GIFT_POLICY_OPTIONS: {
   value: BuyGetGiftPolicy;
   label: string;
 }[] = [
-  { value: "SPECIFIC", label: "Tặng hàng hóa cụ thể" },
-  { value: "CHEAPEST", label: "Tặng hàng hóa rẻ nhất" },
+  { value: BuyGetGiftPolicy.SPECIFIC, label: "Tặng hàng hóa cụ thể" },
+  { value: BuyGetGiftPolicy.CHEAPEST, label: "Tặng hàng hóa rẻ nhất" },
 ];
 
 export function blankBuyGetRow(): BuyGetRow {
@@ -162,38 +189,44 @@ export function buildInitialFormState(): ProgramFormState {
   return {
     name: "",
     description: "",
-    applyTo: "ALL_CUSTOMERS",
+    applyTo: PromotionApplyTo.ALL_CUSTOMERS,
+    applicableGroupLogic: ProductGroupLogic.ALL,
+    applicableGroups: [],
+    birthdayDateMode: "",
+    birthdayBeforeDays: 0,
+    birthdayAfterDays: 0,
+    cardTier: "",
     startDate: "",
     endDate: "",
     daysOfWeek: [],
     startTime: "",
     endTime: "",
-    storeScope: "ALL_CHAIN",
+    storeScope: StoreScope.ALL_CHAIN,
     storeIds: [],
-    applyScope: "NON_PROMO_ONLY",
-    discountType: "PERCENT",
+    applyScope: ApplyScope.NON_PROMO_ONLY,
+    discountType: DiscountType.PERCENT,
     discountPercent: 0,
     discountAmount: 0,
-    goodsDiscountScope: "GROUP",
-    goodsDiscountMethod: "PERCENT",
+    goodsDiscountScope: GoodsDiscountScope.GROUP,
+    goodsDiscountMethod: GoodsDiscountMethod.PERCENT,
     goodsFixedPrice: 0,
     goodsDiscountRows: [blankGoodsDiscountRow()],
-    tierDiscountUnit: "PERCENT",
-    tierBasis: "PER_ITEM",
-    tierTarget: "PRODUCT",
+    tierDiscountUnit: TierDiscountUnit.PERCENT,
+    tierBasis: TierBasis.PER_ITEM,
+    tierTarget: TierTarget.PRODUCT,
     tierGroups: [blankTierGroup(1)],
-    giftMode: "ONE",
+    giftMode: GiftMode.ONE,
     giftProducts: [blankGiftProduct()],
     giftMultiplyByTotal: false,
-    buyGetGiftPolicy: "SPECIFIC",
-    buyGetPurchaseTarget: "PRODUCT",
-    buyGetGiftMode: "ONE",
+    buyGetGiftPolicy: BuyGetGiftPolicy.SPECIFIC,
+    buyGetPurchaseTarget: TierTarget.PRODUCT,
+    buyGetGiftMode: GiftMode.ONE,
     buyGetPurchaseRows: [blankBuyGetRow()],
     buyGetGiftRows: [blankBuyGetRow()],
     autoApply: true,
-    conditionType: "NONE",
+    conditionType: ConditionType.NONE,
     minTotalAmount: 0,
-    calcBasis: "ALL_ITEMS",
+    calcBasis: CalcBasis.ALL_ITEMS,
     applicableGoods: [blankApplicableGood()],
   };
 }

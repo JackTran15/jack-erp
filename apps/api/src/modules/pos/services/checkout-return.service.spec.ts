@@ -196,6 +196,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
   let journalReturnPublisher: { publish: jest.Mock };
   let cashRefundPublisher: { publish: jest.Mock };
   let loyaltyReversePublisher: { publish: jest.Mock };
+  let loyaltyAwardPublisher: { publish: jest.Mock };
   let debtRepo: { findOne: jest.Mock };
   let invoiceDebtService: { createFromInvoice: jest.Mock };
   let debtRow: Partial<InvoiceDebtEntity>;
@@ -240,6 +241,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
     journalReturnPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
     cashRefundPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
     loyaltyReversePublisher = { publish: jest.fn().mockResolvedValue(undefined) };
+    loyaltyAwardPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
     // Up-front debt lookup (only queried when the operator opts into OFFSET).
     debtRepo = { findOne: jest.fn().mockResolvedValue(debtRow) };
     invoiceDebtService = {
@@ -267,7 +269,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
         { provide: CashRefundPublisher, useValue: cashRefundPublisher },
         { provide: CashFromPaymentPublisher, useValue: noop },
         { provide: JournalReturnPublisher, useValue: journalReturnPublisher },
-        { provide: LoyaltyPointsPublisher, useValue: noop },
+        { provide: LoyaltyPointsPublisher, useValue: loyaltyAwardPublisher },
         { provide: LoyaltyPointsReversePublisher, useValue: loyaltyReversePublisher },
         { provide: MembershipCardService, useValue: { refundRedeemedPoints: jest.fn() } },
       ],
@@ -562,6 +564,87 @@ describe('CheckoutReturnService — debt offset routing', () => {
       expect(loyaltyReversePublisher.publish).toHaveBeenCalledWith(
         expect.objectContaining({ returnInvoiceId: 'ret-1', subtotalDelta: 190 }),
         actor,
+      );
+    });
+
+    it('equal-value exchange (return A, re-buy A) awards on the new item AND reverses the returned one — balance unchanged', async () => {
+      // One IN line (return A, 500) + one OUT line (re-buy A, 500) → netAmount = 0.
+      itemRepo.find.mockResolvedValue([
+        { ...inLineStub(), quantity: 1, unitPrice: 500, lineTotal: 500 } as InvoiceItemEntity,
+        {
+          id: 'exc-out',
+          organizationId: 'org-1',
+          invoiceId: 'exc-eq',
+          itemId: 'item-new',
+          locationId: 'loc-1',
+          itemCode: 'A',
+          itemName: 'A Name',
+          unit: 'pcs',
+          quantity: 1,
+          unitPrice: 500,
+          lineTotal: 500,
+          direction: ItemDirection.OUT,
+          sortOrder: 1,
+        } as InvoiceItemEntity,
+      ]);
+      invoiceRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(
+          where.id === 'exc-eq'
+            ? exchangeDraftStub({
+                id: 'exc-eq',
+                originalInvoiceId: 'orig-1',
+                subtotal: 500,
+                amountDue: 0,
+              })
+            : ({
+                ...originalStub(InvoiceStatus.PAID),
+                subtotal: 500,
+                amountDue: 500,
+              } as InvoiceEntity),
+        ),
+      );
+
+      await service.checkout('exc-eq', cashDto(), actor);
+
+      // AWARD on the newly purchased OUT line (500) — this is the earn that the
+      // old net-based logic swallowed when netAmount was 0.
+      expect(loyaltyAwardPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ invoiceId: 'exc-eq', subtotal: 500 }),
+        actor,
+      );
+      // REVERSE the returned line's original earn (amountDue 500 × 500/500 = 500).
+      expect(loyaltyReversePublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ returnInvoiceId: 'exc-eq', subtotalDelta: 500 }),
+        actor,
+      );
+    });
+
+    it('snapshots pointsReversed on the invoice = floor(reverseBase / 10000)', async () => {
+      // Full return of a 1.490.000đ line whose original earned floor(1490000/10000)=149.
+      itemRepo.find.mockResolvedValue([
+        {
+          ...inLineStub(),
+          quantity: 1,
+          unitPrice: 1_490_000,
+          lineTotal: 1_490_000,
+        } as InvoiceItemEntity,
+      ]);
+      invoiceRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(
+          where.id === 'ret-1'
+            ? returnDraftStub({ subtotal: 1_490_000, amountDue: 1_490_000 })
+            : ({
+                ...originalStub(InvoiceStatus.PAID),
+                subtotal: 1_490_000,
+                amountDue: 1_490_000,
+              } as InvoiceEntity),
+        ),
+      );
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(mockManager.save).toHaveBeenCalledWith(
+        expect.objectContaining({ pointsReversed: 149 }),
       );
     });
   });

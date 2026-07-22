@@ -282,12 +282,19 @@ export class CheckoutReturnService {
       invoice.refundMethod = effectiveRefundMethod;
       invoice.refundedAmount = totals.refundedAmount;
       invoice.netAmount = totals.netAmount;
-      // EXCHANGE net > 0 earns loyalty points on the new-purchase difference
-      // (mirrors the netAmount earn base published below); RETURN/refund earns none.
-      invoice.pointsEarned =
-        totals.netAmount > 0
-          ? Math.floor(totals.netAmount / POINT_EARN_VND_PER_POINT)
-          : 0;
+      // Loyalty earn is on the newly purchased (OUT) goods — a "Mua thêm" line is
+      // a real sale and earns on its own value, independent of what was returned
+      // (the return is reversed separately in fanOutEvents). RETURN/refund has no
+      // OUT lines, so newSubtotal = 0 and this earns nothing.
+      invoice.pointsEarned = Math.floor(
+        totals.newSubtotal / POINT_EARN_VND_PER_POINT,
+      );
+      // Snapshot the points clawed back on the returned goods so receipts can show
+      // "Điểm trừ" without querying point_history. Same base as the reverse event.
+      invoice.pointsReversed = Math.floor(
+        this.computeReverseBase(originalInvoice, totals) /
+          POINT_EARN_VND_PER_POINT,
+      );
       if (dto.note) invoice.note = dto.note;
       const savedInvoice = await manager.save(invoice);
 
@@ -464,6 +471,25 @@ export class CheckoutReturnService {
     const netAmount = round(newSubtotal - returnSubtotal);
     const refundedAmount = round(Math.max(returnSubtotal - newSubtotal, 0));
     return { returnSubtotal, newSubtotal, netAmount, refundedAmount };
+  }
+
+  /**
+   * Money base for the loyalty points clawed back on the returned (IN) goods —
+   * proportional to the ORIGINAL sale's amountDue (net of its discounts/point
+   * redemption), so a full return reverses exactly what was earned. QUICK returns
+   * without an original fall back to the gross returned value. Shared by the
+   * on-invoice `pointsReversed` snapshot and the reverse event, so both agree.
+   */
+  private computeReverseBase(
+    originalInvoice: InvoiceEntity | null,
+    totals: ComputedTotals,
+  ): number {
+    if (totals.returnSubtotal <= 0) return 0;
+    const originalSubtotal = Number(originalInvoice?.subtotal ?? 0);
+    return originalInvoice && originalSubtotal > 0
+      ? (Number(originalInvoice.amountDue) * totals.returnSubtotal) /
+          originalSubtotal
+      : Math.abs(totals.refundedAmount || totals.returnSubtotal);
   }
 
   private validateRefundMatrix(
@@ -754,31 +780,32 @@ export class CheckoutReturnService {
       }
     }
 
-    // 6. Loyalty — REVERSE when net <= 0, AWARD when net > 0.
+    // 6. Loyalty — the return (IN) and the new purchase (OUT) are two independent
+    // movements on the same invoice, so an equal-value exchange (return A, re-buy
+    // A) reverses the returned item's points AND earns them back on the new one,
+    // leaving the balance unchanged. Netting them into a single netAmount would
+    // swallow the earn whenever net <= 0.
     if (invoice.customerId) {
-      if (totals.netAmount > 0) {
+      // AWARD on the newly purchased (OUT) goods.
+      if (totals.newSubtotal > 0) {
         await this.loyaltyPointsPublisher.publish(
           {
             invoiceId: invoice.id,
             customerId: invoice.customerId,
-            subtotal: totals.netAmount,
+            subtotal: totals.newSubtotal,
             issuedAt: invoice.issuedAt,
             branchId,
           },
           actor,
         );
-      } else {
-        // Reverse the points earned on the ORIGINAL sale, proportional to the
-        // returned value — earn was on the original's amountDue (net of its
-        // discounts/point-redemption), so reverse on that same base to stay
-        // symmetric (full return → floor(amountDue/rate) = points earned). QUICK
-        // returns without an original fall back to the gross returned value.
-        const originalSubtotal = Number(originalInvoice?.subtotal ?? 0);
-        const delta =
-          originalInvoice && originalSubtotal > 0
-            ? (Number(originalInvoice.amountDue) * totals.returnSubtotal) /
-              originalSubtotal
-            : Math.abs(totals.refundedAmount || totals.returnSubtotal);
+      }
+      // REVERSE the points earned on the ORIGINAL sale, proportional to the
+      // returned value — earn was on the original's amountDue (net of its
+      // discounts/point-redemption), so reverse on that same base to stay
+      // symmetric (full return → floor(amountDue/rate) = points earned). QUICK
+      // returns without an original fall back to the gross returned value.
+      if (totals.returnSubtotal > 0) {
+        const delta = this.computeReverseBase(originalInvoice, totals);
         if (delta > 0) {
           await this.loyaltyPointsReversePublisher.publish(
             {

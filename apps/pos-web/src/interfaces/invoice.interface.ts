@@ -63,6 +63,8 @@ export interface InvoiceRow {
   pointsDiscountAmount?: number;
   /** Số điểm được tích từ hóa đơn (chỉ có ở chi tiết hoá đơn). */
   pointsEarned?: number;
+  /** Số điểm bị thu hồi khi trả/đổi hàng (chỉ có ở chi tiết hoá đơn). */
+  pointsReversed?: number;
   note?: string;
   issuedAt?: string;
   createdAt: string;

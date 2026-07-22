@@ -1,37 +1,93 @@
 import type { PromotionApplyTo } from "./programs.types";
 
+/** "Ngày tính KM" khi áp dụng cho khách hàng có sinh nhật. */
+export enum BirthdayDateMode {
+  WEEK = "WEEK",
+  MONTH = "MONTH",
+  RANGE = "RANGE",
+}
+
 /** Cách giảm giá: theo % hoặc theo số tiền. */
-export type DiscountType = "PERCENT" | "AMOUNT";
+export enum DiscountType {
+  PERCENT = "PERCENT",
+  AMOUNT = "AMOUNT",
+}
 
 /** Phạm vi cửa hàng áp dụng (chỉ dùng khi view = chuỗi cửa hàng). */
-export type StoreScope = "ALL_CHAIN" | "SELECTED";
+export enum StoreScope {
+  ALL_CHAIN = "ALL_CHAIN",
+  SELECTED = "SELECTED",
+}
 
 /** Phạm vi hàng hóa áp dụng trong hóa đơn. */
-export type ApplyScope = "NON_PROMO_ONLY" | "ALL_ITEMS";
+export enum ApplyScope {
+  NON_PROMO_ONLY = "NON_PROMO_ONLY",
+  ALL_ITEMS = "ALL_ITEMS",
+}
 
 /** Ngày trong tuần (T2..CN). */
-export type DayOfWeek = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
+export enum DayOfWeek {
+  MON = "MON",
+  TUE = "TUE",
+  WED = "WED",
+  THU = "THU",
+  FRI = "FRI",
+  SAT = "SAT",
+  SUN = "SUN",
+}
 
 /** Loại điều kiện áp dụng (tab "Điều kiện áp dụng"). */
-export type ConditionType = "NONE" | "MIN_TOTAL" | "SPECIFIC_QUANTITY";
+export enum ConditionType {
+  NONE = "NONE",
+  MIN_TOTAL = "MIN_TOTAL",
+  SPECIFIC_QUANTITY = "SPECIFIC_QUANTITY",
+}
 
 /** Phạm vi tính tổng tiền cho điều kiện "Tổng tiền hàng ≥". */
-export type CalcBasis = "ALL_ITEMS" | "SELECTED_ITEMS";
+export enum CalcBasis {
+  ALL_ITEMS = "ALL_ITEMS",
+  NOT_DISCOUNTED = "NOT_DISCOUNTED",
+  PRODUCT_GROUP = "PRODUCT_GROUP",
+}
+
+/** Logic áp dụng nhóm hàng hóa: thuộc 1 trong (ANY) hoặc thuộc tất cả (ALL) các nhóm. */
+export enum ProductGroupLogic {
+  ANY = "ANY",
+  ALL = "ALL",
+}
 
 /** Một dòng hàng hóa áp dụng (bảng editable). */
 export interface ApplicableGood {
   id: string;
+  /** Id hàng hóa đã chọn từ tra cứu (rỗng khi chưa chọn). */
+  itemId: string;
   sku: string;
   name: string;
   unit: string;
   minQuantity: number | "";
 }
 
+/** Một dòng nhóm hàng hóa áp dụng (bảng editable, tra cứu danh mục). */
+export interface ApplicableGroup {
+  id: string;
+  /** Id nhóm/danh mục đã chọn từ tra cứu (rỗng khi chưa chọn). */
+  groupId: string;
+  code: string;
+  name: string;
+}
+
 /** Phạm vi giảm giá hàng hóa: theo nhóm hàng hóa hoặc theo từng hàng hóa. */
-export type GoodsDiscountScope = "GROUP" | "PRODUCT";
+export enum GoodsDiscountScope {
+  GROUP = "GROUP",
+  PRODUCT = "PRODUCT",
+}
 
 /** Phương thức thiết lập giảm giá hàng hóa. */
-export type GoodsDiscountMethod = "PERCENT" | "AMOUNT" | "FIXED_PRICE";
+export enum GoodsDiscountMethod {
+  PERCENT = "PERCENT",
+  AMOUNT = "AMOUNT",
+  FIXED_PRICE = "FIXED_PRICE",
+}
 
 /** Một dòng thiết lập giảm giá hàng hóa (bảng editable). */
 export interface GoodsDiscountRow {
@@ -45,13 +101,23 @@ export interface GoodsDiscountRow {
 }
 
 /** Đơn vị giảm giá theo mức (select 2 của "Loại giảm theo"). */
-export type TierDiscountUnit = "PERCENT" | "AMOUNT";
+export enum TierDiscountUnit {
+  PERCENT = "PERCENT",
+  AMOUNT = "AMOUNT",
+}
 
 /** "Tính trên": áp điều kiện số lượng theo từng hàng hóa hay gộp cả nhóm. */
-export type TierBasis = "PER_ITEM" | "ALL_ITEMS";
+export enum TierBasis {
+  PER_ITEM = "PER_ITEM",
+  ALL_ITEMS = "ALL_ITEMS",
+}
 
 /** "Giảm giá theo": đối tượng hàng hóa của grid chọn hàng. */
-export type TierTarget = "PRODUCT" | "VARIANT" | "GROUP";
+export enum TierTarget {
+  PRODUCT = "PRODUCT",
+  VARIANT = "VARIANT",
+  GROUP = "GROUP",
+}
 
 /** Một dòng hàng hóa trong grid chọn hàng của nhóm giảm giá theo mức. */
 export interface TierProduct {
@@ -80,7 +146,10 @@ export interface TierGroup {
 }
 
 /** Hình thức tặng: tặng một trong danh sách hoặc tặng tất cả. */
-export type GiftMode = "ONE" | "ALL";
+export enum GiftMode {
+  ONE = "ONE",
+  ALL = "ALL",
+}
 
 /** Một dòng hàng hóa quà tặng (grid 5 cột của loại "Tặng hàng hóa"). */
 export interface GiftProduct {
@@ -95,7 +164,10 @@ export interface GiftProduct {
 }
 
 /** Chính sách tặng khi mua m tặng n: tặng hàng cụ thể hoặc tặng hàng rẻ nhất. */
-export type BuyGetGiftPolicy = "SPECIFIC" | "CHEAPEST";
+export enum BuyGetGiftPolicy {
+  SPECIFIC = "SPECIFIC",
+  CHEAPEST = "CHEAPEST",
+}
 
 /** Một dòng hàng hóa trong grid mua-m-tặng-n (điều kiện mua hoặc hàng được tặng). */
 export interface BuyGetRow {
@@ -112,6 +184,18 @@ export interface ProgramFormState {
   name: string;
   description: string;
   applyTo: PromotionApplyTo;
+  /** Logic nhóm hàng hóa (chỉ dùng khi calcBasis = PRODUCT_GROUP). */
+  applicableGroupLogic: ProductGroupLogic;
+  /** Nhóm hàng hóa áp dụng (chỉ dùng khi calcBasis = PRODUCT_GROUP). */
+  applicableGroups: ApplicableGroup[];
+  /** "Ngày tính KM" — chỉ dùng khi applyTo = HAS_BIRTHDAY. */
+  birthdayDateMode: BirthdayDateMode | "";
+  /** Số ngày trước ngày sinh (khi birthdayDateMode = RANGE). */
+  birthdayBeforeDays: number | "";
+  /** Số ngày sau ngày sinh (khi birthdayDateMode = RANGE). */
+  birthdayAfterDays: number | "";
+  /** Hạng thẻ — chỉ dùng khi applyTo = HAS_CARD_TIER. */
+  cardTier: string;
   /** ISO date yyyy-MM-dd hoặc rỗng. */
   startDate: string;
   endDate: string;

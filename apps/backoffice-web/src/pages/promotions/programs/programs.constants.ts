@@ -1,8 +1,26 @@
-import type {
-  PromotionApplyTo,
-  PromotionForm,
-  PromotionStatus,
-} from "./programs.types";
+/** Đối tượng áp dụng khuyến mãi. */
+export enum PromotionApplyTo {
+  ALL_CUSTOMERS = "ALL_CUSTOMERS",
+  CUSTOMER_GROUP = "CUSTOMER_GROUP",
+  HAS_BIRTHDAY = "HAS_BIRTHDAY",
+  HAS_CARD_TIER = "HAS_CARD_TIER",
+}
+
+/** Hình thức khuyến mãi (5 loại — khớp menu "Thêm mới"). */
+export enum PromotionForm {
+  INVOICE_DISCOUNT = "INVOICE_DISCOUNT",
+  PRODUCT_DISCOUNT = "PRODUCT_DISCOUNT",
+  TIERED_DISCOUNT = "TIERED_DISCOUNT",
+  GIFT = "GIFT",
+  BUY_M_GET_N = "BUY_M_GET_N",
+}
+
+/** Trạng thái theo dõi chương trình. */
+export enum PromotionStatus {
+  TRACKING = "TRACKING",
+  PAUSED = "PAUSED",
+  ENDED = "ENDED",
+}
 
 interface Option<T extends string> {
   value: T;
@@ -10,23 +28,24 @@ interface Option<T extends string> {
 }
 
 export const PROMOTION_APPLY_TO_OPTIONS: Option<PromotionApplyTo>[] = [
-  { value: "ALL_CUSTOMERS", label: "Tất cả khách hàng" },
-  { value: "CUSTOMER_GROUP", label: "Nhóm khách hàng" },
-  { value: "SPECIFIC_CUSTOMER", label: "Khách hàng cụ thể" },
+  { value: PromotionApplyTo.ALL_CUSTOMERS, label: "Tất cả khách hàng" },
+  // { value: PromotionApplyTo.CUSTOMER_GROUP, label: "Nhóm khách hàng" },
+  { value: PromotionApplyTo.HAS_BIRTHDAY, label: "Khách hàng có sinh nhật" },
+  { value: PromotionApplyTo.HAS_CARD_TIER, label: "Khách hàng có hạng thẻ" },
 ];
 
 export const PROMOTION_FORM_OPTIONS: Option<PromotionForm>[] = [
-  { value: "INVOICE_DISCOUNT", label: "Giảm giá hóa đơn" },
-  { value: "PRODUCT_DISCOUNT", label: "Giảm giá hàng hóa" },
-  { value: "TIERED_DISCOUNT", label: "Giảm giá theo mức" },
-  { value: "GIFT", label: "Tặng hàng hóa" },
-  { value: "BUY_M_GET_N", label: "Mua m tặng n" },
+  { value: PromotionForm.INVOICE_DISCOUNT, label: "Giảm giá hóa đơn" },
+  // { value: PromotionForm.PRODUCT_DISCOUNT, label: "Giảm giá hàng hóa" },
+  // { value: PromotionForm.TIERED_DISCOUNT, label: "Giảm giá theo mức" },
+  // { value: PromotionForm.GIFT, label: "Tặng hàng hóa" },
+  // { value: PromotionForm.BUY_M_GET_N, label: "Mua m tặng n" },
 ];
 
 export const PROMOTION_STATUS_OPTIONS: Option<PromotionStatus>[] = [
-  { value: "TRACKING", label: "Đang theo dõi" },
-  { value: "PAUSED", label: "Tạm dừng" },
-  { value: "ENDED", label: "Đã kết thúc" },
+  { value: PromotionStatus.TRACKING, label: "Đang theo dõi" },
+  { value: PromotionStatus.PAUSED, label: "Tạm dừng" },
+  { value: PromotionStatus.ENDED, label: "Đã kết thúc" },
 ];
 
 /** Menu con của nút "Thêm mới" — 5 loại chương trình khuyến mãi. */

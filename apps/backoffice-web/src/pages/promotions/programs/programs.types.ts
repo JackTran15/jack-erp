@@ -1,19 +1,10 @@
-/** Đối tượng áp dụng khuyến mãi. */
-export type PromotionApplyTo =
-  | "ALL_CUSTOMERS"
-  | "CUSTOMER_GROUP"
-  | "SPECIFIC_CUSTOMER";
+import {
+  PromotionApplyTo,
+  PromotionForm,
+  PromotionStatus,
+} from "./programs.constants";
 
-/** Hình thức khuyến mãi (5 loại — khớp menu "Thêm mới"). */
-export type PromotionForm =
-  | "INVOICE_DISCOUNT"
-  | "PRODUCT_DISCOUNT"
-  | "TIERED_DISCOUNT"
-  | "GIFT"
-  | "BUY_M_GET_N";
-
-/** Trạng thái theo dõi chương trình. */
-export type PromotionStatus = "TRACKING" | "PAUSED" | "ENDED";
+export { PromotionApplyTo, PromotionForm, PromotionStatus };
 
 /** Một dòng trong danh sách chương trình khuyến mãi. */
 export interface PromotionProgramRow {
