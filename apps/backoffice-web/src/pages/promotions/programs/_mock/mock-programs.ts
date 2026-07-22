@@ -39,7 +39,7 @@ export const MOCK_PROGRAM_ROWS: PromotionProgramRow[] = [
     name: "Mua 2 tặng 1",
     startDate: "2026-05-01",
     endDate: "2026-05-31",
-    applyTo: PromotionApplyTo.SPECIFIC_CUSTOMER,
+    applyTo: PromotionApplyTo.HAS_BIRTHDAY,
     form: PromotionForm.BUY_M_GET_N,
     status: PromotionStatus.ENDED,
   },

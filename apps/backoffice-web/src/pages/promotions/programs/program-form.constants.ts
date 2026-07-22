@@ -1,6 +1,7 @@
 import type {
   ApplicableGood,
   ApplyScope,
+  BirthdayDateMode,
   BuyGetGiftPolicy,
   BuyGetRow,
   CalcBasis,
@@ -23,6 +24,19 @@ import { PromotionApplyTo } from "./programs.constants";
 
 /** Bề rộng cột label dùng chung cho các FormField horizontal của form KM. */
 export const FORM_LABEL_WIDTH = "11rem";
+
+export const BIRTHDAY_DATE_MODE_OPTIONS: {
+  value: BirthdayDateMode;
+  label: string;
+}[] = [
+  { value: "WEEK", label: "Trong tuần chứa ngày sinh nhật" },
+  { value: "MONTH", label: "Trong tháng chứa ngày sinh nhật" },
+  { value: "RANGE", label: "Trong khoảng chứa ngày sinh nhật" },
+];
+
+export const CARD_TIER_OPTIONS: { value: string; label: string }[] = [
+  { value: "MEMBER", label: "Thẻ thành viên" },
+];
 
 export const DAY_OF_WEEK_OPTIONS: { value: DayOfWeek; label: string }[] = [
   { value: "MON", label: "Thứ 2" },
@@ -164,6 +178,10 @@ export function buildInitialFormState(): ProgramFormState {
     name: "",
     description: "",
     applyTo: PromotionApplyTo.ALL_CUSTOMERS,
+    birthdayDateMode: "",
+    birthdayBeforeDays: 0,
+    birthdayAfterDays: 0,
+    cardTier: "",
     startDate: "",
     endDate: "",
     daysOfWeek: [],

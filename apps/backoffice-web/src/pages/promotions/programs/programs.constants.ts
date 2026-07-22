@@ -2,7 +2,8 @@
 export enum PromotionApplyTo {
   ALL_CUSTOMERS = "ALL_CUSTOMERS",
   CUSTOMER_GROUP = "CUSTOMER_GROUP",
-  SPECIFIC_CUSTOMER = "SPECIFIC_CUSTOMER",
+  HAS_BIRTHDAY = "HAS_BIRTHDAY",
+  HAS_CARD_TIER = "HAS_CARD_TIER",
 }
 
 /** Hình thức khuyến mãi (5 loại — khớp menu "Thêm mới"). */
@@ -28,8 +29,9 @@ interface Option<T extends string> {
 
 export const PROMOTION_APPLY_TO_OPTIONS: Option<PromotionApplyTo>[] = [
   { value: PromotionApplyTo.ALL_CUSTOMERS, label: "Tất cả khách hàng" },
-  { value: PromotionApplyTo.CUSTOMER_GROUP, label: "Nhóm khách hàng" },
-  { value: PromotionApplyTo.SPECIFIC_CUSTOMER, label: "Khách hàng cụ thể" },
+  // { value: PromotionApplyTo.CUSTOMER_GROUP, label: "Nhóm khách hàng" },
+  { value: PromotionApplyTo.HAS_BIRTHDAY, label: "Khách hàng có sinh nhật" },
+  { value: PromotionApplyTo.HAS_CARD_TIER, label: "Khách hàng có hạng thẻ" },
 ];
 
 export const PROMOTION_FORM_OPTIONS: Option<PromotionForm>[] = [

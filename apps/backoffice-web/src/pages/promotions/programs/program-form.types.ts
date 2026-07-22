@@ -1,5 +1,8 @@
 import type { PromotionApplyTo } from "./programs.types";
 
+/** "Ngày tính KM" khi áp dụng cho khách hàng có sinh nhật. */
+export type BirthdayDateMode = "WEEK" | "MONTH" | "RANGE";
+
 /** Cách giảm giá: theo % hoặc theo số tiền. */
 export type DiscountType = "PERCENT" | "AMOUNT";
 
@@ -112,6 +115,14 @@ export interface ProgramFormState {
   name: string;
   description: string;
   applyTo: PromotionApplyTo;
+  /** "Ngày tính KM" — chỉ dùng khi applyTo = HAS_BIRTHDAY. */
+  birthdayDateMode: BirthdayDateMode | "";
+  /** Số ngày trước ngày sinh (khi birthdayDateMode = RANGE). */
+  birthdayBeforeDays: number | "";
+  /** Số ngày sau ngày sinh (khi birthdayDateMode = RANGE). */
+  birthdayAfterDays: number | "";
+  /** Hạng thẻ — chỉ dùng khi applyTo = HAS_CARD_TIER. */
+  cardTier: string;
   /** ISO date yyyy-MM-dd hoặc rỗng. */
   startDate: string;
   endDate: string;

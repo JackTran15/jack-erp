@@ -32,7 +32,7 @@ export function PromotionGift({ form, onChange }: Props) {
 
       <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
         {activeTab === "km" ? (
-          <div className="max-w-5xl flex flex-col gap-5">
+          <div className="w-full flex flex-col gap-5">
             <GeneralInfoPromotionSection form={form} onChange={onChange} />
             <TimePromotionSection form={form} onChange={onChange} />
             {isChain ? (
@@ -41,7 +41,7 @@ export function PromotionGift({ form, onChange }: Props) {
             <GiftPromotionSection form={form} onChange={onChange} />
           </div>
         ) : (
-          <div className="max-w-5xl flex flex-col gap-5">
+          <div className="w-full flex flex-col gap-5">
             <ConditionPromotionSection
               form={form}
               onChange={onChange}

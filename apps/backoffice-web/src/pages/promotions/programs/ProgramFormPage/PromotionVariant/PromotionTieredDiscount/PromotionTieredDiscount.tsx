@@ -15,7 +15,7 @@ export function PromotionTieredDiscount({ form, onChange }: Props) {
 
   return (
     <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
-      <div className="max-w-5xl flex flex-col gap-5">
+      <div className="w-full flex flex-col gap-5">
         <GeneralInfoPromotionSection form={form} onChange={onChange} />
         <TimePromotionSection form={form} onChange={onChange} />
         {isChain ? (
