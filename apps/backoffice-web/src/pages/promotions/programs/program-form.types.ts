@@ -19,11 +19,13 @@ export type DayOfWeek = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
 export type ConditionType = "NONE" | "MIN_TOTAL" | "SPECIFIC_QUANTITY";
 
 /** Phạm vi tính tổng tiền cho điều kiện "Tổng tiền hàng ≥". */
-export type CalcBasis = "ALL_ITEMS" | "SELECTED_ITEMS";
+export type CalcBasis = "ALL_ITEMS" | "NOT_DISCOUNTED";
 
 /** Một dòng hàng hóa áp dụng (bảng editable). */
 export interface ApplicableGood {
   id: string;
+  /** Id hàng hóa đã chọn từ tra cứu (rỗng khi chưa chọn). */
+  itemId: string;
   sku: string;
   name: string;
   unit: string;

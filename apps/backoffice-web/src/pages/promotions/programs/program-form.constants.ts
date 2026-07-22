@@ -60,7 +60,7 @@ export const APPLY_SCOPE_OPTIONS: { value: ApplyScope; label: string }[] = [
 
 export const CALC_BASIS_OPTIONS: { value: CalcBasis; label: string }[] = [
   { value: "ALL_ITEMS", label: "Tất cả hàng hóa" },
-  { value: "SELECTED_ITEMS", label: "Hàng hóa được chọn" },
+  { value: "NOT_DISCOUNTED", label: "Hàng hóa chưa khuyến mại" },
 ];
 
 export const GOODS_DISCOUNT_SCOPE_OPTIONS: {
@@ -83,6 +83,7 @@ export const GOODS_DISCOUNT_METHOD_OPTIONS: {
 export function blankApplicableGood(): ApplicableGood {
   return {
     id: crypto.randomUUID(),
+    itemId: "",
     sku: "",
     name: "",
     unit: "",

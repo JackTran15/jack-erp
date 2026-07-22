@@ -7,7 +7,6 @@ import { StoreScopePromotionSection } from "../_PromotionSections/StoreScopeProm
 import { ApplyScopePromotionSection } from "../_PromotionSections/ApplyScopePromotionSection/ApplyScopePromotionSection";
 import { DiscountPromotionSection } from "../_PromotionSections/DiscountPromotionSection/DiscountPromotionSection";
 import { ConditionPromotionSection } from "../_PromotionSections/ConditionPromotionSection/ConditionPromotionSection";
-import { ApplicableGoodsPromotionSection } from "../_PromotionSections/ApplicableGoodsPromotionSection/ApplicableGoodsPromotionSection";
 import { AutoApplyCheckbox } from "../_PromotionSections/AutoApplyCheckbox/AutoApplyCheckbox";
 import type { ProgramFormState } from "../../../program-form.types";
 
@@ -48,10 +47,6 @@ export function PromotionInvoiceDiscount({ form, onChange }: Props) {
               form={form}
               onChange={onChange}
               showGiftMultiplier={false}
-            />
-            <ApplicableGoodsPromotionSection
-              value={form.applicableGoods}
-              onChange={(goods) => onChange({ applicableGoods: goods })}
             />
           </div>
         )}
