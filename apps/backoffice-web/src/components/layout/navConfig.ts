@@ -232,7 +232,7 @@ export const navConfig: NavModule[] = [
         id: "promotions-main",
         children: [
           { to: "/promotions/programs", label: "Chương trình khuyến mãi" },
-          { to: "/promotions/vouchers", label: "Thẻ voucher" },
+          // { to: "/promotions/vouchers", label: "Thẻ voucher" },
         ],
       },
     ],

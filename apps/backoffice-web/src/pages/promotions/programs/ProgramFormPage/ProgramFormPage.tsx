@@ -19,9 +19,8 @@ import { ConditionSection } from "./ConditionSection/ConditionSection";
 import { ApplicableGoodsTable } from "./ApplicableGoodsTable/ApplicableGoodsTable";
 import { AutoApplyCheckbox } from "./AutoApplyCheckbox/AutoApplyCheckbox";
 import { buildInitialFormState } from "../program-form.constants";
-import { PROMOTION_FORM_LABELS } from "../programs.constants";
+import { PromotionForm, PROMOTION_FORM_LABELS } from "../programs.constants";
 import type { ProgramFormState } from "../program-form.types";
-import type { PromotionForm } from "../programs.types";
 import { MOCK_PROGRAM_ROWS } from "../_mock/mock-programs";
 
 type FormTab = "km" | "conditions";
@@ -55,8 +54,9 @@ export function ProgramFormPage() {
   const isChain = useIsChainSelected();
 
   const promotionType = isEdit
-    ? MOCK_PROGRAM_ROWS.find((r) => r.id === id)?.form ?? "INVOICE_DISCOUNT"
-    : searchParams.get("type") ?? "INVOICE_DISCOUNT";
+    ? MOCK_PROGRAM_ROWS.find((r) => r.id === id)?.form ??
+      PromotionForm.INVOICE_DISCOUNT
+    : searchParams.get("type") ?? PromotionForm.INVOICE_DISCOUNT;
 
   const [form, setForm] = useState<ProgramFormState>(() => initialStateFor(id));
   const [activeTab, setActiveTab] = useState<FormTab>("km");
@@ -90,11 +90,11 @@ export function ProgramFormPage() {
     navigate("/promotions/programs");
   }, [navigate]);
 
-  const isInvoiceDiscount = promotionType === "INVOICE_DISCOUNT";
-  const isProductDiscount = promotionType === "PRODUCT_DISCOUNT";
-  const isTieredDiscount = promotionType === "TIERED_DISCOUNT";
-  const isGiftDiscount = promotionType === "GIFT";
-  const isBuyGetDiscount = promotionType === "BUY_M_GET_N";
+  const isInvoiceDiscount = promotionType === PromotionForm.INVOICE_DISCOUNT;
+  const isProductDiscount = promotionType === PromotionForm.PRODUCT_DISCOUNT;
+  const isTieredDiscount = promotionType === PromotionForm.TIERED_DISCOUNT;
+  const isGiftDiscount = promotionType === PromotionForm.GIFT;
+  const isBuyGetDiscount = promotionType === PromotionForm.BUY_M_GET_N;
   const isSinglePage = isTieredDiscount || isBuyGetDiscount;
 
   const typeLabel =

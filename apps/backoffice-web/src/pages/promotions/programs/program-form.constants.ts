@@ -19,6 +19,7 @@ import type {
   TierRow,
   TierTarget,
 } from "./program-form.types";
+import { PromotionApplyTo } from "./programs.constants";
 
 /** Bề rộng cột label dùng chung cho các FormField horizontal của form KM. */
 export const FORM_LABEL_WIDTH = "11rem";
@@ -162,7 +163,7 @@ export function buildInitialFormState(): ProgramFormState {
   return {
     name: "",
     description: "",
-    applyTo: "ALL_CUSTOMERS",
+    applyTo: PromotionApplyTo.ALL_CUSTOMERS,
     startDate: "",
     endDate: "",
     daysOfWeek: [],
