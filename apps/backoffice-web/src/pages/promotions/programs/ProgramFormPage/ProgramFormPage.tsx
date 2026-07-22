@@ -5,6 +5,7 @@ import { AdminPageShell } from "../../../../components/layout/AdminPageShell";
 import { PageHeader } from "../../../../components/layout/PageHeader";
 import { FormActionBar } from "./FormActionBar/FormActionBar";
 import { PromotionInvoiceDiscount } from "./PromotionVariant/PromotionInvoiceDiscount/PromotionInvoiceDiscount";
+import { buildInvoiceDiscountPayload } from "./PromotionVariant/PromotionInvoiceDiscount/buildInvoiceDiscountPayload";
 import { buildInitialFormState } from "../program-form.constants";
 import { PromotionForm, PROMOTION_FORM_LABELS } from "../programs.constants";
 import type { ProgramFormState } from "../program-form.types";
@@ -43,21 +44,29 @@ export function ProgramFormPage() {
       toast.error("Vui lòng nhập tên chương trình.");
       return;
     }
+    console.log(
+      "[KM] Giảm giá hóa đơn — payload submit:",
+      buildInvoiceDiscountPayload(form),
+    );
     toast.success(
       isEdit ? "Đã lưu thay đổi chương trình." : "Đã tạo chương trình mới.",
     );
     navigate("/promotions/programs");
-  }, [form.name, isEdit, navigate]);
+  }, [form, isEdit, navigate]);
 
   const handleSaveAndNew = useCallback(() => {
     if (!form.name.trim()) {
       toast.error("Vui lòng nhập tên chương trình.");
       return;
     }
+    console.log(
+      "[KM] Giảm giá hóa đơn — payload submit:",
+      buildInvoiceDiscountPayload(form),
+    );
     toast.success("Đã tạo chương trình mới.");
     setForm(buildInitialFormState());
     setFormNonce((n) => n + 1);
-  }, [form.name]);
+  }, [form]);
 
   const handleCancel = useCallback(() => {
     navigate("/promotions/programs");
