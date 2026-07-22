@@ -9843,6 +9843,68 @@
         ]
       }
     },
+    "/bank-receipts/debt-collection": {
+      "post": {
+        "operationId": "DepositDebtCollectionController_collect",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDepositDebtCollectionReceiptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create + post a debt-collection Phiếu thu tiền gửi that settles the selected\ninvoice debts and credits the deposit fund, atomically. Idempotent per\nX-Idempotency-Key (the frontend always sends one).",
+        "tags": [
+          "DepositDebtCollection"
+        ]
+      }
+    },
+    "/bank-receipts/debt-collection/sagas/{id}": {
+      "get": {
+        "operationId": "DepositDebtCollectionController_getSaga",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositDebtCollectionSagaEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DepositDebtCollection"
+        ]
+      }
+    },
     "/bank-receipts": {
       "post": {
         "operationId": "BankReceiptsController_create",
@@ -23036,6 +23098,9 @@
           "balance": {
             "type": "number"
           },
+          "allowNegative": {
+            "type": "boolean"
+          },
           "accountId": {
             "type": "string"
           },
@@ -23067,6 +23132,7 @@
           "name",
           "type",
           "balance",
+          "allowNegative",
           "accountId",
           "id",
           "organizationId",
@@ -29275,6 +29341,170 @@
           "totalAmount"
         ]
       },
+      "DepositDebtCollectionAllocationDto": {
+        "type": "object",
+        "properties": {
+          "invoiceDebtId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          }
+        },
+        "required": [
+          "invoiceDebtId",
+          "amount"
+        ]
+      },
+      "CreateDepositDebtCollectionReceiptDto": {
+        "type": "object",
+        "properties": {
+          "docDate": {
+            "type": "string",
+            "description": "\"Ngày thu\" (YYYY-MM-DD)."
+          },
+          "depositAccountId": {
+            "type": "string",
+            "description": "\"Tài khoản nhận\" — the deposit fund credited. Required.",
+            "format": "uuid"
+          },
+          "partnerType": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ]
+          },
+          "partnerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payerName": {
+            "type": "string",
+            "description": "\"Người nộp\"",
+            "maxLength": 255
+          },
+          "address": {
+            "type": "string",
+            "description": "\"Địa chỉ\" — frozen onto the voucher as `partnerAddressSnapshot`.",
+            "maxLength": 500
+          },
+          "reason": {
+            "type": "string",
+            "description": "\"Lý do thu\"",
+            "maxLength": 500
+          },
+          "collectedBy": {
+            "type": "string",
+            "description": "Cashier (thủ quỹ).",
+            "format": "uuid"
+          },
+          "allocations": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DepositDebtCollectionAllocationDto"
+            }
+          }
+        },
+        "required": [
+          "docDate",
+          "depositAccountId",
+          "allocations"
+        ]
+      },
+      "DepositDebtCollectionSagaEntity": {
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "description": "Client idempotency key (X-Idempotency-Key) — dedupes retries per org."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "COMPLETED",
+              "COMPENSATED",
+              "FAILED"
+            ]
+          },
+          "bankReceiptId": {
+            "type": "string"
+          },
+          "depositAccountId": {
+            "type": "string"
+          },
+          "contraAccountId": {
+            "type": "string"
+          },
+          "partnerType": {
+            "type": "string",
+            "description": "Denormalized copy for observability — stored as text, not a pg enum.",
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ]
+          },
+          "partnerId": {
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "error": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "idempotencyKey",
+          "status",
+          "depositAccountId",
+          "contraAccountId",
+          "totalAmount",
+          "allocations",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
       "BankReceiptLineDto": {
         "type": "object",
         "properties": {
@@ -29348,6 +29578,11 @@
             "type": "string",
             "description": "\"Người nộp\"",
             "maxLength": 255
+          },
+          "address": {
+            "type": "string",
+            "description": "\"Địa chỉ\" — the payer's address as typed on the voucher. Stored as\n`partnerAddressSnapshot`; when omitted, posting falls back to the partner\nrecord's current address.",
+            "maxLength": 500
           },
           "reason": {
             "type": "string",
@@ -29465,6 +29700,15 @@
           },
           "collectedBy": {
             "type": "string"
+          },
+          "collectedByCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Resolved from {@link collectedBy} on read — not a column. Lets the client show\n\"Nhân viên thu\" without calling the permission-gated user endpoint."
+          },
+          "collectedByName": {
+            "type": "string",
+            "nullable": true
           },
           "reference": {
             "type": "string"
@@ -29657,6 +29901,11 @@
             "type": "string",
             "maxLength": 255
           },
+          "address": {
+            "type": "string",
+            "description": "\"Địa chỉ\" — stored as `partnerAddressSnapshot`.",
+            "maxLength": 500
+          },
           "reason": {
             "type": "string",
             "maxLength": 500
@@ -29788,6 +30037,11 @@
             "description": "\"Người nhận\"",
             "maxLength": 255
           },
+          "address": {
+            "type": "string",
+            "description": "\"Địa chỉ\" — the payee's address as typed on the voucher. Stored as\n`partnerAddressSnapshot`; when omitted, posting falls back to the partner\nrecord's current address.",
+            "maxLength": 500
+          },
           "reason": {
             "type": "string",
             "description": "\"Lý do chi\"",
@@ -29908,6 +30162,15 @@
           },
           "paidBy": {
             "type": "string"
+          },
+          "paidByCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Resolved from {@link paidBy} on read — not a column. Lets the client show\n\"Nhân viên chi\" without calling the permission-gated user endpoint."
+          },
+          "paidByName": {
+            "type": "string",
+            "nullable": true
           },
           "reference": {
             "type": "string"
@@ -30115,6 +30378,11 @@
           "payeeName": {
             "type": "string",
             "maxLength": 255
+          },
+          "address": {
+            "type": "string",
+            "description": "\"Địa chỉ\" — stored as `partnerAddressSnapshot`.",
+            "maxLength": 500
           },
           "reason": {
             "type": "string",
@@ -32940,6 +33208,9 @@
           "pointsEarned": {
             "type": "number"
           },
+          "pointsReversed": {
+            "type": "number"
+          },
           "depositAmount": {
             "type": "number"
           },
@@ -33015,6 +33286,7 @@
           "pointsRedeemed",
           "pointsDiscountAmount",
           "pointsEarned",
+          "pointsReversed",
           "depositAmount",
           "amountDue",
           "totalPaid",
@@ -33434,6 +33706,9 @@
           "pointsEarned": {
             "type": "number"
           },
+          "pointsReversed": {
+            "type": "number"
+          },
           "depositAmount": {
             "type": "number"
           },
@@ -33513,6 +33788,7 @@
           "pointsRedeemed",
           "pointsDiscountAmount",
           "pointsEarned",
+          "pointsReversed",
           "depositAmount",
           "amountDue",
           "totalPaid",

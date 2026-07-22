@@ -4,7 +4,35 @@ import { erpApi, requireErpData } from "../../lib/erp-api";
 import {
   LedgerCashInvoiceKindEnum,
   type LedgerCashInvoiceDetail,
+  type LedgerCashInvoicePayment,
 } from "../../pages/treasury/ledger-cash/ledger-cash.types";
+
+/**
+ * Vietnamese labels for the raw `InvoicePaymentMethod` values the API returns.
+ * An unknown method falls back to its raw value rather than being dropped, so a
+ * new payment method still shows up in the breakdown.
+ */
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: "Tiền mặt",
+  bank_transfer: "Tiền gửi (chuyển khoản)",
+  card: "Thẻ",
+};
+
+function toPaymentBreakdown(
+  payments: { method: string; amount: number }[],
+): LedgerCashInvoicePayment[] {
+  // One row per method: a sale split across two card accounts reads as a single
+  // "Thẻ" line, matching how the cashier thinks about the tender.
+  const byMethod = new Map<string, number>();
+  for (const p of payments) {
+    byMethod.set(p.method, (byMethod.get(p.method) ?? 0) + p.amount);
+  }
+  return [...byMethod.entries()].map(([method, amount]) => ({
+    method,
+    label: PAYMENT_METHOD_LABELS[method] ?? method,
+    amount,
+  }));
+}
 
 /**
  * `InvoiceDetailView` (what the API returns) → `LedgerCashInvoiceDetail` (what
@@ -40,7 +68,12 @@ export function toLedgerCashInvoiceDetail(
     totalPayment: view.totalAmount,
     goodsAmount: view.subtotal,
     customerPaid: view.totalPaid,
-    cashAmount: view.totalPaid,
+    // Only the payment lines actually tendered in cash — not the whole total,
+    // which would mislabel a card/transfer sale as cash.
+    cashAmount: view.payments
+      .filter((p) => p.method === "cash")
+      .reduce((sum, p) => sum + p.amount, 0),
+    payments: toPaymentBreakdown(view.payments),
   };
 }
 

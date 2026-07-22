@@ -48,6 +48,16 @@ export class CreateBankPaymentDto {
   @MaxLength(255)
   payeeName?: string;
 
+  /**
+   * "Địa chỉ" — the payee's address as typed on the voucher. Stored as
+   * `partnerAddressSnapshot`; when omitted, posting falls back to the partner
+   * record's current address.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  address?: string;
+
   /** "Lý do chi" */
   @IsOptional()
   @IsString()

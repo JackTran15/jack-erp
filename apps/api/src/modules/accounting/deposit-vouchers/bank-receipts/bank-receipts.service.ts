@@ -1,8 +1,10 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, DataSource, EntityManager, Not, Repository } from 'typeorm';
@@ -17,6 +19,8 @@ import { DocumentNumberingService } from '../../../document-numbering/document-n
 import { DepositService } from '../../deposit/deposit.service';
 import { DepositAccountEntity } from '../../deposit/deposit-account.entity';
 import { DepositPeriodGuardService } from '../../deposit-period-lock/deposit-period-guard.service';
+import { VoucherStaffResolver } from '../shared/voucher-staff.resolver';
+import { DepositDebtCollectionSagaService } from '../debt-collection/deposit-debt-collection-saga.service';
 import {
   BankReceiptPurpose,
   BankReceiptReferenceType,
@@ -117,6 +121,9 @@ export class BankReceiptsService {
     private readonly partnerResolver: PartnerResolverService,
     private readonly accountResolver: AccountResolverService,
     private readonly periodGuard: DepositPeriodGuardService,
+    private readonly staffResolver: VoucherStaffResolver,
+    @Inject(forwardRef(() => DepositDebtCollectionSagaService))
+    private readonly debtCollectionSaga: DepositDebtCollectionSagaService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -168,7 +175,9 @@ export class BankReceiptsService {
           partnerType: dto.partnerType,
           partnerId: dto.partnerId,
           partnerName: partner?.name ?? undefined,
-          partnerAddress: partner?.address ?? undefined,
+          // What the cashier typed wins over the partner record's current address —
+          // the voucher freezes the address as of the moment it was written.
+          partnerAddress: dto.address ?? partner?.address ?? undefined,
           payerName: dto.payerName,
           collectedBy: dto.collectedBy,
           reference: dto.reference,
@@ -216,6 +225,7 @@ export class BankReceiptsService {
         partnerType: dto.partnerType ?? receipt.partnerType,
         partnerId: dto.partnerId ?? receipt.partnerId,
         payerName: dto.payerName ?? receipt.payerName,
+        partnerAddressSnapshot: dto.address ?? receipt.partnerAddressSnapshot,
         reason: dto.reason ?? receipt.reason,
         collectedBy: dto.collectedBy ?? receipt.collectedBy,
         reference: dto.reference ?? receipt.reference,
@@ -325,7 +335,10 @@ export class BankReceiptsService {
       receipt.postedBy = actor.userId;
       if (partner) {
         receipt.partnerNameSnapshot = partner.name ?? undefined;
-        receipt.partnerAddressSnapshot = partner.address ?? undefined;
+        // Never clobber an address already captured on the voucher — it is the
+        // one the cashier typed, and it is what the printed phiếu shows.
+        receipt.partnerAddressSnapshot =
+          receipt.partnerAddressSnapshot ?? partner.address ?? undefined;
       }
       await manager.save(receipt);
 
@@ -436,6 +449,12 @@ export class BankReceiptsService {
       original.status = BankVoucherStatus.REVERSED;
       original.reversedByVoucherId = savedReversal.id;
       await manager.save(original);
+
+      // Compensating action for debt-collection receipts: reopen the settled
+      // invoice debts so the customer's balance is restored.
+      if (original.referenceType === BankReceiptReferenceType.INVOICE_DEBT) {
+        await this.debtCollectionSaga.compensate(original.id, manager);
+      }
 
       this.logger.log(
         `Reversed bank receipt ${original.documentNumber} → ${documentNumber}`,
@@ -699,11 +718,37 @@ export class BankReceiptsService {
       .take(pageSize);
 
     const [data, total] = await qb.getManyAndCount();
+    await this.attachStaff(data, actor.organizationId);
     return { data, total, page, pageSize };
   }
 
   async getById(id: string, actor: ActorContext): Promise<BankReceiptEntity> {
-    return this.getByIdInTx(this.dataSource.manager, id, actor.organizationId);
+    const receipt = await this.getByIdInTx(
+      this.dataSource.manager,
+      id,
+      actor.organizationId,
+    );
+    await this.attachStaff([receipt], actor.organizationId);
+    return receipt;
+  }
+
+  /** Fill in `collectedByCode`/`collectedByName` for a page of receipts in one batch. */
+  private async attachStaff(
+    receipts: BankReceiptEntity[],
+    organizationId: string,
+  ): Promise<void> {
+    if (receipts.length === 0) return;
+    const staffById = await this.staffResolver.resolveMany(
+      receipts.map((r) => r.collectedBy),
+      organizationId,
+    );
+    for (const receipt of receipts) {
+      const staff = receipt.collectedBy
+        ? staffById.get(receipt.collectedBy)
+        : undefined;
+      receipt.collectedByCode = staff?.code ?? null;
+      receipt.collectedByName = staff?.name ?? null;
+    }
   }
 
   // ---------------------------------------------------------------------------

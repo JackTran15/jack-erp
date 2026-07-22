@@ -16,7 +16,6 @@ import {
   type ToolbarItem,
 } from "@erp/ui";
 import {
-  ArrowLeftRight,
   ChevronDown,
   Eye,
   Pencil,
@@ -54,15 +53,16 @@ import {
   useBankReceiptMutations,
 } from "../../../../hooks/treasury/use-bank-receipts";
 import { useSupplierDepositPaymentMutation } from "../../../../hooks/treasury/use-supplier-deposit-payment";
+import { useDepositDebtCollectionMutation } from "../../../../hooks/treasury/use-deposit-debt-collection";
 import { useFundSwapMutation } from "../../../../hooks/treasury/use-fund-swap";
 import { useCreateDepositTransfer } from "../../../../hooks/treasury/use-deposit-transfers";
 import { CashVoucherCategoryDirection } from "../../cash-vouchers.types";
 import {
   DepositPaymentVoucherDialog,
   DepositReceiptVoucherDialog,
-  FundSwapDialog,
   TreasuryVoucherDialogModeEnum,
   type DepositPaymentSaveResult,
+  type DepositReceiptSaveResult,
 } from "../../documents";
 import {
   BankVoucherStatus,
@@ -121,7 +121,6 @@ export function TreasuryDepositReceiptsPage() {
   const [reverseItem, setReverseItem] = useState<ReceiptDepositListItem | null>(null);
   const [reverseReason, setReverseReason] = useState("");
   const [reverseLoading, setReverseLoading] = useState(false);
-  const [fundSwapOpen, setFundSwapOpen] = useState(false);
 
   const categoryInMap = useCategoryNameMap(CashVoucherCategoryDirection.IN);
   const categoryOutMap = useCategoryNameMap(CashVoucherCategoryDirection.OUT);
@@ -179,6 +178,7 @@ export function TreasuryDepositReceiptsPage() {
   const receiptMutations = useBankReceiptMutations();
   const paymentMutations = useBankPaymentMutations();
   const supplierDepositPayment = useSupplierDepositPaymentMutation();
+  const depositDebtCollection = useDepositDebtCollectionMutation();
   const fundSwap = useFundSwapMutation();
   const createDepositTransfer = useCreateDepositTransfer();
 
@@ -310,12 +310,8 @@ export function TreasuryDepositReceiptsPage() {
       },
     },
     { id: "sep2", type: "separator" },
-    {
-      id: "swap",
-      label: "Chuyển quỹ",
-      icon: ArrowLeftRight,
-      onClick: () => setFundSwapOpen(true),
-    },
+    // "Chuyển quỹ" đã bỏ khỏi toolbar: nghiệp vụ chuyển quỹ nằm trong Phiếu chi
+    // (Hình thức chi = "Chuyển tiền gửi thành tiền mặt").
     {
       id: "reload",
       label: "Nạp",
@@ -339,13 +335,18 @@ export function TreasuryDepositReceiptsPage() {
   }, []);
 
   const handleSaveReceipt = useCallback(
-    async (body: CreateBankReceiptBody) => {
+    async (result: DepositReceiptSaveResult) => {
       try {
-        if (voucherDialog?.mode === TreasuryVoucherDialogModeEnum.CREATE) {
-          const created = await receiptMutations.create.mutateAsync(body);
+        if (result.kind === "debtCollection") {
+          // Settles the picked invoice debts + issues the voucher in one
+          // server-side transaction; there is no draft/update path for it.
+          const saga = await depositDebtCollection.mutateAsync(result.body);
+          if (saga.receiptId) setSelectedId(saga.receiptId);
+        } else if (voucherDialog?.mode === TreasuryVoucherDialogModeEnum.CREATE) {
+          const created = await receiptMutations.create.mutateAsync(result.body);
           setSelectedId(created.id);
         } else if (selectedId) {
-          const { documentNumber: _doc, ...updateBody } = body;
+          const { documentNumber: _doc, ...updateBody } = result.body;
           await receiptMutations.update.mutateAsync({ id: selectedId, body: updateBody });
         }
         closeVoucherDialogs();
@@ -353,7 +354,13 @@ export function TreasuryDepositReceiptsPage() {
         toast.error(e instanceof Error ? e.message : "Lưu phiếu thu thất bại.");
       }
     },
-    [voucherDialog, selectedId, receiptMutations, closeVoucherDialogs],
+    [
+      voucherDialog,
+      selectedId,
+      receiptMutations,
+      depositDebtCollection,
+      closeVoucherDialogs,
+    ],
   );
 
   const handleSavePayment = useCallback(
@@ -552,8 +559,6 @@ export function TreasuryDepositReceiptsPage() {
           setVoucherDialog((prev) => (prev ? { ...prev, mode: TreasuryVoucherDialogModeEnum.EDIT } : prev))
         }
       />
-
-      <FundSwapDialog open={fundSwapOpen} onOpenChange={setFundSwapOpen} />
 
       {confirmDeleteItem ? (
         <ConfirmActionModal

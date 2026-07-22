@@ -71,6 +71,9 @@ export interface BankReceipt {
   payerName?: string;
   reason?: string;
   collectedBy?: string;
+  /** Resolved server-side from `collectedBy` — no separate user lookup needed. */
+  collectedByCode?: string | null;
+  collectedByName?: string | null;
   reference?: string;
   affectRevenue: boolean;
   contraAccountId?: string;
@@ -107,6 +110,9 @@ export interface BankPayment {
   payeeName?: string;
   reason?: string;
   paidBy?: string;
+  /** Resolved server-side from `paidBy` — no separate user lookup needed. */
+  paidByCode?: string | null;
+  paidByName?: string | null;
   reference?: string;
   affectExpense: boolean;
   contraAccountId?: string;
@@ -142,6 +148,7 @@ export interface CreateBankReceiptBody {
   partnerType?: CashVoucherPartnerType;
   partnerId?: string;
   payerName?: string;
+  address?: string;
   reason?: string;
   collectedBy?: string;
   reference?: string;
@@ -162,6 +169,7 @@ export interface CreateBankPaymentBody {
   partnerType?: CashVoucherPartnerType;
   partnerId?: string;
   payeeName?: string;
+  address?: string;
   reason?: string;
   paidBy?: string;
   reference?: string;
@@ -242,6 +250,36 @@ export interface SupplierDepositPaymentSagaResult {
   totalAmount: number;
   error?: string;
   id: string;
+}
+
+// ── Deposit debt collection (thu nợ khách hàng vào tài khoản tiền gửi) ──
+
+export interface DepositDebtCollectionAllocation {
+  invoiceDebtId: string;
+  amount: number;
+}
+
+export interface CreateDepositDebtCollectionBody {
+  docDate: string;
+  depositAccountId: string;
+  partnerType?: CashVoucherPartnerType;
+  partnerId?: string;
+  payerName?: string;
+  address?: string;
+  reason?: string;
+  collectedBy?: string;
+  allocations: DepositDebtCollectionAllocation[];
+}
+
+export interface DepositDebtCollectionResult {
+  sagaId: string;
+  receiptId: string;
+  documentNumber: string;
+  totalAmount: number;
+  status: "PENDING" | "COMPLETED" | "COMPENSATED" | "FAILED";
+  allocations: Array<
+    DepositDebtCollectionAllocation & { settled: boolean; debtPaymentId?: string }
+  >;
 }
 
 // ── Fund swap (cash <-> deposit, FR-08) ──

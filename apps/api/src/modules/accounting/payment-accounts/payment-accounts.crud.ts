@@ -193,6 +193,13 @@ export class PaymentAccountsCrudService extends BaseCrudService<
   }
 }
 
+/** Display labels for {@link PaymentAccountMethod} on the admin grid and form. */
+const PAYMENT_ACCOUNT_METHOD_LABELS: Record<PaymentAccountMethod, string> = {
+  [PaymentAccountMethod.CASH]: 'Tiền mặt',
+  [PaymentAccountMethod.BANK_TRANSFER]: 'Chuyển khoản',
+  [PaymentAccountMethod.CARD]: 'Thẻ',
+};
+
 export const PAYMENT_ACCOUNT_ENTITY_CONFIG: CrudEntityConfig = {
   entityKey: 'payment-accounts',
   displayName: 'Tài khoản thanh toán',
@@ -205,15 +212,18 @@ export const PAYMENT_ACCOUNT_ENTITY_CONFIG: CrudEntityConfig = {
       type: 'enum',
       required: true,
       enumValues: Object.values(PaymentAccountMethod),
+      enumLabels: PAYMENT_ACCOUNT_METHOD_LABELS,
     },
     // ── Display-only labels (list) ──
     { key: 'branchName', label: 'Chi nhánh', type: 'string', readOnly: true },
     { key: 'depositAccountName', label: 'Tài khoản tiền gửi', type: 'string', readOnly: true },
     { key: 'accountName', label: 'Tài khoản kế toán nhận tiền', type: 'string', readOnly: true },
     // ── Form-only pickers (the raw FKs) ──
+    // Conditional requirements are enforced in `validateBusinessRules` (they depend
+    // on paymentMethod), so none of these carries a blanket `required: true`.
     {
       key: 'branchId',
-      label: 'Chi nhánh (bắt buộc nếu có Tài khoản tiền gửi; để trống chỉ hợp lệ cho Tiền mặt)',
+      label: 'Chi nhánh (để trống = áp dụng toàn hệ thống)',
       type: 'relation',
       relationEntity: 'branches',
       hideInList: true,
@@ -227,10 +237,9 @@ export const PAYMENT_ACCOUNT_ENTITY_CONFIG: CrudEntityConfig = {
     },
     {
       key: 'accountId',
-      label: 'Tài khoản kế toán nhận tiền (dùng cho Tiền mặt; tự lấy theo Tài khoản tiền gửi nếu đã chọn ở trên)',
+      label: 'Tài khoản kế toán nhận tiền (bắt buộc cho Tiền mặt)',
       type: 'relation',
       relationEntity: 'accounts',
-      required: true,
       hideInList: true,
     },
     { key: 'label', label: 'Nhãn hiển thị', type: 'string' },
@@ -243,7 +252,10 @@ export const PAYMENT_ACCOUNT_ENTITY_CONFIG: CrudEntityConfig = {
       key: 'paymentMethod',
       label: 'Phương thức',
       type: 'select',
-      options: Object.values(PaymentAccountMethod).map((m) => ({ label: m, value: m })),
+      options: Object.values(PaymentAccountMethod).map((m) => ({
+        label: PAYMENT_ACCOUNT_METHOD_LABELS[m],
+        value: m,
+      })),
     },
     { key: 'isActive', label: 'Hoạt động', type: 'boolean' },
   ],

@@ -1,4 +1,4 @@
-import { AppModal, Button, PageToolbar, type ToolbarItem } from "@erp/ui";
+import { AppModal, Button } from "@erp/ui";
 import { CloudUpload, X } from "lucide-react";
 import { toast } from "sonner";
 import { LedgerCashInvoiceKindEnum } from "../../ledger-cash/ledger-cash.types";
@@ -23,15 +23,6 @@ export function InvoiceDetailDialog({
   const isReturn = detail.kind === LedgerCashInvoiceKindEnum.RETURN;
   const titleLabel = isReturn ? "HÓA ĐƠN ĐỔI TRẢ" : "HÓA ĐƠN THANH TOÁN";
 
-  const toolbarItems: ToolbarItem[] = [
-    {
-      id: "close",
-      label: "Đóng",
-      icon: X,
-      onClick: () => onOpenChange(false),
-    },
-  ];
-
   return (
     <AppModal
       open={open}
@@ -43,8 +34,9 @@ export function InvoiceDetailDialog({
       minHeight={480}
       showFooter={false}
     >
+      {/* No toolbar here on purpose — the dialog is read-only, and its only
+          actions (Xuất khẩu / Đóng) live in the footer below. */}
       <div className="flex h-full min-h-0 flex-col overflow-hidden">
-        <PageToolbar tone="primary" items={toolbarItems} className="rounded-none" />
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4">
           <p className="text-center text-sm font-semibold uppercase tracking-wide text-primary">
             {titleLabel}

@@ -62,6 +62,14 @@ export interface LedgerCashInvoiceLine {
   note?: string;
 }
 
+/** One tendered payment, already resolved to its Vietnamese method label. */
+export interface LedgerCashInvoicePayment {
+  /** Raw InvoicePaymentMethod value (cash / bank_transfer / card). */
+  method: string;
+  label: string;
+  amount: number;
+}
+
 export interface LedgerCashInvoiceDetail {
   kind: LedgerCashInvoiceKindEnum;
   code: string;
@@ -79,6 +87,11 @@ export interface LedgerCashInvoiceDetail {
   changeAmount?: number;
   cashAmount: number;
   returnValue?: number;
+  /**
+   * Per-method breakdown of what the customer tendered. Empty for sources that
+   * do not carry payment lines; the summary then falls back to `cashAmount`.
+   */
+  payments?: LedgerCashInvoicePayment[];
 }
 
 export interface LedgerCashVoucherLine {

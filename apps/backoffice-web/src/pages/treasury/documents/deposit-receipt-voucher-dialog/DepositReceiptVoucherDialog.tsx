@@ -16,14 +16,15 @@ import { DocumentType } from "@erp/shared-interfaces";
 import { Pencil, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { useGenerateDocumentNumber } from "../../../../hooks/document-numbering/useGenerateDocumentNumber";
-import { getStoredUserId } from "../../../../lib/auth-storage";
 import { RadioGroup } from "../../../../components/forms/RadioGroup";
+import { Tabs } from "../../../../components/tabs";
 import { BaseDataTable, type TableColumn } from "../../../../components/table/BaseDataTable";
 import {
   BankReceiptPurpose,
   BankReceiptReferenceType,
   type BankReceipt,
   type CreateBankReceiptBody,
+  type CreateDepositDebtCollectionBody,
 } from "../../bank-vouchers.types";
 import { CashVoucherCategoryDirection } from "../../cash-vouchers.types";
 import { useCashVoucherCategories } from "../../../../hooks/treasury/use-cash-voucher-categories";
@@ -39,6 +40,13 @@ import {
 import { TreasuryVoucherDialogModeEnum } from "../_shared/voucher-dialog.types";
 import { VoucherLink } from "../_shared/VoucherLink";
 import { useFundSwapLegs } from "../../../../hooks/treasury/use-fund-swap";
+import { useBankReceipt } from "../../../../hooks/treasury/use-bank-receipts";
+import { useVoucherDocumentColumns } from "../_shared/useVoucherDocumentColumns";
+import {
+  RECEIPT_VOUCHER_DETAIL_TABS,
+  ReceiptVoucherDetailTabEnum,
+} from "../receipt-voucher-dialog/receipt-voucher.constants";
+import type { LedgerCashVoucherDocumentLine } from "../../ledger-cash/ledger-cash.types";
 import { voucherLineTotal } from "../_shared/voucher-dialog.utils";
 import { DepositAccountSelect } from "../_shared/DepositAccountSelect";
 import {
@@ -110,12 +118,21 @@ function lookupTypeToPartnerType(kind: PartnerLookupType): CashVoucherPartnerTyp
   }
 }
 
+/**
+ * A "Thu nợ" receipt is NOT a plain voucher: it must settle the picked invoice
+ * debts server-side, which is a different endpoint. The union lets the host page
+ * route the save without the dialog knowing about mutations.
+ */
+export type DepositReceiptSaveResult =
+  | { kind: "voucher"; body: CreateBankReceiptBody }
+  | { kind: "debtCollection"; body: CreateDepositDebtCollectionBody };
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: TreasuryVoucherDialogModeEnum;
   initial: BankReceipt | null;
-  onSave?: (body: CreateBankReceiptBody) => void;
+  onSave?: (result: DepositReceiptSaveResult) => void;
   onRequestEdit?: () => void;
 }
 
@@ -133,7 +150,7 @@ export function DepositReceiptVoucherDialog({
 }: Props) {
   const readOnly = mode === TreasuryVoucherDialogModeEnum.VIEW;
   const { mutateAsync: generateDocNumber } = useGenerateDocumentNumber();
-  const { fetchPartnerByType, fetchStaffById } = usePartnerLookup();
+  const { fetchPartnerByType, fetchCurrentStaff } = usePartnerLookup();
 
   const [depositAccountId, setDepositAccountId] = useState("");
   const [purpose, setPurpose] = useState<BankReceiptPurpose>(BankReceiptPurpose.OTHER);
@@ -153,6 +170,10 @@ export function DepositReceiptVoucherDialog({
   const [docDate, setDocDate] = useState(toIsoDate(new Date()));
   const [affectRevenue, setAffectRevenue] = useState(false);
   const [lines, setLines] = useState<VoucherFormLine[]>([emptyFormLine()]);
+  const [documentLines, setDocumentLines] = useState<
+    LedgerCashVoucherDocumentLine[]
+  >([]);
+  const [detailTab, setDetailTab] = useState(ReceiptVoucherDetailTabEnum.LINES);
   const [entitySearchTarget, setEntitySearchTarget] =
     useState<VoucherEntitySearchTarget | null>(null);
   const [partnerCreateKind, setPartnerCreateKind] = useState<PartnerLookupType | null>(null);
@@ -200,6 +221,8 @@ export function DepositReceiptVoucherDialog({
       setDocDate(toIsoDate(new Date()));
       setAffectRevenue(false);
       setLines([emptyFormLine()]);
+      setDocumentLines([]);
+      setDetailTab(ReceiptVoucherDetailTabEnum.LINES);
       return;
     }
     if (initial) {
@@ -213,8 +236,9 @@ export function DepositReceiptVoucherDialog({
       setAddress(initial.partnerAddressSnapshot ?? "");
       setReason(initial.reason ?? "");
       setStaffId(initial.collectedBy ?? "");
-      setEmployeeCode("");
-      setEmployeeName("");
+      // Resolved server-side — the client no longer needs `iam.user.read`.
+      setEmployeeCode(initial.collectedByCode ?? "");
+      setEmployeeName(initial.collectedByName ?? "");
       setReference(initial.reference ?? "");
       setDocumentNumber(initial.documentNumber ?? "");
       setDocDate(initial.docDate);
@@ -229,6 +253,21 @@ export function DepositReceiptVoucherDialog({
             }))
           : [emptyFormLine()],
       );
+      // A settled receipt's lines carry the invoice code in `referenceNote`;
+      // that is what the "Chứng từ" tab lists when reopening the voucher.
+      setDocumentLines(
+        initial.lines
+          .filter((l) => l.referenceNote)
+          .map((l) => ({
+            documentDate: new Date(initial.docDate),
+            documentNo: l.referenceNote as string,
+            debtAmount: l.amount,
+            collectedAmount: l.amount,
+            remainingAmount: 0,
+            collectAmount: l.amount,
+          })),
+      );
+      setDetailTab(ReceiptVoucherDetailTabEnum.LINES);
     }
   }, [resetKey, open, mode, initial]);
 
@@ -253,10 +292,8 @@ export function DepositReceiptVoucherDialog({
   // field, the cashier can pick someone else via the lookup/search as before.
   useEffect(() => {
     if (!open || mode !== TreasuryVoucherDialogModeEnum.CREATE) return;
-    const userId = getStoredUserId();
-    if (!userId) return;
     let cancelled = false;
-    void fetchStaffById(userId).then((staff) => {
+    void fetchCurrentStaff().then((staff) => {
       if (cancelled || !staff) return;
       setStaffId(staff.id);
       setEmployeeCode(staff.code);
@@ -265,7 +302,7 @@ export function DepositReceiptVoucherDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, mode, fetchStaffById]);
+  }, [open, mode, fetchCurrentStaff]);
 
   useEffect(() => {
     if (!open) setEntitySearchTarget(null);
@@ -295,18 +332,11 @@ export function DepositReceiptVoucherDialog({
           }
         }
       }
-      if (initial.collectedBy) {
-        const staff = await fetchStaffById(initial.collectedBy);
-        if (!cancelled && staff) {
-          setEmployeeCode(staff.code);
-          setEmployeeName(staff.name);
-        }
-      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [open, mode, initial, fetchPartnerByType, fetchStaffById]);
+  }, [open, mode, initial, fetchPartnerByType]);
 
   const applyPartnerFromSearch = useCallback((item: VoucherPartnerOption) => {
     setPartnerKind(item.kind);
@@ -337,6 +367,7 @@ export function DepositReceiptVoucherDialog({
       setReason("");
       setLines([emptyFormLine()]);
     }
+    setDocumentLines([]);
   }, []);
 
   const debtPickInitialPartner = useMemo((): VoucherPartnerOption | null => {
@@ -353,17 +384,23 @@ export function DepositReceiptVoucherDialog({
   }, [partnerId, counterpartyCode, counterpartyName, counterpartyPhone, partnerKind]);
 
   // BR-THU-02 (amount <= remaining debt) is enforced inside DebtCollectionPickDialog
-  // itself. NOTE: unlike the cash "Thu nợ" flow (which hits a dedicated saga that
-  // atomically settles each picked invoice_debt), no equivalent settlement endpoint
-  // exists yet for deposit receipts — this purpose only tags/categorizes a manual
-  // voucher; picking debts here is a data-entry convenience (prefill partner/
-  // reason/amount), it does not reduce the customer's outstanding debt server-side.
+  // itself. The picked allocations settle real invoice_debts rows via
+  // POST /bank-receipts/debt-collection — the deposit twin of the cash saga — so
+  // the customer's outstanding balance really does drop.
   const handleDebtCollectionConfirm = useCallback(
     (result: DebtCollectionPickResult) => {
       applyPartnerFromSearch(result.partner);
       const reasonText = `Thu nợ của ${result.partner.name}`;
       setReason(reasonText);
-      setLines([{ description: reasonText, amount: result.totalCollect, category: "" }]);
+      setDocumentLines(result.documentLines);
+      // One detail line per settled invoice, mirroring what the saga writes.
+      setLines(
+        result.documentLines.map((d) => ({
+          description: `Thu nợ ${d.documentNo}`,
+          amount: d.collectAmount,
+          category: "",
+        })),
+      );
     },
     [applyPartnerFromSearch],
   );
@@ -452,6 +489,11 @@ export function DepositReceiptVoucherDialog({
     [lineColumnsWithFooterEdit],
   );
 
+  // The "Chứng từ" tab only means something for a Thu nợ receipt — it lists the
+  // invoices the voucher settles.
+  const showDetailTabs = isDebtCollection;
+  const { documentColumnsWithFooter } = useVoucherDocumentColumns(documentLines);
+
   const handleClose = useCallback(() => onOpenChange(false), [onOpenChange]);
 
   const handleSave = useCallback(() => {
@@ -464,6 +506,38 @@ export function DepositReceiptVoucherDialog({
       toast.error("Ngày thu là bắt buộc.");
       return;
     }
+    // Thu nợ settles real invoice_debts rows server-side (BR-THU-02 is enforced
+    // inside DebtCollectionPickDialog); it is a saga, not a plain voucher.
+    if (isDebtCollection) {
+      const allocations = documentLines
+        .filter((d) => d.debtId && Number(d.collectAmount) > 0)
+        .map((d) => ({
+          invoiceDebtId: d.debtId as string,
+          amount: Number(d.collectAmount) || 0,
+        }));
+      if (allocations.length === 0) {
+        toast.error("Chọn ít nhất một hóa đơn thu nợ.");
+        return;
+      }
+      onSave({
+        kind: "debtCollection",
+        body: {
+          docDate,
+          depositAccountId,
+          partnerType: partnerId ? lookupTypeToPartnerType(partnerKind) : undefined,
+          partnerId: partnerId || undefined,
+          payerName: payerName || undefined,
+          address: address || undefined,
+          reason: reason || undefined,
+          collectedBy: staffId || undefined,
+          allocations,
+        },
+      });
+      toast.success("Đã thu nợ khách hàng.");
+      handleClose();
+      return;
+    }
+
     const validLines = lines.filter((l) => l.description.trim() || Number(l.amount) > 0);
     if (validLines.length === 0) {
       toast.error("Vui lòng nhập ít nhất một dòng chi tiết.");
@@ -475,6 +549,8 @@ export function DepositReceiptVoucherDialog({
       return;
     }
     onSave({
+      kind: "voucher",
+      body: {
       documentNumber: documentNumber.trim() || undefined,
       depositAccountId,
       docDate,
@@ -482,6 +558,7 @@ export function DepositReceiptVoucherDialog({
       partnerType: partnerId ? lookupTypeToPartnerType(partnerKind) : undefined,
       partnerId: partnerId || undefined,
       payerName: payerName || undefined,
+      address: address || undefined,
       reason: reason || undefined,
       collectedBy: staffId || undefined,
       reference: reference || undefined,
@@ -492,6 +569,7 @@ export function DepositReceiptVoucherDialog({
         amount: Number(l.amount) || 0,
         categoryId: l.categoryId || undefined,
       })),
+      },
     });
     toast.success(
       mode === TreasuryVoucherDialogModeEnum.CREATE ? "Đã thêm phiếu thu." : "Đã cập nhật phiếu thu.",
@@ -507,10 +585,15 @@ export function DepositReceiptVoucherDialog({
     partnerId,
     partnerKind,
     payerName,
+    address,
     reason,
     staffId,
     reference,
     affectRevenue,
+    address,
+    isDebtCollection,
+    documentLines,
+    depositAccountId,
     mode,
     handleClose,
   ]);
@@ -530,6 +613,18 @@ export function DepositReceiptVoucherDialog({
     return other?.documentNumber ?? "";
   }, [fundSwapLegs, initial?.id]);
 
+  /**
+   * A reversal ("đảo phiếu") copies every field of the voucher it cancels, so on
+   * its own it is indistinguishable from the original. These three read the
+   * reversal link the server already stores and surface it: which voucher was
+   * reversed, and why.
+   */
+  const isReversal = Boolean(initial?.reversesVoucherId);
+  const { data: reversedVoucher } = useBankReceipt(
+    initial?.reversesVoucherId ?? undefined,
+    isReversal,
+  );
+
   const toolbarItems: ToolbarItem[] = useMemo(() => {
     const items: ToolbarItem[] = [];
     if (readOnly && onRequestEdit) {
@@ -545,7 +640,7 @@ export function DepositReceiptVoucherDialog({
   const title =
     mode === TreasuryVoucherDialogModeEnum.CREATE
       ? LABELS.titleCreate
-      : `${LABELS.titleView} ${documentNumber}`;
+      : `${isReversal ? "PHIẾU ĐẢO — " : ""}${LABELS.titleView} ${documentNumber}`;
 
   if (!open) return null;
 
@@ -662,7 +757,26 @@ export function DepositReceiptVoucherDialog({
               onOpenSearchDialog={() => setEntitySearchTarget("staff")}
               onCreateNew={!readOnly ? () => setStaffCreateOpen(true) : undefined}
             />
-            {counterpartLabel || reference ? (
+            {isReversal ? (
+              <>
+                <FormField label="Tham chiếu" layout="horizontal" labelWidth="8rem">
+                  <span className="flex h-9 items-center text-sm">
+                    <VoucherLink
+                      code={reversedVoucher?.documentNumber ?? "—"}
+                      clickable={false}
+                    />
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      (phiếu gốc đã bị đảo)
+                    </span>
+                  </span>
+                </FormField>
+                <FormField label="Lý do đảo" layout="horizontal" labelWidth="8rem">
+                  <span className="flex h-9 items-center text-sm">
+                    {initial?.reversalReason || "—"}
+                  </span>
+                </FormField>
+              </>
+            ) : counterpartLabel || reference ? (
               <FormField label="Tham chiếu" layout="horizontal" labelWidth="8rem">
                 <span className="flex h-9 items-center text-sm">
                   {counterpartLabel ? (
@@ -707,20 +821,31 @@ export function DepositReceiptVoucherDialog({
                 className={cn(fieldClass(readOnly))}
               />
             </FormField>
-            <FormField label="Tính vào doanh thu" layout="horizontal" labelWidth="8rem">
-              <input
-                type="checkbox"
-                checked={affectRevenue}
-                onChange={(e) => setAffectRevenue(e.target.checked)}
-                disabled={readOnly}
-                className={cn("h-9", fieldClass(readOnly))}
-              />
-            </FormField>
+            {/* "Tính vào doanh thu" đã bỏ khỏi form theo yêu cầu nghiệp vụ.
+                `affectRevenue` vẫn được gửi (giữ giá trị đã lưu / mặc định false)
+                nên hợp đồng API không đổi. */}
           </>
         }
         detail={
           <div className="flex flex-col">
-            {readOnly ? (
+            {showDetailTabs ? (
+              <Tabs
+                tabs={RECEIPT_VOUCHER_DETAIL_TABS}
+                activeTab={detailTab}
+                onTabChange={setDetailTab}
+              />
+            ) : null}
+            {showDetailTabs &&
+            detailTab === ReceiptVoucherDetailTabEnum.DOCUMENTS ? (
+              <BaseDataTable
+                columns={documentColumnsWithFooter}
+                rows={documentLines}
+                loading={false}
+                emptyLabel="Chưa có chứng từ — bấm Chọn hóa đơn thu nợ."
+                getRowKey={(r) => r.debtId ?? r.documentNo}
+                className="min-h-0 flex-1"
+              />
+            ) : readOnly ? (
               <BaseDataTable
                 columns={lineColumnsWithFooterView}
                 rows={lines}

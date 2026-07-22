@@ -8,6 +8,7 @@ import type { PaymentMethodOption } from "@erp/pos/interfaces/checkout.interface
 import {
   API_METHOD_TO_PAYMENT_METHOD,
   PAYMENT_METHODS,
+  PaymentMethodEnum,
   type PaymentMethod,
 } from "@erp/pos/constants/checkout.constant";
 
@@ -140,9 +141,13 @@ export const PosPaymentMethodRow = forwardRef<
     methodOptions.find((m) => m.value === line.method) ?? null;
   const selectedAccount =
     methodAccounts.find((a) => a.id === line.paymentAccountId) ?? null;
-  const showAccountSelect = methodAccounts.some(
-    (a) => a.depositAccountName || a.accountNumber,
-  );
+  // Every non-cash method needs a visible "Tài khoản thu" — a card/transfer
+  // payment lands in a specific fund and the cashier must be able to see and
+  // change which. Only cash has no fund to pick, so the select would just repeat
+  // the method name. Shown even when the mapping has no deposit fund linked, so a
+  // misconfigured account is visible instead of silently hiding the whole row.
+  const showAccountSelect =
+    line.method !== PaymentMethodEnum.CASH && methodAccounts.length > 0;
 
   return (
     <div className="py-2">

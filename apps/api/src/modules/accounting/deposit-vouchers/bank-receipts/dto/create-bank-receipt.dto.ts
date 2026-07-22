@@ -48,6 +48,16 @@ export class CreateBankReceiptDto {
   @MaxLength(255)
   payerName?: string;
 
+  /**
+   * "Địa chỉ" — the payer's address as typed on the voucher. Stored as
+   * `partnerAddressSnapshot`; when omitted, posting falls back to the partner
+   * record's current address.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  address?: string;
+
   /** "Lý do nộp" */
   @IsOptional()
   @IsString()

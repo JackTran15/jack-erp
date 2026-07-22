@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@erp/ui";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { useCrudConfig, useCrudRecord, useCrudUpdate } from "./useCrudApi";
+import { buildCrudPayload, sanitizeCrudPayload } from "./crudPayload";
 import { CrudFieldInput } from "./CrudFieldInput";
 import { InventoryItemCreateForm } from "./inventory/InventoryItemCreateForm";
 import type { InventoryItemSaveMode } from "./inventory/item-create/InventoryItemActionBar";
@@ -160,12 +161,9 @@ export function CrudEditPage() {
     // send the whole values map (generic CRUD backend accepts Record<string,any>).
     let payload: Record<string, unknown>;
     if (entityKey === "inventory-providers" || entityKey === "inventory-items") {
-      payload = { ...values };
+      payload = sanitizeCrudPayload(editableFields, values, "update");
     } else {
-      payload = {};
-      editableFields.forEach((field) => {
-        payload[field.key] = values[field.key];
-      });
+      payload = buildCrudPayload(editableFields, values, "update");
     }
 
     try {

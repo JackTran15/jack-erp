@@ -111,6 +111,7 @@ describe('CashService', () => {
   });
 
   describe('recordMovement (TRANSFER)', () => {
+    // allowNegative mirrors the column default: a cash fund may go negative.
     const sourceAccount = {
       id: 'src-1',
       name: 'Quầy 1',
@@ -119,6 +120,7 @@ describe('CashService', () => {
       branchId: 'branch-1',
       organizationId: 'org-1',
       type: CashAccountType.REGISTER,
+      allowNegative: true,
     };
     const destAccount = {
       id: 'dst-1',
@@ -196,9 +198,35 @@ describe('CashService', () => {
       ).rejects.toThrow(/Cross-branch/);
     });
 
-    it('rejects TRANSFER when source has insufficient balance', async () => {
+    it('allows TRANSFER that drives the source negative when allowNegative', async () => {
       mockManager.findOne
         .mockResolvedValueOnce({ ...sourceAccount, balance: 50 })
+        .mockResolvedValueOnce({ ...destAccount });
+
+      const result = await service.recordMovement(
+        {
+          cashAccountId: 'src-1',
+          toAccountId: 'dst-1',
+          type: CashMovementType.TRANSFER,
+          amount: 100,
+        },
+        actor,
+      );
+
+      expect(result.movement).toBeDefined();
+      const saved = mockManager.save.mock.calls[0][0] as Array<{
+        balance: number;
+      }>;
+      expect(saved[0].balance).toBe(-50);
+    });
+
+    it('rejects TRANSFER on insufficient balance when allowNegative is off', async () => {
+      mockManager.findOne
+        .mockResolvedValueOnce({
+          ...sourceAccount,
+          balance: 50,
+          allowNegative: false,
+        })
         .mockResolvedValueOnce({ ...destAccount });
 
       await expect(
@@ -269,6 +297,7 @@ describe('CashService', () => {
       branchId: 'branch-1',
       organizationId: 'org-1',
       type: CashAccountType.REGISTER,
+      allowNegative: true,
     };
 
     it('rejects DEPOSIT without contraAccountId', async () => {
@@ -373,8 +402,32 @@ describe('CashService', () => {
       );
     });
 
-    it('rejects WITHDRAWAL that would drive the balance below zero', async () => {
+    it('allows WITHDRAWAL that drives the balance below zero when allowNegative', async () => {
       mockManager.findOne.mockResolvedValueOnce({ ...cashAccount, balance: 30 });
+
+      const result = await service.recordMovement(
+        {
+          cashAccountId: 'cash-1',
+          type: CashMovementType.WITHDRAWAL,
+          amount: 100,
+          contraAccountId: 'gl-expense',
+        },
+        actor,
+      );
+
+      expect(result.movement).toBeDefined();
+      const savedAccount = mockManager.save.mock.calls
+        .map((call) => call[0])
+        .find((entity) => entity?.id === 'cash-1') as { balance: number };
+      expect(savedAccount.balance).toBe(-70);
+    });
+
+    it('rejects WITHDRAWAL below zero when allowNegative is off', async () => {
+      mockManager.findOne.mockResolvedValueOnce({
+        ...cashAccount,
+        balance: 30,
+        allowNegative: false,
+      });
 
       await expect(
         service.recordMovement(
@@ -427,6 +480,7 @@ describe('CashService', () => {
       branchId: 'branch-1',
       organizationId: 'org-1',
       type: CashAccountType.REGISTER,
+      allowNegative: true,
     };
 
     it('runs inside the caller manager without opening a new transaction', async () => {
@@ -485,6 +539,7 @@ describe('CashService', () => {
       branchId: 'branch-1',
       organizationId: 'org-1',
       type: CashAccountType.REGISTER,
+      allowNegative: true,
     };
 
     it('auto-fills sessionId when active session exists for the cash_account', async () => {
