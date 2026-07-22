@@ -19,7 +19,10 @@ export type DayOfWeek = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
 export type ConditionType = "NONE" | "MIN_TOTAL" | "SPECIFIC_QUANTITY";
 
 /** Phạm vi tính tổng tiền cho điều kiện "Tổng tiền hàng ≥". */
-export type CalcBasis = "ALL_ITEMS" | "NOT_DISCOUNTED";
+export type CalcBasis = "ALL_ITEMS" | "NOT_DISCOUNTED" | "PRODUCT_GROUP";
+
+/** Logic áp dụng nhóm hàng hóa: thuộc 1 trong (ANY) hoặc thuộc tất cả (ALL) các nhóm. */
+export type ProductGroupLogic = "ANY" | "ALL";
 
 /** Một dòng hàng hóa áp dụng (bảng editable). */
 export interface ApplicableGood {
@@ -30,6 +33,15 @@ export interface ApplicableGood {
   name: string;
   unit: string;
   minQuantity: number | "";
+}
+
+/** Một dòng nhóm hàng hóa áp dụng (bảng editable, tra cứu danh mục). */
+export interface ApplicableGroup {
+  id: string;
+  /** Id nhóm/danh mục đã chọn từ tra cứu (rỗng khi chưa chọn). */
+  groupId: string;
+  code: string;
+  name: string;
 }
 
 /** Phạm vi giảm giá hàng hóa: theo nhóm hàng hóa hoặc theo từng hàng hóa. */
@@ -117,6 +129,10 @@ export interface ProgramFormState {
   name: string;
   description: string;
   applyTo: PromotionApplyTo;
+  /** Logic nhóm hàng hóa (chỉ dùng khi calcBasis = PRODUCT_GROUP). */
+  applicableGroupLogic: ProductGroupLogic;
+  /** Nhóm hàng hóa áp dụng (chỉ dùng khi calcBasis = PRODUCT_GROUP). */
+  applicableGroups: ApplicableGroup[];
   /** "Ngày tính KM" — chỉ dùng khi applyTo = HAS_BIRTHDAY. */
   birthdayDateMode: BirthdayDateMode | "";
   /** Số ngày trước ngày sinh (khi birthdayDateMode = RANGE). */

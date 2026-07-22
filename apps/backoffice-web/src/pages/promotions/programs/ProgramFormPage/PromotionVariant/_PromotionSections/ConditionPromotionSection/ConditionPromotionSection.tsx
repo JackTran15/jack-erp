@@ -1,5 +1,6 @@
 import { ConditionTypeRadioGroup } from "./ConditionTypeRadioGroup/ConditionTypeRadioGroup";
 import { ApplicableGoodsGrid } from "./ApplicableGoodsGrid/ApplicableGoodsGrid";
+import { ProductGroupSection } from "./ProductGroupSection/ProductGroupSection";
 import type { ProgramFormState } from "../../../../program-form.types";
 
 interface Props {
@@ -26,14 +27,21 @@ export function ConditionPromotionSection({
         showGiftMultiplier={showGiftMultiplier}
       />
 
-      <h3 className="mb-3 mt-8 text-sm font-bold uppercase tracking-wide text-muted-foreground">
-        Hàng hóa áp dụng
-      </h3>
-      <ApplicableGoodsGrid
-        value={form.applicableGoods}
-        onChange={(goods) => onChange({ applicableGoods: goods })}
-        disabled={form.conditionType !== "SPECIFIC_QUANTITY"}
-      />
+      {form.conditionType === "MIN_TOTAL" &&
+      form.calcBasis === "PRODUCT_GROUP" ? (
+        <ProductGroupSection form={form} onChange={onChange} />
+      ) : (
+        <>
+          <h3 className="mb-3 mt-8 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+            Hàng hóa áp dụng
+          </h3>
+          <ApplicableGoodsGrid
+            value={form.applicableGoods}
+            onChange={(goods) => onChange({ applicableGoods: goods })}
+            disabled={form.conditionType !== "SPECIFIC_QUANTITY"}
+          />
+        </>
+      )}
     </section>
   );
 }

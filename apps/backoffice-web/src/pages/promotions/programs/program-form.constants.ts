@@ -1,5 +1,6 @@
 import type {
   ApplicableGood,
+  ApplicableGroup,
   ApplyScope,
   BirthdayDateMode,
   BuyGetGiftPolicy,
@@ -61,6 +62,7 @@ export const APPLY_SCOPE_OPTIONS: { value: ApplyScope; label: string }[] = [
 export const CALC_BASIS_OPTIONS: { value: CalcBasis; label: string }[] = [
   { value: "ALL_ITEMS", label: "Tất cả hàng hóa" },
   { value: "NOT_DISCOUNTED", label: "Hàng hóa chưa khuyến mại" },
+  { value: "PRODUCT_GROUP", label: "Hàng hóa thuộc nhóm hàng hóa" },
 ];
 
 export const GOODS_DISCOUNT_SCOPE_OPTIONS: {
@@ -89,6 +91,10 @@ export function blankApplicableGood(): ApplicableGood {
     unit: "",
     minQuantity: "",
   };
+}
+
+export function blankApplicableGroup(): ApplicableGroup {
+  return { id: crypto.randomUUID(), groupId: "", code: "", name: "" };
 }
 
 export function blankGoodsDiscountRow(): GoodsDiscountRow {
@@ -179,6 +185,8 @@ export function buildInitialFormState(): ProgramFormState {
     name: "",
     description: "",
     applyTo: PromotionApplyTo.ALL_CUSTOMERS,
+    applicableGroupLogic: "ALL",
+    applicableGroups: [],
     birthdayDateMode: "",
     birthdayBeforeDays: 0,
     birthdayAfterDays: 0,
