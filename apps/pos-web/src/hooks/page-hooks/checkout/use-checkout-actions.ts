@@ -443,10 +443,16 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
                   returnLines,
                 }),
               );
-              await checkoutReturnMutation.mutateAsync({
-                id: createdReturn.id,
-                body: returnResolve.body,
-              });
+              const returnedExchange = await checkoutReturnMutation.mutateAsync(
+                {
+                  id: createdReturn.id,
+                  body: returnResolve.body,
+                },
+              );
+              if (receiptPayload) {
+                receiptPayload.totals.pointsReversed =
+                  returnedExchange.pointsReversed;
+              }
             } catch (err) {
               toast.error(
                 saleCheckoutBody
