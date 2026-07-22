@@ -53,12 +53,13 @@ export function PromotionInvoiceDiscount({ form, onChange }: Props) {
               value={form.applicableGoods}
               onChange={(goods) => onChange({ applicableGoods: goods })}
             />
-            <AutoApplyCheckbox
-              checked={form.autoApply}
-              onChange={(v) => onChange({ autoApply: v })}
-            />
           </div>
         )}
+
+        <AutoApplyCheckbox
+          checked={form.autoApply}
+          onChange={(v) => onChange({ autoApply: v })}
+        />
       </div>
     </>
   );

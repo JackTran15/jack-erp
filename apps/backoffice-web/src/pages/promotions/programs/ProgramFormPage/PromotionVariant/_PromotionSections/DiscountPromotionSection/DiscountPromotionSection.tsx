@@ -1,5 +1,4 @@
 import { Input, MoneyInput } from "@erp/ui";
-import { AutoApplyCheckbox } from "../AutoApplyCheckbox/AutoApplyCheckbox";
 import type { DiscountType, ProgramFormState } from "../../../../program-form.types";
 
 interface Props {
@@ -64,11 +63,6 @@ export function DiscountPromotionSection({ form, onChange }: Props) {
           />
         </div>
       </div>
-
-      <AutoApplyCheckbox
-        checked={form.autoApply}
-        onChange={(v) => onChange({ autoApply: v })}
-      />
     </section>
   );
 }
