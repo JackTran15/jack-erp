@@ -1,12 +1,11 @@
 import { MoneyInput, SingleSelect } from "@erp/ui";
 import { HelpCircle } from "lucide-react";
-import { SectionHeader } from "../SectionHeader/SectionHeader";
-import { CALC_BASIS_OPTIONS } from "../../program-form.constants";
+import { CALC_BASIS_OPTIONS } from "../../../../program-form.constants";
 import type {
   CalcBasis,
   ConditionType,
   ProgramFormState,
-} from "../../program-form.types";
+} from "../../../../program-form.types";
 
 interface Props {
   form: ProgramFormState;
@@ -15,7 +14,7 @@ interface Props {
   showGiftMultiplier?: boolean;
 }
 
-export function ConditionSection({
+export function ConditionPromotionSection({
   form,
   onChange,
   showGiftMultiplier = false,
@@ -25,7 +24,9 @@ export function ConditionSection({
 
   return (
     <section>
-      <SectionHeader title="Điều kiện áp dụng" />
+      <h2 className="mb-3 mt-8 text-sm font-bold uppercase tracking-wide text-muted-foreground first:mt-0">
+        Điều kiện áp dụng
+      </h2>
       <div className="flex flex-col gap-2 text-sm">
         <label className="flex cursor-pointer items-center gap-2">
           <input

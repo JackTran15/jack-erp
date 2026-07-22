@@ -1,5 +1,4 @@
-import { SectionHeader } from "../SectionHeader/SectionHeader";
-import { AutoApplyCheckbox } from "../AutoApplyCheckbox/AutoApplyCheckbox";
+import { AutoApplyCheckbox } from "../PromotionVariant/_PromotionSections/AutoApplyCheckbox/AutoApplyCheckbox";
 import { GoodsDiscountGrid } from "./GoodsDiscountGrid/GoodsDiscountGrid";
 import { GOODS_DISCOUNT_SCOPE_OPTIONS } from "../../program-form.constants";
 import type { GoodsDiscountScope, ProgramFormState } from "../../program-form.types";
@@ -16,7 +15,9 @@ export function GoodsDiscountSection({ form, onChange }: Props) {
 
   return (
     <section>
-      <SectionHeader title="Khuyến mại" />
+      <h2 className="mb-3 mt-8 text-sm font-bold uppercase tracking-wide text-muted-foreground first:mt-0">
+        Khuyến mại
+      </h2>
       <div className="mb-3 flex flex-wrap items-center gap-8 text-sm">
         <span>Giảm giá theo</span>
         {GOODS_DISCOUNT_SCOPE_OPTIONS.map((opt) => (

@@ -1,9 +1,8 @@
 import { FormField, Input, SingleSelect } from "@erp/ui";
-import { SectionHeader } from "../SectionHeader/SectionHeader";
-import { PROMOTION_APPLY_TO_OPTIONS } from "../../programs.constants";
-import { FORM_LABEL_WIDTH } from "../../program-form.constants";
-import type { PromotionApplyTo } from "../../programs.types";
-import type { ProgramFormState } from "../../program-form.types";
+import { PROMOTION_APPLY_TO_OPTIONS } from "../../../../programs.constants";
+import { FORM_LABEL_WIDTH } from "../../../../program-form.constants";
+import type { PromotionApplyTo } from "../../../../programs.types";
+import type { ProgramFormState } from "../../../../program-form.types";
 
 interface Props {
   form: ProgramFormState;
@@ -12,10 +11,12 @@ interface Props {
 
 const LABEL_WIDTH = FORM_LABEL_WIDTH;
 
-export function GeneralInfoSection({ form, onChange }: Props) {
+export function GeneralInfoPromotionSection({ form, onChange }: Props) {
   return (
     <section>
-      <SectionHeader title="Thông tin chung" />
+      <h2 className="mb-3 mt-8 text-sm font-bold uppercase tracking-wide text-muted-foreground first:mt-0">
+        Thông tin chung
+      </h2>
       <div className="flex flex-col gap-2">
         <FormField
           label="Tên chương trình"

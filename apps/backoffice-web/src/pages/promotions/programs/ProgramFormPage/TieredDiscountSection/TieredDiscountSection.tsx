@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Button, SingleSelect } from "@erp/ui";
 import { DownloadCloud, Plus, UploadCloud } from "lucide-react";
-import { SectionHeader } from "../SectionHeader/SectionHeader";
 import { GroupTabBar } from "./GroupTabBar/GroupTabBar";
 import { ProductSelectionGrid } from "./ProductSelectionGrid/ProductSelectionGrid";
 import { QuantityTierGrid } from "./QuantityTierGrid/QuantityTierGrid";
@@ -63,7 +62,9 @@ export function TieredDiscountSection({ form, onChange }: Props) {
 
   return (
     <section>
-      <SectionHeader title="Giảm giá" />
+      <h2 className="mb-3 mt-8 text-sm font-bold uppercase tracking-wide text-muted-foreground first:mt-0">
+        Giảm giá
+      </h2>
 
       <div className="flex flex-col gap-3 text-sm">
         <div className="flex flex-wrap items-center gap-4">

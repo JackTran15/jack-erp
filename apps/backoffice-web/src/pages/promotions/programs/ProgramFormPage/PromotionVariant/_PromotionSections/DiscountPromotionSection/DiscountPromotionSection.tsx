@@ -1,21 +1,22 @@
 import { Input, MoneyInput } from "@erp/ui";
-import { SectionHeader } from "../SectionHeader/SectionHeader";
 import { AutoApplyCheckbox } from "../AutoApplyCheckbox/AutoApplyCheckbox";
-import type { DiscountType, ProgramFormState } from "../../program-form.types";
+import type { DiscountType, ProgramFormState } from "../../../../program-form.types";
 
 interface Props {
   form: ProgramFormState;
   onChange: (patch: Partial<ProgramFormState>) => void;
 }
 
-export function DiscountSection({ form, onChange }: Props) {
+export function DiscountPromotionSection({ form, onChange }: Props) {
   const select = (type: DiscountType) => onChange({ discountType: type });
   const isPercent = form.discountType === "PERCENT";
   const isAmount = form.discountType === "AMOUNT";
 
   return (
     <section>
-      <SectionHeader title="Khuyến mại" />
+      <h2 className="mb-3 mt-8 text-sm font-bold uppercase tracking-wide text-muted-foreground first:mt-0">
+        Khuyến mại
+      </h2>
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <label className="flex cursor-pointer items-center gap-2">

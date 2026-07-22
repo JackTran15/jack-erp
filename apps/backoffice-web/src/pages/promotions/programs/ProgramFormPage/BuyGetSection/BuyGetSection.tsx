@@ -1,5 +1,4 @@
 import { DownloadCloud, UploadCloud } from "lucide-react";
-import { SectionHeader } from "../SectionHeader/SectionHeader";
 import { BuyGetProductGrid } from "./BuyGetProductGrid/BuyGetProductGrid";
 import {
   BUY_GET_GIFT_POLICY_OPTIONS,
@@ -61,7 +60,9 @@ export function BuyGetSection({ form, onChange }: Props) {
 
   return (
     <section>
-      <SectionHeader title="Khuyến mại" />
+      <h2 className="mb-3 mt-8 text-sm font-bold uppercase tracking-wide text-muted-foreground first:mt-0">
+        Khuyến mại
+      </h2>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Cột trái: điều kiện mua */}

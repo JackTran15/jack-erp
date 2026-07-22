@@ -1,34 +1,14 @@
 import { useCallback, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { AdminPageShell } from "../../../../components/layout/AdminPageShell";
 import { PageHeader } from "../../../../components/layout/PageHeader";
-import { Tabs } from "../../../../components/tabs/Tabs";
-import { useIsChainSelected } from "../../../../store/common/branch/branch.store";
 import { FormActionBar } from "./FormActionBar/FormActionBar";
-import { GeneralInfoSection } from "./GeneralInfoSection/GeneralInfoSection";
-import { TimeSection } from "./TimeSection/TimeSection";
-import { StoreScopeSection } from "./StoreScopeSection/StoreScopeSection";
-import { ApplyScopeSection } from "./ApplyScopeSection/ApplyScopeSection";
-import { DiscountSection } from "./DiscountSection/DiscountSection";
-import { GoodsDiscountSection } from "./GoodsDiscountSection/GoodsDiscountSection";
-import { TieredDiscountSection } from "./TieredDiscountSection/TieredDiscountSection";
-import { GiftSection } from "./GiftSection/GiftSection";
-import { BuyGetSection } from "./BuyGetSection/BuyGetSection";
-import { ConditionSection } from "./ConditionSection/ConditionSection";
-import { ApplicableGoodsTable } from "./ApplicableGoodsTable/ApplicableGoodsTable";
-import { AutoApplyCheckbox } from "./AutoApplyCheckbox/AutoApplyCheckbox";
+import { PromotionInvoiceDiscount } from "./PromotionVariant/PromotionInvoiceDiscount/PromotionInvoiceDiscount";
 import { buildInitialFormState } from "../program-form.constants";
 import { PromotionForm, PROMOTION_FORM_LABELS } from "../programs.constants";
 import type { ProgramFormState } from "../program-form.types";
 import { MOCK_PROGRAM_ROWS } from "../_mock/mock-programs";
-
-type FormTab = "km" | "conditions";
-
-const FORM_TABS: { id: FormTab; label: string }[] = [
-  { id: "km", label: "Khuyến mại" },
-  { id: "conditions", label: "Điều kiện áp dụng" },
-];
 
 /** Dựng state ban đầu, prefill từ mock khi ở chế độ sửa. */
 function initialStateFor(id: string | undefined): ProgramFormState {
@@ -49,17 +29,10 @@ function initialStateFor(id: string | undefined): ProgramFormState {
 export function ProgramFormPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const [searchParams] = useSearchParams();
   const isEdit = Boolean(id);
-  const isChain = useIsChainSelected();
-
-  const promotionType = isEdit
-    ? MOCK_PROGRAM_ROWS.find((r) => r.id === id)?.form ??
-      PromotionForm.INVOICE_DISCOUNT
-    : searchParams.get("type") ?? PromotionForm.INVOICE_DISCOUNT;
 
   const [form, setForm] = useState<ProgramFormState>(() => initialStateFor(id));
-  const [activeTab, setActiveTab] = useState<FormTab>("km");
+  const [formNonce, setFormNonce] = useState(0);
 
   const onChange = useCallback((patch: Partial<ProgramFormState>) => {
     setForm((prev) => ({ ...prev, ...patch }));
@@ -83,30 +56,16 @@ export function ProgramFormPage() {
     }
     toast.success("Đã tạo chương trình mới.");
     setForm(buildInitialFormState());
-    setActiveTab("km");
+    setFormNonce((n) => n + 1);
   }, [form.name]);
 
   const handleCancel = useCallback(() => {
     navigate("/promotions/programs");
   }, [navigate]);
 
-  const isInvoiceDiscount = promotionType === PromotionForm.INVOICE_DISCOUNT;
-  const isProductDiscount = promotionType === PromotionForm.PRODUCT_DISCOUNT;
-  const isTieredDiscount = promotionType === PromotionForm.TIERED_DISCOUNT;
-  const isGiftDiscount = promotionType === PromotionForm.GIFT;
-  const isBuyGetDiscount = promotionType === PromotionForm.BUY_M_GET_N;
-  const isSinglePage = isTieredDiscount || isBuyGetDiscount;
-
   const typeLabel =
-    PROMOTION_FORM_LABELS[promotionType as PromotionForm]?.toLowerCase() ??
-    "chương trình khuyến mãi";
+    PROMOTION_FORM_LABELS[PromotionForm.INVOICE_DISCOUNT].toLowerCase();
   const pageTitle = `Chương trình KM/ ${isEdit ? "Sửa" : "Thêm mới"} ${typeLabel}`;
-  const isSupported =
-    isInvoiceDiscount ||
-    isProductDiscount ||
-    isTieredDiscount ||
-    isGiftDiscount ||
-    isBuyGetDiscount;
 
   return (
     <AdminPageShell>
@@ -117,63 +76,12 @@ export function ProgramFormPage() {
         onSaveAndNew={handleSaveAndNew}
         onCancel={handleCancel}
       />
-      {isSinglePage ? null : (
-        <Tabs tabs={FORM_TABS} activeTab={activeTab} onTabChange={setActiveTab} />
-      )}
 
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
-        {!isSupported ? (
-          <div className="py-10 text-sm text-muted-foreground">
-            Loại khuyến mãi này đang được phát triển.
-          </div>
-        ) : isTieredDiscount ? (
-          <div className="max-w-5xl flex flex-col gap-5">
-            <GeneralInfoSection form={form} onChange={onChange} />
-            <TimeSection form={form} onChange={onChange} />
-            {isChain ? <StoreScopeSection form={form} onChange={onChange} /> : null}
-            <TieredDiscountSection form={form} onChange={onChange} />
-          </div>
-        ) : isBuyGetDiscount ? (
-          <div className="flex flex-col gap-5">
-            <GeneralInfoSection form={form} onChange={onChange} />
-            <TimeSection form={form} onChange={onChange} />
-            {isChain ? <StoreScopeSection form={form} onChange={onChange} /> : null}
-            <BuyGetSection form={form} onChange={onChange} />
-          </div>
-        ) : activeTab === "km" ? (
-          <div className="max-w-5xl flex flex-col gap-5">
-            <GeneralInfoSection form={form} onChange={onChange} />
-            <TimeSection form={form} onChange={onChange} />
-            {isChain ? <StoreScopeSection form={form} onChange={onChange} /> : null}
-            {isInvoiceDiscount ? (
-              <>
-                <ApplyScopeSection form={form} onChange={onChange} />
-                <DiscountSection form={form} onChange={onChange} />
-              </>
-            ) : isProductDiscount ? (
-              <GoodsDiscountSection form={form} onChange={onChange} />
-            ) : (
-              <GiftSection form={form} onChange={onChange} />
-            )}
-          </div>
-        ) : (
-          <div className="max-w-5xl flex flex-col gap-5">
-            <ConditionSection
-              form={form}
-              onChange={onChange}
-              showGiftMultiplier={isGiftDiscount}
-            />
-            <ApplicableGoodsTable
-              value={form.applicableGoods}
-              onChange={(goods) => onChange({ applicableGoods: goods })}
-            />
-            <AutoApplyCheckbox
-              checked={form.autoApply}
-              onChange={(v) => onChange({ autoApply: v })}
-            />
-          </div>
-        )}
-      </div>
+      <PromotionInvoiceDiscount
+        key={formNonce}
+        form={form}
+        onChange={onChange}
+      />
 
       <FormActionBar
         position="bottom"

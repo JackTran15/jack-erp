@@ -1,6 +1,5 @@
 import { DownloadCloud, UploadCloud } from "lucide-react";
-import { SectionHeader } from "../SectionHeader/SectionHeader";
-import { AutoApplyCheckbox } from "../AutoApplyCheckbox/AutoApplyCheckbox";
+import { AutoApplyCheckbox } from "../PromotionVariant/_PromotionSections/AutoApplyCheckbox/AutoApplyCheckbox";
 import { GiftProductGrid } from "./GiftProductGrid/GiftProductGrid";
 import { GIFT_MODE_OPTIONS } from "../../program-form.constants";
 import type { GiftMode, ProgramFormState } from "../../program-form.types";
@@ -16,7 +15,9 @@ export function GiftSection({ form, onChange }: Props) {
 
   return (
     <section>
-      <SectionHeader title="Tặng hàng hóa" />
+      <h2 className="mb-3 mt-8 text-sm font-bold uppercase tracking-wide text-muted-foreground first:mt-0">
+        Tặng hàng hóa
+      </h2>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-sm">
         <div className="flex flex-wrap items-center gap-12">
