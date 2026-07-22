@@ -362,6 +362,14 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
           <span class="value">+${totals.pointsEarned}</span>
         </div>`
           : ""
+      }${
+        totals.pointsReversed != null && totals.pointsReversed > 0
+          ? `
+        <div class="row">
+          <span>Điểm trừ</span>
+          <span class="value">-${totals.pointsReversed}</span>
+        </div>`
+          : ""
       }${paymentRows}${amountRow("Giảm nợ", totals.debtReduction)}${amountRow(
         "Trả lại khách",
         totals.change,

@@ -81,6 +81,9 @@ export class InvoiceEntity extends BaseEntity {
   @Column({ name: 'points_earned', type: 'int', default: 0, comment: 'Loyalty points earned from this invoice (floor(amountDue / POINT_EARN_VND_PER_POINT))' })
   pointsEarned: number;
 
+  @Column({ name: 'points_reversed', type: 'int', default: 0, comment: 'Loyalty points clawed back when goods are returned/exchanged (floor(reverseBase / POINT_EARN_VND_PER_POINT))' })
+  pointsReversed: number;
+
   @Column({ name: 'deposit_amount', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Deposit collected upfront (e.g. on layaway)' })
   depositAmount: number;
 

@@ -618,5 +618,34 @@ describe('CheckoutReturnService — debt offset routing', () => {
         actor,
       );
     });
+
+    it('snapshots pointsReversed on the invoice = floor(reverseBase / 10000)', async () => {
+      // Full return of a 1.490.000đ line whose original earned floor(1490000/10000)=149.
+      itemRepo.find.mockResolvedValue([
+        {
+          ...inLineStub(),
+          quantity: 1,
+          unitPrice: 1_490_000,
+          lineTotal: 1_490_000,
+        } as InvoiceItemEntity,
+      ]);
+      invoiceRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(
+          where.id === 'ret-1'
+            ? returnDraftStub({ subtotal: 1_490_000, amountDue: 1_490_000 })
+            : ({
+                ...originalStub(InvoiceStatus.PAID),
+                subtotal: 1_490_000,
+                amountDue: 1_490_000,
+              } as InvoiceEntity),
+        ),
+      );
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(mockManager.save).toHaveBeenCalledWith(
+        expect.objectContaining({ pointsReversed: 149 }),
+      );
+    });
   });
 });
