@@ -4,13 +4,13 @@ import {
   BUY_GET_GIFT_POLICY_OPTIONS,
   GIFT_MODE_OPTIONS,
   TIER_TARGET_OPTIONS,
-} from "../../program-form.constants";
+} from "../../../../program-form.constants";
 import type {
   BuyGetGiftPolicy,
   GiftMode,
   ProgramFormState,
   TierTarget,
-} from "../../program-form.types";
+} from "../../../../program-form.types";
 
 interface Props {
   form: ProgramFormState;
@@ -55,7 +55,7 @@ function ImportExport({ canExport }: { canExport: boolean }) {
 }
 
 /** Section "Khuyến mại" cho loại mua m tặng n: bố cục 2 cột (điều kiện mua ↔ hàng được tặng). */
-export function BuyGetSection({ form, onChange }: Props) {
+export function BuyGetPromotionSection({ form, onChange }: Props) {
   const target = form.buyGetPurchaseTarget;
 
   return (

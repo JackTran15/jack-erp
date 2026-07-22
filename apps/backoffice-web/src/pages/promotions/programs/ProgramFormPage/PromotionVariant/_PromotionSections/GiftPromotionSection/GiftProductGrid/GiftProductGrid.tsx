@@ -1,7 +1,7 @@
 import { Button, Input } from "@erp/ui";
 import { Plus, Trash2 } from "lucide-react";
-import { blankGiftProduct } from "../../../program-form.constants";
-import type { GiftProduct } from "../../../program-form.types";
+import { blankGiftProduct } from "../../../../../program-form.constants";
+import type { GiftProduct } from "../../../../../program-form.types";
 
 interface Props {
   value: GiftProduct[];

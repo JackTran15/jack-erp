@@ -3,12 +3,12 @@ import { Copy, Plus, Trash2 } from "lucide-react";
 import {
   GOODS_DISCOUNT_METHOD_OPTIONS,
   blankGoodsDiscountRow,
-} from "../../../program-form.constants";
+} from "../../../../../program-form.constants";
 import type {
   GoodsDiscountMethod,
   GoodsDiscountRow,
   ProgramFormState,
-} from "../../../program-form.types";
+} from "../../../../../program-form.types";
 
 interface Props {
   form: ProgramFormState;

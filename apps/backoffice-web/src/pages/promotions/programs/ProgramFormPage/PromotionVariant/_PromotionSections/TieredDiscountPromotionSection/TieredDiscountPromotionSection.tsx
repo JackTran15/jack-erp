@@ -10,7 +10,7 @@ import {
   TIER_DISCOUNT_UNIT_OPTIONS,
   TIER_TARGET_OPTIONS,
   blankTierGroup,
-} from "../../program-form.constants";
+} from "../../../../program-form.constants";
 import type {
   ProgramFormState,
   TierBasis,
@@ -19,7 +19,7 @@ import type {
   TierProduct,
   TierRow,
   TierTarget,
-} from "../../program-form.types";
+} from "../../../../program-form.types";
 
 interface Props {
   form: ProgramFormState;
@@ -27,7 +27,7 @@ interface Props {
 }
 
 /** Section "Giảm giá" cho loại giảm giá theo mức (số lượng hàng mua): nhóm + 2 grid lồng nhau. */
-export function TieredDiscountSection({ form, onChange }: Props) {
+export function TieredDiscountPromotionSection({ form, onChange }: Props) {
   const groups = form.tierGroups;
   const [activeId, setActiveId] = useState(() => groups[0]?.id ?? "");
   const activeGroup =

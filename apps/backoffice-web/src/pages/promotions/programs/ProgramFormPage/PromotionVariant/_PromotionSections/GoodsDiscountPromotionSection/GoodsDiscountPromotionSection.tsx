@@ -1,7 +1,7 @@
-import { AutoApplyCheckbox } from "../PromotionVariant/_PromotionSections/AutoApplyCheckbox/AutoApplyCheckbox";
+import { AutoApplyCheckbox } from "../AutoApplyCheckbox/AutoApplyCheckbox";
 import { GoodsDiscountGrid } from "./GoodsDiscountGrid/GoodsDiscountGrid";
-import { GOODS_DISCOUNT_SCOPE_OPTIONS } from "../../program-form.constants";
-import type { GoodsDiscountScope, ProgramFormState } from "../../program-form.types";
+import { GOODS_DISCOUNT_SCOPE_OPTIONS } from "../../../../program-form.constants";
+import type { GoodsDiscountScope, ProgramFormState } from "../../../../program-form.types";
 
 interface Props {
   form: ProgramFormState;
@@ -9,7 +9,7 @@ interface Props {
 }
 
 /** Section "Khuyến mại" cho loại giảm giá hàng hóa: phạm vi (nhóm/hàng hóa) + bảng thiết lập. */
-export function GoodsDiscountSection({ form, onChange }: Props) {
+export function GoodsDiscountPromotionSection({ form, onChange }: Props) {
   const setScope = (scope: GoodsDiscountScope) =>
     onChange({ goodsDiscountScope: scope });
 

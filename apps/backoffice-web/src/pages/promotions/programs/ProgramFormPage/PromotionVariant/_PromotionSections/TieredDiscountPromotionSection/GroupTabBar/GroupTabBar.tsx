@@ -1,6 +1,6 @@
 import { cn } from "@erp/ui";
 import { X } from "lucide-react";
-import type { TierGroup } from "../../../program-form.types";
+import type { TierGroup } from "../../../../../program-form.types";
 
 interface Props {
   groups: TierGroup[];

@@ -1,7 +1,7 @@
 import { Button, Input, MoneyInput } from "@erp/ui";
 import { Copy, Plus, Trash2 } from "lucide-react";
-import { blankTierRow } from "../../../program-form.constants";
-import type { TierRow } from "../../../program-form.types";
+import { blankTierRow } from "../../../../../program-form.constants";
+import type { TierRow } from "../../../../../program-form.types";
 
 interface Props {
   value: TierRow[];

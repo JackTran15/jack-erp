@@ -1,8 +1,8 @@
 import { DownloadCloud, UploadCloud } from "lucide-react";
-import { AutoApplyCheckbox } from "../PromotionVariant/_PromotionSections/AutoApplyCheckbox/AutoApplyCheckbox";
+import { AutoApplyCheckbox } from "../AutoApplyCheckbox/AutoApplyCheckbox";
 import { GiftProductGrid } from "./GiftProductGrid/GiftProductGrid";
-import { GIFT_MODE_OPTIONS } from "../../program-form.constants";
-import type { GiftMode, ProgramFormState } from "../../program-form.types";
+import { GIFT_MODE_OPTIONS } from "../../../../program-form.constants";
+import type { GiftMode, ProgramFormState } from "../../../../program-form.types";
 
 interface Props {
   form: ProgramFormState;
@@ -10,7 +10,7 @@ interface Props {
 }
 
 /** Section "Tặng hàng hóa": hình thức tặng + Nhập/Xuất khẩu + grid 5 cột hàng quà. */
-export function GiftSection({ form, onChange }: Props) {
+export function GiftPromotionSection({ form, onChange }: Props) {
   const canExport = form.giftProducts.length > 0;
 
   return (
