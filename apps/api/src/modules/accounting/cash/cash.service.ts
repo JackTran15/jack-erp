@@ -162,7 +162,8 @@ export class CashService {
     }
 
     const amount = Number(dto.amount);
-    if (Number(source.balance) < amount) {
+    // A cash fund is allowed to go negative unless its own flag says otherwise.
+    if (!source.allowNegative && Number(source.balance) < amount) {
       throw new BadRequestException(
         `Insufficient balance on source. Current: ${source.balance}, requested: ${amount}`,
       );
@@ -242,7 +243,8 @@ export class CashService {
     const balanceDelta = this.computeBalanceDelta(dto.type, Number(dto.amount));
     const newBalance = Number(cashAccount.balance) + balanceDelta;
 
-    if (newBalance < 0) {
+    // A cash fund is allowed to go negative unless its own flag says otherwise.
+    if (!cashAccount.allowNegative && newBalance < 0) {
       throw new BadRequestException(
         `Insufficient cash balance. Current: ${cashAccount.balance}, requested: ${dto.type} ${dto.amount}`,
       );

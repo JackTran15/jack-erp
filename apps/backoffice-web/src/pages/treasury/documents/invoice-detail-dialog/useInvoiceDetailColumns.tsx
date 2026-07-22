@@ -89,7 +89,7 @@ export function useInvoiceDetailColumns(detail: LedgerCashInvoiceDetail | null) 
               ...c,
               footer: (
                 <span className="font-semibold">
-                  Tổng {qtyTotal.toLocaleString("vi-VN")}
+                  {qtyTotal.toLocaleString("vi-VN")}
                 </span>
               ),
             }

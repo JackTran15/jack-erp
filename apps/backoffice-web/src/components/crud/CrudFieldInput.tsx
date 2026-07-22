@@ -13,6 +13,10 @@ const TREE_PICKER_CONFIG: Record<string, { entityKey: string; placeholder: strin
     entityKey: "provider-groups",
     placeholder: "Tìm theo mã hoặc tên nhóm NCC…",
   },
+  "accounts.parentAccountId": {
+    entityKey: "accounts",
+    placeholder: "Tìm theo mã hoặc tên tài khoản kế toán…",
+  },
   "deposit-accounts.bankId": {
     entityKey: "banks",
     placeholder: "Tìm theo mã hoặc tên ngân hàng…",

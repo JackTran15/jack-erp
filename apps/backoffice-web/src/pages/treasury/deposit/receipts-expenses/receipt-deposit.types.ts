@@ -41,7 +41,10 @@ export interface ReceiptDepositListItem {
   depositAccountName: string;
   depositAccountNo: string;
   referenceType?: string;
+  /** This voucher was cancelled by a reversal. */
   isReversed: boolean;
+  /** This voucher IS the reversal of another one. */
+  isReversal: boolean;
 }
 
 export enum ReceiptDepositVoucherDialogKindEnum {

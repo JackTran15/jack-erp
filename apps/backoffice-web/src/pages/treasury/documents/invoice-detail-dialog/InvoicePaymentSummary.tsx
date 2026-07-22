@@ -42,10 +42,22 @@ export function InvoicePaymentSummary({ detail }: Props) {
             )}
           />
         )}
-        <InvoiceDetailSummaryRow
-          label="Tiền mặt"
-          value={formatMoneyInteger(detail.cashAmount)}
-        />
+        {/* Per-method breakdown when the invoice carries payment lines; a single
+            "Tiền mặt" row otherwise (sources that don't record them). */}
+        {detail.payments?.length ? (
+          detail.payments.map((payment) => (
+            <InvoiceDetailSummaryRow
+              key={payment.method}
+              label={payment.label}
+              value={formatMoneyInteger(payment.amount)}
+            />
+          ))
+        ) : (
+          <InvoiceDetailSummaryRow
+            label="Tiền mặt"
+            value={formatMoneyInteger(detail.cashAmount)}
+          />
+        )}
         {!isReturn &&
         detail.changeAmount != null &&
         detail.changeAmount > 0 ? (

@@ -8,6 +8,9 @@ const BUSINESS_STATUS_VI: Record<string, string> = {
 
 export function formatCrudFieldValue(value: unknown, field: FieldDefinition): string {
   if (value === null || value === undefined) return "—";
+  // Server-declared labels win: they are the entity's own Vietnamese wording.
+  const declared = field.enumLabels?.[String(value)];
+  if (declared) return declared;
   if (isBusinessStatusField(field)) {
     return BUSINESS_STATUS_VI[String(value)] ?? String(value);
   }
@@ -16,6 +19,8 @@ export function formatCrudFieldValue(value: unknown, field: FieldDefinition): st
 }
 
 export function formatCrudEnumOption(field: FieldDefinition, value: string): string {
+  const declared = field.enumLabels?.[value];
+  if (declared) return declared;
   if (isBusinessStatusField(field)) {
     return BUSINESS_STATUS_VI[value] ?? value;
   }

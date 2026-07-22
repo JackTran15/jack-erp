@@ -18,7 +18,6 @@ import { DocumentType } from "@erp/shared-interfaces";
 import { Pencil, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { useGenerateDocumentNumber } from "../../../../hooks/document-numbering/useGenerateDocumentNumber";
-import { getStoredUserId } from "../../../../lib/auth-storage";
 import { useBranches } from "../../../../hooks/iam/useBranches";
 import { useBranchStore } from "../../../../store/common/branch/branch.store";
 import { useDepositDashboard } from "../../../../hooks/treasury/use-deposit-dashboard";
@@ -35,6 +34,13 @@ import {
 } from "../../bank-vouchers.types";
 import type { CreateDepositTransferBody } from "../../deposit-transfer/deposit-transfer.types";
 import { useDepositTransfer } from "../../../../hooks/treasury/use-deposit-transfers";
+import { useBankPayment } from "../../../../hooks/treasury/use-bank-payments";
+import { Tabs } from "../../../../components/tabs";
+import { useVoucherDocumentColumns } from "../_shared/useVoucherDocumentColumns";
+import {
+  RECEIPT_VOUCHER_DETAIL_TABS,
+  ReceiptVoucherDetailTabEnum,
+} from "../receipt-voucher-dialog/receipt-voucher.constants";
 import { CashVoucherCategoryDirection, CashVoucherPartnerType } from "../../cash-vouchers.types";
 import { useCashVoucherCategories } from "../../../../hooks/treasury/use-cash-voucher-categories";
 import type { LedgerCashVoucherDocumentLine } from "../../ledger-cash/ledger-cash.types";
@@ -155,7 +161,7 @@ export function DepositPaymentVoucherDialog({
 }: Props) {
   const readOnly = mode === TreasuryVoucherDialogModeEnum.VIEW;
   const { mutateAsync: generateDocNumber } = useGenerateDocumentNumber();
-  const { fetchPartnerByType, fetchStaffById } = usePartnerLookup();
+  const { fetchPartnerByType, fetchCurrentStaff } = usePartnerLookup();
 
   const [depositAccountId, setDepositAccountId] = useState("");
   const [purposeGroup, setPurposeGroup] = useState<DepositPaymentPurposeRadio>(
@@ -187,6 +193,7 @@ export function DepositPaymentVoucherDialog({
   const [partnerCreateKind, setPartnerCreateKind] = useState<PartnerLookupType | null>(null);
   const [staffCreateOpen, setStaffCreateOpen] = useState(false);
   const [debtPickOpen, setDebtPickOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState(ReceiptVoucherDetailTabEnum.LINES);
 
   const { data: paymentCategories = [] } = useCashVoucherCategories(
     CashVoucherCategoryDirection.OUT,
@@ -299,8 +306,9 @@ export function DepositPaymentVoucherDialog({
       setAddress(initial.partnerAddressSnapshot ?? "");
       setReason(initial.reason ?? "");
       setStaffId(initial.paidBy ?? "");
-      setEmployeeCode("");
-      setEmployeeName("");
+      // Resolved server-side — the client no longer needs `iam.user.read`.
+      setEmployeeCode(initial.paidByCode ?? "");
+      setEmployeeName(initial.paidByName ?? "");
       setReference(initial.reference ?? "");
       setDocumentNumber(initial.documentNumber ?? "");
       setDocDate(initial.docDate);
@@ -341,10 +349,8 @@ export function DepositPaymentVoucherDialog({
   // field, the cashier can pick someone else via the lookup/search as before.
   useEffect(() => {
     if (!open || mode !== TreasuryVoucherDialogModeEnum.CREATE) return;
-    const userId = getStoredUserId();
-    if (!userId) return;
     let cancelled = false;
-    void fetchStaffById(userId).then((staff) => {
+    void fetchCurrentStaff().then((staff) => {
       if (cancelled || !staff) return;
       setStaffId(staff.id);
       setEmployeeCode(staff.code);
@@ -353,7 +359,7 @@ export function DepositPaymentVoucherDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, mode, fetchStaffById]);
+  }, [open, mode, fetchCurrentStaff]);
 
   useEffect(() => {
     if (!open) setEntitySearchTarget(null);
@@ -377,18 +383,11 @@ export function DepositPaymentVoucherDialog({
           }
         }
       }
-      if (initial.paidBy) {
-        const staff = await fetchStaffById(initial.paidBy);
-        if (!cancelled && staff) {
-          setEmployeeCode(staff.code);
-          setEmployeeName(staff.name);
-        }
-      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [open, mode, initial, fetchPartnerByType, fetchStaffById]);
+  }, [open, mode, initial, fetchPartnerByType]);
 
   const applyPartnerFromSearch = useCallback((item: VoucherPartnerOption) => {
     setPartnerKind(item.kind);
@@ -587,6 +586,11 @@ export function DepositPaymentVoucherDialog({
     [lineColumnsWithFooter],
   );
 
+  // The "Chứng từ" tab only means something for a Trả nợ payment — it lists the
+  // supplier invoices the voucher settles.
+  const showDetailTabs = isSupplierPayment;
+  const { documentColumnsWithFooter } = useVoucherDocumentColumns(documentLines);
+
   const handleClose = useCallback(() => onOpenChange(false), [onOpenChange]);
 
   const handleSave = useCallback(() => {
@@ -719,6 +723,7 @@ export function DepositPaymentVoucherDialog({
         partnerType: partnerId ? lookupTypeToPartnerType(partnerKind) : undefined,
         partnerId: partnerId || undefined,
         payeeName: payeeName || undefined,
+        address: address || undefined,
         reason: reason || undefined,
         paidBy: staffId || undefined,
         reference: reference || undefined,
@@ -774,6 +779,18 @@ export function DepositPaymentVoucherDialog({
     return other?.documentNumber ?? "";
   }, [fundSwapLegs, initial?.id]);
 
+  /**
+   * A reversal ("đảo phiếu") copies every field of the voucher it cancels, so on
+   * its own it is indistinguishable from the original. These three read the
+   * reversal link the server already stores and surface it: which voucher was
+   * reversed, and why.
+   */
+  const isReversal = Boolean(initial?.reversesVoucherId);
+  const { data: reversedVoucher } = useBankPayment(
+    initial?.reversesVoucherId ?? undefined,
+    isReversal,
+  );
+
   const toolbarItems: ToolbarItem[] = useMemo(() => {
     const items: ToolbarItem[] = [];
     if (readOnly && onRequestEdit) {
@@ -789,7 +806,7 @@ export function DepositPaymentVoucherDialog({
   const title =
     mode === TreasuryVoucherDialogModeEnum.CREATE
       ? LABELS.titleCreate
-      : `${LABELS.titleView} ${documentNumber}`;
+      : `${isReversal ? "PHIẾU ĐẢO — " : ""}${LABELS.titleView} ${documentNumber}`;
 
   if (!open) return null;
 
@@ -929,7 +946,26 @@ export function DepositPaymentVoucherDialog({
               onOpenSearchDialog={() => setEntitySearchTarget("staff")}
               onCreateNew={!readOnly ? () => setStaffCreateOpen(true) : undefined}
             />
-            {counterpartLabel || reference ? (
+            {isReversal ? (
+              <>
+                <FormField label="Tham chiếu" layout="horizontal" labelWidth="8rem">
+                  <span className="flex h-9 items-center text-sm">
+                    <VoucherLink
+                      code={reversedVoucher?.documentNumber ?? "—"}
+                      clickable={false}
+                    />
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      (phiếu gốc đã bị đảo)
+                    </span>
+                  </span>
+                </FormField>
+                <FormField label="Lý do đảo" layout="horizontal" labelWidth="8rem">
+                  <span className="flex h-9 items-center text-sm">
+                    {initial?.reversalReason || "—"}
+                  </span>
+                </FormField>
+              </>
+            ) : counterpartLabel || reference ? (
               <FormField label="Tham chiếu" layout="horizontal" labelWidth="8rem">
                 <span className="flex h-9 items-center text-sm">
                   {counterpartLabel ? (
@@ -1037,7 +1073,24 @@ export function DepositPaymentVoucherDialog({
         }
         detail={
           <div className="flex flex-col gap-2">
-            {readOnly ? (
+            {showDetailTabs ? (
+              <Tabs
+                tabs={RECEIPT_VOUCHER_DETAIL_TABS}
+                activeTab={detailTab}
+                onTabChange={setDetailTab}
+              />
+            ) : null}
+            {showDetailTabs &&
+            detailTab === ReceiptVoucherDetailTabEnum.DOCUMENTS ? (
+              <BaseDataTable
+                columns={documentColumnsWithFooter}
+                rows={documentLines}
+                loading={false}
+                emptyLabel="Chưa có chứng từ — bấm Chọn hóa đơn trả nợ."
+                getRowKey={(r) => r.debtId ?? r.documentNo}
+                className="min-h-0 flex-1"
+              />
+            ) : readOnly ? (
               <BaseDataTable
                 columns={lineColumnsView}
                 rows={lines}

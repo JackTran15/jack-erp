@@ -56,6 +56,11 @@ export function useReceiptDepositTableColumns(
             {r.isReversed ? (
               <StatusBadge variant="warning">Đảo bút</StatusBadge>
             ) : null}
+            {/* The reversal copies the original's data verbatim, so without this
+                badge the two rows are indistinguishable in the grid. */}
+            {r.isReversal ? (
+              <StatusBadge variant="warning">Phiếu đảo</StatusBadge>
+            ) : null}
           </div>
         ),
       },

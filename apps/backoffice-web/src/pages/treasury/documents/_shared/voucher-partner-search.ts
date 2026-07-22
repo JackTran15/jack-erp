@@ -109,17 +109,47 @@ interface VoucherPartnerByIdResult {
   kind: PartnerLookupType;
 }
 
+function toStaffOption(data: UserListItem): {
+  id: string;
+  code: string;
+  name: string;
+  phone?: string;
+} {
+  return {
+    id: data.id,
+    code: data.code ?? data.profile?.code ?? "",
+    name: `${data.firstName ?? ""} ${data.lastName ?? ""}`.trim() || data.email,
+    phone: data.profile?.mobile ?? undefined,
+  };
+}
+
 async function fetchStaffByIdRaw(
   id: string,
 ): Promise<{ id: string; code: string; name: string; phone?: string } | null> {
   try {
     const { data } = await apiClient.get<UserListItem>(`/admin/users/${id}`);
-    return {
-      id: data.id,
-      code: data.code ?? data.profile?.code ?? "",
-      name: `${data.firstName ?? ""} ${data.lastName ?? ""}`.trim() || data.email,
-      phone: data.profile?.mobile ?? undefined,
-    };
+    return toStaffOption(data);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The signed-in user, for prefilling "Nhân viên thu/chi" on a new voucher.
+ *
+ * Uses `/admin/users/me` rather than `/admin/users/:id`: the by-id endpoint is
+ * gated behind `iam.user.read`, which treasury staff generally do not hold, so
+ * the prefill silently came back empty for exactly the people who use the form.
+ */
+async function fetchCurrentStaffRaw(): Promise<{
+  id: string;
+  code: string;
+  name: string;
+  phone?: string;
+} | null> {
+  try {
+    const { data } = await apiClient.get<UserListItem>("/admin/users/me");
+    return toStaffOption(data);
   } catch {
     return null;
   }
@@ -154,10 +184,20 @@ async function fetchPartnerByTypeRaw(
 
   if (partnerType === CashVoucherPartnerType.SUPPLIER) {
     try {
-      const { data } = await apiClient.get<{ id: string; code: string; name: string; phone?: string }>(
-        `/inventory/providers/${partnerId}`,
-      );
-      return { code: data.code, name: data.name, phone: data.phone, kind: PartnerLookupType.SUPPLIER };
+      const { data } = await apiClient.get<{
+        id: string;
+        code: string;
+        name: string;
+        phone?: string;
+        address?: string;
+      }>(`/inventory/providers/${partnerId}`);
+      return {
+        code: data.code,
+        name: data.name,
+        phone: data.phone,
+        address: data.address,
+        kind: PartnerLookupType.SUPPLIER,
+      };
     } catch {
       return null;
     }
@@ -217,6 +257,16 @@ export function usePartnerSearch() {
   );
 }
 
+export function fetchCurrentVoucherStaff(
+  qc: QueryClient,
+): Promise<{ id: string; code: string; name: string; phone?: string } | null> {
+  return qc.fetchQuery({
+    queryKey: treasuryQueryKeys.staffById("me"),
+    queryFn: fetchCurrentStaffRaw,
+    staleTime: DETAIL_STALE_TIME,
+  });
+}
+
 export function usePartnerLookup() {
   const qc = useQueryClient();
   return {
@@ -229,5 +279,6 @@ export function usePartnerLookup() {
       (id: string) => fetchVoucherStaffById(qc, id),
       [qc],
     ),
+    fetchCurrentStaff: useCallback(() => fetchCurrentVoucherStaff(qc), [qc]),
   };
 }

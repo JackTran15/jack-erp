@@ -27,6 +27,11 @@ export interface FieldDefinition {
    */
   skipOnDuplicate?: boolean;
   enumValues?: string[];
+  /**
+   * Với `type: 'enum'`: nhãn hiển thị (tiếng Việt) cho từng giá trị enum. Giá trị
+   * enum vẫn là tiếng Anh; chỉ phần hiển thị ở lưới và ô chọn của form dùng nhãn này.
+   */
+  enumLabels?: Record<string, string>;
   relationEntity?: string;
 }
 

@@ -4,14 +4,16 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import {
   AccountType,
   ScopingPolicy,
   DeletionPolicy,
   CrudEntityConfig,
+  PaginatedResponse,
 } from '@erp/shared-interfaces';
 import { BaseCrudService, CrudOperation } from '../../crud/base-crud.service';
+import { PaginationQueryDto } from '../../crud/dto/pagination-query.dto';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { AccountEntity } from './account.entity';
 import { CreateAccountDto, UpdateAccountDto } from './dto';
@@ -32,6 +34,43 @@ export class CoaService extends BaseCrudService<
     protected readonly dataSource: DataSource,
   ) {
     super(dataSource);
+  }
+
+  /**
+   * Inline the parent account's human label so the admin grid shows a name
+   * instead of a raw UUID. One batched lookup per page, never per row.
+   */
+  override async list(
+    query: PaginationQueryDto,
+    filters: Record<string, any>,
+    actor: ActorContext,
+  ): Promise<PaginatedResponse<AccountEntity>> {
+    const page = await super.list(query, filters, actor);
+    const parentIds = [
+      ...new Set(
+        page.data
+          .map((r) => r.parentAccountId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (parentIds.length === 0) return page;
+
+    const parents = await this.repository.find({
+      where: { id: In(parentIds), organizationId: actor.organizationId },
+    });
+    const parentById = new Map(parents.map((p) => [p.id, p]));
+
+    const data = page.data.map((row) => {
+      const parent = row.parentAccountId
+        ? parentById.get(row.parentAccountId)
+        : undefined;
+      return {
+        ...row,
+        parentAccountName: parent ? `${parent.code} - ${parent.name}` : '—',
+      };
+    }) as AccountEntity[];
+
+    return { ...page, data };
   }
 
   protected override async beforeCreate(
@@ -102,43 +141,61 @@ export class CoaService extends BaseCrudService<
   }
 }
 
+/** Display labels for {@link AccountType} on the admin grid and form. */
+const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
+  [AccountType.ASSET]: 'Tài sản',
+  [AccountType.LIABILITY]: 'Nợ phải trả',
+  [AccountType.EQUITY]: 'Vốn chủ sở hữu',
+  [AccountType.REVENUE]: 'Doanh thu',
+  [AccountType.EXPENSE]: 'Chi phí',
+};
+
 export const ACCOUNT_ENTITY_CONFIG: CrudEntityConfig = {
   entityKey: 'accounts',
-  displayName: 'Account',
+  displayName: 'Tài khoản kế toán',
   apiResource: 'accounts',
   idField: 'id',
   fields: [
-    { key: 'code', label: 'Code', type: 'string', required: true },
-    { key: 'name', label: 'Name', type: 'string', required: true },
+    { key: 'code', label: 'Mã', type: 'string', required: true },
+    { key: 'name', label: 'Tên tài khoản', type: 'string', required: true },
     {
       key: 'type',
-      label: 'Type',
+      label: 'Loại',
       type: 'enum',
       required: true,
       enumValues: Object.values(AccountType),
+      enumLabels: ACCOUNT_TYPE_LABELS,
+    },
+    // Display-only label inlined by `list()`; the raw FK below is the form picker.
+    {
+      key: 'parentAccountName',
+      label: 'Tài khoản cha',
+      type: 'string',
+      readOnly: true,
     },
     {
       key: 'parentAccountId',
-      label: 'Parent Account',
+      label: 'Tài khoản cha',
       type: 'relation',
       relationEntity: 'accounts',
+      hideInList: true,
     },
-    { key: 'isActive', label: 'Active', type: 'boolean' },
+    { key: 'isActive', label: 'Hoạt động', type: 'boolean' },
   ],
   searchableFields: ['code', 'name'],
   filterDefinitions: [
     {
       key: 'type',
-      label: 'Type',
+      label: 'Loại',
       type: 'select',
       options: Object.values(AccountType).map((t) => ({
-        label: t,
+        label: ACCOUNT_TYPE_LABELS[t],
         value: t,
       })),
     },
     {
       key: 'isActive',
-      label: 'Active',
+      label: 'Hoạt động',
       type: 'boolean',
     },
   ],

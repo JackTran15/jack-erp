@@ -32,6 +32,7 @@ import { PartnerResolverService } from "../../cash-vouchers/shared/partner-resol
 import { CashVoucherPartnerType } from "../../cash-vouchers/enums";
 import { AccountResolverService } from "../../payment-accounts/account-resolver.service";
 import { AccountingDefaultAccountRole } from "../../payment-accounts/enums";
+import { VoucherStaffResolver } from "../shared/voucher-staff.resolver";
 import { BankPaymentEntity } from "./bank-payment.entity";
 import { BankPaymentLineEntity } from "./bank-payment-line.entity";
 import { CreateBankPaymentDto } from "./dto/create-bank-payment.dto";
@@ -136,6 +137,7 @@ export class BankPaymentsService {
     private readonly partnerResolver: PartnerResolverService,
     private readonly accountResolver: AccountResolverService,
     private readonly periodGuard: DepositPeriodGuardService,
+    private readonly staffResolver: VoucherStaffResolver,
     @Inject(forwardRef(() => SupplierDepositPaymentSagaService))
     private readonly supplierDepositPaymentSaga: SupplierDepositPaymentSagaService,
   ) {}
@@ -193,7 +195,9 @@ export class BankPaymentsService {
           partnerType: dto.partnerType,
           partnerId: dto.partnerId,
           partnerName: partner?.name ?? undefined,
-          partnerAddress: partner?.address ?? undefined,
+          // What the cashier typed wins over the partner record's current address —
+          // the voucher freezes the address as of the moment it was written.
+          partnerAddress: dto.address ?? partner?.address ?? undefined,
           payeeName: dto.payeeName,
           paidBy: dto.paidBy,
           reference: dto.reference,
@@ -248,6 +252,7 @@ export class BankPaymentsService {
         partnerType: dto.partnerType ?? payment.partnerType,
         partnerId: dto.partnerId ?? payment.partnerId,
         payeeName: dto.payeeName ?? payment.payeeName,
+        partnerAddressSnapshot: dto.address ?? payment.partnerAddressSnapshot,
         reason: dto.reason ?? payment.reason,
         paidBy: dto.paidBy ?? payment.paidBy,
         reference: dto.reference ?? payment.reference,
@@ -368,7 +373,10 @@ export class BankPaymentsService {
       payment.postedBy = actor.userId;
       if (partner) {
         payment.partnerNameSnapshot = partner.name ?? undefined;
-        payment.partnerAddressSnapshot = partner.address ?? undefined;
+        // Never clobber an address already captured on the voucher — it is the
+        // one the cashier typed, and it is what the printed phiếu shows.
+        payment.partnerAddressSnapshot =
+          payment.partnerAddressSnapshot ?? partner.address ?? undefined;
       }
       await manager.save(payment);
 
@@ -823,11 +831,35 @@ export class BankPaymentsService {
       .take(pageSize);
 
     const [data, total] = await qb.getManyAndCount();
+    await this.attachStaff(data, actor.organizationId);
     return { data, total, page, pageSize };
   }
 
   async getById(id: string, actor: ActorContext): Promise<BankPaymentEntity> {
-    return this.getByIdInTx(this.dataSource.manager, id, actor.organizationId);
+    const payment = await this.getByIdInTx(
+      this.dataSource.manager,
+      id,
+      actor.organizationId,
+    );
+    await this.attachStaff([payment], actor.organizationId);
+    return payment;
+  }
+
+  /** Fill in `paidByCode`/`paidByName` for a page of payments in one batch. */
+  private async attachStaff(
+    payments: BankPaymentEntity[],
+    organizationId: string,
+  ): Promise<void> {
+    if (payments.length === 0) return;
+    const staffById = await this.staffResolver.resolveMany(
+      payments.map((p) => p.paidBy),
+      organizationId,
+    );
+    for (const payment of payments) {
+      const staff = payment.paidBy ? staffById.get(payment.paidBy) : undefined;
+      payment.paidByCode = staff?.code ?? null;
+      payment.paidByName = staff?.name ?? null;
+    }
   }
 
   // ---------------------------------------------------------------------------

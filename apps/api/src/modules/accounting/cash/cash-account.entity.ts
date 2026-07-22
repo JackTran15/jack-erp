@@ -32,6 +32,15 @@ export class CashAccountEntity extends BaseEntity {
   })
   balance: number;
 
+  @Column({
+    name: 'allow_negative',
+    type: 'boolean',
+    default: true,
+    comment:
+      'When true (default), movements may drive the balance below zero; false re-enables the insufficient-balance guard',
+  })
+  allowNegative: boolean;
+
   @Column({ name: 'account_id', type: 'uuid', comment: 'Corresponding general ledger account in the COA' })
   accountId: string;
 }

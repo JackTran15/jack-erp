@@ -5,6 +5,7 @@ import { Button } from "@erp/ui";
 import { Plus } from "lucide-react";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { useCrudConfig, useCrudCreate, useCrudRecord } from "./useCrudApi";
+import { buildCrudPayload, sanitizeCrudPayload } from "./crudPayload";
 import { CrudFieldInput } from "./CrudFieldInput";
 import { InventoryItemCreateForm } from "./inventory/InventoryItemCreateForm";
 import type { InventoryItemSaveMode } from "./inventory/item-create/InventoryItemActionBar";
@@ -156,12 +157,9 @@ export function CrudCreatePage() {
     // values map for those; the generic CRUD backend accepts Record<string,any>.
     let payload: Record<string, unknown>;
     if (entityKey === "inventory-items" || entityKey === "inventory-providers") {
-      payload = { ...values };
+      payload = sanitizeCrudPayload(editableFields, values, "create");
     } else {
-      payload = {};
-      editableFields.forEach((field) => {
-        payload[field.key] = values[field.key];
-      });
+      payload = buildCrudPayload(editableFields, values, "create");
     }
 
     try {

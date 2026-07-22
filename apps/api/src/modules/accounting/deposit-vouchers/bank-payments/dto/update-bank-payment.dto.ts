@@ -43,6 +43,12 @@ export class UpdateBankPaymentDto {
   @MaxLength(255)
   payeeName?: string;
 
+  /** "Địa chỉ" — stored as `partnerAddressSnapshot`. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  address?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(500)

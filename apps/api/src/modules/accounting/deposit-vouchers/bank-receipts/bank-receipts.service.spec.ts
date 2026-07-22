@@ -12,6 +12,8 @@ import { PartnerResolverService } from '../../cash-vouchers/shared/partner-resol
 import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
 import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
 import { DepositPeriodGuardService } from '../../deposit-period-lock/deposit-period-guard.service';
+import { VoucherStaffResolver } from '../shared/voucher-staff.resolver';
+import { DepositDebtCollectionSagaService } from '../debt-collection/deposit-debt-collection-saga.service';
 import {
   BankReceiptPurpose,
   BankReceiptReferenceType,
@@ -93,6 +95,17 @@ describe('BankReceiptsService', () => {
         { provide: PartnerResolverService, useValue: partnerResolver },
         { provide: AccountResolverService, useValue: accountResolver },
         { provide: DepositPeriodGuardService, useValue: periodGuard },
+        // Read paths resolve the cashier name; the specs assert voucher fields,
+        // so an empty resolution is enough.
+        {
+          provide: VoucherStaffResolver,
+          useValue: { resolveMany: jest.fn().mockResolvedValue(new Map()) },
+        },
+        // Only reached when reversing a DEBT_COLLECTION receipt.
+        {
+          provide: DepositDebtCollectionSagaService,
+          useValue: { compensate: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile();
 
