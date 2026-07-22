@@ -1828,3 +1828,58 @@ flowchart LR
   T6 --> T8["CTF-08 Test plan"]
   T7 --> T8
 ```
+
+### EPIC-22072026 Khuyến mại — schema chuẩn hóa, domain engine & evaluate API
+
+- [EPIC-22072026 Promotion programs & engine](./epics/EPIC-22072026-promotion-programs-engine.md)
+
+`docs/promotions/` (REQ-KM-001 + khảo sát MISA eShop) đặc tả 5 hình thức khuyến mại; repo lệch khỏi đặc tả theo hai hướng ngược nhau. FE backoffice **đã dựng xong khung** (`pages/promotions/` có đủ section cho cả 5 hình thức, route + nav đã có) nhưng chạy hoàn toàn trên mock — `ProgramFormPage.handleSave` chỉ `navigate()`. BE thì là **stub**: `promotions` lưu `conditions`/`benefits` dạng `jsonb` không kiểu, `PromotionApplyService.computePromotionAmount` chỉ hiểu giảm giá phẳng trên `subtotal` và **trả về 0 cho mọi promotion gift / buy-x-get-y**. Epic này đóng khoảng cách ở backend: 7 bảng chuẩn hóa, domain engine thuần TS tính đúng cả 5 hình thức, `POST /v2/promotions/evaluate`, và gỡ mock ở backoffice. Bảng `promotions` cũ không đụng tới. **Ngoài phạm vi:** tích hợp POS checkout và Excel import/export → epic sau.
+
+Hai sai lệch chủ ý so với convention repo, đã cân nhắc: (1) dùng `CommandBus` cho write dù skill `cqrs-search-endpoint` ghi "commands are not used in this repo" — một lần ghi CTKM đụng 7 bảng trong cùng transaction; (2) `modules/promotion/` là module đầu tiên phân lớp clean architecture (`domain/` thuần TS, `application/`, `infrastructure/`, `interface/`).
+
+Quyết định nghiệp vụ chốt: **BR-001** sắp theo `priority ASC, createdAt ASC`, first-match-wins theo từng tài nguyên bị tranh chấp (dòng hàng / slot hóa đơn / slot quà) — không cộng dồn.
+
+| Ticket | Mô tả |
+| ------ | ----- |
+| [TKT-KM-01](./tickets/TKT-KM-01-design-doc.md) | `docs/26-promotion-design.md` — use case, ERD, sequence, bảng truy vết FR/BR |
+| [TKT-KM-02](./tickets/TKT-KM-02-schema-migration.md) | 3 migration viết tay (7 bảng + 15 enum), `DocumentType.PROMOTION` prefix `KM`, 3 permission key |
+| [TKT-KM-03](./tickets/TKT-KM-03-shared-interfaces.md) | `packages/shared-interfaces/src/promotion/` — enum + DTO type dùng chung |
+| [TKT-KM-04](./tickets/TKT-KM-04-domain-model.md) | Domain model + ports; invariants BR-004; thuần TS, cấm import Nest/TypeORM |
+| [TKT-KM-05](./tickets/TKT-KM-05-domain-engine.md) | 5 strategy + `PromotionResolver`; unit test phủ AC-01…AC-09 |
+| [TKT-KM-06](./tickets/TKT-KM-06-infrastructure.md) | 7 TypeORM entity + repository adapter + catalog/customer reader + mapper |
+| [TKT-KM-07](./tickets/TKT-KM-07-commands.md) | create / update / duplicate / change-status / delete + DTO phân nhánh theo `type` |
+| [TKT-KM-08](./tickets/TKT-KM-08-queries-crud.md) | `POST /v2/promotions/search` (FilterBuilder) + `GET /v2/promotions/:id` |
+| [TKT-KM-09](./tickets/TKT-KM-09-evaluate-api.md) | `POST /v2/promotions/evaluate` — đọc thuần, kèm `skippedPrograms[]` giải thích CTKM thua |
+| [TKT-KM-10](./tickets/TKT-KM-10-vouchers.md) | Mở rộng `vouchers` (issuer/description/status, ngày nullable) + search v2 + CRUD |
+| [TKT-KM-11](./tickets/TKT-KM-11-openapi.md) | OpenAPI regen + commit snapshot |
+| [TKT-KM-12](./tickets/TKT-KM-12-fe-data-layer.md) | TanStack hooks + mapper `ProgramFormState` ↔ DTO (round-trip test 5 hình thức) |
+| [TKT-KM-13](./tickets/TKT-KM-13-fe-programs.md) | `ProgramsPage` + `ProgramFormPage` bỏ mock; chip bộ lọc FR-004; giữ auto-apply FR-023 |
+| [TKT-KM-14](./tickets/TKT-KM-14-fe-vouchers.md) | `VouchersPage` bỏ mock + dialog FR-051 + dòng tổng cộng |
+| [TKT-KM-15](./tickets/TKT-KM-15-fe-item-picker.md) | Nối 6 lưới vào `ProductSelectDialog` **có sẵn** (không dựng dialog mới) + chế độ chọn nhóm |
+| [TKT-KM-16](./tickets/TKT-KM-16-e2e.md) | E2E phủ AC-01…AC-11 + checklist QA thủ công |
+
+```mermaid
+flowchart LR
+  T1["KM-01 Design doc"] --> T2["KM-02 Schema"]
+  T2 --> T3["KM-03 shared-interfaces"]
+  T3 --> T4["KM-04 Domain model"]
+  T4 --> T5["KM-05 Domain engine"]
+  T2 --> T6["KM-06 Infrastructure"]
+  T4 --> T6
+  T6 --> T7["KM-07 Commands"]
+  T6 --> T8["KM-08 Queries CRUD"]
+  T5 --> T9["KM-09 Evaluate API"]
+  T6 --> T9
+  T2 --> T10["KM-10 Vouchers"]
+  T7 --> T11["KM-11 OpenAPI"]
+  T8 --> T11
+  T9 --> T11
+  T10 --> T11
+  T11 --> T12["KM-12 FE data layer"]
+  T12 --> T13["KM-13 FE programs"]
+  T12 --> T14["KM-14 FE vouchers"]
+  T12 --> T15["KM-15 FE item picker"]
+  T13 --> T16["KM-16 E2E"]
+  T14 --> T16
+  T15 --> T16
+```
