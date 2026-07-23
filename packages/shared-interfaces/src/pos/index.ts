@@ -20,6 +20,7 @@ export enum InvoiceType {
 
 export enum RefundMethod {
   CASH = 'CASH',
+  BANK = 'BANK',
   STORE_CREDIT = 'STORE_CREDIT',
   OFFSET = 'OFFSET',
 }

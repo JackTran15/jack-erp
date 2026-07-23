@@ -28,6 +28,9 @@ export const ERP_TOPICS = {
   STOCK_RETURN_IN: 'erp.stock.return.in',
   LOYALTY_POINTS_REVERSE: 'erp.loyalty.points.reverse',
   CASH_REFUND: 'erp.cash.refund',
+  // POS return/exchange refund routed to a deposit fund → consumer records a
+  // deposit WITHDRAWAL + JE + Phiếu chi ngân hàng (Quỹ tiền gửi).
+  DEPOSIT_REFUND: 'erp.deposit.refund',
   JOURNAL_POST_RETURN: 'erp.journal.post.return',
   GOODS_RECEIPT_POSTED: 'erp.inventory.goods_receipt.posted',
   DEBT_OVERDUE: 'erp.debt.overdue',

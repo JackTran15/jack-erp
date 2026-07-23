@@ -27,6 +27,7 @@ const TOPIC_SPECS: TopicSpec[] = [
   { topic: ERP_TOPICS.STOCK_RETURN_IN, numPartitions: 6, replicationFactor: 1 },
   { topic: ERP_TOPICS.LOYALTY_POINTS_REVERSE, numPartitions: 3, replicationFactor: 1 },
   { topic: ERP_TOPICS.CASH_REFUND, numPartitions: 3, replicationFactor: 1 },
+  { topic: ERP_TOPICS.DEPOSIT_REFUND, numPartitions: 3, replicationFactor: 1 },
   { topic: ERP_TOPICS.JOURNAL_POST_RETURN, numPartitions: 3, replicationFactor: 1 },
   { topic: ERP_TOPICS.GOODS_RECEIPT_POSTED, numPartitions: 3, replicationFactor: 1 },
   { topic: ERP_TOPICS.DEBT_OVERDUE, numPartitions: 1, replicationFactor: 1 },

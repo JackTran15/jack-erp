@@ -18,6 +18,7 @@ import { DocumentNumberingService } from '../../document-numbering/document-numb
 import { WebSocketEmitterService } from '../../websocket/websocket-emitter.service';
 import { CashFromPaymentPublisher } from '../../accounting/publishers/cash-from-payment.publisher';
 import { CashRefundPublisher } from '../../accounting/publishers/cash-refund.publisher';
+import { DepositRefundPublisher } from '../../accounting/publishers/deposit-refund.publisher';
 import { JournalReturnPublisher } from '../../accounting/publishers/journal-return.publisher';
 import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points.publisher';
 import { LoyaltyPointsReversePublisher } from '../../customer/publishers/loyalty-points-reverse.publisher';
@@ -101,6 +102,7 @@ export class CheckoutReturnService {
     private readonly stockReturnInPublisher: StockReturnInPublisher,
     private readonly stockDeductionPublisher: StockDeductionPublisher,
     private readonly cashRefundPublisher: CashRefundPublisher,
+    private readonly depositRefundPublisher: DepositRefundPublisher,
     private readonly cashFromPaymentPublisher: CashFromPaymentPublisher,
     private readonly journalReturnPublisher: JournalReturnPublisher,
     private readonly loyaltyPointsPublisher: LoyaltyPointsPublisher,
@@ -239,6 +241,27 @@ export class CheckoutReturnService {
           invoice.branchId,
         )
       : undefined;
+
+    // BANK refund: resolve the deposit fund from the operator's chosen payment
+    // account (payment_accounts.id) server-side, so the refund lands on the
+    // exact bank/deposit fund the "Sổ chi tiết tiền gửi" ledger displays. Resolve
+    // before the transaction so an invalid/unlinked mapping fails fast.
+    let resolvedDepositAccountId: string | undefined;
+    if (
+      effectiveRefundMethod === RefundMethod.BANK &&
+      totals.refundedAmount > 0
+    ) {
+      const resolved = await this.accountResolver.resolvePaymentAccountById(
+        dto.refundAccountId!,
+        actor,
+      );
+      if (!resolved.depositAccountId) {
+        throw new BadRequestException(
+          'Tài khoản hoàn tiền chưa liên kết quỹ tiền gửi',
+        );
+      }
+      resolvedDepositAccountId = resolved.depositAccountId;
+    }
 
     // Resolve the receiving COA account for each EXCHANGE payment line — the
     // same server-side derivation as a normal sale checkout: the client sends a
@@ -428,6 +451,7 @@ export class CheckoutReturnService {
       effectiveRefundMethod,
       receivableAccountId,
       resolvedCashAccountId,
+      resolvedDepositAccountId,
       originalInvoice,
       actor,
     );
@@ -526,11 +550,17 @@ export class CheckoutReturnService {
       // RETURN or EXCHANGE refund.
       if (
         effectiveRefundMethod !== RefundMethod.CASH &&
+        effectiveRefundMethod !== RefundMethod.BANK &&
         effectiveRefundMethod !== RefundMethod.STORE_CREDIT &&
         effectiveRefundMethod !== RefundMethod.OFFSET
       ) {
         throw new BadRequestException(
           `refundMethod ${effectiveRefundMethod} không hợp lệ khi netAmount<0`,
+        );
+      }
+      if (effectiveRefundMethod === RefundMethod.BANK && !dto.refundAccountId) {
+        throw new BadRequestException(
+          'BANK refund yêu cầu refundAccountId (tài khoản nhận hoàn)',
         );
       }
       if (
@@ -671,12 +701,21 @@ export class CheckoutReturnService {
     effectiveRefundMethod: RefundMethod,
     receivableAccountId: string | undefined,
     resolvedCashAccountId: string | undefined,
+    resolvedDepositAccountId: string | undefined,
     originalInvoice: InvoiceEntity | null,
     actor: ActorContext,
   ): Promise<void> {
     const branchId = invoice.branchId!;
     const inLines = items.filter((it) => it.direction === ItemDirection.IN);
     const outLines = items.filter((it) => it.direction === ItemDirection.OUT);
+
+    // Revenue (contra for refund JEs + journal-return) is resolved server-side —
+    // the FE never supplies a COA id (same as checkout-invoice). This avoids a
+    // stale/invalid client account id breaking the cash/deposit refund posting.
+    const revenueAccountId = await this.accountResolver.resolveDefaultAccount(
+      AccountingDefaultAccountRole.REVENUE,
+      actor,
+    );
 
     // 1. STOCK_RETURN_IN — always for IN lines.
     if (inLines.length > 0) {
@@ -729,7 +768,7 @@ export class CheckoutReturnService {
         refundedAmount: totals.refundedAmount,
         netAmount: totals.netAmount,
         debtAmount,
-        revenueAccountId: dto.revenueAccountId,
+        revenueAccountId,
         cashAccountId: resolvedCashAccountId,
         receivableAccountId: receivableAccountId,
         creditLiabilityAccountId: dto.creditLiabilityAccountId,
@@ -749,9 +788,34 @@ export class CheckoutReturnService {
           returnInvoiceId: invoice.id,
           returnInvoiceCode: invoice.code,
           cashAccountId: resolvedCashAccountId,
-          contraAccountId: dto.revenueAccountId,
+          contraAccountId: revenueAccountId,
           amount: totals.refundedAmount,
           sessionId: undefined,
+          branchId,
+        },
+        actor,
+      );
+    }
+
+    // 4b. DEPOSIT_REFUND — refundMethod=BANK AND refundedAmount > 0. Records a
+    // deposit WITHDRAWAL on the chosen fund (Sổ chi tiết tiền gửi) + Phiếu chi
+    // ngân hàng. The bank leg's JE (DR revenue / CR 112x) is owned by that
+    // movement, so journal-return posts nothing for the refunded portion.
+    if (
+      effectiveRefundMethod === RefundMethod.BANK &&
+      totals.refundedAmount > 0 &&
+      resolvedDepositAccountId
+    ) {
+      await this.depositRefundPublisher.publish(
+        {
+          returnInvoiceId: invoice.id,
+          returnInvoiceCode: invoice.code,
+          depositAccountId: resolvedDepositAccountId,
+          contraAccountId: revenueAccountId,
+          amount: totals.refundedAmount,
+          docDate: (invoice.issuedAt ?? new Date())
+            .toISOString()
+            .slice(0, 10),
           branchId,
         },
         actor,
@@ -771,7 +835,7 @@ export class CheckoutReturnService {
             invoiceCode: invoice.code,
             sessionId: undefined,
             cashAccountId: resolvedCashAccountId,
-            contraAccountId: dto.revenueAccountId,
+            contraAccountId: revenueAccountId,
             amount: Number(cp.amount),
             branchId,
           },

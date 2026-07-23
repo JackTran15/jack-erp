@@ -49,6 +49,8 @@ export enum BankPaymentReferenceType {
   REVERSAL = 'REVERSAL',
   /** Source leg of a fund swap (FR-08); reference_id = the swap id. */
   FUND_SWAP = 'FUND_SWAP',
+  /** POS return/exchange refund to a deposit fund; reference_id = the return invoice id. */
+  REFUND = 'REFUND',
 }
 
 /**

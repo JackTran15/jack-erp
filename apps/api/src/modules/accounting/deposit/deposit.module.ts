@@ -13,6 +13,7 @@ import { DepositService } from './deposit.service';
 import { DepositFundResolverService } from './deposit-fund-resolver.service';
 import { DepositRoutingService } from './deposit-routing.service';
 import { DepositFromPaymentPublisher } from './deposit-from-payment.publisher';
+import { DepositRefundPublisher } from '../publishers/deposit-refund.publisher';
 import { PosDepositSaleConsumer } from './consumers/pos-deposit-sale.consumer';
 import { DepositFeeService } from '../deposit-fee/deposit-fee.service';
 import { DepositLedgerService } from './deposit-ledger/deposit-ledger.service';
@@ -60,6 +61,7 @@ import {
     DepositFundResolverService,
     DepositRoutingService,
     DepositFromPaymentPublisher,
+    DepositRefundPublisher,
     DepositFeeService,
     PosDepositSaleConsumer,
     DepositLedgerService,
@@ -81,6 +83,7 @@ import {
     DepositFundResolverService,
     DepositRoutingService,
     DepositFromPaymentPublisher,
+    DepositRefundPublisher,
     DepositFeeService,
     DepositBalanceService,
     DepositPeriodGuardService,
