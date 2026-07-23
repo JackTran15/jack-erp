@@ -6,7 +6,7 @@
 
 | Tầng | Hiện trạng |
 | ---- | ---------- |
-| FE backoffice | **Khung đã dựng xong** — `apps/backoffice-web/src/pages/promotions/` có đủ section cho cả 5 hình thức (`GoodsDiscountSection`, `TieredDiscountSection`, `GiftSection`, `BuyGetSection`, `ConditionSection`, `StoreScopeSection`, `TimeSection`), route trong `App.tsx` + `NavChild` trong `navConfig.ts` đã có. Nhưng **chạy hoàn toàn trên mock** (`_mock/mock-programs.ts`, `_mock/mock-vouchers.ts`); `ProgramFormPage.handleSave` chỉ `navigate()`, không gọi API. |
+| FE backoffice | **Khung đã dựng xong** — `apps/backoffice-web/src/pages/promotions/programs/ProgramFormPage/PromotionVariant/` có 5 variant theo hình thức (`PromotionInvoiceDiscount`, `PromotionProductDiscount`, `PromotionTieredDiscount`, `PromotionGift`, `PromotionBuyGet`), mỗi variant nhận `{ form, onChange }` và compose section từ `_PromotionSections/` (`GeneralInfoPromotionSection`, `TimePromotionSection`, `StoreScopePromotionSection`, `ApplyScopePromotionSection`, `DiscountPromotionSection`, `GoodsDiscountPromotionSection`, `TieredDiscountPromotionSection`, `GiftPromotionSection`, `BuyGetPromotionSection`, `ConditionPromotionSection`, `AutoApplyCheckbox`). Route trong `App.tsx` đã có; `NavChild` trong `navConfig.ts` mới bật mục CTKM, mục voucher đang comment. Nhưng: (1) **chạy hoàn toàn trên mock** (`_mock/mock-programs.ts`, `_mock/mock-vouchers.ts`); (2) `ProgramFormPage.tsx` **chỉ render `PromotionInvoiceDiscount`**, không đọc `?type=` — 4 variant kia đã dựng nhưng chưa wire, 4/5 option trong `PROMOTION_FORM_OPTIONS` (`programs.constants.ts`) đang comment; (3) `handleSave` build payload qua `buildInvoiceDiscountPayload(form)` rồi chỉ `console.log` + toast + `navigate()`, chưa gọi API. |
 | BE | **Stub** — `promotions` lưu `conditions`/`benefits` dạng `jsonb` không kiểu (`promotion.entity.ts:20-24`). `PromotionApplyService.computePromotionAmount` (`promotion-apply.service.ts:233-245`) chỉ hiểu `percentage` / `discount_amount` phẳng trên `subtotal` và **trả về `0` cho mọi promotion `gift_product` / `buy_x_get_y`**. Không có bậc thang, không có giảm giá cấp dòng, không có quà tặng, không có khái niệm ưu tiên. |
 
 `ProgramFormState` trong `pages/promotions/programs/program-form.types.ts` chính là **contract backend phải đáp ứng**.
@@ -56,7 +56,7 @@ Epic này đóng khoảng cách ở backend: schema chuẩn hóa, domain engine 
 | BR-002 | Giảm cấp dòng (`ITEM_DISCOUNT`, `TIERED_DISCOUNT`) chạy trước → `INVOICE_DISCOUNT` chạy sau trên phần còn lại theo `invoice_scope`. `NON_PROMO_ONLY` = chỉ các dòng chưa bị chiếm — đúng ngữ nghĩa MISA. |
 | BR-003 | Cho phép `end_date` null (vô thời hạn); FE cảnh báo khi lưu, **không** chặn. |
 | BR-004 | Chặn khi lưu: thiếu `name`; `end_date < start_date`; `discount_value <= 0`; `PERCENT > 100`; lưới `REWARD` rỗng (trừ `INVOICE_DISCOUNT` và `TIERED_DISCOUNT` + `INVOICE_VALUE`); bậc thang chồng lấn hoặc `from >= to`. |
-| BR-005 | CTKM thuộc tổ chức. `promotion_branches` rỗng = toàn chuỗi. Khớp `StoreScopeSection` của FE (`ALL_CHAIN` \| `SELECTED`). |
+| BR-005 | CTKM thuộc tổ chức. `promotion_branches` rỗng = toàn chuỗi. Khớp `StoreScopePromotionSection` của FE (`ALL_CHAIN` \| `SELECTED`). |
 | BR-006 | Tồn kho quà tặng: **ngoài phạm vi**. Engine chỉ trả `gifts[]` dạng đề xuất, chưa trừ kho, chưa ghi giá vốn. Chốt ở epic POS. |
 | Làm tròn | Làm tròn về **đồng** (`Math.round`), một helper `roundVnd` duy nhất ở `domain/model/value-objects/money.ts`. |
 | FR-006 | `type` **immutable** sau khi tạo. Đổi hình thức = nhân bản thành CTKM mới. |

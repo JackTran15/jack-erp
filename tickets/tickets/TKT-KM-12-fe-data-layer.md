@@ -38,7 +38,7 @@ apps/backoffice-web/src/pages/promotions/
 - [ ] Ba lệch tên đã biết giữa type FE cũ và API mới được xử lý trong mapper hoặc sửa tại nguồn:
   - `PromotionForm.PRODUCT_DISCOUNT` → `PromotionProgramType.ITEM_DISCOUNT`
   - `PromotionForm.GIFT` → `PromotionProgramType.GIFT_ITEM`
-  - `PromotionApplyTo.SPECIFIC_CUSTOMER` **không tồn tại** trong REQ → thay bằng `BIRTHDAY` + `CARD_TIER`
+  - `PromotionApplyTo` FE (`programs.constants.ts`) đã bỏ `SPECIFIC_CUSTOMER`, hiện là `ALL_CUSTOMERS | CUSTOMER_GROUP | HAS_BIRTHDAY | HAS_CARD_TIER` — mapper chỉ còn map `HAS_BIRTHDAY` / `HAS_CARD_TIER` ↔ tên enum phía API
 
 ## Definition of Done
 
@@ -48,6 +48,8 @@ apps/backoffice-web/src/pages/promotions/
 - [ ] Chuỗi hiển thị cho người dùng bằng tiếng Việt; định danh/enum giữ tiếng Anh.
 
 ## Tech Approach
+
+FE đã có một payload builder cục bộ cho `INVOICE_DISCOUNT`: `ProgramFormPage/PromotionVariant/PromotionInvoiceDiscount/buildInvoiceDiscountPayload.ts` (kèm helper `buildConditionPayload` phân nhánh theo `conditionType`, lọc row trống). Dùng nó làm điểm xuất phát cho `toCreateDto` — tổng quát hóa lên 5 hình thức rồi **hợp nhất về một mapper duy nhất** trong `api/promotion.mapper.ts`, không để hai nguồn build payload song song.
 
 Mapper là nơi tập trung toàn bộ độ phức tạp "5 hình thức, một form". Tách hàm theo hình thức thay vì một `switch` khổng lồ:
 

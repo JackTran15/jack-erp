@@ -13,11 +13,12 @@ Nối màn danh sách và màn form CTKM vào API thật. Khung UI **đã dựng
 Sửa các file có sẵn dưới `apps/backoffice-web/src/pages/promotions/programs/`:
 
 - `ProgramsPage.tsx` — bỏ `MOCK_PROGRAM_ROWS`, dùng `usePromotionsQuery`; lọc/phân trang/sắp xếp chuyển sang **server-side** (hiện đang lọc trong RAM qua `applyColumnFilter`).
-- `ProgramFormPage/ProgramFormPage.tsx` — bỏ `MOCK_PROGRAM_ROWS`; `handleSave` / `handleSaveAndNew` gọi mutation thật; chế độ sửa nạp bằng `usePromotionQuery(id)`.
+- `ProgramFormPage/ProgramFormPage.tsx` — bỏ `MOCK_PROGRAM_ROWS`; **wire chọn variant theo `?type=`** — hiện luôn render `PromotionInvoiceDiscount` bất kể type, phải render đúng 1 trong 5 `PromotionVariant/*` theo `PromotionForm`; `handleSave` / `handleSaveAndNew` đã tồn tại và build payload qua `buildInvoiceDiscountPayload` (chỉ `console.log` + toast) — thay bằng mutation thật, tổng quát hóa cho cả 5 hình thức (mapper ở TKT-KM-12); chế độ sửa nạp bằng `usePromotionQuery(id)`.
+- `programs.constants.ts` — bỏ comment 4 option trong `PROMOTION_FORM_OPTIONS` để dropdown "Thêm mới" đủ 5 hình thức (FR-006; hiện chỉ còn `INVOICE_DISCOUNT`).
 - `ProgramsTable/ProgramsTable.tsx` — bind cột theo response thật.
-- `programs.types.ts` — thay union type cục bộ bằng enum từ `@erp/shared-interfaces` (xử lý 3 lệch tên đã nêu ở TKT-KM-12).
+- `programs.types.ts` — thay union type cục bộ bằng enum từ `@erp/shared-interfaces` (xử lý các lệch tên đã nêu ở TKT-KM-12).
 - Xóa `_mock/mock-programs.ts`.
-- `ProgramFormPage/AutoApplyCheckbox/AutoApplyCheckbox.tsx` — xác nhận **không** có side-effect tự bỏ tick.
+- `ProgramFormPage/PromotionVariant/_PromotionSections/AutoApplyCheckbox/AutoApplyCheckbox.tsx` — xác nhận **không** có side-effect tự bỏ tick.
 
 ## Acceptance Criteria
 
@@ -54,7 +55,7 @@ Chip bộ lọc (FR-004) đặt trong `PageToolbar` cùng hàng nút — dùng b
 
 Kiểm chứng FR-023 bằng cách đọc code: nếu có `useEffect` nào set `autoApply` theo `conditionType` thì xóa. Đây là hành vi ngầm của MISA mà REQ yêu cầu **không** sao chép.
 
-Không tạo trang mới, không tạo route mới — `App.tsx` và `navConfig.ts` đã có sẵn 3 route (`/promotions/programs`, `/new`, `/:id/edit`).
+Không tạo trang mới, không tạo route mới — `App.tsx` đã có sẵn 3 route (`/promotions/programs`, `/new`, `/:id/edit`) và `navConfig.ts` đã có NavChild cho `/promotions/programs`. (NavChild `/promotions/vouchers` đang comment trong `navConfig.ts` — bỏ comment thuộc TKT-KM-14.)
 
 ## Testing Strategy
 
