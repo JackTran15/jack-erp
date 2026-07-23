@@ -20,17 +20,17 @@ export interface BusinessResultsRawValues {
   promoOnSaleOut: number;
   /** 2.1.3.b — same, type = RETURN. */
   promoOnReturnIn: number;
-  /** 2.2.{i} — categoryId -> Σ CashReceiptLineEntity.amount, POSTED, category.direction=IN. */
+  /** 2.2.{i} — categoryId -> Σ POSTED receipt-line amounts, category.direction=IN, from cash (CashReceiptLineEntity) + deposit (BankReceiptLineEntity, affectRevenue) vouchers combined. */
   otherIncomeByCategory: Record<string, number>;
-  /** 2.2.{last} "Thu khác" — Σ CashReceiptLineEntity.amount where categoryId IS NULL, POSTED. */
+  /** 2.2.{last} "Thu khác" — same as above where categoryId IS NULL. */
   otherIncomeUncategorized: number;
   /** 3.1.1 — Σ (invoice_items.quantity × costPrice), direction=OUT. */
   cogsOut: number;
   /** 3.1.2 raw magnitude — Σ (invoice_items.quantity × costPrice), direction=IN (stored positive; negated below). */
   cogsReturnedIn: number;
-  /** 3.2.{i} — categoryId -> Σ CashPaymentLineEntity.amount, POSTED, category.direction=OUT. */
+  /** 3.2.{i} — categoryId -> Σ POSTED payment-line amounts, category.direction=OUT, from cash (CashPaymentLineEntity) + deposit (BankPaymentLineEntity, affectExpense) vouchers combined. */
   otherExpenseByCategory: Record<string, number>;
-  /** 3.2.{last} "Chi khác" — Σ CashPaymentLineEntity.amount where categoryId IS NULL, POSTED. */
+  /** 3.2.{last} "Chi khác" — same as above where categoryId IS NULL. */
   otherExpenseUncategorized: number;
 }
 
