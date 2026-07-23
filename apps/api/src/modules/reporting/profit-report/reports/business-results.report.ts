@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm';
 import {
   PROFIT_REPORT_COLUMN_LABELS_VI,
   InvoiceReportResult,
@@ -19,6 +19,15 @@ import {
   CashVoucherCategoryDirection,
   CashVoucherStatus,
 } from '../../../accounting/cash-vouchers/enums';
+import { BankReceiptEntity } from '../../../accounting/deposit-vouchers/bank-receipts/bank-receipt.entity';
+import { BankReceiptLineEntity } from '../../../accounting/deposit-vouchers/bank-receipts/bank-receipt-line.entity';
+import { BankPaymentEntity } from '../../../accounting/deposit-vouchers/bank-payments/bank-payment.entity';
+import { BankPaymentLineEntity } from '../../../accounting/deposit-vouchers/bank-payments/bank-payment-line.entity';
+import {
+  BankPaymentReferenceType,
+  BankReceiptReferenceType,
+  BankVoucherStatus,
+} from '../../../accounting/deposit-vouchers/enums';
 import { ItemDirection } from '../../../pos/entities/invoice-item.entity';
 import { InvoiceItemEntity } from '../../../pos/entities/invoice-item.entity';
 import { InvoiceEntity, InvoiceType } from '../../../pos/entities/invoice.entity';
@@ -61,6 +70,10 @@ export class BusinessResultsReport implements ReportDefinition {
     private readonly cashPaymentLines: Repository<CashPaymentLineEntity>,
     @InjectRepository(CashReceiptLineEntity)
     private readonly cashReceiptLines: Repository<CashReceiptLineEntity>,
+    @InjectRepository(BankReceiptLineEntity)
+    private readonly bankReceiptLines: Repository<BankReceiptLineEntity>,
+    @InjectRepository(BankPaymentLineEntity)
+    private readonly bankPaymentLines: Repository<BankPaymentLineEntity>,
     @InjectRepository(CashVoucherCategoryEntity)
     private readonly cashVoucherCategories: Repository<CashVoucherCategoryEntity>,
     private readonly rbac: RbacService,
@@ -132,12 +145,25 @@ export class BusinessResultsReport implements ReportDefinition {
     fromDate: string,
     toDate: string,
   ): Promise<BusinessResultsRawValues> {
-    const [goodsAndCogs, headerPromo, otherIncome, otherExpense] = await Promise.all([
+    const [
+      goodsAndCogs,
+      headerPromo,
+      cashIncome,
+      cashExpense,
+      depositIncome,
+      depositExpense,
+    ] = await Promise.all([
       this.queryGoodsAndCogs(organizationId, branchIds, fromDate, toDate),
       this.queryHeaderPromo(organizationId, branchIds, fromDate, toDate),
       this.queryOtherIncomeByCategory(organizationId, branchIds, fromDate, toDate),
       this.queryOtherExpenseByCategory(organizationId, branchIds, fromDate, toDate),
+      this.queryDepositOtherIncomeByCategory(organizationId, branchIds, fromDate, toDate),
+      this.queryDepositOtherExpenseByCategory(organizationId, branchIds, fromDate, toDate),
     ]);
+    // "Thu khác"/"Chi khác" gộp cả tiền mặt (phiếu thu/chi) lẫn tiền gửi (NTTK/UNC);
+    // cùng dùng cash_voucher_categories nên trộn theo categoryId là khớp dòng.
+    const otherIncome = this.mergeOtherLines(cashIncome, depositIncome);
+    const otherExpense = this.mergeOtherLines(cashExpense, depositExpense);
     return {
       goodsSoldOut: goodsAndCogs.goodsSoldOut,
       goodsReturnedIn: goodsAndCogs.goodsReturnedIn,
@@ -389,6 +415,112 @@ export class BusinessResultsReport implements ReportDefinition {
       }
     }
     return { byCategory, uncategorized };
+  }
+
+  /**
+   * 2.2 (tiền gửi) — Σ BankReceiptLineEntity.amount for POSTED bank receipts
+   * (phiếu thu tiền gửi, NTTK) in the period, GROUPED by category, mirroring
+   * `queryOtherIncomeByCategory` on the deposit-fund side. Bank receipt lines
+   * reference the SAME cash_voucher_categories rows, so a deposit line's amount
+   * lands in the exact same 2.2 category row as its cash counterpart.
+   *
+   * Gated by `affectRevenue = true` — the deposit domain's explicit P&L intent
+   * flag (system vouchers: transfers, fund swaps, supplier payments are all
+   * `false`, so only genuine other-income manual receipts pass). REVERSAL is
+   * excluded: a reversal voucher copies the original's `affectRevenue` and posts
+   * with status POSTED while the original flips to REVERSED (dropped by the
+   * status filter) — counting it would re-add the income the reversal cancelled.
+   */
+  private async queryDepositOtherIncomeByCategory(
+    organizationId: string,
+    branchIds: string[] | null,
+    fromDate: string,
+    toDate: string,
+  ): Promise<{ byCategory: Record<string, number>; uncategorized: number }> {
+    const qb = this.bankReceiptLines
+      .createQueryBuilder('line')
+      .innerJoin(BankReceiptEntity, 'receipt', 'receipt.id = line.bankReceiptId')
+      .leftJoin(CashVoucherCategoryEntity, 'category', 'category.id = line.categoryId')
+      .where('receipt.organizationId = :orgId', { orgId: organizationId })
+      .andWhere('receipt.status = :status', { status: BankVoucherStatus.POSTED })
+      .andWhere('receipt.affectRevenue = true')
+      .andWhere('receipt.postedAt >= :fromDate', { fromDate })
+      .andWhere('receipt.postedAt <= :toDate', { toDate })
+      .andWhere('(line.categoryId IS NULL OR category.direction = :inDirection)', {
+        inDirection: CashVoucherCategoryDirection.IN,
+      })
+      .andWhere('(receipt.referenceType IS NULL OR receipt.referenceType != :reversal)', {
+        reversal: BankReceiptReferenceType.REVERSAL,
+      });
+    applyBranchScope(qb, 'receipt', branchIds);
+
+    return this.collectByCategory(qb);
+  }
+
+  /**
+   * 3.2 (tiền gửi) — Σ BankPaymentLineEntity.amount for POSTED bank payments
+   * (phiếu chi tiền gửi, UNC) in the period, GROUPED by category. Mirror of
+   * `queryDepositOtherIncomeByCategory` on the "phiếu chi" side; gated by
+   * `affectExpense = true`, REVERSAL excluded for the same reason.
+   */
+  private async queryDepositOtherExpenseByCategory(
+    organizationId: string,
+    branchIds: string[] | null,
+    fromDate: string,
+    toDate: string,
+  ): Promise<{ byCategory: Record<string, number>; uncategorized: number }> {
+    const qb = this.bankPaymentLines
+      .createQueryBuilder('line')
+      .innerJoin(BankPaymentEntity, 'payment', 'payment.id = line.bankPaymentId')
+      .leftJoin(CashVoucherCategoryEntity, 'category', 'category.id = line.categoryId')
+      .where('payment.organizationId = :orgId', { orgId: organizationId })
+      .andWhere('payment.status = :status', { status: BankVoucherStatus.POSTED })
+      .andWhere('payment.affectExpense = true')
+      .andWhere('payment.postedAt >= :fromDate', { fromDate })
+      .andWhere('payment.postedAt <= :toDate', { toDate })
+      .andWhere('(line.categoryId IS NULL OR category.direction = :outDirection)', {
+        outDirection: CashVoucherCategoryDirection.OUT,
+      })
+      .andWhere('(payment.referenceType IS NULL OR payment.referenceType != :reversal)', {
+        reversal: BankPaymentReferenceType.REVERSAL,
+      });
+    applyBranchScope(qb, 'payment', branchIds);
+
+    return this.collectByCategory(qb);
+  }
+
+  /** Run a `(categoryId, Σ amount)` grouped query and split into by-category + uncategorized buckets. */
+  private async collectByCategory<T extends ObjectLiteral>(
+    qb: SelectQueryBuilder<T>,
+  ): Promise<{ byCategory: Record<string, number>; uncategorized: number }> {
+    const rows = await qb
+      .select('line.categoryId', 'categoryId')
+      .addSelect('COALESCE(SUM(line.amount), 0)', 'total')
+      .groupBy('line.categoryId')
+      .getRawMany<{ categoryId: string | null; total: string }>();
+
+    const byCategory: Record<string, number> = {};
+    let uncategorized = 0;
+    for (const r of rows) {
+      if (r.categoryId === null) {
+        uncategorized += Number(r.total ?? 0);
+      } else {
+        byCategory[r.categoryId] = Number(r.total ?? 0);
+      }
+    }
+    return { byCategory, uncategorized };
+  }
+
+  /** Sum two `{ byCategory, uncategorized }` results per category id (cash + tiền gửi). */
+  private mergeOtherLines(
+    a: { byCategory: Record<string, number>; uncategorized: number },
+    b: { byCategory: Record<string, number>; uncategorized: number },
+  ): { byCategory: Record<string, number>; uncategorized: number } {
+    const byCategory: Record<string, number> = { ...a.byCategory };
+    for (const [categoryId, amount] of Object.entries(b.byCategory)) {
+      byCategory[categoryId] = (byCategory[categoryId] ?? 0) + amount;
+    }
+    return { byCategory, uncategorized: a.uncategorized + b.uncategorized };
   }
 
   /** Every active cash-voucher category of the given direction for the org — drives 2.2's/3.2's dynamic row set. */

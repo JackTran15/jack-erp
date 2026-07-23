@@ -6,6 +6,10 @@ import { CashPaymentLineEntity } from '../../accounting/cash-vouchers/cash-payme
 import { CashReceiptEntity } from '../../accounting/cash-vouchers/cash-receipts/cash-receipt.entity';
 import { CashReceiptLineEntity } from '../../accounting/cash-vouchers/cash-receipts/cash-receipt-line.entity';
 import { CashVoucherCategoryEntity } from '../../accounting/cash-vouchers/cash-voucher-categories/cash-voucher-category.entity';
+import { BankReceiptEntity } from '../../accounting/deposit-vouchers/bank-receipts/bank-receipt.entity';
+import { BankReceiptLineEntity } from '../../accounting/deposit-vouchers/bank-receipts/bank-receipt-line.entity';
+import { BankPaymentEntity } from '../../accounting/deposit-vouchers/bank-payments/bank-payment.entity';
+import { BankPaymentLineEntity } from '../../accounting/deposit-vouchers/bank-payments/bank-payment-line.entity';
 import { BranchEntity } from '../../branch/branch.entity';
 import { ItemCategoryEntity } from '../../inventory/location/item-category.entity';
 import { ItemEntity } from '../../inventory/location/item.entity';
@@ -53,6 +57,10 @@ import { ProfitByItemReport } from './reports/profit-by-item.report';
       CashReceiptEntity,
       CashReceiptLineEntity,
       CashVoucherCategoryEntity,
+      BankReceiptEntity,
+      BankReceiptLineEntity,
+      BankPaymentEntity,
+      BankPaymentLineEntity,
     ]),
   ],
   controllers: [ProfitReportController],

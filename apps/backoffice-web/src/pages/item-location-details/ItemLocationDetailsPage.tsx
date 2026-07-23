@@ -229,6 +229,7 @@ export function ItemLocationDetailsPage() {
           name: row.name,
           unit: row.unit,
           sellingPrice: Number(row.sellingPrice) || 0,
+          quantity: row.quantity,
           storageId: location.storage.id,
           storageName: location.storage.name,
           locationId: location.id,
