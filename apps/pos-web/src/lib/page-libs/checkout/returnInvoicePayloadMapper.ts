@@ -91,7 +91,6 @@ export function buildCreateExchangePayload(
 }
 
 interface BuildCheckoutReturnPayloadInput {
-  revenueAccountId: string;
   /** Tổng tiền hàng trả lại (Σ unitPrice × qty của return lines). */
   returnSubtotal: number;
   /** Tổng tiền hàng mua mới (Σ unitPrice × qty của new lines, 0 nếu trả thuần). */
@@ -118,10 +117,12 @@ interface BuildCheckoutReturnPayloadInput {
  * `netAmount = newSubtotal − returnSubtotal` (đúng ma trận BE):
  *   - net > 0  → khách trả thêm: CASH + `payments` (map từ dòng thanh toán).
  *   - net = 0  → bù trừ ngang: OFFSET.
- *   - net < 0  → hoàn tiền khách: OFFSET nếu operator tích "Tính vào công nợ",
- *     ngược lại CASH (mặc định, không kèm payments). BE tự chuyển OFFSET→CASH
- *     nếu hóa đơn gốc không còn công nợ để bù trừ.
- * `revenueAccountId` luôn bắt buộc; `cashAccountId` để trống ⇒ BE lấy theo ca quỹ.
+ *   - net < 0  → hoàn tiền khách: OFFSET nếu operator tích "Tính vào công nợ";
+ *     ngược lại theo quỹ operator chọn ở "Hình thức đổi trả" — tiền mặt ⇒ CASH,
+ *     tài khoản ngân hàng/thẻ ⇒ BANK + `refundAccountId` (payment_accounts.id).
+ *     BE tự chuyển OFFSET→CASH nếu hóa đơn gốc không còn công nợ để bù trừ.
+ * BE tự resolve tài khoản doanh thu (contra) — FE không gửi `revenueAccountId`;
+ * `cashAccountId` để trống ⇒ BE lấy theo quỹ chi nhánh.
  */
 export function buildCheckoutReturnPayload(
   input: BuildCheckoutReturnPayloadInput,
@@ -149,7 +150,6 @@ export function buildCheckoutReturnPayload(
       ok: true,
       body: {
         refundMethod: "CASH",
-        revenueAccountId: input.revenueAccountId,
         payments,
         ...(input.putOnDebt
           ? {
@@ -162,12 +162,46 @@ export function buildCheckoutReturnPayload(
     };
   }
 
+  // net === 0: bù trừ ngang (không có tiền đổi chủ) ⇒ OFFSET.
+  // net < 0 + "Tính vào công nợ" ⇒ OFFSET (cấn trừ công nợ hóa đơn gốc).
+  if (net === 0 || input.offsetToDebt) {
+    return {
+      ok: true,
+      body: {
+        refundMethod: "OFFSET",
+        note: input.note,
+      },
+    };
+  }
+
+  // net < 0: hoàn tiền theo quỹ operator chọn ở "Hình thức đổi trả". Dòng hoàn
+  // (amount = số tiền hoàn) mang method + tài khoản đã chọn: tiền mặt ⇒ CASH,
+  // ngân hàng/thẻ ⇒ BANK + payment_accounts.id để BE trừ đúng quỹ tiền gửi.
+  const selected =
+    input.paymentLines.find((line) => line.amount > 0) ??
+    input.paymentLines[0];
+  const apiMethod = selected
+    ? PAYMENT_METHOD_TO_API_METHOD[selected.method]
+    : "cash";
+
+  if (apiMethod === "cash") {
+    return {
+      ok: true,
+      body: {
+        refundMethod: "CASH",
+        note: input.note,
+      },
+    };
+  }
+
+  if (!selected?.paymentAccountId) {
+    return { ok: false, error: { code: "missing_payment_account" } };
+  }
   return {
     ok: true,
     body: {
-      refundMethod:
-        net === 0 ? "OFFSET" : input.offsetToDebt ? "OFFSET" : "CASH",
-      revenueAccountId: input.revenueAccountId,
+      refundMethod: "BANK",
+      refundAccountId: selected.paymentAccountId,
       note: input.note,
     },
   };

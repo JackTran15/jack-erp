@@ -26,6 +26,7 @@ import { BankReceiptsService } from './bank-receipts/bank-receipts.service';
 import { BankReceiptsController } from './bank-receipts/bank-receipts.controller';
 import { BankPaymentsService } from './bank-payments/bank-payments.service';
 import { BankPaymentsController } from './bank-payments/bank-payments.controller';
+import { RefundBankConsumer } from './bank-payment-consumers/refund-bank.consumer';
 import { SupplierDepositPaymentSagaEntity } from './supplier-deposit-payment/supplier-deposit-payment-saga.entity';
 import { SupplierDepositPaymentSagaService } from './supplier-deposit-payment/supplier-deposit-payment-saga.service';
 import { SupplierDepositPaymentController } from './supplier-deposit-payment/supplier-deposit-payment.controller';
@@ -93,6 +94,7 @@ import { SearchDepositVouchersV2Handler } from './queries/search-deposit-voucher
   providers: [
     BankReceiptsService,
     BankPaymentsService,
+    RefundBankConsumer,
     PartnerResolverService,
     VoucherStaffResolver,
     DepositDebtCollectionSagaService,

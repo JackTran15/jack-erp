@@ -29,7 +29,7 @@ export type ReturnInvoiceMode = "quick" | "regular";
 
 /**
  * Cách hoàn tiền khi tất toán đơn trả/đổi — mirror `RefundMethod`
- * (`invoice.entity.ts`). CASH = chi tiền mặt, STORE_CREDIT = ghi có cửa hàng,
- * OFFSET = cấn trừ vào công nợ của hóa đơn gốc.
+ * (`invoice.entity.ts`). CASH = chi tiền mặt, BANK = chi qua quỹ tiền gửi/ngân
+ * hàng, STORE_CREDIT = ghi có cửa hàng, OFFSET = cấn trừ vào công nợ hóa đơn gốc.
  */
-export type RefundMethod = "CASH" | "STORE_CREDIT" | "OFFSET";
+export type RefundMethod = "CASH" | "BANK" | "STORE_CREDIT" | "OFFSET";

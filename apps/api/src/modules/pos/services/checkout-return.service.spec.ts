@@ -31,6 +31,7 @@ import { ReturnPostedPublisher } from '../publishers/return-posted.publisher';
 import { StockReturnInPublisher } from '../publishers/stock-return-in.publisher';
 import { StockDeductionPublisher } from '../../inventory/publishers/stock-deduction.publisher';
 import { CashRefundPublisher } from '../../accounting/publishers/cash-refund.publisher';
+import { DepositRefundPublisher } from '../../accounting/publishers/deposit-refund.publisher';
 import { CashFromPaymentPublisher } from '../../accounting/publishers/cash-from-payment.publisher';
 import { JournalReturnPublisher } from '../../accounting/publishers/journal-return.publisher';
 import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points.publisher';
@@ -114,6 +115,13 @@ const offsetDto = () => ({
   revenueAccountId: REVENUE_ACCOUNT,
 });
 
+/** Operator chose a bank/card fund for the refund → FE sends BANK + payment_accounts.id. */
+const bankDto = () => ({
+  refundMethod: RefundMethod.BANK,
+  revenueAccountId: REVENUE_ACCOUNT,
+  refundAccountId: 'pay-acct-bank',
+});
+
 /** Draft EXCHANGE: return a 750k line, buy a 780k line → net = +30k (khách nợ thêm). */
 const exchangeDraftStub = (
   overrides: Partial<InvoiceEntity> = {},
@@ -191,10 +199,12 @@ describe('CheckoutReturnService — debt offset routing', () => {
   let accountResolver: {
     resolveDefaultAccount: jest.Mock;
     resolvePaymentAccount: jest.Mock;
+    resolvePaymentAccountById: jest.Mock;
   };
   let cashFundResolver: { resolveBranchCashFund: jest.Mock };
   let journalReturnPublisher: { publish: jest.Mock };
   let cashRefundPublisher: { publish: jest.Mock };
+  let depositRefundPublisher: { publish: jest.Mock };
   let loyaltyReversePublisher: { publish: jest.Mock };
   let loyaltyAwardPublisher: { publish: jest.Mock };
   let debtRepo: { findOne: jest.Mock };
@@ -232,14 +242,28 @@ describe('CheckoutReturnService — debt offset routing', () => {
     dataSource = { transaction: jest.fn().mockImplementation((cb) => cb(mockManager)) };
 
     accountResolver = {
-      resolveDefaultAccount: jest.fn().mockResolvedValue(RECEIVABLE_ACCOUNT),
+      // Revenue is resolved server-side in fanOutEvents (every checkout); AR only
+      // when an OFFSET / exchange-debt leg needs it.
+      resolveDefaultAccount: jest.fn().mockImplementation((role) =>
+        Promise.resolve(
+          role === AccountingDefaultAccountRole.REVENUE
+            ? REVENUE_ACCOUNT
+            : RECEIVABLE_ACCOUNT,
+        ),
+      ),
       resolvePaymentAccount: jest.fn(),
+      resolvePaymentAccountById: jest.fn().mockResolvedValue({
+        accountId: 'coa-112',
+        depositAccountId: 'deposit-1',
+        paymentMethod: 'bank_transfer',
+      }),
     };
     cashFundResolver = {
       resolveBranchCashFund: jest.fn().mockResolvedValue(CASH_FUND),
     };
     journalReturnPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
     cashRefundPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
+    depositRefundPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
     loyaltyReversePublisher = { publish: jest.fn().mockResolvedValue(undefined) };
     loyaltyAwardPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
     // Up-front debt lookup (only queried when the operator opts into OFFSET).
@@ -267,6 +291,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
         { provide: StockReturnInPublisher, useValue: noop },
         { provide: StockDeductionPublisher, useValue: noop },
         { provide: CashRefundPublisher, useValue: cashRefundPublisher },
+        { provide: DepositRefundPublisher, useValue: depositRefundPublisher },
         { provide: CashFromPaymentPublisher, useValue: noop },
         { provide: JournalReturnPublisher, useValue: journalReturnPublisher },
         { provide: LoyaltyPointsPublisher, useValue: loyaltyAwardPublisher },
@@ -292,7 +317,10 @@ describe('CheckoutReturnService — debt offset routing', () => {
     // No debt is looked up or settled — the customer is paid cash instead.
     expect(debtRepo.findOne).not.toHaveBeenCalled();
     expect(mockManager.findOne).not.toHaveBeenCalled();
-    expect(accountResolver.resolveDefaultAccount).not.toHaveBeenCalled();
+    expect(accountResolver.resolveDefaultAccount).not.toHaveBeenCalledWith(
+      AccountingDefaultAccountRole.RECEIVABLE,
+      actor,
+    );
     expect(cashRefundPublisher.publish).toHaveBeenCalled();
     expect(journalReturnPublisher.publish).toHaveBeenCalledWith(
       expect.objectContaining({ refundMethod: RefundMethod.CASH }),
@@ -382,12 +410,63 @@ describe('CheckoutReturnService — debt offset routing', () => {
     // and no adjustment row (nothing was applied to any debt).
     expect(mockManager.findOne).not.toHaveBeenCalled();
     expect(mockManager.create).not.toHaveBeenCalled();
-    expect(accountResolver.resolveDefaultAccount).not.toHaveBeenCalled();
+    expect(accountResolver.resolveDefaultAccount).not.toHaveBeenCalledWith(
+      AccountingDefaultAccountRole.RECEIVABLE,
+      actor,
+    );
     expect(cashRefundPublisher.publish).toHaveBeenCalled();
     expect(journalReturnPublisher.publish).toHaveBeenCalledWith(
       expect.objectContaining({ refundMethod: RefundMethod.CASH }),
       actor,
     );
+  });
+
+  describe('BANK refund → quỹ tiền gửi', () => {
+    it('publishes a deposit refund (not cash) on the fund resolved from the chosen payment account', async () => {
+      await service.checkout('ret-1', bankDto(), actor);
+
+      expect(accountResolver.resolvePaymentAccountById).toHaveBeenCalledWith(
+        'pay-acct-bank',
+        actor,
+      );
+      expect(depositRefundPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          depositAccountId: 'deposit-1',
+          contraAccountId: REVENUE_ACCOUNT,
+          amount: 200,
+        }),
+        actor,
+      );
+      expect(cashRefundPublisher.publish).not.toHaveBeenCalled();
+      expect(journalReturnPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ refundMethod: RefundMethod.BANK }),
+        actor,
+      );
+    });
+
+    it('rejects a BANK refund without refundAccountId', async () => {
+      await expect(
+        service.checkout(
+          'ret-1',
+          { refundMethod: RefundMethod.BANK, revenueAccountId: REVENUE_ACCOUNT },
+          actor,
+        ),
+      ).rejects.toThrow(/refundAccountId/);
+      expect(depositRefundPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('rejects a BANK refund whose payment account has no linked deposit fund', async () => {
+      accountResolver.resolvePaymentAccountById.mockResolvedValue({
+        accountId: 'coa-x',
+        depositAccountId: undefined,
+        paymentMethod: 'bank_transfer',
+      });
+
+      await expect(
+        service.checkout('ret-1', bankDto(), actor),
+      ).rejects.toThrow(/quỹ tiền gửi/);
+      expect(depositRefundPublisher.publish).not.toHaveBeenCalled();
+    });
   });
 
   describe('EXCHANGE net > 0 → "tính vào công nợ"', () => {
@@ -458,7 +537,10 @@ describe('CheckoutReturnService — debt offset routing', () => {
 
       expect(result.status).toBe(InvoiceStatus.PAID);
       expect(invoiceDebtService.createFromInvoice).not.toHaveBeenCalled();
-      expect(accountResolver.resolveDefaultAccount).not.toHaveBeenCalled();
+      expect(accountResolver.resolveDefaultAccount).not.toHaveBeenCalledWith(
+      AccountingDefaultAccountRole.RECEIVABLE,
+      actor,
+    );
       expect(journalReturnPublisher.publish).toHaveBeenCalledWith(
         expect.objectContaining({ debtAmount: 0 }),
         actor,
