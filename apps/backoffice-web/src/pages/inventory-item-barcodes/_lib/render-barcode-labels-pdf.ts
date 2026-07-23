@@ -47,9 +47,9 @@ function barcodePng(value: string): string | null {
 
 /**
  * Vẽ một tem theo tem mặc định MISA (`local/images/barcode-item.png`) — 3 hàng:
- *  • trên: SKU (trái) · vị trí (phải), trải hết bề ngang tem;
+ *  • trên: SKU (giữa theo barcode) · vị trí (phải), trải hết bề ngang tem;
  *  • giữa: barcode cao (trái ~76%) · mã chi nhánh lớn (phải);
- *  • dưới: giá "X VND" (trái) · mã đợt (phải), trải hết bề ngang tem.
+ *  • dưới: giá "X VND" (giữa theo barcode) · mã đợt (phải), trải hết bề ngang tem.
  */
 function drawLabel(
   doc: jsPDF,
@@ -69,6 +69,7 @@ function drawLabel(
   // kéo sát mép tem, khoảng trống này tách rõ các tem cạnh nhau, dễ đọc/phân biệt.
   const sideWidth = width * 0.24; // cột phải cho mã chi nhánh (để trống ở chuỗi cửa hàng)
   const barWidth = width - sideWidth - padX;
+  const barCenter = left + barWidth / 2; // tâm ngang barcode để canh giữa SKU & giá
 
   // 3 hàng (SKU · barcode · giá) xếp sát nhau thành một nhóm, canh giữa theo
   // chiều dọc — khoảng trắng dồn ra mép trên/dưới, giữ các hàng gần barcode.
@@ -81,12 +82,15 @@ function drawLabel(
   doc.setFont("helvetica", "bold");
   doc.setTextColor(0, 0, 0);
 
-  // ── Hàng 1: SKU trái · vị trí phải (vị trí ẩn ở chuỗi cửa hàng) ────
+  // ── Hàng 1: SKU giữa (theo barcode) · vị trí giữa cột phải (ẩn ở chuỗi cửa hàng) ──
   doc.setFontSize(FONT.sku);
-  doc.text(row.sku, left, top, { baseline: "top", align: "left" });
+  doc.text(row.sku, barCenter, top, { baseline: "top", align: "center" });
   if (showStoreInfo && row.locationCode) {
     doc.setFontSize(FONT.location);
-    doc.text(row.locationCode, right, top, { baseline: "top", align: "right" });
+    doc.text(row.locationCode, x + width - sideWidth / 2, top, {
+      baseline: "top",
+      align: "center",
+    });
   }
 
   // ── Hàng 2: barcode trái · mã chi nhánh lớn phải (ẩn ở chuỗi cửa hàng) ─
@@ -101,12 +105,12 @@ function drawLabel(
     });
   }
 
-  // ── Hàng 3: giá trái · mã đợt phải ────────────────────────────────
+  // ── Hàng 3: giá giữa (theo barcode) · mã đợt phải ─────────────────
   const priceTop = barTop + barH + ROW_GAP;
   doc.setFontSize(FONT.price);
-  doc.text(`${priceFormatter.format(row.sellingPrice)} VND`, left, priceTop, {
+  doc.text(`${priceFormatter.format(row.sellingPrice)} VND`, barCenter, priceTop, {
     baseline: "top",
-    align: "left",
+    align: "center",
   });
   doc.setFontSize(FONT.batch);
   doc.text(batchCode, right, priceTop + priceH, {
