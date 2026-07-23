@@ -47,9 +47,9 @@ function barcodePng(value: string): string | null {
 
 /**
  * Vẽ một tem theo tem mặc định MISA (`local/images/barcode-item.png`) — 3 hàng:
- *  • trên: SKU (giữa theo barcode) · vị trí (phải), trải hết bề ngang tem;
- *  • giữa: barcode cao (trái ~76%) · mã chi nhánh lớn (phải);
- *  • dưới: giá "X VND" (giữa theo barcode) · mã đợt (phải), trải hết bề ngang tem.
+ *  • trên: SKU (giữa theo barcode) · vị trí (giữa cột phải);
+ *  • giữa: barcode cao (trái ~76%) · mã chi nhánh lớn (giữa cột phải);
+ *  • dưới: giá "X VND" (giữa theo barcode) · mã đợt (giữa cột phải).
  */
 function drawLabel(
   doc: jsPDF,
@@ -64,12 +64,12 @@ function drawLabel(
 ): void {
   const padX = 0.6; // lề trong tem
   const left = x + padX;
-  const right = x + width - padX;
   // Luôn chừa cột phải (kể cả khi ẩn mã CN/vị trí ở chuỗi cửa hàng) — barcode không
   // kéo sát mép tem, khoảng trống này tách rõ các tem cạnh nhau, dễ đọc/phân biệt.
   const sideWidth = width * 0.24; // cột phải cho mã chi nhánh (để trống ở chuỗi cửa hàng)
   const barWidth = width - sideWidth - padX;
   const barCenter = left + barWidth / 2; // tâm ngang barcode để canh giữa SKU & giá
+  const sideCenter = x + width - sideWidth / 2; // tâm ngang cột phải: vị trí · CN · mã đợt cùng canh giữa
 
   // 3 hàng (SKU · barcode · giá) xếp sát nhau thành một nhóm, canh giữa theo
   // chiều dọc — khoảng trắng dồn ra mép trên/dưới, giữ các hàng gần barcode.
@@ -87,7 +87,7 @@ function drawLabel(
   doc.text(row.sku, barCenter, top, { baseline: "top", align: "center" });
   if (showStoreInfo && row.locationCode) {
     doc.setFontSize(FONT.location);
-    doc.text(row.locationCode, x + width - sideWidth / 2, top, {
+    doc.text(row.locationCode, sideCenter, top, {
       baseline: "top",
       align: "center",
     });
@@ -99,7 +99,7 @@ function drawLabel(
   if (png) doc.addImage(png, "PNG", left, barTop, barWidth, barH);
   if (showStoreInfo) {
     doc.setFontSize(FONT.branch);
-    doc.text(branchCode, x + width - sideWidth / 2, barTop + barH / 2, {
+    doc.text(branchCode, sideCenter, barTop + barH / 2, {
       baseline: "middle",
       align: "center",
     });
@@ -113,9 +113,9 @@ function drawLabel(
     align: "center",
   });
   doc.setFontSize(FONT.batch);
-  doc.text(batchCode, right, priceTop + priceH, {
+  doc.text(batchCode, sideCenter, priceTop + priceH, {
     baseline: "bottom",
-    align: "right",
+    align: "center",
   });
 }
 

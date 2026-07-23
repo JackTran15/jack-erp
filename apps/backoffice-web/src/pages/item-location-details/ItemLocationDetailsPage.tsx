@@ -215,8 +215,9 @@ export function ItemLocationDetailsPage() {
     stockRows,
   ]);
 
-  // Hàng đang chọn → đổ sẵn sang trang In tem mã. Chế độ 1-vị-trí giữ được giá bán
-  // (từ locationRows); chế độ tổng quan không có giá → trang in tem tự resolve sau.
+  // Hàng đang chọn → đổ sẵn sang trang In tem mã. Cả 2 chế độ mang theo số lượng
+  // tồn tại vị trí (= số lượng tem). Chế độ 1-vị-trí còn giữ giá bán (từ
+  // locationRows); chế độ tổng quan không có giá → trang in tem tự resolve sau.
   const barcodePrefillItems = useMemo<BarcodePrefillItem[]>(() => {
     if (isLocationDetail) {
       const location = locationQuery.data?.meta.location;
@@ -244,6 +245,7 @@ export function ItemLocationDetailsPage() {
         name: row.item.name,
         unit: row.item.unit,
         sellingPrice: 0,
+        quantity: row.quantity,
         storageId: row.location.storageId,
         storageName: row.location.storageName,
         locationId: row.location.id,
