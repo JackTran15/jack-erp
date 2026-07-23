@@ -167,4 +167,45 @@ export class AccountResolverService {
       depositAccountId: candidates[0].depositAccountId,
     };
   }
+
+  /**
+   * Resolve a configured payment account by its id alone (no client-supplied
+   * method to trust) — used by the POS return/exchange BANK refund, where the
+   * operator picks the receiving fund and the server derives its COA + linked
+   * deposit fund. Validates org scope, active state, and branch access exactly
+   * like {@link resolvePaymentAccount}.
+   */
+  async resolvePaymentAccountById(
+    paymentAccountId: string,
+    actor: ActorContext,
+  ): Promise<{
+    accountId: string;
+    depositAccountId?: string;
+    paymentMethod: PaymentAccountMethod;
+  }> {
+    if (!actor.branchId) {
+      throw new BadRequestException(
+        'Branch scope is required to resolve a payment account',
+      );
+    }
+    const row = await this.paymentAccountRepo.findOne({
+      where: {
+        id: paymentAccountId,
+        organizationId: actor.organizationId,
+        isActive: true,
+      },
+    });
+    // Accept the org-wide default (branch_id NULL) or the actor's own branch
+    // override; reject another branch's mapping.
+    if (!row || (row.branchId && row.branchId !== actor.branchId)) {
+      throw new BadRequestException(
+        `Payment account ${paymentAccountId} not found for branch ${actor.branchId}`,
+      );
+    }
+    return {
+      accountId: row.accountId,
+      depositAccountId: row.depositAccountId,
+      paymentMethod: row.paymentMethod,
+    };
+  }
 }

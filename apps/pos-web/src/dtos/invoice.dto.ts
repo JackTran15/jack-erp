@@ -137,14 +137,16 @@ export interface CreateExchangeInvoiceBody {
 
 /**
  * Body cho `POST /invoices/:id/checkout-return` — tất toán đơn trả/đổi.
- * `revenueAccountId` bắt buộc (BE chưa tự resolve cho luồng trả). `payments` chỉ
- * cần khi EXCHANGE có netAmount > 0. `cashAccountId` để trống → BE lấy theo ca
- * quỹ đang mở.
+ * BE tự resolve tài khoản doanh thu (contra) — FE không gửi `revenueAccountId`.
+ * `payments` chỉ cần khi EXCHANGE có netAmount > 0. `cashAccountId` để trống → BE
+ * lấy theo ca quỹ đang mở.
  */
 export interface CheckoutReturnBody {
   refundMethod: RefundMethod;
-  revenueAccountId: string;
   cashAccountId?: string;
+  /** Bắt buộc khi refundMethod = BANK: payment_accounts.id quỹ nhận hoàn (BE tự
+   * suy ra deposit_account_id + COA). */
+  refundAccountId?: string;
   receivableAccountId?: string;
   creditLiabilityAccountId?: string;
   creditExpiresAt?: string;

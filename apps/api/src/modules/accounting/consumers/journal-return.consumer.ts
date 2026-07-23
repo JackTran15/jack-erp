@@ -31,7 +31,6 @@ export class JournalReturnConsumer {
       netAmount,
       debtAmount,
       revenueAccountId,
-      cashAccountId,
       receivableAccountId,
       creditLiabilityAccountId,
       organizationId,
@@ -61,10 +60,19 @@ export class JournalReturnConsumer {
     //   - New-purchase leg (EXCHANGE net > 0): DR cash (CASH method) / CR revenue
     //
     // Sign convention: SALE posts CR revenue + DR cash/AR. Refund reverses by
-    // DR revenue (refunded amount) and CR cash (CASH), AR (OFFSET), or
-    // credit_liability (STORE_CREDIT).
-
-    if (refunded > 0) {
+    // DR revenue (refunded amount) and CR credit_liability (STORE_CREDIT) or
+    // CR receivable (OFFSET).
+    //
+    // CASH and BANK refunds are NOT booked here: the treasury movement created by
+    // the cash/deposit refund consumer posts its own JE (JournalSource.CASH_MOVEMENT
+    // / BANK_MOVEMENT = DR revenue / CR cash|112x). Booking the money leg here too
+    // would double-post the GL — so journal-return only owns the legs that have no
+    // treasury movement (STORE_CREDIT liability, OFFSET receivable).
+    if (
+      refunded > 0 &&
+      (refundMethod === RefundMethod.STORE_CREDIT ||
+        refundMethod === RefundMethod.OFFSET)
+    ) {
       lines.push({
         accountId: revenueAccountId,
         debitAmount: refunded,
@@ -72,19 +80,7 @@ export class JournalReturnConsumer {
         lineOrder: lineOrder++,
       });
 
-      if (refundMethod === RefundMethod.CASH) {
-        if (!cashAccountId) {
-          throw new Error(
-            `journal-return ${returnInvoiceCode}: CASH refund without cashAccountId`,
-          );
-        }
-        lines.push({
-          accountId: cashAccountId,
-          debitAmount: 0,
-          creditAmount: refunded,
-          lineOrder: lineOrder++,
-        });
-      } else if (refundMethod === RefundMethod.STORE_CREDIT) {
+      if (refundMethod === RefundMethod.STORE_CREDIT) {
         if (!creditLiabilityAccountId) {
           throw new Error(
             `journal-return ${returnInvoiceCode}: STORE_CREDIT without creditLiabilityAccountId`,
@@ -96,7 +92,8 @@ export class JournalReturnConsumer {
           creditAmount: refunded,
           lineOrder: lineOrder++,
         });
-      } else if (refundMethod === RefundMethod.OFFSET) {
+      } else {
+        // OFFSET
         if (!receivableAccountId) {
           throw new Error(
             `journal-return ${returnInvoiceCode}: OFFSET without receivableAccountId`,
@@ -135,8 +132,8 @@ export class JournalReturnConsumer {
     }
 
     if (lines.length === 0) {
-      this.logger.warn(
-        `journal-return ${returnInvoiceCode}: no lines computed (refunded=0, net=0) — skipping`,
+      this.logger.log(
+        `journal-return ${returnInvoiceCode}: money leg owned by the cash/deposit movement (method=${refundMethod}) — no separate journal entry`,
       );
       return;
     }

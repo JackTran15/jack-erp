@@ -24,6 +24,7 @@ export enum InvoiceType {
 
 export enum RefundMethod {
   CASH         = 'CASH',
+  BANK         = 'BANK',
   STORE_CREDIT = 'STORE_CREDIT',
   OFFSET       = 'OFFSET',
 }
@@ -57,7 +58,7 @@ export class InvoiceEntity extends BaseEntity {
   @JoinColumn({ name: 'original_invoice_id' })
   originalInvoice?: InvoiceEntity;
 
-  @Column({ name: 'refund_method', type: 'enum', enum: RefundMethod, nullable: true, comment: 'How refund was settled: CASH / STORE_CREDIT / OFFSET (RETURN + EXCHANGE only)' })
+  @Column({ name: 'refund_method', type: 'enum', enum: RefundMethod, nullable: true, comment: 'How refund was settled: CASH / BANK / STORE_CREDIT / OFFSET (RETURN + EXCHANGE only)' })
   refundMethod?: RefundMethod;
 
   @Column({ name: 'refunded_amount', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Amount refunded to customer (max(returnSubtotal - newSubtotal, 0))' })

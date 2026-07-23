@@ -17,13 +17,26 @@ export class CheckoutReturnDto {
   @IsEnum(RefundMethod)
   refundMethod: RefundMethod;
 
+  /** Deprecated — revenue (the refund/journal contra) is resolved server-side from
+   * the org's default REVENUE account. Kept optional for backward compatibility;
+   * any value sent by the client is ignored. */
+  @IsOptional()
   @IsUUID()
-  revenueAccountId: string;
+  revenueAccountId?: string;
 
   /** Required when refundMethod = CASH AND no active drawer session is found. */
   @IsOptional()
   @IsUUID()
   cashAccountId?: string;
+
+  /**
+   * Required when refundMethod = BANK: the operator's chosen receiving fund
+   * (payment_accounts.id). The server resolves its linked deposit_account_id and
+   * uses revenueAccountId as the contra — clients never send a COA id directly.
+   */
+  @IsOptional()
+  @IsUUID()
+  refundAccountId?: string;
 
   /** Required when refundMethod = OFFSET against an original AR (debt) invoice. */
   @IsOptional()

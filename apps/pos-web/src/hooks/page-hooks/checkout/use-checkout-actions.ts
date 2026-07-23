@@ -13,11 +13,7 @@ import {
   useRedeemPointsMutation,
   useUpdateInvoiceMutation,
 } from "@erp/pos/hooks/react-query/use-query-invoice";
-import {
-  pickAccountByCodePrefix,
-  usePaymentAccountsQuery,
-  useRevenueAccountsQuery,
-} from "@erp/pos/hooks/react-query/use-query-account";
+import { usePaymentAccountsQuery } from "@erp/pos/hooks/react-query/use-query-account";
 import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
 import {
   buildCheckoutInvoicePayload,
@@ -136,9 +132,6 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
   const createReturnMutation = useCreateReturnInvoiceMutation();
   const createExchangeMutation = useCreateExchangeInvoiceMutation();
   const checkoutReturnMutation = useCheckoutReturnMutation();
-  // Đơn trả/đổi bắt buộc gửi `revenueAccountId` (BE chưa tự resolve cho luồng
-  // này như SALE). Lấy tài khoản doanh thu đầu tiên (ưu tiên code "511…").
-  const revenueQuery = useRevenueAccountsQuery();
   // Tài khoản nhận tiền — fallback cho dòng thanh toán phiếu SALE của đổi trả nhanh.
   const { accounts: paymentAccounts } = usePaymentAccountsQuery();
   // "NV Thu ngân" trên bản in — user đang đăng nhập.
@@ -344,15 +337,6 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             return;
           }
 
-          const revenueAccountId = pickAccountByCodePrefix(
-            revenueQuery.data?.data,
-            "511",
-          )?.id;
-          if (!revenueAccountId) {
-            toast.error(CHECKOUT_TOASTS.REVENUE_ACCOUNT_UNAVAILABLE);
-            return;
-          }
-
           const returnSubtotal = returnLines.reduce(
             (s, l) => s + l.unitPrice * l.qty,
             0,
@@ -368,11 +352,14 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             // RETURN (hoàn tiền mặt đủ giá trị hàng trả). Panel chỉ thu phần chênh
             // (net); ở đây tự tổng hợp thanh toán đủ cho từng phiếu.
             const returnResolve = buildCheckoutReturnPayload({
-              revenueAccountId,
               returnSubtotal,
-              // Phiếu trả chỉ có dòng IN → net<0 → hoàn tiền mặt, không kèm payments.
+              // Phiếu trả chỉ có dòng IN → net<0 → hoàn tiền theo quỹ operator chọn.
               newSubtotal: 0,
-              paymentLines: [],
+              // Trả thuần (không mua mới): panel hiển thị picker "Hình thức đổi
+              // trả" nên paymentLines mang quỹ hoàn khách chọn (tiền mặt/ngân
+              // hàng). Có mua mới: picker là thanh toán đơn SALE, nên phiếu trả
+              // giữ mặc định tiền mặt.
+              paymentLines: newLines.length > 0 ? [] : p.paymentLines,
               offsetToDebt: false,
               note,
             });
@@ -466,7 +453,6 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
           } else {
             // ── INVOICE_RETURN (trả/đổi theo hóa đơn gốc) ──
             const checkoutResolve = buildCheckoutReturnPayload({
-              revenueAccountId,
               returnSubtotal,
               newSubtotal,
               paymentLines: p.paymentLines,
@@ -580,7 +566,6 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       createReturnMutation,
       createExchangeMutation,
       checkoutReturnMutation,
-      revenueQuery.data,
       paymentAccounts,
       currentUser,
       branches,

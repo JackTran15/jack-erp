@@ -89,7 +89,7 @@ describe('JournalReturnConsumer', () => {
     ).rejects.toThrow(/receivableAccountId/);
   });
 
-  it('posts DR revenue / CR cash for a CASH refund (net < 0)', async () => {
+  it('posts nothing for a CASH refund — the cash movement owns the JE (no double-post)', async () => {
     await consumer.handle(
       buildEvent({
         source: 'RETURN',
@@ -101,11 +101,60 @@ describe('JournalReturnConsumer', () => {
       }),
     );
 
+    expect(journalService.post).not.toHaveBeenCalled();
+  });
+
+  it('posts nothing for a BANK refund — the deposit movement owns the JE (no double-post)', async () => {
+    await consumer.handle(
+      buildEvent({
+        source: 'RETURN',
+        refundMethod: RefundMethod.BANK,
+        refundedAmount: 200,
+        netAmount: -200,
+        debtAmount: 0,
+      }),
+    );
+
+    expect(journalService.post).not.toHaveBeenCalled();
+  });
+
+  it('posts DR revenue / CR credit_liability for a STORE_CREDIT refund (net < 0)', async () => {
+    await consumer.handle(
+      buildEvent({
+        source: 'RETURN',
+        refundMethod: RefundMethod.STORE_CREDIT,
+        refundedAmount: 200,
+        netAmount: -200,
+        debtAmount: 0,
+        creditLiabilityAccountId: 'acc-credit',
+      }),
+    );
+
     const [dto] = journalService.post.mock.calls[0];
     expect(dto.source).toBe(JournalSource.RETURN);
     expect(dto.lines).toEqual([
       { accountId: 'acc-revenue', debitAmount: 200, creditAmount: 0, lineOrder: 1 },
-      { accountId: 'acc-cash', debitAmount: 0, creditAmount: 200, lineOrder: 2 },
+      { accountId: 'acc-credit', debitAmount: 0, creditAmount: 200, lineOrder: 2 },
+    ]);
+  });
+
+  it('posts DR revenue / CR receivable for an OFFSET refund (net < 0)', async () => {
+    await consumer.handle(
+      buildEvent({
+        source: 'RETURN',
+        refundMethod: RefundMethod.OFFSET,
+        refundedAmount: 200,
+        netAmount: -200,
+        debtAmount: 0,
+        receivableAccountId: 'acc-ar',
+      }),
+    );
+
+    const [dto] = journalService.post.mock.calls[0];
+    expect(dto.source).toBe(JournalSource.RETURN);
+    expect(dto.lines).toEqual([
+      { accountId: 'acc-revenue', debitAmount: 200, creditAmount: 0, lineOrder: 1 },
+      { accountId: 'acc-ar', debitAmount: 0, creditAmount: 200, lineOrder: 2 },
     ]);
   });
 
