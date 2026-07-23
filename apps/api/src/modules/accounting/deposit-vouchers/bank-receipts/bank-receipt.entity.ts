@@ -94,6 +94,13 @@ export class BankReceiptEntity {
   @Column({ name: 'collected_by', type: 'varchar', nullable: true })
   collectedBy?: string;
 
+  /**
+   * Resolved from {@link collectedBy} on read — not a column. Lets the client show
+   * "Nhân viên thu" without calling the permission-gated user endpoint.
+   */
+  collectedByCode?: string | null;
+  collectedByName?: string | null;
+
   @Column({ type: 'varchar', length: 255, nullable: true })
   reference?: string;
 

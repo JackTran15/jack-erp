@@ -3119,6 +3119,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/bank-receipts/debt-collection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create + post a debt-collection Phiếu thu tiền gửi that settles the selected
+         *     invoice debts and credits the deposit fund, atomically. Idempotent per
+         *     X-Idempotency-Key (the frontend always sends one).
+         */
+        post: operations["DepositDebtCollectionController_collect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bank-receipts/debt-collection/sagas/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DepositDebtCollectionController_getSaga"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/bank-receipts": {
         parameters: {
             query?: never;
@@ -7347,6 +7384,7 @@ export interface components {
             /** @enum {string} */
             type: "REGISTER" | "SAFE" | "PETTY_CASH";
             balance: number;
+            allowNegative: boolean;
             accountId: string;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
@@ -9282,6 +9320,65 @@ export interface components {
             /** @description SUM(total_amount) over every matching row, not only this page */
             totalAmount: number;
         };
+        DepositDebtCollectionAllocationDto: {
+            /** Format: uuid */
+            invoiceDebtId: string;
+            amount: number;
+        };
+        CreateDepositDebtCollectionReceiptDto: {
+            /** @description "Ngày thu" (YYYY-MM-DD). */
+            docDate: string;
+            /**
+             * Format: uuid
+             * @description "Tài khoản nhận" — the deposit fund credited. Required.
+             */
+            depositAccountId: string;
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            /** Format: uuid */
+            partnerId?: string;
+            /** @description "Người nộp" */
+            payerName?: string;
+            /** @description "Địa chỉ" — frozen onto the voucher as `partnerAddressSnapshot`. */
+            address?: string;
+            /** @description "Lý do thu" */
+            reason?: string;
+            /**
+             * Format: uuid
+             * @description Cashier (thủ quỹ).
+             */
+            collectedBy?: string;
+            allocations: components["schemas"]["DepositDebtCollectionAllocationDto"][];
+        };
+        DepositDebtCollectionSagaEntity: {
+            /** @description Client idempotency key (X-Idempotency-Key) — dedupes retries per org. */
+            idempotencyKey: string;
+            /** @enum {string} */
+            status: "PENDING" | "COMPLETED" | "COMPENSATED" | "FAILED";
+            bankReceiptId?: string;
+            depositAccountId: string;
+            contraAccountId: string;
+            /**
+             * @description Denormalized copy for observability — stored as text, not a pg enum.
+             * @enum {string}
+             */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            partnerId?: string;
+            totalAmount: number;
+            allocations: Record<string, never>[];
+            error?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
         BankReceiptLineDto: {
             /** Format: uuid */
             id?: string;
@@ -9312,6 +9409,12 @@ export interface components {
             partnerId?: string;
             /** @description "Người nộp" */
             payerName?: string;
+            /**
+             * @description "Địa chỉ" — the payer's address as typed on the voucher. Stored as
+             *     `partnerAddressSnapshot`; when omitted, posting falls back to the partner
+             *     record's current address.
+             */
+            address?: string;
             /** @description "Lý do nộp" */
             reason?: string;
             /**
@@ -9354,6 +9457,12 @@ export interface components {
             payerName?: string;
             reason?: string;
             collectedBy?: string;
+            /**
+             * @description Resolved from {@link collectedBy} on read — not a column. Lets the client show
+             *     "Nhân viên thu" without calling the permission-gated user endpoint.
+             */
+            collectedByCode?: string | null;
+            collectedByName?: string | null;
             reference?: string;
             affectRevenue: boolean;
             contraAccountId?: string;
@@ -9408,6 +9517,8 @@ export interface components {
             /** Format: uuid */
             partnerId?: string;
             payerName?: string;
+            /** @description "Địa chỉ" — stored as `partnerAddressSnapshot`. */
+            address?: string;
             reason?: string;
             /** Format: uuid */
             collectedBy?: string;
@@ -9453,6 +9564,12 @@ export interface components {
             partnerId?: string;
             /** @description "Người nhận" */
             payeeName?: string;
+            /**
+             * @description "Địa chỉ" — the payee's address as typed on the voucher. Stored as
+             *     `partnerAddressSnapshot`; when omitted, posting falls back to the partner
+             *     record's current address.
+             */
+            address?: string;
             /** @description "Lý do chi" */
             reason?: string;
             /**
@@ -9499,6 +9616,12 @@ export interface components {
             payeeName?: string;
             reason?: string;
             paidBy?: string;
+            /**
+             * @description Resolved from {@link paidBy} on read — not a column. Lets the client show
+             *     "Nhân viên chi" without calling the permission-gated user endpoint.
+             */
+            paidByCode?: string | null;
+            paidByName?: string | null;
             reference?: string;
             affectExpense: boolean;
             contraAccountId?: string;
@@ -9557,6 +9680,8 @@ export interface components {
             /** Format: uuid */
             partnerId?: string;
             payeeName?: string;
+            /** @description "Địa chỉ" — stored as `partnerAddressSnapshot`. */
+            address?: string;
             reason?: string;
             /** Format: uuid */
             paidBy?: string;
@@ -10511,6 +10636,7 @@ export interface components {
             pointsRedeemed: number;
             pointsDiscountAmount: number;
             pointsEarned: number;
+            pointsReversed: number;
             depositAmount: number;
             amountDue: number;
             totalPaid: number;
@@ -10658,6 +10784,7 @@ export interface components {
             pointsRedeemed: number;
             pointsDiscountAmount: number;
             pointsEarned: number;
+            pointsReversed: number;
             depositAmount: number;
             amountDue: number;
             totalPaid: number;
@@ -18059,6 +18186,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DepositVoucherSearchV2ResponseDto"];
+                };
+            };
+        };
+    };
+    DepositDebtCollectionController_collect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDepositDebtCollectionReceiptDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    DepositDebtCollectionController_getSaga: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositDebtCollectionSagaEntity"];
                 };
             };
         };

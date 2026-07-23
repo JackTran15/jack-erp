@@ -6,6 +6,7 @@ export { InvoiceDetailDialog } from "./invoice-detail-dialog";
 export { DepositReceiptVoucherDialog } from "./deposit-receipt-voucher-dialog";
 export { DepositPaymentVoucherDialog } from "./deposit-payment-voucher-dialog";
 export type { DepositPaymentSaveResult } from "./deposit-payment-voucher-dialog";
+export type { DepositReceiptSaveResult } from "./deposit-receipt-voucher-dialog";
 export { FundSwapDialog } from "./fund-swap-dialog";
 export { TreasuryVoucherDialogModeEnum } from "./_shared/voucher-dialog.types";
 export { VoucherLink } from "./_shared/VoucherLink";

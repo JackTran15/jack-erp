@@ -1,6 +1,6 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { FilterBuilder } from '../../../common/filters/filter.builder';
 import { AccountEntity } from '../../accounting/coa/account.entity';
 import { SearchAccountsV2Query } from './search-accounts-v2.query';
@@ -18,8 +18,6 @@ export class SearchAccountsV2Handler
     const page = dto.page ?? 1;
     const limit = dto.limit ?? 20;
 
-    // No parent-account join: the row returns the raw `parentAccountId` UUID,
-    // matching the current generic CRUD list (parent name is resolved on the FE).
     const qb = this.repo
       .createQueryBuilder('acc')
       .where('acc.organizationId = :orgId', { orgId: actor.organizationId });
@@ -44,6 +42,37 @@ export class SearchAccountsV2Handler
       .take(limit);
 
     const [data, total] = await qb.getManyAndCount();
-    return { data, total, page, limit };
+    return { data: await this.withParentNames(data, actor.organizationId), total, page, limit };
+  }
+
+  /**
+   * Inline the parent account's label so the admin grid shows a name instead of
+   * a raw UUID. Mirrors `CoaService.list` — this endpoint, not the generic CRUD
+   * one, is what the "Tài khoản kế toán" grid actually reads. One batched
+   * lookup per page, never per row.
+   */
+  private async withParentNames(
+    rows: AccountEntity[],
+    organizationId: string,
+  ): Promise<AccountEntity[]> {
+    const parentIds = [
+      ...new Set(
+        rows.map((r) => r.parentAccountId).filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (parentIds.length === 0) return rows;
+
+    const parents = await this.repo.find({
+      where: { id: In(parentIds), organizationId },
+    });
+    const parentById = new Map(parents.map((p) => [p.id, p]));
+
+    return rows.map((row) => {
+      const parent = row.parentAccountId ? parentById.get(row.parentAccountId) : undefined;
+      return {
+        ...row,
+        parentAccountName: parent ? `${parent.code} - ${parent.name}` : '—',
+      };
+    }) as AccountEntity[];
   }
 }

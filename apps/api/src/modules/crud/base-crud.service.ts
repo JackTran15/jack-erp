@@ -78,8 +78,9 @@ export abstract class BaseCrudService<
   }
 
   async create(payload: TCreate, actor: ActorContext): Promise<TEntity> {
-    await this.validateBusinessRules('create', payload, actor);
-    const prepared = await this.beforeCreate(payload, actor);
+    const normalized = this.normalizeBlankValues(payload);
+    await this.validateBusinessRules('create', normalized, actor);
+    const prepared = await this.beforeCreate(normalized, actor);
 
     const entity = this.repository.create({
       ...prepared,
@@ -109,8 +110,9 @@ export abstract class BaseCrudService<
     actor: ActorContext,
   ): Promise<TEntity> {
     const existing = await this.getById(id, actor);
-    await this.validateBusinessRules('update', payload, actor);
-    const prepared = await this.beforeUpdate(id, payload, actor);
+    const normalized = this.normalizeBlankValues(payload);
+    await this.validateBusinessRules('update', normalized, actor);
+    const prepared = await this.beforeUpdate(id, normalized, actor);
 
     if ((prepared as any).version !== undefined) {
       const currentVersion = (existing as any).version;
@@ -242,6 +244,37 @@ export abstract class BaseCrudService<
   // ---------------------------------------------------------------------------
   // Internal helpers
   // ---------------------------------------------------------------------------
+
+  /**
+   * Turn `''` into `null` for every field the config declares as non-text
+   * (relation/date/number/enum).
+   *
+   * The generic CRUD endpoint takes `Record<string, any>` with no DTO and no
+   * ValidationPipe, so an untouched form field would otherwise reach the driver
+   * as an empty string and fail a uuid/date/numeric cast with Postgres 22P02 —
+   * surfacing as a 500 instead of a validation error. `null` keeps the intent
+   * ("no value") while staying castable.
+   */
+  protected normalizeBlankValues<T extends Record<string, any>>(payload: T): T {
+    const nonTextKeys = new Set(
+      this.entityConfig.fields
+        .filter((f) =>
+          ['relation', 'date', 'number', 'enum'].includes(f.type),
+        )
+        .map((f) => f.key),
+    );
+    if (nonTextKeys.size === 0) return payload;
+
+    const normalized: Record<string, any> = { ...payload };
+    let changed = false;
+    for (const key of Object.keys(normalized)) {
+      if (nonTextKeys.has(key) && normalized[key] === '') {
+        normalized[key] = null;
+        changed = true;
+      }
+    }
+    return changed ? (normalized as T) : payload;
+  }
 
   protected applyScoping(
     qb: SelectQueryBuilder<TEntity>,

@@ -10,6 +10,14 @@ import { PaymentAccountsModule } from '../payment-accounts/payment-accounts.modu
 import { CashModule } from '../cash/cash.module';
 import { CashVouchersModule } from '../cash-vouchers/cash-vouchers.module';
 import { PartnerResolverService } from '../cash-vouchers/shared/partner-resolver.service';
+import { UserEntity } from '../../auth/user.entity';
+import { EmployeeProfileEntity } from '../../rbac/employee/employee-profile.entity';
+import { VoucherStaffResolver } from './shared/voucher-staff.resolver';
+import { DepositDebtCollectionSagaEntity } from './debt-collection/deposit-debt-collection-saga.entity';
+import { DepositDebtCollectionSagaService } from './debt-collection/deposit-debt-collection-saga.service';
+import { DepositDebtCollectionController } from './debt-collection/deposit-debt-collection.controller';
+import { InvoiceDebtEntity } from '../../pos/entities/invoice-debt.entity';
+import { DebtPaymentEntity } from '../../pos/entities/debt-payment.entity';
 import { BankReceiptEntity } from './bank-receipts/bank-receipt.entity';
 import { BankReceiptLineEntity } from './bank-receipts/bank-receipt-line.entity';
 import { BankPaymentEntity } from './bank-payments/bank-payment.entity';
@@ -51,6 +59,11 @@ import { SearchDepositVouchersV2Handler } from './queries/search-deposit-voucher
       DepositAccountEntity,
       BranchEntity,
       BankEntity,
+      UserEntity,
+      EmployeeProfileEntity,
+      DepositDebtCollectionSagaEntity,
+      InvoiceDebtEntity,
+      DebtPaymentEntity,
     ]),
     DepositModule,
     DocumentNumberingModule,
@@ -61,6 +74,10 @@ import { SearchDepositVouchersV2Handler } from './queries/search-deposit-voucher
   ],
   controllers: [
     DepositVoucherV2Controller,
+    // MUST precede BankReceiptsController: its static `bank-receipts/debt-collection`
+    // route would otherwise be swallowed by `bank-receipts/:id` (routes match in
+    // registration order, and the uuid pipe then rejects the literal segment).
+    DepositDebtCollectionController,
     BankReceiptsController,
     BankPaymentsController,
     SupplierDepositPaymentController,
@@ -77,6 +94,8 @@ import { SearchDepositVouchersV2Handler } from './queries/search-deposit-voucher
     BankReceiptsService,
     BankPaymentsService,
     PartnerResolverService,
+    VoucherStaffResolver,
+    DepositDebtCollectionSagaService,
     SupplierDepositPaymentSagaService,
     FundSwapsService,
     DepositTransferService,

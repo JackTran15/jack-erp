@@ -363,15 +363,9 @@ export const navConfig: NavModule[] = [
             label: "Tài khoản tiền gửi",
             views: [STORE_TYPE.SINGLE],
           },
-          {
-            to: "/admin/deposit-payment-policy",
-            label: "Chính sách thanh toán tiền gửi",
-            views: [STORE_TYPE.SINGLE],
-          },
           { to: "/admin/payment-accounts", label: "Tài khoản thanh toán" },
-          { to: "/admin/payables", label: "Phải trả" },
-          { to: "/admin/receivables", label: "Phải thu" },
-          { to: "/admin/expenses", label: "Chi phí" },
+          // Chính sách thanh toán tiền gửi / Phải trả / Phải thu / Chi phí đã được
+          // ẩn khỏi menu theo yêu cầu nghiệp vụ; route và CRUD backend vẫn giữ nguyên.
         ],
       },
       {

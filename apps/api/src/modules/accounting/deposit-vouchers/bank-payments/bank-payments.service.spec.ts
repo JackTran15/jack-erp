@@ -13,6 +13,7 @@ import { AccountResolverService } from '../../payment-accounts/account-resolver.
 import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
 import { SupplierDepositPaymentSagaService } from '../supplier-deposit-payment/supplier-deposit-payment-saga.service';
 import { DepositPeriodGuardService } from '../../deposit-period-lock/deposit-period-guard.service';
+import { VoucherStaffResolver } from '../shared/voucher-staff.resolver';
 import {
   BankPaymentPurpose,
   BankPaymentReferenceType,
@@ -95,6 +96,12 @@ describe('BankPaymentsService', () => {
         { provide: PartnerResolverService, useValue: partnerResolver },
         { provide: AccountResolverService, useValue: accountResolver },
         { provide: DepositPeriodGuardService, useValue: periodGuard },
+        // Read paths resolve the cashier name; the specs assert voucher fields,
+        // so an empty resolution is enough.
+        {
+          provide: VoucherStaffResolver,
+          useValue: { resolveMany: jest.fn().mockResolvedValue(new Map()) },
+        },
         {
           provide: SupplierDepositPaymentSagaService,
           useValue: supplierDepositPaymentSaga,

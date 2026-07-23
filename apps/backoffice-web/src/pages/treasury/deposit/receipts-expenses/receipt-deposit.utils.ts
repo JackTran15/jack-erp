@@ -1,4 +1,7 @@
-import { BankVoucherStatus } from "../../bank-vouchers.types";
+import {
+  BankPaymentReferenceType as BankVoucherReferenceType,
+  BankVoucherStatus,
+} from "../../bank-vouchers.types";
 import { RECEIPT_DEPOSIT_DOCUMENT_TYPE_LABEL } from "./receipt-deposit.constants";
 import {
   ReceiptDepositKind,
@@ -28,6 +31,8 @@ export function toReceiptDepositListItem(
     depositAccountNo: row.depositAccountNo ?? "",
     referenceType: row.referenceType ?? undefined,
     isReversed: row.status === BankVoucherStatus.REVERSED,
+    // The reversal voucher itself stays POSTED — only its referenceType marks it.
+    isReversal: row.referenceType === BankVoucherReferenceType.REVERSAL,
   };
 }
 

@@ -4,6 +4,7 @@ import { AppModal, Button, Input, MoneyInput, Textarea } from "@erp/ui";
 import { HelpCircle, Plus, Save, X } from "lucide-react";
 import { apiClient } from "../../lib/api-axios";
 import { formatCrudEnumOption } from "../../lib/crud-display";
+import { buildCrudPayload } from "./crudPayload";
 import { SearchListingInput } from "../forms/SearchListingInput";
 import { TreeSelectInput } from "../forms/TreeSelectInput";
 
@@ -312,15 +313,15 @@ export function CrudFormDialog({
     if (!validate()) return;
     setSubmitting(true);
     try {
-      const payload: Record<string, unknown> = {};
-      editableFields.forEach((f) => {
-        const searchConfig = getSearchFieldConfig(config.entityKey, f.key);
-        if (searchConfig) {
-          payload[f.key] = getSearchSelectionId(values[f.key]);
-        } else {
-          payload[f.key] = values[f.key];
-        }
-      });
+      const payload = buildCrudPayload(
+        editableFields,
+        values,
+        isEdit ? "update" : "create",
+        (f) =>
+          getSearchFieldConfig(config.entityKey, f.key)
+            ? getSearchSelectionId(values[f.key])
+            : values[f.key],
+      );
       // Không gửi id / audit khi tạo hoặc nhân bản
       delete payload[config.idField];
       delete payload.createdAt;

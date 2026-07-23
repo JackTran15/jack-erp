@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { EntityRegistryService } from '../../crud/entity-registry.service';
 import { JournalModule } from '../journal/journal.module';
 import { CashModule } from '../cash/cash.module';
+import { AccountEntity } from '../coa/account.entity';
 import { BankEntity } from './bank.entity';
 import { DepositAccountEntity } from './deposit-account.entity';
 import { DepositMovementEntity } from './deposit-movement.entity';
@@ -41,6 +42,7 @@ import {
 @Module({
   imports: [
     TypeOrmModule.forFeature([
+      AccountEntity,
       BankEntity,
       DepositAccountEntity,
       DepositMovementEntity,

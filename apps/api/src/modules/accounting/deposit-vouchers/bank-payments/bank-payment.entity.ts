@@ -96,6 +96,13 @@ export class BankPaymentEntity {
   @Column({ name: 'paid_by', type: 'varchar', nullable: true })
   paidBy?: string;
 
+  /**
+   * Resolved from {@link paidBy} on read — not a column. Lets the client show
+   * "Nhân viên chi" without calling the permission-gated user endpoint.
+   */
+  paidByCode?: string | null;
+  paidByName?: string | null;
+
   @Column({ type: 'varchar', length: 255, nullable: true })
   reference?: string;
 
