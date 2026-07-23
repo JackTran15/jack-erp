@@ -1,8 +1,8 @@
 import {
   ArrowRightLeft,
+  Barcode,
   EyeOff,
   PackageOpen,
-  Printer,
   RefreshCw,
 } from "lucide-react";
 import type { ToolbarItem } from "@erp/ui";
@@ -64,7 +64,7 @@ export function buildItemLocationToolbarItems({
     {
       id: "print-label",
       label: "In tem mã",
-      icon: Printer,
+      icon: Barcode,
       onClick: onPrintLabel,
       disabled: !hasSelection,
       tooltip: hasSelection ? undefined : "Chọn dòng để dùng tính năng này",

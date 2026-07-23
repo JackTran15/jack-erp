@@ -349,7 +349,7 @@ function CollapsedModuleRow({
           className={cn(
             "relative flex h-10 w-full items-center justify-center rounded-md transition-colors",
             isActive
-              ? "bg-gray-700 text-white"
+              ? "bg-gray-600 text-white"
               : "text-gray-400 hover:bg-gray-800 hover:text-white",
           )}
           aria-label={module.label}
@@ -393,7 +393,7 @@ function FlyoutModuleRow({
       className={cn(
         "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
         isFlyoutOpen
-          ? "bg-gray-700 text-white font-medium"
+          ? "bg-gray-600 text-white font-semibold"
           : isActive
             ? "text-white"
             : "text-gray-300 hover:bg-gray-800 hover:text-white",
@@ -437,7 +437,7 @@ function DirectNavRow({
         cn(
           "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
           routeActive && !suppressRouteActiveHighlight
-            ? "bg-gray-700 text-white font-medium"
+            ? "bg-gray-600 text-white font-semibold"
             : "text-gray-300 hover:bg-gray-800 hover:text-white",
         )
       }
@@ -482,7 +482,7 @@ function AccordionModuleRow({
           className={cn(
             "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
             isActive
-              ? "bg-gray-700 text-white font-medium"
+              ? "bg-gray-600 text-white font-semibold"
               : "text-gray-300 hover:bg-gray-800 hover:text-white",
           )}
           aria-expanded={isOpen}
