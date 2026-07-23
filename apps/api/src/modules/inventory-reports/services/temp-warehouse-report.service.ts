@@ -46,8 +46,11 @@ import { DataSource } from 'typeorm';
  *                    false`, `is_active = true`). Không tìm được vị trí nào
  *                    thỏa (mọi vị trí đều ngừng hoạt động / ngừng theo dõi /
  *                    hết hàng) → để trống.
- *   - remainingQty : tồn kho tại đúng vị trí đã resolve ở trên (0 nếu không
- *                    resolve được vị trí nào).
+ *   - remainingQty : số còn lại ở kho tạm (trưng bày) của cặp ghép =
+ *                    SL xuất − SL trả − SL bán (Nhập−Xuất−Tồn kiểu MISA). Tổng
+ *                    cột = số hàng còn trưng bày thực tế trong kỳ. LƯU Ý có thể
+ *                    âm ở dòng "Trả hàng trưng bày" trả lẻ (lần xuất tương ứng
+ *                    nằm ngoài kỳ lọc) — đúng về mặt net, để tổng cân bằng.
  *   - staff        : carrier (`users.first_name + last_name`).
  *
  * saleQty / invoice: điền từ liên kết hóa đơn của dòng xuất đã bán
@@ -234,7 +237,9 @@ export class TempWarehouseReportService {
         p.out_qty AS out_qty,
         p.return_qty AS return_qty,
         (p.invoice_id IS NOT NULL)::int AS sale_qty,
-        COALESCE(preferred.quantity, fallback.quantity, 0) AS remaining_qty,
+        -- SL tồn = SL xuất − SL trả − SL bán (còn trưng bày ở kho tạm), KHÔNG
+        -- phải tồn kho hiện tại của mặt hàng. Có thể âm với dòng trả lẻ.
+        (p.out_qty - p.return_qty - (p.invoice_id IS NOT NULL)::int) AS remaining_qty,
         CASE
           WHEN p.invoice_id IS NOT NULL THEN 'Bán hàng trưng bày'
           WHEN p.exp_transfer_id IS NOT NULL THEN 'Chuyển kho xuất đi'
@@ -251,7 +256,7 @@ export class TempWarehouseReportService {
       -- line's branch — same priority order as loadItemLocations in
       -- profit-by-item/revenue-by-item: preferred shelf first.
       LEFT JOIN LATERAL (
-        SELECT loc.code, sb.quantity
+        SELECT loc.code
         FROM item_storage_locations isl
         JOIN storages st ON st.id = isl.storage_id
         JOIN locations loc ON loc.id = isl.location_id
@@ -271,7 +276,7 @@ export class TempWarehouseReportService {
       -- Fallback: highest-stock tracked location among the branch's
       -- non-showroom warehouses, when no preferred shelf resolved.
       LEFT JOIN LATERAL (
-        SELECT loc.code, sb.quantity
+        SELECT loc.code
         FROM stock_balances sb
         JOIN locations loc ON loc.id = sb.location_id
         JOIN storages st ON st.id = loc.storage_id
