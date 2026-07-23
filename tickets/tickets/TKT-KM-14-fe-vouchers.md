@@ -17,6 +17,7 @@ Sửa dưới `apps/backoffice-web/src/pages/promotions/vouchers/`:
 - `VoucherFormDialog/VoucherFormDialog.tsx` (mới) — dialog Thêm mới / Sửa theo FR-051.
 - `vouchers.types.ts` — dùng type từ `@erp/api-client` / `@erp/shared-interfaces` thay union cục bộ.
 - Xóa `_mock/mock-vouchers.ts`.
+- `components/layout/navConfig.ts` — bỏ comment NavChild `/promotions/vouchers` (đang comment) để màn voucher hiện trong menu; route trong `App.tsx` đã có sẵn.
 
 ## Acceptance Criteria
 
