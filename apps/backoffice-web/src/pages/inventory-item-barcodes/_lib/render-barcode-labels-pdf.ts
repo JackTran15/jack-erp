@@ -70,7 +70,6 @@ function drawLabel(
   const sideWidth = width * 0.24; // cột phải cho mã chi nhánh (để trống ở chuỗi cửa hàng)
   const barWidth = width - sideWidth - padX;
   const barCenter = left + barWidth / 2; // tâm ngang barcode để canh giữa SKU & giá
-  const sideCenter = x + width - sideWidth / 2; // tâm ngang cột phải: vị trí · CN · mã đợt cùng canh giữa
 
   // 3 hàng (SKU · barcode · giá) xếp sát nhau thành một nhóm, canh giữa theo
   // chiều dọc — khoảng trắng dồn ra mép trên/dưới, giữ các hàng gần barcode.
@@ -114,9 +113,9 @@ function drawLabel(
     align: "center",
   });
   doc.setFontSize(FONT.batch);
-  doc.text(batchCode, sideCenter, priceTop + priceH, {
+  doc.text(batchCode, right, priceTop + priceH, {
     baseline: "bottom",
-    align: "center",
+    align: "right",
   });
 }
 

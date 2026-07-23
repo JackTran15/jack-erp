@@ -68,7 +68,7 @@ export function BarcodeLabelPreview({ row, branchCode, showStoreInfo }: Props) {
               {priceFormatter.format(data.sellingPrice)} VND
             </div>
           </div>
-          <div className="flex w-[22%] shrink-0 flex-col items-center justify-between text-center">
+          <div className="flex w-[22%] shrink-0 flex-col items-end justify-between text-right">
             <span className="text-[10px] font-bold leading-tight">
               {showStoreInfo ? data.locationCode : ""}
             </span>
