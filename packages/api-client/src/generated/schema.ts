@@ -5399,6 +5399,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/promotions/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PromotionV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/promotions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PromotionV2Controller_getById_v2"];
+        put: operations["PromotionV2Controller_update_v2"];
+        post?: never;
+        delete: operations["PromotionV2Controller_delete_v2"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/promotions/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PromotionV2Controller_evaluate_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/promotions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PromotionV2Controller_create_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/promotions/{id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PromotionV2Controller_duplicate_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/promotions/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["PromotionV2Controller_changeStatus_v2"];
+        trace?: never;
+    };
+    "/v2/vouchers/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["VoucherV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/vouchers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["VoucherV2Controller_create_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/vouchers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["VoucherV2Controller_update_v2"];
+        post?: never;
+        delete: operations["VoucherV2Controller_deactivate_v2"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/vouchers/{id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["VoucherV2Controller_duplicate_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/dashboard": {
         parameters: {
             query?: never;
@@ -7534,7 +7694,7 @@ export interface components {
         };
         CreateDocumentNumberRuleDto: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP" | "PROMOTION";
             branchId?: string;
             prefix: string;
             suffix?: string;
@@ -7546,7 +7706,7 @@ export interface components {
         };
         DocumentNumberRuleEntity: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP" | "PROMOTION";
             prefix: string;
             suffix?: string;
             includeDate: boolean;
@@ -7578,7 +7738,7 @@ export interface components {
         };
         GenerateDocumentNumberDto: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP" | "PROMOTION";
             branchId?: string;
         };
         CreateMembershipCardInlineDto: {
@@ -11172,12 +11332,16 @@ export interface components {
         };
         VoucherEntity: {
             code: string;
+            issuer?: string;
+            description?: string;
+            /** @enum {string} */
+            status: "TRACKING" | "STOPPED";
             faceValue: number;
             customerId?: string;
             /** Format: date-time */
-            validFrom: string;
+            validFrom?: string;
             /** Format: date-time */
-            validTo: string;
+            validTo?: string;
             isUsed: boolean;
             redeemedInvoiceId?: string;
             isActive: boolean;
@@ -11195,11 +11359,16 @@ export interface components {
         };
         CreateVoucherDto: {
             code: string;
+            issuer: string;
+            description?: string;
+            /** @enum {string} */
+            status?: "TRACKING" | "STOPPED";
             faceValue: number;
             /** Format: uuid */
             customerId?: string;
-            validFrom: string;
-            validTo: string;
+            /** @description Omit for an unlimited-duration voucher (FR-051). */
+            validFrom?: string;
+            validTo?: string;
         };
         PromotionEntity: {
             name: string;
@@ -11238,6 +11407,304 @@ export interface components {
         ApplyPromotionDto: {
             /** @enum {string} */
             type: "discount_code" | "voucher" | "promotion";
+            code: string;
+        };
+        PromotionSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /**
+             * @description FR-005: 50 rows/page by default
+             * @default 50
+             */
+            limit: number;
+            name?: components["schemas"]["StringFilterDto"];
+            description?: components["schemas"]["StringFilterDto"];
+            type?: components["schemas"]["EnumFilterDto"];
+            /** @description Not applied by default — the "Tracking only" default is a FE-side chip (FR-004), not a hidden server filter */
+            status?: components["schemas"]["EnumFilterDto"];
+            applyTo?: components["schemas"]["EnumFilterDto"];
+            startDate?: components["schemas"]["DateRangeFilterDto"];
+            endDate?: components["schemas"]["DateRangeFilterDto"];
+        };
+        EvaluateCartLineInputDto: {
+            /** @description Client-supplied, echoed back in lineDiscounts so the client can map results without guessing by order */
+            lineId: string;
+            /** Format: uuid */
+            itemId: string;
+            quantity: number;
+            unitPrice: number;
+            /** @description Per-line discount the cashier already entered manually */
+            manualLineDiscount?: number;
+        };
+        EvaluateCartDto: {
+            /**
+             * Format: uuid
+             * @description Omit for a walk-in customer
+             */
+            customerId?: string;
+            /** @description ISO datetime; omitted = server current time */
+            at?: string;
+            /** @description Ids of auto_apply=false programs the cashier picked manually */
+            selectedProgramIds?: string[];
+            lines: components["schemas"]["EvaluateCartLineInputDto"][];
+        };
+        PromotionLineInputDto: {
+            /** @enum {string} */
+            role: "CONDITION" | "REWARD";
+            /** @enum {string} */
+            targetType: "PRODUCT" | "ITEM" | "CATEGORY";
+            /** Format: uuid */
+            targetId: string;
+            quantity?: number;
+            /** @enum {string} */
+            discountMode?: "PERCENT" | "AMOUNT" | "FIXED_PRICE";
+            discountValue?: number;
+            /** @description "Selling price <=" filter on the gift-item grid (FR-033) */
+            maxUnitPrice?: number;
+            /** @default 0 */
+            sortOrder: number;
+        };
+        PromotionTierInputDto: {
+            fromValue: number;
+            /** @description Omit for an unbounded (infinite) upper tier */
+            toValue?: number;
+            /** @enum {string} */
+            discountMode: "PERCENT" | "AMOUNT" | "FIXED_PRICE";
+            discountValue: number;
+            /** @default 0 */
+            sortOrder: number;
+        };
+        PromotionGroupInputDto: {
+            /** @description 0 for the implicit single group of every non-TIERED_DISCOUNT type */
+            ordinal: number;
+            name?: string;
+            lines?: components["schemas"]["PromotionLineInputDto"][];
+            tiers?: components["schemas"]["PromotionTierInputDto"][];
+        };
+        PromotionConditionInputDto: {
+            /** @enum {string} */
+            type: "NONE" | "MIN_INVOICE_AMOUNT" | "SPECIFIC_QUANTITY";
+            minAmount?: number;
+            /** @enum {string} */
+            calcBasis?: "ALL_ITEMS" | "NON_PROMO_ITEMS" | "ITEM_CATEGORIES";
+            /** @enum {string} */
+            groupMatchMode?: "ANY" | "ALL";
+            /** @default false */
+            multiplyGift: boolean;
+        };
+        CreatePromotionV2Dto: {
+            /**
+             * @description Immutable after creation (FR-006) — change type by duplicating instead
+             * @enum {string}
+             */
+            type: "INVOICE_DISCOUNT" | "ITEM_DISCOUNT" | "TIERED_DISCOUNT" | "GIFT_ITEM" | "BUY_M_GET_N";
+            name: string;
+            description?: string;
+            /** @enum {string} */
+            applyTo: "ALL_CUSTOMERS" | "CUSTOMER_GROUP" | "BIRTHDAY" | "CARD_TIER";
+            /** @enum {string} */
+            birthdayMatch?: "EXACT_DAY" | "SAME_WEEK" | "SAME_MONTH" | "RANGE";
+            /** @description Only when birthdayMatch = RANGE */
+            birthdayBeforeDays?: number;
+            /** @description Only when birthdayMatch = RANGE */
+            birthdayAfterDays?: number;
+            /**
+             * Format: uuid
+             * @description Only when applyTo = CARD_TIER
+             */
+            cardTierId?: string;
+            /** @description Only when applyTo = CUSTOMER_GROUP */
+            customerGroupIds?: string[];
+            /**
+             * @description Omit for no start bound
+             * @example 2026-01-01
+             */
+            startDate?: string;
+            /**
+             * @description Omit for no end bound
+             * @example 2026-12-31
+             */
+            endDate?: string;
+            /** @description ISO day-of-week (1=Monday..7=Sunday); empty = every day */
+            daysOfWeek?: number[];
+            /** @example 18:00 */
+            startTime?: string;
+            /**
+             * @description endTime < startTime is an overnight window (FR-022), not an error
+             * @example 21:00
+             */
+            endTime?: string;
+            /** @default true */
+            autoApply: boolean;
+            /**
+             * @description Lower runs first when programs contend for the same resource (BR-001)
+             * @default 100
+             */
+            priority: number;
+            /** @description promotion_branches — empty = whole chain (BR-005) */
+            branchIds?: string[];
+            /**
+             * @description INVOICE_DISCOUNT only
+             * @enum {string}
+             */
+            invoiceScope?: "NON_PROMO_ONLY" | "ALL_ITEMS";
+            /**
+             * @description INVOICE_DISCOUNT only
+             * @enum {string}
+             */
+            discountMode?: "PERCENT" | "AMOUNT" | "FIXED_PRICE";
+            /** @description INVOICE_DISCOUNT only */
+            discountValue?: number;
+            /** @description TIERED_DISCOUNT + tierBasis=INVOICE_VALUE only */
+            maxDiscountAmount?: number;
+            /**
+             * @description TIERED_DISCOUNT only
+             * @enum {string}
+             */
+            tierBasis?: "QUANTITY" | "ITEM_VALUE" | "INVOICE_VALUE";
+            /**
+             * @description TIERED_DISCOUNT only
+             * @enum {string}
+             */
+            tierScope?: "PER_ITEM" | "ALL_ITEMS_IN_GROUP";
+            /**
+             * @description Default grid target for TIERED_DISCOUNT/BUY_M_GET_N
+             * @enum {string}
+             */
+            targetType?: "PRODUCT" | "ITEM" | "CATEGORY";
+            /**
+             * @description GIFT_ITEM only
+             * @enum {string}
+             */
+            giftMode?: "ONE_OF" | "ALL_OF";
+            /**
+             * @description BUY_M_GET_N only
+             * @enum {string}
+             */
+            buyGetPolicy?: "SPECIFIC" | "CHEAPEST";
+            /** @description BUY_M_GET_N only — the "m" in "buy m get n" */
+            buyQuantity?: number;
+            /** @description BUY_M_GET_N only — the "n" in "buy m get n" */
+            giftQuantity?: number;
+            groups: components["schemas"]["PromotionGroupInputDto"][];
+            condition?: components["schemas"]["PromotionConditionInputDto"];
+        };
+        UpdatePromotionV2Dto: {
+            /**
+             * @description Immutable after creation (FR-006) — change type by duplicating instead
+             * @enum {string}
+             */
+            type: "INVOICE_DISCOUNT" | "ITEM_DISCOUNT" | "TIERED_DISCOUNT" | "GIFT_ITEM" | "BUY_M_GET_N";
+            name: string;
+            description?: string;
+            /** @enum {string} */
+            applyTo: "ALL_CUSTOMERS" | "CUSTOMER_GROUP" | "BIRTHDAY" | "CARD_TIER";
+            /** @enum {string} */
+            birthdayMatch?: "EXACT_DAY" | "SAME_WEEK" | "SAME_MONTH" | "RANGE";
+            /** @description Only when birthdayMatch = RANGE */
+            birthdayBeforeDays?: number;
+            /** @description Only when birthdayMatch = RANGE */
+            birthdayAfterDays?: number;
+            /**
+             * Format: uuid
+             * @description Only when applyTo = CARD_TIER
+             */
+            cardTierId?: string;
+            /** @description Only when applyTo = CUSTOMER_GROUP */
+            customerGroupIds?: string[];
+            /**
+             * @description Omit for no start bound
+             * @example 2026-01-01
+             */
+            startDate?: string;
+            /**
+             * @description Omit for no end bound
+             * @example 2026-12-31
+             */
+            endDate?: string;
+            /** @description ISO day-of-week (1=Monday..7=Sunday); empty = every day */
+            daysOfWeek?: number[];
+            /** @example 18:00 */
+            startTime?: string;
+            /**
+             * @description endTime < startTime is an overnight window (FR-022), not an error
+             * @example 21:00
+             */
+            endTime?: string;
+            /** @default true */
+            autoApply: boolean;
+            /**
+             * @description Lower runs first when programs contend for the same resource (BR-001)
+             * @default 100
+             */
+            priority: number;
+            /** @description promotion_branches — empty = whole chain (BR-005) */
+            branchIds?: string[];
+            /**
+             * @description INVOICE_DISCOUNT only
+             * @enum {string}
+             */
+            invoiceScope?: "NON_PROMO_ONLY" | "ALL_ITEMS";
+            /**
+             * @description INVOICE_DISCOUNT only
+             * @enum {string}
+             */
+            discountMode?: "PERCENT" | "AMOUNT" | "FIXED_PRICE";
+            /** @description INVOICE_DISCOUNT only */
+            discountValue?: number;
+            /** @description TIERED_DISCOUNT + tierBasis=INVOICE_VALUE only */
+            maxDiscountAmount?: number;
+            /**
+             * @description TIERED_DISCOUNT only
+             * @enum {string}
+             */
+            tierBasis?: "QUANTITY" | "ITEM_VALUE" | "INVOICE_VALUE";
+            /**
+             * @description TIERED_DISCOUNT only
+             * @enum {string}
+             */
+            tierScope?: "PER_ITEM" | "ALL_ITEMS_IN_GROUP";
+            /**
+             * @description Default grid target for TIERED_DISCOUNT/BUY_M_GET_N
+             * @enum {string}
+             */
+            targetType?: "PRODUCT" | "ITEM" | "CATEGORY";
+            /**
+             * @description GIFT_ITEM only
+             * @enum {string}
+             */
+            giftMode?: "ONE_OF" | "ALL_OF";
+            /**
+             * @description BUY_M_GET_N only
+             * @enum {string}
+             */
+            buyGetPolicy?: "SPECIFIC" | "CHEAPEST";
+            /** @description BUY_M_GET_N only — the "m" in "buy m get n" */
+            buyQuantity?: number;
+            /** @description BUY_M_GET_N only — the "n" in "buy m get n" */
+            giftQuantity?: number;
+            groups: components["schemas"]["PromotionGroupInputDto"][];
+            condition?: components["schemas"]["PromotionConditionInputDto"];
+        };
+        ChangePromotionStatusV2Dto: {
+            /** @enum {string} */
+            status: "TRACKING" | "STOPPED";
+        };
+        VoucherSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            limit: number;
+            issuer?: components["schemas"]["StringFilterDto"];
+            code?: components["schemas"]["StringFilterDto"];
+            description?: components["schemas"]["StringFilterDto"];
+            startDate?: components["schemas"]["DateRangeFilterDto"];
+            endDate?: components["schemas"]["DateRangeFilterDto"];
+            status?: components["schemas"]["EnumFilterDto"];
+            faceValue?: components["schemas"]["CompareFilterDto"];
+        };
+        DuplicateVoucherDto: {
+            /** @description New voucher code (must be unique within the organization) — vouchers have no auto-numbering, so the client must supply one */
             code: string;
         };
         AsyncReportDto: {
@@ -22000,6 +22467,299 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    PromotionV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromotionSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PromotionV2Controller_getById_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PromotionV2Controller_update_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePromotionV2Dto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PromotionV2Controller_delete_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PromotionV2Controller_evaluate_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvaluateCartDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PromotionV2Controller_create_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePromotionV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PromotionV2Controller_duplicate_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PromotionV2Controller_changeStatus_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePromotionStatusV2Dto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    VoucherV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoucherSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    VoucherV2Controller_create_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateVoucherDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoucherEntity"];
+                };
+            };
+        };
+    };
+    VoucherV2Controller_update_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoucherEntity"];
+                };
+            };
+        };
+    };
+    VoucherV2Controller_deactivate_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoucherEntity"];
+                };
+            };
+        };
+    };
+    VoucherV2Controller_duplicate_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DuplicateVoucherDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoucherEntity"];
+                };
             };
         };
     };

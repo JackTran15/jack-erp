@@ -16240,6 +16240,418 @@
         ]
       }
     },
+    "/v2/promotions/search": {
+      "post": {
+        "operationId": "PromotionV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromotionSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "promotions-v2"
+        ]
+      }
+    },
+    "/v2/promotions/{id}": {
+      "get": {
+        "operationId": "PromotionV2Controller_getById_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "promotions-v2"
+        ]
+      },
+      "put": {
+        "operationId": "PromotionV2Controller_update_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePromotionV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "promotions-v2"
+        ]
+      },
+      "delete": {
+        "operationId": "PromotionV2Controller_delete_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "promotions-v2"
+        ]
+      }
+    },
+    "/v2/promotions/evaluate": {
+      "post": {
+        "operationId": "PromotionV2Controller_evaluate_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluateCartDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "promotions-v2"
+        ]
+      }
+    },
+    "/v2/promotions": {
+      "post": {
+        "operationId": "PromotionV2Controller_create_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePromotionV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "promotions-v2"
+        ]
+      }
+    },
+    "/v2/promotions/{id}/duplicate": {
+      "post": {
+        "operationId": "PromotionV2Controller_duplicate_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "promotions-v2"
+        ]
+      }
+    },
+    "/v2/promotions/{id}/status": {
+      "patch": {
+        "operationId": "PromotionV2Controller_changeStatus_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePromotionStatusV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "promotions-v2"
+        ]
+      }
+    },
+    "/v2/vouchers/search": {
+      "post": {
+        "operationId": "VoucherV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoucherSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "vouchers-v2"
+        ]
+      }
+    },
+    "/v2/vouchers": {
+      "post": {
+        "operationId": "VoucherV2Controller_create_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVoucherDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoucherEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "vouchers-v2"
+        ]
+      }
+    },
+    "/v2/vouchers/{id}": {
+      "put": {
+        "operationId": "VoucherV2Controller_update_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoucherEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "vouchers-v2"
+        ]
+      },
+      "delete": {
+        "operationId": "VoucherV2Controller_deactivate_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoucherEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "vouchers-v2"
+        ]
+      }
+    },
+    "/v2/vouchers/{id}/duplicate": {
+      "post": {
+        "operationId": "VoucherV2Controller_duplicate_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DuplicateVoucherDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoucherEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "vouchers-v2"
+        ]
+      }
+    },
     "/reports/dashboard": {
       "get": {
         "operationId": "ReportingController_getDashboard",
@@ -23605,7 +24017,8 @@
               "SUPPLIER",
               "DELIVERY_PARTNER",
               "WAREHOUSE",
-              "CUSTOMER_GROUP"
+              "CUSTOMER_GROUP",
+              "PROMOTION"
             ]
           },
           "branchId": {
@@ -23680,7 +24093,8 @@
               "SUPPLIER",
               "DELIVERY_PARTNER",
               "WAREHOUSE",
-              "CUSTOMER_GROUP"
+              "CUSTOMER_GROUP",
+              "PROMOTION"
             ],
             "type": "string"
           },
@@ -23818,7 +24232,8 @@
               "SUPPLIER",
               "DELIVERY_PARTNER",
               "WAREHOUSE",
-              "CUSTOMER_GROUP"
+              "CUSTOMER_GROUP",
+              "PROMOTION"
             ],
             "type": "string"
           },
@@ -34812,6 +35227,19 @@
           "code": {
             "type": "string"
           },
+          "issuer": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "TRACKING",
+              "STOPPED"
+            ],
+            "type": "string"
+          },
           "faceValue": {
             "type": "number"
           },
@@ -34861,9 +35289,8 @@
         },
         "required": [
           "code",
+          "status",
           "faceValue",
-          "validFrom",
-          "validTo",
           "isUsed",
           "isActive",
           "id",
@@ -34879,6 +35306,19 @@
           "code": {
             "type": "string"
           },
+          "issuer": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "TRACKING",
+              "STOPPED"
+            ],
+            "type": "string"
+          },
           "faceValue": {
             "type": "number",
             "minimum": 0
@@ -34888,7 +35328,8 @@
             "format": "uuid"
           },
           "validFrom": {
-            "type": "string"
+            "type": "string",
+            "description": "Omit for an unlimited-duration voucher (FR-051)."
           },
           "validTo": {
             "type": "string"
@@ -34896,9 +35337,8 @@
         },
         "required": [
           "code",
-          "faceValue",
-          "validFrom",
-          "validTo"
+          "issuer",
+          "faceValue"
         ]
       },
       "PromotionEntity": {
@@ -35040,6 +35480,733 @@
         },
         "required": [
           "type",
+          "code"
+        ]
+      },
+      "PromotionSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 200,
+            "description": "FR-005: 50 rows/page by default"
+          },
+          "name": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "description": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "type": {
+            "$ref": "#/components/schemas/EnumFilterDto"
+          },
+          "status": {
+            "description": "Not applied by default — the \"Tracking only\" default is a FE-side chip (FR-004), not a hidden server filter",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnumFilterDto"
+              }
+            ]
+          },
+          "applyTo": {
+            "$ref": "#/components/schemas/EnumFilterDto"
+          },
+          "startDate": {
+            "$ref": "#/components/schemas/DateRangeFilterDto"
+          },
+          "endDate": {
+            "$ref": "#/components/schemas/DateRangeFilterDto"
+          }
+        }
+      },
+      "EvaluateCartLineInputDto": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "string",
+            "description": "Client-supplied, echoed back in lineDiscounts so the client can map results without guessing by order"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1
+          },
+          "unitPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "manualLineDiscount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Per-line discount the cashier already entered manually"
+          }
+        },
+        "required": [
+          "lineId",
+          "itemId",
+          "quantity",
+          "unitPrice"
+        ]
+      },
+      "EvaluateCartDto": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Omit for a walk-in customer"
+          },
+          "at": {
+            "type": "string",
+            "description": "ISO datetime; omitted = server current time"
+          },
+          "selectedProgramIds": {
+            "description": "Ids of auto_apply=false programs the cashier picked manually",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvaluateCartLineInputDto"
+            }
+          }
+        },
+        "required": [
+          "lines"
+        ]
+      },
+      "PromotionLineInputDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "enum": [
+              "CONDITION",
+              "REWARD"
+            ],
+            "type": "string"
+          },
+          "targetType": {
+            "enum": [
+              "PRODUCT",
+              "ITEM",
+              "CATEGORY"
+            ],
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0
+          },
+          "discountMode": {
+            "enum": [
+              "PERCENT",
+              "AMOUNT",
+              "FIXED_PRICE"
+            ],
+            "type": "string"
+          },
+          "discountValue": {
+            "type": "number"
+          },
+          "maxUnitPrice": {
+            "type": "number",
+            "minimum": 0,
+            "description": "\"Selling price <=\" filter on the gift-item grid (FR-033)"
+          },
+          "sortOrder": {
+            "type": "number",
+            "default": 0
+          }
+        },
+        "required": [
+          "role",
+          "targetType",
+          "targetId"
+        ]
+      },
+      "PromotionTierInputDto": {
+        "type": "object",
+        "properties": {
+          "fromValue": {
+            "type": "number",
+            "minimum": 0
+          },
+          "toValue": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Omit for an unbounded (infinite) upper tier"
+          },
+          "discountMode": {
+            "enum": [
+              "PERCENT",
+              "AMOUNT",
+              "FIXED_PRICE"
+            ],
+            "type": "string"
+          },
+          "discountValue": {
+            "type": "number"
+          },
+          "sortOrder": {
+            "type": "number",
+            "default": 0
+          }
+        },
+        "required": [
+          "fromValue",
+          "discountMode",
+          "discountValue"
+        ]
+      },
+      "PromotionGroupInputDto": {
+        "type": "object",
+        "properties": {
+          "ordinal": {
+            "type": "number",
+            "minimum": 0,
+            "description": "0 for the implicit single group of every non-TIERED_DISCOUNT type"
+          },
+          "name": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PromotionLineInputDto"
+            }
+          },
+          "tiers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PromotionTierInputDto"
+            }
+          }
+        },
+        "required": [
+          "ordinal"
+        ]
+      },
+      "PromotionConditionInputDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "NONE",
+              "MIN_INVOICE_AMOUNT",
+              "SPECIFIC_QUANTITY"
+            ],
+            "type": "string"
+          },
+          "minAmount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "calcBasis": {
+            "enum": [
+              "ALL_ITEMS",
+              "NON_PROMO_ITEMS",
+              "ITEM_CATEGORIES"
+            ],
+            "type": "string"
+          },
+          "groupMatchMode": {
+            "enum": [
+              "ANY",
+              "ALL"
+            ],
+            "type": "string"
+          },
+          "multiplyGift": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "CreatePromotionV2Dto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "INVOICE_DISCOUNT",
+              "ITEM_DISCOUNT",
+              "TIERED_DISCOUNT",
+              "GIFT_ITEM",
+              "BUY_M_GET_N"
+            ],
+            "type": "string",
+            "description": "Immutable after creation (FR-006) — change type by duplicating instead"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "applyTo": {
+            "enum": [
+              "ALL_CUSTOMERS",
+              "CUSTOMER_GROUP",
+              "BIRTHDAY",
+              "CARD_TIER"
+            ],
+            "type": "string"
+          },
+          "birthdayMatch": {
+            "enum": [
+              "EXACT_DAY",
+              "SAME_WEEK",
+              "SAME_MONTH",
+              "RANGE"
+            ],
+            "type": "string"
+          },
+          "birthdayBeforeDays": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Only when birthdayMatch = RANGE"
+          },
+          "birthdayAfterDays": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Only when birthdayMatch = RANGE"
+          },
+          "cardTierId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Only when applyTo = CARD_TIER"
+          },
+          "customerGroupIds": {
+            "description": "Only when applyTo = CUSTOMER_GROUP",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "startDate": {
+            "type": "string",
+            "example": "2026-01-01",
+            "description": "Omit for no start bound"
+          },
+          "endDate": {
+            "type": "string",
+            "example": "2026-12-31",
+            "description": "Omit for no end bound"
+          },
+          "daysOfWeek": {
+            "description": "ISO day-of-week (1=Monday..7=Sunday); empty = every day",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "maximum": 7,
+              "minimum": 1
+            }
+          },
+          "startTime": {
+            "type": "string",
+            "example": "18:00"
+          },
+          "endTime": {
+            "type": "string",
+            "example": "21:00",
+            "description": "endTime < startTime is an overnight window (FR-022), not an error"
+          },
+          "autoApply": {
+            "type": "boolean",
+            "default": true
+          },
+          "priority": {
+            "type": "number",
+            "default": 100,
+            "description": "Lower runs first when programs contend for the same resource (BR-001)"
+          },
+          "branchIds": {
+            "description": "promotion_branches — empty = whole chain (BR-005)",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "invoiceScope": {
+            "enum": [
+              "NON_PROMO_ONLY",
+              "ALL_ITEMS"
+            ],
+            "type": "string",
+            "description": "INVOICE_DISCOUNT only"
+          },
+          "discountMode": {
+            "enum": [
+              "PERCENT",
+              "AMOUNT",
+              "FIXED_PRICE"
+            ],
+            "type": "string",
+            "description": "INVOICE_DISCOUNT only"
+          },
+          "discountValue": {
+            "type": "number",
+            "description": "INVOICE_DISCOUNT only"
+          },
+          "maxDiscountAmount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "TIERED_DISCOUNT + tierBasis=INVOICE_VALUE only"
+          },
+          "tierBasis": {
+            "enum": [
+              "QUANTITY",
+              "ITEM_VALUE",
+              "INVOICE_VALUE"
+            ],
+            "type": "string",
+            "description": "TIERED_DISCOUNT only"
+          },
+          "tierScope": {
+            "enum": [
+              "PER_ITEM",
+              "ALL_ITEMS_IN_GROUP"
+            ],
+            "type": "string",
+            "description": "TIERED_DISCOUNT only"
+          },
+          "targetType": {
+            "enum": [
+              "PRODUCT",
+              "ITEM",
+              "CATEGORY"
+            ],
+            "type": "string",
+            "description": "Default grid target for TIERED_DISCOUNT/BUY_M_GET_N"
+          },
+          "giftMode": {
+            "enum": [
+              "ONE_OF",
+              "ALL_OF"
+            ],
+            "type": "string",
+            "description": "GIFT_ITEM only"
+          },
+          "buyGetPolicy": {
+            "enum": [
+              "SPECIFIC",
+              "CHEAPEST"
+            ],
+            "type": "string",
+            "description": "BUY_M_GET_N only"
+          },
+          "buyQuantity": {
+            "type": "number",
+            "minimum": 1,
+            "description": "BUY_M_GET_N only — the \"m\" in \"buy m get n\""
+          },
+          "giftQuantity": {
+            "type": "number",
+            "minimum": 1,
+            "description": "BUY_M_GET_N only — the \"n\" in \"buy m get n\""
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PromotionGroupInputDto"
+            }
+          },
+          "condition": {
+            "$ref": "#/components/schemas/PromotionConditionInputDto"
+          }
+        },
+        "required": [
+          "type",
+          "name",
+          "applyTo",
+          "groups"
+        ]
+      },
+      "UpdatePromotionV2Dto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "INVOICE_DISCOUNT",
+              "ITEM_DISCOUNT",
+              "TIERED_DISCOUNT",
+              "GIFT_ITEM",
+              "BUY_M_GET_N"
+            ],
+            "type": "string",
+            "description": "Immutable after creation (FR-006) — change type by duplicating instead"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "applyTo": {
+            "enum": [
+              "ALL_CUSTOMERS",
+              "CUSTOMER_GROUP",
+              "BIRTHDAY",
+              "CARD_TIER"
+            ],
+            "type": "string"
+          },
+          "birthdayMatch": {
+            "enum": [
+              "EXACT_DAY",
+              "SAME_WEEK",
+              "SAME_MONTH",
+              "RANGE"
+            ],
+            "type": "string"
+          },
+          "birthdayBeforeDays": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Only when birthdayMatch = RANGE"
+          },
+          "birthdayAfterDays": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Only when birthdayMatch = RANGE"
+          },
+          "cardTierId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Only when applyTo = CARD_TIER"
+          },
+          "customerGroupIds": {
+            "description": "Only when applyTo = CUSTOMER_GROUP",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "startDate": {
+            "type": "string",
+            "example": "2026-01-01",
+            "description": "Omit for no start bound"
+          },
+          "endDate": {
+            "type": "string",
+            "example": "2026-12-31",
+            "description": "Omit for no end bound"
+          },
+          "daysOfWeek": {
+            "description": "ISO day-of-week (1=Monday..7=Sunday); empty = every day",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "maximum": 7,
+              "minimum": 1
+            }
+          },
+          "startTime": {
+            "type": "string",
+            "example": "18:00"
+          },
+          "endTime": {
+            "type": "string",
+            "example": "21:00",
+            "description": "endTime < startTime is an overnight window (FR-022), not an error"
+          },
+          "autoApply": {
+            "type": "boolean",
+            "default": true
+          },
+          "priority": {
+            "type": "number",
+            "default": 100,
+            "description": "Lower runs first when programs contend for the same resource (BR-001)"
+          },
+          "branchIds": {
+            "description": "promotion_branches — empty = whole chain (BR-005)",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "invoiceScope": {
+            "enum": [
+              "NON_PROMO_ONLY",
+              "ALL_ITEMS"
+            ],
+            "type": "string",
+            "description": "INVOICE_DISCOUNT only"
+          },
+          "discountMode": {
+            "enum": [
+              "PERCENT",
+              "AMOUNT",
+              "FIXED_PRICE"
+            ],
+            "type": "string",
+            "description": "INVOICE_DISCOUNT only"
+          },
+          "discountValue": {
+            "type": "number",
+            "description": "INVOICE_DISCOUNT only"
+          },
+          "maxDiscountAmount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "TIERED_DISCOUNT + tierBasis=INVOICE_VALUE only"
+          },
+          "tierBasis": {
+            "enum": [
+              "QUANTITY",
+              "ITEM_VALUE",
+              "INVOICE_VALUE"
+            ],
+            "type": "string",
+            "description": "TIERED_DISCOUNT only"
+          },
+          "tierScope": {
+            "enum": [
+              "PER_ITEM",
+              "ALL_ITEMS_IN_GROUP"
+            ],
+            "type": "string",
+            "description": "TIERED_DISCOUNT only"
+          },
+          "targetType": {
+            "enum": [
+              "PRODUCT",
+              "ITEM",
+              "CATEGORY"
+            ],
+            "type": "string",
+            "description": "Default grid target for TIERED_DISCOUNT/BUY_M_GET_N"
+          },
+          "giftMode": {
+            "enum": [
+              "ONE_OF",
+              "ALL_OF"
+            ],
+            "type": "string",
+            "description": "GIFT_ITEM only"
+          },
+          "buyGetPolicy": {
+            "enum": [
+              "SPECIFIC",
+              "CHEAPEST"
+            ],
+            "type": "string",
+            "description": "BUY_M_GET_N only"
+          },
+          "buyQuantity": {
+            "type": "number",
+            "minimum": 1,
+            "description": "BUY_M_GET_N only — the \"m\" in \"buy m get n\""
+          },
+          "giftQuantity": {
+            "type": "number",
+            "minimum": 1,
+            "description": "BUY_M_GET_N only — the \"n\" in \"buy m get n\""
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PromotionGroupInputDto"
+            }
+          },
+          "condition": {
+            "$ref": "#/components/schemas/PromotionConditionInputDto"
+          }
+        },
+        "required": [
+          "type",
+          "name",
+          "applyTo",
+          "groups"
+        ]
+      },
+      "ChangePromotionStatusV2Dto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "TRACKING",
+              "STOPPED"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "VoucherSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 200
+          },
+          "issuer": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "code": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "description": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "startDate": {
+            "$ref": "#/components/schemas/DateRangeFilterDto"
+          },
+          "endDate": {
+            "$ref": "#/components/schemas/DateRangeFilterDto"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EnumFilterDto"
+          },
+          "faceValue": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          }
+        }
+      },
+      "DuplicateVoucherDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "New voucher code (must be unique within the organization) — vouchers have no auto-numbering, so the client must supply one"
+          }
+        },
+        "required": [
           "code"
         ]
       },

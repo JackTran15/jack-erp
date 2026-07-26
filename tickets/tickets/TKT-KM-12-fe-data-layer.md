@@ -35,10 +35,12 @@ apps/backoffice-web/src/pages/promotions/
 - [ ] Mapper chỉ gửi các trường thuộc hình thức đang chọn — gửi thừa sẽ bị `forbidNonWhitelisted: true` từ chối 400.
 - [ ] Lỗi 400 kèm `issues[]` từ domain được surface ra dạng dùng được: hook trả `issues` để form gắn lỗi vào đúng trường, không chỉ toast một dòng chung chung.
 - [ ] Không đặt dữ liệu server vào Zustand — toàn bộ ở TanStack Query.
-- [ ] Ba lệch tên đã biết giữa type FE cũ và API mới được xử lý trong mapper hoặc sửa tại nguồn:
+- [ ] Năm lệch tên đã biết giữa type FE cũ và API mới được xử lý trong mapper hoặc sửa tại nguồn (2 mục cuối bổ sung sau khi viết `docs/26-promotion-design.md`, xem mục 10.3 ở đó):
   - `PromotionForm.PRODUCT_DISCOUNT` → `PromotionProgramType.ITEM_DISCOUNT`
   - `PromotionForm.GIFT` → `PromotionProgramType.GIFT_ITEM`
   - `PromotionApplyTo` FE (`programs.constants.ts`) đã bỏ `SPECIFIC_CUSTOMER`, hiện là `ALL_CUSTOMERS | CUSTOMER_GROUP | HAS_BIRTHDAY | HAS_CARD_TIER` — mapper chỉ còn map `HAS_BIRTHDAY` / `HAS_CARD_TIER` ↔ tên enum phía API
+  - *(amdt KM-01)* `TierTarget.VARIANT` (FE) ↔ `PromotionTargetType.ITEM` (API) — cùng khái niệm, tên khác
+  - *(amdt KM-01)* `GiftMode.ONE` / `GiftMode.ALL` (FE) ↔ `PromotionGiftMode.ONE_OF` / `ALL_OF` (API)
 
 ## Definition of Done
 

@@ -92,6 +92,8 @@ export enum GoodsDiscountMethod {
 /** Một dòng thiết lập giảm giá hàng hóa (bảng editable). */
 export interface GoodsDiscountRow {
   id: string;
+  /** Id thật (product/category id theo goodsDiscountScope) — rỗng khi chưa chọn từ picker. */
+  targetId: string;
   /** Mã nhóm hàng hóa (GROUP) hoặc mã hàng (PRODUCT). */
   code: string;
   /** Tên nhóm hàng hóa (GROUP) hoặc tên hàng hóa (PRODUCT). */
@@ -122,6 +124,8 @@ export enum TierTarget {
 /** Một dòng hàng hóa trong grid chọn hàng của nhóm giảm giá theo mức. */
 export interface TierProduct {
   id: string;
+  /** Id thật (product/item/category id theo TierTarget) — rỗng khi chưa chọn từ picker. */
+  targetId: string;
   /** Mã SKU / mã mẫu mã / mã nhóm hàng hóa (theo TierTarget). */
   code: string;
   name: string;
@@ -154,6 +158,8 @@ export enum GiftMode {
 /** Một dòng hàng hóa quà tặng (grid 5 cột của loại "Tặng hàng hóa"). */
 export interface GiftProduct {
   id: string;
+  /** Id hàng hóa thật (luôn cấp mẫu mã/ITEM) — rỗng khi chưa chọn từ picker. */
+  itemId: string;
   sku: string;
   name: string;
   unit: string;
@@ -172,6 +178,8 @@ export enum BuyGetGiftPolicy {
 /** Một dòng hàng hóa trong grid mua-m-tặng-n (điều kiện mua hoặc hàng được tặng). */
 export interface BuyGetRow {
   id: string;
+  /** Id thật (theo buyGetPurchaseTarget ở lưới điều kiện mua, luôn ITEM ở lưới quà) — rỗng khi chưa chọn từ picker. */
+  targetId: string;
   code: string;
   name: string;
   unit: string;
@@ -226,8 +234,14 @@ export interface ProgramFormState {
   buyGetPurchaseRows: BuyGetRow[];
   buyGetGiftRows: BuyGetRow[];
   autoApply: boolean;
+  /** BR-001 — thứ tự áp dụng khi nhiều CTKM chồng lấn, số nhỏ chạy trước. */
+  priority: number;
   conditionType: ConditionType;
   minTotalAmount: number | "";
   calcBasis: CalcBasis;
   applicableGoods: ApplicableGood[];
+  /** "m" trong "mua m tặng n" — chỉ dùng ở BUY_M_GET_N. */
+  buyQuantity: number | "";
+  /** "n" trong "mua m tặng n" — chỉ dùng ở BUY_M_GET_N. */
+  giftQuantity: number | "";
 }

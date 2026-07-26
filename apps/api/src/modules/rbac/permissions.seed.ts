@@ -183,6 +183,11 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "reporting.debts.read", module: "reporting" },
   { key: "reporting.profit.read", module: "reporting" },
 
+  // Promotion (CTKM)
+  { key: "promotion.read", module: "promotion" },
+  { key: "promotion.write", module: "promotion" },
+  { key: "promotion.delete", module: "promotion" },
+
   // Registration
   { key: "org.registration.submit", module: "registration" },
   { key: "org.registration.approve", module: "registration" },

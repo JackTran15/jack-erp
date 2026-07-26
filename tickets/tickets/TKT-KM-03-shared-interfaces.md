@@ -23,20 +23,20 @@ export enum PromotionProgramType {
   GIFT_ITEM        = 'GIFT_ITEM',
   BUY_M_GET_N      = 'BUY_M_GET_N',
 }
-export enum PromotionStatus       { TRACKING = 'TRACKING', STOPPED = 'STOPPED' }
-export enum PromotionApplyTo      { ALL_CUSTOMERS, CUSTOMER_GROUP, BIRTHDAY, CARD_TIER }   // string enum
-export enum PromotionBirthdayMatch{ EXACT_DAY, SAME_WEEK, SAME_MONTH }
-export enum PromotionDiscountMode { PERCENT, AMOUNT, FIXED_PRICE }
-export enum PromotionInvoiceScope { NON_PROMO_ONLY, ALL_ITEMS }
-export enum PromotionTierBasis    { QUANTITY, ITEM_VALUE, INVOICE_VALUE }
-export enum PromotionTierScope    { PER_ITEM, ALL_ITEMS_IN_GROUP }
-export enum PromotionTargetType   { PRODUCT, ITEM, CATEGORY }
-export enum PromotionGiftMode     { ONE_OF, ALL_OF }
-export enum PromotionBuyGetPolicy { SPECIFIC, CHEAPEST }
-export enum PromotionLineRole     { CONDITION, REWARD }
-export enum PromotionConditionType{ NONE, MIN_INVOICE_AMOUNT, SPECIFIC_QUANTITY }
-export enum PromotionCalcBasis    { ALL_ITEMS, NON_PROMO_ITEMS, ITEM_CATEGORIES }
-export enum PromotionGroupMatchMode { ANY, ALL }
+export enum PromotionStatus        { TRACKING = 'TRACKING', STOPPED = 'STOPPED' }
+export enum PromotionApplyTo       { ALL_CUSTOMERS = 'ALL_CUSTOMERS', CUSTOMER_GROUP = 'CUSTOMER_GROUP', BIRTHDAY = 'BIRTHDAY', CARD_TIER = 'CARD_TIER' }
+export enum PromotionBirthdayMatch { EXACT_DAY = 'EXACT_DAY', SAME_WEEK = 'SAME_WEEK', SAME_MONTH = 'SAME_MONTH', RANGE = 'RANGE' }  // amdt KM-01: before/afterDays
+export enum PromotionDiscountMode  { PERCENT = 'PERCENT', AMOUNT = 'AMOUNT', FIXED_PRICE = 'FIXED_PRICE' }
+export enum PromotionInvoiceScope  { NON_PROMO_ONLY = 'NON_PROMO_ONLY', ALL_ITEMS = 'ALL_ITEMS' }
+export enum PromotionTierBasis     { QUANTITY = 'QUANTITY', ITEM_VALUE = 'ITEM_VALUE', INVOICE_VALUE = 'INVOICE_VALUE' }
+export enum PromotionTierScope     { PER_ITEM = 'PER_ITEM', ALL_ITEMS_IN_GROUP = 'ALL_ITEMS_IN_GROUP' }
+export enum PromotionTargetType    { PRODUCT = 'PRODUCT', ITEM = 'ITEM', CATEGORY = 'CATEGORY' }
+export enum PromotionGiftMode      { ONE_OF = 'ONE_OF', ALL_OF = 'ALL_OF' }
+export enum PromotionBuyGetPolicy  { SPECIFIC = 'SPECIFIC', CHEAPEST = 'CHEAPEST' }
+export enum PromotionLineRole      { CONDITION = 'CONDITION', REWARD = 'REWARD' }
+export enum PromotionConditionType { NONE = 'NONE', MIN_INVOICE_AMOUNT = 'MIN_INVOICE_AMOUNT', SPECIFIC_QUANTITY = 'SPECIFIC_QUANTITY' }
+export enum PromotionCalcBasis     { ALL_ITEMS = 'ALL_ITEMS', NON_PROMO_ITEMS = 'NON_PROMO_ITEMS', ITEM_CATEGORIES = 'ITEM_CATEGORIES' }
+export enum PromotionGroupMatchMode{ ANY = 'ANY', ALL = 'ALL' }
 ```
 
 Kèm các interface đọc-ghi mà FE tiêu thụ: `PromotionProgramSummary` (dòng danh sách), `PromotionProgramDetail` (aggregate đầy đủ cho form), `PromotionGroupDto`, `PromotionLineDto`, `PromotionTierDto`, `PromotionConditionDto`, và bộ type của evaluate: `EvaluateCartRequest`, `EvaluateCartResponse`, `AppliedProgram`, `GiftOffer`, `SkippedProgram`.
@@ -59,7 +59,7 @@ Kèm các interface đọc-ghi mà FE tiêu thụ: `PromotionProgramSummary` (d�
 
 `programs.types.ts` của FE hiện có `PromotionForm` với đúng 5 giá trị `INVOICE_DISCOUNT | PRODUCT_DISCOUNT | TIERED_DISCOUNT | GIFT | BUY_M_GET_N` — **hai giá trị lệch tên** so với thiết kế (`PRODUCT_DISCOUNT` vs `ITEM_DISCOUNT`, `GIFT` vs `GIFT_ITEM`). Lấy tên theo pg enum (`ITEM_DISCOUNT`, `GIFT_ITEM`); FE sẽ đổi ở TKT-KM-13.
 
-Tương tự `PromotionApplyTo` của FE hiện là `ALL_CUSTOMERS | CUSTOMER_GROUP | SPECIFIC_CUSTOMER` — `SPECIFIC_CUSTOMER` **không có trong REQ**; REQ FR-021 là 4 giá trị `ALL_CUSTOMERS | CUSTOMER_GROUP | BIRTHDAY | CARD_TIER`. Lấy theo REQ; ghi chú sai lệch này để TKT-KM-13 sửa FE.
+Tương tự `PromotionApplyTo` của FE (`programs.constants.ts`) đã là 4 giá trị `ALL_CUSTOMERS | CUSTOMER_GROUP | HAS_BIRTHDAY | HAS_CARD_TIER`, khớp REQ FR-021 về số lượng nhưng lệch tên 2 giá trị cuối (`HAS_BIRTHDAY`/`HAS_CARD_TIER` so với `BIRTHDAY`/`CARD_TIER` của pg enum) — TKT-KM-12 map ở mapper, không đổi FE.
 
 Type cục bộ của FE (`ProgramFormState`, `TierGroup`, `GiftProduct`…) **giữ nguyên** — chúng là view-model của form, khác với DTO truyền qua dây. TKT-KM-12 sẽ viết mapper giữa hai lớp.
 
