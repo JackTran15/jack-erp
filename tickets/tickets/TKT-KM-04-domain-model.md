@@ -42,14 +42,15 @@ Kèm spec: `promotion-program.spec.ts`, `time-window.spec.ts`, `customer-scope.s
   - `end_date < start_date`
   - `discount_value <= 0` khi hình thức có mức giảm
   - `PERCENT` mà giá trị > 100
-  - lưới `REWARD` rỗng — trừ `INVOICE_DISCOUNT` và `TIERED_DISCOUNT` + `tier_basis = INVOICE_VALUE`
+  - lưới `REWARD` rỗng — trừ `INVOICE_DISCOUNT`, `TIERED_DISCOUNT` + `tier_basis = INVOICE_VALUE`, và `BUY_M_GET_N` + `buy_get_policy = CHEAPEST` *(amdt KM-04: CHEAPEST tặng đúng SP rẻ nhất trong lưới `CONDITION`, không có lưới `REWARD` riêng — xem ghi chú strategy ở KM-05)*
   - bậc thang chồng lấn, hoặc `from >= to` (khi `to` không null)
   - `apply_to = CUSTOMER_GROUP` mà danh sách nhóm rỗng; `apply_to = CARD_TIER` mà `card_tier_id` null
   - `TIERED_DISCOUNT` mà không có bậc nào
   - `BUY_M_GET_N` + `CHEAPEST` mà `buy_quantity` hoặc `gift_quantity` null / ≤ 0
 - [ ] `TimeWindow.contains()` đúng cho ca qua đêm: window `22:00–02:00` chứa `23:30` và `01:00`, **không** chứa `12:00` (FR-022).
 - [ ] `DateWindow.contains()`: `start` null = không giới hạn đầu, `end` null = không giới hạn cuối, cả hai null = luôn đúng (BR-003).
-- [ ] `CustomerScope.matches()` phủ 4 giá trị `apply_to`; nhánh `BIRTHDAY` phủ cả 3 `birthday_match` (`EXACT_DAY` / `SAME_WEEK` / `SAME_MONTH`); khách vãng lai (`customer = undefined`) chỉ khớp `ALL_CUSTOMERS`.
+- [ ] `CustomerScope.matches()` phủ 4 giá trị `apply_to`; nhánh `BIRTHDAY` phủ cả 4 `birthday_match` (`EXACT_DAY` / `SAME_WEEK` / `SAME_MONTH` / `RANGE`); khách vãng lai (`customer = undefined`) chỉ khớp `ALL_CUSTOMERS`.
+- [ ] *(amdt KM-01)* `birthday_match = RANGE`: so ngày-trong-năm của `birthDate` với `at`, cách `birthdayBeforeDays`/`birthdayAfterDays` ngày quanh mốc sinh nhật, **quấn vòng năm** khi khoảng vượt 31/12 (VD sinh nhật 30/12, `afterDays=5` phải khớp cả 1-4/01) — cùng kỹ thuật quấn vòng đã dùng cho `TimeWindow` ca qua đêm.
 - [ ] `roundVnd(479_500.4) === 479_500`; `roundVnd(685_000 * 0.3) === 205_500`.
 - [ ] `PromotionProgram` bất biến sau khi tạo (mọi field `readonly`); thao tác sửa trả về instance mới.
 - [ ] Port khai báo bằng `Symbol()` + `interface`, không phải `abstract class`.

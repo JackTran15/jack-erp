@@ -73,7 +73,7 @@ Endpoint này là mặt tiếp xúc duy nhất của engine với thế giới b
 - [ ] `lines` rỗng → 400 (`@ArrayMinSize(1)`).
 - [ ] Mọi CTKM bị loại đều xuất hiện trong `skippedPrograms` kèm `reason` thuộc union: `STOPPED` `DATE_WINDOW` `DAY_OF_WEEK` `TIME_OF_DAY` `BRANCH_SCOPE` `CUSTOMER_SCOPE` `CONDITION_NOT_MET` `RESOURCE_TAKEN` `NOT_SELECTED`. Không có CTKM nào "biến mất im lặng".
 - [ ] `Σ appliedPrograms[].discountAmount === promotionDiscount`; `subtotal − promotionDiscount === amountAfterPromotion`.
-- [ ] Số lần truy vấn DB trên một lần gọi là **hằng số** (không phụ thuộc số dòng giỏ hay số CTKM): 1 program + 1 con + 1 items + 1 categories + 1 customer + 1 membership card. Không N+1.
+- [ ] Số lần truy vấn DB trên một lần gọi là **hằng số theo hình dạng request** (không phụ thuộc số dòng giỏ hay số CTKM): 1 (danh sách CTKM active) + 6 (hydrate con song song, đã chốt ở amdt KM-06) + 2 (`TypeormCatalogReader.loadItems`: items + categories) = 9 truy vấn cố định khi giỏ hàng khách vãng lai; **+ 0-3 truy vấn nữa** khi có `customerId` (`TypeormCustomerReader.load`: customer, thẻ thành viên, và loại thẻ — truy vấn thứ 3 chỉ chạy khi khách có thẻ đang hoạt động). Không N+1 theo số dòng giỏ hay số CTKM ở cả hai trường hợp.
 - [ ] Kết quả khớp tay cho AC-01…AC-09 khi chạy trên dữ liệu thật (e2e ở TKT-KM-16).
 - [ ] Controller có `@RequirePermission('promotion.read')`, guard cấp class đầy đủ.
 
@@ -101,15 +101,30 @@ export class EvaluateCartHandler implements IQueryHandler<EvaluateCartQuery> {
 
   async execute({ dto, actor }: EvaluateCartQuery) {
     const at = dto.at ? new Date(dto.at) : new Date();
-    const itemIds = [...new Set(dto.lines.map(l => l.itemId))];
+    const cartItemIds = [...new Set(dto.lines.map(l => l.itemId))];
 
-    const [programs, catalog, customer] = await Promise.all([
-      this.programs.findActive(actor.organizationId, actor.branchId!, at),
+    // `programs` must resolve before `catalog.loadItems` — gift/reward targets
+    // (GIFT_ITEM, BUY_M_GET_N's SPECIFIC mode) reference items that are not
+    // necessarily in the cart at all (amdt KM-05: discovered while building
+    // GiftItemStrategy — `cart.catalog` is the engine's only source of item
+    // data, so a gift target missing from it silently produces no gift,
+    // see TKT-KM-05's "target không resolve được... bị bỏ qua im lặng").
+    const programs = await this.programs.findActive(actor.organizationId, actor.branchId!, at);
+    const targetItemIds = programs
+      .flatMap(p => p.groups.flatMap(g => g.lines))
+      .filter(l => l.targetType === PromotionTargetType.ITEM)
+      .map(l => l.targetId);
+    const itemIds = [...new Set([...cartItemIds, ...targetItemIds])];
+
+    const [catalog, customer] = await Promise.all([
       this.catalog.loadItems(actor.organizationId, itemIds),
       dto.customerId ? this.customers.load(actor.organizationId, dto.customerId) : undefined,
     ]);
 
-    const missing = itemIds.filter(id => !catalog.has(id));
+    // UNKNOWN_ITEM only checks cart lines — a gift/reward target missing from
+    // the catalog is a data-quality issue in the promotion itself (handled
+    // silently by the engine), not a client error.
+    const missing = cartItemIds.filter(id => !catalog.has(id));
     if (missing.length) throw new BadRequestException({ code: 'UNKNOWN_ITEM', itemIds: missing });
     if (dto.customerId && !customer) throw new BadRequestException({ code: 'UNKNOWN_CUSTOMER' });
 
@@ -126,7 +141,7 @@ export class EvaluateCartHandler implements IQueryHandler<EvaluateCartQuery> {
 
 `PromotionResolver` đăng ký như một provider thường (`providers: [PromotionResolver]`) — nó là class thuần TS không phụ thuộc gì, đưa vào DI chỉ để inject cho tiện, không phải vì nó cần container.
 
-`actor.branchId` bắt buộc cho endpoint này (`@RequireBranchScope()`) — phạm vi chi nhánh là điều kiện lọc CTKM. Nếu thiếu header `X-Branch-Id` → 400 từ guard sẵn có.
+`actor.branchId` bắt buộc cho endpoint này (`@RequireBranchScope()`, cần thêm `BranchScopeGuard` vào `@UseGuards` cấp class — metadata một mình không đủ) — phạm vi chi nhánh là điều kiện lọc CTKM. Nếu thiếu header `X-Branch-Id` → **403** (`ForbiddenException`) từ `BranchScopeGuard` sẵn có, không phải 400.
 
 **Chưa làm cache.** Mỗi lần gọi đọc thẳng DB. Với vài chục CTKM/org thì 6 truy vấn có index là đủ nhanh. Nếu epic POS đo thấy chậm, khi đó mới thêm cache Redis keyed `org:branch:date` và invalidate ở command — đừng làm trước khi có số đo.
 

@@ -15,6 +15,7 @@ export const PERMISSION_MODULE_LABELS_VI: Record<string, string> = {
   events: 'Sự kiện',
   crud: 'Dữ liệu danh mục',
   iam: 'Phân quyền & người dùng',
+  promotion: 'Khuyến mại',
 };
 
 /** Vietnamese labels for permission keys (role editor checkboxes). */
@@ -195,6 +196,11 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
   'reporting.invoice-template.manage': 'Quản lý mẫu báo cáo hóa đơn',
   'inventory.reports.read': 'Xem báo cáo nhập xuất tồn kho',
   'reporting.debts.read': 'Xem báo cáo công nợ',
+
+  // Khuyến mại (CTKM)
+  'promotion.read': 'Xem chương trình khuyến mại',
+  'promotion.write': 'Thêm/sửa chương trình khuyến mại',
+  'promotion.delete': 'Xóa chương trình khuyến mại',
 
   // Đăng ký
   'org.registration.submit': 'Gửi đăng ký tổ chức',

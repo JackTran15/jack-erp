@@ -39,7 +39,7 @@ apps/api/src/modules/promotion/application/
 - [ ] Mặc định **không** lọc `status`: bộ lọc `Đang theo dõi` là mặc định của **FE** (FR-004) và hiển thị bằng chip xóa được. API không được âm thầm ẩn dữ liệu.
 - [ ] Dòng danh sách trả đủ cột FR-001: `name`, `startDate`, `endDate`, `applyTo`, `type`, `description`, `status`, cộng `code` và `priority`.
 - [ ] Search **không** nạp `groups/lines/tiers` (danh sách không cần) — tránh kéo hàng nghìn dòng con.
-- [ ] `GET /v2/promotions/:id` nạp **trọn aggregate** trong tối đa 2 truy vấn, đủ để FE dựng lại `ProgramFormState` mà không gọi thêm.
+- [ ] `GET /v2/promotions/:id` nạp **trọn aggregate** qua `PromotionRepositoryPort.findById()` (đã chốt ở amdt KM-06: 1 program + 6 con song song, hằng số không phụ thuộc kích thước aggregate) **cộng thêm tối đa 3 truy vấn `IN`** để resolve `targetCode`/`targetName` cho `promotion_lines` (items/products/categories, chỉ chạy khi có dòng thuộc loại đó) — tổng vẫn là hằng số, đủ để FE dựng lại `ProgramFormState` mà không gọi thêm.
 - [ ] `GET` inline thông tin tham chiếu vào từng dòng con: mỗi `line` có `{ targetId, targetType, targetCode, targetName, unit, sellingPrice }` resolve sẵn — **không** trả map gốc dạng `{ [id]: X }`. Đây là quy ước đã chốt của repo.
 - [ ] `GET` của org khác → 404. Bản ghi đã soft-delete → 404.
 - [ ] `soft-deleted` không xuất hiện trong search.

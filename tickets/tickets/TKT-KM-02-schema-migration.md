@@ -6,7 +6,7 @@
 
 ## Summary
 
-Dựng schema chuẩn hóa cho CTKM: 7 bảng mới + 12 pg enum, thêm `DocumentType.PROMOTION` (prefix `KM`) để auto-sinh mã chương trình, và 3 permission key mới. Bảng `promotions` cũ (jsonb) **không đụng tới**. Đây là nền cho toàn epic.
+Dựng schema chuẩn hóa cho CTKM: 7 bảng mới + 15 pg enum, thêm `DocumentType.PROMOTION` (prefix `KM`) để auto-sinh mã chương trình, và 3 permission key mới. Bảng `promotions` cũ (jsonb) **không đụng tới**. Đây là nền cho toàn epic.
 
 ## Deliverables
 
@@ -17,7 +17,7 @@ Dựng schema chuẩn hóa cho CTKM: 7 bảng mới + 12 pg enum, thêm `Documen
   ALTER TYPE "document_number_rules_document_type_enum" ADD VALUE IF NOT EXISTS 'PROMOTION'
   ```
   Theo đúng mẫu `1780400000000-AddGoodsReceiptToDocumentTypeEnum.ts`. `down()` để trống kèm comment — Postgres không gỡ được giá trị enum.
-- `apps/api/src/database/migrations/<ts+1>-AddPromotionProgramTables.ts` — `CREATE TYPE` (12 enum) + `CREATE TABLE` (7 bảng) + index.
+- `apps/api/src/database/migrations/<ts+1>-AddPromotionProgramTables.ts` — `CREATE TYPE` (15 enum) + `CREATE TABLE` (7 bảng) + index.
 - `apps/api/src/database/migrations/<ts+2>-SeedPromotionPermissions.ts` — chỉ nếu permission cần ghi DB; kiểm tra trước: `PermissionSyncService` đồng bộ `PERMISSION_DEFINITIONS` lúc boot, nếu vậy **bỏ migration này** và chỉ sửa seed file.
 
 **Enum (pg):**
@@ -27,7 +27,7 @@ Dựng schema chuẩn hóa cho CTKM: 7 bảng mới + 12 pg enum, thêm `Documen
 | `promotion_program_type_enum` | `INVOICE_DISCOUNT` `ITEM_DISCOUNT` `TIERED_DISCOUNT` `GIFT_ITEM` `BUY_M_GET_N` |
 | `promotion_status_enum` | `TRACKING` `STOPPED` |
 | `promotion_apply_to_enum` | `ALL_CUSTOMERS` `CUSTOMER_GROUP` `BIRTHDAY` `CARD_TIER` |
-| `promotion_birthday_match_enum` | `EXACT_DAY` `SAME_WEEK` `SAME_MONTH` |
+| `promotion_birthday_match_enum` | `EXACT_DAY` `SAME_WEEK` `SAME_MONTH` `RANGE` *(amdt KM-01: FE `GeneralInfoPromotionSection.tsx` đã build chế độ RANGE trước/sau N ngày — xem `docs/26-promotion-design.md` mục 10.2)* |
 | `promotion_discount_mode_enum` | `PERCENT` `AMOUNT` `FIXED_PRICE` |
 | `promotion_invoice_scope_enum` | `NON_PROMO_ONLY` `ALL_ITEMS` |
 | `promotion_tier_basis_enum` | `QUANTITY` `ITEM_VALUE` `INVOICE_VALUE` |
@@ -54,6 +54,8 @@ Dựng schema chuẩn hóa cho CTKM: 7 bảng mới + 12 pg enum, thêm `Documen
 | `priority` | int | ✗ | DEFAULT `100`, nhỏ = ưu tiên cao (BR-001) |
 | `apply_to` | `promotion_apply_to_enum` | ✗ | DEFAULT `'ALL_CUSTOMERS'` |
 | `birthday_match` | `promotion_birthday_match_enum` | ✓ | chỉ khi `apply_to = BIRTHDAY` |
+| `birthday_before_days` | smallint | ✓ | *(amdt KM-01)* chỉ khi `birthday_match = RANGE` |
+| `birthday_after_days` | smallint | ✓ | *(amdt KM-01)* chỉ khi `birthday_match = RANGE` |
 | `card_tier_id` | uuid | ✓ | `membership_card_types.id`, không FK (khác module) |
 | `start_date` / `end_date` | date | ✓ | null = vô thời hạn (BR-003) |
 | `days_of_week` | smallint[] | ✗ | DEFAULT `'{}'`, ISO 1..7, rỗng = mọi ngày |
@@ -101,7 +103,7 @@ Danh sách nhóm hàng hóa của `calc_basis = ITEM_CATEGORIES` và lưới SKU
 ## Acceptance Criteria
 
 - [ ] `pnpm migration:run` sạch trên DB đang có dữ liệu (không drop, không đụng `promotions` / `discount_codes` / `invoice_promotions`).
-- [ ] `pnpm migration:revert` × 3 gỡ sạch 7 bảng + 15 enum mới; chạy `migration:run` lại vẫn sạch (idempotent).
+- [ ] `pnpm migration:revert` × 2 gỡ sạch 7 bảng + 15 enum mới (chỉ 2 migration — permission seed không cần migration riêng, xem Deliverables); chạy `migration:run` lại vẫn sạch (idempotent).
 - [ ] `ALTER TYPE ... ADD VALUE` nằm ở **file migration riêng**, không chung file với bất kỳ câu nào dùng giá trị `'PROMOTION'`.
 - [ ] Mọi FK con → `promotion_programs` đều `ON DELETE CASCADE`.
 - [ ] Không có FK trên `promotion_lines.target_id`; có index `(organization_id, target_type, target_id)`.
@@ -114,7 +116,7 @@ Danh sách nhóm hàng hóa của `calc_basis = ITEM_CATEGORIES` và lưới SKU
 - [ ] `pnpm --filter @erp/api test` và `lint` xanh.
 - [ ] `synchronize` vẫn `false`; không thay đổi schema ngoài migration.
 - [ ] Không có tiếng Việt trong source backend (comment migration, comment cột đều tiếng Anh).
-- [ ] `pnpm migration:show` liệt kê đủ 3 migration mới ở trạng thái đã chạy.
+- [ ] `pnpm migration:show` liệt kê đủ 2 migration mới ở trạng thái đã chạy.
 
 ## Tech Approach
 
