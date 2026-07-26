@@ -105,6 +105,7 @@ export function blankApplicableGroup(): ApplicableGroup {
 export function blankGoodsDiscountRow(): GoodsDiscountRow {
   return {
     id: crypto.randomUUID(),
+    targetId: "",
     code: "",
     name: "",
     value: "",
@@ -135,7 +136,7 @@ export const TIER_TARGET_OPTIONS: { value: TierTarget; label: string }[] = [
 ];
 
 export function blankTierProduct(): TierProduct {
-  return { id: crypto.randomUUID(), code: "", name: "", unit: "" };
+  return { id: crypto.randomUUID(), targetId: "", code: "", name: "", unit: "" };
 }
 
 export function blankTierRow(): TierRow {
@@ -159,6 +160,7 @@ export const GIFT_MODE_OPTIONS: { value: GiftMode; label: string }[] = [
 export function blankGiftProduct(): GiftProduct {
   return {
     id: crypto.randomUUID(),
+    itemId: "",
     sku: "",
     name: "",
     unit: "",
@@ -178,6 +180,7 @@ export const BUY_GET_GIFT_POLICY_OPTIONS: {
 export function blankBuyGetRow(): BuyGetRow {
   return {
     id: crypto.randomUUID(),
+    targetId: "",
     code: "",
     name: "",
     unit: "",
@@ -224,9 +227,12 @@ export function buildInitialFormState(): ProgramFormState {
     buyGetPurchaseRows: [blankBuyGetRow()],
     buyGetGiftRows: [blankBuyGetRow()],
     autoApply: true,
+    priority: 100,
     conditionType: ConditionType.NONE,
     minTotalAmount: 0,
     calcBasis: CalcBasis.ALL_ITEMS,
     applicableGoods: [blankApplicableGood()],
+    buyQuantity: 1,
+    giftQuantity: 1,
   };
 }

@@ -28,6 +28,7 @@ export enum DocumentType {
   DELIVERY_PARTNER = 'DELIVERY_PARTNER', // DTGH
   WAREHOUSE = 'WAREHOUSE', // WH
   CUSTOMER_GROUP = 'CUSTOMER_GROUP', // NKH
+  PROMOTION = 'PROMOTION', // KM
 }
 
 export interface DocumentNumberRule {

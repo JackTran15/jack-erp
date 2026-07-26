@@ -576,6 +576,7 @@ function formatDocumentTypeLabel(documentType: DocumentType): string {
     [DocumentType.DELIVERY_PARTNER]: "Đối tác giao hàng",
     [DocumentType.WAREHOUSE]: "Kho lưu trữ",
     [DocumentType.CUSTOMER_GROUP]: "Nhóm khách hàng",
+    [DocumentType.PROMOTION]: "Chương trình khuyến mại",
   };
   return labels[documentType];
 }
@@ -621,6 +622,7 @@ function defaultPrefix(documentType: DocumentType): string {
     [DocumentType.DELIVERY_PARTNER]: "DTGH",
     [DocumentType.WAREHOUSE]: "WH",
     [DocumentType.CUSTOMER_GROUP]: "NKH",
+    [DocumentType.PROMOTION]: "KM",
   };
   return prefixMap[documentType];
 }

@@ -49,7 +49,7 @@ apps/api/src/modules/promotion/application/
 - [ ] `delete` là **soft delete** (`deleted_at`). Có hook `assertNotReferenced()` kiểm tra `invoice_promotions.ref_id` — hiện luôn rỗng vì POS chưa nối, nhưng đặt sẵn để epic POS không quên (FR-009).
 - [ ] Mọi handler lọc theo `actor.organizationId`; sửa/xóa CTKM của org khác → 404, không phải 403 (không tiết lộ tồn tại).
 - [ ] Gửi lại cùng `X-Idempotency-Key` + cùng body → replay response cũ (`X-Idempotency-Status: REPLAYED`); cùng key + body khác → 409. Không tự hiện thực lại, chỉ xác nhận interceptor toàn cục vẫn ăn route v2.
-- [ ] Controller có `@UseGuards(AuthGuard, PermissionGuard)` ở cấp class và `@RequirePermission(...)` từng method. **Không** để `@RequirePermission` bị comment như `invoice-v2.controller.ts` đang mắc.
+- [ ] Controller có `@UseGuards(PermissionGuard)` ở cấp class và `@RequirePermission(...)` từng method. *(amdt KM-07, chốt sau khi implement)*: không cần liệt kê thêm `AuthGuard` — nó đã đăng ký toàn cục qua `APP_GUARD` trong `common.module.ts` (đúng theo `invoice-v2.controller.ts` và chú thích ở `inventory-reports.controller.ts`); kiểm bằng request không token tới cả 5 route mới → 401. **Không** để `@RequirePermission` bị comment như `invoice-v2.controller.ts` đang mắc.
 
 ## Definition of Done
 

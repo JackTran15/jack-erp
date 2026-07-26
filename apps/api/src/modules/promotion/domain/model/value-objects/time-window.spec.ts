@@ -1,0 +1,43 @@
+import { TimeWindow, TimeOfDay } from './time-window';
+
+function t(hours: number, minutes: number): TimeOfDay {
+  return { hours, minutes };
+}
+
+describe('TimeWindow', () => {
+  it('is always open when both bounds are missing', () => {
+    const window = TimeWindow.of(undefined, undefined);
+    expect(window.contains(t(0, 0))).toBe(true);
+    expect(window.contains(t(23, 59))).toBe(true);
+  });
+
+  describe('same-day window (18:00-21:00)', () => {
+    const window = TimeWindow.of(t(18, 0), t(21, 0));
+
+    it.each([
+      ['before start (15:00)', t(15, 0), false],
+      ['at start (18:00)', t(18, 0), true],
+      ['inside (19:30)', t(19, 30), true],
+      ['at end (21:00)', t(21, 0), true],
+      ['after end (21:01)', t(21, 1), false],
+    ])('%s -> %s', (_label, at, expected) => {
+      expect(window.contains(at as TimeOfDay)).toBe(expected);
+    });
+  });
+
+  describe('overnight window spanning midnight (22:00-02:00)', () => {
+    const window = TimeWindow.of(t(22, 0), t(2, 0));
+
+    it.each([
+      ['23:30', t(23, 30), true],
+      ['01:00', t(1, 0), true],
+      ['22:00 (start)', t(22, 0), true],
+      ['02:00 (end)', t(2, 0), true],
+      ['12:00 (outside)', t(12, 0), false],
+      ['02:01 (just after end)', t(2, 1), false],
+      ['21:59 (just before start)', t(21, 59), false],
+    ])('%s -> %s', (_label, at, expected) => {
+      expect(window.contains(at as TimeOfDay)).toBe(expected);
+    });
+  });
+});
