@@ -91,7 +91,9 @@ describe("InventoryItemCrudService.lookupByCode", () => {
     expect(queryMock).toHaveBeenCalledTimes(1);
     expect(paramsOf()).toEqual(["org-1", "SKU-1"]);
     // Both the SKU and the barcode match against the same parameter.
-    expect(sqlOf()).toContain("(i.code = $2 OR b.code = $2)");
+    expect(sqlOf()).toContain(
+      "(LOWER(i.code) = LOWER($2) OR LOWER(b.code) = LOWER($2))",
+    );
   });
 
   it("matches an item by an attached barcode", async () => {
@@ -102,6 +104,16 @@ describe("InventoryItemCrudService.lookupByCode", () => {
     expect(result).toEqual([row]);
     expect(paramsOf()).toEqual(["org-1", "8938500123457"]);
     expect(sqlOf()).toContain("LEFT JOIN item_barcodes b");
+  });
+
+  it("matches SKU and barcode without depending on Caps Lock", async () => {
+    queryMock.mockResolvedValueOnce([row]);
+
+    await service.lookupByCode("sku-1", actor);
+
+    expect(paramsOf()).toEqual(["org-1", "sku-1"]);
+    expect(sqlOf()).toContain("LOWER(i.code) = LOWER($2)");
+    expect(sqlOf()).toContain("LOWER(b.code) = LOWER($2)");
   });
 
   it("scopes the query to the actor organization (no cross-org match)", async () => {

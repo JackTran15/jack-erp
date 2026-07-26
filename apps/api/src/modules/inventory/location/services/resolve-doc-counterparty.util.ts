@@ -2,7 +2,6 @@ import { BadRequestException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { DocCounterpartyKind } from '@erp/shared-interfaces';
 import { ProviderEntity } from '../provider.entity';
-import { CustomerEntity } from '../../../customer/customer.entity';
 import { UserEntity } from '../../../auth/user.entity';
 
 export interface DocCounterpartyInput {
@@ -22,7 +21,6 @@ export interface ResolvedDocCounterparty {
  * Resolve the "Đối tượng" of a goods document (receipt / issue). Validates the
  * counterparty exists in the org and routes it:
  *  - supplier  → provider_id (+ counterparty cols) so post()'s nợ-NCC path works
- *  - customer  → counterparty cols only, provider_id null
  *  - employee  → counterparty cols only, provider_id null
  *
  * Only validates/routes when counterpartyKind is explicitly set. Legacy callers
@@ -47,6 +45,12 @@ export async function resolveDocCounterparty(
   }
   const id = input.counterpartyId;
 
+  if (input.counterpartyKind === DocCounterpartyKind.CUSTOMER) {
+    throw new BadRequestException(
+      'Đối tượng phiếu kho chỉ bao gồm nhà cung cấp và nhân viên',
+    );
+  }
+
   if (input.counterpartyKind === DocCounterpartyKind.SUPPLIER) {
     const provider = await manager.findOne(ProviderEntity, {
       where: { id, organizationId },
@@ -59,22 +63,6 @@ export async function resolveDocCounterparty(
     return {
       providerId: id,
       counterpartyKind: DocCounterpartyKind.SUPPLIER,
-      counterpartyId: id,
-    };
-  }
-
-  if (input.counterpartyKind === DocCounterpartyKind.CUSTOMER) {
-    const customer = await manager.findOne(CustomerEntity, {
-      where: { id, organizationId },
-    });
-    if (!customer) {
-      throw new BadRequestException(
-        'Customer counterparty not found in organization',
-      );
-    }
-    return {
-      providerId: undefined,
-      counterpartyKind: DocCounterpartyKind.CUSTOMER,
       counterpartyId: id,
     };
   }

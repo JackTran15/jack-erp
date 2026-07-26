@@ -1295,7 +1295,7 @@ export class InventoryItemCrudService extends BaseCrudService<
          ON ic.id = i.category_id
        WHERE i.organization_id = $1
          AND i.is_active = true
-         AND (i.code = $2 OR b.code = $2)
+         AND (LOWER(i.code) = LOWER($2) OR LOWER(b.code) = LOWER($2))
        ORDER BY i.code ASC`,
       [actor.organizationId, trimmed],
     );

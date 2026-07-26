@@ -95,6 +95,7 @@ describe('TransferOrderService', () => {
     };
     giRepo = {
       find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
     };
     branchRepo = {
       find: jest.fn().mockResolvedValue([]),
@@ -571,6 +572,41 @@ describe('TransferOrderService', () => {
       expect(grDto.receivedAt).toBe('2026-06-08T15:24:00.000Z');
     });
 
+    it('inherits đối tượng and người giao from the linked export issue', async () => {
+      toRepo.findOne.mockResolvedValueOnce(
+        baseOrder({
+          status: TransferOrderStatus.IN_PROGRESS,
+          exportGoodsIssueId: 'gi-1',
+        }),
+      );
+      toRepo.findOne.mockResolvedValueOnce(
+        baseOrder({ status: TransferOrderStatus.COMPLETED }),
+      );
+      giRepo.findOne.mockResolvedValueOnce({
+        id: 'gi-1',
+        counterpartyKind: DocCounterpartyKind.EMPLOYEE,
+        counterpartyId: 'emp-1',
+        deliverer: 'Nguyễn Văn A',
+      });
+      locationRepo.find.mockResolvedValue([
+        {
+          id: 'loc-unassigned',
+          isActive: true,
+          storageId: 'storage-B',
+          storage: { branchId: 'branch-B' },
+        },
+      ]);
+
+      await service.confirmImport('to-1', actorDest, {
+        destinationStorageId: 'storage-B',
+      });
+
+      const grDto = goodsReceiptService.createAndPost.mock.calls[0][0];
+      expect(grDto.counterpartyKind).toBe(DocCounterpartyKind.EMPLOYEE);
+      expect(grDto.counterpartyId).toBe('emp-1');
+      expect(grDto.deliveredBy).toBe('Nguyễn Văn A');
+    });
+
     it('uses the form-submitted per-line Kho/Vị trí when provided', async () => {
       toRepo.findOne.mockResolvedValueOnce(
         baseOrder({ status: TransferOrderStatus.IN_PROGRESS }),
@@ -725,7 +761,7 @@ describe('TransferOrderService', () => {
   });
 
   describe('cancelFromExportIssue', () => {
-    it('reverses the destination receipt and soft-deletes a COMPLETED order', async () => {
+    it('rejects deleting an export issue after the destination receipt exists', async () => {
       toRepo.findOne.mockResolvedValue(
         baseOrder({
           status: TransferOrderStatus.COMPLETED,
@@ -733,14 +769,12 @@ describe('TransferOrderService', () => {
         }),
       );
 
-      await service.cancelFromExportIssue('to-1', actorSource);
+      await expect(
+        service.cancelFromExportIssue('to-1', actorSource),
+      ).rejects.toBeInstanceOf(ConflictException);
 
-      // Receipt is reversed from the destination branch, not the source.
-      expect(goodsReceiptService.cancel).toHaveBeenCalledWith(
-        'gr-1',
-        expect.objectContaining({ branchId: 'branch-B' }),
-      );
-      expect(toRepo.softDelete).toHaveBeenCalledWith('to-1');
+      expect(goodsReceiptService.cancel).not.toHaveBeenCalled();
+      expect(toRepo.softDelete).not.toHaveBeenCalled();
     });
 
     it('soft-deletes an IN_PROGRESS order without reversing a receipt', async () => {

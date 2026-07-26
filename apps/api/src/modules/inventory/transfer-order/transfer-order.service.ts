@@ -1075,6 +1075,14 @@ export class TransferOrderService {
       ...actor,
       branchId: to.sourceBranchId,
     };
+    const sourceIssue = to.exportGoodsIssueId
+      ? await this.giRepo.findOne({
+          where: {
+            id: to.exportGoodsIssueId,
+            organizationId: actor.organizationId,
+          },
+        })
+      : null;
     if (!to.exportGoodsIssueId) {
       const exportLines = await this.deriveExportLines(to, sourceActor);
       const goodsIssue = await this.goodsIssueService.createAndPost(
@@ -1105,11 +1113,13 @@ export class TransferOrderService {
           // Carry the goods-receipt form's header fields onto the spawned receipt
           // so the import leg round-trips Đối tượng / Người giao / Tham chiếu.
           // Route Đối tượng through the counterparty resolver (supplier →
-          // provider_id, customer/employee → counterparty cols); a bare
+          // provider_id, employee → counterparty cols); a bare
           // providerId would bypass validation and violate the provider FK.
-          counterpartyKind: dto.counterpartyKind,
-          counterpartyId: dto.counterpartyId,
-          deliveredBy: dto.deliverer,
+          counterpartyKind:
+            dto.counterpartyKind ?? sourceIssue?.counterpartyKind ?? undefined,
+          counterpartyId:
+            dto.counterpartyId ?? sourceIssue?.counterpartyId ?? undefined,
+          deliveredBy: dto.deliverer ?? sourceIssue?.deliverer ?? undefined,
           references: dto.references,
           lines,
         },
@@ -1370,18 +1380,9 @@ export class TransferOrderService {
       return;
     }
 
-    // A completed transfer already posted the destination goods receipt; reverse
-    // it from the destination branch so its incoming stock is rolled back too.
-    // GoodsReceipt.cancel tolerates a resulting negative balance (transfer-in
-    // carries no supplier debt), so this always succeeds.
     if (to.importGoodsReceiptId) {
-      const destActor: ActorContext = {
-        ...actor,
-        branchId: to.destinationBranchId,
-      };
-      await this.goodsReceiptService.cancel(
-        to.importGoodsReceiptId,
-        destActor,
+      throw new ConflictException(
+        "Phiếu xuất đã có phiếu nhập tham chiếu, không thể xoá",
       );
     }
 
@@ -1393,6 +1394,18 @@ export class TransferOrderService {
     this.logger.log(
       `Transfer order ${toId} cancelled via export goods issue deletion`,
     );
+  }
+
+  async assertExportIssueCanBeCancelled(
+    toId: string,
+    actor: ActorContext,
+  ): Promise<void> {
+    const to = await this.findOrFail(toId, actor.organizationId);
+    if (to.importGoodsReceiptId) {
+      throw new ConflictException(
+        "Phiếu xuất đã có phiếu nhập tham chiếu, không thể xoá",
+      );
+    }
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────────

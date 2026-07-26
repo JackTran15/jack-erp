@@ -1709,7 +1709,7 @@ export function PurchaseOrderFormDialog({
                   allowedTypes={
                     isPurchaseImport || purpose === "PURCHASE"
                       ? ["supplier"]
-                      : ["supplier", "customer", "employee"]
+                      : ["supplier", "employee"]
                   }
                   className="w-[180px]"
                   dropdownMinWidth={500}

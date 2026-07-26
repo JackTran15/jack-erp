@@ -1419,8 +1419,8 @@ export function GoodsIssueFormDialog({
             <FieldRow label="Đối tượng">
               <div className="flex items-stretch gap-2">
                 <CounterpartyPickerField
-                  defaultType="customer"
-                  allowedTypes={["supplier", "customer", "employee"]}
+                  defaultType="supplier"
+                  allowedTypes={["supplier", "employee"]}
                   className="w-[180px]"
                   dropdownMinWidth={500}
                   modalTitle="Chọn đối tượng"
