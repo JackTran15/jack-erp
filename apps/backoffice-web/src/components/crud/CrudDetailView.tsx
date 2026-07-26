@@ -51,7 +51,7 @@ export function CrudDetailView({
 }: CrudDetailViewProps) {
   return (
     <div
-      className="fixed inset-0 z-[1000] flex items-start justify-center bg-black/40 pt-20"
+      className="fixed inset-0 z-[1000] flex items-start justify-center bg-foreground/40 pt-20"
       onClick={onClose}
     >
       <div

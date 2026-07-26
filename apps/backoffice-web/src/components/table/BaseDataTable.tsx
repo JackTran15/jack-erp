@@ -456,7 +456,7 @@ export function BaseDataTable<T>({
                     >
                       {kind === "none" ? null : kind === "select" ? (
                         <select
-                          className="h-8 w-full min-w-0 border-0 bg-background px-2 text-xs font-normal outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500"
+                          className="h-8 w-full min-w-0 border-0 bg-background px-2 text-xs font-normal outline-none focus:ring-1 focus:ring-inset focus:ring-ring"
                           value={activeFilter?.value ?? ""}
                           onChange={(event) => {
                             // Select filters always use exact-match semantics.
@@ -479,7 +479,7 @@ export function BaseDataTable<T>({
                           <span className="inline-flex w-7 shrink-0 items-center justify-center border-r bg-muted/30 text-xs font-semibold text-muted-foreground">=</span>
                           <input
                             type={kind}
-                            className="h-8 min-w-0 flex-1 border-0 bg-background px-2 text-xs font-normal outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500"
+                            className="h-8 min-w-0 flex-1 border-0 bg-background px-2 text-xs font-normal outline-none focus:ring-1 focus:ring-inset focus:ring-ring"
                             value={activeFilter?.value ?? ""}
                             onChange={(event) => {
                               columnFilterControl.onModeChange(column.key, "equals");
@@ -492,7 +492,7 @@ export function BaseDataTable<T>({
                         <div className="flex h-8 min-w-0 items-stretch">
                           <input
                             type="date"
-                            className="h-8 min-w-0 flex-1 border-0 bg-background px-1 text-xs font-normal outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500"
+                            className="h-8 min-w-0 flex-1 border-0 bg-background px-1 text-xs font-normal outline-none focus:ring-1 focus:ring-inset focus:ring-ring"
                             value={activeFilter?.from ?? ""}
                             onChange={(event) =>
                               columnFilterControl.onRangeChange?.(
@@ -506,7 +506,7 @@ export function BaseDataTable<T>({
                           <span className="inline-flex items-center border-x bg-muted/30 px-1 text-xs text-muted-foreground">–</span>
                           <input
                             type="date"
-                            className="h-8 min-w-0 flex-1 border-0 bg-background px-1 text-xs font-normal outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500"
+                            className="h-8 min-w-0 flex-1 border-0 bg-background px-1 text-xs font-normal outline-none focus:ring-1 focus:ring-inset focus:ring-ring"
                             value={activeFilter?.to ?? ""}
                             onChange={(event) =>
                               columnFilterControl.onRangeChange?.(
@@ -543,7 +543,7 @@ export function BaseDataTable<T>({
                           <input
                             type="number"
                             inputMode="numeric"
-                            className="h-8 min-w-0 flex-1 border-0 bg-background px-2 text-xs font-normal outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500"
+                            className="h-8 min-w-0 flex-1 border-0 bg-background px-2 text-xs font-normal outline-none focus:ring-1 focus:ring-inset focus:ring-ring"
                             placeholder="Giá trị..."
                             value={activeFilter?.value ?? ""}
                             onChange={(event) =>
@@ -601,7 +601,7 @@ export function BaseDataTable<T>({
                   key={getRowKey(row, index)}
                   className={cn(
                     index % 2 === 0 ? "bg-background" : "bg-muted/20",
-                    onRowClick || onRowDoubleClick ? "cursor-pointer hover:bg-blue-50/70" : null,
+                    onRowClick || onRowDoubleClick ? "cursor-pointer hover:bg-info-subtle/70" : null,
                   )}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                   onDoubleClick={onRowDoubleClick ? () => onRowDoubleClick(row) : undefined}

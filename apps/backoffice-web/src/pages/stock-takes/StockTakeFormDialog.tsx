@@ -1463,8 +1463,8 @@ export function StockTakeFormDialog({
   const processStatusBadge = stockTake?.mergedIntoId ? (
     <span className="text-lg font-bold uppercase text-primary">ĐÃ GỘP</span>
   ) : stockTake?.status === "POSTED" ? (
-    <span className="inline-flex items-center gap-2 text-lg font-bold uppercase text-green-600">
-      <CheckCircle2 className="h-6 w-6 fill-green-500 text-white" /> ĐÃ XỬ LÝ
+    <span className="inline-flex items-center gap-2 text-lg font-bold uppercase text-success">
+      <CheckCircle2 className="h-6 w-6 fill-success text-success-foreground" /> ĐÃ XỬ LÝ
     </span>
   ) : stockTake?.status === "CANCELLED" ? (
     <span className="text-sm font-semibold text-destructive">Đã huỷ</span>
@@ -1817,7 +1817,7 @@ export function StockTakeFormDialog({
                     {members.map((member, memberIndex) => (
                       <tr
                         key={member.id ?? `member-${memberIndex}`}
-                        className="h-10 border-b bg-indigo-50/40"
+                        className="h-10 border-b bg-info-subtle/40"
                       >
                         {(["fullName", "title", "representative"] as const).map(
                           (key) => (

@@ -163,9 +163,9 @@ export function StockTakeImportStepDataReview({
           Tổng số <strong className="font-semibold">{total}</strong>
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <CheckCircle2 className="h-4 w-4 text-green-600" aria-hidden />
+          <CheckCircle2 className="h-4 w-4 text-success" aria-hidden />
           Hợp lệ{" "}
-          <strong className="font-semibold text-green-700">{validCount}</strong>
+          <strong className="font-semibold text-success">{validCount}</strong>
         </span>
         {errorCount > 0 ? (
           <span>
@@ -176,7 +176,7 @@ export function StockTakeImportStepDataReview({
             (
             <button
               type="button"
-              className="inline-flex items-center gap-1 text-[#2563eb] hover:underline disabled:opacity-60"
+              className="inline-flex items-center gap-1 text-info hover:underline disabled:opacity-60"
               disabled={isDownloadingErrors}
               onClick={() => void handleDownloadErrors()}
             >
@@ -190,7 +190,7 @@ export function StockTakeImportStepDataReview({
         ) : null}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-hidden rounded border border-gray-200">
+      <div className="min-h-0 flex-1 overflow-hidden rounded border border-border">
         <BaseDataTable
           columns={columns}
           rows={reviewRows}
@@ -198,7 +198,7 @@ export function StockTakeImportStepDataReview({
           emptyLabel="Không có dòng dữ liệu."
           getRowKey={(row) => row.id}
           scrollContainerClassName="max-h-[min(52vh,480px)]"
-          className="min-w-full [&_thead]:bg-gray-100 [&_thead_th]:font-semibold [&_tbody_tr:nth-child(even)]:bg-gray-50/80"
+          className="min-w-full [&_thead]:bg-muted [&_thead_th]:font-semibold [&_tbody_tr:nth-child(even)]:bg-muted/70"
         />
       </div>
     </div>

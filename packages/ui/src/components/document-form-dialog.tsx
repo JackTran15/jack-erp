@@ -28,7 +28,7 @@ function DocumentFormCollapseBar({
       <button
         type="button"
         className={cn(
-          "relative z-10 mx-auto flex items-center gap-1 rounded border bg-background px-3 py-0.5 text-xs font-medium text-indigo-600 shadow-sm hover:bg-gray-100",
+          "relative z-10 mx-auto flex items-center gap-1 rounded border bg-background px-3 py-0.5 text-xs font-medium text-primary-blue shadow-sm hover:bg-muted",
         )}
         onClick={onToggle}
       >

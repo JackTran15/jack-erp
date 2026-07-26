@@ -327,7 +327,7 @@ export function DocumentLineImportDialog({
                 <p className="text-sm font-medium">Chọn tệp nhập khẩu:</p>
                 <button
                   type="button"
-                  className="mt-1 inline-flex items-center gap-1 text-sm text-[#2563eb] hover:underline disabled:opacity-60"
+                  className="mt-1 inline-flex items-center gap-1 text-sm text-info hover:underline disabled:opacity-60"
                   disabled={isDownloadingTemplate}
                   onClick={() => void handleDownloadTemplate()}
                 >
@@ -365,9 +365,9 @@ export function DocumentLineImportDialog({
                 Tổng số <strong>{job.totalRows}</strong>
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <CheckCircle2 className="h-4 w-4 text-success" />
                 Hợp lệ{" "}
-                <strong className="text-green-700">{job.validRows}</strong>
+                <strong className="text-success">{job.validRows}</strong>
               </span>
               {job.errorRows > 0 ? (
                 <span>
@@ -376,7 +376,7 @@ export function DocumentLineImportDialog({
                   (
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1 text-[#2563eb] hover:underline"
+                    className="inline-flex items-center gap-1 text-info hover:underline"
                     onClick={() => void handleDownloadErrors()}
                   >
                     {isDownloadingErrors ? (
@@ -404,7 +404,7 @@ export function DocumentLineImportDialog({
 
         {step === ImportWizardStep.Complete ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-            <Check className="h-16 w-16 rounded-full bg-green-100 p-3 text-green-700" />
+            <Check className="h-16 w-16 rounded-full bg-success-subtle p-3 text-success" />
             <p className="text-lg font-semibold">Nhập khẩu thành công</p>
             <p className="text-muted-foreground">
               {successMessage(importedRows)}

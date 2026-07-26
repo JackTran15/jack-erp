@@ -999,7 +999,7 @@ export function PaymentVoucherDialog({
                   />
                 </FormField>
                 {showToAccountGap ? (
-                  <p className="text-xs text-amber-600">
+                  <p className="text-xs text-warning">
                     Không thấy tài khoản tiền gửi nào của cửa hàng này — bạn có thể không
                     được gán quyền xem quỹ chi nhánh đích.
                   </p>

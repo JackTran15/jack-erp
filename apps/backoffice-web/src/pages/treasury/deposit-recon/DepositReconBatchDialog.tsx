@@ -202,9 +202,9 @@ export function DepositReconBatchDialog({
             <div key={r.batch.id} className="rounded-md border p-3">
               <div className="flex items-center gap-2">
                 {r.status === DepositReconBatchStatus.RECONCILED ? (
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                  <CheckCircle2 className="h-5 w-5 text-success" />
                 ) : (
-                  <TriangleAlert className="h-5 w-5 text-amber-600" />
+                  <TriangleAlert className="h-5 w-5 text-warning" />
                 )}
                 <span className="text-sm font-semibold">
                   {labelOf(r.batch.depositAccountId)}
@@ -226,7 +226,7 @@ export function DepositReconBatchDialog({
                 </span>
               </div>
               {r.proposalId ? (
-                <p className="mt-2 rounded-md bg-amber-50 p-2 text-xs text-amber-700">
+                <p className="mt-2 rounded-md bg-warning-subtle p-2 text-xs text-warning">
                   Đã tạo đề xuất điều chỉnh phí (nháp, mã {r.proposalId}) — cần duyệt riêng ở
                   phiếu chi tiền gửi. Số dư quỹ tiền gửi <strong>chưa</strong> thay đổi.
                 </p>
@@ -271,7 +271,7 @@ export function DepositReconBatchDialog({
                 </FormField>
                 {diff !== 0 ? (
                   <>
-                    <p className="text-xs text-amber-600">
+                    <p className="text-xs text-warning">
                       Chênh lệch dự kiến: {formatMoneyInteger(diff)} — bắt buộc nhập ghi chú
                       trước khi gửi.
                     </p>

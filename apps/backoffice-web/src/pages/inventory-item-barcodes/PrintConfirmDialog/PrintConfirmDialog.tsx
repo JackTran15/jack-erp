@@ -40,7 +40,7 @@ export function PrintConfirmDialog({
       }
     >
       <div className="flex items-start gap-4 py-2">
-        <TriangleAlert className="h-10 w-10 shrink-0 text-amber-400" />
+        <TriangleAlert className="h-10 w-10 shrink-0 text-warning" />
         <p className="text-sm leading-relaxed text-foreground">
           Trước khi in tem hàng loạt, Quý khách nên in và quét thử tem với máy
           quét mã vạch để kiểm tra lại, tránh xảy ra sai sót.

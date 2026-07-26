@@ -146,7 +146,7 @@ export function GoodsReceiptImportDialog({
         {step === ImportWizardStep.DataReview && job ? <GoodsReceiptImportStepDataReview job={job} rows={rows} /> : null}
         {step === ImportWizardStep.Complete ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-            <Check className="h-16 w-16 rounded-full bg-green-100 p-3 text-green-700" />
+            <Check className="h-16 w-16 rounded-full bg-success-subtle p-3 text-success" />
             <p className="text-lg font-semibold">Nhập khẩu thành công</p>
             <p className="text-muted-foreground">{importedRows} dòng đã được đưa vào phiếu nhập kho.</p>
           </div>

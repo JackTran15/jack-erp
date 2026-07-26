@@ -65,7 +65,7 @@ export function StockTakeImportStepFileSelect({
           </p>
           <button
             type="button"
-            className="mt-1 inline-flex items-center gap-1 text-left text-sm text-[#2563eb] hover:underline disabled:opacity-60"
+            className="mt-1 inline-flex items-center gap-1 text-left text-sm text-info hover:underline disabled:opacity-60"
             disabled={isDownloadingTemplate}
             onClick={() => void handleDownloadTemplate()}
           >

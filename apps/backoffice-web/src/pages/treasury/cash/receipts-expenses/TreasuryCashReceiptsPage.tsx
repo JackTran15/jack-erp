@@ -577,7 +577,7 @@ export function TreasuryCashReceiptsPage() {
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="flex items-center gap-1.5 rounded-none bg-primary-blue px-3 py-2 text-sm font-medium text-white hover:bg-primary-blue-hover"
+                  className="flex items-center gap-1.5 rounded-none bg-primary-blue px-3 py-2 text-sm font-medium text-primary-blue-foreground hover:bg-primary-blue-hover"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Thêm mới

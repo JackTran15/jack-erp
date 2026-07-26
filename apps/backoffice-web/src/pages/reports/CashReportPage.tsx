@@ -107,7 +107,7 @@ export function CashReportPage() {
                     <td
                       style={{
                         ...styles.tdRight,
-                        color: row.discrepancy === 0 ? "#2e7d32" : "#c62828",
+                        color: row.discrepancy === 0 ? "hsl(var(--success))" : "hsl(var(--destructive))",
                         fontWeight: 600,
                       }}
                     >
@@ -120,7 +120,7 @@ export function CashReportPage() {
                 ))}
               </tbody>
               <tfoot>
-                <tr style={{ background: "#f9fafb" }}>
+                <tr style={{ background: "hsl(var(--muted))" }}>
                   <td colSpan={4} style={{ ...styles.td, fontWeight: 700 }}>
                     Tổng chênh lệch
                   </td>
@@ -128,7 +128,7 @@ export function CashReportPage() {
                     style={{
                       ...styles.tdRight,
                       fontWeight: 700,
-                      color: totalVariance === 0 ? "#2e7d32" : "#c62828",
+                      color: totalVariance === 0 ? "hsl(var(--success))" : "hsl(var(--destructive))",
                     }}
                   >
                     {fmt(totalVariance)}
@@ -153,16 +153,16 @@ const styles: Record<string, React.CSSProperties> = {
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
   title: { margin: 0, fontSize: 24, fontWeight: 600 },
   filters: { display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end", marginBottom: 24 },
-  filterLabel: { display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 500, gap: 4, color: "#344054" },
-  input: { padding: "8px 10px", border: "1px solid #d0d5dd", borderRadius: 6, fontSize: 14, outline: "none", minWidth: 160 },
-  btn: { padding: "8px 16px", background: "#1570ef", color: "#fff", border: "none", borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: "pointer" },
-  btnSecondary: { padding: "8px 16px", background: "#fff", color: "#344054", border: "1px solid #d0d5dd", borderRadius: 6, fontSize: 14, cursor: "pointer" },
-  muted: { color: "#667085" },
-  tableWrap: { overflowX: "auto", border: "1px solid #e4e7ec", borderRadius: 8 },
+  filterLabel: { display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 500, gap: 4, color: "hsl(var(--foreground))" },
+  input: { padding: "8px 10px", border: "1px solid hsl(var(--input))", borderRadius: 6, fontSize: 14, outline: "none", minWidth: 160 },
+  btn: { padding: "8px 16px", background: "rgb(var(--primary-blue))", color: "hsl(var(--primary-blue-foreground))", border: "none", borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: "pointer" },
+  btnSecondary: { padding: "8px 16px", background: "hsl(var(--card))", color: "hsl(var(--foreground))", border: "1px solid hsl(var(--input))", borderRadius: 6, fontSize: 14, cursor: "pointer" },
+  muted: { color: "hsl(var(--muted-foreground))" },
+  tableWrap: { overflowX: "auto", border: "1px solid hsl(var(--border))", borderRadius: 8 },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 14 },
-  th: { textAlign: "left", padding: "10px 12px", borderBottom: "2px solid #e4e7ec", background: "#f9fafb", fontWeight: 600, fontSize: 13 },
-  thRight: { textAlign: "right", padding: "10px 12px", borderBottom: "2px solid #e4e7ec", background: "#f9fafb", fontWeight: 600, fontSize: 13 },
-  tr: { borderBottom: "1px solid #f2f4f7" },
+  th: { textAlign: "left", padding: "10px 12px", borderBottom: "2px solid hsl(var(--border))", background: "hsl(var(--muted))", fontWeight: 600, fontSize: 13 },
+  thRight: { textAlign: "right", padding: "10px 12px", borderBottom: "2px solid hsl(var(--border))", background: "hsl(var(--muted))", fontWeight: 600, fontSize: 13 },
+  tr: { borderBottom: "1px solid hsl(var(--border))" },
   td: { padding: "10px 12px" },
   tdRight: { padding: "10px 12px", textAlign: "right" },
 };

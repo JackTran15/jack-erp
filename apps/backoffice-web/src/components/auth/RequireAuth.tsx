@@ -8,7 +8,7 @@ export function RequireAuth() {
   if (!isReady) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
-        <p style={{ color: "#667085" }}>Đang khôi phục phiên…</p>
+        <p className="text-muted-foreground">Đang khôi phục phiên…</p>
       </div>
     );
   }

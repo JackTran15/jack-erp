@@ -277,7 +277,7 @@ export function LineItemGrid<R>({
             rows.map((row, rowIndex) => (
               <tr
                 key={rowIndex}
-                className="odd:bg-background even:bg-muted/15 hover:bg-blue-50/60"
+                className="odd:bg-background even:bg-muted/15 hover:bg-accent/60"
                 style={{ height: rowHeight }}
               >
                 {columns.map((col) => {

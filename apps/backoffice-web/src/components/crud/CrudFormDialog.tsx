@@ -405,7 +405,7 @@ export function CrudFormDialog({
           <div className="flex items-center gap-2">
             <Button
               type="button"
-              className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
+              className="!bg-primary-blue !text-primary-blue-foreground hover:!bg-primary-blue-hover"
               disabled={submitting}
               onClick={handleSave}
             >
@@ -488,7 +488,7 @@ function FieldInput({
       <FieldRow label={field.label} required={field.required} error={error}>
         <select
           id={id}
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-500"
+          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           value={String(value ?? "")}
           onChange={(e) => onChange(e.target.value)}
         >

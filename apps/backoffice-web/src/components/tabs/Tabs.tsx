@@ -18,8 +18,8 @@ export interface TabsProps<T extends string> {
 }
 
 const NAV_CLASS: Record<TabsVariant, string> = {
-  underline: "flex shrink-0 gap-3 border-b bg-gray-100 items-center",
-  segment: "flex shrink-0 gap-1 rounded-md bg-gray-100 p-1 items-center",
+  underline: "flex shrink-0 gap-3 border-b bg-muted items-center",
+  segment: "flex shrink-0 gap-1 rounded-md bg-muted p-1 items-center",
 };
 
 function tabButtonClass(variant: TabsVariant, isActive: boolean): string {
@@ -61,7 +61,7 @@ export function Tabs<T extends string>({
               {tab.label}
             </button>
             {idx !== tabs.length - 1 && variant === "underline" && (
-              <div className={cn("h-[20px] w-px", "bg-gray-200")} />
+              <div className={cn("h-[20px] w-px", "bg-border")} />
             )}
           </Fragment>
         );

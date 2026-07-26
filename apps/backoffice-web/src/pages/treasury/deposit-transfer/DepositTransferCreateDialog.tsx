@@ -136,7 +136,7 @@ export function DepositTransferCreateDialog({ open, onOpenChange }: Props) {
           />
         </FormField>
         {showAccountGap ? (
-          <p className="text-xs text-amber-600">
+          <p className="text-xs text-warning">
             Không thấy tài khoản tiền gửi nào của chi nhánh này — bạn có thể không được gán quyền
             xem quỹ chi nhánh đích. Liên hệ quản trị nếu cần chuyển tới chi nhánh này.
           </p>

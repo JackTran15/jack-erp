@@ -140,7 +140,7 @@ export function ProductForm({ product, onSaved, onCancel }: ProductFormProps) {
           type="checkbox"
           checked={isActive}
           onChange={(e) => setIsActive(e.target.checked)}
-          className="h-4 w-4 rounded border-gray-300"
+          className="h-4 w-4 rounded border-input"
         />
         <span>Trạng thái hoạt động</span>
       </label>

@@ -223,7 +223,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={header.getResizeHandler()}
         onTouchStart={header.getResizeHandler()}
-        className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-blue-500"
+        className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-info"
       />
     );
   };
@@ -414,7 +414,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
               return (
                 <tr
                   key={row.id}
-                  className={`${rowBg} ${rowBgVarClass} ${isBold ? "font-semibold" : ""} hover:bg-blue-50/70 hover:[--row-bg:theme(colors.blue.50)]`}
+                  className={`${rowBg} ${rowBgVarClass} ${isBold ? "font-semibold" : ""} hover:bg-info-subtle/70 hover:[--row-bg:theme(colors.info.subtle)]`}
                 >
                   {cells.map((cell, cellIndex) => {
                     const col = configById.get(cell.column.id);
@@ -425,7 +425,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
                     const content = col.tableConfig?.link ? (
                       col.column === "invoiceCode" && raw ? (
                         <a
-                          className="cursor-pointer text-blue-600 hover:underline"
+                          className="cursor-pointer text-info hover:underline"
                           onClick={() => setDetailInvoiceCode(String(raw))}
                         >
                           {raw}
@@ -504,7 +504,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
 
       <DragOverlay modifiers={[restrictToHorizontalAxis]}>
         {activeData ? (
-          <div className="cursor-grabbing rounded-[2px] border border-blue-500 bg-muted px-2 py-2 text-xs font-semibold text-foreground shadow-md">
+          <div className="cursor-grabbing rounded-[2px] border border-info bg-muted px-2 py-2 text-xs font-semibold text-foreground shadow-md">
             {overlayLabel(activeData)}
           </div>
         ) : null}

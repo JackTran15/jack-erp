@@ -20,10 +20,10 @@ export interface IssueMembershipCardDialogProps {
 }
 
 const TIER_BADGE_COLORS: Record<string, string> = {
-  none: "bg-gray-100 text-gray-600",
-  silver: "bg-slate-200 text-slate-700",
-  gold: "bg-yellow-100 text-yellow-700",
-  diamond: "bg-cyan-100 text-cyan-700",
+  none: "bg-muted text-muted-foreground",
+  silver: "bg-muted text-foreground",
+  gold: "bg-warning-subtle text-warning",
+  diamond: "bg-info-subtle text-info",
 };
 
 export function IssueMembershipCardDialog({
@@ -122,7 +122,7 @@ export function IssueMembershipCardDialog({
                     </div>
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        TIER_BADGE_COLORS[ct.tier] ?? "bg-gray-100 text-gray-600"
+                        TIER_BADGE_COLORS[ct.tier] ?? "bg-muted text-muted-foreground"
                       }`}
                     >
                       {ct.tier.toUpperCase()}

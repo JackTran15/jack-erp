@@ -53,12 +53,12 @@ interface EmployeeFormModalProps {
 function EmployeeFormLoadingOverlay() {
   return (
     <div
-      className="absolute inset-0 z-10 flex items-center justify-center bg-gray-900/20"
+      className="absolute inset-0 z-10 flex items-center justify-center bg-foreground/20"
       aria-busy="true"
       aria-live="polite"
       aria-label="Đang tải dữ liệu nhân viên"
     >
-      <div className="flex flex-col items-center gap-2 rounded-md border border-border bg-white px-8 py-5 shadow-lg">
+      <div className="flex flex-col items-center gap-2 rounded-md border border-border bg-card px-8 py-5 shadow-lg">
         <Loader2
           className="h-9 w-9 animate-spin text-primary"
           strokeWidth={2}
@@ -229,7 +229,7 @@ export function EmployeeFormModal({
           <div className="flex items-center gap-2">
             <Button
               type="button"
-              className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
+              className="!bg-primary-blue !text-primary-blue-foreground hover:!bg-primary-blue-hover"
               onClick={handleSave}
               disabled={!formReady}
             >
