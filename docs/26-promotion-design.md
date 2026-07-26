@@ -496,6 +496,14 @@ Không cần đổi FE — `promotion.mapper.ts` (TKT-KM-12) là nơi duy nhất
 
 `GoodsDiscountRow { id, code, name, value }` không có trường đánh dấu hàng đang chọn là cấp hàng hóa (`PRODUCT`) hay cấp mẫu mã (`ITEM`) khi `goodsDiscountScope=PRODUCT`. TKT-KM-15 đã tự nêu đúng việc này ở bảng lưới ("PRODUCT hoặc ITEM") — xác nhận lại ở đây để không ai tưởng đã xong: `PromotionTargetPicker` (KM-15) phải mở rộng `GoodsDiscountRow` với trường ẩn `targetType`/`itemId`/`productId` khi wire dialog thật, không phải việc của KM-01/KM-02.
 
+*(amdt KM-12)* Thực hiện luôn phần "trường ẩn `itemId`/`targetId`" ở TKT-KM-12 thay vì để dành cho KM-15 — lý do: mapper `toCreateDto`/`toFormState` (KM-12) cần một chỗ chứa id thật để build `targetId` (UUID, bắt buộc) cho `TierProduct`, `GiftProduct`, `BuyGetRow` **và** `GoodsDiscountRow`, nếu không thì round-trip 5 hình thức không thể đúng. Đã thêm `targetId`/`itemId` (rỗng mặc định) vào cả 4 type trong `program-form.types.ts`. KM-15 vẫn là ticket wire `ProductSelectDialog`/`PromotionTargetPicker` thật (`onSelect` set field đã có sẵn) — phần còn lại của quyết định này không đổi.
+
+Tương tự, `BUY_M_GET_N` không có chỗ chứa "m"/"n" toàn cục (`buy_quantity`/`gift_quantity`) — UI hiện hard-code "Mua **1** trong những hàng hóa sau" (`BuyGetPromotionSection.tsx`), không đọc từ state nào. Đã thêm `buyQuantity`/`giftQuantity` (`number | ""`, mặc định `1`) vào `ProgramFormState` ở KM-12 cho cùng lý do — không có 2 field này thì `toCreateDto`/`toFormState` không thể round-trip `BUY_M_GET_N`. Việc dựng 2 ô nhập số hiển thị cho người dùng (thay vì text tĩnh "1") để lại cho KM-13/KM-15.
+
+### 10.6. `tierDiscountUnit`/`goodsDiscountMethod` — một giá trị form-wide, API cho phép khác nhau theo từng dòng/tier
+
+`ProgramFormState.tierDiscountUnit` là **một** field áp cho toàn bộ `tierGroups[]`, nhưng `PromotionTierInputDto.discountMode` là **per-tier** và domain (`promotion-program.ts`) không có invariant nào bắt buộc đồng nhất giữa các tier/group. Một CTKM tạo qua Swagger/POS với tier vừa `PERCENT` vừa `AMOUNT` sẽ bị `tieredDiscountFromDetail` (KM-12) gộp về **một** giá trị (lấy từ tier đầu tiên) khi mở lại form Sửa — lưu lại sẽ ghi đè mọi tier khác về cùng `discountMode`. Cùng loại giới hạn với `tierBasis` ở mục 10.4 (chấp nhận được vì UI chưa hỗ trợ, không phải bug của mapper), nhưng chưa được ghi nhận ở đó — ghi nhận ở đây để KM-13 biết không tự ý coi đây là round-trip hoàn hảo.
+
 ---
 
 ## 11. Kịch bản kiểm thử
