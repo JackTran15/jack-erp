@@ -235,7 +235,7 @@ export function AttributeDefinitionsForm({
   return (
     <div className="flex flex-col gap-4">
       {error && <p className="text-sm text-destructive">{error}</p>}
-      {successMsg && <p className="text-sm text-green-600">{successMsg}</p>}
+      {successMsg && <p className="text-sm text-success">{successMsg}</p>}
 
       {visibleDefs.length === 0 && (
         <p className="py-4 text-center text-sm text-muted-foreground">
@@ -246,7 +246,7 @@ export function AttributeDefinitionsForm({
       {visibleDefs.map((def) => (
         <div
           key={def._key}
-          className="rounded-lg border border-gray-200 bg-white"
+          className="rounded-lg border border-border bg-card"
         >
           <div className="flex items-center gap-2 px-3 py-2.5">
             <button
@@ -290,7 +290,7 @@ export function AttributeDefinitionsForm({
           </div>
 
           {def._expanded && (
-            <div className="border-t border-gray-100 px-4 py-3">
+            <div className="border-t border-border px-4 py-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase text-muted-foreground">
                   Giá trị

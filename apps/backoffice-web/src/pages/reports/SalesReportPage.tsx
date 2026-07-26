@@ -87,7 +87,7 @@ export function SalesReportPage() {
               </tr>
               <tr style={styles.tr}>
                 <td style={styles.td}>Doanh thu ròng</td>
-                <td style={{ ...styles.td, fontWeight: 700, color: "#2e7d32" }}>
+                <td style={{ ...styles.td, fontWeight: 700, color: "hsl(var(--success))" }}>
                   {fmt(data.netRevenue)}
                 </td>
               </tr>
@@ -111,13 +111,13 @@ const styles: Record<string, React.CSSProperties> = {
   page: { maxWidth: 1200, margin: "0 auto", padding: "24px 16px", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
   title: { margin: "0 0 20px", fontSize: 24, fontWeight: 600 },
   filters: { display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end", marginBottom: 24 },
-  filterLabel: { display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 500, gap: 4, color: "#344054" },
-  input: { padding: "8px 10px", border: "1px solid #d0d5dd", borderRadius: 6, fontSize: 14, outline: "none", minWidth: 160 },
-  btn: { padding: "8px 16px", background: "#1570ef", color: "#fff", border: "none", borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: "pointer" },
-  muted: { color: "#667085" },
-  tableWrap: { overflowX: "auto", border: "1px solid #e4e7ec", borderRadius: 8 },
+  filterLabel: { display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 500, gap: 4, color: "hsl(var(--foreground))" },
+  input: { padding: "8px 10px", border: "1px solid hsl(var(--input))", borderRadius: 6, fontSize: 14, outline: "none", minWidth: 160 },
+  btn: { padding: "8px 16px", background: "rgb(var(--primary-blue))", color: "hsl(var(--primary-blue-foreground))", border: "none", borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: "pointer" },
+  muted: { color: "hsl(var(--muted-foreground))" },
+  tableWrap: { overflowX: "auto", border: "1px solid hsl(var(--border))", borderRadius: 8 },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 14 },
-  th: { textAlign: "left", padding: "10px 12px", borderBottom: "2px solid #e4e7ec", background: "#f9fafb", fontWeight: 600, fontSize: 13 },
-  tr: { borderBottom: "1px solid #f2f4f7" },
+  th: { textAlign: "left", padding: "10px 12px", borderBottom: "2px solid hsl(var(--border))", background: "hsl(var(--muted))", fontWeight: 600, fontSize: 13 },
+  tr: { borderBottom: "1px solid hsl(var(--border))" },
   td: { padding: "10px 12px" },
 };

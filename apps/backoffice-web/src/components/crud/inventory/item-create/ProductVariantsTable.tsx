@@ -86,10 +86,10 @@ export function ProductVariantsTable({
                     <button
                       type="button"
                       aria-label="Thêm ảnh cho phiên bản"
-                      className="mx-auto flex h-16 w-16 flex-col items-center justify-center gap-1 rounded border border-dashed border-indigo-500 bg-background text-muted-foreground hover:bg-indigo-50"
+                      className="mx-auto flex h-16 w-16 flex-col items-center justify-center gap-1 rounded border border-dashed border-info bg-background text-muted-foreground hover:bg-info-subtle"
                     >
                       <ImageIcon className="h-5 w-5 text-muted-foreground/60" />
-                      <span className="rounded bg-indigo-900 px-2 py-0.5 text-[11px] font-medium leading-none text-white">
+                      <span className="rounded bg-primary px-2 py-0.5 text-[11px] font-medium leading-none text-primary-foreground">
                         ...
                       </span>
                     </button>
@@ -148,7 +148,7 @@ export function ProductVariantsTable({
                       }
                     />
                     <ScanBarcode
-                      className="h-4 w-4 shrink-0 text-indigo-600"
+                      className="h-4 w-4 shrink-0 text-info"
                       aria-label="Thiết lập giá theo nhóm"
                     />
                   </div>
@@ -169,7 +169,7 @@ export function ProductVariantsTable({
                     type="button"
                     aria-label="Sao chép giá xuống các dòng dưới"
                     title="Sao chép giá xuống các dòng dưới"
-                    className="inline-flex h-7 w-7 items-center justify-center rounded text-indigo-600 hover:bg-indigo-50"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded text-info hover:bg-info-subtle"
                     onClick={() => onCopyPriceDown(row)}
                   >
                     <ArrowDownToLine className="h-3.5 w-3.5" />

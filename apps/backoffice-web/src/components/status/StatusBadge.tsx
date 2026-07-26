@@ -5,17 +5,12 @@ export type StatusBadgeVariant =
   "success" | "neutral" | "danger" | "warning" | "info" | "primary";
 
 const STATUS_BADGE_CLASSES: Record<StatusBadgeVariant, string> = {
-  success:
-    "border-emerald-100 bg-emerald-50/70 text-emerald-600 dark:border-emerald-100 dark:bg-emerald-50/70 dark:text-emerald-600",
-  neutral:
-    "border-slate-100 bg-slate-50/80 text-slate-600 dark:border-slate-100 dark:bg-slate-50/80 dark:text-slate-600",
-  danger:
-    "border-rose-100 bg-rose-50/75 text-rose-600 dark:border-rose-100 dark:bg-rose-50/75 dark:text-rose-600",
-  warning:
-    "border-amber-100 bg-amber-50/80 text-amber-600 dark:border-amber-100 dark:bg-amber-50/80 dark:text-amber-600",
-  info: "border-blue-100 bg-blue-50/75 text-blue-600 dark:border-blue-100 dark:bg-blue-50/75 dark:text-blue-600",
-  primary:
-    "border-primary/15 bg-primary/5 text-primary dark:border-primary/15 dark:bg-primary/5 dark:text-primary",
+  success: "border-success/20 bg-success-subtle text-success",
+  neutral: "border-border bg-muted/70 text-muted-foreground",
+  danger: "border-destructive/20 bg-destructive-subtle text-destructive",
+  warning: "border-warning/20 bg-warning-subtle text-warning",
+  info: "border-info/20 bg-info-subtle text-info",
+  primary: "border-primary/15 bg-primary/5 text-primary",
 };
 
 interface StatusBadgeProps {

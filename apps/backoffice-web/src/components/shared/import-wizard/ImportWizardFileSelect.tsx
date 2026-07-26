@@ -70,7 +70,7 @@ export function ImportWizardFileSelect({
           </p>
           <button
             type="button"
-            className="mt-1 text-left text-sm text-[#2563eb] hover:underline"
+            className="mt-1 text-left text-sm text-info hover:underline"
             onClick={() => void onDownloadTemplate().catch(() => undefined)}
           >
             (Tải tệp mẫu tại đây)

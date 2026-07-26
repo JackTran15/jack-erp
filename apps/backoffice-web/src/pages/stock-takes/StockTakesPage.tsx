@@ -720,7 +720,7 @@ export function StockTakesPage() {
         >
           <div className="flex h-full min-h-0 flex-col">
             <div className="flex flex-1 items-start gap-3 border-b px-1 py-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-500 text-white">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-info text-info-foreground">
                 <Info className="h-6 w-6" />
               </span>
               <div className="space-y-1 pt-1 text-sm leading-5 text-foreground">

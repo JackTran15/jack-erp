@@ -54,6 +54,7 @@ import { ItemLocationsPage } from "./pages/item-locations/ItemLocationsPage";
 
 import { HttpErrorPage, HttpErrorView } from "./pages/errors/HttpErrorPage";
 import { DocumentNumberingPage } from "./pages/settings/DocumentNumberingPage";
+import { AppearancePage } from "./pages/settings/appearance/AppearancePage";
 import { ProductsPage } from "./pages/products/ProductsPage";
 import { ProductDetailPage } from "./pages/products/ProductDetailPage";
 import { EmployeesPage } from "./pages/employees/EmployeesPage";
@@ -325,6 +326,10 @@ export function App() {
                 <Route
                   path="/settings/document-numbering"
                   element={<DocumentNumberingPage />}
+                />
+                <Route
+                  path="/settings/appearance"
+                  element={<AppearancePage />}
                 />
                 <Route
                   path="/role-management"

@@ -283,8 +283,8 @@ export function LedgerCashPage() {
       </DocumentListShell>
 
       {isDetailLoading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-          <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-3 shadow-lg">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20">
+          <div className="flex items-center gap-2 rounded-lg bg-card px-4 py-3 shadow-lg">
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
             <span className="text-sm text-muted-foreground">Đang tải dữ liệu...</span>
           </div>

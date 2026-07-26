@@ -13,7 +13,7 @@ import { STORE_TYPE } from "../../../../constants/store.constant";
 // TODO(tạm thời): dropdown switch giữa các báo cáo kho ở store view. Xóa khi
 // refactor báo cáo kho sang dynamic store view.
 const selectClass =
-  "w-full h-9 rounded-[4px] border border-[#CCCCCC] bg-white px-3 text-[13px] text-[#333333] outline-none focus:border-[#3B6FE5]";
+  "w-full h-9 rounded-[4px] border border-input bg-card px-3 text-[13px] text-foreground outline-none focus:border-ring";
 
 export function StorageReportSelect() {
   const navigate = useNavigate();

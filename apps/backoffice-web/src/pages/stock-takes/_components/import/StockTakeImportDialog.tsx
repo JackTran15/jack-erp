@@ -226,7 +226,7 @@ export function StockTakeImportDialog({
       <div className="relative flex min-h-0 flex-1 flex-col">
         {isValidating ? (
           <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-md bg-background/80 text-sm text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin text-[#1e3a6e]" />
+            <Loader2 className="h-5 w-5 animate-spin text-primary-blue" />
             Đang kiểm tra dữ liệu…
           </div>
         ) : null}

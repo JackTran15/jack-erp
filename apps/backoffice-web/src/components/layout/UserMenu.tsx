@@ -31,7 +31,7 @@ export function UserMenu() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="rounded-full outline-none ring-2 ring-transparent transition-all hover:ring-white/30 focus-visible:ring-white/50"
+          className="rounded-full outline-none ring-2 ring-transparent transition-all hover:ring-sidebar-ring/40 focus-visible:ring-sidebar-ring"
           aria-label="Tài khoản người dùng"
         >
           <Avatar name={displayName} size="sm" />

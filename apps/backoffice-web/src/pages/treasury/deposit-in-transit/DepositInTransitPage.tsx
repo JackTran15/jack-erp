@@ -61,7 +61,7 @@ export function DepositInTransitPage() {
           <span
             className={
               r.isOverdue
-                ? "flex items-center justify-end gap-1 font-semibold text-amber-600"
+                ? "flex items-center justify-end gap-1 font-semibold text-warning"
                 : undefined
             }
           >
@@ -91,7 +91,7 @@ export function DepositInTransitPage() {
         report.data ? (
           <p className="text-sm text-muted-foreground">
             Ngưỡng cảnh báo quá hạn: <strong>{report.data.staleDays} ngày</strong> — các dòng quá
-            hạn được đánh dấu <AlertTriangle className="inline h-3.5 w-3.5 text-amber-600" />.
+            hạn được đánh dấu <AlertTriangle className="inline h-3.5 w-3.5 text-warning" />.
           </p>
         ) : null
       }

@@ -137,7 +137,7 @@ export function ProductsPage() {
         renderActions={(row) => (
           <button
             type="button"
-            className="text-sm text-blue-600 hover:underline"
+            className="text-sm text-info hover:underline"
             onClick={() => navigate(`/products/${row.id}`)}
           >
             Chi tiết

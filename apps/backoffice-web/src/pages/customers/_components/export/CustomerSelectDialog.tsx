@@ -168,7 +168,7 @@ export function CustomerSelectDialog({
             {selectedIds.size > 0 ? (
               <button
                 type="button"
-                className="ml-2 text-[#2563eb] hover:underline"
+                className="ml-2 text-info hover:underline"
                 onClick={() => setSelectedIds(new Set())}
               >
                 Bỏ chọn tất cả

@@ -360,7 +360,7 @@ export function CrudRecordDialog({
             <div className="flex gap-2">
               <Button
                 type="button"
-                className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
+                className="!bg-primary-blue !text-primary-blue-foreground hover:!bg-primary-blue-hover"
                 onClick={() => void save(false)}
                 disabled={isSaving}
               >
@@ -398,7 +398,7 @@ export function CrudRecordDialog({
       <div className="flex gap-2">
         <Button
           type="button"
-          className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
+          className="!bg-primary-blue !text-primary-blue-foreground hover:!bg-primary-blue-hover"
           onClick={() => void save(false)}
           disabled={isSaving}
         >

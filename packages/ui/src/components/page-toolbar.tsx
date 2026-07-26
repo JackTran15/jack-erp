@@ -82,7 +82,7 @@ export function PageToolbar({
         "flex items-center gap-0.5 border-b px-2 py-1",
         tone === "primary"
           ? "rounded-md border-primary-blue bg-primary-blue text-white"
-          : "bg-white",
+          : "bg-card",
         className,
       )}
     >
