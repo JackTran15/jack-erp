@@ -1,6 +1,8 @@
 import type { InvoicePrinter } from "./InvoicePrinter";
 import { renderInvoiceHtml } from "./renderInvoiceHtml";
 import type { InvoicePayload } from "@erp/pos/dtos/invoice-printing.dto";
+import type { ReceiptLayoutSettings } from "@erp/pos/interfaces/print-settings.interface";
+import { getReceiptLayoutSettings } from "@erp/pos/stores/common/print-settings.store";
 
 /**
  * Default printer: builds the receipt HTML and pipes it through a hidden
@@ -9,6 +11,16 @@ import type { InvoicePayload } from "@erp/pos/dtos/invoice-printing.dto";
  * implementation (e.g. ThermalEscPosInvoicePrinter, PdfServiceInvoicePrinter).
  */
 export class BrowserWindowInvoicePrinter implements InvoicePrinter {
+  /**
+   * @param resolveLayout Nguồn thông số khổ giấy/cỡ chữ. Nhận HÀM chứ không
+   * nhận object để giá trị được đọc tại thời điểm in — người dùng chỉnh ở tab
+   * `/cai-dat-in` là lần in kế tiếp ăn ngay, không phải tạo lại printer.
+   * Trang cài đặt truyền resolver riêng để in thử bộ số đang chỉnh dở.
+   */
+  constructor(
+    private readonly resolveLayout: () => ReceiptLayoutSettings = getReceiptLayoutSettings,
+  ) {}
+
   print(invoice: InvoicePayload): Promise<void> {
     return new Promise((resolve) => {
       if (typeof document === "undefined" || typeof window === "undefined") {
@@ -16,7 +28,7 @@ export class BrowserWindowInvoicePrinter implements InvoicePrinter {
         return;
       }
 
-      const html = renderInvoiceHtml(invoice);
+      const html = renderInvoiceHtml(invoice, this.resolveLayout());
       const iframe = document.createElement("iframe");
       iframe.setAttribute("aria-hidden", "true");
       iframe.style.position = "fixed";

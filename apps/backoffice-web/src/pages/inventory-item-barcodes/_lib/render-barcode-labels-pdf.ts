@@ -15,9 +15,9 @@ const PT_TO_MM = 25.4 / 72;
 /** Cỡ chữ (pt) — canh theo tem mặc định MISA (`local/images/barcode-item.png`). */
 const FONT = {
   sku: 8,
-  price: 10,
+  price: 12,
   branch: 13,
-  location: 8,
+  location: 10,
   batch: 7,
 } as const;
 

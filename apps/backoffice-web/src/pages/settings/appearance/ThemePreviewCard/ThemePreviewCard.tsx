@@ -33,9 +33,9 @@ export function ThemePreviewCard({ theme, selected, onSelect }: Props) {
       <div className="flex items-start gap-2 border-t border-border bg-card p-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-foreground">{theme.label}</p>
-          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+          {/* <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
             {theme.description}
-          </p>
+          </p> */}
         </div>
         <span
           className={cn(
