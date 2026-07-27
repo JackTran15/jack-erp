@@ -64,12 +64,12 @@ export function BarcodeLabelPreview({ row, branchCode, showStoreInfo }: Props) {
             <div className="flex min-h-0 flex-1 items-center justify-center py-0.5">
               <svg ref={svgRef} className="h-full w-full" />
             </div>
-            <div className="text-center text-[12px] font-bold leading-tight">
+            <div className="text-center text-[14px] font-bold leading-tight">
               {priceFormatter.format(data.sellingPrice)} VND
             </div>
           </div>
           <div className="flex w-[22%] shrink-0 flex-col items-end justify-between text-right">
-            <span className="text-[10px] font-bold leading-tight">
+            <span className="text-[12px] font-bold leading-tight">
               {showStoreInfo ? data.locationCode : ""}
             </span>
             <span className="text-[14px] font-bold leading-tight">

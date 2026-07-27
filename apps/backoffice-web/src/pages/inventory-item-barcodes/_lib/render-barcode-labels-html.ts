@@ -20,7 +20,7 @@ export interface RenderLabelsSettings {
 /**
  * Số tem xếp được trên một hàng ngang: đếm từ lề trái tới hết bề rộng giấy.
  * Lề phải chỉ là khoảng canh in (không trừ vào số cột) — nhờ vậy khổ mặc định
- * 104mm lề 2mm vẫn xếp được 2 cột 50mm (2 + 2×50 + 0.3 = 102.3 ≤ 104).
+ * 104mm lề 1mm vẫn xếp được 2 cột 50mm (1 + 2×50 + 2 = 103 ≤ 104).
  */
 export function labelsPerRow(paper: BarcodePaperConfig): number {
   const usable = paper.paperWidth - paper.marginLeft;

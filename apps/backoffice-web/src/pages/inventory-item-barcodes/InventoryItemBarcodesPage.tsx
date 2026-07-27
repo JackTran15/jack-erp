@@ -136,11 +136,12 @@ export function InventoryItemBarcodesPage() {
     [storages],
   );
 
-  // Mã cửa hàng in trên tem: lấy `code` của chi nhánh đang chọn. Nếu chi nhánh
-  // chưa đặt mã thì để trống (không fallback "MT") — để admin phát hiện & bổ sung.
+  // Mã cửa hàng in trên tem: lấy `code` của chi nhánh đang chọn, cắt tối đa 3 ký tự
+  // cho vừa cột phải của tem. Nếu chi nhánh chưa đặt mã thì để trống (không fallback
+  // "MT") — để admin phát hiện & bổ sung.
   const { data: myBranches } = useMyBranches();
   const branchCode = useMemo(
-    () => myBranches?.find((b) => b.id === branchId)?.code ?? "",
+    () => (myBranches?.find((b) => b.id === branchId)?.code ?? "").slice(0, 3),
     [myBranches, branchId],
   );
 
