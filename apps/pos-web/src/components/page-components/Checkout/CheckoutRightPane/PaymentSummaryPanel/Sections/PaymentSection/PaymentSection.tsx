@@ -59,6 +59,12 @@ export function PaymentSection({
   // (functional updater → đọc state TƯƠI, KHÔNG chạy manual-edit detection) thay vì
   // `handleChangePaymentLines` để không vô tình tắt auto-fill / ghi đè số tiền vừa
   // được auto-fill — race này chỉ lộ ở invoice_return (mở tab với giỏ khác rỗng).
+  //
+  // Tài khoản được chọn phải ĐÚNG phương thức của dòng, KHÔNG lấy tài khoản đầu
+  // tiên server trả về: dòng mới luôn khởi tạo CASH (`initialCheckoutDraft`) nên
+  // mặc định phải luôn là "Tiền mặt". Chỉ khi chi nhánh chưa cấu hình tài khoản
+  // nào cho phương thức đó mới rơi về tài khoản trống bất kỳ (và đồng bộ lại
+  // `method` theo nó, để dòng không bị lệch method ↔ paymentAccountId).
   const needsAssign =
     accounts.length > 0 && paymentLines.some((l) => !l.paymentAccountId);
   useEffect(() => {
@@ -72,7 +78,12 @@ export function PaymentSection({
       let mutated = false;
       const next = prev.map((line) => {
         if (line.paymentAccountId) return line;
-        const free = accounts.find((a) => !used.has(a.id));
+        const free =
+          accounts.find(
+            (a) =>
+              API_METHOD_TO_PAYMENT_METHOD[a.paymentMethod] === line.method &&
+              !used.has(a.id),
+          ) ?? accounts.find((a) => !used.has(a.id));
         if (!free) return line;
         used.add(free.id);
         mutated = true;
