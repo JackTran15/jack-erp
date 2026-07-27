@@ -1,22 +1,11 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { DepositMovementEntity } from '../deposit/deposit-movement.entity';
-import { DepositModule } from '../deposit/deposit.module';
-import { JournalModule } from '../journal/journal.module';
-import { DepositReconModule } from '../deposit-recon/deposit-recon.module';
-import { DepositAuditModule } from '../deposit-audit/deposit-audit.module';
-import { DepositRefundService } from './deposit-refund.service';
+import { DepositVouchersModule } from '../deposit-vouchers/deposit-vouchers.module';
 import { DepositRefundConsumer } from './deposit-refund.consumer';
 
+// The refund voucher owns the movement, its journal entry and the period check
+// (ADR-04), so this module only needs the voucher service.
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([DepositMovementEntity]),
-    DepositModule,
-    JournalModule,
-    DepositReconModule,
-    DepositAuditModule,
-  ],
-  providers: [DepositRefundService, DepositRefundConsumer],
-  exports: [DepositRefundService],
+  imports: [DepositVouchersModule],
+  providers: [DepositRefundConsumer],
 })
 export class DepositRefundModule {}

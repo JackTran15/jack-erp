@@ -19,6 +19,7 @@ import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { mapInvoiceToReturnRow } from "@erp/pos/lib/page-libs/return-goods/returnInvoiceMapper";
 import { mapInvoiceToListRow } from "@erp/pos/lib/page-libs/invoice-list/invoiceListMapper";
 import type {
+  CancelInvoiceBody,
   CheckoutInvoiceBody,
   CheckoutReturnBody,
   CreateExchangeInvoiceBody,
@@ -137,6 +138,31 @@ export function useDeleteInvoiceMutation(): UseMutationResult<
  * Chi tiết một hóa đơn — `GET /invoices/:id` (kèm `items[]` + thông tin thanh
  * toán). Truyền `undefined` để tắt query khi chưa cần.
  */
+export interface CancelInvoiceVars {
+  id: string;
+  body: CancelInvoiceBody;
+}
+
+/**
+ * Huỷ hoá đơn. Backend hoàn tiền + cộng kho bất đồng bộ, nên invalidate cả
+ * `INVOICE_KEYS.ALL` (danh sách + chi tiết) lẫn catalog để tồn kho hiện lại đúng.
+ */
+export function useCancelInvoiceMutation(): UseMutationResult<
+  InvoiceRow,
+  Error,
+  CancelInvoiceVars
+> {
+  const qc = useQueryClient();
+
+  return useMutation<InvoiceRow, Error, CancelInvoiceVars>({
+    mutationFn: ({ id, body }) => invoiceService.cancel(id, body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: INVOICE_KEYS.ALL });
+      void qc.invalidateQueries({ queryKey: CATALOG_KEYS.ALL });
+    },
+  });
+}
+
 export function useInvoiceDetailQuery(
   id: string | undefined,
 ): UseQueryResult<InvoiceRow, Error> {

@@ -1,5 +1,6 @@
 import { http } from "@erp/pos/lib/common/http";
 import type {
+  CancelInvoiceBody,
   CheckoutInvoiceBody,
   CheckoutReturnBody,
   CreateExchangeInvoiceBody,
@@ -81,6 +82,13 @@ export const invoiceService = {
 
   delete: (id: string): Promise<void> =>
     http.delete<void>(`/invoices/${encodeURIComponent(id)}`),
+
+  /**
+   * `POST /invoices/:id/cancel` — huỷ hoá đơn đã thanh toán. Backend hoàn tiền
+   * về đúng quỹ đã thu và cộng hàng lại kho showroom.
+   */
+  cancel: (id: string, body: CancelInvoiceBody): Promise<InvoiceRow> =>
+    http.post<InvoiceRow>(`/invoices/${encodeURIComponent(id)}/cancel`, body),
 
   // ─── Return / Exchange (EPIC-011) ─────────────────────────────────────────
 

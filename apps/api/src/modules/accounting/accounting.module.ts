@@ -13,6 +13,7 @@ import { DepositReconModule } from './deposit-recon/deposit-recon.module';
 import { DepositAuditModule } from './deposit-audit/deposit-audit.module';
 import { DepositPeriodLockModule } from './deposit-period-lock/deposit-period-lock.module';
 import { DepositRefundModule } from './deposit-refund/deposit-refund.module';
+import { VoucherLinksModule } from './voucher-links/voucher-links.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { DepositRefundModule } from './deposit-refund/deposit-refund.module';
     DepositAuditModule,
     DepositPeriodLockModule,
     DepositRefundModule,
+    VoucherLinksModule,
   ],
   exports: [
     CoaModule,
@@ -46,6 +48,7 @@ import { DepositRefundModule } from './deposit-refund/deposit-refund.module';
     DepositAuditModule,
     DepositPeriodLockModule,
     DepositRefundModule,
+    VoucherLinksModule,
   ],
 })
 export class AccountingModule {}
