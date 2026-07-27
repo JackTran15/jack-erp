@@ -1,4 +1,6 @@
+import { RECEIPT_LAYOUT_DEFAULTS } from "@erp/pos/constants/print-settings.constant";
 import type { InvoicePayload } from "@erp/pos/dtos/invoice-printing.dto";
+import type { ReceiptLayoutSettings } from "@erp/pos/interfaces/print-settings.interface";
 import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
 
 /**
@@ -41,6 +43,44 @@ function amountRow(
 }
 
 /**
+ * Luật `@page` (khổ giấy + lề). Chrome KHÔNG đọc `var()` bên trong `@page`,
+ * nên toàn bộ style của bản in nội suy chuỗi trực tiếp thay vì dùng CSS custom
+ * property — một cơ chế duy nhất, tránh bẫy nửa chạy nửa không.
+ *
+ * Lề toàn 0 rút gọn về `0` để bộ mặc định sinh ra đúng CSS gốc.
+ */
+function pageRule(layout: ReceiptLayoutSettings): string {
+  const size =
+    layout.pageWidth === "auto" ? "auto" : `${layout.pageWidth} auto`;
+  const {
+    pageMarginTop: top,
+    pageMarginRight: right,
+    pageMarginBottom: bottom,
+    pageMarginLeft: left,
+  } = layout;
+  const margin =
+    top === 0 && right === 0 && bottom === 0 && left === 0
+      ? "0"
+      : `${top}mm ${right}mm ${bottom}mm ${left}mm`;
+  return `@page { size: ${size}; margin: ${margin}; }`;
+}
+
+/**
+ * `margin` của `.receipt` — gộp `align` + `offsetX` thành một giá trị.
+ * Canh giữa dùng `calc((100% - width) / 2 + offset)` để `offsetX` hoạt động
+ * giống hệt ở cả hai chế độ căn. Bộ mặc định (center + offset 0) trả về đúng
+ * `0 auto` như CSS gốc.
+ */
+function receiptMargin(layout: ReceiptLayoutSettings): string {
+  if (layout.align === "center" && layout.offsetX === 0) return "0 auto";
+  const left =
+    layout.align === "center"
+      ? `calc((100% - ${layout.contentWidth}mm) / 2 + ${layout.offsetX}mm)`
+      : `${layout.offsetX}mm`;
+  return `0 0 0 ${left}`;
+}
+
+/**
  * Render the invoice payload into a fully-self-contained HTML document.
  * Khổ A80 (giấy nhiệt 80mm, cuộn liên tục) — layout theo mẫu Misa eShop
  * (`local/images/invoice_a80_1.png` / `invoice_a80_2.png`): header giữa,
@@ -52,8 +92,14 @@ function amountRow(
  *
  * Returned string is suitable for `iframe.contentDocument.write(...)` or for
  * dropping into a server-side PDF renderer (the spec is print-friendly).
+ *
+ * `layout` là bộ thông số khổ giấy/cỡ chữ do người dùng chỉnh ở trang
+ * `/cai-dat-in`; bỏ trống → dùng `RECEIPT_LAYOUT_DEFAULTS` (khớp đúng CSS gốc).
  */
-export function renderInvoiceHtml(invoice: InvoicePayload): string {
+export function renderInvoiceHtml(
+  invoice: InvoicePayload,
+  layout: ReceiptLayoutSettings = RECEIPT_LAYOUT_DEFAULTS,
+): string {
   const { store, invoiceNumber, issuedAt, info, lines, totals, payments } =
     invoice;
 
@@ -141,7 +187,7 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
     <meta charset="utf-8" />
     <title>Hóa đơn ${escapeHtml(invoiceNumber)}</title>
     <style>
-      @page { size: 80mm auto; margin: 0; }
+      ${pageRule(layout)}
       * { box-sizing: border-box; }
       html, body {
         margin: 0;
@@ -149,10 +195,15 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
         background: #ffffff;
         color: #000000;
         font-family: Arial, Helvetica, sans-serif;
-        font-size: 11px;
-        line-height: 1.45;
+        font-size: ${layout.baseFontSize}px;
+        line-height: ${layout.lineHeight};
       }
-      .receipt { width: 72mm; margin: 0 auto; padding: 2mm 0 4mm; }
+      .receipt { width: ${layout.contentWidth}mm; margin: ${receiptMargin(layout)}; padding: ${layout.paddingTop}mm 0 ${layout.paddingBottom}mm;${
+        // `zoom` (không phải `transform: scale`) vì zoom co cả layout box nên
+        // page box co theo — đúng thứ cần khi ép bill vừa khổ giấy. Bỏ hẳn khi
+        // = 1 để không tạo stacking context thừa ở bộ mặc định.
+        layout.scale === 1 ? "" : ` zoom: ${layout.scale};`
+      } }
       /* In nhiều liên: mỗi liên 1 trang riêng để máy in nhiệt cắt giữa các liên. */
       .receipt + .receipt { page-break-before: always; break-before: page; }
 
@@ -204,22 +255,25 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
       }
       .product-table th, .product-table td {
         border: 1px solid #000;
-        padding: 2px 3px;
-        font-size: 10.5px;
+        padding: ${layout.tableCellPaddingY}px ${layout.tableCellPaddingX}px;
+        font-size: ${layout.tableFontSize}px;
         vertical-align: top;
       }
       .product-table thead th {
         font-weight: 700;
         text-align: center;
       }
-      .product-table .col-idx { text-align: center; width: 8%; }
+      .product-table .col-idx { text-align: center; width: ${layout.colIdxWidth}%; }
       .product-table .col-name { text-align: left; word-break: break-word; }
       .product-table .col-name .line-sub { font-size: 9.5px; font-style: italic; }
-      .product-table .col-qty { text-align: center; width: 11%; }
-      .product-table .col-price { text-align: right; width: 21%; font-variant-numeric: tabular-nums; }
-      .product-table .col-total { text-align: right; width: 23%; font-variant-numeric: tabular-nums; }
+      .product-table .col-qty { text-align: center; width: ${layout.colQtyWidth}%; }
+      .product-table .col-price { text-align: right; width: ${layout.colPriceWidth}%; font-variant-numeric: tabular-nums; }
+      .product-table .col-total { text-align: right; width: ${layout.colTotalWidth}%; font-variant-numeric: tabular-nums; }
 
-      .summary { font-size: 11px; }
+      .summary { font-size: ${
+        // Bám theo cỡ chữ nền — khối summary là body text, không phải cỡ riêng.
+        layout.baseFontSize
+      }px; }
       .row {
         display: flex;
         justify-content: space-between;
@@ -236,7 +290,7 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
       .row.grand-total {
         padding: 3px 0;
         font-weight: 700;
-        font-size: 14px;
+        font-size: ${layout.grandTotalFontSize}px;
       }
       .row.grand-total .value { font-weight: 700; }
 

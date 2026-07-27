@@ -89,6 +89,9 @@ export const APP_MENU_ITEMS: PosMenuItem[] = [
     label: "Máy in - Mẫu in",
     iconBgColor: "#F59E0B",
     Icon: PrinterIcon,
+    route: "/cai-dat-in",
+    openInNewTab: true,
+    pinnable: true,
   },
   {
     id: "bao-cao-theo-ngay",

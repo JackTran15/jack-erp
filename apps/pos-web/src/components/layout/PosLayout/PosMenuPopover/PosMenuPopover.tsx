@@ -96,6 +96,17 @@ export function PosMenuPopover({
       onClose();
       return;
     }
+    if (item.openInNewTab && item.route) {
+      // Dựng URL từ BASE_URL (không dùng `route` trần) vì BrowserRouter chạy
+      // với `basename={import.meta.env.BASE_URL}` — cùng cách http.ts:102 làm.
+      window.open(
+        `${import.meta.env.BASE_URL}${item.route.replace(/^\//, "")}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+      onClose();
+      return;
+    }
     if (item.route) navigate(item.route);
     onClose();
   };

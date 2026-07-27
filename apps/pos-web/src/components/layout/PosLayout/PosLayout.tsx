@@ -48,6 +48,11 @@ export interface PosMenuItem {
   route?: string;
   /** Present ⇒ click opens this absolute URL in a new tab (e.g. ERP backoffice). */
   externalUrl?: string;
+  /**
+   * Mở `route` ở tab mới thay vì điều hướng tại chỗ — dùng cho trang công cụ
+   * đứng riêng (cài đặt máy in) để không mất giỏ hàng đang dở.
+   */
+  openInNewTab?: boolean;
   badge?: "new";
   /** When true, the popover renders a pin icon at the top-right of the tile. */
   pinnable?: boolean;
