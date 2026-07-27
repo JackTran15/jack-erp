@@ -6,6 +6,13 @@ import { StockLedgerService } from '../ledger/stock-ledger.service';
 import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
 import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
 import { InvoiceCancelledPayload } from '../../pos/publishers/invoice-cancelled.publisher';
+import { resolveBranchItemLocations } from '../../pos/services/resolve-branch-item-locations';
+
+jest.mock('../../pos/services/resolve-branch-item-locations');
+
+const resolveLocationsMock = resolveBranchItemLocations as jest.MockedFunction<
+  typeof resolveBranchItemLocations
+>;
 
 const buildEvent = (
   overrides: Partial<InvoiceCancelledPayload> = {},
@@ -33,12 +40,22 @@ const buildEvent = (
 
 describe('StockReturnConsumer', () => {
   let consumer: StockReturnConsumer;
-  let ledgerRepo: { findOne: jest.Mock };
+  let ledgerRepo: { findOne: jest.Mock; manager: never };
   let itemCostSnapshotService: { snapshotCosts: jest.Mock };
   let stockLedgerService: { recordBatchMovements: jest.Mock };
 
   beforeEach(async () => {
-    ledgerRepo = { findOne: jest.fn().mockResolvedValue(null) };
+    ledgerRepo = {
+      findOne: jest.fn().mockResolvedValue(null),
+      manager: {} as never,
+    };
+    resolveLocationsMock.mockReset();
+    resolveLocationsMock.mockResolvedValue(
+      new Map<string, string>([
+        ['item-A', 'showroom-shelf-A'],
+        ['item-B', 'showroom-default'],
+      ]),
+    );
     itemCostSnapshotService = {
       snapshotCosts: jest.fn().mockResolvedValue(
         new Map<string, number>([
@@ -77,6 +94,8 @@ describe('StockReturnConsumer', () => {
         // unit_cost snapshot from items.purchase_price (10.00). Service then
         // derives line_value = quantity * unitCost = 2 * 10 = 20 (signed +).
         unitCost: 10,
+        // Showroom shelf, not the loc-1 the line was picked from.
+        locationId: 'showroom-shelf-A',
       }),
     );
     expect(movements[1]).toEqual(
@@ -106,6 +125,58 @@ describe('StockReturnConsumer', () => {
 
   it('skips when branchId is missing in payload', async () => {
     await consumer.handle(buildEvent({ branchId: undefined }));
+    expect(stockLedgerService.recordBatchMovements).not.toHaveBeenCalled();
+  });
+
+  it('routes returns to the showroom, ignoring the location the line was sold from', async () => {
+    await consumer.handle(buildEvent());
+
+    expect(resolveLocationsMock).toHaveBeenCalledWith(
+      expect.anything(),
+      ['item-A', 'item-B'],
+      expect.objectContaining({ organizationId: 'org-1', branchId: 'branch-1' }),
+      { showroomOnly: true },
+    );
+    const movements = stockLedgerService.recordBatchMovements.mock.calls[0][0];
+    expect(movements.map((m: { locationId: string }) => m.locationId)).toEqual([
+      'showroom-shelf-A',
+      'showroom-default',
+    ]);
+  });
+
+  it('falls back to the showroom default location for a warehouse-only item', async () => {
+    // resolveBranchItemLocations already applies that fallback; what matters
+    // here is that the consumer uses its answer rather than item.locationId.
+    resolveLocationsMock.mockResolvedValue(
+      new Map<string, string>([
+        ['item-A', 'showroom-default'],
+        ['item-B', 'showroom-default'],
+      ]),
+    );
+
+    await consumer.handle(buildEvent());
+
+    const movements = stockLedgerService.recordBatchMovements.mock.calls[0][0];
+    expect(movements.every((m: { locationId: string }) => m.locationId === 'showroom-default')).toBe(true);
+  });
+
+  it('skips an item with no showroom location instead of crediting the warehouse', async () => {
+    resolveLocationsMock.mockResolvedValue(
+      new Map<string, string>([['item-B', 'showroom-default']]),
+    );
+
+    await consumer.handle(buildEvent());
+
+    const movements = stockLedgerService.recordBatchMovements.mock.calls[0][0];
+    expect(movements).toHaveLength(1);
+    expect(movements[0].itemId).toBe('item-B');
+  });
+
+  it('records nothing when no item resolves to a showroom location', async () => {
+    resolveLocationsMock.mockResolvedValue(new Map<string, string>());
+
+    await consumer.handle(buildEvent());
+
     expect(stockLedgerService.recordBatchMovements).not.toHaveBeenCalled();
   });
 

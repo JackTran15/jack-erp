@@ -18,6 +18,11 @@ import {
   CashVoucherPartnerType,
   CashVoucherStatus,
 } from '../enums';
+import { VoucherLinkKind } from '../../voucher-links/enums';
+import {
+  LinkedVoucher,
+  VoucherLinksService,
+} from '../../voucher-links/voucher-links.service';
 import { PartnerResolverService } from '../shared/partner-resolver.service';
 import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
 import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
@@ -111,6 +116,7 @@ export class CashPaymentsService {
     private readonly partnerResolver: PartnerResolverService,
     private readonly accountResolver: AccountResolverService,
     private readonly supplierDebtPaymentSaga: SupplierDebtPaymentSagaService,
+    private readonly voucherLinks: VoucherLinksService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -676,14 +682,25 @@ export class CashPaymentsService {
   async getById(
     id: string,
     actor: ActorContext,
-  ): Promise<CashPaymentEntity & { sourceLink: PaymentSourceLink | null }> {
+  ): Promise<
+    CashPaymentEntity & {
+      sourceLink: PaymentSourceLink | null;
+      linkedVoucher: LinkedVoucher | null;
+    }
+  > {
     const payment = await this.getByIdInTx(
       this.dataSource.manager,
       id,
       actor.organizationId,
     );
     const sourceLink = await this.buildSourceLink(payment, actor.organizationId);
-    return Object.assign(payment, { sourceLink });
+    // The receipt this payment refunded, when the voucher is one half of a pair.
+    const linkedVoucher = await this.voucherLinks.findLinkedVoucher(
+      VoucherLinkKind.CASH_PAYMENT,
+      payment.id,
+      actor.organizationId,
+    );
+    return Object.assign(payment, { sourceLink, linkedVoucher });
   }
 
   private async buildSourceLink(

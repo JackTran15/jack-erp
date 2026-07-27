@@ -11,6 +11,32 @@ export interface InvoiceCancelledItem {
   quantity: number;
 }
 
+/**
+ * One refund leg of a cancelled invoice: the money actually collected into a
+ * single fund, ready to be paid back out of it.
+ *
+ * The accounting module never reads `pos` tables, so the cancel path resolves
+ * the fund and the contra account here and ships them on the event; the voucher
+ * consumers only compose services (see ADR-01).
+ *
+ * Legs are grouped per destination fund, not per payment line — several tendered
+ * lines landing in the same fund produce a single leg, and therefore a single
+ * refund voucher.
+ */
+export interface InvoiceCancelledRefundLeg {
+  /** The `invoice_payments` rows folded into this leg. */
+  invoicePaymentIds: string[];
+  fundKind: 'CASH' | 'DEPOSIT';
+  /** `cash_accounts.id` of the branch fund. CASH legs only. */
+  cashAccountId?: string;
+  /** `deposit_accounts.id` (or the COA it was resolved from). DEPOSIT legs only. */
+  depositAccountId?: string;
+  /** Amount actually collected into this fund — never the invoice total. */
+  amount: number;
+  /** Revenue COA, the contra side of the refund movement. */
+  contraAccountId: string;
+}
+
 export interface InvoiceCancelledPayload {
   invoiceId: string;
   documentNumber: string;
@@ -19,6 +45,12 @@ export interface InvoiceCancelledPayload {
   items: InvoiceCancelledItem[];
   organizationId: string;
   actorId: string;
+  /**
+   * Empty when nothing was ever collected (a pure debt invoice), and absent
+   * entirely on events published before refunds existed — consumers must read
+   * it as `refunds ?? []`.
+   */
+  refunds?: InvoiceCancelledRefundLeg[];
 }
 
 export interface InvoiceCancelledInput {
@@ -27,6 +59,7 @@ export interface InvoiceCancelledInput {
   reason: string;
   branchId?: string;
   items: InvoiceCancelledItem[];
+  refunds: InvoiceCancelledRefundLeg[];
 }
 
 @Injectable()
@@ -53,13 +86,15 @@ export class InvoiceCancelledPublisher {
           items: input.items,
           organizationId: actor.organizationId,
           actorId: actor.userId,
+          refunds: input.refunds,
         } satisfies InvoiceCancelledPayload,
       },
       input.invoiceId,
     );
 
     this.logger.log(
-      `Published invoice cancelled event for ${input.invoiceId} (${input.items.length} items)`,
+      `Published invoice cancelled event for ${input.invoiceId} ` +
+        `(${input.items.length} items, ${input.refunds.length} refund leg(s))`,
     );
   }
 }

@@ -234,3 +234,9 @@ export interface ListInvoicesParams {
   page?: number;
   limit?: number;
 }
+
+/** Body của `POST /invoices/:id/cancel`. */
+export interface CancelInvoiceBody {
+  /** Lý do huỷ, bắt buộc — hiển thị lại trên hoá đơn đã huỷ. */
+  reason: string;
+}

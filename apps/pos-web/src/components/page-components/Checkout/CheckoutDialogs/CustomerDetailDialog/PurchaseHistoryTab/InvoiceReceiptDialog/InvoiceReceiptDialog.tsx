@@ -1,8 +1,22 @@
+import { useState } from "react";
+
 import { formatVnd } from "@erp/ui";
 import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
 import { PosIconButton } from "@erp/pos/components/common/PosIconButton/PosIconButton";
 import { CloseIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
-import { useInvoiceDetailQuery } from "@erp/pos/hooks/react-query/use-query-invoice";
+import {
+  useCancelInvoiceMutation,
+  useInvoiceDetailQuery,
+} from "@erp/pos/hooks/react-query/use-query-invoice";
+import { useCurrentUserQuery } from "@erp/pos/hooks/react-query/use-query-user";
+import { canCancelInvoice } from "@erp/pos/constants/invoice-cancel.constant";
+import { InvoicePrintMenu } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/InvoiceReceiptDialog/InvoicePrintMenu/InvoicePrintMenu";
+import { CancelInvoicePrompt } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/InvoiceReceiptDialog/CancelInvoicePrompt/CancelInvoicePrompt";
+import { buildInvoiceRowPrintPayload } from "@erp/pos/lib/page-libs/invoice-list/invoiceRowPrintPayload";
+import { BrowserWindowInvoicePrinter } from "@erp/pos/lib/page-libs/checkout/printing/BrowserWindowInvoicePrinter";
+import { buildStoreInfoFromBranch } from "@erp/pos/lib/page-libs/checkout/checkoutReceiptFactory";
+import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
+import { useMyBranchesQuery } from "@erp/pos/hooks/react-query/use-query-branch";
 import { formatDiscountLabel } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { INVOICE_PAYMENT_METHOD_LABEL } from "@erp/pos/constants/checkout.constant";
 import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
@@ -103,6 +117,66 @@ export function InvoiceReceiptDialog({
     isLoading,
     isError,
   } = useInvoiceDetailQuery(open ? (invoiceId ?? undefined) : undefined);
+
+  const { data: currentUser } = useCurrentUserQuery();
+  const cancelInvoice = useCancelInvoiceMutation();
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  // Hoá đơn trả/đổi không huỷ được; backend cũng chặn, đây chỉ là ẩn nút cho khỏi bấm.
+  const canCancel =
+    !!invoice &&
+    canCancelInvoice({
+      roleNames: (currentUser?.roles ?? []).map((role) => role.name),
+      invoiceType: invoice.type,
+      invoiceStatus: invoice.status,
+    });
+
+  // Store chỉ giữ id/tên; địa chỉ + SĐT in trên biên lai nằm ở BranchRow.
+  const activeBranchId = usePosBranchStore((s) => s.branchId);
+  const { data: branches } = useMyBranchesQuery();
+  const activeBranch = branches?.find((b) => b.id === activeBranchId);
+  const [printing, setPrinting] = useState(false);
+
+  const handlePrint = async () => {
+    if (!invoice || printing) return;
+    setPrinting(true);
+    try {
+      await new BrowserWindowInvoicePrinter().print(
+        buildInvoiceRowPrintPayload(invoice, {
+          store: buildStoreInfoFromBranch(activeBranch),
+        }),
+      );
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  const closeCancelPrompt = () => {
+    setCancelOpen(false);
+    setCancelReason("");
+    setCancelError(null);
+  };
+
+  const submitCancel = async () => {
+    if (!invoice || cancelReason.trim().length === 0) return;
+    setCancelError(null);
+    try {
+      await cancelInvoice.mutateAsync({
+        id: invoice.id,
+        body: { reason: cancelReason.trim() },
+      });
+      closeCancelPrompt();
+      onClose();
+    } catch (err) {
+      // Thông điệp của guard phía backend mới nói được vì sao không huỷ được,
+      // nên hiển thị nguyên văn thay vì tự chế chuỗi.
+      setCancelError(
+        err instanceof Error ? err.message : "Không huỷ được hóa đơn.",
+      );
+    }
+  };
 
   const items = invoice?.items ?? [];
   const customerLabel = customerName
@@ -291,7 +365,12 @@ export function InvoiceReceiptDialog({
         </div>
       )}
 
-      <footer className="flex justify-end px-8 py-5">
+      <footer className="flex items-center justify-end gap-3 px-8 py-5">
+        <InvoicePrintMenu
+          onPrint={() => void handlePrint()}
+          onCancelInvoice={canCancel ? () => setCancelOpen(true) : undefined}
+          disabled={printing || !invoice}
+        />
         <button
           type="button"
           onClick={onClose}
@@ -300,6 +379,19 @@ export function InvoiceReceiptDialog({
           Đóng
         </button>
       </footer>
+
+      {cancelOpen && invoice ? (
+        <CancelInvoicePrompt
+          invoiceCode={invoice.code}
+          reason={cancelReason}
+          onReasonChange={setCancelReason}
+          error={cancelError}
+          submitting={cancelInvoice.isPending}
+          onSubmit={() => void submitCancel()}
+          onClose={closeCancelPrompt}
+        />
+      ) : null}
+
     </PosDialog>
   );
 }

@@ -18,6 +18,11 @@ import {
   CashVoucherPartnerType,
   CashVoucherStatus,
 } from '../enums';
+import { VoucherLinkKind } from '../../voucher-links/enums';
+import {
+  LinkedVoucher,
+  VoucherLinksService,
+} from '../../voucher-links/voucher-links.service';
 import { PartnerResolverService } from '../shared/partner-resolver.service';
 import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
 import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
@@ -110,6 +115,7 @@ export class CashReceiptsService {
     private readonly partnerResolver: PartnerResolverService,
     private readonly accountResolver: AccountResolverService,
     private readonly debtCollectionSaga: DebtCollectionSagaService,
+    private readonly voucherLinks: VoucherLinksService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -668,14 +674,25 @@ export class CashReceiptsService {
   async getById(
     id: string,
     actor: ActorContext,
-  ): Promise<CashReceiptEntity & { sourceLink: SourceLink | null }> {
+  ): Promise<
+    CashReceiptEntity & {
+      sourceLink: SourceLink | null;
+      linkedVoucher: LinkedVoucher | null;
+    }
+  > {
     const receipt = await this.getByIdInTx(
       this.dataSource.manager,
       id,
       actor.organizationId,
     );
     const sourceLink = await this.buildSourceLink(receipt, actor.organizationId);
-    return Object.assign(receipt, { sourceLink });
+    // The refund payment issued against this receipt, if the invoice was cancelled.
+    const linkedVoucher = await this.voucherLinks.findLinkedVoucher(
+      VoucherLinkKind.CASH_RECEIPT,
+      receipt.id,
+      actor.organizationId,
+    );
+    return Object.assign(receipt, { sourceLink, linkedVoucher });
   }
 
   private async buildSourceLink(

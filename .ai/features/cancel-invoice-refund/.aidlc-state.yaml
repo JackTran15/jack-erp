@@ -1,0 +1,218 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: cancel-invoice-refund
+slug: cancel-invoice-refund
+profile: none
+created: 2026-07-27T19:54:55
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-07-27T20:09:21
+    by: Akenzy
+    evidence: architecture map verified by Akenzy      # signed 2026-07-27 after reviewing the Verified detail section; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-07-27T20:14:56
+    by: Akenzy
+    evidence: 12 assumptions, none blocking-and-pending; 20 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-07-27T20:28:02
+    by: Akenzy
+    evidence: 6 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-07-27T20:38:41
+    by: Akenzy
+    evidence: graph valid - 6 UoW, 17 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T20:38:58
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T20:43:25
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T20:44:42
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T20:44:54
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T20:46:18
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T20:46:18
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T20:46:18
+    by: claude
+    ticket: T-05-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T20:46:18
+    by: claude
+    ticket: T-04-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T20:58:18
+    by: claude
+    ticket: T-05-01
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T20:58:18
+    by: Akenzy
+    ticket: T-05-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T20:58:18
+    by: claude
+    ticket: T-04-01
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T20:58:18
+    by: Akenzy
+    ticket: T-04-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T20:58:26
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T21:00:29
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T21:00:29
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T21:00:30
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T21:01:55
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T21:01:55
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T21:01:56
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T21:07:50
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T21:07:50
+    by: Akenzy
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T21:07:50
+    by: claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T21:09:45
+    by: claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T21:09:45
+    by: Akenzy
+    ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T21:09:45
+    by: claude
+    ticket: T-03-03
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T21:11:34
+    by: claude
+    ticket: T-03-03
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T21:11:34
+    by: Akenzy
+    ticket: T-03-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T21:11:35
+    by: claude
+    ticket: T-03-04
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T21:14:44
+    by: claude
+    ticket: T-03-04
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T21:14:44
+    by: Akenzy
+    ticket: T-03-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T21:14:52
+    by: claude
+    ticket: T-06-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T21:15:46
+    by: claude
+    ticket: T-06-01
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T21:15:46
+    by: Akenzy
+    ticket: T-06-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T21:15:46
+    by: claude
+    ticket: T-06-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T21:19:25
+    by: claude
+    ticket: T-06-02
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T21:19:25
+    by: Akenzy
+    ticket: T-06-02
+  - gate: G3
+    action: reopened
+    at: 2026-07-27T21:19:25
+    by: claude
+    reason: T-06-03 khong chay duoc - pos-web khong co test runner (khong vitest/@testing-library/jsdom, script test = echo test) — plan gia dinh sai
+  - gate: G3
+    action: passed
+    at: 2026-07-27T21:19:55
+    by: Akenzy
+    evidence: graph valid - 6 UoW, 17 tickets, no cycles
