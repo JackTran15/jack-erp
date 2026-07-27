@@ -5,6 +5,7 @@ import { DomainEvent, StockMovementType } from '@erp/shared-interfaces';
 import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { OnDomainEvent } from '../../events/decorators/on-event.decorator';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
+import { resolveBranchItemLocations } from '../../pos/services/resolve-branch-item-locations';
 import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
 import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
 import { InvoiceCancelledPayload } from '../../pos/publishers/invoice-cancelled.publisher';
@@ -67,20 +68,43 @@ export class StockReturnConsumer {
       itemIds,
     );
 
-    const movements = itemsToReturn.map((item) => ({
-      itemId: item.itemId,
-      locationId: item.locationId,
-      branchId,
-      organizationId,
-      movementType: StockMovementType.RETURN_IN,
-      quantity: item.quantity,
-      referenceType: INVOICE_CANCEL_REFERENCE_TYPE,
-      referenceId: invoiceId,
-      actorContext: actor,
-      unitCost: itemCostByItemId.get(item.itemId) ?? 0,
-      // POS trả hàng (huỷ hoá đơn) không bị chặn bởi trạng thái ngừng hoạt động kho.
-      skipInactiveStorageGuard: true,
-    }));
+    // Cancelled goods come back over the counter, so they land in the showroom
+    // regardless of where they were picked from — an item sold out of the
+    // warehouse would otherwise reappear in stock somewhere nobody can sell it.
+    const locationByItemId = await resolveBranchItemLocations(
+      this.ledgerRepo.manager,
+      itemIds,
+      actor,
+      { showroomOnly: true },
+    );
+
+    const movements = itemsToReturn
+      .filter((item) => {
+        if (locationByItemId.has(item.itemId)) return true;
+        this.logger.warn(
+          `Stock return skipped for invoice ${invoiceId} item ${item.itemId}: ` +
+            'no showroom location resolved for this branch',
+        );
+        return false;
+      })
+      .map((item) => ({
+        itemId: item.itemId,
+        locationId: locationByItemId.get(item.itemId)!,
+        branchId,
+        organizationId,
+        movementType: StockMovementType.RETURN_IN,
+        quantity: item.quantity,
+        referenceType: INVOICE_CANCEL_REFERENCE_TYPE,
+        referenceId: invoiceId,
+        actorContext: actor,
+        unitCost: itemCostByItemId.get(item.itemId) ?? 0,
+        // POS trả hàng (huỷ hoá đơn) không bị chặn bởi trạng thái ngừng hoạt động kho.
+        skipInactiveStorageGuard: true,
+      }));
+
+    if (movements.length === 0) {
+      return;
+    }
 
     await this.stockLedgerService.recordBatchMovements(movements);
 

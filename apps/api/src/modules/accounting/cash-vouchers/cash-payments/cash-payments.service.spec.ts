@@ -10,6 +10,7 @@ import { CashMovementType } from '../../cash/cash-movement.entity';
 import { DocumentNumberingService } from '../../../document-numbering/document-numbering.service';
 import { PartnerResolverService } from '../shared/partner-resolver.service';
 import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
+import { VoucherLinksService } from '../../voucher-links/voucher-links.service';
 import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
 import { SupplierDebtPaymentSagaService } from '../supplier-debt-payment/supplier-debt-payment-saga.service';
 import {
@@ -86,6 +87,10 @@ describe('CashPaymentsService', () => {
         { provide: DocumentNumberingService, useValue: docNumbering },
         { provide: PartnerResolverService, useValue: partnerResolver },
         { provide: AccountResolverService, useValue: accountResolver },
+        {
+          provide: VoucherLinksService,
+          useValue: { findLinkedVoucher: jest.fn().mockResolvedValue(null) },
+        },
         {
           provide: SupplierDebtPaymentSagaService,
           useValue: { compensate: jest.fn().mockResolvedValue(undefined) },

@@ -1,58 +1,95 @@
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
-import { DomainEvent } from '@erp/shared-interfaces';
+import { DepositMovementSource, DomainEvent } from '@erp/shared-interfaces';
 import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { OnDomainEvent } from '../../events/decorators/on-event.decorator';
 import { InvoiceCancelledPayload } from '../../pos/publishers/invoice-cancelled.publisher';
-import { DepositRefundService } from './deposit-refund.service';
+import { BankPaymentsService } from '../deposit-vouchers/bank-payments/bank-payments.service';
+import {
+  BankPaymentPurpose,
+  BankPaymentReferenceType,
+} from '../deposit-vouchers/enums';
 
 /**
  * Deposit-fund side of a cancelled POS invoice (FR-11). Complements
- * `JournalReverseConsumer` (which reverses the sale/revenue journal entry) —
- * this reverses the SEPARATE deposit-movement journal entry, if any (a cash
- * invoice has no deposit movement, so this is a harmless no-op for it).
+ * `JournalReverseConsumer` (which reverses the sale/revenue journal entry) by
+ * paying the non-cash money back out of the fund it landed in.
+ *
+ * The payment voucher owns the movement (ADR-04): `createAndPostInternal`
+ * writes the withdrawal, its journal entry and the voucher in one transaction.
+ * The original sale movement is left alone and offset by this new one rather
+ * than reversed, so a movement that has already been reconciled with the bank
+ * no longer blocks the refund.
+ *
+ * A cash-only invoice carries no DEPOSIT leg, so this is a harmless no-op for it.
  */
 @Injectable()
 export class DepositRefundConsumer {
   private readonly logger = new Logger(DepositRefundConsumer.name);
 
-  constructor(private readonly refund: DepositRefundService) {}
+  constructor(private readonly bankPayments: BankPaymentsService) {}
 
   @OnDomainEvent(ERP_TOPICS.INVOICE_CANCELLED, {
     groupId: 'erp-api.invoice.cancelled.deposit-refund',
   })
   async handle(event: DomainEvent<InvoiceCancelledPayload>): Promise<void> {
-    const { invoiceId, branchId, organizationId, actorId } = event.payload;
+    const {
+      invoiceId,
+      documentNumber,
+      branchId,
+      organizationId,
+      actorId,
+      refunds,
+    } = event.payload;
     if (!branchId) return;
 
-    // BR-REF-02: the invoice is already cancelled by the time this event
-    // arrives (cancellation isn't gated on this async side-effect) — a
-    // reconciled movement can't be auto-reversed, and it's a business-rule
-    // block, not a transient failure, so it's logged (not sent to the DLQ for
-    // pointless retry) with the same guidance the ticket's 409 message gives.
-    try {
-      const result = await this.refund.reverseForCancelledInvoice(invoiceId, {
-        userId: actorId,
-        organizationId,
-        branchId,
-        roles: [],
-      });
-      if (result.reversedCount > 0) {
-        this.logger.log(
-          `Reversed ${result.reversedCount} deposit movement(s) for cancelled invoice ${invoiceId}`,
-        );
-      }
-    } catch (err) {
-      // Only the reconciled-block (BR-REF-02) is a permanent, non-retryable
-      // business rule. A locked-period block (BR-LOCK-01) is transient (the
-      // period may later unlock) and must still reach the DLQ, so it is
-      // deliberately re-thrown, not caught here.
-      if (err instanceof ConflictException && err.message.includes('BR-REF-02')) {
-        this.logger.warn(
-          `Invoice ${invoiceId} cancelled but its deposit movement is already reconciled — create a customer-refund payment manually: ${err.message}`,
-        );
-        return;
-      }
-      throw err;
+    // `refunds` is absent on events published before this feature shipped.
+    const depositLegs = (refunds ?? []).filter(
+      (leg) => leg.fundKind === 'DEPOSIT',
+    );
+    if (depositLegs.length === 0) {
+      return;
     }
+
+    // ADR-06: `createAndPostInternal` dedupes on (referenceType, referenceId),
+    // so a second voucher for the same invoice would be silently swallowed and
+    // one fund would keep money it no longer holds. Refusing outright sends the
+    // event to the DLQ with a message an accountant can act on, which beats an
+    // invisible partial refund.
+    if (depositLegs.length > 1) {
+      throw new ConflictException(
+        `Invoice ${documentNumber} was paid into ${depositLegs.length} deposit funds; ` +
+          'automatic refund supports one fund per invoice — issue the refund vouchers manually (ADR-06)',
+      );
+    }
+
+    const [leg] = depositLegs;
+    if (!leg.depositAccountId) {
+      throw new Error(
+        `Invoice ${invoiceId}: DEPOSIT refund leg without depositAccountId`,
+      );
+    }
+
+    const actor = { userId: actorId, organizationId, branchId, roles: [] };
+
+    const result = await this.bankPayments.createAndPostInternal({
+      purpose: BankPaymentPurpose.REFUND,
+      depositAccountId: leg.depositAccountId,
+      contraAccountId: leg.contraAccountId,
+      amount: Number(leg.amount),
+      // BankPaymentReferenceType has no REFUND member; `purpose` already
+      // carries that meaning (ADR-03).
+      referenceType: BankPaymentReferenceType.INVOICE,
+      referenceId: invoiceId,
+      reason: `Cancelled invoice ${documentNumber}`,
+      description: `Hoàn tiền hủy hóa đơn ${documentNumber}`,
+      source: DepositMovementSource.POS_INVOICE,
+      sourceRefLineId: `${leg.depositAccountId}-CANCEL`,
+      actor,
+    });
+
+    this.logger.log(
+      `Cancelled invoice ${documentNumber} → ${result.voucherNumber} ` +
+        `(bank payment=${result.voucherId}, fund=${leg.depositAccountId}, amount=${leg.amount})`,
+    );
   }
 }

@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { EntityRegistryService } from '../../crud/entity-registry.service';
 import { CashModule } from '../cash/cash.module';
 import { PaymentAccountsModule } from '../payment-accounts/payment-accounts.module';
+import { VoucherLinksModule } from '../voucher-links/voucher-links.module';
 import { DocumentNumberingModule } from '../../document-numbering/document-numbering.module';
 import { CashMovementEntity } from '../cash/cash-movement.entity';
 import { CashAccountEntity } from '../cash/cash-account.entity';
@@ -29,6 +30,7 @@ import { DebtCollectionCashConsumer } from './cash-voucher-consumers/debt-collec
 import { GoodsReceiptCashConsumer } from './cash-voucher-consumers/goods-receipt-cash.consumer';
 import { ExpenseCashConsumer } from './cash-voucher-consumers/expense-cash.consumer';
 import { RefundCashConsumer } from './cash-voucher-consumers/refund-cash.consumer';
+import { InvoiceCancelRefundCashConsumer } from './cash-voucher-consumers/invoice-cancel-refund-cash.consumer';
 import { CashReceiptsService } from './cash-receipts/cash-receipts.service';
 import { CashReceiptsController } from './cash-receipts/cash-receipts.controller';
 import { CashPaymentsService } from './cash-payments/cash-payments.service';
@@ -64,6 +66,7 @@ import { SearchCashLedgerV2Handler } from './cash-ledger/queries/search-cash-led
     ]),
     CashModule,
     PaymentAccountsModule,
+    VoucherLinksModule,
     DocumentNumberingModule,
     CqrsModule,
   ],
@@ -100,6 +103,7 @@ import { SearchCashLedgerV2Handler } from './cash-ledger/queries/search-cash-led
     GoodsReceiptCashConsumer,
     ExpenseCashConsumer,
     RefundCashConsumer,
+    InvoiceCancelRefundCashConsumer,
     SearchCashVouchersV2Handler,
     SearchCashLedgerV2Handler,
   ],
