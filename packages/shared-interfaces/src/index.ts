@@ -19,3 +19,4 @@ export * from './inventory-report';
 export * from './debt-report';
 export * from './profit-report';
 export * from './promotion';
+export * from './printing';

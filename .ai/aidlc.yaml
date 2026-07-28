@@ -1,0 +1,4 @@
+profile: none
+ruleset: 4
+# jack-erp is a pnpm monorepo: NestJS API (modules + CQRS) plus two React SPAs.
+layers: [domain, application, api, infra, web, shared, test]

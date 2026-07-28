@@ -11,6 +11,7 @@ import {
   ReportRow,
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
+import { assertUnderRowCap } from '../../report-core/row-cap.util';
 import { ReceivableEntity } from '../../../accounting/receivables/receivable.entity';
 import { ReceivableSettlementEntity } from '../../../accounting/receivables/receivable-settlement.entity';
 import { CustomerEntity } from '../../../customer/customer.entity';
@@ -220,6 +221,10 @@ export class CustomerDebtsReport implements ReportDefinition {
     if (!merged.length) {
       return { rows: [], totals: null, total: 0 };
     }
+    // Before the `In(...)` lookups below fan out over every party: the ledger
+    // is grouped in SQL, so this count is the report's real size, and until
+    // now this domain had no cap at all.
+    assertUnderRowCap(merged.length, 'customers');
 
     const customerIds = merged.map((r) => r.partyId);
     const customers = await this.customers.find({

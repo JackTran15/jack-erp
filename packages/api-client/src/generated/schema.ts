@@ -5801,6 +5801,40 @@ export interface paths {
         patch: operations["InvoiceReportController_updateTemplate"];
         trace?: never;
     };
+    "/reports/invoices/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export one invoice report as an .xlsx workbook */
+        post: operations["InvoiceReportController_export"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/invoices/print-payload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Print-ready payload for one invoice report */
+        post: operations["InvoiceReportController_printPayload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/debts/columns": {
         parameters: {
             query?: never;
@@ -5882,6 +5916,40 @@ export interface paths {
         patch: operations["DebtReportController_updateTemplate"];
         trace?: never;
     };
+    "/reports/debts/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export one debt report as an .xlsx workbook */
+        post: operations["DebtReportController_export"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/debts/print-payload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Print-ready payload for one debt report */
+        post: operations["DebtReportController_printPayload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/profit/columns": {
         parameters: {
             query?: never;
@@ -5961,6 +6029,40 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["ProfitReportController_updateTemplate"];
+        trace?: never;
+    };
+    "/reports/profit/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export one profit report as an .xlsx workbook */
+        post: operations["ProfitReportController_export"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/profit/print-payload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Print-ready payload for one profit report */
+        post: operations["ProfitReportController_printPayload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/inventory/purchase-orders": {
@@ -6067,6 +6169,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["GoodsIssueController_getById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/goods-issues/{id}/print-payload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsIssueController_getPrintPayload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/goods-issues/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsIssueController_export"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6253,14 +6387,14 @@ export interface paths {
         patch: operations["TransferOrderController_update"];
         trace?: never;
     };
-    "/inventory/transfer-orders/{id}/export-goods-issue": {
+    "/inventory/transfer-orders/{id}/print-payload": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["TransferOrderController_getExportGoodsIssue"];
+        get: operations["TransferOrderController_getPrintPayload"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6276,9 +6410,25 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["TransferOrderController_export"];
         put?: never;
         post: operations["TransferOrderController_confirmExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/transfer-orders/{id}/export-goods-issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferOrderController_getExportGoodsIssue"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -6331,6 +6481,38 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["GoodsReceiptController_update"];
+        trace?: never;
+    };
+    "/goods-receipts/{id}/print-payload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsReceiptController_getPrintPayload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/goods-receipts/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsReceiptController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/goods-receipts/{id}/post": {
@@ -6612,6 +6794,40 @@ export interface paths {
         put?: never;
         /** Run one inventory report (keyed rows + totals) */
         post: operations["InventoryReportV2Controller_search"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export one inventory report as an .xlsx workbook */
+        post: operations["InventoryReportV2Controller_export"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/print-payload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Print-ready payload for one inventory report */
+        post: operations["InventoryReportV2Controller_printPayload"];
         delete?: never;
         options?: never;
         head?: never;
@@ -11836,6 +12052,20 @@ export interface components {
             columnFilters?: components["schemas"]["ColumnFilterDto"][];
             sortOrder?: number;
         };
+        InvoiceReportExportDto: {
+            /** @description Which backend report definition to run. */
+            reportType: string;
+            /** @description Selected column keys (fixed registry keys + dynamic `payment.method.<coaAccountId>`). */
+            columns: string[];
+            filters: components["schemas"]["InvoiceReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            /** Format: uuid */
+            branchId?: string;
+            /** @description Per-column display names the user renamed, keyed by column key. Columns left out keep their catalog label. */
+            columnLabels?: {
+                [key: string]: string;
+            };
+        };
         DebtReportFilterDto: {
             /**
              * @description "Thống kê theo" — supplier-debts-detail-by-document-and-product only.
@@ -11891,6 +12121,18 @@ export interface components {
             columnFilters?: components["schemas"]["ColumnFilterDto"][];
             sortOrder?: number;
         };
+        DebtReportExportDto: {
+            /** @description Which backend report definition to run. */
+            reportType: string;
+            /** @description Selected column keys (fixed registry keys only — debt reports have no dynamic columns). */
+            columns: string[];
+            filters: components["schemas"]["DebtReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            /** @description Per-column display names the user renamed, keyed by column key. Columns left out keep their catalog label. */
+            columnLabels?: {
+                [key: string]: string;
+            };
+        };
         ProfitReportFilterDto: {
             /**
              * @description profit-by-item only — row grain (default item). "Hàng hoá" = PARENT, "Mẫu mã" = ITEM, "Nhóm hàng hóa" = GROUP.
@@ -11944,6 +12186,18 @@ export interface components {
             filters?: components["schemas"]["ProfitReportFilterDto"];
             columnFilters?: components["schemas"]["ColumnFilterDto"][];
             sortOrder?: number;
+        };
+        ProfitReportExportDto: {
+            /** @description Which backend report definition to run. */
+            reportType: string;
+            /** @description Selected column keys (fixed registry keys only — profit reports have no dynamic columns). */
+            columns: string[];
+            filters: components["schemas"]["ProfitReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            /** @description Per-column display names the user renamed, keyed by column key. Columns left out keep their catalog label. */
+            columnLabels?: {
+                [key: string]: string;
+            };
         };
         CreatePurchaseOrderDto: Record<string, never>;
         PurchaseOrderEntity: {
@@ -12552,6 +12806,18 @@ export interface components {
             page: number;
             /** @default 20 */
             limit: number;
+        };
+        InventoryReportExportDto: {
+            /** @description Which backend report definition to run (see INVENTORY_REPORT_KEYS). */
+            reportType: string;
+            /** @description Selected column keys (fixed keys + dynamic `branch.qty.<branchId>` for the pivot). */
+            columns: string[];
+            filters: components["schemas"]["InventoryReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            /** @description Per-column display names the user renamed, keyed by column key. Columns left out keep their catalog label. */
+            columnLabels?: {
+                [key: string]: string;
+            };
         };
         CreateInventoryReportTemplateDto: {
             reportType: string;
@@ -23166,6 +23432,50 @@ export interface operations {
             };
         };
     };
+    InvoiceReportController_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvoiceReportExportDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InvoiceReportController_printPayload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvoiceReportExportDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     DebtReportController_getColumns: {
         parameters: {
             query: {
@@ -23348,6 +23658,50 @@ export interface operations {
             };
         };
     };
+    DebtReportController_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DebtReportExportDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DebtReportController_printPayload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DebtReportExportDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     ProfitReportController_getColumns: {
         parameters: {
             query: {
@@ -23517,6 +23871,50 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UpdateProfitReportTemplateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ProfitReportController_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfitReportExportDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProfitReportController_printPayload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfitReportExportDto"];
             };
         };
         responses: {
@@ -23734,6 +24132,46 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["GoodsIssueEntity"];
                 };
+            };
+        };
+    };
+    GoodsIssueController_getPrintPayload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoodsIssueController_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -24040,7 +24478,7 @@ export interface operations {
             };
         };
     };
-    TransferOrderController_getExportGoodsIssue: {
+    TransferOrderController_getPrintPayload: {
         parameters: {
             query?: never;
             header?: never;
@@ -24056,8 +24494,27 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["GoodsIssueEntity"];
+                    "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    TransferOrderController_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -24082,6 +24539,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TransferOrderEntity"];
+                };
+            };
+        };
+    };
+    TransferOrderController_getExportGoodsIssue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueEntity"];
                 };
             };
         };
@@ -24222,6 +24700,46 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["GoodsReceiptEntity"];
                 };
+            };
+        };
+    };
+    GoodsReceiptController_getPrintPayload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoodsReceiptController_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -24762,6 +25280,50 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InventoryReportV2Controller_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryReportExportDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryReportV2Controller_printPayload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryReportExportDto"];
+            };
+        };
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

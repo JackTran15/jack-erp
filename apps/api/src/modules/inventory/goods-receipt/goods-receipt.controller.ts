@@ -4,15 +4,18 @@ import {
   Delete,
   Get,
   HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
+import type { Response } from 'express';
 import {
   GoodsReceiptPurpose,
   GoodsReceiptStatus,
@@ -23,6 +26,11 @@ import { PermissionGuard } from '../../rbac/permission.guard';
 import { BranchScopeGuard } from '../../rbac/branch-scope.guard';
 import { AuditInterceptor } from '../../crud/audit.interceptor';
 import { PaginationQueryDto } from '../../crud/dto';
+import { ExportPipeline } from '../../reporting/report-core/export/export-pipeline';
+import { HttpResponseSink } from '../../reporting/report-core/export/http-response.sink';
+import { XlsxStreamWriter } from '../../reporting/report-core/export/xlsx-stream.writer';
+import { StaticRowsFetcher } from '../../reporting/report-core/export/static-rows.fetcher';
+import { voucherToReportDocument } from '../../reporting/report-core/export/voucher-export.adapter';
 import { GoodsReceiptService } from './goods-receipt.service';
 import { CreateGoodsReceiptDto } from './dto/create-goods-receipt.dto';
 import { UpdateGoodsReceiptDto } from './dto/update-goods-receipt.dto';
@@ -78,6 +86,34 @@ export class GoodsReceiptController {
     @Actor() actor: ActorContext,
   ) {
     return this.service.getById(id, actor);
+  }
+
+  @Get(':id/print-payload')
+  @RequirePermission('goods_receipt.read')
+  @RequireBranchScope()
+  getPrintPayload(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.getPrintPayload(id, actor);
+  }
+
+  @Get(':id/export')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission('goods_receipt.read')
+  @RequireBranchScope()
+  async export(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+    @Res() res: Response,
+  ): Promise<void> {
+    const payload = await this.service.getPrintPayload(id, actor);
+    const doc = voucherToReportDocument(payload);
+    await new ExportPipeline(
+      new StaticRowsFetcher(doc.rows, doc.totals),
+      new XlsxStreamWriter(payload.docNo),
+      new HttpResponseSink(res, payload.docNo),
+    ).run(doc.header, doc.columns);
   }
 
   @Patch(':id')

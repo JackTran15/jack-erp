@@ -40,6 +40,8 @@ import { DailySalesSummaryReport } from './reports/daily-sales-summary.report';
 import { InvoiceOrderListingReport } from './reports/invoice-order-listing.report';
 import { InvoiceItemRevenueDetailReport } from './reports/invoice-item-revenue-detail.report';
 import { RevenueByItemReport } from './reports/revenue-by-item.report';
+import { ReportExportService } from '../report-core/report-export.service';
+import { GetInvoiceReportDocumentHandler } from './queries/get-invoice-report-document.handler';
 
 @Module({
   imports: [
@@ -71,6 +73,8 @@ import { RevenueByItemReport } from './reports/revenue-by-item.report';
   ],
   controllers: [InvoiceReportController],
   providers: [
+    GetInvoiceReportDocumentHandler,
+    ReportExportService,
     // Report definitions (one per report type — add new ones here + to the registry factory).
     DailySalesSummaryReport,
     InvoiceOrderListingReport,

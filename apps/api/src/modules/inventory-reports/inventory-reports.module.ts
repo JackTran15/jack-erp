@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BranchEntity } from '../branch/branch.entity';
+import { ReportExportService } from '../reporting/report-core/report-export.service';
 import { ReportTemplateEntity } from '../reporting/report-core/report-template.entity';
 import { ItemEntity } from '../inventory/location/item.entity';
 import { ItemCategoryEntity } from '../inventory/location/item-category.entity';
@@ -18,6 +19,7 @@ import { GetInventoryReportTemplateHandler } from './queries/get-inventory-repor
 import { ListInventoryReportTemplatesHandler } from './queries/list-inventory-report-templates.handler';
 import { GetInventoryFilterOptionsHandler } from './queries/get-inventory-filter-options.handler';
 import { GetInventoryReportColumnsHandler } from './queries/get-inventory-report-columns.handler';
+import { GetInventoryReportDocumentHandler } from './queries/get-inventory-report-document.handler';
 import { SearchInventoryReportHandler } from './queries/search-inventory-report.handler';
 import {
   InventoryReportDefinition,
@@ -94,6 +96,8 @@ const REPORT_DEFINITIONS = [
     GetInventoryReportColumnsHandler,
     GetInventoryFilterOptionsHandler,
     SearchInventoryReportHandler,
+    GetInventoryReportDocumentHandler,
+    ReportExportService,
     CreateInventoryReportTemplateHandler,
     UpdateInventoryReportTemplateHandler,
     DeleteInventoryReportTemplateHandler,

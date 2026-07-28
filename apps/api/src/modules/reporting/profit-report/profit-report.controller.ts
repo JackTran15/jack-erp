@@ -3,15 +3,29 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { ReportGroupBy } from '@erp/shared-interfaces';
+import type { Response } from 'express';
+import { ExportPipeline } from '../report-core/export/export-pipeline';
+import { HttpResponseSink } from '../report-core/export/http-response.sink';
+import { XlsxStreamWriter } from '../report-core/export/xlsx-stream.writer';
+import {
+  PreparedExport,
+  ReportExportService,
+} from '../report-core/report-export.service';
+import { ProfitReportExportDto } from './dto/profit-report-export.dto';
+import { profitReportLabel } from './queries/get-profit-report-document.handler';
+import { GetProfitReportDocumentQuery } from './queries/get-profit-report-document.query';
+import { ReportDocumentPayload, ReportGroupBy } from '@erp/shared-interfaces';
 import {
   Actor,
   ActorContext,
@@ -40,6 +54,7 @@ export class ProfitReportController {
   constructor(
     private readonly queryBus: QueryBus,
     private readonly commandBus: CommandBus,
+    private readonly exportService: ReportExportService,
   ) {}
 
   @Get('columns')
@@ -116,5 +131,44 @@ export class ProfitReportController {
     return this.commandBus.execute(
       new DeleteProfitReportTemplateCommand(id, actor),
     );
+  }
+
+  @Post('export')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(PROFIT_READ)
+  @ApiOperation({ summary: 'Export one profit report as an .xlsx workbook' })
+  async export(
+    @Body() dto: ProfitReportExportDto,
+    @Actor() actor: ActorContext,
+    @Res() res: Response,
+  ): Promise<void> {
+    // Prepare first: everything that can still answer with a 4xx happens
+    // before the sink writes a header byte (ADR-08).
+    const prepared = await this.queryBus.execute<
+      GetProfitReportDocumentQuery,
+      PreparedExport
+    >(new GetProfitReportDocumentQuery(dto, actor));
+    const label = profitReportLabel(dto.reportType);
+    const written = await new ExportPipeline(
+      prepared.fetcher,
+      new XlsxStreamWriter(label),
+      new HttpResponseSink(res, label),
+    ).run(prepared.header, prepared.columns);
+    prepared.onComplete(written);
+  }
+
+  @Post('print-payload')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(PROFIT_READ)
+  @ApiOperation({ summary: 'Print-ready payload for one profit report' })
+  async printPayload(
+    @Body() dto: ProfitReportExportDto,
+    @Actor() actor: ActorContext,
+  ): Promise<ReportDocumentPayload> {
+    const prepared = await this.queryBus.execute<
+      GetProfitReportDocumentQuery,
+      PreparedExport
+    >(new GetProfitReportDocumentQuery(dto, actor));
+    return this.exportService.materialize(prepared);
   }
 }

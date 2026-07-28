@@ -18,6 +18,7 @@ import {
   DocumentType,
   PaginatedResponse,
   PaginationQuery,
+  VoucherPrintPayload,
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { StockLedgerService, RecordMovementParams } from '../ledger/stock-ledger.service';
@@ -26,6 +27,11 @@ import { IssueReasonEntity } from '../issue-reason/issue-reason.entity';
 import { BranchEntity } from '../../branch/branch.entity';
 import { resolveDocCounterparty } from '../location/services/resolve-doc-counterparty.util';
 import { attachCounterparties } from '../location/services/counterparty-name.util';
+import {
+  loadStorageNames,
+  loadVoucherBranch,
+} from '../location/services/voucher-print-context.util';
+import { mapGoodsIssueToVoucherPayload } from './goods-issue-print.mapper';
 import { TransferOrderService } from '../transfer-order/transfer-order.service';
 import { RbacService } from '../../rbac/rbac.service';
 import { GoodsIssueEntity } from './goods-issue.entity';
@@ -341,6 +347,22 @@ export class GoodsIssueService {
     const gi = await this.findOrFail(id, actor.organizationId, actor.branchId);
     await attachCounterparties(this.giRepo.manager, [gi], actor.organizationId);
     return gi;
+  }
+
+  /** Print/export payload for one issue (T-03-02, UOW-08) — reuses `getById`'s 404. */
+  async getPrintPayload(
+    id: string,
+    actor: ActorContext,
+  ): Promise<VoucherPrintPayload> {
+    const issue = await this.getById(id, actor);
+    const [branch, storageNameByStorageId] = await Promise.all([
+      loadVoucherBranch(this.giRepo.manager, issue.branchId, actor.organizationId),
+      loadStorageNames(
+        this.giRepo.manager,
+        issue.lines.map((line) => line.location?.storageId),
+      ),
+    ]);
+    return mapGoodsIssueToVoucherPayload(issue, branch, storageNameByStorageId);
   }
 
   async list(query: GoodsIssueQuery): Promise<PaginatedResponse<GoodsIssueEntity>> {

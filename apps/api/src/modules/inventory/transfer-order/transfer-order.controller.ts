@@ -4,14 +4,17 @@ import {
   Delete,
   Get,
   HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
+import type { Response } from "express";
 import {
   ArrayMinSize,
   IsArray,
@@ -37,6 +40,11 @@ import { AuditInterceptor } from "../../crud/audit.interceptor";
 import { PermissionGuard } from "../../rbac/permission.guard";
 import { BranchScopeGuard } from "../../rbac/branch-scope.guard";
 import { PaginationQueryDto } from "../../crud/dto";
+import { ExportPipeline } from "../../reporting/report-core/export/export-pipeline";
+import { HttpResponseSink } from "../../reporting/report-core/export/http-response.sink";
+import { XlsxStreamWriter } from "../../reporting/report-core/export/xlsx-stream.writer";
+import { StaticRowsFetcher } from "../../reporting/report-core/export/static-rows.fetcher";
+import { voucherToReportDocument } from "../../reporting/report-core/export/voucher-export.adapter";
 import { TransferOrderService } from "./transfer-order.service";
 
 class TransferOrderLineDto {
@@ -396,6 +404,32 @@ export class TransferOrderController {
     @Actor() actor: ActorContext,
   ) {
     return this.service.getById(id, actor);
+  }
+
+  @Get(":id/print-payload")
+  @RequirePermission("inventory.transfer.read")
+  getPrintPayload(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.getPrintPayload(id, actor);
+  }
+
+  @Get(":id/export")
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission("inventory.transfer.read")
+  async export(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+    @Res() res: Response,
+  ): Promise<void> {
+    const payload = await this.service.getPrintPayload(id, actor);
+    const doc = voucherToReportDocument(payload);
+    await new ExportPipeline(
+      new StaticRowsFetcher(doc.rows, doc.totals),
+      new XlsxStreamWriter(payload.docNo),
+      new HttpResponseSink(res, payload.docNo),
+    ).run(doc.header, doc.columns);
   }
 
   @Get(":id/export-goods-issue")
