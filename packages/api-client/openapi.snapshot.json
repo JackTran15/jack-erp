@@ -17344,6 +17344,63 @@
         ]
       }
     },
+    "/reports/debts/export": {
+      "post": {
+        "operationId": "DebtReportController_export",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DebtReportExportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Export one debt report as an .xlsx workbook",
+        "tags": [
+          "reports/debts"
+        ]
+      }
+    },
+    "/reports/debts/print-payload": {
+      "post": {
+        "operationId": "DebtReportController_printPayload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DebtReportExportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Print-ready payload for one debt report",
+        "tags": [
+          "reports/debts"
+        ]
+      }
+    },
     "/reports/profit/columns": {
       "get": {
         "operationId": "ProfitReportController_getColumns",
@@ -17642,6 +17699,63 @@
             }
           }
         },
+        "tags": [
+          "reports/profit"
+        ]
+      }
+    },
+    "/reports/profit/export": {
+      "post": {
+        "operationId": "ProfitReportController_export",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfitReportExportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Export one profit report as an .xlsx workbook",
+        "tags": [
+          "reports/profit"
+        ]
+      }
+    },
+    "/reports/profit/print-payload": {
+      "post": {
+        "operationId": "ProfitReportController_printPayload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfitReportExportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Print-ready payload for one profit report",
         "tags": [
           "reports/profit"
         ]
@@ -18024,6 +18138,59 @@
                 }
               }
             }
+          }
+        },
+        "tags": [
+          "GoodsIssue"
+        ]
+      }
+    },
+    "/inventory/goods-issues/{id}/print-payload": {
+      "get": {
+        "operationId": "GoodsIssueController_getPrintPayload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "GoodsIssue"
+        ]
+      }
+    },
+    "/inventory/goods-issues/{id}/export": {
+      "get": {
+        "operationId": "GoodsIssueController_export",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
           }
         },
         "tags": [
@@ -18488,9 +18655,9 @@
         ]
       }
     },
-    "/inventory/transfer-orders/{id}/export-goods-issue": {
+    "/inventory/transfer-orders/{id}/print-payload": {
       "get": {
-        "operationId": "TransferOrderController_getExportGoodsIssue",
+        "operationId": "TransferOrderController_getPrintPayload",
         "parameters": [
           {
             "name": "id",
@@ -18507,7 +18674,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GoodsIssueEntity"
+                  "type": "object"
                 }
               }
             }
@@ -18519,6 +18686,27 @@
       }
     },
     "/inventory/transfer-orders/{id}/export": {
+      "get": {
+        "operationId": "TransferOrderController_export",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      },
       "post": {
         "operationId": "TransferOrderController_confirmExport",
         "parameters": [
@@ -18548,6 +18736,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TransferOrderEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      }
+    },
+    "/inventory/transfer-orders/{id}/export-goods-issue": {
+      "get": {
+        "operationId": "TransferOrderController_getExportGoodsIssue",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoodsIssueEntity"
                 }
               }
             }
@@ -18791,6 +19009,59 @@
         ],
         "responses": {
           "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GoodsReceipt"
+        ]
+      }
+    },
+    "/goods-receipts/{id}/print-payload": {
+      "get": {
+        "operationId": "GoodsReceiptController_getPrintPayload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "GoodsReceipt"
+        ]
+      }
+    },
+    "/goods-receipts/{id}/export": {
+      "get": {
+        "operationId": "GoodsReceiptController_export",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
             "description": ""
           }
         },
@@ -20356,6 +20627,63 @@
           }
         },
         "summary": "Run one inventory report (keyed rows + totals)",
+        "tags": [
+          "inventory-reports"
+        ]
+      }
+    },
+    "/reports/inventory/export": {
+      "post": {
+        "operationId": "InventoryReportV2Controller_export",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryReportExportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Export one inventory report as an .xlsx workbook",
+        "tags": [
+          "inventory-reports"
+        ]
+      }
+    },
+    "/reports/inventory/print-payload": {
+      "post": {
+        "operationId": "InventoryReportV2Controller_printPayload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryReportExportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Print-ready payload for one inventory report",
         "tags": [
           "inventory-reports"
         ]
@@ -35824,6 +36152,44 @@
           }
         }
       },
+      "DebtReportExportDto": {
+        "type": "object",
+        "properties": {
+          "reportType": {
+            "type": "string",
+            "description": "Which backend report definition to run."
+          },
+          "columns": {
+            "description": "Selected column keys (fixed registry keys only — debt reports have no dynamic columns).",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "$ref": "#/components/schemas/DebtReportFilterDto"
+          },
+          "columnFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFilterDto"
+            }
+          },
+          "columnLabels": {
+            "type": "object",
+            "description": "Per-column display names the user renamed, keyed by column key. Columns left out keep their catalog label.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "reportType",
+          "columns",
+          "filters"
+        ]
+      },
       "ProfitReportFilterDto": {
         "type": "object",
         "properties": {
@@ -35996,6 +36362,44 @@
             "minimum": 0
           }
         }
+      },
+      "ProfitReportExportDto": {
+        "type": "object",
+        "properties": {
+          "reportType": {
+            "type": "string",
+            "description": "Which backend report definition to run."
+          },
+          "columns": {
+            "description": "Selected column keys (fixed registry keys only — profit reports have no dynamic columns).",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "$ref": "#/components/schemas/ProfitReportFilterDto"
+          },
+          "columnFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFilterDto"
+            }
+          },
+          "columnLabels": {
+            "type": "object",
+            "description": "Per-column display names the user renamed, keyed by column key. Columns left out keep their catalog label.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "reportType",
+          "columns",
+          "filters"
+        ]
       },
       "CreatePurchaseOrderDto": {
         "type": "object",
@@ -37796,6 +38200,44 @@
             "default": 20,
             "minimum": 1,
             "maximum": 500
+          }
+        },
+        "required": [
+          "reportType",
+          "columns",
+          "filters"
+        ]
+      },
+      "InventoryReportExportDto": {
+        "type": "object",
+        "properties": {
+          "reportType": {
+            "type": "string",
+            "description": "Which backend report definition to run (see INVENTORY_REPORT_KEYS)."
+          },
+          "columns": {
+            "description": "Selected column keys (fixed keys + dynamic `branch.qty.<branchId>` for the pivot).",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "$ref": "#/components/schemas/InventoryReportFilterDto"
+          },
+          "columnFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFilterDto"
+            }
+          },
+          "columnLabels": {
+            "type": "object",
+            "description": "Per-column display names the user renamed, keyed by column key. Columns left out keep their catalog label.",
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         },
         "required": [

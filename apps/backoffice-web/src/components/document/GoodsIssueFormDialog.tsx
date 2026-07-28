@@ -29,6 +29,11 @@ import {
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
+import { VoucherKind } from "@erp/shared-interfaces";
+import { fetchVoucherPrintPayload } from "../../lib/print/voucher-print.api";
+import { downloadVoucherExcel } from "../../lib/print/voucher-export.api";
+import { renderVoucherHtml } from "../../lib/print/render-voucher-html";
+import { printHtmlDocument } from "../../lib/print/print-html-document";
 import {
   getPreferredShelf,
   getPreferredShelfBatch,
@@ -356,6 +361,8 @@ export function GoodsIssueFormDialog({
   const [barcodeMode, setBarcodeMode] = useState(false);
 
   const [saving, setSaving] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [overstockWarnings, setOverstockWarnings] = useState<
     OverstockWarningRow[] | null
   >(null);
@@ -858,6 +865,36 @@ export function GoodsIssueFormDialog({
     }
   };
 
+  const canPrint = mode !== "create" && Boolean(initial?.id);
+
+  const handlePrint = async () => {
+    if (!initial?.id || printing) return;
+    setPrinting(true);
+    try {
+      const payload = await fetchVoucherPrintPayload(
+        VoucherKind.GOODS_ISSUE,
+        initial.id,
+      );
+      await printHtmlDocument(renderVoucherHtml(payload));
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  const handleExport = async () => {
+    if (!initial?.id || exporting) return;
+    setExporting(true);
+    try {
+      await downloadVoucherExcel(VoucherKind.GOODS_ISSUE, initial.id);
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const dialogToolbar: ToolbarItem[] = [
     { id: "prev", label: "Trước", icon: ChevronLeft, disabled: true, onClick: () => {} },
     { id: "next", label: "Sau", icon: ChevronRight, disabled: true, onClick: () => {} },
@@ -909,8 +946,20 @@ export function GoodsIssueFormDialog({
         ]
       : []),
     { id: "sep2", type: "separator" },
-    { id: "print", label: "In", icon: Printer, disabled: true, onClick: () => {} },
-    { id: "export", label: "Xuất khẩu", icon: CloudUpload, disabled: true, onClick: () => {} },
+    {
+      id: "print",
+      label: "In",
+      icon: Printer,
+      disabled: !canPrint || printing,
+      onClick: () => void handlePrint(),
+    },
+    {
+      id: "export",
+      label: "Xuất khẩu",
+      icon: CloudUpload,
+      disabled: !canPrint || exporting,
+      onClick: () => void handleExport(),
+    },
     { id: "help", label: "Trợ giúp", icon: HelpCircle, onClick: () => {} },
     { id: "close", label: "Đóng", icon: X, onClick: requestClose },
   ];

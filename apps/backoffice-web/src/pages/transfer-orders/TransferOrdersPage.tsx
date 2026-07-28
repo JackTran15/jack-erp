@@ -33,6 +33,11 @@ import {
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
+import { VoucherKind } from "@erp/shared-interfaces";
+import { fetchVoucherPrintPayload } from "../../lib/print/voucher-print.api";
+import { downloadVoucherExcel } from "../../lib/print/voucher-export.api";
+import { renderVoucherHtml } from "../../lib/print/render-voucher-html";
+import { printHtmlDocument } from "../../lib/print/print-html-document";
 import {
   BaseDataTable,
   type TableColumn,
@@ -776,6 +781,8 @@ function TransferOrderFormDialog({
   });
 
   const [saving, setSaving] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -1048,6 +1055,36 @@ function TransferOrderFormDialog({
     }
   };
 
+  const canPrint = mode !== "create" && Boolean(initial?.id);
+
+  const handlePrint = async () => {
+    if (!initial?.id || printing) return;
+    setPrinting(true);
+    try {
+      const payload = await fetchVoucherPrintPayload(
+        VoucherKind.TRANSFER_ORDER,
+        initial.id,
+      );
+      await printHtmlDocument(renderVoucherHtml(payload));
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  const handleExport = async () => {
+    if (!initial?.id || exporting) return;
+    setExporting(true);
+    try {
+      await downloadVoucherExcel(VoucherKind.TRANSFER_ORDER, initial.id);
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const dialogToolbar: ToolbarItem[] = [
     {
       id: "prev",
@@ -1112,15 +1149,15 @@ function TransferOrderFormDialog({
       id: "print",
       label: "In",
       icon: Printer,
-      disabled: true,
-      onClick: () => {},
+      disabled: !canPrint || printing,
+      onClick: () => void handlePrint(),
     },
     {
       id: "export",
       label: "Xuất khẩu",
       icon: CloudUpload,
-      disabled: true,
-      onClick: () => {},
+      disabled: !canPrint || exporting,
+      onClick: () => void handleExport(),
     },
     { id: "help", label: "Trợ giúp", icon: HelpCircle, onClick: () => {} },
     { id: "close", label: "Đóng", icon: X, onClick: requestClose },

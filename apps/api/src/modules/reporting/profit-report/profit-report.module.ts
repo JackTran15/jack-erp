@@ -35,6 +35,8 @@ import { ReportRegistry } from './report-definition';
 import { BusinessResultsReport } from './reports/business-results.report';
 import { GrossProfitByInvoiceReport } from './reports/gross-profit-by-invoice.report';
 import { ProfitByItemReport } from './reports/profit-by-item.report';
+import { ReportExportService } from '../report-core/report-export.service';
+import { GetProfitReportDocumentHandler } from './queries/get-profit-report-document.handler';
 
 @Module({
   imports: [
@@ -65,6 +67,8 @@ import { ProfitByItemReport } from './reports/profit-by-item.report';
   ],
   controllers: [ProfitReportController],
   providers: [
+    GetProfitReportDocumentHandler,
+    ReportExportService,
     // Report definitions (one per report type — add new ones here + to the registry factory).
     ProfitByItemReport,
     GrossProfitByInvoiceReport,

@@ -3,14 +3,26 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import type { Response } from 'express';
+import { ReportDocumentPayload } from '@erp/shared-interfaces';
+import { ExportPipeline } from '../reporting/report-core/export/export-pipeline';
+import { HttpResponseSink } from '../reporting/report-core/export/http-response.sink';
+import { XlsxStreamWriter } from '../reporting/report-core/export/xlsx-stream.writer';
+import {
+  PreparedExport,
+  ReportExportService,
+} from '../reporting/report-core/report-export.service';
 import {
   Actor,
   ActorContext,
@@ -22,7 +34,10 @@ import { DeleteInventoryReportTemplateCommand } from './commands/delete-inventor
 import { UpdateInventoryReportTemplateCommand } from './commands/update-inventory-report-template.command';
 import { CreateInventoryReportTemplateDto } from './dto/create-inventory-report-template.dto';
 import { InventoryFilterOptionsQueryDto } from './dto/inventory-filter-options-query.dto';
+import { InventoryReportExportDto } from './dto/inventory-report-export.dto';
 import { InventoryReportSearchDto } from './dto/inventory-report-search.dto';
+import { inventoryReportLabel } from './queries/get-inventory-report-document.handler';
+import { GetInventoryReportDocumentQuery } from './queries/get-inventory-report-document.query';
 import { UpdateInventoryReportTemplateDto } from './dto/update-inventory-report-template.dto';
 import { GetInventoryFilterOptionsQuery } from './queries/get-inventory-filter-options.query';
 import { GetInventoryReportColumnsQuery } from './queries/get-inventory-report-columns.query';
@@ -46,6 +61,7 @@ export class InventoryReportV2Controller {
   constructor(
     private readonly queryBus: QueryBus,
     private readonly commandBus: CommandBus,
+    private readonly exportService: ReportExportService,
   ) {}
 
   @Get('columns')
@@ -75,6 +91,45 @@ export class InventoryReportV2Controller {
   @ApiOperation({ summary: 'Run one inventory report (keyed rows + totals)' })
   search(@Body() dto: InventoryReportSearchDto, @Actor() actor: ActorContext) {
     return this.queryBus.execute(new SearchInventoryReportQuery(dto, actor));
+  }
+
+  @Post('export')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(REPORTS_READ)
+  @ApiOperation({ summary: 'Export one inventory report as an .xlsx workbook' })
+  async export(
+    @Body() dto: InventoryReportExportDto,
+    @Actor() actor: ActorContext,
+    @Res() res: Response,
+  ): Promise<void> {
+    // Prepare first: everything that can still answer with a 4xx happens
+    // before the sink writes a header byte (ADR-08).
+    const prepared = await this.queryBus.execute<
+      GetInventoryReportDocumentQuery,
+      PreparedExport
+    >(new GetInventoryReportDocumentQuery(dto, actor));
+    const label = inventoryReportLabel(dto.reportType);
+    const written = await new ExportPipeline(
+      prepared.fetcher,
+      new XlsxStreamWriter(label),
+      new HttpResponseSink(res, label),
+    ).run(prepared.header, prepared.columns);
+    prepared.onComplete(written);
+  }
+
+  @Post('print-payload')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(REPORTS_READ)
+  @ApiOperation({ summary: 'Print-ready payload for one inventory report' })
+  async printPayload(
+    @Body() dto: InventoryReportExportDto,
+    @Actor() actor: ActorContext,
+  ): Promise<ReportDocumentPayload> {
+    const prepared = await this.queryBus.execute<
+      GetInventoryReportDocumentQuery,
+      PreparedExport
+    >(new GetInventoryReportDocumentQuery(dto, actor));
+    return this.exportService.materialize(prepared);
   }
 
   @Get('templates')

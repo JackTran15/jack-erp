@@ -3,15 +3,29 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { ReportGroupBy } from '@erp/shared-interfaces';
+import type { Response } from 'express';
+import { ExportPipeline } from '../report-core/export/export-pipeline';
+import { HttpResponseSink } from '../report-core/export/http-response.sink';
+import { XlsxStreamWriter } from '../report-core/export/xlsx-stream.writer';
+import {
+  PreparedExport,
+  ReportExportService,
+} from '../report-core/report-export.service';
+import { InvoiceReportExportDto } from './dto/invoice-report-export.dto';
+import { invoiceReportLabel } from './queries/get-invoice-report-document.handler';
+import { GetInvoiceReportDocumentQuery } from './queries/get-invoice-report-document.query';
+import { ReportDocumentPayload, ReportGroupBy } from '@erp/shared-interfaces';
 import {
   Actor,
   ActorContext,
@@ -43,6 +57,7 @@ export class InvoiceReportController {
   constructor(
     private readonly queryBus: QueryBus,
     private readonly commandBus: CommandBus,
+    private readonly exportService: ReportExportService,
   ) {}
 
   @Get('types')
@@ -146,5 +161,44 @@ export class InvoiceReportController {
     return this.commandBus.execute(
       new DeleteInvoiceReportTemplateCommand(id, actor),
     );
+  }
+
+  @Post('export')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(BRANCH_READ)
+  @ApiOperation({ summary: 'Export one invoice report as an .xlsx workbook' })
+  async export(
+    @Body() dto: InvoiceReportExportDto,
+    @Actor() actor: ActorContext,
+    @Res() res: Response,
+  ): Promise<void> {
+    // Prepare first: everything that can still answer with a 4xx happens
+    // before the sink writes a header byte (ADR-08).
+    const prepared = await this.queryBus.execute<
+      GetInvoiceReportDocumentQuery,
+      PreparedExport
+    >(new GetInvoiceReportDocumentQuery(dto, actor));
+    const label = invoiceReportLabel(dto.reportType);
+    const written = await new ExportPipeline(
+      prepared.fetcher,
+      new XlsxStreamWriter(label),
+      new HttpResponseSink(res, label),
+    ).run(prepared.header, prepared.columns);
+    prepared.onComplete(written);
+  }
+
+  @Post('print-payload')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(BRANCH_READ)
+  @ApiOperation({ summary: 'Print-ready payload for one invoice report' })
+  async printPayload(
+    @Body() dto: InvoiceReportExportDto,
+    @Actor() actor: ActorContext,
+  ): Promise<ReportDocumentPayload> {
+    const prepared = await this.queryBus.execute<
+      GetInvoiceReportDocumentQuery,
+      PreparedExport
+    >(new GetInvoiceReportDocumentQuery(dto, actor));
+    return this.exportService.materialize(prepared);
   }
 }

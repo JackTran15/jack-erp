@@ -61,6 +61,11 @@ import {
 } from "../../pages/inventory-line-normalization";
 import { GoodsReceiptImportDialog } from "../../pages/purchase-orders/import/GoodsReceiptImportDialog";
 import type { GoodsReceiptImportJobRow } from "../../pages/purchase-orders/import/import-goods-receipt.types";
+import { VoucherKind } from "@erp/shared-interfaces";
+import { fetchVoucherPrintPayload } from "../../lib/print/voucher-print.api";
+import { downloadVoucherExcel } from "../../lib/print/voucher-export.api";
+import { renderVoucherHtml } from "../../lib/print/render-voucher-html";
+import { printHtmlDocument } from "../../lib/print/print-html-document";
 import {
   ProductSelectDialog,
   type ProductSelectResult,
@@ -386,6 +391,8 @@ export function PurchaseOrderFormDialog({
   const [barcodeMode, setBarcodeMode] = useState(false);
 
   const [saving, setSaving] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
   const dirtyRef = useRef(false);
@@ -1124,6 +1131,36 @@ export function PurchaseOrderFormDialog({
     }
   };
 
+  const canPrint = mode !== "create" && Boolean(initial?.id);
+
+  const handlePrint = async () => {
+    if (!initial?.id || printing) return;
+    setPrinting(true);
+    try {
+      const payload = await fetchVoucherPrintPayload(
+        VoucherKind.GOODS_RECEIPT,
+        initial.id,
+      );
+      await printHtmlDocument(renderVoucherHtml(payload));
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  const handleExport = async () => {
+    if (!initial?.id || exporting) return;
+    setExporting(true);
+    try {
+      await downloadVoucherExcel(VoucherKind.GOODS_RECEIPT, initial.id);
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const dialogToolbar: ToolbarItem[] = [
     {
       id: "prev",
@@ -1174,15 +1211,15 @@ export function PurchaseOrderFormDialog({
       id: "print",
       label: "In",
       icon: Printer,
-      disabled: true,
-      onClick: () => {},
+      disabled: !canPrint || printing,
+      onClick: () => void handlePrint(),
     },
     {
       id: "export",
       label: "Xuất khẩu",
       icon: CloudUpload,
-      disabled: true,
-      onClick: () => {},
+      disabled: !canPrint || exporting,
+      onClick: () => void handleExport(),
     },
     { id: "help", label: "Trợ giúp", icon: HelpCircle, onClick: () => {} },
     { id: "close", label: "Đóng", icon: X, onClick: requestClose },

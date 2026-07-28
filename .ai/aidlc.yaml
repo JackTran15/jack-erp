@@ -3,4 +3,4 @@ ruleset: 4
 # Layer vocabulary for jack-erp tickets. Derived from the repo's actual NestJS
 # module convention (entity / migration / service / consumer / controller-dto)
 # plus the React SPA layer, not from a generic DDD default.
-layers: [entity, migration, service, consumer, api, frontend, test]
+layers: [entity, migration, service, consumer, api, frontend, test, domain, application, api, infra, web, shared, test]

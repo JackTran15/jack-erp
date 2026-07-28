@@ -34,9 +34,15 @@ import {
   PaginatedResponse,
   PaginationQuery,
   TransferOrderStatus,
+  VoucherPrintPayload,
 } from "@erp/shared-interfaces";
 import { ActorContext } from "../../../common/decorators/actor-context.decorator";
 import { DocumentNumberingService } from "../../document-numbering/document-numbering.service";
+import {
+  loadStorageNames,
+  loadVoucherBranch,
+} from "../location/services/voucher-print-context.util";
+import { mapTransferOrderToVoucherPayload } from "./transfer-order-print.mapper";
 import { BranchEntity } from "../../branch/branch.entity";
 import { GoodsIssueService } from "../goods-issue/goods-issue.service";
 import { GoodsReceiptService } from "../goods-receipt/goods-receipt.service";
@@ -271,6 +277,34 @@ export class TransferOrderService {
     this.assertParticipantBranch(to, actor);
     await this.attachSourceLocations(to, actor.organizationId);
     return to;
+  }
+
+  /** Print/export payload for one transfer order (T-03-02, UOW-08) — reuses `getById`'s 404. */
+  async getPrintPayload(
+    id: string,
+    actor: ActorContext,
+  ): Promise<VoucherPrintPayload> {
+    const order = await this.getById(id, actor);
+    const [sourceBranch, destinationBranch, storageNameByStorageId] =
+      await Promise.all([
+        loadVoucherBranch(this.toRepo.manager, order.sourceBranchId, actor.organizationId),
+        loadVoucherBranch(
+          this.toRepo.manager,
+          order.destinationBranchId,
+          actor.organizationId,
+        ),
+        loadStorageNames(this.toRepo.manager, [
+          order.sourceStorageId,
+          order.destinationStorageId,
+          ...order.lines.map((line) => line.sourceStorageId),
+        ]),
+      ]);
+    return mapTransferOrderToVoucherPayload(
+      order,
+      sourceBranch,
+      destinationBranch?.name ?? '',
+      storageNameByStorageId,
+    );
   }
 
   /**

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import {
   PROFIT_REPORT_COLUMN_LABELS_VI,
   InvoiceReportResult,
@@ -22,6 +22,7 @@ import { RbacService } from '../../../rbac/rbac.service';
 import { matchColumnFilter } from '../../report-core/column-filter.util';
 import { ProfitReportFilterDto } from '../dto/profit-report-filter.dto';
 import { ProfitReportSearchDto } from '../dto/profit-report-search.dto';
+import { CountedRows } from '../../report-core/report-definition';
 import {
   aggregateProfitByItem,
   buildItemGroupRow,
@@ -119,6 +120,51 @@ export class ProfitByItemReport implements ReportDefinition {
     );
   }
 
+  /**
+   * The invoice set this report aggregates, as a query.
+   *
+   * Shared by `buildData` and `countRows` so the cap can never fire on a
+   * different set than the one that gets loaded.
+   */
+  private async scopedInvoices(
+    dto: ProfitReportSearchDto,
+    actor: ActorContext,
+  ): Promise<SelectQueryBuilder<InvoiceEntity>> {
+    const hasConsolidated = await this.rbac.hasPermission(
+      actor.userId,
+      actor.organizationId,
+      CONSOLIDATED_PERMISSION,
+    );
+    const branchIds = resolveBranchIds(
+      hasConsolidated,
+      dto.filters.store,
+      dto.filters.branchId,
+      actor,
+    );
+
+    const qb = this.invoices
+      .createQueryBuilder('invoice')
+      .where('invoice.organizationId = :orgId', { orgId: actor.organizationId });
+    applyBranchScope(qb, 'invoice', branchIds);
+    applyInvoiceStatusFilter(qb, 'invoice', {});
+    new FilterBuilder(qb).applyDateRange('invoice.issuedAt', dto.filters.issuedAt);
+    return qb;
+  }
+
+  /**
+   * Counts invoices, not report rows: every invoice and every line in the
+   * period is loaded to be aggregated per item in memory, so the invoice count
+   * is what predicts the memory — a period with 60k invoices is dangerous even
+   * when it produces 300 item rows.
+   */
+  async countRows(
+    dto: ProfitReportSearchDto,
+    actor: ActorContext,
+  ): Promise<CountedRows> {
+    const qb = await this.scopedInvoices(dto, actor);
+    return { total: await qb.getCount(), subject: 'invoices' };
+  }
+
   async buildData(
     dto: ProfitReportSearchDto,
     actor: ActorContext,
@@ -141,24 +187,7 @@ export class ProfitByItemReport implements ReportDefinition {
       );
     }
 
-    const hasConsolidated = await this.rbac.hasPermission(
-      actor.userId,
-      actor.organizationId,
-      CONSOLIDATED_PERMISSION,
-    );
-    const branchIds = resolveBranchIds(
-      hasConsolidated,
-      dto.filters.store,
-      dto.filters.branchId,
-      actor,
-    );
-
-    const qb = this.invoices
-      .createQueryBuilder('invoice')
-      .where('invoice.organizationId = :orgId', { orgId: actor.organizationId });
-    applyBranchScope(qb, 'invoice', branchIds);
-    applyInvoiceStatusFilter(qb, 'invoice', {});
-    new FilterBuilder(qb).applyDateRange('invoice.issuedAt', dto.filters.issuedAt);
+    const qb = await this.scopedInvoices(dto, actor);
     const invoiceRows = (await qb.getMany()).filter((i) => i.issuedAt);
     const invoiceIds = invoiceRows.map((i) => i.id);
 
