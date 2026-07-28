@@ -8,16 +8,14 @@ import { InventoryReportSearchDto } from '../dto/inventory-report-search.dto';
  * Upper bound on the rows a definition may materialize for in-memory
  * column-filtering + totals. Beyond this the user must narrow the period
  * or filters — silently truncating would produce wrong totals.
+ *
+ * Declared in report-core so the export pipeline can enforce it too; re-exported
+ * here because every inventory report already imports it from this file.
  */
-export const MAX_REPORT_ROWS = 50_000;
-
-export function assertUnderRowCap(total: number): void {
-  if (total > MAX_REPORT_ROWS) {
-    throw new BadRequestException(
-      `Report exceeds ${MAX_REPORT_ROWS} rows (${total}); narrow the period or filters`,
-    );
-  }
-}
+export {
+  assertUnderRowCap,
+  MAX_REPORT_ROWS,
+} from '../../reporting/report-core/row-cap.util';
 
 /** Reject requested/filtered column keys not present in the catalog. */
 export function assertKnownColumns(

@@ -18,3 +18,4 @@ export * from './invoice-report';
 export * from './inventory-report';
 export * from './debt-report';
 export * from './profit-report';
+export * from './printing';

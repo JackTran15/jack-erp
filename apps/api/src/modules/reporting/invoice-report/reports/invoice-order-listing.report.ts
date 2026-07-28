@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import {
   INVOICE_REPORT_BAND_LABELS_VI,
   INVOICE_REPORT_COLUMN_LABELS_VI,
@@ -39,6 +39,7 @@ import {
   buildListingTotals,
   InvoiceRowInput,
   listingCellValue,
+  listingColumnType,
 } from '../invoice-listing.aggregator';
 import { enrichHeader } from '../report-column.util';
 import {
@@ -51,6 +52,7 @@ import {
   statDateColumn,
 } from '../../report-core/report-query.util';
 import { ReportDefinition } from '../report-definition';
+import { ReportExportSource } from '../../report-core/report-definition';
 
 const band = (id: ListingBandId | null): ReportColumnGroup | null =>
   id ? { id, name: INVOICE_REPORT_BAND_LABELS_VI[id] ?? id } : null;
@@ -148,6 +150,46 @@ export class InvoiceOrderListingReport implements ReportDefinition {
       );
     }
 
+    const qb = await this.scopedQuery(dto, actor);
+    const invoiceRows = (await qb.getMany()).filter((i) => i.issuedAt);
+
+    const rows = (await this.toRowInputs(invoiceRows, referenced, actor)).sort(
+      (a, b) => {
+        const t = a.issuedAt.getTime() - b.issuedAt.getTime();
+        return t !== 0 ? t : a.code.localeCompare(b.code);
+      },
+    );
+
+    const filtered = dto.columnFilters?.length
+      ? rows.filter((r) =>
+          dto.columnFilters!.every((f) =>
+            matchColumnFilter(listingCellValue(f.col, r), f),
+          ),
+        )
+      : rows;
+
+    const total = filtered.length;
+    const offset = (page - 1) * limit;
+    const pageRows = filtered.slice(offset, offset + limit);
+
+    const rows2 = pageRows.map((r) => buildInvoiceRow(dto.columns, r));
+    const totals = filtered.length
+      ? buildListingTotals(dto.columns, filtered)
+      : null;
+
+    return { rows: rows2, totals, total };
+  }
+
+  /**
+   * The invoice set this report lists, as a query.
+   *
+   * Shared by `buildData` and the keyset export so the exported file can never
+   * be scoped differently from the table it came from.
+   */
+  private async scopedQuery(
+    dto: InvoiceReportSearchDto,
+    actor: ActorContext,
+  ): Promise<SelectQueryBuilder<InvoiceEntity>> {
     const hasConsolidated = await this.rbac.hasPermission(
       actor.userId,
       actor.organizationId,
@@ -168,10 +210,24 @@ export class InvoiceOrderListingReport implements ReportDefinition {
     new FilterBuilder(qb)
       .applyDateRange(statDateColumn('invoice', dto.filters), dto.filters.issuedAt)
       .applyEnum('invoice.type', dto.filters.type?.value);
-    const invoiceRows = (await qb.getMany()).filter((i) => i.issuedAt);
+    return qb;
+  }
+
+  /**
+   * Resolve one batch of invoices into report rows, loading only the auxiliary
+   * data the requested columns actually need.
+   *
+   * Called with the whole period by `buildData` and with a single keyset page
+   * by the export — which is the point: the `In(...)` lookups below go from
+   * tens of thousands of ids to one page's worth.
+   */
+  private async toRowInputs(
+    invoiceRows: InvoiceEntity[],
+    referenced: string[],
+    actor: ActorContext,
+  ): Promise<InvoiceRowInput[]> {
     const invoiceIds = invoiceRows.map((i) => i.id);
 
-    // Fetch only the auxiliary data the requested columns actually need.
     const needsPayments = referenced.some(
       (c) =>
         c === 'payment.cash' ||
@@ -204,63 +260,117 @@ export class InvoiceOrderListingReport implements ReportDefinition {
       ? await this.loadEmployeesById(invoiceRows, actor.organizationId)
       : new Map<string, string>();
 
-    const rows: InvoiceRowInput[] = invoiceRows
-      .map((i) => {
-        const customer = i.customerId ? customerById.get(i.customerId) : undefined;
-        // Sign each invoice row's money by type so a RETURN contributes negative
-        // amounts and the footer nets; goods use the net line value (EXCHANGE = net).
-        const sign = invoiceTypeSign(i.type);
-        const rawByAccount: Record<string, number> = pay.byAccount.get(i.id) ?? {};
-        return {
-          id: i.id,
-          issuedAt: i.issuedAt!,
-          code: i.code,
-          status: i.status,
-          subtotal: signedGoods(i),
-          discountAmount: sign * Number(i.discountAmount ?? 0),
-          pointsDiscountAmount: sign * Number(i.pointsDiscountAmount ?? 0),
-          totalPaid: sign * Number(i.totalPaid ?? 0),
-          amountDue: sign * Number(i.amountDue ?? 0),
-          note: i.note ?? null,
-          customerName: customer?.name ?? null,
-          customerPhone: customer?.phone ?? null,
-          cashier: cashierByUser.get(i.staffId) ?? null,
-          salesperson: i.salespersonId
-            ? salespersonById.get(i.salespersonId) ?? null
-            : null,
-          storeCode: i.branchId ? storeById.get(i.branchId) ?? null : null,
-          cash: sign * (pay.cash.get(i.id) ?? 0),
-          bankTransfer: sign * (pay.bank.get(i.id) ?? 0),
-          voucher: sign * (voucherByInvoice.get(i.id) ?? 0),
-          byAccount: Object.fromEntries(
-            Object.entries(rawByAccount).map(([k, v]) => [k, sign * v]),
-          ),
-        };
-      })
-      .sort((a, b) => {
-        const t = a.issuedAt.getTime() - b.issuedAt.getTime();
-        return t !== 0 ? t : a.code.localeCompare(b.code);
-      });
-
-    const filtered = dto.columnFilters?.length
-      ? rows.filter((r) =>
-          dto.columnFilters!.every((f) =>
-            matchColumnFilter(listingCellValue(f.col, r), f),
-          ),
-        )
-      : rows;
-
-    const total = filtered.length;
-    const offset = (page - 1) * limit;
-    const pageRows = filtered.slice(offset, offset + limit);
-
-    const rows2 = pageRows.map((r) => buildInvoiceRow(dto.columns, r));
-    const totals = filtered.length
-      ? buildListingTotals(dto.columns, filtered)
-      : null;
-
-    return { rows: rows2, totals, total };
+    return invoiceRows.map((i) => {
+      const customer = i.customerId ? customerById.get(i.customerId) : undefined;
+      // Sign each invoice row's money by type so a RETURN contributes negative
+      // amounts and the footer nets; goods use the net line value (EXCHANGE = net).
+      const sign = invoiceTypeSign(i.type);
+      const rawByAccount: Record<string, number> = pay.byAccount.get(i.id) ?? {};
+      return {
+        id: i.id,
+        issuedAt: i.issuedAt!,
+        code: i.code,
+        status: i.status,
+        subtotal: signedGoods(i),
+        discountAmount: sign * Number(i.discountAmount ?? 0),
+        pointsDiscountAmount: sign * Number(i.pointsDiscountAmount ?? 0),
+        totalPaid: sign * Number(i.totalPaid ?? 0),
+        amountDue: sign * Number(i.amountDue ?? 0),
+        note: i.note ?? null,
+        customerName: customer?.name ?? null,
+        customerPhone: customer?.phone ?? null,
+        cashier: cashierByUser.get(i.staffId) ?? null,
+        salesperson: i.salespersonId
+          ? salespersonById.get(i.salespersonId) ?? null
+          : null,
+        storeCode: i.branchId ? storeById.get(i.branchId) ?? null : null,
+        cash: sign * (pay.cash.get(i.id) ?? 0),
+        bankTransfer: sign * (pay.bank.get(i.id) ?? 0),
+        voucher: sign * (voucherByInvoice.get(i.id) ?? 0),
+        byAccount: Object.fromEntries(
+          Object.entries(rawByAccount).map(([k, v]) => [k, sign * v]),
+        ),
+      };
+    });
   }
+
+  /**
+   * Keyset export (ADR-07). One row per invoice, so the cursor has a real
+   * record to point at — unlike the aggregate reports, which have none.
+   */
+  readonly exportSource: ReportExportSource<InvoiceReportSearchDto> = {
+    // The table sorts oldest first; the file has to read the same way.
+    order: 'asc',
+    range: (dto) => dto.filters?.issuedAt ?? null,
+    summable: (columns) =>
+      columns.filter((col) => {
+        const type = listingColumnType(col);
+        return (
+          type === ReportColumnDataType.CURRENCY ||
+          type === ReportColumnDataType.NUMBER
+        );
+      }),
+    page: async (dto, actor, { partition, cursor, size }) => {
+      const referenced = [
+        ...dto.columns,
+        ...(dto.columnFilters ?? []).map((f) => f.col),
+      ];
+      // Order and page on the same column the period filters on — the report
+      // lets the user choose invoice date or created date.
+      const dateColumn = statDateColumn('invoice', dto.filters);
+      const rawDateColumn =
+        dateColumn === 'invoice.createdAt'
+          ? 'invoice.created_at'
+          : 'invoice.issued_at';
+
+      const qb = await this.scopedQuery(dto, actor);
+      if (partition.from) {
+        qb.andWhere(`${dateColumn} >= :partFrom`, { partFrom: partition.from });
+      }
+      if (partition.to) {
+        // Half-open: the next window owns this instant.
+        qb.andWhere(`${dateColumn} < :partTo`, { partTo: partition.to });
+      }
+      if (cursor) {
+        qb.andWhere(
+          `(${rawDateColumn} > CAST(:cursorAt AS timestamptz) OR ` +
+            `(${rawDateColumn} = CAST(:cursorAt AS timestamptz) AND invoice.id > :cursorId))`,
+          { cursorAt: cursor.at, cursorId: cursor.id },
+        );
+      }
+      // `id` is the tiebreaker: without it, invoices sharing a timestamp make
+      // the cursor stand still or skip the rest of that instant.
+      qb.orderBy(dateColumn, 'ASC').addOrderBy('invoice.id', 'ASC').take(size);
+      // Full-precision timestamptz as text. Going through a JS Date rounds off
+      // microseconds, and a rounded cursor re-reads or skips rows either side.
+      qb.addSelect(`${rawDateColumn}::text`, 'cursor_at');
+
+      const { entities, raw } = await qb.getRawAndEntities<{
+        cursor_at: string;
+      }>();
+      const dated = entities.filter((i) => i.issuedAt);
+      const inputs = await this.toRowInputs(dated, referenced, actor);
+      const kept = dto.columnFilters?.length
+        ? inputs.filter((r) =>
+            dto.columnFilters!.every((f) =>
+              matchColumnFilter(listingCellValue(f.col, r), f),
+            ),
+          )
+        : inputs;
+
+      const lastEntity = entities[entities.length - 1];
+      const lastRaw = raw[raw.length - 1];
+      return {
+        rows: kept.map((r) => buildInvoiceRow(dto.columns, r)),
+        nextCursor: lastEntity
+          ? { at: lastRaw.cursor_at, id: lastEntity.id }
+          : null,
+        // Column filters run after the page is fetched, so paging must follow
+        // what the database returned, not how much survived the filter.
+        hasMore: entities.length === size,
+      };
+    },
+  };
 
   private activeAccounts(actor: ActorContext): Promise<PaymentAccountEntity[]> {
     return this.paymentAccounts.find({

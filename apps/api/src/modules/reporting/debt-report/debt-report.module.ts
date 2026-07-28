@@ -38,6 +38,8 @@ import { ReceivablesDetailByProductReport } from './reports/receivables-detail-b
 import { SupplierDebtsDetailByDocumentAndProductReport } from './reports/supplier-debts-detail-by-document-and-product.report';
 import { SupplierDebtsReport } from './reports/supplier-debts.report';
 import { DebtPeriodService } from './services/debt-period.service';
+import { ReportExportService } from '../report-core/report-export.service';
+import { GetDebtReportDocumentHandler } from './queries/get-debt-report-document.handler';
 
 @Module({
   imports: [
@@ -69,6 +71,8 @@ import { DebtPeriodService } from './services/debt-period.service';
   ],
   controllers: [DebtReportController],
   providers: [
+    GetDebtReportDocumentHandler,
+    ReportExportService,
     DebtPeriodService,
     // Report definitions (one per report type — add new ones here + to the registry factory).
     CustomerDebtsReport,

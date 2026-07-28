@@ -1,3 +1,5 @@
+export * from './document-payload';
+
 export interface DashboardSummary {
   organizationId: string;
   branchId?: string;

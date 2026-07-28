@@ -17,6 +17,7 @@ import {
   PaginatedResponse,
   PaginationQuery,
   StockMovementType,
+  VoucherPrintPayload,
 } from "@erp/shared-interfaces";
 import { ERP_TOPICS } from "@erp/shared-kafka-client";
 import { ActorContext } from "../../../common/decorators/actor-context.decorator";
@@ -52,6 +53,11 @@ import {
   attachCounterparties,
   attachPurchasingEmployees,
 } from "../location/services/counterparty-name.util";
+import {
+  loadStorageNames,
+  loadVoucherBranch,
+} from "../location/services/voucher-print-context.util";
+import { mapGoodsReceiptToVoucherPayload } from "./goods-receipt-print.mapper";
 import { UserEntity } from "../../auth/user.entity";
 
 export interface GoodsReceiptQuery extends PaginationQuery {
@@ -605,6 +611,22 @@ export class GoodsReceiptService {
       actor.organizationId,
     );
     return receipt;
+  }
+
+  /** Print/export payload for one receipt (T-03-02, UOW-08) — reuses `getById`'s 404. */
+  async getPrintPayload(
+    id: string,
+    actor: ActorContext,
+  ): Promise<VoucherPrintPayload> {
+    const receipt = await this.getById(id, actor);
+    const [branch, storageNameByStorageId] = await Promise.all([
+      loadVoucherBranch(this.receiptRepo.manager, receipt.branchId, actor.organizationId),
+      loadStorageNames(
+        this.receiptRepo.manager,
+        receipt.lines.map((line) => line.location?.storageId),
+      ),
+    ]);
+    return mapGoodsReceiptToVoucherPayload(receipt, branch, storageNameByStorageId);
   }
 
   /** Validate a purchasing-employee reference (users.id) belongs to the org. */

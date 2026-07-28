@@ -84,11 +84,31 @@ export interface DocumentDetailQuery {
   search?: string;
   page: number;
   pageSize: number;
+  /**
+   * Keyset cursor for export (ADR-07). Present means: continue after this row,
+   * skip the COUNT, and ignore `page` — OFFSET on a three-way UNION gets slower
+   * with every page and shifts rows under concurrent postings.
+   */
+  cursor?: DocumentDetailCursor | null;
+  /** Start a keyset walk at the first page. Implied when `cursor` is set. */
+  keyset?: boolean;
+}
+
+/**
+ * `(posted_at, docKind:lineId)`. The union has no single id column, so the row
+ * key is the stream name plus the line id — unique, and stable to sort on.
+ */
+export interface DocumentDetailCursor {
+  at: string;
+  id: string;
 }
 
 export interface DocumentDetailResult {
   data: DocumentDetailRow[];
+  /** Row count for the period; 0 in keyset mode, which runs no COUNT. */
   total: number;
+  nextCursor: DocumentDetailCursor | null;
+  hasMore: boolean;
 }
 
 @Injectable()
@@ -110,6 +130,14 @@ export class DocumentDetailService {
     const page = Math.max(1, query.page);
     const pageSize = Math.max(1, query.pageSize);
     const offset = (page - 1) * pageSize;
+    const keyset = query.keyset === true || query.cursor != null;
+    // Compare on the same expression the ORDER BY uses, so the walk cannot
+    // straddle two rows that share a posted_at.
+    const keysetPredicate = query.cursor
+      ? `AND (l.posted_at < CAST($8 AS timestamptz)
+             OR (l.posted_at = CAST($8 AS timestamptz)
+                 AND (l.doc_kind || ':' || l.line_id) < $9))`
+      : '';
 
     // ──────────────────────────────────────────────────────────────────
     // UNION ALL of the 3 source streams. Each branch projects the same
@@ -121,6 +149,7 @@ export class DocumentDetailService {
         -- 1) Goods receipts (Nhập kho)
         SELECT
           'GOODS_RECEIPT'::text AS doc_kind,
+          grl.id::text AS line_id,
           gr.posted_at AS posted_at,
           gr.document_number AS document_number,
           gr.reference_id::text AS reference_number,
@@ -150,6 +179,7 @@ export class DocumentDetailService {
         -- 2) Goods issues (Xuất kho)
         SELECT
           'GOODS_ISSUE'::text AS doc_kind,
+          gil.id::text AS line_id,
           gi.posted_at,
           gi.document_number,
           NULL::text AS reference_number,
@@ -179,6 +209,7 @@ export class DocumentDetailService {
         -- 3) Stock transfers (Điều chuyển) — OUT-side from source branch
         SELECT
           'STOCK_TRANSFER'::text AS doc_kind,
+          stl.id::text AS line_id,
           st.posted_at,
           st.document_number,
           NULL::text AS reference_number,
@@ -262,7 +293,9 @@ export class DocumentDetailService {
              (SELECT p2.name FROM inventory_providers p2 WHERE p2.id::text = l.provider_id AND p2.organization_id = $1)
            ELSE NULL
          END) AS customer_name,
-        l.notes
+        l.notes,
+        l.posted_at::text AS cursor_at,
+        (l.doc_kind || ':' || l.line_id) AS cursor_id
       FROM lines l
       JOIN items i ON i.id = l.item_id AND i.organization_id = $1
       LEFT JOIN inventory_item_categories ic ON ic.id = i.category_id
@@ -272,8 +305,9 @@ export class DocumentDetailService {
       LEFT JOIN locations loc ON loc.id = l.location_id
       WHERE ($5::uuid[] IS NULL OR i.category_id = ANY($5))
         AND ($6::text IS NULL OR i.code ILIKE '%' || $6 || '%' OR i.name ILIKE '%' || $6 || '%')
-      ORDER BY l.posted_at DESC, l.document_number ASC
-      LIMIT $7 OFFSET $8
+      ${keyset ? keysetPredicate : ''}
+      ORDER BY ${keyset ? 'l.posted_at DESC, cursor_id DESC' : 'l.posted_at DESC, l.document_number ASC'}
+      ${keyset ? 'LIMIT $7' : 'LIMIT $7 OFFSET $8'}
     `;
 
     const countSql = `
@@ -294,9 +328,21 @@ export class DocumentDetailService {
       search,
     ];
 
+    // Only bind what the statement actually references: an unused parameter is
+    // a bind-count error, not a no-op.
+    const dataParams = keyset
+      ? query.cursor
+        ? [...sharedParams, pageSize, query.cursor.at, query.cursor.id]
+        : [...sharedParams, pageSize]
+      : [...sharedParams, pageSize, offset];
+
     const [rows, countRows] = await Promise.all([
-      this.dataSource.query(dataSql, [...sharedParams, pageSize, offset]),
-      this.dataSource.query(countSql, sharedParams),
+      this.dataSource.query(dataSql, dataParams),
+      // No COUNT on the keyset path: it is the expensive half of this query,
+      // and `hasMore` answers the only question the export asks.
+      keyset
+        ? Promise.resolve([{ total: 0 }])
+        : this.dataSource.query(countSql, sharedParams),
     ]);
 
     const total = Number(
@@ -340,12 +386,22 @@ export class DocumentDetailService {
       }),
     );
 
-    return { data, total };
+    const raw = rows as RawDocumentDetailRow[];
+    const last = raw[raw.length - 1];
+    return {
+      data,
+      total,
+      nextCursor: last ? { at: last.cursor_at, id: last.cursor_id } : null,
+      hasMore: keyset ? raw.length === pageSize : offset + raw.length < total,
+    };
   }
 }
 
 interface RawDocumentDetailRow {
   doc_kind: 'GOODS_RECEIPT' | 'GOODS_ISSUE' | 'STOCK_TRANSFER';
+  /** Full-precision timestamptz text — the keyset cursor, never a JS Date. */
+  cursor_at: string;
+  cursor_id: string;
   posted_at: Date;
   document_number: string | null;
   reference_number: string | null;

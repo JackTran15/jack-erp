@@ -279,3 +279,240 @@ describe('InvoiceOrderListingReport.buildData', () => {
     expect(result.totals!['revenue.goods']).toBe(5000000);
   });
 });
+
+/**
+ * A query builder that actually behaves like the keyset query: it reads the
+ * partition bounds and the cursor out of the bound parameters and applies them,
+ * so these tests exercise cursor advancement rather than asserting on SQL text.
+ * The generated SQL itself is covered by the e2e against a real database.
+ */
+function makeKeysetReport(invoices: any[]) {
+  const seen: { ids: string[]; takes: number[] } = { ids: [], takes: [] };
+  const invoicesRepo: any = {
+    createQueryBuilder: () => {
+      const params: Record<string, any> = {};
+      let take = Number.POSITIVE_INFINITY;
+      const qb: any = {
+        where: () => qb,
+        andWhere: (_sql: string, p?: Record<string, any>) => {
+          Object.assign(params, p ?? {});
+          return qb;
+        },
+        orderBy: () => qb,
+        addOrderBy: () => qb,
+        addSelect: () => qb,
+        take: (n: number) => {
+          take = n;
+          seen.takes.push(n);
+          return qb;
+        },
+        getMany: async () => invoices,
+        getRawAndEntities: async () => {
+          let rows = [...invoices].sort((a, b) => {
+            const t = a.issuedAt.getTime() - b.issuedAt.getTime();
+            return t !== 0 ? t : a.id.localeCompare(b.id);
+          });
+          if (params.partFrom) {
+            rows = rows.filter((r) => r.issuedAt >= params.partFrom);
+          }
+          if (params.partTo) rows = rows.filter((r) => r.issuedAt < params.partTo);
+          if (params.cursorAt) {
+            const at = new Date(params.cursorAt).getTime();
+            rows = rows.filter(
+              (r) =>
+                r.issuedAt.getTime() > at ||
+                (r.issuedAt.getTime() === at && r.id > params.cursorId),
+            );
+          }
+          rows = rows.slice(0, take);
+          return {
+            entities: rows,
+            raw: rows.map((r) => ({ cursor_at: r.issuedAt.toISOString() })),
+          };
+        },
+      };
+      return qb;
+    },
+  };
+  const repo = (rows: any[] = []) => ({
+    find: jest.fn(async (opts: any) => {
+      const where = opts?.where ?? {};
+      if (where.invoiceId?._value) seen.ids.push(...where.invoiceId._value);
+      return rows;
+    }),
+  });
+  const report = new InvoiceOrderListingReport(
+    invoicesRepo,
+    repo() as any,
+    repo() as any,
+    { find: jest.fn(async () => [{ accountId: ACC }]) } as any,
+    repo() as any,
+    repo() as any,
+    repo() as any,
+    { hasPermission: jest.fn(async () => false) } as any,
+  );
+  return { report, seen };
+}
+
+const exportDto = (over: Record<string, any> = {}) =>
+  ({
+    reportType: 'invoice-order-listing',
+    columns: ['invoiceCode', 'revenue.goods'],
+    filters: { issuedAt: { from: '2026-06-01', to: '2026-06-30' } },
+    ...over,
+  }) as any;
+
+const wholeMonth = {
+  from: new Date('2026-06-01T00:00:00Z'),
+  to: new Date('2026-07-01T00:00:00Z'),
+};
+
+describe('InvoiceOrderListingReport.exportSource', () => {
+  it('reads the period straight off the report filters', () => {
+    const { report } = makeKeysetReport([]);
+    expect(report.exportSource.range(exportDto())).toEqual({
+      from: '2026-06-01',
+      to: '2026-06-30',
+    });
+    expect(report.exportSource.range(exportDto({ filters: {} }))).toBeNull();
+  });
+
+  it('sums money columns and leaves the discount rate alone', () => {
+    const { report } = makeKeysetReport([]);
+    const summable = report.exportSource.summable([
+      'invoiceCode',
+      'revenue.goods',
+      'promoRate',
+    ]);
+    // promoRate is a percentage: adding percentages together means nothing.
+    expect(summable).toEqual(['revenue.goods']);
+  });
+
+  it('exports the file oldest-first, the same way the table reads', () => {
+    const { report } = makeKeysetReport([]);
+    expect(report.exportSource.order).toBe('asc');
+  });
+
+  it('walks pages by cursor without repeating or losing a row', async () => {
+    // Three invoices share a timestamp: `id` is the only thing that can move
+    // the cursor past them. This is where OFFSET paging goes wrong.
+    const sameInstant = new Date('2026-06-10T10:00:00Z');
+    const invoices = [
+      inv({ id: 'a', code: 'HD1', issuedAt: sameInstant }),
+      inv({ id: 'b', code: 'HD2', issuedAt: sameInstant }),
+      inv({ id: 'c', code: 'HD3', issuedAt: sameInstant }),
+      inv({ id: 'd', code: 'HD4', issuedAt: new Date('2026-06-11T10:00:00Z') }),
+      inv({ id: 'e', code: 'HD5', issuedAt: new Date('2026-06-12T10:00:00Z') }),
+    ];
+    const { report } = makeKeysetReport(invoices);
+
+    const collected: string[] = [];
+    let cursor: any = null;
+    let hasMore = true;
+    let guard = 0;
+    while (hasMore && guard++ < 10) {
+      const page = await report.exportSource.page(exportDto(), actor, {
+        partition: wholeMonth,
+        cursor,
+        size: 2,
+      });
+      collected.push(...page.rows.map((r) => r.invoiceCode as string));
+      cursor = page.nextCursor;
+      hasMore = page.hasMore && cursor !== null;
+    }
+
+    expect(collected).toEqual(['HD1', 'HD2', 'HD3', 'HD4', 'HD5']);
+  });
+
+  it('yields the same rows as buildData for the same filters', async () => {
+    const invoices = [
+      inv({ id: 'a', code: 'HD1', issuedAt: new Date('2026-06-02T10:00:00Z') }),
+      inv({ id: 'b', code: 'HD2', issuedAt: new Date('2026-06-05T10:00:00Z') }),
+      inv({ id: 'c', code: 'HD3', issuedAt: new Date('2026-06-09T10:00:00Z') }),
+    ];
+    const { report } = makeKeysetReport(invoices);
+
+    const viaBuildData = await report.buildData(
+      exportDto({ limit: 100 }),
+      actor,
+    );
+    const viaKeyset: any[] = [];
+    let cursor: any = null;
+    let hasMore = true;
+    let guard = 0;
+    while (hasMore && guard++ < 10) {
+      const page = await report.exportSource.page(exportDto(), actor, {
+        partition: wholeMonth,
+        cursor,
+        size: 2,
+      });
+      viaKeyset.push(...page.rows);
+      cursor = page.nextCursor;
+      hasMore = page.hasMore && cursor !== null;
+    }
+
+    expect(viaKeyset).toEqual(viaBuildData.rows);
+  });
+
+  it('keeps a window to its own rows', async () => {
+    const invoices = [
+      inv({ id: 'a', code: 'IN', issuedAt: new Date('2026-06-05T10:00:00Z') }),
+      inv({ id: 'b', code: 'OUT', issuedAt: new Date('2026-06-20T10:00:00Z') }),
+    ];
+    const { report } = makeKeysetReport(invoices);
+
+    const page = await report.exportSource.page(exportDto(), actor, {
+      partition: {
+        from: new Date('2026-06-01T00:00:00Z'),
+        to: new Date('2026-06-10T00:00:00Z'),
+      },
+      cursor: null,
+      size: 50,
+    });
+
+    expect(page.rows.map((r) => r.invoiceCode)).toEqual(['IN']);
+  });
+
+  it('loads auxiliary data for one page, not the whole period', async () => {
+    const invoices = Array.from({ length: 6 }, (_, i) =>
+      inv({
+        id: `id-${i}`,
+        code: `HD${i}`,
+        issuedAt: new Date(`2026-06-0${i + 1}T10:00:00Z`),
+      }),
+    );
+    const { report, seen } = makeKeysetReport(invoices);
+
+    await report.exportSource.page(
+      exportDto({ columns: ['invoiceCode', 'payment.cash'] }),
+      actor,
+      { partition: wholeMonth, cursor: null, size: 2 },
+    );
+
+    // The whole point of keyset here: `In(...)` shrinks from every invoice in
+    // the period to the two on this page.
+    expect(seen.ids).toEqual(['id-0', 'id-1']);
+    expect(seen.takes).toEqual([2]);
+  });
+
+  it('reports hasMore from what the database returned, not what survived filtering', async () => {
+    const invoices = [
+      inv({ id: 'a', code: 'HD1', issuedAt: new Date('2026-06-02T10:00:00Z'), subtotal: 1 }),
+      inv({ id: 'b', code: 'HD2', issuedAt: new Date('2026-06-03T10:00:00Z'), subtotal: 1 }),
+    ];
+    const { report } = makeKeysetReport(invoices);
+
+    const page = await report.exportSource.page(
+      exportDto({ columnFilters: [{ col: 'revenue.goods', gte: 999999 }] }),
+      actor,
+      { partition: wholeMonth, cursor: null, size: 2 },
+    );
+
+    // Every row was filtered out, but a full page came back from the database,
+    // so paging must continue — otherwise the export stops at the first page
+    // where the user's column filter happens to match nothing.
+    expect(page.rows).toHaveLength(0);
+    expect(page.hasMore).toBe(true);
+    expect(page.nextCursor).not.toBeNull();
+  });
+});

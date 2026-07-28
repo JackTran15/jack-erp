@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import {
   INVOICE_REPORT_COLUMN_LABELS_VI,
   InvoiceReportResult,
@@ -44,6 +44,7 @@ import {
   InvoiceReportColumnsFilterDto,
   ReportDefinition,
 } from '../report-definition';
+import { CountedRows } from '../../report-core/report-definition';
 
 interface ItemMeta {
   categoryId: string | null;
@@ -138,6 +139,61 @@ export class RevenueByItemReport implements ReportDefinition {
     );
   }
 
+  /**
+   * The invoice set this report aggregates, as a query.
+   *
+   * `buildData` materializes it and `countRows` counts it, from the same
+   * builder on purpose: the moment the count is assembled from a second copy
+   * of these filters, the cap starts firing on a different set than the one
+   * that gets loaded.
+   */
+  private async scopedInvoices(
+    dto: InvoiceReportSearchDto,
+    actor: ActorContext,
+  ): Promise<{
+    qb: SelectQueryBuilder<InvoiceEntity>;
+    branchIds: string[] | null;
+  }> {
+    const hasConsolidated = await this.rbac.hasPermission(
+      actor.userId,
+      actor.organizationId,
+      CONSOLIDATED_PERMISSION,
+    );
+    const branchIds = resolveBranchIds(
+      hasConsolidated,
+      dto.filters.store,
+      dto.branchId ?? dto.filters.branchId,
+      actor,
+    );
+
+    const qb = this.invoices
+      .createQueryBuilder('invoice')
+      .where('invoice.organizationId = :orgId', { orgId: actor.organizationId });
+    applyBranchScope(qb, 'invoice', branchIds);
+    applyInvoiceStatusFilter(qb, 'invoice', dto.filters);
+    new FilterBuilder(qb)
+      .applyDateRange('invoice.issuedAt', dto.filters.issuedAt)
+      .applyEnum('invoice.type', dto.filters.type?.value);
+    return { qb, branchIds };
+  }
+
+  /**
+   * Counts invoices, not report rows: this report loads every invoice and
+   * every line in the period to aggregate them per item in memory, so the
+   * invoice count is what predicts the memory, and a period with 60k invoices
+   * is dangerous even when it produces 300 item rows.
+   */
+  async countRows(
+    dto: InvoiceReportSearchDto,
+    actor: ActorContext,
+  ): Promise<CountedRows> {
+    if (!dto.filters?.issuedAt?.from) {
+      throw new BadRequestException('filters.issuedAt.from is required');
+    }
+    const { qb } = await this.scopedInvoices(dto, actor);
+    return { total: await qb.getCount(), subject: 'invoices' };
+  }
+
   async buildData(
     dto: InvoiceReportSearchDto,
     actor: ActorContext,
@@ -160,26 +216,7 @@ export class RevenueByItemReport implements ReportDefinition {
       );
     }
 
-    const hasConsolidated = await this.rbac.hasPermission(
-      actor.userId,
-      actor.organizationId,
-      CONSOLIDATED_PERMISSION,
-    );
-    const branchIds = resolveBranchIds(
-      hasConsolidated,
-      dto.filters.store,
-      dto.branchId ?? dto.filters.branchId,
-      actor,
-    );
-
-    const qb = this.invoices
-      .createQueryBuilder('invoice')
-      .where('invoice.organizationId = :orgId', { orgId: actor.organizationId });
-    applyBranchScope(qb, 'invoice', branchIds);
-    applyInvoiceStatusFilter(qb, 'invoice', dto.filters);
-    new FilterBuilder(qb)
-      .applyDateRange('invoice.issuedAt', dto.filters.issuedAt)
-      .applyEnum('invoice.type', dto.filters.type?.value);
+    const { qb, branchIds } = await this.scopedInvoices(dto, actor);
     const invoiceRows = (await qb.getMany()).filter((i) => i.issuedAt);
     const invoiceIds = invoiceRows.map((i) => i.id);
 

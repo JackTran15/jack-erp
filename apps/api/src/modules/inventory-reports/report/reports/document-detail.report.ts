@@ -32,6 +32,7 @@ import {
   paginateRows,
 } from '../report-data.util';
 import { resolveInventoryBranchIds } from '../report-scope.util';
+import { ReportExportSource } from '../../../reporting/report-core/report-definition';
 
 const { STRING, NUMBER } = ReportColumnDataType;
 
@@ -101,25 +102,10 @@ export class DocumentDetailReport implements InventoryReportDefinition {
     actor: ActorContext,
   ): Promise<InventoryReportResult> {
     assertKnownColumns(dto, CATALOG_KEYS);
-    const filters = dto.filters;
-    const period = resolvePeriod({
-      preset: filters.period?.from || filters.period?.to ? undefined : filters.preset,
-      startDate: filters.period?.from,
-      endDate: filters.period?.to,
-    });
-    const branchIds = await resolveInventoryBranchIds(
-      this.branches,
-      filters.store,
-      actor,
-    );
+    const query = await this.scopedQuery(dto, actor);
 
     const result = await this.documentDetail.list({
-      organizationId: actor.organizationId,
-      startDate: period.startDate,
-      endDate: period.endDate,
-      branchIds,
-      categoryIds: filters.categoryId ? [filters.categoryId] : undefined,
-      search: filters.search,
+      ...query,
       page: 1,
       pageSize: MAX_REPORT_ROWS,
     });
@@ -134,6 +120,93 @@ export class DocumentDetailReport implements InventoryReportDefinition {
       total: rows.length,
     };
   }
+
+  /**
+   * Period + scope for one request, shared by `buildData` and the keyset
+   * export so the file can never cover a different window than the table.
+   */
+  private async scopedQuery(
+    dto: InventoryReportSearchDto,
+    actor: ActorContext,
+  ) {
+    const filters = dto.filters;
+    const period = resolvePeriod({
+      preset: filters.period?.from || filters.period?.to ? undefined : filters.preset,
+      startDate: filters.period?.from,
+      endDate: filters.period?.to,
+    });
+    const branchIds = await resolveInventoryBranchIds(
+      this.branches,
+      filters.store,
+      actor,
+    );
+    return {
+      organizationId: actor.organizationId,
+      startDate: period.startDate,
+      endDate: period.endDate,
+      branchIds,
+      categoryIds: filters.categoryId ? [filters.categoryId] : undefined,
+      search: filters.search,
+    };
+  }
+
+  /**
+   * Keyset export (ADR-07). One row per document line, so a cursor has a real
+   * record to point at — and OFFSET is worst here, where every page re-runs a
+   * three-way UNION and discards everything before it.
+   */
+  readonly exportSource: ReportExportSource<InventoryReportSearchDto> = {
+    // The table reads newest first, and so must the file.
+    order: 'desc',
+    range: (dto) => {
+      const period = resolvePeriod({
+        preset:
+          dto.filters.period?.from || dto.filters.period?.to
+            ? undefined
+            : dto.filters.preset,
+        startDate: dto.filters.period?.from,
+        endDate: dto.filters.period?.to,
+      });
+      return {
+        from: period.startDate.toISOString(),
+        to: period.endDate.toISOString(),
+      };
+    },
+    summable: (columns) =>
+      columns.filter((col) => NUMERIC.has(col) && !NON_ADDITIVE.has(col)),
+    page: async (dto, actor, { partition, cursor, size }) => {
+      assertKnownColumns(dto, CATALOG_KEYS);
+      const query = await this.scopedQuery(dto, actor);
+      const result = await this.documentDetail.list({
+        ...query,
+        // The window narrows the period; the CTE already filters half-open
+        // `posted_at >= start AND posted_at < end`, which is exactly the
+        // partition contract.
+        startDate: partition.from ?? query.startDate,
+        endDate: partition.to ?? query.endDate,
+        page: 1,
+        pageSize: size,
+        keyset: true,
+        cursor,
+      });
+
+      const rows = applyColumnFilters(
+        result.data.map((r) => this.toRow(r)),
+        dto.columnFilters,
+      );
+      return {
+        rows: rows.map((row) => {
+          const projected: ReportRow = {};
+          for (const col of dto.columns) projected[col] = row[col] ?? null;
+          return projected;
+        }),
+        nextCursor: result.nextCursor,
+        // Follows what the database returned, not what survived the column
+        // filters — otherwise a fully-filtered page ends the export early.
+        hasMore: result.hasMore,
+      };
+    },
+  };
 
   private toRow(r: DocumentDetailRow): ReportRow {
     const posted = new Date(r.postedAt);

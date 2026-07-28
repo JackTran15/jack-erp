@@ -1,0 +1,493 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: export-print
+slug: export-print
+profile: none
+created: 2026-07-27T09:35:12
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-07-27T10:58:24
+    by: akenzy
+    evidence: architecture map verified by akenzy          # a human puts their name here after checking it; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-07-27T10:58:24
+    by: akenzy
+    evidence: 12 assumptions, none blocking-and-pending; 17 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-07-27T10:58:24
+    by: akenzy
+    evidence: 5 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-07-27T10:58:24
+    by: akenzy
+    evidence: graph valid - 5 UoW, 23 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T10:58:33
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T11:00:03
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T11:00:03
+    by: akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T11:01:32
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T11:03:27
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T11:03:27
+    by: akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T11:03:27
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T11:05:25
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T11:05:25
+    by: akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T11:05:25
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T11:17:28
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T11:17:29
+    by: akenzy
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T11:17:29
+    by: claude
+    ticket: T-01-05
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T11:23:31
+    by: claude
+    ticket: T-01-05
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T11:23:31
+    by: akenzy
+    ticket: T-01-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T11:23:43
+    by: claude
+    ticket: T-01-06
+  - gate: G3
+    action: reopened
+    at: 2026-07-27T11:25:19
+    by: akenzy
+    reason: StorageReportShell is unreachable - every /reports/storage nav entry in navConfig.ts is commented out, so the live inventory report surface is chain-store/reports/ReportPage. T-01-06 targeted dead UI and would have needed a risky legacy-to-v2 filter translation. Retargeting FE export tickets onto the live shell.
+  - gate: G3
+    action: passed
+    at: 2026-07-27T11:26:51
+    by: akenzy
+    evidence: graph valid - 5 UoW, 23 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T11:27:04
+    by: claude
+    ticket: T-01-06
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T11:40:00
+    by: claude
+    ticket: T-01-06
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T11:40:00
+    by: akenzy
+    ticket: T-01-06
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T11:40:00
+    by: claude
+    ticket: T-01-07
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T11:40:00
+    by: claude
+    ticket: T-01-07
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T11:40:00
+    by: akenzy
+    ticket: T-01-07
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T11:40:48
+    by: claude
+    ticket: T-01-08
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T12:25:35
+    by: claude
+    ticket: T-01-08
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T12:25:35
+    by: akenzy
+    ticket: T-01-08
+  - gate: G2
+    action: reopened
+    at: 2026-07-27T19:41:58
+    by: Akenzy
+    reason: ADR-03 (mot lan buildData voi limit lon) bi bac - buildData materialize toan bo tap loc vao RAM nen export pipeline hien tai khong pluggable (UOW-05 da phai bypass, risk A-08) va khong co chien luoc fetch an toan cho DB. Thay bang export pipeline strategy-based + keyset/time-partition fetch cho cac report kieu liet ke.
+  - gate: G2
+    action: passed
+    at: 2026-07-27T19:49:28
+    by: akenzy
+    evidence: 8 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-07-27T20:05:09
+    by: akenzy
+    evidence: graph valid - 7 UoW, 32 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T20:05:36
+    by: claude
+    ticket: T-06-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T20:07:51
+    by: claude
+    ticket: T-06-01
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T20:11:30
+    by: akenzy
+    ticket: T-06-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T20:11:30
+    by: claude
+    ticket: T-06-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T20:15:18
+    by: claude
+    ticket: T-06-02
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T20:17:43
+    by: akenzy
+    ticket: T-06-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T20:17:44
+    by: claude
+    ticket: T-06-03
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T20:30:52
+    by: claude
+    ticket: T-06-03
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T20:31:47
+    by: akenzy
+    ticket: T-06-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T20:31:47
+    by: claude
+    ticket: T-06-04
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T20:47:54
+    by: claude
+    ticket: T-06-04
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T21:03:01
+    by: akenzy
+    ticket: T-06-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T21:03:27
+    by: claude
+    ticket: T-07-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T21:08:57
+    by: claude
+    ticket: T-07-01
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T21:10:44
+    by: akenzy
+    ticket: T-07-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T21:10:44
+    by: claude
+    ticket: T-07-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T21:13:33
+    by: claude
+    ticket: T-07-02
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T21:20:09
+    by: akenzy
+    ticket: T-07-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T21:20:10
+    by: claude
+    ticket: T-07-03
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T21:24:42
+    by: claude
+    ticket: T-07-03
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T21:27:02
+    by: akenzy
+    ticket: T-07-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T21:27:03
+    by: claude
+    ticket: T-07-04
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T21:33:37
+    by: claude
+    ticket: T-07-04
+  - gate: G4
+    action: ticket done
+    at: 2026-07-27T21:39:07
+    by: akenzy
+    ticket: T-07-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T21:39:08
+    by: claude
+    ticket: T-07-05
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T21:59:50
+    by: claude
+    ticket: T-07-05
+  - gate: G1
+    action: reopened
+    at: 2026-07-27T22:52:40
+    by: Akenzy
+    reason: User confirmed on 2026-07-27 - 3 stock vouchers (goods-receipt/goods-issue/transfer-order) need Xuat khau (single-document Excel export) in addition to In (print). Original US-03 only covered print; MISA survey doc-2.3/3.3/4.3 documents both buttons exist per-voucher there. Adding AC-23..25 to US-03.
+  - gate: G1
+    action: passed
+    at: 2026-07-27T22:54:08
+    by: Akenzy
+    evidence: 12 assumptions, none blocking-and-pending; 25 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-07-27T22:55:11
+    by: Akenzy
+    evidence: 9 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-07-27T23:00:24
+    by: Akenzy
+    evidence: graph valid - 8 UoW, 36 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T23:09:13
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T23:09:13
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T23:29:07
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-27T23:29:07
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T23:29:07
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-27T23:29:07
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T23:29:22
+    by: claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-27T23:29:22
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T23:29:22
+    by: claude
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-27T23:29:23
+    by: Akenzy
+    ticket: T-02-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T23:30:25
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T23:31:33
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-27T23:31:33
+    by: Akenzy
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T23:31:43
+    by: claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T23:31:43
+    by: claude
+    ticket: T-03-03
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T23:47:40
+    by: claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-27T23:47:40
+    by: Akenzy
+    ticket: T-03-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-27T23:47:40
+    by: claude
+    ticket: T-03-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-27T23:47:40
+    by: Akenzy
+    ticket: T-03-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T23:47:51
+    by: claude
+    ticket: T-03-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-27T23:47:51
+    by: claude
+    ticket: T-03-05
+  - gate: G4
+    action: ticket review
+    at: 2026-07-28T00:14:53
+    by: claude
+    ticket: T-03-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-28T00:14:54
+    by: Akenzy
+    ticket: T-03-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-28T00:15:18
+    by: claude
+    ticket: T-08-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-28T00:18:35
+    by: claude
+    ticket: T-08-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-28T00:18:35
+    by: Akenzy
+    ticket: T-08-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-28T00:18:45
+    by: claude
+    ticket: T-08-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-28T00:24:30
+    by: claude
+    ticket: T-08-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-28T00:24:30
+    by: Akenzy
+    ticket: T-08-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-28T00:24:38
+    by: claude
+    ticket: T-08-03
+  - gate: G4
+    action: ticket review
+    at: 2026-07-28T00:32:10
+    by: claude
+    ticket: T-08-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-28T00:32:10
+    by: Akenzy
+    ticket: T-08-03
+  - gate: G4
+    action: ticket done
+    at: 2026-07-28T08:34:19
+    by: akenzy
+    ticket: T-07-05
