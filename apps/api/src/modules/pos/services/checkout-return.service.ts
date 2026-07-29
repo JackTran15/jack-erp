@@ -318,6 +318,29 @@ export class CheckoutReturnService {
         this.computeReverseBase(originalInvoice, totals) /
           POINT_EARN_VND_PER_POINT,
       );
+      // Balance this document leaves the customer on: the locked card balance
+      // plus everything this transaction is about to apply (creditBack, below)
+      // and everything the async consumers will apply (earn / reverse). The
+      // reverse consumer caps its decrement at the available balance, which the
+      // max(0, …) clamp reproduces.
+      const creditBack = this.computeRedeemedCreditBack(originalInvoice, totals);
+      const cardBalance = invoice.customerId
+        ? await this.membershipCardService.getPointBalanceForUpdate(
+            invoice.customerId,
+            manager,
+            actor,
+          )
+        : null;
+      invoice.pointsBalanceAfter =
+        cardBalance == null
+          ? null
+          : Math.max(
+              0,
+              cardBalance +
+                creditBack +
+                invoice.pointsEarned -
+                invoice.pointsReversed,
+            );
       if (dto.note) invoice.note = dto.note;
       const savedInvoice = await manager.save(invoice);
 
@@ -414,28 +437,16 @@ export class CheckoutReturnService {
       // proportional to the returned value (floored, so multiple partial returns
       // never re-credit more than was redeemed). Additive and safe, so it runs
       // in-transaction — distinct from the earn-reversal fanned out as an event.
-      if (
-        originalInvoice &&
-        invoice.customerId &&
-        Number(originalInvoice.pointsRedeemed) > 0 &&
-        Number(originalInvoice.subtotal) > 0 &&
-        totals.returnSubtotal > 0
-      ) {
-        const creditBack = Math.floor(
-          (Number(originalInvoice.pointsRedeemed) * totals.returnSubtotal) /
-            Number(originalInvoice.subtotal),
+      if (invoice.customerId && creditBack > 0) {
+        await this.membershipCardService.refundRedeemedPoints(
+          {
+            customerId: invoice.customerId,
+            points: creditBack,
+            invoiceId: savedInvoice.id,
+          },
+          manager,
+          actor,
         );
-        if (creditBack > 0) {
-          await this.membershipCardService.refundRedeemedPoints(
-            {
-              customerId: invoice.customerId,
-              points: creditBack,
-              invoiceId: savedInvoice.id,
-            },
-            manager,
-            actor,
-          );
-        }
       }
 
       return { invoice: savedInvoice, payments: savedPayments };
@@ -514,6 +525,32 @@ export class CheckoutReturnService {
       ? (Number(originalInvoice.amountDue) * totals.returnSubtotal) /
           originalSubtotal
       : Math.abs(totals.refundedAmount || totals.returnSubtotal);
+  }
+
+  /**
+   * Loyalty points redeemed on the ORIGINAL sale that are given back on this
+   * return, proportional to the returned value (floored, so multiple partial
+   * returns never re-credit more than was redeemed). Shared by the
+   * `pointsBalanceAfter` snapshot and the actual refundRedeemedPoints call, so
+   * both agree.
+   */
+  private computeRedeemedCreditBack(
+    originalInvoice: InvoiceEntity | null,
+    totals: ComputedTotals,
+  ): number {
+    const originalSubtotal = Number(originalInvoice?.subtotal ?? 0);
+    if (
+      !originalInvoice ||
+      Number(originalInvoice.pointsRedeemed) <= 0 ||
+      originalSubtotal <= 0 ||
+      totals.returnSubtotal <= 0
+    ) {
+      return 0;
+    }
+    return Math.floor(
+      (Number(originalInvoice.pointsRedeemed) * totals.returnSubtotal) /
+        originalSubtotal,
+    );
   }
 
   private validateRefundMatrix(

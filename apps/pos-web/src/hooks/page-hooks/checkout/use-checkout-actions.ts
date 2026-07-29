@@ -316,6 +316,8 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
           // checkout xong, nên gắn vào biên lai (dựng trước) trước khi in.
           if (receiptPayload) {
             receiptPayload.totals.pointsEarned = soldInvoice.pointsEarned;
+            receiptPayload.totals.pointsBalanceAfter =
+              soldInvoice.pointsBalanceAfter ?? undefined;
           }
         } else {
           // ── RETURN / EXCHANGE ─────────────────────────────────────────────
@@ -439,6 +441,10 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
               if (receiptPayload) {
                 receiptPayload.totals.pointsReversed =
                   returnedExchange.pointsReversed;
+                // Số dư lấy từ chân RETURN (chứng từ sau) chứ không phải chân
+                // SALE, vì nó phản ánh trạng thái cuối của cặp phiếu.
+                receiptPayload.totals.pointsBalanceAfter =
+                  returnedExchange.pointsBalanceAfter ?? undefined;
               }
             } catch (err) {
               toast.error(
@@ -508,6 +514,8 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             if (receiptPayload) {
               receiptPayload.totals.pointsEarned = posted.pointsEarned;
               receiptPayload.totals.pointsReversed = posted.pointsReversed;
+              receiptPayload.totals.pointsBalanceAfter =
+                posted.pointsBalanceAfter ?? undefined;
             }
             // Operator tích "Tính vào công nợ" nhưng hóa đơn gốc không còn nợ để
             // bù trừ → BE tự chi tiền mặt; báo cho thu ngân biết.

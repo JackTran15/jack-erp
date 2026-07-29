@@ -129,7 +129,7 @@ export function renderInvoiceHtml(
   // when the cashier split the payment across methods; collapses to a single
   // row when only one method was used.
   const paymentRows = payments
-    .map((p) => amountRow(p.label, p.amount))
+    .map((p) => amountRow(p.label, p.amount, "payment-method"))
     .join("");
 
   // Khối KM: chỉ render khi có ít nhất 1 sub-row có dữ liệu. Tổng "Khuyến mãi"
@@ -293,6 +293,13 @@ export function renderInvoiceHtml(
         font-size: ${layout.grandTotalFontSize}px;
       }
       .row.grand-total .value { font-weight: 700; }
+      /* Dòng phương thức (Tiền mặt, Chuyển khoản…) đọc ngang tầm quan trọng với
+         "Tổng thanh toán" nên bám đúng cỡ chữ đó — đổi cài đặt in là cả hai đổi. */
+      .row.payment-method,
+      .row.payment-method .value {
+        font-weight: 700;
+        font-size: ${layout.grandTotalFontSize}px;
+      }
 
       .policy { padding: 6px 0 0; text-align: center; }
       .policy-title {
@@ -422,6 +429,15 @@ export function renderInvoiceHtml(
         <div class="row">
           <span>Điểm trừ</span>
           <span class="value">-${totals.pointsReversed}</span>
+        </div>`
+          : ""
+      }${
+        // Số dư, không phải delta: `0` là giá trị hợp lệ nên chỉ chặn null/undefined.
+        totals.pointsBalanceAfter != null
+          ? `
+        <div class="row">
+          <span>Số điểm hiện tại</span>
+          <span class="value">${totals.pointsBalanceAfter}</span>
         </div>`
           : ""
       }${paymentRows}${amountRow("Giảm nợ", totals.debtReduction)}${amountRow(

@@ -97,6 +97,15 @@ function buildPaymentLines(invoice: InvoiceRow): SummaryLine[] {
       valueText: `-${invoice.pointsReversed}`,
     });
   }
+  // Số dư, không phải delta: 0 là giá trị hợp lệ nên chỉ chặn null/undefined
+  // (hóa đơn cũ, khách vãng lai, khách chưa có thẻ).
+  if (invoice.pointsBalanceAfter != null) {
+    lines.push({
+      label: "Số điểm hiện tại",
+      value: 0,
+      valueText: String(invoice.pointsBalanceAfter),
+    });
+  }
   return lines;
 }
 

@@ -85,6 +85,15 @@ export class InvoiceEntity extends BaseEntity {
   @Column({ name: 'points_reversed', type: 'int', default: 0, comment: 'Loyalty points clawed back when goods are returned/exchanged (floor(reverseBase / POINT_EARN_VND_PER_POINT))' })
   pointsReversed: number;
 
+  /**
+   * Projected inside the checkout transaction from the locked card balance, since
+   * the earn/reverse consumers run async and the receipt prints from the checkout
+   * response. NULL = unknown (no customer, no active card, or pre-migration
+   * invoice) → receipts hide the row; 0 is a real balance and is displayed.
+   */
+  @Column({ name: 'points_balance_after', type: 'int', nullable: true, comment: "Customer's loyalty point balance right after this invoice (card balance ± this invoice's redeem/earn/reverse). NULL when unknown" })
+  pointsBalanceAfter?: number | null;
+
   @Column({ name: 'deposit_amount', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Deposit collected upfront (e.g. on layaway)' })
   depositAmount: number;
 
