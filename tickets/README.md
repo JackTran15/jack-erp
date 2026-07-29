@@ -1862,4 +1862,34 @@ flowchart LR
   T7 --> T8
   T8 --> T9["PDR-09 Tests+E2E+DoD"]
   T9 --> T10["PDR-10 Xuất BE rewrite+hardening"]
+### EPIC-26072026 Backoffice — theme dịu mắt & token hoá màu
+
+- [EPIC-26072026 Backoffice low-strain theme](./epics/EPIC-26072026-backoffice-low-strain-theme.md)
+
+Backoffice đang để nền trắng tinh (`--background: 0 0% 100%`) đi với chữ gần đen (~19:1) và chrome hardcode `bg-gray-900 + text-white` (~17:1), nhìn lâu mỏi mắt. Epic hạ tương phản về mức dễ chịu (body ~10–11:1, vẫn AAA) theo tông xám-lạnh dịu — nền `#f4f6f8`, card trắng, chữ slate `#2b3644`, chrome `#26303f` — và quan trọng hơn là **token hoá toàn bộ màu**: ~250 lượt class Tailwind thô ở 59 file cùng ~99 hex literal được đưa về biến CSS, tái dùng bộ `--sidebar-*` vốn đã khai báo sẵn nhưng chưa ai dùng, cộng nhóm token trạng thái mới `success/warning/info` + `-subtle`. Sau epic, đổi theme chỉ cần sửa khối `:root` trong `index.css`. Thuần FE, không đụng `packages/ui` nên pos-web giữ nguyên.
+
+| Ticket | Mô tả |
+| ------ | ----- |
+| [TKT-THM-01](./tickets/TKT-THM-01-token-layer.md) | Viết lại `:root` (surfaces/brand/status/chrome) + map token mới trong `tailwind.config.js` |
+| [TKT-THM-02](./tickets/TKT-THM-02-chrome-tokens.md) | `AppHeader`/`AppSidebar`/`MegaMenuPanel`/`BranchSelector`/`UserMenu` → `bg-sidebar`, `text-sidebar-foreground`, `bg-sidebar-active` |
+| [TKT-THM-03](./tickets/TKT-THM-03-surface-border-migration.md) | ~55 file: `bg-white`→`bg-card`, `bg-gray-50/100`→`bg-muted`, `border-gray-*`→`border-border`, `text-gray-*`→`text-muted-foreground` |
+| [TKT-THM-04](./tickets/TKT-THM-04-status-color-tokens.md) | Badge/chỉ số green·amber·blue·rose → `success`/`warning`/`info`/`destructive` (+ `-subtle`) |
+| [TKT-THM-05](./tickets/TKT-THM-05-hex-literal-cleanup.md) | Hex `#1e3a6e`/`#172e57`/`#2563eb`/`#667085` trong import-wizard → token; giữ hex trong SVG minh hoạ |
+| [TKT-THM-06](./tickets/TKT-THM-06-verify-theming-doc.md) | Build + grep gate + bảng tương phản + `apps/backoffice-web/THEMING.md` |
+| [TKT-THM-07](./tickets/TKT-THM-07-theme-switcher.md) | Màn `Cấu hình → Giao diện` + 3 khối `[data-theme]` (MISA / MISA tối / Cổ điển) + store `store/common/theme/` |
+| [TKT-THM-08](./tickets/TKT-THM-08-ui-package-tokens.md) | Tách `--primary-blue-foreground`; `packages/ui` (PageToolbar/LineItemGrid/DocumentFormDialog) dùng token |
+
+Đợt 2 (THM-08 → THM-07): bảng màu chốt ở đợt 1 chưa vừa ý khi dùng thật, nên thay vì đoán tiếp, biến bảng màu thành lựa chọn của người dùng. Ba theme `misa` (mặc định, bám bảng màu MISA eShop) / `dark` (bản tối cùng họ navy) / `classic`; mỗi theme là một khối `[data-theme="..."]` khai đủ token, đổi theme = đổi một attribute trên `<html>`. Thêm theme về sau = 1 khối CSS + 1 entry registry, không đụng component.
+
+```mermaid
+flowchart LR
+  T1["THM-01 Token layer"] --> T2["THM-02 Chrome"]
+  T1 --> T3["THM-03 Surface & border"]
+  T1 --> T4["THM-04 Màu trạng thái"]
+  T3 --> T5["THM-05 Hex literal"]
+  T2 --> T6["THM-06 Verify + doc"]
+  T4 --> T6
+  T5 --> T6
+  T6 --> T8["THM-08 primary-blue-fg + packages/ui"]
+  T8 --> T7["THM-07 Theme switcher + theme MISA"]
 ```

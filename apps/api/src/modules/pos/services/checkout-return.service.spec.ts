@@ -207,6 +207,10 @@ describe('CheckoutReturnService — debt offset routing', () => {
   let depositRefundPublisher: { publish: jest.Mock };
   let loyaltyReversePublisher: { publish: jest.Mock };
   let loyaltyAwardPublisher: { publish: jest.Mock };
+  let membershipCardService: {
+    refundRedeemedPoints: jest.Mock;
+    getPointBalanceForUpdate: jest.Mock;
+  };
   let debtRepo: { findOne: jest.Mock };
   let invoiceDebtService: { createFromInvoice: jest.Mock };
   let debtRow: Partial<InvoiceDebtEntity>;
@@ -266,6 +270,10 @@ describe('CheckoutReturnService — debt offset routing', () => {
     depositRefundPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
     loyaltyReversePublisher = { publish: jest.fn().mockResolvedValue(undefined) };
     loyaltyAwardPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
+    membershipCardService = {
+      refundRedeemedPoints: jest.fn().mockResolvedValue(undefined),
+      getPointBalanceForUpdate: jest.fn().mockResolvedValue(null),
+    };
     // Up-front debt lookup (only queried when the operator opts into OFFSET).
     debtRepo = { findOne: jest.fn().mockResolvedValue(debtRow) };
     invoiceDebtService = {
@@ -296,7 +304,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
         { provide: JournalReturnPublisher, useValue: journalReturnPublisher },
         { provide: LoyaltyPointsPublisher, useValue: loyaltyAwardPublisher },
         { provide: LoyaltyPointsReversePublisher, useValue: loyaltyReversePublisher },
-        { provide: MembershipCardService, useValue: { refundRedeemedPoints: jest.fn() } },
+        { provide: MembershipCardService, useValue: membershipCardService },
       ],
     }).compile();
 
@@ -727,6 +735,76 @@ describe('CheckoutReturnService — debt offset routing', () => {
 
       expect(mockManager.save).toHaveBeenCalledWith(
         expect.objectContaining({ pointsReversed: 149 }),
+      );
+    });
+
+    /** Same 1.490.000đ full return as above → pointsReversed 149, pointsEarned 0. */
+    const setupFullReturnOf149 = (originalOverrides: Partial<InvoiceEntity> = {}) => {
+      itemRepo.find.mockResolvedValue([
+        {
+          ...inLineStub(),
+          quantity: 1,
+          unitPrice: 1_490_000,
+          lineTotal: 1_490_000,
+        } as InvoiceItemEntity,
+      ]);
+      invoiceRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(
+          where.id === 'ret-1'
+            ? returnDraftStub({ subtotal: 1_490_000, amountDue: 1_490_000 })
+            : ({
+                ...originalStub(InvoiceStatus.PAID),
+                subtotal: 1_490_000,
+                amountDue: 1_490_000,
+                ...originalOverrides,
+              } as InvoiceEntity),
+        ),
+      );
+    };
+
+    it('snapshots pointsBalanceAfter = balance + creditBack + earned − reversed', async () => {
+      // Bản gốc đã đổi 10 điểm → trả toàn bộ hoàn lại đúng 10 điểm.
+      setupFullReturnOf149({ pointsRedeemed: 10 });
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(300);
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(mockManager.save).toHaveBeenCalledWith(
+        expect.objectContaining({ pointsBalanceAfter: 161 }), // 300 + 10 + 0 − 149
+      );
+    });
+
+    it('clamps pointsBalanceAfter at 0 like the reverse consumer caps its decrement', async () => {
+      setupFullReturnOf149();
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(10);
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(mockManager.save).toHaveBeenCalledWith(
+        expect.objectContaining({ pointsBalanceAfter: 0 }),
+      );
+    });
+
+    it('snapshots pointsBalanceAfter = null when the customer has no active card', async () => {
+      setupFullReturnOf149();
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(null);
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(mockManager.save).toHaveBeenCalledWith(
+        expect.objectContaining({ pointsBalanceAfter: null }),
+      );
+    });
+
+    it('re-credits the points redeemed on the original sale, proportional to the return', async () => {
+      setupFullReturnOf149({ pointsRedeemed: 10 });
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(membershipCardService.refundRedeemedPoints).toHaveBeenCalledWith(
+        expect.objectContaining({ customerId: 'cust-1', points: 10 }),
+        expect.anything(),
+        actor,
       );
     });
   });

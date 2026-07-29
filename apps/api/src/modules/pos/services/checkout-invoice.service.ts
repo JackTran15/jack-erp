@@ -240,6 +240,28 @@ export class CheckoutInvoiceService {
         invoice.totalPaid = totalPaid;
         invoice.pointsEarned = pointsEarned;
 
+        // Snapshot the balance this invoice leaves the customer on. The earn is
+        // applied by an async consumer (see loyaltyPointsPublisher below) awarding
+        // floor(amountDue / rate) — the same number as `pointsEarned` — so
+        // projecting it here is exact, and the receipt (printed straight from this
+        // response) can show it. Read before redeemPointsForInvoice: that call
+        // re-validates the balance and throws, rolling back the whole checkout, so
+        // a projection made from a balance too small can never be committed.
+        const cardBalance = invoice.customerId
+          ? await this.membershipCardService.getPointBalanceForUpdate(
+              invoice.customerId,
+              manager,
+              actor,
+            )
+          : null;
+        invoice.pointsBalanceAfter =
+          cardBalance == null
+            ? null
+            : Math.max(
+                0,
+                cardBalance - Number(invoice.pointsRedeemed ?? 0) + pointsEarned,
+              );
+
         const saved = await manager.save(invoice);
 
         let savedPayments: InvoicePaymentEntity[] = [];

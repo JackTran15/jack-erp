@@ -162,6 +162,24 @@ export class MembershipCardService {
   }
 
   /**
+   * Point balance of the customer's active card, read FOR UPDATE inside the
+   * caller's transaction so the checkout flows can snapshot the balance they are
+   * about to change. Returns null when there is no active card — callers record
+   * that as an unknown balance, never 0.
+   */
+  async getPointBalanceForUpdate(
+    customerId: string,
+    manager: EntityManager,
+    actor: ActorContext,
+  ): Promise<number | null> {
+    const card = await manager.findOne(MembershipCardEntity, {
+      where: { customerId, organizationId: actor.organizationId, isActive: true },
+      lock: { mode: 'pessimistic_write' },
+    });
+    return card ? Number(card.points) : null;
+  }
+
+  /**
    * Deducts redeemed points within an existing transaction (the checkout
    * transaction). Locks the card row, re-validates the balance, decrements and
    * records a REDEEM ledger entry. Throws if the balance is insufficient so the

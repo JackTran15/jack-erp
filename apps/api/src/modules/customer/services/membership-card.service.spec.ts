@@ -430,6 +430,41 @@ describe('MembershipCardService', () => {
   });
 
   // =========================================================================
+  // getPointBalanceForUpdate — locked balance read for the checkout snapshot
+  // =========================================================================
+  describe('getPointBalanceForUpdate', () => {
+    const mgr = () => mockManager as unknown as EntityManager;
+
+    it('returns the active card balance, read FOR UPDATE and scoped to the org', async () => {
+      mockManager.findOne.mockResolvedValue(cardStub({ points: 250 }));
+
+      const balance = await service.getPointBalanceForUpdate(
+        'cust-1',
+        mgr(),
+        actor,
+      );
+
+      expect(balance).toBe(250);
+      expect(mockManager.findOne).toHaveBeenCalledWith(MembershipCardEntity, {
+        where: {
+          customerId: 'cust-1',
+          organizationId: actor.organizationId,
+          isActive: true,
+        },
+        lock: { mode: 'pessimistic_write' },
+      });
+    });
+
+    it('returns null when there is no active card (never 0)', async () => {
+      mockManager.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.getPointBalanceForUpdate('cust-1', mgr(), actor),
+      ).resolves.toBeNull();
+    });
+  });
+
+  // =========================================================================
   // redeemPointsForInvoice — synchronous deduction within checkout transaction
   // =========================================================================
   describe('redeemPointsForInvoice', () => {

@@ -116,6 +116,12 @@ export interface InvoiceTotals {
   pointsEarned?: number;
   /** Số điểm bị thu hồi khi trả/đổi hàng — dòng "Điểm trừ". */
   pointsReversed?: number;
+  /**
+   * Số điểm còn lại của khách sau hóa đơn này — dòng "Số điểm hiện tại". BE
+   * snapshot; `undefined` = không rõ (khách vãng lai / chưa có thẻ) → ẩn dòng.
+   * `0` là số dư hợp lệ và VẪN in.
+   */
+  pointsBalanceAfter?: number;
 
   // ── Slot chưa có nguồn dữ liệu (ẩn cho tới khi BE nối) ───────────────────
   /** "Phí giao hàng". */

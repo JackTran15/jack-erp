@@ -10686,6 +10686,13 @@ export interface components {
             pointsDiscountAmount: number;
             pointsEarned: number;
             pointsReversed: number;
+            /**
+             * @description Projected inside the checkout transaction from the locked card balance, since
+             *     the earn/reverse consumers run async and the receipt prints from the checkout
+             *     response. NULL = unknown (no customer, no active card, or pre-migration
+             *     invoice) → receipts hide the row; 0 is a real balance and is displayed.
+             */
+            pointsBalanceAfter?: number | null;
             depositAmount: number;
             amountDue: number;
             totalPaid: number;
@@ -10834,6 +10841,13 @@ export interface components {
             pointsDiscountAmount: number;
             pointsEarned: number;
             pointsReversed: number;
+            /**
+             * @description Projected inside the checkout transaction from the locked card balance, since
+             *     the earn/reverse consumers run async and the receipt prints from the checkout
+             *     response. NULL = unknown (no customer, no active card, or pre-migration
+             *     invoice) → receipts hide the row; 0 is a real balance and is displayed.
+             */
+            pointsBalanceAfter?: number | null;
             depositAmount: number;
             amountDue: number;
             totalPaid: number;

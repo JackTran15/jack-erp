@@ -33300,6 +33300,11 @@
           "pointsReversed": {
             "type": "number"
           },
+          "pointsBalanceAfter": {
+            "type": "number",
+            "nullable": true,
+            "description": "Projected inside the checkout transaction from the locked card balance, since\nthe earn/reverse consumers run async and the receipt prints from the checkout\nresponse. NULL = unknown (no customer, no active card, or pre-migration\ninvoice) → receipts hide the row; 0 is a real balance and is displayed."
+          },
           "depositAmount": {
             "type": "number"
           },
@@ -33798,6 +33803,11 @@
           },
           "pointsReversed": {
             "type": "number"
+          },
+          "pointsBalanceAfter": {
+            "type": "number",
+            "nullable": true,
+            "description": "Projected inside the checkout transaction from the locked card balance, since\nthe earn/reverse consumers run async and the receipt prints from the checkout\nresponse. NULL = unknown (no customer, no active card, or pre-migration\ninvoice) → receipts hide the row; 0 is a real balance and is displayed."
           },
           "depositAmount": {
             "type": "number"
@@ -35545,7 +35555,6 @@
             ]
           },
           "category": {
-            "type": "string",
             "enum": [
               "revenue-cash",
               "revenue-bank-transfer",
@@ -35554,7 +35563,8 @@
               "expense-bank-transfer",
               "debt-increase",
               "debt-decrease"
-            ]
+            ],
+            "type": "string"
           },
           "branchId": {
             "type": "string",

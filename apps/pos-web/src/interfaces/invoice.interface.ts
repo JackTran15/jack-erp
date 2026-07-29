@@ -65,6 +65,11 @@ export interface InvoiceRow {
   pointsEarned?: number;
   /** Số điểm bị thu hồi khi trả/đổi hàng (chỉ có ở chi tiết hoá đơn). */
   pointsReversed?: number;
+  /**
+   * Số điểm còn lại sau hóa đơn này (chỉ có ở chi tiết hoá đơn). `null` = không
+   * rõ (khách vãng lai / chưa có thẻ / hóa đơn cũ) → ẩn dòng; `0` vẫn hiển thị.
+   */
+  pointsBalanceAfter?: number | null;
   note?: string;
   issuedAt?: string;
   createdAt: string;

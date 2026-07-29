@@ -110,7 +110,10 @@ describe('CheckoutInvoiceService (event-driven)', () => {
   let cashFromPaymentPublisher: { publish: jest.Mock };
   let depositFromPaymentPublisher: { publish: jest.Mock };
   let cashFundResolver: { resolveBranchCashFund: jest.Mock };
-  let membershipCardService: { redeemPointsForInvoice: jest.Mock };
+  let membershipCardService: {
+    redeemPointsForInvoice: jest.Mock;
+    getPointBalanceForUpdate: jest.Mock;
+  };
   let accountResolver: {
     resolveDefaultAccount: jest.Mock;
     resolvePaymentAccount: jest.Mock;
@@ -164,7 +167,10 @@ describe('CheckoutInvoiceService (event-driven)', () => {
       ),
     };
     sessionRepo              = { findOne: jest.fn().mockResolvedValue(null) };
-    membershipCardService    = { redeemPointsForInvoice: jest.fn().mockResolvedValue(undefined) };
+    membershipCardService    = {
+      redeemPointsForInvoice: jest.fn().mockResolvedValue(undefined),
+      getPointBalanceForUpdate: jest.fn().mockResolvedValue(null),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -649,6 +655,43 @@ describe('CheckoutInvoiceService (event-driven)', () => {
         expect.objectContaining({ subtotal: 950_000 }),
         actor,
       );
+    });
+
+    it('snapshots pointsBalanceAfter = balance − redeemed + earned', async () => {
+      setupBigInvoice();
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(500);
+
+      const result = await service.checkout(
+        'inv-1',
+        { payments: [{ paymentMethod: 'cash' as any, amount: 950_000 }] },
+        actor,
+      );
+
+      expect(result.pointsBalanceAfter).toBe(495); // 500 − 100 + 95
+    });
+
+    it('snapshots pointsBalanceAfter = null when the customer has no active card', async () => {
+      setupBigInvoice();
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(null);
+
+      const result = await service.checkout(
+        'inv-1',
+        { payments: [{ paymentMethod: 'cash' as any, amount: 950_000 }] },
+        actor,
+      );
+
+      expect(result.pointsBalanceAfter).toBeNull();
+    });
+
+    it('does not read the card balance for a walk-in invoice (no customer)', async () => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({ customerId: undefined }),
+      );
+
+      const result = await service.checkout('inv-1', cashPaymentDto(), actor);
+
+      expect(membershipCardService.getPointBalanceForUpdate).not.toHaveBeenCalled();
+      expect(result.pointsBalanceAfter).toBeNull();
     });
   });
 
