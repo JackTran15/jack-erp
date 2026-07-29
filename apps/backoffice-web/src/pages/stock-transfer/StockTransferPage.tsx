@@ -678,24 +678,18 @@ function TransferFormDialog({
 }) {
   const isView = mode === "view";
 
-  // Kho chính and Kho dự trữ are both valid source warehouses. Only the
-  // explicitly named showroom is excluded; prefer Kho dự trữ when an item is
-  // arranged in more than one warehouse.
+  // Source warehouses for auto-fill, in priority order. Kho lưu trữ is any
+  // storage with isMainStorage = false (isMainStorage marks the showroom-backing
+  // storage), so an item arranged in both is issued from the kho lưu trữ. Within
+  // those, the branch's default receiving warehouse is tried first.
   const storageWarehouses = useMemo(() => {
     const warehouses = storages
-      .filter(
-        (storage) =>
-          !storage.name.toLocaleLowerCase("vi").includes("showroom"),
-      )
-      .sort((left, right) => {
-        const priority = (storage: InventoryStorage) =>
-          storage.name.toLocaleLowerCase("vi").includes("dự trữ")
-            ? 0
-            : storage.isDefaultReceiving
-              ? 1
-              : 2;
-        return priority(left) - priority(right);
-      });
+      .filter((storage) => !storage.isMainStorage)
+      .sort(
+        (left, right) =>
+          Number(Boolean(right.isDefaultReceiving)) -
+          Number(Boolean(left.isDefaultReceiving)),
+      );
     return warehouses.length > 0 ? warehouses : storages;
   }, [storages]);
 

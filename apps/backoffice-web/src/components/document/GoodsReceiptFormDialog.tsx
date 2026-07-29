@@ -75,6 +75,7 @@ import type {
   InventoryStorage,
   InventoryItem,
 } from "./goods-receipt-shared";
+import type { GoodsIssue } from "./goods-issue-shared";
 
 // ─── Form dialog (create / edit / view) ──────────────────────────────────────
 
@@ -548,12 +549,34 @@ export function PurchaseOrderFormDialog({
         row.exportGoodsIssueDocumentNumber ?? detail.documentNumber ?? "";
       setReferences(xk ? [xk] : []);
       setSourceTransferOrderId(detail.id);
-      setSourceExportGoodsIssueId(
-        row.exportGoodsIssueId ?? detail.exportGoodsIssueId ?? null,
-      );
+      const exportIssueId =
+        row.exportGoodsIssueId ?? detail.exportGoodsIssueId ?? null;
+      setSourceExportGoodsIssueId(exportIssueId);
       setNotes(
         `Nhập kho hàng hóa điều chuyển từ cửa hàng ${row.sourceBranchName}`,
       );
+      // Đối tượng / Người giao are entered on the source branch's export issue;
+      // carry them over so the destination form shows what it will save (the
+      // import endpoint inherits the same values when the form leaves them empty).
+      if (exportIssueId) {
+        void (async () => {
+          try {
+            // Org-scoped endpoint — the export issue belongs to the source branch.
+            const { data: issue } = await apiClient.get<GoodsIssue>(
+              `/inventory/transfer-orders/${detail.id}/export-goods-issue`,
+            );
+            if (issue.counterpartyKind && issue.counterpartyId) {
+              setCounterpartyKind(issue.counterpartyKind);
+              setProviderId(issue.counterpartyId);
+              setProviderCode(issue.counterparty?.code ?? "");
+              setProviderName(issue.counterparty?.name ?? "");
+            }
+            if (issue.deliverer) setDeliveryPerson(issue.deliverer);
+          } catch {
+            // best-effort — the fields stay editable and the server still inherits them
+          }
+        })();
+      }
       const targetStorageId = defaultStorage?.id ?? "";
       const targetStorageLabel = defaultStorage?.name ?? "";
       if (targetStorageId) {

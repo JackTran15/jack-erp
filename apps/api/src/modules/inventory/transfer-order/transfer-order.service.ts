@@ -41,6 +41,7 @@ import { BranchEntity } from "../../branch/branch.entity";
 import { GoodsIssueService } from "../goods-issue/goods-issue.service";
 import { GoodsReceiptService } from "../goods-receipt/goods-receipt.service";
 import { LocationEntity } from "../location/location.entity";
+import { attachCounterparties } from "../location/services/counterparty-name.util";
 import { StockBalanceEntity } from "../ledger/stock-balance.entity";
 import { GoodsIssueEntity } from "../goods-issue/goods-issue.entity";
 import { StorageEntity } from "../location/storage.entity";
@@ -300,6 +301,13 @@ export class TransferOrderService {
         `Không tìm thấy phiếu xuất kho của lệnh điều chuyển ${id}`,
       );
     }
+    // Inline the Đối tượng name so the destination branch can display it — the
+    // raw row only carries counterparty_kind + counterparty_id.
+    await attachCounterparties(
+      this.dataSource.manager,
+      [gi],
+      actor.organizationId,
+    );
     return gi;
   }
 
