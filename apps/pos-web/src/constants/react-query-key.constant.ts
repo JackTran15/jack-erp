@@ -115,6 +115,22 @@ export const POS_BRANCH_CATALOG_KEYS = {
     ["pos-branch-catalog", branchId, direction, search] as const,
 } as const;
 
+export const DAILY_REPORT_KEYS = {
+  ALL: ["daily-report"] as const,
+  /** `POST /reports/pos/daily-summary` — tab Tổng hợp. */
+  SUMMARY: (body: Record<string, unknown>) =>
+    ["daily-report", "summary", body] as const,
+  /** `POST /reports/invoices/search` (revenue-by-item) — tab Doanh thu theo mặt hàng. */
+  REVENUE_BY_ITEM: (body: Record<string, unknown>) =>
+    ["daily-report", "revenue-by-item", body] as const,
+  /** `GET /reports/invoices/filter-options` — Thu ngân / NVBH dropdowns. */
+  FILTER_OPTIONS: (type: string, branchId: string) =>
+    ["daily-report", "filter-options", type, branchId] as const,
+  /** `POST /reports/pos/daily-summary/detail` — modal "xem chi tiết" trên tab Tổng hợp. */
+  SUMMARY_DETAIL: (body: Record<string, unknown>) =>
+    ["daily-report", "summary-detail", body] as const,
+} as const;
+
 export const TEMP_WAREHOUSE_KEYS = {
   ALL: ["temp-wh"] as const,
   ACTIVE: (branchId: string, direction: TempWarehouseDirection) =>

@@ -236,6 +236,10 @@ export function itemGroupCellValue(
     case 'measure':
       return agg[def.source.field];
     case 'computed':
+      if (def.source.computed === 'unitPrice') {
+        // Weighted-average unit price of the aggregated group (goods = Σ sign*qty*unitPrice).
+        return agg.quantity !== 0 ? round2(agg.goods / agg.quantity) : 0;
+      }
       // promoRate — discount as a % of goods.
       return agg.goods > 0 ? round2((agg.discount / agg.goods) * 100) : 0;
     case 'placeholder':
@@ -258,7 +262,8 @@ export function buildItemGroupRow(
 
 /**
  * Footer totals — NUMBER/CURRENCY columns are summed across groups. The PERCENT
- * promoRate has no meaningful sum, so its footer cell is null.
+ * promoRate and the weighted-average `unitPrice` have no meaningful sum, so their
+ * footer cells are null.
  */
 export function buildItemGroupTotals(
   columns: string[],
@@ -266,10 +271,14 @@ export function buildItemGroupTotals(
 ): ReportRow {
   const out: ReportRow = {};
   for (const col of columns) {
+    const def = getRevenueByItemColumnDef(col);
+    const isAverage =
+      def?.source.kind === 'computed' && def.source.computed === 'unitPrice';
     const type = itemGroupColumnType(col);
     const summable =
-      type === ReportColumnDataType.CURRENCY ||
-      type === ReportColumnDataType.NUMBER;
+      !isAverage &&
+      (type === ReportColumnDataType.CURRENCY ||
+        type === ReportColumnDataType.NUMBER);
     out[col] = summable
       ? round2(
           groups.reduce((sum, g) => sum + Number(itemGroupCellValue(col, g) ?? 0), 0),

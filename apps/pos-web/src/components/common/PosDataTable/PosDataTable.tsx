@@ -123,7 +123,11 @@ export function PosDataTable<TData>({
         ) : null}
       </tbody>
 
-      {summaryRow ? <tfoot className="bg-white">{summaryRow}</tfoot> : null}
+      {summaryRow ? (
+        <tfoot className="sticky bottom-0 z-[1] bg-white shadow-[0_-1px_0_0_#E5E7EB]">
+          {summaryRow}
+        </tfoot>
+      ) : null}
     </table>
   );
 }

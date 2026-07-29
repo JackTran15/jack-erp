@@ -29,6 +29,7 @@ import { InventoryCsvModule } from './modules/inventory/csv/inventory-csv.module
 import { PosModule } from './modules/pos/pos.module';
 import { ReportingModule } from './modules/reporting/reporting.module';
 import { InvoiceReportModule } from './modules/reporting/invoice-report/invoice-report.module';
+import { PosDailyReportModule } from './modules/reporting/pos-daily-report/pos-daily-report.module';
 import { DebtReportModule } from './modules/reporting/debt-report/debt-report.module';
 import { ProfitReportModule } from './modules/reporting/profit-report/profit-report.module';
 import { PurchaseOrderModule } from './modules/inventory/purchase-order/purchase-order.module';
@@ -102,6 +103,7 @@ import { CounterpartyModule } from './modules/counterparty/counterparty.module';
     PosModule,
     ReportingModule,
     InvoiceReportModule,
+    PosDailyReportModule,
     DebtReportModule,
     ProfitReportModule,
     PurchaseOrderModule,

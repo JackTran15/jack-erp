@@ -5641,6 +5641,55 @@ export interface paths {
         patch: operations["InvoiceReportController_updateTemplate"];
         trace?: never;
     };
+    "/reports/pos/daily-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosDailyReportController_dailySummary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/pos/daily-summary/detail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** "Xem chi tiết" drill-down for one Tab 1 summary line item. */
+        post: operations["PosDailyReportController_dailySummaryDetail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/pos/daily-summary/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosDailyReportController_exportDailySummary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/debts/columns": {
         parameters: {
             query?: never;
@@ -9628,7 +9677,7 @@ export interface components {
             totalAmount: number;
             attachmentIds: string[];
             /** @enum {string} */
-            referenceType?: "GOODS_RECEIPT" | "PAYABLE" | "INVOICE" | "TRANSFER" | "EXPENSE" | "MANUAL" | "REVERSAL" | "FUND_SWAP";
+            referenceType?: "GOODS_RECEIPT" | "PAYABLE" | "INVOICE" | "TRANSFER" | "EXPENSE" | "MANUAL" | "REVERSAL" | "FUND_SWAP" | "REFUND";
             referenceId?: string;
             approvalStatus?: string;
             approvedBy?: string;
@@ -10628,7 +10677,7 @@ export interface components {
             originalInvoiceId?: string;
             originalInvoice?: components["schemas"]["InvoiceEntity"];
             /** @enum {string} */
-            refundMethod?: "CASH" | "STORE_CREDIT" | "OFFSET";
+            refundMethod?: "CASH" | "BANK" | "STORE_CREDIT" | "OFFSET";
             refundedAmount: number;
             netAmount: number;
             subtotal: number;
@@ -10776,7 +10825,7 @@ export interface components {
             originalInvoiceId?: string;
             originalInvoice?: components["schemas"]["InvoiceEntity"];
             /** @enum {string} */
-            refundMethod?: "CASH" | "STORE_CREDIT" | "OFFSET";
+            refundMethod?: "CASH" | "BANK" | "STORE_CREDIT" | "OFFSET";
             refundedAmount: number;
             netAmount: number;
             subtotal: number;
@@ -11014,14 +11063,26 @@ export interface components {
         };
         CheckoutReturnDto: {
             /** @enum {string} */
-            refundMethod: "CASH" | "STORE_CREDIT" | "OFFSET";
-            /** Format: uuid */
-            revenueAccountId: string;
+            refundMethod: "CASH" | "BANK" | "STORE_CREDIT" | "OFFSET";
+            /**
+             * Format: uuid
+             * @description Deprecated — revenue (the refund/journal contra) is resolved server-side from
+             *     the org's default REVENUE account. Kept optional for backward compatibility;
+             *     any value sent by the client is ignored.
+             */
+            revenueAccountId?: string;
             /**
              * Format: uuid
              * @description Required when refundMethod = CASH AND no active drawer session is found.
              */
             cashAccountId?: string;
+            /**
+             * Format: uuid
+             * @description Required when refundMethod = BANK: the operator's chosen receiving fund
+             *     (payment_accounts.id). The server resolves its linked deposit_account_id and
+             *     uses revenueAccountId as the contra — clients never send a COA id directly.
+             */
+            refundAccountId?: string;
             /**
              * Format: uuid
              * @description Required when refundMethod = OFFSET against an original AR (debt) invoice.
@@ -11368,6 +11429,88 @@ export interface components {
             filters?: components["schemas"]["InvoiceReportFilterDto"];
             columnFilters?: components["schemas"]["ColumnFilterDto"][];
             sortOrder?: number;
+        };
+        PosDailySummaryDto: {
+            /** @description Issued-at window (ISO from/to). Both bounds optional. */
+            issuedAt: components["schemas"]["DateRangeFilterDto"];
+            /**
+             * Format: uuid
+             * @description Target branch id (defaults to actor branch).
+             */
+            branchId?: string;
+            /**
+             * Format: uuid
+             * @description Filter by cashier (invoice.staffId).
+             */
+            cashierId?: string;
+            /**
+             * Format: uuid
+             * @description Filter by salesperson (invoice.salespersonId).
+             */
+            salespersonId?: string;
+            /** @description Invoice statuses to include; defaults to all except cancelled. */
+            invoiceStatus?: string[];
+        };
+        PosDailySummaryDetailDto: {
+            /** @description Issued-at window (ISO from/to). Both bounds optional. */
+            issuedAt: components["schemas"]["DateRangeFilterDto"];
+            /** @enum {string} */
+            category: "revenue-cash" | "revenue-bank-transfer" | "revenue-points" | "expense-cash" | "expense-bank-transfer" | "debt-increase" | "debt-decrease";
+            /**
+             * Format: uuid
+             * @description Target branch id (defaults to actor branch).
+             */
+            branchId?: string;
+            /**
+             * Format: uuid
+             * @description Filter by cashier (invoice.staffId).
+             */
+            cashierId?: string;
+            /**
+             * Format: uuid
+             * @description Filter by salesperson (invoice.salespersonId).
+             */
+            salespersonId?: string;
+            /** @description Invoice statuses to include; defaults to all except cancelled. */
+            invoiceStatus?: string[];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            limit: number;
+        };
+        PosDailySummaryExportDto: {
+            /** @description Issued-at window (ISO from/to). Both bounds optional. */
+            issuedAt: components["schemas"]["DateRangeFilterDto"];
+            /**
+             * Format: uuid
+             * @description Target branch id (defaults to actor branch).
+             */
+            branchId?: string;
+            /**
+             * Format: uuid
+             * @description Filter by cashier (invoice.staffId).
+             */
+            cashierId?: string;
+            /**
+             * Format: uuid
+             * @description Filter by salesperson (invoice.salespersonId).
+             */
+            salespersonId?: string;
+            /** @description Invoice statuses to include; defaults to all except cancelled. */
+            invoiceStatus?: string[];
+            /** @description Resolved "Thu ngân" filter label ("Tất cả" when unset). */
+            cashierLabel?: string;
+            /** @description Resolved "NVBH" filter label ("Tất cả" when unset). */
+            nvbhLabel?: string;
+            /** @description Tiền nhận bàn giao (opening cash) — FE-only, unpersisted. */
+            openingAmount?: number;
+            /** @description Tiền bàn giao (handover cash) — FE-only, unpersisted. */
+            handoverAmount?: number;
+            /** @description Người nhận bàn giao (resolved staff name) — FE-only. */
+            receivedByLabel?: string;
+            /** @description Ghi chú bàn giao. */
+            note?: string;
         };
         DebtReportFilterDto: {
             /**
@@ -22403,6 +22546,73 @@ export interface operations {
                 content: {
                     "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    PosDailyReportController_dailySummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosDailySummaryDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PosDailyReportController_dailySummaryDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosDailySummaryDetailDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PosDailyReportController_exportDailySummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosDailySummaryExportDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

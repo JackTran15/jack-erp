@@ -6,7 +6,7 @@ import {
   REPORT_ENUM_OPTION_TABLES,
   ReportFilterOptionType,
 } from '@erp/shared-interfaces';
-import { FindOptionsWhere, ILike, Repository } from 'typeorm';
+import { FindOptionsWhere, ILike, In, Repository } from 'typeorm';
 import { UserEntity } from '../../../auth/user.entity';
 import { BranchEntity } from '../../../branch/branch.entity';
 import { CustomerEntity } from '../../../customer/customer.entity';
@@ -16,10 +16,10 @@ import { EmployeeProfileEntity } from '../../../rbac/employee/employee-profile.e
 import { ReportFilterOptionsQueryDto } from '../dto/report-filter-options-query.dto';
 import { GetReportFilterOptionsQuery } from './get-report-filter-options.query';
 
-/** "Last First" — mirrors the per-line report name resolution. */
+/** "First Last" — matches the codebase-wide name convention (see counterparty-name.util.ts). */
 const fullName = (u?: { firstName?: string; lastName?: string }): string | null => {
   if (!u) return null;
-  const name = [u.lastName, u.firstName].filter(Boolean).join(' ').trim();
+  const name = [u.firstName, u.lastName].filter(Boolean).join(' ').trim();
   return name || null;
 };
 
@@ -100,7 +100,11 @@ export class GetReportFilterOptionsHandler
     }));
   }
 
-  /** Cashier — invoice.staffId references users.id. value = user id. */
+  /**
+   * Cashier — invoice.staffId references users.id. value = user id. Label is
+   * "{employee code} - {name}" when the user has a linked employee_profiles
+   * row (1:1 via user_id); falls back to the bare name/email otherwise.
+   */
   private async cashiers(
     org: string,
     dto: ReportFilterOptionsQueryDto,
@@ -121,10 +125,27 @@ export class GetReportFilterOptionsHandler
       skip: this.skip(dto),
       take: this.take(dto),
     });
-    return rows.map((u) => ({ value: u.id, label: fullName(u) ?? u.email }));
+    const userIds = rows.map((u) => u.id);
+    const profiles = userIds.length
+      ? await this.employees.find({ where: { userId: In(userIds) } })
+      : [];
+    const codeByUserId = new Map(profiles.map((p) => [p.userId, p.code]));
+    return rows.map((u) => {
+      const name = fullName(u) ?? u.email;
+      const code = codeByUserId.get(u.id);
+      return {
+        value: u.id,
+        label: code ? `${code} - ${name}` : name,
+        metadata: { name },
+      };
+    });
   }
 
-  /** Salesperson — invoice.salespersonId references employee_profiles.id; name via users. */
+  /**
+   * Salesperson — invoice.salespersonId references employee_profiles.id; name
+   * via users. Label is "{employee code} - {name}"; falls back to the bare
+   * code when the linked user has no name on file.
+   */
   private async salespeople(
     org: string,
     dto: ReportFilterOptionsQueryDto,
@@ -149,7 +170,14 @@ export class GetReportFilterOptionsHandler
       .offset(this.skip(dto))
       .limit(this.take(dto))
       .getRawMany<{ id: string; code: string; firstName: string; lastName: string }>();
-    return rows.map((r) => ({ value: r.id, label: fullName(r) ?? r.code }));
+    return rows.map((r) => {
+      const name = fullName(r);
+      return {
+        value: r.id,
+        label: name ? `${r.code} - ${name}` : r.code,
+        metadata: { name: name ?? r.code },
+      };
+    });
   }
 
   /** Customers — search by name or phone. */

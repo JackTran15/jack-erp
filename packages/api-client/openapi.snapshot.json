@@ -16954,6 +16954,93 @@
         ]
       }
     },
+    "/reports/pos/daily-summary": {
+      "post": {
+        "operationId": "PosDailyReportController_dailySummary",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosDailySummaryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/pos"
+        ]
+      }
+    },
+    "/reports/pos/daily-summary/detail": {
+      "post": {
+        "operationId": "PosDailyReportController_dailySummaryDetail",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosDailySummaryDetailDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "\"Xem chi tiết\" drill-down for one Tab 1 summary line item.",
+        "tags": [
+          "reports/pos"
+        ]
+      }
+    },
+    "/reports/pos/daily-summary/export": {
+      "post": {
+        "operationId": "PosDailyReportController_exportDailySummary",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosDailySummaryExportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "reports/pos"
+        ]
+      }
+    },
     "/reports/debts/columns": {
       "get": {
         "operationId": "DebtReportController_getColumns",
@@ -30199,7 +30286,8 @@
               "EXPENSE",
               "MANUAL",
               "REVERSAL",
-              "FUND_SWAP"
+              "FUND_SWAP",
+              "REFUND"
             ],
             "type": "string"
           },
@@ -33182,6 +33270,7 @@
           "refundMethod": {
             "enum": [
               "CASH",
+              "BANK",
               "STORE_CREDIT",
               "OFFSET"
             ],
@@ -33680,6 +33769,7 @@
           "refundMethod": {
             "enum": [
               "CASH",
+              "BANK",
               "STORE_CREDIT",
               "OFFSET"
             ],
@@ -34357,17 +34447,24 @@
             "type": "string",
             "enum": [
               "CASH",
+              "BANK",
               "STORE_CREDIT",
               "OFFSET"
             ]
           },
           "revenueAccountId": {
             "type": "string",
+            "description": "Deprecated — revenue (the refund/journal contra) is resolved server-side from\nthe org's default REVENUE account. Kept optional for backward compatibility;\nany value sent by the client is ignored.",
             "format": "uuid"
           },
           "cashAccountId": {
             "type": "string",
             "description": "Required when refundMethod = CASH AND no active drawer session is found.",
+            "format": "uuid"
+          },
+          "refundAccountId": {
+            "type": "string",
+            "description": "Required when refundMethod = BANK: the operator's chosen receiving fund\n(payment_accounts.id). The server resolves its linked deposit_account_id and\nuses revenueAccountId as the contra — clients never send a COA id directly.",
             "format": "uuid"
           },
           "receivableAccountId": {
@@ -34405,8 +34502,7 @@
           }
         },
         "required": [
-          "refundMethod",
-          "revenueAccountId"
+          "refundMethod"
         ]
       },
       "EnumFilterDto": {
@@ -35398,6 +35494,176 @@
             "minimum": 0
           }
         }
+      },
+      "PosDailySummaryDto": {
+        "type": "object",
+        "properties": {
+          "issuedAt": {
+            "description": "Issued-at window (ISO from/to). Both bounds optional.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Target branch id (defaults to actor branch)."
+          },
+          "cashierId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Filter by cashier (invoice.staffId)."
+          },
+          "salespersonId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Filter by salesperson (invoice.salespersonId)."
+          },
+          "invoiceStatus": {
+            "description": "Invoice statuses to include; defaults to all except cancelled.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "issuedAt"
+        ]
+      },
+      "PosDailySummaryDetailDto": {
+        "type": "object",
+        "properties": {
+          "issuedAt": {
+            "description": "Issued-at window (ISO from/to). Both bounds optional.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "revenue-cash",
+              "revenue-bank-transfer",
+              "revenue-points",
+              "expense-cash",
+              "expense-bank-transfer",
+              "debt-increase",
+              "debt-decrease"
+            ]
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Target branch id (defaults to actor branch)."
+          },
+          "cashierId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Filter by cashier (invoice.staffId)."
+          },
+          "salespersonId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Filter by salesperson (invoice.salespersonId)."
+          },
+          "invoiceStatus": {
+            "description": "Invoice statuses to include; defaults to all except cancelled.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "columnFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFilterDto"
+            }
+          },
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "required": [
+          "issuedAt",
+          "category"
+        ]
+      },
+      "PosDailySummaryExportDto": {
+        "type": "object",
+        "properties": {
+          "issuedAt": {
+            "description": "Issued-at window (ISO from/to). Both bounds optional.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Target branch id (defaults to actor branch)."
+          },
+          "cashierId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Filter by cashier (invoice.staffId)."
+          },
+          "salespersonId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Filter by salesperson (invoice.salespersonId)."
+          },
+          "invoiceStatus": {
+            "description": "Invoice statuses to include; defaults to all except cancelled.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cashierLabel": {
+            "type": "string",
+            "description": "Resolved \"Thu ngân\" filter label (\"Tất cả\" when unset)."
+          },
+          "nvbhLabel": {
+            "type": "string",
+            "description": "Resolved \"NVBH\" filter label (\"Tất cả\" when unset)."
+          },
+          "openingAmount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Tiền nhận bàn giao (opening cash) — FE-only, unpersisted."
+          },
+          "handoverAmount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Tiền bàn giao (handover cash) — FE-only, unpersisted."
+          },
+          "receivedByLabel": {
+            "type": "string",
+            "description": "Người nhận bàn giao (resolved staff name) — FE-only."
+          },
+          "note": {
+            "type": "string",
+            "description": "Ghi chú bàn giao."
+          }
+        },
+        "required": [
+          "issuedAt"
+        ]
       },
       "DebtReportFilterDto": {
         "type": "object",

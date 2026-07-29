@@ -1,3 +1,28 @@
+const pad2 = (n: number): string => String(n).padStart(2, "0");
+
+/**
+ * Split an ISO date/datetime string into vi-VN display parts (dd/mm/yyyy,
+ * HH:mm). Parses the date/time components literally (no `Date` object, no
+ * timezone shift) so a bare "YYYY-MM-DD" boundary (as returned by the preset
+ * ranges) reads correctly. When the string has no time part, defaults to the
+ * boundary's implied full-day edge: 00:00 for `from`, 23:59 for `to`.
+ */
+export function splitDateTimeVi(
+  iso?: string,
+  boundary: "from" | "to" = "from",
+): { date: string; time: string } | null {
+  if (!iso) return null;
+  const [datePart, timePart] = iso.split("T");
+  const [y, m, d] = datePart.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const date = `${pad2(d)}/${pad2(m)}/${y}`;
+  if (timePart) {
+    const [hh = "00", mi = "00"] = timePart.split(":");
+    return { date, time: `${hh}:${mi}` };
+  }
+  return { date, time: boundary === "to" ? "23:59" : "00:00" };
+}
+
 function toLocalDateStr(d: Date): string {
   const yyyy = d.getFullYear();
   const mm   = String(d.getMonth() + 1).padStart(2, "0");
@@ -8,13 +33,16 @@ function toLocalDateStr(d: Date): string {
 /**
  * Converts a discrete date-range option to `{ from?, to? }` ISO date strings
  * suitable for the v2 search API (DateRangeFilterDto).
- * `ALL` and `OTHER` return `{}` (no date restriction).
+ * `ALL` returns `{}` (no date restriction). `OTHER` returns the caller-supplied
+ * `customRange` (from the "Chọn thời gian" modal) when given, else `{}`.
  */
 export function dateRangeToISO(
   opt: PosDateRangeFilterOption,
   now: Date = new Date(),
+  customRange?: { from?: string; to?: string },
 ): { from?: string; to?: string } {
-  if (opt === "ALL" || opt === "OTHER") return {};
+  if (opt === "OTHER") return customRange ?? {};
+  if (opt === "ALL") return {};
 
   const startOf = (d: Date) => {
     const c = new Date(d);

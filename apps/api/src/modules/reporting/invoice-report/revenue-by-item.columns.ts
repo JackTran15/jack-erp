@@ -26,7 +26,7 @@ export type RevenueByItemMeasure = 'quantity' | 'goods' | 'discount' | 'total';
 export type RevenueByItemSource =
   | { kind: 'dimension'; field: RevenueByItemDimension }
   | { kind: 'measure'; field: RevenueByItemMeasure }
-  | { kind: 'computed'; computed: 'promoRate' }
+  | { kind: 'computed'; computed: 'promoRate' | 'unitPrice' }
   | { kind: 'placeholder'; placeholder: 0 };
 
 export interface RevenueByItemColumnDef {
@@ -37,9 +37,11 @@ export interface RevenueByItemColumnDef {
 
 /**
  * Curated whitelist in on-screen order: dimension columns then measures.
- * `unitPrice` is intentionally absent — a per-unit price has no meaning once
- * lines are aggregated. `revenue.promoPoints` is a placeholder (0) until a
- * per-line loyalty backing exists. Labels live in INVOICE_REPORT_COLUMN_LABELS_VI.
+ * `unitPrice` (Đơn giá) is a weighted-average unit price of the aggregated group
+ * (goods ÷ quantity), so it stays meaningful after lines are summed; its footer
+ * total is null (an average has no meaningful sum). `revenue.promoPoints` is a
+ * placeholder (0) until a per-line loyalty backing exists. Labels live in
+ * INVOICE_REPORT_COLUMN_LABELS_VI.
  */
 export const REVENUE_BY_ITEM_COLUMNS: RevenueByItemColumnDef[] = [
   { key: 'sku', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'sku' } },
@@ -50,6 +52,7 @@ export const REVENUE_BY_ITEM_COLUMNS: RevenueByItemColumnDef[] = [
   { key: 'locationCode', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'locationCode' } },
   { key: 'locationName', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'locationName' } },
   { key: 'quantity', type: ReportColumnDataType.NUMBER, source: { kind: 'measure', field: 'quantity' } },
+  { key: 'unitPrice', type: ReportColumnDataType.CURRENCY, source: { kind: 'computed', computed: 'unitPrice' } },
   { key: 'revenue.goods', type: ReportColumnDataType.CURRENCY, source: { kind: 'measure', field: 'goods' } },
   { key: 'revenue.discount', type: ReportColumnDataType.CURRENCY, source: { kind: 'measure', field: 'discount' } },
   { key: 'revenue.total', type: ReportColumnDataType.CURRENCY, source: { kind: 'measure', field: 'total' } },
