@@ -45,6 +45,19 @@ const NUMBER_TYPES: ReadonlySet<ReportColumnDataType> = new Set([
   ReportColumnDataType.PERCENT,
 ]);
 
+/**
+ * `ReportColumnHeader.width` is a pixel hint for the on-screen grid column;
+ * `DocumentColumn.width` is read by Excel as a character count. 7px/char
+ * approximates Calibri 11's default digit width — the same font the
+ * generated workbook uses — so a 240px grid column becomes a ~34-character
+ * Excel column instead of a literal 240 characters wide.
+ */
+const PX_PER_EXCEL_CHAR = 7;
+
+function toExcelColumnWidth(px: number): number {
+  return Math.round(px / PX_PER_EXCEL_CHAR);
+}
+
 /** The subset of a domain search DTO that exporting actually depends on. */
 export interface ReportExportRequest {
   reportType: string;
@@ -272,7 +285,9 @@ export class ReportExportService {
         type: header.type,
         align: header.align ?? (NUMBER_TYPES.has(header.type) ? 'right' : 'left'),
       };
-      if (header.width !== undefined) column.width = header.width;
+      if (header.width !== undefined) {
+        column.width = toExcelColumnWidth(header.width);
+      }
       return column;
     });
   }

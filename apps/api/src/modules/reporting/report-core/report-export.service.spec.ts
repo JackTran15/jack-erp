@@ -150,6 +150,29 @@ describe('ReportExportService.buildPayload', () => {
     ]);
   });
 
+  it('converts a header width hint from grid pixels to Excel character units', async () => {
+    const { service } = makeService();
+    const { registry } = makeRegistry(
+      jest.fn().mockResolvedValue(RESULT),
+      jest.fn().mockResolvedValue([
+        { ...header('sku', 'Mã SKU'), width: 140 },
+        { ...header('name', 'Tên hàng hóa'), width: 240 },
+      ]),
+    );
+
+    const payload = await service.buildPayload(
+      registry,
+      dto({ columns: ['sku', 'name'] }),
+      actor,
+      context,
+    );
+
+    expect(payload.columns).toEqual([
+      expect.objectContaining({ col: 'sku', width: 20 }),
+      expect.objectContaining({ col: 'name', width: 34 }),
+    ]);
+  });
+
   it('keeps the column order the request asked for', async () => {
     const { service } = makeService();
     const { registry } = makeRegistry();
