@@ -9,6 +9,7 @@ import { PosRequireBranch } from "./components/common/PosRequireBranch/PosRequir
 import { PosLayout } from "./components/layout/PosLayout/PosLayout";
 import { BranchSelectPage } from "./pages/BranchSelectPage";
 import { CheckoutPage } from "./pages/CheckoutPage";
+import { DailyReportPage } from "./pages/DailyReportPage";
 import { FastStockTransferPage } from "./pages/FastStockTransferPage";
 import { InvoiceListPage } from "./pages/InvoiceListPage";
 import { PosLoginPage } from "./pages/PosLoginPage";
@@ -57,6 +58,7 @@ export function App() {
                   />
                   <Route path="/return-goods" element={<ReturnGoodsPage />} />
                   <Route path="/invoices" element={<InvoiceListPage />} />
+                  <Route path="/daily-report" element={<DailyReportPage />} />
                 </Route>
               </Route>
             </Route>

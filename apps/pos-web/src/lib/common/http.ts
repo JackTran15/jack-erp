@@ -119,6 +119,35 @@ async function request<T>(
   return JSON.parse(text) as T;
 }
 
+async function requestBlob(path: string, init: RequestInit = {}): Promise<Blob> {
+  const url = `${resolveApiBaseUrl()}${path}`;
+  const headers = buildHeaders(init);
+
+  let res = await fetch(url, { ...init, headers });
+
+  if (res.status === 401) {
+    const refreshed = await refreshOnce();
+    if (refreshed) {
+      const retryHeaders = buildHeaders(init);
+      res = await fetch(url, { ...init, headers: retryHeaders });
+    }
+  }
+
+  if (res.status === 401) {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    window.location.href = `${import.meta.env.BASE_URL}dang-nhap`;
+    throw new Error("Phiên hết hạn. Đang chuyển hướng đăng nhập.");
+  }
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`HTTP ${res.status}: ${body}`);
+  }
+
+  return res.blob();
+}
+
 export const http = {
   get<T>(path: string): Promise<T> {
     return request<T>(path, { method: "GET" });
@@ -126,6 +155,14 @@ export const http = {
 
   post<T>(path: string, body?: unknown): Promise<T> {
     return request<T>(path, {
+      method: "POST",
+      body: body != null ? JSON.stringify(body) : undefined,
+    });
+  },
+
+  /** For binary responses (e.g. file exports) — same auth/refresh flow as `post`, returns a Blob. */
+  postBlob(path: string, body?: unknown): Promise<Blob> {
+    return requestBlob(path, {
       method: "POST",
       body: body != null ? JSON.stringify(body) : undefined,
     });

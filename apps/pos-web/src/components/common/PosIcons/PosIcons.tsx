@@ -541,3 +541,24 @@ export function ProhibitedGlyphIcon(props: IconProps) {
     </svg>
   );
 }
+
+/** Download / export (e.g. "Xuất" — export report to file). */
+export function DownloadIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 3v12" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M4 21h16" />
+    </svg>
+  );
+}
+
+/** Table columns (e.g. "Thiết lập cột hiển thị" — show/hide table columns). */
+export function ColumnsIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4v16M15 4v16" />
+    </svg>
+  );
+}

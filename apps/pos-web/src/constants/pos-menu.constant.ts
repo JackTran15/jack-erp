@@ -98,6 +98,8 @@ export const APP_MENU_ITEMS: PosMenuItem[] = [
     label: "Báo cáo theo ngày",
     iconBgColor: "#22B8CF",
     Icon: BarChartUpIcon,
+    route: "/daily-report",
+    pinnable: true,
   },
   {
     id: "nhat-ky-truy-cap",

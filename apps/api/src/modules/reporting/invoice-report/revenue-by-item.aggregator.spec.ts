@@ -153,6 +153,29 @@ describe('itemGroupCellValue', () => {
     );
     expect(itemGroupCellValue('revenue.promoRate', g)).toBe(0);
   });
+
+  it('computes unitPrice as the weighted average goods / quantity', () => {
+    const [g] = aggregateByItem(
+      [
+        row({ direction: ItemDirection.OUT, quantity: 2, unitPrice: 100, lineTotal: 200 }),
+        row({ direction: ItemDirection.OUT, quantity: 3, unitPrice: 200, lineTotal: 600 }),
+      ],
+      'item',
+    );
+    // goods = 2*100 + 3*200 = 800; quantity = 5 → 160
+    expect(itemGroupCellValue('unitPrice', g)).toBe(160);
+  });
+
+  it('unitPrice is 0 when quantity nets to 0', () => {
+    const [g] = aggregateByItem(
+      [
+        row({ direction: ItemDirection.OUT, quantity: 1, unitPrice: 100, lineTotal: 100 }),
+        row({ direction: ItemDirection.IN, quantity: 1, unitPrice: 100, lineTotal: 100 }),
+      ],
+      'item',
+    );
+    expect(itemGroupCellValue('unitPrice', g)).toBe(0);
+  });
 });
 
 describe('buildItemGroupRow / buildItemGroupTotals', () => {
@@ -169,12 +192,13 @@ describe('buildItemGroupRow / buildItemGroupTotals', () => {
       'item',
     );
     const totals = buildItemGroupTotals(
-      ['itemName', 'quantity', 'revenue.total', 'revenue.promoRate'],
+      ['itemName', 'quantity', 'unitPrice', 'revenue.total', 'revenue.promoRate'],
       groups,
     );
     expect(totals['quantity']).toBe(4);
     expect(totals['revenue.total']).toBe(3800);
     expect(totals['itemName']).toBeNull();
     expect(totals['revenue.promoRate']).toBeNull();
+    expect(totals['unitPrice']).toBeNull();
   });
 });
