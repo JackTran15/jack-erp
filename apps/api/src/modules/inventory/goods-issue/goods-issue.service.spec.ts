@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { ConflictException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import {
   DocCounterpartyKind,
@@ -59,6 +60,7 @@ describe('GoodsIssueService', () => {
       publishMovementEvents: jest.fn().mockResolvedValue(undefined),
     };
     transferOrderService = {
+      assertExportIssueCanBeCancelled: jest.fn().mockResolvedValue(undefined),
       cancelFromExportIssue: jest.fn().mockResolvedValue(undefined),
     };
     // Default: actor holds every purpose permission so unrelated create() tests
@@ -132,22 +134,21 @@ describe('GoodsIssueService', () => {
       expect(created.occurredAt).toBeNull();
     });
 
-    it('routes a customer counterparty to counterparty columns, provider_id null', async () => {
-      (dataSource.manager.findOne as jest.Mock).mockResolvedValue({ id: 'cust-1' });
-      await service.create(
-        {
-          locationId: 'loc-A01',
-          counterpartyKind: DocCounterpartyKind.CUSTOMER,
-          counterpartyId: 'cust-1',
-          purpose: GoodsIssuePurpose.OTHER,
-          lines: [{ itemId: 'item-1', quantity: 1 }],
-        },
-        actor,
+    it('rejects a customer counterparty on a warehouse document', async () => {
+      await expect(
+        service.create(
+          {
+            locationId: 'loc-A01',
+            counterpartyKind: DocCounterpartyKind.CUSTOMER,
+            counterpartyId: 'cust-1',
+            purpose: GoodsIssuePurpose.OTHER,
+            lines: [{ itemId: 'item-1', quantity: 1 }],
+          },
+          actor,
+        ),
+      ).rejects.toThrow(
+        'Đối tượng phiếu kho chỉ bao gồm nhà cung cấp và nhân viên',
       );
-      const created = giRepo.create.mock.calls[0][0];
-      expect(created.providerId).toBeUndefined();
-      expect(created.counterpartyKind).toBe(DocCounterpartyKind.CUSTOMER);
-      expect(created.counterpartyId).toBe('cust-1');
     });
 
     it('routes a supplier counterparty to provider_id', async () => {
@@ -174,14 +175,14 @@ describe('GoodsIssueService', () => {
         service.create(
           {
             locationId: 'loc-A01',
-            counterpartyKind: DocCounterpartyKind.CUSTOMER,
+            counterpartyKind: DocCounterpartyKind.SUPPLIER,
             counterpartyId: 'missing',
             purpose: GoodsIssuePurpose.OTHER,
             lines: [{ itemId: 'item-1', quantity: 1 }],
           },
           actor,
         ),
-      ).rejects.toThrow('Customer counterparty not found in organization');
+      ).rejects.toThrow('Supplier counterparty not found in organization');
     });
 
     it('rejects a transfer to the active branch', async () => {
@@ -356,6 +357,23 @@ describe('GoodsIssueService', () => {
         'to-1',
         actor,
       );
+    });
+
+    it('does not reverse stock when the linked transfer already has an import receipt', async () => {
+      giRepo.findOne.mockResolvedValue({ ...postedTransferIssue });
+      transferOrderService.assertExportIssueCanBeCancelled.mockRejectedValueOnce(
+        new ConflictException(
+          'Phiếu xuất đã có phiếu nhập tham chiếu, không thể xoá',
+        ),
+      );
+
+      await expect(service.cancel('gi-1', actor)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+
+      expect(ledgerService.recordBatchMovements).not.toHaveBeenCalled();
+      expect(giRepo.save).not.toHaveBeenCalled();
+      expect(transferOrderService.cancelFromExportIssue).not.toHaveBeenCalled();
     });
 
     it('does not cascade when cascadeTransferOrder is false', async () => {

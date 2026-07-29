@@ -35,8 +35,8 @@ import { assertPurposePermission } from './assert-purpose-permission';
 export interface CreateGoodsIssueDto {
   locationId: string;
   providerId?: string;
-  /** Đối tượng kind (supplier | customer). When set, the counterparty is
-   *  validated and routed: supplier→provider_id, customer→counterparty cols. */
+  /** Đối tượng kind (supplier | employee). When set, the counterparty is
+   * validated and routed through the warehouse-document resolver. */
   counterpartyKind?: DocCounterpartyKind;
   counterpartyId?: string;
   purpose?: GoodsIssuePurpose;
@@ -285,6 +285,17 @@ export class GoodsIssueService {
 
     if (gi.status === GoodsIssueStatus.CANCELLED) {
       throw new ConflictException('Phiếu đã huỷ, không thể xoá lại');
+    }
+
+    if (
+      options.cascadeTransferOrder !== false &&
+      gi.referenceType === GoodsIssueReferenceType.TRANSFER_ORDER &&
+      gi.referenceId
+    ) {
+      await this.transferOrderService.assertExportIssueCanBeCancelled(
+        gi.referenceId,
+        actor,
+      );
     }
 
     if (gi.status === GoodsIssueStatus.POSTED) {

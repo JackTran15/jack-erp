@@ -41,7 +41,11 @@ import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LookupField } from "../../components/forms/LookupField";
 import { CounterpartyPickerField } from "../../components/forms/CounterpartyPickerField";
 import { ChooseTransferWarehousesDialog } from "../../components/document/ChooseTransferWarehousesDialog";
-import { getTransferPreferredShelfBatch } from "../../api/inventory-location-preferences";
+import {
+  getPreferredShelf,
+  getPreferredShelfBatch,
+  getTransferPreferredShelfBatch,
+} from "../../api/inventory-location-preferences";
 import { lookupItemByCode, type ItemLookupResult } from "../../api/item-lookup";
 import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import { useDocumentListSelection } from "../../components/document/useDocumentListSelection";
@@ -182,6 +186,7 @@ interface InventoryStorage {
   name: string;
   branchId: string;
   isMainStorage?: boolean;
+  isDefaultReceiving?: boolean;
 }
 
 export function StockTransferPage() {
@@ -673,12 +678,22 @@ function TransferFormDialog({
 }) {
   const isView = mode === "view";
 
-  // Default new lines' Kho xuất to the active branch's main storage (list is
-  // main-first) so the common single-warehouse case is one fewer click.
-  const defaultStorage = useMemo(
-    () => storages.find((s) => s.isMainStorage) ?? storages[0],
-    [storages],
-  );
+  // Source warehouses for auto-fill, in priority order. Kho lưu trữ is any
+  // storage with isMainStorage = false (isMainStorage marks the showroom-backing
+  // storage), so an item arranged in both is issued from the kho lưu trữ. Within
+  // those, the branch's default receiving warehouse is tried first.
+  const storageWarehouses = useMemo(() => {
+    const warehouses = storages
+      .filter((storage) => !storage.isMainStorage)
+      .sort(
+        (left, right) =>
+          Number(Boolean(right.isDefaultReceiving)) -
+          Number(Boolean(left.isDefaultReceiving)),
+      );
+    return warehouses.length > 0 ? warehouses : storages;
+  }, [storages]);
+
+  const defaultStorage = storageWarehouses[0];
 
   const makeEmptyLine = useCallback(
     (): FormLine => ({
@@ -991,14 +1006,92 @@ function TransferFormDialog({
   // new line (source warehouse from the default). Quantity always follows the
   // dialog; unit price only overwrites when the dialog provides a positive value
   // so re-selecting to bump quantity doesn't wipe a price already entered.
-  const addLinesFromPicker = (result: ProductSelectResult) => {
+  // Same indexed batch pattern as purchase-orders: the response only updates
+  // the row that still has the item + source warehouse used by the request.
+  const fillPreferredSourceBatch = (
+    rows: { idx: number; itemId: string; storageId: string }[],
+  ) => {
+    const valid = rows.filter((row) => row.itemId && row.storageId);
+    if (valid.length === 0) return;
+    const pairs = [
+      ...new Map(
+        valid.map((row) => [
+          `${row.itemId}:${row.storageId}`,
+          { itemId: row.itemId, storageId: row.storageId },
+        ]),
+      ).values(),
+    ];
+    void getPreferredShelfBatch(pairs)
+      .then((results) => {
+        const shelfByKey = new Map(
+          results.map((result) => [
+            `${result.itemId}:${result.storageId}`,
+            result.shelf,
+          ]),
+        );
+        setLines((currentLines) =>
+          currentLines.map((line, lineIdx) => {
+            const match = valid.find(
+              (row) =>
+                row.idx === lineIdx &&
+                line.itemId === row.itemId &&
+                line.sourceStorageId === row.storageId,
+            );
+            if (!match) return line;
+            const shelf = shelfByKey.get(
+              `${match.itemId}:${match.storageId}`,
+            );
+            if (!shelf) return line;
+            return {
+              ...line,
+              sourceLocationId: shelf.id,
+              sourceLocationLabel: `${shelf.code} · ${shelf.name}`,
+            };
+          }),
+        );
+      })
+      .catch(() => {});
+  };
+
+  const fillPreferredSource = (
+    idx: number,
+    itemId: string,
+    storageId: string,
+  ) => fillPreferredSourceBatch([{ idx, itemId, storageId }]);
+
+  const resolveItemSource = useCallback(
+    async (itemId: string) => {
+      for (const storage of storageWarehouses) {
+        try {
+          const { data: assigned } = await apiClient.get<{
+            locationId: string;
+            code: string;
+          } | null>(
+            `/products/storage-location?itemId=${encodeURIComponent(itemId)}&storageId=${encodeURIComponent(storage.id)}`,
+          );
+          if (!assigned) continue;
+          const shelf = await getPreferredShelf(itemId, storage.id);
+          if (shelf) return { storage, shelf };
+        } catch {
+          // Try the next eligible warehouse.
+        }
+      }
+
+      if (!defaultStorage) return null;
+      const shelf = await getPreferredShelf(itemId, defaultStorage.id).catch(
+        () => null,
+      );
+      return { storage: defaultStorage, shelf };
+    },
+    [defaultStorage, storageWarehouses],
+  );
+
+  const addLinesFromPicker = async (result: ProductSelectResult) => {
     const picked = new Map<string, SelectedLine>(
       result.lines.filter((s) => s.itemId).map((s) => [s.itemId, s]),
     );
     if (picked.size === 0) return;
 
-    const sourceStorageId = defaultStorage?.id ?? "";
-    const sourceStorageLabel = defaultStorage?.name ?? "";
     const base = getPersistableFormLines(lines);
     const existing = new Set(base.map((l) => l.itemId).filter(Boolean));
 
@@ -1012,19 +1105,28 @@ function TransferFormDialog({
       };
     });
 
-    const fresh: FormLine[] = [...picked.values()]
-      .filter((s) => !existing.has(s.itemId))
-      .map((s) => ({
-        ...emptyLine(),
-        itemId: s.itemId,
-        itemLabel: s.sku,
-        itemName: s.name,
-        unit: s.unit,
-        sourceStorageId,
-        sourceStorageLabel,
-        quantity: s.quantity > 0 ? s.quantity : 1,
-        unitPrice: s.unitPrice > 0 ? String(s.unitPrice) : "",
-      }));
+    const fresh = await Promise.all(
+      [...picked.values()]
+        .filter((s) => !existing.has(s.itemId))
+        .map(async (s): Promise<FormLine> => {
+          const resolved = await resolveItemSource(s.itemId);
+          return {
+            ...emptyLine(),
+            itemId: s.itemId,
+            itemLabel: s.sku,
+            itemName: s.name,
+            unit: s.unit,
+            sourceStorageId: resolved?.storage.id ?? "",
+            sourceStorageLabel: resolved?.storage.name ?? "",
+            sourceLocationId: resolved?.shelf?.id ?? "",
+            sourceLocationLabel: resolved?.shelf
+              ? `${resolved.shelf.code} · ${resolved.shelf.name}`
+              : "",
+            quantity: s.quantity > 0 ? s.quantity : 1,
+            unitPrice: s.unitPrice > 0 ? String(s.unitPrice) : "",
+          };
+        }),
+    );
 
     setLines(normalizeLines([...updated, ...fresh]));
     markDirty();
@@ -1102,32 +1204,30 @@ function TransferFormDialog({
   // typeahead (onSelect) and the single-fill ProductSelectDialog. Selecting an
   // item on the last row appends a fresh blank line carrying the current
   // warehouses, then auto-fills that line's locations.
-  const fillLineFromItem = (
+  const fillLineFromItem = async (
     idx: number,
     item: { id: string; code: string; name: string; unit: string },
   ) => {
     const current = lines[idx];
-    const filledLine = current
-      ? {
-          ...current,
-          itemId: item.id,
-          itemLabel: item.code,
-          itemName: item.name,
-          unit: item.unit,
-        }
-      : null;
+    if (!current) return;
+    const resolved = await resolveItemSource(item.id);
+    const filledLine: FormLine = {
+      ...current,
+      itemId: item.id,
+      itemLabel: item.code,
+      itemName: item.name,
+      unit: item.unit,
+      sourceStorageId: resolved?.storage.id ?? "",
+      sourceStorageLabel: resolved?.storage.name ?? "",
+      sourceLocationId: resolved?.shelf?.id ?? "",
+      sourceLocationLabel: resolved?.shelf
+        ? `${resolved.shelf.code} · ${resolved.shelf.name}`
+        : "",
+    };
     setLines((prev) => {
       const appendBlank = idx === prev.length - 1 && !prev[idx]?.itemId;
-      const mapped = prev.map((l, i) =>
-        i === idx
-          ? {
-              ...l,
-              itemId: item.id,
-              itemLabel: item.code,
-              itemName: item.name,
-              unit: item.unit,
-            }
-          : l,
+      const mapped = prev.map((line, lineIdx) =>
+        lineIdx === idx ? filledLine : line,
       );
       if (appendBlank) {
         const f = mapped[idx]!;
@@ -1142,12 +1242,12 @@ function TransferFormDialog({
       return normalizeLines(mapped);
     });
     markDirty();
-    if (filledLine) void fillTransferLocations([filledLine]);
+    void fillTransferLocations([filledLine]);
   };
 
   // Barcode scan: existing item -> accumulate the quantity; new item -> add a line (default
   // source storage) then auto-fill the source/destination locations like the item-pick flow.
-  const handleScanResolved = (item: ItemLookupResult, qty: number) => {
+  const handleScanResolved = async (item: ItemLookupResult, qty: number) => {
     const existingIdx = lines.findIndex((l) => l.itemId === item.itemId);
     if (existingIdx >= 0) {
       setLines((prev) =>
@@ -1158,16 +1258,19 @@ function TransferFormDialog({
       markDirty();
       return;
     }
-    const sourceStorageId = defaultStorage?.id ?? "";
-    const sourceStorageLabel = defaultStorage?.name ?? "";
+    const resolved = await resolveItemSource(item.itemId);
     const newLine: FormLine = {
       ...emptyLine(),
       itemId: item.itemId,
       itemLabel: item.code,
       itemName: item.name,
       unit: item.unit,
-      sourceStorageId,
-      sourceStorageLabel,
+      sourceStorageId: resolved?.storage.id ?? "",
+      sourceStorageLabel: resolved?.storage.name ?? "",
+      sourceLocationId: resolved?.shelf?.id ?? "",
+      sourceLocationLabel: resolved?.shelf
+        ? `${resolved.shelf.code} · ${resolved.shelf.name}`
+        : "",
       quantity: qty > 0 ? qty : 1,
       unitPrice: "", // leave empty -> server computes it from cost (same as addLinesFromPicker)
     };
@@ -1251,6 +1354,9 @@ function TransferFormDialog({
                   : l,
               ),
             );
+            if (row.itemId) {
+              fillPreferredSource(idx, row.itemId, s.id);
+            }
             markDirty();
           }}
           search={searchStorages}
@@ -1477,8 +1583,8 @@ function TransferFormDialog({
             <FieldRow label="Đối tượng">
               <div className="flex items-stretch gap-2">
                 <CounterpartyPickerField
-                  defaultType="all"
-                  allowedTypes={["supplier", "customer", "employee"]}
+                  defaultType="supplier"
+                  allowedTypes={["supplier", "employee"]}
                   className="w-[180px]"
                   dropdownMinWidth={500}
                   modalTitle="Chọn đối tượng"

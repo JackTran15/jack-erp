@@ -747,6 +747,7 @@ export class InventoryLocationService {
       branchId?: string;
       includeUnassigned?: boolean;
       activeOnly?: boolean;
+      search?: string;
     },
     actor: ActorContext,
   ): Promise<PaginatedResponse<LocationEntity>> {
@@ -757,6 +758,12 @@ export class InventoryLocationService {
       .where('location.organizationId = :organizationId', {
         organizationId: actor.organizationId,
       });
+    const search = query.search?.trim();
+    if (search) {
+      qb.andWhere('(location.code ILIKE :s OR location.name ILIKE :s)', {
+        s: `%${search}%`,
+      });
+    }
     if (query.storageId) {
       qb.andWhere('location.storageId = :storageId', {
         storageId: query.storageId,

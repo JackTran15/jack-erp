@@ -34,18 +34,18 @@ describe('resolveDocCounterparty', () => {
     });
   });
 
-  it('routes customer → counterparty cols, provider_id undefined', async () => {
+  it('rejects customers because warehouse documents only allow suppliers and employees', async () => {
     const manager = makeManager({ id: 'cust-1' });
-    const r = await resolveDocCounterparty(
-      manager,
-      { counterpartyKind: DocCounterpartyKind.CUSTOMER, counterpartyId: 'cust-1' },
-      org,
+    await expect(
+      resolveDocCounterparty(
+        manager,
+        { counterpartyKind: DocCounterpartyKind.CUSTOMER, counterpartyId: 'cust-1' },
+        org,
+      ),
+    ).rejects.toThrow(
+      'Đối tượng phiếu kho chỉ bao gồm nhà cung cấp và nhân viên',
     );
-    expect(r).toEqual({
-      providerId: undefined,
-      counterpartyKind: DocCounterpartyKind.CUSTOMER,
-      counterpartyId: 'cust-1',
-    });
+    expect((manager as any).findOne).not.toHaveBeenCalled();
   });
 
   it('routes employee → counterparty cols, provider_id undefined', async () => {
@@ -62,15 +62,15 @@ describe('resolveDocCounterparty', () => {
     });
   });
 
-  it('throws when the counterparty does not exist in the org', async () => {
+  it('throws when the supplier does not exist in the org', async () => {
     const manager = makeManager(null);
     await expect(
       resolveDocCounterparty(
         manager,
-        { counterpartyKind: DocCounterpartyKind.CUSTOMER, counterpartyId: 'missing' },
+        { counterpartyKind: DocCounterpartyKind.SUPPLIER, counterpartyId: 'missing' },
         org,
       ),
-    ).rejects.toThrow('Customer counterparty not found in organization');
+    ).rejects.toThrow('Supplier counterparty not found in organization');
   });
 
   it('throws when counterpartyId is missing', async () => {

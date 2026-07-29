@@ -308,9 +308,14 @@ export function TransferLocationDialog({
       toast.error("Vui lòng chọn vị trí hiện tại trước");
       return;
     }
+    if (!destLocationId) {
+      toast.error("Vui lòng chọn vị trí chuyển đến trước");
+      return;
+    }
     setLoadingRows(true);
     try {
-      // Load every item with on-hand at the source location across pages.
+      // Load every tracked item at the source location across pages, including
+      // assigned items whose current balance is zero.
       const collected: StockBalanceRow[] = [];
       let pageNum = 1;
       let total = Infinity;
@@ -320,8 +325,6 @@ export function TransferLocationDialog({
           pageSize: FETCH_PAGE_SIZE,
           locationCode: sourceLocationCode,
           locationCodeMode: "equals",
-          quantity: 0,
-          quantityOp: "gt",
         });
         total = result.total;
         const batch = result.data as StockBalanceRow[];
@@ -347,7 +350,7 @@ export function TransferLocationDialog({
       }));
       setRows(mapped);
       if (mapped.length === 0) {
-        toast.info("Vị trí này không có hàng tồn kho nào.");
+        toast.info("Vị trí này chưa có hàng hoá được theo dõi.");
       }
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
@@ -721,7 +724,7 @@ export function TransferLocationDialog({
 
   // ─── Derived ──────────────────────────────────────────────────────────────
 
-  const canFetch = Boolean(sourceLocationId);
+  const canFetch = Boolean(sourceLocationId && destLocationId);
 
   const validRowCount = rows.filter(
     (row) => row.itemId && getRowValidationReason(row) === null,
@@ -890,7 +893,7 @@ export function TransferLocationDialog({
           <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
             {canFetch
               ? 'Nhấn "Lấy dữ liệu" để tải danh sách hàng tồn, hoặc "Thêm dòng" để thêm thủ công.'
-              : "Chọn kho và vị trí hiện tại để bắt đầu."}
+              : "Chọn kho, vị trí hiện tại và vị trí chuyển đến để bắt đầu."}
           </div>
         ) : (
           <table className="w-full min-w-[1360px] table-fixed border-collapse text-sm">

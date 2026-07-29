@@ -913,6 +913,48 @@ describe('InventoryLocationStockService', () => {
       });
     });
 
+    it('uses the storage default when the item is only mapped in a showroom storage', async () => {
+      itemRepo.findOne.mockResolvedValue({
+        id: 'item-1',
+        productId: 'prod-1',
+        organizationId: 'org-1',
+      });
+      pslService.listByItem.mockResolvedValue([
+        {
+          productId: 'prod-1',
+          storageId: 'showroom-storage',
+          locationId: 'showroom-shelf',
+        },
+      ]);
+      stockBalanceRepo.find.mockResolvedValue([]);
+      locationRepo.findOne.mockResolvedValue({
+        id: 'loc-default',
+        code: 'MD',
+        name: 'Mặc định',
+      });
+
+      await expect(
+        service.getPreferredShelf('item-1', 'storage-1', actor),
+      ).resolves.toEqual({
+        id: 'loc-default',
+        code: 'MD',
+        name: 'Mặc định',
+      });
+
+      expect(locationRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          storageId: 'storage-1',
+          organizationId: 'org-1',
+          isActive: true,
+          isUnassigned: false,
+          isDefault: true,
+          storage: { branchId: 'branch-1' },
+        },
+        relations: { storage: true },
+        select: { id: true, code: true, name: true },
+      });
+    });
+
     it('returns null when the preferred shelf belongs to another branch', async () => {
       itemRepo.findOne.mockResolvedValue({
         id: 'item-1',
