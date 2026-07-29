@@ -2,44 +2,191 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   THEME TOKENS
+
+   Mỗi theme là một khối biến khai đủ bộ token dưới đây. Đổi theme = đổi
+   thuộc tính data-theme trên <html>; class trong component KHÔNG đổi.
+
+   Thêm theme mới:
+     1. copy một khối `[data-theme="..."]` bên dưới, đổi id + giá trị;
+     2. thêm một entry vào THEMES trong src/store/common/theme/theme.constant.ts.
+   Không cần sửa tailwind.config.js, không cần sửa file .tsx nào.
+
+   Mỗi khối PHẢI khai color-scheme khớp độ sáng của theme. Thiếu nó, trình duyệt
+   coi trang là giao diện sáng và tự vẽ widget của nó theo tông sáng bất kể token:
+   icon lịch của <input type="date">, scrollbar gốc, popup <select>, nền autofill.
+
+   Quy ước: kênh HSL rời (để dùng biến thể alpha `bg-sidebar/50`); riêng
+   --primary-blue* là kênh RGB rời vì tailwind map bằng rgb(... / <alpha-value>).
+   Chi tiết + bảng tương phản: apps/backoffice-web/THEMING.md
+   ═════════════════════════════════════════════════════════════════════════ */
 @layer base {
-  :root {
+  /* ── MISA (mặc định) ─────────────────────────────────────────────────────
+     Bám bảng màu MISA eShop: navy #223065 dùng chung cho sidebar + toolbar,
+     mục sidebar active TỐI hơn nền (#18234D) trong khi nút toolbar active lại
+     SÁNG hơn (#5E6690) — cách đảo chiều này để phân biệt hai vùng.
+     Ảnh đối chiếu: local/images/misa_sample_theme.png                      */
+  :root,
+  [data-theme="misa"] {
+    color-scheme: light;
+
+    --background: 0 0% 96%; /* #f5f5f5 */
+    --foreground: 0 0% 12%; /* #1e1e1e */
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 12%;
+    --muted: 0 0% 93%; /* #eeeeee header bảng */
+    --muted-foreground: 0 0% 53%; /* #868686 — đúng MISA, xem THEMING.md */
+    --secondary: 0 0% 93%;
+    --secondary-foreground: 0 0% 12%;
+    --accent: 226 33% 90%; /* #dde1ee dòng đang chọn */
+    --accent-foreground: 227 50% 26%;
+    --border: 0 0% 90%; /* #e6e6e6 */
+    --input: 0 0% 87%; /* #dddddd */
+    --ring: 228 60% 57%;
+
+    --primary: 227 50% 26%; /* #223065 */
+    --primary-foreground: 0 0% 100%;
+    --primary-blue: 34 48 101; /* #223065 nền toolbar */
+    --primary-blue-hover: 94 102 144; /* #5e6690 nút toolbar active */
+    --primary-blue-foreground: 0 0% 100%;
+
+    --success: 145 63% 27%;
+    --success-foreground: 0 0% 100%;
+    --success-subtle: 145 45% 94%;
+    --warning: 30 88% 34%; /* cam đậm cùng hệ #ff9f3b, đủ tương phản để làm chữ */
+    --warning-foreground: 0 0% 100%;
+    --warning-subtle: 32 100% 94%;
+    --info: 228 60% 57%; /* #516ad3 link SKU, giữ đúng MISA */
+    --info-foreground: 0 0% 100%;
+    --info-subtle: 226 85% 98%; /* rất nhạt để chữ #516ad3 trên badge vẫn đạt AA */
+    --destructive: 4 65% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --destructive-subtle: 4 70% 95%;
+
+    --sidebar-background: 227 50% 26%; /* #223065 */
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-muted-foreground: 228 22% 76%;
+    --sidebar-accent: 228 40% 32%; /* hover — sáng hơn nền */
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-active: 228 52% 20%; /* #18234d — tối hơn nền, đúng MISA */
+    --sidebar-active-foreground: 0 0% 100%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 227 50% 26%;
+    --sidebar-border: 228 45% 33%;
+    --sidebar-ring: 228 65% 68%;
+  }
+
+  /* ── Tối ─────────────────────────────────────────────────────────────── */
+  [data-theme="dark"] {
+    color-scheme: dark;
+
+    --background: 230 35% 12%;
+    --foreground: 225 20% 88%;
+    --card: 230 30% 16%;
+    --card-foreground: 225 20% 88%;
+    --popover: 230 30% 16%;
+    --popover-foreground: 225 20% 88%;
+    --muted: 230 25% 22%;
+    --muted-foreground: 226 14% 68%;
+    --secondary: 230 25% 22%;
+    --secondary-foreground: 225 20% 88%;
+    --accent: 230 26% 27%;
+    --accent-foreground: 225 22% 92%;
+    --border: 230 22% 26%;
+    --input: 230 22% 32%;
+    --ring: 228 65% 66%;
+
+    --primary: 225 20% 88%;
+    --primary-foreground: 230 40% 14%;
+    --primary-blue: 110 140 230;
+    --primary-blue-hover: 138 164 240;
+    --primary-blue-foreground: 230 45% 10%;
+
+    --success: 150 45% 55%;
+    --success-foreground: 150 40% 10%;
+    --success-subtle: 150 25% 20%;
+    --warning: 32 80% 60%;
+    --warning-foreground: 32 45% 10%;
+    --warning-subtle: 32 32% 20%;
+    --info: 228 65% 70%; /* #7f95e6 — bản sáng của link MISA */
+    --info-foreground: 228 45% 10%;
+    --info-subtle: 228 32% 21%;
+    --destructive: 2 68% 66%;
+    --destructive-foreground: 2 40% 10%;
+    --destructive-subtle: 2 30% 19%;
+
+    --sidebar-background: 228 52% 15%;
+    --sidebar-foreground: 225 18% 86%;
+    --sidebar-muted-foreground: 226 14% 62%;
+    --sidebar-accent: 228 42% 24%;
+    --sidebar-accent-foreground: 225 22% 94%;
+    --sidebar-active: 228 45% 32%;
+    --sidebar-active-foreground: 225 25% 96%;
+    --sidebar-primary: 225 18% 88%;
+    --sidebar-primary-foreground: 228 52% 15%;
+    --sidebar-border: 228 35% 24%;
+    --sidebar-ring: 228 65% 68%;
+  }
+
+  /* ── Cổ điển, tương phản cao (bảng màu trước EPIC-26072026) ──────────── */
+  [data-theme="classic"] {
+    color-scheme: light;
+
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 16% 42%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
     --primary: 222.2 47.4% 11.2%;
     --primary-foreground: 210 40% 98%;
     --primary-blue: 31 45 138;
     --primary-blue-hover: 41 66 188;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
+    --primary-blue-foreground: 210 40% 98%;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --success: 142 71% 29%;
+    --success-foreground: 138 40% 98%;
+    --success-subtle: 138 70% 94%;
+    --warning: 30 90% 33%;
+    --warning-foreground: 45 50% 98%;
+    --warning-subtle: 45 93% 89%;
+    --info: 221 78% 44%;
+    --info-foreground: 214 40% 98%;
+    --info-subtle: 214 92% 93%;
+    --destructive: 0 74% 45%;
+    --destructive-foreground: 210 40% 98%;
+    --destructive-subtle: 0 90% 95%;
+
+    --sidebar-background: 221 39% 11%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-muted-foreground: 218 11% 65%;
+    --sidebar-accent: 215 19% 20%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-active: 215 14% 34%;
+    --sidebar-active-foreground: 0 0% 100%;
+    --sidebar-primary: 0 0% 98%;
+    --sidebar-primary-foreground: 221 39% 11%;
+    --sidebar-border: 217 19% 27%;
+    --sidebar-ring: 217 91% 60%;
   }
 }
 
 @layer base {
   :root {
+    --radius: 0.5rem;
     --header-height: 3.5rem;
     --sidebar-width: 15rem;
     --sidebar-width-collapsed: 3.75rem;

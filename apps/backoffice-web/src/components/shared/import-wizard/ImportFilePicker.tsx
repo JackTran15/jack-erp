@@ -3,7 +3,7 @@ import { cn } from "@erp/ui";
 import { FileText } from "lucide-react";
 
 const MISA_PRIMARY_BTN =
-  "inline-flex h-9 items-center justify-center rounded bg-[#1e3a6e] px-4 text-sm font-medium text-white hover:bg-[#172e57]";
+  "inline-flex h-9 items-center justify-center rounded bg-primary-blue px-4 text-sm font-medium text-primary-blue-foreground hover:bg-primary-blue-hover";
 
 interface Props {
   accept?: string;
@@ -42,7 +42,7 @@ export function ImportFilePicker({
   return (
     <div
       className={cn(
-        "flex min-h-[200px] flex-1 flex-col items-center justify-center rounded border border-dashed border-gray-300 bg-gray-50/80 px-6 py-8",
+        "flex min-h-[200px] flex-1 flex-col items-center justify-center rounded border border-dashed border-input bg-muted/70 px-6 py-8",
         className,
       )}
       onDragOver={(e) => e.preventDefault()}
@@ -51,7 +51,7 @@ export function ImportFilePicker({
         pickFile(e.dataTransfer.files[0]);
       }}
     >
-      <FileText className="mb-3 h-12 w-12 text-gray-400" strokeWidth={1.25} />
+      <FileText className="mb-3 h-12 w-12 text-muted-foreground" strokeWidth={1.25} />
       {file ? (
         <p className="mb-4 max-w-full truncate text-center text-sm text-foreground">
           {file.name}

@@ -92,7 +92,7 @@ export function PaginationControls({
             min={1}
             max={totalPages}
             aria-label="Số trang"
-            className="h-8 w-12 rounded-sm border border-input bg-background px-1 text-center text-sm tabular-nums outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-blue-500/35"
+            className="h-8 w-12 rounded-sm border border-input bg-background px-1 text-center text-sm tabular-nums outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring/40"
             value={page}
             disabled={disabled}
             onChange={(event) => {

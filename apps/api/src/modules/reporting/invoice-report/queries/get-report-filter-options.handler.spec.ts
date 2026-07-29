@@ -13,7 +13,10 @@ function makeHandler(overrides: Record<string, any> = {}) {
       { id: 'usr-1', firstName: 'Thu', lastName: 'Nguyễn', email: 'thu@x.vn' },
     ]),
   };
-  const employees = { createQueryBuilder: jest.fn() };
+  const employees = {
+    createQueryBuilder: jest.fn(),
+    find: jest.fn(async () => []),
+  };
   const customers = {
     find: jest.fn(async () => [{ id: 'cus-1', name: 'Khách lẻ', phone: '0900' }]),
   };
@@ -46,13 +49,32 @@ describe('GetReportFilterOptionsHandler', () => {
     expect((repos.branches.find as jest.Mock).mock.calls[0][0].where.organizationId).toBe('org-1');
   });
 
-  it('cashier: label is "Last First", filtered by org + active', async () => {
+  it('cashier: label is "First Last", filtered by org + active', async () => {
     const { handler, repos } = makeHandler();
     const out = await run(handler, { type: ReportFilterOptionType.CASHIER });
-    expect(out).toEqual([{ value: 'usr-1', label: 'Nguyễn Thu' }]);
+    expect(out).toEqual([
+      { value: 'usr-1', label: 'Thu Nguyễn', metadata: { name: 'Thu Nguyễn' } },
+    ]);
     const where = (repos.users.find as jest.Mock).mock.calls[0][0].where;
     expect(where.organizationId).toBe('org-1');
     expect(where.isActive).toBe(true);
+  });
+
+  it('cashier: label is "{code} - First Last" when an employee profile is linked', async () => {
+    const { handler, repos } = makeHandler({
+      employees: {
+        createQueryBuilder: jest.fn(),
+        find: jest.fn(async () => [{ userId: 'usr-1', code: 'NV000002' }]),
+      },
+    });
+    const out = await run(handler, { type: ReportFilterOptionType.CASHIER });
+    expect(out).toEqual([
+      {
+        value: 'usr-1',
+        label: 'NV000002 - Thu Nguyễn',
+        metadata: { name: 'Thu Nguyễn' },
+      },
+    ]);
   });
 
   it('cashier: search builds an OR over first/last name', async () => {
@@ -62,6 +84,31 @@ describe('GetReportFilterOptionsHandler', () => {
     expect(Array.isArray(where)).toBe(true);
     expect(where).toHaveLength(2);
     expect(where[0].organizationId).toBe('org-1');
+  });
+
+  it('salesperson: label is "{code} - First Last"', async () => {
+    const rows = [
+      { id: 'emp-1', code: 'NV000003', firstName: 'An', lastName: 'Trần' },
+    ];
+    const qb: any = {};
+    for (const m of [
+      'innerJoin', 'where', 'select', 'addSelect', 'andWhere',
+      'orderBy', 'addOrderBy', 'offset', 'limit',
+    ]) {
+      qb[m] = jest.fn(() => qb);
+    }
+    qb.getRawMany = jest.fn(async () => rows);
+    const { handler } = makeHandler({
+      employees: { createQueryBuilder: jest.fn(() => qb), find: jest.fn(async () => []) },
+    });
+    const out = await run(handler, { type: ReportFilterOptionType.SALESPERSON });
+    expect(out).toEqual([
+      {
+        value: 'emp-1',
+        label: 'NV000003 - An Trần',
+        metadata: { name: 'An Trần' },
+      },
+    ]);
   });
 
   it('customer: search matches name or phone', async () => {

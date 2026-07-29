@@ -771,7 +771,7 @@ export function ReceiptVoucherDialog({
             ) : null}
             {linkedInvoiceCodes.length > 0 ? (
               <FormField label="Chứng từ" layout="horizontal" labelWidth="8rem">
-                <div className="flex flex-wrap items-center gap-1.5 line-clamp-1 text-sm text-indigo-500">
+                <div className="flex flex-wrap items-center gap-1.5 line-clamp-1 text-sm text-info">
                   {linkedInvoiceCodes.map((code, index) => (
                     <>
                       <VoucherLink

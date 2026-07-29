@@ -12,13 +12,13 @@ export function ImportStepComplete({ productsCount, itemsCount }: Props) {
       <p className="text-base text-muted-foreground">Nhập khẩu thành công</p>
       <div className="space-y-1 text-center text-base">
         <p>
-          <strong className="text-xl font-semibold text-[#2563eb]">
+          <strong className="text-xl font-semibold text-info">
             {productsCount}
           </strong>{" "}
           mẫu mã
         </p>
         <p>
-          <strong className="text-xl font-semibold text-[#2563eb]">
+          <strong className="text-xl font-semibold text-info">
             {itemsCount}
           </strong>{" "}
           hàng hóa

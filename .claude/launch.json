@@ -12,6 +12,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@erp/backoffice-web", "dev"],
       "port": 3000
+    },
+    {
+      "name": "dev-pos",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@erp/pos-web", "dev"],
+      "port": 3001
     }
   ]
 }

@@ -10,7 +10,7 @@ export function StockTakeImportStepComplete({ importedRows }: Props) {
       <ImportSuccessIllustration />
       <p className="text-base text-muted-foreground">Nhập khẩu thành công</p>
       <p className="text-center text-base">
-        <strong className="text-xl font-semibold text-[#2563eb]">
+        <strong className="text-xl font-semibold text-info">
           {importedRows.toLocaleString("vi-VN")}
         </strong>{" "}
         dòng kiểm kê đã nhập

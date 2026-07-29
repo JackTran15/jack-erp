@@ -717,7 +717,7 @@ export function ArrangeLocationDialog({
           <Button
             variant="default"
             size="sm"
-            className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
+            className="!bg-primary-blue !text-primary-blue-foreground hover:!bg-primary-blue-hover"
             disabled={submitting}
             onClick={() => void handleSave()}
           >

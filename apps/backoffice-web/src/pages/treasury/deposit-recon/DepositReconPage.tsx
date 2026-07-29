@@ -533,7 +533,7 @@ export function DepositReconPage() {
               <PeriodFilter value={period} onChange={setPeriod} onApply={handleApply} />
             </div>
             {list.data?.hasStaleUnreconciled ? (
-              <div className="flex items-center gap-1.5 text-sm text-amber-600">
+              <div className="flex items-center gap-1.5 text-sm text-warning">
                 <AlertTriangle className="h-4 w-4" />
                 Có giao dịch chưa đối chiếu quá hạn trong kỳ đã chọn.
               </div>

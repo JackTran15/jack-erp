@@ -66,7 +66,7 @@ export function ImportStepFileSelect({
           </p>
           <button
             type="button"
-            className="mt-1 text-left text-sm text-[#2563eb] hover:underline"
+            className="mt-1 text-left text-sm text-info hover:underline"
             onClick={() =>
               void downloadInventoryTemplate().catch(() => undefined)
             }

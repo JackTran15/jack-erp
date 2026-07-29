@@ -5,8 +5,8 @@ import {
   IMPORT_WIZARD_STEP_TITLES,
 } from "./types";
 
-const MISA_NAVY = "bg-[#1e3a6e] text-white";
-const MISA_PENDING = "border border-gray-300 bg-white text-gray-500";
+const MISA_NAVY = "bg-primary-blue text-primary-blue-foreground";
+const MISA_PENDING = "border border-input bg-card text-muted-foreground";
 
 const STEP_ORDER: ImportWizardStep[] = [
   ImportWizardStep.FileSelect,
@@ -54,7 +54,7 @@ export function ImportWizardStepper({ currentStep }: Props) {
                 <span
                   className={cn(
                     "flex h-5 w-5 shrink-0 items-center justify-center rounded-full",
-                    isReached ? "bg-white/20" : "bg-gray-100",
+                    isReached ? "bg-primary-blue-foreground/20" : "bg-muted",
                   )}
                   aria-hidden
                 >
@@ -66,7 +66,7 @@ export function ImportWizardStepper({ currentStep }: Props) {
             </div>
             {index < STEP_ORDER.length - 1 ? (
               <div
-                className="w-6 shrink-0 self-center border-t border-gray-300"
+                className="w-6 shrink-0 self-center border-t border-input"
                 aria-hidden
               />
             ) : null}

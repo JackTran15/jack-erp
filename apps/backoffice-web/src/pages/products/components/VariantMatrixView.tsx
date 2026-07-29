@@ -99,7 +99,7 @@ export function VariantMatrixView({ productId }: VariantMatrixViewProps) {
   return (
     <div className="flex flex-col gap-4">
       {error && <p className="text-sm text-destructive">{error}</p>}
-      {successMsg && <p className="text-sm text-green-600">{successMsg}</p>}
+      {successMsg && <p className="text-sm text-success">{successMsg}</p>}
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
@@ -185,17 +185,17 @@ function MatrixTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200">
+    <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
-            <th className="border-b-2 border-r border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-xs font-semibold">
+            <th className="border-b-2 border-r border-border bg-muted/60 px-3 py-2.5 text-left text-xs font-semibold">
               {rowAttr.name} \ {colAttr.name}
             </th>
             {colAttr.options.map((colOpt) => (
               <th
                 key={colOpt.id}
-                className="border-b-2 border-gray-200 bg-gray-50 px-3 py-2.5 text-center text-xs font-semibold"
+                className="border-b-2 border-border bg-muted/60 px-3 py-2.5 text-center text-xs font-semibold"
               >
                 {colOpt.valueLabel}
               </th>
@@ -204,8 +204,8 @@ function MatrixTable({
         </thead>
         <tbody>
           {rowAttr.options.map((rowOpt) => (
-            <tr key={rowOpt.id} className="border-b border-gray-100">
-              <td className="border-r border-gray-200 bg-gray-50/50 px-3 py-2 text-xs font-medium">
+            <tr key={rowOpt.id} className="border-b border-border">
+              <td className="border-r border-border bg-muted/50 px-3 py-2 text-xs font-medium">
                 {rowOpt.valueLabel}
               </td>
               {colAttr.options.map((colOpt) => {
@@ -249,34 +249,34 @@ function FlatTable({
 }) {
   if (variants.length === 0) {
     return (
-      <div className="rounded-lg border border-gray-200 px-4 py-8 text-center text-sm text-muted-foreground">
+      <div className="rounded-lg border border-border px-4 py-8 text-center text-sm text-muted-foreground">
         Chưa có biến thể nào. Hãy thêm thuộc tính rồi bấm "Sinh biến thể".
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200">
+    <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full min-w-[760px] table-fixed border-collapse text-sm">
         <thead>
           <tr>
-            <th className="w-44 border-b-2 border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-xs font-semibold">
+            <th className="w-44 border-b-2 border-border bg-muted/60 px-3 py-2.5 text-left text-xs font-semibold">
               Mã SKU
             </th>
-            <th className="w-[280px] border-b-2 border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-xs font-semibold">
+            <th className="w-[280px] border-b-2 border-border bg-muted/60 px-3 py-2.5 text-left text-xs font-semibold">
               Tên hàng hóa
             </th>
-            <th className="w-40 border-b-2 border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-xs font-semibold">
+            <th className="w-40 border-b-2 border-border bg-muted/60 px-3 py-2.5 text-left text-xs font-semibold">
               Nhãn biến thể
             </th>
-            <th className="w-32 border-b-2 border-gray-200 bg-gray-50 px-3 py-2.5 text-right text-xs font-semibold">
+            <th className="w-32 border-b-2 border-border bg-muted/60 px-3 py-2.5 text-right text-xs font-semibold">
               Tồn kho
             </th>
           </tr>
         </thead>
         <tbody>
           {variants.map((v) => (
-            <tr key={v.id} className="border-b border-gray-100">
+            <tr key={v.id} className="border-b border-border">
               <td className="px-3 py-2 font-mono text-xs break-all">
                 {v.code}
               </td>

@@ -204,19 +204,19 @@ export function ApprovalQueuePage() {
             </div>
             <div className="border-r border-border px-3 py-2">
               <div className="text-xs text-muted-foreground">Chờ duyệt</div>
-              <div className="font-semibold text-amber-700">
+              <div className="font-semibold text-warning">
                 {summary.pending}
               </div>
             </div>
             <div className="border-r border-border px-3 py-2">
               <div className="text-xs text-muted-foreground">Đã duyệt</div>
-              <div className="font-semibold text-green-700">
+              <div className="font-semibold text-success">
                 {summary.approved}
               </div>
             </div>
             <div className="px-3 py-2">
               <div className="text-xs text-muted-foreground">Từ chối</div>
-              <div className="font-semibold text-rose-700">
+              <div className="font-semibold text-destructive">
                 {summary.rejected}
               </div>
             </div>
@@ -311,7 +311,7 @@ export function ApprovalQueuePage() {
                                 size="sm"
                                 disabled={actionLoading === row.id}
                                 onClick={() => handleApprove(row)}
-                                className="bg-green-600 text-white hover:bg-green-700"
+                                className="bg-success text-success-foreground hover:bg-success/85"
                               >
                                 {actionLoading === row.id ? "..." : "Duyệt"}
                               </Button>

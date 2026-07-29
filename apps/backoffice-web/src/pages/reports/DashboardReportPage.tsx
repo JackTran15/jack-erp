@@ -71,13 +71,13 @@ export function DashboardReportPage() {
 
       {data && (
         <div style={styles.cardGrid}>
-          <SummaryCard label="Tổng bán hôm nay" value={fmt(data.totalSalesToday)} color="#1570ef" />
-          <SummaryCard label="Tổng trả hàng hôm nay" value={fmt(data.totalReturnsToday)} color="#d32f2f" />
-          <SummaryCard label="Doanh thu ròng" value={fmt(data.netRevenue)} color="#2e7d32" />
-          <SummaryCard label="Phiên POS đang mở" value={String(data.openPosSessionCount)} color="#6941c6" />
-          <SummaryCard label="Mặt hàng sắp hết" value={String(data.lowStockItemCount)} color="#dc6803" />
-          <SummaryCard label="Công nợ phải thu" value={fmt(data.pendingReceivables)} color="#1570ef" />
-          <SummaryCard label="Công nợ phải trả" value={fmt(data.pendingPayables)} color="#c4320a" />
+          <SummaryCard label="Tổng bán hôm nay" value={fmt(data.totalSalesToday)} color="rgb(var(--primary-blue))" />
+          <SummaryCard label="Tổng trả hàng hôm nay" value={fmt(data.totalReturnsToday)} color="hsl(var(--destructive))" />
+          <SummaryCard label="Doanh thu ròng" value={fmt(data.netRevenue)} color="hsl(var(--success))" />
+          <SummaryCard label="Phiên POS đang mở" value={String(data.openPosSessionCount)} color="hsl(var(--primary))" />
+          <SummaryCard label="Mặt hàng sắp hết" value={String(data.lowStockItemCount)} color="hsl(var(--warning))" />
+          <SummaryCard label="Công nợ phải thu" value={fmt(data.pendingReceivables)} color="rgb(var(--primary-blue))" />
+          <SummaryCard label="Công nợ phải trả" value={fmt(data.pendingPayables)} color="hsl(var(--destructive))" />
         </div>
       )}
 
@@ -137,11 +137,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     fontWeight: 500,
     gap: 4,
-    color: "#344054",
+    color: "hsl(var(--foreground))",
   },
   input: {
     padding: "8px 10px",
-    border: "1px solid #d0d5dd",
+    border: "1px solid hsl(var(--input))",
     borderRadius: 6,
     fontSize: 14,
     outline: "none",
@@ -149,15 +149,15 @@ const styles: Record<string, React.CSSProperties> = {
   },
   btn: {
     padding: "8px 16px",
-    background: "#1570ef",
-    color: "#fff",
+    background: "rgb(var(--primary-blue))",
+    color: "hsl(var(--primary-blue-foreground))",
     border: "none",
     borderRadius: 6,
     fontSize: 14,
     fontWeight: 500,
     cursor: "pointer",
   },
-  muted: { color: "#667085" },
+  muted: { color: "hsl(var(--muted-foreground))" },
   cardGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
@@ -165,15 +165,15 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 16,
   },
   card: {
-    background: "#fff",
-    border: "1px solid #e4e7ec",
+    background: "hsl(var(--card))",
+    border: "1px solid hsl(var(--border))",
     borderRadius: 8,
     padding: "20px 16px",
     display: "flex",
     flexDirection: "column",
     gap: 8,
   },
-  cardLabel: { fontSize: 13, color: "#667085", fontWeight: 500 },
+  cardLabel: { fontSize: 13, color: "hsl(var(--muted-foreground))", fontWeight: 500 },
   cardValue: { fontSize: 28, fontWeight: 700 },
-  generatedAt: { fontSize: 12, color: "#98a2b3", marginTop: 8 },
+  generatedAt: { fontSize: 12, color: "hsl(var(--muted-foreground))", marginTop: 8 },
 };

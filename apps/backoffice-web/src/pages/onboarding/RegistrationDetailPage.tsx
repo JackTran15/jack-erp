@@ -292,7 +292,7 @@ export function RegistrationDetailPage() {
                       type="button"
                       disabled={actionLoading}
                       onClick={handleApprove}
-                      className="bg-green-600 text-white hover:bg-green-700"
+                      className="bg-success text-success-foreground hover:bg-success/85"
                     >
                       {actionLoading ? "Đang duyệt…" : "Duyệt"}
                     </Button>

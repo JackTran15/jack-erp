@@ -118,8 +118,8 @@ export function GoodsReceiptImportStepDataReview({ job, rows }: Props) {
           Tổng số <strong>{job.totalRows}</strong>
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <CheckCircle2 className="h-4 w-4 text-green-600" />
-          Hợp lệ <strong className="text-green-700">{job.validRows}</strong>
+          <CheckCircle2 className="h-4 w-4 text-success" />
+          Hợp lệ <strong className="text-success">{job.validRows}</strong>
         </span>
         {job.errorRows > 0 ? (
           <span>
@@ -127,7 +127,7 @@ export function GoodsReceiptImportStepDataReview({ job, rows }: Props) {
             <strong className="text-destructive">{job.errorRows}</strong> (
             <button
               type="button"
-              className="inline-flex items-center gap-1 text-[#2563eb] hover:underline"
+              className="inline-flex items-center gap-1 text-info hover:underline"
               onClick={() => void handleDownload()}
             >
               {isDownloading ? (

@@ -128,7 +128,7 @@ export function EmployeeContactFormTab({
         Chỗ ở hiện tại
         <button
           type="button"
-          className="text-xs text-indigo-500 hover:underline hover:text-indigo-600 font-normal"
+          className="text-xs text-info hover:underline hover:text-info font-normal"
           onClick={copyPermanentToCurrent}
         >
           (Sao chép từ thông tin hộ khẩu thường trú)

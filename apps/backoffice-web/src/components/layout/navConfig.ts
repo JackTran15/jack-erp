@@ -430,6 +430,7 @@ export const navConfig: NavModule[] = [
             label: "Quản lý vai trò",
             permission: "iam.role.read",
           },
+          { to: "/settings/appearance", label: "Giao diện" },
         ],
       },
     ],

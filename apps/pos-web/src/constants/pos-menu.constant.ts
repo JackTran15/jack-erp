@@ -89,12 +89,17 @@ export const APP_MENU_ITEMS: PosMenuItem[] = [
     label: "Máy in - Mẫu in",
     iconBgColor: "#F59E0B",
     Icon: PrinterIcon,
+    route: "/cai-dat-in",
+    openInNewTab: true,
+    pinnable: true,
   },
   {
     id: "bao-cao-theo-ngay",
     label: "Báo cáo theo ngày",
     iconBgColor: "#22B8CF",
     Icon: BarChartUpIcon,
+    route: "/daily-report",
+    pinnable: true,
   },
   {
     id: "nhat-ky-truy-cap",

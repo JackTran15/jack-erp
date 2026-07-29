@@ -51,7 +51,7 @@ export const MegaMenuPanel = forwardRef<HTMLDivElement, MegaMenuPanelProps>(
         className={cn(
           "fixed top-14 z-[70] h-[calc(100vh-3.5rem)]",
           "w-max min-w-56 overflow-y-auto",
-          "border-l border-gray-700 bg-gray-900 text-white shadow-2xl",
+          "border-l border-sidebar-border bg-sidebar text-sidebar-foreground shadow-2xl",
           "transition-[left] duration-200",
           sidebarCollapsed
             ? "left-[60px] max-w-[calc(100vw-60px)]"
@@ -123,7 +123,7 @@ function SectionColumn({
   return (
     <div className="min-w-0">
       {section.label && (
-        <h3 className="mb-2 rounded px-2 py-1 text-[14px] font-bold uppercase tracking-widest text-gray-400 bg-gray-800">
+        <h3 className="mb-2 rounded px-2 py-1 text-[14px] font-bold uppercase tracking-widest text-sidebar-muted-foreground bg-sidebar-accent">
           {section.label}
         </h3>
       )}
@@ -170,8 +170,8 @@ function MegaMenuLink({ child, badgeCounts, onNavigate }: MegaMenuLinkProps) {
       className={cn(
         "flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-left text-sm transition-colors",
         active
-          ? "bg-blue-600 text-white font-medium"
-          : "text-gray-300 hover:bg-gray-800 hover:text-white",
+          ? "bg-sidebar-active text-sidebar-active-foreground font-medium"
+          : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
       )}
     >
       <span className="whitespace-normal">{child.label}</span>
@@ -190,7 +190,7 @@ function NavItemBadge({
   const count = child.badgeKey ? (badgeCounts[child.badgeKey] ?? 0) : 0;
   if (count <= 0) return null;
   return (
-    <span className="ml-auto rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+    <span className="ml-auto rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive-foreground">
       {count}
     </span>
   );

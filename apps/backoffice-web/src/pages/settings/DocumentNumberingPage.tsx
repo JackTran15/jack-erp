@@ -275,7 +275,7 @@ export function DocumentNumberingPage() {
               variant="link"
               size="sm"
               className={`h-auto px-1 py-0.5 ${
-                row.isActive ? "text-destructive" : "text-green-700"
+                row.isActive ? "text-destructive" : "text-success"
               }`}
               disabled={actionLoadingId === row.id}
               onClick={() => void handleActivateToggle(row)}

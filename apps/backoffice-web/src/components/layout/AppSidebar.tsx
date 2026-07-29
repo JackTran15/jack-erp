@@ -99,7 +99,7 @@ export function AppSidebar() {
       <aside
         ref={asideRef}
         className={cn(
-          "fixed left-0 top-14 flex h-[calc(100vh-3.5rem)] flex-col border-r border-gray-700 bg-gray-900 text-white transition-all duration-200",
+          "fixed left-0 top-14 flex h-[calc(100vh-3.5rem)] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-200",
           sidebarCollapsed ? "w-[60px]" : "w-60",
         )}
       >
@@ -134,7 +134,7 @@ export function AppSidebar() {
 
         <PosLaunchButton collapsed={sidebarCollapsed} />
 
-        <Separator className="bg-gray-700" />
+        <Separator className="bg-sidebar-border" />
 
         <CollapseToggle collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
       </aside>
@@ -168,7 +168,7 @@ function PosLaunchButton({ collapsed }: { collapsed: boolean }) {
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        "mx-2 mb-1 mt-2 flex h-10 items-center rounded-md bg-emerald-600 font-medium text-white transition-colors hover:bg-emerald-500",
+        "mx-2 mb-1 mt-2 flex h-10 items-center rounded-md bg-success font-medium text-success-foreground transition-colors hover:bg-success/85",
         collapsed ? "justify-center" : "gap-2 px-3",
       )}
       aria-label="Bán hàng (mở POS)"
@@ -205,7 +205,7 @@ function CollapseToggle({
         type="button"
         onClick={onToggle}
         className={cn(
-          "flex h-9 w-full items-center rounded-md text-gray-400 transition-colors hover:bg-gray-800 hover:text-white",
+          "flex h-9 w-full items-center rounded-md text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
           collapsed ? "justify-center" : "justify-end gap-1 px-3",
         )}
         aria-label={collapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
@@ -349,15 +349,15 @@ function CollapsedModuleRow({
           className={cn(
             "relative flex h-10 w-full items-center justify-center rounded-md transition-colors",
             isActive
-              ? "bg-gray-600 text-white"
-              : "text-gray-400 hover:bg-gray-800 hover:text-white",
+              ? "bg-sidebar-active text-sidebar-active-foreground"
+              : "text-sidebar-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
           )}
           aria-label={module.label}
           aria-current={isActive ? "page" : undefined}
         >
           <Icon className="h-5 w-5 shrink-0" />
           {badgeCount > 0 && (
-            <span className="absolute right-2 top-1.5 h-2 w-2 rounded-full bg-red-600" />
+            <span className="absolute right-2 top-1.5 h-2 w-2 rounded-full bg-destructive" />
           )}
         </button>
       </TooltipTrigger>
@@ -393,10 +393,10 @@ function FlyoutModuleRow({
       className={cn(
         "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
         isFlyoutOpen
-          ? "bg-gray-600 text-white font-semibold"
+          ? "bg-sidebar-active text-sidebar-active-foreground font-semibold"
           : isActive
-            ? "text-white"
-            : "text-gray-300 hover:bg-gray-800 hover:text-white",
+            ? "text-sidebar-active-foreground"
+            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
       )}
       aria-current={isActive && isFlyoutOpen ? "page" : undefined}
       aria-expanded={isFlyoutOpen}
@@ -406,7 +406,7 @@ function FlyoutModuleRow({
       <CountBadge count={badgeCount} />
       <ChevronRight
         className={cn(
-          "h-3.5 w-3.5 shrink-0 text-gray-500 transition-transform",
+          "h-3.5 w-3.5 shrink-0 text-sidebar-muted-foreground transition-transform",
           isFlyoutOpen && "rotate-90",
         )}
       />
@@ -437,8 +437,8 @@ function DirectNavRow({
         cn(
           "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
           routeActive && !suppressRouteActiveHighlight
-            ? "bg-gray-600 text-white font-semibold"
-            : "text-gray-300 hover:bg-gray-800 hover:text-white",
+            ? "bg-sidebar-active text-sidebar-active-foreground font-semibold"
+            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         )
       }
       aria-label={module.label}
@@ -482,8 +482,8 @@ function AccordionModuleRow({
           className={cn(
             "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
             isActive
-              ? "bg-gray-600 text-white font-semibold"
-              : "text-gray-300 hover:bg-gray-800 hover:text-white",
+              ? "bg-sidebar-active text-sidebar-active-foreground font-semibold"
+              : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
           )}
           aria-expanded={isOpen}
         >
@@ -492,7 +492,7 @@ function AccordionModuleRow({
           <CountBadge count={badgeCount} />
           <ChevronDown
             className={cn(
-              "h-3.5 w-3.5 shrink-0 text-gray-500 transition-transform duration-200",
+              "h-3.5 w-3.5 shrink-0 text-sidebar-muted-foreground transition-transform duration-200",
               isOpen && "rotate-180",
             )}
           />
@@ -530,7 +530,7 @@ function AccordionSection({
   return (
     <div>
       {section.label && (
-        <p className="ml-10 mr-2 mt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+        <p className="ml-10 mr-2 mt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-sidebar-muted-foreground">
           {section.label}
         </p>
       )}
@@ -568,8 +568,8 @@ function AccordionItem({
         cn(
           "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors",
           routeActive && !suppressRouteActiveHighlight
-            ? "bg-blue-600 text-white font-medium"
-            : "text-gray-400 hover:bg-gray-800 hover:text-white",
+            ? "bg-sidebar-active text-sidebar-active-foreground font-medium"
+            : "text-sidebar-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         )
       }
     >
@@ -579,8 +579,8 @@ function AccordionItem({
             className={cn(
               "h-1.5 w-1.5 shrink-0 rounded-full",
               routeActive && !suppressRouteActiveHighlight
-                ? "bg-white"
-                : "bg-gray-600",
+                ? "bg-sidebar-active-foreground"
+                : "bg-sidebar-muted-foreground",
             )}
           />
           <span className="truncate">{child.label}</span>
@@ -613,7 +613,7 @@ function CountBadge({
   return (
     <span
       className={cn(
-        "rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white",
+        "rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive-foreground",
         className,
       )}
     >

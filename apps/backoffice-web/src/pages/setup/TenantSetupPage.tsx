@@ -84,7 +84,7 @@ export function TenantSetupPage() {
           </p>
           <form className="flex max-w-[400px] flex-col gap-3" onSubmit={(e) => void createBranch(e)}>
             {error && <p className="text-sm text-destructive">{error}</p>}
-            {message && <p className="text-sm text-green-700">{message}</p>}
+            {message && <p className="text-sm text-success">{message}</p>}
             <FormField label="Tên chi nhánh">
               <Input
                 value={branchName}

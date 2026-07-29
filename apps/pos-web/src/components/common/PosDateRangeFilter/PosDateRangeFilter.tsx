@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@erp/ui";
 import { PosRadio } from "@erp/pos/components/common/PosRadio/PosRadio";
 import { ChevronDownIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
@@ -8,6 +8,12 @@ import type { PosDateRangeFilterOption } from "@erp/pos/lib/common/dateRangeFilt
 interface PosDateRangeFilterProps {
   value: PosDateRangeFilterOption;
   onChange: (next: PosDateRangeFilterOption) => void;
+  /**
+   * Extra content rendered under the "Khác" option while it is the pending
+   * selection — e.g. the current custom Từ–Đến range, clickable to edit it.
+   * Optional so existing callers (InvoiceListFilterBar) are unaffected.
+   */
+  otherExtra?: ReactNode;
 }
 
 /**
@@ -15,7 +21,11 @@ interface PosDateRangeFilterProps {
  * can preview a choice before committing via "Áp dụng" — matches the
  * existing draft-invoices UX.
  */
-export function PosDateRangeFilter({ value, onChange }: PosDateRangeFilterProps) {
+export function PosDateRangeFilter({
+  value,
+  onChange,
+  otherExtra,
+}: PosDateRangeFilterProps) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<PosDateRangeFilterOption>(value);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -86,23 +96,31 @@ export function PosDateRangeFilter({ value, onChange }: PosDateRangeFilterProps)
           <div className="py-2">
             {DATE_RANGE_FILTER_CHOICES.map((choice) => {
               const selected = choice.value === pending;
+              const showOtherExtra =
+                choice.value === "OTHER" && selected && otherExtra;
               return (
-                <button
-                  key={choice.value}
-                  type="button"
-                  role="option"
-                  aria-selected={selected}
-                  onClick={() => setPending(choice.value)}
-                  className={cn(
-                    "flex w-full items-center gap-3 px-5 py-3 text-left text-[14px] transition-colors",
-                    selected
-                      ? "bg-[#EEEEFB] font-medium text-[#6366F1]"
-                      : "text-[#1F2233] hover:bg-[#F4F5F7]",
-                  )}
-                >
-                  <PosRadio selected={selected} />
-                  {choice.label}
-                </button>
+                <div key={choice.value}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    onClick={() => setPending(choice.value)}
+                    className={cn(
+                      "flex w-full items-center gap-3 px-5 py-3 text-left text-[14px] transition-colors",
+                      selected
+                        ? "bg-[#EEEEFB] font-medium text-[#6366F1]"
+                        : "text-[#1F2233] hover:bg-[#F4F5F7]",
+                    )}
+                  >
+                    <PosRadio selected={selected} />
+                    {choice.label}
+                  </button>
+                  {showOtherExtra ? (
+                    <div className="bg-[#EEEEFB] px-5 pb-3 pl-11">
+                      {otherExtra}
+                    </div>
+                  ) : null}
+                </div>
               );
             })}
           </div>

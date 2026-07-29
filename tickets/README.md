@@ -1828,3 +1828,38 @@ flowchart LR
   T6 --> T8["CTF-08 Test plan"]
   T7 --> T8
 ```
+
+## EPIC-27072026 Báo cáo theo ngày (POS Daily Report — pos-web, 2 tab + endpoint tổng hợp)
+
+- [EPIC-27072026 Báo cáo theo ngày (POS Daily Report)](./epics/EPIC-27072026-pos-daily-report.md)
+- Dựng trang **"Báo cáo theo ngày"** trong **pos-web** (menu `bao-cao-theo-ngay` đã có, chưa có route/page) — báo cáo cuối ngày kiểu KiotViet/MISA, 2 tab: **Tổng hợp** (Thu/Chi/Công nợ, Hàng bán/trả, KHÁC, BÀN GIAO TIỀN) + **Doanh thu theo mặt hàng** (tái dùng report `revenue-by-item`, thêm cột Đơn giá). BE thêm **endpoint mới** `POST /reports/pos/daily-summary` (module con CQRS, gộp Thu incl. Điểm/Chi từ `cash_payments`/Công nợ/Hàng/KHÁC, tính trong JS, tái dùng `report-query.util` + logic `daily-sales-summary`) — **không entity/migration mới**. Filter Thu ngân/NVBH áp cả 2 tab (kể cả Chi/Công nợ, thêm ở PDR-10); custom range from–to qua modal "Chọn thời gian". BÀN GIAO TIỀN + kiểm đếm = FE-only (nhập tay + in), tự động điền "Tiền bàn giao" để Chênh lệch về 0. In client-side (A80), **Xuất server-side `.xlsx`** (`exceljs`, đổi từ client-side `.xls` ở PDR-10 để khớp chính xác file mẫu). TAB 2 In/Xuất tạm hoãn.
+
+| Ticket | Mô tả |
+| ------ | ----- |
+| [TKT-PDR-01](./tickets/TKT-PDR-01-shared-interfaces-daily-summary.md) | shared-interfaces: type `PosDailySummaryResult` (+ sub-shapes) additive |
+| [TKT-PDR-02](./tickets/TKT-PDR-02-revenue-by-item-unit-price.md) | BE: cột `unitPrice` (Đơn giá) cho `revenue-by-item` (weighted avg, totals null) + specs |
+| [TKT-PDR-03](./tickets/TKT-PDR-03-daily-summary-endpoint.md) | BE: `POST /reports/pos/daily-summary` (module + DTO + CQRS query/handler; Thu/Chi/Công nợ/Hàng/KHÁC) |
+| [TKT-PDR-04](./tickets/TKT-PDR-04-openapi-regen.md) | BE: `openapi:generate` + commit snapshot + `schema.ts` |
+| [TKT-PDR-05](./tickets/TKT-PDR-05-fe-data-layer-shell-tab2.md) | FE: data layer + page shell + route `/daily-report` + menu + TAB 2 table (cột Đơn giá, phân trang, dòng tổng) |
+| [TKT-PDR-06](./tickets/TKT-PDR-06-fe-toolbar-filters-custom-range.md) | FE: toolbar + filter Thu ngân/NVBH (cả 2 tab) + wire preset "Khác" + modal "Chọn thời gian" from–to |
+| [TKT-PDR-07](./tickets/TKT-PDR-07-fe-summary-panels-handover.md) | FE: TAB 1 panels (Thu/Chi/Công nợ/Hàng/KHÁC) + BÀN GIAO TIỀN (FE-only) + modal "Chi tiết kiểm đếm" |
+| [TKT-PDR-08](./tickets/TKT-PDR-08-fe-print-export.md) | FE: In + Xuất client-side tài liệu "BÁO CÁO TỔNG HỢP" (chỉ tab Tổng hợp) — phần Xuất bị thay thế bởi PDR-10 |
+| [TKT-PDR-09](./tickets/TKT-PDR-09-tests-e2e-dod.md) | Tests (unit + e2e) + verify FE trên app thật + no-regress + DoD |
+| [TKT-PDR-10](./tickets/TKT-PDR-10-export-be-rewrite-hardening.md) | Xuất → BE-generated `.xlsx` (`exceljs`) + hardening (tên nhân viên, branch scope, cash-refund netting, Chi/Công nợ filter theo staff) |
+
+### Ticket dependency graph (EPIC-27072026 pos-daily-report)
+
+```mermaid
+flowchart LR
+  T1["PDR-01 shared types"] --> T3["PDR-03 daily-summary endpoint"]
+  T2["PDR-02 unitPrice column"] --> T4["PDR-04 openapi regen"]
+  T3 --> T4
+  T4 --> T5["PDR-05 FE data+shell+TAB2"]
+  T2 --> T5
+  T5 --> T6["PDR-06 toolbar+filters+range modal"]
+  T5 --> T7["PDR-07 TAB1 panels+handover"]
+  T6 --> T8["PDR-08 In+Xuất"]
+  T7 --> T8
+  T8 --> T9["PDR-09 Tests+E2E+DoD"]
+  T9 --> T10["PDR-10 Xuất BE rewrite+hardening"]
+```

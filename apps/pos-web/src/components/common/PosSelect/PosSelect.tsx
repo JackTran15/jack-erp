@@ -108,6 +108,14 @@ export interface PosSelectProps<T> {
   trailing?: ReactNode;
   className?: string;
   menuClassName?: string;
+  /**
+   * Widen the menu beyond the trigger's own width (e.g. when the trigger sits
+   * in a narrow grid column but option labels are long). When set wider than
+   * the trigger, the menu's right edge stays pinned to the trigger's right
+   * edge — it grows leftward — so it doesn't overflow the viewport on the
+   * right for triggers positioned near the screen edge.
+   */
+  menuMinWidth?: number;
   triggerClassName?: string;
   /** Forwarded to the underlying trigger button — used by hotkeys/focus. */
   ref?: Ref<HTMLButtonElement>;
@@ -170,6 +178,7 @@ export function PosSelect<T>({
   trailing,
   className,
   menuClassName,
+  menuMinWidth,
   triggerClassName,
   ref,
   size = "md",
@@ -335,11 +344,11 @@ export function PosSelect<T>({
     const updateMenuPosition = () => {
       const rect = rootRef.current?.getBoundingClientRect();
       if (!rect) return;
-      setMenuPosition({
-        top: rect.bottom,
-        left: rect.left,
-        width: rect.width,
-      });
+      const width = Math.max(rect.width, menuMinWidth ?? 0);
+      // Widening beyond the trigger grows leftward from its right edge, so a
+      // narrow trigger near the screen's right edge doesn't overflow.
+      const left = width > rect.width ? rect.right - width : rect.left;
+      setMenuPosition({ top: rect.bottom, left, width });
     };
 
     updateMenuPosition();
@@ -349,7 +358,7 @@ export function PosSelect<T>({
       window.removeEventListener("resize", updateMenuPosition);
       window.removeEventListener("scroll", updateMenuPosition, true);
     };
-  }, [open]);
+  }, [open, menuMinWidth]);
 
   useEffect(() => {
     if (!open) return;

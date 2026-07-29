@@ -125,7 +125,7 @@ export function StockTakeDetailPanel({ stockTake }: Props) {
                           variance == null
                             ? "text-muted-foreground"
                             : variance === 0
-                              ? "text-emerald-600"
+                              ? "text-success"
                               : "text-destructive font-medium"
                         }`}
                       >
@@ -161,7 +161,7 @@ export function StockTakeDetailPanel({ stockTake }: Props) {
                   <td
                     className={`border-t border-r px-3 py-1.5 text-right tabular-nums ${
                       totals.varianceTotal === 0
-                        ? "text-emerald-600"
+                        ? "text-success"
                         : "text-destructive"
                     }`}
                   >

@@ -13,7 +13,7 @@ export function ImportWizardComplete({ stats }: Props) {
       <div className="space-y-1 text-center text-base">
         {stats.map((stat) => (
           <p key={stat.label}>
-            <strong className="text-xl font-semibold text-[#2563eb]">
+            <strong className="text-xl font-semibold text-info">
               {stat.value}
             </strong>{" "}
             {stat.label}

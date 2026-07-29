@@ -317,7 +317,7 @@ export function ColumnConfigDialog({ open, onClose }: Props) {
             <Button
               type="button"
               size="sm"
-              className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
+              className="!bg-primary-blue !text-primary-blue-foreground hover:!bg-primary-blue-hover"
               onClick={handleSave}
             >
               <Save className="mr-1.5 h-4 w-4" />

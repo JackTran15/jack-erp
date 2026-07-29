@@ -9,9 +9,11 @@ import { PosRequireBranch } from "./components/common/PosRequireBranch/PosRequir
 import { PosLayout } from "./components/layout/PosLayout/PosLayout";
 import { BranchSelectPage } from "./pages/BranchSelectPage";
 import { CheckoutPage } from "./pages/CheckoutPage";
+import { DailyReportPage } from "./pages/DailyReportPage";
 import { FastStockTransferPage } from "./pages/FastStockTransferPage";
 import { InvoiceListPage } from "./pages/InvoiceListPage";
 import { PosLoginPage } from "./pages/PosLoginPage";
+import { PrintSettingsPage } from "./pages/PrintSettingsPage";
 import { ReturnGoodsPage } from "./pages/ReturnGoodsPage";
 import { UiCatalogPage } from "./pages/UiCatalogPage";
 
@@ -43,6 +45,10 @@ export function App() {
             <Route path="/ui" element={<UiCatalogPage />} />
             <Route element={<PosRequireAuth />}>
               <Route path="/chon-chi-nhanh" element={<BranchSelectPage />} />
+              {/* Trang công cụ đứng riêng (mở ở tab mới): không bọc PosLayout
+                  vì topbar POS thừa, không bọc PosRequireBranch vì thông số in
+                  là cấu hình theo máy, preview dùng dữ liệu mẫu. */}
+              <Route path="/cai-dat-in" element={<PrintSettingsPage />} />
               <Route element={<PosRequireBranch />}>
                 <Route element={<PosLayout />}>
                   <Route path="/" element={<CheckoutPage />} />
@@ -52,6 +58,7 @@ export function App() {
                   />
                   <Route path="/return-goods" element={<ReturnGoodsPage />} />
                   <Route path="/invoices" element={<InvoiceListPage />} />
+                  <Route path="/daily-report" element={<DailyReportPage />} />
                 </Route>
               </Route>
             </Route>
