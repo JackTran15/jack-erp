@@ -1,9 +1,15 @@
+import { useState } from "react";
+
 import { PrintSettingsActions } from "@erp/pos/components/page-components/PrintSettings/PrintSettingsActions/PrintSettingsActions";
+import { PrintSettingsContentForm } from "@erp/pos/components/page-components/PrintSettings/PrintSettingsContentForm/PrintSettingsContentForm";
 import { PrintSettingsDriverNote } from "@erp/pos/components/page-components/PrintSettings/PrintSettingsDriverNote/PrintSettingsDriverNote";
 import { PrintSettingsForm } from "@erp/pos/components/page-components/PrintSettings/PrintSettingsForm/PrintSettingsForm";
 import { PrintSettingsJson } from "@erp/pos/components/page-components/PrintSettings/PrintSettingsJson/PrintSettingsJson";
 import { PrintSettingsPreview } from "@erp/pos/components/page-components/PrintSettings/PrintSettingsPreview/PrintSettingsPreview";
+import { PrintSettingsTabs } from "@erp/pos/components/page-components/PrintSettings/PrintSettingsTabs/PrintSettingsTabs";
 import { usePrintSettings } from "@erp/pos/hooks/page-hooks/print-settings/use-print-settings";
+import { useSampleInvoice } from "@erp/pos/hooks/page-hooks/print-settings/use-sample-invoice";
+import type { PrintSettingsTab } from "@erp/pos/types/print-settings.type";
 
 /**
  * Trang căn chỉnh thông số in hóa đơn. Mở ở tab riêng từ menu "Máy in - Mẫu in"
@@ -23,6 +29,8 @@ export const PrintSettingsPage = () => {
     copyAsDefaults,
     isDirty,
   } = usePrintSettings();
+  const sample = useSampleInvoice();
+  const [activeTab, setActiveTab] = useState<PrintSettingsTab>("layout");
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -45,11 +53,23 @@ export const PrintSettingsPage = () => {
             onReset={resetSettings}
             onCopyDefaults={() => void copyAsDefaults()}
           />
-          <PrintSettingsForm settings={settings} onChange={setSetting} />
-          <PrintSettingsJson settings={settings} />
+          <PrintSettingsTabs activeTab={activeTab} onChange={setActiveTab} />
+
+          {activeTab === "layout" ? (
+            <>
+              <PrintSettingsForm settings={settings} onChange={setSetting} />
+              <PrintSettingsJson settings={settings} />
+            </>
+          ) : (
+            <PrintSettingsContentForm sample={sample} />
+          )}
         </div>
 
-        <div className="shrink-0 lg:sticky lg:top-6">
+        {/* Bill bật hết thành phần thì cao hơn màn hình. Sticky mà không giới
+            hạn chiều cao sẽ ghim đỉnh bill lại và cắt cụt phần đuôi — phải cuộn
+            hết cột trái mới thấy được. Kẹp chiều cao vào viewport rồi cho khối
+            này tự cuộn: bill dài bao nhiêu cũng xem được tại chỗ. */}
+        <div className="shrink-0 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1">
           <PrintSettingsPreview
             html={previewHtml}
             pageWidth={settings.pageWidth}

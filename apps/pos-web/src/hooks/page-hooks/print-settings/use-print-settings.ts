@@ -4,7 +4,8 @@ import { RECEIPT_LAYOUT_DEFAULTS } from "@erp/pos/constants/print-settings.const
 import type { ReceiptLayoutSettings } from "@erp/pos/interfaces/print-settings.interface";
 import { BrowserWindowInvoicePrinter } from "@erp/pos/lib/page-libs/checkout/printing/BrowserWindowInvoicePrinter";
 import { renderInvoiceHtml } from "@erp/pos/lib/page-libs/checkout/printing/renderInvoiceHtml";
-import { buildSampleInvoicePayload } from "@erp/pos/lib/page-libs/print-settings/sampleInvoicePayload";
+import { buildPayloadFromDraft } from "@erp/pos/lib/page-libs/print-settings/sampleInvoiceDraft";
+import { usePosPrintSampleInvoiceStore } from "@erp/pos/stores/common/print-sample-invoice.store";
 import { usePosPrintSettingsStore } from "@erp/pos/stores/common/print-settings.store";
 
 export interface UsePrintSettingsResult {
@@ -32,12 +33,14 @@ export const usePrintSettings = (): UsePrintSettingsResult => {
   const settings = usePosPrintSettingsStore((s) => s.settings);
   const setSetting = usePosPrintSettingsStore((s) => s.setSetting);
   const resetSettings = usePosPrintSettingsStore((s) => s.resetSettings);
+  // Nội dung hóa đơn mẫu do người dùng chỉnh ở tab "Nội dung hóa đơn".
+  const draft = usePosPrintSampleInvoiceStore((s) => s.draft);
   const [isPrinting, setIsPrinting] = useState(false);
 
   // Preview luôn 1 liên: nhiều liên chỉ lặp lại đúng nội dung đó, xem 1 là đủ.
   const previewHtml = useMemo(
-    () => renderInvoiceHtml(buildSampleInvoicePayload(1), settings),
-    [settings],
+    () => renderInvoiceHtml(buildPayloadFromDraft(draft, 1), settings),
+    [draft, settings],
   );
 
   const isDirty = useMemo(
@@ -56,14 +59,14 @@ export const usePrintSettings = (): UsePrintSettingsResult => {
       // Resolver đóng gói `settings` hiện tại thay vì đọc store: in đúng bộ số
       // đang hiển thị, kể cả khi state chưa kịp ghi xuống localStorage.
       const printer = new BrowserWindowInvoicePrinter(() => settings);
-      await printer.print(buildSampleInvoicePayload(settings.testCopies));
+      await printer.print(buildPayloadFromDraft(draft, settings.testCopies));
     } catch (err) {
       console.error("Lỗi in thử:", err);
       toast.error("Không mở được hộp thoại in.");
     } finally {
       setIsPrinting(false);
     }
-  }, [settings]);
+  }, [draft, settings]);
 
   const copyAsDefaults = useCallback(async () => {
     const snippet = JSON.stringify(settings, null, 2);

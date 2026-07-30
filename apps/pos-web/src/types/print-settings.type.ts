@@ -5,3 +5,6 @@
  *   hơn thực tế làm bill dạt sang phải.
  */
 export type ReceiptHorizontalAlign = "center" | "left";
+
+/** Tab của trang `/cai-dat-in`: thông số bố cục vs nội dung hóa đơn mẫu. */
+export type PrintSettingsTab = "layout" | "content";
