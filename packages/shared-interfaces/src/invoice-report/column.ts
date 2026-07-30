@@ -140,3 +140,36 @@ export const INVOICE_REPORT_COLUMN_DESCS: Record<string, string> = {
   'payment.voucher': '(9)',
   'payment.points': '(10)',
 };
+
+/**
+ * Per-report label overrides for `revenue-by-item` ("Doanh thu theo mặt hàng").
+ *
+ * Three keys mean something narrower in this report than in the three other
+ * invoice reports that share INVOICE_REPORT_COLUMN_LABELS_VI, and those three
+ * must keep their current labels — hence an override rather than an edit.
+ * Resolution order in the report's buildColumns: this map, then the shared map.
+ */
+export const REVENUE_BY_ITEM_COLUMN_LABELS_VI: Record<string, string> = {
+  quantity: 'Số lượng bán',
+  unitPrice: 'Đơn giá TB',
+  'revenue.total': 'Doanh thu',
+};
+
+/**
+ * Formula notation per column, matching the reference MISA export.
+ *
+ * `revenue.total` carries the CORRECT formula `(6)=(3)-(4)-(9)`. The reference
+ * file prints `(4)=(1)-(2)` there, which reuses the number already taken by
+ * `revenue.discount` and does not describe the value it labels — the figures in
+ * that same file are goods − discount − points. Notation is copied; the mistake
+ * is not.
+ */
+export const REVENUE_BY_ITEM_COLUMN_DESCS: Record<string, string> = {
+  quantity: '(1)',
+  unitPrice: '(2)=(3)/(1)',
+  'revenue.goods': '(3)',
+  'revenue.discount': '(4)',
+  'revenue.promoPoints': '(9)',
+  'revenue.promoRate': '(5)=((4)+(9))/(3)',
+  'revenue.total': '(6)=(3)-(4)-(9)',
+};

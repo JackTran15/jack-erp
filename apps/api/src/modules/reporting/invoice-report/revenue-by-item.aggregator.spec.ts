@@ -134,6 +134,57 @@ describe('aggregateByItem', () => {
     expect(byBrand).toMatchObject({ locationCode: null, locationName: null });
     expect(byParent).toMatchObject({ locationCode: null, locationName: null });
   });
+
+  // ADR-03: catalog keeps locationCode/locationName at every grain, so an
+  // aggregate row spanning items at DIFFERENT locations must null the cell
+  // rather than leak the first-seen item's location — a single-row fixture
+  // cannot tell "hardcoded null" apart from "picked the first row's value".
+  it('nulls the location even when the merged rows have different locations (parent grain)', () => {
+    const [g] = aggregateByItem(
+      [
+        row({
+          itemId: 'v1',
+          parentId: 'p1',
+          parentSku: 'MODEL1',
+          parentName: 'Model 1',
+          locationCode: 'A-01',
+          locationName: 'Aisle A',
+        }),
+        row({
+          itemId: 'v2',
+          parentId: 'p1',
+          parentSku: 'MODEL1',
+          parentName: 'Model 1',
+          locationCode: 'B-02',
+          locationName: 'Aisle B',
+        }),
+      ],
+      'parent',
+    );
+    expect(g).toMatchObject({ locationCode: null, locationName: null });
+  });
+
+  it('nulls the location even when the merged rows have different locations (group grain)', () => {
+    const [g] = aggregateByItem(
+      [
+        row({ itemId: 'v1', categoryId: 'cat1', itemCategory: 'C1', locationCode: 'A-01', locationName: 'Aisle A' }),
+        row({ itemId: 'v2', categoryId: 'cat1', itemCategory: 'C1', locationCode: 'B-02', locationName: 'Aisle B' }),
+      ],
+      'group',
+    );
+    expect(g).toMatchObject({ locationCode: null, locationName: null });
+  });
+
+  it('nulls the location even when the merged rows have different locations (brand grain)', () => {
+    const [g] = aggregateByItem(
+      [
+        row({ itemId: 'v1', brand: 'Nike', locationCode: 'A-01', locationName: 'Aisle A' }),
+        row({ itemId: 'v2', brand: 'Nike', locationCode: 'B-02', locationName: 'Aisle B' }),
+      ],
+      'brand',
+    );
+    expect(g).toMatchObject({ locationCode: null, locationName: null });
+  });
 });
 
 describe('itemGroupCellValue', () => {

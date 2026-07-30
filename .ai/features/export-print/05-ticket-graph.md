@@ -2,9 +2,9 @@
 
 # Ticket graph — export-print
 
-- Units of Work: **8**
-- Tickets: **36** (28 done)
-- Total effort: **14.1d**
+- Units of Work: **13**
+- Tickets: **53** (45 done)
+- Total effort: **19.9d**
 - Critical path: **3.4d** across 8 tickets
 - Theoretical minimum duration with unlimited parallelism: **3.4d**
 
@@ -20,6 +20,11 @@
 | UOW-06 | Export đi qua pipeline thay được, trần chặn trước khi nạp | medium | 1.6d | 1.6d | UOW-01 | todo |
 | UOW-07 | Keyset + phân mảnh thời gian cho báo cáo kiểu liệt kê | medium | 2.1d | 1.6d | UOW-06 | todo |
 | UOW-08 | Xuất khẩu chứng từ kho (nhập / xuất / chuyển kho) ra Excel | low | 1.2d | 1.0d | UOW-01, UOW-03 | todo |
+| UOW-09 | File Excel báo cáo theo đúng house style MISA | medium | 1.4d | 1.0d | UOW-01, UOW-06 | todo |
+| UOW-10 | File Excel chứng từ kho theo đúng mẫu MISA (có tiền-bằng-chữ và ô ký) | medium | 2.1d | 1.5d | UOW-08, UOW-09 | todo |
+| UOW-11 | Bản in trùng bố cục với file Excel theo mẫu MISA | low | 6h | 6h | UOW-10 | todo |
+| UOW-12 | Lưới cột chứng từ đúng mẫu — cột ẩn, cột gộp, khối ký từ cột B | low | 1.1d | 7h | UOW-10, UOW-11 | todo |
+| UOW-13 | Tên file tải về là loại chứng từ, và tên do server đặt phải tới được trình duyệt | low | 3h | 3h | UOW-10 | todo |
 
 Effort is total person-hours. Elapsed is the longest dependency chain inside the
 slice — the floor on how fast it can finish no matter how many people work on it.
@@ -80,6 +85,33 @@ graph LR
     T_08_03["✓ T-08-03<br/>Nút Xuất khẩu ở 3 dialog chứng từ kho"]
     T_08_04["T-08-04<br/>Test phân tách org/branch cho route export chứng từ kho"]
   end
+  subgraph UOW_09["UOW-09 · File Excel báo cáo theo đúng house style MISA"]
+    T_09_01["✓ T-09-01<br/>xlsx-style.ts — hằng số và helper trình bày dùng chung"]
+    T_09_02["✓ T-09-02<br/>XlsxStreamWriter đổi sang house style MISA"]
+    T_09_03["✓ T-09-03<br/>Dòng kỳ và dòng tóm tắt bộ lọc cho cả bốn miền báo cáo"]
+    T_09_04["✓ T-09-04<br/>Script đối chiếu byte-level file sinh ra với mẫu MISA"]
+  end
+  subgraph UOW_10["UOW-10 · File Excel chứng từ kho theo đúng mẫu MISA (có tiền-bằng-chữ và ô ký)"]
+    T_10_01["✓ T-10-01<br/>amount-in-words.util.ts — đọc số tiền thành chữ tiếng Việt"]
+    T_10_02["✓ T-10-02<br/>VoucherXlsxWriter — Writer Excel riêng cho chứng từ"]
+    T_10_03["✓ T-10-03<br/>VoucherPrintPayload thêm totalsLabel, siết docDate; adapter thôi gánh chrome"]
+    T_10_04["✓ T-10-04<br/>Ba mapper chứng từ theo đúng tập cột và khối đầu của mẫu"]
+    T_10_05["✓ T-10-05<br/>Dòng 'Cửa hàng xuất/nhận điều chuyển' cho chứng từ sinh từ lệnh điều chuyển"]
+    T_10_06["✓ T-10-06<br/>Ba controller chứng từ chuyển sang VoucherXlsxWriter"]
+  end
+  subgraph UOW_11["UOW-11 · Bản in trùng bố cục với file Excel theo mẫu MISA"]
+    T_11_01["✓ T-11-01<br/>renderVoucherHtml theo đúng bố cục mẫu in"]
+    T_11_02["✓ T-11-02<br/>Bản in bảng báo cáo và định dạng số dùng chung house style"]
+  end
+  subgraph UOW_12["UOW-12 · Lưới cột chứng từ đúng mẫu — cột ẩn, cột gộp, khối ký từ cột B"]
+    T_12_01["✓ T-12-01<br/>DocumentColumn hidden/span; VoucherXlsxWriter dựng lưới vật lý"]
+    T_12_02["✓ T-12-02<br/>Ba mapper thêm cột Giá bán / Thành tiền giá bán (ẩn) và gộp Tên hàng hóa"]
+    T_12_03["✓ T-12-03<br/>Bản in bỏ cột ẩn và tôn trọng cột gộp"]
+  end
+  subgraph UOW_13["UOW-13 · Tên file tải về là loại chứng từ, và tên do server đặt phải tới được trình duyệt"]
+    T_13_01["✓ T-13-01<br/>Mở Content-Disposition qua CORS để tên file của server tới được trình duyệt"]
+    T_13_02["✓ T-13-02<br/>Tên file chứng từ theo loại phiếu, cả ở server lẫn tên dự phòng FE"]
+  end
   T_01_01 --> T_01_02
   T_01_01 --> T_01_03
   T_01_02 --> T_01_04
@@ -130,6 +162,21 @@ graph LR
   T_03_04 --> T_08_03
   T_08_02 --> T_08_04
   T_03_05 --> T_08_04
+  T_09_01 --> T_09_02
+  T_09_02 --> T_09_04
+  T_09_03 --> T_09_04
+  T_09_01 --> T_10_02
+  T_10_03 --> T_10_02
+  T_10_01 --> T_10_04
+  T_10_03 --> T_10_04
+  T_10_04 --> T_10_05
+  T_10_02 --> T_10_06
+  T_10_04 --> T_10_06
+  T_10_05 --> T_10_06
+  T_11_01 --> T_11_02
+  T_12_01 --> T_12_02
+  T_12_01 --> T_12_03
+  T_13_01 --> T_13_02
 ```
 
 ## Execution waves
@@ -138,10 +185,10 @@ Tickets in the same wave have no dependency between them and can run in parallel
 
 | Wave | Tickets | Parallel capacity | Wave duration (longest ticket) |
 |------|---------|-------------------|-------------------------------|
-| W1 | T-01-01, T-02-01, T-04-01, T-06-01 | 4 | 4h |
-| W2 | T-01-02, T-01-03, T-02-03, T-03-01, T-06-02, T-07-01 | 6 | 4h |
-| W3 | T-01-04, T-03-03, T-05-01, T-06-03, T-08-01 | 5 | 4h |
-| W4 | T-01-05, T-01-06, T-06-04 | 3 | 4h |
+| W1 | T-01-01, T-02-01, T-04-01, T-06-01, T-09-01, T-09-03, T-10-01, T-10-03, T-11-01, T-12-01, T-13-01 | 11 | 4h |
+| W2 | T-01-02, T-01-03, T-02-03, T-03-01, T-06-02, T-07-01, T-09-02, T-10-02, T-10-04, T-11-02, T-12-02, T-12-03, T-13-02 | 13 | 4h |
+| W3 | T-01-04, T-03-03, T-05-01, T-06-03, T-08-01, T-09-04, T-10-05 | 7 | 4h |
+| W4 | T-01-05, T-01-06, T-06-04, T-10-06 | 4 | 4h |
 | W5 | T-01-07, T-01-08, T-02-02, T-07-02 | 4 | 3h |
 | W6 | T-02-04, T-03-02, T-07-03, T-07-04 | 4 | 4h |
 | W7 | T-03-04, T-03-05, T-04-02, T-07-05, T-08-02 | 5 | 4h |
@@ -156,10 +203,12 @@ parallel agents will lose one side's work.
 
 | A | B | Contested path |
 |---|---|---|
+| T-01-01 | T-12-01 | `packages/shared-interfaces/src/reporting/document-payload.ts` |
 | T-01-03 | T-06-03 | `apps/api/src/modules/reporting/report-core/report-export.service.spec.ts`, `apps/api/src/modules/reporting/report-core/report-export.service.ts` |
 | T-01-03 | T-06-04 | `apps/api/src/modules/reporting/report-core/report-export.service.spec.ts`, `apps/api/src/modules/reporting/report-core/report-export.service.ts` |
 | T-01-03 | T-07-02 | `apps/api/src/modules/reporting/report-core/report-export.service.spec.ts`, `apps/api/src/modules/reporting/report-core/report-export.service.ts` |
 | T-01-03 | T-07-03 | `apps/api/src/modules/reporting/report-core/report-export.service.ts` |
+| T-01-03 | T-09-03 | `apps/api/src/modules/reporting/report-core/report-export.service.ts` |
 | T-01-04 | T-06-03 | `apps/api/src/common/utils/send-xlsx.util.ts`, `apps/api/src/modules/inventory-reports/inventory-report-v2.controller.ts` |
 | T-01-05 | T-06-03 | `apps/api/src/modules/reporting/debt-report/debt-report.controller.ts`, `apps/api/src/modules/reporting/invoice-report/invoice-report.controller.ts`, `apps/api/src/modules/reporting/profit-report/profit-report.controller.ts` |
 | T-01-08 | T-07-05 | `apps/api/test/e2e/report-export.e2e-spec.ts` |
@@ -167,8 +216,34 @@ parallel agents will lose one side's work.
 | T-02-02 | T-06-04 | `apps/api/src/modules/reporting/report-core/report-export.service.ts` |
 | T-02-02 | T-07-02 | `apps/api/src/modules/reporting/report-core/report-export.service.ts` |
 | T-02-02 | T-07-03 | `apps/api/src/modules/reporting/report-core/report-export.service.ts` |
+| T-02-02 | T-09-03 | `apps/api/src/modules/reporting/report-core/report-export.service.ts` |
+| T-02-03 | T-11-02 | `apps/backoffice-web/src/lib/print/render-report-table-html.ts` |
+| T-03-01 | T-10-03 | `packages/shared-interfaces/src/printing/voucher-payload.ts` |
+| T-03-02 | T-10-04 | `apps/api/src/modules/inventory/goods-issue/goods-issue-print.mapper.spec.ts`, `apps/api/src/modules/inventory/goods-issue/goods-issue-print.mapper.ts`, `apps/api/src/modules/inventory/goods-issue/goods-issue.service.ts`, `apps/api/src/modules/inventory/goods-receipt/goods-receipt-print.mapper.spec.ts`, `apps/api/src/modules/inventory/goods-receipt/goods-receipt-print.mapper.ts`, `apps/api/src/modules/inventory/goods-receipt/goods-receipt.service.ts`, `apps/api/src/modules/inventory/transfer-order/transfer-order-print.mapper.spec.ts`, `apps/api/src/modules/inventory/transfer-order/transfer-order-print.mapper.ts` |
+| T-03-02 | T-10-05 | `apps/api/src/modules/inventory/goods-issue/goods-issue.service.ts`, `apps/api/src/modules/inventory/goods-receipt/goods-receipt.service.ts`, `apps/api/src/modules/inventory/location/services/voucher-print-context.util.ts` |
+| T-03-02 | T-10-06 | `apps/api/src/modules/inventory/goods-issue/goods-issue.controller.ts`, `apps/api/src/modules/inventory/goods-receipt/goods-receipt.controller.ts`, `apps/api/src/modules/inventory/transfer-order/transfer-order.controller.ts` |
+| T-03-02 | T-12-02 | `apps/api/src/modules/inventory/goods-issue/goods-issue-print.mapper.spec.ts`, `apps/api/src/modules/inventory/goods-issue/goods-issue-print.mapper.ts`, `apps/api/src/modules/inventory/goods-receipt/goods-receipt-print.mapper.spec.ts`, `apps/api/src/modules/inventory/goods-receipt/goods-receipt-print.mapper.ts`, `apps/api/src/modules/inventory/transfer-order/transfer-order-print.mapper.spec.ts`, `apps/api/src/modules/inventory/transfer-order/transfer-order-print.mapper.ts` |
+| T-03-02 | T-13-02 | `apps/api/src/modules/inventory/goods-issue/goods-issue.controller.ts`, `apps/api/src/modules/inventory/goods-receipt/goods-receipt.controller.ts`, `apps/api/src/modules/inventory/transfer-order/transfer-order.controller.ts` |
+| T-03-03 | T-11-01 | `apps/backoffice-web/src/lib/print/render-voucher-html.test.ts`, `apps/backoffice-web/src/lib/print/render-voucher-html.ts` |
+| T-03-03 | T-11-02 | `apps/backoffice-web/src/lib/print/print-format.util.ts` |
+| T-03-03 | T-12-03 | `apps/backoffice-web/src/lib/print/render-voucher-html.test.ts`, `apps/backoffice-web/src/lib/print/render-voucher-html.ts` |
+| T-04-01 | T-10-01 | `apps/api/src/common/utils/amount-in-words.util.spec.ts`, `apps/api/src/common/utils/amount-in-words.util.ts` |
 | T-04-02 | T-08-02 | `packages/api-client/openapi.snapshot.json`, `packages/api-client/src/generated/schema.ts` |
 | T-05-02 | T-08-02 | `packages/api-client/openapi.snapshot.json`, `packages/api-client/src/generated/schema.ts` |
+| T-06-02 | T-09-02 | `apps/api/src/modules/reporting/report-core/export/xlsx-stream.writer.spec.ts`, `apps/api/src/modules/reporting/report-core/export/xlsx-stream.writer.ts` |
+| T-06-02 | T-09-04 | `apps/api/src/modules/reporting/report-core/export/xlsx-stream.writer.spec.ts` |
+| T-06-03 | T-09-03 | `apps/api/src/modules/inventory-reports/queries/get-inventory-report-document.handler.ts`, `apps/api/src/modules/reporting/debt-report/queries/get-debt-report-document.handler.ts`, `apps/api/src/modules/reporting/invoice-report/queries/get-invoice-report-document.handler.ts`, `apps/api/src/modules/reporting/profit-report/queries/get-profit-report-document.handler.ts`, `apps/api/src/modules/reporting/report-core/report-export.service.ts` |
+| T-06-04 | T-09-03 | `apps/api/src/modules/reporting/report-core/report-export.service.ts` |
+| T-07-02 | T-09-03 | `apps/api/src/modules/reporting/report-core/report-export.service.ts` |
+| T-07-03 | T-09-03 | `apps/api/src/modules/reporting/report-core/report-export.service.ts` |
+| T-08-01 | T-10-03 | `apps/api/src/modules/reporting/report-core/export/voucher-export.adapter.spec.ts`, `apps/api/src/modules/reporting/report-core/export/voucher-export.adapter.ts` |
+| T-08-02 | T-10-06 | `apps/api/src/modules/inventory/goods-issue/goods-issue.controller.ts`, `apps/api/src/modules/inventory/goods-receipt/goods-receipt.controller.ts`, `apps/api/src/modules/inventory/transfer-order/transfer-order.controller.ts` |
+| T-08-02 | T-13-02 | `apps/api/src/modules/inventory/goods-issue/goods-issue.controller.ts`, `apps/api/src/modules/inventory/goods-receipt/goods-receipt.controller.ts`, `apps/api/src/modules/inventory/transfer-order/transfer-order.controller.ts` |
+| T-08-03 | T-13-02 | `apps/backoffice-web/src/lib/print/voucher-export.api.ts` |
+| T-10-02 | T-12-01 | `apps/api/src/modules/reporting/report-core/export/voucher-xlsx.writer.spec.ts`, `apps/api/src/modules/reporting/report-core/export/voucher-xlsx.writer.ts` |
+| T-10-04 | T-12-02 | `apps/api/src/modules/inventory/goods-issue/goods-issue-print.mapper.spec.ts`, `apps/api/src/modules/inventory/goods-issue/goods-issue-print.mapper.ts`, `apps/api/src/modules/inventory/goods-receipt/goods-receipt-print.mapper.spec.ts`, `apps/api/src/modules/inventory/goods-receipt/goods-receipt-print.mapper.ts`, `apps/api/src/modules/inventory/transfer-order/transfer-order-print.mapper.spec.ts`, `apps/api/src/modules/inventory/transfer-order/transfer-order-print.mapper.ts` |
+| T-10-06 | T-13-02 | `apps/api/src/modules/inventory/goods-issue/goods-issue.controller.ts`, `apps/api/src/modules/inventory/goods-receipt/goods-receipt.controller.ts`, `apps/api/src/modules/inventory/transfer-order/transfer-order.controller.ts` |
+| T-11-01 | T-12-03 | `apps/backoffice-web/src/lib/print/render-voucher-html.test.ts`, `apps/backoffice-web/src/lib/print/render-voucher-html.ts` |
 
 ## Critical path
 
@@ -217,3 +292,20 @@ adding people to tickets off this path will not make the feature ship sooner.
 | T-08-02 | UOW-08 | api | feature | 3h | T-08-01, T-03-02 | AC-23, AC-24, AC-25 | done |
 | T-08-03 | UOW-08 | web | feature | 3h | T-08-02, T-03-04 | AC-23, AC-24 | done |
 | T-08-04 | UOW-08 | test | test | 2h | T-08-02, T-03-05 | AC-25 | todo |
+| T-09-01 | UOW-09 | shared | feature | 2h | — | AC-26 | done |
+| T-09-02 | UOW-09 | infra | feature | 4h | T-09-01 | AC-26 | done |
+| T-09-03 | UOW-09 | application | feature | 3h | — | AC-33 | done |
+| T-09-04 | UOW-09 | test | test | 2h | T-09-02, T-09-03 | AC-26, AC-33 | done |
+| T-10-01 | UOW-10 | shared | feature | 3h | — | AC-31 | done |
+| T-10-02 | UOW-10 | infra | feature | 4h | T-09-01, T-10-03 | AC-27, AC-28 | done |
+| T-10-03 | UOW-10 | shared | refactor | 1h | — | AC-28 | done |
+| T-10-04 | UOW-10 | application | feature | 4h | T-10-01, T-10-03 | AC-28, AC-29 | done |
+| T-10-05 | UOW-10 | service | feature | 3h | T-10-04 | AC-32 | done |
+| T-10-06 | UOW-10 | api | feature | 2h | T-10-02, T-10-04, T-10-05 | AC-27, AC-29 | done |
+| T-11-01 | UOW-11 | web | feature | 4h | — | AC-30 | done |
+| T-11-02 | UOW-11 | web | feature | 2h | T-11-01 | AC-30 | done |
+| T-12-01 | UOW-12 | infra | feature | 4h | — | AC-34 | done |
+| T-12-02 | UOW-12 | application | feature | 3h | T-12-01 | AC-34 | done |
+| T-12-03 | UOW-12 | web | feature | 2h | T-12-01 | AC-34 | done |
+| T-13-01 | UOW-13 | api | chore | 1h | — | AC-35 | done |
+| T-13-02 | UOW-13 | api | feature | 2h | T-13-01 | AC-35 | done |

@@ -55,4 +55,50 @@ describe("renderReportTableHtml", () => {
     const html = renderReportTableHtml(payload({ totals: null }));
     expect(html).not.toContain('class="totals"');
   });
+
+  describe("column formula notation (desc)", () => {
+    it("renders the formula in a separate span under the label", () => {
+      const html = renderReportTableHtml(
+        payload({
+          columns: [
+            { col: "date", label: "Ngày", type: ReportColumnDataType.STRING },
+            {
+              col: "unitPrice",
+              label: "Đơn giá TB",
+              type: ReportColumnDataType.CURRENCY,
+              desc: "(2)=(3)/(1)",
+            },
+          ],
+        }),
+      );
+
+      expect(html).toContain(
+        '<th>Đơn giá TB<span class="formula">(2)=(3)/(1)</span></th>',
+      );
+    });
+
+    it("omits the formula span for a column with no desc", () => {
+      const html = renderReportTableHtml(payload());
+      expect(html).toContain("<th>Ngày</th>");
+      expect(html).not.toContain('class="formula"');
+    });
+
+    it("escapes the formula text like any other value", () => {
+      const html = renderReportTableHtml(
+        payload({
+          columns: [
+            {
+              col: "x",
+              label: "X",
+              type: ReportColumnDataType.STRING,
+              desc: "<b>(1)</b>",
+            },
+          ],
+        }),
+      );
+
+      expect(html).toContain("&lt;b&gt;(1)&lt;/b&gt;");
+      expect(html).not.toContain("<b>(1)</b>");
+    });
+  });
 });

@@ -29,5 +29,15 @@
 | AC-20 | T-07-01, T-07-05 | UOW-07 | done |
 | AC-21 | T-05-01 | UOW-05 | open |
 | AC-22 | T-07-01 | UOW-07 | done |
+| AC-26 | T-09-01, T-09-02, T-09-04 | UOW-09 | done |
+| AC-27 | T-10-02, T-10-06 | UOW-10 | done |
+| AC-28 | T-10-02, T-10-03, T-10-04 | UOW-10 | done |
+| AC-29 | T-10-04, T-10-06 | UOW-10 | done |
+| AC-30 | T-11-01, T-11-02 | UOW-11 | done |
+| AC-31 | T-10-01 | UOW-10 | done |
+| AC-32 | T-10-05 | UOW-10 | done |
+| AC-33 | T-09-03, T-09-04 | UOW-09 | done |
+| AC-34 | T-12-01, T-12-02, T-12-03 | UOW-12 | done |
+| AC-35 | T-13-01, T-13-02 | UOW-13 | done |
 
-Coverage: **25/25** acceptance criteria.
+Coverage: **35/35** acceptance criteria.

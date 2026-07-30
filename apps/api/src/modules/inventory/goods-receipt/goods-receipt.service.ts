@@ -54,7 +54,7 @@ import {
   attachPurchasingEmployees,
 } from "../location/services/counterparty-name.util";
 import {
-  loadStorageNames,
+  loadTransferCounterpartStoreName,
   loadVoucherBranch,
 } from "../location/services/voucher-print-context.util";
 import { mapGoodsReceiptToVoucherPayload } from "./goods-receipt-print.mapper";
@@ -619,14 +619,16 @@ export class GoodsReceiptService {
     actor: ActorContext,
   ): Promise<VoucherPrintPayload> {
     const receipt = await this.getById(id, actor);
-    const [branch, storageNameByStorageId] = await Promise.all([
+    const [branch, transferSourceStoreName] = await Promise.all([
       loadVoucherBranch(this.receiptRepo.manager, receipt.branchId, actor.organizationId),
-      loadStorageNames(
+      loadTransferCounterpartStoreName(
         this.receiptRepo.manager,
-        receipt.lines.map((line) => line.location?.storageId),
+        "receipt",
+        receipt.id,
+        actor.organizationId,
       ),
     ]);
-    return mapGoodsReceiptToVoucherPayload(receipt, branch, storageNameByStorageId);
+    return mapGoodsReceiptToVoucherPayload(receipt, branch, transferSourceStoreName);
   }
 
   /** Validate a purchasing-employee reference (users.id) belongs to the org. */

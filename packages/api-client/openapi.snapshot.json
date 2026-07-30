@@ -16954,6 +16954,63 @@
         ]
       }
     },
+    "/reports/invoices/export": {
+      "post": {
+        "operationId": "InvoiceReportController_export",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoiceReportExportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Export one invoice report as an .xlsx workbook",
+        "tags": [
+          "reports/invoices"
+        ]
+      }
+    },
+    "/reports/invoices/print-payload": {
+      "post": {
+        "operationId": "InvoiceReportController_printPayload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoiceReportExportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Print-ready payload for one invoice report",
+        "tags": [
+          "reports/invoices"
+        ]
+      }
+    },
     "/reports/pos/daily-summary": {
       "post": {
         "operationId": "PosDailyReportController_dailySummary",
@@ -35832,6 +35889,48 @@
             "minimum": 0
           }
         }
+      },
+      "InvoiceReportExportDto": {
+        "type": "object",
+        "properties": {
+          "reportType": {
+            "type": "string",
+            "description": "Which backend report definition to run."
+          },
+          "columns": {
+            "description": "Selected column keys (fixed registry keys + dynamic `payment.method.<coaAccountId>`).",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "$ref": "#/components/schemas/InvoiceReportFilterDto"
+          },
+          "columnFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFilterDto"
+            }
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "columnLabels": {
+            "type": "object",
+            "description": "Per-column display names the user renamed, keyed by column key. Columns left out keep their catalog label.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "reportType",
+          "columns",
+          "filters"
+        ]
       },
       "PosDailySummaryDto": {
         "type": "object",

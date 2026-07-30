@@ -4,6 +4,8 @@ import {
 } from '@erp/shared-interfaces';
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import {
+  dateRangeSubtitle,
+  filterSummarySubtitle,
   PreparedExport,
   ReportExportService,
 } from '../../reporting/report-core/report-export.service';
@@ -24,30 +26,31 @@ const PRESET_LABELS_VI: Record<string, string> = {
 };
 
 /**
- * Context lines under the document title. Only states what the user actually
- * filtered on — an absent filter contributes no line, so the header does not
- * claim a scope that was never applied.
+ * The two context lines under the document title: the period, then one line
+ * naming the active filters. Only states what the user actually filtered on —
+ * an absent filter contributes nothing, so the header does not claim a scope
+ * that was never applied.
  */
 export function buildSubtitleLines(
   filters: InventoryReportFilterDto | undefined,
 ): string[] {
   if (!filters) return [];
-  const lines: string[] = [];
 
-  const from = filters.period?.from;
-  const to = filters.period?.to;
-  if (from || to) {
-    lines.push(`Từ ngày: ${from ?? '—'}; Đến ngày: ${to ?? '—'}`);
-  } else if (filters.preset) {
-    lines.push(`Kỳ báo cáo: ${PRESET_LABELS_VI[filters.preset] ?? filters.preset}`);
-  }
+  const period = filters.period?.from || filters.period?.to
+    ? dateRangeSubtitle(filters.period)
+    : filters.preset
+      ? [`Kỳ báo cáo: ${PRESET_LABELS_VI[filters.preset] ?? filters.preset}`]
+      : [];
 
-  if (filters.warehouseIds?.length) {
-    lines.push(`Kho: ${filters.warehouseIds.length} kho được chọn`);
-  }
-  if (filters.search) lines.push(`Tìm kiếm: ${filters.search}`);
-
-  return lines;
+  return [
+    ...period,
+    ...filterSummarySubtitle([
+      filters.warehouseIds?.length
+        ? `Kho: ${filters.warehouseIds.length} kho được chọn`
+        : null,
+      filters.search ? `Tìm kiếm: ${filters.search}` : null,
+    ]),
+  ];
 }
 
 @QueryHandler(GetInventoryReportDocumentQuery)

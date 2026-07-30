@@ -5,63 +5,118 @@ import {
   VoucherKind,
   VoucherPrintPayload,
 } from '@erp/shared-interfaces';
+import { amountInWordsVi } from '../../../common/utils/amount-in-words.util';
+import { toLongVietnameseDate } from '../../../common/utils/document-date.util';
 import { GoodsIssueEntity } from './goods-issue.entity';
 
+/**
+ * Columns as the reference voucher prints them
+ * (`examples/ERP/export_Xuat_Khau_Xuat_Kho.xlsx`) — same shape as the goods
+ * receipt, with the full "Số lượng" label the reference uses on an issue.
+ *
+ * Unit comes off the item: unlike `GoodsReceiptLineEntity`, a goods issue line
+ * has no `uomCode` of its own.
+ */
 const LINE_COLUMNS = [
+  { col: 'stt', label: 'STT', type: ReportColumnDataType.NUMBER, align: 'center' as const },
   { col: 'sku', label: 'Mã SKU', type: ReportColumnDataType.STRING },
-  { col: 'name', label: 'Tên hàng hóa', type: ReportColumnDataType.STRING },
-  { col: 'warehouse', label: 'Kho', type: ReportColumnDataType.STRING },
+  { col: 'name', label: 'Tên hàng hóa', type: ReportColumnDataType.STRING, span: 4 },
+  { col: 'uom', label: 'ĐVT', type: ReportColumnDataType.STRING },
   { col: 'position', label: 'Vị trí', type: ReportColumnDataType.STRING },
   { col: 'quantity', label: 'Số lượng', type: ReportColumnDataType.NUMBER },
   { col: 'unitPrice', label: 'Đơn giá', type: ReportColumnDataType.CURRENCY },
   { col: 'lineTotal', label: 'Thành tiền', type: ReportColumnDataType.CURRENCY },
+  { col: 'salePrice', label: 'Giá bán', type: ReportColumnDataType.CURRENCY, hidden: true },
+  {
+    col: 'saleTotal',
+    label: 'Thành tiền giá bán',
+    type: ReportColumnDataType.CURRENCY,
+    hidden: true,
+  },
+  { col: 'note', label: 'Ghi chú', type: ReportColumnDataType.STRING },
+];
+
+const SIGNATURES = [
+  'Người lập phiếu',
+  'Người nhận hàng',
+  'Thủ kho',
+  'Kế toán trưởng',
+  'Giám đốc',
 ];
 
 /**
  * Maps a `GoodsIssueEntity` (as returned by `GoodsIssueService.getById`) into a
- * `VoucherPrintPayload` (ADR-05, ADR-09). Pure — the caller resolves `branch` and
- * warehouse names before calling this, same contract as `mapGoodsReceiptToVoucherPayload`.
+ * `VoucherPrintPayload` (ADR-05, ADR-10). Pure — the caller resolves `branch` and,
+ * when the issue is the outbound leg of a transfer, the destination store name,
+ * before calling this. Same contract as `mapGoodsReceiptToVoucherPayload`.
  */
 export function mapGoodsIssueToVoucherPayload(
   issue: GoodsIssueEntity,
   branch: DocumentBranchInfo | null,
-  storageNameByStorageId: Map<string, string>,
+  transferDestinationStoreName?: string | null,
 ): VoucherPrintPayload {
-  const lines: ReportRow[] = issue.lines.map((line) => ({
-    sku: line.item?.code ?? null,
-    name: line.item?.name ?? null,
-    warehouse: storageNameByStorageId.get(line.location?.storageId ?? '') ?? null,
-    position: line.location?.name ?? null,
-    quantity: Number(line.quantity),
-    unitPrice: Number(line.unitPrice),
-    lineTotal: Number(line.lineTotal),
-  }));
+  const lines: ReportRow[] = issue.lines.map((line, index) => {
+    const quantity = Number(line.quantity);
+    const salePrice = Number(line.item?.sellingPrice ?? 0);
+    return {
+      stt: index + 1,
+      sku: line.item?.code ?? null,
+      name: line.item?.name ?? null,
+      uom: line.item?.unit ?? null,
+      position: line.location?.name ?? null,
+      quantity,
+      unitPrice: Number(line.unitPrice),
+      lineTotal: Number(line.lineTotal),
+      salePrice,
+      saleTotal: salePrice * quantity,
+      note: line.notes ?? null,
+    };
+  });
+
+  const sum = (key: string): number =>
+    lines.reduce((acc, l) => acc + (l[key] as number), 0);
+  const totalAmount = sum('lineTotal');
 
   const totals: ReportRow = {
+    stt: null,
     sku: null,
     name: null,
-    warehouse: null,
+    uom: null,
     position: null,
-    quantity: lines.reduce((sum, l) => sum + (l.quantity as number), 0),
+    quantity: sum('quantity'),
     unitPrice: null,
-    lineTotal: lines.reduce((sum, l) => sum + (l.lineTotal as number), 0),
+    lineTotal: totalAmount,
+    salePrice: null,
+    saleTotal: sum('saleTotal'),
+    note: null,
   };
+
+  const info = [
+    { label: 'Đối tượng', value: issue.counterparty?.name ?? '—' },
+    { label: 'Người giao', value: issue.deliverer ?? '—' },
+    { label: 'Diễn giải', value: issue.reason ?? issue.notes ?? '—' },
+  ];
+  if (transferDestinationStoreName) {
+    info.push({
+      label: 'Cửa hàng nhận điều chuyển',
+      value: transferDestinationStoreName,
+    });
+  }
 
   return {
     kind: VoucherKind.GOODS_ISSUE,
     paper: 'A4',
     title: 'PHIẾU XUẤT KHO',
     docNo: issue.documentNumber ?? '',
-    docDate: (issue.occurredAt ?? issue.createdAt).toLocaleDateString('vi-VN'),
+    docDate: toLongVietnameseDate(issue.occurredAt ?? issue.createdAt),
     branch,
-    info: [
-      { label: 'Đối tượng', value: issue.counterparty?.name ?? '—' },
-      { label: 'Người giao', value: issue.deliverer ?? '—' },
-      { label: 'Diễn giải', value: issue.reason ?? issue.notes ?? '—' },
-    ],
+    info,
     lineColumns: LINE_COLUMNS,
     lines,
     totals: lines.length ? totals : null,
-    signatures: ['Người giao hàng', 'Người nhận hàng', 'Thủ kho'],
+    // The reference issue voucher says "Cộng" where the receipt says "Tổng".
+    totalsLabel: 'Cộng',
+    amountInWords: lines.length ? amountInWordsVi(totalAmount) : undefined,
+    signatures: SIGNATURES,
   };
 }

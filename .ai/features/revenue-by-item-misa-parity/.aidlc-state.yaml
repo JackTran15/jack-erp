@@ -1,0 +1,248 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: revenue-by-item-misa-parity
+slug: revenue-by-item-misa-parity
+profile: none
+created: 2026-07-30T20:29:52
+current_gate: G5
+history:
+  - gate: G0
+    action: passed
+    at: 2026-07-30T20:57:46
+    by: Akenzy
+    evidence: architecture map verified by Akenzy      # signed 2026-07-27 after reviewing the Verified detail section; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-07-30T20:57:46
+    by: Akenzy
+    evidence: 15 assumptions, none blocking-and-pending; 18 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-07-30T20:57:46
+    by: Akenzy
+    evidence: 5 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-07-30T20:57:46
+    by: Akenzy
+    evidence: graph valid - 5 UoW, 14 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T20:57:51
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T20:58:54
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T20:59:45
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-30T20:59:45
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T21:02:13
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-30T21:02:13
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T21:02:13
+    by: Akenzy
+    ticket: T-03-01
+  - gate: G2
+    action: reopened
+    at: 2026-07-30T21:06:49
+    by: Akenzy
+    reason: AC-17/T-03-01 based on a mistraced bug - productTemplate value belongs to STATISTIC_GROUP_BY_ITEM_OR_TEMPLATE (supplier-debts-detail report), not revenue-by-item statBy which already uses correct item/parent/group. Dropping T-03-01, keeping T-03-02 (GROUP_BY_LABELS_VI inversion, still real).
+  - gate: G2
+    action: passed
+    at: 2026-07-30T21:11:43
+    by: Akenzy
+    evidence: 5 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-07-30T21:11:43
+    by: Akenzy
+    evidence: graph valid - 5 UoW, 13 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T21:12:01
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T21:15:56
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-30T21:15:56
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T21:16:16
+    by: Akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T21:19:21
+    by: Akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-30T21:19:21
+    by: Akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T21:19:29
+    by: Akenzy
+    ticket: T-01-04
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T21:21:29
+    by: Akenzy
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-30T21:21:29
+    by: Akenzy
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T21:21:38
+    by: Akenzy
+    ticket: T-01-05
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T21:23:29
+    by: Akenzy
+    ticket: T-01-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-30T21:23:29
+    by: Akenzy
+    ticket: T-01-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T21:23:40
+    by: Akenzy
+    ticket: T-03-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T21:25:59
+    by: Akenzy
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-30T21:25:59
+    by: Akenzy
+    ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T21:26:40
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T21:29:49
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-30T21:29:49
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T21:29:59
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T21:31:30
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-30T21:31:30
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T21:31:40
+    by: Akenzy
+    ticket: T-04-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T21:36:44
+    by: Akenzy
+    ticket: T-04-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-30T21:36:44
+    by: Akenzy
+    ticket: T-04-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T21:36:53
+    by: Akenzy
+    ticket: T-04-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T21:39:40
+    by: Akenzy
+    ticket: T-04-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-30T21:39:40
+    by: Akenzy
+    ticket: T-04-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T21:39:50
+    by: Akenzy
+    ticket: T-05-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T21:44:32
+    by: Akenzy
+    ticket: T-05-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-30T21:44:32
+    by: Akenzy
+    ticket: T-05-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T21:52:39
+    by: Akenzy
+    ticket: T-05-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-07-30T21:52:39
+    by: Akenzy
+    ticket: T-05-02
+  - gate: G4
+    action: passed
+    at: 2026-07-30T21:54:23
+    by: Akenzy
+    evidence: all 13 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-07-30T21:56:54
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

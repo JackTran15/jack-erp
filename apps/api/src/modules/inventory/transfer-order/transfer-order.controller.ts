@@ -42,7 +42,7 @@ import { BranchScopeGuard } from "../../rbac/branch-scope.guard";
 import { PaginationQueryDto } from "../../crud/dto";
 import { ExportPipeline } from "../../reporting/report-core/export/export-pipeline";
 import { HttpResponseSink } from "../../reporting/report-core/export/http-response.sink";
-import { XlsxStreamWriter } from "../../reporting/report-core/export/xlsx-stream.writer";
+import { VoucherXlsxWriter } from "../../reporting/report-core/export/voucher-xlsx.writer";
 import { StaticRowsFetcher } from "../../reporting/report-core/export/static-rows.fetcher";
 import { voucherToReportDocument } from "../../reporting/report-core/export/voucher-export.adapter";
 import { TransferOrderService } from "./transfer-order.service";
@@ -427,8 +427,8 @@ export class TransferOrderController {
     const doc = voucherToReportDocument(payload);
     await new ExportPipeline(
       new StaticRowsFetcher(doc.rows, doc.totals),
-      new XlsxStreamWriter(payload.docNo),
-      new HttpResponseSink(res, payload.docNo),
+      new VoucherXlsxWriter(payload),
+      new HttpResponseSink(res, payload.title),
     ).run(doc.header, doc.columns);
   }
 

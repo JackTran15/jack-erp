@@ -1,14 +1,67 @@
-import { VoucherPrintPayload } from "@erp/shared-interfaces";
-import { escapeHtml, renderTableRow } from "./print-format.util";
+import { DocumentColumn, ReportRow, VoucherPrintPayload } from "@erp/shared-interfaces";
+import { alignOf, escapeHtml, formatCell, isNumberColumn } from "./print-format.util";
 
 /**
  * Renders a `VoucherPrintPayload` into a self-contained HTML document for
  * `printHtmlDocument` (T-02-01). One skeleton for all 7 voucher kinds
- * (ADR-05): header → title → doc no/date → info block → line table → totals
- * → amount-in-words → signatures. What differs between kinds lives in the
- * payload (labels, columns), never as a branch here — a `kind` switch that
- * changes layout would mean the design failed.
+ * (ADR-05): header → title → date → number → info block → line table → totals
+ * → amount-in-words → signing date → signatures. What differs between kinds
+ * lives in the payload (labels, columns), never as a branch here — a `kind`
+ * switch that changes layout would mean the design failed.
+ *
+ * The layout mirrors the reference printouts in `examples/ERP/in_phieu_*.pdf`,
+ * which are the same document as the exported workbook minus the columns the
+ * spreadsheet hides. That is ADR-01 working: one payload, two renderers, no
+ * drift — so a change here usually needs the matching change in
+ * `VoucherXlsxWriter`.
  */
+
+const SIGNATURE_DATE_LINE = "Ngày.......tháng.......năm............";
+const SIGNATURE_HINT = "(Ký, họ tên)";
+const DEFAULT_TOTALS_LABEL = "Tổng";
+
+/** Grid columns a column occupies — the same `span` the workbook merges across. */
+function spanOf(column: DocumentColumn): number {
+  return Math.max(1, column.span ?? 1);
+}
+
+/**
+ * How many leading grid columns the totals label spans: everything up to the
+ * first figure, so no total is ever hidden underneath it.
+ */
+function labelSpan(columns: DocumentColumn[]): number {
+  const firstNumber = columns.findIndex(isNumberColumn);
+  if (firstNumber <= 0) return 1;
+  return columns
+    .slice(0, firstNumber)
+    .reduce((total, column) => total + spanOf(column), 0);
+}
+
+function renderCell(column: DocumentColumn, value: ReportRow[string]): string {
+  const span = spanOf(column);
+  const colspan = span > 1 ? ` colspan="${span}"` : "";
+  return `<td${colspan} class="align-${alignOf(column)}">${formatCell(column, value)}</td>`;
+}
+
+/** The totals row, with its label in the leading cells and the figures after. */
+function renderTotalsRow(
+  columns: DocumentColumn[],
+  totals: ReportRow | null,
+  totalsLabel: string | undefined,
+): string {
+  if (!totals) return "";
+
+  const firstNumber = columns.findIndex(isNumberColumn);
+  const covered = firstNumber <= 0 ? 1 : firstNumber;
+  const label = escapeHtml(totalsLabel ?? DEFAULT_TOTALS_LABEL);
+  const figures = columns
+    .slice(covered)
+    .map((column) => renderCell(column, totals[column.col]))
+    .join("");
+
+  return `<tr class="totals"><td colspan="${labelSpan(columns)}" class="align-left">${label}</td>${figures}</tr>`;
+}
+
 export function renderVoucherHtml(payload: VoucherPrintPayload): string {
   const {
     paper,
@@ -17,15 +70,21 @@ export function renderVoucherHtml(payload: VoucherPrintPayload): string {
     docDate,
     branch,
     info,
-    lineColumns,
     lines,
     totals,
+    totalsLabel,
     amountInWords,
     signatures,
   } = payload;
 
+  // Filtered once, then used for the header, every body row and the totals row:
+  // three separate filters would be three chances for the columns to disagree.
+  // Hidden columns exist for the spreadsheet; the printed voucher omits them,
+  // which is exactly what the reference printouts do.
+  const lineColumns = payload.lineColumns.filter((column) => !column.hidden);
+
   const branchLines = branch
-    ? [branch.name, branch.address, branch.phone ? `SĐT: ${branch.phone}` : null].filter(
+    ? [branch.name, branch.address, branch.phone].filter(
         (line): line is string => Boolean(line),
       )
     : [];
@@ -38,17 +97,28 @@ export function renderVoucherHtml(payload: VoucherPrintPayload): string {
     .join("");
 
   const headerCells = lineColumns
-    .map((column) => `<th>${escapeHtml(column.label)}</th>`)
+    .map((column) => {
+      const span = spanOf(column);
+      const colspan = span > 1 ? ` colspan="${span}"` : "";
+      return `<th${colspan}>${escapeHtml(column.label)}</th>`;
+    })
     .join("");
-  const bodyRows = lines.map((line) => renderTableRow(lineColumns, line)).join("");
-  const totalsRow = totals ? renderTableRow(lineColumns, totals, "totals") : "";
+  const bodyRows = lines
+    .map(
+      (line) =>
+        `<tr>${lineColumns.map((column) => renderCell(column, line[column.col])).join("")}</tr>`,
+    )
+    .join("");
 
   const amountInWordsBlock = amountInWords
-    ? `<div class="amount-in-words"><span class="label">Số tiền bằng chữ:</span> ${escapeHtml(amountInWords)}</div>`
+    ? `<div class="amount-in-words"><span class="label">Số tiền viết bằng chữ:</span> ${escapeHtml(amountInWords)}</div>`
     : "";
 
   const signatureCells = signatures
-    .map((label) => `<div class="signature-col"><div class="signature-label">${escapeHtml(label)}</div><div class="signature-hint">(Ký, họ tên)</div></div>`)
+    .map(
+      (label) =>
+        `<div class="signature-col"><div class="signature-label">${escapeHtml(label)}</div><div class="signature-hint">${SIGNATURE_HINT}</div></div>`,
+    )
     .join("");
 
   return `<!doctype html>
@@ -59,41 +129,45 @@ export function renderVoucherHtml(payload: VoucherPrintPayload): string {
     <style>
       @page { size: ${paper}; margin: 10mm; }
       * { box-sizing: border-box; }
-      html, body { margin: 0; padding: 0; color: #000; font-family: Arial, Helvetica, sans-serif; font-size: 12px; }
-      .branch-line { text-align: center; }
-      .branch-line.name { font-weight: bold; font-size: 14px; }
-      h1 { text-align: center; font-size: 16px; margin: 8px 0 2px; text-transform: uppercase; }
-      .doc-meta { text-align: center; font-size: 12px; margin-bottom: 8px; }
-      .info-block { display: flex; flex-wrap: wrap; gap: 4px 24px; margin-bottom: 8px; }
-      .info-row { flex: 1 1 45%; }
+      html, body { margin: 0; padding: 0; color: #000; font-family: "Times New Roman", Times, serif; font-size: 13px; }
+      .branch-line { text-align: left; }
+      .branch-line.name { font-weight: bold; }
+      h1 { text-align: center; font-size: 20px; margin: 14px 0 4px; text-transform: uppercase; }
+      .doc-date { text-align: center; font-weight: bold; font-style: italic; }
+      .doc-no { text-align: center; font-weight: bold; margin-bottom: 8px; }
+      .info-block { margin-bottom: 8px; }
+      .info-row { text-align: left; }
       .info-row .label { font-weight: bold; }
       table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 4px; }
       thead { display: table-header-group; }
       th, td { border: 1px solid #333; padding: 4px 6px; word-wrap: break-word; }
-      th { background: #f0f0f0; font-weight: bold; text-align: center; }
+      th { font-weight: bold; text-align: center; vertical-align: middle; }
       .align-left { text-align: left; }
       .align-right { text-align: right; }
       .align-center { text-align: center; }
       tr.totals td { font-weight: bold; }
       tr { break-inside: avoid; }
-      .amount-in-words { margin-top: 8px; font-style: italic; }
-      .amount-in-words .label { font-weight: bold; font-style: normal; }
-      .signature-row { display: flex; justify-content: space-around; margin-top: 32px; break-inside: avoid; }
+      .amount-in-words { margin-top: 8px; }
+      .amount-in-words .label { font-weight: bold; }
+      .signing-date { text-align: right; font-style: italic; margin-top: 24px; }
+      .signature-row { display: flex; justify-content: space-around; margin-top: 4px; break-inside: avoid; }
       .signature-col { text-align: center; }
       .signature-label { font-weight: bold; }
-      .signature-hint { font-size: 10px; font-style: italic; }
+      .signature-hint { font-style: italic; }
     </style>
   </head>
   <body>
     ${branchLines.map((line, i) => `<div class="branch-line${i === 0 ? " name" : ""}">${escapeHtml(line)}</div>`).join("")}
     <h1>${escapeHtml(title)}</h1>
-    <div class="doc-meta">Số: ${escapeHtml(docNo)} — Ngày: ${escapeHtml(docDate)}</div>
+    <div class="doc-date">Ngày ${escapeHtml(docDate)}</div>
+    <div class="doc-no">Số: ${escapeHtml(docNo)}</div>
     <div class="info-block">${infoRows}</div>
     <table>
       <thead><tr>${headerCells}</tr></thead>
-      <tbody>${bodyRows}${totalsRow}</tbody>
+      <tbody>${bodyRows}${renderTotalsRow(lineColumns, totals, totalsLabel)}</tbody>
     </table>
     ${amountInWordsBlock}
+    <div class="signing-date">${SIGNATURE_DATE_LINE}</div>
     <div class="signature-row">${signatureCells}</div>
   </body>
 </html>`;

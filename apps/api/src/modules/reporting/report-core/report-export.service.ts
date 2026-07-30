@@ -90,6 +90,18 @@ export interface PreparedExport {
 }
 
 /**
+ * `dd/mm/yyyy` for the document header. Falls back to the raw string when the
+ * value is not a date we recognise — a header that shows the filter verbatim is
+ * better than one that silently shows nothing.
+ */
+export function formatDocumentDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!match) return value;
+  const [, year, month, day] = match;
+  return `${day}/${month}/${year}`;
+}
+
+/**
  * Period line for the document header. Every domain stores its range as a
  * `DateRangeFilterDto` under a different field name (`issuedAt`, `period`, …),
  * so the caller passes the range and this formats it. Returns no line at all
@@ -99,8 +111,34 @@ export function dateRangeSubtitle(
   range?: { from?: string; to?: string } | null,
 ): string[] {
   if (!range?.from && !range?.to) return [];
-  return [`Từ ngày: ${range.from ?? '—'}; Đến ngày: ${range.to ?? '—'}`];
+  const from = range.from ? formatDocumentDate(range.from) : '—';
+  const to = range.to ? formatDocumentDate(range.to) : '—';
+  return [`Từ ngày: ${from} Đến ngày: ${to}`];
 }
+
+/**
+ * The filter line under the period line — one sentence naming what the numbers
+ * were narrowed to.
+ *
+ * Callers pass one part per active filter and `null` for every filter they did
+ * not apply; nothing is invented for an absent filter, so the header never
+ * claims a scope the query did not use. An all-null list produces no line at
+ * all rather than an empty one.
+ */
+export function filterSummarySubtitle(parts: (string | null)[]): string[] {
+  const active = parts.filter((part): part is string => Boolean(part));
+  return active.length ? [active.join('; ')] : [];
+}
+
+/**
+ * Marker for a filter whose value is a UUID.
+ *
+ * Resolving every id to its display name would mean a lookup per filter per
+ * export, and a raw UUID in a printed header helps nobody. Stating that the
+ * filter is active is the honest middle: the reader knows the figures are
+ * scoped without being handed an opaque key.
+ */
+export const FILTERED_MARKER = 'đã lọc';
 
 @Injectable()
 export class ReportExportService {
@@ -287,6 +325,9 @@ export class ReportExportService {
       };
       if (header.width !== undefined) {
         column.width = toExcelColumnWidth(header.width);
+      }
+      if (header.desc) {
+        column.desc = header.desc;
       }
       return column;
     });

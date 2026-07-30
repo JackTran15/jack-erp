@@ -28,7 +28,7 @@ import { BranchEntity } from '../../branch/branch.entity';
 import { resolveDocCounterparty } from '../location/services/resolve-doc-counterparty.util';
 import { attachCounterparties } from '../location/services/counterparty-name.util';
 import {
-  loadStorageNames,
+  loadTransferCounterpartStoreName,
   loadVoucherBranch,
 } from '../location/services/voucher-print-context.util';
 import { mapGoodsIssueToVoucherPayload } from './goods-issue-print.mapper';
@@ -366,14 +366,16 @@ export class GoodsIssueService {
     actor: ActorContext,
   ): Promise<VoucherPrintPayload> {
     const issue = await this.getById(id, actor);
-    const [branch, storageNameByStorageId] = await Promise.all([
+    const [branch, transferDestinationStoreName] = await Promise.all([
       loadVoucherBranch(this.giRepo.manager, issue.branchId, actor.organizationId),
-      loadStorageNames(
+      loadTransferCounterpartStoreName(
         this.giRepo.manager,
-        issue.lines.map((line) => line.location?.storageId),
+        'issue',
+        issue.id,
+        actor.organizationId,
       ),
     ]);
-    return mapGoodsIssueToVoucherPayload(issue, branch, storageNameByStorageId);
+    return mapGoodsIssueToVoucherPayload(issue, branch, transferDestinationStoreName);
   }
 
   async list(query: GoodsIssueQuery): Promise<PaginatedResponse<GoodsIssueEntity>> {

@@ -39,7 +39,11 @@ async function bootstrap() {
     origin: true,
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    exposedHeaders: ['X-Request-Id', 'X-Total-Count'],
+    // Content-Disposition is not a CORS-safelisted response header, so without
+    // it here the browser hides the filename the export routes set and every
+    // download lands under whatever name the client guessed. It carries only a
+    // slug, nothing worth withholding.
+    exposedHeaders: ['X-Request-Id', 'X-Total-Count', 'Content-Disposition'],
   });
 
   const configService = app.get(ConfigService);

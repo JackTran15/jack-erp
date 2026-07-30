@@ -78,41 +78,71 @@ const baseDto = (over: Record<string, any> = {}) => ({
   ...over,
 });
 
+const MISA_COLUMN_ORDER = [
+  'sku',
+  'itemName',
+  'unit',
+  'locationCode',
+  'locationName',
+  'quantity',
+  'unitPrice',
+  'revenue.goods',
+  'revenue.discount',
+  'revenue.promoPoints',
+  'revenue.promoRate',
+  'revenue.total',
+  'itemCategory',
+  'brand',
+];
+
 describe('RevenueByItemReport.buildColumns', () => {
   it('returns a flat catalog (no bands)', async () => {
     const report = makeReport({});
     const headers = await report.buildColumns(actor);
     expect(headers.every((h) => h.group === null)).toBe(true);
-    expect(headers.map((h) => h.col)).toEqual(
-      expect.arrayContaining(['sku', 'itemName', 'brand', 'quantity', 'revenue.total']),
-    );
   });
 
-  it('includes locationCode/locationName at item grain when exactly one store resolves', async () => {
+  it('returns exactly the 14 MISA columns, in MISA order', async () => {
     const report = makeReport({});
-    const headers = await report.buildColumns(actor, { statBy: ReportGroupBy.ITEM });
-    expect(headers.map((h) => h.col)).toEqual(
-      expect.arrayContaining(['locationCode', 'locationName']),
-    );
+    const headers = await report.buildColumns(actor);
+    expect(headers.map((h) => h.col)).toEqual(MISA_COLUMN_ORDER);
   });
 
-  it('drops locationCode/locationName when statBy is not item', async () => {
+  it('overrides quantity/unitPrice/revenue.total labels for this report only', async () => {
     const report = makeReport({});
-    const headers = await report.buildColumns(actor, { statBy: ReportGroupBy.PARENT });
-    expect(headers.map((h) => h.col)).not.toEqual(
-      expect.arrayContaining(['locationCode', 'locationName']),
-    );
+    const headers = await report.buildColumns(actor);
+    const byCol = new Map(headers.map((h) => [h.col, h.name]));
+    expect(byCol.get('quantity')).toBe('Số lượng bán');
+    expect(byCol.get('unitPrice')).toBe('Đơn giá TB');
+    expect(byCol.get('revenue.total')).toBe('Doanh thu');
   });
 
-  it('drops locationCode/locationName when the store filter resolves to more than one branch', async () => {
+  it('carries a formula desc on the 7 measure columns, null on the 7 dimension columns', async () => {
+    const report = makeReport({});
+    const headers = await report.buildColumns(actor);
+    const byCol = new Map(headers.map((h) => [h.col, h.desc]));
+    expect(byCol.get('quantity')).toBe('(1)');
+    expect(byCol.get('unitPrice')).toBe('(2)=(3)/(1)');
+    expect(byCol.get('revenue.goods')).toBe('(3)');
+    expect(byCol.get('revenue.discount')).toBe('(4)');
+    expect(byCol.get('revenue.promoPoints')).toBe('(9)');
+    expect(byCol.get('revenue.promoRate')).toBe('(5)=((4)+(9))/(3)');
+    expect(byCol.get('revenue.total')).toBe('(6)=(3)-(4)-(9)');
+    for (const col of ['sku', 'itemName', 'unit', 'locationCode', 'locationName', 'itemCategory', 'brand']) {
+      expect(byCol.get(col)).toBeNull();
+    }
+  });
+
+  it.each([
+    ['parent grain', { statBy: ReportGroupBy.PARENT }],
+    ['group grain', { statBy: ReportGroupBy.GROUP }],
+    ['multi-store scope', { statBy: ReportGroupBy.ITEM, store: { scope: 'all' as const, storeIds: [] } }],
+  ])('keeps locationCode/locationName in the catalog at %s (ADR-03)', async (_label, filters) => {
     const report = makeReport({ hasConsolidated: true });
-    const headers = await report.buildColumns(actor, {
-      statBy: ReportGroupBy.ITEM,
-      store: { scope: 'group', storeIds: ['b1', 'b2'] },
-    });
-    expect(headers.map((h) => h.col)).not.toEqual(
-      expect.arrayContaining(['locationCode', 'locationName']),
-    );
+    const headers = await report.buildColumns(actor, filters as any);
+    expect(headers.map((h) => h.col)).toEqual(MISA_COLUMN_ORDER);
+    expect(headers[3].col).toBe('locationCode');
+    expect(headers[4].col).toBe('locationName');
   });
 });
 
@@ -199,6 +229,52 @@ describe('RevenueByItemReport.buildData', () => {
       actor,
     );
     expect(res.rows[0]).toMatchObject({ locationCode: null, locationName: null });
+  });
+
+  // ADR-03: the location columns stay in the catalog at every grain, but the
+  // grain='parent' path must not start querying warehouse locations just
+  // because the columns are in the request — dimensionOf('parent') already
+  // nulls them, so loadItemLocations has no work to do at this grain.
+  it('does not query item locations at parent grain even when locationCode/locationName are requested', async () => {
+    const itemStorageLocationsFind = jest.fn(async () => []);
+    const stockBalanceQb: any = {
+      innerJoin: jest.fn(() => stockBalanceQb),
+      where: jest.fn(() => stockBalanceQb),
+      andWhere: jest.fn(() => stockBalanceQb),
+      orderBy: jest.fn(() => stockBalanceQb),
+      select: jest.fn(() => stockBalanceQb),
+      addSelect: jest.fn(() => stockBalanceQb),
+      getRawMany: jest.fn(async () => []),
+    };
+    const qb: any = {
+      where: jest.fn(() => qb),
+      andWhere: jest.fn(() => qb),
+      getMany: jest.fn(async () => [inv()]),
+    };
+    const repo = (rows?: any[]) => ({ find: jest.fn(async () => rows ?? []) });
+    const report = new RevenueByItemReport(
+      { createQueryBuilder: jest.fn(() => qb) } as any,
+      repo([line()]) as any,
+      repo([{ id: 'it1', categoryId: 'cat1', brand: 'Nike' }]) as any,
+      repo([{ id: 'cat1', name: 'Shoes' }]) as any,
+      repo([]) as any,
+      repo([{ id: 'wh1', branchId: 'b1', isMainStorage: false, isActive: true }]) as any,
+      repo([]) as any,
+      { find: itemStorageLocationsFind } as any,
+      { ...repo([]), createQueryBuilder: jest.fn(() => stockBalanceQb) } as any,
+      { hasPermission: jest.fn(async () => false) } as any,
+    );
+
+    await report.buildData(
+      baseDto({
+        columns: ['itemName', 'locationCode', 'locationName'],
+        filters: { issuedAt: { from: '2026-06-01' }, statBy: ReportGroupBy.PARENT },
+      }) as any,
+      actor,
+    );
+
+    expect(itemStorageLocationsFind).not.toHaveBeenCalled();
+    expect(stockBalanceQb.getRawMany).not.toHaveBeenCalled();
   });
 
   it('filters by brand pre-aggregate', async () => {

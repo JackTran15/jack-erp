@@ -31,9 +31,14 @@ export interface VoucherPrintPayload {
   kind: VoucherKind;
   /** Default paper size for this kind — A4 for stock vouchers, A5 for treasury. */
   paper: 'A4' | 'A5';
-  /** Document title, e.g. "PHIẾU NHẬP KHO". */
+  /** Document title, e.g. "PHIẾU NHẬP KHO" — never carries the document number. */
   title: string;
   docNo: string;
+  /**
+   * The document date in long form, WITHOUT the leading word: "28 tháng 7 năm
+   * 2026". Renderers print `Ngày ${docDate}` on its own centred line, so the
+   * word lives in the template and the value stays a value.
+   */
   docDate: string;
   branch: DocumentBranchInfo | null;
   /** Header block below the title: counterparty, deliverer, reason, etc. */
@@ -42,8 +47,13 @@ export interface VoucherPrintPayload {
   lineColumns: DocumentColumn[];
   lines: ReportRow[];
   totals: ReportRow | null;
-  /** Vietnamese amount-in-words; treasury vouchers only (UOW-04). */
+  /** Label on the totals row: "Tổng" (default) or "Cộng" on a goods issue. */
+  totalsLabel?: string;
+  /**
+   * Vietnamese amount-in-words. Present on every voucher that carries money —
+   * a transfer order has no line price, so it has none.
+   */
   amountInWords?: string;
-  /** Signature block labels, e.g. ["Người giao hàng", "Người nhận hàng", "Thủ kho"]. */
+  /** Signature block labels, e.g. ["Người lập phiếu", "Người nhận hàng", …]. */
   signatures: string[];
 }

@@ -7,7 +7,7 @@ function payload(overrides: Partial<VoucherPrintPayload> = {}): VoucherPrintPayl
     paper: 'A4',
     title: 'PHIẾU NHẬP KHO',
     docNo: 'IMP000001',
-    docDate: '09/07/2026',
+    docDate: '9 tháng 7 năm 2026',
     branch: { name: 'Chi nhánh Hồ Chí Minh', address: null, phone: null },
     info: [
       { label: 'Đối tượng', value: 'Nhân viên HCM' },
@@ -19,33 +19,43 @@ function payload(overrides: Partial<VoucherPrintPayload> = {}): VoucherPrintPayl
     ],
     lines: [{ sku: 'ABA2777-D-38', quantity: 10 }],
     totals: { sku: null, quantity: 10 },
-    signatures: ['Người giao hàng', 'Người nhận hàng', 'Thủ kho'],
+    signatures: ['Người lập phiếu', 'Người nhận hàng', 'Thủ kho'],
     ...overrides,
   };
 }
 
 describe('voucherToReportDocument', () => {
-  it('maps title+docNo, branch, info rows, columns, lines and totals', () => {
+  it('maps the title, branch, columns, lines and totals', () => {
     const doc = voucherToReportDocument(payload());
 
-    expect(doc.header.title).toBe('PHIẾU NHẬP KHO IMP000001');
+    expect(doc.header.title).toBe('PHIẾU NHẬP KHO');
     expect(doc.header.branch?.name).toBe('Chi nhánh Hồ Chí Minh');
-    expect(doc.header.subtitleLines).toEqual([
-      'Đối tượng: Nhân viên HCM',
-      'Người giao: NV 01',
-    ]);
     expect(doc.columns).toEqual(payload().lineColumns);
     expect(doc.rows).toEqual(payload().lines);
     expect(doc.totals).toEqual({ sku: null, quantity: 10 });
   });
 
-  it('drops signatures and amountInWords — they belong to the printed page, not a spreadsheet', () => {
+  it('leaves the document number out of the title', () => {
+    const doc = voucherToReportDocument(payload());
+
+    // The number gets its own centred line, written by VoucherXlsxWriter.
+    expect(doc.header.title).not.toContain('IMP000001');
+  });
+
+  it('leaves the info rows to the voucher writer instead of folding them into subtitles', () => {
+    const doc = voucherToReportDocument(payload());
+
+    expect(doc.header.subtitleLines).toEqual([]);
+  });
+
+  it('carries none of the voucher chrome — the writer reads that from the payload', () => {
     const doc = voucherToReportDocument(
-      payload({ amountInWords: 'Một triệu đồng chẵn' }),
+      payload({ amountInWords: 'Một triệu đồng chẵn.' }),
     );
+
     expect(JSON.stringify(doc)).not.toContain('amountInWords');
     expect(JSON.stringify(doc)).not.toContain('Một triệu');
-    expect(JSON.stringify(doc)).not.toContain('Người giao hàng');
+    expect(JSON.stringify(doc)).not.toContain('Người lập phiếu');
   });
 
   it('passes null totals through unchanged', () => {
