@@ -19,11 +19,11 @@ export const RECEIPT_LAYOUT_DEFAULTS: ReceiptLayoutSettings = {
   contentWidth: 72,
   align: "center",
   offsetX: 0,
-  paddingTop: 2,
-  paddingBottom: 4,
+  paddingTop: 6,
+  paddingBottom: 8,
   scale: 1,
 
-  logoWidth: 80,
+  logoWidth: 40,
 
   baseFontSize: 11,
   lineHeight: 1.45,
@@ -32,10 +32,10 @@ export const RECEIPT_LAYOUT_DEFAULTS: ReceiptLayoutSettings = {
   tableCellPaddingX: 3,
   grandTotalFontSize: 14,
 
-  colIdxWidth: 8,
-  colQtyWidth: 11,
-  colPriceWidth: 21,
-  colTotalWidth: 23,
+  colIdxWidth: 5,
+  colQtyWidth: 7,
+  colPriceWidth: 16,
+  colTotalWidth: 16,
 
   testCopies: 1,
 };
