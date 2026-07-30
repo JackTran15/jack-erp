@@ -72,7 +72,8 @@ export function buildInvoiceRowPrintPayload(
     info: {
       customerName: invoice.customer?.name?.trim() || undefined,
       customerPhone: invoice.customer?.phone?.trim() || undefined,
-      cashierName: options.cashierName?.trim() || undefined,
+      cashierName:
+        options.cashierName?.trim() || invoice.staffName?.trim() || undefined,
       note: invoice.note?.trim() || undefined,
     },
     lines: items.map((item, index) => ({
@@ -100,6 +101,9 @@ export function buildInvoiceRowPrintPayload(
           : undefined,
       pointsEarned: pointsEarned > 0 ? pointsEarned : undefined,
       pointsReversed: pointsReversed > 0 ? pointsReversed : undefined,
+      // Số dư chứ không phải delta: `0` là giá trị hợp lệ nên KHÔNG dùng
+      // `Number(x) || 0` như các dòng trên — chỉ null/undefined mới ẩn dòng.
+      pointsBalanceAfter: invoice.pointsBalanceAfter ?? undefined,
     },
     payments,
     isReturnExchange,

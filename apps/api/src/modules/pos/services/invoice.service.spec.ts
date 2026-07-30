@@ -9,6 +9,7 @@ import { InvoicePaymentEntity } from '../entities/invoice-payment.entity';
 import { InvoiceDebtEntity } from '../entities/invoice-debt.entity';
 import { LocationEntity } from '../../inventory/location/location.entity';
 import { CustomerEntity } from '../../customer/customer.entity';
+import { UserEntity } from '../../auth/user.entity';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
 import { UpdateInvoiceDto } from '../dto/update-invoice.dto';
 import { resolveBranchItemLocations } from './resolve-branch-item-locations';
@@ -78,6 +79,7 @@ describe('InvoiceService', () => {
   let customerRepo: Record<string, jest.Mock>;
   let paymentRepo: Record<string, jest.Mock>;
   let debtRepo: Record<string, jest.Mock>;
+  let userRepo: Record<string, jest.Mock>;
   let dataSource: Record<string, jest.Mock>;
   let mockManager: Record<string, jest.Mock>;
 
@@ -118,6 +120,10 @@ describe('InvoiceService', () => {
       findOne: jest.fn().mockResolvedValue(null),
     };
 
+    userRepo = {
+      findOne: jest.fn().mockResolvedValue(null),
+    };
+
     dataSource = {
       transaction: jest.fn().mockImplementation((cb) => cb(mockManager)),
     };
@@ -131,6 +137,7 @@ describe('InvoiceService', () => {
         { provide: getRepositoryToken(CustomerEntity), useValue: customerRepo },
         { provide: getRepositoryToken(InvoicePaymentEntity), useValue: paymentRepo },
         { provide: getRepositoryToken(InvoiceDebtEntity), useValue: debtRepo },
+        { provide: getRepositoryToken(UserEntity), useValue: userRepo },
         { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
@@ -361,6 +368,33 @@ describe('InvoiceService', () => {
 
       expect(customerRepo.findBy).not.toHaveBeenCalled();
       expect(result.customer).toBeNull();
+    });
+
+    it('resolves staffName from the invoice staffId', async () => {
+      invoiceRepo.findOne.mockResolvedValue(invoiceStub({ staffId: 'user-9' }));
+      itemRepo.find.mockResolvedValue([]);
+      userRepo.findOne.mockResolvedValue({
+        id: 'user-9',
+        firstName: 'Nguyễn',
+        lastName: 'Văn A',
+      });
+
+      const result = await service.findOneWithItems('inv-1', actor);
+
+      expect(userRepo.findOne).toHaveBeenCalledWith({
+        where: { id: 'user-9', organizationId: 'org-1' },
+      });
+      expect(result.staffName).toBe('Nguyễn Văn A');
+    });
+
+    it('sets staffName to null when the staff user no longer exists', async () => {
+      invoiceRepo.findOne.mockResolvedValue(invoiceStub({ staffId: 'user-gone' }));
+      itemRepo.find.mockResolvedValue([]);
+      userRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.findOneWithItems('inv-1', actor);
+
+      expect(result.staffName).toBeNull();
     });
   });
 

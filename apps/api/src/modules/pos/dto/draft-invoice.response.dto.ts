@@ -39,4 +39,11 @@ export class DraftInvoiceResponseDto extends InvoiceEntity {
     description: 'Outstanding debt (invoice_debts.remainingAmount) for this invoice; null when there is no debt.',
   })
   remainingDebt: number | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Display name of the staff member (cashier) who created the invoice; null when the user no longer exists.',
+  })
+  staffName: string | null;
 }

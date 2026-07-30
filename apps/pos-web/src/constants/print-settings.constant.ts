@@ -23,6 +23,8 @@ export const RECEIPT_LAYOUT_DEFAULTS: ReceiptLayoutSettings = {
   paddingBottom: 4,
   scale: 1,
 
+  logoWidth: 80,
+
   baseFontSize: 11,
   lineHeight: 1.45,
   tableFontSize: 10.5,
@@ -142,6 +144,20 @@ export const RECEIPT_LAYOUT_FIELD_GROUPS: readonly ReceiptLayoutFieldGroup[] = [
         max: 1.5,
         step: 0.05,
         hint: "Thu nhỏ toàn bộ bill khi nội dung vẫn tràn dù đã chỉnh bề rộng.",
+      },
+    ],
+  },
+  {
+    title: "Logo",
+    fields: [
+      {
+        key: "logoWidth",
+        label: "Bề rộng logo",
+        unit: "px",
+        min: 20,
+        max: 200,
+        step: 5,
+        hint: "Chiều cao tự co theo tỉ lệ ảnh. 80px ≈ 30% bề ngang bill khổ 80mm.",
       },
     ],
   },

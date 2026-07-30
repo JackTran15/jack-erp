@@ -2,6 +2,10 @@ import { RECEIPT_LAYOUT_DEFAULTS } from "@erp/pos/constants/print-settings.const
 import type { InvoicePayload } from "@erp/pos/dtos/invoice-printing.dto";
 import type { ReceiptLayoutSettings } from "@erp/pos/interfaces/print-settings.interface";
 import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
+// `?inline` → data URI. Bill được nhồi vào iframe bằng `document.write`, ở đó
+// URL tương đối phụ thuộc base URL kế thừa từ trang cha; data URI thì luôn tải được.
+// (Chuỗi base64 lặp lại theo số liên in — đổi lại thì logo mới ra được giấy.)
+import logoUrl from "@erp/pos/assets/images/logo.jpeg?inline";
 
 /**
  * Format a number as VND, vi-VN grouping (1.650.000) — no currency symbol.
@@ -208,15 +212,15 @@ export function renderInvoiceHtml(
       .receipt + .receipt { page-break-before: always; break-before: page; }
 
       .header { text-align: center; margin-bottom: 4px; }
+      /* Logo (ảnh đã gồm sẵn chữ "GIÀY MT") BẮT BUỘC là thẻ <img>, không phải
+         background-image: hộp thoại in mặc định tắt "Background graphics" nên
+         ảnh nền hiện trên preview màn hình mà mất sạch khi in ra giấy. */
       .logo {
-        width: 40px; height: 40px;
-        border: 2px solid #000;
-        border-radius: 9999px;
+        display: block;
+        /* Chỉ set bề rộng — height auto để ảnh không bị bóp méo khi đổi logo. */
+        width: ${layout.logoWidth}px; height: auto;
         margin: 0 auto 2px auto;
-        display: flex; align-items: center; justify-content: center;
-        font-weight: 700; font-size: 14px;
       }
-      .logo-caption { font-weight: 700; font-size: 10px; letter-spacing: 0.05em; }
       .store-name { font-weight: 700; font-size: 13px; margin-top: 2px; }
       .store-meta { font-size: 10.5px; }
 
@@ -334,8 +338,7 @@ export function renderInvoiceHtml(
   <body>${Array.from({ length: copyCount }, () => `
     <div class="receipt">
       <header class="header">
-        <div class="logo" aria-hidden="true">MT'</div>
-        <div class="logo-caption">GIÀY MT</div>
+        <img class="logo" src="${logoUrl}" alt="Giày MT" />
         <div class="store-name">${escapeHtml(store.name)}</div>${
           store.address
             ? `\n        <div class="store-meta">Đ/c: ${escapeHtml(store.address)}</div>`
