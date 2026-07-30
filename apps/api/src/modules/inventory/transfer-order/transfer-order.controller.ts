@@ -126,6 +126,11 @@ class ImportTransferOrderDto {
   @IsString({ each: true })
   references?: string[];
 
+  /** Diễn giải typed on the receipt form. */
+  @IsOptional()
+  @IsString()
+  description?: string;
+
   /** User-entered receive date+time (ISO). */
   @IsOptional()
   @IsDateString()

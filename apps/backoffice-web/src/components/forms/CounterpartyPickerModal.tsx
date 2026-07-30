@@ -6,6 +6,7 @@ import { PaginationControls } from "../table/PaginationControls";
 import {
   COUNTERPARTY_KIND_LABEL,
   counterpartyKey,
+  counterpartySearchScope,
   useCounterpartySearch,
   type CounterpartyOption,
   type CounterpartySearchType,
@@ -47,15 +48,25 @@ export function CounterpartyPickerModal({
 }: Props) {
   const search = useCounterpartySearch();
 
-  const typeOptions = useMemo(
+  // "Tất cả" stays available whenever more than one kind is selectable — it then
+  // means "every allowed kind", not literally every kind in the system.
+  const typeOptions = useMemo(() => {
+    if (!allowedTypes?.length) return ALL_TYPE_OPTIONS;
+    const kinds = ALL_TYPE_OPTIONS.filter(
+      (o) => o.value !== "all" && allowedTypes.includes(o.value),
+    );
+    return kinds.length > 1 ? [ALL_TYPE_OPTIONS[0]!, ...kinds] : kinds;
+  }, [allowedTypes]);
+
+  const initialType = useMemo<CounterpartySearchType>(
     () =>
-      allowedTypes && allowedTypes.length > 0
-        ? ALL_TYPE_OPTIONS.filter((o) => allowedTypes.includes(o.value))
-        : ALL_TYPE_OPTIONS,
-    [allowedTypes],
+      typeOptions.some((o) => o.value === defaultType)
+        ? defaultType
+        : (typeOptions[0]?.value ?? "all"),
+    [defaultType, typeOptions],
   );
 
-  const [type, setType] = useState<CounterpartySearchType>(defaultType);
+  const [type, setType] = useState<CounterpartySearchType>(initialType);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
@@ -72,7 +83,8 @@ export function CounterpartyPickerModal({
       const reqId = ++reqIdRef.current;
       setLoading(true);
       try {
-        const res = await search(t, query, nextPage, ps);
+        const scope = t === "all" ? counterpartySearchScope(allowedTypes) : t;
+        const res = await search(scope, query, nextPage, ps);
         if (reqId !== reqIdRef.current) return;
         setItems(res.data);
         setTotal(res.total);
@@ -86,18 +98,18 @@ export function CounterpartyPickerModal({
         if (reqId === reqIdRef.current) setLoading(false);
       }
     },
-    [search],
+    [search, allowedTypes],
   );
 
   // Reset and load a fresh first page each time the dialog opens.
   useEffect(() => {
     if (!open) return;
-    setType(defaultType);
+    setType(initialType);
     setSearchInput("");
     setCommittedQuery("");
     setSelectedKey(null);
     setPage(1);
-    void loadPage(1, "", pageSize, defaultType);
+    void loadPage(1, "", pageSize, initialType);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 

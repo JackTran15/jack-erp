@@ -1,4 +1,8 @@
-import { GoodsReceiptPurpose, GoodsReceiptStatus } from '@erp/shared-interfaces';
+import {
+  GoodsReceiptPurpose,
+  GoodsReceiptReferenceType,
+  GoodsReceiptStatus,
+} from '@erp/shared-interfaces';
 import { GoodsReceiptService } from './goods-receipt.service';
 
 describe('GoodsReceiptService', () => {
@@ -118,6 +122,25 @@ describe('GoodsReceiptService', () => {
     ).rejects.toThrow('Purchasing employee not found in organization');
 
     expect(documentNumberingService.generate).not.toHaveBeenCalled();
+    expect(receiptRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('refuses to delete the import leg of a transfer order', async () => {
+    receiptRepo.findOne.mockResolvedValue({
+      id: 'receipt-1',
+      organizationId: actor.organizationId,
+      branchId: actor.branchId,
+      status: GoodsReceiptStatus.POSTED,
+      purpose: GoodsReceiptPurpose.TRANSFER_IN,
+      referenceType: GoodsReceiptReferenceType.STOCK_TRANSFER,
+      referenceId: 'to-1',
+      lines: [],
+    });
+
+    await expect(service.cancel('receipt-1', actor)).rejects.toThrow(
+      'Phiếu nhập kho điều chuyển không thể xoá',
+    );
+
     expect(receiptRepo.save).not.toHaveBeenCalled();
   });
 

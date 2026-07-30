@@ -1062,6 +1062,7 @@ export function PurchaseOrderFormDialog({
             counterpartyId: providerId || undefined,
             deliverer: deliveryPerson || undefined,
             references: references.length ? references : undefined,
+            description: notes || undefined,
             occurredAt: receivedAtIso,
           },
         );
@@ -1765,7 +1766,7 @@ export function PurchaseOrderFormDialog({
             <FieldRow label={isPurchaseImport ? "Nhà cung cấp" : "Đối tượng"}>
               <div className="flex items-stretch gap-2">
                 <CounterpartyPickerField
-                  defaultType="supplier"
+                  defaultType="all"
                   allowedTypes={
                     isPurchaseImport || purpose === "PURCHASE"
                       ? ["supplier"]

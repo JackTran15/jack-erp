@@ -1,6 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 export enum CounterpartyKind {
   SUPPLIER = 'supplier',
@@ -14,6 +22,12 @@ export class SearchCounterpartiesDto {
   @IsOptional()
   @IsEnum(CounterpartyKind)
   type: CounterpartyKind = CounterpartyKind.ALL;
+
+  @ApiPropertyOptional({ enum: CounterpartyKind, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(CounterpartyKind, { each: true })
+  types?: CounterpartyKind[];
 
   @ApiPropertyOptional({ description: 'Match on name or code' })
   @IsOptional()
