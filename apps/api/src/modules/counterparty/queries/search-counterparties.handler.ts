@@ -9,6 +9,7 @@ import { EmployeeProfileEntity } from '../../rbac/employee/employee-profile.enti
 import {
   CounterpartyKind,
   CounterpartyOptionDto,
+  SearchCounterpartiesDto,
   SearchCounterpartiesResponseDto,
 } from '../dto/search-counterparties.dto';
 import { SearchCounterpartiesQuery } from './search-counterparties.query';
@@ -16,6 +17,19 @@ import { SearchCounterpartiesQuery } from './search-counterparties.query';
 interface KindResult {
   items: CounterpartyOptionDto[];
   total: number;
+}
+
+const CONCRETE_KINDS = [
+  CounterpartyKind.SUPPLIER,
+  CounterpartyKind.CUSTOMER,
+  CounterpartyKind.EMPLOYEE,
+] as const;
+
+/** `types` (when given) wins over `type`; both fall back to every kind. */
+function resolveKinds(dto: SearchCounterpartiesDto): CounterpartyKind[] {
+  const requested = dto.types?.length ? dto.types : [dto.type];
+  if (requested.includes(CounterpartyKind.ALL)) return [...CONCRETE_KINDS];
+  return CONCRETE_KINDS.filter((kind) => requested.includes(kind));
 }
 
 @QueryHandler(SearchCounterpartiesQuery)
@@ -35,14 +49,15 @@ export class SearchCounterpartiesHandler
     dto,
     actor,
   }: SearchCounterpartiesQuery): Promise<SearchCounterpartiesResponseDto> {
-    const { type, page, pageSize } = dto;
+    const { page, pageSize } = dto;
     const orgId = actor.organizationId;
     const like = dto.search?.trim() ? `%${dto.search.trim()}%` : null;
+    const kinds = resolveKinds(dto);
 
-    if (type !== CounterpartyKind.ALL) {
+    if (kinds.length === 1) {
       const offset = (page - 1) * pageSize;
       const { items, total } = await this.searchKind(
-        type,
+        kinds[0],
         orgId,
         like,
         pageSize,
@@ -51,20 +66,18 @@ export class SearchCounterpartiesHandler
       return { data: items, total, page, pageSize };
     }
 
-    // type = all: take the top (page * pageSize) from each source so a k-way
+    // Multiple kinds: take the top (page * pageSize) from each source so a k-way
     // merge + slice yields the correct globally-sorted page.
     const cap = page * pageSize;
-    const [sup, cus, emp] = await Promise.all([
-      this.searchSuppliers(orgId, like, cap, 0),
-      this.searchCustomers(orgId, like, cap, 0),
-      this.searchEmployees(orgId, like, cap, 0),
-    ]);
-    const merged = [...sup.items, ...cus.items, ...emp.items].sort((a, b) =>
-      a.name.localeCompare(b.name, 'vi'),
+    const results = await Promise.all(
+      kinds.map((kind) => this.searchKind(kind, orgId, like, cap, 0)),
     );
+    const merged = results
+      .flatMap((r) => r.items)
+      .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
     return {
       data: merged.slice((page - 1) * pageSize, page * pageSize),
-      total: sup.total + cus.total + emp.total,
+      total: results.reduce((sum, r) => sum + r.total, 0),
       page,
       pageSize,
     };

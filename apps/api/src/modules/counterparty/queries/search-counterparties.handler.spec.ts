@@ -88,4 +88,58 @@ describe('SearchCounterpartiesHandler', () => {
     expect(res.data.map((d) => d.kind)).toEqual(['customer', 'supplier', 'employee']);
     expect(res.data[2]).toMatchObject({ id: 'e1', code: 'NV1', phone: '3' });
   });
+
+  it('merges only the requested kinds when `types` is given', async () => {
+    const handler = makeHandler({
+      suppliers: { rows: [{ id: 's1', code: 'NCC1', name: 'Beta', phone: '1' }], total: 1 },
+      customers: { rows: [{ id: 'c1', code: 'KH1', name: 'Alpha', phone: '2', address: 'a' }], total: 1 },
+      employees: {
+        rows: [{ id: 'e1', firstName: 'Zoe', lastName: 'Z', code: 'NV1', mobile: '3' }],
+        count: 1,
+      },
+    });
+
+    const res = await handler.execute(
+      new SearchCounterpartiesQuery(
+        {
+          type: CounterpartyKind.ALL,
+          types: [CounterpartyKind.SUPPLIER, CounterpartyKind.EMPLOYEE],
+          page: 1,
+          pageSize: 20,
+        },
+        actor,
+      ),
+    );
+
+    // Customers are excluded even though the repo would return one.
+    expect(res.total).toBe(2);
+    expect(res.data.map((d) => d.kind)).toEqual(['supplier', 'employee']);
+  });
+
+  it('takes the single-kind path when `types` holds one kind', async () => {
+    const handler = makeHandler({
+      suppliers: { rows: [], total: 0 },
+      customers: { rows: [], total: 0 },
+      employees: {
+        rows: [{ id: 'e1', firstName: 'Zoe', lastName: 'Z', code: 'NV1', mobile: '3' }],
+        count: 5,
+      },
+    });
+
+    const res = await handler.execute(
+      new SearchCounterpartiesQuery(
+        {
+          type: CounterpartyKind.ALL,
+          types: [CounterpartyKind.EMPLOYEE],
+          page: 1,
+          pageSize: 20,
+        },
+        actor,
+      ),
+    );
+
+    // Single kind → the kind's own total (not a merged sum), so paging works.
+    expect(res.total).toBe(5);
+    expect(res.data.map((d) => d.kind)).toEqual(['employee']);
+  });
 });

@@ -1583,7 +1583,7 @@ function TransferFormDialog({
             <FieldRow label="Đối tượng">
               <div className="flex items-stretch gap-2">
                 <CounterpartyPickerField
-                  defaultType="supplier"
+                  defaultType="all"
                   allowedTypes={["supplier", "employee"]}
                   className="w-[180px]"
                   dropdownMinWidth={500}

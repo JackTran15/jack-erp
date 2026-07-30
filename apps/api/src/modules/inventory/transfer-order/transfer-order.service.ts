@@ -80,6 +80,8 @@ export interface ConfirmImportDto {
   deliverer?: string;
   /** Tham chiếu — FE-supplied reference codes. */
   references?: string[];
+  /** Diễn giải carried onto the spawned receipt. */
+  description?: string;
   /** User-entered receive date+time (ISO); falls back to now when omitted. */
   occurredAt?: string;
 }
@@ -1163,6 +1165,7 @@ export class TransferOrderService {
             dto.counterpartyId ?? sourceIssue?.counterpartyId ?? undefined,
           deliveredBy: dto.deliverer ?? sourceIssue?.deliverer ?? undefined,
           references: dto.references,
+          description: dto.description ?? to.notes ?? undefined,
           lines,
         },
         actor,

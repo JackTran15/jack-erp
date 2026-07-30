@@ -12,6 +12,7 @@ import {
   DocumentType,
   DomainEventType,
   GoodsReceiptPurpose,
+  GoodsReceiptReferenceType,
   GoodsReceiptStatus,
   JournalSource,
   PaginatedResponse,
@@ -283,6 +284,13 @@ export class GoodsReceiptService {
       throw new ConflictException(
         `Phiếu đã ${receipt.status === GoodsReceiptStatus.CANCELLED ? "huỷ" : "đảo bút"}, không thể xoá lại`,
       );
+    }
+
+    if (
+      receipt.referenceType === GoodsReceiptReferenceType.STOCK_TRANSFER &&
+      receipt.referenceId
+    ) {
+      throw new ConflictException("Phiếu nhập kho điều chuyển không thể xoá");
     }
 
     if (receipt.status === GoodsReceiptStatus.POSTED) {

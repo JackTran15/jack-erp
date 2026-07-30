@@ -4,6 +4,7 @@ import { CounterpartyPickerModal } from "./CounterpartyPickerModal";
 import {
   COUNTERPARTY_KIND_LABEL,
   counterpartyKey,
+  counterpartySearchScope,
   useCounterpartySearch,
   type CounterpartyOption,
   type CounterpartySearchType,
@@ -49,21 +50,19 @@ export function CounterpartyPickerField({
   const search = useCounterpartySearch();
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Inline type-ahead searches across the allowed types (default: all). When the
-  // field is restricted to a single type we query that type directly; otherwise
-  // we query "all" and filter to allowedTypes so disallowed kinds (e.g. employees
-  // on a goods document) never appear inline.
+  // Inline type-ahead searches exactly the allowed kinds server-side, so an
+  // empty query still lists every allowed kind (e.g. NCC + Nhân viên).
   const inlineSearch = useCallback(
     async (query: string, page: number, pageSize?: number) => {
       const ps = pageSize ?? INLINE_PAGE_SIZE;
-      const inlineType: CounterpartySearchType =
-        allowedTypes && allowedTypes.length === 1 ? allowedTypes[0]! : "all";
-      const res = await search(inlineType, query, page, ps);
-      const items = allowedTypes
-        ? res.data.filter((c) => allowedTypes.includes(c.kind))
-        : res.data;
+      const res = await search(
+        counterpartySearchScope(allowedTypes),
+        query,
+        page,
+        ps,
+      );
       return {
-        items,
+        items: res.data,
         hasMore: page * ps < res.total,
         total: res.total,
       };

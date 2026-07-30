@@ -572,6 +572,60 @@ describe('TransferOrderService', () => {
       expect(grDto.receivedAt).toBe('2026-06-08T15:24:00.000Z');
     });
 
+    it('forwards Diễn giải onto the spawned receipt', async () => {
+      toRepo.findOne.mockResolvedValueOnce(
+        baseOrder({ status: TransferOrderStatus.IN_PROGRESS }),
+      );
+      toRepo.findOne.mockResolvedValueOnce(
+        baseOrder({ status: TransferOrderStatus.COMPLETED }),
+      );
+      locationRepo.find.mockResolvedValue([
+        {
+          id: 'loc-unassigned',
+          isActive: true,
+          storageId: 'storage-B',
+          storage: { branchId: 'branch-B' },
+        },
+      ]);
+
+      await service.confirmImport('to-1', actorDest, {
+        destinationStorageId: 'storage-B',
+        description: 'Nhập kho hàng hóa điều chuyển từ cửa hàng A',
+      });
+
+      expect(goodsReceiptService.createAndPost.mock.calls[0][0].description).toBe(
+        'Nhập kho hàng hóa điều chuyển từ cửa hàng A',
+      );
+    });
+
+    it('falls back to the order notes when Diễn giải is omitted', async () => {
+      toRepo.findOne.mockResolvedValueOnce(
+        baseOrder({
+          status: TransferOrderStatus.IN_PROGRESS,
+          notes: 'Điều chuyển bù hàng tồn',
+        }),
+      );
+      toRepo.findOne.mockResolvedValueOnce(
+        baseOrder({ status: TransferOrderStatus.COMPLETED }),
+      );
+      locationRepo.find.mockResolvedValue([
+        {
+          id: 'loc-unassigned',
+          isActive: true,
+          storageId: 'storage-B',
+          storage: { branchId: 'branch-B' },
+        },
+      ]);
+
+      await service.confirmImport('to-1', actorDest, {
+        destinationStorageId: 'storage-B',
+      });
+
+      expect(goodsReceiptService.createAndPost.mock.calls[0][0].description).toBe(
+        'Điều chuyển bù hàng tồn',
+      );
+    });
+
     it('inherits đối tượng and người giao from the linked export issue', async () => {
       toRepo.findOne.mockResolvedValueOnce(
         baseOrder({
