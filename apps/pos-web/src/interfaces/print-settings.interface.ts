@@ -30,6 +30,10 @@ export interface ReceiptLayoutSettings {
   /** Tỉ lệ thu/phóng toàn bản in (`zoom`). 1 = giữ nguyên. */
   scale: number;
 
+  // ── Logo ─────────────────────────────────────────────────────────────────
+  /** Bề rộng logo đầu bill — px. Chiều cao tự co theo tỉ lệ ảnh. */
+  logoWidth: number;
+
   // ── Chữ ──────────────────────────────────────────────────────────────────
   /** Cỡ chữ nền của `html, body` — px. */
   baseFontSize: number;

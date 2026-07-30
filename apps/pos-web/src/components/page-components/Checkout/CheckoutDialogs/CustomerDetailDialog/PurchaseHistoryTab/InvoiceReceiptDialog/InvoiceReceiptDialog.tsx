@@ -222,7 +222,9 @@ export function InvoiceReceiptDialog({
               <span className="text-[14px] font-semibold text-[#1F2937]">
                 Thu ngân:
               </span>
-              <span className="text-[14px] text-[#1F2937]">—</span>
+              <span className="text-[14px] text-[#1F2937]">
+                {invoice.staffName?.trim() || "—"}
+              </span>
 
               <span className="text-[14px] font-semibold text-[#1F2937]">
                 Khách hàng:

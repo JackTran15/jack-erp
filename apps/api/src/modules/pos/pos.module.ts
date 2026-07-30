@@ -24,6 +24,7 @@ import { CashReceiptEntity } from '../accounting/cash-vouchers/cash-receipts/cas
 import { BranchEntity } from '../branch/branch.entity';
 import { LocationEntity } from '../inventory/location/location.entity';
 import { CustomerEntity } from '../customer/customer.entity';
+import { UserEntity } from '../auth/user.entity';
 import { ItemEntity } from '../inventory/location/item.entity';
 import { ItemCategoryEntity } from '../inventory/location/item-category.entity';
 import { ShowroomEntity } from '../inventory/location/showroom.entity';
@@ -77,6 +78,7 @@ import { StockReturnInPublisher } from './publishers/stock-return-in.publisher';
       BranchEntity,
       LocationEntity,
       CustomerEntity,
+      UserEntity,
       ItemEntity,
       ItemCategoryEntity,
       ShowroomEntity,

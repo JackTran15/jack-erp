@@ -48,6 +48,8 @@ export interface InvoiceRow {
   /** Branch nhúng ở các endpoint search v2 mới (returnable/purchase-history/drafts). */
   branch?: { id: string; name: string } | null;
   staffId: string;
+  /** Tên thu ngân đã resolve từ `staffId` — chỉ có ở `GET /invoices/:id`. */
+  staffName?: string | null;
   subtotal: number;
   discountAmount: number;
   depositAmount: number;

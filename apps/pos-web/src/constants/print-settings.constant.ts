@@ -19,9 +19,11 @@ export const RECEIPT_LAYOUT_DEFAULTS: ReceiptLayoutSettings = {
   contentWidth: 72,
   align: "center",
   offsetX: 0,
-  paddingTop: 2,
-  paddingBottom: 4,
+  paddingTop: 6,
+  paddingBottom: 8,
   scale: 1,
+
+  logoWidth: 40,
 
   baseFontSize: 11,
   lineHeight: 1.45,
@@ -30,10 +32,10 @@ export const RECEIPT_LAYOUT_DEFAULTS: ReceiptLayoutSettings = {
   tableCellPaddingX: 3,
   grandTotalFontSize: 14,
 
-  colIdxWidth: 8,
-  colQtyWidth: 11,
-  colPriceWidth: 21,
-  colTotalWidth: 23,
+  colIdxWidth: 5,
+  colQtyWidth: 7,
+  colPriceWidth: 16,
+  colTotalWidth: 16,
 
   testCopies: 1,
 };
@@ -142,6 +144,20 @@ export const RECEIPT_LAYOUT_FIELD_GROUPS: readonly ReceiptLayoutFieldGroup[] = [
         max: 1.5,
         step: 0.05,
         hint: "Thu nhỏ toàn bộ bill khi nội dung vẫn tràn dù đã chỉnh bề rộng.",
+      },
+    ],
+  },
+  {
+    title: "Logo",
+    fields: [
+      {
+        key: "logoWidth",
+        label: "Bề rộng logo",
+        unit: "px",
+        min: 20,
+        max: 200,
+        step: 5,
+        hint: "Chiều cao tự co theo tỉ lệ ảnh. 80px ≈ 30% bề ngang bill khổ 80mm.",
       },
     ],
   },

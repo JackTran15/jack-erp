@@ -17,6 +17,7 @@ import { InvoiceDebtEntity } from '../entities/invoice-debt.entity';
 import { ItemEntity } from '../../inventory/location/item.entity';
 import { LocationEntity } from '../../inventory/location/location.entity';
 import { CustomerEntity } from '../../customer/customer.entity';
+import { UserEntity } from '../../auth/user.entity';
 import { EmployeeProfileEntity } from '../../rbac/employee/employee-profile.entity';
 import { resolveBranchItemLocations } from './resolve-branch-item-locations';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
@@ -41,6 +42,8 @@ export class InvoiceService {
     private readonly paymentRepo: Repository<InvoicePaymentEntity>,
     @InjectRepository(InvoiceDebtEntity)
     private readonly debtRepo: Repository<InvoiceDebtEntity>,
+    @InjectRepository(UserEntity)
+    private readonly userRepo: Repository<UserEntity>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -302,6 +305,7 @@ export class InvoiceService {
       items: Array<InvoiceItemEntity & { location: LocationEntity | null }>;
       payments: InvoicePaymentEntity[];
       remainingDebt: number | null;
+      staffName: string | null;
     }
   > {
     const invoice = await this.findOne(id, actor);
@@ -325,10 +329,16 @@ export class InvoiceService {
     });
     const remainingDebt = debt ? Number(debt.remainingAmount) : null;
 
+    // Tên thu ngân cho biên lai / dialog chi tiết — `staffId` trỏ tới `users.id`.
+    const staff = await this.userRepo.findOne({
+      where: { id: invoice.staffId, organizationId: actor.organizationId },
+    });
+
     return Object.assign(invoiceWithCustomer, {
       items: itemsWithLocation,
       payments,
       remainingDebt,
+      staffName: staff ? `${staff.firstName} ${staff.lastName}`.trim() : null,
     });
   }
 
