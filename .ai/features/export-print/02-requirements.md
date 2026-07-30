@@ -1,7 +1,7 @@
 ---
 feature: export-print
-stories: 6
-acceptance_criteria: 25
+stories: 7
+acceptance_criteria: 35
 ---
 
 # Requirements — Xuất khẩu / In
@@ -262,6 +262,154 @@ Given `EXPORT_PARTITION_PARALLEL` đặt bằng 1
 When một export chạy trên đường keyset
 Then chỉ một truy vấn partition chạy tại một thời điểm
 And log ghi lại số partition, số trang và số dòng của từng partition
+```
+
+## US-07 — Tài liệu xuất ra giống mẫu MISA
+
+Là kế toán đang chuyển từ MISA eShop sang, tôi muốn file Excel và bản in của jack-erp trông
+đúng như file tôi vẫn nộp và vẫn lưu, để không phải định dạng lại bằng tay trước khi in ký
+hay gửi đi.
+
+> Thêm 2026-07-30. Nguồn chuẩn: 8 file trong `examples/ERP` — `export_Phieu_nhap_kho.xlsx`,
+> `export_Xuat_Khau_Xuat_Kho.xlsx`, `export_XuatKhauChuyenKho.xlsx`,
+> `export_Doanh_thu_theo_mat_hang.xlsx` và 4 bản in `.pdf` tương ứng. Chúng đã được giải mã
+> tới từng ô, từng `cellXf`, từng `mergeCell`; bảng đối chiếu nằm trong `03-logical-design.md`
+> §"House style". Ba mẫu chứng từ `.xlsx` **có** dòng tiền-bằng-chữ và khối ký — đó là bằng
+> chứng bác bỏ ADR-09, xem ADR-10.
+
+**Priority:** must
+**Depends on:** US-01, US-02, US-03
+
+### Acceptance criteria
+
+**AC-26** — House style của workbook báo cáo
+```gherkin
+Given tôi xuất bất kỳ báo cáo nào trong bốn miền invoice / inventory / profit / debt
+When tôi mở file .xlsx tải về
+Then mọi ô của hàng tiêu đề cột, hàng dữ liệu và hàng tổng đều có viền mảnh bốn cạnh
+And hàng tiêu đề cột có nền màu FFFDE9D9 với chữ đen in đậm, không phải nền xanh chữ trắng
+And số hiển thị theo định dạng #,##0
+And tiêu đề báo cáo in đậm cỡ 18 căn giữa trên toàn bộ bề rộng cột
+And file không có AutoFilter và không có freeze pane
+```
+
+**AC-27** — Excel chứng từ mang tiền-bằng-chữ và khối ký
+```gherkin
+Given tôi xuất Excel một phiếu nhập kho hoặc phiếu xuất kho có tiền
+When tôi mở file .xlsx tải về
+Then có một dòng "Số tiền viết bằng chữ: <số tiền đọc bằng tiếng Việt>" merge hết bề rộng
+And bên dưới có dòng "Ngày.......tháng.......năm............" căn phải
+And có khối 5 ô ký: Người lập phiếu, Người nhận hàng, Thủ kho, Kế toán trưởng, Giám đốc
+And mỗi ô ký có dòng "(Ký, họ tên)" bên dưới
+```
+
+**AC-28** — Khối đầu chứng từ đúng ba dòng riêng
+```gherkin
+Given tôi xuất Excel hoặc in một phiếu kho
+When tôi xem phần đầu tài liệu
+Then tên chi nhánh và địa chỉ nằm ở hai dòng đầu, căn trái
+And tiêu đề phiếu là một dòng riêng in đậm cỡ 18 căn giữa, không kèm số phiếu
+And "Ngày <d> tháng <M> năm <yyyy>" là một dòng riêng căn giữa
+And "Số: <số phiếu>" là một dòng riêng căn giữa
+And các dòng thông tin chung (Đối tượng / Người giao / Diễn giải) in đậm căn trái, mỗi dòng một mục
+```
+
+**AC-29** — Tập cột đúng cho từng loại phiếu kho
+```gherkin
+Given chứng từ là phiếu nhập kho
+When tôi xuất hoặc in
+Then bảng dòng hàng có đúng các cột: STT, Mã SKU, Tên hàng hóa, ĐVT, Vị trí, SL, Đơn giá, Thành tiền, Ghi chú
+And không có cột "Kho"
+
+Given chứng từ là phiếu xuất kho
+Then bảng dòng hàng có đúng các cột: STT, Mã SKU, Tên hàng hóa, ĐVT, Vị trí, Số lượng, Đơn giá, Thành tiền, Ghi chú
+
+Given chứng từ là phiếu chuyển kho
+Then tiêu đề là "PHIẾU CHUYỂN KHO", không phải "LỆNH ĐIỀU CHUYỂN"
+And bảng dòng hàng có đúng các cột: STT, Mã SKU, Tên hàng hóa, Kho xuất, Vị trí xuất, Kho nhập, ĐVT, SL, Ghi chú
+
+Given bất kỳ loại nào trong ba loại trên
+Then dòng cuối bảng có nhãn tổng ("Tổng" với nhập/chuyển, "Cộng" với xuất) ở cột bên trái
+```
+
+**AC-30** — Bản in trùng bố cục với file Excel
+```gherkin
+Given tôi bấm "In" trên một phiếu kho
+When hộp thoại in mở ra
+Then bản in dùng font Times New Roman
+And khối tên/địa chỉ chi nhánh căn trái, không căn giữa
+And ngày và số phiếu nằm ở hai dòng riêng căn giữa, không gộp một dòng
+And khối thông tin chung xếp dọc full width, không chia hai cột
+And hàng tiêu đề bảng không có nền xám
+And có dòng "Số tiền viết bằng chữ:", dòng "Ngày.......tháng.......năm............" căn phải, và 5 ô ký
+```
+
+**AC-31** — Đọc số thành chữ tiếng Việt
+```gherkin
+Given một số tiền bất kỳ
+When gọi amountInWordsVi(số đó)
+Then 0 cho ra "Không đồng chẵn."
+And 18000000 cho ra "Mười tám triệu đồng chẵn."
+And 315000 cho ra "Ba trăm mười lăm nghìn đồng chẵn."
+And số có phần lẻ hàng đơn vị không kết thúc bằng "chẵn"
+And số âm được đọc kèm tiền tố "Âm"
+And số từ hàng tỷ trở lên đọc đúng nhóm tỷ / triệu / nghìn
+```
+
+**AC-32** — Dòng cửa hàng điều chuyển
+```gherkin
+Given phiếu nhập kho được sinh từ một lệnh điều chuyển
+When tôi xuất hoặc in phiếu đó
+Then khối thông tin chung có thêm dòng "Cửa hàng xuất điều chuyển: <tên kho/chi nhánh nguồn>"
+
+Given phiếu xuất kho được sinh từ một lệnh điều chuyển
+Then khối thông tin chung có thêm dòng "Cửa hàng nhận điều chuyển: <tên kho/chi nhánh đích>"
+
+Given chứng từ không liên quan lệnh điều chuyển nào
+Then không có dòng nào trong hai dòng trên
+```
+
+**AC-33** — Dòng kỳ và dòng bộ lọc trên đầu báo cáo
+```gherkin
+Given tôi xuất một báo cáo có đặt kỳ
+When tôi mở file .xlsx
+Then dưới tiêu đề có dòng "Từ ngày: dd/mm/yyyy Đến ngày: dd/mm/yyyy" in nghiêng căn giữa
+And dưới nữa có một dòng tóm tắt các bộ lọc đang áp dụng, in nghiêng căn giữa
+And điều này đúng cho cả bốn miền báo cáo, không riêng inventory
+```
+
+**AC-34** — Lưới cột chứng từ đúng mẫu: cột ẩn, cột gộp, khối ký từ cột B
+```gherkin
+Given tôi xuất Excel một phiếu nhập kho
+When tôi mở file .xlsx
+Then bảng có hai cột "Giá bán" và "Thành tiền giá bán" ở đúng vị trí của mẫu
+And hai cột đó bị **ẩn** khi mở file
+And "Giá bán" bằng giá bán mặc định của mặt hàng, "Thành tiền giá bán" = SL × giá bán
+And ô "Tên hàng hóa" được gộp qua 4 cột (C:F) ở cả hàng tiêu đề lẫn mọi hàng dữ liệu
+And ô ký đầu tiên ("Người lập phiếu") nằm ở cột B, các ô sau cách nhau một cột
+
+Given chứng từ là phiếu xuất kho hoặc lệnh điều chuyển (phiếu chuyển kho)
+Then áp dụng đúng ba điều trên
+
+Given tôi bấm "In" thay vì "Xuất khẩu"
+Then bản in **không** hiện hai cột ẩn đó, giống hệt bản in mẫu
+```
+
+**AC-35** — Tên file tải về là loại chứng từ
+```gherkin
+Given tôi bấm "Xuất khẩu" trên một phiếu nhập kho trong backoffice
+When trình duyệt tải file về
+Then tên file là "phieu-nhap-kho.xlsx"
+
+Given chứng từ là phiếu xuất kho hoặc lệnh điều chuyển
+Then tên file lần lượt là "phieu-xuat-kho.xlsx" và "phieu-chuyen-kho.xlsx"
+
+Given tôi xuất một báo cáo
+Then tên file là tên báo cáo dạng slug, ví dụ "doanh-thu-theo-mat-hang.xlsx"
+
+Given backoffice và API nằm ở hai origin khác nhau
+When trình duyệt đọc phản hồi
+Then nó vẫn đọc được `Content-Disposition` do server đặt, không rơi về tên mặc định
 ```
 
 ## Non-functional

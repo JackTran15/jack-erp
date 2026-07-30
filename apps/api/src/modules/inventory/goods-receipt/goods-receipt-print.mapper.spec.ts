@@ -4,21 +4,26 @@ import { GoodsReceiptEntity } from './goods-receipt.entity';
 
 function receipt(overrides: Record<string, unknown> = {}): GoodsReceiptEntity {
   return {
-    documentNumber: 'IMP000001',
-    receivedAt: new Date('2026-07-09T22:12:00Z'),
-    counterparty: { kind: 'EMPLOYEE', id: 'e1', code: null, name: 'Nhân viên HCM' },
-    deliveredBy: 'NV 01',
+    documentNumber: 'NK000383',
+    receivedAt: new Date(2026, 6, 28, 22, 12),
+    counterparty: { kind: 'EMPLOYEE', id: 'e1', code: null, name: 'CHÂU' },
+    deliveredBy: 'A VINH',
     reason: 'Nhập hàng',
-    description: null,
+    description: 'HÀNG TOA 12/07/2026-CNDN 1 THUNG',
     branchId: 'branch-1',
     lines: [
       {
-        item: { code: 'ABA2777-D-38', name: 'Giày nam ABA2777-D-38' },
-        location: { name: 'A01.01', storageId: 'storage-1' },
+        item: {
+          code: 'TH10520-D-35',
+          name: 'Giày nữ TH10520-D-35',
+          sellingPrice: 400000,
+        },
+        location: { name: 'B05.05', storageId: 'storage-1' },
         uomCode: 'Đôi',
-        quantity: '10',
-        unitPrice: '350000',
-        lineTotal: '3500000',
+        quantity: '2',
+        unitPrice: '250000',
+        lineTotal: '500000',
+        note: 'ghi chú dòng',
       },
     ],
     ...overrides,
@@ -27,47 +32,159 @@ function receipt(overrides: Record<string, unknown> = {}): GoodsReceiptEntity {
 }
 
 describe('mapGoodsReceiptToVoucherPayload', () => {
-  it('maps header fields, resolves warehouse name, and sums totals', () => {
+  it('uses the column set the reference voucher prints', () => {
+    const payload = mapGoodsReceiptToVoucherPayload(receipt(), null);
+
+    expect(payload.lineColumns.map((c) => c.label)).toEqual([
+      'STT',
+      'Mã SKU',
+      'Tên hàng hóa',
+      'ĐVT',
+      'Vị trí',
+      'SL',
+      'Đơn giá',
+      'Thành tiền',
+      'Giá bán',
+      'Thành tiền giá bán',
+      'Ghi chú',
+    ]);
+    // The receipt's warehouse is named in the branch block, not per line.
+    expect(payload.lineColumns.map((c) => c.col)).not.toContain('warehouse');
+  });
+
+  it('spans the product name across four grid columns', () => {
+    const payload = mapGoodsReceiptToVoucherPayload(receipt(), null);
+    const name = payload.lineColumns.find((c) => c.col === 'name');
+
+    expect(name?.span).toBe(4);
+  });
+
+  it('carries the sale columns hidden, the way the reference does', () => {
+    const payload = mapGoodsReceiptToVoucherPayload(receipt(), null);
+    const byCol = new Map(payload.lineColumns.map((c) => [c.col, c]));
+
+    expect(byCol.get('salePrice')?.hidden).toBe(true);
+    expect(byCol.get('saleTotal')?.hidden).toBe(true);
+    // Everything else stays visible.
+    expect(byCol.get('lineTotal')?.hidden).toBeUndefined();
+  });
+
+  it('fills the sale columns from the item price rather than leaving them zero', () => {
+    const payload = mapGoodsReceiptToVoucherPayload(receipt(), null);
+
+    expect(payload.lines[0].salePrice).toBe(400000);
+    expect(payload.lines[0].saleTotal).toBe(800000);
+    expect(payload.totals?.saleTotal).toBe(800000);
+    // A unit price has no meaningful sum.
+    expect(payload.totals?.salePrice).toBeNull();
+  });
+
+  it('reads a missing selling price as zero, not NaN', () => {
     const payload = mapGoodsReceiptToVoucherPayload(
-      receipt(),
-      { name: 'Hồ Chí Minh', address: null, phone: null },
-      new Map([['storage-1', 'Kho lưu trữ HCM']]),
+      receipt({
+        lines: [
+          {
+            item: { code: 'X', name: 'X' },
+            location: { name: 'A01' },
+            uomCode: 'Đôi',
+            quantity: '2',
+            unitPrice: '1',
+            lineTotal: '2',
+          },
+        ],
+      }),
+      null,
     );
+
+    expect(payload.lines[0].salePrice).toBe(0);
+    expect(payload.lines[0].saleTotal).toBe(0);
+    expect(payload.totals?.saleTotal).toBe(0);
+  });
+
+  it('maps header fields, numbers the lines and sums totals', () => {
+    const payload = mapGoodsReceiptToVoucherPayload(receipt(), {
+      name: 'Chi nhánh 211 TP. Đà Nẵng',
+      address: '211 Lê Duẩn, Thanh Khê - Đà Nẵng',
+      phone: null,
+    });
 
     expect(payload.kind).toBe(VoucherKind.GOODS_RECEIPT);
     expect(payload.title).toBe('PHIẾU NHẬP KHO');
-    expect(payload.docNo).toBe('IMP000001');
-    expect(payload.branch?.name).toBe('Hồ Chí Minh');
-    expect(payload.info).toContainEqual({ label: 'Đối tượng', value: 'Nhân viên HCM' });
-    expect(payload.lines).toHaveLength(1);
-    expect(payload.lines[0]).toMatchObject({
-      sku: 'ABA2777-D-38',
-      warehouse: 'Kho lưu trữ HCM',
-      position: 'A01.01',
-      quantity: 10,
-      lineTotal: 3500000,
+    expect(payload.docNo).toBe('NK000383');
+    expect(payload.branch?.name).toBe('Chi nhánh 211 TP. Đà Nẵng');
+    expect(payload.info).toContainEqual({ label: 'Đối tượng', value: 'CHÂU' });
+    expect(payload.info).toContainEqual({
+      label: 'Diễn giải',
+      value: 'HÀNG TOA 12/07/2026-CNDN 1 THUNG',
     });
-    expect(payload.totals).toMatchObject({ quantity: 10, lineTotal: 3500000 });
+    expect(payload.lines[0]).toMatchObject({
+      stt: 1,
+      sku: 'TH10520-D-35',
+      uom: 'Đôi',
+      position: 'B05.05',
+      quantity: 2,
+      lineTotal: 500000,
+      note: 'ghi chú dòng',
+    });
+    expect(payload.totals).toMatchObject({ quantity: 2, lineTotal: 500000 });
   });
 
-  it('falls back to a dash for missing info fields and null for an unresolved warehouse', () => {
+  it('writes the document date the long way, without the leading word', () => {
+    const payload = mapGoodsReceiptToVoucherPayload(receipt(), null);
+
+    expect(payload.docDate).toBe('28 tháng 7 năm 2026');
+  });
+
+  it('labels the totals row "Tổng" and reads the amount aloud', () => {
+    const payload = mapGoodsReceiptToVoucherPayload(receipt(), null);
+
+    expect(payload.totalsLabel).toBe('Tổng');
+    expect(payload.amountInWords).toBe('Năm trăm nghìn đồng chẵn.');
+  });
+
+  it('carries the five signature boxes the reference voucher has', () => {
+    const payload = mapGoodsReceiptToVoucherPayload(receipt(), null);
+
+    expect(payload.signatures).toEqual([
+      'Người lập phiếu',
+      'Người nhận hàng',
+      'Thủ kho',
+      'Kế toán trưởng',
+      'Giám đốc',
+    ]);
+  });
+
+  it('adds the transfer source store line only when the receipt came from a transfer', () => {
+    const fromTransfer = mapGoodsReceiptToVoucherPayload(
+      receipt(),
+      null,
+      'Kho tổng',
+    );
+    expect(fromTransfer.info).toContainEqual({
+      label: 'Cửa hàng xuất điều chuyển',
+      value: 'Kho tổng',
+    });
+
+    const plain = mapGoodsReceiptToVoucherPayload(receipt(), null);
+    expect(
+      plain.info.some((row) => row.label === 'Cửa hàng xuất điều chuyển'),
+    ).toBe(false);
+  });
+
+  it('falls back to a dash for missing info fields', () => {
     const payload = mapGoodsReceiptToVoucherPayload(
       receipt({ deliveredBy: undefined }),
       null,
-      new Map(),
     );
 
     expect(payload.branch).toBeNull();
     expect(payload.info).toContainEqual({ label: 'Người giao', value: '—' });
-    expect(payload.lines[0].warehouse).toBeNull();
   });
 
-  it('returns null totals when there are no lines', () => {
-    const payload = mapGoodsReceiptToVoucherPayload(
-      receipt({ lines: [] }),
-      null,
-      new Map(),
-    );
+  it('returns null totals and no amount in words when there are no lines', () => {
+    const payload = mapGoodsReceiptToVoucherPayload(receipt({ lines: [] }), null);
+
     expect(payload.totals).toBeNull();
+    expect(payload.amountInWords).toBeUndefined();
   });
 });

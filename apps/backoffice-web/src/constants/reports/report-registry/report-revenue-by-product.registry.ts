@@ -28,22 +28,22 @@ const columns: ReportColumnConfig[] = [
     tableConfig: { width: 80, align: "left", dataType: "text" },
   },
   {
-    // Chỉ áp dụng ở "Thống kê theo" = Hàng hoá (statBy=item) VÀ khi filter
-    // "Cửa hàng" resolve đúng 1 cửa hàng — BE bỏ 2 cột này khỏi catalog ở
-    // grain Mẫu mã/Nhóm hàng hóa hoặc khi đang xem nhiều/mọi cửa hàng.
-    // Registry này chỉ là fallback dự phòng (nguồn sự thật là GET
-    // /reports/invoices/columns?reportType=revenue-by-item&statBy=...).
-    column: ReportTableColumn.LOCATION,
-    backendField: "locationName",
-    label: "Vị trí",
+    // Cột vị trí có mặt trong catalog ở MỌI grain và MỌI phạm vi cửa hàng
+    // (BE luôn trả đủ 14 cột — không còn nhánh loại cột theo statBy/store).
+    // Ở grain Mẫu mã/Nhóm hàng hóa hoặc khi xem nhiều/mọi cửa hàng, giá trị
+    // đơn giản là rỗng thay vì cột biến mất. Registry này chỉ là fallback dự
+    // phòng (nguồn sự thật là GET /reports/invoices/columns?reportType=revenue-by-item).
+    column: ReportTableColumn.LOCATION_CODE,
+    backendField: "locationCode",
+    label: "Mã vị trí",
     order: 4,
     visible: true,
     tableConfig: { width: 110, align: "left", dataType: "text" },
   },
   {
-    column: ReportTableColumn.LOCATION_CODE,
-    backendField: "locationCode",
-    label: "Mã vị trí",
+    column: ReportTableColumn.LOCATION,
+    backendField: "locationName",
+    label: "Tên vị trí",
     order: 5,
     visible: true,
     tableConfig: { width: 110, align: "left", dataType: "text" },
@@ -130,14 +130,6 @@ const columns: ReportColumnConfig[] = [
     visible: true,
     tableConfig: { width: 140, align: "left", dataType: "text" },
   },
-  {
-    column: ReportTableColumn.SUPPLIER_NAME,
-    backendField: "supplierName",
-    label: "Nhà cung cấp",
-    order: 15,
-    visible: true,
-    tableConfig: { width: 150, align: "left", dataType: "text" },
-  },
 ];
 
 export const single_tableRegistryReportRevenueByProduct: ReportTableConfig = {
@@ -145,19 +137,10 @@ export const single_tableRegistryReportRevenueByProduct: ReportTableConfig = {
   columns,
 };
 
-// "Vị trí"/"Mã vị trí" là dữ liệu phụ thuộc việc resolve đúng 1 cửa hàng — ở
-// chế độ Chuỗi cửa hàng khi đang gộp nhiều/mọi cửa hàng vào 1 dòng, không có
-// 1 vị trí duy nhất để hiển thị. Registry này chỉ là fallback dự phòng; BE đã
-// tự loại 2 cột này khỏi catalog thật khi filter "Cửa hàng" không resolve về
-// đúng 1 cửa hàng (kể cả khi vẫn ở chế độ Chuỗi cửa hàng).
-export const chain_tableRegistryReportRevenueByProduct: ReportTableConfig = {
-  summaryLabel: "Tổng",
-  columns: columns.filter(
-    (c) =>
-      c.column !== ReportTableColumn.LOCATION &&
-      c.column !== ReportTableColumn.LOCATION_CODE,
-  ),
-};
+// Cùng 14 cột ở cả 2 chế độ (ADR-03) — chế độ Chuỗi cửa hàng không còn loại
+// bỏ 2 cột vị trí, chỉ là chúng thường rỗng khi gộp nhiều/mọi cửa hàng.
+export const chain_tableRegistryReportRevenueByProduct: ReportTableConfig =
+  single_tableRegistryReportRevenueByProduct;
 
 export const single_filterRegistryReportRevenueByProduct = [
   REPORT_FILTERS_LINE.STORE,

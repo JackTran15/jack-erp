@@ -10,18 +10,23 @@ export interface VoucherExportDocument {
 
 /**
  * Adapts a `VoucherPrintPayload` into the shape `ExportPipeline` expects
- * (ADR-09) — reusing the report-export path instead of a payload/writer of
- * its own. `signatures` and `amountInWords` are deliberately dropped: they
- * are content for a page to be signed, not a spreadsheet.
+ * (ADR-09) — reusing the report-export path instead of a payload of its own.
+ *
+ * It maps the table and nothing else. Everything around the table — document
+ * number, date line, info block, totals label, amount in words, signatures —
+ * goes straight from the payload into `VoucherXlsxWriter` (ADR-10), which knows
+ * the voucher layout. Before that writer existed this function had to fold the
+ * document number into the title and the info rows into `subtitleLines` so the
+ * report writer would print them at all; that distortion is gone.
  */
 export function voucherToReportDocument(
   payload: VoucherPrintPayload,
 ): VoucherExportDocument {
   return {
     header: {
-      title: `${payload.title} ${payload.docNo}`.trim(),
+      title: payload.title,
       branch: payload.branch,
-      subtitleLines: payload.info.map((row) => `${row.label}: ${row.value}`),
+      subtitleLines: [],
     },
     columns: payload.lineColumns,
     rows: payload.lines,

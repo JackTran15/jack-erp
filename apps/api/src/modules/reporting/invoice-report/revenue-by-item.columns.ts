@@ -36,18 +36,18 @@ export interface RevenueByItemColumnDef {
 }
 
 /**
- * Curated whitelist in on-screen order: dimension columns then measures.
- * `unitPrice` (Đơn giá) is a weighted-average unit price of the aggregated group
- * (goods ÷ quantity), so it stays meaningful after lines are summed; its footer
- * total is null (an average has no meaningful sum). `revenue.promoPoints` is a
- * placeholder (0) until a per-line loyalty backing exists. Labels live in
- * INVOICE_REPORT_COLUMN_LABELS_VI.
+ * Curated whitelist, in the reference MISA export's column order (A→N):
+ * identity dimensions, location, measures, then the trailing classification
+ * dimensions (category/brand). `unitPrice` (Đơn giá TB) is a weighted-average
+ * unit price of the aggregated group (goods ÷ quantity), so it stays
+ * meaningful after lines are summed; its footer total is null (an average has
+ * no meaningful sum). `revenue.promoPoints` is a placeholder (0) until a
+ * per-line loyalty backing exists. Labels live in
+ * REVENUE_BY_ITEM_COLUMN_LABELS_VI / INVOICE_REPORT_COLUMN_LABELS_VI.
  */
 export const REVENUE_BY_ITEM_COLUMNS: RevenueByItemColumnDef[] = [
   { key: 'sku', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'sku' } },
   { key: 'itemName', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'name' } },
-  { key: 'itemCategory', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'itemCategory' } },
-  { key: 'brand', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'brand' } },
   { key: 'unit', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'unit' } },
   { key: 'locationCode', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'locationCode' } },
   { key: 'locationName', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'locationName' } },
@@ -55,9 +55,11 @@ export const REVENUE_BY_ITEM_COLUMNS: RevenueByItemColumnDef[] = [
   { key: 'unitPrice', type: ReportColumnDataType.CURRENCY, source: { kind: 'computed', computed: 'unitPrice' } },
   { key: 'revenue.goods', type: ReportColumnDataType.CURRENCY, source: { kind: 'measure', field: 'goods' } },
   { key: 'revenue.discount', type: ReportColumnDataType.CURRENCY, source: { kind: 'measure', field: 'discount' } },
-  { key: 'revenue.total', type: ReportColumnDataType.CURRENCY, source: { kind: 'measure', field: 'total' } },
-  { key: 'revenue.promoRate', type: ReportColumnDataType.PERCENT, source: { kind: 'computed', computed: 'promoRate' } },
   { key: 'revenue.promoPoints', type: ReportColumnDataType.CURRENCY, source: { kind: 'placeholder', placeholder: 0 } },
+  { key: 'revenue.promoRate', type: ReportColumnDataType.PERCENT, source: { kind: 'computed', computed: 'promoRate' } },
+  { key: 'revenue.total', type: ReportColumnDataType.CURRENCY, source: { kind: 'measure', field: 'total' } },
+  { key: 'itemCategory', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'itemCategory' } },
+  { key: 'brand', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'brand' } },
 ];
 
 const BY_KEY = new Map(REVENUE_BY_ITEM_COLUMNS.map((c) => [c.key, c]));

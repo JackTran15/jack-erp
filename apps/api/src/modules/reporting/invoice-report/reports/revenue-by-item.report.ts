@@ -6,6 +6,8 @@ import {
   InvoiceReportResult,
   ReportColumnHeader,
   ReportGroupBy,
+  REVENUE_BY_ITEM_COLUMN_DESCS,
+  REVENUE_BY_ITEM_COLUMN_LABELS_VI,
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { FilterBuilder } from '../../../../common/filters/filter.builder';
@@ -94,45 +96,22 @@ export class RevenueByItemReport implements ReportDefinition {
   ) {}
 
   async buildColumns(
-    actor: ActorContext,
-    filters?: InvoiceReportColumnsFilterDto,
+    _actor: ActorContext,
+    _filters?: InvoiceReportColumnsFilterDto,
   ): Promise<ReportColumnHeader[]> {
-    // "Vị trí"/"Mã vị trí" only apply at item grain (statBy=item, "Hàng hoá") AND
-    // when the request resolves to exactly one store — a parent/category row
-    // spans multiple items, and a multi-store row has no single location.
-    let showLocation = !filters?.statBy || filters.statBy === ReportGroupBy.ITEM;
-    if (showLocation) {
-      try {
-        const hasConsolidated = await this.rbac.hasPermission(
-          actor.userId,
-          actor.organizationId,
-          CONSOLIDATED_PERMISSION,
-        );
-        const branchIds = resolveBranchIds(
-          hasConsolidated,
-          filters?.store,
-          filters?.branchId,
-          actor,
-        );
-        showLocation = Array.isArray(branchIds) && branchIds.length === 1;
-      } catch {
-        // No resolvable store scope (e.g. no branch, no consolidated access) —
-        // the columns catalog should still render; buildData handles this the
-        // same way when it actually needs the scope for data, not headers.
-        showLocation = false;
-      }
-    }
-    const defs = showLocation
-      ? REVENUE_BY_ITEM_COLUMNS
-      : REVENUE_BY_ITEM_COLUMNS.filter(
-          (c) => c.key !== 'locationCode' && c.key !== 'locationName',
-        );
-    // Flat catalog — no bands, no dynamic payment-method columns.
-    return defs.map((c) =>
+    // Catalog is the same at every grain and every store scope: locationCode /
+    // locationName stay in it even where they resolve to null (ADR-03) — a
+    // parent/category row or a multi-store row simply prints an empty cell,
+    // matching the reference MISA export rather than making the column list
+    // itself change shape under the user.
+    return REVENUE_BY_ITEM_COLUMNS.map((c) =>
       enrichHeader({
         col: c.key,
-        name: INVOICE_REPORT_COLUMN_LABELS_VI[c.key] ?? c.key,
-        desc: null,
+        name:
+          REVENUE_BY_ITEM_COLUMN_LABELS_VI[c.key] ??
+          INVOICE_REPORT_COLUMN_LABELS_VI[c.key] ??
+          c.key,
+        desc: REVENUE_BY_ITEM_COLUMN_DESCS[c.key] ?? null,
         type: c.type,
         group: null,
       }),

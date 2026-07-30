@@ -1,6 +1,6 @@
 ---
 feature: export-print
-adr_count: 9
+adr_count: 11
 ---
 
 # Logical design — Xuất khẩu / In
@@ -21,8 +21,12 @@ ReportDocumentPayload ────┤
 
                           ┌─→ renderVoucherHtml (client) → iframe → window.print()
 VoucherPrintPayload ──────┤
-                          └─→ voucherToReportDocument (server, adapter thuần) ──→ ExportPipeline (XlsxStreamWriter) → .xlsx
+                          └─→ voucherToReportDocument (server, adapter thuần) ──→ ExportPipeline (VoucherXlsxWriter) → .xlsx
 ```
+
+Sửa 2026-07-30 (US-07, ADR-10/11): đường Excel của chứng từ đổi từ `XlsxStreamWriter` sang
+`VoucherXlsxWriter` — cùng pipeline, cùng fetcher, cùng sink, khác đúng một mảnh. Cả hai Writer đọc
+chuẩn trình bày từ `export/xlsx-style.ts`.
 
 Bổ sung 2026-07-27 (AC-23..25, ADR-09): 3 chứng từ kho cần cả Xuất khẩu, không chỉ In.
 Vì `VoucherPrintPayload` đã có đủ `title`/`branch`/`lineColumns`/`lines`/`totals`, đường
@@ -89,7 +93,7 @@ iframe ẩn rồi `window.print()`. Không thêm dependency ở cả ba package.
 |---|---|---|---|
 | `ReportDocumentPayload` | `packages/shared-interfaces/src/reporting/document-payload.ts` (new) | `title`, `branch: {name, address, phone} \| null`, `subtitleLines: string[]`, `columns: DocumentColumn[]`, `rows: ReportRow[]`, `totals: ReportRow \| null` | Đủ để dựng workbook lẫn HTML; không chứa gì thuộc về cách trình bày |
 | `DocumentColumn` | cùng file | `col`, `label`, `type: ReportColumnDataType`, `width?`, `align?` | `label` = `displayName` người dùng đặt, fallback `ReportColumnHeader.name` |
-| `VoucherPrintPayload` | `packages/shared-interfaces/src/printing/voucher-payload.ts` (new) | `kind: VoucherKind`, `paper: 'A4' \| 'A5'`, `title`, `docNo`, `docDate`, `branch`, `info: InfoRow[]`, `lineColumns: DocumentColumn[]`, `lines: ReportRow[]`, `totals`, `amountInWords?`, `signatures: string[]` | Một kiểu cho cả 7 loại phiếu |
+| `VoucherPrintPayload` | `packages/shared-interfaces/src/printing/voucher-payload.ts` (new) | `kind: VoucherKind`, `paper: 'A4' \| 'A5'`, `title`, `docNo`, `docDate`, `branch`, `info: InfoRow[]`, `lineColumns: DocumentColumn[]`, `lines: ReportRow[]`, `totals`, `amountInWords?`, `totalsLabel?`, `signatures: string[]` | Một kiểu cho cả 7 loại phiếu. **Sửa 2026-07-30 (US-07):** thêm `totalsLabel?` ("Tổng"/"Cộng"); `docDate` siết ngữ nghĩa sang dạng dài không kèm chữ "Ngày" (`"28 tháng 7 năm 2026"`) để cả hai renderer in ra `Ngày ${docDate}`; `amountInWords` bắt đầu được sinh giá trị cho phiếu nhập/xuất kho, không còn chỉ dành cho phiếu quỹ |
 | `VoucherKind` | cùng file | enum: `GOODS_RECEIPT`, `GOODS_ISSUE`, `TRANSFER_ORDER`, `CASH_RECEIPT`, `CASH_PAYMENT`, `BANK_RECEIPT`, `BANK_PAYMENT` | |
 
 Không có bảng mới, không migration. Cả hai payload là kiểu truyền tải, không lưu.
@@ -109,6 +113,93 @@ nằm ở `apps/api/src/modules/reporting/report-core/export/`.
 | `ExportWriter` | `begin(header, columns)`, `rows(rows)`, `end(totals)` | |
 | `ExportSink` | `stream(): Writable`, `finalize(): Promise<void>` | HTTP: đặt header rồi `res`; S3 sau này: upload stream |
 | `ReportExportSource<TDto>` | `range(dto)`, `summable(columns): string[]`, `page(dto, actor, args): Promise<FetchPageResult>` | Capability **tuỳ chọn** trên `ReportDefinition`. `summable` cần vì `ReportColumnHeader` không có cờ additive, còn `NON_ADDITIVE` là tri thức của từng report (`document-detail.report.ts`) |
+
+## House style (nguồn: `examples/ERP`, đo 2026-07-30)
+
+Số liệu dưới đây lấy trực tiếp từ `xl/styles.xml` + `xl/worksheets/sheet1.xml` của 4 file mẫu, không
+phải ước lượng bằng mắt. Đây là đặc tả mà `xlsx-style.ts` phải mã hoá.
+
+### Chung cho mọi workbook
+
+| Thuộc tính | Giá trị |
+|---|---|
+| Font | Times New Roman (đã là `GENERATED_XLSX_FONT_NAME`) |
+| Cỡ thân / tiêu đề cột / tiêu đề tài liệu | 12 / 12 bold / 18 bold |
+| Định dạng số | `#,##0` (`numFmtId 177`) |
+| Viền | `thin` bốn cạnh cho ô tiêu đề cột, ô dữ liệu, ô dòng tổng |
+| AutoFilter / freeze pane | **không có ở cả 4 mẫu** |
+| pageSetup | `orientation="portrait"` |
+
+### Riêng workbook báo cáo (`export_Doanh_thu_theo_mat_hang.xlsx`)
+
+```
+R1  tên chi nhánh            bold 12, trái, không merge
+R2  địa chỉ                  12, trái
+R3  điện thoại               12, trái          ← số trần, KHÔNG có tiền tố "SĐT:"
+R4  TIÊU ĐỀ                  bold 18, giữa, merge A..lastCol
+R5  Từ ngày: … Đến ngày: …   italic 12, giữa, merge
+R6  tóm tắt bộ lọc           italic 12, giữa, merge
+R7  (trống)
+R8  tiêu đề cột              bold 12, nền FFFDE9D9, viền, giữa+middle+wrapText
+R9+ dữ liệu                  12, viền; chuỗi trái, số phải #,##0
+Rn  dòng tổng                bold 12, nền FFFDE9D9, viền, số phải #,##0, ô nhãn để trống
+```
+
+### Riêng workbook chứng từ (3 mẫu `phieu_*.xlsx`)
+
+```
+R1  tên chi nhánh            bold 12, trái
+R2  địa chỉ                  12, trái
+R3  (trống)
+R4  TIÊU ĐỀ                  bold 18, giữa, merge          ← KHÔNG kèm số phiếu
+R5  Ngày <d> tháng <M> năm <yyyy>   bold italic 12, giữa, merge
+R6  Số: <docNo>              bold 12, giữa, merge
+R7+ <label>: <value>         bold 12, trái, merge — mỗi InfoRow một dòng
+    (+ "Cửa hàng xuất/nhận điều chuyển: …" khi chứng từ sinh từ lệnh điều chuyển)
+R   (trống)
+H   tiêu đề cột              bold 12, viền, giữa+middle, KHÔNG nền
+D   dữ liệu                  12, viền; STT giữa, chuỗi trái, số phải #,##0
+T   dòng tổng                nhãn "Tổng"/"Cộng" merge bên trái + số bold phải, viền
+W   Số tiền viết bằng chữ: … bold, merge hết bề rộng
+    (2 dòng trống)
+S1  Ngày.......tháng.......năm............   italic 12, căn phải
+S2  5 nhãn ô ký              bold 12, giữa, wrapText, chiều cao dòng 31.5
+S3  (Ký, họ tên) ×5          italic 12, giữa
+```
+
+Tên sheet = tiêu đề chứng từ (`Phiếu nhập kho`), không phải `docNo`.
+
+Nhãn 5 ô ký: `Người lập phiếu`, `Người nhận hàng`, `Thủ kho`, `Kế toán trưởng`, `Giám đốc`.
+Nhãn dòng tổng: `Tổng` cho nhập kho và chuyển kho, `Cộng` cho xuất kho (MISA đặt vậy).
+
+### Tập cột từng loại chứng từ
+
+Sau khi bỏ các cột mẫu để ẩn và repo không có dữ liệu (A-20):
+
+| Loại | Cột |
+|---|---|
+| Nhập kho | STT, Mã SKU, Tên hàng hóa, ĐVT, Vị trí, SL, Đơn giá, Thành tiền, Ghi chú |
+| Xuất kho | STT, Mã SKU, Tên hàng hóa, ĐVT, Vị trí, Số lượng, Đơn giá, Thành tiền, Ghi chú |
+| Chuyển kho | STT, Mã SKU, Tên hàng hóa, Kho xuất, Vị trí xuất, Kho nhập, ĐVT, SL, Ghi chú |
+
+Tiêu đề chuyển kho: `PHIẾU CHUYỂN KHO`.
+
+### Bản in (4 mẫu `.pdf`)
+
+Mẫu PDF trùng khít bố cục Excel, chỉ bỏ các cột mẫu đang ẩn — xác nhận nguyên tắc ADR-01. Bản in
+phải đổi theo: font Times New Roman (đang Arial), khối chi nhánh **căn trái** (đang căn giữa), ngày
+và số phiếu ở **hai dòng riêng căn giữa** (đang một dòng `Số: X — Ngày: Y`), khối info **xếp dọc
+full width** (đang flex 2 cột), tiêu đề bảng **không nền xám**, dòng tổng có nhãn, chuỗi
+`Số tiền viết bằng chữ:` (đang `Số tiền bằng chữ:`), thêm dòng `Ngày.......tháng.......năm............`
+căn phải, và **5** ô ký (đang 3).
+
+### Sai lệch có chủ ý so với mẫu
+
+| Mẫu | Ta làm | Lý do |
+|---|---|---|
+| Tiêu đề cột báo cáo merge 2 dòng (`A8:A9`) | 1 dòng + `wrapText` + tăng chiều cao | `WorkbookWriter` không quay lại ô đã commit (ADR-08); merge chéo dòng đòi giữ 2 dòng chưa commit. Xem A-22 |
+| Nhãn cột kèm chú thích công thức (`Số lượng bán\n(1)`) | Giữ nhãn từ catalog | Nhãn thuộc về `ReportColumnHeader` + `columnLabels` người dùng đặt (ADR-04) |
+| Giữ cột ẩn Serials / Giá bán / Thành tiền giá bán | Bỏ hẳn | A-20, người dùng chốt |
 
 ## Contracts
 
@@ -354,7 +445,54 @@ chỉ một adapter nhỏ và một fetcher tầm thường. Đổi lại: file 
 `amountInWords` hay ô ký, vì đó là nội dung dành cho giấy in, không dành cho bảng tính; nếu
 sau này cần bản Excel "y hệt phiếu giấy" thì đó là một renderer khác, không phải mở rộng
 `ReportDocumentPayload`.
-**Status:** accepted — chốt bởi Akenzy, 2026-07-27
+**Status:** **superseded** bởi ADR-10 — Akenzy, 2026-07-30. Phần "tái dùng `ExportPipeline` và
+`ReportDocumentPayload`" vẫn đúng và vẫn giữ. Phần sai là câu "`amountInWords` và ô ký không thuộc
+về một bảng tính": cả ba mẫu `.xlsx` chứng từ của MISA đều có cả hai, và người dùng dùng chính file
+Excel đó để in ký. Hệ quả kéo theo: ràng buộc "không có Writer mới" (AC-24) cũng bị bỏ — xem ADR-10.
+
+### ADR-10 — Chứng từ có Writer Excel riêng, mang cả tiền-bằng-chữ và khối ký
+**Context:** ADR-09 chốt file Excel chứng từ chỉ là bảng dữ liệu, và ràng buộc "không viết Writer
+mới" (AC-24) là thứ làm cho UOW-08 rẻ. Ngày 2026-07-30 người dùng đưa 3 file `.xlsx` chứng từ xuất
+thật từ MISA eShop. Cả ba đều có: tiêu đề / ngày / số phiếu là **ba dòng riêng căn giữa**, khối
+thông tin chung **in đậm căn trái**, dòng tổng có **nhãn** (`Tổng` / `Cộng`), dòng
+`Số tiền viết bằng chữ: …`, dòng `Ngày.......tháng.......năm............`, và **khối 5 ô ký** kèm
+`(Ký, họ tên)`. Nghĩa là người dùng in ký từ chính file Excel — giả định "bảng tính không phải giấy
+ký" của ADR-09 sai.
+
+**Decision:** Viết `VoucherXlsxWriter implements ExportWriter`, đứng cạnh `XlsxStreamWriter`, dùng
+chung hằng số trình bày ở `export/xlsx-style.ts`. Ba controller chứng từ đổi Writer, giữ nguyên
+`ExportPipeline`, `StaticRowsFetcher`, `HttpResponseSink`. `voucherToReportDocument` thôi ghép
+`docNo` vào `title` và thôi đổ `info` vào `subtitleLines`; phần "chrome" của chứng từ (số phiếu,
+dòng ngày, info, nhãn tổng, tiền-bằng-chữ, ô ký) đi thẳng vào constructor của Writer từ
+`VoucherPrintPayload`.
+
+**Consequences:** Chứng từ và báo cáo có bộ xương khác nhau thật, nên chúng là hai Writer chứ không
+phải một Writer với cờ `if kind === voucher` — đó chính là chỗ ADR-06 dựng seam ra để dùng. Đổi lại
+ba thứ: (1) AC-24 mất hiệu lực ở vế "không Writer mới" — vế "không kiểu payload mới, không Sink
+mới" vẫn giữ; (2) phải viết `amountInWordsVi` (repo chưa có bất kỳ util đọc số thành chữ nào —
+`amountInWords` đã khai trong `VoucherPrintPayload` từ ADR-05 nhưng chưa nơi nào sinh giá trị);
+(3) `VoucherXlsxWriter` ghi khối ký **sau** dòng cuối cùng của bảng, nên nó phải biết số dòng đã
+ghi — `ExportWriter.end(totals)` là chỗ duy nhất biết điều đó, và với chứng từ thì `StaticRowsFetcher`
+đảm bảo toàn bộ dòng đã nằm trong RAM nên không mâu thuẫn với ADR-08.
+**Status:** accepted — chốt bởi Akenzy, 2026-07-30
+
+### ADR-11 — House style MISA nằm ở một file hằng số, không nằm trong từng Writer
+**Context:** Sau ADR-10 có hai Writer cùng phải tuân một chuẩn trình bày (font Times New Roman, nền
+tiêu đề `FFFDE9D9`, viền mảnh bốn cạnh, `#,##0`, tiêu đề bold 18 căn giữa). Đây đúng loại tri thức
+đã bị chép ở 7 chỗ trước khi có feature này — chép lần thứ tám vào Writer thứ hai là lặp lại đúng
+sai lầm.
+
+**Decision:** `apps/api/src/modules/reporting/report-core/export/xlsx-style.ts` giữ toàn bộ hằng số
+và helper trình bày (`HEADER_FILL`, `THIN_BORDER`, `NUMBER_FORMAT`, cỡ chữ, helper ghi một dòng
+banner có merge + style). Cả hai Writer chỉ đọc, không tự khai. Bản in HTML tuân cùng chuẩn nhưng
+bằng CSS của nó — không chia sẻ code qua ranh giới BE/FE, chỉ chia sẻ chuẩn.
+
+**Consequences:** Đổi house-style về sau là sửa một file. Đổi lại: một tầng gián tiếp cho thứ mà
+hôm nay hai chỗ dùng — chấp nhận, vì Writer thứ ba (CSV, hoặc phiếu quỹ A5 của UOW-04) là chuyện
+đã thấy trước chứ không phải giả định. Ranh giới BE/FE cố ý **không** chia sẻ code: một hằng số màu
+dùng chung giữa `exceljs` và CSS sẽ kéo `@erp/shared-interfaces` vào việc trình bày, đúng thứ
+`ReportDocumentPayload` khai là không làm.
+**Status:** accepted — chốt bởi Akenzy, 2026-07-30
 
 ### ADR-05 — Một khuôn HTML cho cả 7 loại chứng từ
 **Context:** MISA có 2–4 mẫu in mỗi loại phiếu. Bản đầu chốt 1 mẫu mỗi loại (A4 cho

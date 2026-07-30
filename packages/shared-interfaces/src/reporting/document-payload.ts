@@ -29,11 +29,36 @@ export interface DocumentColumn {
   /** Catalog column key; matches the keys of every `ReportRow` in the payload. */
   col: string;
   label: string;
+  /**
+   * Formula notation shown under the label, e.g. "(2)=(3)/(1)".
+   *
+   * Carried from `ReportColumnHeader.desc` so a printed page and an exported
+   * file annotate a column the same way the on-screen grid does. Independent of
+   * `label`: a user-renamed column keeps its notation. Vouchers have none.
+   */
+  desc?: string | null;
   type: ReportColumnDataType;
   /** Suggested width. Excel reads it as characters, HTML as a flex hint. */
   width?: number;
   /** Omitted means the renderer derives it from `type` (numbers right, rest left). */
   align?: 'left' | 'right' | 'center';
+  /**
+   * Carried into the spreadsheet but hidden from view, and left out of the
+   * printed page entirely.
+   *
+   * The reference vouchers do this for columns the document defines but does
+   * not normally show — the value is there for whoever unhides the column,
+   * while the paper stays uncluttered.
+   */
+  hidden?: boolean;
+  /**
+   * How many spreadsheet columns this one occupies; default 1.
+   *
+   * A logical column is not always one grid column: the reference vouchers give
+   * "Tên hàng hóa" four, merged on every row, because a product name needs the
+   * room. Renderers merge (Excel) or `colspan` (HTML) across the span.
+   */
+  span?: number;
 }
 
 /** A tabular document — one report or ledger — ready to render in any format. */

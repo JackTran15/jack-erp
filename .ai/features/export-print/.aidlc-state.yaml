@@ -491,3 +491,273 @@ history:
     at: 2026-07-28T08:34:19
     by: akenzy
     ticket: T-07-05
+  - gate: G2
+    action: reopened
+    at: 2026-07-30T16:33:39
+    by: akenzy
+    reason: MISA sample files in examples/ERP contradict ADR-09 and the current workbook house style
+  - gate: G2
+    action: passed
+    at: 2026-07-30T16:37:29
+    by: akenzy
+    evidence: 11 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-07-30T16:43:17
+    by: akenzy
+    evidence: graph valid - 11 UoW, 48 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T16:43:45
+    by: claude
+    ticket: T-09-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T16:45:14
+    by: claude
+    ticket: T-09-01
+  - gate: G4
+    action: ticket done
+    at: 2026-07-30T16:45:14
+    by: akenzy
+    ticket: T-09-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T16:45:14
+    by: claude
+    ticket: T-09-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T16:47:45
+    by: claude
+    ticket: T-09-02
+  - gate: G4
+    action: ticket done
+    at: 2026-07-30T16:47:45
+    by: akenzy
+    ticket: T-09-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T16:47:45
+    by: claude
+    ticket: T-09-03
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T16:51:59
+    by: claude
+    ticket: T-09-03
+  - gate: G4
+    action: ticket done
+    at: 2026-07-30T16:51:59
+    by: akenzy
+    ticket: T-09-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T16:51:59
+    by: claude
+    ticket: T-09-04
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T16:56:10
+    by: claude
+    ticket: T-09-04
+  - gate: G4
+    action: ticket done
+    at: 2026-07-30T16:56:10
+    by: akenzy
+    ticket: T-09-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T16:56:25
+    by: claude
+    ticket: T-10-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T16:56:25
+    by: claude
+    ticket: T-10-03
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T16:59:58
+    by: claude
+    ticket: T-10-01
+  - gate: G4
+    action: ticket done
+    at: 2026-07-30T16:59:58
+    by: akenzy
+    ticket: T-10-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T16:59:58
+    by: claude
+    ticket: T-10-03
+  - gate: G4
+    action: ticket done
+    at: 2026-07-30T16:59:58
+    by: akenzy
+    ticket: T-10-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T16:59:58
+    by: claude
+    ticket: T-10-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T17:02:59
+    by: claude
+    ticket: T-10-02
+  - gate: G4
+    action: ticket done
+    at: 2026-07-30T17:03:00
+    by: akenzy
+    ticket: T-10-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T17:03:00
+    by: claude
+    ticket: T-10-04
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T17:08:39
+    by: claude
+    ticket: T-10-04
+  - gate: G4
+    action: ticket done
+    at: 2026-07-30T17:08:39
+    by: akenzy
+    ticket: T-10-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T17:08:39
+    by: claude
+    ticket: T-10-05
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T17:10:34
+    by: claude
+    ticket: T-10-05
+  - gate: G4
+    action: ticket done
+    at: 2026-07-30T17:10:34
+    by: akenzy
+    ticket: T-10-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T17:10:34
+    by: claude
+    ticket: T-10-06
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T17:14:10
+    by: claude
+    ticket: T-11-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T19:07:09
+    by: claude
+    ticket: T-11-01
+  - gate: G4
+    action: ticket done
+    at: 2026-07-30T19:07:09
+    by: akenzy
+    ticket: T-11-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T19:07:09
+    by: claude
+    ticket: T-11-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T19:19:47
+    by: claude
+    ticket: T-10-06
+  - gate: G4
+    action: ticket done
+    at: 2026-07-30T19:19:47
+    by: akenzy
+    ticket: T-10-06
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T19:19:47
+    by: claude
+    ticket: T-11-02
+  - gate: G4
+    action: ticket done
+    at: 2026-07-30T19:19:47
+    by: akenzy
+    ticket: T-11-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T20:08:48
+    by: claude
+    ticket: T-12-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T20:13:07
+    by: claude
+    ticket: T-12-01
+  - gate: G4
+    action: ticket done
+    at: 2026-07-30T20:13:07
+    by: akenzy
+    ticket: T-12-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T20:13:07
+    by: claude
+    ticket: T-12-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T20:16:04
+    by: claude
+    ticket: T-12-02
+  - gate: G4
+    action: ticket done
+    at: 2026-07-30T20:16:04
+    by: akenzy
+    ticket: T-12-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T20:16:04
+    by: claude
+    ticket: T-12-03
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T20:28:58
+    by: claude
+    ticket: T-12-03
+  - gate: G4
+    action: ticket done
+    at: 2026-07-30T20:28:58
+    by: akenzy
+    ticket: T-12-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T20:36:49
+    by: claude
+    ticket: T-13-01
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T20:43:46
+    by: claude
+    ticket: T-13-01
+  - gate: G4
+    action: ticket done
+    at: 2026-07-30T20:43:46
+    by: akenzy
+    ticket: T-13-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-07-30T20:43:46
+    by: claude
+    ticket: T-13-02
+  - gate: G4
+    action: ticket review
+    at: 2026-07-30T20:44:13
+    by: claude
+    ticket: T-13-02
+  - gate: G4
+    action: ticket done
+    at: 2026-07-30T20:44:13
+    by: akenzy
+    ticket: T-13-02

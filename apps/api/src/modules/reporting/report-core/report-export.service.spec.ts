@@ -173,6 +173,55 @@ describe('ReportExportService.buildPayload', () => {
     ]);
   });
 
+  it('carries a column formula notation from the catalog into the payload', async () => {
+    const { service } = makeService();
+    const { registry } = makeRegistry(
+      jest.fn().mockResolvedValue(RESULT),
+      jest.fn().mockResolvedValue([
+        { ...header('sku', 'Mã SKU'), desc: null },
+        { ...header('qty', 'Số lượng bán', ReportColumnDataType.NUMBER), desc: '(1)' },
+      ]),
+    );
+
+    const payload = await service.buildPayload(
+      registry,
+      dto({ columns: ['sku', 'qty'] }),
+      actor,
+      context,
+    );
+
+    expect(payload.columns[0].desc).toBeUndefined();
+    expect(payload.columns[1]).toEqual(
+      expect.objectContaining({ col: 'qty', desc: '(1)' }),
+    );
+  });
+
+  it('keeps the formula notation when the user renames the column label', async () => {
+    const { service } = makeService();
+    const { registry } = makeRegistry(
+      jest.fn().mockResolvedValue(RESULT),
+      jest.fn().mockResolvedValue([
+        { ...header('sku', 'Mã SKU') },
+        {
+          ...header('qty', 'Đơn giá TB', ReportColumnDataType.NUMBER),
+          desc: '(2)=(3)/(1)',
+        },
+      ]),
+    );
+
+    const payload = await service.buildPayload(
+      registry,
+      dto({ columns: ['sku', 'qty'], columnLabels: { qty: 'DT thuần' } }),
+      actor,
+      context,
+    );
+
+    expect(payload.columns).toEqual([
+      expect.objectContaining({ col: 'sku' }),
+      expect.objectContaining({ col: 'qty', label: 'DT thuần', desc: '(2)=(3)/(1)' }),
+    ]);
+  });
+
   it('keeps the column order the request asked for', async () => {
     const { service } = makeService();
     const { registry } = makeRegistry();
