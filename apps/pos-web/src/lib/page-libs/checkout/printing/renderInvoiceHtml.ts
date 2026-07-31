@@ -185,6 +185,35 @@ export function renderInvoiceHtml(
         )}`
       : "";
 
+  // Khối điểm tích lũy — in cuối khối tổng kết, sau công nợ, để dãy số tiền
+  // (Tổng thanh toán → thanh toán → Trả lại khách) liền mạch không bị cắt.
+  const pointsBlock = `${
+    totals.pointsEarned != null && totals.pointsEarned > 0
+      ? `
+        <div class="row">
+          <span>Điểm được tích</span>
+          <span class="value">+${totals.pointsEarned}</span>
+        </div>`
+      : ""
+  }${
+    totals.pointsReversed != null && totals.pointsReversed > 0
+      ? `
+        <div class="row">
+          <span>Điểm trừ</span>
+          <span class="value">-${totals.pointsReversed}</span>
+        </div>`
+      : ""
+  }${
+    // Số dư, không phải delta: `0` là giá trị hợp lệ nên chỉ chặn null/undefined.
+    totals.pointsBalanceAfter != null
+      ? `
+        <div class="row">
+          <span>Số điểm hiện tại</span>
+          <span class="value">${totals.pointsBalanceAfter}</span>
+        </div>`
+      : ""
+  }`;
+
   return `<!doctype html>
 <html lang="vi">
   <head>
@@ -415,35 +444,10 @@ export function renderInvoiceHtml(
         totals.depositAmount,
       )}${amountRow(
         totals.pointsRedeemed != null
-          ? `Điểm (${formatVnd(totals.pointsRedeemed)})`
+          ? `Dùng điểm (${formatVnd(totals.pointsRedeemed)})`
           : "Điểm",
         totals.pointsDiscountAmount,
-      )}${
-        totals.pointsEarned != null && totals.pointsEarned > 0
-          ? `
-        <div class="row">
-          <span>Điểm được tích</span>
-          <span class="value">+${totals.pointsEarned}</span>
-        </div>`
-          : ""
-      }${
-        totals.pointsReversed != null && totals.pointsReversed > 0
-          ? `
-        <div class="row">
-          <span>Điểm trừ</span>
-          <span class="value">-${totals.pointsReversed}</span>
-        </div>`
-          : ""
-      }${
-        // Số dư, không phải delta: `0` là giá trị hợp lệ nên chỉ chặn null/undefined.
-        totals.pointsBalanceAfter != null
-          ? `
-        <div class="row">
-          <span>Số điểm hiện tại</span>
-          <span class="value">${totals.pointsBalanceAfter}</span>
-        </div>`
-          : ""
-      }${paymentRows}${amountRow("Giảm nợ", totals.debtReduction)}${amountRow(
+      )}${paymentRows}${amountRow("Giảm nợ", totals.debtReduction)}${amountRow(
         "Trả lại khách",
         totals.change,
         "bold divider",
@@ -463,7 +467,7 @@ export function renderInvoiceHtml(
         "Còn phải thu",
         totals.remainingReceivable,
         "bold-italic divider",
-      )}${debtBlock}</section>
+      )}${debtBlock}${pointsBlock}</section>
 
       <section class="policy">
         <div class="policy-title">${escapeHtml(invoice.policy.title)}</div>

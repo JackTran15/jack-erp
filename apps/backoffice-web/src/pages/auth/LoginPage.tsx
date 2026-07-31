@@ -13,7 +13,8 @@ import {
   FormField,
 } from "@erp/ui";
 
-const DEFAULT_DEV_ORG_ID = "10000000-0000-4000-8000-000000000001";
+// const DEFAULT_DEV_ORG_ID = "10000000-0000-4000-8000-000000000001";
+const DEFAULT_DEV_ORG_ID = "e60e5f49-304d-4eb1-9735-3a2d10ba288f";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -30,10 +31,12 @@ export function LoginPage() {
   const from = rawFrom === "/login" ? "/" : rawFrom;
 
   const [email, setEmail] = useState(
-    import.meta.env.VITE_DEV_LOGIN_EMAIL ?? "inventory.admin@erp.local",
+    // import.meta.env.VITE_DEV_LOGIN_EMAIL ?? "inventory.admin@erp.local",
+    ""
   );
   const [password, setPassword] = useState(
-    import.meta.env.VITE_DEV_LOGIN_PASSWORD ?? "password123",
+    // import.meta.env.VITE_DEV_LOGIN_PASSWORD ?? "password123",
+    "",
   );
   const [organizationId, setOrganizationId] = useState(
     import.meta.env.VITE_DEV_ORG_ID ?? DEFAULT_DEV_ORG_ID,
@@ -107,6 +110,8 @@ export function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="username"
+                placeholder="email@example.com"
+                required
               />
             </FormField>
 
@@ -117,6 +122,8 @@ export function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
+                placeholder="********"
+                required
               />
             </FormField>
 

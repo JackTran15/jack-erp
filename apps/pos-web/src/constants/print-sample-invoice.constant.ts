@@ -368,13 +368,21 @@ export const SAMPLE_INVOICE_FIELD_GROUPS: readonly SampleFieldGroup[] = [
     ],
   },
   {
+    title: "Công nợ",
+    description: 'Cả khối chỉ hiện khi bật "Dư nợ trước".',
+    fields: [
+      { key: "totals.debtBefore", label: "Dư nợ trước", kind: "money", slot: true },
+      { key: "totals.debtAfter", label: "Dư nợ sau", kind: "money", slot: true },
+    ],
+  },
+  {
     title: "Điểm tích lũy",
     fields: [
       {
         key: "totals.pointsRedeemed",
         label: "Số điểm dùng",
         kind: "int",
-        hint: 'In thành "Điểm (n)" — giá trị VND của dòng lấy từ ô bên dưới.',
+        hint: 'In thành "Dùng điểm (n)" — giá trị VND của dòng lấy từ ô bên dưới.',
       },
       {
         key: "totals.pointsDiscountAmount",
@@ -389,14 +397,6 @@ export const SAMPLE_INVOICE_FIELD_GROUPS: readonly SampleFieldGroup[] = [
         kind: "int",
         hint: "Là số dư chứ không phải delta — giá trị 0 VẪN in ra.",
       },
-    ],
-  },
-  {
-    title: "Công nợ",
-    description: 'Cả khối chỉ hiện khi bật "Dư nợ trước".',
-    fields: [
-      { key: "totals.debtBefore", label: "Dư nợ trước", kind: "money", slot: true },
-      { key: "totals.debtAfter", label: "Dư nợ sau", kind: "money", slot: true },
     ],
   },
   {

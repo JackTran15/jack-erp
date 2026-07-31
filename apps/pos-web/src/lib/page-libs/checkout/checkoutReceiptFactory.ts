@@ -84,7 +84,7 @@ interface BuildCheckoutInvoicePayloadInput {
   returnLines?: CartLine[];
   /** "Phí đổi trả" — từ payment draft. */
   returnFee?: number;
-  /** Số điểm khách dùng — n trong "Điểm (n)". */
+  /** Số điểm khách dùng — n trong "Dùng điểm (n)". */
   pointsRedeemed?: number;
   /** Tiền giảm từ điểm (VND). */
   pointsDiscountAmount?: number;
