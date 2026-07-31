@@ -108,9 +108,9 @@ export interface InvoiceTotals {
   voucherDiscount?: number;
 
   // ── Điểm tích lũy ────────────────────────────────────────────────────────
-  /** Số điểm khách dùng — n trong "Điểm (n)". */
+  /** Số điểm khách dùng — n trong "Dùng điểm (n)". */
   pointsRedeemed?: number;
-  /** Tiền giảm từ điểm (VND) — value của dòng "Điểm (n)". */
+  /** Tiền giảm từ điểm (VND) — value của dòng "Dùng điểm (n)". */
   pointsDiscountAmount?: number;
   /** Số điểm được tích từ hóa đơn — dòng "Điểm được tích". */
   pointsEarned?: number;

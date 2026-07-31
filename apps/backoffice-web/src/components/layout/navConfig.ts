@@ -345,10 +345,10 @@ export const navConfig: NavModule[] = [
             label: "Đơn vị tính",
           },
           { to: "/admin/inventory-item-barcodes", label: "In tem mã" },
-          {
-            to: "/admin/inventory-item-prices",
-            label: "Bảng giá",
-          },
+          // {
+          //   to: "/admin/inventory-item-prices",
+          //   label: "Bảng giá",
+          // },
           { to: "/admin/inventory-storages", label: "Kho hàng", views: [STORE_TYPE.SINGLE] },
         ],
       },
@@ -372,7 +372,7 @@ export const navConfig: NavModule[] = [
         id: "catalog-customers",
         label: "KHÁCH HÀNG",
         children: [
-          { to: "/admin/customer-groups", label: "Nhóm khách hàng" },
+          // { to: "/admin/customer-groups", label: "Nhóm khách hàng" },
           { to: "/admin/customers", label: "Khách hàng" },
         ],
       },
@@ -385,16 +385,16 @@ export const navConfig: NavModule[] = [
             label: "Nhân viên",
             permission: "iam.user.read",
           },
-          { to: "/admin/job-positions", label: "Vị trí công việc" },
+          // { to: "/admin/job-positions", label: "Vị trí công việc" },
           { to: "/admin/branches", label: "Cửa hàng" },
-          { to: "/admin/cash-boxes", label: "Két đựng tiền", views: [STORE_TYPE.SINGLE] },
-          { to: "/admin/work-shifts", label: "Ca làm việc", views: [STORE_TYPE.SINGLE] },
-          {
-            to: "/admin/payment-methods",
-            label: "Phương thức dịch vụ và thanh toán",
-          },
-          { to: "/admin/bank-accounts", label: "Tài khoản ngân hàng" },
-          { to: "/admin/sales-channels", label: "Kênh bán hàng" },
+          // { to: "/admin/cash-boxes", label: "Két đựng tiền", views: [STORE_TYPE.SINGLE] },
+          // { to: "/admin/work-shifts", label: "Ca làm việc", views: [STORE_TYPE.SINGLE] },
+          // {
+          //   to: "/admin/payment-methods",
+          //   label: "Phương thức dịch vụ và thanh toán",
+          // },
+          // { to: "/admin/bank-accounts", label: "Tài khoản ngân hàng" },
+          // { to: "/admin/sales-channels", label: "Kênh bán hàng" },
         ],
       },
       {
@@ -403,7 +403,7 @@ export const navConfig: NavModule[] = [
         children: [
           { to: "/admin/provider-groups", label: "Nhóm nhà cung cấp" },
           { to: "/admin/inventory-providers", label: "Nhà cung cấp" },
-          { to: "/admin/delivery-partners", label: "Đối tác giao hàng" },
+          // { to: "/admin/delivery-partners", label: "Đối tác giao hàng" },
         ],
       },
     ],
