@@ -12,6 +12,7 @@ const COLUMN_WIDTHS: Partial<Record<CustomerImportExcelField, number>> = {
   [CustomerImportExcelField.CUSTOMER_NAME]: 200,
   [CustomerImportExcelField.CUSTOMER_CATEGORY_CODE]: 140,
   [CustomerImportExcelField.TEL]: 130,
+  [CustomerImportExcelField.POINTS]: 110,
   [CustomerImportExcelField.ADDRESS]: 180,
   [CustomerImportExcelField.EMAIL]: 180,
   [CustomerImportExcelField.COMPANY_NAME]: 180,
@@ -31,7 +32,7 @@ function buildStatusColumn(): TableColumn<ImportReviewRow> {
   };
 }
 
-/** 21 template columns + Tình trạng for the customer import review step. */
+/** 22 template columns + Tình trạng for the customer import review step. */
 export function buildCustomerImportReviewColumns(): TableColumn<ImportReviewRow>[] {
   const dataCols: TableColumn<ImportReviewRow>[] =
     CUSTOMER_IMPORT_EXCEL_COLUMN_ORDER.map((excelKey) => ({

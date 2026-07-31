@@ -15,8 +15,8 @@ import { CustomerImportService } from "./customer-import.service";
 import { CustomerImportWorkbookService } from "./customer-import-workbook.service";
 
 /**
- * Excel import/export for the customer catalog (MISA `DanhMucKhachHang.xls`
- * template). Reuses the shared inventory import job/row entities for job
+ * Excel import/export for the customer catalog (MISA `DanhMucKhachHang`
+ * layout). Reuses the shared inventory import job/row entities for job
  * tracking; the import/export logic itself is customer-specific.
  */
 @Module({

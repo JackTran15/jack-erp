@@ -1642,13 +1642,19 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/customers/imports/import-template.xls": {
+    "/customers/imports/import-template.xlsx": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
+        /**
+         * Generated rather than served from a checked-in .xls, matching the inventory
+         *     items template: the file must always carry the current column keys, and
+         *     neither exceljs nor SheetJS can write a styled .xls (BIFF drops the hidden
+         *     key rows and the header fill).
+         */
         get: operations["CustomerImportController_downloadTemplate"];
         put?: never;
         post?: never;
@@ -11751,7 +11757,7 @@ export interface components {
             nvbhLabel?: string;
             /** @description Tiền nhận bàn giao (opening cash) — FE-only, unpersisted. */
             openingAmount?: number;
-            /** @description Tiền bàn giao (handover cash) — FE-only, unpersisted. */
+            /** @description Tiền bàn giao (handover cash) — FE-only, unpersisted. Can go negative (chênh lệch âm khi chi vượt thu tiền mặt), same as the print flow which applies no such floor. */
             handoverAmount?: number;
             /** @description Người nhận bàn giao (resolved staff name) — FE-only. */
             receivedByLabel?: string;
@@ -12654,6 +12660,7 @@ export interface components {
              * @enum {string}
              */
             type: "supplier" | "customer" | "employee" | "all";
+            types?: ("supplier" | "customer" | "employee" | "all")[];
             /** @description Match on name or code */
             search?: string;
             /** @default 1 */

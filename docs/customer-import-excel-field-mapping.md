@@ -5,7 +5,8 @@
 
 ## Mục tiêu hiện tại
 
-- Dùng template tĩnh `DanhMucKhachHang.xls` (MISA `MS_007`) làm tệp mẫu tải về.
+- Tệp mẫu `DanhMucKhachHang.xlsx` được **sinh động** từ `CustomerImportWorkbookService` nên luôn khớp danh sách cột trong code — cùng cơ chế với template hàng hóa (`mau-nhap-hang-hoa.xlsx`) và `goods-receipts/generated-import-template.xlsx`. Giữ nguyên chrome MISA: ẩn dòng 1–2, nền nhãn `#F2DCDB`, `(*)` đỏ, độ rộng cột và định dạng text (`@`) cho các cột định danh (giữ số 0 đứng đầu của điện thoại/CMND).
+- Không dùng `.xls` cho tệp sinh động: `exceljs` không ghi được BIFF, còn `xlsx` (SheetJS) bản community ghi `.xls` sẽ **mất thuộc tính ẩn của dòng 1–2** (lộ dòng key tiếng Anh) **và mất nền màu** — đã kiểm chứng.
 - Layout MISA 5 dòng: dòng 1 = marker `MS_007`, dòng 2 = field key tiếng Anh, dòng 3 = tiêu đề `DANH MỤC KHÁCH HÀNG`, dòng 4 = nhãn tiếng Việt, dòng 5+ = dữ liệu.
 - Export sinh `.xlsx` cùng layout để file xuất khẩu re-import được (roundtrip).
 - Import runtime đọc sheet `Danh sách khách hàng` (fallback sheet đầu tiên).
@@ -28,7 +29,7 @@
 
 - Các cột DEFER bên dưới: cần thêm field trên `CustomerEntity` (hoặc domain kế toán cho hạn mức nợ) trước khi map.
 
-## Mapping 21 fields
+## Mapping 22 fields
 
 **Chú thích:**
 - `MAP`: đã map vào nghiệp vụ hiện tại.
@@ -46,20 +47,22 @@
 | 8 | `Gender` | Giới tính | MAP | `customers.gender` (Nam→male, Nữ→female, Không xác định→unspecified; giá trị lạ → warning, bỏ cột) |
 | 9 | `MemberCardNo` | Mã thẻ thành viên | MAP | `membership_cards.cardNumber` (đã thuộc KH khác → warning, không đổi thẻ) |
 | 10 | `MemberLevelCode` | Hạng thẻ | MAP | `membership_cards.tier` (Thường/Bạc/Vàng/Kim cương; không nhận diện → warning, dùng hạng mặc định) |
-| 11 | `IdentifyNumber` | Số CMND/Hộ chiếu | MAP | `customers.nationalId` (>12 ký tự → warning, bỏ cột) |
-| 12 | `ExportProvince` | Tỉnh thành | DEFER | chưa có field trên entity (địa chỉ hiện là 1 cột `address`) |
-| 13 | `ExportDistrict` | Quận/Huyện | DEFER | chưa có field trên entity |
-| 14 | `ExportVillage` | Phường/Xã | DEFER | chưa có field trên entity |
-| 15 | `Address` | Số nhà, đường phố | MAP | `customers.address` (cắt 500 ký tự) |
-| 16 | `Email` | Email | MAP | `customers.email` (unique/org; sai định dạng → warning, bỏ cột; thuộc KH khác = lỗi) |
-| 17 | `CompanyName` | Tên công ty | MAP | `customers.companyName` |
-| 18 | `CompanyTaxCode` | Mã số thuế | MAP | `customers.taxCode` (>20 ký tự → warning, bỏ cột) |
-| 19 | `Description` | Ghi chú | MAP | `customers.note` |
-| 20 | `EmployeeCode` | Mã nhân viên phụ trách | MAP | lookup `employee_profiles.code` → `customers.assignedStaffId` (miss → warning, bỏ cột) |
-| 21 | `EmployeeName` | Tên nhân viên phụ trách | MAP (export-only) | export điền họ tên user phụ trách; import bỏ qua |
+| 11 | `Points` | Điểm tích lũy | MAP | `membership_cards.points` — **số dư tuyệt đối**, ghi đè balance; ô trống giữ nguyên điểm hiện có. Chênh lệch sinh 1 dòng `point_history` type `ADJUST` (`delta = giá trị mới − balance cũ`, note `Điều chỉnh khi nhập khẩu khách hàng`); delta 0 → không ghi sổ. Không phải số nguyên ≥ 0 → warning, bỏ cột. **Cột mở rộng ngoài MISA** |
+| 12 | `IdentifyNumber` | Số CMND/Hộ chiếu | MAP | `customers.nationalId` (>12 ký tự → warning, bỏ cột) |
+| 13 | `ExportProvince` | Tỉnh thành | DEFER | chưa có field trên entity (địa chỉ hiện là 1 cột `address`) |
+| 14 | `ExportDistrict` | Quận/Huyện | DEFER | chưa có field trên entity |
+| 15 | `ExportVillage` | Phường/Xã | DEFER | chưa có field trên entity |
+| 16 | `Address` | Số nhà, đường phố | MAP | `customers.address` (cắt 500 ký tự) |
+| 17 | `Email` | Email | MAP | `customers.email` (unique/org; sai định dạng → warning, bỏ cột; thuộc KH khác = lỗi) |
+| 18 | `CompanyName` | Tên công ty | MAP | `customers.companyName` |
+| 19 | `CompanyTaxCode` | Mã số thuế | MAP | `customers.taxCode` (>20 ký tự → warning, bỏ cột) |
+| 20 | `Description` | Ghi chú | MAP | `customers.note` |
+| 21 | `EmployeeCode` | Mã nhân viên phụ trách | MAP | lookup `employee_profiles.code` → `customers.assignedStaffId` (miss → warning, bỏ cột) |
+| 22 | `EmployeeName` | Tên nhân viên phụ trách | MAP (export-only) | export điền họ tên user phụ trách; import bỏ qua |
 
 ## Ghi chú runtime
 
-- Cột `Tình trạng` là cột hệ thống khi review/export lỗi, không thuộc 21 cột gốc.
+- Cột `Tình trạng` là cột hệ thống khi review/export lỗi, không thuộc 22 cột template.
+- Parser đọc key theo dòng 2 của **chính tệp được upload**, không theo vị trí cột — tệp MISA 21 cột cũ (không có `Points`) vẫn import đúng, điểm giữ nguyên.
 - Ô trống ở chế độ UPDATE giữ nguyên giá trị hiện có trong DB (chỉ ghi đè cột có dữ liệu).
 - Khách hàng trạng thái `MERGED` không được export.

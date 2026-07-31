@@ -140,6 +140,7 @@ export class CustomerExportService {
         [CustomerImportExcelField.MEMBER_LEVEL_CODE]: card
           ? TIER_EXPORT_LABELS[card.tier]
           : "",
+        [CustomerImportExcelField.POINTS]: card ? String(card.points) : "",
         [CustomerImportExcelField.IDENTIFY_NUMBER]: customer.nationalId ?? "",
         [CustomerImportExcelField.ADDRESS]: customer.address ?? "",
         [CustomerImportExcelField.EMAIL]: customer.email ?? "",

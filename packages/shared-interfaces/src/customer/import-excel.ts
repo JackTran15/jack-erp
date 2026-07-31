@@ -10,6 +10,8 @@ export enum CustomerImportExcelField {
   GENDER = 'Gender',
   MEMBER_CARD_NO = 'MemberCardNo',
   MEMBER_LEVEL_CODE = 'MemberLevelCode',
+  /** Loyalty balance. Extension beyond the stock MISA layout. */
+  POINTS = 'Points',
   IDENTIFY_NUMBER = 'IdentifyNumber',
   EXPORT_PROVINCE = 'ExportProvince',
   EXPORT_DISTRICT = 'ExportDistrict',
@@ -37,6 +39,7 @@ export const CUSTOMER_IMPORT_EXCEL_FIELD_LABELS: Record<
   [CustomerImportExcelField.GENDER]: 'Giới tính',
   [CustomerImportExcelField.MEMBER_CARD_NO]: 'Mã thẻ thành viên',
   [CustomerImportExcelField.MEMBER_LEVEL_CODE]: 'Hạng thẻ',
+  [CustomerImportExcelField.POINTS]: 'Điểm tích lũy',
   [CustomerImportExcelField.IDENTIFY_NUMBER]: 'Số CMND/Hộ chiếu',
   [CustomerImportExcelField.EXPORT_PROVINCE]: 'Tỉnh thành',
   [CustomerImportExcelField.EXPORT_DISTRICT]: 'Quận/Huyện',
@@ -50,7 +53,7 @@ export const CUSTOMER_IMPORT_EXCEL_FIELD_LABELS: Record<
   [CustomerImportExcelField.EMPLOYEE_NAME]: 'Tên nhân viên phụ trách',
 };
 
-/** Full MISA template column order (21 fields). */
+/** Template column order (22 fields): the 21 MISA columns plus `Points`. */
 export const CUSTOMER_IMPORT_EXCEL_COLUMN_ORDER: CustomerImportExcelField[] = [
   CustomerImportExcelField.CUSTOMER_CODE,
   CustomerImportExcelField.CUSTOMER_NAME,
@@ -62,6 +65,7 @@ export const CUSTOMER_IMPORT_EXCEL_COLUMN_ORDER: CustomerImportExcelField[] = [
   CustomerImportExcelField.GENDER,
   CustomerImportExcelField.MEMBER_CARD_NO,
   CustomerImportExcelField.MEMBER_LEVEL_CODE,
+  CustomerImportExcelField.POINTS,
   CustomerImportExcelField.IDENTIFY_NUMBER,
   CustomerImportExcelField.EXPORT_PROVINCE,
   CustomerImportExcelField.EXPORT_DISTRICT,
