@@ -4,6 +4,19 @@ export interface ReportDateRangeFilter {
   to?: string;
 }
 
+/**
+ * Sentinel `ReportDateRangeFilter.from` pos-web sends for report
+ * `revenue-by-item` when preset "Toàn bộ" is selected. That report requires a
+ * bounded lower date (a query-safety guard against unbounded full-invoice-
+ * history scans — see RevenueByItemReport.buildData/countRows), so an
+ * effectively-unbounded request substitutes this date rather than leaving
+ * `from` empty and 400ing. The document builder
+ * (GetInvoiceReportDocumentHandler) recognizes this exact value to suppress
+ * the "Từ ngày:" subtitle line, so the implementation detail never leaks into
+ * a printed page or exported file.
+ */
+export const REVENUE_BY_ITEM_ALL_TIME_FROM = '2000-01-01';
+
 export interface ReportEnumFilter {
   value: string | null;
 }

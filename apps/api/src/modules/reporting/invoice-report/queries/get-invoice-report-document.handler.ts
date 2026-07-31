@@ -1,4 +1,8 @@
-import { REPORT_TYPE_LABELS_VI, ReportGroupBy } from '@erp/shared-interfaces';
+import {
+  REPORT_TYPE_LABELS_VI,
+  REVENUE_BY_ITEM_ALL_TIME_FROM,
+  ReportGroupBy,
+} from '@erp/shared-interfaces';
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import {
   dateRangeSubtitle,
@@ -101,9 +105,18 @@ export class GetInvoiceReportDocumentHandler
         ? await this.revenueByItemParams.build(dto.filters, actor)
         : invoiceFilterSummary(dto.filters);
 
+    // pos-web's "Toàn bộ" preset sends this sentinel `from` (with no `to`) so
+    // revenue-by-item's bounded-query guard does not 400 it — treat it as
+    // unbounded for display, same as an actually-empty issuedAt.
+    const isAllTimeSentinel =
+      dto.reportType === REVENUE_BY_ITEM_REPORT_KEY &&
+      dto.filters?.issuedAt?.from === REVENUE_BY_ITEM_ALL_TIME_FROM &&
+      !dto.filters?.issuedAt?.to;
+    const issuedAtForSubtitle = isAllTimeSentinel ? {} : dto.filters?.issuedAt;
+
     return this.exportService.prepareExport(this.registry, dto, actor, {
       title: invoiceReportLabel(dto.reportType).toUpperCase(),
-      subtitleLines: [...dateRangeSubtitle(dto.filters?.issuedAt), ...filterLines],
+      subtitleLines: [...dateRangeSubtitle(issuedAtForSubtitle), ...filterLines],
     });
   }
 }
