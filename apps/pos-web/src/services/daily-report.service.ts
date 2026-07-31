@@ -5,11 +5,13 @@ import type {
   InvoiceReportSearchPayload,
   PosDailySummaryDetailResult,
   PosDailySummaryResult,
+  ReportDocumentPayload,
 } from "@erp/shared-interfaces";
 import type {
   PosDailySummaryBody,
   PosDailySummaryDetailBody,
   PosDailySummaryExportBody,
+  RevenueByItemExportBody,
 } from "@erp/pos/dtos/daily-report.dto";
 
 export const dailyReportService = {
@@ -32,6 +34,16 @@ export const dailyReportService = {
     body: InvoiceReportSearchPayload,
   ): Promise<InvoiceReportResult> =>
     http.post<InvoiceReportResult>("/reports/invoices/search", body),
+
+  /** `POST /reports/invoices/export` — "Xuất" cho tab Doanh thu theo mặt hàng, trả .xlsx. */
+  exportRevenueByItem: (body: RevenueByItemExportBody): Promise<Blob> =>
+    http.postBlob("/reports/invoices/export", body),
+
+  /** `POST /reports/invoices/print-payload` — "In" cho tab Doanh thu theo mặt hàng. */
+  getRevenueByItemPrintPayload: (
+    body: RevenueByItemExportBody,
+  ): Promise<ReportDocumentPayload> =>
+    http.post<ReportDocumentPayload>("/reports/invoices/print-payload", body),
 
   /** `GET /reports/invoices/filter-options` — Thu ngân (`cashier`) / NVBH (`salesperson`). */
   getFilterOptions: (

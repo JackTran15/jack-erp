@@ -10,6 +10,8 @@ import {
 } from "@erp/pos/hooks/react-query/use-query-user";
 import {
   useExportDailySummaryMutation,
+  useExportRevenueByItemMutation,
+  usePrintRevenueByItemMutation,
   useReportFilterOptionsQuery,
 } from "@erp/pos/hooks/react-query/use-query-daily-report";
 import { useMyBranchesQuery } from "@erp/pos/hooks/react-query/use-query-branch";
@@ -24,12 +26,15 @@ import { renderDailySummaryPrintHtml } from "@erp/pos/lib/page-libs/daily-report
 import { renderHandoverReceiptPrintHtml } from "@erp/pos/lib/page-libs/daily-report/renderHandoverReceiptHtml";
 import { printDailyReport } from "@erp/pos/lib/page-libs/daily-report/printDailyReport";
 import { exportDailyReportXls } from "@erp/pos/lib/page-libs/daily-report/exportDailyReportXls";
+import { renderRevenueByItemPrintHtml } from "@erp/pos/lib/page-libs/daily-report/renderRevenueByItemPrintHtml";
 
 /**
  * Trang "Báo cáo theo ngày" (`/daily-report`). Shell: tabs + toolbar + nội dung
- * tab; modal chọn thời gian. Logic ở `use-daily-report`. In/Xuất (chỉ tab Tổng
- * hợp) render tài liệu A80 client-side: "BÁO CÁO TỔNG HỢP" (toolbar In/Xuất) và
- * "BÀN GIAO TIỀN" độc lập (nút "In bàn giao" trong HandoverPanel).
+ * tab; modal chọn thời gian. Logic ở `use-daily-report`. Toolbar In/Xuất theo
+ * tab: tab Tổng hợp render tài liệu A80 "BÁO CÁO TỔNG HỢP" client-side (và
+ * "BÀN GIAO TIỀN" độc lập qua nút "In bàn giao" trong HandoverPanel); tab
+ * Doanh thu theo mặt hàng gọi BE `/reports/invoices/export`
+ * `/print-payload` (cùng invoice-report engine dùng ở backoffice).
  */
 export function DailyReportPage() {
   const dr = useDailyReport();
@@ -84,13 +89,16 @@ export function DailyReportPage() {
   };
 
   const exportMutation = useExportDailySummaryMutation();
-
-  // Tab Doanh thu theo mặt hàng: In/Xuất chưa implement, chỉ báo bằng toast.
-  const NOT_IMPLEMENTED_MESSAGE = "Chức năng đang được phát triển";
+  const exportRevenueMutation = useExportRevenueByItemMutation();
+  const printRevenueMutation = usePrintRevenueByItemMutation();
 
   const handlePrint = () => {
-    if (dr.activeTab !== "summary") {
-      toast(NOT_IMPLEMENTED_MESSAGE);
+    if (dr.activeTab === "revenue-by-item") {
+      printRevenueMutation.mutate(dr.revenueExportBody, {
+        onSuccess: (payload) =>
+          printDailyReport(renderRevenueByItemPrintHtml(payload)),
+        onError: () => toast.error("In báo cáo thất bại. Vui lòng thử lại."),
+      });
       return;
     }
     if (!dr.summary) return;
@@ -99,8 +107,12 @@ export function DailyReportPage() {
     );
   };
   const handleExport = () => {
-    if (dr.activeTab !== "summary") {
-      toast(NOT_IMPLEMENTED_MESSAGE);
+    if (dr.activeTab === "revenue-by-item") {
+      exportRevenueMutation.mutate(dr.revenueExportBody, {
+        onSuccess: (blob) =>
+          exportDailyReportXls(blob, "Doanh-thu-theo-mat-hang.xlsx"),
+        onError: () => toast.error("Xuất báo cáo thất bại. Vui lòng thử lại."),
+      });
       return;
     }
     exportMutation.mutate(
@@ -115,7 +127,10 @@ export function DailyReportPage() {
         receivedByLabel,
         note: dr.handover.note,
       },
-      { onSuccess: (blob) => exportDailyReportXls(blob) },
+      {
+        onSuccess: (blob) => exportDailyReportXls(blob),
+        onError: () => toast.error("Xuất báo cáo thất bại. Vui lòng thử lại."),
+      },
     );
   };
   const handlePrintHandover = () => {

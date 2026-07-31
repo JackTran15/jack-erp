@@ -26,7 +26,10 @@ import {
   EMPTY_REVENUE_COLUMN_FILTERS,
 } from "@erp/pos/constants/daily-report.constant";
 import type { DailyReportTab } from "@erp/pos/types/daily-report.type";
-import type { PosDailySummaryBody } from "@erp/pos/dtos/daily-report.dto";
+import type {
+  PosDailySummaryBody,
+  RevenueByItemExportBody,
+} from "@erp/pos/dtos/daily-report.dto";
 import type {
   CashCountState,
   CashHandoverForm,
@@ -182,6 +185,26 @@ export function useDailyReport() {
     [issuedAt, cashierId, salespersonId, columnFilters, page, pageSize],
   );
 
+  // In/Xuất always cover the whole filtered set (no page/limit), and only the
+  // columns currently visible on screen — matching the invoice-report engine's
+  // own export/print-payload contract used elsewhere in the ERP.
+  const revenueExportBody = useMemo<RevenueByItemExportBody>(
+    () => ({
+      reportType: "revenue-by-item",
+      columns: DAILY_REPORT_REVENUE_COLUMN_ORDER.filter((key) =>
+        visibleRevenueColumns.has(key),
+      ),
+      filters: {
+        issuedAt,
+        statBy: ReportGroupBy.ITEM,
+        cashierId: cashierId ?? undefined,
+        salespersonId: salespersonId ?? undefined,
+      },
+      columnFilters: columnFilters.length ? columnFilters : undefined,
+    }),
+    [issuedAt, cashierId, salespersonId, columnFilters, visibleRevenueColumns],
+  );
+
   const summaryQuery = useDailySummaryQuery(summaryBody);
   const revenueQuery = useRevenueByItemReportQuery(revenueBody);
 
@@ -292,6 +315,7 @@ export function useDailyReport() {
     openColumnSettings: useCallback(() => setColumnSettingsOpen(true), []),
     closeColumnSettings: useCallback(() => setColumnSettingsOpen(false), []),
     applyVisibleRevenueColumns,
+    revenueExportBody,
 
     // BÀN GIAO TIỀN
     handover,

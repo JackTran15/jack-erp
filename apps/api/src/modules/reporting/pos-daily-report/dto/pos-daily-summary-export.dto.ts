@@ -27,10 +27,12 @@ export class PosDailySummaryExportDto extends PosDailySummaryDto {
   @Min(0)
   openingAmount?: number;
 
-  @ApiPropertyOptional({ description: 'Tiền bàn giao (handover cash) — FE-only, unpersisted.' })
+  @ApiPropertyOptional({
+    description:
+      'Tiền bàn giao (handover cash) — FE-only, unpersisted. Can go negative (chênh lệch âm khi chi vượt thu tiền mặt), same as the print flow which applies no such floor.',
+  })
   @IsOptional()
   @IsNumber()
-  @Min(0)
   handoverAmount?: number;
 
   @ApiPropertyOptional({ description: 'Người nhận bàn giao (resolved staff name) — FE-only.' })
