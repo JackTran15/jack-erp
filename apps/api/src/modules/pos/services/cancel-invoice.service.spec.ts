@@ -17,6 +17,7 @@ import { WebSocketEmitterService } from '../../websocket/websocket-emitter.servi
 import { PromotionApplyService } from '../../promotion/promotion-apply.service';
 import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
 import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
+import { LoyaltyPointsReversePublisher } from '../../customer/publishers/loyalty-points-reverse.publisher';
 import { InvoiceCancelledPublisher } from '../publishers/invoice-cancelled.publisher';
 
 const actor = {
@@ -87,6 +88,7 @@ describe('CancelInvoiceService', () => {
   let wsEmitter: { emitToBranch: jest.Mock };
   let accountResolver: { resolveDefaultAccount: jest.Mock };
   let cashFundResolver: { resolveBranchCashFund: jest.Mock };
+  let loyaltyPointsReversePublisher: { publish: jest.Mock };
   let mockManager: Record<string, jest.Mock>;
 
   beforeEach(async () => {
@@ -112,6 +114,7 @@ describe('CancelInvoiceService', () => {
     };
     promotionApplyService = { revertPromotions: jest.fn().mockResolvedValue(undefined) };
     invoiceCancelledPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
+    loyaltyPointsReversePublisher = { publish: jest.fn().mockResolvedValue(true) };
     wsEmitter = { emitToBranch: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -126,6 +129,10 @@ describe('CancelInvoiceService', () => {
         { provide: WebSocketEmitterService, useValue: wsEmitter },
         { provide: AccountResolverService, useValue: accountResolver },
         { provide: CashFundResolverService, useValue: cashFundResolver },
+        {
+          provide: LoyaltyPointsReversePublisher,
+          useValue: loyaltyPointsReversePublisher,
+        },
       ],
     }).compile();
 
@@ -412,6 +419,37 @@ describe('CancelInvoiceService', () => {
 
       expect(dataSource.transaction).not.toHaveBeenCalled();
       expect(invoiceCancelledPublisher.publish).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('loyalty points reversal', () => {
+    it('reverses points earned when the invoice has a customer', async () => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({ customerId: 'cust-1', amountDue: 200, pointsEarned: 20 }),
+      );
+
+      const result = await service.cancel('inv-1', { reason: 'mistake' }, actor);
+
+      expect(result.pointsReversed).toBe(20);
+      expect(loyaltyPointsReversePublisher.publish).toHaveBeenCalledWith(
+        {
+          returnInvoiceId: 'inv-1',
+          customerId: 'cust-1',
+          subtotalDelta: 200,
+          branchId: 'branch-1',
+        },
+        actor,
+      );
+    });
+
+    it('does not publish a reversal for a walk-in invoice without a customer', async () => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({ customerId: undefined, pointsEarned: 20 }),
+      );
+
+      await service.cancel('inv-1', { reason: 'mistake' }, actor);
+
+      expect(loyaltyPointsReversePublisher.publish).not.toHaveBeenCalled();
     });
   });
 
