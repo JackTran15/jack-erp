@@ -20,24 +20,52 @@ export const GENERAL_MANAGER_PERMISSION_KEYS: string[] = ALL_PERMISSION_KEYS.fil
     !key.startsWith('branch.registration.'),
 );
 
+/**
+ * Reserved for User Root and General Manager: deleting a voucher (phiếu thu/chi
+ * tiền mặt & tiền gửi, and the voucher category itself) and cancelling a paid
+ * invoice — both reverse posted money movements.
+ */
+const ROOT_AND_GENERAL_MANAGER_ONLY_KEYS: ReadonlySet<string> = new Set([
+  'accounting.cash_receipt.delete',
+  'accounting.cash_payment.delete',
+  'accounting.bank_receipt.delete',
+  'accounting.bank_payment.delete',
+  'accounting.cash_voucher_category.delete',
+  'pos.invoice.cancel',
+]);
+
 /** Branch Manager — branch-scoped operations + branch dashboard. */
 export const BRANCH_MANAGER_PERMISSION_KEYS: string[] = ALL_PERMISSION_KEYS.filter(
   (key) =>
-    key.startsWith('branch.') ||
-    key.startsWith('customer.') ||
-    key.startsWith('inventory.') ||
-    key.startsWith('product.') ||
-    key.startsWith('pos.') ||
-    key.startsWith('goods_receipt.') ||
-    key.startsWith('accounting.') ||
-    key.startsWith('reporting.dashboard.branch.') ||
-    key.startsWith('reporting.invoice.branch.') ||
-    key === 'reporting.invoice-template.manage' ||
-    key === 'iam.user.read' ||
-    key === 'iam.user.roles.write' ||
-    key === 'iam.user.branches.write' ||
-    key === 'sales-hierarchy.read' ||
-    key === 'document-numbering.manage',
+    !ROOT_AND_GENERAL_MANAGER_ONLY_KEYS.has(key) &&
+    // Onboarding a branch/organization belongs to General Manager & User Root.
+    ((!key.startsWith('branch.registration.') && key.startsWith('branch.')) ||
+      key.startsWith('customer.') ||
+      key.startsWith('inventory.') ||
+      key.startsWith('product.') ||
+      key.startsWith('pos.') ||
+      key.startsWith('goods_receipt.') ||
+      key.startsWith('accounting.') ||
+      key.startsWith('reporting.dashboard.branch.') ||
+      key.startsWith('reporting.invoice.branch.') ||
+      // Branch-pinned by resolveBranchIds() — consolidated needs the key below.
+      key === 'reporting.profit.read' ||
+      // Aggregated across branches by design (docs/24-debt-reports-spec.md).
+      key === 'reporting.debts.read' ||
+      key === 'reporting.invoice-template.manage' ||
+      key === 'iam.user.read' ||
+      key === 'iam.user.roles.write' ||
+      key === 'iam.user.branches.write' ||
+      // Needed to list assignable roles for iam.user.roles.write above.
+      key === 'iam.role.read' ||
+      // Assign/unassign routes are all @RequireBranchScope().
+      key === 'sales-hierarchy.read' ||
+      key === 'sales-hierarchy.manage' ||
+      // "… cho chi nhánh" — staffing the branch the manager runs.
+      key === 'salesman.assign' ||
+      key === 'salesmanager.assign' ||
+      key === 'storage.manager.assign' ||
+      key === 'document-numbering.manage'),
 );
 
 /** Staff — orders, temp warehouse, invoices, shifts, transfer requests. */
@@ -63,4 +91,8 @@ export const STAFF_PERMISSION_KEYS: string[] = [
   'pos.exchange.create',
   'pos.session.manage',
   'accounting.cash.read',
+  // POS Báo cáo theo ngày: /reports/pos/daily-summary* + /reports/invoices/*
+  'reporting.invoice.branch.read',
+  // POS Checkout + Fast stock transfer: GET /branches/:id/salesmen
+  'sales-hierarchy.read',
 ];

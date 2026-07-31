@@ -8,6 +8,7 @@ import {
   Query,
   Body,
   NotFoundException,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import {
@@ -23,9 +24,11 @@ import { EntityRegistryService } from './entity-registry.service';
 import { BaseCrudService } from './base-crud.service';
 import { PaginationQueryDto } from './dto/pagination-query.dto';
 import { AuditInterceptor } from './audit.interceptor';
+import { CrudPermissionGuard } from './crud-permission.guard';
 
 @ApiTags('admin')
 @Controller('admin/entities')
+@UseGuards(CrudPermissionGuard)
 @UseInterceptors(AuditInterceptor)
 export class CrudController {
   constructor(

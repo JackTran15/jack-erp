@@ -28,6 +28,7 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
   'branch.read': 'Xem chi nhánh',
   'branch.write': 'Thêm/sửa chi nhánh',
   'branch.archive': 'Lưu trữ chi nhánh',
+  'branch.delete': 'Xóa chi nhánh',
 
   // Kho hàng
   'inventory.read': 'Xem tồn kho',
@@ -79,7 +80,8 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
 
   // Bán hàng (POS)
   'pos.invoice.read': 'Xem hóa đơn bán hàng',
-  'pos.invoice.write': 'Tạo/sửa/hủy hóa đơn bán hàng',
+  'pos.invoice.write': 'Tạo/sửa hóa đơn bán hàng',
+  'pos.invoice.cancel': 'Hủy hóa đơn bán hàng',
   'pos.sale.create': 'Tạo đơn bán hàng',
   'pos.return.create': 'Tạo trả hàng',
   'pos.exchange.create': 'Tạo đổi hàng',
@@ -98,12 +100,15 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
   'accounting.expenses.read': 'Xem chi phí',
   'accounting.expenses.create': 'Tạo chi phí',
   'accounting.expenses.update': 'Cập nhật chi phí',
+  'accounting.expenses.delete': 'Xóa chi phí',
   'accounting.payables.read': 'Xem công nợ phải trả',
   'accounting.payables.create': 'Tạo công nợ phải trả',
   'accounting.payables.update': 'Cập nhật công nợ phải trả',
+  'accounting.payables.delete': 'Xóa công nợ phải trả',
   'accounting.receivables.read': 'Xem công nợ phải thu',
   'accounting.receivables.create': 'Tạo công nợ phải thu',
   'accounting.receivables.update': 'Cập nhật công nợ phải thu',
+  'accounting.receivables.delete': 'Xóa công nợ phải thu',
   'accounting.receivables.write-off': 'Xóa nợ khó đòi',
 
   // Phiếu thu tiền mặt
@@ -195,6 +200,7 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
   'reporting.invoice-template.manage': 'Quản lý mẫu báo cáo hóa đơn',
   'inventory.reports.read': 'Xem báo cáo nhập xuất tồn kho',
   'reporting.debts.read': 'Xem báo cáo công nợ',
+  'reporting.profit.read': 'Xem báo cáo lợi nhuận',
 
   // Đăng ký
   'org.registration.submit': 'Gửi đăng ký tổ chức',

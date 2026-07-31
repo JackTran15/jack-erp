@@ -18,6 +18,7 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "branch.read", module: "branch" },
   { key: "branch.write", module: "branch" },
   { key: "branch.archive", module: "branch" },
+  { key: "branch.delete", module: "branch" },
 
   // Inventory
   { key: "inventory.read", module: "inventory" },
@@ -70,6 +71,7 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   // POS
   { key: "pos.invoice.read", module: "pos" },
   { key: "pos.invoice.write", module: "pos" },
+  { key: "pos.invoice.cancel", module: "pos" },
   { key: "pos.sale.create", module: "pos" },
   { key: "pos.return.create", module: "pos" },
   { key: "pos.exchange.create", module: "pos" },
@@ -88,12 +90,15 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "accounting.expenses.read", module: "accounting" },
   { key: "accounting.expenses.create", module: "accounting" },
   { key: "accounting.expenses.update", module: "accounting" },
+  { key: "accounting.expenses.delete", module: "accounting" },
   { key: "accounting.payables.read", module: "accounting" },
   { key: "accounting.payables.create", module: "accounting" },
   { key: "accounting.payables.update", module: "accounting" },
+  { key: "accounting.payables.delete", module: "accounting" },
   { key: "accounting.receivables.read", module: "accounting" },
   { key: "accounting.receivables.create", module: "accounting" },
   { key: "accounting.receivables.update", module: "accounting" },
+  { key: "accounting.receivables.delete", module: "accounting" },
   { key: "accounting.receivables.write-off", module: "accounting" },
 
   // Cash vouchers (Phiếu thu / Phiếu chi / Kiểm kê / Sổ tiền mặt)

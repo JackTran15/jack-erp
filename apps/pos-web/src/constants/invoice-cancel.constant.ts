@@ -5,8 +5,8 @@ import type { InvoiceStatus, InvoiceType } from "@erp/pos/types/invoice.type";
  *
  * Bảng `roles` không có cột mã ổn định — chỉ có `name` (tiếng Việt, unique theo
  * từng tổ chức), nên chỗ này buộc phải so theo tên hiển thị. Tổ chức nào đặt tên
- * vai trò khác thì bổ sung vào đây; backend vẫn chặn bằng quyền
- * `pos.invoice.write`, đây chỉ là lớp ẩn nút cho đúng người.
+ * vai trò khác thì bổ sung vào đây; backend chặn bằng quyền `pos.invoice.cancel`
+ * (chỉ cấp cho 2 vai trò dưới), đây chỉ là lớp ẩn nút cho đúng người.
  */
 export const INVOICE_CANCEL_ROLE_NAMES: readonly string[] = [
   "Quản trị hệ thống",
