@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { PosDailySummaryDetailCategory, ReportGroupBy } from "@erp/shared-interfaces";
+import {
+  PosDailySummaryDetailCategory,
+  ReportGroupBy,
+  REVENUE_BY_ITEM_ALL_TIME_FROM,
+} from "@erp/shared-interfaces";
 import type {
   ColumnFilter,
   InvoiceReportSearchPayload,
@@ -168,12 +172,23 @@ export function useDailyReport() {
     [issuedAt, cashierId, salespersonId],
   );
 
+  // Report `revenue-by-item` 400s without a lower bound (unlike `daily-summary`,
+  // which allows the open-ended "Toàn bộ" range) — substitute the shared
+  // all-time sentinel so "Toàn bộ" still returns everything instead of
+  // failing. The backend recognizes this exact value (and a missing `to`) to
+  // keep it out of the printed/exported document's "Từ ngày:" line.
+  const revenueIssuedAt = useMemo<ReportDateRangeFilter>(
+    () =>
+      issuedAt.from ? issuedAt : { ...issuedAt, from: REVENUE_BY_ITEM_ALL_TIME_FROM },
+    [issuedAt],
+  );
+
   const revenueBody = useMemo<InvoiceReportSearchPayload>(
     () => ({
       reportType: "revenue-by-item",
       columns: [...DAILY_REPORT_REVENUE_COLUMN_ORDER],
       filters: {
-        issuedAt,
+        issuedAt: revenueIssuedAt,
         statBy: ReportGroupBy.ITEM,
         cashierId: cashierId ?? undefined,
         salespersonId: salespersonId ?? undefined,
@@ -182,7 +197,7 @@ export function useDailyReport() {
       page,
       limit: pageSize,
     }),
-    [issuedAt, cashierId, salespersonId, columnFilters, page, pageSize],
+    [revenueIssuedAt, cashierId, salespersonId, columnFilters, page, pageSize],
   );
 
   // In/Xuất always cover the whole filtered set (no page/limit), and only the
@@ -195,14 +210,14 @@ export function useDailyReport() {
         visibleRevenueColumns.has(key),
       ),
       filters: {
-        issuedAt,
+        issuedAt: revenueIssuedAt,
         statBy: ReportGroupBy.ITEM,
         cashierId: cashierId ?? undefined,
         salespersonId: salespersonId ?? undefined,
       },
       columnFilters: columnFilters.length ? columnFilters : undefined,
     }),
-    [issuedAt, cashierId, salespersonId, columnFilters, visibleRevenueColumns],
+    [revenueIssuedAt, cashierId, salespersonId, columnFilters, visibleRevenueColumns],
   );
 
   const summaryQuery = useDailySummaryQuery(summaryBody);

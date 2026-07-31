@@ -1,4 +1,4 @@
-import { ReportGroupBy } from '@erp/shared-interfaces';
+import { REVENUE_BY_ITEM_ALL_TIME_FROM, ReportGroupBy } from '@erp/shared-interfaces';
 import {
   GetInvoiceReportDocumentHandler,
   invoiceFilterSummary,
@@ -95,5 +95,62 @@ describe('GetInvoiceReportDocumentHandler.execute — builder dispatch by report
 
     expect(revenueByItemParams.build).not.toHaveBeenCalled();
     expect(prepared.header.subtitleLines).toEqual(['Thống kê theo: Ngày hóa đơn']);
+  });
+});
+
+// pos-web's "Toàn bộ" preset substitutes REVENUE_BY_ITEM_ALL_TIME_FROM as
+// `issuedAt.from` because revenue-by-item's query-safety guard 400s on an
+// unbounded request — the document must not leak that implementation detail
+// as a literal "Từ ngày: 01/01/2000" line.
+describe('GetInvoiceReportDocumentHandler.execute — revenue-by-item all-time sentinel', () => {
+  it('suppresses the date line when issuedAt.from is the sentinel and to is unset', async () => {
+    const { handler } = makeHandler();
+    const dto = {
+      reportType: 'revenue-by-item',
+      filters: { issuedAt: { from: REVENUE_BY_ITEM_ALL_TIME_FROM } },
+    } as any;
+
+    const prepared = await handler.execute(new GetInvoiceReportDocumentQuery(dto, actor));
+
+    expect(prepared.header.subtitleLines).toEqual(['MISA-STYLE LINE']);
+  });
+
+  it('keeps the date line for a real from date', async () => {
+    const { handler } = makeHandler();
+    const dto = {
+      reportType: 'revenue-by-item',
+      filters: { issuedAt: { from: '2026-01-01' } },
+    } as any;
+
+    const prepared = await handler.execute(new GetInvoiceReportDocumentQuery(dto, actor));
+
+    expect(prepared.header.subtitleLines).toEqual([
+      'Từ ngày: 01/01/2026 Đến ngày: —',
+      'MISA-STYLE LINE',
+    ]);
+  });
+
+  it('keeps the date line when the sentinel from is paired with a real to (not the "Toàn bộ" shape)', async () => {
+    const { handler } = makeHandler();
+    const dto = {
+      reportType: 'revenue-by-item',
+      filters: { issuedAt: { from: REVENUE_BY_ITEM_ALL_TIME_FROM, to: '2026-01-31' } },
+    } as any;
+
+    const prepared = await handler.execute(new GetInvoiceReportDocumentQuery(dto, actor));
+
+    expect(prepared.header.subtitleLines[0]).toMatch(/^Từ ngày: 01\/01\/2000 Đến ngày:/);
+  });
+
+  it('does not suppress the sentinel-shaped date for other report types (revenue-by-item only)', async () => {
+    const { handler } = makeHandler();
+    const dto = {
+      reportType: 'daily-sales-summary',
+      filters: { issuedAt: { from: REVENUE_BY_ITEM_ALL_TIME_FROM } },
+    } as any;
+
+    const prepared = await handler.execute(new GetInvoiceReportDocumentQuery(dto, actor));
+
+    expect(prepared.header.subtitleLines[0]).toMatch(/^Từ ngày: 01\/01\/2000 Đến ngày:/);
   });
 });
