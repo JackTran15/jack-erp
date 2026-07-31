@@ -4890,7 +4890,7 @@
         ]
       }
     },
-    "/customers/imports/import-template.xls": {
+    "/customers/imports/import-template.xlsx": {
       "get": {
         "operationId": "CustomerImportController_downloadTemplate",
         "parameters": [],
@@ -4899,6 +4899,7 @@
             "description": ""
           }
         },
+        "summary": "Generated rather than served from a checked-in .xls, matching the inventory\nitems template: the file must always carry the current column keys, and\nneither exceljs nor SheetJS can write a styled .xls (BIFF drops the hidden\nkey rows and the header fill).",
         "tags": [
           "CustomerImport"
         ]
@@ -36092,8 +36093,7 @@
           },
           "handoverAmount": {
             "type": "number",
-            "minimum": 0,
-            "description": "Tiền bàn giao (handover cash) — FE-only, unpersisted."
+            "description": "Tiền bàn giao (handover cash) — FE-only, unpersisted. Can go negative (chênh lệch âm khi chi vượt thu tiền mặt), same as the print flow which applies no such floor."
           },
           "receivedByLabel": {
             "type": "string",
@@ -38801,6 +38801,18 @@
               "all"
             ],
             "type": "string"
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "supplier",
+                "customer",
+                "employee",
+                "all"
+              ]
+            }
           },
           "search": {
             "type": "string",

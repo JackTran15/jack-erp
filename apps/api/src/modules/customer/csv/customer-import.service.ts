@@ -33,6 +33,7 @@ import {
   isCsvFile,
   isOleExcelBuffer,
   isZipExcelBuffer,
+  parseGroupedInteger,
 } from "../../inventory/csv/inventory-excel-parse.utils";
 import { parseDelimitedGrid } from "../../inventory/csv/import-workbook/semicolon-grid.utils";
 import {
@@ -51,6 +52,7 @@ import {
   MembershipTier,
 } from "../membership-card.entity";
 import { DEFAULT_NEW_CUSTOMER_MEMBERSHIP_TIER } from "../membership-card.utils";
+import { PointHistoryEntity, PointType } from "../point-history.entity";
 import { EmployeeProfileEntity } from "../../rbac/employee/employee-profile.entity";
 import {
   GENDER_BY_NORMALIZED,
@@ -66,6 +68,10 @@ const HEADER_KEY_ROW_INDEX = 2; // 1-based row 2
 const DATA_START_ROW_INDEX = 5; // 1-based row 5
 
 const CUSTOMER_GROUP_CODE_MAX_LENGTH = 50;
+
+/** point_history note marking rows written by the customer Excel import. */
+export const IMPORT_POINT_ADJUSTMENT_NOTE =
+  "Điều chỉnh khi nhập khẩu khách hàng";
 
 type RowMessage = { column?: string; code: string; message: string };
 
@@ -92,7 +98,15 @@ interface NormalizedCustomerRow {
   assignedStaffId?: string;
   cardNumber?: string;
   tier?: MembershipTier;
+  /** Absolute loyalty balance from the file; undefined = leave the card untouched. */
+  points?: number;
   existingCustomerId?: string;
+}
+
+/** A point_history row waiting to be written, batched per commit transaction. */
+interface PointAdjustmentDraft {
+  cardId: string;
+  delta: number;
 }
 
 /** Per-validate lookup context, scoped to the values present in the file. */
@@ -329,6 +343,10 @@ export class CustomerImportService {
         INVENTORY_IMPORT_ROW_SAVE_BATCH_SIZE,
       )) {
         await this.dataSource.transaction(async (em) => {
+          // Collected across the batch, then written as one multi-row INSERT so
+          // a large file costs +1 query per 100 rows instead of +1 per row.
+          const pointAdjustments: PointAdjustmentDraft[] = [];
+
           for (const rowEntity of batch) {
             const normalized =
               rowEntity.normalizedData as unknown as NormalizedCustomerRow;
@@ -337,6 +355,7 @@ export class CustomerImportService {
               normalized,
               actor,
               groupIdByCode,
+              pointAdjustments,
             );
             if (created) customersCreated++;
             else customersUpdated++;
@@ -345,6 +364,8 @@ export class CustomerImportService {
               .getRepository(InventoryImportJobRowEntity)
               .update(rowEntity.id, { status: ImportRowStatus.COMMITTED });
           }
+
+          await this.flushPointAdjustments(em, pointAdjustments, actor);
         });
       }
 
@@ -993,6 +1014,21 @@ export class CustomerImportService {
       }
     }
 
+    // ── Points: absolute balance, empty cell keeps the current one ──
+    const pointsRaw = getField(raw, F.POINTS);
+    if (pointsRaw) {
+      const points = parseGroupedInteger(pointsRaw);
+      if (points === undefined) {
+        warnings.push({
+          column: F.POINTS,
+          code: "POINTS_INVALID",
+          message: `${label(F.POINTS)} "${pointsRaw}" không hợp lệ (số nguyên ≥ 0) — bỏ qua cột này.`,
+        });
+      } else {
+        normalized.points = points;
+      }
+    }
+
     return {
       status: errors.length > 0 ? ImportRowStatus.ERROR : ImportRowStatus.VALID,
       errors,
@@ -1009,6 +1045,7 @@ export class CustomerImportService {
     normalized: NormalizedCustomerRow,
     actor: ActorContext,
     groupIdByCode: Map<string, string>,
+    pointAdjustments: PointAdjustmentDraft[],
   ): Promise<boolean> {
     const customerRepo = em.getRepository(CustomerEntity);
 
@@ -1047,6 +1084,7 @@ export class CustomerImportService {
         normalized,
         actor,
         false,
+        pointAdjustments,
       );
       return false;
     }
@@ -1069,7 +1107,14 @@ export class CustomerImportService {
         createdBy: actor.userId,
       }),
     );
-    await this.upsertMembershipCard(em, customer.id, normalized, actor, true);
+    await this.upsertMembershipCard(
+      em,
+      customer.id,
+      normalized,
+      actor,
+      true,
+      pointAdjustments,
+    );
     return true;
   }
 
@@ -1125,9 +1170,17 @@ export class CustomerImportService {
     normalized: NormalizedCustomerRow,
     actor: ActorContext,
     isNewCustomer: boolean,
+    pointAdjustments: PointAdjustmentDraft[],
   ): Promise<void> {
     // Existing customer with no card data in the file → leave the card alone.
-    if (!isNewCustomer && !normalized.cardNumber && !normalized.tier) return;
+    if (
+      !isNewCustomer &&
+      !normalized.cardNumber &&
+      !normalized.tier &&
+      normalized.points === undefined
+    ) {
+      return;
+    }
 
     const cardRepo = em.getRepository(MembershipCardEntity);
     const card = isNewCustomer
@@ -1139,22 +1192,63 @@ export class CustomerImportService {
     if (card) {
       if (normalized.cardNumber) card.cardNumber = normalized.cardNumber;
       if (normalized.tier) card.tier = normalized.tier;
+
+      // The file carries an absolute balance; the ledger records the delta it
+      // implies. Same balance → no ledger row, so re-importing an unchanged
+      // export is a no-op.
+      const delta =
+        normalized.points === undefined
+          ? 0
+          : normalized.points - Number(card.points);
+      if (delta !== 0) {
+        card.points = normalized.points!;
+        pointAdjustments.push({ cardId: card.id, delta });
+      }
+
       await cardRepo.save(card);
       return;
     }
 
     // Mirror CustomerService.create: every new customer gets a card.
-    await cardRepo.save(
+    const created = await cardRepo.save(
       cardRepo.create({
         organizationId: actor.organizationId,
         customerId,
         cardNumber: normalized.cardNumber ?? issueImportCardNumber(),
         tier: normalized.tier ?? DEFAULT_NEW_CUSTOMER_MEMBERSHIP_TIER,
-        points: 0,
+        points: normalized.points ?? 0,
         issuedAt: new Date(new Date().toISOString().slice(0, 10)),
         isActive: true,
         createdBy: actor.userId,
       }),
+    );
+    if (created.points > 0) {
+      pointAdjustments.push({ cardId: created.id, delta: created.points });
+    }
+  }
+
+  /**
+   * Writes the batch's point_history rows in one INSERT, inside the caller's
+   * transaction. Deliberately not MembershipCardService.adjustPoints(): that
+   * opens its own transaction, so calling it per row would check out a second
+   * connection while the batch still holds one, and would leave ledger rows
+   * committed behind a rolled-back batch.
+   */
+  private async flushPointAdjustments(
+    em: EntityManager,
+    drafts: PointAdjustmentDraft[],
+    actor: ActorContext,
+  ): Promise<void> {
+    if (drafts.length === 0) return;
+    await em.getRepository(PointHistoryEntity).insert(
+      drafts.map((draft) => ({
+        cardId: draft.cardId,
+        type: PointType.ADJUST,
+        delta: draft.delta,
+        note: IMPORT_POINT_ADJUSTMENT_NOTE,
+        organizationId: actor.organizationId,
+        createdBy: actor.userId,
+      })),
     );
   }
 

@@ -4,7 +4,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -17,8 +16,6 @@ import {
 import { FileInterceptor } from "@nestjs/platform-express";
 import { IsEnum, IsOptional } from "class-validator";
 import { Response } from "express";
-import { existsSync, readFileSync } from "fs";
-import { join } from "path";
 import {
   Actor,
   ActorContext,
@@ -30,8 +27,9 @@ import { ImportRowStatus } from "../../inventory/csv/inventory-import-job-row.en
 import { BranchScopeGuard } from "../../rbac/branch-scope.guard";
 import { PermissionGuard } from "../../rbac/permission.guard";
 import { CustomerImportService } from "./customer-import.service";
+import { CustomerImportWorkbookService } from "./customer-import-workbook.service";
 
-const TEMPLATE_FILE_NAME = "DanhMucKhachHang.xls";
+const TEMPLATE_FILE_NAME = "DanhMucKhachHang.xlsx";
 
 class CustomerImportJobRowsQueryDto extends PaginationQueryDto {
   @IsOptional()
@@ -43,7 +41,10 @@ class CustomerImportJobRowsQueryDto extends PaginationQueryDto {
 @UseInterceptors(AuditInterceptor)
 @UseGuards(PermissionGuard, BranchScopeGuard)
 export class CustomerImportController {
-  constructor(private readonly importService: CustomerImportService) {}
+  constructor(
+    private readonly importService: CustomerImportService,
+    private readonly workbookService: CustomerImportWorkbookService,
+  ) {}
 
   @Post("validate")
   @RequirePermission("customer.write")
@@ -65,25 +66,20 @@ export class CustomerImportController {
     return this.importService.commit(jobId, actor);
   }
 
-  @Get("import-template.xls")
+  /**
+   * Generated rather than served from a checked-in .xls, matching the inventory
+   * items template: the file must always carry the current column keys, and
+   * neither exceljs nor SheetJS can write a styled .xls (BIFF drops the hidden
+   * key rows and the header fill).
+   */
+  @Get("import-template.xlsx")
   @RequirePermission("customer.read")
-  downloadTemplate(@Res() res: Response) {
-    const builtPath = join(__dirname, "templates", TEMPLATE_FILE_NAME);
-    const sourcePath = join(
-      process.cwd(),
-      "src",
-      "modules",
-      "customer",
-      "csv",
-      "templates",
-      TEMPLATE_FILE_NAME,
+  async downloadTemplate(@Res() res: Response) {
+    const buffer = await this.workbookService.buildWorkbookBuffer([]);
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
-    const path = existsSync(builtPath) ? builtPath : sourcePath;
-    if (!existsSync(path)) {
-      throw new NotFoundException("Không tìm thấy tệp mẫu nhập khẩu");
-    }
-    const buffer = readFileSync(path);
-    res.setHeader("Content-Type", "application/vnd.ms-excel");
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="${TEMPLATE_FILE_NAME}"`,

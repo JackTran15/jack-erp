@@ -48,10 +48,10 @@ export async function downloadCustomersImportErrorRowsExcel(
 
 export async function downloadCustomersTemplate(): Promise<void> {
   const { data } = await apiClient.get<Blob>(
-    "/customers/imports/import-template.xls",
+    "/customers/imports/import-template.xlsx",
     { responseType: "blob" },
   );
-  triggerBlobDownload(data, "DanhMucKhachHang.xls");
+  triggerBlobDownload(data, "DanhMucKhachHang.xlsx");
 }
 
 export async function downloadCustomersExport(): Promise<void> {
