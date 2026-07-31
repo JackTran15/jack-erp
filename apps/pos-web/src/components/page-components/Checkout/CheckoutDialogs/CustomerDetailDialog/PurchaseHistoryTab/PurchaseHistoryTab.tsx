@@ -48,12 +48,15 @@ const STATUS_FILTER_TO_STATUS: Record<
   [PurchaseHistoryStatusFilterEnum.ALL]: null,
   [PurchaseHistoryStatusFilterEnum.PAID]: PurchaseHistoryStatusEnum.PAID,
   [PurchaseHistoryStatusFilterEnum.DEBT]: PurchaseHistoryStatusEnum.DEBT,
+  [PurchaseHistoryStatusFilterEnum.CANCELLED]:
+    PurchaseHistoryStatusEnum.CANCELLED,
 };
 
 /** UI status enum → backend `InvoiceStatus` value sent to the search endpoint. */
 const STATUS_TO_API: Record<PurchaseHistoryStatusEnum, string> = {
   [PurchaseHistoryStatusEnum.PAID]: "paid",
   [PurchaseHistoryStatusEnum.DEBT]: "debt",
+  [PurchaseHistoryStatusEnum.CANCELLED]: "cancelled",
 };
 
 /** Per-column filter state for the text/number/date columns (status uses its own select). */
@@ -104,7 +107,8 @@ function dateColumnToRange(state: ColumnFilterState): DateRangeFilter | undefine
  * "Lịch sử mua hàng" tab — server-side filtered via
  * `POST /v2/invoices/purchase-history/search`. The header filter row maps to v2
  * filter shapes (debounced); the status select maps "Tất cả/Đã thanh toán/Ghi
- * nợ" to the backend `status` enum. "Tên cửa hàng" comes from the joined branch.
+ * nợ/Đã hủy" to the backend `status` enum. "Tên cửa hàng" comes from the joined
+ * branch.
  */
 export function PurchaseHistoryTab({
   customerId,
@@ -169,6 +173,7 @@ export function PurchaseHistoryTab({
         label: "Đã thanh toán",
       },
       { value: PurchaseHistoryStatusFilterEnum.DEBT, label: "Ghi nợ" },
+      { value: PurchaseHistoryStatusFilterEnum.CANCELLED, label: "Đã hủy" },
     ],
     [],
   );

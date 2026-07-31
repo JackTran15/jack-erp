@@ -17,6 +17,7 @@ import type {
 export enum PurchaseHistoryStatusEnum {
   PAID = "PAID",
   DEBT = "DEBT",
+  CANCELLED = "CANCELLED",
 }
 
 export type PurchaseHistoryStatus = PurchaseHistoryStatusEnum;
@@ -25,6 +26,7 @@ export enum PurchaseHistoryStatusFilterEnum {
   ALL = "ALL",
   PAID = PurchaseHistoryStatusEnum.PAID,
   DEBT = PurchaseHistoryStatusEnum.DEBT,
+  CANCELLED = PurchaseHistoryStatusEnum.CANCELLED,
 }
 
 export type PurchaseHistoryStatusFilter = PurchaseHistoryStatusFilterEnum;

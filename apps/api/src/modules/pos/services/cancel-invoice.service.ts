@@ -14,6 +14,7 @@ import { PromotionApplyService } from '../../promotion/promotion-apply.service';
 import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
 import { AccountingDefaultAccountRole } from '../../accounting/payment-accounts/enums';
 import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
+import { LoyaltyPointsReversePublisher } from '../../customer/publishers/loyalty-points-reverse.publisher';
 import {
   InvoiceEntity,
   InvoicePaymentMethod,
@@ -52,6 +53,7 @@ export class CancelInvoiceService {
     private readonly wsEmitter: WebSocketEmitterService,
     private readonly accountResolver: AccountResolverService,
     private readonly cashFundResolver: CashFundResolverService,
+    private readonly loyaltyPointsReversePublisher: LoyaltyPointsReversePublisher,
   ) {}
 
   async cancel(
@@ -97,6 +99,9 @@ export class CancelInvoiceService {
       invoice.status = InvoiceStatus.CANCELLED;
       invoice.cancelledAt = now;
       invoice.cancelReason = dto.reason;
+      // Cancelling voids the sale outright, so every point it earned is clawed
+      // back — same snapshot convention as a full return (see checkout-return.service).
+      invoice.pointsReversed = invoice.pointsEarned;
       const saved = await manager.save(invoice);
 
       if (hasOutstandingDebt) {
@@ -129,6 +134,18 @@ export class CancelInvoiceService {
       },
       actor,
     );
+
+    if (invoice.customerId) {
+      await this.loyaltyPointsReversePublisher.publish(
+        {
+          returnInvoiceId: id,
+          customerId: invoice.customerId,
+          subtotalDelta: Number(invoice.amountDue),
+          branchId: invoice.branchId,
+        },
+        actor,
+      );
+    }
 
     this.wsEmitter.emitToBranch(invoice.branchId!, {
       eventId: uuid(),

@@ -22,6 +22,11 @@ export function StatusBadge({ status }: StatusBadgeProps) {
       bg: "bg-[#FEF3C7]",
       text: "text-[#92400E]",
     },
+    [PurchaseHistoryStatusEnum.CANCELLED]: {
+      label: "Đã hủy",
+      bg: "bg-[#FEE2E2]",
+      text: "text-[#991B1B]",
+    },
   };
   const c = config[status];
   return (
