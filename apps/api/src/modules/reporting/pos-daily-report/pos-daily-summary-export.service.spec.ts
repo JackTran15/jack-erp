@@ -143,6 +143,24 @@ describe('PosDailySummaryExportService', () => {
     expect(sheet.getCell(chenhLech + 1, 3).value).toBe(expected);
   });
 
+  it('accepts a negative handoverAmount (chênh lệch âm khi chi vượt thu tiền mặt) — no floor at 0, matching the print flow', async () => {
+    const service = new PosDailySummaryExportService(repoStub(null), repoStub(null));
+    const dto: PosDailySummaryExportDto = {
+      issuedAt: {},
+      openingAmount: 0,
+      handoverAmount: -58836000,
+    };
+    const buffer = await service.buildWorkbookBuffer(summary, dto, actor);
+    const sheet = await loadSheet(buffer);
+
+    const banGiao = findRow(sheet, 'II. Bàn giao');
+    expect(sheet.getCell(banGiao + 1, 3).value).toBe(-58836000);
+
+    const chenhLech = findRow(sheet, 'III. Chênh lệch');
+    const expected = 0 + summary.revenue.cash - summary.expense.cash - -58836000;
+    expect(sheet.getCell(chenhLech + 1, 3).value).toBe(expected);
+  });
+
   it('indents the SL hóa đơn breakdown rows under both V. Khác and II. Bàn giao, and gives every row equal height', async () => {
     const service = new PosDailySummaryExportService(repoStub(null), repoStub(null));
     const dto: PosDailySummaryExportDto = { issuedAt: {} };

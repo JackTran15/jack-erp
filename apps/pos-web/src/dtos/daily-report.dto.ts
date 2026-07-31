@@ -1,5 +1,6 @@
 import type {
   ColumnFilter,
+  InvoiceReportSearchPayload,
   PosDailySummaryDetailCategory,
   ReportDateRangeFilter,
 } from "@erp/shared-interfaces";
@@ -35,3 +36,15 @@ export interface PosDailySummaryDetailBody extends PosDailySummaryBody {
   page?: number;
   limit?: number;
 }
+
+/**
+ * Request body for tab Doanh thu theo mặt hàng's "In"/"Xuất" —
+ * `POST /reports/invoices/export` and `POST /reports/invoices/print-payload`.
+ * Same shape as the `search` request minus pagination (export always covers
+ * the whole filtered set, matching the invoice-report engine's own
+ * `InvoiceReportExportDto`).
+ */
+export type RevenueByItemExportBody = Omit<
+  InvoiceReportSearchPayload,
+  "page" | "limit"
+>;

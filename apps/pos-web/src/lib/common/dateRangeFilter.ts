@@ -64,20 +64,20 @@ export function dateRangeToISO(
     case "LAST_7_DAYS": {
       const from = new Date(today);
       from.setDate(from.getDate() - 6);
-      return { from: toLocalDateStr(from) };
+      return { from: toLocalDateStr(from), to: toLocalDateStr(today) };
     }
 
     case "LAST_14_DAYS": {
       const from = new Date(today);
       from.setDate(from.getDate() - 13);
-      return { from: toLocalDateStr(from) };
+      return { from: toLocalDateStr(from), to: toLocalDateStr(today) };
     }
 
     case "THIS_WEEK": {
       const from = new Date(today);
       const day = (from.getDay() + 6) % 7;
       from.setDate(from.getDate() - day);
-      return { from: toLocalDateStr(from) };
+      return { from: toLocalDateStr(from), to: toLocalDateStr(today) };
     }
 
     case "LAST_WEEK": {
@@ -91,7 +91,7 @@ export function dateRangeToISO(
 
     case "THIS_MONTH": {
       const from = new Date(today.getFullYear(), today.getMonth(), 1);
-      return { from: toLocalDateStr(from) };
+      return { from: toLocalDateStr(from), to: toLocalDateStr(today) };
     }
 
     case "LAST_MONTH": {
@@ -103,13 +103,13 @@ export function dateRangeToISO(
     case "THREE_MONTHS_AGO": {
       const from = new Date(today);
       from.setMonth(from.getMonth() - 3);
-      return { from: toLocalDateStr(from) };
+      return { from: toLocalDateStr(from), to: toLocalDateStr(today) };
     }
 
     case "SIX_MONTHS_AGO": {
       const from = new Date(today);
       from.setMonth(from.getMonth() - 6);
-      return { from: toLocalDateStr(from) };
+      return { from: toLocalDateStr(from), to: toLocalDateStr(today) };
     }
 
     default:

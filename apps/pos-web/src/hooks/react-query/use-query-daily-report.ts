@@ -11,6 +11,7 @@ import type {
   InvoiceReportSearchPayload,
   PosDailySummaryDetailResult,
   PosDailySummaryResult,
+  ReportDocumentPayload,
 } from "@erp/shared-interfaces";
 
 import { DAILY_REPORT_KEYS } from "@erp/pos/constants/react-query-key.constant";
@@ -20,6 +21,7 @@ import type {
   PosDailySummaryBody,
   PosDailySummaryDetailBody,
   PosDailySummaryExportBody,
+  RevenueByItemExportBody,
 } from "@erp/pos/dtos/daily-report.dto";
 
 /** Tab Tổng hợp — `POST /reports/pos/daily-summary`. */
@@ -84,5 +86,29 @@ export function useExportDailySummaryMutation(): UseMutationResult<
   return useMutation({
     mutationFn: (body: PosDailySummaryExportBody) =>
       dailyReportService.exportDailySummary(body),
+  });
+}
+
+/** Tab Doanh thu theo mặt hàng "Xuất" — `POST /reports/invoices/export`, returns the .xlsx as a Blob. */
+export function useExportRevenueByItemMutation(): UseMutationResult<
+  Blob,
+  Error,
+  RevenueByItemExportBody
+> {
+  return useMutation({
+    mutationFn: (body: RevenueByItemExportBody) =>
+      dailyReportService.exportRevenueByItem(body),
+  });
+}
+
+/** Tab Doanh thu theo mặt hàng "In" — `POST /reports/invoices/print-payload`. */
+export function usePrintRevenueByItemMutation(): UseMutationResult<
+  ReportDocumentPayload,
+  Error,
+  RevenueByItemExportBody
+> {
+  return useMutation({
+    mutationFn: (body: RevenueByItemExportBody) =>
+      dailyReportService.getRevenueByItemPrintPayload(body),
   });
 }
