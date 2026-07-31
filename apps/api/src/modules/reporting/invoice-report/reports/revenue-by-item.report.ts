@@ -2,8 +2,10 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import {
+  INVOICE_REPORT_BAND_LABELS_VI,
   INVOICE_REPORT_COLUMN_LABELS_VI,
   InvoiceReportResult,
+  ReportColumnGroup,
   ReportColumnHeader,
   ReportGroupBy,
   REVENUE_BY_ITEM_COLUMN_DESCS,
@@ -47,6 +49,9 @@ import {
   ReportDefinition,
 } from '../report-definition';
 import { CountedRows } from '../../report-core/report-definition';
+
+const band = (id: string | null): ReportColumnGroup | null =>
+  id ? { id, name: INVOICE_REPORT_BAND_LABELS_VI[id] ?? id } : null;
 
 interface ItemMeta {
   categoryId: string | null;
@@ -113,7 +118,7 @@ export class RevenueByItemReport implements ReportDefinition {
           c.key,
         desc: REVENUE_BY_ITEM_COLUMN_DESCS[c.key] ?? null,
         type: c.type,
-        group: null,
+        group: band(c.group),
       }),
     );
   }

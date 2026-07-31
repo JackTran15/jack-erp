@@ -47,9 +47,21 @@ describe('invoice-item-revenue.columns', () => {
     expect(getItemRevenueColumnDef('date')?.type).toBe(ReportColumnDataType.DATE);
   });
 
-  it('has no bands (flat) and no dynamic payment columns', () => {
-    // The registry carries no group/band metadata on any column.
-    expect(INVOICE_ITEM_REVENUE_COLUMNS.every((c) => !('group' in c))).toBe(true);
+  it('bands the revenue measures under "revenue", no dynamic payment columns', () => {
+    const revenueKeys = INVOICE_ITEM_REVENUE_COLUMNS.filter((c) => c.group === 'revenue').map(
+      (c) => c.key,
+    );
+    expect(revenueKeys).toEqual([
+      'lineAmount',
+      'lineDiscount',
+      'revenue.promoPoints',
+      'lineRevenue',
+    ]);
+    expect(
+      INVOICE_ITEM_REVENUE_COLUMNS.filter((c) => !revenueKeys.includes(c.key)).every(
+        (c) => c.group === null,
+      ),
+    ).toBe(true);
     expect(isKnownItemRevenueColumn('payment.method.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')).toBe(false);
   });
 

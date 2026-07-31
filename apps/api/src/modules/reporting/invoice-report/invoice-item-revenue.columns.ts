@@ -1,4 +1,5 @@
 import { ReportColumnDataType } from '@erp/shared-interfaces';
+import { ReportBandId } from './invoice-report.columns';
 
 /**
  * Column registry for the `invoice-item-revenue-detail` report (MISA-style
@@ -6,7 +7,8 @@ import { ReportColumnDataType } from '@erp/shared-interfaces';
  * ITEM. Kept separate from `invoice-listing.columns.ts` (per-invoice) and
  * `invoice-report.columns.ts` (per-day) so the three reports never interfere.
  *
- * The column set is FLAT (no bands) and has NO dynamic payment-method columns.
+ * The revenue measures (lineAmount/lineDiscount/promoPoints/lineRevenue) are
+ * banded under "Doanh thu"; the catalog has NO dynamic payment-method columns.
  *
  * Every column declares a `classification`:
  *  - `backed`      — a real field on the line/invoice or an inline-resolved relation.
@@ -59,6 +61,7 @@ export interface ItemRevenueColumnDef {
   key: string;
   type: ReportColumnDataType;
   classification: ItemRevenueClassification;
+  group: ReportBandId | null;
   source: ItemRevenueSource;
 }
 
@@ -71,39 +74,39 @@ export interface ItemRevenueColumnDef {
  * no separate code column (mirrors `invoice-order-listing`'s `storeCode`).
  */
 export const INVOICE_ITEM_REVENUE_COLUMNS: ItemRevenueColumnDef[] = [
-  { key: 'date', type: ReportColumnDataType.DATE, classification: 'backed', source: { kind: 'field', field: 'issuedAtDate' } },
-  { key: 'time', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'field', field: 'issuedAtTime' } },
-  { key: 'invoiceCode', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'field', field: 'invoiceCode' } },
-  { key: 'sku', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'field', field: 'itemCode' } },
-  { key: 'itemName', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'field', field: 'itemName' } },
-  { key: 'itemCategory', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'relation', rel: 'itemCategory' } },
-  { key: 'unit', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'field', field: 'unit' } },
-  { key: 'quantity', type: ReportColumnDataType.NUMBER, classification: 'backed', source: { kind: 'field', field: 'quantity' } },
-  { key: 'unitPrice', type: ReportColumnDataType.CURRENCY, classification: 'backed', source: { kind: 'field', field: 'unitPrice' } },
-  { key: 'lineAmount', type: ReportColumnDataType.CURRENCY, classification: 'derived', source: { kind: 'computed', computed: 'lineAmount' } },
-  { key: 'lineDiscount', type: ReportColumnDataType.CURRENCY, classification: 'backed', source: { kind: 'field', field: 'lineDiscount' } },
-  { key: 'revenue.promoPoints', type: ReportColumnDataType.CURRENCY, classification: 'placeholder', source: { kind: 'placeholder', placeholder: 0 } },
-  { key: 'lineRevenue', type: ReportColumnDataType.CURRENCY, classification: 'backed', source: { kind: 'field', field: 'lineTotal' } },
-  { key: 'reference', type: ReportColumnDataType.STRING, classification: 'placeholder', source: { kind: 'placeholder', placeholder: null } },
-  { key: 'locationCode', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'relation', rel: 'locationCode' } },
-  { key: 'locationName', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'relation', rel: 'locationName' } },
-  { key: 'payment.bankAccount', type: ReportColumnDataType.STRING, classification: 'placeholder', source: { kind: 'placeholder', placeholder: null } },
-  { key: 'customerCode', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'relation', rel: 'customerCode' } },
-  { key: 'customer', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'relation', rel: 'customerName' } },
-  { key: 'customerGroup', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'relation', rel: 'customerGroup' } },
-  { key: 'customerPhone', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'relation', rel: 'customerPhone' } },
-  { key: 'salesChannel', type: ReportColumnDataType.STRING, classification: 'placeholder', source: { kind: 'placeholder', placeholder: null } },
-  { key: 'cashierCode', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'relation', rel: 'cashierCode' } },
-  { key: 'cashier', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'relation', rel: 'cashierName' } },
-  { key: 'salespersonCode', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'relation', rel: 'salespersonCode' } },
-  { key: 'salesperson', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'relation', rel: 'salespersonName' } },
-  { key: 'receiver', type: ReportColumnDataType.STRING, classification: 'placeholder', source: { kind: 'placeholder', placeholder: null } },
-  { key: 'receiverPhone', type: ReportColumnDataType.STRING, classification: 'placeholder', source: { kind: 'placeholder', placeholder: null } },
-  { key: 'storeCode', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'relation', rel: 'storeName' } },
-  { key: 'storeName', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'relation', rel: 'storeName' } },
-  { key: 'invoiceNote', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'field', field: 'invoiceNote' } },
-  { key: 'itemNote', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'field', field: 'itemNote' } },
-  { key: 'supplier', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'relation', rel: 'supplier' } },
+  { key: 'date', type: ReportColumnDataType.DATE, classification: 'backed', group: null, source: { kind: 'field', field: 'issuedAtDate' } },
+  { key: 'time', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'field', field: 'issuedAtTime' } },
+  { key: 'invoiceCode', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'field', field: 'invoiceCode' } },
+  { key: 'sku', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'field', field: 'itemCode' } },
+  { key: 'itemName', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'field', field: 'itemName' } },
+  { key: 'itemCategory', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'relation', rel: 'itemCategory' } },
+  { key: 'unit', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'field', field: 'unit' } },
+  { key: 'quantity', type: ReportColumnDataType.NUMBER, classification: 'backed', group: null, source: { kind: 'field', field: 'quantity' } },
+  { key: 'unitPrice', type: ReportColumnDataType.CURRENCY, classification: 'backed', group: null, source: { kind: 'field', field: 'unitPrice' } },
+  { key: 'lineAmount', type: ReportColumnDataType.CURRENCY, classification: 'derived', group: 'revenue', source: { kind: 'computed', computed: 'lineAmount' } },
+  { key: 'lineDiscount', type: ReportColumnDataType.CURRENCY, classification: 'backed', group: 'revenue', source: { kind: 'field', field: 'lineDiscount' } },
+  { key: 'revenue.promoPoints', type: ReportColumnDataType.CURRENCY, classification: 'placeholder', group: 'revenue', source: { kind: 'placeholder', placeholder: 0 } },
+  { key: 'lineRevenue', type: ReportColumnDataType.CURRENCY, classification: 'backed', group: 'revenue', source: { kind: 'field', field: 'lineTotal' } },
+  { key: 'reference', type: ReportColumnDataType.STRING, classification: 'placeholder', group: null, source: { kind: 'placeholder', placeholder: null } },
+  { key: 'locationCode', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'relation', rel: 'locationCode' } },
+  { key: 'locationName', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'relation', rel: 'locationName' } },
+  { key: 'payment.bankAccount', type: ReportColumnDataType.STRING, classification: 'placeholder', group: null, source: { kind: 'placeholder', placeholder: null } },
+  { key: 'customerCode', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'relation', rel: 'customerCode' } },
+  { key: 'customer', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'relation', rel: 'customerName' } },
+  { key: 'customerGroup', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'relation', rel: 'customerGroup' } },
+  { key: 'customerPhone', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'relation', rel: 'customerPhone' } },
+  { key: 'salesChannel', type: ReportColumnDataType.STRING, classification: 'placeholder', group: null, source: { kind: 'placeholder', placeholder: null } },
+  { key: 'cashierCode', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'relation', rel: 'cashierCode' } },
+  { key: 'cashier', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'relation', rel: 'cashierName' } },
+  { key: 'salespersonCode', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'relation', rel: 'salespersonCode' } },
+  { key: 'salesperson', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'relation', rel: 'salespersonName' } },
+  { key: 'receiver', type: ReportColumnDataType.STRING, classification: 'placeholder', group: null, source: { kind: 'placeholder', placeholder: null } },
+  { key: 'receiverPhone', type: ReportColumnDataType.STRING, classification: 'placeholder', group: null, source: { kind: 'placeholder', placeholder: null } },
+  { key: 'storeCode', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'relation', rel: 'storeName' } },
+  { key: 'storeName', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'relation', rel: 'storeName' } },
+  { key: 'invoiceNote', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'field', field: 'invoiceNote' } },
+  { key: 'itemNote', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'field', field: 'itemNote' } },
+  { key: 'supplier', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'relation', rel: 'supplier' } },
 ];
 
 const BY_KEY = new Map(INVOICE_ITEM_REVENUE_COLUMNS.map((c) => [c.key, c]));
