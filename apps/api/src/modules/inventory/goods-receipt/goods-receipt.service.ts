@@ -18,6 +18,7 @@ import {
   PaginatedResponse,
   PaginationQuery,
   StockMovementType,
+  TransferOrderStatus,
   VoucherPrintPayload,
 } from "@erp/shared-interfaces";
 import { ERP_TOPICS } from "@erp/shared-kafka-client";
@@ -60,6 +61,7 @@ import {
 } from "../location/services/voucher-print-context.util";
 import { mapGoodsReceiptToVoucherPayload } from "./goods-receipt-print.mapper";
 import { UserEntity } from "../../auth/user.entity";
+import { TransferOrderEntity } from "../transfer-order/transfer-order.entity";
 
 export interface GoodsReceiptQuery extends PaginationQuery {
   status?: GoodsReceiptStatus;
@@ -286,13 +288,6 @@ export class GoodsReceiptService {
       );
     }
 
-    if (
-      receipt.referenceType === GoodsReceiptReferenceType.STOCK_TRANSFER &&
-      receipt.referenceId
-    ) {
-      throw new ConflictException("Phiếu nhập kho điều chuyển không thể xoá");
-    }
-
     if (receipt.status === GoodsReceiptStatus.POSTED) {
       const branchId = receipt.branchId ?? actor.branchId;
       if (!branchId) {
@@ -349,6 +344,27 @@ export class GoodsReceiptService {
     receipt.status = GoodsReceiptStatus.CANCELLED;
     await this.receiptRepo.save(receipt);
     await this.receiptRepo.softDelete(receipt.id);
+
+    if (
+      receipt.referenceType === GoodsReceiptReferenceType.STOCK_TRANSFER &&
+      receipt.referenceId
+    ) {
+      await this.receiptRepo.manager.update(
+        TransferOrderEntity,
+        {
+          id: receipt.referenceId,
+          organizationId: receipt.organizationId,
+          importGoodsReceiptId: receipt.id,
+        },
+        {
+          status: TransferOrderStatus.IN_PROGRESS,
+          importGoodsReceiptId: null,
+          completedAt: null,
+          completedBy: null,
+        },
+      );
+    }
+
     this.logger.log(`Goods receipt ${id} cancelled by ${actor.userId}`);
   }
 

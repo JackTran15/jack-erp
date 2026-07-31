@@ -49,9 +49,13 @@ export class TransferOrderEntity extends BaseEntity {
   @Column({ name: 'export_goods_issue_id', type: 'uuid', nullable: true })
   exportGoodsIssueId?: string;
 
-  /** GoodsReceipt spawned when the destination branch confirms import — the import_reference. */
+  /**
+   * GoodsReceipt spawned when the destination branch confirms import — the
+   * import_reference. Cleared back to null when that receipt is deleted, which
+   * reopens the order for a new import.
+   */
   @Column({ name: 'import_goods_receipt_id', type: 'uuid', nullable: true })
-  importGoodsReceiptId?: string;
+  importGoodsReceiptId?: string | null;
 
   @Column({ name: 'exported_at', type: 'timestamptz', nullable: true })
   exportedAt?: Date;
@@ -60,10 +64,10 @@ export class TransferOrderEntity extends BaseEntity {
   exportedBy?: string;
 
   @Column({ name: 'completed_at', type: 'timestamptz', nullable: true })
-  completedAt?: Date;
+  completedAt?: Date | null;
 
   @Column({ name: 'completed_by', type: 'uuid', nullable: true })
-  completedBy?: string;
+  completedBy?: string | null;
 
   @Column({ name: 'cancelled_at', type: 'timestamptz', nullable: true })
   cancelledAt?: Date;

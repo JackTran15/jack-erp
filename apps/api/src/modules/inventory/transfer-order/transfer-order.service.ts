@@ -1427,7 +1427,7 @@ export class TransferOrderService {
 
     if (to.importGoodsReceiptId) {
       throw new ConflictException(
-        "Phiếu xuất đã có phiếu nhập tham chiếu, không thể xoá",
+        "Phiếu xuất đã có phiếu nhập tham chiếu, vui lòng xoá phiếu nhập trước",
       );
     }
 
@@ -1448,7 +1448,7 @@ export class TransferOrderService {
     const to = await this.findOrFail(toId, actor.organizationId);
     if (to.importGoodsReceiptId) {
       throw new ConflictException(
-        "Phiếu xuất đã có phiếu nhập tham chiếu, không thể xoá",
+        "Phiếu xuất đã có phiếu nhập tham chiếu, vui lòng xoá phiếu nhập trước",
       );
     }
   }
