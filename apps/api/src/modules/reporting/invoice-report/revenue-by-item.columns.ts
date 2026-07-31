@@ -1,11 +1,13 @@
 import { ReportColumnDataType } from '@erp/shared-interfaces';
+import { ReportBandId } from './invoice-report.columns';
 
 /**
  * Column registry for the `revenue-by-item` report ("Doanh thu theo mặt hàng")
  * — ONE ROW PER ITEM (or category / brand, per the request `groupBy`). Kept
  * separate from the other report registries so the four reports never interfere.
  *
- * The catalog is FLAT (no bands) and has NO dynamic payment-method columns.
+ * The revenue measures (goods/discount/promoPoints/promoRate/total) are banded
+ * under "Doanh thu"; the catalog has NO dynamic payment-method columns.
  * Leading DIMENSION columns change meaning with `groupBy`: at item grain
  * `sku`/`itemName`/`unit` are the item's; at group/brand grain `sku`/`unit` are
  * null and `itemName` carries the category/brand label.
@@ -32,6 +34,7 @@ export type RevenueByItemSource =
 export interface RevenueByItemColumnDef {
   key: string;
   type: ReportColumnDataType;
+  group: ReportBandId | null;
   source: RevenueByItemSource;
 }
 
@@ -46,20 +49,20 @@ export interface RevenueByItemColumnDef {
  * REVENUE_BY_ITEM_COLUMN_LABELS_VI / INVOICE_REPORT_COLUMN_LABELS_VI.
  */
 export const REVENUE_BY_ITEM_COLUMNS: RevenueByItemColumnDef[] = [
-  { key: 'sku', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'sku' } },
-  { key: 'itemName', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'name' } },
-  { key: 'unit', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'unit' } },
-  { key: 'locationCode', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'locationCode' } },
-  { key: 'locationName', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'locationName' } },
-  { key: 'quantity', type: ReportColumnDataType.NUMBER, source: { kind: 'measure', field: 'quantity' } },
-  { key: 'unitPrice', type: ReportColumnDataType.CURRENCY, source: { kind: 'computed', computed: 'unitPrice' } },
-  { key: 'revenue.goods', type: ReportColumnDataType.CURRENCY, source: { kind: 'measure', field: 'goods' } },
-  { key: 'revenue.discount', type: ReportColumnDataType.CURRENCY, source: { kind: 'measure', field: 'discount' } },
-  { key: 'revenue.promoPoints', type: ReportColumnDataType.CURRENCY, source: { kind: 'placeholder', placeholder: 0 } },
-  { key: 'revenue.promoRate', type: ReportColumnDataType.PERCENT, source: { kind: 'computed', computed: 'promoRate' } },
-  { key: 'revenue.total', type: ReportColumnDataType.CURRENCY, source: { kind: 'measure', field: 'total' } },
-  { key: 'itemCategory', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'itemCategory' } },
-  { key: 'brand', type: ReportColumnDataType.STRING, source: { kind: 'dimension', field: 'brand' } },
+  { key: 'sku', type: ReportColumnDataType.STRING, group: null, source: { kind: 'dimension', field: 'sku' } },
+  { key: 'itemName', type: ReportColumnDataType.STRING, group: null, source: { kind: 'dimension', field: 'name' } },
+  { key: 'unit', type: ReportColumnDataType.STRING, group: null, source: { kind: 'dimension', field: 'unit' } },
+  { key: 'locationCode', type: ReportColumnDataType.STRING, group: null, source: { kind: 'dimension', field: 'locationCode' } },
+  { key: 'locationName', type: ReportColumnDataType.STRING, group: null, source: { kind: 'dimension', field: 'locationName' } },
+  { key: 'quantity', type: ReportColumnDataType.NUMBER, group: null, source: { kind: 'measure', field: 'quantity' } },
+  { key: 'unitPrice', type: ReportColumnDataType.CURRENCY, group: null, source: { kind: 'computed', computed: 'unitPrice' } },
+  { key: 'revenue.goods', type: ReportColumnDataType.CURRENCY, group: 'revenue', source: { kind: 'measure', field: 'goods' } },
+  { key: 'revenue.discount', type: ReportColumnDataType.CURRENCY, group: 'revenue', source: { kind: 'measure', field: 'discount' } },
+  { key: 'revenue.promoPoints', type: ReportColumnDataType.CURRENCY, group: 'revenue', source: { kind: 'placeholder', placeholder: 0 } },
+  { key: 'revenue.promoRate', type: ReportColumnDataType.PERCENT, group: 'revenue', source: { kind: 'computed', computed: 'promoRate' } },
+  { key: 'revenue.total', type: ReportColumnDataType.CURRENCY, group: 'revenue', source: { kind: 'measure', field: 'total' } },
+  { key: 'itemCategory', type: ReportColumnDataType.STRING, group: null, source: { kind: 'dimension', field: 'itemCategory' } },
+  { key: 'brand', type: ReportColumnDataType.STRING, group: null, source: { kind: 'dimension', field: 'brand' } },
 ];
 
 const BY_KEY = new Map(REVENUE_BY_ITEM_COLUMNS.map((c) => [c.key, c]));

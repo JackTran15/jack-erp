@@ -2,8 +2,10 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import {
+  INVOICE_REPORT_BAND_LABELS_VI,
   INVOICE_REPORT_COLUMN_LABELS_VI,
   InvoiceReportResult,
+  ReportColumnGroup,
   ReportColumnHeader,
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
@@ -42,6 +44,9 @@ import {
   statDateColumn,
 } from '../../report-core/report-query.util';
 import { ReportDefinition } from '../report-definition';
+
+const band = (id: string | null): ReportColumnGroup | null =>
+  id ? { id, name: INVOICE_REPORT_BAND_LABELS_VI[id] ?? id } : null;
 
 const fullName = (u?: { firstName?: string; lastName?: string }): string | null => {
   if (!u) return null;
@@ -83,15 +88,16 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
   ) {}
 
   async buildColumns(_actor: ActorContext): Promise<ReportColumnHeader[]> {
-    // Flat catalog — no bands and no dynamic payment-method columns. `desc` is
-    // null: values are direct line fields, not MISA formula derivations.
+    // Revenue measures band under "Doanh thu"; no dynamic payment-method
+    // columns. `desc` is null: values are direct line fields, not MISA formula
+    // derivations.
     return INVOICE_ITEM_REVENUE_COLUMNS.map((c) =>
       enrichHeader({
         col: c.key,
         name: INVOICE_REPORT_COLUMN_LABELS_VI[c.key] ?? c.key,
         desc: null,
         type: c.type,
-        group: null,
+        group: band(c.group),
       }),
     );
   }

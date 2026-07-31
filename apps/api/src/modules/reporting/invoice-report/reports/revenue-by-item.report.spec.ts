@@ -96,10 +96,32 @@ const MISA_COLUMN_ORDER = [
 ];
 
 describe('RevenueByItemReport.buildColumns', () => {
-  it('returns a flat catalog (no bands)', async () => {
+  it('bands the revenue measures under Doanh thu', async () => {
     const report = makeReport({});
     const headers = await report.buildColumns(actor);
-    expect(headers.every((h) => h.group === null)).toBe(true);
+    const byCol = new Map(headers.map((h) => [h.col, h.group]));
+    for (const col of [
+      'revenue.goods',
+      'revenue.discount',
+      'revenue.promoPoints',
+      'revenue.promoRate',
+      'revenue.total',
+    ]) {
+      expect(byCol.get(col)).toEqual({ id: 'revenue', name: 'Doanh thu' });
+    }
+    for (const col of [
+      'sku',
+      'itemName',
+      'unit',
+      'locationCode',
+      'locationName',
+      'quantity',
+      'unitPrice',
+      'itemCategory',
+      'brand',
+    ]) {
+      expect(byCol.get(col)).toBeNull();
+    }
   });
 
   it('returns exactly the 14 MISA columns, in MISA order', async () => {

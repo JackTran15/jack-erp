@@ -72,16 +72,21 @@ function makeReport(opts: {
 }
 
 describe('InvoiceItemRevenueDetailReport.buildColumns', () => {
-  it('returns a flat catalog (no bands, no dynamic columns)', async () => {
+  it('bands the revenue measures under Doanh thu, no dynamic columns', async () => {
     const headers = await makeReport({}).buildColumns(actor);
     expect(headers.find((h) => h.col === 'date')).toMatchObject({ name: 'Ngày', group: null });
     expect(headers.find((h) => h.col === 'sku')).toMatchObject({ name: 'Mã SKU', group: null });
-    expect(headers.find((h) => h.col === 'lineRevenue')).toMatchObject({
-      name: 'Doanh thu',
-      group: null,
-    });
-    expect(headers.find((h) => h.col === 'supplier')).toMatchObject({ name: 'Nhà cung cấp' });
-    expect(headers.every((h) => h.group === null)).toBe(true);
+    const byCol = new Map(headers.map((h) => [h.col, h.group]));
+    for (const col of ['lineAmount', 'lineDiscount', 'revenue.promoPoints', 'lineRevenue']) {
+      expect(byCol.get(col)).toEqual({ id: 'revenue', name: 'Doanh thu' });
+    }
+    expect(headers.find((h) => h.col === 'lineRevenue')).toMatchObject({ name: 'Doanh thu' });
+    expect(headers.find((h) => h.col === 'supplier')).toMatchObject({ name: 'Nhà cung cấp', group: null });
+    expect(
+      headers
+        .filter((h) => !['lineAmount', 'lineDiscount', 'revenue.promoPoints', 'lineRevenue'].includes(h.col))
+        .every((h) => h.group === null),
+    ).toBe(true);
   });
 });
 
