@@ -1026,6 +1026,56 @@ describe('InventoryLocationStockService', () => {
         }),
       );
     });
+
+    it('skips a preferred shelf whose balance is untracked and uses a tracked location', async () => {
+      itemRepo.findOne.mockResolvedValue({
+        id: 'item-1',
+        productId: 'prod-1',
+        organizationId: 'org-1',
+      });
+      // Preferred shelf still points at loc-A after "Ngừng theo dõi" flipped its balance.
+      pslService.listByItem.mockResolvedValue([
+        { productId: 'prod-1', storageId: 'storage-1', locationId: 'loc-A' },
+      ]);
+      stockBalanceRepo.findOne.mockResolvedValue({
+        id: 'sb-A',
+        isTracked: false,
+      });
+      stockBalanceRepo.find.mockResolvedValue([
+        { itemId: 'item-1', locationId: 'loc-B', quantity: 5, isTracked: true },
+      ]);
+      locationRepo.findOne.mockImplementation(async (opts: any) => {
+        const id = opts?.where?.id;
+        if (id === 'loc-A') return { id: 'loc-A', code: 'A-01', name: 'Kệ A' };
+        if (id === 'loc-B') return { id: 'loc-B', code: 'B-01', name: 'Kệ B' };
+        return null;
+      });
+
+      await expect(
+        service.getPreferredShelf('item-1', 'storage-1', actor),
+      ).resolves.toEqual({ id: 'loc-B', code: 'B-01', name: 'Kệ B' });
+    });
+
+    it('keeps a preferred shelf that has no balance row yet', async () => {
+      itemRepo.findOne.mockResolvedValue({
+        id: 'item-1',
+        productId: 'prod-1',
+        organizationId: 'org-1',
+      });
+      pslService.listByItem.mockResolvedValue([
+        { productId: 'prod-1', storageId: 'storage-1', locationId: 'loc-A' },
+      ]);
+      stockBalanceRepo.findOne.mockResolvedValue(null);
+      locationRepo.findOne.mockResolvedValue({
+        id: 'loc-A',
+        code: 'A-01',
+        name: 'Kệ A',
+      });
+
+      await expect(
+        service.getPreferredShelf('item-1', 'storage-1', actor),
+      ).resolves.toEqual({ id: 'loc-A', code: 'A-01', name: 'Kệ A' });
+    });
   });
 
   describe('getPreferredShelfBatch', () => {

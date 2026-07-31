@@ -562,9 +562,9 @@ export function PurchaseOrderFormDialog({
       setNotes(
         `Nhập kho hàng hóa điều chuyển từ cửa hàng ${row.sourceBranchName}`,
       );
-      // Đối tượng / Người giao are entered on the source branch's export issue;
-      // carry them over so the destination form shows what it will save (the
-      // import endpoint inherits the same values when the form leaves them empty).
+      // Người giao comes from the source branch's export issue. Đối tượng is
+      // deliberately NOT pre-filled — the destination picks it (or leaves it
+      // blank, in which case the import endpoint inherits the export issue's).
       if (exportIssueId) {
         void (async () => {
           try {
@@ -572,12 +572,6 @@ export function PurchaseOrderFormDialog({
             const { data: issue } = await apiClient.get<GoodsIssue>(
               `/inventory/transfer-orders/${detail.id}/export-goods-issue`,
             );
-            if (issue.counterpartyKind && issue.counterpartyId) {
-              setCounterpartyKind(issue.counterpartyKind);
-              setProviderId(issue.counterpartyId);
-              setProviderCode(issue.counterparty?.code ?? "");
-              setProviderName(issue.counterparty?.name ?? "");
-            }
             if (issue.deliverer) setDeliveryPerson(issue.deliverer);
           } catch {
             // best-effort — the fields stay editable and the server still inherits them
@@ -605,45 +599,17 @@ export function PurchaseOrderFormDialog({
       }));
       setLines(mapped);
       if (targetStorageId) {
-        // Auto-fill Vị trí like MISA: preferred shelf per item, else fall back to
-        // the warehouse's default/unassigned bin (mirrors the save-time resolution
-        // so the receipt can be created immediately without manual picking).
+        // Auto-fill Vị trí from the item's preferred shelf. An item with no vị trí
+        // in this kho stays blank — save-time resolution still picks a bin, so the
+        // user is not forced to choose one, but the form must not invent one here.
         void (async () => {
-          let storageFallback: { id: string; label: string } | null = null;
-          const ensureStorageFallback = async () => {
-            if (storageFallback) return storageFallback;
-            try {
-              const { data } = await apiClient.get<
-                PaginatedResponse<InventoryLocation>
-              >(
-                `/inventory/locations?page=1&pageSize=50&storageId=${encodeURIComponent(targetStorageId)}&includeUnassigned=true&activeOnly=true`,
-              );
-              const locs = data.data ?? [];
-              const pick =
-                locs.find((l) => l.isUnassigned === true) ??
-                locs.find((l) => l.code === "__UNASSIGNED__") ??
-                locs[0];
-              if (pick) {
-                storageFallback = {
-                  id: pick.id,
-                  label: pick.isUnassigned ? pick.name : pick.code,
-                };
-              }
-            } catch {
-              storageFallback = null;
-            }
-            return storageFallback;
-          };
           for (let index = 0; index < mapped.length; index++) {
             const line = mapped[index];
             const shelf = await getPreferredShelf(
               line.itemId,
               targetStorageId,
             ).catch(() => null);
-            const resolved = shelf
-              ? { id: shelf.id, label: shelf.code }
-              : await ensureStorageFallback();
-            if (!resolved) continue;
+            if (!shelf) continue;
             setLines((currentLines) =>
               currentLines.map((current, lineIndex) =>
                 lineIndex === index &&
@@ -652,8 +618,8 @@ export function PurchaseOrderFormDialog({
                 !current.locationId
                   ? {
                       ...current,
-                      locationId: resolved.id,
-                      locationLabel: resolved.label,
+                      locationId: shelf.id,
+                      locationLabel: shelf.code,
                     }
                   : current,
               ),

@@ -282,6 +282,38 @@ export function TransferLocationDialog({
     [],
   );
 
+  const resolveItemSourceLocation = useCallback(
+    async (
+      itemId: string,
+    ): Promise<Pick<
+      TransferRow,
+      | "sourceLocationId"
+      | "sourceLocationLabel"
+      | "sourceLocationCode"
+      | "quantityOnHand"
+    > | null> => {
+      if (!storageId) return null;
+      const result = await listStockBalances({
+        page: 1,
+        pageSize: 1,
+        itemId,
+        storageId,
+        isTracked: true,
+        sortBy: "quantity",
+        sortOrder: "desc",
+      });
+      const bal = result.data[0];
+      if (!bal) return null;
+      return {
+        sourceLocationId: bal.location.id,
+        sourceLocationLabel: `${bal.location.code} · ${bal.location.name}`,
+        sourceLocationCode: bal.location.code,
+        quantityOnHand: Number(bal.quantity),
+      };
+    },
+    [storageId],
+  );
+
   const refreshRowOnHand = useCallback(
     async (uid: string, itemId: string, locationCode: string) => {
       if (!itemId || !locationCode) return;
@@ -465,9 +497,15 @@ export function TransferLocationDialog({
       });
       if (row.sourceLocationCode) {
         void refreshRowOnHand(row.uid, item.id, row.sourceLocationCode);
+        return;
       }
+      // Dòng chưa có vị trí nguồn → lấy theo vị trí hiện có của hàng hoá.
+      void (async () => {
+        const source = await resolveItemSourceLocation(item.id).catch(() => null);
+        if (source) patchRow(row.uid, { ...source, qty: String(source.quantityOnHand) });
+      })();
     },
-    [rows, patchRow, refreshRowOnHand],
+    [rows, patchRow, refreshRowOnHand, resolveItemSourceLocation],
   );
 
   // Select by product: expand ALL variants of the chosen product into multiple rows,
@@ -493,24 +531,35 @@ export function TransferLocationDialog({
         return;
       }
 
-      // Fetch on-hand per variant at the source location (in parallel) to set the default qty.
-      let onHandByItem = new Map<string, number>();
-      if (target.sourceLocationCode) {
-        try {
-          const balances = await Promise.all(
-            uniqueLines.map(async (line) => ({
-              itemId: line.itemId,
-              onHand: await fetchOnHand(line.itemId, target.sourceLocationCode),
-            })),
-          );
-          onHandByItem = new Map(balances.map((b) => [b.itemId, b.onHand]));
-        } catch (err) {
-          toast.error(getUserFacingApiErrorMessage(err));
-        }
+      let sourceByItem = new Map<
+        string,
+        Awaited<ReturnType<typeof resolveItemSourceLocation>>
+      >();
+      try {
+        const resolved = await Promise.all(
+          uniqueLines.map(async (line) => ({
+            itemId: line.itemId,
+            source: target.sourceLocationId
+              ? {
+                  sourceLocationId: target.sourceLocationId,
+                  sourceLocationLabel: target.sourceLocationLabel,
+                  sourceLocationCode: target.sourceLocationCode,
+                  quantityOnHand: await fetchOnHand(
+                    line.itemId,
+                    target.sourceLocationCode,
+                  ),
+                }
+              : await resolveItemSourceLocation(line.itemId),
+          })),
+        );
+        sourceByItem = new Map(resolved.map((r) => [r.itemId, r.source]));
+      } catch (err) {
+        toast.error(getUserFacingApiErrorMessage(err));
       }
 
       const newRows = uniqueLines.map<TransferRow>((line) => {
-        const onHand = onHandByItem.get(line.itemId) ?? 0;
+        const source = sourceByItem.get(line.itemId) ?? null;
+        const onHand = source?.quantityOnHand ?? 0;
         return {
           uid: crypto.randomUUID(),
           itemId: line.itemId,
@@ -518,9 +567,9 @@ export function TransferLocationDialog({
           itemName: line.name,
           unit: line.unit,
           storageName: target.storageName,
-          sourceLocationId: target.sourceLocationId,
-          sourceLocationLabel: target.sourceLocationLabel,
-          sourceLocationCode: target.sourceLocationCode,
+          sourceLocationId: source?.sourceLocationId ?? "",
+          sourceLocationLabel: source?.sourceLocationLabel ?? "",
+          sourceLocationCode: source?.sourceLocationCode ?? "",
           destLocationId: target.destLocationId,
           destLocationLabel: target.destLocationLabel,
           quantityOnHand: onHand,
@@ -536,7 +585,7 @@ export function TransferLocationDialog({
       });
       setProductPickerRowId(null);
     },
-    [productPickerRowId, rows, fetchOnHand],
+    [productPickerRowId, rows, fetchOnHand, resolveItemSourceLocation],
   );
 
   // Barcode scan: accumulate into the row with the same item + same header source location

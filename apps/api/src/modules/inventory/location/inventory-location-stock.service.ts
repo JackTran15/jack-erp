@@ -708,7 +708,7 @@ export class InventoryLocationStockService {
 
     const psls = await this.pslService.listByItem(itemId, actor);
     const psl = psls.find((p) => p.storageId === storageId);
-    if (psl) {
+    if (psl && (await this.isBalanceTracked(itemId, psl.locationId, actor))) {
       const preferred = await this.findAccessibleShelf(
         psl.locationId,
         storageId,
@@ -831,6 +831,24 @@ export class InventoryLocationStockService {
         destShelf: row?.destShelf ?? null,
       };
     });
+  }
+
+  /**
+   * "Ngừng theo dõi" only flips stock_balances.is_tracked — the preferred-shelf
+   * mapping keeps pointing at that bin, so document forms would still auto-fill
+   * an untracked vị trí when the item sits in several locations. A mapping with
+   * no balance row yet (assigned but never received) stays usable.
+   */
+  private async isBalanceTracked(
+    itemId: string,
+    locationId: string,
+    actor: ActorContext,
+  ): Promise<boolean> {
+    const balance = await this.stockBalanceRepo.findOne({
+      where: { organizationId: actor.organizationId, itemId, locationId },
+      select: { id: true, isTracked: true },
+    });
+    return !balance || balance.isTracked;
   }
 
   private async findAccessibleShelf(

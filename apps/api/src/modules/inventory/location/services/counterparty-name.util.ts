@@ -3,6 +3,7 @@ import { DocCounterpartyKind } from '@erp/shared-interfaces';
 import { ProviderEntity } from '../provider.entity';
 import { CustomerEntity } from '../../../customer/customer.entity';
 import { UserEntity } from '../../../auth/user.entity';
+import { EmployeeProfileEntity } from '../../../rbac/employee/employee-profile.entity';
 
 /** Resolved "Đối tượng" for display — inlined onto a document row. */
 export interface CounterpartyDisplay {
@@ -100,11 +101,15 @@ export async function attachCounterparties<T extends HasCounterparty>(
     const users = await manager.find(UserEntity, {
       where: employeeIds.map((id) => ({ id, organizationId })),
     });
+    const profiles = await manager.find(EmployeeProfileEntity, {
+      where: employeeIds.map((userId) => ({ userId, organizationId })),
+    });
+    const codeByUserId = new Map(profiles.map((p) => [p.userId, p.code]));
     for (const u of users) {
       display.set(`${DocCounterpartyKind.EMPLOYEE}:${u.id}`, {
         kind: DocCounterpartyKind.EMPLOYEE,
         id: u.id,
-        code: null,
+        code: codeByUserId.get(u.id) ?? null,
         name: `${u.firstName} ${u.lastName}`.trim(),
       });
     }

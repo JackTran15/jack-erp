@@ -2,15 +2,25 @@ import {
   GoodsReceiptPurpose,
   GoodsReceiptReferenceType,
   GoodsReceiptStatus,
+  TransferOrderStatus,
 } from '@erp/shared-interfaces';
 import { GoodsReceiptService } from './goods-receipt.service';
+import { TransferOrderEntity } from '../transfer-order/transfer-order.entity';
 
 describe('GoodsReceiptService', () => {
   const receiptRepo = {
     create: jest.fn(),
     save: jest.fn(),
     findOne: jest.fn(),
-    manager: { findOne: jest.fn() },
+    softDelete: jest.fn(),
+    manager: { findOne: jest.fn(), update: jest.fn() },
+  };
+  const dataSource = {
+    transaction: jest.fn((cb: (manager: unknown) => Promise<unknown>) => cb({})),
+  };
+  const stockLedger = {
+    recordBatchMovements: jest.fn().mockResolvedValue([]),
+    publishMovementEvents: jest.fn().mockResolvedValue(undefined),
   };
   const documentNumberingService = {
     generate: jest.fn(),
@@ -30,8 +40,8 @@ describe('GoodsReceiptService', () => {
     service = new GoodsReceiptService(
       receiptRepo as never,
       {} as never,
-      {} as never,
-      {} as never,
+      dataSource as never,
+      stockLedger as never,
       documentNumberingService as never,
       {} as never,
       {} as never,
@@ -125,7 +135,7 @@ describe('GoodsReceiptService', () => {
     expect(receiptRepo.save).not.toHaveBeenCalled();
   });
 
-  it('refuses to delete the import leg of a transfer order', async () => {
+  it('reopens the transfer order when its import leg is deleted', async () => {
     receiptRepo.findOne.mockResolvedValue({
       id: 'receipt-1',
       organizationId: actor.organizationId,
@@ -134,14 +144,52 @@ describe('GoodsReceiptService', () => {
       purpose: GoodsReceiptPurpose.TRANSFER_IN,
       referenceType: GoodsReceiptReferenceType.STOCK_TRANSFER,
       referenceId: 'to-1',
+      documentNumber: 'PN0001',
+      lines: [
+        {
+          itemId: 'item-1',
+          locationId: 'loc-A01',
+          quantity: 3,
+          unitPrice: 100,
+        },
+      ],
+    });
+
+    await service.cancel('receipt-1', actor);
+
+    // Stock reversed, then the order is unlinked so the source phiếu xuất is
+    // no longer referenced and becomes deletable.
+    expect(stockLedger.recordBatchMovements).toHaveBeenCalled();
+    expect(receiptRepo.softDelete).toHaveBeenCalledWith('receipt-1');
+    expect(receiptRepo.manager.update).toHaveBeenCalledWith(
+      TransferOrderEntity,
+      {
+        id: 'to-1',
+        organizationId: actor.organizationId,
+        importGoodsReceiptId: 'receipt-1',
+      },
+      {
+        status: TransferOrderStatus.IN_PROGRESS,
+        importGoodsReceiptId: null,
+        completedAt: null,
+        completedBy: null,
+      },
+    );
+  });
+
+  it('does not touch transfer orders when a plain receipt is deleted', async () => {
+    receiptRepo.findOne.mockResolvedValue({
+      id: 'receipt-2',
+      organizationId: actor.organizationId,
+      branchId: actor.branchId,
+      status: GoodsReceiptStatus.DRAFT,
+      purpose: GoodsReceiptPurpose.OTHER,
       lines: [],
     });
 
-    await expect(service.cancel('receipt-1', actor)).rejects.toThrow(
-      'Phiếu nhập kho điều chuyển không thể xoá',
-    );
+    await service.cancel('receipt-2', actor);
 
-    expect(receiptRepo.save).not.toHaveBeenCalled();
+    expect(receiptRepo.manager.update).not.toHaveBeenCalled();
   });
 
   it('scopes detail lookup to the active branch', async () => {

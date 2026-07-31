@@ -3,6 +3,7 @@ import { DocCounterpartyKind } from '@erp/shared-interfaces';
 import { ProviderEntity } from '../provider.entity';
 import { CustomerEntity } from '../../../customer/customer.entity';
 import { UserEntity } from '../../../auth/user.entity';
+import { EmployeeProfileEntity } from '../../../rbac/employee/employee-profile.entity';
 import {
   attachCounterparties,
   counterpartyNameSql,
@@ -27,11 +28,13 @@ describe('attachCounterparties', () => {
     providers?: unknown[];
     customers?: unknown[];
     users?: unknown[];
+    employeeProfiles?: unknown[];
   }) {
     const find = jest.fn(async (entity: unknown, _opts?: { where: unknown }) => {
       if (entity === ProviderEntity) return data.providers ?? [];
       if (entity === CustomerEntity) return data.customers ?? [];
       if (entity === UserEntity) return data.users ?? [];
+      if (entity === EmployeeProfileEntity) return data.employeeProfiles ?? [];
       return [];
     });
     return { manager: { find } as unknown as EntityManager, find };
@@ -42,6 +45,7 @@ describe('attachCounterparties', () => {
       providers: [{ id: 's1', code: 'NCC001', name: 'Acme' }],
       customers: [{ id: 'c1', code: 'KH001', name: 'Khach A' }],
       users: [{ id: 'u1', firstName: 'Nguyen', lastName: 'Van A' }],
+      employeeProfiles: [{ userId: 'u1', code: 'NV000002' }],
     });
     const rows: HasCounterparty[] = [
       { counterpartyKind: DocCounterpartyKind.SUPPLIER, counterpartyId: 's1' },
@@ -66,11 +70,30 @@ describe('attachCounterparties', () => {
     expect(rows[2].counterparty).toEqual({
       kind: DocCounterpartyKind.EMPLOYEE,
       id: 'u1',
+      code: 'NV000002',
+      name: 'Nguyen Van A',
+    });
+    // One query per kind present (+ employee_profiles for the mã NV) — no N+1.
+    expect(find).toHaveBeenCalledTimes(4);
+  });
+
+  it('leaves the employee code null when the user has no employee profile', async () => {
+    const { manager } = makeManager({
+      users: [{ id: 'u1', firstName: 'Nguyen', lastName: 'Van A' }],
+      employeeProfiles: [],
+    });
+    const rows: HasCounterparty[] = [
+      { counterpartyKind: DocCounterpartyKind.EMPLOYEE, counterpartyId: 'u1' },
+    ];
+
+    await attachCounterparties(manager, rows, organizationId);
+
+    expect(rows[0].counterparty).toEqual({
+      kind: DocCounterpartyKind.EMPLOYEE,
+      id: 'u1',
       code: null,
       name: 'Nguyen Van A',
     });
-    // One query per kind present — no N+1.
-    expect(find).toHaveBeenCalledTimes(3);
   });
 
   it('batches a kind into a single query regardless of row count', async () => {
