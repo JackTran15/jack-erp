@@ -196,7 +196,7 @@ export class InvoiceController {
   }
 
   @Post(':id/cancel')
-  @RequirePermission('pos.invoice.write')
+  @RequirePermission('pos.invoice.cancel')
   cancel(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CancelInvoiceDto,
