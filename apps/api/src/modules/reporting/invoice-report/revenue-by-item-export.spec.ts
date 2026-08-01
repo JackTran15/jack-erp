@@ -162,12 +162,25 @@ describe('revenue-by-item end-to-end export (catalog → payload → workbook)',
     const sheet = await writeAndRead(prepared.header, prepared.columns, rows, totals);
 
     // Layout: branch name/address/phone (3) + title (1) + 2 subtitle lines +
-    // 1 blank separator = 7 rows above the header, so header is row 8.
-    const HEADER_ROW = 8;
+    // 1 blank separator = 7 rows above the header.
+    //
+    // AC-36 (2026-08-01) added the band row: five consecutive columns here carry
+    // the "Doanh thu" band, so the header is now two rows — band on 8, labels on
+    // 9. That is a deliberate departure from the flat 14-cell header of the MISA
+    // reference, taken so the exported file matches the two-tier header the user
+    // sees on screen. Akenzy chose this over keeping MISA parity, 2026-08-01.
+    const BAND_ROW = 8;
+    const HEADER_ROW = 9;
     const DATA_ROW = HEADER_ROW + 1;
     const TOTALS_ROW = DATA_ROW + 1;
 
-    // AC-01: 14 header cells, MISA order.
+    // AC-36: the band spans exactly the five revenue columns, H..L.
+    expect(sheet.getCell(`H${BAND_ROW}`).value).toBe('Doanh thu');
+    expect(
+      ((sheet.model as unknown as { merges?: string[] }).merges ?? []),
+    ).toContain(`H${BAND_ROW}:L${BAND_ROW}`);
+
+    // AC-01: still 14 columns in MISA order — the band adds a row, not a column.
     const headerRow = sheet.getRow(HEADER_ROW);
     const headerValues = (headerRow.values as unknown[]).slice(1) as string[];
     expect(headerValues.length).toBe(14);
@@ -178,6 +191,7 @@ describe('revenue-by-item end-to-end export (catalog → payload → workbook)',
     // AC-04 / AC-08: formula notation on the 2nd line of the measure columns' cells.
     expect(sheet.getCell(`G${HEADER_ROW}`).value).toBe('Đơn giá TB\n(2)=(3)/(1)');
     expect(sheet.getCell(`L${HEADER_ROW}`).value).toBe('Doanh thu\n(6)=(3)-(4)-(9)');
+    // Unbanded columns merge down through both rows, so A9 echoes A8's master.
     expect(sheet.getCell(`A${HEADER_ROW}`).value).toBe('Mã SKU');
     expect(sheet.getCell(`A${HEADER_ROW}`).value as string).not.toContain('\n');
 

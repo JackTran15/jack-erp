@@ -265,4 +265,102 @@ describe("renderVoucherHtml", () => {
     expect(html).not.toContain("<script>alert(1)</script>");
     expect(html).toContain("&lt;script&gt;");
   });
+
+  describe("column widths (colgroup)", () => {
+    const colWidths = (html: string): number[] =>
+      [...html.matchAll(/<col style="width: ([\d.]+)%"/g)].map((m) =>
+        Number(m[1]),
+      );
+
+    it("emits one col per grid column, counting spans and skipping hidden ones", () => {
+      // Fixture: stt + sku + name(span 4) + quantity + lineTotal = 8 grid
+      // columns; the two hidden sale columns contribute none.
+      const widths = colWidths(renderVoucherHtml(payload()));
+
+      expect(widths).toHaveLength(8);
+    });
+
+    it("distributes the declared widths as percentages summing to ~100", () => {
+      const widths = colWidths(
+        renderVoucherHtml(
+          payload({
+            lineColumns: [
+              { col: "stt", label: "STT", type: ReportColumnDataType.NUMBER, width: 5 },
+              { col: "sku", label: "Mã SKU", type: ReportColumnDataType.STRING, width: 20 },
+              {
+                col: "lineTotal",
+                label: "Thành tiền",
+                type: ReportColumnDataType.CURRENCY,
+                width: 15,
+              },
+            ],
+          }),
+        ),
+      );
+
+      expect(widths).toHaveLength(3);
+      // 5 / 20 / 15 out of 40 units.
+      expect(widths[0]).toBeCloseTo(12.5, 1);
+      expect(widths[1]).toBeCloseTo(50, 1);
+      expect(widths[2]).toBeCloseTo(37.5, 1);
+      expect(widths.reduce((a, b) => a + b, 0)).toBeCloseTo(100, 0);
+    });
+
+    it("gives a wider column more room than a narrow one", () => {
+      const widths = colWidths(
+        renderVoucherHtml(
+          payload({
+            lineColumns: [
+              { col: "stt", label: "STT", type: ReportColumnDataType.NUMBER, width: 5 },
+              { col: "sku", label: "Mã SKU", type: ReportColumnDataType.STRING, width: 20 },
+            ],
+          }),
+        ),
+      );
+
+      expect(widths[0]).toBeLessThan(widths[1]);
+    });
+
+    it("repeats a spanned column's width on each grid column it covers", () => {
+      const widths = colWidths(
+        renderVoucherHtml(
+          payload({
+            lineColumns: [
+              { col: "stt", label: "STT", type: ReportColumnDataType.NUMBER, width: 10 },
+              {
+                col: "name",
+                label: "Tên hàng hóa",
+                type: ReportColumnDataType.STRING,
+                span: 4,
+                width: 10,
+              },
+            ],
+          }),
+        ),
+      );
+
+      // 5 grid columns of equal weight — the spanned one takes 4 of them, which
+      // is what keeps the colgroup aligned with the header's colspan.
+      expect(widths).toHaveLength(5);
+      expect(new Set(widths).size).toBe(1);
+      expect(widths[0]).toBeCloseTo(20, 1);
+    });
+
+    it("falls back to an even split when no column declares a width", () => {
+      // A voucher that has not been sized must print exactly as it did before
+      // widths existed.
+      const widths = colWidths(
+        renderVoucherHtml(
+          payload({
+            lineColumns: [
+              { col: "stt", label: "STT", type: ReportColumnDataType.NUMBER },
+              { col: "sku", label: "Mã SKU", type: ReportColumnDataType.STRING },
+            ],
+          }),
+        ),
+      );
+
+      expect(widths).toEqual([50, 50]);
+    });
+  });
 });

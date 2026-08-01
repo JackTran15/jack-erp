@@ -504,3 +504,54 @@ giấy = thêm một khối CSS `@page`. Đổi lại: mẫu in nào lệch hẳ
 vạch từng dòng) sẽ không nhét vừa khuôn này và cần renderer riêng — chấp nhận, vì các mẫu
 đó nằm ngoài phạm vi bản đầu.
 **Status:** accepted
+
+### ADR-12 — Nhóm cột đi qua payload dưới dạng nhãn đã resolve, và hàng nhóm dựng bằng hai hàng chưa commit
+**Context:** `ReportColumnHeader.group` lái tiêu đề hai tầng trên màn hình, nhưng
+`resolveColumns` (`report-export.service.ts:315`) không đọc nó và `DocumentColumn` không có chỗ
+chứa, nên band biến mất khỏi cả bản in lẫn file Excel (AC-36). Có hai câu hỏi thiết kế: band đi
+qua mặt cắt dưới hình thù gì, và `WorkbookWriter` stream có merge nổi qua hai hàng không —
+comment `xlsx-stream.writer.ts:199-202` khẳng định là không.
+
+**Decision:**
+1. `DocumentColumn.group?: string | null` mang **nhãn tiếng Việt đã resolve**, không mang
+   `ReportColumnGroup { id, name }`. Cùng lối `label` và `desc` đang đi: renderer không tra cứu gì.
+2. Thuật toán gộp cột liền nhau thành segment nằm ở **một** hàm thuần trong
+   `@erp/shared-interfaces` (`buildColumnBands`), dùng chung cho `XlsxStreamWriter` và
+   `renderReportTableHtml`.
+3. Hàng nhóm dựng bằng `addRow(band)` + `addRow(labels)` **chưa commit hàng nào**, merge ngang cho
+   band và merge dọc cho cột không band, rồi mới commit. Bác bỏ khẳng định của comment cũ:
+   ràng buộc thật của ExcelJS là "không merge được **sau khi** commit", không phải "không merge
+   được qua nhiều hàng" (xem A-28, đã đọc source thư viện).
+4. Không cột nào có `group` → phát **đúng một** hàng tiêu đề, y như hôm nay.
+
+**Consequences:** Hai renderer không thể lệch nhau về cách gộp band vì chỉ có một hàm gộp — cùng
+lý lẽ đã sinh ra ADR-01. Đổi lại, `@erp/shared-interfaces` mọc thêm một hàm thuần bên cạnh các
+kiểu; chấp nhận được vì package đã chứa hằng số nhãn (`INVOICE_REPORT_BAND_LABELS_VI`) và hàm này
+không biết gì về trình bày — nó chỉ trả về `{label, start, span}`.
+
+Phần bị loại: (a) để mỗi renderer tự gộp — hai bản 15 dòng, đúng thứ ADR-01 dựng payload để tránh;
+(b) nhồi nhãn nhóm vào cùng ô với nhãn cột kiểu `"Doanh thu\nTiền mặt"` như đang làm với `desc` —
+không gộp được ô nên mất hẳn thông tin "những cột nào cùng một nhóm", tức là không đạt AC-36;
+(c) bỏ merge dọc và để ô trống phía trên cột không nhóm — ô gộp mất viền, lệch AC-26.
+
+**Status:** accepted — chốt bởi Akenzy khi duyệt plan, 2026-08-01
+
+### ADR-13 — Bề rộng cột khai một lần bằng ký tự; HTML tự quy về phần trăm
+**Context:** `DocumentColumn.width` đã có trong hợp đồng từ đầu và `VoucherXlsxWriter.widthOf()`
+đã đọc, nhưng không mapper nào set và `renderVoucherHtml` không đọc. Bản in dùng
+`table-layout: fixed` **không kèm `<colgroup>`** nên trình duyệt chia đều mọi cột lưới — đó là
+nguyên nhân AC-37.
+
+**Decision:** `width` khai **một lần** ở mapper, đơn vị là **ký tự** (đơn vị Excel đã dùng). Excel
+đọc thẳng. HTML quy về phần trăm: `width / Σ(width × span của các cột không ẩn) × 100`, phát một
+`<col>` cho **mỗi cột vật lý** để `colspan` khớp lưới. Cột không khai `width` rơi về đúng mặc định
+`WIDTH_DEFAULT = 17` mà Excel đang dùng, nên chứng từ chưa khai vẫn ra như cũ.
+
+**Consequences:** Một con số cho hai đầu ra — không có cách nào chỉnh bản in mà quên file, đúng
+tinh thần ADR-01. Đổi lại, tương quan bề rộng là chung cho cả hai, không tối ưu riêng cho giấy:
+một cột hợp lý trên A4 có thể hơi hẹp trong Excel và ngược lại. Chấp nhận, vì hai bản lệch nhau
+tốn nhiều hơn nhiều so với vài milimet.
+
+Phần bị loại: thêm `printWidth` riêng cho HTML — hai nguồn sự thật, và chưa ai yêu cầu chúng khác nhau.
+
+**Status:** accepted — chốt bởi Akenzy khi duyệt plan, 2026-08-01

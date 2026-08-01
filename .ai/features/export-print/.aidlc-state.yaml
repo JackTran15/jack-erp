@@ -761,3 +761,73 @@ history:
     at: 2026-07-30T20:44:13
     by: akenzy
     ticket: T-13-02
+  - gate: G1
+    action: reopened
+    at: 2026-08-01T10:13:30
+    by: akenzy
+    reason: Ghi chu thanh cot an tren phieu kho (sua AC-29); them AC band header cho in/xuat bao cao va AC be rong cot phieu
+  - gate: G1
+    action: passed
+    at: 2026-08-01T10:15:39
+    by: akenzy
+    evidence: 23 assumptions, none blocking-and-pending; 37 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-01T10:16:45
+    by: akenzy
+    evidence: 13 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-01T10:21:29
+    by: akenzy
+    evidence: graph valid - 15 UoW, 58 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-01T10:21:42
+    by: claude
+    ticket: T-14-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-01T10:24:12
+    by: claude
+    ticket: T-14-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-01T10:24:12
+    by: claude
+    ticket: T-14-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-01T10:42:31
+    by: claude
+    ticket: T-14-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-01T10:42:31
+    by: claude
+    ticket: T-14-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-01T10:45:21
+    by: claude
+    ticket: T-14-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-01T10:45:22
+    by: claude
+    ticket: T-15-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-01T10:48:26
+    by: claude
+    ticket: T-15-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-01T10:48:26
+    by: claude
+    ticket: T-15-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-01T10:59:54
+    by: claude
+    ticket: T-15-02

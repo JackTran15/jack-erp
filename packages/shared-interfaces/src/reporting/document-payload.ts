@@ -59,6 +59,16 @@ export interface DocumentColumn {
    * room. Renderers merge (Excel) or `colspan` (HTML) across the span.
    */
   span?: number;
+  /**
+   * Band this column sits under in a two-tier header, e.g. "Doanh thu".
+   *
+   * Already resolved to the label the reader sees, the same way `label` is —
+   * a renderer never looks a band up. Consecutive columns sharing a band are
+   * merged under one heading; a column without one spans both header rows.
+   * Absent on every column means a single-row header, exactly as before bands
+   * existed.
+   */
+  group?: string | null;
 }
 
 /** A tabular document — one report or ledger — ready to render in any format. */

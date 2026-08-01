@@ -7,6 +7,7 @@ import {
 } from '@erp/shared-interfaces';
 import { amountInWordsVi } from '../../../common/utils/amount-in-words.util';
 import { toLongVietnameseDate } from '../../../common/utils/document-date.util';
+import { VOUCHER_COLUMN_WIDTHS } from '../voucher-column-width.const';
 import { GoodsIssueEntity } from './goods-issue.entity';
 
 /**
@@ -16,24 +17,29 @@ import { GoodsIssueEntity } from './goods-issue.entity';
  *
  * Unit comes off the item: unlike `GoodsReceiptLineEntity`, a goods issue line
  * has no `uomCode` of its own.
+ *
+ * "Ghi chú" is hidden: on the spreadsheet, off the printed slip.
  */
+const W = VOUCHER_COLUMN_WIDTHS;
+
 const LINE_COLUMNS = [
-  { col: 'stt', label: 'STT', type: ReportColumnDataType.NUMBER, align: 'center' as const },
-  { col: 'sku', label: 'Mã SKU', type: ReportColumnDataType.STRING },
-  { col: 'name', label: 'Tên hàng hóa', type: ReportColumnDataType.STRING, span: 4 },
-  { col: 'uom', label: 'ĐVT', type: ReportColumnDataType.STRING },
-  { col: 'position', label: 'Vị trí', type: ReportColumnDataType.STRING },
-  { col: 'quantity', label: 'Số lượng', type: ReportColumnDataType.NUMBER },
-  { col: 'unitPrice', label: 'Đơn giá', type: ReportColumnDataType.CURRENCY },
-  { col: 'lineTotal', label: 'Thành tiền', type: ReportColumnDataType.CURRENCY },
-  { col: 'salePrice', label: 'Giá bán', type: ReportColumnDataType.CURRENCY, hidden: true },
+  { col: 'stt', label: 'STT', type: ReportColumnDataType.NUMBER, align: 'center' as const, width: W.stt },
+  { col: 'sku', label: 'Mã SKU', type: ReportColumnDataType.STRING, width: W.sku },
+  { col: 'name', label: 'Tên hàng hóa', type: ReportColumnDataType.STRING, span: 4, width: W.name },
+  { col: 'uom', label: 'ĐVT', type: ReportColumnDataType.STRING, width: W.uom },
+  { col: 'position', label: 'Vị trí', type: ReportColumnDataType.STRING, width: W.position },
+  { col: 'quantity', label: 'Số lượng', type: ReportColumnDataType.NUMBER, width: W.quantity },
+  { col: 'unitPrice', label: 'Đơn giá', type: ReportColumnDataType.CURRENCY, width: W.unitPrice },
+  { col: 'lineTotal', label: 'Thành tiền', type: ReportColumnDataType.CURRENCY, width: W.lineTotal },
+  { col: 'salePrice', label: 'Giá bán', type: ReportColumnDataType.CURRENCY, hidden: true, width: W.salePrice },
   {
     col: 'saleTotal',
     label: 'Thành tiền giá bán',
     type: ReportColumnDataType.CURRENCY,
     hidden: true,
+    width: W.saleTotal,
   },
-  { col: 'note', label: 'Ghi chú', type: ReportColumnDataType.STRING },
+  { col: 'note', label: 'Ghi chú', type: ReportColumnDataType.STRING, hidden: true, width: W.note },
 ];
 
 const SIGNATURES = [

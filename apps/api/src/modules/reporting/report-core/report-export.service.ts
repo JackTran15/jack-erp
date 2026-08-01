@@ -329,6 +329,11 @@ export class ReportExportService {
       if (header.desc) {
         column.desc = header.desc;
       }
+      // The band label, not the band object: a renderer reads what it prints
+      // and looks nothing up, the same deal `label` and `desc` already have.
+      if (header.group) {
+        column.group = header.group.name;
+      }
       return column;
     });
   }

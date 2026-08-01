@@ -6,6 +6,7 @@ import {
   VoucherPrintPayload,
 } from '@erp/shared-interfaces';
 import { toLongVietnameseDate } from '../../../common/utils/document-date.util';
+import { VOUCHER_COLUMN_WIDTHS } from '../voucher-column-width.const';
 import { TransferOrderEntity } from './transfer-order.entity';
 
 /**
@@ -24,24 +25,29 @@ import { TransferOrderEntity } from './transfer-order.entity';
  *
  * "Kho nhập" comes off the order, not the line — the destination is a
  * document-level field today.
+ *
+ * "Ghi chú" is hidden: on the spreadsheet, off the printed slip.
  */
+const W = VOUCHER_COLUMN_WIDTHS;
+
 const LINE_COLUMNS = [
-  { col: 'stt', label: 'STT', type: ReportColumnDataType.NUMBER, align: 'center' as const },
-  { col: 'sku', label: 'Mã SKU', type: ReportColumnDataType.STRING },
-  { col: 'name', label: 'Tên hàng hóa', type: ReportColumnDataType.STRING, span: 4 },
-  { col: 'sourceWarehouse', label: 'Kho xuất', type: ReportColumnDataType.STRING },
-  { col: 'sourcePosition', label: 'Vị trí xuất', type: ReportColumnDataType.STRING },
-  { col: 'destWarehouse', label: 'Kho nhập', type: ReportColumnDataType.STRING },
-  { col: 'uom', label: 'ĐVT', type: ReportColumnDataType.STRING },
-  { col: 'quantity', label: 'SL', type: ReportColumnDataType.NUMBER },
-  { col: 'salePrice', label: 'Giá bán', type: ReportColumnDataType.CURRENCY, hidden: true },
+  { col: 'stt', label: 'STT', type: ReportColumnDataType.NUMBER, align: 'center' as const, width: W.stt },
+  { col: 'sku', label: 'Mã SKU', type: ReportColumnDataType.STRING, width: W.sku },
+  { col: 'name', label: 'Tên hàng hóa', type: ReportColumnDataType.STRING, span: 4, width: W.name },
+  { col: 'sourceWarehouse', label: 'Kho xuất', type: ReportColumnDataType.STRING, width: W.sourceWarehouse },
+  { col: 'sourcePosition', label: 'Vị trí xuất', type: ReportColumnDataType.STRING, width: W.sourcePosition },
+  { col: 'destWarehouse', label: 'Kho nhập', type: ReportColumnDataType.STRING, width: W.destWarehouse },
+  { col: 'uom', label: 'ĐVT', type: ReportColumnDataType.STRING, width: W.uom },
+  { col: 'quantity', label: 'SL', type: ReportColumnDataType.NUMBER, width: W.quantity },
+  { col: 'salePrice', label: 'Giá bán', type: ReportColumnDataType.CURRENCY, hidden: true, width: W.salePrice },
   {
     col: 'saleTotal',
     label: 'Thành tiền giá bán',
     type: ReportColumnDataType.CURRENCY,
     hidden: true,
+    width: W.saleTotal,
   },
-  { col: 'note', label: 'Ghi chú', type: ReportColumnDataType.STRING },
+  { col: 'note', label: 'Ghi chú', type: ReportColumnDataType.STRING, hidden: true, width: W.note },
 ];
 
 const SIGNATURES = [

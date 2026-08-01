@@ -1,4 +1,5 @@
 export * from './document-payload';
+export * from './column-bands';
 
 export interface DashboardSummary {
   organizationId: string;

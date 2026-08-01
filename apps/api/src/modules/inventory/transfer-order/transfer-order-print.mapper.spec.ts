@@ -90,6 +90,24 @@ describe('mapTransferOrderToVoucherPayload', () => {
     expect(byCol.get('saleTotal')?.hidden).toBe(true);
   });
 
+  it('hides the note column and keeps the index, unit and quantity narrow', () => {
+    const payload = mapTransferOrderToVoucherPayload(
+      order(),
+      null,
+      'Hà Nội',
+      STORAGES,
+    );
+    const byCol = new Map(payload.lineColumns.map((c) => [c.col, c]));
+
+    expect(byCol.get('note')?.hidden).toBe(true);
+    expect(byCol.has('note')).toBe(true);
+    expect(byCol.get('sku')!.width).toBeGreaterThanOrEqual(18);
+    // This voucher has no money columns, so the warehouse ones are the wide pair.
+    expect(byCol.get('stt')!.width).toBeLessThan(byCol.get('sourceWarehouse')!.width!);
+    expect(byCol.get('uom')!.width).toBeLessThan(byCol.get('destWarehouse')!.width!);
+    expect(byCol.get('quantity')!.width).toBeLessThan(byCol.get('sku')!.width!);
+  });
+
   it('fills the sale columns even though the line has no cost price', () => {
     const payload = mapTransferOrderToVoucherPayload(
       order(),
