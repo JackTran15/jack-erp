@@ -61,6 +61,21 @@ describe('mapGoodsIssueToVoucherPayload', () => {
     expect(byCol.get('saleTotal')?.hidden).toBe(true);
   });
 
+  it('hides the note column and sizes the money columns to real values', () => {
+    const payload = mapGoodsIssueToVoucherPayload(issue(), null);
+    const byCol = new Map(payload.lineColumns.map((c) => [c.col, c]));
+
+    expect(byCol.get('note')?.hidden).toBe(true);
+    expect(byCol.has('note')).toBe(true);
+    // Character-count floors; the on-paper fit is verified in T-15-02.
+    expect(byCol.get('sku')!.width).toBeGreaterThanOrEqual(18);
+    expect(byCol.get('unitPrice')!.width).toBeGreaterThanOrEqual(11);
+    expect(byCol.get('lineTotal')!.width).toBeGreaterThanOrEqual(13);
+    // "Số lượng" is the wider label here, so it gets no less room than "SL".
+    expect(byCol.get('quantity')!.width).toBeLessThan(byCol.get('lineTotal')!.width!);
+    expect(byCol.get('stt')!.width).toBeLessThan(byCol.get('sku')!.width!);
+  });
+
   it('fills the sale columns from the item price', () => {
     const payload = mapGoodsIssueToVoucherPayload(issue(), null);
 

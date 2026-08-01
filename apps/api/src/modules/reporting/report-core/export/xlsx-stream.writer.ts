@@ -1,4 +1,10 @@
-import { DocumentColumn, ReportColumnDataType, ReportRow } from '@erp/shared-interfaces';
+import {
+  buildColumnBands,
+  DocumentColumn,
+  hasColumnBands,
+  ReportColumnDataType,
+  ReportRow,
+} from '@erp/shared-interfaces';
 import * as ExcelJS from 'exceljs';
 import { Writable } from 'stream';
 import { ExportDocumentHeader, ExportWriter } from './export.types';
@@ -28,6 +34,10 @@ import {
  *
  * What it buys is memory that does not grow with the report: rows leave the
  * process as they arrive instead of piling up in a buffer.
+ *
+ * The constraint is *committed*, not *one row at a time*: cells can still be
+ * merged across two rows as long as neither has been committed yet, which is
+ * what the two-tier band header relies on (ADR-12).
  *
  * The layout follows the reference report workbook (ADR-11, see the house-style
  * section of the logical design): branch block, centred title, italic period
@@ -94,6 +104,11 @@ function titleLinesOf(header: ExportDocumentHeader): TitleLine[] {
     lines.push({ text: line, italic: true, align: 'center' });
   }
   return lines;
+}
+
+/** A header cell: the label, with the formula notation wrapped underneath. */
+function labelCell(column: DocumentColumn): string {
+  return column.desc ? `${column.label}\n${column.desc}` : column.label;
 }
 
 /** Project one keyed row onto the column order; missing keys become null. */
@@ -196,19 +211,82 @@ export class XlsxStreamWriter implements ExportWriter {
     sheet: ExcelJS.Worksheet,
     columns: DocumentColumn[],
   ): void {
+    if (hasColumnBands(columns)) {
+      this.writeBandedHeaderRows(sheet, columns);
+      return;
+    }
+
     // A column's formula notation goes in the same cell as its label, on a
-    // second wrapped line — `WorkbookWriter` cannot merge a header row with a
-    // notation row underneath once either is committed (ADR-08), and the
-    // reference MISA export uses one two-line cell, not two one-line rows.
+    // second wrapped line, because the reference MISA export uses one two-line
+    // cell rather than two one-line rows.
     const hasDesc = columns.some((column) => Boolean(column.desc));
-    const row = sheet.addRow(
-      columns.map((column) =>
-        column.desc ? `${column.label}\n${column.desc}` : column.label,
+    const row = sheet.addRow(columns.map((column) => labelCell(column)));
+    row.height = hasDesc ? HEADER_ROW_HEIGHT_WITH_DESC : HEADER_ROW_HEIGHT;
+    this.styleHeaderRow(row);
+    row.commit();
+  }
+
+  /**
+   * The two-tier header: band labels above, column labels below.
+   *
+   * Both rows are added before either is merged or committed. `WorkbookWriter`
+   * refuses to reach back into a committed row — that, not the row count, is
+   * the real constraint under ADR-08 (A-28), so a merge spanning two rows is
+   * fine as long as neither has gone out yet.
+   *
+   * A column with no band takes both rows via a vertical merge instead of
+   * sitting under an empty cell, which is also what keeps the merged cell's
+   * border unbroken.
+   */
+  private writeBandedHeaderRows(
+    sheet: ExcelJS.Worksheet,
+    columns: DocumentColumn[],
+  ): void {
+    const bands = buildColumnBands(columns);
+    const hasDesc = columns.some((column) => Boolean(column.desc));
+
+    const bandRow = sheet.addRow(
+      // A banded run carries its label in the first cell of the run; an
+      // unbanded column carries its own label here and the merge below pulls
+      // it down through both rows.
+      bands.flatMap((band) =>
+        band.label === null
+          ? [labelCell(columns[band.start])]
+          : [band.label, ...Array<null>(band.span - 1).fill(null)],
       ),
     );
-    row.height = hasDesc ? HEADER_ROW_HEIGHT_WITH_DESC : HEADER_ROW_HEIGHT;
-    // Per cell rather than per row: a row-level fill does not survive the
-    // column-level style the data cells inherit.
+    const labelRow = sheet.addRow(
+      columns.map((column, index) =>
+        bands.some((band) => band.label === null && band.start === index)
+          ? null
+          : labelCell(column),
+      ),
+    );
+
+    bandRow.height = HEADER_ROW_HEIGHT;
+    labelRow.height = hasDesc ? HEADER_ROW_HEIGHT_WITH_DESC : HEADER_ROW_HEIGHT;
+
+    for (const band of bands) {
+      const first = band.start + 1;
+      if (band.label === null) {
+        sheet.mergeCells(bandRow.number, first, labelRow.number, first);
+      } else if (band.span > 1) {
+        sheet.mergeCells(bandRow.number, first, bandRow.number, first + band.span - 1);
+      }
+    }
+
+    // Every physical cell, not just each merge master: styling only the master
+    // leaves the tail of a merged cell without a border.
+    this.styleHeaderRow(bandRow);
+    this.styleHeaderRow(labelRow);
+
+    bandRow.commit();
+    labelRow.commit();
+  }
+
+  /** Per cell rather than per row: a row-level fill does not survive the
+   * column-level style the data cells inherit. */
+  private styleHeaderRow(row: ExcelJS.Row): void {
     row.eachCell({ includeEmpty: true }, (cell) => {
       cell.font = bodyFont({ bold: true });
       cell.fill = HEADER_FILL;
@@ -219,7 +297,6 @@ export class XlsxStreamWriter implements ExportWriter {
         wrapText: true,
       };
     });
-    row.commit();
   }
 
   private requireSheet(): ExcelJS.Worksheet {

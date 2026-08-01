@@ -69,6 +69,38 @@ describe('mapGoodsReceiptToVoucherPayload', () => {
     expect(byCol.get('lineTotal')?.hidden).toBeUndefined();
   });
 
+  it('hides the note column: kept in the spreadsheet, off the printed slip', () => {
+    const payload = mapGoodsReceiptToVoucherPayload(receipt(), null);
+    const byCol = new Map(payload.lineColumns.map((c) => [c.col, c]));
+
+    expect(byCol.get('note')?.hidden).toBe(true);
+    // Hidden, not dropped — the .xlsx still carries whatever was written.
+    expect(byCol.has('note')).toBe(true);
+  });
+
+  it('sizes the money and SKU columns to the values they really hold', () => {
+    const payload = mapGoodsReceiptToVoucherPayload(receipt(), null);
+    const byCol = new Map(payload.lineColumns.map((c) => [c.col, c]));
+
+    // Character-count floors: a 16-char SKU, `9.999.999` (9) and `999.999.999`
+    // (11), each plus a little padding. Whether they actually fit on A4 depends
+    // on the ratio between columns, which is checked where it is decided — in
+    // the printed table (T-15-02), measured in a browser at 190 mm.
+    expect(byCol.get('sku')!.width).toBeGreaterThanOrEqual(18);
+    expect(byCol.get('unitPrice')!.width).toBeGreaterThanOrEqual(11);
+    expect(byCol.get('lineTotal')!.width).toBeGreaterThanOrEqual(13);
+  });
+
+  it('keeps the index, quantity and unit columns narrower than the money ones', () => {
+    const payload = mapGoodsReceiptToVoucherPayload(receipt(), null);
+    const byCol = new Map(payload.lineColumns.map((c) => [c.col, c]));
+
+    // The relation is what was asked for; the absolute numbers are tuning.
+    expect(byCol.get('stt')!.width).toBeLessThan(byCol.get('sku')!.width!);
+    expect(byCol.get('uom')!.width).toBeLessThan(byCol.get('unitPrice')!.width!);
+    expect(byCol.get('quantity')!.width).toBeLessThan(byCol.get('lineTotal')!.width!);
+  });
+
   it('fills the sale columns from the item price rather than leaving them zero', () => {
     const payload = mapGoodsReceiptToVoucherPayload(receipt(), null);
 

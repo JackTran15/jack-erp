@@ -101,4 +101,118 @@ describe("renderReportTableHtml", () => {
       expect(html).not.toContain("<b>(1)</b>");
     });
   });
+
+  describe("column band header (DocumentColumn.group)", () => {
+    const banded = () =>
+      payload({
+        columns: [
+          { col: "date", label: "Ngày", type: ReportColumnDataType.STRING },
+          {
+            col: "cash",
+            label: "Tiền mặt",
+            type: ReportColumnDataType.CURRENCY,
+            group: "Doanh thu",
+          },
+          {
+            col: "card",
+            label: "Thẻ",
+            type: ReportColumnDataType.CURRENCY,
+            group: "Doanh thu",
+          },
+          {
+            col: "debt",
+            label: "Công nợ",
+            type: ReportColumnDataType.CURRENCY,
+            group: "Khách hàng thanh toán",
+          },
+        ],
+        rows: [{ date: "2026-07-09", cash: 1, card: 2, debt: 3 }],
+        totals: { date: null, cash: 1, card: 2, debt: 3 },
+      });
+
+    it("renders two thead rows when any column carries a band", () => {
+      const html = renderReportTableHtml(banded());
+      const thead = html.slice(html.indexOf("<thead>"), html.indexOf("</thead>"));
+
+      expect(thead.match(/<tr>/g)).toHaveLength(2);
+    });
+
+    it("spans a band across exactly the columns that carry it", () => {
+      const html = renderReportTableHtml(banded());
+
+      expect(html).toContain('<th colspan="2">Doanh thu</th>');
+      expect(html).toContain('<th colspan="1">Khách hàng thanh toán</th>');
+    });
+
+    it("gives an unbanded column both rows and does not repeat it below", () => {
+      const html = renderReportTableHtml(banded());
+      const thead = html.slice(html.indexOf("<thead>"), html.indexOf("</thead>"));
+      const secondRow = thead.slice(thead.lastIndexOf("<tr>"));
+
+      expect(thead).toContain('<th rowspan="2">Ngày</th>');
+      expect(secondRow).not.toContain("Ngày");
+      expect(secondRow).toContain("Tiền mặt");
+      expect(secondRow).toContain("Công nợ");
+    });
+
+    it("renders a single thead row when no column carries a band", () => {
+      // The debt and profit domains emit no bands; their printout must not grow
+      // a second header row.
+      const html = renderReportTableHtml(payload());
+      const thead = html.slice(html.indexOf("<thead>"), html.indexOf("</thead>"));
+
+      expect(thead.match(/<tr>/g)).toHaveLength(1);
+      expect(thead).not.toContain("colspan");
+      expect(thead).not.toContain("rowspan");
+    });
+
+    it("keeps the formula notation on both banded and unbanded columns", () => {
+      const html = renderReportTableHtml(
+        payload({
+          columns: [
+            {
+              col: "date",
+              label: "Ngày",
+              type: ReportColumnDataType.STRING,
+              desc: "(0)",
+            },
+            {
+              col: "cash",
+              label: "Tiền mặt",
+              type: ReportColumnDataType.CURRENCY,
+              group: "Doanh thu",
+              desc: "(7)",
+            },
+          ],
+          rows: [{ date: "2026-07-09", cash: 1 }],
+          totals: null,
+        }),
+      );
+
+      expect(html).toContain(
+        '<th rowspan="2">Ngày<span class="formula">(0)</span></th>',
+      );
+      expect(html).toContain('<th>Tiền mặt<span class="formula">(7)</span></th>');
+    });
+
+    it("escapes a band label like any other value", () => {
+      const html = renderReportTableHtml(
+        payload({
+          columns: [
+            {
+              col: "x",
+              label: "X",
+              type: ReportColumnDataType.STRING,
+              group: "<b>DT</b>",
+            },
+          ],
+          rows: [{ x: "1" }],
+          totals: null,
+        }),
+      );
+
+      expect(html).toContain("&lt;b&gt;DT&lt;/b&gt;");
+      expect(html).not.toContain("<b>DT</b>");
+    });
+  });
 });

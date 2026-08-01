@@ -26,6 +26,47 @@ function spanOf(column: DocumentColumn): number {
 }
 
 /**
+ * Matches `WIDTH_DEFAULT` in `VoucherXlsxWriter`, so a voucher that declares no
+ * widths prints with the proportions it had before widths existed.
+ */
+const DEFAULT_COLUMN_WIDTH = 17;
+
+function widthOf(column: DocumentColumn): number {
+  return column.width ?? DEFAULT_COLUMN_WIDTH;
+}
+
+/**
+ * The `<colgroup>` that gives `table-layout: fixed` something to lay out.
+ *
+ * Without it the browser splits the width evenly across every grid column, so
+ * "STT" gets as much room as "Thành tiền" and a 16-character SKU wraps. The
+ * widths are the character counts the spreadsheet uses (ADR-13), normalised to
+ * percentages here.
+ *
+ * One `<col>` per *grid* column, not per logical column: a column with `span`
+ * covers several, and emitting one `<col>` for it would slide every column
+ * after it out of line with its `colspan`.
+ */
+function renderColgroup(columns: DocumentColumn[]): string {
+  const totalUnits = columns.reduce(
+    (total, column) => total + widthOf(column) * spanOf(column),
+    0,
+  );
+  if (totalUnits <= 0) return "";
+
+  const cols = columns
+    .flatMap((column) => {
+      const percent = ((widthOf(column) / totalUnits) * 100).toFixed(2);
+      return Array<string>(spanOf(column)).fill(
+        `<col style="width: ${percent}%" />`,
+      );
+    })
+    .join("");
+
+  return `<colgroup>${cols}</colgroup>`;
+}
+
+/**
  * How many leading grid columns the totals label spans: everything up to the
  * first figure, so no total is ever hidden underneath it.
  */
@@ -163,6 +204,7 @@ export function renderVoucherHtml(payload: VoucherPrintPayload): string {
     <div class="doc-no">Số: ${escapeHtml(docNo)}</div>
     <div class="info-block">${infoRows}</div>
     <table>
+      ${renderColgroup(lineColumns)}
       <thead><tr>${headerCells}</tr></thead>
       <tbody>${bodyRows}${renderTotalsRow(lineColumns, totals, totalsLabel)}</tbody>
     </table>

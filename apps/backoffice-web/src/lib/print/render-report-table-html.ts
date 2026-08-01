@@ -1,4 +1,9 @@
-import { ReportDocumentPayload } from "@erp/shared-interfaces";
+import {
+  buildColumnBands,
+  DocumentColumn,
+  hasColumnBands,
+  ReportDocumentPayload,
+} from "@erp/shared-interfaces";
 import { escapeHtml, renderTableRow } from "./print-format.util";
 
 export type ReportPrintOrientation = "landscape" | "portrait";
@@ -13,6 +18,48 @@ function fontSizeFor(columnCount: number): number {
 
 /** The header/totals band, matching the fill the generated workbooks use. */
 const BAND_FILL = "#FDE9D9";
+
+/** One `<th>` carrying a column's label and, underneath, its formula notation. */
+function headerCell(column: DocumentColumn, attrs = ""): string {
+  const label = escapeHtml(column.label);
+  const body = column.desc
+    ? `${label}<span class="formula">${escapeHtml(column.desc)}</span>`
+    : label;
+  return `<th${attrs}>${body}</th>`;
+}
+
+/**
+ * The `<thead>` rows — one, or two when any column carries a band.
+ *
+ * `colspan` and `rowspan` here are the HTML counterpart of the merges
+ * `XlsxStreamWriter` writes, off the same `buildColumnBands` (ADR-12), so the
+ * printed page and the exported file group their columns identically.
+ */
+function renderHeaderRows(columns: DocumentColumn[]): string {
+  if (!hasColumnBands(columns)) {
+    return `<tr>${columns.map((column) => headerCell(column)).join("")}</tr>`;
+  }
+
+  const bands = buildColumnBands(columns);
+  // An unbanded column takes both rows rather than sitting under a blank cell.
+  const bandRow = bands
+    .map((band) =>
+      band.label === null
+        ? headerCell(columns[band.start], ' rowspan="2"')
+        : `<th colspan="${band.span}">${escapeHtml(band.label)}</th>`,
+    )
+    .join("");
+  const labelRow = bands
+    .filter((band) => band.label !== null)
+    .flatMap((band) =>
+      columns
+        .slice(band.start, band.start + band.span)
+        .map((column) => headerCell(column)),
+    )
+    .join("");
+
+  return `<tr>${bandRow}</tr><tr>${labelRow}</tr>`;
+}
 
 /**
  * Renders a `ReportDocumentPayload` into a self-contained A4 HTML document
@@ -35,14 +82,7 @@ export function renderReportTableHtml(
       )
     : [];
 
-  const headerCells = columns
-    .map((column) => {
-      const label = escapeHtml(column.label);
-      return column.desc
-        ? `<th>${label}<span class="formula">${escapeHtml(column.desc)}</span></th>`
-        : `<th>${label}</th>`;
-    })
-    .join("");
+  const headerRows = renderHeaderRows(columns);
   const bodyRows = rows.map((row) => renderTableRow(columns, row)).join("");
   const totalsRow = totals ? renderTableRow(columns, totals, "totals") : "";
 
@@ -77,7 +117,7 @@ export function renderReportTableHtml(
     <h1>${escapeHtml(title)}</h1>
     ${subtitleLines.map((line) => `<div class="subtitle-line">${escapeHtml(line)}</div>`).join("")}
     <table>
-      <thead><tr>${headerCells}</tr></thead>
+      <thead>${headerRows}</thead>
       <tbody>${bodyRows}${totalsRow}</tbody>
     </table>
   </body>

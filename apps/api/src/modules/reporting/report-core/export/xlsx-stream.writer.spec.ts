@@ -301,4 +301,144 @@ describe('XlsxStreamWriter', () => {
       expect(sheet.getCell(`A${ROW_HEADER}`).value).toBe('DT thuần\n(2)=(3)/(1)');
     });
   });
+
+  describe('column band header (DocumentColumn.group)', () => {
+    const BANDED: DocumentColumn[] = [
+      { col: 'date', label: 'Ngày', type: ReportColumnDataType.STRING },
+      {
+        col: 'cash',
+        label: 'Tiền mặt',
+        type: ReportColumnDataType.CURRENCY,
+        group: 'Doanh thu',
+      },
+      {
+        col: 'card',
+        label: 'Thẻ',
+        type: ReportColumnDataType.CURRENCY,
+        group: 'Doanh thu',
+      },
+      {
+        col: 'debt',
+        label: 'Công nợ',
+        type: ReportColumnDataType.CURRENCY,
+        group: 'Khách hàng thanh toán',
+      },
+    ];
+
+    const ROW_BAND = ROW_HEADER;
+    const ROW_LABEL = ROW_HEADER + 1;
+
+    const merges = (sheet: ExcelJS.Worksheet): string[] =>
+      // `model.merges` is the serialised <mergeCells> list — the assertion is
+      // about what landed in the file, not about which calls were made.
+      ((sheet.model as unknown as { merges?: string[] }).merges ?? []).slice().sort();
+
+    it('writes a band row above the label row', async () => {
+      const sheet = await writeAndRead(HEADER, BANDED, [
+        { date: '01/01', cash: 1, card: 2, debt: 3 },
+      ]);
+
+      expect(sheet.getCell(`A${ROW_BAND}`).value).toBe('Ngày');
+      expect(sheet.getCell(`B${ROW_BAND}`).value).toBe('Doanh thu');
+      expect(sheet.getCell(`D${ROW_BAND}`).value).toBe('Khách hàng thanh toán');
+
+      expect(sheet.getCell(`B${ROW_LABEL}`).value).toBe('Tiền mặt');
+      expect(sheet.getCell(`C${ROW_LABEL}`).value).toBe('Thẻ');
+      expect(sheet.getCell(`D${ROW_LABEL}`).value).toBe('Công nợ');
+    });
+
+    it('reads a merged cell back as its master on both axes', async () => {
+      const sheet = await writeAndRead(HEADER, BANDED, [
+        { date: '01/01', cash: 1, card: 2, debt: 3 },
+      ]);
+
+      // A merged slave echoes its master when the file is read back — it is not
+      // an empty cell. That is what proves the two merges took, and it is why
+      // the structural assertions below go through the merge ranges instead of
+      // looking for blanks.
+      expect(sheet.getCell(`C${ROW_BAND}`).value).toBe('Doanh thu');
+      expect(sheet.getCell(`A${ROW_LABEL}`).value).toBe('Ngày');
+    });
+
+    it('merges a band across exactly the columns that carry it', async () => {
+      const sheet = await writeAndRead(HEADER, BANDED, [
+        { date: '01/01', cash: 1, card: 2, debt: 3 },
+      ]);
+
+      // B..C is the two-column "Doanh thu" run; "Khách hàng thanh toán" is a
+      // single column, so it needs no horizontal merge.
+      expect(merges(sheet)).toContain(`B${ROW_BAND}:C${ROW_BAND}`);
+      expect(merges(sheet)).not.toContain(`D${ROW_BAND}:D${ROW_BAND}`);
+    });
+
+    it('merges an unbanded column down through both header rows', async () => {
+      const sheet = await writeAndRead(HEADER, BANDED, [
+        { date: '01/01', cash: 1, card: 2, debt: 3 },
+      ]);
+
+      expect(merges(sheet)).toContain(`A${ROW_BAND}:A${ROW_LABEL}`);
+    });
+
+    it('fills and borders every physical cell of both header rows, not just the merge masters', async () => {
+      const sheet = await writeAndRead(HEADER, BANDED, [
+        { date: '01/01', cash: 1, card: 2, debt: 3 },
+      ]);
+
+      for (const row of [ROW_BAND, ROW_LABEL]) {
+        for (const col of ['A', 'B', 'C', 'D']) {
+          const cell = sheet.getCell(`${col}${row}`);
+          expect((cell.fill as ExcelJS.FillPattern)?.fgColor?.argb).toBe(
+            HEADER_FILL_ARGB,
+          );
+          expect(cell.border?.bottom?.style).toBe('thin');
+        }
+      }
+    });
+
+    it('pushes the data rows down by one so the totals row still lands under them', async () => {
+      const sheet = await writeAndRead(
+        HEADER,
+        BANDED,
+        [{ date: '01/01', cash: 1, card: 2, debt: 3 }],
+        { date: 'Tổng', cash: 1, card: 2, debt: 3 },
+      );
+
+      expect(sheet.getCell(`A${ROW_LABEL + 1}`).value).toBe('01/01');
+      expect(sheet.getCell(`A${ROW_LABEL + 2}`).value).toBe('Tổng');
+    });
+
+    it('keeps the formula notation in the label row rather than adding a third row', async () => {
+      const banded: DocumentColumn[] = [
+        {
+          col: 'cash',
+          label: 'Tiền mặt',
+          type: ReportColumnDataType.CURRENCY,
+          group: 'Doanh thu',
+          desc: '(7)',
+        },
+      ];
+      const sheet = await writeAndRead(HEADER, banded, [{ cash: 1 }]);
+
+      expect(sheet.getCell(`A${ROW_BAND}`).value).toBe('Doanh thu');
+      expect(sheet.getCell(`A${ROW_LABEL}`).value).toBe('Tiền mặt\n(7)');
+      expect(sheet.getCell(`A${ROW_LABEL + 1}`).value).toBe(1);
+    });
+
+    it('writes a single header row when no column carries a band', async () => {
+      // The debt and profit domains emit no bands; their files must not grow a
+      // blank row.
+      const sheet = await writeAndRead(HEADER, COLUMNS, [
+        { sku: 'SKU-1', name: 'Giày A', amount: 1 },
+      ]);
+
+      expect(sheet.getRow(ROW_HEADER).values).toEqual([
+        undefined,
+        'Mã SKU',
+        'Tên hàng hóa',
+        'Thành tiền',
+      ]);
+      expect(sheet.getCell(`A${ROW_HEADER + 1}`).value).toBe('SKU-1');
+      expect(merges(sheet).filter((m) => m.includes(String(ROW_HEADER)))).toEqual([]);
+    });
+  });
 });

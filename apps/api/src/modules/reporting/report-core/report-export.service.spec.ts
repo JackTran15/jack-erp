@@ -222,6 +222,54 @@ describe('ReportExportService.buildPayload', () => {
     ]);
   });
 
+  it('carries a column band from the catalog into the payload as its label', async () => {
+    const { service } = makeService();
+    const { registry } = makeRegistry(
+      jest.fn().mockResolvedValue(RESULT),
+      jest.fn().mockResolvedValue([
+        { ...header('sku', 'Mã SKU') },
+        {
+          ...header('qty', 'Tiền mặt', ReportColumnDataType.NUMBER),
+          group: { id: 'customerPayment', name: 'Khách hàng thanh toán' },
+        },
+      ]),
+    );
+
+    const payload = await service.buildPayload(
+      registry,
+      dto({ columns: ['sku', 'qty'] }),
+      actor,
+      context,
+    );
+
+    expect(payload.columns[0].group).toBeUndefined();
+    expect(payload.columns[1].group).toBe('Khách hàng thanh toán');
+  });
+
+  it('keeps the band when the user renames the column label', async () => {
+    const { service } = makeService();
+    const { registry } = makeRegistry(
+      jest.fn().mockResolvedValue(RESULT),
+      jest.fn().mockResolvedValue([
+        {
+          ...header('qty', 'Tiền mặt', ReportColumnDataType.NUMBER),
+          group: { id: 'revenue', name: 'Doanh thu' },
+        },
+      ]),
+    );
+
+    const payload = await service.buildPayload(
+      registry,
+      dto({ columns: ['qty'], columnLabels: { qty: 'Thu tiền mặt' } }),
+      actor,
+      context,
+    );
+
+    expect(payload.columns[0]).toEqual(
+      expect.objectContaining({ label: 'Thu tiền mặt', group: 'Doanh thu' }),
+    );
+  });
+
   it('keeps the column order the request asked for', async () => {
     const { service } = makeService();
     const { registry } = makeRegistry();

@@ -1,7 +1,7 @@
 ---
 feature: export-print
-stories: 7
-acceptance_criteria: 35
+stories: 8
+acceptance_criteria: 37
 ---
 
 # Requirements — Xuất khẩu / In
@@ -315,18 +315,31 @@ And các dòng thông tin chung (Đối tượng / Người giao / Diễn giải
 ```
 
 **AC-29** — Tập cột đúng cho từng loại phiếu kho
+
+> Sửa 2026-08-01: "Ghi chú" chuyển thành **cột ẩn**, đúng cơ chế `hidden` mà AC-34 đã dựng cho
+> Giá bán / Thành tiền giá bán. File Excel vẫn có cột; bản in bỏ hẳn. Người dùng chốt: phiếu in
+> ra để ký không cần cột ghi chú, nhưng dữ liệu không được mất khỏi file.
+
 ```gherkin
 Given chứng từ là phiếu nhập kho
 When tôi xuất hoặc in
-Then bảng dòng hàng có đúng các cột: STT, Mã SKU, Tên hàng hóa, ĐVT, Vị trí, SL, Đơn giá, Thành tiền, Ghi chú
+Then bảng dòng hàng có đúng các cột hiện: STT, Mã SKU, Tên hàng hóa, ĐVT, Vị trí, SL, Đơn giá, Thành tiền
 And không có cột "Kho"
 
 Given chứng từ là phiếu xuất kho
-Then bảng dòng hàng có đúng các cột: STT, Mã SKU, Tên hàng hóa, ĐVT, Vị trí, Số lượng, Đơn giá, Thành tiền, Ghi chú
+Then bảng dòng hàng có đúng các cột hiện: STT, Mã SKU, Tên hàng hóa, ĐVT, Vị trí, Số lượng, Đơn giá, Thành tiền
 
 Given chứng từ là phiếu chuyển kho
 Then tiêu đề là "PHIẾU CHUYỂN KHO", không phải "LỆNH ĐIỀU CHUYỂN"
-And bảng dòng hàng có đúng các cột: STT, Mã SKU, Tên hàng hóa, Kho xuất, Vị trí xuất, Kho nhập, ĐVT, SL, Ghi chú
+And bảng dòng hàng có đúng các cột hiện: STT, Mã SKU, Tên hàng hóa, Kho xuất, Vị trí xuất, Kho nhập, ĐVT, SL
+
+Given bất kỳ loại nào trong ba loại trên
+When tôi mở file .xlsx
+Then vẫn có cột "Ghi chú" nhưng **bị ẩn**, bỏ ẩn thì thấy nội dung ghi chú của từng dòng
+
+Given bất kỳ loại nào trong ba loại trên
+When tôi bấm "In"
+Then bản in **không** có cột "Ghi chú"
 
 Given bất kỳ loại nào trong ba loại trên
 Then dòng cuối bảng có nhãn tổng ("Tổng" với nhập/chuyển, "Cộng" với xuất) ở cột bên trái
@@ -410,6 +423,57 @@ Then tên file là tên báo cáo dạng slug, ví dụ "doanh-thu-theo-mat-hang
 Given backoffice và API nằm ở hai origin khác nhau
 When trình duyệt đọc phản hồi
 Then nó vẫn đọc được `Content-Disposition` do server đặt, không rơi về tên mặc định
+```
+
+## US-08 — Tài liệu xuất ra đọc được đúng như bảng trên màn hình
+
+Là kế toán, tôi muốn file và bản in giữ nguyên cấu trúc cột tôi đang nhìn trên màn hình — nhóm
+cột và bề rộng cột — để tờ giấy cầm trên tay không phải đoán cột nào thuộc nhóm nào và không có
+ô nào bị bẻ dòng hay cụt số.
+
+> Thêm 2026-08-01. Nguồn: người dùng báo hai lỗi — "Heading Group chưa work trên in và report",
+> và lưới cột phiếu in ra sai tỉ lệ (STT rộng bằng Thành tiền, Mã SKU xuống hai dòng).
+
+**Priority:** must
+**Depends on:** US-01, US-02, US-03
+
+### Acceptance criteria
+
+**AC-36** — Tiêu đề nhóm cột (Heading Group) lên cả bản in và file Excel báo cáo
+```gherkin
+Given một báo cáo có cột thuộc nhóm, ví dụ "Doanh thu theo mặt hàng" với nhóm "Doanh thu"
+When tôi bấm "Xuất khẩu" và mở file .xlsx
+Then trên hàng nhãn cột có thêm một hàng nhóm
+And ô nhóm gộp ngang qua đúng những cột liền nhau thuộc nhóm đó
+And cột không thuộc nhóm nào gộp dọc qua cả hai hàng, không để ô trống phía trên
+And mọi ô của cả hai hàng đều có nền FFFDE9D9 và viền mảnh bốn cạnh
+
+Given cùng báo cáo đó
+When tôi bấm "In"
+Then bảng in có hai hàng tiêu đề đúng như file Excel, dùng colspan cho nhóm và rowspan cho cột không nhóm
+
+Given một báo cáo mà không cột nào thuộc nhóm nào, ví dụ báo cáo công nợ
+When tôi xuất hoặc in
+Then tiêu đề vẫn là **đúng một hàng**, y hệt trước khi có tính năng này
+
+Given điều này đúng cho cả bốn miền báo cáo invoice / inventory / debt / profit
+```
+
+**AC-37** — Bề rộng cột phiếu kho đủ chứa nội dung thật
+```gherkin
+Given tôi in một phiếu nhập kho, phiếu xuất kho hoặc phiếu chuyển kho
+When tôi xem bản in
+Then cột "Mã SKU" chứa được mã 16 ký tự trên **một dòng**, không bị bẻ xuống dòng thứ hai
+And cột "Đơn giá" chứa được số 7 chữ số ("9.999.999") không xuống dòng
+And cột "Thành tiền" chứa được số 9 chữ số ("999.999.999") không xuống dòng
+And cột "STT", "SL"/"Số lượng" và "ĐVT" hẹp hơn các cột trên, không chiếm chỗ ngang bằng
+
+Given cùng ba loại phiếu đó
+When tôi mở file .xlsx
+Then bề rộng cột trong file khớp cùng bộ số đã khai, không phải cột nào cũng 17 ký tự
+
+Given một chứng từ chưa khai bề rộng cột nào
+Then bản in và file vẫn ra đúng như hôm nay — bề rộng khai báo là tuỳ chọn, không bắt buộc
 ```
 
 ## Non-functional
