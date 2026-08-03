@@ -1848,6 +1848,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/inventory/locations/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Location search with server-side per-column filters */
+        post: operations["LocationV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/items": {
         parameters: {
             query?: never;
@@ -8331,6 +8348,55 @@ export interface components {
         ArrangeLocationDto: {
             lines: components["schemas"]["ArrangeLocationLineDto"][];
         };
+        EnumFilterDto: {
+            value: string | null;
+        };
+        LocationSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /**
+             * @description Include the virtual "Chưa xếp" location. Defaults to false so it stays
+             *     hidden from the list, same as `GET /inventory/locations`.
+             * @default false
+             */
+            includeUnassigned: boolean;
+            /** @description Mã vị trí */
+            code?: components["schemas"]["StringFilterDto"];
+            /** @description Tên vị trí */
+            name?: components["schemas"]["StringFilterDto"];
+            /** @description Mô tả */
+            description?: components["schemas"]["StringFilterDto"];
+            /** @description Thuộc kho — storage id */
+            storageId?: components["schemas"]["EnumFilterDto"];
+            /** @description Trạng thái */
+            isActive?: boolean;
+            /** @description Xếp hàng hóa — true = "Đã xếp" (has ≥1 stock_balance row) */
+            hasItems?: boolean;
+        };
+        LocationSearchV2RowDto: {
+            id: string;
+            code: string;
+            name: string;
+            /** Format: uuid */
+            storageId: string;
+            /** Format: uuid */
+            branchId: string | null;
+            /** @enum {string} */
+            type: "SHELF" | "RACK" | "BIN" | "ZONE";
+            description: string | null;
+            isActive: boolean;
+            isDefault: boolean;
+            /** @description Đã xếp hàng hóa (has ≥1 stock_balance row) */
+            hasItems: boolean;
+        };
+        LocationSearchV2ResponseDto: {
+            data: components["schemas"]["LocationSearchV2RowDto"][];
+            total: number;
+            page: number;
+            limit: number;
+        };
         CreateItemBarcodeInput: {
             code: string;
             notes?: string;
@@ -11347,9 +11413,6 @@ export interface components {
             creditDays?: number;
             note?: string;
         };
-        EnumFilterDto: {
-            value: string | null;
-        };
         InvoiceSearchV2Dto: {
             /** @default 1 */
             page: number;
@@ -12081,14 +12144,18 @@ export interface components {
             notes?: string;
             attachmentIds: string[];
             exportGoodsIssueId?: string;
-            /** @description GoodsReceipt spawned when the destination branch confirms import — the import_reference. */
-            importGoodsReceiptId?: string;
+            /**
+             * @description GoodsReceipt spawned when the destination branch confirms import — the
+             *     import_reference. Cleared back to null when that receipt is deleted, which
+             *     reopens the order for a new import.
+             */
+            importGoodsReceiptId?: string | null;
             /** Format: date-time */
             exportedAt?: string;
             exportedBy?: string;
             /** Format: date-time */
-            completedAt?: string;
-            completedBy?: string;
+            completedAt?: string | null;
+            completedBy?: string | null;
             /** Format: date-time */
             cancelledAt?: string;
             cancelledBy?: string;
@@ -16207,6 +16274,29 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    LocationV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocationSearchV2Dto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationSearchV2ResponseDto"];
+                };
             };
         };
     };

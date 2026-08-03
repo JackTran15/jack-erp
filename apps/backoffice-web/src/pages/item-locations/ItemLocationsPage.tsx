@@ -1,4 +1,3 @@
-import { LocationType } from "@erp/shared-interfaces";
 import {
   AppModal,
   Button,
@@ -20,8 +19,17 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import {
+  buildV2Body,
+  type V2SearchConfig,
+} from "../../components/crud/crudV2Search";
+import {
+  searchLocationsV2,
+  type LocationRow,
+} from "../../api/inventory-locations";
 import {
   InventoryPageTitle,
   InventoryTabBar,
@@ -47,18 +55,7 @@ import { LocationStockItemsDialog } from "./LocationStockItemsDialog";
 import { ImportLocationDialog } from "./import/ImportLocationDialog";
 import { downloadLocationsExcel } from "./import/import-location.api";
 
-interface InventoryLocation {
-  id: string;
-  code: string;
-  name: string;
-  storageId: string;
-  branchId: string;
-  type: LocationType;
-  description?: string | null;
-  isActive: boolean;
-  isDefault?: boolean;
-  hasItems?: boolean;
-}
+type InventoryLocation = LocationRow;
 
 interface InventoryStorage {
   id: string;
@@ -79,8 +76,21 @@ const STATUS_LABEL = {
   INACTIVE: "Ngừng hoạt động",
 } as const;
 
-const FILTER_KEYS = ["code", "name"] as const;
-type FilterKey = (typeof FILTER_KEYS)[number];
+/**
+ * Column key → v2 filter kind. Only these keys are sent to
+ * `POST /v2/inventory/locations/search` (the backend runs forbidNonWhitelisted).
+ */
+const V2_SEARCH: V2SearchConfig = {
+  path: "/v2/inventory/locations/search",
+  fields: {
+    code: "string",
+    name: "string",
+    description: "string",
+    storageId: "enum",
+    isActive: "boolean",
+    hasItems: "boolean",
+  },
+};
 
 const naturalCollator = new Intl.Collator("vi-VN", {
   numeric: true,
@@ -140,16 +150,6 @@ function buildDuplicateLocationDraft(
   };
 }
 
-function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
-  return FILTER_KEYS.reduce(
-    (acc, k) => {
-      acc[k] = { mode: DEFAULT_COLUMN_FILTER_MODE, value: "" };
-      return acc;
-    },
-    {} as Record<FilterKey, ColumnFilter>,
-  );
-}
-
 function getActiveBranchId(): string | null {
   return (
     localStorage.getItem("active_branch_id") ??
@@ -158,23 +158,13 @@ function getActiveBranchId(): string | null {
 }
 
 export function ItemLocationsPage() {
-  const [locations, setLocations] =
-    useState<PaginatedResponse<InventoryLocation> | null>(null);
+  const qc = useQueryClient();
   const [storages, setStorages] = useState<InventoryStorage[]>([]);
-  const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState<PaginationStateDto>({
     ...DEFAULT_PAGINATION,
     pageSize: 50,
   });
-  const [columnFilters, setColumnFilters] =
-    useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
-  const [storageFilter, setStorageFilter] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<"" | "active" | "inactive">(
-    "",
-  );
-  const [arrangeFilter, setArrangeFilter] = useState<
-    "" | "arranged" | "unarranged"
-  >("");
+  const [filters, setFilters] = useState<Record<string, ColumnFilter>>({});
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialogState, setDialogState] = useState<
@@ -213,50 +203,39 @@ export function ItemLocationsPage() {
     }
   }, []);
 
-  const loadLocations = useCallback(async () => {
-    const branchId = getActiveBranchId();
-    if (!branchId) {
-      toast.error("Chưa chọn chi nhánh đang hoạt động.");
-      setLocations({
-        data: [],
-        total: 0,
-        page: 1,
-        pageSize: pagination.pageSize,
-      });
-      return;
-    }
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: String(pagination.page),
-        pageSize: String(pagination.pageSize),
-        branchId,
-      });
-      if (storageFilter) params.set("storageId", storageFilter);
-      const { data } = await apiClient.get<
-        PaginatedResponse<InventoryLocation>
-      >(`/inventory/locations?${params}`);
-      setLocations(data);
-    } catch (err) {
-      toast.error(getUserFacingApiErrorMessage(err));
-      setLocations({
-        data: [],
-        total: 0,
-        page: 1,
-        pageSize: pagination.pageSize,
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [pagination.page, pagination.pageSize, storageFilter]);
+  const activeBranchId = getActiveBranchId();
+
+  const searchBody = useMemo(
+    () => buildV2Body(V2_SEARCH, filters, pagination.page, pagination.pageSize),
+    [filters, pagination.page, pagination.pageSize],
+  );
+
+  const locationsQuery = useQuery({
+    queryKey: ["inventory-locations", activeBranchId, searchBody],
+    queryFn: () => searchLocationsV2(searchBody),
+    enabled: Boolean(activeBranchId),
+  });
+
+  const reloadLocations = useCallback(
+    () => qc.invalidateQueries({ queryKey: ["inventory-locations"] }),
+    [qc],
+  );
+
+  // Filtering now happens server-side across the whole branch, so any filter
+  // change invalidates the current page offset.
+  useEffect(() => {
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  }, [filters]);
 
   useEffect(() => {
     void loadStorages();
   }, [loadStorages]);
 
   useEffect(() => {
-    void loadLocations();
-  }, [loadLocations]);
+    if (locationsQuery.error) {
+      toast.error(getUserFacingApiErrorMessage(locationsQuery.error));
+    }
+  }, [locationsQuery.error]);
 
   const storageNameById = useMemo(() => {
     const m = new Map<string, string>();
@@ -269,9 +248,14 @@ export function ItemLocationsPage() {
     [storages],
   );
 
+  const rows = useMemo(
+    () => sortLocationsByCode(locationsQuery.data?.data ?? []),
+    [locationsQuery.data?.data],
+  );
+
   const selected = useMemo(
-    () => (locations?.data ?? []).find((l) => l.id === selectedId) ?? null,
-    [locations, selectedId],
+    () => rows.find((l) => l.id === selectedId) ?? null,
+    [rows, selectedId],
   );
   const selectedStorage = useMemo(
     () => storages.find((s) => s.id === selected?.storageId) ?? null,
@@ -291,35 +275,6 @@ export function ItemLocationsPage() {
     [selected, storageNameById],
   );
 
-  const filteredRows = useMemo(() => {
-    const rows = locations?.data ?? [];
-    const filtered = rows.filter((row) => {
-      if (statusFilter === "active" && !row.isActive) return false;
-      if (statusFilter === "inactive" && row.isActive) return false;
-      if (arrangeFilter === "arranged" && !row.hasItems) return false;
-      if (arrangeFilter === "unarranged" && row.hasItems) return false;
-      for (const key of FILTER_KEYS) {
-        const filter = columnFilters[key];
-        if (!filter.value.trim()) continue;
-        const text = String(row[key] ?? "").toLowerCase();
-        const value = filter.value.toLowerCase();
-        const matches =
-          filter.mode === "equals"
-            ? text === value
-            : filter.mode === "startsWith"
-              ? text.startsWith(value)
-              : filter.mode === "endsWith"
-                ? text.endsWith(value)
-                : filter.mode === "notContains"
-                  ? !text.includes(value)
-                  : text.includes(value);
-        if (!matches) return false;
-      }
-      return true;
-    });
-    return sortLocationsByCode(filtered);
-  }, [locations, columnFilters, statusFilter, arrangeFilter]);
-
   const handleCreate = useCallback(
     async (draft: LocationDraft) => {
       const branchId = getActiveBranchId();
@@ -338,7 +293,7 @@ export function ItemLocationsPage() {
           isActive: draft.isActive,
         });
         toast.success("Đã tạo vị trí mới.");
-        await loadLocations();
+        await reloadLocations();
         return true;
       } catch (err) {
         toast.error(getUserFacingApiErrorMessage(err));
@@ -347,7 +302,7 @@ export function ItemLocationsPage() {
         setSaving(false);
       }
     },
-    [loadLocations],
+    [reloadLocations],
   );
 
   const handleUpdate = useCallback(
@@ -362,7 +317,7 @@ export function ItemLocationsPage() {
           isActive: draft.isActive,
         });
         toast.success("Đã cập nhật vị trí.");
-        await loadLocations();
+        await reloadLocations();
         return true;
       } catch (err) {
         toast.error(getUserFacingApiErrorMessage(err));
@@ -371,7 +326,7 @@ export function ItemLocationsPage() {
         setSaving(false);
       }
     },
-    [loadLocations],
+    [reloadLocations],
   );
 
   const handleDeactivate = useCallback(
@@ -384,14 +339,14 @@ export function ItemLocationsPage() {
         });
         toast.success("Đã ngừng hoạt động vị trí.");
         if (selectedId === loc.id) setSelectedId(null);
-        await loadLocations();
+        await reloadLocations();
       } catch (err) {
         toast.error(getUserFacingApiErrorMessage(err));
       } finally {
         setSaving(false);
       }
     },
-    [loadLocations, selectedId],
+    [reloadLocations, selectedId],
   );
 
   const openStockDialog = useCallback((loc: InventoryLocation) => {
@@ -414,7 +369,7 @@ export function ItemLocationsPage() {
         if (!selected) return;
         setDialogState({
           mode: "create",
-          initial: buildDuplicateLocationDraft(selected, locations?.data ?? []),
+          initial: buildDuplicateLocationDraft(selected, rows),
         });
       },
     },
@@ -442,7 +397,7 @@ export function ItemLocationsPage() {
       id: "reload",
       label: "Nạp",
       icon: RefreshCw,
-      onClick: () => loadLocations(),
+      onClick: () => void reloadLocations(),
     },
     {
       id: "import",
@@ -505,7 +460,7 @@ export function ItemLocationsPage() {
       ),
     },
     {
-      key: "storage",
+      key: "storageId",
       label: "Thuộc kho",
       width: 220,
       filterKind: "select",
@@ -524,13 +479,13 @@ export function ItemLocationsPage() {
         ),
     },
     {
-      key: "arrange",
+      key: "hasItems",
       label: "Xếp hàng hóa",
       width: 140,
       filterKind: "select",
       filterOptions: [
-        { value: "arranged", label: "Đã xếp" },
-        { value: "unarranged", label: "Chưa xếp" },
+        { value: "true", label: "Đã xếp" },
+        { value: "false", label: "Chưa xếp" },
       ],
       render: (row) =>
         row.hasItems ? (
@@ -540,13 +495,13 @@ export function ItemLocationsPage() {
         ),
     },
     {
-      key: "status",
+      key: "isActive",
       label: "Trạng thái",
       width: 160,
       filterKind: "select",
       filterOptions: [
-        { value: "active", label: STATUS_LABEL.ACTIVE },
-        { value: "inactive", label: STATUS_LABEL.INACTIVE },
+        { value: "true", label: STATUS_LABEL.ACTIVE },
+        { value: "false", label: STATUS_LABEL.INACTIVE },
       ],
       render: (row) => (
         <ActiveStatusBadge
@@ -559,41 +514,21 @@ export function ItemLocationsPage() {
 
   const columnFilterControl = useMemo(
     () => ({
-      filters: {
-        ...(columnFilters as unknown as Record<string, ColumnFilter>),
-        storage: { mode: "equals" as ColumnFilterMode, value: storageFilter },
-        status: { mode: "equals" as ColumnFilterMode, value: statusFilter },
-        arrange: { mode: "equals" as ColumnFilterMode, value: arrangeFilter },
-      },
+      filters,
       onModeChange: (key: string, mode: ColumnFilterMode) => {
-        if (!FILTER_KEYS.includes(key as FilterKey)) return;
-        setColumnFilters((prev) => ({
+        setFilters((prev) => ({
           ...prev,
-          [key as FilterKey]: { ...prev[key as FilterKey], mode },
+          [key]: { mode, value: prev[key]?.value ?? "" },
         }));
       },
       onValueChange: (key: string, value: string) => {
-        if (key === "storage") {
-          setStorageFilter(value);
-          setPagination((p) => ({ ...p, page: 1 }));
-          return;
-        }
-        if (key === "status") {
-          setStatusFilter(value as "" | "active" | "inactive");
-          return;
-        }
-        if (key === "arrange") {
-          setArrangeFilter(value as "" | "arranged" | "unarranged");
-          return;
-        }
-        if (!FILTER_KEYS.includes(key as FilterKey)) return;
-        setColumnFilters((prev) => ({
+        setFilters((prev) => ({
           ...prev,
-          [key as FilterKey]: { ...prev[key as FilterKey], value },
+          [key]: { mode: prev[key]?.mode ?? DEFAULT_COLUMN_FILTER_MODE, value },
         }));
       },
     }),
-    [columnFilters, storageFilter, statusFilter, arrangeFilter],
+    [filters],
   );
 
   return (
@@ -612,7 +547,7 @@ export function ItemLocationsPage() {
           <PaginationControls
             page={pagination.page}
             pageSize={pagination.pageSize}
-            total={locations?.total ?? 0}
+            total={locationsQuery.data?.total ?? 0}
             onPageChange={(p) =>
               setPagination((prev) => ({ ...prev, page: p }))
             }
@@ -623,14 +558,14 @@ export function ItemLocationsPage() {
                 pageSize: nextPageSize,
               }))
             }
-            onRefresh={() => void loadLocations()}
+            onRefresh={() => void reloadLocations()}
           />
         }
       >
         <BaseDataTable
           columns={columns}
-          rows={filteredRows}
-          loading={loading}
+          rows={rows}
+          loading={locationsQuery.isFetching}
           emptyLabel="Không có dữ liệu"
           getRowKey={(row) => row.id}
           onRowClick={(row) => setSelectedId(row.id)}
@@ -693,7 +628,7 @@ export function ItemLocationsPage() {
       <ImportLocationDialog
         open={importOpen}
         onOpenChange={setImportOpen}
-        onCommitted={() => void loadLocations()}
+        onCommitted={() => void reloadLocations()}
       />
 
       {stockDialogLoc && (
@@ -707,7 +642,7 @@ export function ItemLocationsPage() {
       <ArrangeLocationDialog
         open={arrangeOpen}
         onOpenChange={setArrangeOpen}
-        onSaved={() => void loadLocations()}
+        onSaved={() => void reloadLocations()}
         initialLocation={selectedArrangeLocation}
       />
     </>

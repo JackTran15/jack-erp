@@ -39,11 +39,13 @@ import { InventoryLocationController } from './inventory-location.controller';
 import { InventoryLocationStockController } from './inventory-location-stock.controller';
 import { InventoryLocationStockService } from './inventory-location-stock.service';
 import { InventoryItemV2Controller } from './controllers/inventory-item-v2.controller';
+import { LocationV2Controller } from './controllers/location-v2.controller';
 import { StorageDefaultReceivingController } from './controllers/storage-default-receiving.controller';
 import { ResolveItemLocationsController } from './controllers/resolve-item-locations.controller';
 import { ItemCategoryTreeController } from './controllers/item-category-tree.controller';
 import { ProductGroupSearchController } from './controllers/product-group-search.controller';
 import { SearchInventoryItemsV2Handler } from './queries/search-inventory-items-v2.handler';
+import { SearchLocationsV2Handler } from './queries/search-locations-v2.handler';
 import { ResolveItemLocationsHandler } from './queries/resolve-item-locations.handler';
 import { SearchItemCategoryTreeHandler } from './queries/search-item-category-tree.handler';
 import { SearchProductGroupsHandler } from './queries/search-product-groups.handler';
@@ -115,6 +117,9 @@ import { BrandEntity } from "./brand.entity";
     // dynamic `inventory/locations/:id` route (Express 5 matches in registration
     // order; inline regex param constraints are unsupported in path-to-regexp v8).
     InventoryLocationStockController,
+    // `POST /v2 inventory/locations/search` must also register before the
+    // dynamic `inventory/locations/:id` routes.
+    LocationV2Controller,
     InventoryLocationController,
     InventoryItemV2Controller,
     StorageDefaultReceivingController,
@@ -126,6 +131,7 @@ import { BrandEntity } from "./brand.entity";
     InventoryLocationService,
     InventoryLocationStockService,
     SearchInventoryItemsV2Handler,
+    SearchLocationsV2Handler,
     ResolveItemLocationsHandler,
     SearchItemCategoryTreeHandler,
     SearchProductGroupsHandler,
