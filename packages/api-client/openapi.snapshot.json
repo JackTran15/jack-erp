@@ -5604,6 +5604,38 @@
         ]
       }
     },
+    "/v2/inventory/locations/search": {
+      "post": {
+        "operationId": "LocationV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationSearchV2ResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Location search with server-side per-column filters",
+        "tags": [
+          "LocationV2"
+        ]
+      }
+    },
     "/inventory/items": {
       "post": {
         "operationId": "InventoryLocationController_createItem",
@@ -25917,6 +25949,163 @@
           "lines"
         ]
       },
+      "EnumFilterDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "value"
+        ]
+      },
+      "LocationSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "includeUnassigned": {
+            "type": "boolean",
+            "description": "Include the virtual \"Chưa xếp\" location. Defaults to false so it stays\nhidden from the list, same as `GET /inventory/locations`.",
+            "default": false
+          },
+          "code": {
+            "description": "Mã vị trí",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "name": {
+            "description": "Tên vị trí",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "description": {
+            "description": "Mô tả",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "storageId": {
+            "description": "Thuộc kho — storage id",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnumFilterDto"
+              }
+            ]
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Trạng thái"
+          },
+          "hasItems": {
+            "type": "boolean",
+            "description": "Xếp hàng hóa — true = \"Đã xếp\" (has ≥1 stock_balance row)"
+          }
+        }
+      },
+      "LocationSearchV2RowDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "storageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "type": {
+            "enum": [
+              "SHELF",
+              "RACK",
+              "BIN",
+              "ZONE"
+            ],
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "hasItems": {
+            "type": "boolean",
+            "description": "Đã xếp hàng hóa (has ≥1 stock_balance row)"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "storageId",
+          "branchId",
+          "type",
+          "description",
+          "isActive",
+          "isDefault",
+          "hasItems"
+        ]
+      },
+      "LocationSearchV2ResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LocationSearchV2RowDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
       "CreateItemBarcodeInput": {
         "type": "object",
         "properties": {
@@ -34907,18 +35096,6 @@
           "refundMethod"
         ]
       },
-      "EnumFilterDto": {
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "value"
-        ]
-      },
       "InvoiceSearchV2Dto": {
         "type": "object",
         "properties": {
@@ -37116,7 +37293,8 @@
           },
           "importGoodsReceiptId": {
             "type": "string",
-            "description": "GoodsReceipt spawned when the destination branch confirms import — the import_reference."
+            "nullable": true,
+            "description": "GoodsReceipt spawned when the destination branch confirms import — the\nimport_reference. Cleared back to null when that receipt is deleted, which\nreopens the order for a new import."
           },
           "exportedAt": {
             "format": "date-time",
@@ -37127,10 +37305,12 @@
           },
           "completedAt": {
             "format": "date-time",
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "completedBy": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "cancelledAt": {
             "format": "date-time",

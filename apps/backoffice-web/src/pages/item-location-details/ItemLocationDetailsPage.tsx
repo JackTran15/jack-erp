@@ -28,6 +28,7 @@ import {
   listStockBalances,
   setBalancesTracking,
   type BalanceTrackingEntry,
+  type LocationStockItemsQuery,
   type PaginatedResponse,
   type StockBalanceRow,
 } from "../../api/stock-balances";
@@ -102,10 +103,27 @@ export function ItemLocationDetailsPage() {
     () => buildQuery(page, pageSize, filters),
     [page, pageSize, filters],
   );
-  const locationSearch =
-    filters.itemCode?.value?.trim() ||
-    filters.itemName?.value?.trim() ||
-    undefined;
+  // Chế độ xem 1 vị trí: gửi từng bộ lọc cột kèm toán tử thay vì gộp thành một
+  // tham số `search` (vốn bỏ toán tử và tìm lẫn giữa mã và tên).
+  const locationParams = useMemo<LocationStockItemsQuery>(() => {
+    const params: LocationStockItemsQuery = {
+      page,
+      pageSize,
+      sortBy: "code",
+      sortOrder: "asc",
+    };
+    const itemCode = filters.itemCode?.value?.trim();
+    if (itemCode) {
+      params.itemCode = itemCode;
+      params.itemCodeMode = filters.itemCode?.mode;
+    }
+    const itemName = filters.itemName?.value?.trim();
+    if (itemName) {
+      params.itemName = itemName;
+      params.itemNameMode = filters.itemName?.mode;
+    }
+    return params;
+  }, [page, pageSize, filters]);
 
   const stockQuery = useQuery({
     queryKey: ["stock-balances", activeBranchId, queryParams],
@@ -128,24 +146,8 @@ export function ItemLocationDetailsPage() {
   });
 
   const locationQuery = useQuery({
-    queryKey: [
-      "location-stock-items",
-      activeBranchId,
-      locationId,
-      page,
-      pageSize,
-      locationSearch,
-      "code",
-      "asc",
-    ],
-    queryFn: () =>
-      listLocationStockItems(locationId, {
-        page,
-        pageSize,
-        search: locationSearch,
-        sortBy: "code",
-        sortOrder: "asc",
-      }),
+    queryKey: ["location-stock-items", activeBranchId, locationId, locationParams],
+    queryFn: () => listLocationStockItems(locationId, locationParams),
     enabled: isLocationDetail,
   });
 

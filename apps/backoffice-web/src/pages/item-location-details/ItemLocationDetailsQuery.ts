@@ -2,7 +2,6 @@ import type { ColumnFilter } from "../../components/table/pagination.dto";
 import type { StockBalancesQuery } from "../../api/stock-balances";
 
 export const STRING_FILTER_KEYS = [
-  "locationCode",
   "locationName",
   "itemCode",
   "itemName",
@@ -27,12 +26,13 @@ export function buildQuery(
   }
   const storageId = filters.storageId?.value?.trim();
   if (storageId) extra.storageId = storageId;
+  // Cột số dùng toán tử ≤ (number-range), giống các cột số khác trong app.
   const q = filters.quantity;
   if (q?.value?.trim()) {
     const n = Number(q.value.trim());
     if (!Number.isNaN(n)) {
       extra.quantity = n;
-      extra.quantityOp = "eq";
+      extra.quantityOp = "lte";
     }
   }
   // Trạng thái: mặc định chỉ hiện vị trí đang theo dõi; "" (Tất cả) bỏ lọc.
