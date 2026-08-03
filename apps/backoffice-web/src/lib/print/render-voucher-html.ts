@@ -20,6 +20,26 @@ const SIGNATURE_DATE_LINE = "Ngày.......tháng.......năm............";
 const SIGNATURE_HINT = "(Ký, họ tên)";
 const DEFAULT_TOTALS_LABEL = "Tổng";
 
+/**
+ * The paper geometry, pinned in CSS instead of left to `@page` alone.
+ *
+ * Chrome's own "Margins" dropdown overrides the `@page` margin — pick "None"
+ * and the page box grows from 190 mm to the full 210 mm, so the voucher spreads
+ * to both paper edges and the printer's unprintable border eats the first
+ * characters of every left-aligned line. Chrome remembers that choice per
+ * destination, and this machine also prints 80 mm POS receipts with `margin: 0`
+ * (`pos-web`'s `renderInvoiceHtml`), so the setting really does travel.
+ *
+ * `.sheet` therefore carries the printable width itself and centres inside
+ * whatever page box it is given: identical to today when the margin survives,
+ * still correct when it does not.
+ */
+const PAGE_MARGIN_MM = 10;
+const PAPER_WIDTH_MM: Record<VoucherPrintPayload["paper"], number> = {
+  A4: 210,
+  A5: 148,
+};
+
 /** Grid columns a column occupies — the same `span` the workbook merges across. */
 function spanOf(column: DocumentColumn): number {
   return Math.max(1, column.span ?? 1);
@@ -124,6 +144,8 @@ export function renderVoucherHtml(payload: VoucherPrintPayload): string {
   // which is exactly what the reference printouts do.
   const lineColumns = payload.lineColumns.filter((column) => !column.hidden);
 
+  const sheetWidthMm = PAPER_WIDTH_MM[paper] - PAGE_MARGIN_MM * 2;
+
   const branchLines = branch
     ? [branch.name, branch.address, branch.phone].filter(
         (line): line is string => Boolean(line),
@@ -168,9 +190,10 @@ export function renderVoucherHtml(payload: VoucherPrintPayload): string {
     <meta charset="utf-8" />
     <title>${escapeHtml(title)} ${escapeHtml(docNo)}</title>
     <style>
-      @page { size: ${paper}; margin: 10mm; }
+      @page { size: ${paper}; margin: ${PAGE_MARGIN_MM}mm; }
       * { box-sizing: border-box; }
       html, body { margin: 0; padding: 0; color: #000; font-family: "Times New Roman", Times, serif; font-size: 13px; }
+      .sheet { width: ${sheetWidthMm}mm; max-width: 100%; margin: 0 auto; }
       .branch-line { text-align: left; }
       .branch-line.name { font-weight: bold; }
       h1 { text-align: center; font-size: 20px; margin: 14px 0 4px; text-transform: uppercase; }
@@ -198,19 +221,21 @@ export function renderVoucherHtml(payload: VoucherPrintPayload): string {
     </style>
   </head>
   <body>
-    ${branchLines.map((line, i) => `<div class="branch-line${i === 0 ? " name" : ""}">${escapeHtml(line)}</div>`).join("")}
-    <h1>${escapeHtml(title)}</h1>
-    <div class="doc-date">Ngày ${escapeHtml(docDate)}</div>
-    <div class="doc-no">Số: ${escapeHtml(docNo)}</div>
-    <div class="info-block">${infoRows}</div>
-    <table>
-      ${renderColgroup(lineColumns)}
-      <thead><tr>${headerCells}</tr></thead>
-      <tbody>${bodyRows}${renderTotalsRow(lineColumns, totals, totalsLabel)}</tbody>
-    </table>
-    ${amountInWordsBlock}
-    <div class="signing-date">${SIGNATURE_DATE_LINE}</div>
-    <div class="signature-row">${signatureCells}</div>
+    <div class="sheet">
+      ${branchLines.map((line, i) => `<div class="branch-line${i === 0 ? " name" : ""}">${escapeHtml(line)}</div>`).join("")}
+      <h1>${escapeHtml(title)}</h1>
+      <div class="doc-date">Ngày ${escapeHtml(docDate)}</div>
+      <div class="doc-no">Số: ${escapeHtml(docNo)}</div>
+      <div class="info-block">${infoRows}</div>
+      <table>
+        ${renderColgroup(lineColumns)}
+        <thead><tr>${headerCells}</tr></thead>
+        <tbody>${bodyRows}${renderTotalsRow(lineColumns, totals, totalsLabel)}</tbody>
+      </table>
+      ${amountInWordsBlock}
+      <div class="signing-date">${SIGNATURE_DATE_LINE}</div>
+      <div class="signature-row">${signatureCells}</div>
+    </div>
   </body>
 </html>`;
 }

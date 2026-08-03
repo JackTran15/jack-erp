@@ -214,6 +214,44 @@ describe("renderVoucherHtml", () => {
     expect(renderVoucherHtml(payload({ paper: "A5" }))).toContain("size: A5;");
   });
 
+  describe("printable width (.sheet)", () => {
+    it("sizes the sheet to the paper minus the margin on both sides", () => {
+      // 210 - 2×10 and 148 - 2×10. Hard-coding 190mm would overflow an A5
+      // treasury voucher, so the width has to follow `paper`.
+      expect(renderVoucherHtml(payload({ paper: "A4" }))).toContain(
+        ".sheet { width: 190mm;",
+      );
+      expect(renderVoucherHtml(payload({ paper: "A5" }))).toContain(
+        ".sheet { width: 128mm;",
+      );
+    });
+
+    it("centres the sheet, so a print dialog that drops the @page margin still leaves one", () => {
+      expect(renderVoucherHtml(payload())).toContain("margin: 0 auto;");
+    });
+
+    it("keeps the @page margin the sheet width was derived from", () => {
+      // The two are one number in the source; if they ever drift apart the
+      // sheet stops matching the page box and the centring silently shifts.
+      expect(renderVoucherHtml(payload())).toContain("margin: 10mm;");
+    });
+
+    it("wraps the whole voucher body in the sheet", () => {
+      const html = renderVoucherHtml(payload({ docNo: "IMP000064" }));
+
+      expect(html).toContain('<div class="sheet">');
+      // Everything from the branch block to the signatures sits inside it —
+      // anything left outside would print at the raw page-box width.
+      const sheet = html.slice(
+        html.indexOf('<div class="sheet">'),
+        html.indexOf("</body>"),
+      );
+      expect(sheet).toContain("IMP000064");
+      expect(sheet).toContain("<table>");
+      expect(sheet).toContain("signature-row");
+    });
+  });
+
   it("omits the amount-in-words block when absent, and words it the way the reference does", () => {
     expect(renderVoucherHtml(payload())).not.toContain("Số tiền viết bằng chữ");
 
