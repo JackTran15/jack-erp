@@ -99,6 +99,11 @@ export interface LocationStockItemsQuery {
   search?: string;
   sortBy?: "code" | "name" | "quantity" | "lastMovementAt";
   sortOrder?: "asc" | "desc";
+  // Per-column symbol filters
+  itemCode?: string;
+  itemCodeMode?: StringFilterMode;
+  itemName?: string;
+  itemNameMode?: StringFilterMode;
 }
 
 export async function listLocationStockItems(
@@ -112,6 +117,14 @@ export async function listLocationStockItems(
   if (query.search?.trim()) params.search = query.search.trim();
   if (query.sortBy) params.sortBy = query.sortBy;
   if (query.sortOrder) params.sortOrder = query.sortOrder;
+  if (query.itemCode?.trim()) {
+    params.itemCode = query.itemCode.trim();
+    if (query.itemCodeMode) params.itemCodeMode = query.itemCodeMode;
+  }
+  if (query.itemName?.trim()) {
+    params.itemName = query.itemName.trim();
+    if (query.itemNameMode) params.itemNameMode = query.itemNameMode;
+  }
 
   const { data } = await apiClient.get<StockByLocationResponse>(
     `/inventory/locations/${locationId}/stock-items`,

@@ -56,7 +56,7 @@ export function buildItemLocationColumns(
       key: "quantity",
       label: "Số lượng",
       width: 110,
-      filterKind: "symbol",
+      filterKind: "number-range",
       headerClassName: "text-right",
       className: "text-right tabular-nums",
       render: (r) => Number(r.quantity).toLocaleString("vi-VN"),
