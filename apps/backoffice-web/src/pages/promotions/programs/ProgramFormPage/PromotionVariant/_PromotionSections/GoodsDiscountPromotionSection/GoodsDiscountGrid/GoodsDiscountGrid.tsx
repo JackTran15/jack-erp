@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { Button, Input, MoneyInput } from "@erp/ui";
-import { Copy, Plus, Trash2 } from "lucide-react";
+import { Copy, Plus, PackageSearch, Trash2 } from "lucide-react";
+import { PromotionTargetPicker } from "../../../../../../components/PromotionTargetPicker/PromotionTargetPicker";
+import { mergeTargetsIntoGrid } from "../../../../../../components/PromotionTargetPicker/promotion-target";
 import {
   GOODS_DISCOUNT_METHOD_OPTIONS,
   blankGoodsDiscountRow,
@@ -23,6 +26,7 @@ const CELL_INPUT_CLASS =
 
 /** Bảng thiết lập giảm giá hàng hóa: hàng "Thiết lập" (phương thức) + bảng dòng hàng hóa. */
 export function GoodsDiscountGrid({ form, onChange }: Props) {
+  const [pickerOpen, setPickerOpen] = useState(false);
   const rows = form.goodsDiscountRows;
   const isGroup = form.goodsDiscountScope === GoodsDiscountScope.GROUP;
   const method = form.goodsDiscountMethod;
@@ -53,6 +57,22 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
     const next = [...rows];
     next.splice(index + 1, 0, copy);
     onChange({ goodsDiscountRows: next });
+  };
+
+  // FR-031 — phạm vi "Nhóm hàng hóa" chọn nhóm; còn lại chọn hàng hóa/mẫu mã.
+  const addFromPicker = (drafts: Parameters<typeof mergeTargetsIntoGrid>[1]) => {
+    onChange({
+      goodsDiscountRows: mergeTargetsIntoGrid<GoodsDiscountRow>(rows, drafts, {
+        targetIdOf: (row) => row.targetId,
+        isBlank: (row) => !row.targetId && !row.code.trim() && !row.name.trim(),
+        toRow: (draft) => ({
+          ...blankGoodsDiscountRow(),
+          targetId: draft.targetId,
+          code: draft.code,
+          name: draft.name,
+        }),
+      }),
+    });
   };
 
   const addRow = () => {
@@ -182,12 +202,30 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
         </table>
       </div>
 
-      <div className="px-3 py-2">
+      <div className="flex items-center gap-1 px-3 py-2">
         <Button type="button" variant="ghost" size="sm" onClick={addRow}>
           <Plus className="mr-1.5 h-4 w-4" />
           Thêm dòng
         </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setPickerOpen(true)}
+        >
+          <PackageSearch className="mr-1.5 h-4 w-4" />
+          {isGroup ? "Chọn nhóm hàng hóa" : "Chọn hàng hóa"}
+        </Button>
       </div>
+
+      <PromotionTargetPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        mode={isGroup ? "CATEGORY" : "PRODUCT_OR_ITEM"}
+        title={isGroup ? "Chọn nhóm hàng hóa" : "Chọn hàng hóa"}
+        selectedIds={new Set(rows.map((row) => row.targetId).filter(Boolean))}
+        onSelect={addFromPicker}
+      />
     </div>
   );
 }

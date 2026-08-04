@@ -1,4 +1,4 @@
-import type { PromotionApplyTo } from "./programs.types";
+import type { PromotionApplyTo, PromotionStatus } from "./programs.types";
 
 /** "Ngày tính KM" khi áp dụng cho khách hàng có sinh nhật. */
 export enum BirthdayDateMode {
@@ -236,6 +236,11 @@ export interface ProgramFormState {
   autoApply: boolean;
   /** BR-001 — thứ tự áp dụng khi nhiều CTKM chồng lấn, số nhỏ chạy trước. */
   priority: number;
+  /**
+   * FR-010 — chỉ sửa được ở chế độ Sửa; bản ghi mới luôn `TRACKING` và form
+   * Thêm mới không có radio trạng thái.
+   */
+  status: PromotionStatus;
   conditionType: ConditionType;
   minTotalAmount: number | "";
   calcBasis: CalcBasis;

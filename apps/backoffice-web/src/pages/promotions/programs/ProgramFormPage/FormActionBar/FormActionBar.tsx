@@ -7,6 +7,8 @@ interface Props {
   onCancel: () => void;
   /** "top" dùng border-bottom, "bottom" dùng border-top. */
   position: "top" | "bottom";
+  /** Chặn bấm lại khi request lưu đang bay. */
+  saveDisabled?: boolean;
 }
 
 /** Thanh hành động Lưu / Lưu và thêm mới / Hủy bỏ, lặp lại ở đầu và cuối form. */
@@ -15,6 +17,7 @@ export function FormActionBar({
   onSaveAndNew,
   onCancel,
   position,
+  saveDisabled = false,
 }: Props) {
   return (
     <div
@@ -23,11 +26,16 @@ export function FormActionBar({
         position === "top" ? "border-b" : "border-t",
       )}
     >
-      <Button type="button" onClick={onSave}>
+      <Button type="button" onClick={onSave} disabled={saveDisabled}>
         <Save className="mr-1.5 h-4 w-4" />
         Lưu
       </Button>
-      <Button type="button" variant="outline" onClick={onSaveAndNew}>
+      <Button
+        type="button"
+        variant="outline"
+        onClick={onSaveAndNew}
+        disabled={saveDisabled}
+      >
         <Plus className="mr-1.5 h-4 w-4" />
         Lưu và thêm mới
       </Button>

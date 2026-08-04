@@ -26,7 +26,7 @@ import {
   TierDiscountUnit,
   TierTarget,
 } from "./program-form.types";
-import { PromotionApplyTo } from "./programs.constants";
+import { PromotionApplyTo, PromotionStatus } from "./programs.constants";
 
 /** Bề rộng cột label dùng chung cho các FormField horizontal của form KM. */
 export const FORM_LABEL_WIDTH = "11rem";
@@ -228,6 +228,7 @@ export function buildInitialFormState(): ProgramFormState {
     buyGetGiftRows: [blankBuyGetRow()],
     autoApply: true,
     priority: 100,
+    status: PromotionStatus.TRACKING,
     conditionType: ConditionType.NONE,
     minTotalAmount: 0,
     calcBasis: CalcBasis.ALL_ITEMS,

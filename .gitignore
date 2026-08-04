@@ -18,6 +18,13 @@ test_logs/
 .code-review-graph/
 graphify-out
 
+# AI-DLC generated artifacts — functions of the tickets, rebuilt by uow_graph.py --write.
+# Everything with judgement in it (intent, assumptions, requirements, design, UoW, tickets,
+# gate state) stays tracked.
+.ai/features/*/05-ticket-graph.md
+.ai/features/*/06-traceability.md
+.ai/features/*/registry.yaml
+
 # ai-dlc-verify: local-only skill, its generated evidence, and its secrets.
 # `.env.*` above does not cover credentials.env — that pattern matches a basename
 # beginning with .env, not one ending in it.

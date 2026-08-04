@@ -36,6 +36,7 @@ const actor: ActorContext = { userId: 'user-1', organizationId: 'org-1', branchI
 
 function aVoucherRow(overrides: Partial<VoucherEntity> = {}): Partial<VoucherEntity> {
   return {
+    id: 'voucher-1',
     code: 'V1',
     issuer: 'Shop A',
     description: undefined,
@@ -76,6 +77,17 @@ describe('SearchVouchersV2Handler', () => {
     expect(result.data).toEqual([
       expect.objectContaining({ code: 'V1', totalQuantity: 1, totalVoucherValue: 150_000, totalAppliedValue: 0 }),
     ]);
+  });
+
+  // Without an id the toolbar cannot call PUT/duplicate/DELETE on the selected
+  // row — the 10 display columns of FR-050 alone are not enough to act on a row.
+  it('carries the row id so the client can edit, duplicate or deactivate it', async () => {
+    const { repo } = makeQueryBuilderRepo([aVoucherRow({ id: 'voucher-42', code: 'V9' })]);
+    const handler = new SearchVouchersV2Handler(repo as any);
+
+    const result = await handler.execute(new SearchVouchersV2Query({}, actor));
+
+    expect(result.data[0]).toMatchObject({ id: 'voucher-42', code: 'V9' });
   });
 
   it('counts totalAppliedValue only for used vouchers', async () => {

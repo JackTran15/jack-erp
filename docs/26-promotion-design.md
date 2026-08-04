@@ -508,4 +508,87 @@ Tương tự, `BUY_M_GET_N` không có chỗ chứa "m"/"n" toàn cục (`buy_qu
 
 ## 11. Kịch bản kiểm thử
 
-*(bổ sung ở TKT-KM-16 sau khi FE + e2e hoàn tất — không thuộc phạm vi ticket này.)*
+### 11.1 Tự động
+
+| Tầng | File | Phủ |
+| --- | --- | --- |
+| Domain | `modules/promotion/domain/**/*.spec.ts` | 5 strategy, condition evaluator, resolver 3 pha, `CartState` |
+| Application | `modules/promotion/application/**/*.spec.ts` | 5 command handler, `SearchPromotionsV2`, `SearchVouchersV2`, `EvaluateCart` |
+| FE mapper | `pages/promotions/api/promotion.mapper.spec.ts` | round-trip form ↔ payload cho cả 5 hình thức |
+| FE target | `pages/promotions/components/PromotionTargetPicker/promotion-target.spec.ts` | `toPromotionTargets`, `mergeTargetsIntoGrid`, `promoPrice` |
+| E2E CRUD | `test/e2e/promotion-crud.e2e-spec.ts` | AC-15…AC-21, AC-23 |
+| E2E engine | `test/e2e/promotion-evaluate.e2e-spec.ts` | AC-01, AC-03…AC-09, AC-12…AC-14, AC-22, AC-25, AC-26, AC-29 |
+| E2E voucher | `test/e2e/voucher-crud.e2e-spec.ts` | AC-24, phần voucher của AC-17/AC-19 |
+
+Chạy e2e **bắt buộc** truyền DB đích tường minh:
+
+```bash
+DB_NAME=erp_test REDIS_HOST=localhost REDIS_PORT=6380 REDIS_PASSWORD=erp_redis_secret \
+OUTBOX_RELAY_DISABLED=1 \
+pnpm --filter @erp/api exec jest --config ./test/e2e/jest-e2e.config.ts \
+  --testPathPattern "promotion-crud|promotion-evaluate|voucher-crud"
+```
+
+Ba biến không được bỏ:
+
+- **`DB_NAME=erp_test`** — `global-setup.ts` nạp `apps/api/.env` (`DB_NAME=erp_dev`) và `resetDatabase()` gọi `synchronize(true)`. Chạy trần sẽ **xóa sạch DB dev**. dotenv không ghi đè biến môi trường đã đặt, nên override này thắng.
+- **`OUTBOX_RELAY_DISABLED=1`** — relay poll mỗi 2s; trúng lúc `synchronize(true)` đang drop bảng thì ném `relation "outbox_messages" does not exist` và Jest báo *"Test suite failed to run"* dù mọi test đã xanh.
+- **`REDIS_*`** — `RbacService` cache tập quyền 300s ở `perms:<userId>:<orgId>`. Seed đã gọi `invalidateUserPermissions` sau khi cấp quyền, nhưng vẫn cần trỏ đúng Redis của docker stack.
+
+`beforeAll` để 300s: boot `AppModule` bắt tay toàn bộ consumer Kafka, đo được ~130s trên stack docker local (sync schema chỉ ~2s). `afterAll` để 120s vì `app.close()` ngắt từng consumer.
+
+> **`resetDatabase()` chỉ xóa Postgres — Redis sống sót qua mọi lần chạy.** Đã cắn hai lần:
+> 1. Tập quyền cache ở `perms:<userId>:<orgId>` → mọi request 403 dù `role_permissions` đã có
+>    đủ dòng. Seed phải `invalidateUserPermissions` sau khi cấp quyền.
+> 2. `X-Idempotency-Key` **cố định** → lần chạy sau replay đúng response 201 của lần trước và
+>    **không ghi gì**; test vẫn xanh ở mọi assertion về replay trong khi bảng rỗng. Key phải
+>    duy nhất mỗi lần chạy (`` `e2e-…-${Date.now()}` ``).
+>
+> Quy tắc chung: state nào nằm ngoài Postgres thì `resetDatabase` không dọn — phải tự lo.
+
+**Đổi chi nhánh phải qua `POST /auth/switch-branch`, không phải header.** `AuthService` luôn
+nhét `branchId = branchIds[0]` vào JWT và `actor-context.decorator.ts` giải theo
+`jwt > header > branchIds[0]`, nên nhánh header là code chết với mọi token từ `/auth/login`.
+Muốn "nhìn từ chi nhánh khác": gán `user_branch_assignments` → đăng nhập lại → `switch-branch`
+→ dùng token trả về (A-34).
+
+### 11.2 Thủ công (backoffice)
+
+Điều kiện: đăng nhập bằng tài khoản có `promotion.read/write/delete`; **Quản lý chi nhánh** cũng phải làm được toàn bộ mục dưới.
+
+**A. Danh sách CTKM** — `/promotions/programs`
+
+1. Mở màn hình → danh sách server-side, thứ tự **cố định `priority` tăng dần** (BR-001). Không có mũi tên sắp xếp trên đầu cột — đây là chủ ý, không phải thiếu.
+2. Gõ vào ô tìm kiếm → chỉ **một** request sau ~300ms (debounce), không phải mỗi ký tự một request.
+3. Lọc theo từng cột → mỗi bộ lọc hiện một chip; xóa chip → kết quả trở lại.
+4. **CTKM để trống ngày bắt đầu/kết thúc vẫn phải hiện** khi lọc theo khoảng ngày (A-29 — điều kiện ngày là NULL-tolerant).
+5. Trạng thái chỉ có hai giá trị API hiểu: *Đang theo dõi* / *Ngừng theo dõi*.
+
+**B. Form CTKM** — đủ 5 hình thức
+
+6. Thêm mới → đổi hình thức trên dropdown → phần điều kiện/khuyến mại đổi theo, dữ liệu đã nhập của hình thức cũ không rò sang.
+7. Lưu thiếu trường bắt buộc → lỗi hiện **tại từng ô**, không phải một toast chung.
+8. Lưu xong → mở lại bản ghi → mọi trường đúng như lúc lưu (round-trip).
+9. **Mua m tặng n**: ô *m* ở cột điều kiện, ô *n* chỉ hiện khi chọn *Tặng hàng rẻ nhất*, nhãn “Tặng [n] hàng hóa rẻ nhất trong số đó”. Ở chế độ này lưới hàng tặng thay bằng ghi chú giải thích — engine chỉ đọc dòng `CONDITION`.
+10. **Giảm giá theo mức**: trộn `PERCENT` và `AMOUNT` giữa các mức → hiện cảnh báo (BR-003, mục 10.5).
+11. **Nhân bản**: mở form mới đã điền sẵn, **chưa ghi gì** cho tới khi bấm Lưu (FR-008).
+12. Sửa bản ghi đã lưu → **không đổi được Hình thức** (`type` bất biến).
+
+**C. Chọn hàng hóa** — cả 6 lưới
+
+13. Mỗi lưới đều mở được dialog chọn; chọn hỗn hợp hàng hóa / mẫu mã / nhóm hàng.
+14. Chọn nhóm hàng → CTKM chạm tới hàng ở **nhóm con** (AC-25).
+15. Chọn lại lần hai → giữ nguyên lựa chọn cũ, không nhân đôi dòng.
+
+**D. Voucher** — `/promotions/vouchers`
+
+16. Tạo voucher → thấy trong danh sách, **dòng tổng cộng** cộng trên toàn bộ tập đã lọc chứ không riêng trang hiện tại.
+17. Trùng mã → lỗi 409 hiện **tại ô `Voucher`**, không phải toast lỗi máy chủ.
+18. Nhân bản → dialog điền sẵn nhưng **để trống mã** (A-16: mã nhập tay).
+19. Ngừng theo dõi → badge đổi sang *Ngừng theo dõi* **và** voucher hết dùng được ở POS (A-31 — hai cờ `status` + `isActive` phải đổi cùng nhau).
+
+**E. Đối chiếu số học** — POS
+
+20. Giỏ một mặt hàng 685.000, CTKM giảm 30% → giảm **205.500**, còn **479.500** (AC-01).
+21. Hai CTKM cùng chạm một dòng → chỉ CTKM `priority` nhỏ hơn được áp, cái còn lại báo `RESOURCE_TAKEN` (BR-001).
+22. CTKM hóa đơn phạm vi *Chỉ hàng chưa khuyến mại* → chỉ tính trên phần dòng chưa bị CTKM hàng hóa chiếm (BR-002).

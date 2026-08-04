@@ -129,8 +129,40 @@ describe('SearchPromotionsV2Handler', () => {
       new SearchPromotionsV2Query({ startDate: { from: '2026-01-01' }, endDate: { to: '2026-12-31' } }, actorWithBranch()),
     );
 
-    expect(whereCalls.some((c) => c.sql.startsWith('p.startDate >='))).toBe(true);
+    expect(whereCalls.some((c) => c.sql.includes('p.startDate >='))).toBe(true);
     expect(whereCalls.some((c) => c.sql.includes('p.endDate <'))).toBe(true);
+  });
+
+  // An open-ended promotion (BR-003 allows both dates to be null) belongs to
+  // every period. A plain `col >= :from` would drop it, because `NULL >= x` is
+  // NULL — that is exactly what hid KM000001 from the list on 2026-08-03.
+  it('keeps NULL dates inside every period range', async () => {
+    const { repo, whereCalls } = makeQueryBuilderRepo({ data: [], total: 0 });
+    const handler = new SearchPromotionsV2Handler(repo as any);
+
+    await handler.execute(
+      new SearchPromotionsV2Query(
+        { startDate: { from: '2026-01-01', to: '2026-12-31' }, endDate: { from: '2026-01-01' } },
+        actorWithBranch(),
+      ),
+    );
+
+    const dateClauses = whereCalls.filter((c) => /p\.(startDate|endDate)/.test(c.sql));
+    expect(dateClauses).toHaveLength(3);
+    for (const clause of dateClauses) {
+      expect(clause.sql).toMatch(/IS NULL OR/);
+    }
+    // `to` stays inclusive of the whole day, same convention as FilterBuilder.
+    expect(whereCalls.some((c) => c.sql.includes("INTERVAL '1 day'"))).toBe(true);
+  });
+
+  it('leaves date columns unfiltered when no period is supplied', async () => {
+    const { repo, whereCalls } = makeQueryBuilderRepo({ data: [], total: 0 });
+    const handler = new SearchPromotionsV2Handler(repo as any);
+
+    await handler.execute(new SearchPromotionsV2Query({}, actorWithBranch()));
+
+    expect(whereCalls.some((c) => /p\.(startDate|endDate)/.test(c.sql))).toBe(false);
   });
 
   it('defaults to page 1, limit 50, and sorts by priority ASC then createdAt DESC', async () => {

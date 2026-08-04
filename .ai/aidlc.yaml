@@ -1,8 +1,19 @@
-profile: none
-ruleset: 4
+# AI-DLC configuration for jack-erp.
+# Read by ai-dlc-core/scripts/{aidlc,uow_graph}.py.
+
+profile: none              # no stack profile written for NestJS + React yet; core-only
+ruleset: 4                 # pins the rules this plan was authored under
+
 # Layer vocabulary for jack-erp tickets. Derived from the repo's actual NestJS
 # module convention (entity / migration / service / consumer / controller-dto)
-# plus the React SPA layer, not from a generic DDD default.
+# plus the React SPA layer, not from a generic DDD default. See .ai/architecture.md
+# "Layer vocabulary observed":
+#   domain      — pure TS, no @nestjs/*, no typeorm (modules/promotion/domain)
+#   application — CQRS handlers, DTOs, mappers (modules/promotion/application)
+#   infra       — TypeORM entities, repositories, migrations
+#   api         — HTTP controllers, OpenAPI surface, generated api-client
+#   web         — backoffice-web / pos-web React code
+#   test        — unit and e2e suites
 layers: [entity, migration, service, consumer, api, frontend, test, domain, application, api, infra, web, shared, test]
 
 # Browser verification (ai-dlc-verify). Two frontends, so two environments rather than one:

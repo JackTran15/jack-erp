@@ -16,6 +16,8 @@ export interface VoucherSearchFilters {
 
 /** One row of `POST /v2/vouchers/search` — mirrors `VoucherSummaryRow` (apps/api); the 3 totals are computed in RAM, not stored columns (FR-050). */
 export interface VoucherSummaryRow {
+  /** Định danh dòng — thanh công cụ cần nó để gọi PUT/duplicate/DELETE (T-06-04). */
+  id: string;
   issuer?: string;
   code: string;
   startDate?: string;

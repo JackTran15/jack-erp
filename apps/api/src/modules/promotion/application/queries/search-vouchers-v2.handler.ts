@@ -8,6 +8,14 @@ import { toIsoDate } from '../date-format.util';
 import { SearchVouchersV2Query } from './search-vouchers-v2.query';
 
 export interface VoucherSummaryRow {
+  /**
+   * Identifies the row for update/duplicate/deactivate. Rows are grouped by
+   * `code`, so this is the id of the group's representative — unambiguous today
+   * because `uq_voucher_org_code` plus the one-row-per-voucher model means every
+   * group holds exactly one voucher. Revisit what "edit this code" means before
+   * introducing batch issuance, where a code would span several rows.
+   */
+  id: string;
   issuer?: string;
   code: string;
   startDate?: string;
@@ -79,6 +87,7 @@ export class SearchVouchersV2Handler implements IQueryHandler<SearchVouchersV2Qu
       const totalAppliedValue = groupRows.filter((r) => r.isUsed).reduce((sum, r) => sum + Number(r.faceValue), 0);
 
       return {
+        id: first.id,
         issuer: first.issuer,
         code: first.code,
         startDate: toIsoDate(first.validFrom),

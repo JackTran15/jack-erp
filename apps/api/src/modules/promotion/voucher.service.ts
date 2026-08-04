@@ -8,6 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager } from 'typeorm';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
+import { PromotionStatus } from '@erp/shared-interfaces';
 import { VoucherEntity } from './voucher.entity';
 import { CreateVoucherDto } from './dto/create-voucher.dto';
 
@@ -122,9 +123,20 @@ export class VoucherService {
     return this.repo.save(entity);
   }
 
+  /**
+   * Stops a voucher from being tracked *and* from being redeemed.
+   *
+   * A voucher carries two independent "still valid" flags: `isActive` is the
+   * legacy gate `validate()`/`markUsed()` enforce at the till, while `status` is
+   * what the list, the filter and the badge show. Flipping only `isActive` made
+   * the button lie — the voucher stopped working at the till while the screen
+   * kept reporting it as tracked. Merging the two flags belongs to the POS epic;
+   * `isActive` is part of the legacy layer ADR-04 leaves untouched here.
+   */
   async deactivate(id: string, actor: ActorContext): Promise<VoucherEntity> {
     const entity = await this.findOne(id, actor);
     entity.isActive = false;
+    entity.status = PromotionStatus.STOPPED;
     return this.repo.save(entity);
   }
 

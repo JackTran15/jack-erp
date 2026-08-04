@@ -6,26 +6,29 @@ import type {
   ColumnFilter,
   ColumnFilterMode,
 } from "../../../../components/table/pagination.dto";
+import { PromotionStatus } from "@erp/shared-interfaces";
 import {
   VOUCHER_STATUS_LABELS,
   VOUCHER_STATUS_OPTIONS,
 } from "../vouchers.constants";
-import type { VoucherRow, VoucherStatus } from "../vouchers.types";
+import type {
+  VoucherSearchResponse,
+  VoucherSummaryRow,
+} from "../../api/use-vouchers";
 
 interface Props {
-  rows: VoucherRow[];
+  rows: VoucherSummaryRow[];
   loading: boolean;
+  /** Tổng của **toàn tập kết quả lọc**, do server tính — không phải tổng trang hiện tại. */
+  summary?: VoucherSearchResponse["summary"];
   selectedIds: Set<string>;
   allSelected: boolean;
   onToggleAll: (checked: boolean) => void;
   onToggleRow: (id: string) => void;
-  onOpenVoucher: (row: VoucherRow) => void;
+  onOpenVoucher: (row: VoucherSummaryRow) => void;
   columnFilters: Record<string, ColumnFilter>;
   onFilterModeChange: (key: string, mode: ColumnFilterMode) => void;
   onFilterValueChange: (key: string, value: string) => void;
-  sortBy?: string;
-  sortOrder?: "asc" | "desc";
-  onSort: (key: string) => void;
 }
 
 const numberFormatter = new Intl.NumberFormat("vi-VN");
@@ -38,9 +41,9 @@ function formatDateVi(iso?: string): string {
   return `${day}/${month}/${year}`;
 }
 
-const STATUS_BADGE_VARIANT: Record<VoucherStatus, "default" | "secondary"> = {
-  TRACKING: "default",
-  STOPPED: "secondary",
+const STATUS_BADGE_VARIANT: Record<PromotionStatus, "default" | "secondary"> = {
+  [PromotionStatus.TRACKING]: "default",
+  [PromotionStatus.STOPPED]: "secondary",
 };
 
 const NUMERIC_CELL_CLASS = "text-right tabular-nums";
@@ -48,6 +51,7 @@ const NUMERIC_CELL_CLASS = "text-right tabular-nums";
 export function VouchersTable({
   rows,
   loading,
+  summary,
   selectedIds,
   allSelected,
   onToggleAll,
@@ -56,11 +60,8 @@ export function VouchersTable({
   columnFilters,
   onFilterModeChange,
   onFilterValueChange,
-  sortBy,
-  sortOrder,
-  onSort,
 }: Props) {
-  const columns = useMemo<TableColumn<VoucherRow>[]>(
+  const columns = useMemo<TableColumn<VoucherSummaryRow>[]>(
     () => [
       {
         key: "issuer",
@@ -129,6 +130,8 @@ export function VouchersTable({
         filterKind: "number-range",
         className: NUMERIC_CELL_CLASS,
         render: (row) => numberFormatter.format(row.totalQuantity),
+        // Tổng của toàn tập kết quả lọc, do server tính — không phải tổng trang.
+        footer: summary ? numberFormatter.format(summary.totalQuantity) : null,
       },
       {
         key: "totalVoucherValue",
@@ -138,6 +141,8 @@ export function VouchersTable({
         filterKind: "number-range",
         className: NUMERIC_CELL_CLASS,
         render: (row) => numberFormatter.format(row.totalVoucherValue),
+        // Tổng của toàn tập kết quả lọc, do server tính — không phải tổng trang.
+        footer: summary ? numberFormatter.format(summary.totalVoucherValue) : null,
       },
       {
         key: "totalAppliedValue",
@@ -147,6 +152,8 @@ export function VouchersTable({
         filterKind: "number-range",
         className: NUMERIC_CELL_CLASS,
         render: (row) => numberFormatter.format(row.totalAppliedValue),
+        // Tổng của toàn tập kết quả lọc, do server tính — không phải tổng trang.
+        footer: summary ? numberFormatter.format(summary.totalAppliedValue) : null,
       },
       {
         key: "status",
@@ -161,7 +168,7 @@ export function VouchersTable({
         ),
       },
     ],
-    [onOpenVoucher],
+    [onOpenVoucher, summary],
   );
 
   return (
@@ -172,9 +179,6 @@ export function VouchersTable({
       emptyLabel="Không có dữ liệu."
       getRowKey={(row) => row.id}
       onRowClick={(row) => onToggleRow(row.id)}
-      sortBy={sortBy}
-      sortOrder={sortOrder}
-      onSort={onSort}
       columnFilterControl={{
         filters: columnFilters,
         onModeChange: onFilterModeChange,

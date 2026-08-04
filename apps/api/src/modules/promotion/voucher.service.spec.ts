@@ -7,6 +7,7 @@ import {
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
+import { PromotionStatus } from '@erp/shared-interfaces';
 import { VoucherEntity } from './voucher.entity';
 import { VoucherService } from './voucher.service';
 
@@ -30,6 +31,7 @@ const voucherStub = (overrides: Partial<VoucherEntity> = {}): VoucherEntity =>
     isUsed: false,
     redeemedInvoiceId: undefined,
     isActive: true,
+    status: PromotionStatus.TRACKING,
     createdBy: 'user-1',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -334,6 +336,32 @@ describe('VoucherService', () => {
       expect(mockManagerRepo.update).toHaveBeenCalledWith(
         { id: 'voucher-1', isUsed: false, isActive: true },
         { isUsed: true, redeemedInvoiceId: 'invoice-1' },
+      );
+    });
+  });
+
+  // Voucher mang hai cờ "còn hiệu lực": `isActive` là cổng chặn ở quầy
+  // (`validate`/`markUsed` đọc), còn `status` là cái danh sách/bộ lọc/badge hiển
+  // thị. Hạ mỗi `isActive` thì thẻ hết dùng được mà màn hình vẫn báo đang theo dõi.
+  describe('deactivate', () => {
+    it('lowers both the legacy redemption gate and the displayed status', async () => {
+      const entity = voucherStub({ isActive: true, status: PromotionStatus.TRACKING });
+      repo.findOne.mockResolvedValue(entity);
+      repo.save.mockImplementation(async (v: VoucherEntity) => v);
+
+      const result = await service.deactivate('voucher-1', actor);
+
+      expect(result.isActive).toBe(false);
+      expect(result.status).toBe(PromotionStatus.STOPPED);
+    });
+
+    it('keeps rejecting a deactivated voucher at validate()', async () => {
+      repo.findOne.mockResolvedValue(
+        voucherStub({ isActive: false, status: PromotionStatus.STOPPED }),
+      );
+
+      await expect(service.validate('VOUCHER100', undefined, actor)).rejects.toThrow(
+        BadRequestException,
       );
     });
   });
