@@ -80,4 +80,12 @@ export class InvoiceItemEntity extends BaseEntity {
 
   @Column({ name: 'sort_order', type: 'int', default: 0, comment: 'Display ordering of lines within the invoice' })
   sortOrder: number;
+
+  // --- checkout-saga (UOW-04, T-04-02): additive columns, v1 neither reads
+  // nor writes either one (A-12) — do not touch anything else in this file.
+  @Column({ type: 'boolean', default: false, name: 'is_gift' })
+  isGift: boolean;
+
+  @Column({ type: 'uuid', nullable: true, name: 'promotion_program_id' })
+  promotionProgramId?: string;
 }

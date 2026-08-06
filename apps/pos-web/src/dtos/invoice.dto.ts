@@ -90,6 +90,30 @@ export interface CheckoutInvoiceBody {
   creditDays?: number;
 }
 
+/**
+ * Body cho `POST /v2/pos/checkout` — luồng checkout saga (T-05-03, cờ
+ * `VITE_CHECKOUT_V2`). Khác `CheckoutInvoiceBody`: `invoiceId` nằm trong
+ * body vì endpoint không có `:id` trên path.
+ */
+export interface CheckoutV2Body {
+  invoiceId: string;
+  payments: InvoicePaymentLineBody[];
+  dueDate?: string;
+  creditDays?: number;
+}
+
+/**
+ * Đáp trả thô của `POST /v2/pos/checkout` — KHÔNG phải `InvoiceRow` đầy đủ,
+ * chỉ tổng kết saga. `invoiceService.checkout` tự gọi lại `getById` sau khi
+ * commit để lấy đúng hình dạng phần còn lại của app đang mong đợi.
+ */
+export interface CheckoutV2Response {
+  committed: boolean;
+  invoiceId: string;
+  sagaId: string;
+  documentNumber?: string;
+}
+
 // ─── Return / Exchange (EPIC-011) ──────────────────────────────────────────
 // Đơn trả/đổi dùng endpoint riêng (không phải `type` trên POST /invoices):
 //   POST /invoices/returns      — tạo draft RETURN (mode quick|regular)

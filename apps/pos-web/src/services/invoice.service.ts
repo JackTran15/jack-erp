@@ -3,6 +3,8 @@ import type {
   CancelInvoiceBody,
   CheckoutInvoiceBody,
   CheckoutReturnBody,
+  CheckoutV2Body,
+  CheckoutV2Response,
   CreateExchangeInvoiceBody,
   CreateInvoiceBody,
   CreateReturnInvoiceBody,
@@ -74,11 +76,32 @@ export const invoiceService = {
     return http.get<Paginated<InvoiceRow>>(`/invoices${suffix}`);
   },
 
-  checkout: (id: string, body: CheckoutInvoiceBody): Promise<InvoiceRow> =>
-    http.post<InvoiceRow>(
+  /**
+   * `VITE_CHECKOUT_V2=true` → `POST /v2/pos/checkout` (saga mới, T-05-01..04);
+   * mặc định → `POST /invoices/:id/checkout` (luồng cũ). Chữ ký hàm không đổi
+   * nên `use-query-invoice.ts` (chỗ gọi duy nhất, A-08) không phải sửa gì —
+   * đó là toàn bộ lý do cờ nằm ở tầng service chứ không ở tầng hook.
+   *
+   * `/v2/pos/checkout` không trả `InvoiceRow` đầy đủ, chỉ tổng kết saga
+   * (`CheckoutV2Response`) — gọi lại `getById` sau khi commit để trả đúng
+   * hình dạng phần còn lại của app đang mong đợi, giống hệt luồng cũ.
+   */
+  checkout: async (id: string, body: CheckoutInvoiceBody): Promise<InvoiceRow> => {
+    if (import.meta.env.VITE_CHECKOUT_V2 === "true") {
+      const v2Body: CheckoutV2Body = {
+        invoiceId: id,
+        payments: body.payments,
+        dueDate: body.dueDate,
+        creditDays: body.creditDays,
+      };
+      await http.post<CheckoutV2Response>("/v2/pos/checkout", v2Body);
+      return http.get<InvoiceRow>(`/invoices/${encodeURIComponent(id)}`);
+    }
+    return http.post<InvoiceRow>(
       `/invoices/${encodeURIComponent(id)}/checkout`,
       body,
-    ),
+    );
+  },
 
   delete: (id: string): Promise<void> =>
     http.delete<void>(`/invoices/${encodeURIComponent(id)}`),
