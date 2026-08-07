@@ -57,6 +57,7 @@ import {
   selectMetaDraft,
   selectPaymentDraft,
   selectPointsDiscountAmount,
+  selectPromotionDiscountAmount,
   selectPromotionDraft,
   selectPurchaseCart,
   selectReturnCart,
@@ -134,6 +135,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
 
       const grandTotal = selectGrandTotal(sessionState);
       const pointsDiscountAmount = selectPointsDiscountAmount(sessionState);
+      const promotionDiscountAmount = selectPromotionDiscountAmount(sessionState);
       const pointsToRedeem = selectEffectivePointsRedeemed(sessionState);
       const {
         settlementGrandTotal,
@@ -146,6 +148,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
         deposit: p.deposit,
         returnFee: p.returnFee,
         pointsDiscountAmount,
+        promotionDiscountAmount,
         paymentLines: p.paymentLines,
         keepChange: p.keepChange,
         debt: p.debt,

@@ -79,6 +79,10 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "pos.session.approve_variance", module: "pos" },
   { key: "pos.promotion.read", module: "pos" },
   { key: "pos.promotion.write", module: "pos" },
+  // Cashier-scoped counterpart of the back-office `promotion.read`: lets the
+  // till price a cart without granting read access to the whole promotion
+  // catalogue.
+  { key: "pos.promotion.evaluate", module: "pos" },
 
   // Accounting
   { key: "accounting.journal.post", module: "accounting" },

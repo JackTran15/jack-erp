@@ -8,6 +8,7 @@ import {
   selectHasAnyCartLines,
   selectPaymentDraft,
   selectPointsDiscountAmount,
+  selectPromotionDiscountAmount,
   selectReturnCart,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
@@ -40,6 +41,9 @@ export function useCheckoutCollectState(): UseCheckoutCollectStateResult {
   const pointsDiscountAmount = usePosCheckoutSessionStore(
     selectPointsDiscountAmount,
   );
+  const promotionDiscountAmount = usePosCheckoutSessionStore(
+    selectPromotionDiscountAmount,
+  );
   const { deposit, returnFee, paymentLines, keepChange, debt } =
     usePosCheckoutSessionStore(selectPaymentDraft);
 
@@ -50,6 +54,7 @@ export function useCheckoutCollectState(): UseCheckoutCollectStateResult {
         deposit,
         returnFee,
         pointsDiscountAmount,
+        promotionDiscountAmount,
         paymentLines,
         keepChange,
         debt,
@@ -59,6 +64,7 @@ export function useCheckoutCollectState(): UseCheckoutCollectStateResult {
       deposit,
       returnFee,
       pointsDiscountAmount,
+      promotionDiscountAmount,
       paymentLines,
       keepChange,
       debt,

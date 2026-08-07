@@ -42,9 +42,15 @@ export class PromotionV2Controller {
     return this.queryBus.execute(new GetPromotionQuery(id, actor));
   }
 
+  /**
+   * Prices a cart without writing anything. Accepts either the back-office
+   * `promotion.read` or the cashier-scoped `pos.promotion.evaluate`, because
+   * the till needs this endpoint but must not inherit read access to the
+   * whole promotion catalogue.
+   */
   @Post('evaluate')
   @Version('2')
-  @RequirePermission('promotion.read')
+  @RequirePermission(['promotion.read', 'pos.promotion.evaluate'])
   @RequireBranchScope()
   evaluate(@Body() dto: EvaluateCartDto, @Actor() actor: ActorContext) {
     return this.queryBus.execute(new EvaluateCartQuery(dto, actor));

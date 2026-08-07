@@ -87,6 +87,11 @@ export function deriveSettlement(input: {
    * khác để 0 (xem `selectEffectivePointsRedeemed`).
    */
   pointsDiscountAmount?: number;
+  /**
+   * Tiền giảm CTKM từ preview `evaluate` (xem `selectPromotionDiscountAmount`).
+   * Chỉ > 0 khi preview đã `ready`; cùng vai trò với `pointsDiscountAmount`.
+   */
+  promotionDiscountAmount?: number;
   paymentLines: ReadonlyArray<{ amount: number }>;
   keepChange: boolean;
   debt: boolean;
@@ -95,7 +100,8 @@ export function deriveSettlement(input: {
     input.grandTotal -
     input.deposit +
     (input.returnFee ?? 0) -
-    (input.pointsDiscountAmount ?? 0);
+    (input.pointsDiscountAmount ?? 0) -
+    (input.promotionDiscountAmount ?? 0);
   const settlementAbs = settlementAbsFromGrand(settlementGrandTotal);
   const totalPaid = input.paymentLines.reduce((sum, l) => sum + l.amount, 0);
   const { changeAmount, shortageAmount, debtAmount } = derivePaymentDisplay({

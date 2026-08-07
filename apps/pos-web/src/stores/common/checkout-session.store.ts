@@ -15,6 +15,7 @@ import type {
   CheckoutMetaDraft,
   CheckoutPaymentDraft,
   CheckoutPromotionDraft,
+  CheckoutPromotionPreview,
   DraftInvoice,
 } from "@erp/pos/interfaces/checkout.interface";
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
@@ -854,6 +855,33 @@ export function selectPromotionDraft(
   state: PosCheckoutSessionState,
 ): CheckoutPromotionDraft {
   return selectActiveDraft(state).promotion;
+}
+
+/**
+ * Kết quả `evaluate` của tab đang mở. Mọi thành phần UI hiển thị tiền khuyến
+ * mại phải đọc từ đây — không component nào được tự gọi API hay tự tính lại,
+ * nếu không hai chỗ trên cùng một màn hình sẽ hiện hai con số khác nhau.
+ */
+export function selectPromotionPreview(
+  state: PosCheckoutSessionState,
+): CheckoutPromotionPreview {
+  return selectActiveDraft(state).promotionPreview;
+}
+
+/**
+ * Tiền giảm CTKM (VND) từ preview `evaluate`. Chỉ > 0 khi slice đã `ready` —
+ * `loading`/`unavailable`/`idle` trả 0, để settlement không đoán số trong lúc
+ * chưa có kết quả hoặc khi preview hỏng (AC-03: lỗi preview không được hiện
+ * sai số, chỉ được hiện "chưa tính được"). Cùng vai trò với
+ * `selectPointsDiscountAmount`: trừ ở tầng settlement, không đụng `grandTotal`
+ * — "Tổng tiền" vẫn hiện giá gốc trước khuyến mại.
+ */
+export function selectPromotionDiscountAmount(
+  state: PosCheckoutSessionState,
+): number {
+  const preview = selectPromotionPreview(state);
+  if (preview.status !== "ready" || !preview.data) return 0;
+  return preview.data.promotionDiscount;
 }
 
 export function selectLabelsDraft(

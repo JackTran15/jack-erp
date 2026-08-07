@@ -19,12 +19,19 @@ export class PermissionGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredPermission = this.reflector.getAllAndOverride<string>(
+    const declared = this.reflector.getAllAndOverride<string | string[]>(
       REQUIRE_PERMISSION_KEY,
       [context.getHandler(), context.getClass()],
     );
 
-    if (!requiredPermission) return true;
+    if (!declared) return true;
+
+    // A single key and a list of keys are the same thing to the check below;
+    // several keys mean OR. Normalising here (rather than in the decorator)
+    // keeps the metadata readable as written when debugging.
+    const requiredPermissions = Array.isArray(declared) ? declared : [declared];
+
+    if (requiredPermissions.length === 0) return true;
 
     const request = context.switchToHttp().getRequest();
     const user = request.user;
@@ -33,19 +40,18 @@ export class PermissionGuard implements CanActivate {
       throw new ForbiddenException('Authentication context missing');
     }
 
-    const allowed = await this.rbacService.hasPermission(
+    const allowed = await this.rbacService.hasAnyPermission(
       user.userId,
       user.organizationId,
-      requiredPermission,
+      requiredPermissions,
     );
 
     if (!allowed) {
+      const listed = requiredPermissions.join(' or ');
       this.logger.warn(
-        `Permission denied: user=${user.userId} permission=${requiredPermission}`,
+        `Permission denied: user=${user.userId} permission=${listed}`,
       );
-      throw new ForbiddenException(
-        `Missing required permission: ${requiredPermission}`,
-      );
+      throw new ForbiddenException(`Missing required permission: ${listed}`);
     }
 
     return true;

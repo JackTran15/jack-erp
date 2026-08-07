@@ -10,6 +10,7 @@ import {
   selectIsReturnExchangeInvoice,
   selectItemCountForPayment,
   selectPointsDiscountAmount,
+  selectPromotionPreview,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
 
@@ -35,6 +36,7 @@ export function PaymentSummaryBlock({
   );
   const { clearRedeemedPoints } = useCheckoutPromotion();
   const { deposit, returnFee } = useCheckoutPayment();
+  const promotionPreview = usePosCheckoutSessionStore(selectPromotionPreview);
 
   return (
     <div className="space-y-2 py-3">
@@ -47,6 +49,21 @@ export function PaymentSummaryBlock({
         value={formatVnd(total)}
         emphasis="strong"
       />
+      {promotionPreview.status === "loading" ? (
+        <PosSummaryRow
+          label="Khuyến mại"
+          value={
+            <span className="inline-block h-4 w-16 animate-pulse rounded bg-gray-100" />
+          }
+        />
+      ) : promotionPreview.status === "ready" && promotionPreview.data ? (
+        <PosSummaryRow
+          label="Khuyến mại"
+          value={`-${formatVnd(promotionPreview.data.promotionDiscount)}`}
+        />
+      ) : promotionPreview.status === "unavailable" ? (
+        <p className="text-[13px] text-gray-400">Chưa tính được khuyến mại</p>
+      ) : null}
       <PosSummaryRow
         label={
           onDepositClick ? (

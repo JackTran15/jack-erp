@@ -240,10 +240,22 @@ describe('POS staff permission seeds', () => {
   const POS_STAFF_KEYS: Array<[string, string]> = [
     ['Báo cáo theo ngày', 'reporting.invoice.branch.read'],
     ['picker NVBH (Checkout, Fast stock transfer)', 'sales-hierarchy.read'],
+    ['xem trước khuyến mại tại Checkout', 'pos.promotion.evaluate'],
   ];
 
   it.each(POS_STAFF_KEYS)('grants %s (%s) to SALES and CASHIER', (_surface, key) => {
     expect(SALES_PERMISSION_KEYS).toContain(key);
     expect(CASHIER_PERMISSION_KEYS).toContain(key);
+  });
+
+  it('registers pos.promotion.evaluate in the permission catalogue', () => {
+    expect(PERMISSION_SEEDS.map((p) => p.key)).toContain('pos.promotion.evaluate');
+  });
+
+  // The whole point of the narrow key: a cashier prices a cart without being
+  // able to read the back-office promotion catalogue.
+  it('does not grant the back-office promotion keys to STAFF', () => {
+    expect(STAFF_PERMISSION_KEYS).not.toContain('promotion.read');
+    expect(STAFF_PERMISSION_KEYS).not.toContain('promotion.write');
   });
 });

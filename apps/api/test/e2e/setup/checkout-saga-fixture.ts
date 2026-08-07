@@ -1,6 +1,8 @@
+import { randomUUID } from 'crypto';
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
+import * as bcrypt from 'bcryptjs';
 import { createTestApp, resetDatabase, seedBaseData, authHeader, SeedResult } from './test-app';
 import { CoaSeederService } from '../../../src/modules/accounting/seeders/coa-seeder.service';
 import { DefaultAccountSeederService } from '../../../src/modules/accounting/seeders/default-account.seeder';
@@ -159,5 +161,86 @@ export async function buildCheckoutSagaFixture(): Promise<CheckoutSagaFixture> {
     locationId,
     customerId,
     headers,
+  };
+}
+
+export interface ScopedTestUser {
+  userId: string;
+  accessToken: string;
+  headers: () => Record<string, string>;
+}
+
+/**
+ * Creates a fresh user + role holding **exactly** `permissionKeys` — no more,
+ * no less — in the given org/branch. `seedBaseData` only ever provisions one
+ * admin user carrying every permission on this app's list, which cannot prove
+ * a permission *guard* actually blocks: a suite asserting 403 needs a token
+ * that genuinely lacks the key, and one asserting 200 off a narrow key (e.g.
+ * `pos.promotion.evaluate`) needs a token that doesn't also carry
+ * `promotion.read` masking the check (T-01-06, ADR-05).
+ *
+ * Fresh `userId` per call, so there is nothing to invalidate in the
+ * `RbacService` Redis cache (unlike `seedPromotionFixtures`, which grants
+ * onto the already-logged-in shared admin role).
+ */
+export async function createUserWithPermissions(
+  app: INestApplication,
+  base: { organizationId: string; branchId: string },
+  permissionKeys: string[],
+): Promise<ScopedTestUser> {
+  const ds = app.get(DataSource);
+  const userId = randomUUID();
+  const roleId = randomUUID();
+  const email = `e2e-scoped-${userId}@test.com`;
+  const passwordHash = await bcrypt.hash('password123', 10);
+
+  await ds.query(
+    `INSERT INTO users (id, organization_id, email, password_hash, first_name, last_name, is_active, created_at, updated_at)
+     VALUES ($1::uuid, $2::uuid, $3, $4, 'E2E', 'Scoped', true, NOW(), NOW())`,
+    [userId, base.organizationId, email, passwordHash],
+  );
+  await ds.query(
+    `INSERT INTO roles (id, organization_id, name, description, created_at, updated_at)
+     VALUES ($1::uuid, $2::uuid, $3, 'E2E scoped-permission role', NOW(), NOW())`,
+    [roleId, base.organizationId, `e2e-scoped-${roleId}`],
+  );
+  await ds.query(
+    `INSERT INTO user_roles (id, user_id, role_id, organization_id)
+     VALUES (gen_random_uuid(), $1::uuid, $2::uuid, $3::uuid)`,
+    [userId, roleId, base.organizationId],
+  );
+  await ds.query(
+    `INSERT INTO user_branch_assignments (id, user_id, branch_id, organization_id, assigned_by)
+     VALUES (gen_random_uuid(), $1::uuid, $2::uuid, $3::uuid, $1::uuid)`,
+    [userId, base.branchId, base.organizationId],
+  );
+  for (const key of permissionKeys) {
+    await ds.query(
+      `INSERT INTO permissions (id, key, description, module)
+       VALUES (gen_random_uuid(), $1, $1, $2)
+       ON CONFLICT DO NOTHING`,
+      [key, key.split('.')[0]],
+    );
+    await ds.query(
+      `INSERT INTO role_permissions (id, role_id, permission_id)
+       SELECT gen_random_uuid(), $1::uuid, p.id FROM permissions p WHERE p.key = $2
+       ON CONFLICT DO NOTHING`,
+      [roleId, key],
+    );
+  }
+
+  const login = await request(app.getHttpServer())
+    .post('/auth/login')
+    .send({ email, password: 'password123', organizationId: base.organizationId })
+    .expect(200);
+  const accessToken = login.body.accessToken as string;
+
+  return {
+    userId,
+    accessToken,
+    headers: () => ({
+      Authorization: authHeader(accessToken),
+      'X-Branch-Id': base.branchId,
+    }),
   };
 }

@@ -15,6 +15,7 @@ import { useCheckoutGrandTotal } from "@erp/pos/hooks/page-hooks/checkout/use-ch
 import {
   selectPaymentDraft,
   selectPointsDiscountAmount,
+  selectPromotionDiscountAmount,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
@@ -92,6 +93,9 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
   const grandTotal = useCheckoutGrandTotal();
   const pointsDiscountAmount = usePosCheckoutSessionStore(
     selectPointsDiscountAmount,
+  );
+  const promotionDiscountAmount = usePosCheckoutSessionStore(
+    selectPromotionDiscountAmount,
   );
 
   // Slice payment của tab đang active (reference ổn định theo session).
@@ -249,6 +253,7 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
         deposit,
         returnFee,
         pointsDiscountAmount,
+        promotionDiscountAmount,
         paymentLines,
         keepChange,
         debt,
@@ -258,6 +263,7 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
       deposit,
       returnFee,
       pointsDiscountAmount,
+      promotionDiscountAmount,
       paymentLines,
       keepChange,
       debt,

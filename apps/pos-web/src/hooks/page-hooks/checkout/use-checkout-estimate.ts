@@ -27,6 +27,7 @@ import {
   selectMetaDraft,
   selectPaymentDraft,
   selectPointsDiscountAmount,
+  selectPromotionDiscountAmount,
   selectPromotionDraft,
   selectPurchaseCart,
   selectReturnCart,
@@ -67,6 +68,7 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
     const p = selectPaymentDraft(sessionState);
     const grandTotal = selectGrandTotal(sessionState);
     const pointsDiscountAmount = selectPointsDiscountAmount(sessionState);
+    const promotionDiscountAmount = selectPromotionDiscountAmount(sessionState);
     const pointsRedeemed = selectEffectivePointsRedeemed(sessionState);
     const selectedCustomer = selectCustomerDraft(sessionState).selectedCustomer;
     const selectedSalesperson =
@@ -95,6 +97,7 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
       deposit: p.deposit,
       returnFee: p.returnFee,
       pointsDiscountAmount,
+      promotionDiscountAmount,
       paymentLines: p.paymentLines,
       keepChange: p.keepChange,
       debt: p.debt,

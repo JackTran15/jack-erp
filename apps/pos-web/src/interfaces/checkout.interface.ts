@@ -1,3 +1,4 @@
+import type { EvaluateCartResponse } from "@erp/shared-interfaces";
 import type { PaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import type { PaymentMethod } from "@erp/pos/constants/checkout.constant";
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
@@ -247,11 +248,39 @@ export interface CheckoutCatalogDraft {
   catalogCollapsed: boolean;
 }
 
+/**
+ * Kết quả `POST /v2/promotions/evaluate` cho giỏ hàng của tab hiện tại.
+ *
+ * Tách hẳn khỏi `CheckoutPromotionDraft`: slice kia giữ **lựa chọn của thu
+ * ngân**, slice này giữ **kết quả server trả về**. Trộn hai thứ vào một chỗ là
+ * cách chắc chắn để sau này không ai biết cái nào là nguồn sự thật khi số tiền
+ * lệch nhau.
+ *
+ * Số tiền ở đây chỉ để hiển thị. Server luôn tự tính lại lúc checkout
+ * (ADR-06 của `checkout-saga`), nên không bao giờ gửi ngược số này lên.
+ */
+export interface CheckoutPromotionPreview {
+  /**
+   * `idle` — giỏ rỗng, chưa có gì để tính (và **không** phát lời gọi nào).
+   * `loading` — đang chờ server. `ready` — có `data`.
+   * `unavailable` — gọi hỏng; hiển thị chỉ báo nhưng **không** chặn thanh toán.
+   */
+  status: "idle" | "loading" | "ready" | "unavailable";
+  data: EvaluateCartResponse | null;
+  error: string | null;
+}
+
 /** Toàn bộ trạng thái soạn thảo per-tab, nhúng trong `InvoiceSession.draft`. */
 export interface CheckoutDraft {
   customer: CheckoutCustomerDraft;
   payment: CheckoutPaymentDraft;
   promotion: CheckoutPromotionDraft;
+  /**
+   * Không được khôi phục từ localStorage khi hydrate — xem `ensureDraftShape`.
+   * Một con số tiền cũ hiện lại sau khi tải lại trang là sai lệch tệ hơn hẳn
+   * so với việc tính lại mất 300ms.
+   */
+  promotionPreview: CheckoutPromotionPreview;
   labels: CheckoutLabelsDraft;
   meta: CheckoutMetaDraft;
   catalog: CheckoutCatalogDraft;
