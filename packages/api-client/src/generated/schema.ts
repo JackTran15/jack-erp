@@ -5526,6 +5526,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * Prices a cart without writing anything. Accepts either the back-office
+         *     `promotion.read` or the cashier-scoped `pos.promotion.evaluate`, because
+         *     the till needs this endpoint but must not inherit read access to the
+         *     whole promotion catalogue.
+         */
         post: operations["PromotionV2Controller_evaluate_v2"];
         delete?: never;
         options?: never;
@@ -5639,6 +5645,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["VoucherV2Controller_duplicate_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/pos/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CheckoutSagaController_checkout_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/pos/checkout/sagas/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CheckoutSagaController_getSaga_v2"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -8285,6 +8323,17 @@ export interface components {
             email?: string;
             phone?: string;
             address?: string;
+            birthDate?: string;
+            /** @enum {string} */
+            gender?: "male" | "female" | "unspecified";
+            nationalId?: string;
+            /** Format: uuid */
+            groupId?: string;
+            /** Format: uuid */
+            assignedStaffId?: string;
+            note?: string;
+            companyName?: string;
+            taxCode?: string;
             /** @enum {string} */
             status?: "ACTIVE" | "INACTIVE" | "MERGED";
             version?: number;
@@ -11276,6 +11325,8 @@ export interface components {
             originalInvoiceItem?: components["schemas"]["InvoiceItemEntity"];
             note?: string;
             sortOrder: number;
+            isGift: boolean;
+            promotionProgramId?: string;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -11314,6 +11365,8 @@ export interface components {
             originalInvoiceItem?: components["schemas"]["InvoiceItemEntity"];
             note?: string;
             sortOrder: number;
+            isGift: boolean;
+            promotionProgramId?: string;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -12169,6 +12222,49 @@ export interface components {
         DuplicateVoucherDto: {
             /** @description New voucher code (must be unique within the organization) — vouchers have no auto-numbering, so the client must supply one */
             code: string;
+        };
+        CheckoutV2PaymentLineDto: {
+            /** @enum {string} */
+            paymentMethod: "cash" | "bank_transfer" | "card";
+            amount: number;
+            /**
+             * Format: uuid
+             * @description A configured `payment_accounts` row — e.g. which bank a transfer went
+             *     into. The server validates and derives the receiving COA account; clients
+             *     never send a COA account id directly.
+             */
+            paymentAccountId?: string;
+            reference?: string;
+        };
+        CheckoutV2Dto: {
+            /** Format: uuid */
+            invoiceId: string;
+            /** @description Payment lines. Empty array = full debt (requires a customer on the invoice). */
+            payments: components["schemas"]["CheckoutV2PaymentLineDto"][];
+            /**
+             * @description Credit due date (ISO `YYYY-MM-DD`). Stored on the debt record when the sale leaves a remaining balance.
+             * @example 2026-06-25
+             */
+            dueDate?: string;
+            /**
+             * @description Credit term in days entered at checkout (per invoice).
+             * @example 9
+             */
+            creditDays?: number;
+            /**
+             * @description Ids of `auto_apply=false` programs the cashier picked manually. The
+             *     server always recomputes the discount itself (ADR-06 in
+             *     03-logical-design.md) — this list only selects *which* programs run.
+             *     Not consumed until T-04-03.
+             */
+            selectedProgramIds?: string[];
+            /** @description Voucher code to redeem against this checkout. Not consumed until T-05-01. */
+            voucherCode?: string;
+            /**
+             * @description Run every preflight step and report the result without writing anything.
+             *     Only `true` is supported until UOW-02 lands the transactional phase.
+             */
+            dryRun?: boolean;
         };
         AsyncReportDto: {
             /** @enum {string} */
@@ -23450,6 +23546,46 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["VoucherEntity"];
                 };
+            };
+        };
+    };
+    CheckoutSagaController_checkout_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CheckoutSagaController_getSaga_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

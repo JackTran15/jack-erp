@@ -16508,6 +16508,7 @@
             }
           }
         },
+        "summary": "Prices a cart without writing anything. Accepts either the back-office\n`promotion.read` or the cashier-scoped `pos.promotion.evaluate`, because\nthe till needs this endpoint but must not inherit read access to the\nwhole promotion catalogue.",
         "tags": [
           "promotions-v2"
         ]
@@ -16771,6 +16772,53 @@
         },
         "tags": [
           "vouchers-v2"
+        ]
+      }
+    },
+    "/v2/pos/checkout": {
+      "post": {
+        "operationId": "CheckoutSagaController_checkout_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "pos-checkout-v2"
+        ]
+      }
+    },
+    "/v2/pos/checkout/sagas/{id}": {
+      "get": {
+        "operationId": "CheckoutSagaController_getSaga_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "pos-checkout-v2"
         ]
       }
     },
@@ -25492,7 +25540,6 @@
         "properties": {
           "code": {
             "type": "string",
-            "minLength": 1,
             "maxLength": 50
           },
           "name": {
@@ -25511,6 +25558,40 @@
           "address": {
             "type": "string",
             "maxLength": 500
+          },
+          "birthDate": {
+            "type": "string"
+          },
+          "gender": {
+            "enum": [
+              "male",
+              "female",
+              "unspecified"
+            ],
+            "type": "string"
+          },
+          "nationalId": {
+            "type": "string",
+            "maxLength": 12
+          },
+          "groupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "assignedStaffId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "note": {
+            "type": "string"
+          },
+          "companyName": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "taxCode": {
+            "type": "string",
+            "maxLength": 20
           },
           "status": {
             "type": "string",
@@ -34678,6 +34759,12 @@
           "sortOrder": {
             "type": "number"
           },
+          "isGift": {
+            "type": "boolean"
+          },
+          "promotionProgramId": {
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
@@ -34717,6 +34804,7 @@
           "direction",
           "returnedQuantity",
           "sortOrder",
+          "isGift",
           "id",
           "organizationId",
           "createdAt",
@@ -34808,6 +34896,12 @@
           "sortOrder": {
             "type": "number"
           },
+          "isGift": {
+            "type": "boolean"
+          },
+          "promotionProgramId": {
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
@@ -34848,6 +34942,7 @@
           "direction",
           "returnedQuantity",
           "sortOrder",
+          "isGift",
           "id",
           "organizationId",
           "createdAt",
@@ -37103,6 +37198,82 @@
         },
         "required": [
           "code"
+        ]
+      },
+      "CheckoutV2PaymentLineDto": {
+        "type": "object",
+        "properties": {
+          "paymentMethod": {
+            "enum": [
+              "cash",
+              "bank_transfer",
+              "card"
+            ],
+            "type": "string"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "paymentAccountId": {
+            "type": "string",
+            "description": "A configured `payment_accounts` row — e.g. which bank a transfer went\ninto. The server validates and derives the receiving COA account; clients\nnever send a COA account id directly.",
+            "format": "uuid"
+          },
+          "reference": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "paymentMethod",
+          "amount"
+        ]
+      },
+      "CheckoutV2Dto": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payments": {
+            "description": "Payment lines. Empty array = full debt (requires a customer on the invoice).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckoutV2PaymentLineDto"
+            }
+          },
+          "dueDate": {
+            "type": "string",
+            "description": "Credit due date (ISO `YYYY-MM-DD`). Stored on the debt record when the sale leaves a remaining balance.",
+            "example": "2026-06-25"
+          },
+          "creditDays": {
+            "type": "number",
+            "description": "Credit term in days entered at checkout (per invoice).",
+            "minimum": 0,
+            "example": 9
+          },
+          "selectedProgramIds": {
+            "description": "Ids of `auto_apply=false` programs the cashier picked manually. The\nserver always recomputes the discount itself (ADR-06 in\n03-logical-design.md) — this list only selects *which* programs run.\nNot consumed until T-04-03.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "voucherCode": {
+            "type": "string",
+            "description": "Voucher code to redeem against this checkout. Not consumed until T-05-01."
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "Run every preflight step and report the result without writing anything.\nOnly `true` is supported until UOW-02 lands the transactional phase."
+          }
+        },
+        "required": [
+          "invoiceId",
+          "payments"
         ]
       },
       "AsyncReportDto": {
