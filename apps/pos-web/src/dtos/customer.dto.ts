@@ -50,9 +50,6 @@ export interface UpdateMembershipCardBody {
   tier?: MembershipTierEnum;
 }
 
-// TODO: extend once BE `UpdateCustomerDto` accepts the richer fields
-// (gender, birthDate, nationalId, groupId, assignedStaffId, note,
-// companyName, taxCode, membershipCard).
 /**
  * Body for `PATCH /customers/:id`. Mirrors `UpdateCustomerDto` on the API,
  * which is a partial of `CreateCustomerDto` (minus the `membershipCard` inline

@@ -79,6 +79,37 @@ describe('Customer (E2E)', () => {
       expect(res.body.name).toBe('Jane Doe');
     });
 
+    // birthDate feeds the BIRTHDAY customer scope of the promotion engine, so a
+    // PATCH that silently rejects it would make birthday programs unreachable.
+    it('should update the rich profile fields', async () => {
+      await request(app.getHttpServer())
+        .patch(`/customers/${customerId}`)
+        .set(headers())
+        .send({
+          birthDate: '1990-08-01',
+          gender: 'male',
+          nationalId: '079090001234',
+          note: 'VIP',
+          companyName: 'Acme JSC',
+          taxCode: '0101234567',
+        })
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .get(`/customers/${customerId}`)
+        .set(headers())
+        .expect(200);
+
+      expect(res.body).toMatchObject({
+        birthDate: '1990-08-01',
+        gender: 'male',
+        nationalId: '079090001234',
+        note: 'VIP',
+        companyName: 'Acme JSC',
+        taxCode: '0101234567',
+      });
+    });
+
     it('should delete a customer', async () => {
       const createRes = await request(app.getHttpServer())
         .post('/customers')
