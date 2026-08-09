@@ -24,14 +24,27 @@ export default async function globalSetup() {
   const dbPort = process.env.DB_PORT || '5432';
   const dbUser = process.env.DB_USER || 'postgres';
   const dbPass = process.env.DB_PASS || 'postgres';
-  // NEVER fall back to DB_NAME from .env: that is the dev database, and the
-  // suite calls `synchronize(true)` (drops every table) in resetDatabase().
-  // Override with E2E_DB_NAME only; the name must still look like a test DB.
+
+  // The suite drops and rebuilds every table (`synchronize(true)` in
+  // resetDatabase), so it must never touch the dev database. NEVER fall back to
+  // DB_NAME from .env: `process.env.DB_NAME || 'erp_test'` read the DB_NAME
+  // dotenv had just loaded one block above, so the erp_test fallback never fired
+  // and the suite wiped erp_dev instead. Override with E2E_DB_NAME only.
+  const devDbName = process.env.DB_NAME;
   const dbName = process.env.E2E_DB_NAME || DEFAULT_E2E_DB_NAME;
+  // Two independent guards, because they fail on different mistakes: the name
+  // must look like a throwaway, AND it must not be whatever .env just said the
+  // dev database is.
   if (!/test/i.test(dbName)) {
     throw new Error(
       `Refusing to run E2E against "${dbName}": the suite drops every table. ` +
         `E2E_DB_NAME must contain "test".`,
+    );
+  }
+  if (dbName === devDbName) {
+    throw new Error(
+      `Refusing to run E2E against "${dbName}": the suite drops every table in it. ` +
+        'Point E2E_DB_NAME at a throwaway database.',
     );
   }
 
@@ -45,14 +58,38 @@ export default async function globalSetup() {
   process.env.REDIS_HOST = process.env.REDIS_HOST || 'localhost';
   process.env.REDIS_PORT = process.env.REDIS_PORT || '6379';
 
+  // `-d postgres` because psql otherwise connects to a database named after the
+  // user, which does not exist — the probe always failed and fell through to
+  // createdb.
+  const psql = `PGPASSWORD=${dbPass} psql -h ${dbHost} -p ${dbPort} -U ${dbUser}`;
   try {
     execSync(
-      `PGPASSWORD=${dbPass} psql -h ${dbHost} -p ${dbPort} -U ${dbUser} -tc "SELECT 1 FROM pg_database WHERE datname = '${dbName}'" | grep -q 1 || PGPASSWORD=${dbPass} createdb -h ${dbHost} -p ${dbPort} -U ${dbUser} ${dbName}`,
+      `${psql} -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '${dbName}'" | grep -q 1 || PGPASSWORD=${dbPass} createdb -h ${dbHost} -p ${dbPort} -U ${dbUser} ${dbName}`,
       { stdio: 'inherit' },
     );
   } catch {
     console.warn(
       'Could not auto-create test database. Ensure it exists before running E2E tests.',
     );
+  }
+
+  // Specs rebuild the schema themselves via resetDatabase(), but AppModule
+  // queries `permissions` while booting — so createTestApp() fails on a
+  // brand-new database unless a schema already exists. Bootstrap it only when
+  // the database is genuinely empty: synchronize(true) drops TypeORM's own
+  // `migrations` table too, so re-running migrations over a database a previous
+  // suite already populated fails on "relation already exists".
+  const tableCount = execSync(
+    `${psql} -d ${dbName} -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'"`,
+  )
+    .toString()
+    .trim();
+
+  if (tableCount === '0') {
+    execSync('pnpm migration:run', {
+      cwd: path.resolve(__dirname, '..', '..', '..'),
+      stdio: 'inherit',
+      env: { ...process.env, DB_NAME: dbName },
+    });
   }
 }
