@@ -126,6 +126,7 @@ describe('InvoiceService', () => {
 
     dataSource = {
       transaction: jest.fn().mockImplementation((cb) => cb(mockManager)),
+      getRepository: jest.fn().mockReturnValue({ find: jest.fn().mockResolvedValue([]) }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -395,6 +396,36 @@ describe('InvoiceService', () => {
       const result = await service.findOneWithItems('inv-1', actor);
 
       expect(result.staffName).toBeNull();
+    });
+
+    // T-08-01 — invoice_checkout_promotions was write-only until this ticket.
+    it('inlines appliedPromotions from the invoice_checkout_promotions snapshot', async () => {
+      invoiceRepo.findOne.mockResolvedValue(invoiceStub());
+      itemRepo.find.mockResolvedValue([]);
+      const promotionRepo = { find: jest.fn().mockResolvedValue([
+        { type: 'INVOICE_DISCOUNT', discountAmount: '100000' },
+        { type: 'ITEM_DISCOUNT', discountAmount: '50000' },
+      ]) };
+      dataSource.getRepository.mockReturnValue(promotionRepo);
+
+      const result = await service.findOneWithItems('inv-1', actor);
+
+      expect(promotionRepo.find).toHaveBeenCalledWith({
+        where: { invoiceId: 'inv-1', organizationId: 'org-1' },
+      });
+      expect(result.appliedPromotions).toEqual([
+        { type: 'INVOICE_DISCOUNT', discountAmount: 100000 },
+        { type: 'ITEM_DISCOUNT', discountAmount: 50000 },
+      ]);
+    });
+
+    it('sets appliedPromotions to an empty array when no promotion ran', async () => {
+      invoiceRepo.findOne.mockResolvedValue(invoiceStub());
+      itemRepo.find.mockResolvedValue([]);
+
+      const result = await service.findOneWithItems('inv-1', actor);
+
+      expect(result.appliedPromotions).toEqual([]);
     });
   });
 

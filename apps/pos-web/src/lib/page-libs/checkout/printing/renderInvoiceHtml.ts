@@ -427,6 +427,10 @@ export function renderInvoiceHtml(
         "Tiền hàng",
         totals.subtotal,
         "bold-italic",
+      )}${amountRow(
+        "Giảm giá",
+        totals.manualDiscountTotal,
+        "italic",
       )}${promoBlock}${amountRow(
         "Phí giao hàng",
         totals.deliveryFee,

@@ -254,8 +254,10 @@ describe('POS staff permission seeds', () => {
 
   // The whole point of the narrow key: a cashier prices a cart without being
   // able to read the back-office promotion catalogue.
-  it('does not grant the back-office promotion keys to STAFF', () => {
-    expect(STAFF_PERMISSION_KEYS).not.toContain('promotion.read');
-    expect(STAFF_PERMISSION_KEYS).not.toContain('promotion.write');
+  it('does not grant the back-office promotion keys to the POS roles', () => {
+    for (const keys of [SALES_PERMISSION_KEYS, CASHIER_PERMISSION_KEYS]) {
+      expect(keys).not.toContain('promotion.read');
+      expect(keys).not.toContain('promotion.write');
+    }
   });
 });

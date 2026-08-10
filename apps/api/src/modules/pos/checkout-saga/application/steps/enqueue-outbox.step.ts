@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { v5 as uuidv5 } from 'uuid';
 import { DomainEventType, WsEventType } from '@erp/shared-interfaces';
-import type { TempWarehouseInvoiceFulfillRequestedPayload } from '@erp/shared-interfaces';
+import type {
+  KeptChangeCashPayload,
+  TempWarehouseInvoiceFulfillRequestedPayload,
+} from '@erp/shared-interfaces';
 import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { CheckoutContext, CheckoutStep, requireManager } from '../checkout-step';
 import { OutboxService } from '../../../../events/outbox/outbox.service';
@@ -30,7 +33,11 @@ function deterministicCheckoutEventId(topic: string, invoiceId: string): string 
  *
  * Three outbox rows: `SALE_POSTED`, `TEMP_WAREHOUSE_INVOICE_FULFILL`,
  * `LOYALTY_POINTS_AWARD` (customer-less invoices get none of the last one —
- * same guard `LoyaltyPointsPublisher.publish` already has). Does NOT publish
+ * same guard `LoyaltyPointsPublisher.publish` already has), plus a fourth,
+ * `CASH_VOUCHER_NEEDED_KEPT_CHANGE`, only when the customer left change
+ * behind. That last one stays async on purpose (v1 parity): its consumer
+ * resolves the OTHER_INCOME account itself, so a missing default parks the
+ * money in the DLQ instead of failing the sale at the counter. Does NOT publish
  * `JOURNAL_POST_SALE` / `STOCK_DEDUCTION` / `CASH_MOVEMENT_FROM_PAYMENT` /
  * `DEPOSIT_VOUCHER_NEEDED_POS_SALE` (ADR-03 — those four are what T-03-01..04
  * replaced with inline writes).
@@ -156,6 +163,46 @@ export class EnqueueOutboxStep implements CheckoutStep {
           payload: loyaltyPayload,
         },
         invoice.customerId,
+      );
+    }
+
+    // Surplus cash the customer declined to take back — its own Phiếu thu
+    // against thu nhập khác, never revenue. `compute-totals` already refused a
+    // kept change without a CASH line, so `resolve-funds` has a till here; the
+    // sale's own payments were already posted to that same fund inline by
+    // `post-cash`, and this row only adds the surplus on top.
+    if (totals.keptChange > 0) {
+      const cashAccountId = ctx.funds?.cashAccountId;
+      if (!cashAccountId) {
+        throw new Error(
+          'enqueue-outbox: kept change was accepted but resolve-funds did not resolve a cashAccountId',
+        );
+      }
+      const keptChangePayload: KeptChangeCashPayload = {
+        invoiceId: invoice.id,
+        invoiceCode: ctx.documentNumber!,
+        cashAccountId,
+        amount: totals.keptChange,
+        branchId,
+        organizationId,
+        actorId: ctx.actor.userId,
+      };
+      await this.outbox.enqueue(
+        manager,
+        ERP_TOPICS.CASH_VOUCHER_NEEDED_KEPT_CHANGE,
+        {
+          eventId: deterministicCheckoutEventId(
+            ERP_TOPICS.CASH_VOUCHER_NEEDED_KEPT_CHANGE,
+            invoice.id,
+          ),
+          eventType: DomainEventType.CASH_VOUCHER_NEEDED_KEPT_CHANGE,
+          timestamp: now,
+          organizationId,
+          branchId,
+          correlationId: invoice.id,
+          payload: keptChangePayload,
+        },
+        cashAccountId,
       );
     }
 

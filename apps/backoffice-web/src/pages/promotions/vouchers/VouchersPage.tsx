@@ -35,8 +35,11 @@ export function VouchersPage() {
   const [columnFilters, setColumnFilters] = useState<
     Record<string, ColumnFilter>
   >({});
-  /** Cùng chuẩn FR-004 với màn CTKM: mặc định chỉ xem thẻ đang theo dõi. */
-  const [trackingOnly, setTrackingOnly] = useState(true);
+  /**
+   * Cùng chuẩn FR-004 với màn CTKM (đảo ngược 2026-08-10, T-03-06/T-06-06):
+   * mặc định KHÔNG lọc trạng thái — chip chỉ hiện khi tự chọn.
+   */
+  const [trackingOnly, setTrackingOnly] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [formMode, setFormMode] = useState<VoucherFormMode | undefined>(
     undefined,

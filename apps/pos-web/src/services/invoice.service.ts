@@ -85,22 +85,34 @@ export const invoiceService = {
    * `/v2/pos/checkout` không trả `InvoiceRow` đầy đủ, chỉ tổng kết saga
    * (`CheckoutV2Response`) — gọi lại `getById` sau khi commit để trả đúng
    * hình dạng phần còn lại của app đang mong đợi, giống hệt luồng cũ.
+   *
+   * `body.selectedProgramIds` chỉ đi vào request khi cờ v2 bật — nhánh v1
+   * build payload riêng, không spread `body`, nên field này không lọt qua.
    */
   checkout: async (id: string, body: CheckoutInvoiceBody): Promise<InvoiceRow> => {
     if (import.meta.env.VITE_CHECKOUT_V2 === "true") {
       const v2Body: CheckoutV2Body = {
         invoiceId: id,
         payments: body.payments,
+        keptChangeAmount: body.keptChangeAmount,
         dueDate: body.dueDate,
         creditDays: body.creditDays,
+        ...(body.selectedProgramIds?.length
+          ? { selectedProgramIds: body.selectedProgramIds }
+          : {}),
       };
       await http.post<CheckoutV2Response>("/v2/pos/checkout", v2Body);
       return http.get<InvoiceRow>(`/invoices/${encodeURIComponent(id)}`);
     }
-    return http.post<InvoiceRow>(
-      `/invoices/${encodeURIComponent(id)}/checkout`,
-      body,
-    );
+    // Nhánh v1 không khai báo `selectedProgramIds` — build payload tách riêng
+    // thay vì spread nguyên `body`, để field mới (nếu caller lỡ truyền) không
+    // lọt qua và bị `forbidNonWhitelisted` của ValidationPipe từ chối 400.
+    return http.post<InvoiceRow>(`/invoices/${encodeURIComponent(id)}/checkout`, {
+      payments: body.payments,
+      keptChangeAmount: body.keptChangeAmount,
+      dueDate: body.dueDate,
+      creditDays: body.creditDays,
+    });
   },
 
   delete: (id: string): Promise<void> =>

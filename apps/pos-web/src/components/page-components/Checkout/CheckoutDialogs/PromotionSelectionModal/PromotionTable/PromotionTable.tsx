@@ -39,8 +39,12 @@ export function PromotionTable({ rows, selectedId, onSelect }: PromotionTablePro
             <PromotionRow
               key={promotion.id}
               promotion={promotion}
-              selected={promotion.id === selectedId}
-              onSelect={() => !promotion.disabled && onSelect(promotion.id)}
+              // Đã áp (auto-apply, khoá) hiện luôn checked, độc lập với lựa
+              // chọn tùy chọn cục bộ của dialog.
+              selected={promotion.id === selectedId || Boolean(promotion.selected)}
+              onSelect={() =>
+                !promotion.disabled && !promotion.selected && onSelect(promotion.id)
+              }
             />
           ))
         )}

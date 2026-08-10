@@ -1,4 +1,4 @@
-import { PromotionProgramType, PromotionGiftMode } from '@erp/shared-interfaces';
+import { PromotionProgramType, PromotionGiftMode, PromotionDiscountMode } from '@erp/shared-interfaces';
 
 export interface LineDiscount {
   lineId: string;
@@ -26,6 +26,14 @@ export interface AppliedProgram {
   discountAmount: number;
   lineDiscounts: LineDiscount[];
   gifts: GiftOffer[];
+  /**
+   * Only set when `type === INVOICE_DISCOUNT` — the only type with a single
+   * program-level discount mode/value. Mirrors `@erp/shared-interfaces`'
+   * `AppliedProgram` — see its docblock for why the other 4 types stay
+   * `undefined` rather than inferring from the first reward/tier.
+   */
+  discountMode?: PromotionDiscountMode;
+  discountValue?: number;
 }
 
 /** auto_apply=false programs that were eligible but not run — the cashier can still pick them. */

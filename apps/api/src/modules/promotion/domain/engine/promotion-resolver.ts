@@ -166,6 +166,11 @@ export class PromotionResolver {
       discountAmount: result.outcome.discountAmount,
       lineDiscounts: result.outcome.lineDiscounts,
       gifts: result.outcome.gifts,
+      // Only INVOICE_DISCOUNT has one mode/value at program level — see the
+      // docblock on AppliedProgram.discountMode. Others stay undefined.
+      ...(program.type === PromotionProgramType.INVOICE_DISCOUNT
+        ? { discountMode: program.discountMode, discountValue: program.discountValue }
+        : {}),
     };
   }
 }

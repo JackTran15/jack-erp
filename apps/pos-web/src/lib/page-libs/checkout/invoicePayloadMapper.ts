@@ -105,6 +105,8 @@ interface BuildCheckoutInvoiceApiPayloadInput {
   dueDate?: string | null;
   /** Số ngày được nợ — chỉ truyền khi tính vào công nợ. */
   creditDays?: number | null;
+  /** Id các CTKM tùy chọn đã chọn — chỉ luồng SALE mới truyền (xem call site). */
+  selectedProgramIds?: string[];
 }
 
 /**
@@ -153,6 +155,9 @@ export function buildCheckoutInvoiceApiPayload(
   }
   if (input.dueDate) body.dueDate = input.dueDate;
   if (input.creditDays != null) body.creditDays = input.creditDays;
+  if (input.selectedProgramIds?.length) {
+    body.selectedProgramIds = input.selectedProgramIds;
+  }
 
   return { ok: true, body };
 }

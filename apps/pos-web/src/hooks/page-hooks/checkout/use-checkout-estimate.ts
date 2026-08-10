@@ -29,6 +29,7 @@ import {
   selectPointsDiscountAmount,
   selectPromotionDiscountAmount,
   selectPromotionDraft,
+  selectPromotionPreview,
   selectPurchaseCart,
   selectReturnCart,
   usePosCheckoutSessionStore,
@@ -133,6 +134,8 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
       printDuplicate: p.printDuplicate,
       isReturnExchange: variant !== CheckoutVariantEnum.SALE,
       store,
+      promotionEngineDiscounts: selectPromotionPreview(sessionState).data
+        ?.appliedPrograms,
     });
     if (!receiptPayload) return;
 

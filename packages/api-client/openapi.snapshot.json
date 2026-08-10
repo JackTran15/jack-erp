@@ -35012,6 +35012,28 @@
           "createdBy"
         ]
       },
+      "AppliedInvoicePromotionDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "INVOICE_DISCOUNT",
+              "ITEM_DISCOUNT",
+              "TIERED_DISCOUNT",
+              "GIFT_ITEM",
+              "BUY_M_GET_N"
+            ],
+            "type": "string"
+          },
+          "discountAmount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "type",
+          "discountAmount"
+        ]
+      },
       "DraftInvoiceResponseDto": {
         "type": "object",
         "properties": {
@@ -35048,6 +35070,13 @@
             "type": "string",
             "nullable": true,
             "description": "Display name of the staff member (cashier) who created the invoice; null when the user no longer exists."
+          },
+          "appliedPromotions": {
+            "description": "Promotion programmes that actually ran at checkout, read back from the invoice_checkout_promotions snapshot.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AppliedInvoicePromotionDto"
+            }
           },
           "code": {
             "type": "string"
@@ -35189,6 +35218,7 @@
           "payments",
           "remainingDebt",
           "staffName",
+          "appliedPromotions",
           "code",
           "status",
           "type",

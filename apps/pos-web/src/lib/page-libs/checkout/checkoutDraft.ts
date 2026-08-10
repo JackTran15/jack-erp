@@ -36,7 +36,7 @@ export function initialCheckoutDraft(): CheckoutDraft {
       creditDays: null,
     },
     promotion: {
-      appliedPromotion: null,
+      selectedProgramIds: [],
       pointsRedeemed: 0,
       appliedVoucher: null,
     },

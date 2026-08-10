@@ -59,6 +59,7 @@ import {
   selectPointsDiscountAmount,
   selectPromotionDiscountAmount,
   selectPromotionDraft,
+  selectPromotionPreview,
   selectPurchaseCart,
   selectReturnCart,
   usePosCheckoutSessionStore,
@@ -197,7 +198,8 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       const cashierName = currentUser
         ? `${currentUser.firstName} ${currentUser.lastName}`.trim()
         : (sessionState.cashierDisplayName ?? undefined);
-      const appliedVoucher = selectPromotionDraft(sessionState).appliedVoucher;
+      const promotionDraft = selectPromotionDraft(sessionState);
+      const appliedVoucher = promotionDraft.appliedVoucher;
       const activeBranchId = usePosBranchStore.getState().branchId;
       const store = buildStoreInfoFromBranch(
         branches?.find((b) => b.id === activeBranchId),
@@ -228,6 +230,8 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
         printDuplicate: p.printDuplicate,
         isReturnExchange: isReturnFlow,
         store,
+        promotionEngineDiscounts: selectPromotionPreview(sessionState).data
+          ?.appliedPrograms,
       });
 
       try {
@@ -297,6 +301,9 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             // Hạn thanh toán chỉ có nghĩa khi tính vào công nợ.
             dueDate: p.debt ? p.paymentDueDate : null,
             creditDays: p.debt ? p.creditDays : null,
+            // CTKM tùy chọn — chỉ luồng SALE (đơn trả/đổi có bài toán hoàn
+            // khuyến mại riêng, ngoài phạm vi UOW-02, giống preview evaluate).
+            selectedProgramIds: promotionDraft.selectedProgramIds,
           });
           if (!checkoutResolve.ok) {
             toast.error(describeResolveError(checkoutResolve.error));

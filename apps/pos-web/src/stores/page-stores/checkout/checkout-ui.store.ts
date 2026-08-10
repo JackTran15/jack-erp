@@ -49,6 +49,14 @@ interface PosCheckoutUiState {
   productSearchFocusSeq: number;
 
   /**
+   * Tăng counter để yêu cầu `useCheckoutPromotionPreview` chạy lại lời gọi
+   * `evaluate` đã hỏng (nút "Thử lại" ở dialog Chương trình khuyến mãi khi
+   * preview `unavailable`). Cùng pattern "signal counter" với
+   * `productSearchFocusSeq`.
+   */
+  promotionPreviewRetrySeq: number;
+
+  /**
    * Right-click context menu cho dòng trong InvoiceLineItemTable. Lưu lineId
    * + toạ độ viewport (clientX/clientY). null = đóng. Mỗi lúc chỉ 1 menu open.
    */
@@ -86,6 +94,7 @@ interface PosCheckoutUiState {
   clearPendingQtyFocusLineId: () => void;
 
   requestProductSearchFocus: () => void;
+  requestPromotionPreviewRetry: () => void;
 
   openLineContextMenu: (lineId: string, x: number, y: number) => void;
   closeLineContextMenu: () => void;
@@ -113,6 +122,7 @@ export const usePosCheckoutUiStore = create<PosCheckoutUiState>()((set) => ({
   variantDialogTarget: null,
   pendingQtyFocusLineId: null,
   productSearchFocusSeq: 0,
+  promotionPreviewRetrySeq: 0,
   lineContextMenu: null,
   recentPriceDialogLineId: null,
   lineDiscountDialogLineId: null,
@@ -167,6 +177,10 @@ export const usePosCheckoutUiStore = create<PosCheckoutUiState>()((set) => ({
 
   requestProductSearchFocus: () =>
     set((state) => ({ productSearchFocusSeq: state.productSearchFocusSeq + 1 })),
+  requestPromotionPreviewRetry: () =>
+    set((state) => ({
+      promotionPreviewRetrySeq: state.promotionPreviewRetrySeq + 1,
+    })),
 
   openLineContextMenu: (lineId, x, y) =>
     set({ lineContextMenu: { lineId, x, y } }),

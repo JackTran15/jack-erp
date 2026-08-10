@@ -25,6 +25,7 @@ function ctx(overrides: Partial<CheckoutContext> = {}): CheckoutContext {
       amountDue: 200,
       totalPaid: 200,
       remainder: 0,
+      keptChange: 0,
       pointsEarned: 0,
       newStatus: InvoiceStatus.PAID,
     },
@@ -74,6 +75,37 @@ describe('EnqueueOutboxStep', () => {
       expect.arrayContaining(['erp.sale.posted', 'erp.temp-warehouse.invoice-fulfill']),
     );
     expect(topics).not.toContain('erp.loyalty.points.award');
+  });
+
+  it('enqueues the kept-change voucher row only when the customer left change behind', async () => {
+    const { manager, outbox, enqueue } = withManager();
+    const c = ctx({
+      manager,
+      funds: { cashAccountId: 'till-1' },
+      totals: { ...ctx().totals!, keptChange: 15_000 },
+    });
+
+    await new EnqueueOutboxStep(outbox as any).execute(c);
+
+    const keptChangeCall = enqueue.mock.calls.find(
+      (call) => call[1] === 'erp.cash.voucher.needed.kept_change',
+    );
+    expect(keptChangeCall).toBeDefined();
+    expect(keptChangeCall![2].payload).toMatchObject({
+      invoiceId: 'inv-1',
+      invoiceCode: 'INV-202608-00001',
+      cashAccountId: 'till-1',
+      amount: 15_000,
+    });
+    // Partition key is the till, same as v1's KeptChangeCashPublisher.
+    expect(keptChangeCall![3]).toBe('till-1');
+  });
+
+  it('enqueues no kept-change row when there is no kept change', async () => {
+    const { manager, outbox, enqueue } = withManager();
+    await new EnqueueOutboxStep(outbox as any).execute(ctx({ manager, funds: { cashAccountId: 'till-1' } }));
+    const topics = enqueue.mock.calls.map((call) => call[1]);
+    expect(topics).not.toContain('erp.cash.voucher.needed.kept_change');
   });
 
   it('also enqueues LOYALTY_POINTS_AWARD when the invoice has a customer', async () => {

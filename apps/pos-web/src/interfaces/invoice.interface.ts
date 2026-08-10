@@ -6,6 +6,7 @@ import type {
   RefundMethod,
 } from "@erp/pos/types/invoice.type";
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
+import type { PromotionProgramType } from "@erp/shared-interfaces";
 
 export interface InvoiceItemRow {
   id: string;
@@ -85,6 +86,12 @@ export interface InvoiceRow {
   payments?: InvoicePaymentRow[];
   /** Công nợ còn lại của hoá đơn (invoice_debts.remainingAmount); null khi không có nợ. */
   remainingDebt?: number | null;
+  /**
+   * CTKM đã chạy lúc checkout, đọc từ snapshot `invoice_checkout_promotions`
+   * (T-08-01) — chỉ có ở `GET /invoices/:id`. Dùng cho breakdown "KM theo hoá
+   * đơn"/"KM theo mặt hàng" khi in lại (T-08-04), qua `groupPromotionsForPrint`.
+   */
+  appliedPromotions?: { type: PromotionProgramType; discountAmount: number }[];
 }
 
 /** Một dòng thanh toán theo phương thức, dùng để dựng biên lai chi tiết. */

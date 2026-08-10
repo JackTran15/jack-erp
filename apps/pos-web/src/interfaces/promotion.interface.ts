@@ -35,4 +35,8 @@ export interface PromotionItem {
   status?: PromotionStatusInfo;
   /** Disable selection (greyed out row). */
   disabled?: boolean;
+  /** Đã tick/đang áp — hiện checkbox checked. Không đồng nghĩa `disabled`. */
+  selected?: boolean;
+  /** Lý do bị bỏ qua bằng tiếng Việt — chỉ có ở CTKM `disabled` (nhóm read-only). */
+  reason?: string;
 }

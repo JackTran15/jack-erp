@@ -60,6 +60,21 @@ export class CheckoutV2Dto implements CheckoutInput {
   @Type(() => CheckoutV2PaymentLineDto)
   payments: CheckoutV2PaymentLineDto[];
 
+  /**
+   * Change the customer declined to take back ("Khách không lấy tiền thừa").
+   *
+   * `payments` still carry only what settles the invoice — the surplus never
+   * inflates `totalPaid` or revenue. It is booked separately as other income
+   * (Phiếu thu, DR quỹ / CR 711), so the drawer matches the cash physically in
+   * it. Only valid on a fully-settled cash sale. Mirrors
+   * `CheckoutInvoiceDto.keptChangeAmount` (v1).
+   */
+  @ApiPropertyOptional({ example: 60000 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  keptChangeAmount?: number;
+
   /** Credit due date (ISO `YYYY-MM-DD`). Stored on the debt record when the sale leaves a remaining balance. */
   @ApiPropertyOptional({ example: '2026-06-25' })
   @IsOptional()

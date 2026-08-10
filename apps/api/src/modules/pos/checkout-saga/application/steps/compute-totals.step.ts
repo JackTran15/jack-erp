@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import type { LineDiscount } from '@erp/shared-interfaces';
 import { POINT_EARN_VND_PER_POINT } from '../../../../customer/loyalty.constants';
 import { computeAmountDue } from '../../../services/invoice-amount.util';
-import { InvoiceStatus } from '../../../entities/invoice.entity';
+import { InvoicePaymentMethod, InvoiceStatus } from '../../../entities/invoice.entity';
 import { CheckoutContext, CheckoutStep } from '../checkout-step';
 
 const round = (v: number): number => Math.round(v * 100) / 100;
@@ -89,6 +89,30 @@ export class ComputeTotalsStep implements CheckoutStep {
       });
     }
 
+    // Kept change is cash tendered above `amountDue` that the customer left
+    // behind. It is deliberately not part of `payments` (v1 parity): an invoice
+    // can never be settled for more than it is worth, so the surplus is booked
+    // as other income instead. Same two guards v1 applies.
+    const keptChange = round(Number(ctx.input.keptChangeAmount ?? 0));
+    if (keptChange > 0) {
+      if (remainder > 0) {
+        throw new BadRequestException({
+          code: 'PAYMENT_INVALID',
+          message: `Kept change (${keptChange}) requires the invoice to be fully settled (remaining ${remainder})`,
+        });
+      }
+      if (
+        !ctx.input.payments.some(
+          (p) => p.paymentMethod === InvoicePaymentMethod.CASH,
+        )
+      ) {
+        throw new BadRequestException({
+          code: 'PAYMENT_INVALID',
+          message: 'Kept change requires at least one cash payment line',
+        });
+      }
+    }
+
     if (remainder > 0 && !invoice.customerId) {
       throw new BadRequestException({
         code: 'PAYMENT_INVALID',
@@ -125,6 +149,7 @@ export class ComputeTotalsStep implements CheckoutStep {
       amountDue,
       totalPaid,
       remainder,
+      keptChange,
       pointsEarned,
       newStatus,
     };

@@ -2,7 +2,6 @@ import type { EvaluateCartResponse } from "@erp/shared-interfaces";
 import type { PaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import type { PaymentMethod } from "@erp/pos/constants/checkout.constant";
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
-import type { PromotionItem } from "@erp/pos/interfaces/promotion.interface";
 import type { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import type { PosProductKind } from "@erp/pos/types/catalog.type";
 import type { VoucherFormResult } from "@erp/pos/dtos/voucher.dto";
@@ -209,7 +208,14 @@ export interface CheckoutPaymentDraft {
 }
 
 export interface CheckoutPromotionDraft {
-  appliedPromotion: PromotionItem | null;
+  /**
+   * Id các CTKM `auto_apply=false` thu ngân tự chọn (dialog "Chương trình
+   * khuyến mãi", các CTKM `auto_apply=true` không nằm ở đây — server tự áp).
+   * Mirror `EvaluateCartRequest.selectedProgramIds`/`CheckoutV2Dto`. Server
+   * luôn là nơi tính lại tiền giảm (A-07) — mảng này chỉ là lựa chọn, không
+   * mang theo số tiền.
+   */
+  selectedProgramIds: string[];
   /**
    * Số điểm khách dùng để giảm giá (1 điểm = 1.000đ, hằng số khớp BE
    * `POINT_REDEMPTION_VALUE_VND`). Lưu trong draft local, chỉ thực sự áp lên

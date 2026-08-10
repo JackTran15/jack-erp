@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In, EntityManager } from 'typeorm';
+import { PromotionProgramType } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { InvoiceEntity, InvoiceStatus } from '../entities/invoice.entity';
 import {
@@ -19,6 +20,7 @@ import { LocationEntity } from '../../inventory/location/location.entity';
 import { CustomerEntity } from '../../customer/customer.entity';
 import { UserEntity } from '../../auth/user.entity';
 import { EmployeeProfileEntity } from '../../rbac/employee/employee-profile.entity';
+import { InvoiceCheckoutPromotionEntity } from '../checkout-saga/infrastructure/invoice-checkout-promotion.entity';
 import { resolveBranchItemLocations } from './resolve-branch-item-locations';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
 import { UpdateInvoiceDto } from '../dto/update-invoice.dto';
@@ -306,6 +308,7 @@ export class InvoiceService {
       payments: InvoicePaymentEntity[];
       remainingDebt: number | null;
       staffName: string | null;
+      appliedPromotions: Array<{ type: PromotionProgramType; discountAmount: number }>;
     }
   > {
     const invoice = await this.findOne(id, actor);
@@ -334,11 +337,25 @@ export class InvoiceService {
       where: { id: invoice.staffId, organizationId: actor.organizationId },
     });
 
+    // Snapshot of the promotion programs that ran at checkout (T-08-01) —
+    // `invoice_checkout_promotions` was write-only until now (only written by
+    // persist-invoice.step.ts, never read back). Only `type`/`discountAmount`
+    // are returned — enough for the print breakdown (UOW-08); per-line detail
+    // already lives on `items[]`.
+    const promotionSnapshots = await this.dataSource
+      .getRepository(InvoiceCheckoutPromotionEntity)
+      .find({ where: { invoiceId: id, organizationId: actor.organizationId } });
+    const appliedPromotions = promotionSnapshots.map((row) => ({
+      type: row.type as PromotionProgramType,
+      discountAmount: Number(row.discountAmount),
+    }));
+
     return Object.assign(invoiceWithCustomer, {
       items: itemsWithLocation,
       payments,
       remainingDebt,
       staffName: staff ? `${staff.firstName} ${staff.lastName}`.trim() : null,
+      appliedPromotions,
     });
   }
 

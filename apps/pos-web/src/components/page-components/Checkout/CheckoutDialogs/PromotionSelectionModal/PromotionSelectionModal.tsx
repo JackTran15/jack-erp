@@ -43,6 +43,15 @@ export interface PromotionSelectionModalProps {
    * users confirm with no selection (e.g. clearing the applied promotion).
    */
   requireSelection?: boolean;
+
+  /**
+   * Set when the caller's data source failed to load (e.g. preview
+   * `unavailable`). Replaces the search + table with an error message +
+   * retry — never render an empty list as if there were simply no programs.
+   */
+  loadError?: string;
+  /** "Thử lại" — omit to hide the retry button even when `loadError` is set. */
+  onRetry?: () => void;
 }
 
 
@@ -65,6 +74,8 @@ export function PromotionSelectionModal({
   onConfirm,
   onAddPromotion,
   requireSelection = true,
+  loadError,
+  onRetry,
 }: PromotionSelectionModalProps) {
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const searchState = useControllableState<string>({
@@ -102,42 +113,63 @@ export function PromotionSelectionModal({
     <PosDialog open={open} onClose={onClose} width={1072}>
       <PosDialog.Header title="Chương trình khuyến mãi" />
       <PosDialog.Body>
-        {/* 4.5 Search input */}
-        <div className="w-full">
-          <div className="relative w-full max-w-[400px]">
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#64748B]"
-            >
-              <SearchIcon size={16} />
-            </span>
-            <input
-              type="text"
-              value={searchState.value}
-              onChange={(e) => searchState.setValue(e.target.value)}
-              placeholder="Tìm kiếm tên chương trình khuyến mãi"
-              aria-label="Tìm kiếm chương trình khuyến mãi"
-              className={cn(
-                "h-9 w-full rounded-md border border-[#E2E8F0] bg-white pl-9 pr-3 text-[14px] text-[#0F172A]",
-                "placeholder:italic placeholder:text-[#94A3B8]",
-                "transition-colors hover:border-[#CBD5E1]",
-                "focus:border-[#6366F1] focus:outline-none focus:ring-2 focus:ring-[#6366F1]/15",
-              )}
-            />
+        {loadError ? (
+          <div className="flex min-h-[280px] w-full flex-col items-center justify-center gap-3 py-12">
+            <p className="text-[14px] text-[#94A3B8]">{loadError}</p>
+            {onRetry ? (
+              <button
+                type="button"
+                onClick={onRetry}
+                className={cn(
+                  "inline-flex h-9 items-center justify-center rounded-md border border-[#E2E8F0] bg-white px-4 text-[14px] font-medium text-[#0F172A]",
+                  "transition-colors hover:bg-[#F8FAFC]",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#A5B4FC] focus-visible:ring-offset-2",
+                )}
+              >
+                Thử lại
+              </button>
+            ) : null}
           </div>
-        </div>
+        ) : (
+          <>
+            {/* 4.5 Search input */}
+            <div className="w-full">
+              <div className="relative w-full max-w-[400px]">
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#64748B]"
+                >
+                  <SearchIcon size={16} />
+                </span>
+                <input
+                  type="text"
+                  value={searchState.value}
+                  onChange={(e) => searchState.setValue(e.target.value)}
+                  placeholder="Tìm kiếm tên chương trình khuyến mãi"
+                  aria-label="Tìm kiếm chương trình khuyến mãi"
+                  className={cn(
+                    "h-9 w-full rounded-md border border-[#E2E8F0] bg-white pl-9 pr-3 text-[14px] text-[#0F172A]",
+                    "placeholder:italic placeholder:text-[#94A3B8]",
+                    "transition-colors hover:border-[#CBD5E1]",
+                    "focus:border-[#6366F1] focus:outline-none focus:ring-2 focus:ring-[#6366F1]/15",
+                  )}
+                />
+              </div>
+            </div>
 
-        {/* 4.6 Table */}
-        <div className="w-full pt-4">
-          <PromotionTable
-            rows={rows}
-            selectedId={selectedId}
-            onSelect={(id) => setSelectedId((cur) => (cur === id ? null : id))}
-          />
-        </div>
+            {/* 4.6 Table */}
+            <div className="w-full pt-4">
+              <PromotionTable
+                rows={rows}
+                selectedId={selectedId}
+                onSelect={(id) => setSelectedId((cur) => (cur === id ? null : id))}
+              />
+            </div>
+          </>
+        )}
 
         {/* 4.9 / 4.10 "Khuyến mại khác" — outline CTA */}
-        {onAddPromotion ? (
+        {onAddPromotion && !loadError ? (
           <div className="px-6 pt-8">
             <p className="text-[14px] font-semibold text-[#0F172A]">
               Khuyến mại khác

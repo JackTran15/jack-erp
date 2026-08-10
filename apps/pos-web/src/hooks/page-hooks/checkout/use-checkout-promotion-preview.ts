@@ -6,9 +6,11 @@ import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import {
   selectCheckoutVariant,
   selectCustomerDraft,
+  selectPromotionDraft,
   selectPurchaseCart,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
+import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 /**
  * Khoảng chờ gộp lời gọi. Thu ngân quét mã liên tục, mỗi lần quét là một lần
@@ -39,9 +41,15 @@ export function useCheckoutPromotionPreview(): void {
   const customer = usePosCheckoutSessionStore(
     (s) => selectCustomerDraft(s).selectedCustomer,
   );
+  const selectedProgramIds = usePosCheckoutSessionStore(
+    (s) => selectPromotionDraft(s).selectedProgramIds,
+  );
   const updateDraftSlice = usePosCheckoutSessionStore(
     (s) => s.updateActiveDraftSlice,
   );
+  // Bump từ nút "Thử lại" ở dialog Chương trình khuyến mãi khi preview
+  // `unavailable` — không tự nó đổi dữ liệu gì, chỉ ép effect chạy lại.
+  const retrySeq = usePosCheckoutUiStore((s) => s.promotionPreviewRetrySeq);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -57,6 +65,7 @@ export function useCheckoutPromotionPreview(): void {
       : {}),
   }));
   const cartKey = JSON.stringify(lines);
+  const selectedProgramIdsKey = JSON.stringify(selectedProgramIds);
   const customerId = customer?.id;
   const isSale = variant === CheckoutVariantEnum.SALE;
 
@@ -85,9 +94,11 @@ export function useCheckoutPromotionPreview(): void {
     const timer = setTimeout(() => {
       promotionService
         .evaluate(
-          // `selectedProgramIds` chưa truyền ở đây: slice đó do T-02-03 tạo
-          // cùng lúc với dialog chọn CTKM. UOW-01 chỉ lo CTKM tự động.
-          { lines, ...(customerId ? { customerId } : {}) },
+          {
+            lines,
+            ...(customerId ? { customerId } : {}),
+            ...(selectedProgramIds.length > 0 ? { selectedProgramIds } : {}),
+          },
           { signal: controller.signal },
         )
         .then((data) => {
@@ -114,5 +125,12 @@ export function useCheckoutPromotionPreview(): void {
       controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartKey, customerId, isSale, updateDraftSlice]);
+  }, [
+    cartKey,
+    customerId,
+    isSale,
+    updateDraftSlice,
+    retrySeq,
+    selectedProgramIdsKey,
+  ]);
 }

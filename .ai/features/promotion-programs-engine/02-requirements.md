@@ -1,13 +1,13 @@
 ---
 feature: promotion-programs-engine
 stories: 7
-acceptance_criteria: 30
+acceptance_criteria: 32
 ---
 
 # Requirements — Khuyến mại
 
 **AC-01…AC-11 giữ nguyên số của REQ-KM-001** (`docs/promotions/25-promotion-req.md` mục 10) để
-truy vết ngược. **AC-12…AC-30** là phần epic đặt ra mà REQ không đánh số: quy tắc ưu tiên,
+truy vết ngược. **AC-12…AC-31** là phần epic đặt ra mà REQ không đánh số: quy tắc ưu tiên,
 vòng đời CTKM, đa tổ chức, idempotency, hiệu năng truy vấn.
 
 Ánh xạ FR/BR → thiết kế nằm ở `docs/26-promotion-design.md` §7; ở đây chỉ có tiêu chí nghiệm thu.
@@ -223,14 +223,23 @@ Là **nhân viên marketing**, tôi muốn lọc và phân trang danh sách CTKM
 
 ### Acceptance criteria
 
-**AC-10** — Bộ lọc mặc định hiển thị thành chip xóa được
+**AC-10** — Mặc định không lọc trạng thái, chip chỉ hiện khi người dùng tự lọc
 ```gherkin
-Given tôi mở màn Chương trình khuyến mại lần đầu
-Then danh sách lọc mặc định theo trạng thái Đang theo dõi
+Given tôi mở màn Chương trình khuyến mại (hoặc màn Thẻ voucher) lần đầu
+Then danh sách hiển thị cả bản ghi Đang theo dõi lẫn Ngừng theo dõi, không lọc trạng thái
+And không có chip bộ lọc trạng thái nào trên thanh công cụ
+When tôi tự chọn lọc trạng thái Đang theo dõi (hoặc Ngừng theo dõi) từ cột Trạng thái
+Then danh sách chỉ còn bản ghi đúng trạng thái đã chọn
 And một chip hiển thị bộ lọc đang bật trên thanh công cụ
-When tôi bấm dấu x trên chip một lần
-Then bộ lọc bị xóa và các CTKM đã ngừng theo dõi hiện ra
+When tôi bấm dấu x trên chip
+Then bộ lọc bị xóa, danh sách trở lại hiển thị mọi trạng thái
 ```
+> Sửa 2026-08-10 (A-35). Bản đầu đòi mặc định lọc `Đang theo dõi` kèm chip xóa được — chốt ở
+> FR-004/AC-10 gốc, hiện thực bởi T-03-04 (màn CTKM) và T-06-02 (màn voucher, "cùng chuẩn
+> FR-004 với màn CTKM"), e2e-verified bởi T-07-04. QA/product (Akenzy, 2026-08-10) đảo ngược
+> có chủ ý: mặc định nay là "Tất cả" (không lọc trạng thái) trên cả hai màn; chip chỉ xuất
+> hiện khi người dùng tự lọc. Bằng chứng click-through của T-03-04/T-07-04 cho hành vi cũ
+> không còn phản ánh hành vi mong đợi hiện tại.
 
 **AC-21** — Phạm vi chi nhánh
 ```gherkin
@@ -299,6 +308,14 @@ When tôi xác nhận
 Then CTKM được lưu với endDate null
 ```
 
+**AC-31** — Xoá nhanh giờ áp dụng đã nhập
+```gherkin
+Given tôi đã nhập giờ bắt đầu hoặc giờ kết thúc cho "Giờ áp dụng"
+When tôi bấm nút xoá (×) cạnh ô đó
+Then giá trị ô đó về rỗng
+And Lưu chương trình vẫn thành công vì trường này không bắt buộc
+```
+
 ---
 
 ## US-05 — Chọn hàng hóa cho các lưới của form
@@ -320,6 +337,22 @@ And tôi chọn được nhiều dòng trong một lần mở, đóng dialog th�
 And chọn ở cấp hàng hóa, cấp mẫu mã và cấp nhóm hàng đều được, ánh xạ lần lượt sang targetType PRODUCT, ITEM và CATEGORY
 And dòng đã có trong lưới hiện trạng thái đã chọn khi mở lại dialog
 ```
+
+**AC-32** — Lưới "Giảm giá hàng hóa" nhập bằng ô tìm kiếm, không cần nút riêng
+```gherkin
+Given tôi đang ở lưới "Giảm giá hàng hóa" của form CTKM (cả hai chế độ Nhóm hàng hóa và Hàng hóa)
+When tôi gõ vào ô mã ở dòng trống cuối lưới
+Then danh sách gợi ý xuất hiện ngay dưới ô, cùng cơ chế tìm-gõ-chọn với ô "Tìm mã hoặc tên hàng hóa"
+     ở phiếu nhập kho/xuất kho/chuyển kho
+And chọn một gợi ý điền đủ mã + tên vào dòng đó, đồng thời tự thêm một dòng trống mới ở cuối lưới
+And không còn nút "+ Thêm dòng" hay "Chọn nhóm hàng hóa"/"Chọn hàng hóa" đứng riêng dưới bảng
+And bấm biểu tượng tìm kiếm trong ô vẫn mở được dialog chọn hàng loạt dùng chung của AC-28, để chọn
+    nhiều dòng cùng lúc khi cần
+```
+> Thêm 2026-08-10 theo yêu cầu QA/product — làm lại `GoodsDiscountGrid` (cùng UOW-04, section
+> `GoodsDiscountPromotionSection`) để khớp UX của `ApplicableGoodsGrid` — lưới song song trong
+> chính UOW-04 (`ConditionPromotionSection`), đã dùng mẫu này từ đầu — và của phiếu nhập/xuất/
+> chuyển kho. Xem A-36 cho đánh đổi mất "Nhân bản dòng".
 
 ---
 
@@ -357,7 +390,7 @@ HTTP thật sự khớp nhau chứ không chỉ khớp trong mock.
 ### Acceptance criteria
 
 Không thêm AC mới — US-07 chạy lại AC-01, AC-03…AC-09, AC-12…AC-26 qua HTTP thật trên
-`erp_test`, cộng checklist QA thủ công cho AC-02, AC-10, AC-11, AC-27, AC-28, AC-30 vì
+`erp_test`, cộng checklist QA thủ công cho AC-02, AC-10, AC-11, AC-27, AC-28, AC-30, AC-31 vì
 `apps/backoffice-web` không có test runner (A-24).
 
 ---

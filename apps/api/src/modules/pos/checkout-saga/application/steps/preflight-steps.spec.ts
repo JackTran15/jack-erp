@@ -482,6 +482,57 @@ describe('ComputeTotalsStep', () => {
     );
   });
 
+  // "Khách không lấy tiền thừa" — v1 parity (checkout-invoice.service.ts:174-188).
+  it('keeps the surplus out of totalPaid and reports it as keptChange', async () => {
+    const c = withDraft({
+      input: {
+        invoiceId: 'inv-1',
+        payments: [{ paymentMethod: InvoicePaymentMethod.CASH, amount: 785000 }],
+        keptChangeAmount: 15000,
+      },
+    });
+    await step.execute(c);
+    expect(c.totals!.keptChange).toBe(15000);
+    expect(c.totals!.totalPaid).toBe(785000);
+    expect(c.totals!.amountDue).toBe(785000);
+  });
+
+  it('defaults keptChange to 0 when the client sends none', async () => {
+    const c = withDraft({
+      input: { invoiceId: 'inv-1', payments: [{ paymentMethod: InvoicePaymentMethod.CASH, amount: 785000 }] },
+    });
+    await step.execute(c);
+    expect(c.totals!.keptChange).toBe(0);
+  });
+
+  it('rejects kept change on an invoice that is not fully settled', async () => {
+    const c = withDraft({
+      invoice: { discountAmount: 0, pointsDiscountAmount: 0, depositAmount: 0, customerId: 'cus-1' } as any,
+      accounts: { revenueAccountId: 'rev-1', receivableAccountId: 'ar-1', perPayment: [] },
+      input: {
+        invoiceId: 'inv-1',
+        payments: [{ paymentMethod: InvoicePaymentMethod.CASH, amount: 100000 }],
+        keptChangeAmount: 5000,
+      },
+    });
+    await expect(step.execute(c)).rejects.toMatchObject({
+      response: { code: 'PAYMENT_INVALID' },
+    });
+  });
+
+  it('rejects kept change when no cash line was tendered', async () => {
+    const c = withDraft({
+      input: {
+        invoiceId: 'inv-1',
+        payments: [{ paymentMethod: InvoicePaymentMethod.BANK_TRANSFER, amount: 785000 }],
+        keptChangeAmount: 15000,
+      },
+    });
+    await expect(step.execute(c)).rejects.toMatchObject({
+      response: { code: 'PAYMENT_INVALID' },
+    });
+  });
+
   it('AC-04-adjacent: rejects overpayment with PAYMENT_INVALID', async () => {
     const c = withDraft({
       input: { invoiceId: 'inv-1', payments: [{ paymentMethod: InvoicePaymentMethod.CASH, amount: 999999 }] },

@@ -397,7 +397,7 @@ Pha 1→3 là hiện thực trực tiếp BR-002 (giảm dòng trước, giảm 
 | FR-001 | Danh sách 7 cột | `SearchPromotionsV2Query` trả đủ cột + `code`/`priority` | `promotion_programs` | KM-08 |
 | FR-002 | Lọc kỳ | `DateRangeFilterDto` trên `start_date`/`end_date` | — | KM-08 |
 | FR-003 | Lọc từng cột, 5 toán tử text | `StringFilterDto` (`StringOperator`: `*`/`=`/`+`/`-`/`!`), `EnumFilterDto` cho cột enum | — | KM-08 |
-| FR-004 | Mặc định lọc `Đang theo dõi` + chip xóa được | **BE không tự lọc status** — chip là hành vi FE (khác MISA có chủ đích) | — | KM-13 |
+| FR-004 | Mặc định `Tất cả` (không lọc trạng thái), chip chỉ hiện khi tự lọc — đảo ngược 2026-08-10 từ bản gốc "mặc định `Đang theo dõi`" (QA/product, xem A-35 + AC-10) | **BE không tự lọc status** — chip là hành vi FE (khác MISA có chủ đích) | — | KM-13 |
 | FR-005 | Phân trang, mặc định 50 | `page`/`limit` DTO, `@Max(200)` | — | KM-08 |
 | FR-006 | Hình thức chọn lúc tạo, khóa sau | `type` immutable; `update` đổi `type` → 400 `PROMOTION_TYPE_IMMUTABLE` | `promotion_programs.type` | KM-04, KM-07 |
 | FR-007 | Sửa CTKM đã phát sinh giao dịch? | **Quyết định:** không khóa sửa trong epic này — `invoice_promotions` chưa liên kết tới `promotion_programs` (POS chưa nối), nên khái niệm "đã phát sinh" chưa tồn tại. Khóa thật sẽ chốt ở epic POS. | — | KM-07 (ghi chú) |

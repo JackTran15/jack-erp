@@ -6,6 +6,10 @@ import { useCheckoutGrandTotal } from "@erp/pos/hooks/page-hooks/checkout/use-ch
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 import { useCheckoutPromotion } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-promotion";
 import {
+  buildPromotionRowLabel,
+  shouldShowPromotionRow,
+} from "@erp/pos/lib/page-libs/checkout/promotionPresentation";
+import {
   selectEffectivePointsRedeemed,
   selectIsReturnExchangeInvoice,
   selectItemCountForPayment,
@@ -34,7 +38,8 @@ export function PaymentSummaryBlock({
   const pointsDiscountAmount = usePosCheckoutSessionStore(
     selectPointsDiscountAmount,
   );
-  const { clearRedeemedPoints } = useCheckoutPromotion();
+  const { selectedProgramIds, applyPromotion, clearRedeemedPoints } =
+    useCheckoutPromotion();
   const { deposit, returnFee } = useCheckoutPayment();
   const promotionPreview = usePosCheckoutSessionStore(selectPromotionPreview);
 
@@ -56,9 +61,27 @@ export function PaymentSummaryBlock({
             <span className="inline-block h-4 w-16 animate-pulse rounded bg-gray-100" />
           }
         />
-      ) : promotionPreview.status === "ready" && promotionPreview.data ? (
+      ) : promotionPreview.status === "ready" &&
+        promotionPreview.data &&
+        shouldShowPromotionRow(promotionPreview.data) ? (
         <PosSummaryRow
-          label="Khuyến mại"
+          label={
+            selectedProgramIds.length > 0 ? (
+              <span className="inline-flex items-center gap-1.5">
+                {buildPromotionRowLabel(promotionPreview.data)}
+                <button
+                  type="button"
+                  onClick={() => applyPromotion(null)}
+                  aria-label="Bỏ áp dụng khuyến mại"
+                  className="text-gray-400 transition-colors hover:text-gray-600"
+                >
+                  <CloseIcon size={14} />
+                </button>
+              </span>
+            ) : (
+              buildPromotionRowLabel(promotionPreview.data)
+            )
+          }
           value={`-${formatVnd(promotionPreview.data.promotionDiscount)}`}
         />
       ) : promotionPreview.status === "unavailable" ? (

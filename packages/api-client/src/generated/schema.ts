@@ -11399,6 +11399,11 @@ export interface components {
             /** @description UUID of the user who created this record. */
             createdBy: string;
         };
+        AppliedInvoicePromotionDto: {
+            /** @enum {string} */
+            type: "INVOICE_DISCOUNT" | "ITEM_DISCOUNT" | "TIERED_DISCOUNT" | "GIFT_ITEM" | "BUY_M_GET_N";
+            discountAmount: number;
+        };
         DraftInvoiceResponseDto: {
             /** @description Line items belonging to this draft, ordered by sortOrder. */
             items: components["schemas"]["DraftInvoiceItemDto"][];
@@ -11410,6 +11415,8 @@ export interface components {
             remainingDebt: number | null;
             /** @description Display name of the staff member (cashier) who created the invoice; null when the user no longer exists. */
             staffName: string | null;
+            /** @description Promotion programmes that actually ran at checkout, read back from the invoice_checkout_promotions snapshot. */
+            appliedPromotions: components["schemas"]["AppliedInvoicePromotionDto"][];
             code: string;
             /** Format: date-time */
             issuedAt?: string;

@@ -135,4 +135,27 @@ describe("buildCheckoutInvoiceApiPayload", () => {
     expect(res.body.payments.map((p) => p.amount)).toEqual([339_000]);
     expect(res.body.keptChangeAmount).toBeUndefined();
   });
+
+  // T-02-04 — CTKM tùy chọn đã chọn phải đi tới server lúc checkout (AC-10).
+  it("forwards selectedProgramIds when set", () => {
+    const res = buildCheckoutInvoiceApiPayload({
+      paymentLines: [cashLine(145_000, "acc-1")],
+      amountDue: 145_000,
+      selectedProgramIds: ["P1"],
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.body.selectedProgramIds).toEqual(["P1"]);
+  });
+
+  it("omits selectedProgramIds entirely when nothing is selected — body stays identical to before the field existed", () => {
+    const res = buildCheckoutInvoiceApiPayload({
+      paymentLines: [cashLine(145_000, "acc-1")],
+      amountDue: 145_000,
+      selectedProgramIds: [],
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.body.selectedProgramIds).toBeUndefined();
+  });
 });

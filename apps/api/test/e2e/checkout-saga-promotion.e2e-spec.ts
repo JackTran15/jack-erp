@@ -110,6 +110,13 @@ describe('Checkout Saga v2 — promotions (E2E, T-04-07)', () => {
       .set(fx.headers())
       .send({ invoiceId, payments: [{ paymentMethod: 'cash', amount: 200000 }], ...overrides });
 
+  /** Mirrors `promotion-evaluate.e2e-spec.ts`'s helper, on this file's own fixture. */
+  const evaluate = (body: unknown) =>
+    request(fx.app.getHttpServer())
+      .post('/v2/promotions/evaluate')
+      .set(fx.headers())
+      .send(body as object);
+
   const revenueCredit = async (invoiceId: string): Promise<number> => {
     const [row] = await ds.query(
       `SELECT jl.credit_amount FROM journal_lines jl
@@ -231,5 +238,111 @@ describe('Checkout Saga v2 — promotions (E2E, T-04-07)', () => {
       [invoiceId],
     );
     expect(snapshots).toHaveLength(0);
+  });
+
+  /**
+   * UOW-02 e2e (T-02-05) — the cashier's manual pick (`selectedProgramIds`)
+   * actually changes what gets committed, not just accepted. Case 1 and 2
+   * share the exact same fixture and only differ in one field, per the
+   * ticket's own done-when.
+   */
+  describe('AC-10: auto_apply=false programs only run when selected', () => {
+    it('case 1 — not selected: the eligible optional program has zero effect', async () => {
+      await createProgram(itemDiscountBody(fx.itemId3, { autoApply: false }));
+      const invoiceId = await createDraft([{ itemId: fx.itemId3, unitPrice: 685000 }]);
+
+      const res = await checkout(invoiceId, {
+        payments: [{ paymentMethod: 'cash', amount: 685000 }],
+      }).expect(201);
+      expect(res.body.committed).toBe(true);
+
+      const [invoice] = await ds.query(`SELECT discount_amount FROM invoices WHERE id = $1`, [
+        invoiceId,
+      ]);
+      expect(Number(invoice.discount_amount)).toBe(0);
+
+      const snapshots = await ds.query(
+        `SELECT * FROM invoice_checkout_promotions WHERE invoice_id = $1`,
+        [invoiceId],
+      );
+      expect(snapshots).toHaveLength(0);
+    });
+
+    it('case 2 — selected: runs, and the committed discountAmount equals what evaluate() quoted for the same cart', async () => {
+      const program = await createProgram(itemDiscountBody(fx.itemId3, { autoApply: false }));
+
+      // Same cart, same program — `evaluate` is the pre-payment quote the
+      // cashier saw in the dialog; the saga must land on the identical number.
+      const previewLine = { lineId: 'l1', itemId: fx.itemId3, quantity: 1, unitPrice: 685000 };
+      const preview = await evaluate({
+        lines: [previewLine],
+        selectedProgramIds: [program.body.id],
+      }).expect(201);
+      expect(preview.body.promotionDiscount).toBe(205500); // 30% of 685000
+
+      const invoiceId = await createDraft([{ itemId: fx.itemId3, unitPrice: 685000 }]);
+      const res = await checkout(invoiceId, {
+        payments: [{ paymentMethod: 'cash', amount: 479500 }], // 685000 - 205500
+        selectedProgramIds: [program.body.id],
+      }).expect(201);
+      expect(res.body.committed).toBe(true);
+
+      const [invoice] = await ds.query(`SELECT discount_amount FROM invoices WHERE id = $1`, [
+        invoiceId,
+      ]);
+      expect(Number(invoice.discount_amount)).toBe(preview.body.promotionDiscount);
+
+      const [snapshot] = await ds.query(
+        `SELECT program_id, discount_amount FROM invoice_checkout_promotions WHERE invoice_id = $1`,
+        [invoiceId],
+      );
+      expect(snapshot.program_id).toBe(program.body.id);
+      expect(Number(snapshot.discount_amount)).toBe(preview.body.promotionDiscount);
+
+      // T-08-01 — the same snapshot must be readable back through the API,
+      // not just visible via a direct DB query (the whole point of the ticket:
+      // invoice_checkout_promotions was write-only before this).
+      const getRes = await request(fx.app.getHttpServer())
+        .get(`/invoices/${invoiceId}`)
+        .set(fx.headers())
+        .expect(200);
+      expect(getRes.body.appliedPromotions).toEqual([
+        { type: 'ITEM_DISCOUNT', discountAmount: preview.body.promotionDiscount },
+      ]);
+    });
+
+    /**
+     * Ticket originally planned this as "unknown id ⇒ 422". Verified against
+     * the actual code before writing the assertion (not just the plan):
+     * `CheckoutV2Dto.selectedProgramIds` only validates UUID *shape*
+     * (`@IsUUID('4', { each: true })`, `checkout-v2.dto.ts`), and
+     * `PromotionResolver` (`promotion-resolver.ts:48-49`) merely filters
+     * eligible programs by id membership — a well-formed id that matches no
+     * eligible program is never treated as an error, just never selected.
+     * There genuinely is no 422 path here. Testing that instead: a phantom
+     * id must not crash checkout or silently apply *something* — it has to
+     * be a true no-op, same shape as case 1.
+     */
+    it('case 3 — a well-formed but non-existent program id is a silent no-op, not an error', async () => {
+      await createProgram(itemDiscountBody(fx.itemId3, { autoApply: false }));
+      const invoiceId = await createDraft([{ itemId: fx.itemId3, unitPrice: 685000 }]);
+
+      const res = await checkout(invoiceId, {
+        payments: [{ paymentMethod: 'cash', amount: 685000 }],
+        selectedProgramIds: [randomUUID()],
+      }).expect(201);
+      expect(res.body.committed).toBe(true);
+
+      const [invoice] = await ds.query(`SELECT discount_amount FROM invoices WHERE id = $1`, [
+        invoiceId,
+      ]);
+      expect(Number(invoice.discount_amount)).toBe(0);
+
+      const snapshots = await ds.query(
+        `SELECT * FROM invoice_checkout_promotions WHERE invoice_id = $1`,
+        [invoiceId],
+      );
+      expect(snapshots).toHaveLength(0);
+    });
   });
 });

@@ -1,7 +1,7 @@
 ---
 feature: pos-promotion-apply
-stories: 7
-acceptance_criteria: 24
+stories: 9
+acceptance_criteria: 32
 ---
 
 # Requirements — Áp dụng khuyến mại & voucher tại POS
@@ -268,6 +268,91 @@ Given hóa đơn có dòng A 1.850.000 chưa có KM và dòng B 540.000 đã gi�
 When tôi áp giảm giá tay 10% với phạm vi "Chỉ hàng hóa chưa áp dụng khuyến mãi"
 Then số tiền giảm là 185.000, bằng 10% của 1.850.000
 And không phải 228.200, tức 10% của tổng 2.282.000
+```
+
+---
+
+## US-08 — Thu ngân thấy rõ và điều chỉnh dòng khuyến mại trên tổng tiền
+
+> Thêm 10/08/2026 sau phiên review bug QA trên `feat/promotions` — dòng "Khuyến mại" ở panel
+> thanh toán render bất kể số tiền, không có %, không xoá được.
+
+Là thu ngân, tôi muốn dòng "Khuyến mại" trên panel thanh toán chỉ hiện khi có giảm giá thật,
+hiện đúng % nếu CTKM tính theo phần trăm, và cho tôi bỏ chọn khi cần.
+
+**Priority:** should
+**Depends on:** US-01, US-03
+
+### Acceptance criteria
+
+**AC-25** — Ẩn dòng khi không có giảm giá
+```gherkin
+Given preview trả promotionDiscount = 0
+When tôi xem panel thanh toán
+Then dòng "Khuyến mại" không hiển thị
+```
+
+**AC-26** — Hiện % khi CTKM tính theo phần trăm
+```gherkin
+Given đúng 1 chương trình INVOICE_DISCOUNT đang áp với discountMode=PERCENT, discountValue=30
+When tôi xem panel thanh toán
+Then dòng hiện "Khuyến mại (30%)"
+```
+
+**AC-27** — Không hiện % khi nhiều CTKM cùng áp
+```gherkin
+Given 2 chương trình đang áp cùng lúc (1 INVOICE_DISCOUNT PERCENT + 1 ITEM_DISCOUNT)
+When tôi xem panel thanh toán
+Then dòng hiện "Khuyến mại" không kèm %, vì một con số % lẻ không mô tả đúng tổng đã cộng dồn
+```
+
+**AC-28** — Bỏ chọn CTKM tùy chọn từ dòng tổng tiền
+```gherkin
+Given tôi đã tick 1 CTKM tùy chọn ở dialog, dòng Khuyến mại đang hiện kèm nút X
+When tôi bấm nút X
+Then selectedProgramIds về rỗng, preview chạy lại, tổng tiền quay về giá trị trước khi chọn
+```
+
+---
+
+## US-09 — Hóa đơn in hiện chi tiết khuyến mại theo hóa đơn và theo mặt hàng
+
+> Thêm 10/08/2026, cùng phiên review với US-08.
+
+Là thu ngân/khách hàng, tôi muốn hóa đơn in ra cho thấy khuyến mại được tính thế nào, tách theo
+hóa đơn hay theo mặt hàng, để đối chiếu — cả lúc vừa thanh toán lẫn khi in lại.
+
+**Priority:** should
+**Depends on:** US-01, US-02
+
+### Acceptance criteria
+
+**AC-29** — Hóa đơn vừa thanh toán hiện đúng breakdown
+```gherkin
+Given khi thanh toán có 1 CTKM INVOICE_DISCOUNT giảm 100.000 và 1 CTKM ITEM_DISCOUNT giảm 50.000
+When hóa đơn được in ngay sau khi Thu tiền
+Then thấy dòng "Khuyến mãi -150.000", "KM theo hoá đơn -100.000", "KM theo mặt hàng -50.000"
+```
+
+**AC-30** — Giảm giá tay không gộp vào KM theo mặt hàng
+```gherkin
+Given thu ngân đã giảm giá tay 1 dòng hàng, đồng thời có 1 CTKM ITEM_DISCOUNT khác dòng
+When hóa đơn in ra
+Then giảm giá tay hiện ở dòng "Giảm giá" riêng, không cộng vào số "KM theo mặt hàng"
+```
+
+**AC-31** — In lại hóa đơn cũ hiện breakdown giống hệt lúc thanh toán
+```gherkin
+Given hóa đơn đã chốt với breakdown như AC-29
+When tôi in lại từ Danh sách hóa đơn hoặc Lịch sử mua hàng
+Then breakdown hiện giống hệt số đã in lúc thanh toán
+```
+
+**AC-32** — Không có khuyến mại thì không hiện khối KM
+```gherkin
+Given hóa đơn không có CTKM nào áp
+When hóa đơn được in (mới hoặc in lại)
+Then không có dòng "Khuyến mãi" / "KM theo hoá đơn" / "KM theo mặt hàng" nào xuất hiện
 ```
 
 ---

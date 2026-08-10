@@ -14,6 +14,7 @@ import type {
 
 /** Dòng giảm trừ vào "Tổng thanh toán" khi đang bật. */
 const DISCOUNT_KEYS: readonly SampleNumberFieldKey[] = [
+  "totals.manualDiscountTotal",
   "totals.itemDiscountTotal",
   "totals.invoiceDiscountTotal",
   "totals.voucherDiscount",

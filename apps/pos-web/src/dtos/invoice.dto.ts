@@ -88,6 +88,13 @@ export interface CheckoutInvoiceBody {
   keptChangeAmount?: number;
   dueDate?: string;
   creditDays?: number;
+  /**
+   * Id các CTKM tùy chọn thu ngân đã chọn (luồng SALE, `VITE_CHECKOUT_V2` mới
+   * nhận). `invoiceService.checkout` tự lược field này khỏi payload nhánh v1
+   * cũ (`/invoices/:id/checkout` không khai báo trường này —
+   * `forbidNonWhitelisted` của backend sẽ 400 nếu gửi nhầm).
+   */
+  selectedProgramIds?: string[];
 }
 
 /**
@@ -98,8 +105,12 @@ export interface CheckoutInvoiceBody {
 export interface CheckoutV2Body {
   invoiceId: string;
   payments: InvoicePaymentLineBody[];
+  /** Mirror `CheckoutInvoiceBody.keptChangeAmount` — xem docblock ở đó. */
+  keptChangeAmount?: number;
   dueDate?: string;
   creditDays?: number;
+  /** Mirror `CheckoutInvoiceBody.selectedProgramIds` — xem docblock ở đó. */
+  selectedProgramIds?: string[];
 }
 
 /**

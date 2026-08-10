@@ -39,8 +39,12 @@ export function ProgramsPage() {
   const [columnFilters, setColumnFilters] = useState<
     Record<string, ColumnFilter>
   >({});
-  /** FR-004 — mặc định chỉ xem chương trình đang theo dõi; xóa được bằng 1 click. */
-  const [trackingOnly, setTrackingOnly] = useState(true);
+  /**
+   * FR-004 (đảo ngược 2026-08-10, T-03-06) — mặc định KHÔNG lọc trạng thái,
+   * hiện cả "Đang theo dõi" lẫn "Ngừng theo dõi". Chip lọc chỉ xuất hiện khi
+   * người dùng tự chọn trạng thái từ cột, và vẫn xóa được bằng 1 click.
+   */
+  const [trackingOnly, setTrackingOnly] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   // Lọc chạy ở server, nên gõ từng ký tự mà gọi ngay là mỗi ký tự một request.

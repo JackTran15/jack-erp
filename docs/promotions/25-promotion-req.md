@@ -75,7 +75,13 @@ Mỗi cột có ô lọc riêng dưới header:
 > ⚠️ **Khác biệt có chủ đích so với hệ tham chiếu.**
 > Hệ tham chiếu mặc định lọc `Đang theo dõi`, khiến CTKM đã ngừng **biến mất** khỏi danh sách mà không có dấu hiệu nào — đây là lỗi UX gây nhầm lẫn "mất chương trình khuyến mại".
 >
-> **Yêu cầu:** mặc định lọc `Đang theo dõi`, **nhưng phải hiển thị chip/badge bộ lọc đang bật** ngay trên thanh công cụ để người dùng biết danh sách đang bị lọc và xóa lọc bằng 1 cú click.
+> **Yêu cầu (gốc, 2026-08-03):** mặc định lọc `Đang theo dõi`, **nhưng phải hiển thị chip/badge bộ lọc đang bật** ngay trên thanh công cụ để người dùng biết danh sách đang bị lọc và xóa lọc bằng 1 cú click.
+>
+> **Đảo ngược 2026-08-10 (QA/product, Akenzy):** mặc định đổi thành `Tất cả` (không lọc trạng
+> thái) trên cả màn CTKM và màn Thẻ voucher — không còn ẩn bản ghi đã ngừng theo dõi khỏi
+> lượt xem đầu tiên. Chip bộ lọc chỉ xuất hiện khi người dùng tự chọn lọc trạng thái. Đây là
+> quyết định yêu cầu, không phải sửa bug — chi tiết ở
+> `.ai/features/promotion-programs-engine/02-requirements.md` AC-10 và assumption A-35.
 
 ### FR-005 — Phân trang `Must`
 Điều hướng trang đầu/trước/sau/cuối, chọn số dòng/trang (mặc định 50), hiển thị `Hiển thị x - y trên z kết quả`.

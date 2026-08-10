@@ -232,6 +232,14 @@ export interface AppliedProgram {
   discountAmount: number;
   lineDiscounts: LineDiscount[];
   gifts: GiftOffer[];
+  /**
+   * Only set when `type === INVOICE_DISCOUNT` — that's the only type with a
+   * single program-level discount mode/value. `ITEM_DISCOUNT`/`TIERED_DISCOUNT`
+   * carry it per-reward/per-tier instead, and `BUY_M_GET_N` has none at all —
+   * always `undefined` for those, never inferred from the first line/tier.
+   */
+  discountMode?: PromotionDiscountMode;
+  discountValue?: number;
 }
 
 /** auto_apply=false programs that were eligible but not run — cashier can still pick them. */

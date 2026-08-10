@@ -26,8 +26,10 @@ function dateRange(filter?: ColumnFilter) {
 /**
  * Body của `POST /v2/vouchers/search`.
  *
- * Giống màn CTKM: API **không** tự lọc `status`; mặc định "Đang theo dõi" là chip
- * của FE, xóa được bằng một click (cùng chuẩn FR-004).
+ * Giống màn CTKM: API **không** tự lọc `status`. Mặc định hiện là "Tất cả"
+ * (FR-004 đảo ngược 2026-08-10, T-06-06) — `trackingOnly` không còn được
+ * truyền `true` từ `VouchersPage.tsx`, tham số này vẫn còn vì cột lọc trạng
+ * thái do người dùng tự đặt vẫn cần thắng nó.
  *
  * `faceValue` dùng `CompareFilterDto` — ô lọc của cột số nhập một con số và ngầm
  * hiểu là "≤", nên map sang toán tử `<=` thay vì `=`.

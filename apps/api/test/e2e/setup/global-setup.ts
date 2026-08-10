@@ -9,13 +9,24 @@ import { config as loadEnv } from 'dotenv';
  *
  * Jest does not load apps/api/.env automatically (unlike Nest ConfigModule).
  * Load it here so DB_* match docker-compose / local dev credentials.
+ *
+ * Prefers `.env.test` over `.env` — the suite calls `ds.synchronize(true)`
+ * (`resetDatabase()`), a full schema drop+recreate, before every fixture.
+ * `.env` alone points at whatever `DB_NAME` a developer's dev environment
+ * uses; without a `.env.test` override that drop runs against the real dev
+ * database. Discovered live (T-02-05): it failed harmlessly only because an
+ * unrelated Postgres extension made the drop error out mid-transaction —
+ * with that extension absent it would have silently wiped `erp_dev`.
  */
 
 /** Only ever let the suite point at a database whose name marks it as throwaway. */
 const DEFAULT_E2E_DB_NAME = 'erp_test';
 
 export default async function globalSetup() {
-  const envPath = path.resolve(__dirname, '../../../.env');
+  const testEnvPath = path.resolve(__dirname, '../../../.env.test');
+  const envPath = fs.existsSync(testEnvPath)
+    ? testEnvPath
+    : path.resolve(__dirname, '../../../.env');
   if (fs.existsSync(envPath)) {
     loadEnv({ path: envPath });
   }
@@ -45,6 +56,17 @@ export default async function globalSetup() {
     throw new Error(
       `Refusing to run E2E against "${dbName}": the suite drops every table in it. ` +
         'Point E2E_DB_NAME at a throwaway database.',
+    );
+  }
+
+  // Hard stop, not a warning: `resetDatabase()` drops this database's entire
+  // schema on every fixture. A name that doesn't look disposable is refused
+  // outright rather than risking a repeat of the incident above.
+  if (!/test/i.test(dbName)) {
+    throw new Error(
+      `refusing to run E2E against database "${dbName}" — its name doesn't contain ` +
+        '"test", and resetDatabase() drops its entire schema on every run. ' +
+        `Add ${testEnvPath} with a disposable DB_NAME (e.g. erp_test) before running test:e2e.`,
     );
   }
 

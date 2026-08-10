@@ -1,9 +1,25 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { PromotionProgramType } from '@erp/shared-interfaces';
 import { InvoiceEntity } from '../entities/invoice.entity';
 import { InvoiceItemEntity } from '../entities/invoice-item.entity';
 import { InvoicePaymentEntity } from '../entities/invoice-payment.entity';
 import { LocationEntity } from '../../inventory/location/location.entity';
 import { CustomerEntity } from '../../customer/customer.entity';
+
+/**
+ * One promotion program that actually ran at checkout, read back from the
+ * `invoice_checkout_promotions` audit snapshot (T-08-01). Only `type` +
+ * `discountAmount` — enough for the print breakdown (UOW-08) to bucket by
+ * invoice-level vs item-level discount; per-line/gift detail already lives
+ * on `items[]` and isn't duplicated here.
+ */
+export class AppliedInvoicePromotionDto {
+  @ApiProperty({ enum: PromotionProgramType })
+  type: PromotionProgramType;
+
+  @ApiProperty({ type: Number })
+  discountAmount: number;
+}
 
 /** Invoice line item enriched with its resolved storage location. */
 export class DraftInvoiceItemDto extends InvoiceItemEntity {
@@ -46,4 +62,10 @@ export class DraftInvoiceResponseDto extends InvoiceEntity {
     description: 'Display name of the staff member (cashier) who created the invoice; null when the user no longer exists.',
   })
   staffName: string | null;
+
+  @ApiProperty({
+    type: [AppliedInvoicePromotionDto],
+    description: 'Promotion programmes that actually ran at checkout, read back from the invoice_checkout_promotions snapshot.',
+  })
+  appliedPromotions: AppliedInvoicePromotionDto[];
 }

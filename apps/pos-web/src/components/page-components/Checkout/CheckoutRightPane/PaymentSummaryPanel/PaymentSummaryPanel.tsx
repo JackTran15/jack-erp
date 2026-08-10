@@ -22,10 +22,13 @@ import {
 import { useCheckoutCustomer } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-customer";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 import { useCheckoutPromotion } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-promotion";
+import { mapEvaluateResponseToPromotionItems } from "@erp/pos/lib/page-libs/checkout/promotionPresentation";
 import {
   selectCheckoutVariant,
+  selectPromotionPreview,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
+import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 
 export interface PaymentSummaryPanelProps {
@@ -48,11 +51,23 @@ export function PaymentSummaryPanel({
     paymentLines,
     handleRequireCustomerForDeposit,
   } = useCheckoutPayment();
-  const { appliedPromotion, applyPromotion } = useCheckoutPromotion();
+  const { selectedProgramIds, applyPromotion } = useCheckoutPromotion();
+  const promotionPreview = usePosCheckoutSessionStore(selectPromotionPreview);
+  const requestPromotionPreviewRetry = usePosCheckoutUiStore(
+    (s) => s.requestPromotionPreviewRetry,
+  );
 
   // Tab trả theo hóa đơn → khóa khách (lấy từ hóa đơn gốc, không cho đổi/thêm).
   const variant = usePosCheckoutSessionStore(selectCheckoutVariant);
   const customerLocked = variant === CheckoutVariantEnum.INVOICE_RETURN;
+
+  const dialogPromotions = useMemo(
+    () =>
+      promotionPreview.status === "ready" && promotionPreview.data
+        ? mapEvaluateResponseToPromotionItems(promotionPreview.data)
+        : [],
+    [promotionPreview],
+  );
 
   const [promotionDialogOpen, setPromotionDialogOpen] = useState(false);
   const [promoMenuOpen, setPromoMenuOpen] = useState(false);
@@ -185,9 +200,15 @@ export function PaymentSummaryPanel({
       <PromotionSelectionModal
         open={promotionDialogOpen}
         onClose={() => setPromotionDialogOpen(false)}
-        promotions={[]}
-        initialSelectedId={appliedPromotion?.id ?? null}
+        promotions={dialogPromotions}
+        initialSelectedId={selectedProgramIds[0] ?? null}
         onConfirm={applyPromotion}
+        loadError={
+          promotionPreview.status === "unavailable"
+            ? "Chưa tải được danh sách chương trình"
+            : undefined
+        }
+        onRetry={requestPromotionPreviewRetry}
       />
     </aside>
   );

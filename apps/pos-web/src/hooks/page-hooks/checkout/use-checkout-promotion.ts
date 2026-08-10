@@ -12,7 +12,13 @@ import {
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface UseCheckoutPromotionResult {
-  appliedPromotion: PromotionItem | null;
+  /**
+   * Id các CTKM tùy chọn (`auto_apply=false`) thu ngân đã tick — không gồm
+   * CTKM `auto_apply=true` (server tự áp, không cần chọn). Nguồn sự thật cho
+   * số tiền là `promotionPreview` (đọc qua `selectPromotionPreview`), không
+   * phải mảng này — mảng chỉ là lựa chọn gửi lên `evaluate`/`checkout`.
+   */
+  selectedProgramIds: string[];
   applyPromotion: (promotion: PromotionItem | null) => void;
   pickPromoOption: (option: PromoMenuOption) => void;
   searchVoucher: (code: string) => void;
@@ -28,12 +34,13 @@ export interface UseCheckoutPromotionResult {
 }
 
 /**
- * Promotion + voucher handlers — đọc ui store và phát announce. Hiện
- * `promotions` list ở Page là static `[]` nên không expose từ đây.
+ * Promotion + voucher handlers — đọc ui store và phát announce. Danh sách
+ * CTKM hiển thị trong dialog đến từ `promotionPreview` (T-02-02), không phải
+ * từ đây — hook này chỉ giữ lựa chọn tùy chọn của thu ngân.
  */
 export function useCheckoutPromotion(): UseCheckoutPromotionResult {
-  const appliedPromotion = usePosCheckoutSessionStore(
-    (s) => selectPromotionDraft(s).appliedPromotion,
+  const selectedProgramIds = usePosCheckoutSessionStore(
+    (s) => selectPromotionDraft(s).selectedProgramIds,
   );
   const updateDraftSlice = usePosCheckoutSessionStore(
     (s) => s.updateActiveDraftSlice,
@@ -41,9 +48,11 @@ export function useCheckoutPromotion(): UseCheckoutPromotionResult {
 
   const applyPromotion = useCallback(
     (promotion: PromotionItem | null) => {
+      // Dialog vẫn chọn-1 (chưa multi-select) — mảng chỉ có 0 hoặc 1 phần tử
+      // cho tới khi có UoW cho phép chọn nhiều CTKM tùy chọn cùng lúc.
       updateDraftSlice("promotion", (p) => ({
         ...p,
-        appliedPromotion: promotion,
+        selectedProgramIds: promotion ? [promotion.id] : [],
       }));
       usePosCheckoutUiStore
         .getState()
@@ -111,7 +120,7 @@ export function useCheckoutPromotion(): UseCheckoutPromotionResult {
   }, [updateDraftSlice]);
 
   return {
-    appliedPromotion,
+    selectedProgramIds,
     applyPromotion,
     pickPromoOption,
     searchVoucher,

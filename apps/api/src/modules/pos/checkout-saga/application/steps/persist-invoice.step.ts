@@ -62,6 +62,7 @@ export class PersistInvoiceStep implements CheckoutStep {
     invoice.depositAmount = totals.depositAmount;
     invoice.amountDue = totals.amountDue;
     invoice.totalPaid = totals.totalPaid;
+    invoice.keptChangeAmount = totals.keptChange;
     invoice.pointsEarned = totals.pointsEarned;
 
     const cardBalance = invoice.customerId

@@ -58,6 +58,11 @@ export interface CheckoutPaymentInput {
 export interface CheckoutInput {
   invoiceId: string;
   payments: CheckoutPaymentInput[];
+  /**
+   * Change the customer declined to take back. Never part of `payments` — see
+   * `CheckoutTotals.keptChange`.
+   */
+  keptChangeAmount?: number;
   dueDate?: string;
   creditDays?: number;
   /** Ids of `auto_apply = false` programs the cashier picked. Amounts are never taken from the client. */
@@ -102,6 +107,13 @@ export interface CheckoutTotals {
   amountDue: number;
   totalPaid: number;
   remainder: number;
+  /**
+   * Surplus cash left in the drawer ("Khách không lấy tiền thừa"). Excluded
+   * from `totalPaid` and from revenue on purpose: it is booked as other income
+   * by its own Phiếu thu (enqueue-outbox), so the till matches the cash
+   * physically in it. Zero unless the client sent `keptChangeAmount`.
+   */
+  keptChange: number;
   pointsEarned: number;
   newStatus: InvoiceStatus;
 }

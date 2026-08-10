@@ -1,4 +1,5 @@
 import { DateTimeField, FormField, Input } from "@erp/ui";
+import { X } from "lucide-react";
 import {
   DAY_OF_WEEK_OPTIONS,
   FORM_LABEL_WIDTH,
@@ -78,21 +79,45 @@ export function TimePromotionSection({ form, onChange }: Props) {
 
         <FormField label="Giờ áp dụng" layout="horizontal" labelWidth={LABEL_WIDTH}>
           <div className="flex flex-wrap items-center gap-3">
-            <Input
-              type="time"
-              aria-label="Giờ bắt đầu"
-              className="w-32"
-              value={form.startTime}
-              onChange={(e) => onChange({ startTime: e.target.value })}
-            />
+            <div className="flex items-center gap-1">
+              <Input
+                type="time"
+                aria-label="Giờ bắt đầu"
+                className="w-32"
+                value={form.startTime}
+                onChange={(e) => onChange({ startTime: e.target.value })}
+              />
+              {form.startTime ? (
+                <button
+                  type="button"
+                  aria-label="Xoá giờ bắt đầu"
+                  onClick={() => onChange({ startTime: "" })}
+                  className="text-muted-foreground hover:text-destructive hover:opacity-70"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+            </div>
             <span className="text-muted-foreground">đến</span>
-            <Input
-              type="time"
-              aria-label="Giờ kết thúc"
-              className="w-32"
-              value={form.endTime}
-              onChange={(e) => onChange({ endTime: e.target.value })}
-            />
+            <div className="flex items-center gap-1">
+              <Input
+                type="time"
+                aria-label="Giờ kết thúc"
+                className="w-32"
+                value={form.endTime}
+                onChange={(e) => onChange({ endTime: e.target.value })}
+              />
+              {form.endTime ? (
+                <button
+                  type="button"
+                  aria-label="Xoá giờ kết thúc"
+                  onClick={() => onChange({ endTime: "" })}
+                  className="text-muted-foreground hover:text-destructive hover:opacity-70"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+            </div>
           </div>
         </FormField>
       </div>

@@ -331,3 +331,103 @@ history:
     at: 2026-08-04T20:17:20
     by: Akenzy
     ticket: T-07-04
+  - gate: G1
+    action: reopened
+    at: 2026-08-10T09:50:26
+    by: Akenzy
+    reason: QA 2026-08-10 - reverse FR-004/AC-10 default-filter behavior on Programs+Voucher lists; add Giờ áp dụng clear-button requirement
+  - gate: G1
+    action: passed
+    at: 2026-08-10T09:50:38
+    by: Akenzy
+    evidence: 25 assumptions, none blocking-and-pending; 31 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-10T09:50:47
+    by: Akenzy
+    evidence: 5 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-10T09:53:50
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 34 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-10T11:04:38
+    by: Akenzy
+    ticket: T-03-06
+  - gate: G4
+    action: ticket review
+    at: 2026-08-10T11:05:30
+    by: Akenzy
+    ticket: T-03-06
+  - gate: G4
+    action: ticket done
+    at: 2026-08-10T11:10:37
+    by: Akenzy
+    ticket: T-03-06
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-10T11:10:46
+    by: Akenzy
+    ticket: T-06-06
+  - gate: G4
+    action: ticket review
+    at: 2026-08-10T11:11:53
+    by: Akenzy
+    ticket: T-06-06
+  - gate: G4
+    action: ticket done
+    at: 2026-08-10T11:15:09
+    by: Akenzy
+    ticket: T-06-06
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-10T11:15:18
+    by: Akenzy
+    ticket: T-04-05
+  - gate: G4
+    action: ticket review
+    at: 2026-08-10T11:16:30
+    by: Akenzy
+    ticket: T-04-05
+  - gate: G4
+    action: ticket done
+    at: 2026-08-10T11:19:08
+    by: Akenzy
+    ticket: T-04-05
+  - gate: G1
+    action: reopened
+    at: 2026-08-10T13:30:53
+    by: Akenzy
+    reason: QA 2026-08-10 (Bug #6) - GoodsDiscountGrid nút Thêm dòng/Chọn nhóm hàng hóa thay bằng ô tìm kiếm inline, khớp UX nhập/xuất/chuyển kho
+  - gate: G1
+    action: passed
+    at: 2026-08-10T13:31:02
+    by: Akenzy
+    evidence: 26 assumptions, none blocking-and-pending; 32 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-10T13:31:03
+    by: Akenzy
+    evidence: 5 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-10T13:32:02
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 35 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-10T13:32:18
+    by: Akenzy
+    ticket: T-04-06
+  - gate: G4
+    action: ticket review
+    at: 2026-08-10T13:35:03
+    by: Akenzy
+    ticket: T-04-06
+  - gate: G4
+    action: ticket done
+    at: 2026-08-10T13:40:23
+    by: Akenzy
+    ticket: T-04-06

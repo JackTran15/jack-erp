@@ -135,6 +135,10 @@ export const CASHIER_PERMISSION_KEYS: string[] = [
   'pos.exchange.create',
   'pos.session.manage',
   'pos.promotion.read',
+  // POS Checkout: POST /v2/promotions/evaluate to price the cart before
+  // taking payment. Deliberately not `promotion.read`, which would also open
+  // the back-office promotion catalogue.
+  'pos.promotion.evaluate',
   'accounting.cash.read',
   'accounting.cash.create',
   'accounting.cash_receipt.create',

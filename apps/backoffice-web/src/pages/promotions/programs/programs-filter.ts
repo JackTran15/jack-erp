@@ -43,8 +43,10 @@ export interface PeriodRange {
  * Gộp bộ lọc kỳ + lọc từng cột + bộ lọc trạng thái mặc định thành body của
  * `POST /v2/promotions/search`.
  *
- * API **không** tự lọc `status` (nó không được âm thầm ẩn dữ liệu) — mặc định
- * "Đang theo dõi" là hành vi của FE và hiện thành chip xóa được (FR-004/AC-10).
+ * API **không** tự lọc `status` (nó không được âm thầm ẩn dữ liệu). Mặc định
+ * hiện là "Tất cả" — `trackingOnly` không còn được truyền `true` từ
+ * `ProgramsPage.tsx` (FR-004/AC-10 đảo ngược 2026-08-10, T-03-06) — tham số
+ * này vẫn còn vì cột lọc trạng thái do người dùng tự đặt vẫn cần thắng nó.
  */
 export function buildPromotionFilters(
   columnFilters: Record<string, ColumnFilter>,

@@ -30,6 +30,7 @@ function ctx(overrides: Partial<CheckoutContext> = {}): CheckoutContext {
       amountDue: 200,
       totalPaid: 200,
       remainder: 0,
+      keptChange: 0,
       pointsEarned: 0,
       newStatus: InvoiceStatus.PAID,
     },
