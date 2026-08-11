@@ -7,12 +7,18 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { RedisIoAdapter } from './modules/websocket/redis-io.adapter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const logger = new Logger('Bootstrap');
+
+  // Default body-parser limit is 100kb, which bulk goods-receipt/goods-issue
+  // payloads (many line items) can exceed → PayloadTooLargeError.
+  app.useBodyParser('json', { limit: '5mb' });
+  app.useBodyParser('urlencoded', { limit: '5mb', extended: true });
 
   // Silently short-circuit favicon probes so they don't trip the global
   // HttpExceptionFilter (and drop a 404 stack into the logs on every page load).
