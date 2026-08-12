@@ -243,6 +243,7 @@ export function InventoryManagementPage() {
   const response = summaryQuery.isError ? undefined : summaryQuery.data;
   const rows = response?.data ?? [];
   const total = response?.total ?? 0;
+  const hasPeriod = Boolean(applied.period.from || applied.period.to);
 
   const visibleTotals = useMemo(
     () =>
@@ -321,7 +322,12 @@ export function InventoryManagementPage() {
       quantityColumn(
         "quantity",
         "SL tồn",
-        applied.advanced.excludeReservations
+        // response.totalQuantity là tổng tồn LIVE toàn bộ tập kết quả (mọi
+        // trang) — không theo kỳ. Khi có chọn "Từ ngày/Đến ngày", cột này
+        // hiển thị closingQty theo kỳ nên tổng cũng phải cùng phạm vi với các
+        // cột kỳ khác (Tồn đầu kỳ/SL nhập/SL xuất): cộng dồn theo trang hiện
+        // tại, không dùng response.totalQuantity.
+        hasPeriod || applied.advanced.excludeReservations
           ? visibleTotals.quantity
           : (response?.totalQuantity ?? visibleTotals.quantity),
         (row) => displayStockQuantity(row, applied.advanced.excludeReservations),
@@ -336,7 +342,12 @@ export function InventoryManagementPage() {
       ),
       quantityColumn("incomingQty", "Sắp nhận về", visibleTotals.incomingQty),
     ],
-    [applied.advanced.excludeReservations, response?.totalQuantity, visibleTotals],
+    [
+      applied.advanced.excludeReservations,
+      hasPeriod,
+      response?.totalQuantity,
+      visibleTotals,
+    ],
   );
 
   const activeAdvancedCount = [
@@ -549,7 +560,10 @@ function displayStockQuantity(
   row: StockSummaryRow,
   excludeReservations: boolean,
 ): number {
-  return row.quantity - (excludeReservations ? row.reservedQty : 0);
+  // closingQty = tồn cuối kỳ (đầu kỳ + nhập - xuất) khi có chọn "Từ ngày/Đến
+  // ngày"; backend tự trả về closingQty = quantity (tồn live) khi không có kỳ,
+  // nên dùng closingQty luôn khớp đúng ngữ nghĩa cột "SL tồn" cho cả 2 trường hợp.
+  return row.closingQty - (excludeReservations ? row.reservedQty : 0);
 }
 
 const STOCK_SUMMARY_EXPORT_OPTIONS: Array<{

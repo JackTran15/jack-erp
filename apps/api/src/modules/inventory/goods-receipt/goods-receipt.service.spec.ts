@@ -5,6 +5,7 @@ import {
   TransferOrderStatus,
 } from '@erp/shared-interfaces';
 import { GoodsReceiptService } from './goods-receipt.service';
+import { GoodsReceiptEntity } from './goods-receipt.entity';
 import { TransferOrderEntity } from '../transfer-order/transfer-order.entity';
 
 describe('GoodsReceiptService', () => {
@@ -15,8 +16,16 @@ describe('GoodsReceiptService', () => {
     softDelete: jest.fn(),
     manager: { findOne: jest.fn(), update: jest.fn() },
   };
+  // Manager handed to the `dataSource.transaction(...)` callback in `cancel()`
+  // — row-lock query + status flip both happen through this, inside the tx.
+  const txManager = {
+    query: jest.fn().mockResolvedValue([{ status: GoodsReceiptStatus.POSTED }]),
+    update: jest.fn(),
+    softDelete: jest.fn(),
+    delete: jest.fn(),
+  };
   const dataSource = {
-    transaction: jest.fn((cb: (manager: unknown) => Promise<unknown>) => cb({})),
+    transaction: jest.fn((cb: (manager: unknown) => Promise<unknown>) => cb(txManager)),
   };
   const stockLedger = {
     recordBatchMovements: jest.fn().mockResolvedValue([]),
@@ -157,10 +166,26 @@ describe('GoodsReceiptService', () => {
 
     await service.cancel('receipt-1', actor);
 
-    // Stock reversed, then the order is unlinked so the source phiếu xuất is
+    // Row is locked (FOR UPDATE) and its status re-checked inside the
+    // transaction, so a concurrent duplicate cancel can't post a second
+    // reversal batch.
+    expect(txManager.query).toHaveBeenCalledWith(
+      expect.stringContaining('FOR UPDATE'),
+      ['receipt-1', actor.organizationId],
+    );
+    // Stock reversed, status flipped + soft-deleted inside the same
+    // transaction, then the order is unlinked so the source phiếu xuất is
     // no longer referenced and becomes deletable.
     expect(stockLedger.recordBatchMovements).toHaveBeenCalled();
-    expect(receiptRepo.softDelete).toHaveBeenCalledWith('receipt-1');
+    expect(txManager.update).toHaveBeenCalledWith(
+      GoodsReceiptEntity,
+      'receipt-1',
+      { status: GoodsReceiptStatus.CANCELLED },
+    );
+    expect(txManager.softDelete).toHaveBeenCalledWith(
+      GoodsReceiptEntity,
+      'receipt-1',
+    );
     expect(receiptRepo.manager.update).toHaveBeenCalledWith(
       TransferOrderEntity,
       {
@@ -189,6 +214,11 @@ describe('GoodsReceiptService', () => {
 
     await service.cancel('receipt-2', actor);
 
+    expect(stockLedger.recordBatchMovements).not.toHaveBeenCalled();
+    expect(txManager.softDelete).toHaveBeenCalledWith(
+      GoodsReceiptEntity,
+      'receipt-2',
+    );
     expect(receiptRepo.manager.update).not.toHaveBeenCalled();
   });
 

@@ -27,6 +27,7 @@ import {
   RecordMovementParams,
   StockLedgerService,
 } from "../ledger/stock-ledger.service";
+import { StockLedgerEntryEntity } from "../ledger/stock-ledger-entry.entity";
 import { DocumentNumberingService } from "../../document-numbering/document-numbering.service";
 import { EventPublisher } from "../../events/event-publisher.service";
 import { CashService } from "../../accounting/cash/cash.service";
@@ -288,18 +289,39 @@ export class GoodsReceiptService {
       );
     }
 
-    if (receipt.status === GoodsReceiptStatus.POSTED) {
-      const branchId = receipt.branchId ?? actor.branchId;
-      if (!branchId) {
-        throw new BadRequestException(
-          "Không xác định được chi nhánh để đảo bút tồn kho",
+    const wasPosted = receipt.status === GoodsReceiptStatus.POSTED;
+    const branchId = receipt.branchId ?? actor.branchId;
+    if (wasPosted && !branchId) {
+      throw new BadRequestException(
+        "Không xác định được chi nhánh để đảo bút tồn kho",
+      );
+    }
+
+    const entries = await this.dataSource.transaction(async (manager) => {
+      // Khoá row + đọc lại status mới nhất trong transaction để chặn 2 request
+      // huỷ trùng nhau ghi đúp bút toán đảo (status trước đây chỉ được cập
+      // nhật SAU khi ghi ledger + publish Kafka, để hở khoảng thời gian dài
+      // cho request huỷ thứ 2 vẫn thấy status POSTED và lọt qua guard phía trên).
+      const [locked] = await manager.query(
+        `SELECT status FROM goods_receipts WHERE id = $1 AND organization_id = $2 FOR UPDATE`,
+        [receipt.id, receipt.organizationId],
+      );
+      if (
+        !locked ||
+        locked.status === GoodsReceiptStatus.CANCELLED ||
+        locked.status === GoodsReceiptStatus.REVERSED
+      ) {
+        throw new ConflictException(
+          `Phiếu đã ${locked?.status === GoodsReceiptStatus.CANCELLED ? "huỷ" : "đảo bút"}, không thể xoá lại`,
         );
       }
-      const entries = await this.dataSource.transaction(async (manager) => {
+
+      let reversalEntries: StockLedgerEntryEntity[] = [];
+      if (wasPosted) {
         const reversals: RecordMovementParams[] = receipt.lines.map((line) => ({
           itemId: line.itemId,
           locationId: line.locationId,
-          branchId,
+          branchId: branchId!,
           organizationId: receipt.organizationId,
           movementType: StockMovementType.ADJUSTMENT_DECREASE,
           quantity: -Number(line.quantity),
@@ -311,7 +333,7 @@ export class GoodsReceiptService {
           // Đảo bút huỷ phiếu đã posted: cho phép kể cả khi kho đã ngừng hoạt động.
           skipInactiveStorageGuard: true,
         }));
-        const reversalEntries = await this.stockLedger.recordBatchMovements(
+        reversalEntries = await this.stockLedger.recordBatchMovements(
           reversals,
           manager,
         );
@@ -336,14 +358,22 @@ export class GoodsReceiptService {
             await manager.delete(SupplierDebtEntity, debtRows[0].id);
           }
         }
-        return reversalEntries;
+      }
+
+      // Chuyển trạng thái CANCELLED ngay trong cùng transaction, trước khi
+      // publish Kafka, để bất kỳ request huỷ trùng nào đang chờ lock cũng
+      // thấy status đã đổi thay vì vẫn còn POSTED.
+      await manager.update(GoodsReceiptEntity, receipt.id, {
+        status: GoodsReceiptStatus.CANCELLED,
       });
+      await manager.softDelete(GoodsReceiptEntity, receipt.id);
+
+      return reversalEntries;
+    });
+
+    if (entries.length > 0) {
       await this.stockLedger.publishMovementEvents(entries);
     }
-
-    receipt.status = GoodsReceiptStatus.CANCELLED;
-    await this.receiptRepo.save(receipt);
-    await this.receiptRepo.softDelete(receipt.id);
 
     if (
       receipt.referenceType === GoodsReceiptReferenceType.STOCK_TRANSFER &&
