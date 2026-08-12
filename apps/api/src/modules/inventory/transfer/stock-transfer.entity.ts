@@ -9,7 +9,10 @@ import { StockTransferLineEntity } from './stock-transfer-line.entity';
 @Index(['organizationId', 'status'])
 @Index('IDX_stock_transfers_org_branch_list', ['organizationId', 'branchId', 'status', 'createdAt'])
 export class StockTransferEntity extends BaseEntity {
-  @Column({ name: 'document_number', nullable: true, unique: true, comment: 'Auto-generated document number via DocumentNumberRule' })
+  // Uniqueness enforced per-organization at the DB level
+  // (UQ_stock_transfers_org_document_number), not globally — see
+  // 1787800000000-ScopeStockTransferAdjustmentDocNumberToOrg.
+  @Column({ name: 'document_number', nullable: true, comment: 'Auto-generated document number via DocumentNumberRule' })
   documentNumber?: string;
 
   @Column({ name: 'source_location_id', type: 'uuid', nullable: true, comment: 'Legacy header source location; per-line source storage/location drives the move' })

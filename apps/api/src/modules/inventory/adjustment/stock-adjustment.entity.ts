@@ -14,7 +14,10 @@ export enum AdjustmentStatus {
 @Index(['organizationId', 'status'])
 @Index('IDX_stock_adjustments_org_branch_list', ['organizationId', 'branchId', 'status', 'createdAt'])
 export class StockAdjustmentEntity extends BaseEntity {
-  @Column({ name: 'document_number', nullable: true, unique: true, comment: 'Auto-generated document number' })
+  // Uniqueness enforced per-organization at the DB level
+  // (UQ_stock_adjustments_org_document_number), not globally — see
+  // 1787800000000-ScopeStockTransferAdjustmentDocNumberToOrg.
+  @Column({ name: 'document_number', nullable: true, comment: 'Auto-generated document number' })
   documentNumber?: string;
 
   @Column({ name: 'location_id', type: 'uuid', comment: 'The location being adjusted' })
