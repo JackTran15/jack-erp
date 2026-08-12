@@ -70,6 +70,8 @@ export interface ReportBranchConfig {
 export interface ReportCategoryMetadata {
   label: string;
   url: string;
+  // Permission key gate menu + route của category (xem navConfig/routeAccess).
+  permission?: string;
   configs: Partial<Record<STORE_TYPE, ReportBranchConfig>>;
 }
 

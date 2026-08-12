@@ -1,9 +1,11 @@
 import { PERMISSION_SEEDS } from '../../modules/rbac/permissions.seed';
 import {
   BRANCH_MANAGER_PERMISSION_KEYS,
+  CASHIER_PERMISSION_KEYS,
   GENERAL_MANAGER_PERMISSION_KEYS,
-  STAFF_PERMISSION_KEYS,
+  SALES_PERMISSION_KEYS,
   SYSTEM_ADMIN_PERMISSION_KEYS,
+  WAREHOUSE_PERMISSION_KEYS,
 } from './org-role-permissions';
 
 const OTHER_ISSUE_KEY = 'inventory.goods-issue.other-issue';
@@ -21,14 +23,93 @@ describe('goods-issue purpose permission seeds', () => {
     ['SYSTEM_ADMIN', SYSTEM_ADMIN_PERMISSION_KEYS],
     ['GENERAL_MANAGER', GENERAL_MANAGER_PERMISSION_KEYS],
     ['BRANCH_MANAGER', BRANCH_MANAGER_PERMISSION_KEYS],
+    ['WAREHOUSE', WAREHOUSE_PERMISSION_KEYS],
   ])('grants both purpose keys to %s', (_role, keys) => {
     expect(keys).toContain(OTHER_ISSUE_KEY);
     expect(keys).toContain(DISPOSAL_KEY);
   });
 
-  it('does not grant the purpose keys to STAFF', () => {
-    expect(STAFF_PERMISSION_KEYS).not.toContain(OTHER_ISSUE_KEY);
-    expect(STAFF_PERMISSION_KEYS).not.toContain(DISPOSAL_KEY);
+  it.each([
+    ['SALES', SALES_PERMISSION_KEYS],
+    ['CASHIER', CASHIER_PERMISSION_KEYS],
+  ])('does not grant the purpose keys to %s', (_role, keys) => {
+    expect(keys).not.toContain(OTHER_ISSUE_KEY);
+    expect(keys).not.toContain(DISPOSAL_KEY);
+  });
+});
+
+/**
+ * The point of splitting the single "Nhân viên" role: warehouse staff own the
+ * stock documents, sales/cashier own selling, and approving stays with managers.
+ */
+describe('staff roles separate warehouse, selling and cash duties', () => {
+  const WAREHOUSE_DOCUMENT_KEYS = [
+    'goods_receipt.read',
+    'goods_receipt.write',
+    'goods_receipt.post',
+    'inventory.goods-issue.read',
+    'inventory.goods-issue.create',
+    'inventory.goods-issue.post',
+    'inventory.transfer.create',
+    'inventory.transfer.post',
+    'inventory.adjustment.create',
+    'inventory.adjustment.post',
+  ];
+
+  it.each(WAREHOUSE_DOCUMENT_KEYS)('grants %s to WAREHOUSE', (key) => {
+    expect(WAREHOUSE_PERMISSION_KEYS).toContain(key);
+  });
+
+  it.each(WAREHOUSE_DOCUMENT_KEYS)('withholds %s from SALES and CASHIER', (key) => {
+    expect(SALES_PERMISSION_KEYS).not.toContain(key);
+    expect(CASHIER_PERMISSION_KEYS).not.toContain(key);
+  });
+
+  it('gives the cash drawer to CASHIER only', () => {
+    for (const key of [
+      'accounting.cash_receipt.create',
+      'accounting.cash_payment.create',
+      'accounting.cash_count.create',
+      'accounting.cash_ledger.read',
+    ]) {
+      expect(CASHIER_PERMISSION_KEYS).toContain(key);
+      expect(SALES_PERMISSION_KEYS).not.toContain(key);
+      expect(WAREHOUSE_PERMISSION_KEYS).not.toContain(key);
+    }
+  });
+
+  it('lets SALES and CASHIER sell, WAREHOUSE not', () => {
+    for (const key of ['pos.sale.create', 'pos.invoice.write']) {
+      expect(SALES_PERMISSION_KEYS).toContain(key);
+      expect(CASHIER_PERMISSION_KEYS).toContain(key);
+      expect(WAREHOUSE_PERMISSION_KEYS).not.toContain(key);
+    }
+  });
+
+  it.each([
+    ['SALES', SALES_PERMISSION_KEYS],
+    ['CASHIER', CASHIER_PERMISSION_KEYS],
+    ['WAREHOUSE', WAREHOUSE_PERMISSION_KEYS],
+  ])('never lets %s approve a document', (_role, keys) => {
+    expect(keys.filter((key) => key.endsWith('.approve'))).toEqual([]);
+  });
+
+  it('keeps chuyển kho tạm (POS fast transfer) for SALES and WAREHOUSE', () => {
+    for (const keys of [SALES_PERMISSION_KEYS, WAREHOUSE_PERMISSION_KEYS]) {
+      expect(keys).toContain('inventory.temp-warehouse.write');
+      expect(keys).toContain('inventory.temp-warehouse.close');
+    }
+  });
+
+  /**
+   * The POS product picker (`GET /pos/branches/:id/catalog*`) feeds both
+   * checkout and chuyển kho tạm, so it is gated on inventory.read — every role
+   * that may run a temp transfer must be able to search goods.
+   */
+  it('lets every temp-transfer role search the POS catalogue', () => {
+    for (const keys of [SALES_PERMISSION_KEYS, WAREHOUSE_PERMISSION_KEYS]) {
+      expect(keys).toContain('inventory.read');
+    }
   });
 });
 
@@ -46,11 +127,14 @@ describe('reversing money is reserved for User Root & General Manager', () => {
     expect(SYSTEM_ADMIN_PERMISSION_KEYS).toContain(key);
     expect(GENERAL_MANAGER_PERMISSION_KEYS).toContain(key);
     expect(BRANCH_MANAGER_PERMISSION_KEYS).not.toContain(key);
-    expect(STAFF_PERMISSION_KEYS).not.toContain(key);
+    expect(SALES_PERMISSION_KEYS).not.toContain(key);
+    expect(CASHIER_PERMISSION_KEYS).not.toContain(key);
+    expect(WAREHOUSE_PERMISSION_KEYS).not.toContain(key);
   });
 
-  it('keeps pos.invoice.write for STAFF — cancelling is now a separate key', () => {
-    expect(STAFF_PERMISSION_KEYS).toContain('pos.invoice.write');
+  it('keeps pos.invoice.write for SALES/CASHIER — cancelling is now a separate key', () => {
+    expect(SALES_PERMISSION_KEYS).toContain('pos.invoice.write');
+    expect(CASHIER_PERMISSION_KEYS).toContain('pos.invoice.write');
   });
 });
 
@@ -115,7 +199,14 @@ describe('retiring a branch is reserved for User Root & General Manager', () => 
  */
 describe('seeded roles nest, so role granting stays possible', () => {
   it.each([
-    ['STAFF', STAFF_PERMISSION_KEYS, 'BRANCH_MANAGER', BRANCH_MANAGER_PERMISSION_KEYS],
+    ['SALES', SALES_PERMISSION_KEYS, 'BRANCH_MANAGER', BRANCH_MANAGER_PERMISSION_KEYS],
+    ['CASHIER', CASHIER_PERMISSION_KEYS, 'BRANCH_MANAGER', BRANCH_MANAGER_PERMISSION_KEYS],
+    [
+      'WAREHOUSE',
+      WAREHOUSE_PERMISSION_KEYS,
+      'BRANCH_MANAGER',
+      BRANCH_MANAGER_PERMISSION_KEYS,
+    ],
     [
       'BRANCH_MANAGER',
       BRANCH_MANAGER_PERMISSION_KEYS,
@@ -151,7 +242,8 @@ describe('POS staff permission seeds', () => {
     ['picker NVBH (Checkout, Fast stock transfer)', 'sales-hierarchy.read'],
   ];
 
-  it.each(POS_STAFF_KEYS)('grants %s (%s) to STAFF', (_surface, key) => {
-    expect(STAFF_PERMISSION_KEYS).toContain(key);
+  it.each(POS_STAFF_KEYS)('grants %s (%s) to SALES and CASHIER', (_surface, key) => {
+    expect(SALES_PERMISSION_KEYS).toContain(key);
+    expect(CASHIER_PERMISSION_KEYS).toContain(key);
   });
 });

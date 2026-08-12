@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { getActiveBranch, setActiveBranch } from "../../../lib/auth-storage";
 import { STORE_TYPE } from "../../../constants/store.constant";
+import { canViewChain } from "../../../lib/permissions";
 import type { BranchState } from "./branch.interface";
 
 
@@ -26,7 +27,15 @@ export const useBranchStore = create<BranchState>()(
   ),
 );
 
-export const useIsChainSelected = () => useBranchStore((s) => s.isChain);
+/**
+ * `isChain` is persisted in localStorage, so a user who never had (or just lost)
+ * the consolidated-reports permission could otherwise stay stuck in the chain view.
+ * Both selectors fall back to the single-branch view when the permission is absent.
+ */
+export const useIsChainSelected = () =>
+  useBranchStore((s) => s.isChain && canViewChain());
 
 export const useCurrentView = () =>
-  useBranchStore((s) => (s.isChain ? STORE_TYPE.CHAIN : STORE_TYPE.SINGLE));
+  useBranchStore((s) =>
+    s.isChain && canViewChain() ? STORE_TYPE.CHAIN : STORE_TYPE.SINGLE,
+  );

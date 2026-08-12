@@ -42,8 +42,11 @@ export class PosController {
     private readonly catalogProductService: PosCatalogProductService,
   ) {}
 
+  // Reading the branch catalogue is not selling: the same picker backs POS
+  // checkout AND "chuyển kho tạm", which warehouse staff run. Gate on the read
+  // permission, not pos.sale.create.
   @Get('branches/:branchId/catalog')
-  @RequirePermission('pos.sale.create')
+  @RequirePermission('inventory.read')
   getCatalog(
     @Param('branchId', ParseUUIDPipe) branchId: string,
     @Query() query: PosCatalogQueryDto,
@@ -59,7 +62,7 @@ export class PosController {
   }
 
   @Get('branches/:branchId/catalog/lookup')
-  @RequirePermission('pos.sale.create')
+  @RequirePermission('inventory.read')
   getCatalogLookup(
     @Param('branchId', ParseUUIDPipe) branchId: string,
     @Query() query: PosCatalogLookupQueryDto,
@@ -74,7 +77,7 @@ export class PosController {
   }
 
   @Get('branches/:branchId/catalog/products')
-  @RequirePermission('pos.sale.create')
+  @RequirePermission('inventory.read')
   @ApiOkResponse({ type: PosProductListResponseDto })
   listCatalogProducts(
     @Param('branchId', ParseUUIDPipe) branchId: string,
@@ -85,7 +88,7 @@ export class PosController {
   }
 
   @Get('branches/:branchId/catalog/products/:id')
-  @RequirePermission('pos.sale.create')
+  @RequirePermission('inventory.read')
   @ApiOkResponse({ type: PosProductDetailDto })
   getCatalogProductDetail(
     @Param('branchId', ParseUUIDPipe) branchId: string,

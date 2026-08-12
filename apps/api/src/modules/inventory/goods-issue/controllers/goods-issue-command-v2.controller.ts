@@ -29,7 +29,7 @@ export class GoodsIssueCommandV2Controller {
 
   @Post()
   @Version('2')
-  @RequirePermission('inventory.write')
+  @RequirePermission('inventory.goods-issue.create')
   @RequireBranchScope()
   @ApiOperation({ summary: 'Create a DRAFT goods issue (v2, with Đối tượng)' })
   create(
@@ -41,7 +41,7 @@ export class GoodsIssueCommandV2Controller {
 
   @Post(':id/post')
   @Version('2')
-  @RequirePermission('inventory.write')
+  @RequirePermission('inventory.goods-issue.post')
   @RequireBranchScope()
   @ApiOperation({ summary: 'Post a v2 DRAFT goods issue (DRAFT → POSTED)' })
   post(

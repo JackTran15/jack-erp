@@ -13,6 +13,7 @@ import type { SwitchBranchResponse } from "@erp/shared-interfaces";
 import { useMyBranches } from "../../hooks/iam/useBranches";
 import { erpApi, requireErpData } from "../../lib/erp-api";
 import { getActiveBranch, persistSwitchBranchResponse } from "../../lib/auth-storage";
+import { canViewChain } from "../../lib/permissions";
 import { CHAIN_OPTION_VALUE } from "../../store/common/branch/branch.constant";
 import {
   useBranchStore,
@@ -42,6 +43,8 @@ export function BranchSelector() {
 
   if (!branches?.length) return null;
 
+  // Nhân viên/quản lý chi nhánh chỉ thấy chi nhánh của mình, không thấy chuỗi.
+  const showChainOption = canViewChain();
   const displayName = isChain
     ? "Chuỗi cửa hàng"
     : (branchName ??
@@ -87,10 +90,14 @@ export function BranchSelector() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="center" className="min-w-[180px]">
         <DropdownMenuRadioGroup value={selectedValue} onValueChange={handleSelect}>
-          <DropdownMenuRadioItem value={CHAIN_OPTION_VALUE}>
-            Chuỗi cửa hàng
-          </DropdownMenuRadioItem>
-          <DropdownMenuSeparator />
+          {showChainOption && (
+            <>
+              <DropdownMenuRadioItem value={CHAIN_OPTION_VALUE}>
+                Chuỗi cửa hàng
+              </DropdownMenuRadioItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
           {branches.map((branch) => (
             <DropdownMenuRadioItem key={branch.id} value={branch.id}>
               {branch.name}

@@ -21,10 +21,12 @@ import { AppDataSource } from '../data-source';
 import { PERMISSION_SEEDS } from '../../modules/rbac/permissions.seed';
 import {
   BRANCH_MANAGER_PERMISSION_KEYS,
+  CASHIER_PERMISSION_KEYS,
   GENERAL_MANAGER_PERMISSION_KEYS,
+  SALES_PERMISSION_KEYS,
   SEED_ROLE_NAMES,
-  STAFF_PERMISSION_KEYS,
   SYSTEM_ADMIN_PERMISSION_KEYS,
+  WAREHOUSE_PERMISSION_KEYS,
 } from './org-role-permissions';
 
 /** Plaintext dev login password — must match what you type in the backoffice login form. */
@@ -39,7 +41,9 @@ const IDS = {
   roleSystemAdmin: '40000000-0000-4000-8000-000000000001',
   roleGeneralManager: '40000000-0000-4000-8000-000000000003',
   roleBranchManager: '40000000-0000-4000-8000-000000000004',
-  roleStaff: '40000000-0000-4000-8000-000000000005',
+  roleSales: '40000000-0000-4000-8000-000000000005',
+  roleCashier: '40000000-0000-4000-8000-000000000006',
+  roleWarehouse: '40000000-0000-4000-8000-000000000007',
   /** Legacy second admin role from earlier seeds — removed after merge. */
   legacyAdminRole: '40000000-0000-4000-8000-000000000002',
   storageMain: '50000000-0000-4000-8000-000000000001',
@@ -420,13 +424,31 @@ async function seedInventoryData() {
     );
 
     await upsertSeedRole(
-      IDS.roleStaff,
+      IDS.roleSales,
       IDS.organization,
-      SEED_ROLE_NAMES.STAFF,
-      'Đơn hàng, kho tạm, hóa đơn, ca làm việc, yêu cầu điều chuyển',
+      SEED_ROLE_NAMES.SALES,
+      'Đơn hàng, kho tạm, hóa đơn, ca làm việc',
       false,
     );
-    await assignPermissionsToRole(IDS.roleStaff, STAFF_PERMISSION_KEYS);
+    await assignPermissionsToRole(IDS.roleSales, SALES_PERMISSION_KEYS);
+
+    await upsertSeedRole(
+      IDS.roleCashier,
+      IDS.organization,
+      SEED_ROLE_NAMES.CASHIER,
+      'Bán hàng + quỹ tiền mặt: phiếu thu, phiếu chi, kiểm kê, sổ tiền mặt',
+      false,
+    );
+    await assignPermissionsToRole(IDS.roleCashier, CASHIER_PERMISSION_KEYS);
+
+    await upsertSeedRole(
+      IDS.roleWarehouse,
+      IDS.organization,
+      SEED_ROLE_NAMES.WAREHOUSE,
+      'Phiếu nhập, phiếu xuất, chuyển kho, kiểm kê kho, báo cáo kho',
+      false,
+    );
+    await assignPermissionsToRole(IDS.roleWarehouse, WAREHOUSE_PERMISSION_KEYS);
 
     await AppDataSource.query(
       `

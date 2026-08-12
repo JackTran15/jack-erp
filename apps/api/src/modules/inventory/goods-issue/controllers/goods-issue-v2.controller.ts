@@ -17,7 +17,7 @@ export class GoodsIssueV2Controller {
 
   @Post('search')
   @Version('2')
-  @RequirePermission('inventory.read')
+  @RequirePermission('inventory.goods-issue.read')
   search(
     @Body() dto: GoodsIssueSearchV2Dto,
     @Actor() actor: ActorContext,

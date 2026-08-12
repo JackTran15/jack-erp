@@ -1,5 +1,5 @@
 /**
- * Shared org-baseline seeding logic: an organization, an admin user, the four RBAC
+ * Shared org-baseline seeding logic: an organization, an admin user, the six RBAC
  * roles, and the org-wide accounting/customer foundation — and NOTHING branch- or
  * product-scoped. Extracted so it can be driven with either fixed, deterministic IDs
  * (`org-baseline.seed.ts`, one static demo org) or freshly generated IDs
@@ -14,10 +14,12 @@ import { DEFAULT_MEMBERSHIP_CARD_TYPES } from '../../modules/customer/services/m
 import { PERMISSION_SEEDS } from '../../modules/rbac/permissions.seed';
 import {
   BRANCH_MANAGER_PERMISSION_KEYS,
+  CASHIER_PERMISSION_KEYS,
   GENERAL_MANAGER_PERMISSION_KEYS,
+  SALES_PERMISSION_KEYS,
   SEED_ROLE_NAMES,
-  STAFF_PERMISSION_KEYS,
   SYSTEM_ADMIN_PERMISSION_KEYS,
+  WAREHOUSE_PERMISSION_KEYS,
 } from './org-role-permissions';
 
 const BCRYPT_ROUNDS = 10;
@@ -28,7 +30,9 @@ export interface OrgBaselineSeedIds {
   roleSystemAdmin: string;
   roleGeneralManager: string;
   roleBranchManager: string;
-  roleStaff: string;
+  roleSales: string;
+  roleCashier: string;
+  roleWarehouse: string;
   defaultAccount: Record<AccountingDefaultAccountRole, string>;
   paymentAccount: Record<string, string>;
 }
@@ -154,7 +158,7 @@ export async function seedOrgBaselineData(params: OrgBaselineSeedParams): Promis
     [IDS.user, IDS.organization, adminEmail, adminPasswordHash],
   );
 
-  // ── RBAC: 4 seed roles + their permission sets ──
+  // ── RBAC: 6 seed roles + their permission sets ──
   await upsertSeedRole(
     IDS.roleSystemAdmin,
     IDS.organization,
@@ -183,13 +187,31 @@ export async function seedOrgBaselineData(params: OrgBaselineSeedParams): Promis
   await assignPermissionsToRole(IDS.roleBranchManager, BRANCH_MANAGER_PERMISSION_KEYS);
 
   await upsertSeedRole(
-    IDS.roleStaff,
+    IDS.roleSales,
     IDS.organization,
-    SEED_ROLE_NAMES.STAFF,
-    'Đơn hàng, kho tạm, hóa đơn, ca làm việc, yêu cầu điều chuyển',
+    SEED_ROLE_NAMES.SALES,
+    'Đơn hàng, kho tạm, hóa đơn, ca làm việc',
     false,
   );
-  await assignPermissionsToRole(IDS.roleStaff, STAFF_PERMISSION_KEYS);
+  await assignPermissionsToRole(IDS.roleSales, SALES_PERMISSION_KEYS);
+
+  await upsertSeedRole(
+    IDS.roleCashier,
+    IDS.organization,
+    SEED_ROLE_NAMES.CASHIER,
+    'Bán hàng + quỹ tiền mặt: phiếu thu, phiếu chi, kiểm kê, sổ tiền mặt',
+    false,
+  );
+  await assignPermissionsToRole(IDS.roleCashier, CASHIER_PERMISSION_KEYS);
+
+  await upsertSeedRole(
+    IDS.roleWarehouse,
+    IDS.organization,
+    SEED_ROLE_NAMES.WAREHOUSE,
+    'Phiếu nhập, phiếu xuất, chuyển kho, kiểm kê kho, báo cáo kho',
+    false,
+  );
+  await assignPermissionsToRole(IDS.roleWarehouse, WAREHOUSE_PERMISSION_KEYS);
 
   // ── Assign the admin user the System Admin role ──
   await AppDataSource.query(

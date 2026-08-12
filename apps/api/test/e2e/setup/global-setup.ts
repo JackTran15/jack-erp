@@ -10,6 +10,10 @@ import { config as loadEnv } from 'dotenv';
  * Jest does not load apps/api/.env automatically (unlike Nest ConfigModule).
  * Load it here so DB_* match docker-compose / local dev credentials.
  */
+
+/** Only ever let the suite point at a database whose name marks it as throwaway. */
+const DEFAULT_E2E_DB_NAME = 'erp_test';
+
 export default async function globalSetup() {
   const envPath = path.resolve(__dirname, '../../../.env');
   if (fs.existsSync(envPath)) {
@@ -20,7 +24,16 @@ export default async function globalSetup() {
   const dbPort = process.env.DB_PORT || '5432';
   const dbUser = process.env.DB_USER || 'postgres';
   const dbPass = process.env.DB_PASS || 'postgres';
-  const dbName = process.env.DB_NAME || 'erp_test';
+  // NEVER fall back to DB_NAME from .env: that is the dev database, and the
+  // suite calls `synchronize(true)` (drops every table) in resetDatabase().
+  // Override with E2E_DB_NAME only; the name must still look like a test DB.
+  const dbName = process.env.E2E_DB_NAME || DEFAULT_E2E_DB_NAME;
+  if (!/test/i.test(dbName)) {
+    throw new Error(
+      `Refusing to run E2E against "${dbName}": the suite drops every table. ` +
+        `E2E_DB_NAME must contain "test".`,
+    );
+  }
 
   process.env.DB_HOST = dbHost;
   process.env.DB_PORT = dbPort;

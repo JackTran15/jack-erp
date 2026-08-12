@@ -146,14 +146,14 @@ export class GoodsIssueController {
   constructor(private readonly service: GoodsIssueService) {}
 
   @Post()
-  @RequirePermission('inventory.write')
+  @RequirePermission('inventory.goods-issue.create')
   @RequireBranchScope()
   create(@Body() dto: CreateGoodsIssueDto, @Actor() actor: ActorContext) {
     return this.service.createAndPost(dto, actor);
   }
 
   @Get()
-  @RequirePermission('inventory.read')
+  @RequirePermission('inventory.goods-issue.read')
   @RequireBranchScope()
   list(@Query() query: GoodsIssueQueryDto, @Actor() actor: ActorContext) {
     return this.service.list({
@@ -164,14 +164,14 @@ export class GoodsIssueController {
   }
 
   @Get(':id')
-  @RequirePermission('inventory.read')
+  @RequirePermission('inventory.goods-issue.read')
   @RequireBranchScope()
   getById(@Param('id', ParseUUIDPipe) id: string, @Actor() actor: ActorContext) {
     return this.service.getById(id, actor);
   }
 
   @Get(':id/print-payload')
-  @RequirePermission('inventory.read')
+  @RequirePermission('inventory.goods-issue.read')
   @RequireBranchScope()
   getPrintPayload(
     @Param('id', ParseUUIDPipe) id: string,
@@ -182,7 +182,7 @@ export class GoodsIssueController {
 
   @Get(':id/export')
   @HttpCode(HttpStatus.OK)
-  @RequirePermission('inventory.read')
+  @RequirePermission('inventory.goods-issue.read')
   @RequireBranchScope()
   async export(
     @Param('id', ParseUUIDPipe) id: string,
@@ -199,14 +199,14 @@ export class GoodsIssueController {
   }
 
   @Post(':id/post')
-  @RequirePermission('inventory.write')
+  @RequirePermission('inventory.goods-issue.post')
   @RequireBranchScope()
   post(@Param('id', ParseUUIDPipe) id: string, @Actor() actor: ActorContext) {
     return this.service.post(id, actor);
   }
 
   @Post(':id/cancel')
-  @RequirePermission('inventory.write')
+  @RequirePermission('inventory.goods-issue.cancel')
   @RequireBranchScope()
   cancel(@Param('id', ParseUUIDPipe) id: string, @Actor() actor: ActorContext) {
     return this.service.cancel(id, actor);

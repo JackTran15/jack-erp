@@ -1,4 +1,5 @@
 import { STORE_TYPE } from "../../constants/store.constant";
+import { satisfiesPermission } from "../../lib/permissions";
 import { findNavMatch, isVisibleInView } from "./navConfig";
 
 /**
@@ -13,10 +14,9 @@ export type RouteAccessDecision =
   | { type: "deny" };
 
 /**
- * Single source of truth for route access. Today it only gates by view, but
- * this is the place to add further conditions (permission, role, feature flag):
- * evaluate them against the matched nav entry and return `deny` on a terminal
- * failure.
+ * Single source of truth for route access, gating by permission first and then by
+ * view. Both are evaluated against the matched nav entry; add further conditions
+ * (role, feature flag) here and return `deny` on a terminal failure.
  */
 export function resolveRouteAccess(
   pathname: string,
@@ -24,6 +24,10 @@ export function resolveRouteAccess(
 ): RouteAccessDecision {
   const match = findNavMatch(pathname);
   if (!match) return { type: "allow" }; // route not tied to a nav menu -> not gated
+
+  // Deep-linking into a page the role can't open (the API would 403 anyway).
+  const { permission } = match.child;
+  if (permission && !satisfiesPermission(permission)) return { type: "deny" };
 
   const allowed = Object.values(STORE_TYPE).filter(
     (v) =>
