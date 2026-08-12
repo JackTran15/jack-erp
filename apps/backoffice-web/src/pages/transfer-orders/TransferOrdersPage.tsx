@@ -45,6 +45,7 @@ import {
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LookupField } from "../../components/forms/LookupField";
+import { STORAGE_LOOKUP_COLUMNS } from "../../components/forms/storage-lookup";
 import {
   ProductSelectDialog,
   type ProductSelectResult,
@@ -70,7 +71,10 @@ import {
 } from "../../components/table/pagination.dto";
 import {
   ensureTrailingBlankLine,
+  getLineKey,
   getPersistableLines,
+  nextLineId,
+  type KeyedFormLine,
 } from "../inventory-line-normalization";
 import { DocumentLineImportDialog } from "../inventory/_components/document-import/DocumentLineImportDialog";
 import type { DocumentLineImportJobRow } from "../inventory/_components/document-import/document-line-import.types";
@@ -133,6 +137,8 @@ interface BranchOption {
 
 interface InventoryStorage {
   id: string;
+  /** Mã kho (WHxxxxxx) — cột thứ nhất của dropdown chọn kho. */
+  code?: string;
   name: string;
   branchId: string;
   /** false = kho đã ngừng hoạt động → ẩn khỏi picker chọn kho nguồn. */
@@ -660,7 +666,11 @@ function DetailPanel({
 
 // ─── Form dialog (create / view) ──────────────────────────────────────────────
 
-interface FormLine {
+/**
+ * `lineId` is a client-only grid key — the save payload is built from explicit
+ * fields (see handleSave), never by spreading a line, and it must stay that way.
+ */
+interface FormLine extends KeyedFormLine {
   itemId: string;
   itemLabel: string;
   itemName: string;
@@ -674,6 +684,7 @@ interface FormLine {
 }
 
 const emptyLine = (): FormLine => ({
+  lineId: nextLineId(),
   itemId: "",
   itemLabel: "",
   itemName: "",
@@ -764,6 +775,7 @@ function TransferOrderFormDialog({
     if (!initial) return [emptyLine()];
 
     const initialLines = initial.lines.map((l) => ({
+      lineId: nextLineId(),
       itemId: l.itemId,
       itemLabel: l.item?.code ?? l.itemId.slice(0, 8),
       itemName: l.item?.name ?? "",
@@ -795,9 +807,37 @@ function TransferOrderFormDialog({
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
 
-  const markDirty = () => {
-    if (!dirty) setDirty(true);
-  };
+  // Stable identity: the line columns are memoized on this, and a `dirty`
+  // dependency would rebuild them on the first edit. Setting the same value is
+  // already a no-op re-render in React, so the old guard bought nothing.
+  const markDirty = useCallback(() => setDirty(true), []);
+
+  /**
+   * Single entry point for editing one line — see GoodsReceiptFormDialog for
+   * the rationale: untouched rows keep their identity so memoized grid rows
+   * bail out, and a no-op patch returns `prev` so nothing re-renders at all.
+   */
+  const updateLine = useCallback(
+    (idx: number, patch: Partial<FormLine>) => {
+      setLines((prev) => {
+        const current = prev[idx];
+        if (!current) return prev;
+        let changed = false;
+        for (const key of Object.keys(patch) as (keyof FormLine)[]) {
+          if (current[key] !== patch[key]) {
+            changed = true;
+            break;
+          }
+        }
+        if (!changed) return prev;
+        const next = prev.slice();
+        next[idx] = { ...current, ...patch };
+        return next;
+      });
+      markDirty();
+    },
+    [markDirty],
+  );
 
   const handleApplyDraftImport = useCallback(
     (importedRows: DocumentLineImportJobRow[]) => {
@@ -808,6 +848,7 @@ function TransferOrderFormDialog({
           normalized.sourceStorageId || sourceStorageId || "";
         return [
           {
+            lineId: nextLineId(),
             itemId: normalized.itemId,
             itemLabel: normalized.itemCode,
             itemName: normalized.itemName,
@@ -917,7 +958,10 @@ function TransferOrderFormDialog({
     async (query: string) => {
       const term = query.trim().toLowerCase();
       const items = sourceStorageOptions.filter((s) =>
-        term ? s.name.toLowerCase().includes(term) : true,
+        term
+          ? s.name.toLowerCase().includes(term) ||
+            (s.code ?? "").toLowerCase().includes(term)
+          : true,
       );
       return { items, hasMore: false, total: items.length };
     },
@@ -1164,7 +1208,7 @@ function TransferOrderFormDialog({
   ];
 
   // Fill the line at `idx` from a selected item — used by the inline typeahead.
-  const fillLineFromItem = (
+  const fillLineFromItem = useCallback((
     idx: number,
     item: { id: string; code: string; name: string; unit: string },
   ) => {
@@ -1184,7 +1228,7 @@ function TransferOrderFormDialog({
       ),
     );
     markDirty();
-  };
+  }, [markDirty]);
 
   // Append N lines from the multi-select picker (dedupe by itemId).
   const addLinesFromPicker = (result: ProductSelectResult) => {
@@ -1230,7 +1274,10 @@ function TransferOrderFormDialog({
     markDirty();
   };
 
-  const lineColumns: LineColumn<FormLine>[] = [
+  // Memoized: a fresh array here would rebuild every column object and every
+  // renderEditor closure on each render, re-rendering all rows. Everything it
+  // closes over must therefore be stable — note the absence of `lines`.
+  const lineColumns = useMemo<LineColumn<FormLine>[]>(() => [
     {
       key: "itemLabel",
       label: "Mã SKU",
@@ -1243,14 +1290,7 @@ function TransferOrderFormDialog({
           dropdownMinWidth={520}
           placeholder="Tìm mã hoặc tên"
           value={row.itemLabel}
-          onValueChange={(val) => {
-            setLines((prev) =>
-              prev.map((l, i) =>
-                i === idx ? { ...l, itemLabel: val, itemId: "" } : l,
-              ),
-            );
-            markDirty();
-          }}
+          onValueChange={(val) => updateLine(idx, { itemLabel: val, itemId: "" })}
           onSelect={(item) => fillLineFromItem(idx, item)}
           search={searchItems}
           itemKey={(item) => item.id}
@@ -1296,42 +1336,24 @@ function TransferOrderFormDialog({
             storageNameById.get(row.sourceStorageId || sourceStorageId) ||
             ""
           }
-          onValueChange={(val) => {
-            setLines((prev) =>
-              prev.map((l, i) =>
-                i === idx
-                  ? {
-                      ...l,
-                      sourceStorageId: "",
-                      sourceStorageLabel: val,
-                    }
-                  : l,
-              ),
-            );
-            markDirty();
-          }}
-          onSelect={(storage) => {
-            setLines((prev) =>
-              prev.map((l, i) =>
-                i === idx
-                  ? {
-                      ...l,
-                      sourceStorageId: storage.id,
-                      sourceStorageLabel: storage.name,
-                    }
-                  : l,
-              ),
-            );
-            markDirty();
-          }}
+          onValueChange={(val) =>
+            updateLine(idx, { sourceStorageId: "", sourceStorageLabel: val })
+          }
+          onSelect={(storage) =>
+            updateLine(idx, {
+              sourceStorageId: storage.id,
+              sourceStorageLabel: storage.name,
+            })
+          }
           search={searchSourceStorages}
           enableSearchModal
           searchModalTitle="Chọn kho"
-          searchModalPlaceholder="Nhập tên kho"
+          searchModalPlaceholder="Nhập mã kho hoặc tên kho"
+          dropdownMinWidth={420}
           itemKey={(s) => s.id}
           renderItem={(s) => s.name}
           renderMeta={() => ""}
-          columns={[{ key: "name", label: "Tên kho", render: (s) => s.name }]}
+          columns={STORAGE_LOOKUP_COLUMNS}
           disabled={!canEditDetails}
           className="h-full"
         />
@@ -1358,7 +1380,35 @@ function TransferOrderFormDialog({
       width: 200,
       placeholder: "Nhập ghi chú",
     },
-  ];
+  ], [
+    canEditDetails,
+    fillLineFromItem,
+    searchItems,
+    searchSourceStorages,
+    setProductPickerOpen,
+    sourceStorageId,
+    storageNameById,
+    updateLine,
+  ]);
+
+  const handleChangeCell = useCallback(
+    (idx: number, key: string, value: string | number) =>
+      updateLine(idx, { [key]: value } as Partial<FormLine>),
+    [updateLine],
+  );
+
+  const handleAddRow = useCallback(() => {
+    setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
+    markDirty();
+  }, [markDirty]);
+
+  const handleDeleteRow = useCallback(
+    (idx: number) => {
+      setLines((prev) => normalizeFormLines(prev.filter((_, i) => i !== idx)));
+      markDirty();
+    },
+    [markDirty],
+  );
 
   return (
     <>
@@ -1519,28 +1569,10 @@ function TransferOrderFormDialog({
             <LineItemGrid
               columns={lineColumns}
               rows={lines}
-              onChangeCell={
-                canEditDetails
-                  ? (idx, key, value) => {
-                      setLines((prev) =>
-                        prev.map((l, i) =>
-                          i === idx ? { ...l, [key]: value } : l,
-                        ),
-                      );
-                      markDirty();
-                    }
-                  : undefined
-              }
-              onAddRow={() => {
-                setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
-                markDirty();
-              }}
-              onDeleteRow={(idx) => {
-                setLines((prev) =>
-                  normalizeFormLines(prev.filter((_, i) => i !== idx)),
-                );
-                markDirty();
-              }}
+              getRowKey={getLineKey}
+              onChangeCell={canEditDetails ? handleChangeCell : undefined}
+              onAddRow={handleAddRow}
+              onDeleteRow={handleDeleteRow}
               showAddRow={canEditDetails}
               showRowActions={canEditDetails}
             />

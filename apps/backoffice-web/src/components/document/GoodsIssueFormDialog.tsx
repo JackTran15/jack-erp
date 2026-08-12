@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Button,
@@ -39,6 +46,7 @@ import {
   getPreferredShelfBatch,
 } from "../../api/inventory-location-preferences";
 import { LookupField } from "../../components/forms/LookupField";
+import { STORAGE_LOOKUP_COLUMNS } from "../../components/forms/storage-lookup";
 import { CounterpartyPickerField } from "../../components/forms/CounterpartyPickerField";
 import {
   QuickCreateItemDialog,
@@ -54,7 +62,10 @@ import {
 import { ChooseWarehouseDialog } from "../../components/document/ChooseWarehouseDialog";
 import {
   ensureTrailingBlankLine,
+  getLineKey,
   getPersistableLines,
+  nextLineId,
+  type KeyedFormLine,
 } from "../../pages/inventory-line-normalization";
 import {
   SelectTransferOrderDialog,
@@ -116,7 +127,11 @@ async function getInstantAverageCost(itemId: string): Promise<number> {
   return Number(data.unitCost ?? 0);
 }
 
-interface FormLine {
+/**
+ * `lineId` is a client-only grid key — the save payload is built from explicit
+ * fields (see handleSave), never by spreading a line, and it must stay that way.
+ */
+interface FormLine extends KeyedFormLine {
   itemId: string;
   itemLabel: string;
   itemName: string;
@@ -131,6 +146,7 @@ interface FormLine {
 }
 
 const emptyLine = (): FormLine => ({
+  lineId: nextLineId(),
   itemId: "",
   itemLabel: "",
   itemName: "",
@@ -191,7 +207,7 @@ export function GoodsIssueFormDialog({
   // Resolve preferred shelves for many lines in a single request, then apply
   // each result back to its row. The (idx, itemId, storageId) guard prevents a
   // stale response from overwriting a row the user has since changed.
-  const fillPreferredShelfBatch = (
+  const fillPreferredShelfBatch = useCallback((
     rows: { idx: number; itemId: string; storageId: string }[],
   ) => {
     const valid = rows.filter((r) => r.itemId && r.storageId);
@@ -225,10 +241,13 @@ export function GoodsIssueFormDialog({
         );
       })
       .catch(() => {});
-  };
+  }, []);
 
-  const fillPreferredShelf = (idx: number, itemId: string, storageId: string) =>
-    fillPreferredShelfBatch([{ idx, itemId, storageId }]);
+  const fillPreferredShelf = useCallback(
+    (idx: number, itemId: string, storageId: string) =>
+      fillPreferredShelfBatch([{ idx, itemId, storageId }]),
+    [fillPreferredShelfBatch],
+  );
 
   // Resolve the eager-loaded provider first, then fall back to a customer lookup
   // for legacy rows that pre-date the provider column.
@@ -338,6 +357,7 @@ export function GoodsIssueFormDialog({
     if (!initial) return [emptyLine()];
 
     const initialLines = initial.lines.map((l) => ({
+          lineId: nextLineId(),
           itemId: l.itemId,
           // Prefer the eager-loaded item code; fall back to the legacy
           // flat itemCode field or a short id slice as last resort.
@@ -439,9 +459,45 @@ export function GoodsIssueFormDialog({
     };
   }, []);
 
-  const markDirty = () => {
-    if (!dirty) setDirty(true);
-  };
+  // Stable identity: the line columns are memoized on this, and a `dirty`
+  // dependency would rebuild them on the first edit. Setting the same value is
+  // already a no-op re-render in React, so the old guard bought nothing.
+  const markDirty = useCallback(() => setDirty(true), []);
+
+  // Read by callbacks that must stay referentially stable (the line columns are
+  // memoized on them) but still need the current lines / header warehouse.
+  const linesRef = useRef(lines);
+  linesRef.current = lines;
+  const headerStorageRef = useRef({ id: storageId, label: storageQuery });
+  headerStorageRef.current = { id: storageId, label: storageQuery };
+
+  /**
+   * Single entry point for editing one line — see GoodsReceiptFormDialog for
+   * the rationale: `slice()` avoids 2000 closure calls per keystroke, untouched
+   * rows keep their identity so memoized grid rows bail out, and a no-op patch
+   * returns `prev` so nothing re-renders at all.
+   */
+  const updateLine = useCallback(
+    (idx: number, patch: Partial<FormLine>) => {
+      setLines((prev) => {
+        const current = prev[idx];
+        if (!current) return prev;
+        let changed = false;
+        for (const key of Object.keys(patch) as (keyof FormLine)[]) {
+          if (current[key] !== patch[key]) {
+            changed = true;
+            break;
+          }
+        }
+        if (!changed) return prev;
+        const next = prev.slice();
+        next[idx] = { ...current, ...patch };
+        return next;
+      });
+      markDirty();
+    },
+    [markDirty],
+  );
 
   const handleApplyDraftImport = useCallback(
     (importedRows: DocumentLineImportJobRow[]) => {
@@ -450,6 +506,7 @@ export function GoodsIssueFormDialog({
         if (!normalized) return [];
         return [
           {
+            lineId: nextLineId(),
             itemId: normalized.itemId,
             itemLabel: normalized.itemCode,
             itemName: normalized.itemName,
@@ -515,6 +572,7 @@ export function GoodsIssueFormDialog({
           ? storages.find((s) => s.id === storageId)?.name ?? ""
           : "";
         return {
+          lineId: nextLineId(),
           itemId: l.itemId,
           itemLabel: l.item?.code ?? "",
           itemName: l.item?.name ?? "",
@@ -548,7 +606,11 @@ export function GoodsIssueFormDialog({
       const q = query.trim().toLowerCase();
       const active = storages.filter((s) => s.isActive !== false);
       const filtered = q
-        ? active.filter((s) => s.name.toLowerCase().includes(q))
+        ? active.filter(
+            (s) =>
+              s.name.toLowerCase().includes(q) ||
+              (s.code ?? "").toLowerCase().includes(q),
+          )
         : active;
       const effectivePageSize = pageSize ?? 8;
       const start = (page - 1) * effectivePageSize;
@@ -654,12 +716,19 @@ export function GoodsIssueFormDialog({
     [reasonBucket],
   );
 
-  const summaryLines = getPersistableFormLines(lines);
-  const totalQty = summaryLines.reduce((s, l) => s + Number(l.quantity || 0), 0);
-  const totalAmount = summaryLines.reduce(
-    (s, l) => s + Number(l.quantity || 0) * Number(l.unitPrice || 0),
-    0,
-  );
+  // One pass instead of a filter plus two reduces, and memoized so it doesn't
+  // re-run on every unrelated keystroke in the form header.
+  const { totalQty, totalAmount } = useMemo(() => {
+    let qty = 0;
+    let amount = 0;
+    for (const line of lines) {
+      if (!line.itemId) continue;
+      const lineQty = Number(line.quantity || 0);
+      qty += lineQty;
+      amount += lineQty * Number(line.unitPrice || 0);
+    }
+    return { totalQty: qty, totalAmount: amount };
+  }, [lines]);
 
   const handleSave = useCallback(async (skipOverstockConfirm = false): Promise<boolean> => {
     // Toasts (not modal) — same reason as goods-receipt: AppModal validation
@@ -978,6 +1047,7 @@ export function GoodsIssueFormDialog({
     const fresh: FormLine[] = result.lines
       .filter((s) => s.itemId && !existing.has(s.itemId))
       .map((s) => ({
+        lineId: nextLineId(),
         itemId: s.itemId,
         itemLabel: s.sku,
         itemName: s.name,
@@ -1037,6 +1107,7 @@ export function GoodsIssueFormDialog({
     const fallbackStorageId = storageId || defaultStorage?.id || "";
     const fallbackStorageLabel = storageQuery || defaultStorage?.name || "";
     const newLine: FormLine = {
+      lineId: nextLineId(),
       itemId: item.itemId,
       itemLabel: item.code,
       itemName: item.name,
@@ -1075,7 +1146,7 @@ export function GoodsIssueFormDialog({
 
   // Fill the line at `idx` from a selected item — shared by the inline
   // typeahead (onSelect) and the single-fill ProductSelectDialog.
-  const fillLineFromItem = (
+  const fillLineFromItem = useCallback((
     idx: number,
     item: {
       id: string;
@@ -1086,46 +1157,52 @@ export function GoodsIssueFormDialog({
     },
   ) => {
     const defaultUnitPrice = Number(item.purchasePrice ?? 0) || 0;
-    let selectedStorageId = "";
-    let selectedStorageLabel = "";
-    setLines((prev) => {
-      const updated = prev.map((l, i) => {
-        if (i !== idx) return l;
-        selectedStorageId = l.storageId;
-        selectedStorageLabel = l.storageLabel;
-        if (!selectedStorageId) {
-          for (let j = i - 1; j >= 0; j--) {
-            if (prev[j].storageId) {
-              selectedStorageId = prev[j].storageId;
-              selectedStorageLabel = prev[j].storageLabel;
-              break;
-            }
-          }
+    // Resolve the warehouse before the updater so the updater stays pure —
+    // React may invoke it twice (StrictMode, concurrent rendering), which would
+    // otherwise fire the preferred-shelf request twice.
+    const prev = linesRef.current;
+    const row = prev[idx];
+    if (!row) return;
+    let selectedStorageId = row.storageId;
+    let selectedStorageLabel = row.storageLabel;
+    if (!selectedStorageId) {
+      for (let j = idx - 1; j >= 0; j--) {
+        if (prev[j].storageId) {
+          selectedStorageId = prev[j].storageId;
+          selectedStorageLabel = prev[j].storageLabel;
+          break;
         }
-        if (!selectedStorageId) {
-          selectedStorageId = storageId;
-          selectedStorageLabel = storageQuery;
-        }
-        return {
-          ...l,
-          itemId: item.id,
-          itemLabel: item.code,
-          itemName: item.name,
-          unit: item.unit,
-          storageId: selectedStorageId,
-          storageLabel: selectedStorageLabel,
-          locationId: "",
-          locationLabel: "",
-          unitPrice: defaultUnitPrice,
-        };
-      });
-
-      if (selectedStorageId) {
-        fillPreferredShelf(idx, item.id, selectedStorageId);
       }
+    }
+    if (!selectedStorageId) {
+      selectedStorageId = headerStorageRef.current.id;
+      selectedStorageLabel = headerStorageRef.current.label;
+    }
 
-      return normalizeFormLines(updated);
-    });
+    setLines((current) =>
+      normalizeFormLines(
+        current.map((l, i) =>
+          i === idx
+            ? {
+                ...l,
+                itemId: item.id,
+                itemLabel: item.code,
+                itemName: item.name,
+                unit: item.unit,
+                storageId: selectedStorageId,
+                storageLabel: selectedStorageLabel,
+                locationId: "",
+                locationLabel: "",
+                unitPrice: defaultUnitPrice,
+              }
+            : l,
+        ),
+      ),
+    );
+
+    if (selectedStorageId) {
+      fillPreferredShelf(idx, item.id, selectedStorageId);
+    }
     void getInstantAverageCost(item.id)
       .then((unitCost) => {
         setLines((current) =>
@@ -1140,9 +1217,13 @@ export function GoodsIssueFormDialog({
         // Keep purchase price fallback already shown in the row.
       });
     markDirty();
-  };
+  }, [fillPreferredShelf, markDirty]);
 
-  const lineColumns: LineColumn<FormLine>[] = [
+  // Memoized: a fresh array here would rebuild every column object and every
+  // renderEditor closure on each render, re-rendering all rows. Everything it
+  // closes over must therefore be stable — note the absence of `lines` and of
+  // the running totals (those go through `lineFooters`).
+  const lineColumns = useMemo<LineColumn<FormLine>[]>(() => [
     {
       key: "itemLabel",
       label: "Mã SKU",
@@ -1156,23 +1237,15 @@ export function GoodsIssueFormDialog({
           dropdownMinWidth={520}
           placeholder="Tìm mã hoặc tên"
           value={row.itemLabel}
-          onValueChange={(val) => {
-            setLines((prev) =>
-              prev.map((l, i) =>
-                i === idx
-                  ? {
-                      ...l,
-                      itemLabel: val,
-                      itemName: "",
-                      itemId: "",
-                      locationId: "",
-                      locationLabel: "",
-                    }
-                  : l,
-              ),
-            );
-            markDirty();
-          }}
+          onValueChange={(val) =>
+            updateLine(idx, {
+              itemLabel: val,
+              itemName: "",
+              itemId: "",
+              locationId: "",
+              locationLabel: "",
+            })
+          }
           onSelect={(item) => fillLineFromItem(idx, item)}
           search={searchItems}
           itemKey={(item) => item.id}
@@ -1207,52 +1280,36 @@ export function GoodsIssueFormDialog({
           portalToBody
           enableSearchModal
           searchModalTitle="Chọn kho"
-          searchModalPlaceholder="Nhập tên kho"
-          dropdownMinWidth={320}
+          searchModalPlaceholder="Nhập mã kho hoặc tên kho"
+          dropdownMinWidth={420}
           placeholder="Chọn kho"
           value={row.storageLabel}
-          onValueChange={(val) => {
-            setLines((prev) =>
-              prev.map((l, i) =>
-                i === idx
-                  ? {
-                      ...l,
-                      storageLabel: val,
-                      storageId: "",
-                      locationId: "",
-                      locationLabel: "",
-                    }
-                  : l,
-              ),
-            );
-            markDirty();
-          }}
+          onValueChange={(val) =>
+            updateLine(idx, {
+              storageLabel: val,
+              storageId: "",
+              locationId: "",
+              locationLabel: "",
+            })
+          }
           onSelect={(s) => {
-            setLines((prev) =>
-              prev.map((l, i) =>
-                i === idx
-                  ? {
-                      ...l,
-                      storageId: s.id,
-                      storageLabel: s.name,
-                      // A bin belongs to one warehouse — clear it when the
-                      // line's warehouse changes.
-                      locationId: "",
-                      locationLabel: "",
-                    }
-                  : l,
-              ),
-            );
+            updateLine(idx, {
+              storageId: s.id,
+              storageLabel: s.name,
+              // A bin belongs to one warehouse — clear it when the
+              // line's warehouse changes.
+              locationId: "",
+              locationLabel: "",
+            });
             if (row.itemId) {
               fillPreferredShelf(idx, row.itemId, s.id);
             }
-            markDirty();
           }}
           search={searchStorages}
           itemKey={(s) => s.id}
           renderItem={(s) => s.name}
           renderMeta={() => ""}
-          columns={[{ key: "name", label: "Tên kho", render: (s) => s.name }]}
+          columns={STORAGE_LOOKUP_COLUMNS}
           disabled={detailLocked}
           className="h-full"
         />
@@ -1272,24 +1329,12 @@ export function GoodsIssueFormDialog({
           dropdownMinWidth={360}
           placeholder={row.storageId ? "Chọn vị trí" : "Chọn kho trước"}
           value={row.locationLabel}
-          onValueChange={(val) => {
-            setLines((prev) =>
-              prev.map((l, i) =>
-                i === idx ? { ...l, locationLabel: val, locationId: "" } : l,
-              ),
-            );
-            markDirty();
-          }}
-          onSelect={(loc) => {
-            setLines((prev) =>
-              prev.map((l, i) =>
-                i === idx
-                  ? { ...l, locationId: loc.id, locationLabel: loc.code }
-                  : l,
-              ),
-            );
-            markDirty();
-          }}
+          onValueChange={(val) =>
+            updateLine(idx, { locationLabel: val, locationId: "" })
+          }
+          onSelect={(loc) =>
+            updateLine(idx, { locationId: loc.id, locationLabel: loc.code })
+          }
           search={(q, p, ps) => searchLocationsForStorage(row.storageId, q, p, ps)}
           itemKey={(loc) => loc.id}
           renderItem={(loc) => loc.name}
@@ -1322,7 +1367,6 @@ export function GoodsIssueFormDialog({
       type: "number",
       align: "right",
       filterSymbol: "≤",
-      footer: totalQty.toLocaleString("vi-VN"),
     },
     {
       key: "unitPrice",
@@ -1335,14 +1379,9 @@ export function GoodsIssueFormDialog({
           disabled={detailLocked}
           className="h-full w-full rounded-none border-0 bg-transparent px-1 text-right shadow-none"
           value={row.unitPrice === 0 ? "" : row.unitPrice}
-          onChange={(v) => {
-            setLines((prev) =>
-              prev.map((l, i) =>
-                i === idx ? { ...l, unitPrice: v === "" ? 0 : Number(v) } : l,
-              ),
-            );
-            markDirty();
-          }}
+          onChange={(v) =>
+            updateLine(idx, { unitPrice: v === "" ? 0 : Number(v) })
+          }
         />
       ),
     },
@@ -1355,9 +1394,49 @@ export function GoodsIssueFormDialog({
       filterSymbol: "≤",
       getValue: (r) =>
         r.itemId ? formatMoneyInteger(Number(r.quantity) * Number(r.unitPrice)) : "",
-      footer: formatMoneyInteger(totalAmount),
     },
-  ];
+  ], [
+    detailLocked,
+    fillLineFromItem,
+    fillPreferredShelf,
+    searchItems,
+    searchLocationsForStorage,
+    searchStorages,
+    setProductPickerOpen,
+    setQuickItemLineIdx,
+    setQuickLocationLineIdx,
+    updateLine,
+  ]);
+
+  // Totals live here rather than on the columns: a footer embedded in a column
+  // object changes the identity of `columns` on every quantity edit, which
+  // would re-render every row.
+  const lineFooters = useMemo<Record<string, ReactNode>>(
+    () => ({
+      quantity: totalQty.toLocaleString("vi-VN"),
+      lineTotal: formatMoneyInteger(totalAmount),
+    }),
+    [totalAmount, totalQty],
+  );
+
+  const handleChangeCell = useCallback(
+    (idx: number, key: string, value: string | number) =>
+      updateLine(idx, { [key]: value } as Partial<FormLine>),
+    [updateLine],
+  );
+
+  const handleAddRow = useCallback(() => {
+    setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
+    markDirty();
+  }, [markDirty]);
+
+  const handleDeleteRow = useCallback(
+    (idx: number) => {
+      setLines((prev) => normalizeFormLines(prev.filter((_, i) => i !== idx)));
+      markDirty();
+    },
+    [markDirty],
+  );
 
   return (
     <>
@@ -1661,27 +1740,12 @@ export function GoodsIssueFormDialog({
             <LineItemGrid
               columns={lineColumns}
               // Omitting onChangeCell makes the built-in cells (Số lượng) read-only.
-              onChangeCell={
-                detailLocked
-                  ? undefined
-                  : (idx, key, value) => {
-                      setLines((prev) =>
-                        prev.map((l, i) => (i === idx ? { ...l, [key]: value } : l)),
-                      );
-                      markDirty();
-                    }
-              }
+              onChangeCell={detailLocked ? undefined : handleChangeCell}
               rows={lines}
-              onAddRow={() => {
-                setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
-                markDirty();
-              }}
-              onDeleteRow={(idx) => {
-                setLines((prev) =>
-                  normalizeFormLines(prev.filter((_, i) => i !== idx)),
-                );
-                markDirty();
-              }}
+              footers={lineFooters}
+              getRowKey={getLineKey}
+              onAddRow={handleAddRow}
+              onDeleteRow={handleDeleteRow}
               showAddRow={!detailLocked}
               showRowActions={!detailLocked}
             />

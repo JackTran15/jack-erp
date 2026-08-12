@@ -2,6 +2,27 @@ export interface InventoryFormLine {
   itemId: string;
 }
 
+/**
+ * Client-only row identity for document line grids. Rows keyed by array index
+ * remount everything below an insert/delete (losing focus and in-cell dropdown
+ * state), and a virtualized grid would recycle a row's state onto a different
+ * line entirely.
+ *
+ * A module counter beats randomUUID here — keys only need to be unique within
+ * one list, and a 2000-line document would pay real entropy cost for nothing.
+ *
+ * Never include this in a save payload: it is not a server id.
+ */
+export interface KeyedFormLine {
+  lineId: string;
+}
+
+let lineSeq = 0;
+
+export const nextLineId = () => `ln${(lineSeq += 1)}`;
+
+export const getLineKey = (line: KeyedFormLine) => line.lineId;
+
 export const isFilledLine = <TLine extends InventoryFormLine>(line: TLine) =>
   Boolean(line.itemId);
 

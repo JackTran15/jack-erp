@@ -222,6 +222,10 @@ export function LookupSearchModal<T>({
     onOpenChange(false);
   };
 
+  // Callers are expected to mount this only while open; the guard keeps a
+  // closed instance from paying for an AppModal (Radix Dialog root + portal).
+  if (!open) return null;
+
   return (
     <AppModal
       open={open}

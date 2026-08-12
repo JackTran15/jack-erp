@@ -1,4 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  getLineKey,
+  nextLineId,
+  type KeyedFormLine,
+} from "../inventory-line-normalization";
 import { useNavigate } from "react-router-dom";
 import {
   Button,
@@ -71,7 +83,12 @@ interface Props {
   onOpenStockTakeReference?: (id: string) => void;
 }
 
-interface LineRow {
+/**
+ * `lineId` is a client-only grid key (distinct from `id`, which is the server
+ * line id and is undefined until saved) — the save payload is built from
+ * explicit fields, never by spreading a row, and it must stay that way.
+ */
+interface LineRow extends KeyedFormLine {
   /** Server-side line id if persisted; undefined while still local. */
   id?: string;
   itemId: string;
@@ -127,6 +144,7 @@ function combineDateTime(date: string, time: string): string {
 
 function emptyRow(): LineRow {
   return {
+    lineId: nextLineId(),
     id: undefined,
     itemId: "",
     itemCode: "",
@@ -218,6 +236,7 @@ function ensureTrailingEmptyMember(
 
 function toLineRow(l: StockTakeLine): LineRow {
   return {
+    lineId: nextLineId(),
     id: l.id,
     itemId: l.itemId,
     itemCode: l.item?.code ?? l.itemId.slice(0, 8),
@@ -296,6 +315,10 @@ export function StockTakeFormDialog({
       isLocked,
     ),
   );
+  // Read by callbacks that must stay referentially stable (the line columns are
+  // memoized on them) but still need the current rows.
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [detailTab, setDetailTab] = useState<DetailTab>("items");
   const [scanBarcode, setScanBarcode] = useState(false);
@@ -600,6 +623,9 @@ export function StockTakeFormDialog({
             prev.map((r, i) =>
               i === rowIndex
                 ? {
+                    // Keep the row's grid key — this replaces the row's data,
+                    // not the row itself.
+                    lineId: r.lineId,
                     id: data.id,
                     itemId: data.itemId,
                     itemCode: data.item?.code ?? item.code,
@@ -703,7 +729,7 @@ export function StockTakeFormDialog({
 
   const handleDeleteRow = useCallback(
     async (rowIndex: number) => {
-      const row = rows[rowIndex];
+      const row = rowsRef.current[rowIndex];
       if (!row) return;
       // Local row, or new mode → drop from state only.
       if (!row.id || !stockTake) {
@@ -727,12 +753,12 @@ export function StockTakeFormDialog({
         toast.error(getUserFacingApiErrorMessage(err));
       }
     },
-    [rows, stockTake, markDirty],
+    [stockTake, markDirty],
   );
 
   const handlePickLocation = useCallback(
     async (location: LocationOption, rowIndex: number) => {
-      const row = rows[rowIndex];
+      const row = rowsRef.current[rowIndex];
       if (!row?.itemId) return;
       try {
         if (stockTake && row.id) {
@@ -775,7 +801,7 @@ export function StockTakeFormDialog({
         toast.error(getUserFacingApiErrorMessage(err));
       }
     },
-    [fetchBalanceAtLocation, markDirty, rows, stockTake],
+    [fetchBalanceAtLocation, markDirty, stockTake],
   );
 
   const visibleRowEntries = useMemo(() => {
@@ -802,11 +828,47 @@ export function StockTakeFormDialog({
       }),
     );
   }, [filters, rows]);
-  const visibleRows = visibleRowEntries.map((entry) => entry.row);
+  // Memoized alongside the entries — an inline `.map()` would hand the grid a
+  // fresh array identity on every render and defeat its memo.
+  const visibleRows = useMemo(
+    () => visibleRowEntries.map((entry) => entry.row),
+    [visibleRowEntries],
+  );
+  // Read through a ref so this stays referentially stable: the line columns are
+  // memoized on it, and `visibleRowEntries` changes on every row edit. It is
+  // only ever called from event handlers, never during render.
+  const visibleRowEntriesRef = useRef(visibleRowEntries);
+  visibleRowEntriesRef.current = visibleRowEntries;
   const sourceIndexForVisible = useCallback(
     (visibleIndex: number) =>
-      visibleRowEntries[visibleIndex]?.sourceIndex ?? visibleIndex,
-    [visibleRowEntries],
+      visibleRowEntriesRef.current[visibleIndex]?.sourceIndex ?? visibleIndex,
+    [],
+  );
+
+  /**
+   * Single entry point for editing one row, addressed by its index in `rows`
+   * (not the filtered view). Untouched rows keep their identity so memoized
+   * grid rows bail out, and a no-op patch returns `prev` unchanged.
+   */
+  const updateRow = useCallback(
+    (sourceIndex: number, patch: Partial<LineRow>) => {
+      setRows((prev) => {
+        const current = prev[sourceIndex];
+        if (!current) return prev;
+        let changed = false;
+        for (const key of Object.keys(patch) as (keyof LineRow)[]) {
+          if (current[key] !== patch[key]) {
+            changed = true;
+            break;
+          }
+        }
+        if (!changed) return prev;
+        const next = prev.slice();
+        next[sourceIndex] = { ...current, ...patch };
+        return next;
+      });
+    },
+    [],
   );
 
   const handleExportExcel = useCallback(async () => {
@@ -1160,32 +1222,49 @@ export function StockTakeFormDialog({
     { id: "close", label: "Đóng", icon: X, onClick: requestClose },
   ];
 
-  const countedRows = rows.filter((row) => row.itemId);
-  const totalExpected = countedRows.reduce(
-    (sum, row) => sum + row.expectedQty,
-    0,
-  );
-  const totalCounted = countedRows.reduce(
-    (sum, row) => sum + (row.countedQty ?? 0),
-    0,
-  );
-  const totalExpectedValue = countedRows.reduce(
-    (sum, row) => sum + row.expectedValue,
-    0,
-  );
-  const totalCountedValue = countedRows.reduce(
-    (sum, row) => sum + (row.countedValue ?? 0),
-    0,
-  );
+  // One pass instead of a filter plus four reduces, and memoized so it doesn't
+  // re-run on every unrelated keystroke in the form header.
+  const {
+    countedRowCount,
+    totalExpected,
+    totalCounted,
+    totalExpectedValue,
+    totalCountedValue,
+  } = useMemo(() => {
+    let count = 0;
+    let expected = 0;
+    let counted = 0;
+    let expectedValue = 0;
+    let countedValue = 0;
+    for (const row of rows) {
+      if (!row.itemId) continue;
+      count += 1;
+      expected += row.expectedQty;
+      counted += row.countedQty ?? 0;
+      expectedValue += row.expectedValue;
+      countedValue += row.countedValue ?? 0;
+    }
+    return {
+      countedRowCount: count,
+      totalExpected: expected,
+      totalCounted: counted,
+      totalExpectedValue: expectedValue,
+      totalCountedValue: countedValue,
+    };
+  }, [rows]);
 
   // ─── Line columns ────────────────────────────────────────────────────────
-  const lineColumns: LineColumn<LineRow>[] = [
+  // Memoized: a fresh array here would rebuild every column object and every
+  // renderEditor closure on each render, re-rendering all rows. Everything it
+  // closes over must therefore be stable — note the absence of `rows` and of
+  // the running totals (those go through `lineFooters`).
+  const lineColumns = useMemo<LineColumn<LineRow>[]>(() => {
+    const cols: LineColumn<LineRow>[] = [
     {
       key: "itemCode",
       label: "Mã SKU",
       width: 360,
       placeholder: "Tìm mã hoặc tên",
-      footer: `Số dòng = ${countedRows.length}`,
       renderEditor: (row, idx) => (
         <LookupField
           portalToBody
@@ -1193,29 +1272,21 @@ export function StockTakeFormDialog({
           dropdownMinWidth={520}
           placeholder="Tìm mã hoặc tên"
           value={row.itemCode}
-          onValueChange={(value) => {
-            const sourceIndex = sourceIndexForVisible(idx);
+          onValueChange={(value) =>
             // Gõ lại mã = tìm hàng khác → xoá định danh cũ để chọn lại;
             // giữ số liệu kiểm kê người dùng đã nhập (gắn theo hàng khi chọn).
-            setRows((prev) =>
-              prev.map((current, index) =>
-                index === sourceIndex
-                  ? {
-                      ...current,
-                      itemCode: value,
-                      itemId: "",
-                      itemName: "",
-                      unit: "",
-                      purchasePrice: 0,
-                      locationId: "",
-                      locationCode: "",
-                      expectedQty: 0,
-                      expectedValue: 0,
-                    }
-                  : current,
-              ),
-            );
-          }}
+            updateRow(sourceIndexForVisible(idx), {
+              itemCode: value,
+              itemId: "",
+              itemName: "",
+              unit: "",
+              purchasePrice: 0,
+              locationId: "",
+              locationCode: "",
+              expectedQty: 0,
+              expectedValue: 0,
+            })
+          }
           onSelect={(item) =>
             void handlePickItem(item, sourceIndexForVisible(idx))
           }
@@ -1265,14 +1336,10 @@ export function StockTakeFormDialog({
           placeholder="Vị trí"
           value={row.locationCode}
           onValueChange={(val) => {
-            const sourceIndex = sourceIndexForVisible(idx);
-            setRows((prev) =>
-              prev.map((r, i) =>
-                i === sourceIndex
-                  ? { ...r, locationCode: val, locationId: "" }
-                  : r,
-              ),
-            );
+            updateRow(sourceIndexForVisible(idx), {
+              locationCode: val,
+              locationId: "",
+            });
             markDirty();
           }}
           onSelect={(loc) =>
@@ -1310,7 +1377,6 @@ export function StockTakeFormDialog({
       width: 100,
       type: "readonly",
       align: "right",
-      footer: totalExpected.toLocaleString("vi-VN"),
       getValue: (r) => r.expectedQty.toLocaleString("vi-VN"),
     },
     {
@@ -1319,7 +1385,6 @@ export function StockTakeFormDialog({
       group: "Số lượng",
       width: 110,
       align: "right",
-      footer: totalCounted.toLocaleString("vi-VN"),
       renderEditor: (row, idx) => (
         <Input
           type="text"
@@ -1327,13 +1392,9 @@ export function StockTakeFormDialog({
           className="h-full w-full rounded-none border-0 bg-transparent px-1 text-right shadow-none focus-visible:ring-0"
           value={formatEditableNumber(row.countedQty)}
           onChange={(e) => {
-            const next = parseLocalizedNumber(e.target.value);
-            const sourceIndex = sourceIndexForVisible(idx);
-            setRows((prev) =>
-              prev.map((r, i) =>
-                i === sourceIndex ? { ...r, countedQty: next } : r,
-              ),
-            );
+            updateRow(sourceIndexForVisible(idx), {
+              countedQty: parseLocalizedNumber(e.target.value),
+            });
             markDirty();
           }}
           disabled={isLocked || !row.itemId}
@@ -1347,7 +1408,6 @@ export function StockTakeFormDialog({
       width: 100,
       type: "readonly",
       align: "right",
-      footer: (totalCounted - totalExpected).toLocaleString("vi-VN"),
       getValue: (r) => {
         if (r.countedQty == null) return "—";
         const v = r.countedQty - r.expectedQty;
@@ -1366,11 +1426,7 @@ export function StockTakeFormDialog({
           className="h-full w-full rounded-none border-0 bg-transparent px-2 text-left shadow-none focus-visible:ring-0"
           value={row.reason}
           onChange={(e) => {
-            const v = e.target.value;
-            const sourceIndex = sourceIndexForVisible(idx);
-            setRows((prev) =>
-              prev.map((r, i) => (i === sourceIndex ? { ...r, reason: v } : r)),
-            );
+            updateRow(sourceIndexForVisible(idx), { reason: e.target.value });
             markDirty();
           }}
           disabled={isLocked || !row.itemId}
@@ -1388,69 +1444,109 @@ export function StockTakeFormDialog({
         return variance > 0 ? "Nhập kho" : variance < 0 ? "Xuất kho" : "Tất cả";
       },
     },
-  ];
+    ];
 
-  if (countByValue) {
-    lineColumns.splice(
-      7,
-      0,
-      {
-        key: "expectedValue",
-        label: "Theo sổ",
-        group: "Giá trị",
-        width: 100,
-        type: "readonly",
-        align: "right",
-        footer: totalExpectedValue.toLocaleString("vi-VN"),
-        getValue: (r) => r.expectedValue.toLocaleString("vi-VN"),
-      },
-      {
-        key: "countedValue",
-        label: "Kiểm kê",
-        group: "Giá trị",
-        width: 110,
-        align: "right",
-        footer: totalCountedValue.toLocaleString("vi-VN"),
-        renderEditor: (row, idx) => (
-          <Input
-            type="text"
-            inputMode="decimal"
-            className="h-full w-full rounded-none border-0 bg-transparent px-1 text-right shadow-none focus-visible:ring-0"
-            value={formatEditableNumber(row.countedValue)}
-            onChange={(e) => {
-              const next = parseLocalizedNumber(e.target.value);
-              const sourceIndex = sourceIndexForVisible(idx);
-              setRows((prev) =>
-                prev.map((r, i) =>
-                  i === sourceIndex ? { ...r, countedValue: next } : r,
-                ),
-              );
-              markDirty();
-            }}
-            disabled={isLocked || !row.itemId}
-          />
-        ),
-      },
-      {
-        key: "valueVariance",
-        label: "Chênh lệch",
-        group: "Giá trị",
-        width: 100,
-        type: "readonly",
-        align: "right",
-        footer: (totalCountedValue - totalExpectedValue).toLocaleString(
-          "vi-VN",
-        ),
-        getValue: (r) => {
-          if (r.countedValue == null) return "—";
-          const v = r.countedValue - r.expectedValue;
-          return v > 0
-            ? `+${v.toLocaleString("vi-VN")}`
-            : v.toLocaleString("vi-VN");
+    if (countByValue) {
+      cols.splice(
+        7,
+        0,
+        {
+          key: "expectedValue",
+          label: "Theo sổ",
+          group: "Giá trị",
+          width: 100,
+          type: "readonly",
+          align: "right",
+          getValue: (r) => r.expectedValue.toLocaleString("vi-VN"),
         },
-      },
-    );
-  }
+        {
+          key: "countedValue",
+          label: "Kiểm kê",
+          group: "Giá trị",
+          width: 110,
+          align: "right",
+          renderEditor: (row, idx) => (
+            <Input
+              type="text"
+              inputMode="decimal"
+              className="h-full w-full rounded-none border-0 bg-transparent px-1 text-right shadow-none focus-visible:ring-0"
+              value={formatEditableNumber(row.countedValue)}
+              onChange={(e) => {
+                updateRow(sourceIndexForVisible(idx), {
+                  countedValue: parseLocalizedNumber(e.target.value),
+                });
+                markDirty();
+              }}
+              disabled={isLocked || !row.itemId}
+            />
+          ),
+        },
+        {
+          key: "valueVariance",
+          label: "Chênh lệch",
+          group: "Giá trị",
+          width: 100,
+          type: "readonly",
+          align: "right",
+          getValue: (r) => {
+            if (r.countedValue == null) return "—";
+            const v = r.countedValue - r.expectedValue;
+            return v > 0
+              ? `+${v.toLocaleString("vi-VN")}`
+              : v.toLocaleString("vi-VN");
+          },
+        },
+      );
+    }
+
+    return cols;
+  }, [
+    countByValue,
+    handlePickItem,
+    handlePickLocation,
+    isLocked,
+    markDirty,
+    searchItems,
+    searchLocationsForStorage,
+    setProductPickerOpen,
+    sourceIndexForVisible,
+    updateRow,
+  ]);
+
+  // Totals live here rather than on the columns: a footer embedded in a column
+  // object changes the identity of `columns` on every edit, which would
+  // re-render every row.
+  const lineFooters = useMemo<Record<string, ReactNode>>(
+    () => ({
+      itemCode: `Số dòng = ${countedRowCount}`,
+      expectedQty: totalExpected.toLocaleString("vi-VN"),
+      countedQty: totalCounted.toLocaleString("vi-VN"),
+      variance: (totalCounted - totalExpected).toLocaleString("vi-VN"),
+      ...(countByValue
+        ? {
+            expectedValue: totalExpectedValue.toLocaleString("vi-VN"),
+            countedValue: totalCountedValue.toLocaleString("vi-VN"),
+            valueVariance: (
+              totalCountedValue - totalExpectedValue
+            ).toLocaleString("vi-VN"),
+          }
+        : {}),
+    }),
+    [
+      countByValue,
+      countedRowCount,
+      totalCounted,
+      totalCountedValue,
+      totalExpected,
+      totalExpectedValue,
+    ],
+  );
+
+  const handleDeleteVisibleRow = useCallback(
+    (visibleIndex: number) =>
+      void handleDeleteRow(sourceIndexForVisible(visibleIndex)),
+    [handleDeleteRow, sourceIndexForVisible],
+  );
 
   // ─── Render ──────────────────────────────────────────────────────────────
   const title = isNew
@@ -1784,11 +1880,11 @@ export function StockTakeFormDialog({
                   <LineItemGrid
                     columns={lineColumns}
                     rows={visibleRows}
+                    footers={lineFooters}
+                    getRowKey={getLineKey}
                     filters={filters}
                     onFilterChange={setFilters}
-                    onDeleteRow={(idx) =>
-                      void handleDeleteRow(sourceIndexForVisible(idx))
-                    }
+                    onDeleteRow={handleDeleteVisibleRow}
                     showRowActions={!isLocked}
                     showAddRow={false}
                     onAddRow={handleAddPendingRow}
