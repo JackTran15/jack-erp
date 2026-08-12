@@ -78,6 +78,8 @@ export interface PaginatedResponse<T> {
 
 export interface StorageOption {
   id: string;
+  /** Mã kho (WHxxxxxx) — cột thứ nhất của dropdown chọn kho. */
+  code?: string;
   name: string;
   branchId: string;
 }

@@ -15,6 +15,7 @@ import {
   isZipExcelBuffer,
   parseGroupedDecimal,
 } from "./inventory-excel-parse.utils";
+import { findImportStorage } from "./resolve-import-storage.util";
 
 export const GOODS_RECEIPT_IMPORT_FIELDS = {
   SKU: "Mã SKU",
@@ -147,15 +148,11 @@ export class ExcelImportGoodsReceiptService {
     const item = await this.resolveItem(sku, barcode, actor, errors);
     const storageName = this.value(row, GOODS_RECEIPT_IMPORT_FIELDS.STORAGE);
     const locationCode = this.value(row, GOODS_RECEIPT_IMPORT_FIELDS.LOCATION);
-    const storage = storageName
-      ? await this.storageRepo.findOne({
-          where: {
-            organizationId: actor.organizationId,
-            branchId: actor.branchId,
-            name: ILike(storageName),
-          },
-        })
-      : null;
+    const storage = await findImportStorage(
+      this.storageRepo,
+      storageName,
+      actor,
+    );
     if (!storageName || !storage) {
       errors.push({
         column: GOODS_RECEIPT_IMPORT_FIELDS.STORAGE,

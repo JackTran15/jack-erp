@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Button,
   Dialog,
@@ -10,9 +10,16 @@ import {
 } from "@erp/ui";
 import { Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { LookupField } from "../forms/LookupField";
+import {
+  STORAGE_LOOKUP_COLUMNS,
+  makeStorageSearch,
+} from "../forms/storage-lookup";
 
 export interface ChooseWarehouseOption {
   id: string;
+  /** Mã kho (WHxxxxxx) — cột thứ nhất của dropdown chọn kho. */
+  code?: string;
   name: string;
   /** false = kho đã ngừng hoạt động → ẩn khỏi picker. Bỏ trống coi như đang hoạt động. */
   isActive?: boolean;
@@ -41,6 +48,15 @@ export function ChooseWarehouseDialog({
 
   // Ẩn kho đã ngừng hoạt động (isActive === false) khỏi picker.
   const activeStorages = storages.filter((s) => s.isActive !== false);
+  const [storageLabel, setStorageLabel] = useState(
+    () => activeStorages.find((s) => s.id === defaultStorageId)?.name ?? "",
+  );
+
+  const searchStorages = useMemo(
+    () => makeStorageSearch(activeStorages),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [storages],
+  );
 
   const handleConfirm = () => {
     const storage = activeStorages.find((s) => s.id === storageId);
@@ -68,20 +84,26 @@ export function ChooseWarehouseDialog({
           <Label htmlFor="choose-warehouse-select" className="shrink-0">
             {fieldLabel} <span className="text-destructive">*</span>
           </Label>
-          <select
-            id="choose-warehouse-select"
-            className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm"
-            value={storageId}
-            onChange={(e) => setStorageId(e.target.value)}
-            autoFocus
-          >
-            <option value="">— Chọn kho —</option>
-            {activeStorages.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          <div className="flex-1">
+            <LookupField<ChooseWarehouseOption>
+              inputId="choose-warehouse-select"
+              placeholder="Chọn kho"
+              dropdownMinWidth={420}
+              value={storageLabel}
+              onValueChange={(v) => {
+                setStorageLabel(v);
+                if (!v) setStorageId("");
+              }}
+              onSelect={(s) => {
+                setStorageId(s.id);
+                setStorageLabel(s.name);
+              }}
+              search={searchStorages}
+              itemKey={(s) => s.id}
+              renderItem={(s) => s.name}
+              columns={STORAGE_LOOKUP_COLUMNS}
+            />
+          </div>
         </div>
 
         <DialogFooter>

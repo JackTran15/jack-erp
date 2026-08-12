@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Button,
   Dialog,
@@ -10,6 +10,11 @@ import {
 } from "@erp/ui";
 import { Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { LookupField } from "../forms/LookupField";
+import {
+  STORAGE_LOOKUP_COLUMNS,
+  makeStorageSearch,
+} from "../forms/storage-lookup";
 import type { ChooseWarehouseOption } from "./ChooseWarehouseDialog";
 
 interface Props {
@@ -34,6 +39,11 @@ export function ChooseTransferWarehousesDialog({
 }: Props) {
   const [sourceId, setSourceId] = useState(defaultSourceId);
   const [destId, setDestId] = useState(defaultDestId);
+  const nameOf = (id: string) => storages.find((s) => s.id === id)?.name ?? "";
+  const [sourceLabel, setSourceLabel] = useState(() => nameOf(defaultSourceId));
+  const [destLabel, setDestLabel] = useState(() => nameOf(defaultDestId));
+
+  const searchStorages = useMemo(() => makeStorageSearch(storages), [storages]);
 
   const handleConfirm = () => {
     const source = storages.find((s) => s.id === sourceId);
@@ -63,37 +73,47 @@ export function ChooseTransferWarehousesDialog({
             <Label htmlFor="transfer-source-select">
               Kho xuất <span className="text-destructive">*</span>
             </Label>
-            <select
-              id="transfer-source-select"
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-              value={sourceId}
-              onChange={(e) => setSourceId(e.target.value)}
-              autoFocus
-            >
-              <option value="">— Chọn kho —</option>
-              {storages.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            <LookupField<ChooseWarehouseOption>
+              inputId="transfer-source-select"
+              placeholder="Chọn kho"
+              dropdownMinWidth={420}
+              value={sourceLabel}
+              onValueChange={(v) => {
+                setSourceLabel(v);
+                if (!v) setSourceId("");
+              }}
+              onSelect={(s) => {
+                setSourceId(s.id);
+                setSourceLabel(s.name);
+              }}
+              search={searchStorages}
+              itemKey={(s) => s.id}
+              renderItem={(s) => s.name}
+              columns={STORAGE_LOOKUP_COLUMNS}
+            />
 
             <Label htmlFor="transfer-dest-select">
               Kho nhập <span className="text-destructive">*</span>
             </Label>
-            <select
-              id="transfer-dest-select"
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-              value={destId}
-              onChange={(e) => setDestId(e.target.value)}
-            >
-              <option value="">— Chọn kho —</option>
-              {storages.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            <LookupField<ChooseWarehouseOption>
+              inputId="transfer-dest-select"
+              placeholder="Chọn kho"
+              dropdownMinWidth={420}
+              value={destLabel}
+              onValueChange={(v) => {
+                setDestLabel(v);
+                if (!v) setDestId("");
+              }}
+              onSelect={(s) => {
+                setDestId(s.id);
+                setDestLabel(s.name);
+              }}
+              search={searchStorages}
+              itemKey={(s) => s.id}
+              renderItem={(s) => s.name}
+              columns={STORAGE_LOOKUP_COLUMNS}
+            />
+
           </div>
         </div>
 

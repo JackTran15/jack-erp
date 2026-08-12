@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { HelpCircle, Loader2, Plus, Trash2 } from "lucide-react";
 import { AppModal, Button } from "@erp/ui";
 import { LookupField } from "../../components/forms/LookupField";
+import { STORAGE_LOOKUP_COLUMNS } from "../../components/forms/storage-lookup";
 import { apiClient } from "../../lib/api-axios";
 import { getActiveBranch } from "../../lib/auth-storage";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
@@ -40,6 +41,8 @@ interface InventoryLocation {
 
 interface InventoryStorage {
   id: string;
+  /** Mã kho (WHxxxxxx) — cột thứ nhất của dropdown chọn kho. */
+  code?: string;
   name: string;
   isMainStorage?: boolean;
 }
@@ -609,9 +612,8 @@ export function ArrangeLocationDialog({
                     search={searchStorages}
                     itemKey={(s) => s.id}
                     renderItem={(s) => s.name}
-                    columns={[
-                      { key: "name", label: "Tên kho", render: (s) => s.name },
-                    ]}
+                    dropdownMinWidth={420}
+                    columns={STORAGE_LOOKUP_COLUMNS}
                     className="w-full"
                   />
                 </td>

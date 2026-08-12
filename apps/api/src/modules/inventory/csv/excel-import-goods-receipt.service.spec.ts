@@ -137,6 +137,42 @@ describe("ExcelImportGoodsReceiptService", () => {
     });
   });
 
+  it("resolves the Kho column by warehouse code, not just by name", async () => {
+    itemRepo.findOne.mockResolvedValue({
+      id: "item-1",
+      code: "SKU-1",
+      name: "Áo",
+      unit: "Cái",
+      purchasePrice: "25000",
+    });
+    // Only a code lookup hits; a name lookup for "KHOKT" finds nothing.
+    storageRepo.findOne.mockImplementation(({ where }: any) =>
+      Promise.resolve(
+        where.code ? { id: "storage-1", name: "Kho kế toán" } : null,
+      ),
+    );
+    locationRepo.findOne.mockResolvedValue({
+      id: "location-1",
+      code: "DEFAULT",
+      name: "Mặc định",
+      storageId: "storage-1",
+    });
+
+    const result = await service.validateAndNormalizeRow(
+      {
+        [GOODS_RECEIPT_IMPORT_FIELDS.SKU]: "SKU-1",
+        [GOODS_RECEIPT_IMPORT_FIELDS.STORAGE]: "KHOKT",
+        [GOODS_RECEIPT_IMPORT_FIELDS.LOCATION]: "DEFAULT",
+        [GOODS_RECEIPT_IMPORT_FIELDS.QUANTITY]: "1",
+      },
+      actor,
+    );
+
+    expect(result.errors).toEqual([]);
+    expect(result.normalizedData?.storageId).toBe("storage-1");
+    expect(result.normalizedData?.storageName).toBe("Kho kế toán");
+  });
+
   it("resolves by barcode and warns when price defaults to zero", async () => {
     barcodeRepo.findOne.mockResolvedValue({ itemId: "item-1" });
     itemRepo.findOne.mockResolvedValue({

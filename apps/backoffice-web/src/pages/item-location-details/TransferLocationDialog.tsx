@@ -10,6 +10,7 @@ import {
   TooltipTrigger,
 } from "@erp/ui";
 import { LookupField } from "../../components/forms/LookupField";
+import { STORAGE_LOOKUP_COLUMNS } from "../../components/forms/storage-lookup";
 import {
   ProductSelectDialog,
   type ProductSelectResult,
@@ -30,6 +31,8 @@ import { lookupItemByCode, type ItemLookupResult } from "../../api/item-lookup";
 
 interface InventoryStorage {
   id: string;
+  /** Mã kho (WHxxxxxx) — cột thứ nhất của dropdown chọn kho. */
+  code?: string;
   name: string;
   isMainStorage?: boolean;
 }
@@ -816,7 +819,8 @@ export function TransferLocationDialog({
             search={searchStorages}
             itemKey={(s) => s.id}
             renderItem={(s) => s.name}
-            columns={[{ key: "name", label: "Tên kho", render: (s) => s.name }]}
+            dropdownMinWidth={420}
+            columns={STORAGE_LOOKUP_COLUMNS}
             className="w-44"
           />
         </div>
