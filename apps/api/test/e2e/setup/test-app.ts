@@ -53,11 +53,21 @@ export async function createTestApp(): Promise<INestApplication> {
 }
 
 /**
- * Resets the database by dropping and synchronizing all entities.
+ * Resets the database by DROPPING and re-synchronizing all entities.
  * Only call between top-level describe blocks or in beforeAll.
+ *
+ * This destroys every row, so it refuses to run against a database whose name
+ * does not mark it as throwaway — a misconfigured DB_NAME must not wipe erp_dev.
  */
 export async function resetDatabase(app: INestApplication): Promise<void> {
   const ds = app.get(DataSource);
+  const dbName = String(ds.options.database ?? '');
+  if (!/test/i.test(dbName)) {
+    throw new Error(
+      `Refusing to drop all tables in "${dbName}": not a test database. ` +
+        `Check E2E_DB_NAME / global-setup.ts.`,
+    );
+  }
   await ds.synchronize(true);
 }
 
@@ -125,6 +135,8 @@ export async function seedBaseData(
     'inventory.adjustment.create', 'inventory.adjustment.read',
     'inventory.adjustment.submit', 'inventory.adjustment.approve',
     'inventory.adjustment.post', 'inventory.adjustment.cancel',
+    'inventory.goods-issue.read', 'inventory.goods-issue.create',
+    'inventory.goods-issue.post', 'inventory.goods-issue.cancel',
     'inventory.reports.read',
     'pos.session.manage', 'pos.session.approve_variance',
     'pos.sale.create', 'pos.return.create', 'pos.exchange.create',
