@@ -1,8 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppModal, Button, FormField } from "@erp/ui";
 import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
+import { LookupField } from "../../components/forms/LookupField";
+import {
+  STORAGE_LOOKUP_COLUMNS,
+  makeStorageSearch,
+} from "../../components/forms/storage-lookup";
 import type {
   PaginatedResponse,
   StockTakeLine,
@@ -48,7 +53,10 @@ function getActiveBranchId(): string | null {
 export function CreateStockTakeDialog({ onClose, onPicked }: Props) {
   const [storages, setStorages] = useState<StorageOption[]>([]);
   const [storageId, setStorageId] = useState<string>("");
+  const [storageLabel, setStorageLabel] = useState<string>("");
   const [plannedDate, setPlannedDate] = useState<string>(todayIso());
+
+  const searchStorages = useMemo(() => makeStorageSearch(storages), [storages]);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,19 +111,23 @@ export function CreateStockTakeDialog({ onClose, onPicked }: Props) {
     >
       <div className="flex flex-col gap-4 p-1">
         <FormField label="Kiểm kê tại kho *">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            value={storageId}
-            onChange={(e) => setStorageId(e.target.value)}
-            autoFocus
-          >
-            <option value="">— Chọn kho —</option>
-            {storages.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          <LookupField<StorageOption>
+            placeholder="Chọn kho"
+            dropdownMinWidth={420}
+            value={storageLabel}
+            onValueChange={(v) => {
+              setStorageLabel(v);
+              if (!v) setStorageId("");
+            }}
+            onSelect={(s) => {
+              setStorageId(s.id);
+              setStorageLabel(s.name);
+            }}
+            search={searchStorages}
+            itemKey={(s) => s.id}
+            renderItem={(s) => s.name}
+            columns={STORAGE_LOOKUP_COLUMNS}
+          />
         </FormField>
 
         <FormField label="Kiểm kê đến ngày *">

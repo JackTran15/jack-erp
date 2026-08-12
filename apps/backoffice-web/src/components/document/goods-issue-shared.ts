@@ -104,6 +104,8 @@ export interface InventoryItem {
 
 export interface InventoryStorage {
   id: string;
+  /** Mã kho (WHxxxxxx) — cột thứ nhất của dropdown chọn kho. */
+  code?: string;
   name: string;
   branchId: string;
   isMainStorage?: boolean;

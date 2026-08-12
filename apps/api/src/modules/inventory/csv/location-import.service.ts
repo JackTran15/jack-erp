@@ -26,6 +26,7 @@ import {
   isOleExcelBuffer,
   isZipExcelBuffer,
 } from "./inventory-excel-parse.utils";
+import { findImportStorageUnaccented } from "./resolve-import-storage.util";
 import {
   ImportRowStatus,
   InventoryImportJobRowEntity,
@@ -205,19 +206,11 @@ export class LocationImportService {
             const storageName = (raw["StorageName"] ?? "").trim();
             const description = (raw["Description"] ?? "").trim() || null;
 
-            const storage = await storageRepo
-              .createQueryBuilder("s")
-              .where("s.organizationId = :orgId", {
-                orgId: actor.organizationId,
-              })
-              .andWhere(
-                actor.branchId ? "s.branchId = :branchId" : "1=1",
-                actor.branchId ? { branchId: actor.branchId } : {},
-              )
-              .andWhere("unaccent(LOWER(s.name)) = unaccent(LOWER(:sName))", {
-                sName: storageName,
-              })
-              .getOne();
+            const storage = await findImportStorageUnaccented(
+              storageRepo,
+              storageName,
+              actor,
+            );
 
             if (!storage) continue;
 
@@ -391,17 +384,11 @@ export class LocationImportService {
       return { status: ImportRowStatus.ERROR, errors };
     }
 
-    const storage = await this.storageRepo
-      .createQueryBuilder("s")
-      .where("s.organizationId = :orgId", { orgId: actor.organizationId })
-      .andWhere(
-        actor.branchId ? "s.branchId = :branchId" : "1=1",
-        actor.branchId ? { branchId: actor.branchId } : {},
-      )
-      .andWhere("unaccent(LOWER(s.name)) = unaccent(LOWER(:sName))", {
-        sName: parsed.storageName.trim(),
-      })
-      .getOne();
+    const storage = await findImportStorageUnaccented(
+      this.storageRepo,
+      parsed.storageName,
+      actor,
+    );
 
     if (!storage) {
       errors.push({

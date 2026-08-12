@@ -20,7 +20,7 @@ export const INVENTORY_STORAGE_ENTITY_CONFIG: CrudEntityConfig = {
   apiResource: 'inventory/storages',
   idField: 'id',
   fields: [
-    { key: 'code',               label: 'Mã kho',                  type: 'string',  readOnly: true },
+    { key: 'code',               label: 'Mã kho',                  type: 'string',  skipOnDuplicate: true },
     { key: 'name',               label: 'Tên kho',                 type: 'string',  required: true },
     { key: 'description',        label: 'Diễn giải',               type: 'string',  hideInList: true },
     { key: 'branchName',         label: 'Tên cửa hàng',            type: 'string',  readOnly: true },
@@ -79,21 +79,47 @@ export class InventoryStorageCrudService extends BaseCrudService<
   }
 
   /**
-   * Mã kho is system-assigned (display-only on the form): auto-generate a
-   * continuous "WHxxxxxx" code via DocumentNumberingService when the caller
-   * does not provide one, mirroring how supplier codes (NCC) are issued.
+   * "code" is unique per branch (partial index UQ_storages_code_per_branch).
+   * Pre-check it here rather than relying on the generic 23505 handler in
+   * BaseCrudService, which cannot tell a code collision apart from a name
+   * collision (@Unique(['branchId','name'])) and reports it as org-scoped.
+   */
+  private async assertCodeAvailable(
+    code: string,
+    branchId: string | undefined,
+    excludeId?: string,
+  ): Promise<void> {
+    if (!branchId) return;
+    const clash = await this.repository.findOne({ where: { branchId, code } });
+    if (clash && clash.id !== excludeId) {
+      throw new ConflictException(
+        `Mã kho "${code}" đã tồn tại trong cửa hàng này.`,
+      );
+    }
+  }
+
+  /**
+   * Mã kho is user-editable: keep whatever the caller typed (after trimming and
+   * a per-branch uniqueness check) and only auto-generate a continuous
+   * "WHxxxxxx" code via DocumentNumberingService when it is left blank,
+   * mirroring how supplier codes (NCC) are issued.
    */
   protected async beforeCreate(
     payload: Record<string, any>,
     actor: ActorContext,
   ): Promise<Record<string, any>> {
-    if (!payload.code) {
+    const code =
+      typeof payload.code === 'string' ? payload.code.trim() : payload.code;
+    if (!code) {
       payload.code = await this.docNumbering.generate(
         DocumentType.WAREHOUSE,
         actor.branchId,
         actor,
       );
+      return payload;
     }
+    await this.assertCodeAvailable(code, actor.branchId);
+    payload.code = code;
     return payload;
   }
 
@@ -128,11 +154,16 @@ export class InventoryStorageCrudService extends BaseCrudService<
     if (payload && 'isDefaultReceiving' in payload) {
       delete payload.isDefaultReceiving;
     }
+    const editsCode = Boolean(payload) && 'code' in payload;
+    const deactivates = Boolean(payload) && payload.isActive === false;
+    if (!editsCode && !deactivates) return payload;
+
+    const storage = await this.repository.findOne({
+      where: { id, organizationId: actor.organizationId },
+    });
+
     // Inactive storage: block the showroom storage and the default receiving storage of the branch.
-    if (payload && payload.isActive === false) {
-      const storage = await this.repository.findOne({
-        where: { id, organizationId: actor.organizationId },
-      });
+    if (deactivates) {
       if (storage?.isMainStorage) {
         throw new BadRequestException(
           'Không thể ngừng hoạt động kho showroom (kho bán hàng mặc định).',
@@ -143,6 +174,18 @@ export class InventoryStorageCrudService extends BaseCrudService<
           'Không thể ngừng hoạt động kho nhập hàng mặc định. Hãy đặt kho khác làm kho nhập mặc định trước.',
         );
       }
+    }
+
+    // Mã kho is user-editable but stays required and unique within the branch.
+    // normalizeBlankValues only nulls out relation/date/number/enum fields, so a
+    // blank string would otherwise be persisted verbatim.
+    if (editsCode) {
+      const code = typeof payload.code === 'string' ? payload.code.trim() : '';
+      if (!code) {
+        throw new BadRequestException('Mã kho không được để trống.');
+      }
+      await this.assertCodeAvailable(code, storage?.branchId, id);
+      payload.code = code;
     }
     return payload;
   }

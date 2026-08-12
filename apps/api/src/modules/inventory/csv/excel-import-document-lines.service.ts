@@ -9,6 +9,7 @@ import { ItemEntity } from "../location/item.entity";
 import { LocationEntity } from "../location/location.entity";
 import { StorageEntity } from "../location/storage.entity";
 import { ImportJobType } from "./inventory-import-job.entity";
+import { findImportStorage } from "./resolve-import-storage.util";
 import {
   cellToString,
   isOleExcelBuffer,
@@ -481,15 +482,11 @@ export class ExcelImportDocumentLinesService {
   ): Promise<void> {
     const storageName = this.value(row, storageField);
     const locationCode = locationField ? this.value(row, locationField) : "";
-    const storage = storageName
-      ? await this.storageRepo.findOne({
-          where: {
-            organizationId: actor.organizationId,
-            branchId: actor.branchId,
-            name: ILike(storageName),
-          },
-        })
-      : null;
+    const storage = await findImportStorage(
+      this.storageRepo,
+      storageName,
+      actor,
+    );
     if ((options.requireStorage || storageName) && !storage) {
       errors.push({
         column: storageField,

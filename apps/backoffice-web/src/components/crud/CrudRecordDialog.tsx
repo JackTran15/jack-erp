@@ -256,6 +256,8 @@ export function CrudRecordDialog({
       if (f.required && isBlank(values[f.key])) next[f.key] = `${f.label} là bắt buộc`;
     });
     if (isSupplier && isBlank(values.name)) next.name = "Tên nhà cung cấp là bắt buộc";
+    // Kho: mã để trống chỉ hợp lệ khi thêm mới (backend tự cấp WHxxxxxx).
+    if (isStorage && isEdit && isBlank(values.code)) next.code = "Mã kho là bắt buộc";
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -455,20 +457,39 @@ export function CrudRecordDialog({
           <>
             {isStorage ? (
               <div className="space-y-4">
-                {/* Mã kho — hệ thống cấp, chỉ đọc */}
-                <div className="grid grid-cols-[140px_1fr] items-center gap-3">
+                {/* Mã kho — sửa được; để trống khi thêm mới thì hệ thống tự cấp */}
+                <div className="grid grid-cols-[140px_1fr] items-start gap-3">
                   <label
                     htmlFor="dialog-storage-code"
-                    className="text-sm font-medium text-muted-foreground"
+                    className="pt-2 text-sm font-medium"
                   >
                     Mã kho
                   </label>
-                  <Input
-                    id="dialog-storage-code"
-                    type="text"
-                    value={isEdit ? String(record?.code ?? "") : ""}
-                    disabled
-                  />
+                  <div>
+                    <Input
+                      id="dialog-storage-code"
+                      type="text"
+                      value={String(values.code ?? "")}
+                      placeholder={
+                        isEdit ? undefined : "Để trống để hệ thống tự cấp"
+                      }
+                      aria-invalid={Boolean(errors.code)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setValues((p) => ({ ...p, code: v }));
+                        setErrors((p) => {
+                          const n = { ...p };
+                          delete n.code;
+                          return n;
+                        });
+                      }}
+                    />
+                    {errors.code ? (
+                      <p className="mt-1 text-xs text-destructive">
+                        {errors.code}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
                 {/* Tên kho */}
                 <div className="grid grid-cols-[140px_1fr] items-start gap-3">
