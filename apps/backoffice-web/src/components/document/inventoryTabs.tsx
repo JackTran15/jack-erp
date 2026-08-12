@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { PageTabBar, type PageTabItem } from "@erp/ui";
 import type { ReactNode } from "react";
 import { useImportableTransferOrderCount } from "../../hooks/useImportableTransferOrderCount";
+import { hasPermission } from "../../lib/permissions";
 import {
   INVENTORY_NAV_ITEMS,
   type InventoryTabId,
@@ -11,6 +12,7 @@ export type { InventoryTabId } from "./inventoryNavigation";
 
 export const INVENTORY_TABS: (PageTabItem & {
   id: InventoryTabId;
+  permission: string;
   /** Pages that aren't built yet are rendered as disabled placeholders. */
   comingSoon?: boolean;
 })[] = [
@@ -19,6 +21,8 @@ export const INVENTORY_TABS: (PageTabItem & {
 
 export function InventoryTabBar({ activeId }: { activeId: InventoryTabId }) {
   const transferInCountQuery = useImportableTransferOrderCount();
+  // Don't offer links the user's role can't open (RouteAccessGuard would deny them).
+  const visibleTabs = INVENTORY_TABS.filter((tab) => hasPermission(tab.permission));
 
   const linkClassName =
     "font-medium text-primary-blue transition-colors hover:text-primary-blue-hover";
@@ -38,7 +42,7 @@ export function InventoryTabBar({ activeId }: { activeId: InventoryTabId }) {
   return (
     <PageTabBar
       activeId={activeId}
-      items={INVENTORY_TABS}
+      items={visibleTabs}
       renderItem={(item, isActive) => {
         // Ẩn tab đang active khỏi thanh nav — chỉ hiện các trang khác.
         if (isActive) {

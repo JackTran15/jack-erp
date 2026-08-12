@@ -46,6 +46,7 @@ export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCat
   [REPORT_CATEGORY.SALES]: {
     label: "Bán hàng",
     url: "/reports/sales",
+    permission: "reporting.invoice.branch.read",
     configs: {
       [STORE_TYPE.SINGLE]: {
         listReport: Object.values(REPORT_TYPE_SALES),
@@ -59,6 +60,7 @@ export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCat
     label: "Kho",
     // Trang ReportPage generic (contract v2); trang legacy /reports/storage/* vẫn truy cập trực tiếp được.
     url: "/reports/inventory",
+    permission: "inventory.reports.read",
     configs: {
       // 8 báo cáo kho đã cấu hình (registry + fetcher).
       [STORE_TYPE.SINGLE]: { listReport: STORAGE_REPORTS },
@@ -80,6 +82,7 @@ export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCat
   [REPORT_CATEGORY.DEBTS]: {
     label: "Công nợ",
     url: "/reports/debts",
+    permission: "reporting.debts.read",
     configs: {
       [STORE_TYPE.SINGLE]: { listReport: DEBT_REPORTS },
       [STORE_TYPE.CHAIN]: { listReport: DEBT_REPORTS },
@@ -92,6 +95,7 @@ export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCat
   [REPORT_CATEGORY.PROFIT]: {
     label: "Lợi nhuận",
     url: "/reports/profit",
+    permission: "reporting.profit.read",
     configs: {
       [STORE_TYPE.SINGLE]: { listReport: PROFIT_REPORTS },
       [STORE_TYPE.CHAIN]: { listReport: PROFIT_REPORTS },

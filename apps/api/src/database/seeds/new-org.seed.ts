@@ -31,7 +31,9 @@ function generateIds(): OrgBaselineSeedIds {
     roleSystemAdmin: randomUUID(),
     roleGeneralManager: randomUUID(),
     roleBranchManager: randomUUID(),
-    roleStaff: randomUUID(),
+    roleSales: randomUUID(),
+    roleCashier: randomUUID(),
+    roleWarehouse: randomUUID(),
     defaultAccount: {
       [AccountingDefaultAccountRole.REVENUE]: randomUUID(),
       [AccountingDefaultAccountRole.RECEIVABLE]: randomUUID(),

@@ -27,7 +27,7 @@ import {
   BadgePercent,
 } from "lucide-react";
 import type { ComponentType } from "react";
-import { hasPermission } from "../../lib/permissions";
+import { satisfiesPermission } from "../../lib/permissions";
 import { REPORT_CATEGORY_METADATA } from "../../constants/reports/report-category.constant";
 import { STORE_TYPE } from "../../constants/store.constant";
 import { INVENTORY_NAV_ITEMS } from "../document/inventoryNavigation";
@@ -37,8 +37,11 @@ export interface NavChild {
   label: string;
   end?: boolean;
   badgeKey?: "importable-transfer-orders";
-  /** When set, link is hidden unless the user has this permission key. */
-  permission?: string;
+  /**
+   * When set, link is hidden unless the user holds the permission key — an array
+   * means any one of them is enough. Also enforced on the route by routeAccess.
+   */
+  permission?: string | string[];
   /** When set, link only shows in these views. Omitted = shown in every view. */
   views?: STORE_TYPE[];
 }
@@ -84,7 +87,7 @@ export function isVisibleInView(
 export function isNavChildVisible(child: NavChild, view: STORE_TYPE): boolean {
   if (!isVisibleInView(child.views, view)) return false;
   if (!child.permission) return true;
-  return hasPermission(child.permission);
+  return satisfiesPermission(child.permission);
 }
 
 export function filterNavSections(
@@ -138,6 +141,7 @@ export const navConfig: NavModule[] = [
         children: INVENTORY_NAV_ITEMS.map((item) => ({
           to: item.href,
           label: item.label,
+          permission: item.permission,
           ...(item.id === "transfer-in"
             ? { badgeKey: "importable-transfer-orders" as const }
             : {}),
@@ -155,7 +159,13 @@ export const navConfig: NavModule[] = [
     sections: [
       {
         id: "purchases-main",
-        children: [{ to: "/purchases/imports", label: "Nhập hàng" }],
+        children: [
+          {
+            to: "/purchases/imports",
+            label: "Nhập hàng",
+            permission: "goods_receipt.read",
+          },
+        ],
       },
     ],
   },
@@ -178,12 +188,25 @@ export const navConfig: NavModule[] = [
           {
             to: "/treasury/cash/receipts-expenses",
             label: "Thu, chi tiền mặt",
+            permission: [
+              "accounting.cash_receipt.read",
+              "accounting.cash_payment.read",
+            ],
           },
-          { to: "/treasury/cash/count", label: "Kiểm kê tiền mặt" },
-          { to: "/treasury/cash/ledger", label: "Sổ chi tiết tiền mặt" },
+          {
+            to: "/treasury/cash/count",
+            label: "Kiểm kê tiền mặt",
+            permission: "accounting.cash_count.read",
+          },
+          {
+            to: "/treasury/cash/ledger",
+            label: "Sổ chi tiết tiền mặt",
+            permission: "accounting.cash_ledger.read",
+          },
           {
             to: "/treasury/cash-transfers",
             label: "Chuyển tiền mặt liên chi nhánh",
+            permission: "accounting.cash_transfer.read",
           },
         ],
       },
@@ -191,32 +214,67 @@ export const navConfig: NavModule[] = [
         id: "treasury-deposit",
         label: "TIỀN GỬI",
         children: [
-          { to: "/treasury/deposit/receipts-expenses", label: "Thu, chi tiền gửi" },
-          { to: "/treasury/deposit-reconciliation", label: "Đối chiếu tiền gửi" },
-          { to: "/treasury/deposit/ledger", label: "Sổ chi tiết tiền gửi" },
+          {
+            to: "/treasury/deposit/receipts-expenses",
+            label: "Thu, chi tiền gửi",
+            permission: [
+              "accounting.bank_receipt.read",
+              "accounting.bank_payment.read",
+            ],
+          },
+          {
+            to: "/treasury/deposit-reconciliation",
+            label: "Đối chiếu tiền gửi",
+            permission: "accounting.deposit_recon.read",
+          },
+          {
+            to: "/treasury/deposit/ledger",
+            label: "Sổ chi tiết tiền gửi",
+            permission: "accounting.deposit_ledger.read",
+          },
         ],
       },
       {
         id: "treasury-deposit-interbranch",
         label: "TIỀN GỬI LIÊN CHI NHÁNH",
         children: [
-          { to: "/treasury/deposit-transfers", label: "Chuyển liên chi nhánh" },
-          { to: "/treasury/deposit-in-transit", label: "Tiền đang chuyển" },
-          { to: "/treasury/deposit-dashboard", label: "Số dư toàn hệ thống" },
+          {
+            to: "/treasury/deposit-transfers",
+            label: "Chuyển liên chi nhánh",
+            permission: "accounting.deposit_transfer.read",
+          },
+          {
+            to: "/treasury/deposit-in-transit",
+            label: "Tiền đang chuyển",
+            permission: "accounting.deposit_transfer.read",
+          },
+          {
+            to: "/treasury/deposit-dashboard",
+            label: "Số dư toàn hệ thống",
+            permission: "accounting.deposit_dashboard.read",
+          },
         ],
       },
       {
         id: "treasury-offset",
         label: "ĐỐI TRỪ",
         children: [
-          { to: "/treasury/wip/offset-debt", label: "Đối trừ công nợ" },
+          {
+            to: "/treasury/wip/offset-debt",
+            label: "Đối trừ công nợ",
+            permission: "accounting.receivables.read",
+          },
         ],
       },
       {
         id: "treasury-compensation",
         label: "BÙ TRỪ",
         children: [
-          { to: "/treasury/wip/compensation-debt", label: "Bù trừ công nợ" },
+          {
+            to: "/treasury/wip/compensation-debt",
+            label: "Bù trừ công nợ",
+            permission: "accounting.receivables.read",
+          },
         ],
       },
     ],
@@ -231,7 +289,11 @@ export const navConfig: NavModule[] = [
       {
         id: "promotions-main",
         children: [
-          { to: "/promotions/programs", label: "Chương trình khuyến mãi" },
+          {
+            to: "/promotions/programs",
+            label: "Chương trình khuyến mãi",
+            permission: "pos.promotion.read",
+          },
           // { to: "/promotions/vouchers", label: "Thẻ voucher" },
         ],
       },
@@ -249,6 +311,7 @@ export const navConfig: NavModule[] = [
         children: Object.values(REPORT_CATEGORY_METADATA).map((category) => ({
           to: category.url,
           label: category.label,
+          permission: category.permission,
         }))
       },
       // {
@@ -316,9 +379,24 @@ export const navConfig: NavModule[] = [
       {
         id: "onboarding-main",
         children: [
-          { to: "/onboarding/approvals", label: "Hàng chờ phê duyệt" },
-          { to: "/onboarding/org-registration", label: "Đăng ký tổ chức" },
-          { to: "/onboarding/branch-registration", label: "Đăng ký chi nhánh" },
+          {
+            to: "/onboarding/approvals",
+            label: "Hàng chờ phê duyệt",
+            permission: [
+              "org.registration.approve",
+              "branch.registration.approve",
+            ],
+          },
+          {
+            to: "/onboarding/org-registration",
+            label: "Đăng ký tổ chức",
+            permission: "org.registration.submit",
+          },
+          {
+            to: "/onboarding/branch-registration",
+            label: "Đăng ký chi nhánh",
+            permission: "branch.registration.submit",
+          },
         ],
       },
     ],
@@ -338,32 +416,63 @@ export const navConfig: NavModule[] = [
         id: "catalog-goods",
         label: "HÀNG HÓA",
         children: [
-          { to: "/admin/inventory-item-categories", label: "Nhóm hàng hoá" },
-          { to: "/admin/inventory-items", label: "Hàng hoá" },
+          {
+            to: "/admin/inventory-item-categories",
+            label: "Nhóm hàng hoá",
+            permission: "inventory.read",
+          },
+          {
+            to: "/admin/inventory-items",
+            label: "Hàng hoá",
+            permission: "inventory.read",
+          },
           {
             to: "/admin/inventory-item-units",
             label: "Đơn vị tính",
+            permission: "inventory.read",
           },
-          { to: "/admin/inventory-item-barcodes", label: "In tem mã" },
+          {
+            to: "/admin/inventory-item-barcodes",
+            label: "In tem mã",
+            permission: "inventory.read",
+          },
           // {
           //   to: "/admin/inventory-item-prices",
           //   label: "Bảng giá",
           // },
-          { to: "/admin/inventory-storages", label: "Kho hàng", views: [STORE_TYPE.SINGLE] },
+          {
+            to: "/admin/inventory-storages",
+            label: "Kho hàng",
+            permission: "inventory.storage.read",
+            views: [STORE_TYPE.SINGLE],
+          },
         ],
       },
       {
         id: "catalog-receipts-expenses",
         label: "THU, CHI",
         children: [
-          { to: "/admin/accounts", label: "Tài khoản kế toán" },
-          { to: "/admin/banks", label: "Ngân hàng" },
+          {
+            to: "/admin/accounts",
+            label: "Tài khoản kế toán",
+            permission: "accounting.journal.post",
+          },
+          {
+            to: "/admin/banks",
+            label: "Ngân hàng",
+            permission: "accounting.bank.read",
+          },
           {
             to: "/admin/deposit-accounts",
             label: "Tài khoản tiền gửi",
+            permission: "accounting.deposit_account.read",
             views: [STORE_TYPE.SINGLE],
           },
-          { to: "/admin/payment-accounts", label: "Tài khoản thanh toán" },
+          {
+            to: "/admin/payment-accounts",
+            label: "Tài khoản thanh toán",
+            permission: "accounting.payment_account.read",
+          },
           // Chính sách thanh toán tiền gửi / Phải trả / Phải thu / Chi phí đã được
           // ẩn khỏi menu theo yêu cầu nghiệp vụ; route và CRUD backend vẫn giữ nguyên.
         ],
@@ -373,7 +482,11 @@ export const navConfig: NavModule[] = [
         label: "KHÁCH HÀNG",
         children: [
           // { to: "/admin/customer-groups", label: "Nhóm khách hàng" },
-          { to: "/admin/customers", label: "Khách hàng" },
+          {
+            to: "/admin/customers",
+            label: "Khách hàng",
+            permission: "customer.read",
+          },
         ],
       },
       {
@@ -386,7 +499,11 @@ export const navConfig: NavModule[] = [
             permission: "iam.user.read",
           },
           // { to: "/admin/job-positions", label: "Vị trí công việc" },
-          { to: "/admin/branches", label: "Cửa hàng" },
+          {
+            to: "/admin/branches",
+            label: "Cửa hàng",
+            permission: "branch.read",
+          },
           // { to: "/admin/cash-boxes", label: "Két đựng tiền", views: [STORE_TYPE.SINGLE] },
           // { to: "/admin/work-shifts", label: "Ca làm việc", views: [STORE_TYPE.SINGLE] },
           // {
@@ -401,8 +518,16 @@ export const navConfig: NavModule[] = [
         id: "catalog-suppliers",
         label: "NHÀ CUNG CẤP",
         children: [
-          { to: "/admin/provider-groups", label: "Nhóm nhà cung cấp" },
-          { to: "/admin/inventory-providers", label: "Nhà cung cấp" },
+          {
+            to: "/admin/provider-groups",
+            label: "Nhóm nhà cung cấp",
+            permission: "inventory.read",
+          },
+          {
+            to: "/admin/inventory-providers",
+            label: "Nhà cung cấp",
+            permission: "inventory.read",
+          },
           // { to: "/admin/delivery-partners", label: "Đối tác giao hàng" },
         ],
       },
@@ -418,11 +543,17 @@ export const navConfig: NavModule[] = [
       {
         id: "settings-main",
         children: [
-          { to: "/setup", label: "Thiết lập chung" },
-          { to: "/settings/document-numbering", label: "Đánh số chứng từ", views: [STORE_TYPE.SINGLE] },
+          { to: "/setup", label: "Thiết lập chung", permission: "branch.write" },
+          {
+            to: "/settings/document-numbering",
+            label: "Đánh số chứng từ",
+            permission: "document-numbering.manage",
+            views: [STORE_TYPE.SINGLE],
+          },
           {
             to: "/treasury/deposit-period-lock",
             label: "Khóa sổ tiền gửi",
+            permission: "accounting.deposit_period.lock",
             views: [STORE_TYPE.SINGLE],
           },
           {
