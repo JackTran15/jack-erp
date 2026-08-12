@@ -623,9 +623,17 @@ export function LookupField<T>({
         </button>
       ) : null}
       {popover}
-      {enableSearchModal ? (
+      {/*
+        Mounted only while open. A closed LookupSearchModal still costs a full
+        AppModal (Radix Dialog root + portal + a centering pass that reads
+        window dimensions), and line-item grids mount one LookupField per
+        lookup cell — thousands of dead dialogs on a large document. Its own
+        close effect already wipes all state, so unmounting is equivalent to
+        closing.
+      */}
+      {enableSearchModal && searchModalOpen ? (
         <LookupSearchModal
-          open={searchModalOpen}
+          open
           onOpenChange={setSearchModalOpen}
           onSelect={(item) => selectItem(item)}
           search={search}
