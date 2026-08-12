@@ -153,6 +153,7 @@ export function aCart(overrides: Partial<CartContext> = {}): CartContext {
     lines,
     catalog: defaultCatalog,
     selectedProgramIds: [],
+    excludedProgramIds: [],
     ...overrides,
   };
 }

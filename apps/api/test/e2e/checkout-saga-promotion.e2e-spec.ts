@@ -345,4 +345,261 @@ describe('Checkout Saga v2 — promotions (E2E, T-04-07)', () => {
       expect(snapshots).toHaveLength(0);
     });
   });
+
+  /**
+   * UOW-04 e2e (T-04-04) — proves T-04-01's resolver-level override (unit
+   * tested in promotion-resolver.spec.ts, T-04-02) actually reaches a real
+   * checkout: the swapped-in program, not the priority winner, is what gets
+   * written to `invoices`/`invoice_items`/`invoice_checkout_promotions`.
+   *
+   * Fixture and expected numbers mirror UOW-04's own demo script (real MISA
+   * experiment, 06/08/2026): two ITEM_DISCOUNT programs on one SKU, A 30%
+   * priority 10, B 50% priority 20, on a 1,495,000 line.
+   */
+  describe('AC-11: selectedProgramIds overrides which competing program wins', () => {
+    const competingPrograms = () => [
+      createProgram(
+        itemDiscountBody(fx.itemId3, {
+          name: 'A',
+          priority: 10,
+          groups: [
+            {
+              ordinal: 0,
+              lines: [
+                { role: 'REWARD', targetType: 'ITEM', targetId: fx.itemId3, discountMode: 'PERCENT', discountValue: 30, sortOrder: 0 },
+              ],
+            },
+          ],
+        }),
+      ),
+      createProgram(
+        itemDiscountBody(fx.itemId3, {
+          name: 'B',
+          priority: 20,
+          groups: [
+            {
+              ordinal: 0,
+              lines: [
+                { role: 'REWARD', targetType: 'ITEM', targetId: fx.itemId3, discountMode: 'PERCENT', discountValue: 50, sortOrder: 0 },
+              ],
+            },
+          ],
+        }),
+      ),
+    ];
+
+    it('case 1 — no selectedProgramIds: priority still decides, invoice records A (30%)', async () => {
+      const [programA] = await Promise.all(competingPrograms());
+      const invoiceId = await createDraft([{ itemId: fx.itemId3, unitPrice: 1_495_000 }]);
+
+      const res = await checkout(invoiceId, {
+        payments: [{ paymentMethod: 'cash', amount: 1_046_500 }], // 1,495,000 - 448,500 (30%)
+      }).expect(201);
+      expect(res.body.committed).toBe(true);
+
+      const [invoice] = await ds.query(`SELECT discount_amount FROM invoices WHERE id = $1`, [invoiceId]);
+      expect(Number(invoice.discount_amount)).toBe(448_500);
+
+      const [snapshot] = await ds.query(
+        `SELECT program_id, discount_amount FROM invoice_checkout_promotions WHERE invoice_id = $1`,
+        [invoiceId],
+      );
+      expect(snapshot.program_id).toBe(programA.body.id);
+      expect(Number(snapshot.discount_amount)).toBe(448_500);
+    });
+
+    it('case 2 — selectedProgramIds: [B] overrides priority: invoice records B (50%), no trace of A', async () => {
+      const [, programB] = await Promise.all(competingPrograms());
+      const invoiceId = await createDraft([{ itemId: fx.itemId3, unitPrice: 1_495_000 }]);
+
+      const res = await checkout(invoiceId, {
+        payments: [{ paymentMethod: 'cash', amount: 747_500 }], // 1,495,000 - 747,500 (50%)
+        selectedProgramIds: [programB.body.id],
+      }).expect(201);
+      expect(res.body.committed).toBe(true);
+
+      const [invoice] = await ds.query(`SELECT discount_amount FROM invoices WHERE id = $1`, [invoiceId]);
+      expect(Number(invoice.discount_amount)).toBe(747_500);
+
+      // Exactly one snapshot row, and it's B — an ITEM_DISCOUNT program never
+      // creates its own invoice_items row (that's gift-only, see
+      // persist-invoice.step.ts), so "no trace of A" is proven here: a losing
+      // program that had been swapped out gets no snapshot row at all, not a
+      // second row with a zero amount.
+      const snapshots = await ds.query(
+        `SELECT program_id, discount_amount, line_discounts FROM invoice_checkout_promotions WHERE invoice_id = $1`,
+        [invoiceId],
+      );
+      expect(snapshots).toHaveLength(1);
+      expect(snapshots[0].program_id).toBe(programB.body.id);
+      expect(Number(snapshots[0].discount_amount)).toBe(747_500);
+      // Line-level proof it's genuinely B's 50% and not A's 30% that landed
+      // on the cart line, not just the invoice-level aggregate.
+      expect(snapshots[0].line_discounts).toEqual([
+        expect.objectContaining({ discountAmount: 747_500 }),
+      ]);
+    });
+  });
+
+  /**
+   * UOW-09 e2e (T-09-05) — proves T-09-01's resolver-level exclusion (unit
+   * tested in promotion-resolver.spec.ts) and T-09-02's checkout-saga forward
+   * (unit tested in evaluate-promotion.step.spec.ts) together reach a real
+   * checkout: an excluded auto_apply program is not committed, even though
+   * it's eligible and would otherwise win.
+   */
+  describe('AC-36: excludedProgramIds keeps an excluded program off the committed invoice', () => {
+    it('case 1 — no excludedProgramIds: the eligible auto_apply program applies normally', async () => {
+      const program = await createProgram(itemDiscountBody(fx.itemId3));
+      const invoiceId = await createDraft([{ itemId: fx.itemId3, unitPrice: 685000 }]);
+
+      const res = await checkout(invoiceId, {
+        payments: [{ paymentMethod: 'cash', amount: 479500 }], // 685000 - 205500 (30%)
+      }).expect(201);
+      expect(res.body.committed).toBe(true);
+
+      const [invoice] = await ds.query(`SELECT discount_amount FROM invoices WHERE id = $1`, [invoiceId]);
+      expect(Number(invoice.discount_amount)).toBe(205500);
+
+      const [snapshot] = await ds.query(
+        `SELECT program_id FROM invoice_checkout_promotions WHERE invoice_id = $1`,
+        [invoiceId],
+      );
+      expect(snapshot.program_id).toBe(program.body.id);
+    });
+
+    it('case 2 — excludedProgramIds: [program]: no discount, no snapshot, even though it was eligible and auto_apply', async () => {
+      const program = await createProgram(itemDiscountBody(fx.itemId3));
+      const invoiceId = await createDraft([{ itemId: fx.itemId3, unitPrice: 685000 }]);
+
+      const res = await checkout(invoiceId, {
+        payments: [{ paymentMethod: 'cash', amount: 685000 }], // full price — no discount applied
+        excludedProgramIds: [program.body.id],
+      }).expect(201);
+      expect(res.body.committed).toBe(true);
+
+      const [invoice] = await ds.query(`SELECT discount_amount FROM invoices WHERE id = $1`, [invoiceId]);
+      expect(Number(invoice.discount_amount)).toBe(0);
+
+      const snapshots = await ds.query(
+        `SELECT * FROM invoice_checkout_promotions WHERE invoice_id = $1`,
+        [invoiceId],
+      );
+      expect(snapshots).toHaveLength(0);
+    });
+
+    /**
+     * A 2-program contest (same shape as `AC-11` above), resolved through
+     * `excludedProgramIds` ALONE — no `selectedProgramIds` at all. Distinct
+     * from `AC-11 case 2`: that test proves `selectedProgramIds` can override
+     * priority; this one proves `excludedProgramIds` can remove the priority
+     * winner from the race entirely, letting the runner-up win by default —
+     * a genuinely different code path (checked before `selectedProgramIds`
+     * is even consulted — see `promotion-resolver.ts`'s exclusion filter).
+     */
+    it('case 3 — excludedProgramIds alone removes the priority winner, the runner-up wins by default', async () => {
+      const programA = await createProgram(
+        itemDiscountBody(fx.itemId3, {
+          name: 'A',
+          priority: 10,
+          groups: [
+            {
+              ordinal: 0,
+              lines: [
+                { role: 'REWARD', targetType: 'ITEM', targetId: fx.itemId3, discountMode: 'PERCENT', discountValue: 30, sortOrder: 0 },
+              ],
+            },
+          ],
+        }),
+      );
+      const programB = await createProgram(
+        itemDiscountBody(fx.itemId3, {
+          name: 'B',
+          priority: 20,
+          groups: [
+            {
+              ordinal: 0,
+              lines: [
+                { role: 'REWARD', targetType: 'ITEM', targetId: fx.itemId3, discountMode: 'PERCENT', discountValue: 50, sortOrder: 0 },
+              ],
+            },
+          ],
+        }),
+      );
+      const invoiceId = await createDraft([{ itemId: fx.itemId3, unitPrice: 1_495_000 }]);
+
+      // No selectedProgramIds — A (priority 10) would win by default (see
+      // AC-11 case 1's identical fixture). Excluding A alone is what makes B
+      // the winner here, not an override.
+      const res = await checkout(invoiceId, {
+        payments: [{ paymentMethod: 'cash', amount: 747_500 }], // 1,495,000 - 747,500 (50%, B)
+        excludedProgramIds: [programA.body.id],
+      }).expect(201);
+      expect(res.body.committed).toBe(true);
+
+      const snapshots = await ds.query(
+        `SELECT program_id, discount_amount FROM invoice_checkout_promotions WHERE invoice_id = $1`,
+        [invoiceId],
+      );
+      expect(snapshots).toHaveLength(1);
+      expect(snapshots[0].program_id).toBe(programB.body.id);
+      expect(Number(snapshots[0].discount_amount)).toBe(747_500);
+    });
+
+    /**
+     * Regression (AC-37) at the checkout layer, mirroring `AC-11 case 2`
+     * exactly but with an explicit empty `excludedProgramIds` in the DTO —
+     * proves the new field's mere presence (empty) doesn't disturb UOW-04's
+     * `selectedProgramIds` override.
+     */
+    it('case 4 — empty excludedProgramIds does not disturb a selectedProgramIds override (UOW-04 regression)', async () => {
+      // A (priority 10, the winner being overridden) is created but never
+      // referenced by id — its only job is to be the competing program B's
+      // override has to beat, same fixture shape as AC-11 case 2.
+      await createProgram(
+        itemDiscountBody(fx.itemId3, {
+          name: 'A',
+          priority: 10,
+          groups: [
+            {
+              ordinal: 0,
+              lines: [
+                { role: 'REWARD', targetType: 'ITEM', targetId: fx.itemId3, discountMode: 'PERCENT', discountValue: 30, sortOrder: 0 },
+              ],
+            },
+          ],
+        }),
+      );
+      const programB = await createProgram(
+        itemDiscountBody(fx.itemId3, {
+          name: 'B',
+          priority: 20,
+          groups: [
+            {
+              ordinal: 0,
+              lines: [
+                { role: 'REWARD', targetType: 'ITEM', targetId: fx.itemId3, discountMode: 'PERCENT', discountValue: 50, sortOrder: 0 },
+              ],
+            },
+          ],
+        }),
+      );
+      const invoiceId = await createDraft([{ itemId: fx.itemId3, unitPrice: 1_495_000 }]);
+
+      const res = await checkout(invoiceId, {
+        payments: [{ paymentMethod: 'cash', amount: 747_500 }], // 1,495,000 - 747,500 (50%, B)
+        selectedProgramIds: [programB.body.id],
+        excludedProgramIds: [],
+      }).expect(201);
+      expect(res.body.committed).toBe(true);
+
+      const snapshots = await ds.query(
+        `SELECT program_id, discount_amount FROM invoice_checkout_promotions WHERE invoice_id = $1`,
+        [invoiceId],
+      );
+      expect(snapshots).toHaveLength(1);
+      expect(snapshots[0].program_id).toBe(programB.body.id);
+      expect(Number(snapshots[0].discount_amount)).toBe(747_500);
+    });
+  });
 });

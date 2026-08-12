@@ -16,7 +16,7 @@ export class PromotionTierEntity extends BaseEntity {
 
   /** null = unbounded (infinity). */
   @Column({ name: 'to_value', type: 'numeric', precision: 18, scale: 2, nullable: true })
-  toValue?: string;
+  toValue?: string | null;
 
   @Column({ name: 'discount_mode', type: 'enum', enum: PromotionDiscountMode, enumName: 'promotion_discount_mode_enum' })
   discountMode: PromotionDiscountMode;

@@ -137,6 +137,14 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       const grandTotal = selectGrandTotal(sessionState);
       const pointsDiscountAmount = selectPointsDiscountAmount(sessionState);
       const promotionDiscountAmount = selectPromotionDiscountAmount(sessionState);
+      // `grandTotal` (từ `selectGrandTotal`) chỉ trừ giảm giá tay per-line —
+      // KHÔNG biết gì về CTKM (đến từ preview `evaluate`, một nguồn riêng).
+      // "Tổng thanh toán" trên hóa đơn in đứng ngay sau khối "Khuyến mãi"
+      // (xem renderInvoiceHtml.ts) nên phải trừ luôn phần này, nếu không hóa
+      // đơn in ra hiện giá gốc dù dòng "Khuyến mãi" đã trừ đúng ngay bên trên
+      // nó — bắt được sống 12/08/2026. Không trừ `pointsDiscountAmount`/deposit
+      // ở đây — hai cái đó in thành dòng riêng NGAY DƯỚI "Tổng thanh toán".
+      const receiptGrandTotal = grandTotal - promotionDiscountAmount;
       const pointsToRedeem = selectEffectivePointsRedeemed(sessionState);
       const {
         settlementGrandTotal,
@@ -208,7 +216,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       const receiptPayload = buildCheckoutInvoicePayload({
         printInvoice: p.printInvoice,
         cart: computeReceiptLines(sessionState),
-        grandTotal,
+        grandTotal: receiptGrandTotal,
         settlementTotal: settlementGrandTotal,
         deposit: p.deposit,
         totalPaid,
@@ -304,6 +312,8 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             // CTKM tùy chọn — chỉ luồng SALE (đơn trả/đổi có bài toán hoàn
             // khuyến mại riêng, ngoài phạm vi UOW-02, giống preview evaluate).
             selectedProgramIds: promotionDraft.selectedProgramIds,
+            // CTKM đã bỏ hẳn (UOW-09) — cùng phạm vi SALE-only như trên.
+            excludedProgramIds: promotionDraft.excludedProgramIds,
           });
           if (!checkoutResolve.ok) {
             toast.error(describeResolveError(checkoutResolve.error));

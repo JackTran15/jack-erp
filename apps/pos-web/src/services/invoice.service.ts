@@ -100,6 +100,9 @@ export const invoiceService = {
         ...(body.selectedProgramIds?.length
           ? { selectedProgramIds: body.selectedProgramIds }
           : {}),
+        ...(body.excludedProgramIds?.length
+          ? { excludedProgramIds: body.excludedProgramIds }
+          : {}),
       };
       await http.post<CheckoutV2Response>("/v2/pos/checkout", v2Body);
       return http.get<InvoiceRow>(`/invoices/${encodeURIComponent(id)}`);

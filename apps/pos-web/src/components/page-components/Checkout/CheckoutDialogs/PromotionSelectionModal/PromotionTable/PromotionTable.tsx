@@ -6,9 +6,11 @@ interface PromotionTableProps {
   rows: PromotionItem[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Bấm dòng "Đã áp dụng"/"Đã bỏ áp dụng" — UOW-09. */
+  onToggleExclude: (promotion: PromotionItem) => void;
 }
 
-export function PromotionTable({ rows, selectedId, onSelect }: PromotionTableProps) {
+export function PromotionTable({ rows, selectedId, onSelect, onToggleExclude }: PromotionTableProps) {
   return (
     <div role="grid" aria-label="Danh sách chương trình khuyến mãi">
       <div
@@ -45,6 +47,7 @@ export function PromotionTable({ rows, selectedId, onSelect }: PromotionTablePro
               onSelect={() =>
                 !promotion.disabled && !promotion.selected && onSelect(promotion.id)
               }
+              onToggleExclude={() => onToggleExclude(promotion)}
             />
           ))
         )}

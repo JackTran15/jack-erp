@@ -40,6 +40,11 @@ function toDomainNumber(value?: string | null): number | undefined {
   return value === undefined || value === null ? undefined : Number(value);
 }
 
+/** DB `null` (an unset nullable column, read back from a real Postgres row) → domain `undefined`. */
+function fromDb<T>(value?: T | null): T | undefined {
+  return value === null ? undefined : value;
+}
+
 /**
  * `type: 'date'` columns come back from a real TypeORM/pg round-trip as a
  * plain `'YYYY-MM-DD'` string despite the entity's `Date` type annotation —
@@ -54,12 +59,24 @@ function toDomainDate(value?: Date | string | null): Date | undefined {
   return new Date(year, month - 1, day);
 }
 
-function toDbNumeric(value?: number): string | undefined {
-  return value === undefined ? undefined : String(value);
+/** See `formatTimeOfDay` — `null`, not `undefined`, is what actually clears a nullable numeric column. */
+function toDbNumeric(value?: number): string | null {
+  return value === undefined ? null : String(value);
 }
 
-function formatTimeOfDay(value?: TimeOfDay): string | undefined {
-  if (!value) return undefined;
+/** Same rule as `formatTimeOfDay`/`toDbNumeric`, generalized for the plain enum/string/date optional columns on `program`. */
+function nullify<T>(value: T | undefined): T | null {
+  return value === undefined ? null : value;
+}
+
+/**
+ * `undefined` here would make TypeORM's `.save()` skip the column entirely
+ * (leaving the old DB value in place) instead of clearing it — `toPersistence`
+ * builds a fresh entity each time, so an omitted property reads as "don't
+ * touch this column", not "no value". Must return `null` to actually clear.
+ */
+function formatTimeOfDay(value?: TimeOfDay): string | null {
+  if (!value) return null;
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${pad(value.hours)}:${pad(value.minutes)}:00`;
 }
@@ -121,15 +138,15 @@ export function toDomain(row: PromotionProgramRow): PromotionProgram {
     organizationId: row.program.organizationId,
     code: row.program.code,
     name: row.program.name,
-    description: row.program.description,
+    description: fromDb(row.program.description),
     type: row.program.type,
     status: row.program.status,
     priority: row.program.priority,
     applyTo: row.program.applyTo,
-    birthdayMatch: row.program.birthdayMatch,
-    birthdayBeforeDays: row.program.birthdayBeforeDays,
-    birthdayAfterDays: row.program.birthdayAfterDays,
-    cardTierId: row.program.cardTierId,
+    birthdayMatch: fromDb(row.program.birthdayMatch),
+    birthdayBeforeDays: fromDb(row.program.birthdayBeforeDays),
+    birthdayAfterDays: fromDb(row.program.birthdayAfterDays),
+    cardTierId: fromDb(row.program.cardTierId),
     customerGroupIds: row.customerGroupIds,
     startDate: toDomainDate(row.program.startDate),
     endDate: toDomainDate(row.program.endDate),
@@ -138,17 +155,17 @@ export function toDomain(row: PromotionProgramRow): PromotionProgram {
     endTime: TimeWindow.parse(row.program.endTime),
     autoApply: row.program.autoApply,
     branchIds: row.branchIds,
-    invoiceScope: row.program.invoiceScope,
-    discountMode: row.program.discountMode,
+    invoiceScope: fromDb(row.program.invoiceScope),
+    discountMode: fromDb(row.program.discountMode),
     discountValue: toDomainNumber(row.program.discountValue),
     maxDiscountAmount: toDomainNumber(row.program.maxDiscountAmount),
-    tierBasis: row.program.tierBasis,
-    tierScope: row.program.tierScope,
-    targetType: row.program.targetType,
-    giftMode: row.program.giftMode,
-    buyGetPolicy: row.program.buyGetPolicy,
-    buyQuantity: row.program.buyQuantity,
-    giftQuantity: row.program.giftQuantity,
+    tierBasis: fromDb(row.program.tierBasis),
+    tierScope: fromDb(row.program.tierScope),
+    targetType: fromDb(row.program.targetType),
+    giftMode: fromDb(row.program.giftMode),
+    buyGetPolicy: fromDb(row.program.buyGetPolicy),
+    buyQuantity: fromDb(row.program.buyQuantity),
+    giftQuantity: fromDb(row.program.giftQuantity),
     groups,
     condition: row.condition ? toDomainCondition(row.condition) : undefined,
     createdBy: row.program.createdBy,
@@ -191,32 +208,32 @@ export function toPersistence(aggregate: PromotionProgram): PromotionPersistence
   program.updatedAt = aggregate.updatedAt as Date;
   program.code = aggregate.code;
   program.name = aggregate.name;
-  program.description = aggregate.description;
+  program.description = nullify(aggregate.description);
   program.type = aggregate.type;
   program.status = aggregate.status;
   program.priority = aggregate.priority;
   program.applyTo = aggregate.applyTo;
-  program.birthdayMatch = aggregate.birthdayMatch;
-  program.birthdayBeforeDays = aggregate.birthdayBeforeDays;
-  program.birthdayAfterDays = aggregate.birthdayAfterDays;
-  program.cardTierId = aggregate.cardTierId;
-  program.startDate = aggregate.startDate;
-  program.endDate = aggregate.endDate;
+  program.birthdayMatch = nullify(aggregate.birthdayMatch);
+  program.birthdayBeforeDays = nullify(aggregate.birthdayBeforeDays);
+  program.birthdayAfterDays = nullify(aggregate.birthdayAfterDays);
+  program.cardTierId = nullify(aggregate.cardTierId);
+  program.startDate = nullify(aggregate.startDate);
+  program.endDate = nullify(aggregate.endDate);
   program.daysOfWeek = aggregate.daysOfWeek;
   program.startTime = formatTimeOfDay(aggregate.startTime);
   program.endTime = formatTimeOfDay(aggregate.endTime);
   program.autoApply = aggregate.autoApply;
-  program.invoiceScope = aggregate.invoiceScope;
-  program.discountMode = aggregate.discountMode;
+  program.invoiceScope = nullify(aggregate.invoiceScope);
+  program.discountMode = nullify(aggregate.discountMode);
   program.discountValue = toDbNumeric(aggregate.discountValue);
   program.maxDiscountAmount = toDbNumeric(aggregate.maxDiscountAmount);
-  program.tierBasis = aggregate.tierBasis;
-  program.tierScope = aggregate.tierScope;
-  program.targetType = aggregate.targetType;
-  program.giftMode = aggregate.giftMode;
-  program.buyGetPolicy = aggregate.buyGetPolicy;
-  program.buyQuantity = aggregate.buyQuantity;
-  program.giftQuantity = aggregate.giftQuantity;
+  program.tierBasis = nullify(aggregate.tierBasis);
+  program.tierScope = nullify(aggregate.tierScope);
+  program.targetType = nullify(aggregate.targetType);
+  program.giftMode = nullify(aggregate.giftMode);
+  program.buyGetPolicy = nullify(aggregate.buyGetPolicy);
+  program.buyQuantity = nullify(aggregate.buyQuantity);
+  program.giftQuantity = nullify(aggregate.giftQuantity);
 
   const groups: PromotionGroupEntity[] = [];
   const lines: PromotionLineEntity[] = [];

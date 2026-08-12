@@ -70,6 +70,9 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
     const grandTotal = selectGrandTotal(sessionState);
     const pointsDiscountAmount = selectPointsDiscountAmount(sessionState);
     const promotionDiscountAmount = selectPromotionDiscountAmount(sessionState);
+    // Cùng lý do với use-checkout-actions.ts::finalizeCheckoutAndPrint —
+    // "Tổng thanh toán" trên bản in phải trừ CTKM, `grandTotal` thì không.
+    const receiptGrandTotal = grandTotal - promotionDiscountAmount;
     const pointsRedeemed = selectEffectivePointsRedeemed(sessionState);
     const selectedCustomer = selectCustomerDraft(sessionState).selectedCustomer;
     const selectedSalesperson =
@@ -112,7 +115,7 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
       printInvoice: true,
       provisional: true,
       cart: computeReceiptLines(sessionState),
-      grandTotal,
+      grandTotal: receiptGrandTotal,
       settlementTotal: settlementGrandTotal,
       deposit: p.deposit,
       totalPaid,

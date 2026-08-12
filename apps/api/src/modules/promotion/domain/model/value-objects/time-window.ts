@@ -37,7 +37,7 @@ export class TimeWindow {
   }
 
   /** Parses "HH:mm" or "HH:mm:ss" (DTO wire format and Postgres `time` read-back both fit). */
-  static parse(value?: string): TimeOfDay | undefined {
+  static parse(value?: string | null): TimeOfDay | undefined {
     if (!value) return undefined;
     const [hours, minutes] = value.split(':').map(Number);
     return { hours, minutes };

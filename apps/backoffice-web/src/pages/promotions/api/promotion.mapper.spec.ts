@@ -395,6 +395,19 @@ describe("promotion.mapper round-trip", () => {
     expect(dto.discountMode).toBeUndefined();
   });
 
+  it("carries the record's actual status into the form (not the TRACKING default)", () => {
+    const detail = baseDetail({
+      type: PromotionProgramType.INVOICE_DISCOUNT,
+      status: PromotionStatus.STOPPED,
+      invoiceScope: PromotionInvoiceScope.ALL_ITEMS,
+      discountMode: PromotionDiscountMode.PERCENT,
+      discountValue: 10,
+      groups: [{ id: "g0", ordinal: 0, lines: [], tiers: [] }],
+    });
+
+    expect(toFormState(detail).status).toBe(PromotionStatus.STOPPED);
+  });
+
   it("does not send fields belonging to other promotion types (forbidNonWhitelisted safety)", () => {
     const detail = baseDetail({
       type: PromotionProgramType.INVOICE_DISCOUNT,

@@ -59,8 +59,15 @@ UoW này giữ `priority` làm mặc định nhưng cho thu ngân đè lên khi 
 
 ## Definition of done
 
-- [ ] AC-11..AC-13 pass theo Demo script
-- [ ] Toàn bộ `promotion-resolver.spec.ts` cũ xanh, không sửa case nào
-- [ ] `selectedProgramIds` rỗng ⇒ kết quả giống hệt trước thay đổi
-- [ ] `pnpm --filter @erp/api test` và `test:e2e` xanh
-- [ ] Demoed và accepted ở gate G4
+- [x] AC-11..AC-13 pass theo Demo script — chạy sống qua Chrome (backoffice tạo 2 CTKM
+      INVOICE_DISCOUNT thật, POS thêm dòng, tick/hoán đổi/mở lại dialog/huỷ), khớp từng bước
+      demo script (chỉ khác tên chương trình và số tiền cụ thể)
+- [x] Toàn bộ `promotion-resolver.spec.ts` cũ xanh, không sửa case nào — 19 case cũ + 5 case
+      mới (T-04-02), file spec cũ 0 diff ngoài phần thêm mới
+- [x] `selectedProgramIds` rỗng ⇒ kết quả giống hệt trước thay đổi — case riêng trong T-04-02 +
+      case 1 của T-04-04 (`checkout` không gửi field này, hoá đơn vẫn ghi theo priority)
+- [x] `pnpm --filter @erp/api test` và `test:e2e` xanh — `test`: 254 suite/2231+ pass; `test:e2e
+      -- checkout-saga-promotion`: 9/9 pass (đã sửa 1 bug chặn suite chạy hoàn toàn ngoài phạm vi
+      ticket, xem ghi chú T-04-04)
+- [ ] Demoed và accepted ở gate G4 — demo đã chạy sống (ghi lại ở T-04-03/T-04-04), còn chờ người
+      accept; không tự ý tick mục này

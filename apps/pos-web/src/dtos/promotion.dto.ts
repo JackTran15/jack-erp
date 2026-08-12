@@ -26,6 +26,8 @@ export interface EvaluateCartBody {
   at?: string;
   /** Id các CTKM `auto_apply=false` thu ngân chọn tay. */
   selectedProgramIds?: string[];
+  /** Id các CTKM thu ngân bỏ hẳn, kể cả `auto_apply=true` (UOW-09/ADR-07). */
+  excludedProgramIds?: string[];
   lines: EvaluateCartLineBody[];
 }
 

@@ -37,6 +37,7 @@ export function initialCheckoutDraft(): CheckoutDraft {
     },
     promotion: {
       selectedProgramIds: [],
+      excludedProgramIds: [],
       pointsRedeemed: 0,
       appliedVoucher: null,
     },

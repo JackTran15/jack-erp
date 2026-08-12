@@ -201,8 +201,19 @@ export interface EvaluateCartRequest {
   customerId?: string;
   /** ISO datetime; omitted = server's current time. */
   at?: string;
-  /** Ids of auto_apply=false programs the cashier picked manually. */
+  /**
+   * Dual meaning (ADR-03 in pos-promotion-apply/03-logical-design.md): turns
+   * on an `auto_apply=false` program, and/or makes a listed program win a
+   * contested resource ahead of `priority` (PromotionResolver.resolve),
+   * including one that's `auto_apply=true` and currently winning.
+   */
   selectedProgramIds?: string[];
+  /**
+   * ADR-07 (pos-promotion-apply/03-logical-design.md) — ids to keep out of
+   * the race entirely, the inverse of `selectedProgramIds`: always "exclude",
+   * never "add". Wins on conflict if an id is in both.
+   */
+  excludedProgramIds?: string[];
   lines: EvaluateCartLineRequest[];
 }
 
@@ -261,7 +272,8 @@ export type SkippedProgramReason =
   | 'CUSTOMER_SCOPE'
   | 'CONDITION_NOT_MET'
   | 'RESOURCE_TAKEN'
-  | 'NOT_SELECTED';
+  | 'NOT_SELECTED'
+  | 'EXCLUDED_BY_CASHIER';
 
 export interface SkippedProgram {
   programId: string;

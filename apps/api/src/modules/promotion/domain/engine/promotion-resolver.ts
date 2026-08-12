@@ -45,12 +45,35 @@ export class PromotionResolver {
       }
     }
 
-    const runnable = eligible.filter((p) => p.autoApply || cart.selectedProgramIds.includes(p.id!));
-    const notSelected = eligible.filter((p) => !p.autoApply && !cart.selectedProgramIds.includes(p.id!));
+    // ADR-07: `excludedProgramIds` always means "keep this program out of the
+    // race entirely" — unlike `selectedProgramIds` below (ADR-03), which only
+    // ever adds a program in. Filtered here, before `selectedProgramIds` is
+    // even consulted, so an excluded program can never win a resource even if
+    // it's `autoApply` or also present in `selectedProgramIds` (exclusion
+    // wins on conflict — see ADR-07).
+    const excludedIds = new Set(cart.excludedProgramIds);
+    const excluded = eligible.filter((p) => excludedIds.has(p.id!));
+    const remaining = eligible.filter((p) => !excludedIds.has(p.id!));
+    for (const program of excluded) {
+      skipped.push({ programId: program.id!, name: program.name, reason: 'EXCLUDED_BY_CASHIER' });
+    }
 
+    const runnable = remaining.filter((p) => p.autoApply || cart.selectedProgramIds.includes(p.id!));
+    const notSelected = remaining.filter((p) => !p.autoApply && !cart.selectedProgramIds.includes(p.id!));
+
+    // ADR-03: `selectedProgramIds` carries a second meaning here — a program the
+    // cashier explicitly picked wins any contested resource ahead of `priority`,
+    // not just "is allowed to run" (that's the `runnable` filter above). Same
+    // selection-tier ⇒ priority as before; still tied ⇒ programId, so the result
+    // never depends on the input array's order (`programs` has no defined order).
     const sorted = [...runnable].sort((a, b) => {
+      const aSelected = cart.selectedProgramIds.includes(a.id!);
+      const bSelected = cart.selectedProgramIds.includes(b.id!);
+      if (aSelected !== bSelected) return aSelected ? -1 : 1;
       if (a.priority !== b.priority) return a.priority - b.priority;
-      return (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0);
+      const createdDelta = (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0);
+      if (createdDelta !== 0) return createdDelta;
+      return a.id! < b.id! ? -1 : a.id! > b.id! ? 1 : 0;
     });
 
     const state = new CartState();

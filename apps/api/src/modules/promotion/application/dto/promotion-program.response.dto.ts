@@ -25,7 +25,7 @@ export function toSummary(entity: PromotionProgramEntity): PromotionProgramSumma
     id: entity.id,
     code: entity.code,
     name: entity.name,
-    description: entity.description,
+    description: entity.description ?? undefined,
     type: entity.type,
     status: entity.status,
     priority: entity.priority,

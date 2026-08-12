@@ -509,6 +509,7 @@ function commonFromDetail(detail: PromotionProgramDetail): ProgramFormState {
   base.storeIds = detail.branchIds;
   base.autoApply = detail.autoApply;
   base.priority = detail.priority;
+  base.status = detail.status;
   return base;
 }
 

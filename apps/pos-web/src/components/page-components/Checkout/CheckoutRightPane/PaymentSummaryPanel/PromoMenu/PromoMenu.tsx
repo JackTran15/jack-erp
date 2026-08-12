@@ -25,6 +25,13 @@ export interface PromoMenuProps {
   open: boolean;
   /** Close on outside click / Esc / option pick. */
   onClose: () => void;
+  /**
+   * "Khuyến mãi" — mở cùng dialog `PromotionSelectionModal` mà icon quà tặng
+   * bên ngoài mở (dialog do `PaymentSummaryPanel` sở hữu state, PromoMenu chỉ
+   * gọi ra ngoài). Trước đây thiếu nhánh này — bấm "Khuyến mãi" chỉ đóng menu
+   * + phát announce, không mở gì cả.
+   */
+  onOpenPromotionDialog: () => void;
 }
 
 interface MenuItem {
@@ -53,7 +60,7 @@ const ITEMS: MenuItem[] = [
  * còn lại các handlers (announce, voucher data) đọc trực tiếp từ promotion
  * hook + session/customer stores.
  */
-export function PromoMenu({ open, onClose }: PromoMenuProps) {
+export function PromoMenu({ open, onClose, onOpenPromotionDialog }: PromoMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
@@ -109,10 +116,11 @@ export function PromoMenu({ open, onClose }: PromoMenuProps) {
     (key: PromoMenuOption) => {
       if (key === PromoMenuOptionEnum.PROMO) setDiscountDialogOpen(true);
       if (key === PromoMenuOptionEnum.VOUCHER) setVoucherDialogOpen(true);
+      if (key === PromoMenuOptionEnum.DISCOUNT) onOpenPromotionDialog();
       pickPromoOption(key);
       onClose();
     },
-    [pickPromoOption, onClose],
+    [pickPromoOption, onClose, onOpenPromotionDialog],
   );
 
   const { highlightIdx, setHighlightIdx, handleKeyDown } =

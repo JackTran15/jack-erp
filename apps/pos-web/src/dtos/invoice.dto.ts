@@ -95,6 +95,11 @@ export interface CheckoutInvoiceBody {
    * `forbidNonWhitelisted` của backend sẽ 400 nếu gửi nhầm).
    */
   selectedProgramIds?: string[];
+  /**
+   * Id các CTKM thu ngân bỏ hẳn, kể cả `auto_apply=true` (UOW-09/ADR-07, đóng
+   * A-13). Cùng ngoại lệ nhánh v1 như `selectedProgramIds` ở trên.
+   */
+  excludedProgramIds?: string[];
 }
 
 /**
@@ -111,6 +116,8 @@ export interface CheckoutV2Body {
   creditDays?: number;
   /** Mirror `CheckoutInvoiceBody.selectedProgramIds` — xem docblock ở đó. */
   selectedProgramIds?: string[];
+  /** Mirror `CheckoutInvoiceBody.excludedProgramIds` — xem docblock ở đó. */
+  excludedProgramIds?: string[];
 }
 
 /**

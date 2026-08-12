@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 
 import { promotionService } from "@erp/pos/services/promotion.service";
-import type { EvaluateCartLineBody } from "@erp/pos/dtos/promotion.dto";
+import { buildEvaluateCartLines } from "@erp/pos/lib/page-libs/checkout/evaluateCartPayload";
 import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import {
   selectCheckoutVariant,
@@ -44,6 +44,9 @@ export function useCheckoutPromotionPreview(): void {
   const selectedProgramIds = usePosCheckoutSessionStore(
     (s) => selectPromotionDraft(s).selectedProgramIds,
   );
+  const excludedProgramIds = usePosCheckoutSessionStore(
+    (s) => selectPromotionDraft(s).excludedProgramIds,
+  );
   const updateDraftSlice = usePosCheckoutSessionStore(
     (s) => s.updateActiveDraftSlice,
   );
@@ -55,25 +58,18 @@ export function useCheckoutPromotionPreview(): void {
 
   // Chỉ những trường thực sự đổi kết quả mới nằm trong khoá — dùng nguyên
   // mảng `cart` sẽ chạy lại mỗi lần render vì tham chiếu đổi liên tục.
-  const lines: EvaluateCartLineBody[] = cart.map((line) => ({
-    lineId: line.lineId,
-    itemId: line.itemId,
-    quantity: line.qty,
-    unitPrice: line.unitPrice,
-    ...(line.lineDiscount?.type === "amount"
-      ? { manualLineDiscount: line.lineDiscount.value }
-      : {}),
-  }));
+  const lines = buildEvaluateCartLines(cart);
   const cartKey = JSON.stringify(lines);
   const selectedProgramIdsKey = JSON.stringify(selectedProgramIds);
+  const excludedProgramIdsKey = JSON.stringify(excludedProgramIds);
   const customerId = customer?.id;
   const isSale = variant === CheckoutVariantEnum.SALE;
 
   useEffect(() => {
     abortRef.current?.abort();
 
-    if (!isSale || lines.length === 0) {
-      // Giỏ rỗng: về idle và **không** phát lời gọi nào.
+    if (!isSale) {
+      // Đơn trả/đổi: bài toán hoàn khuyến mại riêng, ngoài phạm vi hook này.
       updateDraftSlice("promotionPreview", () => ({
         status: "idle",
         data: null,
@@ -81,6 +77,10 @@ export function useCheckoutPromotionPreview(): void {
       }));
       return;
     }
+    // Giỏ rỗng vẫn gọi evaluate (BE chấp nhận `lines: []`) — dialog "Chương
+    // trình khuyến mãi" phải load được danh sách CTKM (đa số sẽ hiện "Chưa đủ
+    // điều kiện") ngay cả khi thu ngân chưa quét hàng nào, không phải chờ dòng
+    // đầu tiên.
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -98,6 +98,7 @@ export function useCheckoutPromotionPreview(): void {
             lines,
             ...(customerId ? { customerId } : {}),
             ...(selectedProgramIds.length > 0 ? { selectedProgramIds } : {}),
+            ...(excludedProgramIds.length > 0 ? { excludedProgramIds } : {}),
           },
           { signal: controller.signal },
         )
@@ -132,5 +133,6 @@ export function useCheckoutPromotionPreview(): void {
     updateDraftSlice,
     retrySeq,
     selectedProgramIdsKey,
+    excludedProgramIdsKey,
   ]);
 }

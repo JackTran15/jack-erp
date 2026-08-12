@@ -1,10 +1,14 @@
+import { useState } from "react";
 import { formatVnd } from "@erp/ui";
 import { CountBadge } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/PaymentSummaryBlock/CountBadge/CountBadge";
 import { PosSummaryRow } from "@erp/pos/components/common/PosSummaryRow/PosSummaryRow";
+import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
 import { CloseIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { useCheckoutGrandTotal } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-grand-total";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 import { useCheckoutPromotion } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-promotion";
+import { useCheckoutExcludePreview } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-exclude-preview";
+import { PROMOTION_EXCLUDE_CONFIRM } from "@erp/pos/constants/checkout-messages.constant";
 import {
   buildPromotionRowLabel,
   shouldShowPromotionRow,
@@ -38,10 +42,41 @@ export function PaymentSummaryBlock({
   const pointsDiscountAmount = usePosCheckoutSessionStore(
     selectPointsDiscountAmount,
   );
-  const { selectedProgramIds, applyPromotion, clearRedeemedPoints } =
-    useCheckoutPromotion();
+  const { excludeAllApplied, clearRedeemedPoints } = useCheckoutPromotion();
+  const { previewExcluding } = useCheckoutExcludePreview();
   const { deposit, returnFee } = useCheckoutPayment();
   const promotionPreview = usePosCheckoutSessionStore(selectPromotionPreview);
+  // T-09-04 — X ở dòng tổng giờ bỏ HẾT mọi CTKM đang áp (không chỉ CTKM tùy
+  // chọn thu ngân từng tick, xem AskUserQuestion 12/08/2026), nên cần hỏi xác
+  // nhận trước (đổi số tiền phải thu). `afterAmount: null` = đang chờ
+  // `previewExcluding` HOẶC gọi lỗi — cả hai hiện hộp không kèm số tiền.
+  // Không suy ra "sau" bằng `subtotal` ở client: loại hết CTKM đang áp có thể
+  // để lộ tài nguyên cho CTKM khác trước đó bị RESOURCE_TAKEN tự áp thay,
+  // giống hệt lý do T-09-03 gọi evaluate thật (xem `useCheckoutExcludePreview`).
+  const [confirmExcludeAll, setConfirmExcludeAll] = useState<{
+    programNames: string[];
+    programIds: string[];
+    beforeAmount: number;
+    afterAmount: number | null;
+  } | null>(null);
+  const [previewingExcludeAll, setPreviewingExcludeAll] = useState(false);
+
+  const handleClickExcludeAll = async () => {
+    if (previewingExcludeAll || promotionPreview.status !== "ready" || !promotionPreview.data) {
+      return;
+    }
+    const { appliedPrograms, amountAfterPromotion } = promotionPreview.data;
+    const programIds = appliedPrograms.map((p) => p.programId);
+    setPreviewingExcludeAll(true);
+    const result = await previewExcluding(programIds);
+    setPreviewingExcludeAll(false);
+    setConfirmExcludeAll({
+      programNames: appliedPrograms.map((p) => p.name),
+      programIds,
+      beforeAmount: amountAfterPromotion,
+      afterAmount: result?.amountAfterPromotion ?? null,
+    });
+  };
 
   return (
     <div className="space-y-2 py-3">
@@ -66,12 +101,12 @@ export function PaymentSummaryBlock({
         shouldShowPromotionRow(promotionPreview.data) ? (
         <PosSummaryRow
           label={
-            selectedProgramIds.length > 0 ? (
+            promotionPreview.data.appliedPrograms.length > 0 ? (
               <span className="inline-flex items-center gap-1.5">
                 {buildPromotionRowLabel(promotionPreview.data)}
                 <button
                   type="button"
-                  onClick={() => applyPromotion(null)}
+                  onClick={handleClickExcludeAll}
                   aria-label="Bỏ áp dụng khuyến mại"
                   className="text-gray-400 transition-colors hover:text-gray-600"
                 >
@@ -138,6 +173,32 @@ export function PaymentSummaryBlock({
           }
           value={formatVnd(returnFee)}
         />
+      ) : null}
+
+      {confirmExcludeAll ? (
+        <PosDialog open onClose={() => setConfirmExcludeAll(null)} width={420}>
+          <PosDialog.Header title={PROMOTION_EXCLUDE_CONFIRM.TITLE} />
+          <PosDialog.Body>
+            <p className="text-[14px] text-[#0F172A]">
+              {confirmExcludeAll.afterAmount !== null
+                ? PROMOTION_EXCLUDE_CONFIRM.messageAll(
+                    confirmExcludeAll.programNames,
+                    confirmExcludeAll.beforeAmount,
+                    confirmExcludeAll.afterAmount,
+                  )
+                : PROMOTION_EXCLUDE_CONFIRM.messageAllNoAmount(confirmExcludeAll.programNames)}
+            </p>
+          </PosDialog.Body>
+          <PosDialog.Footer
+            onSave={() => {
+              excludeAllApplied(confirmExcludeAll.programIds);
+              setConfirmExcludeAll(null);
+            }}
+            onCancel={() => setConfirmExcludeAll(null)}
+            saveLabel={PROMOTION_EXCLUDE_CONFIRM.CONFIRM_LABEL}
+            cancelLabel={PROMOTION_EXCLUDE_CONFIRM.CANCEL_LABEL}
+          />
+        </PosDialog>
       ) : null}
     </div>
   );

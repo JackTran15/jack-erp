@@ -55,7 +55,8 @@ export type SkippedProgramReason =
   | 'CUSTOMER_SCOPE'
   | 'CONDITION_NOT_MET'
   | 'RESOURCE_TAKEN'
-  | 'NOT_SELECTED';
+  | 'NOT_SELECTED'
+  | 'EXCLUDED_BY_CASHIER';
 
 export interface SkippedProgram {
   programId: string;

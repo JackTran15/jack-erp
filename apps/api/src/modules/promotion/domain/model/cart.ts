@@ -19,4 +19,11 @@ export interface CartContext {
   catalog: Map<string, CatalogItemView>;
   /** Ids of auto_apply=false programs the cashier picked manually. */
   selectedProgramIds: string[];
+  /**
+   * ADR-07 (pos-promotion-apply/03-logical-design.md) — ids to keep out of the
+   * race entirely, filtered out of `eligible` before `selectedProgramIds` is
+   * even consulted. Always "exclude", never "add" — the inverse of
+   * `selectedProgramIds`. Wins on conflict if an id is in both.
+   */
+  excludedProgramIds: string[];
 }

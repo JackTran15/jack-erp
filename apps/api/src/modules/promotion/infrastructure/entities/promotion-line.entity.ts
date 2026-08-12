@@ -23,7 +23,7 @@ export class PromotionLineEntity extends BaseEntity {
   targetId: string;
 
   @Column({ type: 'numeric', precision: 18, scale: 2, nullable: true })
-  quantity?: string;
+  quantity?: string | null;
 
   @Column({
     name: 'discount_mode',
@@ -35,11 +35,11 @@ export class PromotionLineEntity extends BaseEntity {
   discountMode?: PromotionDiscountMode;
 
   @Column({ name: 'discount_value', type: 'numeric', precision: 18, scale: 2, nullable: true })
-  discountValue?: string;
+  discountValue?: string | null;
 
   /** "Selling price <=" filter column on the gift-item grid (FR-033). */
   @Column({ name: 'max_unit_price', type: 'numeric', precision: 18, scale: 2, nullable: true })
-  maxUnitPrice?: string;
+  maxUnitPrice?: string | null;
 
   @Column({ name: 'sort_order', type: 'int', default: 0 })
   sortOrder: number;

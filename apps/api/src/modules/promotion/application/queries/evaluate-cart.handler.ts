@@ -51,6 +51,7 @@ export class EvaluateCartHandler implements IQueryHandler<EvaluateCartQuery> {
       lines: dto.lines,
       catalog,
       selectedProgramIds: dto.selectedProgramIds ?? [],
+      excludedProgramIds: dto.excludedProgramIds ?? [],
     });
 
     return toEvaluateResponse(evaluation);

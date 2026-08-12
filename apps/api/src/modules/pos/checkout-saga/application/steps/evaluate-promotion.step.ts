@@ -53,6 +53,7 @@ export class EvaluatePromotionStep implements CheckoutStep {
     const dto = new EvaluateCartDto();
     dto.customerId = invoice.customerId ?? undefined;
     dto.selectedProgramIds = ctx.input.selectedProgramIds;
+    dto.excludedProgramIds = ctx.input.excludedProgramIds;
     dto.lines = items.map((item) => {
       const line = new EvaluateCartLineInputDto();
       // invoice_items.id, not any client-sent lineId — maps engine results

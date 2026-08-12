@@ -117,4 +117,37 @@ describe('EvaluateCartHandler', () => {
 
     expect(customerReader.load).toHaveBeenCalledWith('org-1', 'customer-1');
   });
+
+  // T-09-01 / ADR-07 — excludedProgramIds must reach the resolver, not just
+  // pass DTO validation.
+  it('forwards excludedProgramIds to the resolver, excluding that program from applied', async () => {
+    const program = aProgram()
+      .ofType(PromotionProgramType.ITEM_DISCOUNT)
+      .with({ discountMode: undefined, discountValue: undefined })
+      .withGroups([
+        aGroup({ lines: [aLine({ role: PromotionLineRole.REWARD, targetType: PromotionTargetType.ITEM, targetId: 'sku-1', discountMode: PromotionDiscountMode.PERCENT, discountValue: 30 })] }),
+      ])
+      .build();
+    promotionRepo.findActive.mockResolvedValue([program]);
+
+    const result = await handler.execute(new EvaluateCartQuery(baseDto({ excludedProgramIds: [program.id!] }), actor));
+
+    expect(result.appliedPrograms).toHaveLength(0);
+    expect(result.skippedPrograms).toContainEqual({ programId: program.id, name: program.name, reason: 'EXCLUDED_BY_CASHIER' });
+  });
+
+  it('defaults excludedProgramIds to [] when omitted, so an eligible program still applies', async () => {
+    const program = aProgram()
+      .ofType(PromotionProgramType.ITEM_DISCOUNT)
+      .with({ discountMode: undefined, discountValue: undefined })
+      .withGroups([
+        aGroup({ lines: [aLine({ role: PromotionLineRole.REWARD, targetType: PromotionTargetType.ITEM, targetId: 'sku-1', discountMode: PromotionDiscountMode.PERCENT, discountValue: 30 })] }),
+      ])
+      .build();
+    promotionRepo.findActive.mockResolvedValue([program]);
+
+    const result = await handler.execute(new EvaluateCartQuery(baseDto(), actor));
+
+    expect(result.appliedPrograms).toHaveLength(1);
+  });
 });

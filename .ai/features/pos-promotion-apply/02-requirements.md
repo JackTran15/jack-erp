@@ -1,7 +1,7 @@
 ---
 feature: pos-promotion-apply
-stories: 9
-acceptance_criteria: 32
+stories: 10
+acceptance_criteria: 37
 ---
 
 # Requirements — Áp dụng khuyến mại & voucher tại POS
@@ -353,6 +353,62 @@ Then breakdown hiện giống hệt số đã in lúc thanh toán
 Given hóa đơn không có CTKM nào áp
 When hóa đơn được in (mới hoặc in lại)
 Then không có dòng "Khuyến mãi" / "KM theo hoá đơn" / "KM theo mặt hàng" nào xuất hiện
+```
+
+---
+
+## US-10 — Thu ngân bỏ hẳn một CTKM `auto_apply=true` đang áp
+
+> Thêm 12/08/2026 sau khi live-test lộ hai triệu chứng cùng gốc (xem A-13): nút X ở dòng
+> "Khuyến mại" tự áp lại CTKM vừa bỏ, và checkbox "Đã áp dụng" trong dialog không untick được.
+> `UOW-04` khai rõ đây là **not in scope** của nó — UoW này đóng nốt phần A-13 còn treo.
+
+Là thu ngân, khi khách không muốn nhận một khuyến mãi mà hệ thống tự áp (ví dụ khách từ chối
+quà tặng kèm), tôi muốn bỏ hẳn khuyến mãi đó khỏi hóa đơn, không bị nó tự động quay lại.
+
+**Priority:** should
+**Depends on:** US-02, US-08
+
+### Acceptance criteria
+
+**AC-33** — Untick một CTKM đang áp trong dialog loại nó khỏi giỏ
+```gherkin
+Given dialog Chương trình khuyến mãi đang hiện CTKM "A" với trạng thái "Đã áp dụng"
+When tôi bấm untick dòng đó và xác nhận
+Then CTKM "A" biến mất khỏi appliedPrograms, promotionDiscount giảm đúng phần A đóng góp
+And CTKM "A" chuyển sang skippedPrograms với reason EXCLUDED_BY_CASHIER
+And các CTKM khác đang áp (nếu có) không bị ảnh hưởng
+```
+
+**AC-34** — Có xác nhận trước khi bỏ, nêu rõ số tiền
+```gherkin
+Given tôi vừa untick một CTKM đang áp
+When hộp xác nhận hiện ra
+Then tôi thấy tên chương trình và số tiền còn phải thu trước/sau khi bỏ
+And chỉ khi tôi xác nhận thì việc loại trừ mới xảy ra; huỷ thì giữ nguyên trạng thái cũ
+```
+
+**AC-35** — Nút X ở dòng tổng bỏ hết mọi CTKM đang áp
+```gherkin
+Given panel thanh toán đang hiện dòng "Khuyến mại -X" do 2 CTKM auto_apply cộng dồn
+When tôi bấm nút X và xác nhận
+Then cả 2 CTKM đó vào excludedProgramIds, dòng "Khuyến mại" biến mất (promotionDiscount = 0)
+And tổng còn phải thu quay về giá gốc, không CTKM nào tự áp lại
+```
+
+**AC-36** — Loại trừ đi tới server lúc checkout, hóa đơn không mang CTKM đã bỏ
+```gherkin
+Given tôi đã bỏ CTKM "A" (excludedProgramIds chứa id của A)
+When tôi bấm Thu tiền
+Then request POST /v2/pos/checkout chứa excludedProgramIds: ["<id A>"]
+And hóa đơn chốt không ghi CTKM A, kể cả khi A vẫn đủ điều kiện áp cho giỏ hàng
+```
+
+**AC-37** — `excludedProgramIds` rỗng ⇒ hành vi giống hệt trước UoW này
+```gherkin
+Given tôi không bỏ CTKM nào (excludedProgramIds rỗng hoặc không gửi)
+When PromotionResolver chạy, cả ở evaluate lẫn checkout
+Then kết quả giống hệt hành vi trước UOW-09, kể cả khi selectedProgramIds (UOW-04) đang có giá trị
 ```
 
 ---

@@ -106,8 +106,14 @@ export const PROMOTION_STATUS_OPTIONS: Option<ApiStatus>[] = [
   { value: ApiStatus.STOPPED, label: PROMOTION_STATUS_LABELS_VI[ApiStatus.STOPPED] },
 ];
 
-/** Menu con của nút "Thêm mới" — 5 loại chương trình khuyến mãi. */
-export const ADD_NEW_TYPE_OPTIONS = PROMOTION_FORM_OPTIONS;
+/**
+ * Menu con của nút "Thêm mới" — bình thường đủ 5 loại chương trình khuyến mãi.
+ * TẠM THỜI chỉ chừa "Giảm giá hóa đơn", 4 loại còn lại ẩn theo yêu cầu (2026-08-11).
+ * Bỏ `.filter(...)` để mở lại đủ 5 loại.
+ */
+export const ADD_NEW_TYPE_OPTIONS = PROMOTION_FORM_OPTIONS.filter(
+  (opt) => opt.value === PromotionForm.INVOICE_DISCOUNT,
+);
 
 function toLabelMap<T extends string>(options: Option<T>[]): Record<T, string> {
   return options.reduce(

@@ -89,16 +89,32 @@ export class CheckoutV2Dto implements CheckoutInput {
   creditDays?: number;
 
   /**
-   * Ids of `auto_apply=false` programs the cashier picked manually. The
-   * server always recomputes the discount itself (ADR-06 in
-   * 03-logical-design.md) — this list only selects *which* programs run.
-   * Not consumed until T-04-03.
+   * Dual meaning (ADR-03 in 03-logical-design.md, deliberately one field, not
+   * two). The server always recomputes the discount itself (ADR-06) — this
+   * list only selects *which* programs run:
+   * 1. Turns on an `auto_apply=false` program — without this, it never runs.
+   * 2. Makes a listed program win a contested resource ahead of `priority`
+   *    (PromotionResolver.resolve) — including one that's `auto_apply=true`
+   *    and currently winning. Ids for programs not eligible/not contesting
+   *    anything are simply ignored.
    */
   @ApiPropertyOptional({ type: [String], format: 'uuid' })
   @IsOptional()
   @IsArray()
   @IsUUID('4', { each: true })
   selectedProgramIds?: string[];
+
+  /**
+   * ADR-07 (pos-promotion-apply/03-logical-design.md) — ids to keep out of
+   * the race entirely, filtered out before `selectedProgramIds` is even
+   * consulted. The inverse of `selectedProgramIds`: always exclude, never
+   * add. Wins on conflict if an id is in both.
+   */
+  @ApiPropertyOptional({ type: [String], format: 'uuid' })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  excludedProgramIds?: string[];
 
   /** Voucher code to redeem against this checkout. Not consumed until T-05-01. */
   @ApiPropertyOptional()

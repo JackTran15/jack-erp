@@ -77,6 +77,17 @@ describe('EvaluatePromotionStep', () => {
     expect(query.dto.selectedProgramIds).toEqual(['prog-1']);
   });
 
+  // T-09-02 / ADR-07 — excludedProgramIds must reach the same evaluate call
+  // checkout uses to commit, not just the preview endpoint (ADR-02 parity).
+  it('forwards excludedProgramIds from the request', async () => {
+    const queryBus = { execute: jest.fn().mockResolvedValue(emptyEvaluation) };
+    await new EvaluatePromotionStep(queryBus as any).execute(
+      ctx({ input: { invoiceId: 'inv-1', payments: [], excludedProgramIds: ['prog-2'] } }),
+    );
+    const query = queryBus.execute.mock.calls[0][0];
+    expect(query.dto.excludedProgramIds).toEqual(['prog-2']);
+  });
+
   it('a forged discountAmount in the request body has nowhere to go — CheckoutInput does not even declare the field', async () => {
     const queryBus = { execute: jest.fn().mockResolvedValue(emptyEvaluation) };
     const c = ctx({ input: { invoiceId: 'inv-1', payments: [], discountAmount: 999999 } as any });

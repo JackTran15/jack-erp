@@ -1,6 +1,6 @@
 ---
 feature: pos-promotion-apply
-adr_count: 6
+adr_count: 7
 ---
 
 # Logical design — Áp dụng khuyến mại & voucher tại POS
@@ -37,6 +37,7 @@ số xem trước và số chốt đơn sẽ lệch nhau ngay khi có quà hoặ
 | Trường riêng `overrideProgramIds` tách khỏi `selectedProgramIds` | Thu ngân không phân biệt được "chọn CTKM tùy chọn" với "đè lên priority" — với họ chỉ là tick một dòng. Hai trường sẽ đẩy sự phân biệt kỹ thuật đó ra UI                          |
 | Bắt chước "tính lại lười" của MISA                          | Akenzy loại ở câu hỏi phạm vi (A-10). Giữ KM cũ khi số lượng đã đổi là hiển thị số sai một cách có chủ đích                                                                                 |
 | Dựng vitest cho `pos-web` trong phạm vi feature này          | Là việc hạ tầng cho cả app, không riêng khuyến mại; kéo vào đây làm UoW đầu phình và chặn mọi thứ phía sau. Thay vào đó: ADR-06 chốt cách kiểm chứng mà không cần runner                    |
+| Tái dùng `selectedProgramIds` cho cả nghĩa loại trừ (vd id có dấu trừ, hoặc mảng rỗng đặc biệt) | ADR-03 từng chấp nhận gộp hai nghĩa vào một trường vì cả hai đều là "thêm vào" và hành động UI của thu ngân giống hệt nhau (tick một dòng). Ở đây hành động UI đã tách biệt sẵn (tick vs untick, nút X riêng) — gộp field sẽ giấu một quy ước ngầm sau cùng một tên trường, đi ngược lại chính lý do ADR-03 từng đưa ra |
 
 ## Domain model
 
@@ -50,6 +51,8 @@ Không có entity mới. Ba phần mở rộng trên cấu trúc sẵn có:
 | `ManualDiscountInput` (value object)   | `mode: 'PERCENT' \| 'AMOUNT'`, `value: number`, `reason: string`, `scope: 'ALL' \| 'NOT_DISCOUNTED'` | `reason` bắt buộc, không rỗng sau trim (AC-23)                                             |
 | `invoices.manual_discount_reason` (cột mới) | `varchar(255) null`                                                            | `discount_amount` đã tồn tại nên chỉ thiếu chỗ ghi lý do; không thêm bảng                                    |
 | `promotionPreview` (slice FE)          | `EvaluateCartResponse \| null`, `status`, `error`                                  | Sống trong `checkout-session.store.ts`, thuộc về draft đang mở, xoá khi chuyển tab hoá đơn                   |
+| `EvaluateCartDto`/`CheckoutV2Dto` (BE) | `excludedProgramIds?: string[]`                                                    | ADR-07 — id bị loại **hẳn** khỏi `eligible`, không chỉ thua tie-break; thêm vào cả 2 DTO theo ADR-02          |
+| `excludedProgramIds` (slice FE)        | `string[]`                                                                          | `checkout-session.store.ts`, slice `promotion` — cùng vòng đời với `selectedProgramIds`, xoá theo draft       |
 
 ## Contracts
 
@@ -83,6 +86,18 @@ Failure: 403 → thiếu quyền; 5xx → `ServerFailure`.
 
 Thêm `selectedGifts` và `manualDiscount` (cùng shape trên). `selectedProgramIds` và
 `voucherCode` giữ nguyên. Response không đổi.
+
+### `excludedProgramIds` — ADR-07, thêm vào cả `evaluate` và `checkout`
+
+```json
+{ "excludedProgramIds": ["P3"] }
+```
+Id trong mảng này bị `PromotionResolver` loại **hẳn** khỏi tập `eligible` — khác
+`selectedProgramIds` (luôn là "thêm vào cuộc đua"), trường này luôn là "loại ra". Chương
+trình bị loại vẫn xuất hiện trong `skippedPrograms` với `reason: 'EXCLUDED_BY_CASHIER'`
+(giá trị mới trong union `SkippedProgramReason`, `@erp/shared-interfaces`) — không biến mất
+im lặng, giữ đúng nguyên tắc US-02. Nếu một id vừa nằm trong `excludedProgramIds` vừa trong
+`selectedProgramIds`, loại trừ thắng (ADR-07).
 
 ## State ownership
 
@@ -185,4 +200,27 @@ Jest thật). Phía `pos-web` chỉ giữ phần nối dây và hiển thị, ki
 được ghi "unit test FE xanh" như tiêu chí hoàn thành.
 **Consequences:** Lưới an toàn FE mỏng — chấp nhận có ý thức, và là lý do mỗi UoW bắt buộc
 có Demo script chi tiết. Dựng runner cho `pos-web` nên là một feature hạ tầng riêng.
+**Status:** accepted
+
+### ADR-07 — `excludedProgramIds`: loại hẳn CTKM khỏi `eligible`, tách khỏi `selectedProgramIds`
+**Context:** A-13 — thu ngân cần bỏ hẳn một CTKM `auto_apply=true` mà server đã tự áp.
+`selectedProgramIds` (ADR-03) chỉ mang 2 nghĩa hiện có ("bật CTKM tùy chọn" / "đè priority
+khi tranh chấp"), cả hai đều là **thêm** một chương trình vào cuộc đua — không có nghĩa
+"loại nó ra". `PromotionResolver.resolve()` (`promotion-resolver.ts:48`) đưa mọi
+`autoApply: true` vào `runnable` vô điều kiện; không có khái niệm loại trừ nào tồn tại
+trong engine. Phát hiện qua live-test 12/08/2026: bấm nút X ở dòng "Khuyến mại" chỉ xoá
+`selectedProgramIds`, engine liền quay lại chọn winner mặc định theo `priority` — CTKM
+thu ngân vừa bỏ (hoặc một CTKM `auto_apply` khác) tự áp lại ngay.
+**Decision:** Thêm trường mới `excludedProgramIds: string[]`, đối xứng `selectedProgramIds`,
+cùng thêm vào cả `EvaluateCartDto` và `CheckoutV2Dto` theo ADR-02. Id trong đây bị lọc khỏi
+`eligible` **trước** bước chia `runnable`/`notSelected` — loại hẳn, không chỉ thua tie-break.
+Nếu một id xuất hiện ở cả `excludedProgramIds` lẫn `selectedProgramIds` (mâu thuẫn), loại
+trừ thắng — an toàn hơn để ngỏ khả năng một CTKM vẫn áp ngay sau khi thu ngân vừa bấm bỏ nó.
+Thêm giá trị `EXCLUDED_BY_CASHIER` vào union `SkippedProgramReason` để CTKM bị loại vẫn có
+mặt trong `skippedPrograms` kèm lý do đọc được.
+**Consequences:** Sửa `PromotionResolver` lần thứ hai trong feature này (sau ADR-03/UOW-04)
+— rủi ro hồi quy tương tự, UOW-09 phải giữ nguyên toàn bộ spec cũ của cả hai UoW trước đó
+(31 case gốc + 5 case UOW-04). Đổi lại ngữ nghĩa rõ ràng: `selectedProgramIds` luôn nghĩa là
+"thêm vào", `excludedProgramIds` luôn nghĩa là "loại ra" — không còn trường nào mang hai
+nghĩa trái chiều nhau.
 **Status:** accepted

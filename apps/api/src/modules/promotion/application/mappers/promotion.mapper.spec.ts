@@ -169,6 +169,23 @@ describe('promotion.mapper round-trip', () => {
     expect(result.condition).toBeUndefined();
   });
 
+  it('toPersistence nulls out a cleared startTime/endTime instead of leaving them undefined', () => {
+    // TypeORM's .save() treats `undefined` entity properties as "column not
+    // touched" (old DB value survives) and only `null` actually clears them —
+    // toPersistence builds a fresh entity every time, so this distinction is
+    // load-bearing, not cosmetic. A round-trip test can't catch this because
+    // it never exercises real TypeORM persistence; assert the boundary value.
+    const original = aProgram()
+      .ofType(PromotionProgramType.INVOICE_DISCOUNT)
+      .with({ startTime: undefined, endTime: undefined })
+      .build();
+
+    const bundle = toPersistence(original);
+
+    expect(bundle.program.startTime).toBeNull();
+    expect(bundle.program.endTime).toBeNull();
+  });
+
   it('toPersistence throws if the aggregate has no id assigned', () => {
     const withoutId = aProgram().with({ id: undefined }).build();
     expect(() => toPersistence(withoutId)).toThrow();

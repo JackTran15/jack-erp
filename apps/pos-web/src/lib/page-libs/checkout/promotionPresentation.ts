@@ -104,6 +104,7 @@ const SKIPPED_REASON_LABELS: Record<SkippedProgramReason, string> = {
   CONDITION_NOT_MET: "Chưa đủ điều kiện",
   NOT_SELECTED: "Chưa được chọn",
   RESOURCE_TAKEN: "Đã bị chương trình khác giành mất",
+  EXCLUDED_BY_CASHIER: "Đã bỏ áp dụng",
 };
 
 /**
@@ -116,14 +117,21 @@ export function skippedReasonLabel(
   appliedPrograms: AppliedProgram[],
 ): string {
   if (skipped.reason === "RESOURCE_TAKEN") {
-    const winner = skipped.takenBy
-      ? appliedPrograms.find((program) => program.programId === skipped.takenBy)
-      : undefined;
+    const winner = findTakenByProgram(skipped, appliedPrograms);
     return winner
       ? `Đã bị chương trình ${winner.name} giành mất`
       : SKIPPED_REASON_LABELS.RESOURCE_TAKEN;
   }
   return SKIPPED_REASON_LABELS[skipped.reason];
+}
+
+function findTakenByProgram(
+  skipped: SkippedProgram,
+  appliedPrograms: AppliedProgram[],
+): AppliedProgram | undefined {
+  return skipped.takenBy
+    ? appliedPrograms.find((program) => program.programId === skipped.takenBy)
+    : undefined;
 }
 
 /**
@@ -149,13 +157,24 @@ export function mapEvaluateResponseToPromotionItems(
     kindLabel: PROGRAM_TYPE_LABELS[program.type],
   }));
 
+  // UOW-04/ADR-03/T-04-03 — RESOURCE_TAKEN là nhóm duy nhất tick được (thu ngân
+  // đổi chương trình thắng); UOW-09/ADR-07 — EXCLUDED_BY_CASHIER cũng tick lại
+  // được (thu ngân bỏ tick chính CTKM họ vừa loại, không cần xác nhận). Mọi
+  // reason khác (hết hạn, sai chi nhánh, chưa đủ điều kiện...) tick vào cũng
+  // không giải quyết được gì nên vẫn disabled.
   const skipped: PromotionItem[] = data.skippedPrograms.map((program) => ({
     id: program.programId,
     name: program.name,
     kind: PromotionKindEnum.CUSTOM,
     kindLabel: "—",
-    disabled: true,
+    disabled: program.reason !== "RESOURCE_TAKEN" && program.reason !== "EXCLUDED_BY_CASHIER",
     reason: skippedReasonLabel(program, data.appliedPrograms),
+    reasonCode: program.reason,
+    takenByName:
+      program.reason === "RESOURCE_TAKEN"
+        ? findTakenByProgram(program, data.appliedPrograms)?.name
+        : undefined,
+    excluded: program.reason === "EXCLUDED_BY_CASHIER",
   }));
 
   return [...applied, ...available, ...skipped];

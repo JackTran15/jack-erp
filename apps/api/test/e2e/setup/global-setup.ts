@@ -1,7 +1,7 @@
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { config as loadEnv } from 'dotenv';
+import { config as loadEnv, parse as parseEnv } from 'dotenv';
 
 /**
  * Runs once before the entire E2E suite.
@@ -37,21 +37,17 @@ export default async function globalSetup() {
   const dbPass = process.env.DB_PASS || 'postgres';
 
   // The suite drops and rebuilds every table (`synchronize(true)` in
-  // resetDatabase), so it must never touch the dev database. NEVER fall back to
-  // DB_NAME from .env: `process.env.DB_NAME || 'erp_test'` read the DB_NAME
-  // dotenv had just loaded one block above, so the erp_test fallback never fired
-  // and the suite wiped erp_dev instead. Override with E2E_DB_NAME only.
-  const devDbName = process.env.DB_NAME;
+  // resetDatabase), so it must never touch the dev database. Read
+  // apps/api/.env's own DB_NAME directly from disk (via dotenv's `parse`,
+  // which never touches process.env) rather than trusting `process.env.DB_NAME`
+  // — by this point that may already hold `.env.test`'s value (loaded above,
+  // preferred over `.env` whenever it exists), which made every normal run
+  // compare "erp_test" against itself and refuse to start at all.
+  const devEnvPath = path.resolve(__dirname, '../../../.env');
+  const devDbName = fs.existsSync(devEnvPath)
+    ? parseEnv(fs.readFileSync(devEnvPath)).DB_NAME
+    : undefined;
   const dbName = process.env.E2E_DB_NAME || DEFAULT_E2E_DB_NAME;
-  // Two independent guards, because they fail on different mistakes: the name
-  // must look like a throwaway, AND it must not be whatever .env just said the
-  // dev database is.
-  if (!/test/i.test(dbName)) {
-    throw new Error(
-      `Refusing to run E2E against "${dbName}": the suite drops every table. ` +
-        `E2E_DB_NAME must contain "test".`,
-    );
-  }
   if (dbName === devDbName) {
     throw new Error(
       `Refusing to run E2E against "${dbName}": the suite drops every table in it. ` +

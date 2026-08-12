@@ -76,6 +76,47 @@ describe("mapEvaluateResponseToPromotionItems", () => {
     });
     expect(items[0].disabled).toBe(true);
     expect(items[0].reason).toBe("Chưa đủ điều kiện");
+    expect(items[0].reasonCode).toBe("CONDITION_NOT_MET");
+    expect(items[0].takenByName).toBeUndefined();
+  });
+
+  // T-04-03 — RESOURCE_TAKEN là lý do bị bỏ qua duy nhất vẫn tick được (thu
+  // ngân đổi chương trình thắng); các reason khác giữ nguyên disabled=true.
+  it("maps a RESOURCE_TAKEN skip as tickable, carrying the winner's name for the swap-confirm dialog", () => {
+    const items = mapEvaluateResponseToPromotionItems({
+      ...baseResponse,
+      appliedPrograms: [
+        {
+          programId: "WINNER",
+          code: "KM01",
+          name: "GIÀY NAM ONSALE 30%",
+          type: PromotionProgramType.INVOICE_DISCOUNT,
+          priority: 10,
+          discountAmount: 448_500,
+          lineDiscounts: [],
+          gifts: [],
+        },
+      ],
+      skippedPrograms: [
+        { programId: "P4", name: "GIÀY NAM ONSALE 50%", reason: "RESOURCE_TAKEN", takenBy: "WINNER" },
+      ],
+    });
+    const skipped = items.find((i) => i.id === "P4")!;
+    expect(skipped.disabled).toBe(false);
+    expect(skipped.reasonCode).toBe("RESOURCE_TAKEN");
+    expect(skipped.reason).toBe("Đã bị chương trình GIÀY NAM ONSALE 30% giành mất");
+    expect(skipped.takenByName).toBe("GIÀY NAM ONSALE 30%");
+  });
+
+  it("leaves takenByName unset for a RESOURCE_TAKEN skip whose winner isn't in appliedPrograms", () => {
+    const items = mapEvaluateResponseToPromotionItems({
+      ...baseResponse,
+      skippedPrograms: [
+        { programId: "P5", name: "GIÀY NAM ONSALE 50%", reason: "RESOURCE_TAKEN", takenBy: "ghost-id" },
+      ],
+    });
+    expect(items[0].disabled).toBe(false);
+    expect(items[0].takenByName).toBeUndefined();
   });
 });
 

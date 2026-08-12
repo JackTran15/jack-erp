@@ -17,7 +17,7 @@ export class PromotionConditionEntity extends BaseEntity {
   type: PromotionConditionType;
 
   @Column({ name: 'min_amount', type: 'numeric', precision: 18, scale: 2, nullable: true })
-  minAmount?: string;
+  minAmount?: string | null;
 
   @Column({
     name: 'calc_basis',

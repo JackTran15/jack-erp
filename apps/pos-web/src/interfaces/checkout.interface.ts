@@ -217,6 +217,13 @@ export interface CheckoutPromotionDraft {
    */
   selectedProgramIds: string[];
   /**
+   * Id các CTKM thu ngân bỏ hẳn khỏi giỏ hàng, kể cả CTKM `auto_apply=true`
+   * server đã tự áp (UOW-09/ADR-07, đóng A-13). Ngược nghĩa hoàn toàn với
+   * `selectedProgramIds`: mảng này luôn là "loại ra", không phải "thêm vào".
+   * Mirror `EvaluateCartRequest.excludedProgramIds`/`CheckoutV2Dto`.
+   */
+  excludedProgramIds: string[];
+  /**
    * Số điểm khách dùng để giảm giá (1 điểm = 1.000đ, hằng số khớp BE
    * `POINT_REDEMPTION_VALUE_VND`). Lưu trong draft local, chỉ thực sự áp lên
    * BE ở bước finalize (`POST /invoices/:id/redeem-points` ngay trước

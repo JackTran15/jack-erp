@@ -107,6 +107,8 @@ interface BuildCheckoutInvoiceApiPayloadInput {
   creditDays?: number | null;
   /** Id các CTKM tùy chọn đã chọn — chỉ luồng SALE mới truyền (xem call site). */
   selectedProgramIds?: string[];
+  /** Id các CTKM đã bỏ hẳn — chỉ luồng SALE mới truyền (xem call site). */
+  excludedProgramIds?: string[];
 }
 
 /**
@@ -157,6 +159,9 @@ export function buildCheckoutInvoiceApiPayload(
   if (input.creditDays != null) body.creditDays = input.creditDays;
   if (input.selectedProgramIds?.length) {
     body.selectedProgramIds = input.selectedProgramIds;
+  }
+  if (input.excludedProgramIds?.length) {
+    body.excludedProgramIds = input.excludedProgramIds;
   }
 
   return { ok: true, body };

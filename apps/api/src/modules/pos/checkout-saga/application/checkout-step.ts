@@ -65,8 +65,22 @@ export interface CheckoutInput {
   keptChangeAmount?: number;
   dueDate?: string;
   creditDays?: number;
-  /** Ids of `auto_apply = false` programs the cashier picked. Amounts are never taken from the client. */
+  /**
+   * Dual meaning (ADR-03 in pos-promotion-apply/03-logical-design.md): turns
+   * on an `auto_apply=false` program, and/or makes a listed program win a
+   * contested resource ahead of `priority` (PromotionResolver.resolve),
+   * including one that's `auto_apply=true` and currently winning. Amounts
+   * are never taken from the client either way.
+   */
   selectedProgramIds?: string[];
+  /**
+   * ADR-07 (pos-promotion-apply/03-logical-design.md) — ids to keep out of
+   * the race entirely, filtered out before `selectedProgramIds` is even
+   * consulted (PromotionResolver.resolve). The inverse of
+   * `selectedProgramIds`: always exclude, never add. Wins on conflict if an
+   * id is in both.
+   */
+  excludedProgramIds?: string[];
   voucherCode?: string;
   dryRun?: boolean;
 }

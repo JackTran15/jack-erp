@@ -261,6 +261,110 @@ describe('PromotionResolver', () => {
     });
   });
 
+  // T-04-02 / ADR-03 — `selectedProgramIds` also wins a contested resource ahead
+  // of `priority` (not just "turns on an optional program", covered above).
+  describe('UOW-04: cashier overrides the priority winner via selectedProgramIds', () => {
+    function competingPrograms() {
+      const cartLine = aCartLine({ itemId: 'sku-1', unitPrice: 100_000, quantity: 1 });
+      const priorityWinner = aProgram()
+        .ofType(PromotionProgramType.ITEM_DISCOUNT)
+        .withPriority(10)
+        .with({ discountMode: undefined, discountValue: undefined })
+        .withGroups([aGroup({ lines: [aLine({ role: PromotionLineRole.REWARD, targetId: 'sku-1', discountMode: PromotionDiscountMode.PERCENT, discountValue: 30 })] })])
+        .build();
+      const priorityLoser = aProgram()
+        .ofType(PromotionProgramType.ITEM_DISCOUNT)
+        .withPriority(20)
+        .with({ discountMode: undefined, discountValue: undefined })
+        .withGroups([aGroup({ lines: [aLine({ role: PromotionLineRole.REWARD, targetId: 'sku-1', discountMode: PromotionDiscountMode.PERCENT, discountValue: 50 })] })])
+        .build();
+      const cart = aCart({ lines: [cartLine] });
+      return { priorityWinner, priorityLoser, cart };
+    }
+
+    it('empty selectedProgramIds ⇒ priority still decides (unchanged behavior)', () => {
+      const { priorityWinner, priorityLoser, cart } = competingPrograms();
+
+      const evaluation = resolver.resolve([priorityLoser, priorityWinner], cart);
+
+      expect(evaluation.appliedPrograms[0].programId).toBe(priorityWinner.id);
+      expect(evaluation.skippedPrograms).toContainEqual({
+        programId: priorityLoser.id,
+        name: priorityLoser.name,
+        reason: 'RESOURCE_TAKEN',
+        takenBy: priorityWinner.id,
+      });
+    });
+
+    it('selecting the worse-priority program makes it win', () => {
+      const { priorityWinner, priorityLoser, cart } = competingPrograms();
+      cart.selectedProgramIds = [priorityLoser.id!];
+
+      const evaluation = resolver.resolve([priorityLoser, priorityWinner], cart);
+
+      expect(evaluation.appliedPrograms).toHaveLength(1);
+      expect(evaluation.appliedPrograms[0].programId).toBe(priorityLoser.id);
+      expect(evaluation.appliedPrograms[0].discountAmount).toBe(50_000);
+      expect(evaluation.skippedPrograms).toContainEqual({
+        programId: priorityWinner.id,
+        name: priorityWinner.name,
+        reason: 'RESOURCE_TAKEN',
+        takenBy: priorityLoser.id,
+      });
+    });
+
+    it('selecting the program that already wins on priority changes nothing', () => {
+      const { priorityWinner, priorityLoser, cart } = competingPrograms();
+      cart.selectedProgramIds = [priorityWinner.id!];
+
+      const evaluation = resolver.resolve([priorityLoser, priorityWinner], cart);
+
+      expect(evaluation.appliedPrograms).toHaveLength(1);
+      expect(evaluation.appliedPrograms[0].programId).toBe(priorityWinner.id);
+      expect(evaluation.appliedPrograms[0].discountAmount).toBe(30_000);
+    });
+
+    it('an unknown id in selectedProgramIds is ignored, not thrown, and does not change the result', () => {
+      const { priorityWinner, priorityLoser, cart } = competingPrograms();
+      cart.selectedProgramIds = ['00000000-0000-4000-8000-000000000000'];
+
+      expect(() => resolver.resolve([priorityLoser, priorityWinner], cart)).not.toThrow();
+      const evaluation = resolver.resolve([priorityLoser, priorityWinner], cart);
+      expect(evaluation.appliedPrograms[0].programId).toBe(priorityWinner.id);
+    });
+
+    it('selecting both contestants (same priority, same createdAt) is deterministic regardless of input array order', () => {
+      const cartLine = aCartLine({ itemId: 'sku-1', unitPrice: 100_000, quantity: 1 });
+      const a = aProgram()
+        .ofType(PromotionProgramType.ITEM_DISCOUNT)
+        .withPriority(10)
+        .with({ discountMode: undefined, discountValue: undefined })
+        .withGroups([aGroup({ lines: [aLine({ role: PromotionLineRole.REWARD, targetId: 'sku-1', discountMode: PromotionDiscountMode.PERCENT, discountValue: 30 })] })])
+        .build();
+      const b = aProgram()
+        .ofType(PromotionProgramType.ITEM_DISCOUNT)
+        .withPriority(10)
+        .with({ discountMode: undefined, discountValue: undefined })
+        .withGroups([aGroup({ lines: [aLine({ role: PromotionLineRole.REWARD, targetId: 'sku-1', discountMode: PromotionDiscountMode.PERCENT, discountValue: 50 })] })])
+        .build();
+      const cart = aCart({ lines: [cartLine], selectedProgramIds: [a.id!, b.id!] });
+
+      const forward = resolver.resolve([a, b], cart);
+      const reversed = resolver.resolve([b, a], cart);
+
+      expect(forward.appliedPrograms[0].programId).toBe(reversed.appliedPrograms[0].programId);
+      // Fully tied (same selection tier, same priority, same createdAt) falls back
+      // to programId — deterministic, not "whichever came first in the array".
+      const expectedWinner = a.id! < b.id! ? a.id : b.id;
+      const expectedLoser = expectedWinner === a.id ? b.id : a.id;
+      expect(forward.appliedPrograms[0].programId).toBe(expectedWinner);
+      expect(reversed.appliedPrograms[0].programId).toBe(expectedWinner);
+      expect(forward.skippedPrograms).toContainEqual(
+        expect.objectContaining({ programId: expectedLoser, reason: 'RESOURCE_TAKEN', takenBy: expectedWinner }),
+      );
+    });
+  });
+
   it('never discounts a line beyond quantity * unitPrice - manualLineDiscount', () => {
     const cartLine = aCartLine({ itemId: 'sku-1', unitPrice: 100_000, quantity: 1, manualLineDiscount: 90_000 });
     const program = aProgram()
@@ -362,6 +466,137 @@ describe('PromotionResolver', () => {
       expect(evaluation.appliedPrograms).toHaveLength(1);
       expect(evaluation.appliedPrograms[0].discountMode).toBeUndefined();
       expect(evaluation.appliedPrograms[0].discountValue).toBeUndefined();
+    });
+  });
+
+  // T-09-01 / ADR-07 — `excludedProgramIds` always means "keep this program
+  // out of the race entirely", the inverse of `selectedProgramIds` above
+  // (which only ever adds a program in).
+  describe('UOW-09: cashier excludes an auto_apply program via excludedProgramIds', () => {
+    it('excluding an auto_apply program removes it from applied and marks it EXCLUDED_BY_CASHIER, other applied programs untouched', () => {
+      const cartLine1 = aCartLine({ itemId: 'sku-1', unitPrice: 100_000, quantity: 1 });
+      const cartLine2 = aCartLine({ itemId: 'sku-2', unitPrice: 200_000, quantity: 1 });
+      // Two ITEM_DISCOUNT programs on different SKUs — no contested resource,
+      // both would apply independently if neither were excluded.
+      const excludedProgram = aProgram()
+        .ofType(PromotionProgramType.ITEM_DISCOUNT)
+        .with({ discountMode: undefined, discountValue: undefined })
+        .withGroups([aGroup({ lines: [aLine({ role: PromotionLineRole.REWARD, targetId: 'sku-1', discountMode: PromotionDiscountMode.PERCENT, discountValue: 30 })] })])
+        .build();
+      const otherProgram = aProgram()
+        .ofType(PromotionProgramType.ITEM_DISCOUNT)
+        .with({ discountMode: undefined, discountValue: undefined })
+        .withGroups([aGroup({ lines: [aLine({ role: PromotionLineRole.REWARD, targetId: 'sku-2', discountMode: PromotionDiscountMode.PERCENT, discountValue: 10 })] })])
+        .build();
+      const cart = aCart({
+        lines: [cartLine1, cartLine2],
+        excludedProgramIds: [excludedProgram.id!],
+      });
+
+      const evaluation = resolver.resolve([excludedProgram, otherProgram], cart);
+
+      expect(evaluation.appliedPrograms).toHaveLength(1);
+      expect(evaluation.appliedPrograms[0].programId).toBe(otherProgram.id);
+      expect(evaluation.skippedPrograms).toContainEqual({
+        programId: excludedProgram.id,
+        name: excludedProgram.name,
+        reason: 'EXCLUDED_BY_CASHIER',
+      });
+    });
+
+    it('empty excludedProgramIds ⇒ unchanged behavior', () => {
+      const cartLine = aCartLine({ itemId: 'sku-1', unitPrice: 100_000, quantity: 1 });
+      const program = aProgram()
+        .ofType(PromotionProgramType.ITEM_DISCOUNT)
+        .with({ discountMode: undefined, discountValue: undefined })
+        .withGroups([aGroup({ lines: [aLine({ role: PromotionLineRole.REWARD, targetId: 'sku-1', discountMode: PromotionDiscountMode.PERCENT, discountValue: 30 })] })])
+        .build();
+      const cart = aCart({ lines: [cartLine] });
+
+      const evaluation = resolver.resolve([program], cart);
+
+      expect(evaluation.appliedPrograms).toHaveLength(1);
+      expect(evaluation.appliedPrograms[0].programId).toBe(program.id);
+    });
+
+    it('excluding one contestant lets the other win, marked EXCLUDED_BY_CASHIER not RESOURCE_TAKEN', () => {
+      const cartLine = aCartLine({ itemId: 'sku-1', unitPrice: 100_000, quantity: 1 });
+      const priorityWinner = aProgram()
+        .ofType(PromotionProgramType.ITEM_DISCOUNT)
+        .withPriority(10)
+        .with({ discountMode: undefined, discountValue: undefined })
+        .withGroups([aGroup({ lines: [aLine({ role: PromotionLineRole.REWARD, targetId: 'sku-1', discountMode: PromotionDiscountMode.PERCENT, discountValue: 30 })] })])
+        .build();
+      const priorityLoser = aProgram()
+        .ofType(PromotionProgramType.ITEM_DISCOUNT)
+        .withPriority(20)
+        .with({ discountMode: undefined, discountValue: undefined })
+        .withGroups([aGroup({ lines: [aLine({ role: PromotionLineRole.REWARD, targetId: 'sku-1', discountMode: PromotionDiscountMode.PERCENT, discountValue: 50 })] })])
+        .build();
+      const cart = aCart({ lines: [cartLine], excludedProgramIds: [priorityWinner.id!] });
+
+      const evaluation = resolver.resolve([priorityLoser, priorityWinner], cart);
+
+      expect(evaluation.appliedPrograms).toHaveLength(1);
+      expect(evaluation.appliedPrograms[0].programId).toBe(priorityLoser.id);
+      expect(evaluation.skippedPrograms).toContainEqual({
+        programId: priorityWinner.id,
+        name: priorityWinner.name,
+        reason: 'EXCLUDED_BY_CASHIER',
+      });
+      // Not RESOURCE_TAKEN — priorityWinner never entered the contest at all.
+      expect(evaluation.skippedPrograms).not.toContainEqual(
+        expect.objectContaining({ programId: priorityWinner.id, reason: 'RESOURCE_TAKEN' }),
+      );
+    });
+
+    it('a program in both excludedProgramIds and selectedProgramIds is excluded — exclusion wins on conflict', () => {
+      const cartLine = aCartLine({ itemId: 'sku-1', unitPrice: 100_000, quantity: 1 });
+      const priorityWinner = aProgram()
+        .ofType(PromotionProgramType.ITEM_DISCOUNT)
+        .withPriority(10)
+        .with({ discountMode: undefined, discountValue: undefined })
+        .withGroups([aGroup({ lines: [aLine({ role: PromotionLineRole.REWARD, targetId: 'sku-1', discountMode: PromotionDiscountMode.PERCENT, discountValue: 30 })] })])
+        .build();
+      const priorityLoser = aProgram()
+        .ofType(PromotionProgramType.ITEM_DISCOUNT)
+        .withPriority(20)
+        .with({ discountMode: undefined, discountValue: undefined })
+        .withGroups([aGroup({ lines: [aLine({ role: PromotionLineRole.REWARD, targetId: 'sku-1', discountMode: PromotionDiscountMode.PERCENT, discountValue: 50 })] })])
+        .build();
+      const cart = aCart({
+        lines: [cartLine],
+        selectedProgramIds: [priorityWinner.id!],
+        excludedProgramIds: [priorityWinner.id!],
+      });
+
+      const evaluation = resolver.resolve([priorityLoser, priorityWinner], cart);
+
+      expect(evaluation.appliedPrograms).toHaveLength(1);
+      expect(evaluation.appliedPrograms[0].programId).toBe(priorityLoser.id);
+      expect(evaluation.skippedPrograms).toContainEqual({
+        programId: priorityWinner.id,
+        name: priorityWinner.name,
+        reason: 'EXCLUDED_BY_CASHIER',
+      });
+    });
+
+    it('an unknown id in excludedProgramIds is ignored, not thrown, and does not change the result', () => {
+      const cartLine = aCartLine({ itemId: 'sku-1', unitPrice: 100_000, quantity: 1 });
+      const program = aProgram()
+        .ofType(PromotionProgramType.ITEM_DISCOUNT)
+        .with({ discountMode: undefined, discountValue: undefined })
+        .withGroups([aGroup({ lines: [aLine({ role: PromotionLineRole.REWARD, targetId: 'sku-1', discountMode: PromotionDiscountMode.PERCENT, discountValue: 30 })] })])
+        .build();
+      const cart = aCart({
+        lines: [cartLine],
+        excludedProgramIds: ['00000000-0000-4000-8000-000000000000'],
+      });
+
+      expect(() => resolver.resolve([program], cart)).not.toThrow();
+      const evaluation = resolver.resolve([program], cart);
+      expect(evaluation.appliedPrograms).toHaveLength(1);
+      expect(evaluation.appliedPrograms[0].programId).toBe(program.id);
     });
   });
 });

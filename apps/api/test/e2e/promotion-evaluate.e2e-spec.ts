@@ -378,8 +378,28 @@ describe('Promotion evaluate (e2e)', () => {
       lines: [line('SKU-100', 1, 100_000)],
     }).expect(400);
     expect(JSON.stringify(unknownCustomer.body)).toContain('UNKNOWN_CUSTOMER');
+  });
 
-    await evaluate({ lines: [] }).expect(400);
+  /**
+   * `lines: []` used to be rejected as a "bad cart" (AC-26 above). That was
+   * wrong for the POS dialog: the cashier opens "Chương trình khuyến mãi"
+   * before scanning anything and still needs the program catalog to render
+   * (mostly as "Chưa đủ điều kiện" — see the reference UI screenshots), not
+   * an empty list. `lines` is optional-length by design now.
+   */
+  it('an empty cart is a valid catalog preview, not a client error', async () => {
+    await createProgram(itemDiscountBody(itemId('SKU-685')));
+
+    const res = await evaluate({ lines: [] }).expect(201);
+
+    expect(res.body.subtotal).toBe(0);
+    expect(res.body.promotionDiscount).toBe(0);
+    expect(res.body.appliedPrograms).toHaveLength(0);
+    // The program still shows up (as a near-miss, nothing in cart to target),
+    // it's just not silently omitted from the response entirely.
+    expect(res.body.skippedPrograms).toContainEqual(
+      expect.objectContaining({ reason: 'CONDITION_NOT_MET' }),
+    );
   });
 
   it('AC-22: evaluating repeatedly writes nothing', async () => {
@@ -434,6 +454,41 @@ describe('Promotion evaluate (e2e)', () => {
       );
       expect(sumLines).toBe(applied.discountAmount);
     }
+  });
+
+  /**
+   * UOW-09 e2e (T-09-05) — proves T-09-01's resolver-level exclusion (unit
+   * tested in promotion-resolver.spec.ts) actually reaches a real evaluate
+   * call: an excluded auto_apply program is kept out of appliedPrograms and
+   * surfaced with reason EXCLUDED_BY_CASHIER, not silently dropped.
+   */
+  it('T-09-05/AC-33: excludedProgramIds keeps an auto_apply program out of appliedPrograms, marked EXCLUDED_BY_CASHIER', async () => {
+    const created = await createProgram(itemDiscountBody(itemId('SKU-685')));
+
+    const baseline = await evaluate({ lines: [line('SKU-685', 1, 685_000)] }).expect(201);
+    expect(baseline.body.appliedPrograms).toHaveLength(1);
+
+    const excluded = await evaluate({
+      lines: [line('SKU-685', 1, 685_000)],
+      excludedProgramIds: [created.body.id],
+    }).expect(201);
+
+    expect(excluded.body.appliedPrograms).toHaveLength(0);
+    expect(excluded.body.promotionDiscount).toBe(0);
+    expect(excluded.body.skippedPrograms).toContainEqual(
+      expect.objectContaining({ programId: created.body.id, reason: 'EXCLUDED_BY_CASHIER' }),
+    );
+  });
+
+  it('T-09-05/AC-37: excludedProgramIds empty ⇒ unchanged behavior', async () => {
+    await createProgram(itemDiscountBody(itemId('SKU-685')));
+
+    const res = await evaluate({
+      lines: [line('SKU-685', 1, 685_000)],
+      excludedProgramIds: [],
+    }).expect(201);
+
+    expect(res.body.appliedPrograms).toHaveLength(1);
   });
 
   it('requires a branch: evaluate without X-Branch-Id is a 403', async () => {
