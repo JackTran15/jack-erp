@@ -15,7 +15,7 @@ export function splitFullName(fullName: string): {
   }
   return {
     firstName: trimmed.slice(0, space).trim(),
-    lastName: trimmed.slice(space + 1).trim() || "—",
+    lastName: trimmed.slice(space + 1).trim(),
   };
 }
 

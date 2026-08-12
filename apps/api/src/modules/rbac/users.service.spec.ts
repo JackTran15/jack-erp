@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
@@ -52,7 +53,13 @@ describe('UsersService', () => {
   let branchRepo: ReturnType<typeof makeMockRepo>;
   let profileRepo: ReturnType<typeof makeMockRepo>;
   let rbac: jest.Mocked<
-    Pick<RbacService, 'invalidateUserPermissions' | 'invalidateOrgPermissions'>
+    Pick<
+      RbacService,
+      | 'invalidateUserPermissions'
+      | 'invalidateOrgPermissions'
+      | 'getUserPermissions'
+      | 'getRolePermissionKeys'
+    >
   >;
   let manager: ReturnType<typeof makeMockManager>;
 
@@ -67,6 +74,8 @@ describe('UsersService', () => {
     rbac = {
       invalidateUserPermissions: jest.fn().mockResolvedValue(undefined),
       invalidateOrgPermissions: jest.fn().mockResolvedValue(undefined),
+      getUserPermissions: jest.fn().mockResolvedValue([]),
+      getRolePermissionKeys: jest.fn().mockResolvedValue(new Map()),
     };
 
     const dataSource = {
@@ -354,6 +363,63 @@ describe('UsersService', () => {
       await expect(
         service.setRoles('u-1', ['r-1', 'r-2'], actor),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('privilege escalation via role grants', () => {
+    /** Actor holds the branch-manager-ish set; r-super needs more than that. */
+    function arrangeRoles(roleKeys: Record<string, string[]>) {
+      const ids = Object.keys(roleKeys);
+      userRepo.exist.mockResolvedValue(true);
+      userRepo.findOne.mockResolvedValue({
+        id: 'u-1',
+        isActive: true,
+        organizationId: 'org-1',
+      });
+      roleRepo.find.mockResolvedValue(ids.map((id) => ({ id })));
+      roleRepo.findOne.mockImplementation(async ({ where }: any) => ({
+        id: where.id,
+        name: where.id === 'r-super' ? 'Quản trị hệ thống' : 'Nhân viên',
+      }));
+      userRoleRepo.find.mockResolvedValue([]);
+      rbac.getUserPermissions.mockResolvedValue(['pos.sale.create', 'iam.user.write']);
+      rbac.getRolePermissionKeys.mockResolvedValue(new Map(Object.entries(roleKeys)));
+    }
+
+    it('setRoles refuses a role carrying permissions the actor lacks', async () => {
+      arrangeRoles({ 'r-super': ['pos.sale.create', 'iam.role.permissions.write'] });
+
+      await expect(
+        service.setRoles('u-1', ['r-super'], actor),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(rbac.invalidateUserPermissions).not.toHaveBeenCalled();
+    });
+
+    it('setRoles allows a role whose permissions are a subset of the actors', async () => {
+      arrangeRoles({ 'r-staff': ['pos.sale.create'] });
+
+      await expect(
+        service.setRoles('u-1', ['r-staff'], actor),
+      ).resolves.toEqual(['r-staff']);
+    });
+
+    it('create refuses initial roleIds carrying permissions the actor lacks', async () => {
+      arrangeRoles({ 'r-super': ['iam.role.permissions.write'] });
+      userRepo.findOne.mockResolvedValue(null); // no duplicate email
+
+      await expect(
+        service.create(
+          {
+            email: 'a@example.com',
+            firstName: 'A',
+            lastName: 'B',
+            temporaryPassword: 'Pwd@1234',
+            roleIds: ['r-super'],
+          },
+          actor,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(manager.save).not.toHaveBeenCalled();
     });
   });
 });

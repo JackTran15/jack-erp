@@ -22,10 +22,11 @@ export class CreateUserDto {
   @MaxLength(100)
   firstName: string;
 
+  /** Optional — a mononym goes entirely into firstName and leaves this empty. */
+  @IsOptional()
   @IsString()
-  @MinLength(1)
   @MaxLength(100)
-  lastName: string;
+  lastName?: string;
 
   /** Temporary password set by the administrator; user is expected to change it on first login. */
   @IsString()

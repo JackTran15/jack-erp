@@ -158,7 +158,7 @@ function PermissionEditorGrid({
       <div className="flex-1 overflow-y-auto p-4">
         {readOnly && (
           <p className="mb-3 text-sm text-muted-foreground">
-            Vai trò hệ thống — chỉ xem, không chỉnh quyền.
+            Chế độ chỉ xem — không chỉnh quyền.
           </p>
         )}
         {activeModule ? (

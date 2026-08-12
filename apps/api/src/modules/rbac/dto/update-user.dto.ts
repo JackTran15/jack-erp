@@ -16,9 +16,9 @@ export class UpdateUserDto {
   @MaxLength(100)
   firstName?: string;
 
+  /** Optional — a mononym goes entirely into firstName and leaves this empty. */
   @IsOptional()
   @IsString()
-  @MinLength(1)
   @MaxLength(100)
   lastName?: string;
 

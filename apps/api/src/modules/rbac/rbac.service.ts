@@ -64,6 +64,40 @@ export class RbacService {
     this.logger.debug(`Invalidated all permission caches for org=${orgId}`);
   }
 
+  /**
+   * Permission keys granted by each role, keyed by roleId. Uncached — this is
+   * only used on write paths (granting roles), not on every request.
+   */
+  async getRolePermissionKeys(
+    roleIds: string[],
+  ): Promise<Map<string, string[]>> {
+    const result = new Map<string, string[]>(roleIds.map((id) => [id, []]));
+    if (roleIds.length === 0) return result;
+
+    const rolePermissions = await this.rolePermissionRepo
+      .createQueryBuilder('rp')
+      .where('rp.role_id IN (:...roleIds)', { roleIds })
+      .getMany();
+
+    if (rolePermissions.length === 0) return result;
+
+    const permissions = await this.permissionRepo
+      .createQueryBuilder('p')
+      .where('p.id IN (:...permissionIds)', {
+        permissionIds: [
+          ...new Set(rolePermissions.map((rp) => rp.permissionId)),
+        ],
+      })
+      .getMany();
+
+    const keyById = new Map(permissions.map((p) => [p.id, p.key]));
+    for (const rp of rolePermissions) {
+      const key = keyById.get(rp.permissionId);
+      if (key) result.get(rp.roleId)?.push(key);
+    }
+    return result;
+  }
+
   private async resolvePermissions(
     userId: string,
     orgId: string,

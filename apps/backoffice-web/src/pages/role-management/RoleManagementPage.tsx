@@ -116,6 +116,9 @@ export function RoleManagementPage() {
   const editingIsSystem =
     editRoleDetail?.isSystem ?? selectedRole?.isSystem ?? false;
 
+  // Viewing a role only needs iam.role.read; editing needs iam.role.write.
+  const roleReadOnly = !canWrite || editingIsSystem;
+
   const roleUsers = useMemo((): UserDetail[] => {
     if (!selectedRoleId) return [];
     return allUserDetails.filter((u) => u.roleIds.includes(selectedRoleId));
@@ -184,6 +187,10 @@ export function RoleManagementPage() {
           toast.error("Vai trò hệ thống không thể chỉnh sửa.");
           return;
         }
+        if (roleReadOnly) {
+          toast.error("Bạn không có quyền chỉnh sửa vai trò.");
+          return;
+        }
         await updateRole.mutateAsync({
           draft: editDraft,
           isSystem: false,
@@ -206,6 +213,7 @@ export function RoleManagementPage() {
     permissionsChanged,
     refetch,
     editingIsSystem,
+    roleReadOnly,
     setPermissions,
     updateRole,
   ]);
@@ -267,10 +275,10 @@ export function RoleManagementPage() {
     },
     {
       id: "edit",
-      label: selectedRole?.isSystem ? "Xem" : "Sửa",
+      label: canWrite && !selectedRole?.isSystem ? "Sửa" : "Xem",
       icon: Pencil,
       onClick: openEdit,
-      disabled: !selectedRole || !canWrite,
+      disabled: !selectedRole,
     },
     {
       id: "delete",
@@ -385,6 +393,7 @@ export function RoleManagementPage() {
         mode={editMode}
         draft={editDraft}
         isSystem={editMode === "edit" && editingIsSystem}
+        readOnly={editMode === "edit" && roleReadOnly}
         saving={saving}
         onDraftChange={setEditDraft}
         onClose={() => setEditOpen(false)}

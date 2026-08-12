@@ -3,6 +3,7 @@ import {
   ConflictException,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Logger,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -198,6 +199,7 @@ export class UsersService {
 
     if (dto.roleIds?.length) {
       await this.assertRolesExist(dto.roleIds, actor.organizationId);
+      await this.assertCanGrantRoles(dto.roleIds, actor);
     }
     if (dto.branchIds?.length) {
       await this.assertBranchesExist(dto.branchIds, actor.organizationId);
@@ -211,7 +213,7 @@ export class UsersService {
         email: normalizedEmail,
         passwordHash,
         firstName: dto.firstName.trim(),
-        lastName: dto.lastName.trim(),
+        lastName: dto.lastName?.trim() ?? "",
         isActive: dto.isActive ?? true,
         lastLoginAt: null,
       });
@@ -350,6 +352,7 @@ export class UsersService {
     await this.ensureUserExists(id, actor);
     if (roleIds.length) {
       await this.assertRolesExist(roleIds, actor.organizationId);
+      await this.assertCanGrantRoles(roleIds, actor);
     }
 
     await this.dataSource.transaction(async (manager) => {
@@ -437,6 +440,37 @@ export class UsersService {
       const missing = roleIds.filter((rid) => !foundIds.has(rid));
       throw new BadRequestException(
         `Roles not found in this organization: ${missing.join(", ")}`,
+      );
+    }
+  }
+
+  /**
+   * You cannot hand out a permission you do not hold yourself. Keeps the flat
+   * role model safe without hardcoding a role hierarchy: a branch manager can
+   * grant Nhân viên (a subset of their own keys) but never Quản trị hệ thống.
+   */
+  private async assertCanGrantRoles(
+    roleIds: string[],
+    actor: ActorContext,
+  ): Promise<void> {
+    const actorKeys = new Set(
+      await this.rbacService.getUserPermissions(
+        actor.userId,
+        actor.organizationId,
+      ),
+    );
+    const keysByRole = await this.rbacService.getRolePermissionKeys(roleIds);
+
+    for (const [roleId, roleKeys] of keysByRole) {
+      const excess = roleKeys.filter((key) => !actorKeys.has(key));
+      if (excess.length === 0) continue;
+
+      const role = await this.roleRepo.findOne({ where: { id: roleId } });
+      this.logger.warn(
+        `User ${actor.userId} tried to grant role ${roleId} with ${excess.length} permission(s) they lack: ${excess.join(", ")}`,
+      );
+      throw new ForbiddenException(
+        `Cannot grant role "${role?.name ?? roleId}": it includes ${excess.length} permission(s) you do not have`,
       );
     }
   }
