@@ -76,6 +76,74 @@ describe('branch manager reporting scope', () => {
   });
 });
 
+describe('branch manager IAM scope', () => {
+  it.each([
+    ['tạo/sửa nhân viên', 'iam.user.write'],
+    ['ma trận quyền khi xem vai trò', 'iam.permission.read'],
+    ['danh sách vai trò gán được', 'iam.role.read'],
+  ])('grants %s (%s)', (_surface, key) => {
+    expect(BRANCH_MANAGER_PERMISSION_KEYS).toContain(key);
+  });
+
+  it.each([
+    'iam.user.delete',
+    'iam.role.write',
+    'iam.role.delete',
+    'iam.role.permissions.write',
+  ])('does not grant %s', (key) => {
+    expect(BRANCH_MANAGER_PERMISSION_KEYS).not.toContain(key);
+  });
+});
+
+describe('retiring a branch is reserved for User Root & General Manager', () => {
+  it.each(['branch.archive', 'branch.delete'])('withholds %s from BRANCH_MANAGER', (key) => {
+    expect(SYSTEM_ADMIN_PERMISSION_KEYS).toContain(key);
+    expect(GENERAL_MANAGER_PERMISSION_KEYS).toContain(key);
+    expect(BRANCH_MANAGER_PERMISSION_KEYS).not.toContain(key);
+  });
+
+  it('keeps branch.read and branch.write for BRANCH_MANAGER', () => {
+    expect(BRANCH_MANAGER_PERMISSION_KEYS).toContain('branch.read');
+    expect(BRANCH_MANAGER_PERMISSION_KEYS).toContain('branch.write');
+  });
+});
+
+/**
+ * UsersService.assertCanGrantRoles refuses to grant a role holding permissions
+ * the actor lacks. These nesting invariants are what let each seeded role staff
+ * the tier below it.
+ */
+describe('seeded roles nest, so role granting stays possible', () => {
+  it.each([
+    ['STAFF', STAFF_PERMISSION_KEYS, 'BRANCH_MANAGER', BRANCH_MANAGER_PERMISSION_KEYS],
+    [
+      'BRANCH_MANAGER',
+      BRANCH_MANAGER_PERMISSION_KEYS,
+      'GENERAL_MANAGER',
+      GENERAL_MANAGER_PERMISSION_KEYS,
+    ],
+    [
+      'GENERAL_MANAGER',
+      GENERAL_MANAGER_PERMISSION_KEYS,
+      'SYSTEM_ADMIN',
+      SYSTEM_ADMIN_PERMISSION_KEYS,
+    ],
+  ])('%s keys are a subset of %s keys', (_lower, lowerKeys, _upper, upperKeys) => {
+    const upper = new Set(upperKeys);
+    expect(lowerKeys.filter((key) => !upper.has(key))).toEqual([]);
+  });
+
+  it('does not let GENERAL_MANAGER grant SYSTEM_ADMIN', () => {
+    const gm = new Set(GENERAL_MANAGER_PERMISSION_KEYS);
+    expect(SYSTEM_ADMIN_PERMISSION_KEYS.some((key) => !gm.has(key))).toBe(true);
+  });
+
+  it('does not let BRANCH_MANAGER grant GENERAL_MANAGER', () => {
+    const bm = new Set(BRANCH_MANAGER_PERMISSION_KEYS);
+    expect(GENERAL_MANAGER_PERMISSION_KEYS.some((key) => !bm.has(key))).toBe(true);
+  });
+});
+
 describe('POS staff permission seeds', () => {
   // Keys the pos-web app needs beyond the pos.*/inventory.*/customer.* core.
   const POS_STAFF_KEYS: Array<[string, string]> = [

@@ -10,6 +10,8 @@ interface RoleEditModalProps {
   mode: RoleEditMode;
   draft: RoleFormDraft;
   isSystem?: boolean;
+  /** Forces view-only mode. Defaults to "system role being edited". */
+  readOnly?: boolean;
   saving?: boolean;
   onDraftChange: (draft: RoleFormDraft) => void;
   onClose: () => void;
@@ -21,14 +23,17 @@ export function RoleEditModal({
   mode,
   draft,
   isSystem = false,
+  readOnly: readOnlyProp,
   saving = false,
   onDraftChange,
   onClose,
   onSave,
 }: RoleEditModalProps) {
-  const readOnly = isSystem && mode === "edit";
+  const readOnly = readOnlyProp ?? (isSystem && mode === "edit");
   const title = readOnly
-    ? "Xem vai trò hệ thống"
+    ? isSystem
+      ? "Xem vai trò hệ thống"
+      : "Xem vai trò"
     : mode === "create"
       ? "Thêm vai trò mới"
       : "Sửa quản lý vai trò";

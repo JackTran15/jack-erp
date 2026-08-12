@@ -34,10 +34,20 @@ const ROOT_AND_GENERAL_MANAGER_ONLY_KEYS: ReadonlySet<string> = new Set([
   'pos.invoice.cancel',
 ]);
 
+/**
+ * Reserved for User Root and General Manager: removing a branch from the chain.
+ * A branch manager runs a branch, they do not retire one.
+ */
+const BRANCH_LIFECYCLE_KEYS: ReadonlySet<string> = new Set([
+  'branch.archive',
+  'branch.delete',
+]);
+
 /** Branch Manager — branch-scoped operations + branch dashboard. */
 export const BRANCH_MANAGER_PERMISSION_KEYS: string[] = ALL_PERMISSION_KEYS.filter(
   (key) =>
     !ROOT_AND_GENERAL_MANAGER_ONLY_KEYS.has(key) &&
+    !BRANCH_LIFECYCLE_KEYS.has(key) &&
     // Onboarding a branch/organization belongs to General Manager & User Root.
     ((!key.startsWith('branch.registration.') && key.startsWith('branch.')) ||
       key.startsWith('customer.') ||
@@ -54,10 +64,15 @@ export const BRANCH_MANAGER_PERMISSION_KEYS: string[] = ALL_PERMISSION_KEYS.filt
       key === 'reporting.debts.read' ||
       key === 'reporting.invoice-template.manage' ||
       key === 'iam.user.read' ||
+      // Staffing the branch: create/edit an employee at /admin/employees, and
+      // the Chức vụ catalogue (job-position CRUD is gated on the same key).
+      key === 'iam.user.write' ||
       key === 'iam.user.roles.write' ||
       key === 'iam.user.branches.write' ||
       // Needed to list assignable roles for iam.user.roles.write above.
       key === 'iam.role.read' ||
+      // Renders the permission matrix when viewing a role read-only.
+      key === 'iam.permission.read' ||
       // Assign/unassign routes are all @RequireBranchScope().
       key === 'sales-hierarchy.read' ||
       key === 'sales-hierarchy.manage' ||

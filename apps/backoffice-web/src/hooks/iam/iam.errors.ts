@@ -36,6 +36,9 @@ export function getIamErrorMessage(err: unknown, fallback: string): string {
   ) {
     return "Không thể đổi tên hoặc xóa vai trò hệ thống";
   }
+  if (status === 403 && lower.includes("cannot grant role")) {
+    return "Bạn không thể gán vai trò có quyền cao hơn quyền của mình";
+  }
   if (status === 403) {
     return IAM_ERROR_MESSAGES.FORBIDDEN;
   }
