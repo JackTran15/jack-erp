@@ -48,13 +48,33 @@ describe('StockLedgerService', () => {
       createQueryBuilder: jest.fn(),
     };
 
+    // Bulk ledger insert: manager.createQueryBuilder().insert().into(...).values(rows).execute()
+    // — identifiers are sized to whatever `values()` was called with, so the
+    // batch defensive guard (identifiers.length === rows.length) never trips.
+    let insertedRows: unknown[] = [];
+    const insertBuilder = {
+      insert: jest.fn().mockReturnThis(),
+      into: jest.fn().mockReturnThis(),
+      values: jest.fn().mockImplementation((rows: unknown[]) => {
+        insertedRows = rows;
+        return insertBuilder;
+      }),
+      execute: jest.fn().mockImplementation(() =>
+        Promise.resolve({
+          identifiers: insertedRows.map((_, i) => ({ id: `entry-${i + 1}` })),
+        }),
+      ),
+    };
+
     const mockManager = {
       create: jest.fn().mockImplementation((_entity, data) => ({ id: 'entry-1', ...data })),
       save: jest.fn().mockImplementation((_entity, data) => Promise.resolve(data)),
       findOne: jest.fn(),
       update: jest.fn().mockResolvedValue(undefined),
-      // assertStoragesActive() queries for inactive storages before writing —
-      // empty result means none of the test locations are deactivated.
+      createQueryBuilder: jest.fn().mockReturnValue(insertBuilder),
+      // Shared for assertStoragesActive()'s inactive-storage check and
+      // upsertBalancesBatch()'s bulk UPSERT — empty result means no inactive
+      // storages and no negative-balance rows for the default happy path.
       query: jest.fn().mockResolvedValue([]),
     };
 
@@ -70,6 +90,7 @@ describe('StockLedgerService', () => {
 
     pslService = {
       validateAndAssignByLocation: jest.fn().mockResolvedValue(undefined),
+      validateAndAssignBatch: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -198,34 +219,97 @@ describe('StockLedgerService', () => {
         { ...baseParams, locationId: 'loc-B01', quantity: 6 },
       ]);
 
-      expect(pslService.validateAndAssignByLocation).toHaveBeenNthCalledWith(
-        1,
-        'item-1',
-        'loc-A01',
+      // Shelf-assignment validation is batched into a single call for the
+      // whole request instead of once per movement.
+      expect(pslService.validateAndAssignBatch).toHaveBeenCalledWith(
+        [
+          { itemId: 'item-1', locationId: 'loc-A01' },
+          { itemId: 'item-1', locationId: 'loc-B01' },
+        ],
         actor,
       );
-      expect(pslService.validateAndAssignByLocation).toHaveBeenNthCalledWith(
-        2,
-        'item-1',
-        'loc-B01',
-        actor,
+
+      // Balances are written via one bulk UPSERT (raw SQL) instead of a
+      // manager.create()/save() per line — the two locations must appear as
+      // two separate rows in the query params, each keeping its own quantity
+      // (not merged into a single item-1 total).
+      const balanceQueryCall = (dataSource._mockManager as any).query.mock.calls.find(
+        (call: unknown[]) => (call[0] as string).includes('stock_balances'),
       );
-      expect((dataSource._mockManager as any).create).toHaveBeenCalledWith(
-        StockBalanceEntity,
-        expect.objectContaining({
-          itemId: 'item-1',
-          locationId: 'loc-A01',
-          quantity: 4,
-        }),
+      expect(balanceQueryCall).toBeDefined();
+      const params = balanceQueryCall![1] as unknown[];
+      expect(params).toEqual(
+        expect.arrayContaining(['loc-A01', 4, 'loc-B01', 6]),
       );
-      expect((dataSource._mockManager as any).create).toHaveBeenCalledWith(
-        StockBalanceEntity,
-        expect.objectContaining({
-          itemId: 'item-1',
-          locationId: 'loc-B01',
-          quantity: 6,
-        }),
+    });
+
+    it('aggregates a duplicate item+location delta into one balance row but keeps separate ledger entries (AC-02)', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+
+      // Real case from NhapkhauHangHoaNhapKho SHOWROOM.xls: SKU TX3150-D
+      // appears on two separate lines, quantity 1 each, same item+location.
+      const result = await service.recordBatchMovements([
+        { ...baseParams, itemId: 'item-1', locationId: 'loc-1', quantity: 1 },
+        { ...baseParams, itemId: 'item-1', locationId: 'loc-1', quantity: 1 },
+      ]);
+
+      // Ledger stays 1:1 with the input lines (immutable audit log).
+      expect(result).toHaveLength(2);
+
+      // Only one (item, location) row reaches the balance upsert, carrying
+      // the summed delta (+2) — not two rows of +1 each.
+      const balanceCall = (dataSource._mockManager as any).query.mock.calls.find(
+        (call: unknown[]) => (call[0] as string).includes('stock_balances'),
       );
+      const params = balanceCall![1] as unknown[];
+      expect(params.filter((p) => p === 'item-1')).toHaveLength(1);
+      expect(params).toEqual(expect.arrayContaining(['loc-1', 2]));
+    });
+
+    it('logs exactly one warning per batch when the bulk upsert returns a negative balance (AC-03)', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+      (dataSource._mockManager as any).query.mockImplementation((sql: string) =>
+        Promise.resolve(
+          sql.includes('stock_balances')
+            ? [{ item_id: 'item-1', location_id: 'loc-1', quantity: '-3' }]
+            : [],
+        ),
+      );
+      const warnSpy = jest
+        .spyOn((service as any).logger, 'warn')
+        .mockImplementation(() => undefined);
+
+      await service.recordBatchMovements([
+        { ...baseParams, itemId: 'item-1', locationId: 'loc-1', quantity: -3 },
+      ]);
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Negative balance detected'));
+    });
+
+    it('rejects the whole batch before any writes when a location is in an inactive storage (AC-04)', async () => {
+      (dataSource._mockManager as any).query.mockImplementation((sql: string) =>
+        Promise.resolve(sql.includes('is_active = false') ? [{ name: 'Kho Ngừng' }] : []),
+      );
+
+      await expect(service.recordBatchMovements([baseParams])).rejects.toThrow(
+        /Không thể thao tác trên kho đã ngừng hoạt động/,
+      );
+
+      expect((dataSource._mockManager as any).createQueryBuilder).not.toHaveBeenCalled();
+    });
+
+    it('throws if the bulk ledger insert returns a mismatched identifier count (A-01 defensive guard)', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+      const builder = (dataSource._mockManager as any).createQueryBuilder();
+      builder.execute.mockResolvedValueOnce({ identifiers: [{ id: 'only-one' }] });
+
+      await expect(
+        service.recordBatchMovements([
+          { ...baseParams, itemId: 'item-1' },
+          { ...baseParams, itemId: 'item-2' },
+        ]),
+      ).rejects.toThrow(/returned \d+ identifier\(s\) for \d+ row\(s\)/);
     });
 
     it('should return empty array for empty movements', async () => {

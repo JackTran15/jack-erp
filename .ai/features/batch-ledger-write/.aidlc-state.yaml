@@ -1,0 +1,79 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: batch-ledger-write
+slug: batch-ledger-write
+profile: none
+created: 2026-08-12T20:17:49
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-08-12T20:20:08
+    by: Akenzy
+    evidence: architecture map verified by Akenzy      # signed 2026-07-27 after reviewing the Verified detail section; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-08-12T20:21:03
+    by: Akenzy
+    evidence: 4 assumptions, none blocking-and-pending; 7 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-12T20:21:51
+    by: Akenzy
+    evidence: 2 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-12T20:23:48
+    by: Akenzy
+    evidence: graph valid - 1 UoW, 3 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-12T20:24:18
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-12T20:27:37
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket todo
+    at: 2026-08-12T20:34:08
+    by: code-review
+    reason: toAssign deduped by itemId alone instead of (itemId, storageId) — drops shelf-assignment writes when one item spans two storages in the same batch
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-12T20:41:17
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-12T20:41:22
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-12T20:41:22
+    by: code-review
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-12T20:41:27
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-12T20:59:58
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-12T20:59:59
+    by: code-review
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-12T21:00:07
+    by: Akenzy
+    ticket: T-01-03

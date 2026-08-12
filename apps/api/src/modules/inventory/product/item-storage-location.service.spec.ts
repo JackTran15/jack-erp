@@ -20,16 +20,26 @@ describe('ItemStorageLocationService', () => {
     create: jest.Mock;
     save: jest.Mock;
   };
-  let locationRepo: { findOne: jest.Mock };
+  let locationRepo: { findOne: jest.Mock; find: jest.Mock };
+  let insertExecute: jest.Mock;
 
   beforeEach(async () => {
+    insertExecute = jest.fn().mockResolvedValue({ identifiers: [] });
     islRepo = {
       findOne: jest.fn(),
       find: jest.fn(),
       create: jest.fn((dto) => ({ ...dto })),
       save: jest.fn((entity) => Promise.resolve({ id: 'isl-1', ...entity })),
     };
-    locationRepo = { findOne: jest.fn() };
+    (islRepo as unknown as { createQueryBuilder: jest.Mock }).createQueryBuilder = jest
+      .fn()
+      .mockReturnValue({
+        insert: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orIgnore: jest.fn().mockReturnThis(),
+        execute: insertExecute,
+      });
+    locationRepo = { findOne: jest.fn(), find: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -115,6 +125,133 @@ describe('ItemStorageLocationService', () => {
       await service.validateAndAssignByLocation('item-1', 'loc-missing', actor);
 
       expect(islRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('validateAndAssignBatch', () => {
+    it('no-ops on an empty batch', async () => {
+      await service.validateAndAssignBatch([], actor);
+
+      expect(locationRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('bulk-inserts a mapping for a new item', async () => {
+      locationRepo.find.mockResolvedValue([
+        { id: 'loc-1', storageId: 'storage-1', isUnassigned: false },
+      ]);
+      islRepo.find.mockResolvedValue([]);
+
+      await service.validateAndAssignBatch(
+        [{ itemId: 'item-1', locationId: 'loc-1' }],
+        actor,
+      );
+
+      const builder = (
+        islRepo as unknown as { createQueryBuilder: jest.Mock }
+      ).createQueryBuilder.mock.results[0].value;
+      expect(builder.values).toHaveBeenCalledWith([
+        expect.objectContaining({ itemId: 'item-1', storageId: 'storage-1', locationId: 'loc-1' }),
+      ]);
+      expect(builder.orIgnore).toHaveBeenCalled();
+      expect(insertExecute).toHaveBeenCalled();
+    });
+
+    it('does not insert or repair when the mapping already exists', async () => {
+      locationRepo.find.mockResolvedValue([
+        { id: 'loc-1', storageId: 'storage-1', isUnassigned: false },
+      ]);
+      islRepo.find.mockResolvedValue([
+        { id: 'isl-1', itemId: 'item-1', storageId: 'storage-1', locationId: 'loc-1' },
+      ]);
+
+      await service.validateAndAssignBatch(
+        [{ itemId: 'item-1', locationId: 'loc-1' }],
+        actor,
+      );
+
+      expect(insertExecute).not.toHaveBeenCalled();
+      expect(islRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('skips the unassigned ("Chưa xếp") location entirely', async () => {
+      locationRepo.find.mockResolvedValue([
+        { id: 'loc-u', storageId: 'storage-1', isUnassigned: true },
+      ]);
+
+      await service.validateAndAssignBatch(
+        [{ itemId: 'item-1', locationId: 'loc-u' }],
+        actor,
+      );
+
+      expect(islRepo.find).not.toHaveBeenCalled();
+      expect(insertExecute).not.toHaveBeenCalled();
+    });
+
+    it('first occurrence wins when the same new item targets two locations', async () => {
+      locationRepo.find.mockResolvedValue([
+        { id: 'loc-1', storageId: 'storage-1', isUnassigned: false },
+        { id: 'loc-2', storageId: 'storage-1', isUnassigned: false },
+      ]);
+      islRepo.find.mockResolvedValue([]);
+
+      await service.validateAndAssignBatch(
+        [
+          { itemId: 'item-1', locationId: 'loc-1' },
+          { itemId: 'item-1', locationId: 'loc-2' },
+        ],
+        actor,
+      );
+
+      const builder = (
+        islRepo as unknown as { createQueryBuilder: jest.Mock }
+      ).createQueryBuilder.mock.results[0].value;
+      expect(builder.values).toHaveBeenCalledWith([
+        expect.objectContaining({ itemId: 'item-1', locationId: 'loc-1' }),
+      ]);
+    });
+
+    it('resolves a mapping per storage when the same item spans two storages', async () => {
+      locationRepo.find.mockResolvedValue([
+        { id: 'loc-a', storageId: 'storage-A', isUnassigned: false },
+        { id: 'loc-b', storageId: 'storage-B', isUnassigned: false },
+      ]);
+      islRepo.find.mockResolvedValue([]);
+
+      await service.validateAndAssignBatch(
+        [
+          { itemId: 'item-1', locationId: 'loc-a' },
+          { itemId: 'item-1', locationId: 'loc-b' },
+        ],
+        actor,
+      );
+
+      const builder = (
+        islRepo as unknown as { createQueryBuilder: jest.Mock }
+      ).createQueryBuilder.mock.results[0].value;
+      expect(builder.values).toHaveBeenCalledWith([
+        expect.objectContaining({ itemId: 'item-1', storageId: 'storage-A', locationId: 'loc-a' }),
+        expect.objectContaining({ itemId: 'item-1', storageId: 'storage-B', locationId: 'loc-b' }),
+      ]);
+    });
+
+    it('repairs an existing mapping whose location no longer resolves in the storage', async () => {
+      locationRepo.find
+        .mockResolvedValueOnce([
+          { id: 'loc-new', storageId: 'storage-1', isUnassigned: false },
+        ])
+        .mockResolvedValueOnce([]); // loc-old no longer resolves (deactivated/moved)
+      islRepo.find.mockResolvedValue([
+        { id: 'isl-1', itemId: 'item-1', storageId: 'storage-1', locationId: 'loc-old' },
+      ]);
+
+      await service.validateAndAssignBatch(
+        [{ itemId: 'item-1', locationId: 'loc-new' }],
+        actor,
+      );
+
+      expect(islRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'isl-1', locationId: 'loc-new' }),
+      );
     });
   });
 

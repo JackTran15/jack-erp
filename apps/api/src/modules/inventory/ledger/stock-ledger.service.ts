@@ -261,12 +261,13 @@ export class StockLedgerService {
   ): Promise<StockLedgerEntryEntity[]> {
     if (movements.length === 0) return [];
 
-    for (const params of movements) {
-      if (params.skipLocationAssignment) continue;
-      await this.pslService.validateAndAssignByLocation(
-        params.itemId,
-        params.locationId,
-        params.actorContext,
+    const toValidate = movements
+      .filter((m) => !m.skipLocationAssignment)
+      .map((m) => ({ itemId: m.itemId, locationId: m.locationId }));
+    if (toValidate.length > 0) {
+      await this.pslService.validateAndAssignBatch(
+        toValidate,
+        movements[0].actorContext,
       );
     }
 
@@ -703,12 +704,13 @@ export class StockLedgerService {
     movements: RecordMovementParams[],
   ): Promise<StockLedgerEntryEntity[]> {
     await this.assertStoragesActive(manager, movements);
-    const savedEntries: StockLedgerEntryEntity[] = [];
     const now = new Date();
 
-    for (const params of movements) {
+    // stock_ledger_entries is an immutable append-only audit log — one row per
+    // input movement, always, never aggregated (unlike the balance upsert below).
+    const rows = movements.map((params) => {
       const { unitCost, lineValue } = this.deriveCostFields(params);
-      const ledgerEntry = manager.create(StockLedgerEntryEntity, {
+      return manager.create(StockLedgerEntryEntity, {
         itemId: params.itemId,
         locationId: params.locationId,
         branchId: params.branchId,
@@ -723,13 +725,134 @@ export class StockLedgerService {
         unitCost,
         lineValue,
       });
-      const savedEntry = await manager.save(StockLedgerEntryEntity, ledgerEntry);
-      savedEntries.push(savedEntry);
+    });
 
-      await this.upsertBalance(manager, params);
+    const result = await manager
+      .createQueryBuilder()
+      .insert()
+      .into(StockLedgerEntryEntity)
+      .values(rows)
+      .execute();
+
+    // Defensive guard: TypeORM's bulk insert is documented to return
+    // `identifiers` in the same order as the input `values` array, but a
+    // mismatch here would silently attribute a ledger id to the wrong
+    // movement (wrong itemId/quantity in published events). Fail loudly
+    // inside the transaction instead.
+    if (result.identifiers.length !== rows.length) {
+      throw new Error(
+        `stock ledger bulk insert returned ${result.identifiers.length} identifier(s) for ${rows.length} row(s)`,
+      );
     }
+    rows.forEach((row, i) => {
+      row.id = result.identifiers[i].id as string;
+    });
+    const savedEntries = rows as StockLedgerEntryEntity[];
+
+    await this.upsertBalancesBatch(manager, movements);
 
     return savedEntries;
+  }
+
+  /**
+   * Bulk equivalent of calling {@link upsertBalance} once per movement.
+   * Postgres rejects an `ON CONFLICT DO UPDATE` touching the same conflict
+   * row twice in one statement, so movements are summed in memory by
+   * (organizationId, itemId, locationId) first — this is safe because
+   * stock_balances is a denormalized running total, unlike the ledger rows
+   * above. `recordMovement` (single-movement path) keeps calling
+   * {@link upsertBalance} directly and is untouched by this method.
+   */
+  private async upsertBalancesBatch(
+    manager: EntityManager,
+    movements: RecordMovementParams[],
+  ): Promise<void> {
+    const deltas = new Map<
+      string,
+      {
+        organizationId: string;
+        branchId: string;
+        itemId: string;
+        locationId: string;
+        quantity: number;
+        createdBy: string;
+      }
+    >();
+    for (const m of movements) {
+      const key = `${m.organizationId}:${m.itemId}:${m.locationId}`;
+      const existing = deltas.get(key);
+      if (existing) {
+        existing.quantity += Number(m.quantity);
+      } else {
+        // First movement for this (org, item, location) wins the
+        // branchId/createdBy attribution — same actor/branch across one
+        // batch in practice.
+        deltas.set(key, {
+          organizationId: m.organizationId,
+          branchId: m.branchId,
+          itemId: m.itemId,
+          locationId: m.locationId,
+          quantity: Number(m.quantity),
+          createdBy: m.actorContext.userId,
+        });
+      }
+    }
+
+    const rows = [...deltas.values()];
+    if (rows.length === 0) return;
+
+    const params: unknown[] = [];
+    const valuesSql = rows
+      .map((r, i) => {
+        const base = i * 6;
+        params.push(
+          r.organizationId,
+          r.branchId,
+          r.itemId,
+          r.locationId,
+          r.quantity,
+          r.createdBy,
+        );
+        return (
+          `($${base + 1}::uuid, $${base + 2}::uuid, $${base + 3}::uuid, ` +
+          `$${base + 4}::uuid, $${base + 5}::numeric, $${base + 6}::uuid)`
+        );
+      })
+      .join(',\n');
+    const nowParamIndex = params.length + 1;
+    params.push(new Date());
+
+    const returned = await manager.query<
+      { item_id: string; location_id: string; quantity: string }[]
+    >(
+      `
+        INSERT INTO stock_balances
+          (id, organization_id, branch_id, item_id, location_id, quantity, last_movement_at, is_tracked, created_by)
+        SELECT gen_random_uuid(), v.organization_id, v.branch_id, v.item_id, v.location_id,
+               v.quantity, $${nowParamIndex}::timestamptz, true, v.created_by
+        FROM (VALUES
+          ${valuesSql}
+        ) AS v(organization_id, branch_id, item_id, location_id, quantity, created_by)
+        ON CONFLICT (organization_id, item_id, location_id)
+        DO UPDATE SET
+          quantity = stock_balances.quantity + EXCLUDED.quantity,
+          last_movement_at = $${nowParamIndex}::timestamptz,
+          is_tracked = true
+        RETURNING item_id, location_id, quantity
+      `,
+      params,
+    );
+
+    // Same diagnostic as upsertBalance's per-line negative-balance warning,
+    // now emitted once per affected (item, location) in the whole batch
+    // instead of once per input movement.
+    for (const row of returned) {
+      if (Number(row.quantity) < 0) {
+        this.logger.warn(
+          `Negative balance detected: item=${row.item_id} location=${row.location_id} result=${row.quantity}`,
+        );
+      }
+    }
   }
 
   private deriveCostFields(
