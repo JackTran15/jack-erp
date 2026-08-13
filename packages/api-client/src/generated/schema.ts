@@ -11967,8 +11967,15 @@ export interface components {
             customerId?: string;
             /** @description ISO datetime; omitted = server current time */
             at?: string;
-            /** @description Ids of auto_apply=false programs the cashier picked manually */
+            /** @description Ids of auto_apply=false programs the cashier picked manually, and/or ids that should win a contested resource ahead of priority (ADR-03) */
             selectedProgramIds?: string[];
+            /** @description Ids of programs to exclude entirely, even if auto_apply=true (ADR-07) — wins over selectedProgramIds on conflict */
+            excludedProgramIds?: string[];
+            /**
+             * @description Empty is valid on purpose: the POS promotion dialog previews the program
+             *     catalog (names, "chưa đủ điều kiện"/"có thể áp dụng" per row) before the
+             *     cashier has scanned anything, not just once the cart has lines.
+             */
             lines: components["schemas"]["EvaluateCartLineInputDto"][];
         };
         PromotionLineInputDto: {
@@ -12259,12 +12266,23 @@ export interface components {
              */
             creditDays?: number;
             /**
-             * @description Ids of `auto_apply=false` programs the cashier picked manually. The
-             *     server always recomputes the discount itself (ADR-06 in
-             *     03-logical-design.md) — this list only selects *which* programs run.
-             *     Not consumed until T-04-03.
+             * @description Dual meaning (ADR-03 in 03-logical-design.md, deliberately one field, not
+             *     two). The server always recomputes the discount itself (ADR-06) — this
+             *     list only selects *which* programs run:
+             *     1. Turns on an `auto_apply=false` program — without this, it never runs.
+             *     2. Makes a listed program win a contested resource ahead of `priority`
+             *        (PromotionResolver.resolve) — including one that's `auto_apply=true`
+             *        and currently winning. Ids for programs not eligible/not contesting
+             *        anything are simply ignored.
              */
             selectedProgramIds?: string[];
+            /**
+             * @description ADR-07 (pos-promotion-apply/03-logical-design.md) — ids to keep out of
+             *     the race entirely, filtered out before `selectedProgramIds` is even
+             *     consulted. The inverse of `selectedProgramIds`: always exclude, never
+             *     add. Wins on conflict if an id is in both.
+             */
+            excludedProgramIds?: string[];
             /** @description Voucher code to redeem against this checkout. Not consumed until T-05-01. */
             voucherCode?: string;
             /**

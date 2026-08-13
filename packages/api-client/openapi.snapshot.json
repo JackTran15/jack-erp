@@ -36591,7 +36591,15 @@
             "description": "ISO datetime; omitted = server current time"
           },
           "selectedProgramIds": {
-            "description": "Ids of auto_apply=false programs the cashier picked manually",
+            "description": "Ids of auto_apply=false programs the cashier picked manually, and/or ids that should win a contested resource ahead of priority (ADR-03)",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "excludedProgramIds": {
+            "description": "Ids of programs to exclude entirely, even if auto_apply=true (ADR-07) — wins over selectedProgramIds on conflict",
             "type": "array",
             "items": {
               "type": "string",
@@ -36599,7 +36607,7 @@
             }
           },
           "lines": {
-            "minItems": 1,
+            "description": "Empty is valid on purpose: the POS promotion dialog previews the program\ncatalog (names, \"chưa đủ điều kiện\"/\"có thể áp dụng\" per row) before the\ncashier has scanned anything, not just once the cart has lines.",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/EvaluateCartLineInputDto"
@@ -37285,7 +37293,15 @@
             "example": 9
           },
           "selectedProgramIds": {
-            "description": "Ids of `auto_apply=false` programs the cashier picked manually. The\nserver always recomputes the discount itself (ADR-06 in\n03-logical-design.md) — this list only selects *which* programs run.\nNot consumed until T-04-03.",
+            "description": "Dual meaning (ADR-03 in 03-logical-design.md, deliberately one field, not\ntwo). The server always recomputes the discount itself (ADR-06) — this\nlist only selects *which* programs run:\n1. Turns on an `auto_apply=false` program — without this, it never runs.\n2. Makes a listed program win a contested resource ahead of `priority`\n   (PromotionResolver.resolve) — including one that's `auto_apply=true`\n   and currently winning. Ids for programs not eligible/not contesting\n   anything are simply ignored.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "excludedProgramIds": {
+            "description": "ADR-07 (pos-promotion-apply/03-logical-design.md) — ids to keep out of\nthe race entirely, filtered out before `selectedProgramIds` is even\nconsulted. The inverse of `selectedProgramIds`: always exclude, never\nadd. Wins on conflict if an id is in both.",
             "type": "array",
             "items": {
               "type": "string",
