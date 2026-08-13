@@ -1275,6 +1275,9 @@ export function GoodsIssueFormDialog({
       label: "Kho",
       width: 220,
       placeholder: "Chọn kho",
+      // The key is synthetic (the editor renders the value); the grid needs
+      // this to know what the header filter should match against.
+      getValue: (row) => row.storageLabel,
       renderEditor: (row, idx) => (
         <LookupField
           portalToBody
@@ -1320,6 +1323,7 @@ export function GoodsIssueFormDialog({
       label: "Vị trí",
       width: 220,
       placeholder: "Chọn vị trí",
+      getValue: (row) => row.locationLabel,
       renderEditor: (row, idx) => (
         <LookupField<InventoryLocation>
           portalToBody
