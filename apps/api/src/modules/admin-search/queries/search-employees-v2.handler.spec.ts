@@ -30,7 +30,7 @@ function makeQb(result: [unknown[], number]) {
 describe('SearchEmployeesV2Handler', () => {
   let handler: SearchEmployeesV2Handler;
   let repo: { createQueryBuilder: jest.Mock };
-  let users: { toListItems: jest.Mock };
+  let users: { toListItems: jest.Mock; visibleUserIds: jest.Mock };
   let qb: ReturnType<typeof makeQb>;
 
   const userRow = { id: 'u-1' };
@@ -43,7 +43,11 @@ describe('SearchEmployeesV2Handler', () => {
   beforeEach(async () => {
     qb = makeQb([[userRow], 1]);
     repo = { createQueryBuilder: jest.fn(() => qb) };
-    users = { toListItems: jest.fn().mockResolvedValue([mappedItem]) };
+    users = {
+      toListItems: jest.fn().mockResolvedValue([mappedItem]),
+      // null = actor holds iam.user.read.all, i.e. no branch restriction.
+      visibleUserIds: jest.fn().mockResolvedValue(null),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -74,6 +78,33 @@ describe('SearchEmployeesV2Handler', () => {
       total: 1,
       page: 1,
       limit: 20,
+    });
+  });
+
+  /**
+   * This surface returns the same rows as GET /admin/users, so it has to honour
+   * the same branch scope — otherwise it is a way around it.
+   */
+  describe('branch scoping', () => {
+    it('restricts to the ids the actor may see', async () => {
+      users.visibleUserIds.mockResolvedValue(['u-1', 'u-2']);
+
+      await handler.execute(new SearchEmployeesV2Query({}, actor));
+
+      expect(qb.andWhere).toHaveBeenCalledWith('u.id IN (:...visibleIds)', {
+        visibleIds: ['u-1', 'u-2'],
+      });
+    });
+
+    it('returns nothing, and never queries, when the scope is empty', async () => {
+      users.visibleUserIds.mockResolvedValue([]);
+
+      const result = await handler.execute(
+        new SearchEmployeesV2Query({}, actor),
+      );
+
+      expect(result).toEqual({ data: [], total: 0, page: 1, limit: 20 });
+      expect(qb.getManyAndCount).not.toHaveBeenCalled();
     });
   });
 

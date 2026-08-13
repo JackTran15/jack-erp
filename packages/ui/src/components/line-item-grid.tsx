@@ -367,15 +367,6 @@ function LineItemGridInner<R>({
     [virtualized],
   );
 
-  if (
-    process.env.NODE_ENV !== "production" &&
-    rows.length > virtualizeThreshold &&
-    getRowKey == null
-  ) {
-    console.warn(
-      `[LineItemGrid] ${rows.length} rows rendered without \`getRowKey\` — virtualization stays off. Pass a stable row key to enable it.`,
-    );
-  }
   const stickyHeaderStyle = (top: number): React.CSSProperties => ({
     position: "sticky",
     top,

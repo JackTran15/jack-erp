@@ -37,6 +37,14 @@ export class SearchEmployeesV2Handler
       )
       .where('u.organizationId = :orgId', { orgId: actor.organizationId });
 
+    // Same branch scoping as GET /admin/users — this surface must not become a
+    // way around it. null = the actor holds iam.user.read.all.
+    const visibleIds = await this.users.visibleUserIds(actor);
+    if (visibleIds !== null) {
+      if (visibleIds.length === 0) return { data: [], total: 0, page, limit };
+      qb.andWhere('u.id IN (:...visibleIds)', { visibleIds });
+    }
+
     new FilterBuilder(qb)
       .applyString('profile.code', dto.code)
       // Raw column names (not entity properties) on purpose: TypeORM only

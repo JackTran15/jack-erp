@@ -48,6 +48,8 @@ export interface UserDetail extends UserSummary {
   branchIds: string[];
   /** HR profile (1:1). Null when the user has no employee profile yet. */
   profile?: EmployeeProfileView | null;
+  /** See {@link UserListItem.canEdit}. */
+  canEdit?: boolean;
 }
 
 /** Compact employee profile fields surfaced on the user list rows. */
@@ -64,6 +66,12 @@ export interface EmployeeProfileSummary {
 export interface UserListItem extends UserSummary {
   code: string | null;
   profile: EmployeeProfileSummary | null;
+  /**
+   * False when the row holds permissions the caller does not — a chain manager
+   * or admin seen by a branch manager. The server rejects writes on those rows
+   * regardless; this only lets the UI disable the controls up front.
+   */
+  canEdit?: boolean;
 }
 
 export interface CreateUserRequest {
