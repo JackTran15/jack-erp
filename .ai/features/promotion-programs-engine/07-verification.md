@@ -22,8 +22,20 @@ Fixtures assumed present (created via `POST /v2/promotions`, see `## Notes`):
 | S3 | Danh sách CTKM lọc được theo hình thức Giảm giá hóa đơn | `/promotions/programs` | `scroll table` | AC-23 |
 | S4 | Tab Điều kiện áp dụng giữ nguyên "Tự động áp dụng" người dùng đã chọn | `/promotions/programs/new?type=INVOICE_DISCOUNT` | `click text=Điều kiện áp dụng` | AC-11 |
 | S5 | Danh sách thẻ voucher mở được và hiện đủ cột | `/promotions/vouchers` | — | AC-24 |
+| S6 | Form Giảm giá hóa đơn: chọn "Nhóm khách hàng" mở multi-select nhóm | `/promotions/programs/new?type=INVOICE_DISCOUNT` | `click text=Tất cả khách hàng` | AC-21 |
 
 ## Not verified here
+
+- **Sổ quỹ tiền mặt (`/treasury/cash/ledger`) — không chụp được, đã thử 2 lần.** Backoffice
+  đăng nhập vào **Chi nhánh kiểm thử** (khác POS, `verify:` không có chỗ ghim chi nhánh cho
+  môi trường BO), còn dữ liệu thử nằm ở **HCM**; thêm bước bấm đổi chi nhánh cũng không đổi
+  được, và màn hình đứng ở "Đang tải…" với tổng 0. Bước vẫn *pass* vì `wait` khớp nhãn tĩnh
+  "Số dư cuối kỳ" ở chân trang — đúng kiểu bằng chứng giả mà gói này sinh ra để chặn, nên đã
+  **gỡ bỏ** thay vì giữ lại.
+  Số liệu sổ quỹ đã được đối chiếu ở tầng API thay cho ảnh, qua
+  `POST /v2/cash-ledger/search` ngày 13/08/2026:
+  `đầu kỳ 21.000.000 + thu 6.497.000 − chi 3.970.000 = cuối kỳ 23.527.000` — **khớp tuyệt đối**
+  với `cash_movements`.
 
 - **AC-02** — chặn lưu khi bỏ trống Tên chương trình. Đây là **đường đi âm**: bằng chứng đúng
   của nó *là* một toast lỗi, mà `failure_signals` trong `.ai/aidlc.yaml` lại coi mọi toast lỗi
