@@ -4,3 +4,57 @@ ruleset: 4
 # module convention (entity / migration / service / consumer / controller-dto)
 # plus the React SPA layer, not from a generic DDD default.
 layers: [entity, migration, service, consumer, api, frontend, test, domain, application, api, infra, web, shared, test]
+
+# Browser verification (ai-dlc-verify). Two frontends, so two environments rather than one:
+# each gets its own sign-in path and selectors via the per-environment `auth:` override.
+# Values marked ${VAR} come from .ai/credentials.env, which is never committed.
+verify:
+  environments:
+    local-backoffice:
+      url: http://localhost:3000
+      required: true
+      auth:
+        recipe: form
+        path: /login
+        landing: /
+        # RequireAuth renders this while it restores the session from the refresh token.
+        ready_when: { gone: 'text=Đang khôi phục phiên' }
+        # No data-testid exists in either app, and @erp/ui's Input never emits a `name`
+        # attribute — ids are the only stable handle on these forms.
+        selectors:
+          organization: '#login-org-id'
+          identifier: '#login-email'
+          password: '#login-password'
+          submit: 'button[type="submit"]'
+    local-pos:
+      url: http://localhost:3001
+      required: true
+      auth:
+        recipe: form
+        path: /dang-nhap
+        landing: /
+        ready_when: { gone: 'text=Đang tải' }
+        selectors:
+          organization: '#pos-login-org-id'
+          identifier: '#pos-login-email'
+          password: '#pos-login-password'
+          submit: 'button[type="submit"]'
+        # PosRequireBranch parks a fresh session on /chon-chi-nhanh until a branch is chosen.
+        # The choice persists to localStorage, so it is captured in the saved session — but only
+        # if we wait for it: the trailing `wait` is on the POS shell logo, which mounts only
+        # after both switch-branch and the store write have committed. Without it the session is
+        # captured mid-flight, with branchId still null.
+        # To pin one branch: input[name="pos-branch"][value="${LOCAL_POS_BRANCH_ID}"]
+        post_login: 'wait input[name="pos-branch"]; click input[name="pos-branch"]; click button[type="submit"]; wait [aria-label="Sapo POS"]'
+  # Desktop only. Neither app has a mobile layout: no matchMedia/useMediaQuery anywhere, and
+  # BackofficeLayout is a fixed ml-60 desktop shell.
+  viewports:
+    desktop: { width: 1440, height: 900 }
+  failure_signals:
+    - { selector: '[data-sonner-toast][data-type="error"]', message: 'app hiển thị toast lỗi' }
+    - { selector: '.pos-dialog__alert', message: 'POS báo lỗi đăng nhập' }
+    - { selector: '.pos-panel[role="alert"]', message: 'POS báo lỗi tải dữ liệu' }
+    # Enable once a green baseline exists — turning it on first fails every step on unrelated
+    # log noise, which reads as a broken feature.
+    # - console_errors
+  timeout_ms: 30000

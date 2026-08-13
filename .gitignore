@@ -18,3 +18,12 @@ test_logs/
 .code-review-graph/
 graphify-out
 
+# ai-dlc-verify: local-only skill, its generated evidence, and its secrets.
+# `.env.*` above does not cover credentials.env — that pattern matches a basename
+# beginning with .env, not one ending in it.
+.claude/skills/ai-dlc-verify/
+.ai/credentials.env
+.ai/.auth/
+.ai/features/*/08-evidence.md
+.ai/features/*/evidence/
+
