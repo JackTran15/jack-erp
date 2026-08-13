@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LogOut } from "lucide-react";
+import { KeyRound, LogOut } from "lucide-react";
 import {
   Avatar,
   DropdownMenu,
@@ -11,11 +12,13 @@ import {
 } from "@erp/ui";
 import { useAuth } from "../../hooks/useAuth";
 import { useCurrentUser } from "../../hooks/iam/useCurrentUser";
+import { ChangePasswordDialog } from "./ChangePasswordDialog";
 
 export function UserMenu() {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const { data: user } = useCurrentUser();
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   const displayName = user
     ? `${user.firstName} ${user.lastName}`.trim()
@@ -47,6 +50,12 @@ export function UserMenu() {
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {/* No permission gate: staff roles hold no iam.* key but still own
+            their own credentials. */}
+        <DropdownMenuItem onClick={() => setPasswordOpen(true)}>
+          <KeyRound className="h-4 w-4" />
+          Đổi mật khẩu
+        </DropdownMenuItem>
         <DropdownMenuItem
           onClick={handleLogout}
           className="text-destructive focus:text-destructive"
@@ -55,6 +64,10 @@ export function UserMenu() {
           Đăng xuất
         </DropdownMenuItem>
       </DropdownMenuContent>
+      <ChangePasswordDialog
+        open={passwordOpen}
+        onClose={() => setPasswordOpen(false)}
+      />
     </DropdownMenu>
   );
 }

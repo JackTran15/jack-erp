@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   ForbiddenException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -26,6 +27,8 @@ import type {
 
 const ACCESS_TOKEN_TTL = 15 * 60;
 const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60;
+/** Matches UsersService.BCRYPT_COST so both password paths cost the same. */
+const BCRYPT_ROUNDS = 10;
 
 @Injectable()
 export class AuthService {
@@ -242,6 +245,45 @@ export class AuthService {
   async logout(jti: string): Promise<void> {
     await this.sessionStore.revokeSession(jti);
     this.logger.debug(`Session ${jti} revoked`);
+  }
+
+  /**
+   * Self-service password change. Deliberately not an `iam.*` permission: every
+   * signed-in user owns their own credentials, and the admin path
+   * (`POST /admin/users/:id/reset-password`) is a different operation on someone
+   * else's account.
+   *
+   * `currentPassword` is required even though the caller is authenticated — a
+   * stolen access token must not be enough to lock the owner out.
+   */
+  async changeOwnPassword(
+    userId: string,
+    organizationId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.userRepo.findOne({
+      where: { id: userId, organizationId },
+    });
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) {
+      // Same wording as login: do not tell a caller which half was wrong.
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    if (await bcrypt.compare(newPassword, user.passwordHash)) {
+      throw new BadRequestException(
+        'Mật khẩu mới phải khác mật khẩu hiện tại',
+      );
+    }
+
+    user.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await this.userRepo.save(user);
+
+    this.logger.log(`User ${userId} changed their own password`);
   }
 
   async getSession(jti: string): Promise<SessionInfo | null> {

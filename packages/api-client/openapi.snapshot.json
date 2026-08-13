@@ -423,6 +423,31 @@
         ]
       }
     },
+    "/auth/change-password": {
+      "post": {
+        "operationId": "AuthController_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Self-service, so no @RequirePermission: staff roles hold no `iam.*` key yet\nmust be able to rotate their own password. Resetting someone else's is a\ndifferent route (POST /admin/users/:id/reset-password).",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/auth/logout": {
       "post": {
         "operationId": "AuthController_logout",
@@ -21200,6 +21225,27 @@
           "branchId"
         ]
       },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "description": "Mật khẩu hiện tại",
+            "minLength": 1,
+            "maxLength": 72
+          },
+          "newPassword": {
+            "type": "string",
+            "description": "Mật khẩu mới",
+            "minLength": 8,
+            "maxLength": 72
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ]
+      },
       "EmployeeAddressDto": {
         "type": "object",
         "properties": {
@@ -21422,7 +21468,7 @@
           },
           "lastName": {
             "type": "string",
-            "minLength": 1,
+            "description": "Optional — a mononym goes entirely into firstName and leaves this empty.",
             "maxLength": 100
           },
           "temporaryPassword": {
@@ -21463,7 +21509,6 @@
         "required": [
           "email",
           "firstName",
-          "lastName",
           "temporaryPassword"
         ]
       },
@@ -21477,7 +21522,7 @@
           },
           "lastName": {
             "type": "string",
-            "minLength": 1,
+            "description": "Optional — a mononym goes entirely into firstName and leaves this empty.",
             "maxLength": 100
           },
           "isActive": {

@@ -150,6 +150,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Self-service, so no @RequirePermission: staff roles hold no `iam.*` key yet
+         *     must be able to rotate their own password. Resetting someone else's is a
+         *     different route (POST /admin/users/:id/reset-password).
+         */
+        post: operations["AuthController_changePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/logout": {
         parameters: {
             query?: never;
@@ -6903,6 +6924,12 @@ export interface components {
              */
             branchId: string;
         };
+        ChangePasswordDto: {
+            /** @description Mật khẩu hiện tại */
+            currentPassword: string;
+            /** @description Mật khẩu mới */
+            newPassword: string;
+        };
         EmployeeAddressDto: {
             /** @enum {string} */
             type: "PERMANENT" | "CURRENT";
@@ -6966,7 +6993,8 @@ export interface components {
             /** Format: email */
             email: string;
             firstName: string;
-            lastName: string;
+            /** @description Optional — a mononym goes entirely into firstName and leaves this empty. */
+            lastName?: string;
             /** @description Temporary password set by the administrator; user is expected to change it on first login. */
             temporaryPassword: string;
             /** @description Whether the user can sign in. Defaults to true when omitted. */
@@ -6980,6 +7008,7 @@ export interface components {
         };
         UpdateUserDto: {
             firstName?: string;
+            /** @description Optional — a mononym goes entirely into firstName and leaves this empty. */
             lastName?: string;
             isActive?: boolean;
             /** @description HR profile to upsert. Provided child collections fully replace the existing set. */
@@ -13038,6 +13067,27 @@ export interface operations {
                 content: {
                     "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    AuthController_changePassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
