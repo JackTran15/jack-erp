@@ -423,6 +423,70 @@
         ]
       }
     },
+    "/auth/handoff": {
+      "post": {
+        "operationId": "AuthController_createHandoff",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateHandoffDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Hand the signed-in user to a sibling SPA (backoffice → POS) without a second\nlogin. No @RequirePermission: opening POS is not a privileged act — the code\nonly ever grants the caller's own access, and the receiving app is still\ngated by that user's permissions.",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/handoff/exchange": {
+      "post": {
+        "operationId": "AuthController_exchangeHandoff",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExchangeHandoffDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "because the receiving app has no session yet — that is the point.\nThe code itself is the credential: single-use and valid for a minute.",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/auth/change-password": {
       "post": {
         "operationId": "AuthController_changePassword",
@@ -21223,6 +21287,29 @@
         },
         "required": [
           "branchId"
+        ]
+      },
+      "CreateHandoffDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Branch the receiving app should open on; must be one of the user's assigned branches. Defaults to the caller's currently active branch."
+          }
+        }
+      },
+      "ExchangeHandoffDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Single-use code from POST /auth/handoff."
+          }
+        },
+        "required": [
+          "code"
         ]
       },
       "ChangePasswordDto": {

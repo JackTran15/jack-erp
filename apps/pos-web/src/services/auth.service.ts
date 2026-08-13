@@ -1,4 +1,5 @@
 import type {
+  ExchangeHandoffResponse,
   LoginResponse,
   SwitchBranchResponse,
 } from "@erp/shared-interfaces";
@@ -29,6 +30,27 @@ export const authService = {
     localStorage.setItem(ACCESS_TOKEN_KEY, login.accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, login.refreshToken);
     localStorage.setItem(ORGANIZATION_ID_KEY, input.organizationId);
+  },
+
+  /**
+   * Đổi mã bàn giao (`?handoff=`) từ ERP lấy phiên POS riêng — không cần đăng
+   * nhập lại. Mã dùng một lần, hết hạn sau 60s; phiên tạo ra độc lập với phiên
+   * ERP nên đổi chi nhánh hay đăng xuất bên này không đá bên kia ra.
+   */
+  exchangeHandoff: async (code: string): Promise<void> => {
+    const res = requireErpData(
+      await erpApi.POST<ExchangeHandoffResponse>("/auth/handoff/exchange", {
+        body: { code },
+      }),
+    );
+
+    if (!res.accessToken || !res.refreshToken) {
+      throw new Error("Phản hồi bàn giao phiên không hợp lệ.");
+    }
+
+    localStorage.setItem(ACCESS_TOKEN_KEY, res.accessToken);
+    localStorage.setItem(REFRESH_TOKEN_KEY, res.refreshToken);
+    localStorage.setItem(ORGANIZATION_ID_KEY, res.session.organizationId);
   },
 
   switchBranch: async (branchId: string): Promise<void> => {

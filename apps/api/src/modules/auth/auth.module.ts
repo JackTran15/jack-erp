@@ -9,6 +9,7 @@ import { UserBranchAssignmentEntity } from "../branch/user-branch-assignment.ent
 import { RbacModule } from "../rbac/rbac.module";
 import { AuthService } from "./auth.service";
 import { AuthController } from "./auth.controller";
+import { HandoffStore } from "./handoff.store";
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { AuthController } from "./auth.controller";
     ]),
   ],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [AuthService, HandoffStore],
   exports: [AuthService],
 })
 export class AuthModule {}

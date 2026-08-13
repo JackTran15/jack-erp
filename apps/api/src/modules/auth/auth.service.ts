@@ -12,12 +12,15 @@ import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { SessionStore } from '../redis/session.store';
+import { HandoffStore } from './handoff.store';
 import { RbacService } from '../rbac/rbac.service';
 import { UserEntity } from './user.entity';
 import { UserRoleEntity } from './user-role.entity';
 import { RoleEntity } from './role.entity';
 import { UserBranchAssignmentEntity } from '../branch/user-branch-assignment.entity';
 import type {
+  CreateHandoffResponse,
+  ExchangeHandoffResponse,
   JwtPayload,
   LoginResponse,
   RefreshResponse,
@@ -27,6 +30,8 @@ import type {
 
 const ACCESS_TOKEN_TTL = 15 * 60;
 const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60;
+/** Long enough for one tab-open round trip, short enough that a leaked URL is dead. */
+const HANDOFF_CODE_TTL = 60;
 /** Matches UsersService.BCRYPT_COST so both password paths cost the same. */
 const BCRYPT_ROUNDS = 10;
 
@@ -39,6 +44,7 @@ export class AuthService {
   constructor(
     private readonly config: ConfigService,
     private readonly sessionStore: SessionStore,
+    private readonly handoffStore: HandoffStore,
     private readonly rbacService: RbacService,
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
@@ -237,6 +243,113 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
+      expiresIn: ACCESS_TOKEN_TTL,
+      session,
+    };
+  }
+
+  /**
+   * Mint a single-use code that lets the caller open a sibling SPA (backoffice →
+   * POS) already signed in. The apps sit on different origins so they cannot
+   * share `localStorage`, and handing over the refresh token would be worse than
+   * useless: `refresh()` rotates and revokes the old jti, so the sending app
+   * would log itself out. The code is exchanged for an independent session
+   * instead.
+   */
+  async createHandoffCode(
+    current: JwtPayload,
+    branchId?: string,
+  ): Promise<CreateHandoffResponse> {
+    const target = branchId ?? current.branchId;
+    if (target) {
+      const branchIds = await this.resolveUserBranches(
+        current.userId,
+        current.organizationId,
+      );
+      if (!branchIds.includes(target)) {
+        throw new ForbiddenException('Branch not assigned to user');
+      }
+    }
+
+    const code = uuidv4();
+    await this.handoffStore.issue(
+      code,
+      {
+        userId: current.userId,
+        organizationId: current.organizationId,
+        branchId: target,
+      },
+      HANDOFF_CODE_TTL,
+    );
+
+    this.logger.log(
+      `Handoff code issued for user ${current.userId} (org=${current.organizationId}, branch=${target ?? 'none'})`,
+    );
+
+    return { code, expiresIn: HANDOFF_CODE_TTL };
+  }
+
+  /**
+   * Redeem a handoff code for a fresh session. Deliberately does not touch the
+   * issuing session: each app keeps its own jti, so switching branch or logging
+   * out on one does not sign the user out of the other.
+   */
+  async exchangeHandoffCode(code: string): Promise<ExchangeHandoffResponse> {
+    const handoff = await this.handoffStore.consume(code);
+    if (!handoff) {
+      throw new UnauthorizedException('Invalid or expired handoff code');
+    }
+
+    const user = await this.userRepo.findOne({
+      where: { id: handoff.userId, organizationId: handoff.organizationId },
+    });
+    if (!user || !user.isActive) {
+      // Deactivated between issue and redeem — the code must not outlive access.
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const session = await this.buildSessionInfo(
+      user.id,
+      handoff.organizationId,
+    );
+    const { roles, branchIds } = session;
+    const branchId =
+      handoff.branchId && branchIds.includes(handoff.branchId)
+        ? handoff.branchId
+        : branchIds[0];
+
+    const jti = uuidv4();
+    const now = Math.floor(Date.now() / 1000);
+    await this.sessionStore.createSession(
+      jti,
+      {
+        userId: user.id,
+        organizationId: handoff.organizationId,
+        branchIds,
+        branchId,
+        roles,
+        issuedAt: now,
+        expiresAt: now + REFRESH_TOKEN_TTL,
+      },
+      REFRESH_TOKEN_TTL,
+    );
+
+    const accessToken = this.signAccessToken({
+      userId: user.id,
+      organizationId: handoff.organizationId,
+      roles,
+      branchIds,
+      branchId,
+      jti,
+    });
+
+    this.logger.log(
+      `Handoff code redeemed by user ${user.id} (org=${handoff.organizationId}, branch=${branchId ?? 'none'})`,
+    );
+
+    return {
+      accessToken,
+      refreshToken: this.signRefreshToken({ jti, userId: user.id }),
       expiresIn: ACCESS_TOKEN_TTL,
       session,
     };

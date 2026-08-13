@@ -150,6 +150,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hand the signed-in user to a sibling SPA (backoffice → POS) without a second
+         *     login. No @RequirePermission: opening POS is not a privileged act — the code
+         *     only ever grants the caller's own access, and the receiving app is still
+         *     gated by that user's permissions.
+         */
+        post: operations["AuthController_createHandoff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/handoff/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * because the receiving app has no session yet — that is the point.
+         *     The code itself is the credential: single-use and valid for a minute.
+         */
+        post: operations["AuthController_exchangeHandoff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/change-password": {
         parameters: {
             query?: never;
@@ -6924,6 +6966,20 @@ export interface components {
              */
             branchId: string;
         };
+        CreateHandoffDto: {
+            /**
+             * Format: uuid
+             * @description Branch the receiving app should open on; must be one of the user's assigned branches. Defaults to the caller's currently active branch.
+             */
+            branchId?: string;
+        };
+        ExchangeHandoffDto: {
+            /**
+             * Format: uuid
+             * @description Single-use code from POST /auth/handoff.
+             */
+            code: string;
+        };
         ChangePasswordDto: {
             /** @description Mật khẩu hiện tại */
             currentPassword: string;
@@ -13057,6 +13113,52 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SwitchBranchDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AuthController_createHandoff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateHandoffDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AuthController_exchangeHandoff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExchangeHandoffDto"];
             };
         };
         responses: {

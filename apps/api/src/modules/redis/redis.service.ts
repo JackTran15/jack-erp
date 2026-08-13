@@ -69,6 +69,14 @@ export class RedisService implements OnModuleDestroy {
     return this.client.del(this.buildKey(namespace, key));
   }
 
+  /**
+   * Read and delete in one round trip (Redis >= 6.2). Use for single-use tokens:
+   * a GET followed by a DEL lets two concurrent callers both read the value.
+   */
+  async getdel(namespace: string, key: string): Promise<string | null> {
+    return this.client.getdel(this.buildKey(namespace, key));
+  }
+
   async exists(namespace: string, key: string): Promise<boolean> {
     const result = await this.client.exists(this.buildKey(namespace, key));
     return result === 1;

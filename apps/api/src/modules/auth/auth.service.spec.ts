@@ -16,6 +16,7 @@ import { UserRoleEntity } from './user-role.entity';
 import { RoleEntity } from './role.entity';
 import { UserBranchAssignmentEntity } from '../branch/user-branch-assignment.entity';
 import { SessionStore } from '../redis/session.store';
+import { HandoffStore } from './handoff.store';
 import { RbacService } from '../rbac/rbac.service';
 
 jest.mock('jsonwebtoken');
@@ -47,6 +48,7 @@ describe('AuthService', () => {
   let roleRepo: jest.Mocked<Pick<Repository<RoleEntity>, 'createQueryBuilder'>>;
   let userBranchRepo: jest.Mocked<Pick<Repository<UserBranchAssignmentEntity>, 'find'>>;
   let sessionStore: jest.Mocked<Pick<SessionStore, 'createSession' | 'getSession' | 'revokeSession'>>;
+  let handoffStore: jest.Mocked<Pick<HandoffStore, 'issue' | 'consume'>>;
   let rbacService: jest.Mocked<Pick<RbacService, 'getUserPermissions'>>;
 
   beforeEach(async () => {
@@ -61,6 +63,10 @@ describe('AuthService', () => {
       createSession: jest.fn(),
       getSession: jest.fn(),
       revokeSession: jest.fn(),
+    };
+    handoffStore = {
+      issue: jest.fn(),
+      consume: jest.fn(),
     };
     rbacService = {
       getUserPermissions: jest.fn().mockResolvedValue([
@@ -91,6 +97,7 @@ describe('AuthService', () => {
           },
         },
         { provide: SessionStore, useValue: sessionStore },
+        { provide: HandoffStore, useValue: handoffStore },
         { provide: RbacService, useValue: rbacService },
         { provide: getRepositoryToken(UserEntity), useValue: userRepo },
         { provide: getRepositoryToken(UserRoleEntity), useValue: userRoleRepo },
@@ -404,6 +411,150 @@ describe('AuthService', () => {
         ForbiddenException,
       );
       expect(sessionStore.revokeSession).not.toHaveBeenCalled();
+      expect(sessionStore.createSession).not.toHaveBeenCalled();
+    });
+  });
+
+  // =========================================================================
+  // handoff (backoffice → POS single sign-on)
+  // =========================================================================
+  describe('createHandoffCode', () => {
+    const current: JwtPayload = {
+      userId: 'user-1',
+      organizationId: 'org-1',
+      roles: ['admin'],
+      branchIds: ['branch-1', 'branch-2'],
+      branchId: 'branch-1',
+      jti: 'bo-jti',
+      iat: 1000,
+      exp: 999999,
+    };
+
+    function setupAssignedBranches(branchIds: string[]) {
+      userBranchRepo.find.mockResolvedValue(
+        branchIds.map((branchId) => ({ branchId }) as UserBranchAssignmentEntity),
+      );
+    }
+
+    it('issues a single-use code carrying the requested branch', async () => {
+      setupAssignedBranches(['branch-1', 'branch-2']);
+
+      const result = await service.createHandoffCode(current, 'branch-2');
+
+      expect(handoffStore.issue).toHaveBeenCalledWith(
+        'mock-uuid',
+        { userId: 'user-1', organizationId: 'org-1', branchId: 'branch-2' },
+        expect.any(Number),
+      );
+      expect(result).toEqual({ code: 'mock-uuid', expiresIn: 60 });
+    });
+
+    it('falls back to the caller active branch when none is requested', async () => {
+      setupAssignedBranches(['branch-1', 'branch-2']);
+
+      await service.createHandoffCode(current);
+
+      expect(handoffStore.issue).toHaveBeenCalledWith(
+        'mock-uuid',
+        expect.objectContaining({ branchId: 'branch-1' }),
+        expect.any(Number),
+      );
+    });
+
+    it('refuses a branch the user is not assigned to', async () => {
+      setupAssignedBranches(['branch-1']);
+
+      await expect(
+        service.createHandoffCode(current, 'branch-9'),
+      ).rejects.toThrow(ForbiddenException);
+      expect(handoffStore.issue).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('exchangeHandoffCode', () => {
+    function arrangeUser(isActive = true) {
+      userRepo.findOne.mockResolvedValue({
+        id: 'user-1',
+        organizationId: 'org-1',
+        isActive,
+      } as UserEntity);
+      userRoleRepo.find.mockResolvedValue([
+        { id: 'ur-1', userId: 'user-1', roleId: 'role-1', organizationId: 'org-1' } as UserRoleEntity,
+      ]);
+      userBranchRepo.find.mockResolvedValue([
+        { branchId: 'branch-1' } as UserBranchAssignmentEntity,
+        { branchId: 'branch-2' } as UserBranchAssignmentEntity,
+      ]);
+    }
+
+    it('mints a new session without touching the issuing one', async () => {
+      handoffStore.consume.mockResolvedValue({
+        userId: 'user-1',
+        organizationId: 'org-1',
+        branchId: 'branch-2',
+      });
+      arrangeUser();
+      sessionStore.createSession.mockResolvedValue(undefined);
+      (jwt.sign as jest.Mock).mockReturnValue('handoff-token');
+
+      const result = await service.exchangeHandoffCode('some-code');
+
+      expect(sessionStore.revokeSession).not.toHaveBeenCalled();
+      expect(sessionStore.createSession).toHaveBeenCalledWith(
+        'mock-uuid',
+        expect.objectContaining({
+          userId: 'user-1',
+          organizationId: 'org-1',
+          branchId: 'branch-2',
+        }),
+        expect.any(Number),
+      );
+      expect(result).toEqual({
+        accessToken: 'handoff-token',
+        refreshToken: 'handoff-token',
+        expiresIn: 900,
+        session: expect.objectContaining({ userId: 'user-1' }),
+      });
+    });
+
+    it('falls back to the first branch when the coded branch is gone', async () => {
+      handoffStore.consume.mockResolvedValue({
+        userId: 'user-1',
+        organizationId: 'org-1',
+        branchId: 'branch-9',
+      });
+      arrangeUser();
+      sessionStore.createSession.mockResolvedValue(undefined);
+      (jwt.sign as jest.Mock).mockReturnValue('handoff-token');
+
+      await service.exchangeHandoffCode('some-code');
+
+      expect(sessionStore.createSession).toHaveBeenCalledWith(
+        'mock-uuid',
+        expect.objectContaining({ branchId: 'branch-1' }),
+        expect.any(Number),
+      );
+    });
+
+    it('throws when the code is unknown, expired or already used', async () => {
+      handoffStore.consume.mockResolvedValue(null);
+
+      await expect(service.exchangeHandoffCode('used')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(sessionStore.createSession).not.toHaveBeenCalled();
+    });
+
+    it('throws when the user was deactivated after the code was issued', async () => {
+      handoffStore.consume.mockResolvedValue({
+        userId: 'user-1',
+        organizationId: 'org-1',
+      });
+      arrangeUser(false);
+
+      await expect(service.exchangeHandoffCode('some-code')).rejects.toThrow(
+        UnauthorizedException,
+      );
       expect(sessionStore.createSession).not.toHaveBeenCalled();
     });
   });

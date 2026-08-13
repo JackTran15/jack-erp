@@ -27,6 +27,28 @@ export interface SwitchBranchRequest {
 /** Same shape as login: new tokens carry the active branch, plus refreshed session info. */
 export type SwitchBranchResponse = LoginResponse;
 
+export interface CreateHandoffRequest {
+  /** Branch the receiving app should open on; defaults to the caller's active branch. */
+  branchId?: string;
+}
+
+export interface CreateHandoffResponse {
+  /** Single-use code to put in the target app's URL. */
+  code: string;
+  /** Seconds the code stays valid. */
+  expiresIn: number;
+}
+
+export interface ExchangeHandoffRequest {
+  code: string;
+}
+
+/**
+ * Same shape as login: the exchange mints a brand-new session for the receiving
+ * app, so both apps hold independent sessions and neither logs the other out.
+ */
+export type ExchangeHandoffResponse = LoginResponse;
+
 export interface SessionInfo {
   userId: string;
   organizationId: string;

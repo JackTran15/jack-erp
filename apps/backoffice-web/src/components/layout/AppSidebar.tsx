@@ -24,6 +24,7 @@ import {
 import { useLayout } from "./LayoutContext";
 import { MegaMenuPanel } from "./MegaMenuPanel";
 import { resolvePosWebUrl } from "../../lib/pos-url";
+import { buildPosLaunchUrl } from "../../lib/pos-handoff";
 import { getActiveBranch } from "../../lib/auth-storage";
 import { useCurrentView } from "../../store/common/branch/branch.store";
 import { useImportableTransferOrderCount } from "../../hooks/useImportableTransferOrderCount";
@@ -162,11 +163,35 @@ function PosLaunchButton({ collapsed }: { collapsed: boolean }) {
       ? `${posUrl}?branchId=${encodeURIComponent(branchId)}`
       : posUrl
     : undefined;
+  const [launching, setLaunching] = useState(false);
+
+  // The handoff code has to be minted before POS is reachable, but the tab must
+  // be opened inside the click handler or the popup blocker kills it — so open
+  // an empty tab first and point it at the real URL once the code arrives.
+  const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!posUrl || event.metaKey || event.ctrlKey || event.shiftKey) return;
+    event.preventDefault();
+    if (launching) return;
+    // No `noopener` here: it makes window.open return null, and we need the
+    // handle to navigate the tab. The opener is severed right after instead.
+    const tab = window.open("", "_blank");
+    if (!tab) return;
+    setLaunching(true);
+    void buildPosLaunchUrl()
+      .then((url) => {
+        tab.location.href = url || (href ?? posUrl);
+        tab.opener = null;
+      })
+      .finally(() => setLaunching(false));
+  };
+
   const link = (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={handleClick}
+      aria-busy={launching}
       className={cn(
         "mx-2 mb-1 mt-2 flex h-10 items-center rounded-md bg-success font-medium text-success-foreground transition-colors hover:bg-success/85",
         collapsed ? "justify-center" : "gap-2 px-3",
