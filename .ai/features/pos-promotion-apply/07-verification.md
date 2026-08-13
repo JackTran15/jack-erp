@@ -11,12 +11,28 @@ dialog Chương trình khuyến mãi, và hoá đơn in.
 
 ## Steps
 
-| ID | Step | Path | Interaction | Verifies |
-|---|---|---|---|---|
-| S1 | Giỏ rỗng: panel thanh toán không hiện dòng Khuyến mại | `/` | — | AC-25 |
-| S2 | Một CTKM `INVOICE_DISCOUNT` PERCENT: dòng hiện "Khuyến mại (10%) -85.000", còn phải thu 765.000 | `/` | `fill input[placeholder*="Tìm kiếm"] = DD850; wait text=DD850` | AC-01, AC-26 |
-| S3 | Hai CTKM cùng áp: dòng hiện "Khuyến mại" **không kèm %**, -201.000, còn phải thu 1.229.000 | `/` | `fill input[placeholder*="Tìm kiếm"] = VI580; wait text=VI580` | AC-01, AC-27 |
-| S4 | Danh sách hoá đơn mở được, hiện hoá đơn đã chốt có khuyến mại | `/invoices` | — | — |
+| ID | Step | Path | Interaction | Verifies | Assert |
+|---|---|---|---|---|---|
+| S2 | Một CTKM `INVOICE_DISCOUNT` PERCENT: dòng hiện "Khuyến mại (10%) -85.000", còn phải thu 765.000 | `/` | `fill input[placeholder*="Tìm kiếm"] = DD850; wait text=DD850` | AC-01, AC-26 | `text=Khuyến mại (10%); text=-85.000; text=765.000` |
+| S3 | Hai CTKM cùng áp: dòng hiện "Khuyến mại" **không kèm %**, -201.000, còn phải thu 1.229.000 | `/` | `fill input[placeholder*="Tìm kiếm"] = VI580; wait text=VI580` | AC-01, AC-27 | `text=-201.000; text=1.229.000; no-text=Khuyến mại (10%)` |
+| S4 | Danh sách hoá đơn mở được, hiện hoá đơn đã chốt có khuyến mại | `/invoices` | — | — | `text=INV-202608` |
+
+## Lỗi đã ghi nhận bằng ảnh
+
+Các bước dưới đây **cố ý đỏ**. Assertion viết theo hành vi *đúng* mong đợi; sản phẩm đang sai
+nên bước fail, và ảnh chụp kèm theo chính là bằng chứng lỗi. Khi lỗi được sửa, các bước này
+chuyển xanh mà không phải sửa lại kịch bản.
+
+| ID | Step | Path | Interaction | Verifies | Assert |
+|---|---|---|---|---|---|
+| S1 | Giỏ rỗng thì KHÔNG được hiện dòng "Khuyến mại" (thực tế vẫn hiện kèm ô xám chờ tải) | `/` | — | AC-25 | `no-text=Khuyến mại` |
+| S5 | Hoá đơn khách vãng lai KHÔNG được ghi điểm tích (thực tế `points_earned=122`) | `/invoices` | `click text=INV-202608-00006` | — | `no-text=Điểm được tích` |
+| S6 | Hoá đơn trả RTN-202608-00002 phải hoàn đúng số khách đã trả là 0đ (thực tế hoàn 580.000) | `/invoices` | `click text=RTN-202608-00002` | — | `no-text=580.000` |
+
+> **S1 là lỗi tôi từng báo nhầm là đạt.** Ở vòng 1 bước này xanh và được ghi là verify AC-25,
+> nhưng lúc đó công cụ chưa so sánh gì — nó xanh chỉ vì trang mở được. Khi thêm assertion thật
+> thì lộ ra dòng "Khuyến mại" vẫn render trên giỏ rỗng, đúng triệu chứng mà US-08 sinh ra để
+> sửa. **AC-25 hiện KHÔNG đạt.**
 
 ## Not verified here
 
