@@ -15,8 +15,9 @@ Fixtures assumed present (created via `POST /v2/promotions`, see `## Notes`):
 
 ## Steps
 
-| ID | Step | Path | Interaction | Verifies |
-|---|---|---|---|---|
+| ID | Step | Path | Interaction | Verifies | Assert |
+|---|---|---|---|---|---|
+| S7 | Sổ quỹ tiền mặt HCM (kỳ mặc định = tháng): thu 27.497.000 − chi 3.970.000 = tồn 23.527.000, và thấy rõ từng khoản hoàn vượt số đã thu | `/treasury/cash/ledger` | — | — | `text=27.497.000; text=3.970.000; text=23.527.000` |
 | S1 | Danh sách CTKM mở ra không bị lọc theo trạng thái, hai CTKM fixture đều hiện | `/promotions/programs` | — | AC-10 |
 | S2 | Form Thêm mới hình thức Giảm giá hóa đơn hiện phạm vi + mức giảm | `/promotions/programs/new?type=INVOICE_DISCOUNT` | — | AC-27 |
 | S3 | Danh sách CTKM lọc được theo hình thức Giảm giá hóa đơn | `/promotions/programs` | `scroll table` | AC-23 |
@@ -26,16 +27,8 @@ Fixtures assumed present (created via `POST /v2/promotions`, see `## Notes`):
 
 ## Not verified here
 
-- **Sổ quỹ tiền mặt (`/treasury/cash/ledger`) — không chụp được, đã thử 2 lần.** Backoffice
-  đăng nhập vào **Chi nhánh kiểm thử** (khác POS, `verify:` không có chỗ ghim chi nhánh cho
-  môi trường BO), còn dữ liệu thử nằm ở **HCM**; thêm bước bấm đổi chi nhánh cũng không đổi
-  được, và màn hình đứng ở "Đang tải…" với tổng 0. Bước vẫn *pass* vì `wait` khớp nhãn tĩnh
-  "Số dư cuối kỳ" ở chân trang — đúng kiểu bằng chứng giả mà gói này sinh ra để chặn, nên đã
-  **gỡ bỏ** thay vì giữ lại.
-  Số liệu sổ quỹ đã được đối chiếu ở tầng API thay cho ảnh, qua
-  `POST /v2/cash-ledger/search` ngày 13/08/2026:
-  `đầu kỳ 21.000.000 + thu 6.497.000 − chi 3.970.000 = cuối kỳ 23.527.000` — **khớp tuyệt đối**
-  với `cash_movements`.
+- **Báo cáo theo ngày (`netCashFlow` sai dấu)** — màn hình đó nằm ở **POS** (`/daily-report`),
+  không phải Backoffice, nên bằng chứng của nó thuộc `pos-promotion-apply`.
 
 - **AC-02** — chặn lưu khi bỏ trống Tên chương trình. Đây là **đường đi âm**: bằng chứng đúng
   của nó *là* một toast lỗi, mà `failure_signals` trong `.ai/aidlc.yaml` lại coi mọi toast lỗi

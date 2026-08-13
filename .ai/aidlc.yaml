@@ -37,6 +37,16 @@ verify:
           identifier: '#login-email'
           password: '#login-password'
           submit: 'button[type="submit"]'
+        # Backoffice logs in on whatever branch the account last used — here
+        # "Chi nhánh kiểm thử", which stocks nothing and has no transactions, so
+        # every money screen renders empty and the step still passes. Switch to
+        # ${LOCAL_BACKOFFICE_BRANCH_NAME} once, right after login.
+        # This has to go through the UI rather than localStorage: the selector
+        # POSTs /auth/switch-branch and stores a NEW token, and ActorContext
+        # resolves `branchId: fromJwt ?? fromHeader` — a header alone loses.
+        # The trailing wait is on the trigger showing the new name, which only
+        # happens after the component's window.location.reload() has settled.
+        post_login: 'click button[aria-haspopup="menu"]; click [role="menuitemradio"]:has-text("${LOCAL_BACKOFFICE_BRANCH_NAME}"); wait button:has-text("${LOCAL_BACKOFFICE_BRANCH_NAME}")'
     local-pos:
       url: http://localhost:3001
       required: true

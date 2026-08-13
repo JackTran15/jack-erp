@@ -28,6 +28,7 @@ chuyển xanh mà không phải sửa lại kịch bản.
 | S1 | Giỏ rỗng thì KHÔNG được hiện dòng "Khuyến mại" (thực tế vẫn hiện kèm ô xám chờ tải) | `/` | — | AC-25 | `no-text=Khuyến mại` |
 | S5 | Hoá đơn khách vãng lai KHÔNG được ghi điểm tích (thực tế `points_earned=122`) | `/invoices` | `click text=INV-202608-00006` | — | `no-text=Điểm được tích` |
 | S6 | Hoá đơn trả RTN-202608-00002 phải hoàn đúng số khách đã trả là 0đ (thực tế hoàn 580.000) | `/invoices` | `click text=RTN-202608-00002` | — | `no-text=580.000` |
+| S7 | Báo cáo theo ngày: dòng tiền thuần phải bằng quỹ thực +2.527.000 (thực tế báo −943.000) | `/daily-report` | — | — | `no-text=-943.000` |
 
 > **S1 là lỗi tôi từng báo nhầm là đạt.** Ở vòng 1 bước này xanh và được ghi là verify AC-25,
 > nhưng lúc đó công cụ chưa so sánh gì — nó xanh chỉ vì trang mở được. Khi thêm assertion thật
