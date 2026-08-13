@@ -68,7 +68,12 @@ export class StockSummaryExportService {
   ): Promise<Buffer> {
     const rows = await this.loadAllRows(query, actor);
     const metadata = await this.loadMetadata(rows.map((row) => row.itemId));
-    const exportRows = this.transformRows(rows, metadata, query.variant);
+    const exportRows = this.transformRows(
+      rows,
+      metadata,
+      query.variant,
+      query.excludeReservations,
+    );
     const branch = actor.branchId
       ? await this.branchRepo.findOne({
           where: { id: actor.branchId, organizationId: actor.organizationId },
@@ -136,10 +141,25 @@ export class StockSummaryExportService {
     return result;
   }
 
+  /**
+   * Cột "Số lượng tồn" phải khớp đúng cột "SL tồn" trên UI
+   * (displayStockQuantity trong InventoryManagementPage): closingQty là tồn
+   * cuối kỳ (đầu kỳ + nhập - xuất, đã loại chứng từ huỷ) khi có chọn kỳ, và
+   * backend tự trả closingQty = quantity khi không chọn kỳ. row.quantity là số
+   * dư thô trong stock_balances — không loại chứng từ đã huỷ nên lệch với UI.
+   */
+  private displayQuantity(
+    row: StockSummaryRow,
+    excludeReservations?: boolean,
+  ): number {
+    return row.closingQty - (excludeReservations ? row.reservedQty : 0);
+  }
+
   private transformRows(
     rows: StockSummaryRow[],
     metadata: Map<string, ItemMetadata>,
     variant: StockSummaryExportVariant,
+    excludeReservations?: boolean,
   ): ExportRow[] {
     const variants = rows.map((row) => {
       const meta = metadata.get(row.itemId);
@@ -156,7 +176,7 @@ export class StockSummaryExportService {
         category: row.item.categoryName || "",
         brand: row.item.brand || "",
         storage: row.storage.name,
-        quantity: row.quantity,
+        quantity: this.displayQuantity(row, excludeReservations),
         openingQty: row.openingQty,
         inQty: row.inQty,
         outQty: row.outQty,
@@ -187,7 +207,8 @@ export class StockSummaryExportService {
         transferOutQty: 0,
         incomingQty: 0,
       };
-      for (const field of ["quantity", "openingQty", "inQty", "outQty", "transferOutQty", "incomingQty"] as const) {
+      model.quantity += this.displayQuantity(row, excludeReservations);
+      for (const field of ["openingQty", "inQty", "outQty", "transferOutQty", "incomingQty"] as const) {
         model[field] += row[field];
       }
       models.set(key, model);
