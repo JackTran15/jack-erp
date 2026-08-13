@@ -57,6 +57,9 @@ verify:
         # captured mid-flight, with branchId still null.
         # Ghim chi nhánh theo `${LOCAL_POS_BRANCH_ID}` thay vì lấy radio đầu tiên, để mỗi
         # máy tự chọn chi nhánh có dữ liệu qua credentials.env của mình.
+        # Pinned rather than "first radio": the promotion fixtures (DD850, VI580) are stocked
+        # only in HCM, and the first radio is "Chi nhánh kiểm thử" — evidence captured there
+        # shows an empty catalogue and silently proves nothing.
         post_login: 'wait input[name="pos-branch"]; click input[name="pos-branch"][value="${LOCAL_POS_BRANCH_ID}"]; click button[type="submit"]; wait [aria-label="Sapo POS"]'
   # Desktop only. Neither app has a mobile layout: no matchMedia/useMediaQuery anywhere, and
   # BackofficeLayout is a fixed ml-60 desktop shell.
