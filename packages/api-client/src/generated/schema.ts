@@ -11317,6 +11317,7 @@ export interface components {
             lineDiscountType?: "percent" | "amount";
             lineDiscountValue?: number;
             lineDiscountReason?: string;
+            promotionDiscount: number;
             lineTotal: number;
             /** @enum {string} */
             direction: "OUT" | "IN";
@@ -11357,6 +11358,7 @@ export interface components {
             lineDiscountType?: "percent" | "amount";
             lineDiscountValue?: number;
             lineDiscountReason?: string;
+            promotionDiscount: number;
             lineTotal: number;
             /** @enum {string} */
             direction: "OUT" | "IN";

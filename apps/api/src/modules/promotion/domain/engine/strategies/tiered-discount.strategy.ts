@@ -41,7 +41,13 @@ export class TieredDiscountStrategy implements PromotionStrategy {
 
   /** `INVOICE_VALUE` ignores groups/lines entirely — one bracket table, applied to the whole cart. */
   private computeInvoiceValue(program: PromotionProgram, cart: CartContext): StrategyComputeResult {
+    // A programme saved with no group at all is malformed data, not a cart
+    // mismatch — before this guard `groups[0]` was undefined and the TypeError
+    // escaped as a 500 from every price calculation, jamming the whole till
+    // until someone deleted the promotion (QA #8). Treat it as "does not
+    // apply" so one bad row cannot stop the counter selling.
     const group = program.groups[0];
+    if (!group) return { status: 'not_met' };
     const basisValue = sumLines(cart.lines);
     const tier = findTier(group.tiers, basisValue);
     if (!tier || basisValue <= 0) {

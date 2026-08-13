@@ -137,4 +137,21 @@ describe('TieredDiscountStrategy', () => {
       expect(result.outcome.claimedLineIds).toEqual(['l1']);
     });
   });
+  // QA #8 — see invoice-discount.strategy.spec.ts for the full story. A row with
+  // no group predates the GROUPS_EMPTY rule and still hydrates out of the DB.
+  it('treats a program with no group as not applicable instead of throwing (QA #8)', () => {
+    const emptyGroupsProgram = aProgram().ofType(PromotionProgramType.TIERED_DISCOUNT)
+      .with({ tierBasis: PromotionTierBasis.INVOICE_VALUE, discountMode: undefined, discountValue: undefined })
+      .withGroups([aGroup({ tiers: [aTier({ fromValue: 0 })] })])
+      .build();
+    // The domain object freezes its fields, so shadow `groups` on a descendant
+    // instead of mutating it — the same shape the engine sees when such a row
+    // is hydrated out of the database.
+    const malformed: typeof emptyGroupsProgram = Object.create(emptyGroupsProgram);
+    Object.defineProperty(malformed, 'groups', { value: [], enumerable: true });
+    const emptyGroupsCart = aCart({ lines: [aCartLine({ lineId: 'l1', unitPrice: 100_000, quantity: 1 })] });
+
+    expect(() => strategy.compute(malformed, emptyGroupsCart, new CartState())).not.toThrow();
+    expect(strategy.compute(malformed, emptyGroupsCart, new CartState()).status).toBe('not_met');
+  });
 });

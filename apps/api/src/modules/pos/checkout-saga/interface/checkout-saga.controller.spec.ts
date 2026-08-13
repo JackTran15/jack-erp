@@ -37,6 +37,7 @@ describe('CheckoutSagaController', () => {
     resolveFunds: {},
     computeTotals: {},
     openSaga: {},
+    clampPoints: {},
     lockInvoice: {},
     nextDocumentNumber: {},
     redeemVoucher: {},
@@ -56,6 +57,7 @@ describe('CheckoutSagaController', () => {
     steps.evaluatePromotion,
     steps.resolveAccounts,
     steps.resolveFunds,
+    steps.clampPoints,
     steps.computeTotals,
     steps.openSaga,
     steps.lockInvoice,
@@ -83,6 +85,7 @@ describe('CheckoutSagaController', () => {
       steps.evaluatePromotion as any,
       steps.resolveAccounts as any,
       steps.resolveFunds as any,
+      steps.clampPoints as any,
       steps.computeTotals as any,
       steps.openSaga as any,
       steps.lockInvoice as any,
@@ -104,11 +107,11 @@ describe('CheckoutSagaController', () => {
   });
 
   describe('POST /v2/pos/checkout', () => {
-    it('runs the 19 registered steps, in registration order, via orchestrator.run', async () => {
+    it('runs the 20 registered steps, in registration order, via orchestrator.run', async () => {
       orchestrator.run.mockImplementation(
         async (stepList: CheckoutStep[], ctx: CheckoutContext, trace: CheckoutTrace, totalSteps: number) => {
           expect(stepList).toEqual(orderedSteps);
-          expect(totalSteps).toBe(19);
+          expect(totalSteps).toBe(20); // 19 + clamp-points (QA #2)
           ctx.invoice = { id: 'inv-1' } as any;
           ctx.sagaId = 'saga-1';
           ctx.documentNumber = 'HD-000001';

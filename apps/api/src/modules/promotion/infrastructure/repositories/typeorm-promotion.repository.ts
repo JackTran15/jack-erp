@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
-import { PromotionStatus } from '@erp/shared-interfaces';
 import { PromotionRepositoryPort } from '../../domain/ports/promotion-repository.port';
 import { PromotionProgram } from '../../domain/model/promotion-program';
 import { toDomain, toPersistence } from '../../application/mappers/promotion.mapper';
@@ -35,21 +34,33 @@ export class TypeormPromotionRepository implements PromotionRepositoryPort {
     private readonly dataSource: DataSource,
   ) {}
 
+  /**
+   * Loads the programmes the engine should *consider*, not the ones that
+   * already qualify.
+   *
+   * Status, date window and branch scope are deliberately NOT filtered here.
+   * `checkGenericEligibility` decides on all three and attaches a reason
+   * (`STOPPED`, `DATE_WINDOW`, `BRANCH_SCOPE`) that the POS shows the cashier;
+   * filtering them in SQL removed the row before it could ever carry a reason,
+   * so a programme that was stopped or out of season simply vanished from the
+   * dialog and nobody could tell the customer why.
+   *
+   * The ±1 year bound keeps this from dragging in years of history. It is
+   * deliberately loose, not tight: a programme that ended yesterday — the case
+   * a cashier actually hits — must still reach the reason stage.
+   */
   async findActive(orgId: string, branchId: string, at: Date): Promise<PromotionProgram[]> {
+    const from = new Date(at);
+    from.setFullYear(from.getFullYear() - 1);
+    const to = new Date(at);
+    to.setFullYear(to.getFullYear() + 1);
+
     const programs = await this.programRepo
       .createQueryBuilder('p')
       .where('p.organizationId = :orgId', { orgId })
       .andWhere('p.deletedAt IS NULL')
-      .andWhere('p.status = :status', { status: PromotionStatus.TRACKING })
-      .andWhere('(p.startDate IS NULL OR p.startDate <= :at)', { at })
-      .andWhere('(p.endDate IS NULL OR p.endDate >= :at)', { at })
-      .andWhere(
-        `(
-          NOT EXISTS (SELECT 1 FROM promotion_branches pb WHERE pb.program_id = p.id)
-          OR EXISTS (SELECT 1 FROM promotion_branches pb WHERE pb.program_id = p.id AND pb.branch_id = :branchId)
-        )`,
-        { branchId },
-      )
+      .andWhere('(p.endDate IS NULL OR p.endDate >= :from)', { from })
+      .andWhere('(p.startDate IS NULL OR p.startDate <= :to)', { to })
       .getMany();
 
     return this.hydrate(programs);

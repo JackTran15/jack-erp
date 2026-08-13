@@ -59,6 +59,15 @@ export class InvoiceItemEntity extends BaseEntity {
   @Column({ name: 'line_discount_reason', type: 'varchar', length: 255, nullable: true, comment: 'Free-text label/reason for the per-line discount (e.g. "cc")' })
   lineDiscountReason?: string;
 
+  // Two discount columns now sit side by side; the boundary matters. `lineDiscount`
+  // above is what the cashier typed and it DOES reduce `lineTotal`.
+  // `promotionDiscount` is what the promotion engine allocated to this line and it
+  // does NOT — folding it in would break the `subtotal = SUM(lineTotal)` invariant
+  // several reports rely on. A consumer wanting the net line amount subtracts it
+  // itself (see checkout-return.service computeTotals).
+  @Column({ name: 'promotion_discount', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Promotion-engine discount allocated to this line; NOT deducted from lineTotal' })
+  promotionDiscount: number;
+
   @Column({ name: 'line_total', type: 'numeric', precision: 18, scale: 2, comment: 'Final line amount (quantity × unitPrice − lineDiscount)' })
   lineTotal: number;
 

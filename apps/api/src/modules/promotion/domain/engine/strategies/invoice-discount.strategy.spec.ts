@@ -71,4 +71,28 @@ describe('InvoiceDiscountStrategy', () => {
 
     expect(strategy.compute(program, cart, state).status).toBe('not_met');
   });
+  /**
+   * QA #8. `groups: []` is blocked at save time now (GROUPS_EMPTY), but rows
+   * saved before that rule existed are still in the database, so the engine has
+   * to survive them.
+   *
+   * Reproduced before fixing: `groups[0]` was undefined and
+   * `TypeError: Cannot read properties of undefined (reading 'lines')` escaped
+   * EvaluateCartHandler (which has no try/catch) as a 500 on EVERY price
+   * calculation — the till was down until someone deleted the promotion.
+   */
+  it('treats a program with no group as not applicable instead of throwing (QA #8)', () => {
+    const emptyGroupsProgram = aProgram().ofType(PromotionProgramType.INVOICE_DISCOUNT)
+      .with({ invoiceScope: PromotionInvoiceScope.ALL_ITEMS, discountMode: PromotionDiscountMode.PERCENT, discountValue: 10 })
+      .build();
+    // The domain object freezes its fields, so shadow `groups` on a descendant
+    // instead of mutating it — the same shape the engine sees when such a row
+    // is hydrated out of the database.
+    const malformed: typeof emptyGroupsProgram = Object.create(emptyGroupsProgram);
+    Object.defineProperty(malformed, 'groups', { value: [], enumerable: true });
+    const emptyGroupsCart = aCart({ lines: [aCartLine({ lineId: 'l1', unitPrice: 100_000, quantity: 1 })] });
+
+    expect(() => strategy.compute(malformed, emptyGroupsCart, new CartState())).not.toThrow();
+    expect(strategy.compute(malformed, emptyGroupsCart, new CartState()).status).toBe('not_met');
+  });
 });

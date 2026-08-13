@@ -7,6 +7,7 @@ import {
   PromotionBuyGetPolicy,
   PromotionTargetType,
   PromotionLineRole,
+  PromotionBirthdayMatch,
 } from '@erp/shared-interfaces';
 import { PromotionProgram, PromotionProgramProps } from './promotion-program';
 import { DomainValidationError } from './domain-error';
@@ -291,6 +292,67 @@ describe('PromotionProgram.create', () => {
         PromotionProgram.create(baseProps({ applyTo: PromotionApplyTo.CARD_TIER, cardTierId: undefined })),
       );
       expect(codes).toContain('CARD_TIER_ID_REQUIRED');
+    });
+
+    // QA #9: BIRTHDAY was the one audience with no companion-field rule, so it
+    // saved fine and then matched nobody, for ever, with no signal.
+    it('throws when BIRTHDAY has no birthdayMatch', () => {
+      const codes = issueCodes(() =>
+        PromotionProgram.create(
+          baseProps({ applyTo: PromotionApplyTo.BIRTHDAY, birthdayMatch: undefined }),
+        ),
+      );
+      expect(codes).toContain('BIRTHDAY_MATCH_REQUIRED');
+    });
+
+    it('accepts BIRTHDAY once a match kind is chosen', () => {
+      const codes = issueCodes(() =>
+        PromotionProgram.create(
+          baseProps({
+            applyTo: PromotionApplyTo.BIRTHDAY,
+            birthdayMatch: PromotionBirthdayMatch.SAME_MONTH,
+          }),
+        ),
+      );
+      expect(codes).not.toContain('BIRTHDAY_MATCH_REQUIRED');
+    });
+  });
+
+  // QA #8: a programme with no group saved happily, then every strategy's
+  // `groups[0]` was undefined and the TypeError surfaced as a 500 on every
+  // price calculation until the row was deleted.
+  describe('empty groups', () => {
+    it('throws GROUPS_EMPTY when there is no group at all', () => {
+      const codes = issueCodes(() => PromotionProgram.create(baseProps({ groups: [] })));
+      expect(codes).toContain('GROUPS_EMPTY');
+    });
+
+    it.each([
+      ['INVOICE_DISCOUNT', { type: PromotionProgramType.INVOICE_DISCOUNT }],
+      [
+        'BUY_M_GET_N + CHEAPEST',
+        {
+          type: PromotionProgramType.BUY_M_GET_N,
+          buyGetPolicy: PromotionBuyGetPolicy.CHEAPEST,
+          buyQuantity: 2,
+          giftQuantity: 1,
+          discountMode: undefined,
+          discountValue: undefined,
+        },
+      ],
+    ])(
+      'blocks %s too — the two types exempted from the reward-line rule',
+      (_label, overrides) => {
+        const codes = issueCodes(() =>
+          PromotionProgram.create(baseProps({ ...overrides, groups: [] } as Partial<PromotionProgramProps>)),
+        );
+        expect(codes).toContain('GROUPS_EMPTY');
+      },
+    );
+
+    it('still accepts a program that has a group', () => {
+      const codes = issueCodes(() => PromotionProgram.create(baseProps()));
+      expect(codes).not.toContain('GROUPS_EMPTY');
     });
   });
 

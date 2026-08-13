@@ -12,7 +12,20 @@ export interface PosDailySummaryRevenue {
   card: number;
   bankTransfer: number;
   voucher: number;
+  /**
+   * Value settled with loyalty points. Shown as a settlement method for parity
+   * with MISA, but NOT included in {@link total} or `netCashFlow`: point
+   * redemption is a discount already deducted from `amountDue`, so no money
+   * ever reaches a fund. Adding it inflated the day's cash flow.
+   */
   points: number;
+  /**
+   * Promotion money given away in the window (CTKM + voucher + manual
+   * discount), from `invoices.discount_amount`. Informational, like `points`:
+   * never part of {@link total}.
+   */
+  promotion: number;
+  /** Cash + card + bank transfer + voucher. Excludes `points` and `promotion`. */
   total: number;
 }
 

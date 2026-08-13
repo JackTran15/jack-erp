@@ -29,6 +29,11 @@ graphify-out
 # `.env.*` above does not cover credentials.env — that pattern matches a basename
 # beginning with .env, not one ending in it.
 .claude/skills/ai-dlc-verify/
+
+# ai-dlc-verify — secrets and generated evidence.
+# `.ai/credentials.env` is NOT matched by a `.env*` pattern (that matches a basename
+# *beginning* with .env, not one ending in it), and `.ai/.auth/` holds live session
+# state — a committed one is a working credential. Verified with `git check-ignore -v`.
 .ai/credentials.env
 .ai/.auth/
 .ai/features/*/08-evidence.md

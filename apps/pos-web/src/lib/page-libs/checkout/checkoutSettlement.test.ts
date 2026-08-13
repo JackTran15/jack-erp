@@ -67,3 +67,53 @@ describe("deriveSettlement — debt (Tính vào công nợ)", () => {
     expect(r.shortageAmount).toBe(1_305_000);
   });
 });
+
+/**
+ * QA #2 (POS side). When the value of the points a cashier applies exceeds what
+ * is left after the promotion, the server clamps `amountDue` to 0 — but this
+ * helper subtracted the discounts unconditionally, so the till displayed a
+ * negative "Còn phải thu" (−36.000 in the reported case) that no longer matched
+ * what the server would charge.
+ */
+describe("deriveSettlement — discounts never push a sale below zero", () => {
+  it("clamps at 0 when point value exceeds the amount left after the promotion", () => {
+    const r = deriveSettlement({
+      grandTotal: 580_000,
+      deposit: 0,
+      keepChange: false,
+      paymentLines: [],
+      debt: false,
+      promotionDiscountAmount: 116_000,
+      pointsDiscountAmount: 500_000, // 1,000 points — 36,000 more than is left
+    });
+
+    expect(r.settlementGrandTotal).toBe(0);
+    expect(r.shortageAmount).toBe(0);
+  });
+
+  it("still subtracts discounts normally when they fit", () => {
+    const r = deriveSettlement({
+      grandTotal: 580_000,
+      deposit: 0,
+      keepChange: false,
+      paymentLines: [],
+      debt: false,
+      promotionDiscountAmount: 116_000,
+      pointsDiscountAmount: 50_000,
+    });
+
+    expect(r.settlementGrandTotal).toBe(414_000);
+  });
+
+  it("leaves a refund negative — a return's grand total is meant to be below zero", () => {
+    const r = deriveSettlement({
+      grandTotal: -580_000,
+      deposit: 0,
+      keepChange: false,
+      paymentLines: [],
+      debt: false,
+    });
+
+    expect(r.settlementGrandTotal).toBe(-580_000);
+  });
+});

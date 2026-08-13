@@ -18,7 +18,13 @@ export class ItemDiscountStrategy implements PromotionStrategy {
   }
 
   compute(program: PromotionProgram, cart: CartContext, state: CartState): StrategyComputeResult {
+    // A programme saved with no group at all is malformed data, not a cart
+    // mismatch — before this guard `groups[0]` was undefined and the TypeError
+    // escaped as a 500 from every price calculation, jamming the whole till
+    // until someone deleted the promotion (QA #8). Treat it as "does not
+    // apply" so one bad row cannot stop the counter selling.
     const group = program.groups[0];
+    if (!group) return { status: 'not_met' };
     const rewardLines = group.lines.filter((line) => line.role === PromotionLineRole.REWARD);
     const conditionLines = group.lines.filter((line) => line.role === PromotionLineRole.CONDITION);
 

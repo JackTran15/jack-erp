@@ -23,6 +23,7 @@ import { CheckoutSagaOrchestrator } from '../application/checkout-saga.orchestra
 import { CheckoutContext, CheckoutStep, CheckoutTrace } from '../application/checkout-step';
 import { LoadDraftStep } from '../application/steps/load-draft.step';
 import { EvaluatePromotionStep } from '../application/steps/evaluate-promotion.step';
+import { ClampPointsStep } from '../application/steps/clamp-points.step';
 import { ResolveAccountsStep } from '../application/steps/resolve-accounts.step';
 import { ResolveFundsStep } from '../application/steps/resolve-funds.step';
 import { ComputeTotalsStep } from '../application/steps/compute-totals.step';
@@ -66,6 +67,7 @@ export class CheckoutSagaController {
     private readonly evaluatePromotion: EvaluatePromotionStep,
     private readonly resolveAccounts: ResolveAccountsStep,
     private readonly resolveFunds: ResolveFundsStep,
+    private readonly clampPoints: ClampPointsStep,
     private readonly computeTotals: ComputeTotalsStep,
     private readonly openSaga: OpenSagaStep,
     private readonly lockInvoice: LockInvoiceStep,
@@ -158,7 +160,7 @@ export class CheckoutSagaController {
 
   /**
    * Registration order === execution order (the orchestrator does not
-   * reorder). All 19 steps are now wired — never renumber a step already
+   * reorder). All 20 steps are now wired — never renumber a step already
    * here so the trail stays comparable across slices.
    */
   private allSteps(): CheckoutStep[] {
@@ -167,6 +169,7 @@ export class CheckoutSagaController {
       this.evaluatePromotion,
       this.resolveAccounts,
       this.resolveFunds,
+      this.clampPoints,
       this.computeTotals,
       this.openSaga,
       this.lockInvoice,

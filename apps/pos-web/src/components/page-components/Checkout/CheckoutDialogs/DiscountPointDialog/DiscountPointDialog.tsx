@@ -31,6 +31,9 @@ export interface DiscountPointDialogProps {
   pointsUsed?: number;
   onChangePointsUsed?: (next: number) => void;
 
+  /** Gợi ý trần điểm dùng được cho đơn này — xem UsePointsRow. */
+  maxUsablePoints?: number;
+
   /**
    * "Áp dụng" — ghi `pointsUsed` vào draft local của checkout. KHÔNG gọi BE
    * (BE redeem-points chỉ được gọi ở bước finalize / `finalizeCheckoutAndPrint`).
@@ -71,6 +74,7 @@ export function DiscountPointDialog({
   onApply,
   onClear,
   hasApplied,
+  maxUsablePoints,
   canApply,
 }: DiscountPointDialogProps) {
   const searchState = useControllableState<string>({
@@ -100,7 +104,16 @@ export function DiscountPointDialog({
     // Clamp tối thiểu 0, ép integer — BE @IsInt() @Min(1). Khi value=0 vẫn cho
     // bấm để "reset bằng 0" (tương đương Bỏ dùng điểm), nhưng UX disable bên
     // dưới giúp tránh nhầm.
-    const next = Math.max(0, Math.floor(pointsState.value ?? 0));
+    //
+    // Và kẹp xuống trần dùng được: `PointsRedemptionService.applyRedemption`
+    // **từ chối** (400 "Point discount exceeds the redeemable amount") chứ không
+    // chỉ ghi nhận ý định, và nó chạy trên draft nên bước saga `clamp-points`
+    // chưa kịp can thiệp. Gõ 4.381 điểm cho đơn 750.000 sẽ làm chết cả lần thu
+    // tiền — trong khi dòng gợi ý ngay bên trên vừa nói "chỉ dùng được 1.200".
+    // Áp đúng con số đã hứa với thu ngân; server vẫn là nơi chốt cuối.
+    const entered = Math.max(0, Math.floor(pointsState.value ?? 0));
+    const next =
+      maxUsablePoints !== undefined ? Math.min(entered, maxUsablePoints) : entered;
     if (next === 0) {
       onClear?.();
     } else {
@@ -133,6 +146,7 @@ export function DiscountPointDialog({
             onChangeCard={onChangeCard}
             pointsUsed={pointsState.value}
             onChangePointsUsed={pointsState.setValue}
+            maxUsablePoints={maxUsablePoints}
           />
           <VoucherSearchPanel
             value={searchState.value}

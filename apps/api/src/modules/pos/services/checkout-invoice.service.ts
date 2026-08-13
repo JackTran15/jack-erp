@@ -261,7 +261,12 @@ export class CheckoutInvoiceService {
         invoice.amountDue = amountDue;
         invoice.totalPaid = totalPaid;
         invoice.keptChangeAmount = keptChange;
-        invoice.pointsEarned = pointsEarned;
+        // No customer, no points. The award publisher already refuses to emit
+        // without a customerId, so writing a non-zero figure here produced an
+        // orphan: the receipt printed "Điểm được tích +122" while no card was
+        // credited and no point_history row existed. `pointsBalanceAfter` below
+        // has always been guarded this way — only the earn was left open.
+        invoice.pointsEarned = invoice.customerId ? pointsEarned : 0;
 
         // Snapshot the balance this invoice leaves the customer on. The earn is
         // applied by an async consumer (see loyaltyPointsPublisher below) awarding

@@ -16,9 +16,12 @@ import { lineTotal } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
   computeVoucherLineSource,
   selectCustomerDraft,
+  selectPaymentDraft,
+  selectPromotionDiscountAmount,
   selectPromotionDraft,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
+import { useCheckoutGrandTotal } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-grand-total";
 
 export interface PromoMenuProps {
   /** Visibility — caller (PaymentSummaryPanel) owns the open state. */
@@ -77,6 +80,23 @@ export function PromoMenu({ open, onClose, onOpenPromotionDialog }: PromoMenuPro
   const pointsRedeemed = usePosCheckoutSessionStore(
     (s) => selectPromotionDraft(s).pointsRedeemed,
   );
+  // Trần điểm đơn này hấp thụ được — dùng đúng các số mà `deriveSettlement`
+  // dùng, để gợi ý trên dialog không lệch với "Còn phải thu" ngay cạnh nó.
+  // Chỉ là **gợi ý**: chốt thật nằm ở bước saga `clamp-points` phía server, và
+  // ước lượng này chưa trừ voucher (server mới cộng voucher vào lúc
+  // `resolve-funds`). Nhập quá thì server tự hạ, khách không mất điểm — nên
+  // không chặn cứng ô nhập.
+  const grandTotal = useCheckoutGrandTotal();
+  const promotionDiscountAmount = usePosCheckoutSessionStore(
+    selectPromotionDiscountAmount,
+  );
+  const { deposit, returnFee } = usePosCheckoutSessionStore(selectPaymentDraft);
+  const maxUsablePoints = useMemo(() => {
+    const payable =
+      grandTotal - deposit + (returnFee ?? 0) - promotionDiscountAmount;
+    return Math.max(0, Math.floor(payable / POINT_REDEMPTION_VALUE_VND));
+  }, [grandTotal, deposit, returnFee, promotionDiscountAmount]);
+
   const sessionState = usePosCheckoutSessionStore();
   const voucherLines = useMemo(
     () => computeVoucherLineSource(sessionState),
@@ -207,6 +227,7 @@ export function PromoMenu({ open, onClose, onOpenPromotionDialog }: PromoMenuPro
       ) : null}
 
       <DiscountPointDialog
+        maxUsablePoints={maxUsablePoints}
         open={discountDialogOpen}
         onClose={() => setDiscountDialogOpen(false)}
         data={discountData}

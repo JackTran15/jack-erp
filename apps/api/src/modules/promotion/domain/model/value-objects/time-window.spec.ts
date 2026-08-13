@@ -25,6 +25,37 @@ describe('TimeWindow', () => {
     });
   });
 
+  // QA #7: a programme with only a start time used to run 24/7, so one set to
+  // 18:00 discounted a 09:00 sale. Each bound now constrains on its own.
+  describe('start only (18:00, no end) — from then until end of day', () => {
+    const window = TimeWindow.of(t(18, 0), undefined);
+
+    it.each([
+      ['09:00 (the QA case)', t(9, 0), false],
+      ['17:59 (just before start)', t(17, 59), false],
+      ['18:00 (at start)', t(18, 0), true],
+      ['19:00 (after start)', t(19, 0), true],
+      ['23:59 (end of day)', t(23, 59), true],
+      ['00:00 (next day, before start)', t(0, 0), false],
+    ])('%s -> %s', (_label, at, expected) => {
+      expect(window.contains(at as TimeOfDay)).toBe(expected);
+    });
+  });
+
+  describe('end only (12:00, no start) — from start of day until then', () => {
+    const window = TimeWindow.of(undefined, t(12, 0));
+
+    it.each([
+      ['00:00 (start of day)', t(0, 0), true],
+      ['09:00', t(9, 0), true],
+      ['12:00 (at end)', t(12, 0), true],
+      ['12:01 (just after end)', t(12, 1), false],
+      ['14:00', t(14, 0), false],
+    ])('%s -> %s', (_label, at, expected) => {
+      expect(window.contains(at as TimeOfDay)).toBe(expected);
+    });
+  });
+
   describe('overnight window spanning midnight (22:00-02:00)', () => {
     const window = TimeWindow.of(t(22, 0), t(2, 0));
 

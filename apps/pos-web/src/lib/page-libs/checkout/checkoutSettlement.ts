@@ -96,12 +96,20 @@ export function deriveSettlement(input: {
   keepChange: boolean;
   debt: boolean;
 }): SettlementSnapshot {
+  // Giảm giá không được đẩy số phải thu xuống âm: server đã kẹp
+  // (`computeAmountDue` dùng `Math.max(0, …)`), nên không kẹp ở đây thì POS hiện
+  // "Còn phải thu" âm — ví dụ −36.000 khi giá trị điểm vượt phần còn lại sau
+  // CTKM — trong khi server tính 0.
+  //
+  // Chỉ kẹp khi phần gốc **không âm**: đơn trả hàng có `settlementGrandTotal` âm
+  // một cách hợp lệ (là số tiền hoàn), `settlementAbsFromGrand` dựa vào dấu đó.
+  const settlementBase = input.grandTotal - input.deposit + (input.returnFee ?? 0);
+  const settlementDiscounts =
+    (input.pointsDiscountAmount ?? 0) + (input.promotionDiscountAmount ?? 0);
   const settlementGrandTotal =
-    input.grandTotal -
-    input.deposit +
-    (input.returnFee ?? 0) -
-    (input.pointsDiscountAmount ?? 0) -
-    (input.promotionDiscountAmount ?? 0);
+    settlementBase >= 0
+      ? Math.max(0, settlementBase - settlementDiscounts)
+      : settlementBase - settlementDiscounts;
   const settlementAbs = settlementAbsFromGrand(settlementGrandTotal);
   const totalPaid = input.paymentLines.reduce((sum, l) => sum + l.amount, 0);
   const { changeAmount, shortageAmount, debtAmount } = derivePaymentDisplay({

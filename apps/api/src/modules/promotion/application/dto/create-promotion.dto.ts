@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsArray,
+  ArrayNotEmpty,
   IsUUID,
   IsDateString,
   IsInt,
@@ -304,8 +305,11 @@ export class CreatePromotionV2Dto {
   @Min(1)
   giftQuantity?: number;
 
+  // Every strategy reads groups[0]; an empty array used to be stored happily
+  // and then threw a TypeError on every price calculation (QA #8).
   @ApiProperty({ type: [PromotionGroupInputDto] })
   @IsArray()
+  @ArrayNotEmpty()
   @ValidateNested({ each: true })
   @Type(() => PromotionGroupInputDto)
   groups: PromotionGroupInputDto[];

@@ -63,7 +63,12 @@ export class PersistInvoiceStep implements CheckoutStep {
     invoice.amountDue = totals.amountDue;
     invoice.totalPaid = totals.totalPaid;
     invoice.keptChangeAmount = totals.keptChange;
-    invoice.pointsEarned = totals.pointsEarned;
+    // No customer, no points — same rule as v1 (checkout-invoice.service). The
+    // award publisher refuses to emit without a customerId, so a non-zero figure
+    // here is an orphan: the receipt showed "Điểm được tích" while no card was
+    // credited and no point_history row existed. `pointsBalanceAfter` just below
+    // has always been guarded this way; only the earn was left open.
+    invoice.pointsEarned = invoice.customerId ? totals.pointsEarned : 0;
 
     const cardBalance = invoice.customerId
       ? await this.membershipCardService.getPointBalanceForUpdate(
@@ -83,7 +88,48 @@ export class PersistInvoiceStep implements CheckoutStep {
     await manager.getRepository(InvoiceEntity).save(invoice);
 
     await this.persistGifts(ctx, manager, invoice, items);
+    await this.persistLinePromotionDiscounts(ctx, manager, items);
     await this.persistPromotionSnapshot(ctx, manager, invoice);
+  }
+
+  /**
+   * Writes the engine's per-line allocation onto the lines themselves.
+   *
+   * The same numbers also go into `invoice_checkout_promotions.line_discounts`
+   * just below, and the duplication is deliberate: the jsonb is a per-programme
+   * snapshot used when reprinting an invoice, while this column is the per-line
+   * value every downstream consumer needs — above all the return refund, which
+   * used to read the gross `lineTotal` and pay out more cash than the customer
+   * ever handed over. Keeping both writes adjacent so a change to one is
+   * visible next to the other.
+   *
+   * Does NOT touch `lineTotal`: `subtotal = SUM(lineTotal)` is an invariant
+   * several reports depend on (see the entity comment and ADR-01).
+   */
+  private async persistLinePromotionDiscounts(
+    ctx: CheckoutContext,
+    manager: EntityManager,
+    items: InvoiceItemEntity[],
+  ): Promise<void> {
+    const appliedPrograms = (ctx.promotion?.appliedPrograms ?? []) as AppliedProgram[];
+    if (appliedPrograms.length === 0) return;
+
+    // Summed, not assigned: several programmes can discount the same line.
+    const byLineId = new Map<string, number>();
+    for (const program of appliedPrograms) {
+      for (const ld of program.lineDiscounts ?? []) {
+        byLineId.set(ld.lineId, (byLineId.get(ld.lineId) ?? 0) + Number(ld.discountAmount ?? 0));
+      }
+    }
+    if (byLineId.size === 0) return;
+
+    const touched = items.filter((item) => byLineId.has(item.id));
+    for (const item of touched) {
+      item.promotionDiscount = round(byLineId.get(item.id)!);
+    }
+    if (touched.length > 0) {
+      await manager.save(touched);
+    }
   }
 
   /**

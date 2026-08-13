@@ -89,7 +89,11 @@ export function PaymentSummaryBlock({
         value={formatVnd(total)}
         emphasis="strong"
       />
-      {promotionPreview.status === "loading" ? (
+      {/* Giỏ rỗng vẫn gọi evaluate (dialog CTKM cần danh sách — xem
+          `use-checkout-promotion-preview`), nên phải chặn ở chỗ render chứ
+          không chặn preview: nhánh `ready` đã có `shouldShowPromotionRow`,
+          nhánh `loading` thì chưa, nên ô xám hiện lên ở tổng tiền 0. */}
+      {promotionPreview.status === "loading" && itemCount > 0 ? (
         <PosSummaryRow
           label="Khuyến mại"
           value={

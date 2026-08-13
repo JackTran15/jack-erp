@@ -78,7 +78,9 @@ describe('PersistInvoiceStep', () => {
     expect(invoice.discountAmount).toBe(50000); // 20000 + 30000
     expect(invoice.amountDue).toBe(735000);
     expect(invoice.totalPaid).toBe(735000);
-    expect(invoice.pointsEarned).toBe(73);
+    // This fixture has no customerId, so no points are earned (QA #4) — the two
+    // dedicated tests below cover both sides of that rule.
+    expect(invoice.pointsEarned).toBe(0);
     expect(invoice.issuedAt).toBeInstanceOf(Date);
     expect(invoiceRepo.save).toHaveBeenCalledWith(invoice);
   });
@@ -111,6 +113,36 @@ describe('PersistInvoiceStep', () => {
 
     expect(membershipCardService.getPointBalanceForUpdate).not.toHaveBeenCalled();
     expect(invoice.pointsBalanceAfter).toBeNull();
+  });
+
+  /**
+   * QA #4, v2 half. The same defect existed in both checkout flows (ADR-05):
+   * one env flag flip would bring it straight back, so both are pinned.
+   */
+  it('records no points for a walk-in invoice, even though compute-totals offered some', async () => {
+    const invoiceRepo = { save: jest.fn((x: unknown) => x) };
+    const membershipCardService = { getPointBalanceForUpdate: jest.fn() };
+    const invoice: any = { id: 'inv-1', customerId: undefined, pointsRedeemed: 0 };
+    // ctx()'s totals carry pointsEarned: 73 — the value that used to be written
+    // through regardless of whether anyone could receive it.
+    const c = ctx({ invoice, manager: withManager(invoiceRepo) });
+
+    await new PersistInvoiceStep(membershipCardService as any).execute(c);
+
+    expect(invoice.pointsEarned).toBe(0);
+  });
+
+  it('still records points for an invoice that has a customer', async () => {
+    const invoiceRepo = { save: jest.fn((x: unknown) => x) };
+    const membershipCardService = {
+      getPointBalanceForUpdate: jest.fn().mockResolvedValue(100),
+    };
+    const invoice: any = { id: 'inv-1', customerId: 'cust-1', pointsRedeemed: 0 };
+    const c = ctx({ invoice, manager: withManager(invoiceRepo) });
+
+    await new PersistInvoiceStep(membershipCardService as any).execute(c);
+
+    expect(invoice.pointsEarned).toBe(73);
   });
 
   it('floors pointsBalanceAfter at 0, never negative', async () => {
@@ -356,6 +388,136 @@ describe('PersistInvoiceStep', () => {
 
       expect(promotionRepo.create).not.toHaveBeenCalled();
       expect(promotionRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('per-line promotion discount (T-01-02)', () => {
+    function withLineManager() {
+      return {
+        getRepository: jest.fn(() => ({
+          create: jest.fn((x: unknown) => x),
+          save: jest.fn((x: unknown) => x),
+        })),
+        findBy: jest.fn().mockResolvedValue([]),
+        create: jest.fn((_entity: any, data: any) => data),
+        save: jest.fn((x: unknown) => x),
+      } as any;
+    }
+
+    function programWith(lineDiscounts: any[], overrides: any = {}) {
+      return {
+        programId: 'prog-1',
+        code: 'SALE30',
+        name: 'Giảm giá',
+        type: 'INVOICE_DISCOUNT',
+        priority: 1,
+        discountAmount: lineDiscounts.reduce((s, l) => s + l.discountAmount, 0),
+        lineDiscounts,
+        gifts: [],
+        ...overrides,
+      };
+    }
+
+    it('writes the allocated discount onto each matching line without touching lineTotal', async () => {
+      const manager = withLineManager();
+      const invoice: any = { id: 'inv-1', customerId: undefined, pointsRedeemed: 0 };
+      const lineA: any = { id: 'line-1', lineTotal: 780000, promotionDiscount: 0 };
+      const lineB: any = { id: 'line-2', lineTotal: 500000, promotionDiscount: 0 };
+      const c = ctx({
+        invoice,
+        manager,
+        items: [lineA, lineB],
+        promotion: {
+          promotionDiscount: 234000,
+          appliedPrograms: [
+            programWith([{ lineId: 'line-1', discountAmount: 234000, unitPriceAfter: 546000 }]),
+          ],
+          lineDiscounts: [],
+        },
+      });
+
+      await new PersistInvoiceStep({ getPointBalanceForUpdate: jest.fn() } as any).execute(c);
+
+      expect(lineA.promotionDiscount).toBe(234000);
+      expect(lineA.lineTotal).toBe(780000); // invariant: subtotal = SUM(lineTotal)
+      expect(lineB.promotionDiscount).toBe(0); // untouched line keeps its default
+      expect(manager.save).toHaveBeenCalledWith([lineA]);
+    });
+
+    it('sums the allocation when several programs discount the same line', async () => {
+      const manager = withLineManager();
+      const invoice: any = { id: 'inv-1', customerId: undefined, pointsRedeemed: 0 };
+      const line: any = { id: 'line-1', lineTotal: 780000, promotionDiscount: 0 };
+      const c = ctx({
+        invoice,
+        manager,
+        items: [line],
+        promotion: {
+          promotionDiscount: 300000,
+          appliedPrograms: [
+            programWith([{ lineId: 'line-1', discountAmount: 200000, unitPriceAfter: 580000 }]),
+            programWith([{ lineId: 'line-1', discountAmount: 100000, unitPriceAfter: 480000 }], {
+              programId: 'prog-2',
+            }),
+          ],
+          lineDiscounts: [],
+        },
+      });
+
+      await new PersistInvoiceStep({ getPointBalanceForUpdate: jest.fn() } as any).execute(c);
+
+      expect(line.promotionDiscount).toBe(300000); // 200000 + 100000, not the last one
+    });
+
+    it('leaves a gift line at zero — a gift is already free, not discounted', async () => {
+      resolveBranchItemLocations.mockResolvedValue(new Map([['gift-item-1', 'loc-1']]));
+      const manager = withLineManager();
+      const invoice: any = { id: 'inv-1', customerId: undefined, pointsRedeemed: 0 };
+      const line: any = { id: 'line-1', lineTotal: 780000, promotionDiscount: 0 };
+      const c = ctx({
+        invoice,
+        manager,
+        items: [line],
+        promotion: {
+          promotionDiscount: 0,
+          appliedPrograms: [
+            programWith([], {
+              type: 'GIFT_ITEM',
+              gifts: [
+                {
+                  itemId: 'gift-item-1',
+                  itemCode: 'GFT-1',
+                  itemName: 'Quà tặng',
+                  unit: 'cái',
+                  quantity: 1,
+                  unitPrice: 15000,
+                  mode: PromotionGiftMode.ALL_OF,
+                },
+              ],
+            }),
+          ],
+          lineDiscounts: [],
+        },
+      });
+
+      await new PersistInvoiceStep({ getPointBalanceForUpdate: jest.fn() } as any).execute(c);
+
+      const giftLine: any = c.items!.find((i: any) => i.isGift);
+      expect(giftLine).toBeDefined();
+      expect(giftLine.promotionDiscount ?? 0).toBe(0);
+      expect(line.promotionDiscount).toBe(0);
+    });
+
+    it('saves nothing extra when no program applied', async () => {
+      const manager = withLineManager();
+      const invoice: any = { id: 'inv-1', customerId: undefined, pointsRedeemed: 0 };
+      const line: any = { id: 'line-1', lineTotal: 780000, promotionDiscount: 0 };
+      const c = ctx({ invoice, manager, items: [line] });
+
+      await new PersistInvoiceStep({ getPointBalanceForUpdate: jest.fn() } as any).execute(c);
+
+      expect(line.promotionDiscount).toBe(0);
+      expect(manager.save).not.toHaveBeenCalled();
     });
   });
 });

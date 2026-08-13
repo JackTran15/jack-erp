@@ -34734,6 +34734,9 @@
           "lineDiscountReason": {
             "type": "string"
           },
+          "promotionDiscount": {
+            "type": "number"
+          },
           "lineTotal": {
             "type": "number"
           },
@@ -34800,6 +34803,7 @@
           "unitPriceDefault",
           "costPrice",
           "lineDiscount",
+          "promotionDiscount",
           "lineTotal",
           "direction",
           "returnedQuantity",
@@ -34871,6 +34875,9 @@
           "lineDiscountReason": {
             "type": "string"
           },
+          "promotionDiscount": {
+            "type": "number"
+          },
           "lineTotal": {
             "type": "number"
           },
@@ -34938,6 +34945,7 @@
           "unitPriceDefault",
           "costPrice",
           "lineDiscount",
+          "promotionDiscount",
           "lineTotal",
           "direction",
           "returnedQuantity",
@@ -36957,6 +36965,7 @@
             "description": "BUY_M_GET_N only — the \"n\" in \"buy m get n\""
           },
           "groups": {
+            "minItems": 1,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PromotionGroupInputDto"
@@ -37158,6 +37167,7 @@
             "description": "BUY_M_GET_N only — the \"n\" in \"buy m get n\""
           },
           "groups": {
+            "minItems": 1,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PromotionGroupInputDto"

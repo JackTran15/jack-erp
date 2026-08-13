@@ -964,4 +964,292 @@ describe('CheckoutReturnService — debt offset routing', () => {
       );
     });
   });
+
+  describe('refund is net of promotion and points (T-01-04, QA #1)', () => {
+    /**
+     * Wires a return against a real original invoice: `itemRepo.find` answers
+     * per invoiceId so the returned lines and the original's lines are distinct
+     * (the shared default mock returns the same array for both).
+     */
+    function setupReturn(opts: {
+      original: Partial<InvoiceEntity>;
+      originalLines: Array<Partial<InvoiceItemEntity>>;
+      returnedLines: Array<Partial<InvoiceItemEntity>>;
+    }) {
+      const originalLines = opts.originalLines.map(
+        (l, i) =>
+          ({
+            id: `orig-line-${i}`,
+            organizationId: 'org-1',
+            invoiceId: 'orig-1',
+            itemId: `item-${i}`,
+            locationId: 'loc-1',
+            itemCode: `C${i}`,
+            itemName: `N${i}`,
+            unit: 'pcs',
+            direction: ItemDirection.OUT,
+            promotionDiscount: 0,
+            sortOrder: i,
+            ...l,
+          }) as InvoiceItemEntity,
+      );
+      const returnedLines = opts.returnedLines.map(
+        (l, i) =>
+          ({
+            id: `ret-line-${i}`,
+            organizationId: 'org-1',
+            invoiceId: 'ret-1',
+            itemId: `item-${i}`,
+            locationId: 'loc-1',
+            itemCode: `C${i}`,
+            itemName: `N${i}`,
+            unit: 'pcs',
+            direction: ItemDirection.IN,
+            sortOrder: i,
+            ...l,
+          }) as InvoiceItemEntity,
+      );
+
+      itemRepo.find.mockImplementation(({ where }: any) =>
+        Promise.resolve(where.invoiceId === 'orig-1' ? originalLines : returnedLines),
+      );
+      invoiceRepo.findOne.mockImplementation(({ where }: any) =>
+        Promise.resolve(
+          where.id === 'ret-1'
+            ? returnDraftStub()
+            : ({
+                ...originalStub(InvoiceStatus.PAID),
+                pointsDiscountAmount: 0,
+                depositAmount: 0,
+                discountAmount: 0,
+                ...opts.original,
+              } as InvoiceEntity),
+        ),
+      );
+    }
+
+    const refundedAmount = () =>
+      cashRefundPublisher.publish.mock.calls[0][0].amount as number;
+
+    it('refunds the line price minus its promotion — 500 with a 100 discount pays back 400 (AC-01)', async () => {
+      setupReturn({
+        original: { subtotal: 500, discountAmount: 100, amountDue: 400, totalPaid: 400 },
+        originalLines: [{ quantity: 1, unitPrice: 500, lineTotal: 500, promotionDiscount: 100 }],
+        returnedLines: [
+          { quantity: 1, unitPrice: 500, lineTotal: 500, originalInvoiceItemId: 'orig-line-0' },
+        ],
+      });
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(refundedAmount()).toBe(400);
+    });
+
+    it('refunds what the customer paid, not the gross — 1,430,000 with 201,000 off pays back 1,229,000 (AC-02)', async () => {
+      setupReturn({
+        original: {
+          subtotal: 1_430_000,
+          discountAmount: 201_000,
+          amountDue: 1_229_000,
+          totalPaid: 1_229_000,
+        },
+        originalLines: [
+          { quantity: 1, unitPrice: 850_000, lineTotal: 850_000, promotionDiscount: 119_500 },
+          { quantity: 1, unitPrice: 580_000, lineTotal: 580_000, promotionDiscount: 81_500 },
+        ],
+        returnedLines: [
+          {
+            quantity: 1,
+            unitPrice: 850_000,
+            lineTotal: 850_000,
+            originalInvoiceItemId: 'orig-line-0',
+          },
+          {
+            quantity: 1,
+            unitPrice: 580_000,
+            lineTotal: 580_000,
+            originalInvoiceItemId: 'orig-line-1',
+          },
+        ],
+      });
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(refundedAmount()).toBe(1_229_000);
+    });
+
+    it('pays out no cash for the part settled with points — the 580,000 / 1000-point invoice (AC-03)', async () => {
+      // Paid entirely with points: 580,000 − 500,000 points − 80,000 promo = 0 due.
+      setupReturn({
+        original: {
+          subtotal: 580_000,
+          discountAmount: 80_000,
+          pointsDiscountAmount: 500_000,
+          amountDue: 0,
+          totalPaid: 0,
+          pointsRedeemed: 1000,
+        },
+        originalLines: [
+          { quantity: 1, unitPrice: 580_000, lineTotal: 580_000, promotionDiscount: 80_000 },
+        ],
+        returnedLines: [
+          {
+            quantity: 1,
+            unitPrice: 580_000,
+            lineTotal: 580_000,
+            originalInvoiceItemId: 'orig-line-0',
+          },
+        ],
+      });
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      // The whole invoice was settled with points, so no cash may leave the
+      // till at all — before the fix this published a 580,000 withdrawal.
+      expect(cashRefundPublisher.publish).not.toHaveBeenCalled();
+      expect(mockManager.save).toHaveBeenCalledWith(
+        expect.objectContaining({ refundedAmount: 0 }),
+      );
+      // The points themselves come back through the loyalty path, not the till.
+      expect(membershipCardService.refundRedeemedPoints).toHaveBeenCalledWith(
+        expect.objectContaining({ points: 1000 }),
+        expect.anything(),
+        actor,
+      );
+    });
+
+    it.each([
+      ['promotion only', { subtotal: 1000, discountAmount: 300, amountDue: 700 }, 300, 0],
+      ['points only', { subtotal: 1000, pointsDiscountAmount: 250, amountDue: 750 }, 0, 0],
+      ['deposit only', { subtotal: 1000, depositAmount: 400, amountDue: 600 }, 0, 400],
+      [
+        'promotion + points + deposit',
+        { subtotal: 1000, discountAmount: 200, pointsDiscountAmount: 100, depositAmount: 50, amountDue: 650 },
+        200,
+        50,
+      ],
+      [
+        'manual invoice discount not allocated to any line',
+        { subtotal: 1000, discountAmount: 150, amountDue: 850 },
+        0,
+        0,
+      ],
+    ])(
+      'a full return lands exactly on the original amountDue — %s',
+      async (_label, original: any, linePromo: number, _deposit: number) => {
+        setupReturn({
+          original: { ...original, totalPaid: original.amountDue },
+          originalLines: [
+            { quantity: 1, unitPrice: 1000, lineTotal: 1000, promotionDiscount: linePromo },
+          ],
+          returnedLines: [
+            {
+              quantity: 1,
+              unitPrice: 1000,
+              lineTotal: 1000,
+              originalInvoiceItemId: 'orig-line-0',
+            },
+          ],
+        });
+
+        await service.checkout('ret-1', cashDto(), actor);
+
+        expect(refundedAmount()).toBe(original.amountDue);
+      },
+    );
+
+    it('returning the undiscounted line of a mixed cart pays its full price, not a blended average', async () => {
+      // This is the case a header-level proration gets wrong: it would refund
+      // 800 × 500/1000 = 400 for a line the customer paid 500 for.
+      setupReturn({
+        original: { subtotal: 1000, discountAmount: 200, amountDue: 800, totalPaid: 800 },
+        originalLines: [
+          { quantity: 1, unitPrice: 500, lineTotal: 500, promotionDiscount: 0 },
+          { quantity: 1, unitPrice: 500, lineTotal: 500, promotionDiscount: 200 },
+        ],
+        returnedLines: [
+          { quantity: 1, unitPrice: 500, lineTotal: 500, originalInvoiceItemId: 'orig-line-0' },
+        ],
+      });
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(refundedAmount()).toBe(500);
+    });
+
+    it('prorates a partial return of a multi-quantity line', async () => {
+      setupReturn({
+        original: { subtotal: 1000, discountAmount: 200, amountDue: 800, totalPaid: 800 },
+        originalLines: [
+          { quantity: 4, unitPrice: 250, lineTotal: 1000, promotionDiscount: 200 },
+        ],
+        returnedLines: [
+          { quantity: 1, unitPrice: 250, lineTotal: 250, originalInvoiceItemId: 'orig-line-0' },
+        ],
+      });
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(refundedAmount()).toBe(200); // (1000 − 200) × 1/4
+    });
+
+    it('falls back to the gross amount for a QUICK return with no original invoice (AC-05)', async () => {
+      itemRepo.find.mockResolvedValue([inLineStub()]);
+      invoiceRepo.findOne.mockImplementation(({ where }: any) =>
+        Promise.resolve(
+          where.id === 'ret-1'
+            ? returnDraftStub({ originalInvoiceId: undefined })
+            : null,
+        ),
+      );
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(refundedAmount()).toBe(200); // the IN line's gross lineTotal
+    });
+
+    it('degrades to a plain amountDue proration for a v1 invoice with no per-line allocation (AC-05)', async () => {
+      setupReturn({
+        original: { subtotal: 1000, discountAmount: 200, amountDue: 800, totalPaid: 800 },
+        // v1: promotionDiscount is 0 on every line, the discount lives only on the header.
+        originalLines: [
+          { quantity: 1, unitPrice: 600, lineTotal: 600, promotionDiscount: 0 },
+          { quantity: 1, unitPrice: 400, lineTotal: 400, promotionDiscount: 0 },
+        ],
+        returnedLines: [
+          { quantity: 1, unitPrice: 600, lineTotal: 600, originalInvoiceItemId: 'orig-line-0' },
+        ],
+      });
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(refundedAmount()).toBe(480); // 600 − 200 × (600/1000)
+    });
+
+    it('keeps the loyalty reverse base on the gross subtotal, unchanged by the money fix', async () => {
+      setupReturn({
+        original: { subtotal: 1000, discountAmount: 200, amountDue: 800, totalPaid: 800 },
+        originalLines: [
+          { quantity: 1, unitPrice: 1000, lineTotal: 1000, promotionDiscount: 200 },
+        ],
+        returnedLines: [
+          {
+            quantity: 1,
+            unitPrice: 1000,
+            lineTotal: 1000,
+            originalInvoiceItemId: 'orig-line-0',
+          },
+        ],
+      });
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      // amountDue × returnSubtotal / subtotal = 800 × 1000/1000 — proration is
+      // still driven by the GROSS returned value, not the new net one.
+      expect(loyaltyReversePublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ subtotalDelta: 800 }),
+        actor,
+      );
+    });
+  });
 });

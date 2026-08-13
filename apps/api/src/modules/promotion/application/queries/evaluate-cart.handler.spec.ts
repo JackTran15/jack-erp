@@ -1,4 +1,4 @@
-import { PromotionProgramType, PromotionDiscountMode, PromotionLineRole, PromotionTargetType } from '@erp/shared-interfaces';
+import { PromotionProgramType, PromotionDiscountMode, PromotionLineRole, PromotionTargetType, PromotionStatus } from '@erp/shared-interfaces';
 import { EvaluateCartHandler } from './evaluate-cart.handler';
 import { EvaluateCartQuery } from './evaluate-cart.query';
 import { EvaluateCartDto } from '../dto/evaluate-cart.dto';
@@ -149,5 +149,104 @@ describe('EvaluateCartHandler', () => {
     const result = await handler.execute(new EvaluateCartQuery(baseDto(), actor));
 
     expect(result.appliedPrograms).toHaveLength(1);
+  });
+
+  /**
+   * QA #6: these three used to be filtered out in SQL by findActive, so they
+   * never reached checkGenericEligibility and vanished from the POS dialog with
+   * no row and no reason — the cashier could not answer "why isn't this
+   * running?". The reason branches existed all along; nothing ever reached them.
+   */
+  describe('programs rejected for status / date / branch still surface with a reason (T-05-03)', () => {
+    const discountProgram = (overrides: Record<string, unknown> = {}) =>
+      aProgram()
+        .ofType(PromotionProgramType.ITEM_DISCOUNT)
+        .with({ discountMode: undefined, discountValue: undefined, ...overrides })
+        .withGroups([
+          aGroup({
+            lines: [
+              aLine({
+                role: PromotionLineRole.REWARD,
+                targetType: PromotionTargetType.ITEM,
+                targetId: 'sku-1',
+                discountMode: PromotionDiscountMode.PERCENT,
+                discountValue: 30,
+              }),
+            ],
+          }),
+        ])
+        .build();
+
+    it('a STOPPED program is listed with reason STOPPED, not silently dropped', async () => {
+      const program = discountProgram({ status: PromotionStatus.STOPPED });
+      promotionRepo.findActive.mockResolvedValue([program]);
+
+      const result = await handler.execute(new EvaluateCartQuery(baseDto(), actor));
+
+      expect(result.appliedPrograms).toHaveLength(0);
+      expect(result.skippedPrograms).toContainEqual(
+        expect.objectContaining({ programId: program.id, reason: 'STOPPED' }),
+      );
+    });
+
+    it('a program outside its date window is listed with reason DATE_WINDOW', async () => {
+      const program = discountProgram({
+        startDate: new Date(2026, 0, 1),
+        endDate: new Date(2026, 0, 31),
+      });
+      promotionRepo.findActive.mockResolvedValue([program]);
+
+      const result = await handler.execute(
+        new EvaluateCartQuery(baseDto({ at: '2026-07-22T10:00:00.000Z' }), actor),
+      );
+
+      expect(result.appliedPrograms).toHaveLength(0);
+      expect(result.skippedPrograms).toContainEqual(
+        expect.objectContaining({ programId: program.id, reason: 'DATE_WINDOW' }),
+      );
+    });
+
+    it('a program scoped to another branch is listed with reason BRANCH_SCOPE', async () => {
+      const program = discountProgram({ branchIds: ['branch-other'] });
+      promotionRepo.findActive.mockResolvedValue([program]);
+
+      const result = await handler.execute(new EvaluateCartQuery(baseDto(), actor));
+
+      expect(result.appliedPrograms).toHaveLength(0);
+      expect(result.skippedPrograms).toContainEqual(
+        expect.objectContaining({ programId: program.id, reason: 'BRANCH_SCOPE' }),
+      );
+    });
+
+    it('reports one stable reason when a program fails several checks at once', async () => {
+      const program = discountProgram({
+        status: PromotionStatus.STOPPED,
+        startDate: new Date(2026, 0, 1),
+        endDate: new Date(2026, 0, 31),
+        branchIds: ['branch-other'],
+      });
+      promotionRepo.findActive.mockResolvedValue([program]);
+
+      const first = await handler.execute(
+        new EvaluateCartQuery(baseDto({ at: '2026-07-22T10:00:00.000Z' }), actor),
+      );
+      const second = await handler.execute(
+        new EvaluateCartQuery(baseDto({ at: '2026-07-22T10:00:00.000Z' }), actor),
+      );
+
+      // Status is checked first, so it wins — and it must not flip between calls.
+      expect(first.skippedPrograms[0].reason).toBe('STOPPED');
+      expect(second.skippedPrograms[0].reason).toBe(first.skippedPrograms[0].reason);
+    });
+
+    it('still applies a fully eligible program — the SQL filters were the only thing removed', async () => {
+      const program = discountProgram({ branchIds: ['branch-1'] });
+      promotionRepo.findActive.mockResolvedValue([program]);
+
+      const result = await handler.execute(new EvaluateCartQuery(baseDto(), actor));
+
+      expect(result.appliedPrograms).toHaveLength(1);
+      expect(result.promotionDiscount).toBe(30_000);
+    });
   });
 });

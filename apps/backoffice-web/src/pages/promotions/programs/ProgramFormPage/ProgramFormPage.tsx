@@ -12,7 +12,7 @@ import {
 import { PromotionIssuesProvider } from "./promotion-issues.context";
 import { PromotionFormModeProvider } from "./promotion-form-mode.context";
 import { buildInitialFormState } from "../program-form.constants";
-import { PromotionForm, PROMOTION_FORM_LABELS } from "../programs.constants";
+import { PromotionForm, PROMOTION_FORM_LABELS, PromotionApplyTo } from "../programs.constants";
 import type { ProgramFormState } from "../program-form.types";
 import type { PromotionProgramDetail } from "@erp/shared-interfaces";
 import {
@@ -71,6 +71,21 @@ function collectLocalIssues(
       field: "name",
       code: "NAME_REQUIRED",
       message: "Vui lòng nhập tên chương trình.",
+    });
+  }
+
+  // "Khách hàng có sinh nhật" là đối tượng duy nhất không có luật bắt buộc
+  // trường đi kèm, nên CTKM lưu được mà không chọn "Ngày tính KM" rồi không bao
+  // giờ khớp ai — im lặng, không dấu hiệu gì. Server đã chặn
+  // (BIRTHDAY_MATCH_REQUIRED); chặn ở đây để báo ngay tại ô thay vì sau khi Lưu.
+  if (
+    form.applyTo === PromotionApplyTo.HAS_BIRTHDAY &&
+    !form.birthdayDateMode
+  ) {
+    issues.push({
+      field: "birthdayMatch",
+      code: "BIRTHDAY_MATCH_REQUIRED",
+      message: "Vui lòng chọn ngày tính khuyến mại cho khách hàng có sinh nhật.",
     });
   }
 

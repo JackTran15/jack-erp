@@ -26,6 +26,7 @@ import {
 import { CheckoutSagaOrchestrator } from './application/checkout-saga.orchestrator';
 import { LoadDraftStep } from './application/steps/load-draft.step';
 import { EvaluatePromotionStep } from './application/steps/evaluate-promotion.step';
+import { ClampPointsStep } from './application/steps/clamp-points.step';
 import { ResolveAccountsStep } from './application/steps/resolve-accounts.step';
 import { ResolveFundsStep } from './application/steps/resolve-funds.step';
 import { ComputeTotalsStep } from './application/steps/compute-totals.step';
@@ -107,6 +108,7 @@ import { CheckoutSagaController } from './interface/checkout-saga.controller';
     CheckoutSagaOrchestrator,
     LoadDraftStep,
     EvaluatePromotionStep,
+    ClampPointsStep,
     ResolveAccountsStep,
     ResolveFundsStep,
     ComputeTotalsStep,

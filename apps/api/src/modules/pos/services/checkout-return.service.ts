@@ -56,8 +56,11 @@ import { StockReturnInPublisher } from '../publishers/stock-return-in.publisher'
 import { POINT_EARN_VND_PER_POINT } from '../../customer/loyalty.constants';
 
 interface ComputedTotals {
+  /** Gross value of the returned lines. Loyalty proration is based on this. */
   returnSubtotal: number;
   newSubtotal: number;
+  /** What the customer actually paid for the returned lines — the money base. */
+  returnedNet: number;
   netAmount: number;
   refundedAmount: number;
 }
@@ -149,11 +152,12 @@ export class CheckoutReturnService {
       );
     }
 
-    const totals = this.computeTotals(items);
-
     // Load the original invoice up-front — needed for OFFSET (settling the
-    // original's debt) and the loyalty re-credit below.
+    // original's debt), the loyalty re-credit below, and the refund amount
+    // itself (computeTotals prorates the original's net onto the returned
+    // lines, so it must run after this).
     let originalInvoice: InvoiceEntity | null = null;
+    let originalItems: InvoiceItemEntity[] = [];
     if (invoice.originalInvoiceId) {
       originalInvoice = await this.invoiceRepo.findOne({
         where: {
@@ -161,7 +165,14 @@ export class CheckoutReturnService {
           organizationId: actor.organizationId,
         },
       });
+      if (originalInvoice) {
+        originalItems = await this.itemRepo.find({
+          where: { invoiceId: originalInvoice.id },
+        });
+      }
     }
+
+    const totals = this.computeTotals(items, originalInvoice, originalItems);
 
     // The refund method is the operator's explicit choice (FE sends OFFSET only
     // when they tick "Tính vào công nợ"). When they opt into OFFSET but the
@@ -492,7 +503,42 @@ export class CheckoutReturnService {
 
   // ─── helpers ─────────────────────────────────────────────────────────────
 
-  private computeTotals(items: InvoiceItemEntity[]): ComputedTotals {
+  /**
+   * `returnSubtotal` stays GROSS on purpose — computeReverseBase and
+   * computeRedeemedCreditBack prorate loyalty points against the original's
+   * gross subtotal, and changing that base would silently change how many
+   * points a return gives back. `returnedNet` is a new quantity placed beside
+   * it, not a replacement.
+   *
+   * `returnedNet` is what the customer actually paid for the returned goods:
+   *
+   *   netLine(i)     = lineTotal(i) − promotionDiscount(i)
+   *   headerResidual = pointsDiscountAmount + depositAmount
+   *                  + max(0, discountAmount − Σ promotionDiscount)
+   *   share          = returnedNet / Σ netLine
+   *   refund         = returnedNet − headerResidual × share
+   *
+   * A full return therefore lands exactly on the original's `amountDue`, which
+   * is the invariant the tests pin.
+   *
+   * Deliberately NOT capped at the original's `totalPaid`: debt repayments are
+   * recorded in `debt_payments` and never written back to `invoices.total_paid`
+   * (see invoice-debt.service), so a credit sale settled in full still reads
+   * `totalPaid = 0`. Capping on it would refund such a customer nothing. Paying
+   * out more than was collected on a still-unpaid credit sale remains possible
+   * and is tracked separately — the operator chooses OFFSET for that case.
+   *
+   * Falls back to the gross behaviour when there is no original invoice (QUICK
+   * return); degrades to a plain proration of `amountDue` for v1 invoices,
+   * where every promotionDiscount is 0.
+   */
+  private computeTotals(
+    items: InvoiceItemEntity[],
+    originalInvoice: InvoiceEntity | null = null,
+    originalItems: InvoiceItemEntity[] = [],
+  ): ComputedTotals {
+    const round = (v: number) => Math.round(v * 100) / 100;
+
     let returnSubtotal = 0;
     let newSubtotal = 0;
     for (const it of items) {
@@ -500,12 +546,81 @@ export class CheckoutReturnService {
       if (it.direction === ItemDirection.IN) returnSubtotal += total;
       else newSubtotal += total;
     }
-    const round = (v: number) => Math.round(v * 100) / 100;
     returnSubtotal = round(returnSubtotal);
     newSubtotal = round(newSubtotal);
-    const netAmount = round(newSubtotal - returnSubtotal);
-    const refundedAmount = round(Math.max(returnSubtotal - newSubtotal, 0));
-    return { returnSubtotal, newSubtotal, netAmount, refundedAmount };
+
+    const returnedNet = this.computeReturnedNet(
+      items,
+      originalInvoice,
+      originalItems,
+      returnSubtotal,
+    );
+
+    const netAmount = round(newSubtotal - returnedNet);
+    const refundedAmount = round(Math.max(returnedNet - newSubtotal, 0));
+    return { returnSubtotal, newSubtotal, returnedNet, netAmount, refundedAmount };
+  }
+
+  /**
+   * Value of the returned (IN) lines net of every discount the customer never
+   * paid — the promotion allocated to each line, plus that share of the
+   * invoice-level residual (points, deposit, manual invoice discount).
+   */
+  private computeReturnedNet(
+    items: InvoiceItemEntity[],
+    originalInvoice: InvoiceEntity | null,
+    originalItems: InvoiceItemEntity[],
+    returnSubtotal: number,
+  ): number {
+    const round = (v: number) => Math.round(v * 100) / 100;
+    if (returnSubtotal <= 0) return 0;
+    // QUICK return: nothing to prorate against, keep the gross behaviour.
+    if (!originalInvoice || originalItems.length === 0) return returnSubtotal;
+
+    const originalById = new Map(originalItems.map((it) => [it.id, it]));
+    const totalPromotionDiscount = originalItems.reduce(
+      (sum, it) => sum + Number(it.promotionDiscount ?? 0),
+      0,
+    );
+    const sumNetLine = originalItems.reduce(
+      (sum, it) => sum + Number(it.lineTotal) - Number(it.promotionDiscount ?? 0),
+      0,
+    );
+    if (sumNetLine <= 0) return returnSubtotal;
+
+    // Per returned line: its share of the original line, net of that line's
+    // promotion. Lines with no traceable original (or v1 invoices, where
+    // promotionDiscount is 0 throughout) fall back to their gross amount, which
+    // is exactly what the old behaviour produced.
+    let returnedNet = 0;
+    for (const it of items) {
+      if (it.direction !== ItemDirection.IN) continue;
+      const origin = it.originalInvoiceItemId
+        ? originalById.get(it.originalInvoiceItemId)
+        : undefined;
+      if (!origin) {
+        returnedNet += Number(it.lineTotal);
+        continue;
+      }
+      const originQty = Number(origin.quantity);
+      const originNet =
+        Number(origin.lineTotal) - Number(origin.promotionDiscount ?? 0);
+      returnedNet +=
+        originQty > 0 ? (originNet * Number(it.quantity)) / originQty : originNet;
+    }
+
+    // Invoice-level money the customer also never paid, spread over the same
+    // proportion. `discountAmount` holds manual + promotion + voucher together,
+    // so subtract the part already allocated per line to avoid counting it twice.
+    const headerResidual =
+      Number(originalInvoice.pointsDiscountAmount ?? 0) +
+      Number(originalInvoice.depositAmount ?? 0) +
+      Math.max(
+        0,
+        Number(originalInvoice.discountAmount ?? 0) - totalPromotionDiscount,
+      );
+    const share = Math.min(1, returnedNet / sumNetLine);
+    return round(Math.max(0, returnedNet - headerResidual * share));
   }
 
   /**

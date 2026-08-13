@@ -10,6 +10,8 @@ interface MembershipPanelProps {
   onChangeCard?: () => void;
   pointsUsed: number;
   onChangePointsUsed: (next: number) => void;
+  /** Gợi ý trần điểm dùng được cho đơn này — xem UsePointsRow. */
+  maxUsablePoints?: number;
 }
 
 const formatPoints = new Intl.NumberFormat("vi-VN");
@@ -19,6 +21,7 @@ export function MembershipPanel({
   onChangeCard,
   pointsUsed,
   onChangePointsUsed,
+  maxUsablePoints,
 }: MembershipPanelProps) {
   const totalSpent = member?.totalSpent ?? 0;
   const loyaltyPoints = member?.loyaltyPoints ?? 0;
@@ -50,6 +53,7 @@ export function MembershipPanel({
         value={pointsUsed}
         onChange={onChangePointsUsed}
         moneyFromPoints={moneyFromPoints}
+        maxUsablePoints={maxUsablePoints}
       />
     </section>
   );

@@ -12,6 +12,7 @@ import { ActorContext } from '../../../common/decorators/actor-context.decorator
 import { WebSocketEmitterService } from '../../websocket/websocket-emitter.service';
 import { PromotionApplyService } from '../../promotion/promotion-apply.service';
 import { LoyaltyPointsReversePublisher } from '../../customer/publishers/loyalty-points-reverse.publisher';
+import { MembershipCardService } from '../../customer/services/membership-card.service';
 import {
   InvoiceEntity,
   InvoiceStatus,
@@ -44,6 +45,7 @@ export class CancelInvoiceService {
     private readonly wsEmitter: WebSocketEmitterService,
     private readonly refundLegs: InvoiceRefundLegsService,
     private readonly loyaltyPointsReversePublisher: LoyaltyPointsReversePublisher,
+    private readonly membershipCardService: MembershipCardService,
   ) {}
 
   async cancel(
@@ -92,7 +94,39 @@ export class CancelInvoiceService {
       // Cancelling voids the sale outright, so every point it earned is clawed
       // back — same snapshot convention as a full return (see checkout-return.service).
       invoice.pointsReversed = invoice.pointsEarned;
+
+      // ...and every point it *spent* goes back to the customer. Only the earn
+      // side used to be handled, so cancelling an invoice that redeemed 100
+      // points destroyed them: the sale was void but the points were never
+      // returned. A cancel is a full return, so the ratio is 1 and the amount is
+      // simply `pointsRedeemed` — no proration needed (contrast
+      // checkout-return.service's computeRedeemedCreditBack, which prorates).
+      const creditBack = Number(invoice.pointsRedeemed ?? 0);
+      const cardBalance = invoice.customerId
+        ? await this.membershipCardService.getPointBalanceForUpdate(
+            invoice.customerId,
+            manager,
+            actor,
+          )
+        : null;
+      // Projected balance this cancellation leaves the customer on: what the
+      // card holds now, plus the points handed back here, minus the earn the
+      // async reverse consumer is about to claw back. Clamped like the consumer,
+      // which caps its decrement at the available balance.
+      invoice.pointsBalanceAfter =
+        cardBalance == null
+          ? null
+          : Math.max(0, cardBalance + creditBack - Number(invoice.pointsReversed ?? 0));
+
       const saved = await manager.save(invoice);
+
+      if (invoice.customerId && creditBack > 0) {
+        await this.membershipCardService.refundRedeemedPoints(
+          { customerId: invoice.customerId, points: creditBack, invoiceId: saved.id },
+          manager,
+          actor,
+        );
+      }
 
       if (hasOutstandingDebt) {
         await manager.update(

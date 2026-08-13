@@ -141,6 +141,28 @@ function validate(props: PromotionProgramProps): DomainValidationIssue[] {
       message: 'Card tier is required when apply-to is CARD_TIER',
     });
   }
+  // BIRTHDAY had no companion-field rule while CUSTOMER_GROUP and CARD_TIER
+  // did, so a birthday promotion saved without a match kind and then never
+  // matched anyone — CustomerScope.matchesBirthday falls through to `false`.
+  if (props.applyTo === PromotionApplyTo.BIRTHDAY && !props.birthdayMatch) {
+    issues.push({
+      field: 'birthdayMatch',
+      code: 'BIRTHDAY_MATCH_REQUIRED',
+      message: 'Birthday match kind is required when apply-to is BIRTHDAY',
+    });
+  }
+
+  // Every strategy reads groups[0]; a programme with no group at all reached
+  // the engine and threw, turning one bad row into a 500 on every checkout.
+  // Blocked here so it can never be stored again — the strategies also guard
+  // defensively for rows saved before this rule existed.
+  if (props.groups.length === 0) {
+    issues.push({
+      field: 'groups',
+      code: 'GROUPS_EMPTY',
+      message: 'At least one group is required',
+    });
+  }
 
   if (props.type === PromotionProgramType.INVOICE_DISCOUNT) {
     validateDiscountAmount(props.discountMode, props.discountValue, 'discountValue', issues);

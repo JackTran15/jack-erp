@@ -4,6 +4,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { WsEventType } from '@erp/shared-interfaces';
 import { CancelInvoiceService } from './cancel-invoice.service';
+import { MembershipCardService } from '../../customer/services/membership-card.service';
 import {
   InvoiceEntity,
   InvoicePaymentMethod,
@@ -80,6 +81,10 @@ const publishedRefunds = (publisher: { publish: jest.Mock }) =>
 
 describe('CancelInvoiceService', () => {
   let service: CancelInvoiceService;
+  let membershipCardService: {
+    getPointBalanceForUpdate: jest.Mock;
+    refundRedeemedPoints: jest.Mock;
+  };
   let invoiceRepo: { findOne: jest.Mock; count: jest.Mock };
   let itemRepo: { find: jest.Mock };
   let refundLegs: { build: jest.Mock };
@@ -108,6 +113,10 @@ describe('CancelInvoiceService', () => {
     promotionApplyService = { revertPromotions: jest.fn().mockResolvedValue(undefined) };
     invoiceCancelledPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
     loyaltyPointsReversePublisher = { publish: jest.fn().mockResolvedValue(true) };
+    membershipCardService = {
+      getPointBalanceForUpdate: jest.fn().mockResolvedValue(0),
+      refundRedeemedPoints: jest.fn().mockResolvedValue(undefined),
+    };
     wsEmitter = { emitToBranch: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -124,6 +133,7 @@ describe('CancelInvoiceService', () => {
           provide: LoyaltyPointsReversePublisher,
           useValue: loyaltyPointsReversePublisher,
         },
+        { provide: MembershipCardService, useValue: membershipCardService },
       ],
     }).compile();
 
@@ -349,6 +359,78 @@ describe('CancelInvoiceService', () => {
       await service.cancel('inv-1', { reason: 'mistake' }, actor);
 
       expect(loyaltyPointsReversePublisher.publish).not.toHaveBeenCalled();
+    });
+
+    /**
+     * QA #3. Cancelling used to handle only the earn side: an invoice that
+     * redeemed 100 points and earned 138 clawed back the 138 and silently
+     * destroyed the 100 — the sale was void but the customer never got their
+     * points back. The return flow had done this correctly all along
+     * (checkout-return.service), cancel simply never called it.
+     */
+    it('gives back the points the sale redeemed, leaving the card as it was before', async () => {
+      // Card holds 4,203 now; the sale earned 138 and spent 100.
+      // Cancelling: +100 back, −138 clawed back → 4,165, the pre-sale balance.
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(4203);
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({ customerId: 'cust-1', pointsEarned: 138, pointsRedeemed: 100 }),
+      );
+
+      const result = await service.cancel('inv-1', { reason: 'mistake' }, actor);
+
+      expect(membershipCardService.refundRedeemedPoints).toHaveBeenCalledWith(
+        { customerId: 'cust-1', points: 100, invoiceId: 'inv-1' },
+        mockManager,
+        actor,
+      );
+      expect(result.pointsReversed).toBe(138);
+      expect(result.pointsBalanceAfter).toBe(4165);
+    });
+
+    it('refunds inside the cancel transaction, so there is no path that voids the sale but keeps the points', async () => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({ customerId: 'cust-1', pointsEarned: 0, pointsRedeemed: 50 }),
+      );
+
+      await service.cancel('inv-1', { reason: 'mistake' }, actor);
+
+      // The manager handed to the refund must be the transaction's, not a
+      // free-standing repository.
+      const [, managerArg] = membershipCardService.refundRedeemedPoints.mock.calls[0];
+      expect(managerArg).toBe(mockManager);
+    });
+
+    it('does not refund when the sale redeemed nothing', async () => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({ customerId: 'cust-1', pointsEarned: 20, pointsRedeemed: 0 }),
+      );
+
+      await service.cancel('inv-1', { reason: 'mistake' }, actor);
+
+      expect(membershipCardService.refundRedeemedPoints).not.toHaveBeenCalled();
+    });
+
+    it('never touches a card for a walk-in invoice, even one that somehow recorded points', async () => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({ customerId: undefined, pointsEarned: 20, pointsRedeemed: 10 }),
+      );
+
+      const result = await service.cancel('inv-1', { reason: 'mistake' }, actor);
+
+      expect(membershipCardService.refundRedeemedPoints).not.toHaveBeenCalled();
+      expect(membershipCardService.getPointBalanceForUpdate).not.toHaveBeenCalled();
+      expect(result.pointsBalanceAfter).toBeNull();
+    });
+
+    it('clamps the projected balance at 0 rather than reporting a negative card', async () => {
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(10);
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({ customerId: 'cust-1', pointsEarned: 500, pointsRedeemed: 0 }),
+      );
+
+      const result = await service.cancel('inv-1', { reason: 'mistake' }, actor);
+
+      expect(result.pointsBalanceAfter).toBe(0); // 10 + 0 − 500 would be negative
     });
   });
 
