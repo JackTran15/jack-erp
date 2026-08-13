@@ -220,6 +220,8 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
 
   // IAM
   { key: "iam.user.read", module: "iam" },
+  // Without this, iam.user.read only reaches employees of the actor's own branches.
+  { key: "iam.user.read.all", module: "iam" },
   { key: "iam.user.write", module: "iam" },
   { key: "iam.user.delete", module: "iam" },
   { key: "iam.role.read", module: "iam" },

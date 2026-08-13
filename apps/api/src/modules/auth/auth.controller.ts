@@ -12,6 +12,7 @@ import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { Public } from './decorators/public.decorator';
 import { SwitchBranchDto } from './dto/switch-branch.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import type {
   JwtPayload,
   LoginRequest,
@@ -57,6 +58,29 @@ export class AuthController {
       throw new UnauthorizedException('No active session');
     }
     return this.authService.switchBranch(user, body.branchId);
+  }
+
+  /**
+   * Self-service, so no @RequirePermission: staff roles hold no `iam.*` key yet
+   * must be able to rotate their own password. Resetting someone else's is a
+   * different route (POST /admin/users/:id/reset-password).
+   */
+  @Post('change-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async changePassword(
+    @Req() req: Request,
+    @Body() body: ChangePasswordDto,
+  ): Promise<void> {
+    const user = (req as any).user as JwtPayload | undefined;
+    if (!user?.userId || !user?.organizationId) {
+      throw new UnauthorizedException('No active session');
+    }
+    await this.authService.changeOwnPassword(
+      user.userId,
+      user.organizationId,
+      body.currentPassword,
+      body.newPassword,
+    );
   }
 
   @Post('logout')

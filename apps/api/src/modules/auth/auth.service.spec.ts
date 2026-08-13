@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import type { JwtPayload } from '@erp/shared-interfaces';
 import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -36,7 +40,9 @@ const mockUser: Partial<UserEntity> = {
 
 describe('AuthService', () => {
   let service: AuthService;
-  let userRepo: jest.Mocked<Pick<Repository<UserEntity>, 'findOne' | 'update'>>;
+  let userRepo: jest.Mocked<
+    Pick<Repository<UserEntity>, 'findOne' | 'update' | 'save'>
+  >;
   let userRoleRepo: jest.Mocked<Pick<Repository<UserRoleEntity>, 'find'>>;
   let roleRepo: jest.Mocked<Pick<Repository<RoleEntity>, 'createQueryBuilder'>>;
   let userBranchRepo: jest.Mocked<Pick<Repository<UserBranchAssignmentEntity>, 'find'>>;
@@ -44,7 +50,11 @@ describe('AuthService', () => {
   let rbacService: jest.Mocked<Pick<RbacService, 'getUserPermissions'>>;
 
   beforeEach(async () => {
-    userRepo = { findOne: jest.fn(), update: jest.fn() };
+    userRepo = {
+      findOne: jest.fn(),
+      update: jest.fn(),
+      save: jest.fn().mockImplementation(async (u) => u),
+    };
     userRoleRepo = { find: jest.fn() };
     userBranchRepo = { find: jest.fn() };
     sessionStore = {
@@ -439,6 +449,93 @@ describe('AuthService', () => {
       const result = await service.getSession('jti-unknown');
 
       expect(result).toBeNull();
+    });
+  });
+
+  /**
+   * Staff roles hold no `iam.*` key, so before this existed they could not
+   * change their own password at all — the only path was an admin editing them.
+   * bcryptjs is mocked module-wide in this file, so the assertions are about
+   * which comparisons happen and what gets persisted, not about real hashing.
+   */
+  describe('changeOwnPassword', () => {
+    const ORG = 'org-1';
+    const USER = 'user-1';
+
+    // The outer beforeEach re-stubs bcrypt.compare but leaves call history on
+    // bcrypt.hash, so "was it hashed at all?" needs a clean slate per test.
+    beforeEach(() => {
+      (bcrypt.compare as jest.Mock).mockReset();
+      (bcrypt.hash as jest.Mock).mockReset();
+    });
+
+    function arrangeUser(isActive = true) {
+      userRepo.findOne.mockResolvedValue({
+        id: USER,
+        organizationId: ORG,
+        isActive,
+        passwordHash: 'current-hash',
+      } as UserEntity);
+    }
+
+    it('rotates the hash when the current password matches', async () => {
+      arrangeUser();
+      (bcrypt.compare as jest.Mock)
+        .mockResolvedValueOnce(true) // currentPassword vs stored
+        .mockResolvedValueOnce(false); // newPassword differs from stored
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
+
+      await service.changeOwnPassword(USER, ORG, 'password123', 'Str0ngPwd!');
+
+      expect(bcrypt.hash).toHaveBeenCalledWith('Str0ngPwd!', 10);
+      expect(userRepo.save).toHaveBeenCalledTimes(1);
+      const saved = userRepo.save.mock.calls[0][0] as UserEntity;
+      expect(saved.passwordHash).toBe('new-hash');
+    });
+
+    it('rejects a wrong current password without touching the hash', async () => {
+      arrangeUser();
+      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
+
+      await expect(
+        service.changeOwnPassword(USER, ORG, 'wrong-one', 'Str0ngPwd!'),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(userRepo.save).not.toHaveBeenCalled();
+      expect(bcrypt.hash).not.toHaveBeenCalled();
+    });
+
+    it('rejects reusing the current password', async () => {
+      arrangeUser();
+      (bcrypt.compare as jest.Mock)
+        .mockResolvedValueOnce(true) // current matches
+        .mockResolvedValueOnce(true); // new one matches too => unchanged
+
+      await expect(
+        service.changeOwnPassword(USER, ORG, 'password123', 'password123'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(userRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('refuses a deactivated account', async () => {
+      arrangeUser(false);
+
+      await expect(
+        service.changeOwnPassword(USER, ORG, 'password123', 'Str0ngPwd!'),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(userRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('scopes the lookup to the caller org', async () => {
+      arrangeUser();
+      (bcrypt.compare as jest.Mock)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false);
+
+      await service.changeOwnPassword(USER, ORG, 'password123', 'Str0ngPwd!');
+
+      expect(userRepo.findOne).toHaveBeenCalledWith({
+        where: { id: USER, organizationId: ORG },
+      });
     });
   });
 });

@@ -28,7 +28,9 @@ function makeMockRepo() {
   return {
     findOne: jest.fn(),
     findAndCount: jest.fn(),
-    find: jest.fn(),
+    // Defaults to empty so branch/role scope lookups resolve in every test
+    // without each one having to stub them.
+    find: jest.fn().mockResolvedValue([]),
     save: jest.fn(),
     create: jest.fn().mockImplementation((data) => ({ ...data })),
     delete: jest.fn(),
@@ -74,7 +76,9 @@ describe('UsersService', () => {
     rbac = {
       invalidateUserPermissions: jest.fn().mockResolvedValue(undefined),
       invalidateOrgPermissions: jest.fn().mockResolvedValue(undefined),
-      getUserPermissions: jest.fn().mockResolvedValue([]),
+      // Unscoped by default: most tests are about role/permission rules, not
+      // branch scoping. Tests that exercise scoping override this.
+      getUserPermissions: jest.fn().mockResolvedValue(['iam.user.read.all']),
       getRolePermissionKeys: jest.fn().mockResolvedValue(new Map()),
     };
 
@@ -158,6 +162,8 @@ describe('UsersService', () => {
     });
 
     it('adds an id In(...) clause when the search term matches employee codes', async () => {
+      // Unscoped actor: this test is about the code clause, not branch scoping.
+      rbac.getUserPermissions.mockResolvedValue(['iam.user.read.all']);
       profileRepo.find
         .mockResolvedValueOnce([{ id: 'p-1', userId: 'u-1' }]) // code-match lookup
         .mockResolvedValueOnce([]); // batch profile load for the page
@@ -170,6 +176,55 @@ describe('UsersService', () => {
       // email + firstName + lastName + id-in-code-matches
       expect(findArg.where).toHaveLength(4);
       expect(findArg.where[3]).toHaveProperty('id');
+    });
+
+    /**
+     * The code-match branch sets its own `id`, overwriting the scope clause
+     * spread beside it — so the intersection has to happen before the query is
+     * built, or searching by employee code would reach other branches.
+     */
+    it('drops code matches for users outside the actor branch scope', async () => {
+      rbac.getUserPermissions.mockResolvedValue(['iam.user.read']);
+      // Actor sees only their own branch, which u-99 is not part of.
+      userBranchRepo.find
+        .mockResolvedValueOnce([{ branchId: 'b-1' }]) // actor's branches
+        .mockResolvedValueOnce([{ userId: 'u-actor' }]); // members of b-1
+      profileRepo.find
+        .mockResolvedValueOnce([{ id: 'p-9', userId: 'u-99' }]) // code match, other branch
+        .mockResolvedValueOnce([]);
+      userRepo.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.list({ page: 1, pageSize: 20, search: 'NV0099' }, actor);
+
+      const findArg = userRepo.findAndCount.mock.calls[0][0];
+      // No 4th branch: the only code match was filtered out as out-of-scope.
+      expect(findArg.where).toHaveLength(3);
+      for (const clause of findArg.where) {
+        expect(clause).toHaveProperty('id');
+      }
+    });
+
+    it('restricts the query to the actor branch scope without iam.user.read.all', async () => {
+      rbac.getUserPermissions.mockResolvedValue(['iam.user.read']);
+      userBranchRepo.find
+        .mockResolvedValueOnce([{ branchId: 'b-1' }])
+        .mockResolvedValueOnce([{ userId: 'u-1' }, { userId: 'u-2' }]);
+      userRepo.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.list({ page: 1, pageSize: 20 }, actor);
+
+      const findArg = userRepo.findAndCount.mock.calls[0][0];
+      expect(findArg.where).toHaveProperty('id');
+    });
+
+    it('does not restrict the query when the actor holds iam.user.read.all', async () => {
+      rbac.getUserPermissions.mockResolvedValue(['iam.user.read.all']);
+      userRepo.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.list({ page: 1, pageSize: 20 }, actor);
+
+      const findArg = userRepo.findAndCount.mock.calls[0][0];
+      expect(findArg.where).not.toHaveProperty('id');
     });
 
     it('omits the code clause when the search term matches no employee codes', async () => {
@@ -382,7 +437,11 @@ describe('UsersService', () => {
         name: where.id === 'r-super' ? 'Quản trị hệ thống' : 'Nhân viên',
       }));
       userRoleRepo.find.mockResolvedValue([]);
-      rbac.getUserPermissions.mockResolvedValue(['pos.sale.create', 'iam.user.write']);
+      rbac.getUserPermissions.mockResolvedValue([
+        'pos.sale.create',
+        'iam.user.write',
+        'iam.user.read.all',
+      ]);
       rbac.getRolePermissionKeys.mockResolvedValue(new Map(Object.entries(roleKeys)));
     }
 
@@ -401,6 +460,114 @@ describe('UsersService', () => {
       await expect(
         service.setRoles('u-1', ['r-staff'], actor),
       ).resolves.toEqual(['r-staff']);
+    });
+
+    /**
+     * Granting roles was already guarded, but `iam.user.write` alone used to let
+     * a branch manager edit — and reset the password of — a Quản lý tổng or
+     * Quản trị hệ thống account, i.e. take it over outright.
+     */
+    describe('privilege escalation via writes on a higher account', () => {
+      /** Target holds a permission the actor does not. */
+      function arrangeHigherTarget() {
+        userRepo.exist.mockResolvedValue(true);
+        userRepo.findOne.mockResolvedValue({
+          id: 'u-admin',
+          isActive: true,
+          organizationId: 'org-1',
+        });
+        rbac.getUserPermissions.mockImplementation(async (userId: string) =>
+          userId === 'u-admin'
+            ? ['iam.user.write', 'iam.role.permissions.write']
+            : ['iam.user.write', 'iam.user.read.all'],
+        );
+      }
+
+      it.each([
+        ['update', () => service.update('u-admin', { firstName: 'X' }, actor)],
+        [
+          'resetPassword',
+          () =>
+            service.resetPassword(
+              'u-admin',
+              { newTemporaryPassword: 'Pwd@1234' },
+              actor,
+            ),
+        ],
+        ['deactivate', () => service.deactivate('u-admin', actor)],
+        ['setBranches', () => service.setBranches('u-admin', [], actor)],
+      ])('%s is refused on an account holding permissions the actor lacks', async (
+        _name,
+        call,
+      ) => {
+        arrangeHigherTarget();
+
+        await expect(call()).rejects.toBeInstanceOf(ForbiddenException);
+        expect(userRepo.save).not.toHaveBeenCalled();
+      });
+
+      it('refuses a write on a subordinate at another branch, by id', async () => {
+        userRepo.exist.mockResolvedValue(true);
+        userRepo.findOne.mockResolvedValue({
+          id: 'u-other-branch',
+          isActive: true,
+          organizationId: 'org-1',
+        });
+        // Branch-scoped actor whose branch does not contain the target.
+        rbac.getUserPermissions.mockResolvedValue(['iam.user.write']);
+        userBranchRepo.find
+          .mockResolvedValueOnce([{ branchId: 'b-1' }])
+          .mockResolvedValueOnce([{ userId: 'u-actor' }]);
+
+        await expect(
+          service.update('u-other-branch', { firstName: 'X' }, actor),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(userRepo.save).not.toHaveBeenCalled();
+      });
+
+      it('still allows the same writes on a subordinate account', async () => {
+        userRepo.exist.mockResolvedValue(true);
+        userRepo.findOne.mockResolvedValue({
+          id: 'u-staff',
+          isActive: true,
+          organizationId: 'org-1',
+        });
+        rbac.getUserPermissions.mockImplementation(async (userId: string) =>
+          userId === 'u-staff'
+            ? ['pos.sale.create']
+            : ['pos.sale.create', 'iam.user.write', 'iam.user.read.all'],
+        );
+
+        await expect(
+          service.resetPassword(
+            'u-staff',
+            { newTemporaryPassword: 'Pwd@1234' },
+            actor,
+          ),
+        ).resolves.toBeUndefined();
+        expect(userRepo.save).toHaveBeenCalled();
+      });
+
+      it('never locks the actor out of their own account', async () => {
+        userRepo.exist.mockResolvedValue(true);
+        userRepo.findOne.mockResolvedValue({
+          id: actor.userId,
+          email: 'me@example.com',
+          firstName: 'Me',
+          lastName: 'Self',
+          isActive: true,
+          organizationId: 'org-1',
+          lastLoginAt: null,
+          createdAt: new Date('2025-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2025-01-02T00:00:00.000Z'),
+        });
+        // Even if the cache reports keys the actor "lacks", self is exempt.
+        rbac.getUserPermissions.mockResolvedValue(['anything']);
+
+        await expect(
+          service.update(actor.userId, { firstName: 'Me' }, actor),
+        ).resolves.toBeDefined();
+      });
     });
 
     it('create refuses initial roleIds carrying permissions the actor lacks', async () => {

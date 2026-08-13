@@ -234,6 +234,7 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
 
   // Phân quyền & người dùng
   'iam.user.read': 'Xem người dùng',
+  'iam.user.read.all': 'Xem người dùng của mọi chi nhánh',
   'iam.user.write': 'Thêm/sửa người dùng và đặt lại mật khẩu',
   'iam.user.delete': 'Ngừng hoạt động người dùng',
   'iam.role.read': 'Xem vai trò',

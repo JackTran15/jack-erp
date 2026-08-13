@@ -5,7 +5,7 @@ import {
   type RoleSummary,
   type UserDetail,
 } from "@erp/shared-interfaces";
-import { joinFullName, userDisplayCode } from "../../lib/iam";
+import { joinFullName } from "../../lib/iam";
 import { employmentStatusFromActive } from "./employee-status";
 import {
   createDefaultAccessSchedule,
@@ -117,7 +117,12 @@ export function userDetailToEmployeeDraft(
 
   return {
     basic: {
-      code: profile?.code ?? userDisplayCode(detail),
+      // Never seed with userDisplayCode(): its "N/A" fallback is a label for
+      // read-only views, and this field is editable and persisted. Saving it
+      // wrote the literal string as the employee code, so the second such save
+      // hit the per-org unique index and 409'd — taking the whole save chain
+      // (roles, branches, password reset) down with it.
+      code: profile?.code ?? "",
       email: detail.email,
       mobile: profile?.mobile ?? "",
       fullName: joinFullName(detail.firstName, detail.lastName),

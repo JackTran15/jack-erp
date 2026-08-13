@@ -37,6 +37,9 @@ import { ResetPasswordDto } from "./dto/reset-password.dto";
 
 const BCRYPT_COST = 10;
 
+/** Sentinel for "match nothing" — an empty `In([])` would match every row. */
+const NIL_UUID = "00000000-0000-0000-0000-000000000000";
+
 export interface UserListParams {
   page: number;
   pageSize: number;
@@ -65,6 +68,37 @@ export class UsersService {
     private readonly dataSource: DataSource,
   ) {}
 
+  /**
+   * User ids the actor may see, or `null` for no restriction. Without
+   * `iam.user.read.all` an actor sees the employees of their own branches plus
+   * the accounts above them (chain managers / admins), which the list renders
+   * read-only — see {@link UserListItem.canEdit}.
+   */
+  async visibleUserIds(actor: ActorContext): Promise<string[] | null> {
+    const keys = await this.rbacService.getUserPermissions(
+      actor.userId,
+      actor.organizationId,
+    );
+    if (keys.includes("iam.user.read.all")) return null;
+
+    const elevatedRoles = await this.elevatedRoleIds(actor);
+    const [branchPeers, elevatedUsers] = await Promise.all([
+      this.userIdsInActorBranches(actor),
+      this.userIdsWithRoles(elevatedRoles, actor.organizationId),
+    ]);
+    return [...new Set([...branchPeers, ...elevatedUsers])];
+  }
+
+  /** Ids of accounts the actor may not modify (they hold permissions the actor lacks). */
+  async unmanageableUserIds(actor: ActorContext): Promise<Set<string>> {
+    const elevated = await this.userIdsWithRoles(
+      await this.elevatedRoleIds(actor),
+      actor.organizationId,
+    );
+    elevated.delete(actor.userId);
+    return elevated;
+  }
+
   async list(
     query: UserListParams,
     actor: ActorContext,
@@ -74,6 +108,11 @@ export class UsersService {
     };
     if (typeof query.isActive === "boolean") {
       where.isActive = query.isActive;
+    }
+    const visibleIds = await this.visibleUserIds(actor);
+    if (visibleIds !== null) {
+      // Empty scope must match nothing, not everything.
+      where.id = visibleIds.length ? In(visibleIds) : In([NIL_UUID]);
     }
 
     // Resolve users whose employee code matches the search term so the OR clause
@@ -88,6 +127,12 @@ export class UsersService {
         select: { id: true, userId: true },
       });
       codeMatchedUserIds = matches.map((m) => m.userId);
+      // That branch sets its own `id`, overwriting the scope clause spread in
+      // beside it — intersect here so a code search cannot reach another branch.
+      if (visibleIds !== null) {
+        const visible = new Set(visibleIds);
+        codeMatchedUserIds = codeMatchedUserIds.filter((id) => visible.has(id));
+      }
     }
 
     const baseFind = {
@@ -125,20 +170,44 @@ export class UsersService {
     rows: UserEntity[],
     actor: ActorContext,
   ): Promise<UserListItem[]> {
-    const profiles = rows.length
-      ? await this.profileRepo.find({
-          where: {
-            userId: In(rows.map((u) => u.id)),
-            organizationId: actor.organizationId,
-          },
-          relations: ["jobPosition"],
-        })
-      : [];
+    const [profiles, unmanageable] = await Promise.all([
+      rows.length
+        ? this.profileRepo.find({
+            where: {
+              userId: In(rows.map((u) => u.id)),
+              organizationId: actor.organizationId,
+            },
+            relations: ["jobPosition"],
+          })
+        : Promise.resolve([]),
+      this.unmanageableUserIds(actor),
+    ]);
     const profileByUser = new Map(profiles.map((p) => [p.userId, p]));
-    return rows.map((u) => this.toListItem(u, profileByUser.get(u.id)));
+    return rows.map((u) => ({
+      ...this.toListItem(u, profileByUser.get(u.id)),
+      canEdit: !unmanageable.has(u.id),
+    }));
   }
 
   async findById(id: string, actor: ActorContext): Promise<UserDetail> {
+    // Out-of-scope accounts read as non-existent rather than forbidden, so the
+    // endpoint does not confirm who works at another branch.
+    const visibleIds = await this.visibleUserIds(actor);
+    if (visibleIds !== null && !visibleIds.includes(id)) {
+      throw new NotFoundException(`User ${id} not found`);
+    }
+    return this.buildUserDetail(id, actor);
+  }
+
+  /**
+   * Detail without the visibility check — for callers that just wrote the row
+   * (create/update), where a freshly created account may not be in the actor's
+   * branch scope yet and must still be returned.
+   */
+  private async buildUserDetail(
+    id: string,
+    actor: ActorContext,
+  ): Promise<UserDetail> {
     const user = await this.userRepo.findOne({
       where: { id, organizationId: actor.organizationId },
     });
@@ -167,6 +236,7 @@ export class UsersService {
       roleIds: roles.map((r) => r.roleId),
       branchIds: branches.map((b) => b.branchId),
       profile: profile ? this.toProfileView(profile) : null,
+      canEdit: !(await this.unmanageableUserIds(actor)).has(id),
     };
   }
 
@@ -258,7 +328,7 @@ export class UsersService {
       `Created user ${created.id} (email=${normalizedEmail}, org=${actor.organizationId})`,
     );
 
-    return this.findById(created.id, actor);
+    return this.buildUserDetail(created.id, actor);
   }
 
   async update(
@@ -272,6 +342,7 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`User ${id} not found`);
     }
+    await this.assertCanManageUser(id, actor);
 
     await this.dataSource.transaction(async (manager) => {
       if (dto.firstName !== undefined) user.firstName = dto.firstName.trim();
@@ -292,7 +363,7 @@ export class UsersService {
       );
     }
 
-    return this.findById(id, actor);
+    return this.buildUserDetail(id, actor);
   }
 
   async resetPassword(
@@ -306,6 +377,7 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`User ${id} not found`);
     }
+    await this.assertCanManageUser(id, actor);
 
     user.passwordHash = await bcrypt.hash(
       dto.newTemporaryPassword,
@@ -329,6 +401,7 @@ export class UsersService {
     if (id === actor.userId) {
       throw new BadRequestException("You cannot deactivate your own account");
     }
+    await this.assertCanManageUser(id, actor);
     if (!user.isActive) return;
 
     user.isActive = false;
@@ -350,6 +423,7 @@ export class UsersService {
     actor: ActorContext,
   ): Promise<string[]> {
     await this.ensureUserExists(id, actor);
+    await this.assertCanManageUser(id, actor);
     if (roleIds.length) {
       await this.assertRolesExist(roleIds, actor.organizationId);
       await this.assertCanGrantRoles(roleIds, actor);
@@ -391,6 +465,7 @@ export class UsersService {
     actor: ActorContext,
   ): Promise<string[]> {
     await this.ensureUserExists(id, actor);
+    await this.assertCanManageUser(id, actor);
     if (branchIds.length) {
       await this.assertBranchesExist(branchIds, actor.organizationId);
     }
@@ -473,6 +548,97 @@ export class UsersService {
         `Cannot grant role "${role?.name ?? roleId}": it includes ${excess.length} permission(s) you do not have`,
       );
     }
+  }
+
+  /**
+   * Role ids in the org that grant at least one permission the actor lacks —
+   * i.e. accounts "above" the actor. Computed per role (a handful) rather than
+   * per user, so it stays a constant two queries no matter how many employees
+   * the organization has.
+   */
+  private async elevatedRoleIds(actor: ActorContext): Promise<Set<string>> {
+    const [actorKeys, roles] = await Promise.all([
+      this.rbacService.getUserPermissions(actor.userId, actor.organizationId),
+      this.roleRepo.find({
+        where: { organizationId: actor.organizationId },
+        select: { id: true },
+      }),
+    ]);
+    const actorSet = new Set(actorKeys);
+    const keysByRole = await this.rbacService.getRolePermissionKeys(
+      roles.map((r) => r.id),
+    );
+    const elevated = new Set<string>();
+    for (const [roleId, roleKeys] of keysByRole) {
+      if (roleKeys.some((key) => !actorSet.has(key))) elevated.add(roleId);
+    }
+    return elevated;
+  }
+
+  /** User ids in the org holding at least one of the given roles. */
+  private async userIdsWithRoles(
+    roleIds: Set<string>,
+    organizationId: string,
+  ): Promise<Set<string>> {
+    if (roleIds.size === 0) return new Set();
+    const rows = await this.userRoleRepo.find({
+      where: { roleId: In([...roleIds]), organizationId },
+      select: { userId: true },
+    });
+    return new Set(rows.map((r) => r.userId));
+  }
+
+  /** User ids sharing at least one branch with the actor. */
+  private async userIdsInActorBranches(
+    actor: ActorContext,
+  ): Promise<Set<string>> {
+    const mine = await this.userBranchRepo.find({
+      where: { userId: actor.userId, organizationId: actor.organizationId },
+      select: { branchId: true },
+    });
+    const branchIds = mine.map((b) => b.branchId);
+    if (branchIds.length === 0) return new Set([actor.userId]);
+    const rows = await this.userBranchRepo.find({
+      where: { branchId: In(branchIds), organizationId: actor.organizationId },
+      select: { userId: true },
+    });
+    return new Set([...rows.map((r) => r.userId), actor.userId]);
+  }
+
+  /**
+   * You cannot act on an account holding permissions you do not hold yourself —
+   * the same rule as {@link assertCanGrantRoles}, applied to the target account
+   * rather than to a role. Without it, `iam.user.write` let a branch manager
+   * reset the password of (and therefore take over) a Quản lý tổng or Quản trị
+   * hệ thống account. Acting on your own account is always allowed.
+   */
+  private async assertCanManageUser(
+    targetId: string,
+    actor: ActorContext,
+  ): Promise<void> {
+    if (targetId === actor.userId) return;
+
+    // Out of scope is out of reach: writes must respect the same branch scope as
+    // reads, or knowing an id would be enough to edit another branch's staff.
+    const visibleIds = await this.visibleUserIds(actor);
+    if (visibleIds !== null && !visibleIds.includes(targetId)) {
+      throw new NotFoundException(`User ${targetId} not found`);
+    }
+
+    const [actorKeys, targetKeys] = await Promise.all([
+      this.rbacService.getUserPermissions(actor.userId, actor.organizationId),
+      this.rbacService.getUserPermissions(targetId, actor.organizationId),
+    ]);
+    const actorSet = new Set(actorKeys);
+    const excess = targetKeys.filter((key) => !actorSet.has(key));
+    if (excess.length === 0) return;
+
+    this.logger.warn(
+      `User ${actor.userId} tried to manage user ${targetId} holding ${excess.length} permission(s) they lack: ${excess.join(", ")}`,
+    );
+    throw new ForbiddenException(
+      `Cannot manage this account: it holds ${excess.length} permission(s) you do not have`,
+    );
   }
 
   private async assertBranchesExist(

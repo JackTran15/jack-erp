@@ -287,6 +287,13 @@ export function EmployeesPage() {
     }
   }, [confirmDeactivate, deactivateUser]);
 
+  // The server refuses writes on accounts holding permissions the caller lacks
+  // (a chain manager or admin seen by a branch manager). Mirror that here so the
+  // row is visibly read-only instead of failing with a 403 on click.
+  const canEditSelected = selectedUser
+    ? ((selectedUser as { canEdit?: boolean }).canEdit ?? true)
+    : false;
+
   const toolbarItems: ToolbarItem[] = [
     {
       id: "add",
@@ -307,7 +314,7 @@ export function EmployeesPage() {
       label: "Sửa",
       icon: Pencil,
       onClick: () => void openEdit(),
-      disabled: !selectedId || !canWrite,
+      disabled: !selectedId || !canWrite || !canEditSelected,
     },
     { id: "sep1", type: "separator" },
     {
@@ -321,7 +328,7 @@ export function EmployeesPage() {
           id: selectedUser.id,
           label: `${joinFullName(selectedUser.firstName, selectedUser.lastName)} (${selectedUser.email})`,
         }),
-      disabled: !selectedUser || !canDelete,
+      disabled: !selectedUser || !canDelete || !canEditSelected,
     },
     { id: "sep2", type: "separator" },
     { id: "reload", label: "Nạp", icon: RefreshCw, onClick: handleReload },
