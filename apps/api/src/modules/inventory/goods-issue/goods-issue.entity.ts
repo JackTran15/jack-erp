@@ -18,7 +18,10 @@ import { GoodsIssueLineEntity } from './goods-issue-line.entity';
 @Index(['organizationId', 'status'])
 @Index('IDX_goods_issues_org_branch_list', ['organizationId', 'branchId', 'status', 'createdAt'])
 export class GoodsIssueEntity extends BaseEntity {
-  @Column({ name: 'document_number', nullable: true, unique: true, comment: 'Auto-generated on posting' })
+  // Uniqueness enforced per-organization at the DB level
+  // (UQ_goods_issues_org_document_number), not globally — see
+  // 1787900000000-ScopeGoodsIssuePurchaseOrderDocNumberToOrg.
+  @Column({ name: 'document_number', nullable: true, comment: 'Auto-generated on posting' })
   documentNumber?: string;
 
   @Column({ name: 'location_id', type: 'uuid', comment: 'Source storage location' })

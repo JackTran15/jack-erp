@@ -8,7 +8,10 @@ import { PurchaseOrderLineEntity } from './purchase-order-line.entity';
 @Index(['organizationId', 'status'])
 @Index('IDX_purchase_orders_org_branch_list', ['organizationId', 'branchId', 'status', 'createdAt'])
 export class PurchaseOrderEntity extends BaseEntity {
-  @Column({ name: 'document_number', nullable: true, unique: true, comment: 'Auto-generated on approval' })
+  // Uniqueness enforced per-organization at the DB level
+  // (UQ_purchase_orders_org_document_number), not globally — see
+  // 1787900000000-ScopeGoodsIssuePurchaseOrderDocNumberToOrg.
+  @Column({ name: 'document_number', nullable: true, comment: 'Auto-generated on approval' })
   documentNumber?: string;
 
   @Column({ name: 'provider_id', type: 'uuid', comment: 'Supplier (inventory_providers)' })
