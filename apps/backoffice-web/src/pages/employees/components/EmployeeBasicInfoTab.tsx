@@ -15,8 +15,6 @@ interface EmployeeBasicInfoTabProps {
   onChange: (draft: EmployeeFormDraft) => void;
   isEdit: boolean;
   isGeneratingCode?: boolean;
-  changePassword?: boolean;
-  onChangePassword?: (value: boolean) => void;
 }
 
 const EMPLOYMENT_OPTIONS = Object.values(EmploymentStatusEnum);
@@ -67,14 +65,18 @@ export function EmployeeBasicInfoTab({
   onChange,
   isEdit,
   isGeneratingCode = false,
-  changePassword = false,
-  onChangePassword,
 }: EmployeeBasicInfoTabProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const { basic } = draft;
 
+  /**
+   * Single write path for the toggle. `draft.basic.changePassword` is what
+   * buildUserUpdatePayload reads to decide whether to call reset-password, so
+   * the flag has to live in the draft — a component-local copy silently drops
+   * the new password on save.
+   */
   const handleChangePasswordToggle = (checked: boolean) => {
     onChange(
       setBasic(draft, {
@@ -82,6 +84,10 @@ export function EmployeeBasicInfoTab({
         ...(checked ? {} : { password: "", confirmPassword: "" }),
       }),
     );
+    if (!checked) {
+      setShowPassword(false);
+      setShowConfirm(false);
+    }
   };
 
   const handlePhoto = (file: File | undefined) => {
@@ -197,24 +203,14 @@ export function EmployeeBasicInfoTab({
         </FormField>
       </div>
 
-      {isEdit && onChangePassword && (
+      {isEdit && (
         <FormField label="" layout="horizontal" labelWidth={FORM_LABEL_WIDTH}>
           <label className="flex cursor-pointer items-center gap-2 text-sm">
             <input
               type="checkbox"
               className="h-4 w-4 rounded border-input"
-              checked={changePassword}
-              onChange={(e) => {
-                const checked = e.target.checked;
-                onChangePassword(checked);
-                if (!checked) {
-                  onChange(
-                    setBasic(draft, { password: "", confirmPassword: "" }),
-                  );
-                  setShowPassword(false);
-                  setShowConfirm(false);
-                }
-              }}
+              checked={basic.changePassword}
+              onChange={(e) => handleChangePasswordToggle(e.target.checked)}
             />
             Đổi mật khẩu
           </label>
@@ -239,7 +235,7 @@ export function EmployeeBasicInfoTab({
 
       <div className="grid grid-cols-2 gap-x-6 gap-y-3">
         {((!isEdit && basic.allowSoftwareAccess) ||
-          (isEdit && changePassword)) && (
+          (isEdit && basic.changePassword)) && (
           <>
             <FormField label="Mật khẩu" required {...fieldProps}>
               <PasswordInput

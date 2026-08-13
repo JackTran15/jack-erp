@@ -9,6 +9,7 @@ import {
   Input,
   Label,
 } from "@erp/ui";
+import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { erpApi, requireErpSuccess } from "../../lib/erp-api";
 
@@ -19,6 +20,62 @@ interface Props {
 
 /** Mirrors the server DTO (@MinLength(8)), so the user is told before the round trip. */
 const MIN_LENGTH = 8;
+
+interface PasswordFieldProps {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  autoComplete: "current-password" | "new-password";
+  hint?: string;
+  onEnter?: () => void;
+}
+
+/** Text input with its own show/hide toggle — each field reveals independently. */
+function PasswordField({
+  id,
+  label,
+  value,
+  onChange,
+  autoComplete,
+  hint,
+  onEnter,
+}: PasswordFieldProps) {
+  const [visible, setVisible] = useState(false);
+  const Icon = visible ? EyeOff : Eye;
+
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="relative">
+        <Input
+          id={id}
+          type={visible ? "text" : "password"}
+          autoComplete={autoComplete}
+          className="pr-10"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onEnter?.();
+          }}
+        />
+        <button
+          type="button"
+          // Not focusable: tabbing through the form should go field to field,
+          // and the toggle is reachable by click for anyone who wants it.
+          tabIndex={-1}
+          onClick={() => setVisible((v) => !v)}
+          aria-label={visible ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+          aria-pressed={visible}
+          className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none"
+        >
+          <Icon className="h-4 w-4" />
+        </button>
+      </div>
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
 
 /**
  * Self-service password change, reachable from the account menu by every role.
@@ -86,42 +143,29 @@ export function ChangePasswordDialog({ open, onClose }: Props) {
           <DialogTitle>Đổi mật khẩu</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="current-password">Mật khẩu hiện tại</Label>
-            <Input
-              id="current-password"
-              type="password"
-              autoComplete="current-password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="new-password">Mật khẩu mới</Label>
-            <Input
-              id="new-password"
-              type="password"
-              autoComplete="new-password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Tối thiểu {MIN_LENGTH} ký tự.
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="confirm-password">Xác nhận mật khẩu mới</Label>
-            <Input
-              id="confirm-password"
-              type="password"
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void handleSubmit();
-              }}
-            />
-          </div>
+          <PasswordField
+            id="current-password"
+            label="Mật khẩu hiện tại"
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={setCurrentPassword}
+          />
+          <PasswordField
+            id="new-password"
+            label="Mật khẩu mới"
+            autoComplete="new-password"
+            value={newPassword}
+            onChange={setNewPassword}
+            hint={`Tối thiểu ${MIN_LENGTH} ký tự.`}
+          />
+          <PasswordField
+            id="confirm-password"
+            label="Xác nhận mật khẩu mới"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            onEnter={() => void handleSubmit()}
+          />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={handleClose} disabled={submitting}>

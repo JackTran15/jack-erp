@@ -86,7 +86,6 @@ export function EmployeeFormModal({
   const [activeTab, setActiveTab] = useState<EmployeeFormTabEnum>(
     EmployeeFormTabEnum.BASIC,
   );
-  const [changePassword, setChangePassword] = useState(false);
   const isEdit = mode === "edit";
 
   const {
@@ -99,11 +98,8 @@ export function EmployeeFormModal({
     refetch,
   } = useEmployeeFormDraft({ open, mode, userId, initialDraft });
 
-  useEffect(() => {
-    if (!open || mode !== "edit") {
-      setChangePassword(false);
-    }
-  }, [open, mode]);
+  // No reset effect for `changePassword`: it now lives on the draft, which
+  // useEmployeeFormDraft rebuilds on every open with the flag already false.
   const { mutateAsync: generateDocumentNumber, isPending: isGeneratingCode } =
     useGenerateDocumentNumber();
 
@@ -138,7 +134,7 @@ export function EmployeeFormModal({
 
   const handleSave = () => {
     const error = validateEmployeeDraft(draft, isEdit, {
-      changePassword: isEdit && changePassword,
+      changePassword: isEdit && draft.basic.changePassword,
     });
     if (error) {
       toast.error(error);
@@ -150,7 +146,7 @@ export function EmployeeFormModal({
   const handleSaveAndAddNew = () => {
     if (!onSaveAndAddNew) return;
     const error = validateEmployeeDraft(draft, isEdit, {
-      changePassword: isEdit && changePassword,
+      changePassword: isEdit && draft.basic.changePassword,
     });
     if (error) {
       toast.error(error);
@@ -169,8 +165,6 @@ export function EmployeeFormModal({
           onChange={setDraft}
           isEdit={isEdit}
           isGeneratingCode={isGeneratingCode}
-          changePassword={changePassword}
-          onChangePassword={setChangePassword}
         />
       ),
       [EmployeeFormTabEnum.ROLES]: (
@@ -186,7 +180,7 @@ export function EmployeeFormModal({
         <EmployeeAccessTimeTab draft={draft} onChange={setDraft} />
       ),
     }),
-    [draft, isEdit, isGeneratingCode, changePassword],
+    [draft, isEdit, isGeneratingCode],
   );
 
   const body = isError ? (
