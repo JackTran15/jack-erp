@@ -253,11 +253,13 @@ describe('POS staff permission seeds', () => {
   });
 
   // The whole point of the narrow key: a cashier prices a cart without being
-  // able to read the back-office promotion catalogue.
-  it('does not grant the back-office promotion keys to the POS roles', () => {
-    for (const keys of [SALES_PERMISSION_KEYS, CASHIER_PERMISSION_KEYS]) {
-      expect(keys).not.toContain('promotion.read');
-      expect(keys).not.toContain('promotion.write');
-    }
+  // able to read the back-office promotion catalogue. Asserted against both
+  // POS roles since STAFF was split into SALES + CASHIER.
+  it.each([
+    ['SALES', SALES_PERMISSION_KEYS],
+    ['CASHIER', CASHIER_PERMISSION_KEYS],
+  ])('does not grant the back-office promotion keys to %s', (_role, keys) => {
+    expect(keys).not.toContain('promotion.read');
+    expect(keys).not.toContain('promotion.write');
   });
 });
