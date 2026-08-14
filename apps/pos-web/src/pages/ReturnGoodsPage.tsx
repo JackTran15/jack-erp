@@ -9,7 +9,6 @@ import { useNavigate } from "react-router-dom";
 import { ReturnInvoiceTable } from "@erp/pos/components/page-components/ReturnGoods/ReturnInvoiceTable/ReturnInvoiceTable";
 import { ReturnItemsDialog } from "@erp/pos/components/page-components/ReturnGoods/ReturnItemsDialog/ReturnItemsDialog";
 import { InvoiceReceiptDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/InvoiceReceiptDialog/InvoiceReceiptDialog";
-import { RETURN_GOODS_DEFAULT_PAGE_SIZE } from "@erp/pos/constants/return-goods.constant";
 import { useReturnGoods } from "@erp/pos/hooks/page-hooks/return-goods/use-return-goods";
 
 export function ReturnGoodsPage() {
@@ -26,6 +25,13 @@ export function ReturnGoodsPage() {
     setFilter,
     rows,
     total,
+    page,
+    pageSize,
+    totalPages,
+    setPage,
+    setPageSize,
+    refetch,
+    grandTotal,
     dialog,
     openInvoice,
     closeDialog,
@@ -72,14 +78,18 @@ export function ReturnGoodsPage() {
               onFilterChange={setFilter}
               onReturn={openInvoice}
               onOpenInvoice={openInvoiceDetail}
+              grandTotal={grandTotal}
             />
           </div>
 
           <PosPaginationBar
-            page={1}
-            totalPages={1}
-            pageSize={RETURN_GOODS_DEFAULT_PAGE_SIZE}
+            page={page}
+            totalPages={totalPages}
+            pageSize={pageSize}
             total={total}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            onRefresh={refetch}
           />
         </div>
       </div>

@@ -42,6 +42,19 @@ interface UseReturnGoodsResult {
   rows: ReadonlyArray<ReturnInvoiceRow>;
   /** Total matching rows reported by the server (for the pagination bar). */
   total: number;
+  /** Trang hiện tại (1-based) và cỡ trang — phân trang chạy phía server. */
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  setPage: (next: number) => void;
+  setPageSize: (next: number) => void;
+  /** Tải lại danh sách (nút refresh trên thanh phân trang). */
+  refetch: () => void;
+  /**
+   * Tổng "Tổng thanh toán" của **toàn tập** khớp bộ lọc, do server tính — không
+   * phải tổng các dòng đang hiển thị.
+   */
+  grandTotal: number;
   /** Loading state for the invoice listing. */
   isLoading: boolean;
   /** Items-dialog state for the currently active invoice. */
@@ -85,10 +98,12 @@ export function useReturnGoods(): UseReturnGoodsResult {
     (s) => s.enterInvoiceReturnWithLines,
   );
 
-  const [dateRange, setDateRange] = useState<PosDateRangeFilterOption>("TODAY");
+  const [dateRange, setDateRangeState] = useState<PosDateRangeFilterOption>("TODAY");
   const [filters, setFilters] = useState<ReturnInvoiceFilters>(
     () => ({ ...EMPTY_RETURN_INVOICE_FILTERS }),
   );
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSizeState] = useState(RETURN_GOODS_DEFAULT_PAGE_SIZE);
 
   // Debounce the column inputs so typing doesn't fire a request per keystroke.
   const debouncedFilters = useDebounce(filters);
@@ -97,8 +112,8 @@ export function useReturnGoods(): UseReturnGoodsResult {
     const dateFilter = dateRangeToISO(dateRange);
     const hasDate = Boolean(dateFilter.from ?? dateFilter.to);
     return {
-      page: 1,
-      limit: RETURN_GOODS_DEFAULT_PAGE_SIZE,
+      page,
+      limit: pageSize,
       code:          toStringFilter(debouncedFilters.invoiceNumber),
       customerName:  toStringFilter(debouncedFilters.customerName),
       customerPhone: toStringFilter(debouncedFilters.customerPhone),
@@ -106,7 +121,7 @@ export function useReturnGoods(): UseReturnGoodsResult {
       totalPaid:     toCompareFilter(debouncedFilters.totalAmount),
       ...(hasDate ? { createdAt: dateFilter } : {}),
     };
-  }, [dateRange, debouncedFilters]);
+  }, [dateRange, debouncedFilters, page, pageSize]);
 
   const invoicesQuery = useReturnableInvoicesQuery(searchBody);
   const rows = useMemo(
@@ -114,13 +129,28 @@ export function useReturnGoods(): UseReturnGoodsResult {
     [invoicesQuery.data],
   );
   const total = invoicesQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const grandTotal = invoicesQuery.data?.totalAmount ?? 0;
 
+  // Reset lên trang 1 ở **mọi** setter nuôi truy vấn: lọc hẹp lại mà vẫn ở trang
+  // cũ thì lưới trống trong khi footer vẫn khác 0.
   const setFilter = useCallback<UseReturnGoodsResult["setFilter"]>(
     (key, value) => {
       setFilters((prev) => ({ ...prev, [key]: value }));
+      setPage(1);
     },
     [],
   );
+
+  const setDateRange = useCallback((next: PosDateRangeFilterOption) => {
+    setDateRangeState(next);
+    setPage(1);
+  }, []);
+
+  const setPageSize = useCallback((next: number) => {
+    setPageSizeState(next);
+    setPage(1);
+  }, []);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeInvoice, setActiveInvoice] = useState<ReturnInvoiceRow | null>(
@@ -244,6 +274,13 @@ export function useReturnGoods(): UseReturnGoodsResult {
     setFilter,
     rows,
     total,
+    page,
+    pageSize,
+    totalPages,
+    setPage,
+    setPageSize,
+    refetch: () => void invoicesQuery.refetch(),
+    grandTotal,
     isLoading: invoicesQuery.isLoading,
     dialog: {
       open: dialogOpen,

@@ -1,9 +1,11 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import { TransferStatus } from '@erp/shared-interfaces';
+import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { FilterBuilder } from '../../../../common/filters/filter.builder';
 import { StockTransferEntity } from '../stock-transfer.entity';
+import { StockTransferSearchV2Dto } from '../dto/stock-transfer-search-v2.dto';
 import { UserEntity } from '../../../auth/user.entity';
 import {
   attachCounterparties,
@@ -12,12 +14,22 @@ import {
 import { SearchStockTransfersV2Query } from './search-stock-transfers-v2.query';
 
 /**
- * Correlated line total — Tổng tiền = SUM(line_value). Used only for the
- * server-side `totalAmount` filter; the returned rows still carry `lines`, and
- * the handler attaches `totalAmount` per row from those lines.
+ * Correlated line total — Tổng tiền = SUM(line_value). Drives the server-side
+ * `totalAmount` filter and the footer grand total; the returned rows still
+ * carry `lines`, and the handler attaches `totalAmount` per row from those
+ * lines.
+ *
+ * A correlated subquery rather than a join on purpose: the rows query joins
+ * `lines` one-to-many, and summing over that join would count a 5-line
+ * transfer five times. The totals query never joins `lines` at all.
  */
 const TOTAL_AMOUNT_SUBQUERY = `(SELECT COALESCE(SUM(l.line_value), 0)
    FROM stock_transfer_lines l WHERE l.transfer_id = st.id)`;
+
+interface TotalsRaw {
+  total: string;
+  totalAmount: string;
+}
 
 /** Người vận chuyển — transporter user's full name (legacy fallback Đối tượng). */
 const TRANSPORTER_NAME_SUBQUERY = `(SELECT (u.first_name || ' ' || u.last_name)
@@ -45,39 +57,28 @@ export class SearchStockTransfersV2Handler
     const page = dto.page ?? 1;
     const limit = dto.limit ?? 20;
 
-    // Org + branch scoped, hiding CANCELLED (the "Xóa"-ed reversal docs).
     // Lines and their item/storage/location relations are joined explicitly so
     // each row carries the full `lines` the master-detail "Chi tiết" panel reads.
-    const qb = this.repo
-      .createQueryBuilder('st')
+    const rowsQb = this.buildQuery(dto, actor)
       .leftJoinAndSelect('st.lines', 'lines')
       .leftJoinAndSelect('lines.item', 'lineItem')
       .leftJoinAndSelect('lines.sourceStorage', 'lineSrcStorage')
       .leftJoinAndSelect('lines.destinationStorage', 'lineDstStorage')
       .leftJoinAndSelect('lines.sourceLocation', 'lineSrcLocation')
       .leftJoinAndSelect('lines.destinationLocation', 'lineDstLocation')
-      .where('st.organizationId = :orgId', { orgId: actor.organizationId })
-      .andWhere('st.status != :cancelled', {
-        cancelled: TransferStatus.CANCELLED,
-      });
-
-    if (actor.branchId) {
-      qb.andWhere('st.branchId = :branchId', { branchId: actor.branchId });
-    }
-
-    new FilterBuilder(qb)
-      .applyString('st.documentNumber', dto.documentNumber)
-      .applyString(PARTY_EXPRESSION, dto.party)
-      .applyString('st.notes', dto.notes)
-      .applyDateCompare(DATE_COLUMN, dto.date)
-      .applyDateRange(DATE_COLUMN, dto.dateRange)
-      .applyCompare(TOTAL_AMOUNT_SUBQUERY, dto.totalAmount);
-
-    qb.orderBy('st.createdAt', 'DESC')
+      .orderBy('st.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 
-    const [data, total] = await qb.getManyAndCount();
+    // No `lines` join here — see TOTAL_AMOUNT_SUBQUERY.
+    const totalsQb = this.buildQuery(dto, actor)
+      .select('COUNT(*)', 'total')
+      .addSelect(`COALESCE(SUM(${TOTAL_AMOUNT_SUBQUERY}), 0)`, 'totalAmount');
+
+    const [data, totals] = await Promise.all([
+      rowsQb.getMany(),
+      totalsQb.getRawOne<TotalsRaw>(),
+    ]);
 
     // Inline the transporter ({ id, fullName }) + Tổng tiền (∑ line_value) per
     // row — batched to avoid N+1; mirrors StockTransferService.list().
@@ -117,6 +118,44 @@ export class SearchStockTransfersV2Handler
     // null and fall back to the transporter on the FE.
     await attachCounterparties(this.repo.manager, data, actor.organizationId);
 
-    return { data, total, page, limit };
+    return {
+      data,
+      total: Number(totals?.total ?? 0),
+      page,
+      limit,
+      totals: { totalAmount: Number(totals?.totalAmount ?? 0) },
+    };
+  }
+
+  /**
+   * Scope + every column filter. Built twice per request (rows, totals) so the
+   * footer total can never disagree with the grid.
+   */
+  private buildQuery(
+    dto: StockTransferSearchV2Dto,
+    actor: ActorContext,
+  ): SelectQueryBuilder<StockTransferEntity> {
+    // Org + branch scoped, hiding CANCELLED (the "Xóa"-ed reversal docs) so
+    // they reach neither the grid nor the footer total.
+    const qb = this.repo
+      .createQueryBuilder('st')
+      .where('st.organizationId = :orgId', { orgId: actor.organizationId })
+      .andWhere('st.status != :cancelled', {
+        cancelled: TransferStatus.CANCELLED,
+      });
+
+    if (actor.branchId) {
+      qb.andWhere('st.branchId = :branchId', { branchId: actor.branchId });
+    }
+
+    new FilterBuilder(qb)
+      .applyString('st.documentNumber', dto.documentNumber)
+      .applyString(PARTY_EXPRESSION, dto.party)
+      .applyString('st.notes', dto.notes)
+      .applyDateCompare(DATE_COLUMN, dto.date)
+      .applyDateRange(DATE_COLUMN, dto.dateRange)
+      .applyCompare(TOTAL_AMOUNT_SUBQUERY, dto.totalAmount);
+
+    return qb;
   }
 }

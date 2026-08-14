@@ -61,11 +61,16 @@ export class PurchaseHistorySearchV2Dto {
   @Type(() => EnumFilterDto)
   status?: EnumFilterDto;
 
-  /** Total amount paid */
+  /**
+   * "Tổng thanh toán" — the same signed amount the grid column shows
+   * (`amountDue`, or `netAmount` for RETURN/EXCHANGE). Renamed from `totalPaid`,
+   * which filtered money actually collected and therefore never matched the
+   * number the user was looking at on a debt invoice.
+   */
   @IsOptional()
   @ValidateNested()
   @Type(() => CompareFilterDto)
-  totalPaid?: CompareFilterDto;
+  totalAmount?: CompareFilterDto;
 
   /** Note */
   @IsOptional()

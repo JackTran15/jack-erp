@@ -3,13 +3,16 @@ import {
   IsArray,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   Max,
   Min,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import { MAX_REPORT_ROWS } from '../../reporting/report-core/row-cap.util';
 import { ITEM_GROUP_BY_VALUES, type ItemGroupBy } from '../services/stock-period.service';
+import { ReportColumnFilterDto } from './report-column-filter.dto';
 
 export { ItemGroupBy };
 
@@ -25,6 +28,22 @@ export const PERIOD_PRESETS = [
 ] as const;
 
 export type PeriodPresetLiteral = typeof PERIOD_PRESETS[number];
+
+/**
+ * `columnFilters` arrives as a JSON string on these GET endpoints. Malformed
+ * JSON is left as-is so `@IsObject()` rejects it with a 400 rather than the
+ * request silently proceeding unfiltered.
+ */
+function parseColumnFilters(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if (trimmed === '') return undefined;
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return value;
+  }
+}
 
 /** Shared query params for every inventory report endpoint. */
 export class InventoryReportQueryDto {
@@ -98,11 +117,38 @@ export class InventoryReportQueryDto {
   @Min(1)
   page?: number = 1;
 
-  @ApiPropertyOptional({ default: 20, minimum: 1, maximum: 200 })
+  @ApiPropertyOptional({
+    default: 20,
+    minimum: 1,
+    maximum: MAX_REPORT_ROWS,
+    description:
+      'Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client.',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(200)
+  @Max(MAX_REPORT_ROWS)
   pageSize?: number = 20;
+
+  @ApiPropertyOptional({
+    type: 'string',
+    description:
+      'Lọc theo cột, dạng JSON: {"outQty":{"operator":">=","value":10}}. Khoá là tên field của dòng. ' +
+      'Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem.',
+    example: '{"outQty":{"operator":">=","value":10}}',
+  })
+  @IsOptional()
+  // These are GET endpoints and Express is running the simple query parser, so
+  // `columnFilters[x][operator]` arrives as a literal key rather than a nested
+  // object. A single JSON value is unambiguous and survives any parser.
+  //
+  // No @ValidateNested here on purpose: the keys are column names chosen at
+  // runtime, and the global `forbidNonWhitelisted` pipe would reject every one
+  // of them as an unknown property. The values are validated where they are
+  // turned into SQL — `buildReportColumnFilter` rejects a column the report
+  // cannot filter and ignores a blank or non-numeric value.
+  @Transform(({ value }) => parseColumnFilters(value))
+  @IsObject()
+  columnFilters?: Record<string, ReportColumnFilterDto>;
 }

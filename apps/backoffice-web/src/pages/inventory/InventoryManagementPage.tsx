@@ -245,30 +245,9 @@ export function InventoryManagementPage() {
   const total = response?.total ?? 0;
   const hasPeriod = Boolean(applied.period.from || applied.period.to);
 
-  const visibleTotals = useMemo(
-    () =>
-      rows.reduce(
-        (sum, row) => ({
-          quantity:
-            sum.quantity +
-            displayStockQuantity(row, applied.advanced.excludeReservations),
-          openingQty: sum.openingQty + row.openingQty,
-          inQty: sum.inQty + row.inQty,
-          outQty: sum.outQty + row.outQty,
-          transferOutQty: sum.transferOutQty + row.transferOutQty,
-          incomingQty: sum.incomingQty + row.incomingQty,
-        }),
-        {
-          quantity: 0,
-          openingQty: 0,
-          inQty: 0,
-          outQty: 0,
-          transferOutQty: 0,
-          incomingQty: 0,
-        },
-      ),
-    [applied.advanced.excludeReservations, rows],
-  );
+  // Tổng do server tính trên toàn bộ kết quả lọc. Không cộng dồn `rows` nữa:
+  // `rows` chỉ là một trang, nên tổng kiểu đó đổi mỗi lần người dùng sang trang.
+  const totals = response?.totals;
 
   const columns = useMemo<TableColumn<StockSummaryRow>[]>(
     () => [
@@ -322,32 +301,21 @@ export function InventoryManagementPage() {
       quantityColumn(
         "quantity",
         "SL tồn",
-        // response.totalQuantity là tổng tồn LIVE toàn bộ tập kết quả (mọi
-        // trang) — không theo kỳ. Khi có chọn "Từ ngày/Đến ngày", cột này
-        // hiển thị closingQty theo kỳ nên tổng cũng phải cùng phạm vi với các
-        // cột kỳ khác (Tồn đầu kỳ/SL nhập/SL xuất): cộng dồn theo trang hiện
-        // tại, không dùng response.totalQuantity.
-        hasPeriod || applied.advanced.excludeReservations
-          ? visibleTotals.quantity
-          : (response?.totalQuantity ?? visibleTotals.quantity),
+        // `closingQty` của server đã theo đúng ngữ nghĩa cột này ở cả hai
+        // trường hợp (có kỳ = tồn cuối kỳ, không kỳ = tồn live), nên chỉ cần
+        // trừ phần giữ chỗ giống hệt displayStockQuantity làm cho từng dòng.
+        totals &&
+          totals.closingQty -
+            (applied.advanced.excludeReservations ? totals.reservedQty : 0),
         (row) => displayStockQuantity(row, applied.advanced.excludeReservations),
       ),
-      quantityColumn("openingQty", "Tồn đầu kỳ", visibleTotals.openingQty),
-      quantityColumn("inQty", "SL nhập", visibleTotals.inQty),
-      quantityColumn("outQty", "SL xuất", visibleTotals.outQty),
-      quantityColumn(
-        "transferOutQty",
-        "Đang chuyển đi",
-        visibleTotals.transferOutQty,
-      ),
-      quantityColumn("incomingQty", "Sắp nhận về", visibleTotals.incomingQty),
+      quantityColumn("openingQty", "Tồn đầu kỳ", totals?.openingQty),
+      quantityColumn("inQty", "SL nhập", totals?.inQty),
+      quantityColumn("outQty", "SL xuất", totals?.outQty),
+      quantityColumn("transferOutQty", "Đang chuyển đi", totals?.transferOutQty),
+      quantityColumn("incomingQty", "Sắp nhận về", totals?.incomingQty),
     ],
-    [
-      applied.advanced.excludeReservations,
-      hasPeriod,
-      response?.totalQuantity,
-      visibleTotals,
-    ],
+    [applied.advanced.excludeReservations, totals],
   );
 
   const activeAdvancedCount = [
@@ -537,7 +505,9 @@ export function InventoryManagementPage() {
 function quantityColumn(
   key: keyof StockSummaryRow,
   label: string,
-  total: number,
+  /** Tổng toàn tập từ server; `undefined` khi đang tải hoặc lỗi ⇒ ẩn footer
+   *  thay vì hiển thị 0, vì 0 là một con số và người dùng sẽ tin nó. */
+  total: number | undefined,
   valueOf: (row: StockSummaryRow) => number = (row) => Number(row[key] ?? 0),
 ): TableColumn<StockSummaryRow> {
   return {
@@ -548,11 +518,12 @@ function quantityColumn(
     headerClassName: "text-right",
     className: "text-right tabular-nums",
     render: (row) => formatMoneyInteger(valueOf(row)),
-    footer: (
-      <span className="block text-right font-semibold tabular-nums">
-        {formatMoneyInteger(total)}
-      </span>
-    ),
+    footer:
+      total === undefined ? null : (
+        <span className="block text-right font-semibold tabular-nums">
+          {formatMoneyInteger(total)}
+        </span>
+      ),
   };
 }
 

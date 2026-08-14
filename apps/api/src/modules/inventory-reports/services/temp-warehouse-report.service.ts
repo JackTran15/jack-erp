@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import type { ReportTotals } from '@erp/shared-interfaces';
 import { DataSource } from 'typeorm';
+import type { ReportColumnFilterDto } from '../dto/report-column-filter.dto';
+import {
+  buildReportColumnFilter,
+  type ReportColumnSpecs,
+} from './report-column-filter.util';
 
 /**
  * Báo cáo — Hàng hóa xuất kho tạm (temp-warehouse out goods).
@@ -91,12 +97,39 @@ export interface TempWarehouseReportQuery {
   search?: string;
   page: number;
   pageSize: number;
+  /** Lọc theo cột, áp phía server nên tác dụng trên toàn tập. */
+  columnFilters?: Record<string, ReportColumnFilterDto>;
 }
 
 export interface TempWarehouseReportResult {
   data: TempWarehouseIssueRow[];
   total: number;
+  /**
+   * SUM của từng cột số trên **toàn bộ** kết quả lọc, không phải trang hiện
+   * tại. Khoá trùng tên field của dòng để lưới ánh xạ thẳng vào footer.
+   */
+  totals: ReportTotals;
 }
+
+/**
+ * Cột nào lọc được và ánh xạ sang biểu thức nào ở tầng `enriched`.
+ * Khoá = tên field của `TempWarehouseIssueRow` mà lưới render.
+ */
+const TEMP_WAREHOUSE_COLUMN_SPECS: ReportColumnSpecs = {
+  sku: { sql: 'sku', kind: 'text' },
+  name: { sql: 'name', kind: 'text' },
+  unit: { sql: 'unit', kind: 'text' },
+  location: { sql: 'location', kind: 'text' },
+  date: { sql: 'date', kind: 'text' },
+  time: { sql: 'time', kind: 'text' },
+  staff: { sql: 'staff', kind: 'text' },
+  status: { sql: 'status', kind: 'text' },
+  invoice: { sql: 'invoice', kind: 'text' },
+  outQty: { sql: 'out_qty', kind: 'number' },
+  returnQty: { sql: 'return_qty', kind: 'number' },
+  saleQty: { sql: 'sale_qty', kind: 'number' },
+  remainingQty: { sql: 'remaining_qty', kind: 'number' },
+};
 
 interface RawRow {
   sku: string;
@@ -213,19 +246,13 @@ export class TempWarehouseReportService {
       search,
     ];
 
-    const countRows: Array<{ total: string }> = await this.dataSource.query(
-      `${pairedCte} SELECT COUNT(*)::int AS total FROM paired`,
-      baseParams,
-    );
-    const total = Number(countRows[0]?.total ?? 0);
-
-    if (total === 0) {
-      return { data: [], total: 0 };
-    }
-
-    const rows: RawRow[] = await this.dataSource.query(
-      `
-      ${pairedCte}
+    // One outer stage shared by the rows, count and totals queries. The two
+    // LATERALs resolve the item's shelf; they already ran for the whole matching
+    // set before (ORDER BY + LIMIT forces a full sort), so hoisting them here
+    // costs the rows query nothing and lets the footer see the same columns.
+    const enrichedCte = `
+      ${pairedCte},
+      enriched AS (
       SELECT
         i.code AS sku,
         i.name AS name,
@@ -248,7 +275,8 @@ export class TempWarehouseReportService {
           WHEN p.return_qty = 1 THEN 'Trả hàng trưng bày'
           ELSE 'Xuất không bán'
         END AS status,
-        COALESCE(p.invoice_number, '') AS invoice
+        COALESCE(p.invoice_number, '') AS invoice,
+        p.event_at AS event_at
       FROM paired p
       JOIN items i ON i.id = p.item_id AND i.organization_id = $1
       LEFT JOIN users u ON u.id = p.carrier_user_id
@@ -291,10 +319,59 @@ export class TempWarehouseReportService {
         ORDER BY sb.quantity DESC
         LIMIT 1
       ) fallback ON preferred.code IS NULL
-      ORDER BY p.event_at DESC
-      LIMIT $7 OFFSET $8
+      )
+    `;
+
+    // Column filters are applied to `enriched`, the one stage where the row the
+    // user sees exists. Rows, count and totals all read from it, so the footer
+    // cannot describe a different set than the grid.
+    const columnFilter = buildReportColumnFilter(
+      query.columnFilters,
+      TEMP_WAREHOUSE_COLUMN_SPECS,
+      baseParams.length,
+    );
+    const filterWhere = columnFilter.where ? `WHERE ${columnFilter.where}` : '';
+    const filteredParams = [...baseParams, ...columnFilter.params];
+
+    const [aggregate]: Array<{
+      total: string;
+      out_qty: string;
+      return_qty: string;
+      sale_qty: string;
+      remaining_qty: string;
+    }> = await this.dataSource.query(
+      `${enrichedCte}
+       SELECT COUNT(*)::int AS total,
+              COALESCE(SUM(out_qty), 0)::numeric AS out_qty,
+              COALESCE(SUM(return_qty), 0)::numeric AS return_qty,
+              COALESCE(SUM(sale_qty), 0)::numeric AS sale_qty,
+              COALESCE(SUM(remaining_qty), 0)::numeric AS remaining_qty
+       FROM enriched ${filterWhere}`,
+      filteredParams,
+    );
+    const total = Number(aggregate?.total ?? 0);
+    const totals = {
+      outQty: Number(aggregate?.out_qty ?? 0),
+      returnQty: Number(aggregate?.return_qty ?? 0),
+      saleQty: Number(aggregate?.sale_qty ?? 0),
+      remainingQty: Number(aggregate?.remaining_qty ?? 0),
+    };
+
+    if (total === 0) {
+      return { data: [], total: 0, totals };
+    }
+
+    const rows: RawRow[] = await this.dataSource.query(
+      `
+      ${enrichedCte}
+      SELECT sku, name, unit, location, date, time, staff,
+             out_qty, return_qty, sale_qty, remaining_qty, status, invoice
+      FROM enriched
+      ${filterWhere}
+      ORDER BY event_at DESC
+      LIMIT $${filteredParams.length + 1} OFFSET $${filteredParams.length + 2}
       `,
-      [...baseParams, pageSize, offset],
+      [...filteredParams, pageSize, offset],
     );
 
     const data: TempWarehouseIssueRow[] = rows.map((r) => ({
@@ -313,6 +390,6 @@ export class TempWarehouseReportService {
       invoice: r.invoice,
     }));
 
-    return { data, total };
+    return { data, total, totals };
   }
 }

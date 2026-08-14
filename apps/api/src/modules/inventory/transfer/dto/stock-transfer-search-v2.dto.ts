@@ -10,6 +10,11 @@ import {
  * Server-side search request for the Chuyển kho (stock transfer) list.
  * Filterable columns mirror what `StockTransferPage` renders:
  * Ngày, Số phiếu chuyển, Đối tượng (Người vận chuyển), Tổng tiền, Diễn giải.
+ *
+ * The response envelope is `{ data, total, page, limit, totals }`, where
+ * `totals.totalAmount` is SUM over every matching row, not only this page — it
+ * backs the grid's footer total. `totals` follows the shared `ReportTotals`
+ * shape (`@erp/shared-interfaces`), so every grid reads its footer the same way.
  */
 export class StockTransferSearchV2Dto {
   @IsOptional()

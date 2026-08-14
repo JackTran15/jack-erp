@@ -58,7 +58,8 @@ export interface PurchaseHistoryEntry {
   invoiceDate: Date;
   invoiceNumber: string;
   storeName: string;
-  status: PurchaseHistoryStatus;
+  /** `null` khi trạng thái hoá đơn không có nhãn UI — render "—". */
+  status: PurchaseHistoryStatus | null;
   totalAmount: number;
   note?: string;
 }

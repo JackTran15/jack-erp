@@ -203,7 +203,11 @@ interface InventoryStorage {
 }
 
 export function StockTransferPage() {
-  const [records, setRecords] = useState<PaginatedResponse<Transfer> | null>(null);
+  // `totalAmount` is the server's SUM over every matching row, not only this
+  // page — it backs the footer total.
+  const [records, setRecords] = useState<
+    (PaginatedResponse<Transfer> & { totals: { totalAmount: number } }) | null
+  >(null);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState<PaginationStateDto>(DEFAULT_PAGINATION);
   const [period, setPeriod] = useState<PeriodValue>(() => {
@@ -241,16 +245,24 @@ export function StockTransferPage() {
         total: number;
         page: number;
         limit: number;
+        totals: { totalAmount: number };
       }>(ST_SEARCH.path, body);
       setRecords({
         data: data.data,
         total: data.total,
         page: data.page,
         pageSize: data.limit,
+        totals: data.totals,
       });
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
-      setRecords({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
+      setRecords({
+        data: [],
+        total: 0,
+        page: 1,
+        pageSize: pagination.pageSize,
+        totals: { totalAmount: 0 },
+      });
     } finally {
       setLoading(false);
     }
@@ -346,10 +358,6 @@ export function StockTransferPage() {
     [columnFilters, resetPage],
   );
 
-  const totalSum = useMemo(
-    () => (records?.data ?? []).reduce((s, r) => s + transferTotal(r), 0),
-    [records],
-  );
   const showTotalFooter = !loading && (records?.data.length ?? 0) > 0;
 
   const toolbarItems: ToolbarItem[] = [
@@ -457,7 +465,11 @@ export function StockTransferPage() {
       filterKind: "number-range",
       headerClassName: "text-right",
       className: "text-right tabular-nums",
-      footer: showTotalFooter ? formatMoneyInteger(totalSum) : undefined,
+      // Tổng của toàn tập kết quả lọc, do server tính — không phải tổng trang.
+      footer:
+        showTotalFooter && records
+          ? formatMoneyInteger(records.totals.totalAmount)
+          : undefined,
       render: (row) => formatMoneyInteger(transferTotal(row)),
     },
     {

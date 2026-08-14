@@ -8,11 +8,14 @@ import {
   ALL_VALUE,
   StorageReportShell,
   buildApiFilters,
+  toColumnFilterPayload,
   resolveLabel,
   type FilterField,
   type FilterValues,
 } from "./_shared";
 import type { TableColumn } from "../../../components/table/BaseDataTable";
+import { DEFAULT_PAGINATION } from "../../../components/table/pagination.dto";
+import type { ReportColumnFilterPayload } from "../../../api/inventory-reports";
 import { useStockSummaryReport } from "../../../hooks/use-inventory-reports";
 import type { StockPeriodRow } from "../../../api/inventory-reports";
 import { useBranches } from "../../../hooks/iam/useBranches";
@@ -88,6 +91,24 @@ function mapApiRow(row: StockPeriodRow): ViewRow {
     incomingValue: row.incomingValue,
   };
 }
+
+/** Cột phải lọc theo giá trị số, không phải theo chuỗi đã định dạng. */
+const NUMERIC_COLUMNS = new Set([
+  "openingQty",
+  "openingValue",
+  "inQty",
+  "inValue",
+  "outQty",
+  "outValue",
+  "endingQty",
+  "endingValue",
+]);
+
+/** Khoá cột của lưới → tên field server hiểu. */
+const COLUMN_KEY_MAP = {
+  endingQty: "closingQty",
+  endingValue: "closingValue",
+};
 
 export function StockSummaryReportPage() {
   const { data: branches } = useBranches();
@@ -165,28 +186,48 @@ export function StockSummaryReportPage() {
     ...resolvePeriodRange("this_month"),
   }));
 
+  // Phân trang + lọc-theo-cột chạy phía server, nên trang nào cũng chỉ tải đúng
+  // phần đang xem và dòng tổng luôn nói về toàn tập.
+  const [gridQuery, setGridQuery] = useState<{
+    page: number;
+    pageSize: number;
+    columnFilters: Record<string, ReportColumnFilterPayload>;
+  }>({
+    page: 1,
+    pageSize: DEFAULT_PAGINATION.pageSize,
+    columnFilters: {},
+  });
+
+  const unitFilter = (filterValues.unit as string | undefined) ?? "__all__";
+
   const apiFilters = useMemo(
-    () =>
-      buildApiFilters(filterValues, period, {
+    () => ({
+      ...buildApiFilters(filterValues, period, {
         storeFieldKey: "store",
         categoryFieldKey: "group",
         warehouseFieldKey: "warehouse",
         statFieldKey: "stat",
       }),
-    [filterValues, period],
+      page: gridQuery.page,
+      pageSize: gridQuery.pageSize,
+      columnFilters: {
+        ...gridQuery.columnFilters,
+        // "Đơn vị tính" đến từ hộp bộ lọc chứ không phải ô lọc trên cột; trước
+        // đây nó lọc phía client nên chỉ tác dụng trên trang đang xem.
+        ...(unitFilter !== "__all__"
+          ? { unit: { operator: "=", value: unitFilter } }
+          : {}),
+      },
+    }),
+    [filterValues, period, gridQuery, unitFilter],
   );
 
   const { data, isLoading } = useStockSummaryReport(apiFilters);
 
-  const unitFilter = (filterValues.unit as string | undefined) ?? "__all__";
-
-  const rows = useMemo<ViewRow[]>(() => {
-    const raw = (data?.data ?? []).map(mapApiRow);
-    if (unitFilter !== "__all__") {
-      return raw.filter((r) => r.unit === unitFilter);
-    }
-    return raw;
-  }, [data, unitFilter]);
+  const rows = useMemo<ViewRow[]>(
+    () => (data?.data ?? []).map(mapApiRow),
+    [data],
+  );
 
   // Unit column filter options — exclude the "Tất cả ĐVT" sentinel
   const unitFilterOptions = useMemo(() => unitOptions.slice(1), [unitOptions]);
@@ -387,39 +428,47 @@ export function StockSummaryReportPage() {
       emptyLabel="Không có dữ liệu cho khoảng thời gian này."
       getRowKey={(r, i) => `${r.itemId}-${r.warehouseCode}-${i}`}
       initialPeriod={period}
+      total={data?.total ?? 0}
+      totals={data?.totals}
       onApply={(next, nextPeriod) => {
         setFilterValues(next);
         setPeriod(nextPeriod);
+        setGridQuery((prev) => ({ ...prev, page: 1 }));
       }}
-      columnSummary={(rs) => {
-        const sum = rs.reduce(
-          (a, r) => ({
-            o: a.o + r.openingQty,
-            ov: a.ov + r.openingValue,
-            i: a.i + r.inQty,
-            iv: a.iv + r.inValue,
-            x: a.x + r.outQty,
-            xv: a.xv + r.outValue,
-            t: a.t + r.transferOutQty,
-            tv: a.tv + r.transferOutValue,
-            ic: a.ic + r.incomingQty,
-            icv: a.icv + r.incomingValue,
-          }),
-          { o: 0, ov: 0, i: 0, iv: 0, x: 0, xv: 0, t: 0, tv: 0, ic: 0, icv: 0 },
-        );
+      onQueryChange={({ page, pageSize, columnFilters }) =>
+        setGridQuery({
+          page,
+          pageSize,
+          columnFilters: toColumnFilterPayload(
+            columnFilters,
+            NUMERIC_COLUMNS,
+            COLUMN_KEY_MAP,
+          ),
+        })
+      }
+      // Tổng của toàn tập kết quả lọc, do server tính — không phải tổng trang.
+      columnSummary={(_rows, totals) => {
+        if (!totals) return {};
+        const opening = totals.openingQty ?? 0;
+        const openingValue = totals.openingValue ?? 0;
+        const inQty = totals.inQty ?? 0;
+        const inValue = totals.inValue ?? 0;
+        const outQty = totals.outQty ?? 0;
+        const outValue = totals.outValue ?? 0;
         return {
-          openingQty: sum.o,
-          openingValue: formatMoneyInteger(sum.ov),
-          inQty: sum.i,
-          inValue: formatMoneyInteger(sum.iv),
-          outQty: sum.x,
-          outValue: formatMoneyInteger(sum.xv),
-          endingQty: sum.o + sum.i - sum.x,
-          endingValue: formatMoneyInteger(sum.ov + sum.iv - sum.xv),
-          transferOutQty: sum.t,
-          transferOutValue: formatMoneyInteger(sum.tv),
-          incomingQty: sum.ic,
-          incomingValue: formatMoneyInteger(sum.icv),
+          openingQty: opening,
+          openingValue: formatMoneyInteger(openingValue),
+          inQty,
+          inValue: formatMoneyInteger(inValue),
+          outQty,
+          outValue: formatMoneyInteger(outValue),
+          // Cột dẫn xuất: suy từ primitive, đúng công thức của từng dòng.
+          endingQty: opening + inQty - outQty,
+          endingValue: formatMoneyInteger(openingValue + inValue - outValue),
+          transferOutQty: totals.transferOutQty ?? 0,
+          transferOutValue: formatMoneyInteger(totals.transferOutValue ?? 0),
+          incomingQty: totals.incomingQty ?? 0,
+          incomingValue: formatMoneyInteger(totals.incomingValue ?? 0),
         };
       }}
     />

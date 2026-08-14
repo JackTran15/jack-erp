@@ -11,7 +11,6 @@ import {
   FilterOperatorTypeEnum,
 } from "@erp/pos/constants/checkout.constant";
 import { ReturnInvoiceColumnKey } from "@erp/pos/constants/return-goods.constant";
-import { sumInvoiceTotals } from "@erp/pos/lib/page-libs/return-goods/returnGoodsMath";
 import type { ReturnInvoiceFilters } from "@erp/pos/dtos/return-goods.dto";
 import type { ReturnInvoiceRow } from "@erp/pos/interfaces/return-goods.interface";
 
@@ -22,6 +21,8 @@ export interface ReturnInvoiceTableProps {
   onReturn: (row: ReturnInvoiceRow) => void;
   /** Mở biên lai chi tiết hóa đơn khi bấm vào số hóa đơn. */
   onOpenInvoice: (row: ReturnInvoiceRow) => void;
+  /** Tổng "Tổng tiền" của toàn tập khớp bộ lọc, do server tính. */
+  grandTotal: number;
 }
 
 /**
@@ -35,6 +36,7 @@ export function ReturnInvoiceTable({
   onFilterChange,
   onReturn,
   onOpenInvoice,
+  grandTotal,
 }: ReturnInvoiceTableProps) {
   const columns = useMemo<ReadonlyArray<PosDataTableColumn<ReturnInvoiceRow>>>(
     () => [
@@ -145,8 +147,6 @@ export function ReturnInvoiceTable({
     ],
     [filters, onFilterChange, onReturn, onOpenInvoice],
   );
-
-  const grandTotal = sumInvoiceTotals(rows);
 
   return (
     <div className="flex h-full min-h-0 flex-col">

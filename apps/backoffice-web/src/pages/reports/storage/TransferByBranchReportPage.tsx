@@ -7,12 +7,15 @@ import {
 import {
   StorageReportShell,
   buildApiFilters,
+  toColumnFilterPayload,
   pickSourceBranchId,
   resolveLabel,
   type FilterField,
   type FilterValues,
 } from "./_shared";
 import type { TableColumn } from "../../../components/table/BaseDataTable";
+import { DEFAULT_PAGINATION } from "../../../components/table/pagination.dto";
+import type { ReportColumnFilterPayload } from "../../../api/inventory-reports";
 import { useTransferByBranchReport } from "../../../hooks/use-inventory-reports";
 import type {
   TransferByBranchFilters,
@@ -74,6 +77,9 @@ function mapApiRow(row: ApiTransferByBranchRow): ViewRow {
   };
 }
 
+/** Cột phải lọc theo giá trị số. Đơn giá trung bình là cột dẫn xuất — không lọc. */
+const NUMERIC_COLUMNS = new Set(["outQty", "outValue", "inQty", "inValue"]);
+
 export function TransferByBranchReportPage() {
   const { data: branches } = useBranches();
   const { options: groupOptions } = useReportCategories();
@@ -117,6 +123,16 @@ export function TransferByBranchReportPage() {
 
   const unitFilter = (filterValues.unit as string | undefined) ?? "__all__";
 
+  const [gridQuery, setGridQuery] = useState<{
+    page: number;
+    pageSize: number;
+    columnFilters: Record<string, ReportColumnFilterPayload>;
+  }>({
+    page: 1,
+    pageSize: DEFAULT_PAGINATION.pageSize,
+    columnFilters: {},
+  });
+
   const apiFilters: TransferByBranchFilters = useMemo(() => {
     const base = buildApiFilters(filterValues, period, {
       storeFieldKey: "targetStore",
@@ -124,15 +140,27 @@ export function TransferByBranchReportPage() {
       statFieldKey: "stat",
     });
     const sourceBranchId = pickSourceBranchId(filterValues, "sourceStore");
-    return { ...base, sourceBranchId };
-  }, [filterValues, period]);
+    return {
+      ...base,
+      sourceBranchId,
+      page: gridQuery.page,
+      pageSize: gridQuery.pageSize,
+      columnFilters: {
+        ...gridQuery.columnFilters,
+        // "Đơn vị tính" trước đây lọc phía client sau khi fetch — chỉ tác dụng
+        // trên trang đang xem.
+        ...(unitFilter !== "__all__"
+          ? { unit: { operator: "=", value: unitFilter } }
+          : {}),
+      },
+    };
+  }, [filterValues, period, gridQuery, unitFilter]);
 
   const { data, isLoading } = useTransferByBranchReport(apiFilters);
-  const rows = useMemo<ViewRow[]>(() => {
-    const raw = (data?.data ?? []).map(mapApiRow);
-    if (unitFilter !== "__all__") return raw.filter((r) => r.unit === unitFilter);
-    return raw;
-  }, [data, unitFilter]);
+  const rows = useMemo<ViewRow[]>(
+    () => (data?.data ?? []).map(mapApiRow),
+    [data],
+  );
 
   const num = "text-right tabular-nums";
   const columns: TableColumn<ViewRow>[] = [
@@ -171,25 +199,35 @@ export function TransferByBranchReportPage() {
       emptyLabel="Không có dữ liệu điều chuyển theo cửa hàng."
       getRowKey={(r, i) => `${r.itemId}-${r.destinationBranchId}-${i}`}
       initialPeriod={period}
+      total={data?.total ?? 0}
+      totals={data?.totals}
+      onQueryChange={({ page, pageSize, columnFilters }) =>
+        setGridQuery({
+          page,
+          pageSize,
+          columnFilters: toColumnFilterPayload(columnFilters, NUMERIC_COLUMNS),
+        })
+      }
       onApply={(next, nextPeriod) => {
         setFilterValues(next);
         setPeriod(nextPeriod);
       }}
-      columnSummary={(rs) => {
-        const sum = rs.reduce(
-          (a, r) => ({
-            oq: a.oq + r.outQty,
-            ov: a.ov + r.outValue,
-            iq: a.iq + r.inQty,
-            iv: a.iv + r.inValue,
-          }),
-          { oq: 0, ov: 0, iq: 0, iv: 0 },
-        );
+      // Tổng của toàn tập kết quả lọc, do server tính — không phải tổng trang.
+      columnSummary={(_rows, totals) => {
+        if (!totals) return {};
+        const outQty = totals.outQty ?? 0;
+        const outValue = totals.outValue ?? 0;
+        const inQty = totals.inQty ?? 0;
+        const inValue = totals.inValue ?? 0;
         return {
-          outQty: sum.oq,
-          outValue: formatMoneyInteger(sum.ov),
-          inQty: sum.iq,
-          inValue: formatMoneyInteger(sum.iv),
+          outQty,
+          outValue: formatMoneyInteger(outValue),
+          inQty,
+          inValue: formatMoneyInteger(inValue),
+          // Đơn giá trung bình: suy từ giá trị / số lượng. Cộng trung bình của
+          // từng dòng lại là sai.
+          outAvgPrice: outQty ? formatMoneyInteger(outValue / outQty) : "",
+          inAvgPrice: inQty ? formatMoneyInteger(inValue / inQty) : "",
         };
       }}
     />

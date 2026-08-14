@@ -8,6 +8,7 @@ import {
   type FilterValues,
 } from "./_shared";
 import type { TableColumn } from "../../../components/table/BaseDataTable";
+import { DEFAULT_PAGINATION } from "../../../components/table/pagination.dto";
 import { useStockByBranchReport } from "../../../hooks/use-inventory-reports";
 import type {
   StockByBranchBranchHeader,
@@ -86,13 +87,21 @@ export function StockByBranchReportPage() {
 
   const unitFilter = (filterValues.unit as string | undefined) ?? "__all__";
 
+  const [gridQuery, setGridQuery] = useState<{ page: number; pageSize: number }>({
+    page: 1,
+    pageSize: DEFAULT_PAGINATION.pageSize,
+  });
+
   const apiFilters = useMemo(
-    () =>
-      buildApiFilters(filterValues, period, {
+    () => ({
+      ...buildApiFilters(filterValues, period, {
         categoryFieldKey: "group",
         statFieldKey: "stat",
       }),
-    [filterValues, period],
+      page: gridQuery.page,
+      pageSize: gridQuery.pageSize,
+    }),
+    [filterValues, period, gridQuery],
   );
 
   const { data, isLoading } = useStockByBranchReport(apiFilters);
@@ -155,21 +164,24 @@ export function StockByBranchReportPage() {
       emptyLabel="Không có dữ liệu tồn kho theo cửa hàng."
       getRowKey={(r) => r.sku}
       initialPeriod={period}
+      total={data?.total ?? 0}
+      totals={data?.totals}
+      onQueryChange={({ page, pageSize }) => setGridQuery({ page, pageSize })}
       onApply={(next, nextPeriod) => {
         setFilterValues(next);
         setPeriod(nextPeriod);
+        setGridQuery((prev) => ({ ...prev, page: 1 }));
       }}
-      columnSummary={(rs) => {
-        const totals: Record<string, number> = {
-          total: rs.reduce((s, r) => s + r.total, 0),
-        };
+      // Tổng của toàn tập mã hàng, do server tính. Cột "Tổng" đọc thẳng khoá
+      // `total` của server chứ không cộng lại các cột chi nhánh: nếu server sai,
+      // cộng lại sẽ che mất chỗ sai.
+      columnSummary={(_rows, apiTotals) => {
+        if (!apiTotals) return {};
+        const footer: Record<string, number> = { total: apiTotals.total ?? 0 };
         for (const b of branches) {
-          totals[`branch_${b.id}`] = rs.reduce(
-            (s, r) => s + (r.perBranch[b.id] ?? 0),
-            0,
-          );
+          footer[`branch_${b.id}`] = apiTotals[`perBranch.${b.id}`] ?? 0;
         }
-        return totals;
+        return footer;
       }}
     />
   );

@@ -253,6 +253,183 @@ describe("StockSummaryService", () => {
     );
   });
 
+  describe("whole-set column totals (grid footer)", () => {
+    const TOTALS_ROW = {
+      total: 1540,
+      total_quantity: "2155",
+      opening_qty: "0",
+      in_qty: "2196",
+      out_qty: "41",
+      transfer_out_qty: "7",
+      incoming_qty: "4",
+      pending_only_incoming_qty: "5",
+      reserved_qty: "2",
+    };
+
+    function serviceWith(totalsRow: Record<string, unknown>) {
+      const qb = createQueryBuilder([]);
+      const manager = { query: jest.fn().mockResolvedValue([totalsRow]) };
+      const service = new StockSummaryService({
+        createQueryBuilder: jest.fn().mockReturnValue(qb),
+        manager,
+      } as never);
+      return { service, manager, qb };
+    }
+
+    it("sums every column over the whole filtered set, not the page", async () => {
+      const { service } = serviceWith(TOTALS_ROW);
+
+      const result = await service.getSummary({
+        organizationId: "44444444-4444-4444-8444-444444444444",
+        branchId: "33333333-3333-4333-8333-333333333333",
+        startDate: "2026-08-01",
+        endDate: "2026-08-31",
+        page: 1,
+        pageSize: 2,
+      });
+
+      expect(result.totals).toEqual({
+        quantity: 2155,
+        openingQty: 0,
+        inQty: 2196,
+        outQty: 41,
+        // hasPeriod ⇒ derived, exactly as each row derives it.
+        closingQty: 2155,
+        transferOutQty: 7,
+        // Pairs that hold stock plus pairs that only have goods on the way.
+        incomingQty: 9,
+        reservedQty: 2,
+      });
+      expect(result.totalQuantity).toBe(2155);
+    });
+
+    it("is invariant to pageSize — the footer must not move when the user pages", async () => {
+      const small = await serviceWith(TOTALS_ROW).service.getSummary({
+        organizationId: "org-1",
+        branchId: "branch-1",
+        pageSize: 1,
+      });
+      const large = await serviceWith(TOTALS_ROW).service.getSummary({
+        organizationId: "org-1",
+        branchId: "branch-1",
+        pageSize: 200,
+        page: 5,
+      });
+
+      expect(small.totals).toEqual(large.totals);
+    });
+
+    it("counts incoming-only pairs on every page, not just page 1", async () => {
+      const { service } = serviceWith(TOTALS_ROW);
+
+      const pageTwo = await service.getSummary({
+        organizationId: "org-1",
+        branchId: "branch-1",
+        page: 2,
+        pageSize: 50,
+      });
+
+      // The page path appends incoming-only rows on page 1 only; if the totals
+      // inherited that, the footer would shrink the moment the user paged.
+      expect(pageTwo.totals?.incomingQty).toBe(9);
+    });
+
+    it("falls back to live quantity for closingQty when no period is set", async () => {
+      const { service } = serviceWith({ ...TOTALS_ROW, in_qty: "0", out_qty: "0" });
+
+      const result = await service.getSummary({
+        organizationId: "org-1",
+        branchId: "branch-1",
+      });
+
+      expect(result.totals?.closingQty).toBe(2155);
+    });
+
+    it("skips the totals statement entirely when includeTotals is false", async () => {
+      const { service, manager } = serviceWith({ total: 3, total_quantity: "9" });
+
+      const result = await service.getSummary({
+        organizationId: "org-1",
+        branchId: "branch-1",
+        includeTotals: false,
+      });
+
+      expect(result.totals).toBeUndefined();
+      expect(result.totalQuantity).toBe(9);
+      // The cheap count-only aggregate, not the CTE chain.
+      expect(manager.query.mock.calls[0][0]).not.toContain("WITH pairs AS");
+    });
+
+    it("reduces the totals in memory when a derived-column filter is active", async () => {
+      const rows = [1, 2].map((n) => ({
+        item_id: `item-${n}`,
+        item_code: `SKU-${n}`,
+        item_name: `Hàng hóa ${n}`,
+        item_unit: "Cái",
+        item_brand: null,
+        item_is_active: true,
+        category_name: null,
+        storage_id: "22222222-2222-4222-8222-222222222222",
+        storage_name: "Kho 1",
+        branch_id: "33333333-3333-4333-8333-333333333333",
+        quantity: String(n * 10),
+        last_movement_at: null,
+      }));
+      const qb = createQueryBuilder(rows);
+      const manager = {
+        query: jest
+          .fn()
+          // 1st call is the count aggregate; the period query comes after it.
+          .mockResolvedValueOnce([{ total: 2, total_quantity: "30" }])
+          // period values per (item, storage) — only item-2 passes the filter
+          .mockResolvedValueOnce([
+            {
+              item_id: "item-1",
+              storage_id: rows[0].storage_id,
+              opening_qty: "1",
+              opening_value: "0",
+              in_qty: "1",
+              in_value: "0",
+              out_qty: "0",
+              out_value: "0",
+            },
+            {
+              item_id: "item-2",
+              storage_id: rows[1].storage_id,
+              opening_qty: "4",
+              opening_value: "0",
+              in_qty: "9",
+              in_value: "0",
+              out_qty: "3",
+              out_value: "0",
+            },
+          ])
+          .mockResolvedValue([]),
+      };
+      const service = new StockSummaryService({
+        createQueryBuilder: jest.fn().mockReturnValue(qb),
+        manager,
+      } as never);
+
+      const result = await service.getSummary({
+        organizationId: "org-1",
+        startDate: "2026-08-01",
+        endDate: "2026-08-31",
+        inQty: { operator: CompareOperator.GTE, value: 5 },
+      });
+
+      // Only item-2 survives the derived filter, so the footer must describe
+      // item-2 alone — the totals of the unfiltered set would be wrong.
+      expect(result.total).toBe(1);
+      expect(result.totals).toEqual(
+        expect.objectContaining({ quantity: 20, inQty: 9, outQty: 3, openingQty: 4 }),
+      );
+      // No totals statement is worth running when every row is already loaded.
+      const sqlSeen = manager.query.mock.calls.map(([sql]) => String(sql));
+      expect(sqlSeen.some((sql) => sql.includes("WITH pairs AS"))).toBe(false);
+    });
+  });
+
   it("returns organization-scoped ledger details for one item and storage", async () => {
     const manager = {
       query: jest

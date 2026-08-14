@@ -1,4 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import type { ReportTotals } from '@erp/shared-interfaces';
+import type { ReportColumnFilterDto } from '../dto/report-column-filter.dto';
+import {
+  buildReportColumnFilter,
+  type ReportColumnSpecs,
+} from './report-column-filter.util';
 import { DataSource } from 'typeorm';
 
 /**
@@ -92,6 +98,8 @@ export interface DocumentDetailQuery {
   cursor?: DocumentDetailCursor | null;
   /** Start a keyset walk at the first page. Implied when `cursor` is set. */
   keyset?: boolean;
+  /** Lọc theo cột, áp phía server nên tác dụng trên toàn tập. */
+  columnFilters?: Record<string, ReportColumnFilterDto>;
 }
 
 /**
@@ -109,7 +117,36 @@ export interface DocumentDetailResult {
   total: number;
   nextCursor: DocumentDetailCursor | null;
   hasMore: boolean;
+  /**
+   * SUM của các cột số trên toàn bộ kết quả lọc. Rỗng ở chế độ keyset — đường
+   * đó không chạy COUNT nên cũng không có tổng để bám vào; nó phục vụ xuất
+   * khẩu, nơi không có footer.
+   */
+  totals: ReportTotals;
 }
+
+/** Cột lọc được, chiếu ở tầng ngoài (`lines l` + `items i`). */
+const DOCUMENT_DETAIL_COLUMN_SPECS: ReportColumnSpecs = {
+  documentNumber: { sql: 'l.document_number', kind: 'text' },
+  referenceNumber: { sql: 'l.reference_number', kind: 'text' },
+  sku: { sql: 'i.code', kind: 'text' },
+  itemName: { sql: 'i.name', kind: 'text' },
+  unit: { sql: 'i.unit', kind: 'text' },
+  brand: { sql: 'i.brand', kind: 'text' },
+  inQty: { sql: 'l.in_qty', kind: 'number' },
+  inUnitPrice: { sql: 'l.in_unit_price', kind: 'number' },
+  inValue: { sql: 'l.in_value', kind: 'number' },
+  outQty: { sql: 'l.out_qty', kind: 'number' },
+  outUnitPrice: { sql: 'l.out_unit_price', kind: 'number' },
+  outValue: { sql: 'l.out_value', kind: 'number' },
+};
+
+const DOCUMENT_DETAIL_TOTAL_COLUMNS = [
+  ['inQty', 'in_qty'],
+  ['inValue', 'in_value'],
+  ['outQty', 'out_qty'],
+  ['outValue', 'out_value'],
+] as const;
 
 @Injectable()
 export class DocumentDetailService {
@@ -131,12 +168,32 @@ export class DocumentDetailService {
     const pageSize = Math.max(1, query.pageSize);
     const offset = (page - 1) * pageSize;
     const keyset = query.keyset === true || query.cursor != null;
+    const sharedParams = [
+      query.organizationId,
+      query.startDate,
+      query.endDate,
+      branchIds,
+      categoryIds,
+      search,
+    ];
+    // One fragment, spliced into the rows query and the count+totals query.
+    const columnFilter = buildReportColumnFilter(
+      query.columnFilters,
+      DOCUMENT_DETAIL_COLUMN_SPECS,
+      sharedParams.length,
+    );
+    const filterWhere = columnFilter.where ? `AND ${columnFilter.where}` : '';
+    const filteredParams = [...sharedParams, ...columnFilter.params];
+    const limitIndex = filteredParams.length + 1;
     // Compare on the same expression the ORDER BY uses, so the walk cannot
     // straddle two rows that share a posted_at.
+    // Cursor parameters sit after pageSize, which now sits after the column
+    // filter's parameters — hardcoding $8/$9 would silently read the wrong bind
+    // the moment a filter is active.
     const keysetPredicate = query.cursor
-      ? `AND (l.posted_at < CAST($8 AS timestamptz)
-             OR (l.posted_at = CAST($8 AS timestamptz)
-                 AND (l.doc_kind || ':' || l.line_id) < $9))`
+      ? `AND (l.posted_at < CAST($${limitIndex + 1} AS timestamptz)
+             OR (l.posted_at = CAST($${limitIndex + 1} AS timestamptz)
+                 AND (l.doc_kind || ':' || l.line_id) < $${limitIndex + 2}))`
       : '';
 
     // ──────────────────────────────────────────────────────────────────
@@ -305,36 +362,33 @@ export class DocumentDetailService {
       LEFT JOIN locations loc ON loc.id = l.location_id
       WHERE ($5::uuid[] IS NULL OR i.category_id = ANY($5))
         AND ($6::text IS NULL OR i.code ILIKE '%' || $6 || '%' OR i.name ILIKE '%' || $6 || '%')
+        ${filterWhere}
       ${keyset ? keysetPredicate : ''}
       ORDER BY ${keyset ? 'l.posted_at DESC, cursor_id DESC' : 'l.posted_at DESC, l.document_number ASC'}
-      ${keyset ? 'LIMIT $7' : 'LIMIT $7 OFFSET $8'}
+      ${keyset ? `LIMIT $${limitIndex}` : `LIMIT $${limitIndex} OFFSET $${limitIndex + 1}`}
     `;
 
+    // Count and totals in one pass over exactly the rows the grid will show.
     const countSql = `
       ${linesCte}
-      SELECT COUNT(*)::int AS total
+      SELECT COUNT(*)::int AS total,
+             ${DOCUMENT_DETAIL_TOTAL_COLUMNS.map(
+               ([, col]) => `COALESCE(SUM(l.${col}), 0)::numeric AS ${col}`,
+             ).join(',\n             ')}
       FROM lines l
       JOIN items i ON i.id = l.item_id AND i.organization_id = $1
       WHERE ($5::uuid[] IS NULL OR i.category_id = ANY($5))
         AND ($6::text IS NULL OR i.code ILIKE '%' || $6 || '%' OR i.name ILIKE '%' || $6 || '%')
+        ${filterWhere}
     `;
-
-    const sharedParams = [
-      query.organizationId,
-      query.startDate,
-      query.endDate,
-      branchIds,
-      categoryIds,
-      search,
-    ];
 
     // Only bind what the statement actually references: an unused parameter is
     // a bind-count error, not a no-op.
     const dataParams = keyset
       ? query.cursor
-        ? [...sharedParams, pageSize, query.cursor.at, query.cursor.id]
-        : [...sharedParams, pageSize]
-      : [...sharedParams, pageSize, offset];
+        ? [...filteredParams, pageSize, query.cursor.at, query.cursor.id]
+        : [...filteredParams, pageSize]
+      : [...filteredParams, pageSize, offset];
 
     const [rows, countRows] = await Promise.all([
       this.dataSource.query(dataSql, dataParams),
@@ -342,7 +396,7 @@ export class DocumentDetailService {
       // and `hasMore` answers the only question the export asks.
       keyset
         ? Promise.resolve([{ total: 0 }])
-        : this.dataSource.query(countSql, sharedParams),
+        : this.dataSource.query(countSql, filteredParams),
     ]);
 
     const total = Number(
@@ -388,11 +442,20 @@ export class DocumentDetailService {
 
     const raw = rows as RawDocumentDetailRow[];
     const last = raw[raw.length - 1];
+    const totals: ReportTotals = {};
+    if (!keyset) {
+      const raw = (countRows as Array<Record<string, unknown>>)[0];
+      for (const [field, col] of DOCUMENT_DETAIL_TOTAL_COLUMNS) {
+        totals[field] = Number(raw?.[col] ?? 0);
+      }
+    }
+
     return {
       data,
       total,
       nextCursor: last ? { at: last.cursor_at, id: last.cursor_id } : null,
       hasMore: keyset ? raw.length === pageSize : offset + raw.length < total,
+      totals,
     };
   }
 }

@@ -4,11 +4,14 @@ import {
   ALL_VALUE,
   StorageReportShell,
   buildApiFilters,
+  toColumnFilterPayload,
   resolveLabel,
   type FilterField,
   type FilterValues,
 } from "./_shared";
 import type { TableColumn } from "../../../components/table/BaseDataTable";
+import { DEFAULT_PAGINATION } from "../../../components/table/pagination.dto";
+import type { ReportColumnFilterPayload } from "../../../api/inventory-reports";
 import { useStockQuantityDetailsReport } from "../../../hooks/use-inventory-reports";
 import type { StockPeriodRow } from "../../../api/inventory-reports";
 import { useBranches } from "../../../hooks/iam/useBranches";
@@ -83,6 +86,27 @@ function mapApiRow(row: StockPeriodRow): ViewRow {
     outOther: 0,
   };
 }
+
+/** Cột phải lọc theo giá trị số. */
+const NUMERIC_COLUMNS = new Set([
+  "openingQty",
+  "inTotal",
+  "inPurchase",
+  "inTransfer",
+  "outTotal",
+  "outSale",
+  "endingQty",
+]);
+
+/** Lưới này đặt nhãn cột khác tên field của dòng — đổi tên khi gửi lên server. */
+const COLUMN_KEY_MAP = {
+  inTotal: "inQty",
+  inPurchase: "inQtyPurchase",
+  inTransfer: "inQtyTransferIn",
+  outTotal: "outQty",
+  outSale: "outQtySale",
+  endingQty: "closingQty",
+};
 
 export function StockQuantityDetailsReportPage() {
   const { data: branches } = useBranches();
@@ -162,26 +186,46 @@ export function StockQuantityDetailsReportPage() {
     ...resolvePeriodRange("this_month"),
   }));
 
+  const [gridQuery, setGridQuery] = useState<{
+    page: number;
+    pageSize: number;
+    columnFilters: Record<string, ReportColumnFilterPayload>;
+  }>({
+    page: 1,
+    pageSize: DEFAULT_PAGINATION.pageSize,
+    columnFilters: {},
+  });
+
+  const unitFilter = (filterValues.unit as string | undefined) ?? "__all__";
+
   const apiFilters = useMemo(
-    () =>
-      buildApiFilters(filterValues, period, {
+    () => ({
+      ...buildApiFilters(filterValues, period, {
         storeFieldKey: "store",
         categoryFieldKey: "group",
         warehouseFieldKey: "warehouse",
         statFieldKey: "stat",
       }),
-    [filterValues, period],
+      page: gridQuery.page,
+      pageSize: gridQuery.pageSize,
+      columnFilters: {
+        ...gridQuery.columnFilters,
+        // "Đơn vị tính" đến từ hộp bộ lọc, trước đây lọc phía client nên chỉ
+        // tác dụng trên trang đang xem.
+        ...(unitFilter !== "__all__"
+          ? { unit: { operator: "=", value: unitFilter } }
+          : {}),
+      },
+    }),
+    [filterValues, period, gridQuery, unitFilter],
   );
 
   const { data, isLoading } = useStockQuantityDetailsReport(apiFilters);
 
-  const unitFilter = (filterValues.unit as string | undefined) ?? "__all__";
-  const rows = useMemo<ViewRow[]>(() => {
-    const raw = (data?.data ?? []).map(mapApiRow);
-    if (unitFilter !== "__all__")
-      return raw.filter((r) => r.unit === unitFilter);
-    return raw;
-  }, [data, unitFilter]);
+  const rows = useMemo<ViewRow[]>(
+    () => (data?.data ?? []).map(mapApiRow),
+    [data],
+  );
 
   const num = "text-right tabular-nums";
   const inGrp = "Nhập trong kỳ";
@@ -387,30 +431,39 @@ export function StockQuantityDetailsReportPage() {
       emptyLabel="Không có dữ liệu chi tiết."
       getRowKey={(r, i) => `${r.itemId}-${i}`}
       initialPeriod={period}
+      total={data?.total ?? 0}
+      totals={data?.totals}
+      onQueryChange={({ page, pageSize, columnFilters }) =>
+        setGridQuery({
+          page,
+          pageSize,
+          columnFilters: toColumnFilterPayload(
+            columnFilters,
+            NUMERIC_COLUMNS,
+            COLUMN_KEY_MAP,
+          ),
+        })
+      }
       onApply={(next, nextPeriod) => {
+        setGridQuery((prev) => ({ ...prev, page: 1 }));
         setFilterValues(next);
         setPeriod(nextPeriod);
       }}
-      columnSummary={(rs) => {
-        const sum = rs.reduce(
-          (a, r) => ({
-            o: a.o + r.openingQty,
-            inT: a.inT + r.inQty,
-            inP: a.inP + r.inPurchase,
-            inTr: a.inTr + r.inTransfer,
-            outT: a.outT + r.outQty,
-            outS: a.outS + r.outSale,
-          }),
-          { o: 0, inT: 0, inP: 0, inTr: 0, outT: 0, outS: 0 },
-        );
+      // Tổng của toàn tập kết quả lọc, do server tính — không phải tổng trang.
+      columnSummary={(_rows, totals) => {
+        if (!totals) return {};
+        const opening = totals.openingQty ?? 0;
+        const inQty = totals.inQty ?? 0;
+        const outQty = totals.outQty ?? 0;
         return {
-          openingQty: sum.o,
-          inTotal: sum.inT,
-          inPurchase: sum.inP,
-          inTransfer: sum.inTr,
-          outTotal: sum.outT,
-          outSale: sum.outS,
-          endingQty: sum.o + sum.inT - sum.outT,
+          openingQty: opening,
+          inTotal: inQty,
+          inPurchase: totals.inQtyPurchase ?? 0,
+          inTransfer: totals.inQtyTransferIn ?? 0,
+          outTotal: outQty,
+          outSale: totals.outQtySale ?? 0,
+          // Cột dẫn xuất: suy từ primitive, đúng công thức của từng dòng.
+          endingQty: opening + inQty - outQty,
         };
       }}
     />

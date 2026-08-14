@@ -1,4 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import type { ReportTotals } from '@erp/shared-interfaces';
+import type { ReportColumnFilterDto } from '../dto/report-column-filter.dto';
+import {
+  buildReportColumnFilter,
+  type ReportColumnSpecs,
+} from './report-column-filter.util';
 import { DataSource } from 'typeorm';
 
 /**
@@ -55,6 +61,8 @@ export interface StockPeriodQuery {
   hideZeroRows?: boolean;
   page: number;
   pageSize: number;
+  /** Lọc theo cột, áp phía server nên tác dụng trên toàn tập. */
+  columnFilters?: Record<string, ReportColumnFilterDto>;
 }
 
 export interface StockPeriodRow {
@@ -102,6 +110,93 @@ export interface StockPeriodRow {
 export interface StockPeriodResult {
   data: StockPeriodRow[];
   total: number;
+  /**
+   * SUM của từng cột số trên toàn bộ kết quả lọc. Khoá trùng tên field của
+   * dòng. Cột dẫn xuất (`closingQty`, `closingValue`) không nằm ở đây — FE tự
+   * suy ra từ opening/in/out để footer khớp đúng công thức của từng dòng.
+   */
+  totals: ReportTotals;
+}
+
+/**
+ * Cột nào lọc được và tổng được, cho từng nhánh SQL.
+ *
+ * `item` chiếu từ `combined c` + `items i`; `parent`/`group` chiếu từ `item_agg ia`.
+ * Hai cột điều chuyển (`transferOutQty` / `incomingQty`) chưa có mặt ở đây: chúng
+ * còn được ghép bằng JS theo trang, và được nâng lên SQL ở UOW-06.
+ */
+const NUMERIC_PERIOD_COLUMNS = [
+  'openingQty',
+  'openingValue',
+  'inQty',
+  'inValue',
+  'outQty',
+  'outValue',
+  'inQtyPurchase',
+  'inQtyTransferIn',
+  'inQtyReturn',
+  'inQtyAdjustIn',
+  'outQtySale',
+  'outQtyTransferOut',
+  'outQtyAdjustOut',
+] as const;
+
+const NUMERIC_COLUMN_SQL: Record<string, string> = {
+  openingQty: 'opening_qty',
+  openingValue: 'opening_value',
+  inQty: 'in_qty',
+  inValue: 'in_value',
+  outQty: 'out_qty',
+  outValue: 'out_value',
+  inQtyPurchase: 'in_qty_purchase',
+  inQtyTransferIn: 'in_qty_transfer_in',
+  inQtyReturn: 'in_qty_return',
+  inQtyAdjustIn: 'in_qty_adjust_in',
+  outQtySale: 'out_qty_sale',
+  outQtyTransferOut: 'out_qty_transfer_out',
+  outQtyAdjustOut: 'out_qty_adjust_out',
+};
+
+function periodColumnSpecs(alias: string, withText: boolean): ReportColumnSpecs {
+  const specs: ReportColumnSpecs = {};
+  for (const key of NUMERIC_PERIOD_COLUMNS) {
+    specs[key] = { sql: `${alias}.${NUMERIC_COLUMN_SQL[key]}`, kind: 'number' };
+  }
+  // Derived columns still filter, using the same arithmetic each row displays.
+  // Keys stay the row field names; a grid that labels the column differently
+  // maps its own key on the way out (see toColumnFilterPayload's keyMap).
+  specs.closingQty = {
+    sql: `(${alias}.opening_qty + ${alias}.in_qty - ${alias}.out_qty)`,
+    kind: 'number',
+  };
+  specs.closingValue = {
+    sql: `(${alias}.opening_value + ${alias}.in_value - ${alias}.out_value)`,
+    kind: 'number',
+  };
+  if (withText) {
+    specs.sku = { sql: 'i.code', kind: 'text' };
+    specs.itemName = { sql: 'i.name', kind: 'text' };
+    specs.unit = { sql: 'i.unit', kind: 'text' };
+    specs.brand = { sql: 'i.brand', kind: 'text' };
+  }
+  return specs;
+}
+
+/** SUM(...) cho mọi cột số, dùng chung cho câu count của cả hai nhánh. */
+function periodTotalsSelect(alias: string): string {
+  return NUMERIC_PERIOD_COLUMNS.map(
+    (key) =>
+      `COALESCE(SUM(${alias}.${NUMERIC_COLUMN_SQL[key]}), 0)::numeric AS ${NUMERIC_COLUMN_SQL[key]}`,
+  ).join(',\n             ');
+}
+
+/** Đọc hàng count+totals thành map khoá theo tên field của dòng. */
+function readPeriodTotals(raw: Record<string, unknown> | undefined): ReportTotals {
+  const totals: ReportTotals = {};
+  for (const key of NUMERIC_PERIOD_COLUMNS) {
+    totals[key] = Number(raw?.[NUMERIC_COLUMN_SQL[key]] ?? 0);
+  }
+  return totals;
 }
 
 /**
@@ -147,10 +242,6 @@ export class StockPeriodService {
 
     const combinedCte = this.buildCombinedCte(groupKeyExpr);
 
-    const { dataSql, countSql } = itemGroupBy === 'item'
-      ? this.buildItemSqls(combinedCte, isLocation)
-      : this.buildAggSqls(combinedCte, isLocation, itemGroupBy);
-
     const baseParams = [
       query.organizationId, // $1
       query.startDate,      // $2
@@ -162,19 +253,124 @@ export class StockPeriodService {
       hideZeroRows,         // $8
     ];
 
-    const [rows, countRows, pendingRows] = await Promise.all([
-      this.dataSource.query(dataSql, [...baseParams, pageSize, offset]),
-      this.dataSource.query(countSql, baseParams),
+    // One fragment, spliced into both the rows query and the count+totals
+    // query, so the footer can never describe a different set than the grid.
+    const isItemLevel = itemGroupBy === 'item';
+    const columnFilter = buildReportColumnFilter(
+      query.columnFilters,
+      periodColumnSpecs(isItemLevel ? 'c' : 'ia', isItemLevel),
+      baseParams.length,
+    );
+    const filterWhere = columnFilter.where ? `AND ${columnFilter.where}` : '';
+    const filteredParams = [...baseParams, ...columnFilter.params];
+    const limitIndex = filteredParams.length + 1;
+
+    const { dataSql, countSql } = isItemLevel
+      ? this.buildItemSqls(combinedCte, isLocation, filterWhere, limitIndex)
+      : this.buildAggSqls(combinedCte, isLocation, itemGroupBy, filterWhere, limitIndex);
+
+    const rowKeysSql = this.buildRowKeysSql(combinedCte, itemGroupBy, filterWhere);
+
+    const [rows, countRows, pendingRows, rowKeys] = await Promise.all([
+      this.dataSource.query(dataSql, [...filteredParams, pageSize, offset]),
+      this.dataSource.query(countSql, filteredParams),
       this.loadPendingTransfers(query),
+      rowKeysSql
+        ? (this.dataSource.query(rowKeysSql, filteredParams) as Promise<
+            Array<{ item_id: string; group_key: string | null }>
+          >)
+        : Promise.resolve([]),
     ]);
 
     const total = Number(countRows[0]?.total ?? 0);
+    const totals = {
+      ...readPeriodTotals(countRows[0]),
+      ...this.totalPendingTransfers(rowKeys, pendingRows, isLocation),
+    };
     const data = (rows as RawStockPeriodRow[]).map((r) =>
       this.mapRow(r, query.includeBreakdown === true, isLocation),
     );
     this.applyPendingTransfers(data, pendingRows, isLocation);
 
-    return { data, total };
+    return { data, total, totals };
+  }
+
+  /**
+   * Khoá (item, group) của **toàn bộ** tập đã lọc.
+   *
+   * Hai cột điều chuyển được ghép bằng JS theo từng dòng; muốn có tổng toàn tập
+   * thì phải biết tập khoá của cả kết quả chứ không riêng trang. Lấy khoá rồi
+   * chạy lại **đúng** luật ghép của `applyPendingTransfers` là cách duy nhất
+   * bảo đảm footer khớp cột — kể cả quirk khử trùng "chỉ lượt pending đầu tiên"
+   * (xem `stock-period.service.spec.ts`).
+   */
+  private buildRowKeysSql(
+    combinedCte: string,
+    itemGroupBy: ItemGroupBy,
+    filterWhere: string,
+  ): string {
+    if (itemGroupBy !== 'item') {
+      // Gộp theo hàng cha/nhóm: branch_id và location_id bị NULL hoá nên không
+      // dòng nào ghép được với pending — tập khoá rỗng là đúng.
+      return '';
+    }
+    return `
+      WITH ${combinedCte}
+      SELECT DISTINCT c.item_id, c.group_key
+      FROM combined c
+      JOIN items i ON i.id = c.item_id AND i.organization_id = $1
+      WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
+        AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
+        AND ($8::boolean = FALSE OR NOT (c.opening_qty = 0 AND c.in_qty = 0 AND c.out_qty = 0))
+        ${filterWhere}
+    `;
+  }
+
+  /**
+   * Tổng hai cột điều chuyển trên toàn tập, dùng lại đúng luật ghép của
+   * `applyPendingTransfers` — bao gồm cả việc khử trùng theo cặp
+   * (item, chi nhánh đích) và chỉ tính lượt pending đầu tiên.
+   */
+  private totalPendingTransfers(
+    rowKeys: Array<{ item_id: string; group_key: string | null }>,
+    pendingRows: RawPendingTransferRow[],
+    isLocation: boolean,
+  ): ReportTotals {
+    const totals = {
+      transferOutQty: 0,
+      transferOutValue: 0,
+      incomingQty: 0,
+      incomingValue: 0,
+    };
+    const incomingAssigned = new Set<string>();
+
+    for (const key of rowKeys) {
+      for (const pending of pendingRows) {
+        if (pending.item_id !== key.item_id) continue;
+        const quantity = Number(pending.quantity ?? 0);
+        const value = Number(pending.value ?? 0);
+
+        const isSource = isLocation
+          ? Boolean(key.group_key && key.group_key === pending.source_location_id)
+          : key.group_key === pending.source_branch_id;
+        if (isSource) {
+          totals.transferOutQty += quantity;
+          totals.transferOutValue += value;
+        }
+
+        const incomingKey = `${pending.item_id}:${pending.destination_branch_id}`;
+        if (
+          key.group_key === pending.destination_branch_id &&
+          !incomingAssigned.has(incomingKey)
+        ) {
+          totals.incomingQty += quantity;
+          totals.incomingValue += value;
+          incomingAssigned.add(incomingKey);
+        }
+      }
+    }
+
+    return totals;
   }
 
   private async loadPendingTransfers(
@@ -278,6 +474,8 @@ export class StockPeriodService {
   private buildItemSqls(
     combinedCte: string,
     isLocation: boolean,
+    filterWhere: string,
+    limitIndex: number,
   ): { dataSql: string; countSql: string } {
     const locCols = isLocation
       ? `loc.id AS location_id, loc.code AS location_code, loc.name AS location_name,`
@@ -337,18 +535,22 @@ export class StockPeriodService {
       WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
         AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
         AND ($8::boolean = FALSE OR NOT (c.opening_qty = 0 AND c.in_qty = 0 AND c.out_qty = 0))
+        ${filterWhere}
       ${orderBy}
-      LIMIT $9 OFFSET $10
+      LIMIT $${limitIndex} OFFSET $${limitIndex + 1}
     `;
 
+    // Count and totals in one pass over exactly the rows the grid will show.
     const countSql = `
       WITH ${combinedCte}
-      SELECT COUNT(*)::int AS total
+      SELECT COUNT(*)::int AS total,
+             ${periodTotalsSelect('c')}
       FROM combined c
       JOIN items i ON i.id = c.item_id AND i.organization_id = $1
       WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
         AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
         AND ($8::boolean = FALSE OR NOT (c.opening_qty = 0 AND c.in_qty = 0 AND c.out_qty = 0))
+        ${filterWhere}
     `;
 
     return { dataSql, countSql };
@@ -370,6 +572,8 @@ export class StockPeriodService {
     combinedCte: string,
     _isLocation: boolean,
     itemGroupBy: 'parent' | 'group',
+    filterWhere: string,
+    limitIndex: number,
   ): { dataSql: string; countSql: string } {
     const aggKeyExpr =
       itemGroupBy === 'parent'
@@ -464,16 +668,19 @@ export class StockPeriodService {
       FROM item_agg ia
       ${joinLookup}
       WHERE ($8::boolean = FALSE OR NOT (ia.opening_qty = 0 AND ia.in_qty = 0 AND ia.out_qty = 0))
+        ${filterWhere}
       ORDER BY ${orderByCol} ASC NULLS LAST
-      LIMIT $9 OFFSET $10
+      LIMIT $${limitIndex} OFFSET $${limitIndex + 1}
     `;
 
     const countSql = `
       WITH ${combinedCte},
       ${itemAggCte}
-      SELECT COUNT(*)::int AS total
+      SELECT COUNT(*)::int AS total,
+             ${periodTotalsSelect('ia')}
       FROM item_agg ia
       WHERE ($8::boolean = FALSE OR NOT (ia.opening_qty = 0 AND ia.in_qty = 0 AND ia.out_qty = 0))
+        ${filterWhere}
     `;
 
     return { dataSql, countSql };

@@ -215,16 +215,22 @@ export function useDraftInvoicesQuery(
  */
 export function useReturnableInvoicesQuery(
   body: SearchReturnableInvoicesBody,
-): UseQueryResult<{ rows: ReturnInvoiceRow[]; total: number }, Error> {
+): UseQueryResult<
+  { rows: ReturnInvoiceRow[]; total: number; totalAmount: number },
+  Error
+> {
   const branchId = usePosBranchStore((s) => s.branchId) ?? "";
-  return useQuery<{ rows: ReturnInvoiceRow[]; total: number }, Error>({
+  return useQuery<
+    { rows: ReturnInvoiceRow[]; total: number; totalAmount: number },
+    Error
+  >({
     queryKey: INVOICE_KEYS.RETURNABLE({ ...body, branchId } as Record<string, unknown>),
     queryFn: async () => {
       const res = await invoiceService.searchReturnable(body);
       const rows = res.data.map((inv) =>
         mapInvoiceToReturnRow(inv, inv.customer ?? null, inv.branch?.name ?? ""),
       );
-      return { rows, total: res.total };
+      return { rows, total: res.total, totalAmount: res.totals.totalAmount };
     },
     staleTime: 30_000,
     placeholderData: keepPreviousData,
@@ -238,9 +244,15 @@ export function useReturnableInvoicesQuery(
  */
 export function useInvoiceListV2Query(
   body: SearchInvoicesV2Body,
-): UseQueryResult<{ rows: InvoiceListRow[]; total: number }, Error> {
+): UseQueryResult<
+  { rows: InvoiceListRow[]; total: number; totalAmount: number },
+  Error
+> {
   const branchId = usePosBranchStore((s) => s.branchId) ?? "";
-  return useQuery<{ rows: InvoiceListRow[]; total: number }, Error>({
+  return useQuery<
+    { rows: InvoiceListRow[]; total: number; totalAmount: number },
+    Error
+  >({
     queryKey: INVOICE_KEYS.SEARCH_V2({ ...body, branchId } as Record<string, unknown>),
     queryFn: async () => {
       const res = await invoiceService.searchV2(body);
@@ -271,7 +283,11 @@ export function useInvoiceListV2Query(
           inv.customerId ? byId.get(inv.customerId) ?? null : null,
         ),
       );
-      return { rows, total: res.total };
+      return {
+        rows,
+        total: res.total,
+        totalAmount: res.totals?.totalAmount ?? 0,
+      };
     },
     staleTime: 30_000,
     placeholderData: keepPreviousData,

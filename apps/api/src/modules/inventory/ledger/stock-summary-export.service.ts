@@ -96,6 +96,10 @@ export class StockSummaryExportService {
         branchId: actor.branchId,
         page,
         pageSize: 200,
+        // The export has no footer to fill, and this loop runs once per 200
+        // rows — paying for the whole-set totals statement on every pass would
+        // be ~40 wasted heavy queries on a full catalogue.
+        includeTotals: false,
       });
       rows.push(...response.data);
       total = response.total;
