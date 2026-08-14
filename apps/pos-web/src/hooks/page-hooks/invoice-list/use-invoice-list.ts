@@ -170,10 +170,9 @@ export function useInvoiceList(): UseInvoiceListResult {
   const total      = query.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  const grandTotal = useMemo(
-    () => rows.reduce((sum, row) => sum + row.amount, 0),
-    [rows],
-  );
+  // Tổng của toàn tập kết quả lọc, do server tính — không phải tổng trang.
+  // Cộng `rows` ở đây chính là lỗi cũ: con số đổi mỗi lần người dùng lật trang.
+  const grandTotal = query.data?.totalAmount ?? 0;
 
   const setDateRange = useCallback((next: PosDateRangeFilterOption) => {
     setDateRangeState(next);

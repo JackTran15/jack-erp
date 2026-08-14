@@ -1,3 +1,4 @@
+import type { ReportTotals } from "@erp/shared-interfaces";
 import { erpApi, requireErpData } from "../lib/erp-api";
 
 // === Shared types ===
@@ -42,6 +43,20 @@ export interface InventoryReportFilters {
   search?: string;
   page?: number;
   pageSize?: number;
+  /**
+   * Lọc theo cột, gửi lên dưới dạng JSON. Khoá là tên field của dòng, giá trị
+   * dùng lại đúng `ColumnFilter` của lưới. Server áp trên toàn tập, nên lọc và
+   * dòng tổng luôn nói cùng một chuyện.
+   */
+  columnFilters?: Record<string, ReportColumnFilterPayload>;
+}
+
+/** Một điều kiện lọc cột, đúng hình dạng các endpoint v2 đang nhận. */
+export interface ReportColumnFilterPayload {
+  operator?: string;
+  value?: string | number | null;
+  from?: string | number | null;
+  to?: string | number | null;
 }
 
 export interface TransferByBranchFilters extends InventoryReportFilters {
@@ -206,6 +221,11 @@ export interface TempWarehouseIssueRow {
 export interface InventoryReportResponse<TRow> extends InventoryReportPagination {
   data: TRow[];
   period: ResolvedPeriod;
+  /**
+   * Tổng của **toàn bộ** kết quả lọc, do server tính — khoá trùng tên field của
+   * dòng. Dùng chung kiểu `ReportTotals` với mọi lưới khác.
+   */
+  totals?: ReportTotals;
 }
 
 export interface StockByBranchBranchHeader {
@@ -239,6 +259,10 @@ function buildBaseQuery(filters: InventoryReportFilters): QueryRecord {
   if (filters.search) out.search = filters.search;
   if (filters.page) out.page = filters.page;
   if (filters.pageSize) out.pageSize = filters.pageSize;
+  // JSON rather than bracket syntax: these are GET endpoints and the backend's
+  // query parser leaves `columnFilters[x][op]` as one flat key.
+  if (filters.columnFilters && Object.keys(filters.columnFilters).length > 0)
+    out.columnFilters = JSON.stringify(filters.columnFilters);
   return out;
 }
 

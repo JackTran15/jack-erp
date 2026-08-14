@@ -100,11 +100,9 @@ export function buildApiFilters(
     }
   }
 
-  // pageSize is bounded at 200 by the backend; the shell paginates client-side
-  // so we ask for the max page to avoid client truncation on small result sets.
-  out.pageSize = 200;
-  out.page = 1;
-
+  // Pagination belongs to the caller: every storage report pages on the server
+  // now and passes its own page/pageSize. The old `pageSize: 200` default here
+  // was the truncation that hid everything past row 200.
   return out;
 }
 

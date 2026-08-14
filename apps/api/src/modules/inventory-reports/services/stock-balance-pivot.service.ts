@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import type { ReportTotals } from '@erp/shared-interfaces';
+import type { ReportColumnFilterDto } from '../dto/report-column-filter.dto';
 import { DataSource } from 'typeorm';
 import { type ItemGroupBy } from './stock-period.service';
 
 export interface StockBalancePivotQuery {
+  /** Lọc theo cột — hiện chỉ vào khoá cache; áp vào SQL ở UOW-06 (T-06-03). */
+  columnFilters?: Record<string, ReportColumnFilterDto>;
   organizationId: string;
   itemGroupBy?: ItemGroupBy;
   branchIds?: string[];
@@ -46,6 +50,13 @@ export interface StockBalancePivotResult {
   data: StockBalancePivotRow[];
   branches: StockBalancePivotBranchHeader[];
   total: number;
+  /**
+   * Tổng trên **toàn tập** mã hàng đã lọc, không phải trang hiện tại.
+   * `total` là tổng chung; mỗi chi nhánh có khoá riêng `perBranch.<branchId>`.
+   * Các ô của lưới chỉ tính cho `itemIds` của trang, nên tổng phải là một truy
+   * vấn riêng — nếu cộng các ô lại sẽ chỉ ra tổng của trang.
+   */
+  totals: ReportTotals;
 }
 
 /**
@@ -59,6 +70,42 @@ export interface StockBalancePivotResult {
 @Injectable()
 export class StockBalancePivotService {
   constructor(private readonly dataSource: DataSource) {}
+
+  /**
+   * Tổng tồn theo từng chi nhánh trên toàn bộ mã hàng đã lọc.
+   *
+   * Dùng đúng bộ điều kiện chọn mã hàng của `itemCountSql` — cùng một tập, nên
+   * cột "Tổng" ở footer luôn bằng tổng các cột chi nhánh.
+   */
+  private async loadBranchTotals(
+    orgId: string,
+    branchIds: string[] | null,
+    categoryIds: string[] | null,
+    search: string | null,
+  ): Promise<ReportTotals> {
+    const rows: Array<{ branch_id: string | null; qty: string }> =
+      await this.dataSource.query(
+        `
+        SELECT sb.branch_id AS branch_id, COALESCE(SUM(sb.quantity), 0)::numeric AS qty
+        FROM stock_balances sb
+        JOIN items i ON i.id = sb.item_id AND i.organization_id = $1
+        WHERE sb.organization_id = $1
+          AND ($2::text[] IS NULL OR sb.branch_id = ANY($2::text[]))
+          AND ($3::uuid[] IS NULL OR i.category_id = ANY($3))
+          AND ($4::text IS NULL OR i.code ILIKE '%' || $4 || '%' OR i.name ILIKE '%' || $4 || '%')
+        GROUP BY sb.branch_id
+      `,
+        [orgId, branchIds, categoryIds, search],
+      );
+
+    const totals: ReportTotals = { total: 0 };
+    for (const row of rows) {
+      const qty = Number(row.qty ?? 0);
+      totals.total += qty;
+      if (row.branch_id) totals[`perBranch.${row.branch_id}`] = qty;
+    }
+    return totals;
+  }
 
   async aggregate(query: StockBalancePivotQuery): Promise<StockBalancePivotResult> {
     const itemGroupBy: ItemGroupBy = query.itemGroupBy ?? 'item';
@@ -119,14 +166,15 @@ export class StockBalancePivotService {
     `;
     const baseParams = [orgId, branchIds, categoryIds, search];
 
-    const [itemRows, countRows] = await Promise.all([
+    const [itemRows, countRows, totals] = await Promise.all([
       this.dataSource.query(itemPageSql, [...baseParams, pageSize, offset]),
       this.dataSource.query(itemCountSql, baseParams),
+      this.loadBranchTotals(orgId, branchIds, categoryIds, search),
     ]);
 
     const total = Number(countRows[0]?.total ?? 0);
     const itemIds = (itemRows as Array<{ item_id: string }>).map((r) => r.item_id);
-    if (itemIds.length === 0) return { data: [], branches: [], total };
+    if (itemIds.length === 0) return { data: [], branches: [], total, totals };
 
     const cellSql = `
       SELECT
@@ -168,7 +216,7 @@ export class StockBalancePivotService {
       orgId, itemIds, branchIds,
     ])) as RawPivotCell[];
 
-    return this.foldCells(cellRows, itemIds, total);
+    return this.foldCells(cellRows, itemIds, total, totals);
   }
 
   // ─── parent / group aggregation ──────────────────────────────────────────────
@@ -232,16 +280,19 @@ export class StockBalancePivotService {
         AND ($4::text IS NULL OR i.code ILIKE '%' || $4 || '%' OR i.name ILIKE '%' || $4 || '%')
     `;
 
-    const [aggRows, countRows] = await Promise.all([
+    const [aggRows, countRows, totals] = await Promise.all([
       this.dataSource.query(aggPageSql, [...pageParams, pageSize, offset]),
       this.dataSource.query(aggCountSql, pageParams),
+      // Cùng tập stock_balances bên dưới, nên tổng ở chế độ gộp phải bằng đúng
+      // tổng ở chế độ theo mã hàng — một bất biến đáng khẳng định bằng test.
+      this.loadBranchTotals(orgId, branchIds, categoryIds, search),
     ]);
 
     const total = Number(countRows[0]?.total ?? 0);
     const aggKeys = (aggRows as Array<{ agg_key: string }>)
       .map((r) => r.agg_key)
       .filter(Boolean);
-    if (aggKeys.length === 0) return { data: [], branches: [], total };
+    if (aggKeys.length === 0) return { data: [], branches: [], total, totals };
 
     // Step 2: fetch per-(agg_key, branch) aggregates for the page
     const cellSql = isParent
@@ -304,7 +355,7 @@ export class StockBalancePivotService {
       orgId, aggKeys, branchIds,
     ])) as RawPivotCell[];
 
-    return this.foldCells(cellRows, aggKeys, total);
+    return this.foldCells(cellRows, aggKeys, total, totals);
   }
 
   // ─── shared fold ─────────────────────────────────────────────────────────────
@@ -313,6 +364,7 @@ export class StockBalancePivotService {
     cellRows: RawPivotCell[],
     orderedKeys: string[],
     total: number,
+    totals: ReportTotals,
   ): StockBalancePivotResult {
     const rowByKey = new Map<string, StockBalancePivotRow>();
     const branchById = new Map<string, StockBalancePivotBranchHeader>();
@@ -371,7 +423,7 @@ export class StockBalancePivotService {
       a.name.localeCompare(b.name, 'vi'),
     );
 
-    return { data, branches, total };
+    return { data, branches, total, totals };
   }
 }
 

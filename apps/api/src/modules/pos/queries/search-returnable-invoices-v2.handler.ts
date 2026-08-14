@@ -1,7 +1,10 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
+import type { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { FilterBuilder } from '../../../common/filters/filter.builder';
+import { invoiceSignedTotalSql } from '../services/invoice-amount.util';
+import { ReturnableInvoiceSearchV2Dto } from '../dto/returnable-invoice-search-v2.dto';
 import { BranchEntity } from '../../branch/branch.entity';
 import { CustomerEntity } from '../../customer/customer.entity';
 import {
@@ -14,6 +17,11 @@ import {
   ItemDirection,
 } from '../entities/invoice-item.entity';
 import { SearchReturnableInvoicesV2Query } from './search-returnable-invoices-v2.query';
+
+interface TotalsRaw {
+  total: string;
+  totalAmount: string;
+}
 
 @QueryHandler(SearchReturnableInvoicesV2Query)
 export class SearchReturnableInvoicesV2Handler
@@ -30,6 +38,64 @@ export class SearchReturnableInvoicesV2Handler
     const page  = dto.page  ?? 1;
     const limit = dto.limit ?? 20;
 
+    const rowsQb = this.buildQuery(dto, actor)
+      .orderBy('inv.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const totalsQb = this.buildQuery(dto, actor)
+      .select('COUNT(*)', 'total')
+      .addSelect(
+        `COALESCE(SUM(${invoiceSignedTotalSql('inv')}), 0)`,
+        'totalAmount',
+      );
+
+    const [data, totals] = await Promise.all([
+      rowsQb.getMany(),
+      totalsQb.getRawOne<TotalsRaw>(),
+    ]);
+
+    // Attach line items per invoice so callers see per-line discount breakdown
+    // and notes — mirrors SearchDraftInvoicesV2Handler.
+    if (data.length > 0) {
+      const items = await this.itemRepo.find({
+        where: { invoiceId: In(data.map((d) => d.id)) },
+        order: { sortOrder: 'ASC' },
+      });
+      const byInvoice = new Map<string, InvoiceItemEntity[]>();
+      for (const item of items) {
+        const bucket = byInvoice.get(item.invoiceId) ?? [];
+        bucket.push(item);
+        byInvoice.set(item.invoiceId, bucket);
+      }
+      for (const inv of data) {
+        (inv as InvoiceEntity & { items: InvoiceItemEntity[] }).items =
+          byInvoice.get(inv.id) ?? [];
+      }
+    }
+
+    return {
+      data,
+      total: Number(totals?.total ?? 0),
+      page,
+      limit,
+      totals: { totalAmount: Number(totals?.totalAmount ?? 0) },
+    };
+  }
+
+  /**
+   * Scope + the fixed eligibility predicates + every column filter. Built twice
+   * per request (rows, totals) so the footer total can never disagree with the
+   * grid.
+   *
+   * Every predicate below narrows the row set, so all of them must reach the
+   * totals query too — drop the EXISTS and the footer silently starts counting
+   * fully-returned invoices the grid does not show.
+   */
+  private buildQuery(
+    dto: ReturnableInvoiceSearchV2Dto,
+    actor: ActorContext,
+  ): SelectQueryBuilder<InvoiceEntity> {
     const qb = this.repo
       .createQueryBuilder('inv')
       .leftJoinAndMapOne(
@@ -81,31 +147,6 @@ export class SearchReturnableInvoicesV2Handler
       .applyCompare('inv.totalPaid', dto.totalPaid)
       .applyString('branch.name',    dto.branchName);
 
-    qb.orderBy('inv.createdAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit);
-
-    const [data, total] = await qb.getManyAndCount();
-
-    // Attach line items per invoice so callers see per-line discount breakdown
-    // and notes — mirrors SearchDraftInvoicesV2Handler.
-    if (data.length > 0) {
-      const items = await this.itemRepo.find({
-        where: { invoiceId: In(data.map((d) => d.id)) },
-        order: { sortOrder: 'ASC' },
-      });
-      const byInvoice = new Map<string, InvoiceItemEntity[]>();
-      for (const item of items) {
-        const bucket = byInvoice.get(item.invoiceId) ?? [];
-        bucket.push(item);
-        byInvoice.set(item.invoiceId, bucket);
-      }
-      for (const inv of data) {
-        (inv as InvoiceEntity & { items: InvoiceItemEntity[] }).items =
-          byInvoice.get(inv.id) ?? [];
-      }
-    }
-
-    return { data, total, page, limit };
+    return qb;
   }
 }

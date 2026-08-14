@@ -11440,12 +11440,23 @@ export interface components {
         };
         CreateExchangeInvoiceDto: {
             sessionId: string;
-            /** Format: uuid */
-            originalInvoiceId: string;
+            /**
+             * Format: uuid
+             * @description The original SALE invoice being exchanged against. Omit it for a QUICK
+             *     exchange (the POS "đổi trả nhanh" flow), which has no original document:
+             *     return lines are then free-form, skip the eligibility check, and take their
+             *     cost basis from the item's current purchase price. Its presence — not a
+             *     separate `mode` field — is what selects the mode.
+             */
+            originalInvoiceId?: string;
             reason: string;
             /** Format: uuid */
             customerId?: string;
-            /** @description Items being returned (direction=IN). Must reference original SALE lines. */
+            /**
+             * @description Items being returned (direction=IN). Each must reference an original SALE
+             *     line via `originalInvoiceItemId` when `originalInvoiceId` is set; in QUICK
+             *     mode that field must be absent on every line.
+             */
             returnLines: components["schemas"]["ReturnInvoiceLineDto"][];
             /** @description New items being purchased (direction=OUT). Same shape as a normal SALE. */
             newLines: components["schemas"]["CreateInvoiceItemDto"][];
@@ -11565,8 +11576,13 @@ export interface components {
             storeName?: components["schemas"]["StringFilterDto"];
             /** @description Invoice status (null/absent = all) */
             status?: components["schemas"]["EnumFilterDto"];
-            /** @description Total amount paid */
-            totalPaid?: components["schemas"]["CompareFilterDto"];
+            /**
+             * @description "Tổng thanh toán" — the same signed amount the grid column shows
+             *     (`amountDue`, or `netAmount` for RETURN/EXCHANGE). Renamed from `totalPaid`,
+             *     which filtered money actually collected and therefore never matched the
+             *     number the user was looking at on a debt invoice.
+             */
+            totalAmount?: components["schemas"]["CompareFilterDto"];
             /** @description Note */
             note?: components["schemas"]["StringFilterDto"];
         };
@@ -24676,7 +24692,10 @@ export interface operations {
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
+                /** @description Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client. */
                 pageSize?: number;
+                /** @description Lọc theo cột, dạng JSON: {"outQty":{"operator":">=","value":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem. */
+                columnFilters?: string;
             };
             header?: never;
             path?: never;
@@ -24710,7 +24729,10 @@ export interface operations {
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
+                /** @description Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client. */
                 pageSize?: number;
+                /** @description Lọc theo cột, dạng JSON: {"outQty":{"operator":">=","value":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem. */
+                columnFilters?: string;
             };
             header?: never;
             path?: never;
@@ -24744,7 +24766,10 @@ export interface operations {
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
+                /** @description Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client. */
                 pageSize?: number;
+                /** @description Lọc theo cột, dạng JSON: {"outQty":{"operator":">=","value":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem. */
+                columnFilters?: string;
             };
             header?: never;
             path?: never;
@@ -24778,7 +24803,10 @@ export interface operations {
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
+                /** @description Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client. */
                 pageSize?: number;
+                /** @description Lọc theo cột, dạng JSON: {"outQty":{"operator":">=","value":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem. */
+                columnFilters?: string;
             };
             header?: never;
             path?: never;
@@ -24812,7 +24840,10 @@ export interface operations {
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
+                /** @description Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client. */
                 pageSize?: number;
+                /** @description Lọc theo cột, dạng JSON: {"outQty":{"operator":">=","value":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem. */
+                columnFilters?: string;
             };
             header?: never;
             path?: never;
@@ -24846,7 +24877,10 @@ export interface operations {
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
+                /** @description Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client. */
                 pageSize?: number;
+                /** @description Lọc theo cột, dạng JSON: {"outQty":{"operator":">=","value":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem. */
+                columnFilters?: string;
             };
             header?: never;
             path?: never;
@@ -24880,7 +24914,10 @@ export interface operations {
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
+                /** @description Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client. */
                 pageSize?: number;
+                /** @description Lọc theo cột, dạng JSON: {"outQty":{"operator":">=","value":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem. */
+                columnFilters?: string;
             };
             header?: never;
             path?: never;
@@ -24914,7 +24951,10 @@ export interface operations {
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
+                /** @description Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client. */
                 pageSize?: number;
+                /** @description Lọc theo cột, dạng JSON: {"outQty":{"operator":">=","value":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem. */
+                columnFilters?: string;
                 /** @description Cửa hàng xuất (UUID). Bắt buộc gián tiếp — nếu bỏ trống sẽ dùng X-Branch-Id của request. */
                 sourceBranchId?: string;
             };

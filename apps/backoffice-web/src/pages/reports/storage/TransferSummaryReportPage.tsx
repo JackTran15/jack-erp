@@ -12,6 +12,7 @@ import {
   type FilterValues,
 } from "./_shared";
 import type { TableColumn } from "../../../components/table/BaseDataTable";
+import { DEFAULT_PAGINATION } from "../../../components/table/pagination.dto";
 import { useTransferSummaryReport } from "../../../hooks/use-inventory-reports";
 import type { TransferSummaryRow as ApiTransferSummaryRow } from "../../../api/inventory-reports";
 import { useBranches } from "../../../hooks/iam/useBranches";
@@ -82,12 +83,20 @@ export function TransferSummaryReportPage() {
     ...resolvePeriodRange("this_month"),
   }));
 
+  const [gridQuery, setGridQuery] = useState<{
+    page: number;
+    pageSize: number;
+  }>({ page: 1, pageSize: DEFAULT_PAGINATION.pageSize });
+
   const apiFilters = useMemo(
-    () =>
-      buildApiFilters(filterValues, period, {
+    () => ({
+      ...buildApiFilters(filterValues, period, {
         storeFieldKey: "store",
       }),
-    [filterValues, period],
+      page: gridQuery.page,
+      pageSize: gridQuery.pageSize,
+    }),
+    [filterValues, period, gridQuery],
   );
 
   const { data, isLoading } = useTransferSummaryReport(apiFilters);
@@ -126,37 +135,29 @@ export function TransferSummaryReportPage() {
       emptyLabel="Không có dữ liệu điều chuyển."
       getRowKey={(r) => r.branchId || r.branchCode}
       initialPeriod={period}
+      total={data?.total ?? 0}
+      totals={data?.totals}
+      onQueryChange={({ page, pageSize }) => setGridQuery({ page, pageSize })}
       onApply={(next, nextPeriod) => {
         setFilterValues(next);
         setPeriod(nextPeriod);
       }}
-      columnSummary={(rs) => {
-        const sum = rs.reduce(
-          (a, r) => ({
-            iq: a.iq + r.inQty,
-            iv: a.iv + r.inValue,
-            oq: a.oq + r.outQty,
-            ov: a.ov + r.outValue,
-            rq: a.rq + r.receivedQty,
-            rv: a.rv + r.receivedValue,
-            dq: a.dq + r.diffQty,
-            dv: a.dv + r.diffValue,
-            iodq: a.iodq + r.inOutDiffQty,
-            iodv: a.iodv + r.inOutDiffValue,
-          }),
-          { iq: 0, iv: 0, oq: 0, ov: 0, rq: 0, rv: 0, dq: 0, dv: 0, iodq: 0, iodv: 0 },
-        );
+      // Tổng của toàn tập kết quả, do server tính — không phải tổng trang.
+      // Khoá của server theo tên field nghiệp vụ (qtyIn/valueIn…), lưới đặt tên
+      // cột khác nên ánh xạ ngay tại đây.
+      columnSummary={(_rows, totals) => {
+        if (!totals) return {};
         return {
-          inQty: sum.iq,
-          inValue: formatMoneyInteger(sum.iv),
-          outQty: sum.oq,
-          outValue: formatMoneyInteger(sum.ov),
-          receivedQty: sum.rq,
-          receivedValue: formatMoneyInteger(sum.rv),
-          diffQty: sum.dq,
-          diffValue: formatMoneyInteger(sum.dv),
-          inOutDiffQty: sum.iodq,
-          inOutDiffValue: formatMoneyInteger(sum.iodv),
+          inQty: totals.qtyIn ?? 0,
+          inValue: formatMoneyInteger(totals.valueIn ?? 0),
+          outQty: totals.qtyOut ?? 0,
+          outValue: formatMoneyInteger(totals.valueOut ?? 0),
+          receivedQty: totals.qtyReceived ?? 0,
+          receivedValue: formatMoneyInteger(totals.valueReceived ?? 0),
+          diffQty: totals.qtyDifference ?? 0,
+          diffValue: formatMoneyInteger(totals.valueDifference ?? 0),
+          inOutDiffQty: totals.qtyInOutDifference ?? 0,
+          inOutDiffValue: formatMoneyInteger(totals.valueInOutDifference ?? 0),
         };
       }}
     />

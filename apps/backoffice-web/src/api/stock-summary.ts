@@ -1,3 +1,4 @@
+import type { ReportTotals } from "@erp/shared-interfaces";
 import { erpApi, requireErpData } from "../lib/erp-api";
 import { apiClient } from "../lib/api-axios";
 
@@ -39,12 +40,28 @@ export interface StockSummaryRow {
   reservedQty: number;
 }
 
+/**
+ * Tổng của **toàn bộ** kết quả lọc, do server tính — không phải tổng của trang
+ * hiện tại. Đây là nguồn duy nhất cho dòng footer.
+ */
+export interface StockSummaryTotals extends ReportTotals {
+  quantity: number;
+  openingQty: number;
+  inQty: number;
+  outQty: number;
+  closingQty: number;
+  transferOutQty: number;
+  incomingQty: number;
+  reservedQty: number;
+}
+
 export interface StockSummaryResponse {
   data: StockSummaryRow[];
   total: number;
   page: number;
   pageSize: number;
   totalQuantity: number;
+  totals?: StockSummaryTotals;
 }
 
 export type StockStateFilter = "ALL" | "IN_STOCK" | "OUT_OF_STOCK" | "NEGATIVE";

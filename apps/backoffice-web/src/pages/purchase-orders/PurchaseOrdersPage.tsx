@@ -146,8 +146,11 @@ export function PurchaseOrdersPage({
   const isPurchaseMode = mode === "purchase";
   const location = useLocation();
   const navigate = useNavigate();
-  const [records, setRecords] =
-    useState<PaginatedResponse<PurchaseOrder> | null>(null);
+  // `totalAmount` is the server's SUM over every matching row, not only this
+  // page — it backs the footer total.
+  const [records, setRecords] = useState<
+    (PaginatedResponse<PurchaseOrder> & { totals: { totalAmount: number } }) | null
+  >(null);
   const [providers, setProviders] = useState<InventoryProvider[]>([]);
   const [storages, setStorages] = useState<InventoryStorage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -204,12 +207,14 @@ export function PurchaseOrdersPage({
         total: number;
         page: number;
         limit: number;
+        totals: { totalAmount: number };
       }>("/v2/goods-receipts/search", body);
       setRecords({
         data: data.data,
         total: data.total,
         page: data.page,
         pageSize: data.limit,
+        totals: data.totals,
       });
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
@@ -218,6 +223,7 @@ export function PurchaseOrdersPage({
         total: 0,
         page: 1,
         pageSize: pagination.pageSize,
+        totals: { totalAmount: 0 },
       });
     } finally {
       setLoading(false);
@@ -472,10 +478,6 @@ export function PurchaseOrdersPage({
 
   // ─── Master table columns ─────────────────────────────────────────────────────
 
-  const totalSum = useMemo(
-    () => (records?.data ?? []).reduce((s, r) => s + orderTotal(r), 0),
-    [records],
-  );
   const showTotalFooter = !loading && (records?.data.length ?? 0) > 0;
 
   const columns: TableColumn<PurchaseOrder>[] = [
@@ -529,7 +531,11 @@ export function PurchaseOrdersPage({
       filterKind: "number-range",
       headerClassName: "text-right",
       className: "text-right tabular-nums",
-      footer: showTotalFooter ? formatMoneyInteger(totalSum) : undefined,
+      // Tổng của toàn tập kết quả lọc, do server tính — không phải tổng trang.
+      footer:
+        showTotalFooter && records
+          ? formatMoneyInteger(records.totals.totalAmount)
+          : undefined,
       render: (row) => formatMoneyInteger(orderTotal(row)),
     },
     ...(isPurchaseMode

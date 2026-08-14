@@ -1,9 +1,11 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import { GoodsIssueStatus } from '@erp/shared-interfaces';
+import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { FilterBuilder } from '../../../../common/filters/filter.builder';
 import { GoodsIssueEntity } from '../goods-issue.entity';
+import { GoodsIssueSearchV2Dto } from '../dto/goods-issue-search-v2.dto';
 import {
   attachCounterparties,
   counterpartyNameSql,
@@ -12,11 +14,21 @@ import { SearchGoodsIssuesV2Query } from './search-goods-issues-v2.query';
 
 /**
  * Correlated line total — mirrors the client-side Tổng tiền calc
- * (SUM(quantity * unit_price)). Used only for the server-side `totalAmount`
- * filter; the returned rows still carry `lines` for the FE to total.
+ * (SUM(quantity * unit_price)). Drives both the server-side `totalAmount`
+ * filter and the footer grand total, so the two can never disagree on what
+ * "Tổng tiền" means.
+ *
+ * A correlated subquery rather than a join on purpose: the rows query joins
+ * `lines` one-to-many, and summing over that join would count a 5-line issue
+ * five times. The totals query never joins `lines` at all.
  */
 const TOTAL_AMOUNT_SUBQUERY = `(SELECT COALESCE(SUM(l.quantity * l.unit_price), 0)
    FROM goods_issue_lines l WHERE l.goods_issue_id = gi.id)`;
+
+interface TotalsRaw {
+  total: string;
+  totalAmount: string;
+}
 
 /** Đối tượng (party) — counterparty (supplier/customer/employee), else the
  *  transfer target branch (for purpose=TRANSFER_OUT). */
@@ -35,19 +47,64 @@ export class SearchGoodsIssuesV2Handler
     const page = dto.page ?? 1;
     const limit = dto.limit ?? 20;
 
-    // Scope to the actor's active branch and hide CANCELLED (no soft-delete column).
     // Eager relations are joined explicitly so the row shape matches the
     // current find()-based list (provider, targetBranch, reasonRef, location,
     // lines + line item); the detail panel and view dialog rely on `lines`.
-    const qb = this.repo
-      .createQueryBuilder('gi')
+    const rowsQb = this.buildQuery(dto, actor)
+      // buildQuery only joins targetBranch (the party filter needs its alias);
+      // selecting it is the rows query's business. This is exactly what
+      // leftJoinAndSelect would have done.
+      .addSelect('targetBranch')
       .leftJoinAndSelect('gi.provider', 'provider')
-      .leftJoinAndSelect('gi.targetBranch', 'targetBranch')
       .leftJoinAndSelect('gi.reasonRef', 'reasonRef')
       .leftJoinAndSelect('gi.location', 'location')
       .leftJoinAndSelect('gi.lines', 'lines')
       .leftJoinAndSelect('lines.item', 'lineItem')
       .leftJoinAndSelect('lines.location', 'lineLocation')
+      .orderBy('gi.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    // No `lines` join here — see TOTAL_AMOUNT_SUBQUERY.
+    const totalsQb = this.buildQuery(dto, actor)
+      .select('COUNT(*)', 'total')
+      .addSelect(`COALESCE(SUM(${TOTAL_AMOUNT_SUBQUERY}), 0)`, 'totalAmount');
+
+    const [data, totals] = await Promise.all([
+      rowsQb.getMany(),
+      totalsQb.getRawOne<TotalsRaw>(),
+    ]);
+
+    // Inline the resolved "Đối tượng"; TRANSFER_OUT rows keep targetBranch as
+    // their party (counterparty is null there).
+    await attachCounterparties(this.repo.manager, data, actor.organizationId);
+
+    return {
+      data,
+      total: Number(totals?.total ?? 0),
+      page,
+      limit,
+      totals: { totalAmount: Number(totals?.totalAmount ?? 0) },
+    };
+  }
+
+  /**
+   * Scope + every column filter. Built twice per request (rows, totals) so the
+   * footer total can never disagree with the grid.
+   *
+   * `targetBranch` is joined here rather than alongside the other eager
+   * relations because PARTY_EXPRESSION references its alias — the totals query
+   * needs the alias too. It is many-to-one, so it cannot multiply rows.
+   */
+  private buildQuery(
+    dto: GoodsIssueSearchV2Dto,
+    actor: ActorContext,
+  ): SelectQueryBuilder<GoodsIssueEntity> {
+    // Hide CANCELLED (no soft-delete column) — cancelled documents must not
+    // reach the grid nor the footer total.
+    const qb = this.repo
+      .createQueryBuilder('gi')
+      .leftJoin('gi.targetBranch', 'targetBranch')
       .where('gi.organizationId = :orgId', { orgId: actor.organizationId })
       .andWhere('gi.status != :cancelled', {
         cancelled: GoodsIssueStatus.CANCELLED,
@@ -66,16 +123,6 @@ export class SearchGoodsIssuesV2Handler
       .applyDateRange('gi.createdAt', dto.date)
       .applyCompare(TOTAL_AMOUNT_SUBQUERY, dto.totalAmount);
 
-    qb.orderBy('gi.createdAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit);
-
-    const [data, total] = await qb.getManyAndCount();
-
-    // Inline the resolved "Đối tượng"; TRANSFER_OUT rows keep targetBranch as
-    // their party (counterparty is null there).
-    await attachCounterparties(this.repo.manager, data, actor.organizationId);
-
-    return { data, total, page, limit };
+    return qb;
   }
 }

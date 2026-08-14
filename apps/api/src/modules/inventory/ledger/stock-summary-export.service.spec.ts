@@ -13,6 +13,8 @@ const STORAGE = "edbf4f08-6424-40de-9430-4d9c464187e4";
  * stock_balances.quantity = 0, nhưng query theo kỳ (đã loại chứng từ huỷ) cho
  * closingQty = 1 — con số UI hiển thị.
  */
+let lastSummaryService: { getSummary: jest.Mock };
+
 function createRow(overrides: Partial<StockSummaryRow> = {}): StockSummaryRow {
   return {
     itemId: "63178691-8c23-4291-bd8c-6d98b8efe03f",
@@ -50,6 +52,7 @@ function createService(rows: StockSummaryRow[], hasProduct = false) {
       .fn()
       .mockResolvedValue({ data: rows, total: rows.length }),
   };
+  lastSummaryService = summaryService;
   const itemRepo = {
     find: jest.fn().mockResolvedValue(
       rows.map((row) => ({
@@ -98,6 +101,21 @@ async function readQuantities(buffer: Buffer): Promise<Array<[string, number]>> 
 
 describe("StockSummaryExportService", () => {
   const actor = { userId: "user-1", organizationId: ORG, branchId: "branch-1" };
+
+  it("không yêu cầu tổng toàn tập — export phân trang, không có footer để điền", async () => {
+    const service = createService([createRow()]);
+
+    await service.exportBuffer(
+      { variant: StockSummaryExportVariant.VARIANTS } as never,
+      actor as never,
+    );
+
+    // Vòng lặp chạy một lần cho mỗi 200 dòng; bật totals ở đây là trả tiền cho
+    // một truy vấn nặng mà file xuất ra không dùng tới.
+    for (const [arg] of lastSummaryService.getSummary.mock.calls) {
+      expect(arg.includeTotals).toBe(false);
+    }
+  });
 
   it("xuất cột 'Số lượng tồn' theo closingQty, không lấy số dư thô stock_balances", async () => {
     const service = createService([createRow()]);

@@ -20,6 +20,11 @@ import {
  * Server-side search request for the Nhập kho (goods receipt) list.
  * Filterable columns mirror what `PurchaseOrdersPage` renders:
  * Ngày, Số phiếu nhập, Đối tượng, Tổng tiền, Diễn giải, Lý do, Loại chứng từ.
+ *
+ * The response envelope is `{ data, total, page, limit, totals }`, where
+ * `totals.totalAmount` is SUM over every matching row, not only this page — it
+ * backs the grid's footer total. `totals` follows the shared `ReportTotals`
+ * shape (`@erp/shared-interfaces`), so every grid reads its footer the same way.
  */
 export class GoodsReceiptSearchV2Dto {
   @IsOptional()

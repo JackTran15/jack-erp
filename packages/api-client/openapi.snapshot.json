@@ -19683,11 +19683,22 @@
             "name": "pageSize",
             "required": false,
             "in": "query",
+            "description": "Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client.",
             "schema": {
               "minimum": 1,
-              "maximum": 200,
+              "maximum": 50000,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "columnFilters",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo cột, dạng JSON: {\"outQty\":{\"operator\":\">=\",\"value\":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem.",
+            "schema": {
+              "example": "{\"outQty\":{\"operator\":\">=\",\"value\":10}}",
+              "type": "string"
             }
           }
         ],
@@ -19818,11 +19829,22 @@
             "name": "pageSize",
             "required": false,
             "in": "query",
+            "description": "Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client.",
             "schema": {
               "minimum": 1,
-              "maximum": 200,
+              "maximum": 50000,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "columnFilters",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo cột, dạng JSON: {\"outQty\":{\"operator\":\">=\",\"value\":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem.",
+            "schema": {
+              "example": "{\"outQty\":{\"operator\":\">=\",\"value\":10}}",
+              "type": "string"
             }
           }
         ],
@@ -19953,11 +19975,22 @@
             "name": "pageSize",
             "required": false,
             "in": "query",
+            "description": "Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client.",
             "schema": {
               "minimum": 1,
-              "maximum": 200,
+              "maximum": 50000,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "columnFilters",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo cột, dạng JSON: {\"outQty\":{\"operator\":\">=\",\"value\":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem.",
+            "schema": {
+              "example": "{\"outQty\":{\"operator\":\">=\",\"value\":10}}",
+              "type": "string"
             }
           }
         ],
@@ -20088,11 +20121,22 @@
             "name": "pageSize",
             "required": false,
             "in": "query",
+            "description": "Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client.",
             "schema": {
               "minimum": 1,
-              "maximum": 200,
+              "maximum": 50000,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "columnFilters",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo cột, dạng JSON: {\"outQty\":{\"operator\":\">=\",\"value\":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem.",
+            "schema": {
+              "example": "{\"outQty\":{\"operator\":\">=\",\"value\":10}}",
+              "type": "string"
             }
           }
         ],
@@ -20223,11 +20267,22 @@
             "name": "pageSize",
             "required": false,
             "in": "query",
+            "description": "Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client.",
             "schema": {
               "minimum": 1,
-              "maximum": 200,
+              "maximum": 50000,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "columnFilters",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo cột, dạng JSON: {\"outQty\":{\"operator\":\">=\",\"value\":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem.",
+            "schema": {
+              "example": "{\"outQty\":{\"operator\":\">=\",\"value\":10}}",
+              "type": "string"
             }
           }
         ],
@@ -20358,11 +20413,22 @@
             "name": "pageSize",
             "required": false,
             "in": "query",
+            "description": "Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client.",
             "schema": {
               "minimum": 1,
-              "maximum": 200,
+              "maximum": 50000,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "columnFilters",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo cột, dạng JSON: {\"outQty\":{\"operator\":\">=\",\"value\":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem.",
+            "schema": {
+              "example": "{\"outQty\":{\"operator\":\">=\",\"value\":10}}",
+              "type": "string"
             }
           }
         ],
@@ -20493,11 +20559,22 @@
             "name": "pageSize",
             "required": false,
             "in": "query",
+            "description": "Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client.",
             "schema": {
               "minimum": 1,
-              "maximum": 200,
+              "maximum": 50000,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "columnFilters",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo cột, dạng JSON: {\"outQty\":{\"operator\":\">=\",\"value\":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem.",
+            "schema": {
+              "example": "{\"outQty\":{\"operator\":\">=\",\"value\":10}}",
+              "type": "string"
             }
           }
         ],
@@ -20628,11 +20705,22 @@
             "name": "pageSize",
             "required": false,
             "in": "query",
+            "description": "Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client.",
             "schema": {
               "minimum": 1,
-              "maximum": 200,
+              "maximum": 50000,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "columnFilters",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo cột, dạng JSON: {\"outQty\":{\"operator\":\">=\",\"value\":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem.",
+            "schema": {
+              "example": "{\"outQty\":{\"operator\":\">=\",\"value\":10}}",
+              "type": "string"
             }
           },
           {
@@ -35131,6 +35219,7 @@
           },
           "originalInvoiceId": {
             "type": "string",
+            "description": "The original SALE invoice being exchanged against. Omit it for a QUICK\nexchange (the POS \"đổi trả nhanh\" flow), which has no original document:\nreturn lines are then free-form, skip the eligibility check, and take their\ncost basis from the item's current purchase price. Its presence — not a\nseparate `mode` field — is what selects the mode.",
             "format": "uuid"
           },
           "reason": {
@@ -35141,7 +35230,7 @@
             "format": "uuid"
           },
           "returnLines": {
-            "description": "Items being returned (direction=IN). Must reference original SALE lines.",
+            "description": "Items being returned (direction=IN). Each must reference an original SALE\nline via `originalInvoiceItemId` when `originalInvoiceId` is set; in QUICK\nmode that field must be absent on every line.",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ReturnInvoiceLineDto"
@@ -35157,7 +35246,6 @@
         },
         "required": [
           "sessionId",
-          "originalInvoiceId",
           "reason",
           "returnLines",
           "newLines"
@@ -35444,8 +35532,8 @@
               }
             ]
           },
-          "totalPaid": {
-            "description": "Total amount paid",
+          "totalAmount": {
+            "description": "\"Tổng thanh toán\" — the same signed amount the grid column shows\n(`amountDue`, or `netAmount` for RETURN/EXCHANGE). Renamed from `totalPaid`,\nwhich filtered money actually collected and therefore never matched the\nnumber the user was looking at on a debt invoice.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/CompareFilterDto"

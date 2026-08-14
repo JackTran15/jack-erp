@@ -7,6 +7,7 @@ export {
   mapPeriodToApi,
   pickSourceBranchId,
 } from "./apiFilters";
+export { toColumnFilterPayload } from "./columnFilterPayload";
 export type {
   FilterField,
   FilterFieldOption,

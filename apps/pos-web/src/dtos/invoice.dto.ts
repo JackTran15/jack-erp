@@ -211,7 +211,8 @@ export interface SearchPurchaseHistoryBody {
   issuedAt?:   DateRangeFilter;
   storeName?:  StringFilter;
   status?:     EnumFilter;
-  totalPaid?:  CompareFilter;
+  /** Cùng đại lượng với cột "Tổng thanh toán" đang hiển thị (đổi tên từ `totalPaid`). */
+  totalAmount?: CompareFilter;
   note?:       StringFilter;
 }
 
@@ -229,6 +230,14 @@ export interface InvoiceSearchV2Response {
   total: number;
   page:  number;
   limit: number;
+  /**
+   * Tổng của **toàn bộ** tập khớp bộ lọc, không phải trang hiện tại. Cùng kiểu
+   * `ReportTotals` với mọi lưới khác trong hệ thống.
+   *
+   * `totalAmount` là "Tổng thanh toán" có dấu — đơn trả/đổi mang giá trị âm,
+   * đúng như `getInvoiceSignedTotal` tính cho từng dòng.
+   */
+  totals: { totalAmount: number };
 }
 
 /** Query params cho `GET /invoices` — danh sách invoice có filter + phân trang. */

@@ -1,4 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import type { ReportTotals } from '@erp/shared-interfaces';
+import type { ReportColumnFilterDto } from '../dto/report-column-filter.dto';
+import {
+  buildReportColumnFilter,
+  type ReportColumnSpecs,
+} from './report-column-filter.util';
 import { DataSource } from 'typeorm';
 import { type ItemGroupBy } from './stock-period.service';
 
@@ -7,6 +13,9 @@ import { type ItemGroupBy } from './stock-period.service';
 // ──────────────────────────────────────────────────────────────────
 
 export interface TransferSummaryQuery {
+  /** Trang hiện tại (1-based). Trước đây báo cáo này trả về cả tập. */
+  page?: number;
+  pageSize?: number;
   organizationId: string;
   startDate: Date;
   endDate: Date;
@@ -38,13 +47,31 @@ export interface TransferSummaryRow {
 export interface TransferSummaryResult {
   data: TransferSummaryRow[];
   total: number;
+  /** SUM từng cột số trên toàn bộ kết quả, không phải trang hiện tại. */
+  totals: ReportTotals;
 }
+
+/** Cột số của báo cáo 6 — tổng bằng reduce, vì truy vấn vẫn dựng đủ dòng. */
+const TRANSFER_SUMMARY_TOTAL_FIELDS = [
+  'qtyIn',
+  'valueIn',
+  'qtyOut',
+  'valueOut',
+  'qtyReceived',
+  'valueReceived',
+  'qtyDifference',
+  'valueDifference',
+  'qtyInOutDifference',
+  'valueInOutDifference',
+] as const;
 
 // ──────────────────────────────────────────────────────────────────
 // Báo cáo 7 — Hàng hóa điều chuyển theo cửa hàng (per item × destination)
 // ──────────────────────────────────────────────────────────────────
 
 export interface TransferByBranchQuery {
+  /** Lọc theo cột, áp phía server nên tác dụng trên toàn tập. */
+  columnFilters?: Record<string, ReportColumnFilterDto>;
   organizationId: string;
   startDate: Date;
   endDate: Date;
@@ -84,6 +111,34 @@ export interface TransferByBranchRow {
 export interface TransferByBranchResult {
   data: TransferByBranchRow[];
   total: number;
+  /**
+   * SUM từng cột số trên toàn tập. Không có `outAvgPrice`/`inAvgPrice`: trung
+   * bình của trung bình là sai — FE suy ra từ giá trị / số lượng.
+   */
+  totals: ReportTotals;
+}
+
+const TRANSFER_BY_BRANCH_TOTALS = [
+  ['outQty', 'out_qty'],
+  ['outValue', 'out_value'],
+  ['inQty', 'in_qty'],
+  ['inValue', 'in_value'],
+] as const;
+
+/** Cột lọc được của báo cáo 7, chiếu ở tầng ngoài. */
+function transferByBranchSpecs(alias: string, withText: boolean): ReportColumnSpecs {
+  const specs: ReportColumnSpecs = {
+    outQty: { sql: `${alias}.out_qty`, kind: 'number' },
+    outValue: { sql: `${alias}.out_value`, kind: 'number' },
+    inQty: { sql: `${alias}.in_qty`, kind: 'number' },
+    inValue: { sql: `${alias}.in_value`, kind: 'number' },
+  };
+  if (withText) {
+    specs.sku = { sql: 'i.code', kind: 'text' };
+    specs.itemName = { sql: 'i.name', kind: 'text' };
+    specs.unit = { sql: 'i.unit', kind: 'text' };
+  }
+  return specs;
 }
 
 /**
@@ -292,7 +347,25 @@ export class TransferReportService {
       };
     });
 
-    return { data, total: data.length };
+    // Tổng tính trên **toàn bộ** dòng, trước khi cắt trang — chính xác và
+    // không tốn thêm truy vấn nào, vì truy vấn này vốn dựng đủ dòng.
+    const totals: ReportTotals = {};
+    for (const field of TRANSFER_SUMMARY_TOTAL_FIELDS) {
+      totals[field] = data.reduce((sum, row) => sum + (row[field] ?? 0), 0);
+    }
+
+    // Cắt trang ở đây chứ không ở facade, để `data`, `total` và `totals` luôn
+    // cùng một nguồn. Trước đây báo cáo này trả về cả tập nhưng vẫn echo
+    // page/pageSize, nên lưới tưởng mình đang phân trang.
+    const page = Math.max(1, query.page ?? 1);
+    const pageSize = Math.max(1, query.pageSize ?? data.length ?? 1);
+    const start = (page - 1) * pageSize;
+
+    return {
+      data: data.slice(start, start + pageSize),
+      total: data.length,
+      totals,
+    };
   }
 
   // ──────────────────────────────────────────────────────────────────
@@ -410,6 +483,26 @@ export class TransferReportService {
       )
     `;
 
+    const params: unknown[] = [
+      query.organizationId,
+      query.startDate,
+      query.endDate,
+      query.sourceBranchId,
+      destinationBranchIds,
+      categoryIds,
+      search,
+    ];
+    // One fragment for the rows query and the count+totals query alike.
+    const isItemLevel = itemGroupBy === 'item';
+    const columnFilter = buildReportColumnFilter(
+      query.columnFilters,
+      transferByBranchSpecs(isItemLevel ? 'c' : 'ia', isItemLevel),
+      params.length,
+    );
+    const filterWhere = columnFilter.where ? `AND ${columnFilter.where}` : '';
+    const filteredParams = [...params, ...columnFilter.params];
+    const limitIndex = filteredParams.length + 1;
+
     let dataSql: string;
     let countSql: string;
 
@@ -448,15 +541,19 @@ export class TransferReportService {
         WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
           AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
         ORDER BY i.code ASC, b.name ASC
-        LIMIT $8 OFFSET $9
+        LIMIT $${limitIndex} OFFSET $${limitIndex + 1}
       `;
       countSql = `
         WITH ${baseCtes}
-        SELECT COUNT(*)::int AS total
+        SELECT COUNT(*)::int AS total,
+               ${TRANSFER_BY_BRANCH_TOTALS.map(
+                 ([, col]) => `COALESCE(SUM(c.${col}), 0)::numeric AS ${col}`,
+               ).join(',\n               ')}
         FROM combined c
         JOIN items i ON i.id = c.item_id AND i.organization_id = $1
         WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
           AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
+          ${filterWhere}
       `;
     } else {
       const aggKeyExpr = itemGroupBy === 'parent'
@@ -520,31 +617,32 @@ export class TransferReportService {
         ${joinLookup}
         JOIN branches b ON b.id = ia.other_branch_id AND b.organization_id = $1
         ORDER BY ${orderByCol} ASC NULLS LAST, b.name ASC
-        LIMIT $8 OFFSET $9
+        LIMIT $${limitIndex} OFFSET $${limitIndex + 1}
       `;
       countSql = `
         WITH ${baseCtes},
         ${aggCte}
-        SELECT COUNT(*)::int AS total FROM item_agg ia
+        SELECT COUNT(*)::int AS total,
+               ${TRANSFER_BY_BRANCH_TOTALS.map(
+                 ([, col]) => `COALESCE(SUM(ia.${col}), 0)::numeric AS ${col}`,
+               ).join(',\n               ')}
+        FROM item_agg ia
+        WHERE TRUE ${filterWhere}
       `;
     }
 
-    const params: unknown[] = [
-      query.organizationId,
-      query.startDate,
-      query.endDate,
-      query.sourceBranchId,
-      destinationBranchIds,
-      categoryIds,
-      search,
-    ];
-
     const [rows, countRows] = await Promise.all([
-      this.dataSource.query(dataSql, [...params, pageSize, offset]),
-      this.dataSource.query(countSql, params),
+      this.dataSource.query(dataSql, [...filteredParams, pageSize, offset]),
+      this.dataSource.query(countSql, filteredParams),
     ]);
 
     const total = Number(countRows[0]?.total ?? 0);
+    const totals: ReportTotals = {};
+    for (const [field, col] of TRANSFER_BY_BRANCH_TOTALS) {
+      totals[field] = Number(
+        (countRows as Array<Record<string, unknown>>)[0]?.[col] ?? 0,
+      );
+    }
 
     const data: TransferByBranchRow[] = (rows as RawTransferByBranchRow[]).map((r) => {
       const outQty = Number(r.out_qty ?? 0);
@@ -574,7 +672,7 @@ export class TransferReportService {
       };
     });
 
-    return { data, total };
+    return { data, total, totals };
   }
 }
 

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
 import type { ActorContext } from '../../common/decorators/actor-context.decorator';
 import { CacheService } from '../redis/cache.service';
+import type { ReportColumnFilterDto } from './dto/report-column-filter.dto';
 import { InventoryReportQueryDto } from './dto/inventory-report-query.dto';
 import { TransferByBranchQueryDto } from './dto/transfer-by-branch-query.dto';
 import { resolvePeriod } from './services/date-range-resolver';
@@ -34,7 +35,9 @@ import {
   TempWarehouseReportService,
 } from './services/temp-warehouse-report.service';
 
-const CACHE_NAMESPACE = 'inventory-reports';
+// Bumped when the cached result shape changes: entries written by the previous
+// deploy have no `totals`, and serving one would render an empty footer.
+const CACHE_NAMESPACE = 'inventory-reports:v2';
 const CACHE_TTL_SECONDS = 45;
 
 /**
@@ -43,6 +46,18 @@ const CACHE_TTL_SECONDS = 45;
  * báo cáo 6 / 7 use `TransferReportService`. Báo cáo 2 (stock-document-details)
  * remains a stub for a later task.
  */
+/**
+ * Stable, order-independent form of the column filters for cache keying — two
+ * requests differing only in key order must hit the same entry.
+ */
+function normaliseColumnFilters(
+  filters: Record<string, ReportColumnFilterDto> | undefined,
+): Array<[string, ReportColumnFilterDto]> | null {
+  const entries = Object.entries(filters ?? {}).filter(([, f]) => f);
+  if (entries.length === 0) return null;
+  return entries.sort(([a], [b]) => a.localeCompare(b));
+}
+
 @Injectable()
 export class InventoryReportsService {
   constructor(
@@ -122,6 +137,7 @@ export class InventoryReportsService {
       search: dto.search,
       page,
       pageSize,
+      columnFilters: dto.columnFilters,
     };
 
     const cacheKey = this.buildPivotCacheKey('stock-by-branch', actor, pivotQuery);
@@ -137,6 +153,7 @@ export class InventoryReportsService {
       data: result.data,
       branches: result.branches,
       total: result.total,
+      totals: result.totals,
       page,
       pageSize,
       period: {
@@ -163,6 +180,8 @@ export class InventoryReportsService {
       startDate: period.startDate,
       endDate: period.endDate,
       branchIds: dto.branchIds,
+      page,
+      pageSize,
     };
 
     const cacheKey = this.buildTransferSummaryCacheKey(
@@ -181,6 +200,7 @@ export class InventoryReportsService {
     return {
       data: result.data,
       total: result.total,
+      totals: result.totals,
       page,
       pageSize,
       period: {
@@ -225,6 +245,7 @@ export class InventoryReportsService {
       itemGroupBy: dto.itemGroupBy,
       page,
       pageSize,
+      columnFilters: dto.columnFilters,
     };
 
     const cacheKey = this.buildTransferByBranchCacheKey(
@@ -243,6 +264,7 @@ export class InventoryReportsService {
     return {
       data: result.data,
       total: result.total,
+      totals: result.totals,
       page,
       pageSize,
       sourceBranchId,
@@ -277,6 +299,7 @@ export class InventoryReportsService {
       search: dto.search,
       page,
       pageSize,
+      columnFilters: dto.columnFilters,
     };
 
     const cacheKey = this.buildDocumentDetailCacheKey(
@@ -295,6 +318,7 @@ export class InventoryReportsService {
     return {
       data: result.data,
       total: result.total,
+      totals: result.totals,
       page,
       pageSize,
       period: {
@@ -328,6 +352,7 @@ export class InventoryReportsService {
       search: dto.search,
       page,
       pageSize,
+      columnFilters: dto.columnFilters,
     };
 
     // Query shape matches DocumentDetailQuery, so the same cache-key builder applies.
@@ -347,6 +372,7 @@ export class InventoryReportsService {
     return {
       data: result.data,
       total: result.total,
+      totals: result.totals,
       page,
       pageSize,
       period: {
@@ -388,6 +414,7 @@ export class InventoryReportsService {
       hideZeroRows: false,
       page,
       pageSize,
+      columnFilters: dto.columnFilters,
     };
 
     const cacheKey = this.buildCacheKey(reportKey, actor, stockPeriodQuery);
@@ -402,6 +429,7 @@ export class InventoryReportsService {
     return {
       data: result.data,
       total: result.total,
+      totals: result.totals,
       page,
       pageSize,
       period: {
@@ -443,6 +471,7 @@ export class InventoryReportsService {
       hideZeroRows: query.hideZeroRows === true,
       page: query.page,
       pageSize: query.pageSize,
+      columnFilters: normaliseColumnFilters(query.columnFilters),
     };
     return this.hashKey(reportKey, actor, normalised);
   }
@@ -465,6 +494,7 @@ export class InventoryReportsService {
       search: query.search && query.search.length > 0 ? query.search : null,
       page: query.page,
       pageSize: query.pageSize,
+      columnFilters: normaliseColumnFilters(query.columnFilters),
     };
     return this.hashKey(reportKey, actor, normalised);
   }
@@ -481,6 +511,9 @@ export class InventoryReportsService {
         query.branchIds && query.branchIds.length > 0
           ? [...query.branchIds].sort()
           : null,
+      // Báo cáo 6 nay cắt trang trong service, nên trang là một phần của kết quả.
+      page: query.page,
+      pageSize: query.pageSize,
     };
     return this.hashKey(reportKey, actor, normalised);
   }
@@ -488,7 +521,9 @@ export class InventoryReportsService {
   private buildDocumentDetailCacheKey(
     reportKey: string,
     actor: ActorContext,
-    query: DocumentDetailQuery,
+    query: DocumentDetailQuery & {
+      columnFilters?: Record<string, ReportColumnFilterDto>;
+    },
   ): string {
     const normalised = {
       startDate: query.startDate.toISOString(),
@@ -504,6 +539,9 @@ export class InventoryReportsService {
       search: query.search && query.search.length > 0 ? query.search : null,
       page: query.page,
       pageSize: query.pageSize,
+      // Column filters change which rows — and therefore which totals — come
+      // back. Leaving them out of the key would serve a stale, unfiltered grid.
+      columnFilters: normaliseColumnFilters(query.columnFilters),
     };
     return this.hashKey(reportKey, actor, normalised);
   }
@@ -529,6 +567,7 @@ export class InventoryReportsService {
       search: query.search && query.search.length > 0 ? query.search : null,
       page: query.page,
       pageSize: query.pageSize,
+      columnFilters: normaliseColumnFilters(query.columnFilters),
     };
     return this.hashKey(reportKey, actor, normalised);
   }

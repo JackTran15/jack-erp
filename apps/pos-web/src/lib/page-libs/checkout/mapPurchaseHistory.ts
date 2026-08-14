@@ -5,10 +5,12 @@ import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
 import type { PurchaseHistoryEntry } from "@erp/pos/interfaces/customer-detail.interface";
 
 /**
- * Map các invoice trạng thái "đã hoàn tất" hoặc "đã huỷ" của một khách sang
- * dòng lịch sử mua hàng. Chỉ giữ hoá đơn không phải draft và có trạng thái
- * paid/debt/partial_debt/cancelled (loại draft/pending — chưa từng là giao
- * dịch thật).
+ * Map hoá đơn của một khách sang dòng lịch sử mua hàng. **Không loại dòng nào**:
+ * server đã lọc `isDraft = false` và whitelist trạng thái
+ * paid/debt/partial_debt/cancelled, nên lọc lại ở đây chỉ khiến "Tổng hóa đơn:
+ * {total}" (số của server) và tiền ở footer nói về hai tập khác nhau.
+ * Trạng thái nằm ngoài bảng nhãn UI trả `null` — dòng vẫn hiện, ô trạng thái để
+ * trống.
  *
  * `storeName` lấy từ `inv.branch.name` (BE join trả inline); fallback `branchName`
  * khi thiếu. "Tổng thanh toán" dùng `getInvoiceSignedTotal`: đơn bán (kể cả ghi
@@ -28,15 +30,12 @@ export function mapInvoicesToPurchaseHistory(
 ): PurchaseHistoryEntry[] {
   const rows: PurchaseHistoryEntry[] = [];
   for (const inv of invoices) {
-    if (inv.isDraft) continue;
-    const status = STATUS_MAP[inv.status];
-    if (!status) continue;
     rows.push({
       id: inv.id,
       invoiceDate: new Date(inv.issuedAt ?? inv.createdAt),
       invoiceNumber: inv.code,
       storeName: inv.branch?.name ?? branchName ?? "",
-      status,
+      status: STATUS_MAP[inv.status] ?? null,
       totalAmount: getInvoiceSignedTotal(inv),
       note: inv.note,
     });

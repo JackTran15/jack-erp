@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatVnd } from "@erp/ui";
 import { PosDataTable, type PosDataTableColumn } from "@erp/pos/components/common/PosDataTable/PosDataTable";
 import { PosDataTableFilterCell } from "@erp/pos/components/common/PosDataTable/PosDataTableFilterCell/PosDataTableFilterCell";
@@ -126,34 +126,43 @@ export function PurchaseHistoryTab({
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(
     null,
   );
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PURCHASE_HISTORY_PAGE_SIZE);
   const selectedStatus = STATUS_FILTER_TO_STATUS[statusFilter];
 
+  // Reset lên trang 1 trên **giá trị thô**, không phải giá trị debounce: reset
+  // theo debounce sẽ render một frame "trang 5 của bộ lọc mới".
   const updateFilter = useCallback(
-    (key: keyof PurchaseHistoryColumnFilters, patch: Partial<ColumnFilterState>) =>
-      setColumnFilters((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } })),
+    (key: keyof PurchaseHistoryColumnFilters, patch: Partial<ColumnFilterState>) => {
+      setColumnFilters((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
+      setPage(1);
+    },
     [],
   );
+
+  // Dialog dùng lại cho khách khác mà không unmount → trang phải về 1.
+  useEffect(() => setPage(1), [customerId]);
 
   // Debounce the typed values so each keystroke doesn't fire a request.
   const debouncedFilters = useDebounce(columnFilters);
 
   const searchBody = useMemo<Omit<SearchPurchaseHistoryBody, "customerId">>(
     () => ({
-      page: 1,
-      limit: PURCHASE_HISTORY_PAGE_SIZE,
+      page,
+      limit: pageSize,
       code: columnToStringFilter(debouncedFilters.invoiceNumber),
       issuedAt: dateColumnToRange(debouncedFilters.invoiceDate),
       storeName: columnToStringFilter(debouncedFilters.storeName),
       status: selectedStatus
         ? { value: STATUS_TO_API[selectedStatus] }
         : undefined,
-      totalPaid: columnToCompareFilter(debouncedFilters.totalAmount),
+      totalAmount: columnToCompareFilter(debouncedFilters.totalAmount),
       note: columnToStringFilter(debouncedFilters.note),
     }),
-    [debouncedFilters, selectedStatus],
+    [debouncedFilters, selectedStatus, page, pageSize],
   );
 
-  const { data, isLoading } = useCustomerPurchaseHistory(
+  const { data, isLoading, refetch } = useCustomerPurchaseHistory(
     customerId,
     searchBody,
     enabled,
@@ -164,6 +173,9 @@ export function PurchaseHistoryTab({
     [data, branchName],
   );
   const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  // Tổng của toàn tập khớp bộ lọc, do server tính — cùng tập với `total` ở trên.
+  const grandTotal = data?.totals.totalAmount ?? 0;
 
   const statusOptions = useMemo(
     () => [
@@ -178,7 +190,6 @@ export function PurchaseHistoryTab({
     [],
   );
 
-  const grandTotal = rows.reduce((s, r) => s + r.totalAmount, 0);
   const columns = useMemo<
     ReadonlyArray<PosDataTableColumn<PurchaseHistoryEntry>>
   >(
@@ -244,13 +255,17 @@ export function PurchaseHistoryTab({
       {
         key: "status",
         title: "Trạng thái",
-        render: (row) => <StatusBadge status={row.status} />,
+        render: (row) =>
+          row.status ? <StatusBadge status={row.status} /> : "—",
         filterRender: (
           <PosSelect
             value={
               statusOptions.find((o) => o.value === statusFilter) ?? null
             }
-            onChange={(item) => setStatusFilter(item.value)}
+            onChange={(item) => {
+              setStatusFilter(item.value);
+              setPage(1);
+            }}
             items={statusOptions}
             itemKey={(o) => o.value}
             renderItem={(o) => o.label}
@@ -322,10 +337,16 @@ export function PurchaseHistoryTab({
           />
         </div>
         <PosPaginationBar
-          page={1}
-          totalPages={1}
-          pageSize={PURCHASE_HISTORY_PAGE_SIZE}
+          page={page}
+          totalPages={totalPages}
+          pageSize={pageSize}
           total={total}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+          onRefresh={() => void refetch()}
         />
       </div>
 

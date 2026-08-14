@@ -7,11 +7,14 @@ import {
 import {
   StorageReportShell,
   buildApiFilters,
+  toColumnFilterPayload,
   resolveLabel,
   type FilterField,
   type FilterValues,
 } from "./_shared";
 import type { TableColumn } from "../../../components/table/BaseDataTable";
+import { DEFAULT_PAGINATION } from "../../../components/table/pagination.dto";
+import type { ReportColumnFilterPayload } from "../../../api/inventory-reports";
 import { useStockDocumentDetailsReport } from "../../../hooks/use-inventory-reports";
 import type { DocumentDetailRow } from "../../../api/inventory-reports";
 import { useBranches } from "../../../hooks/iam/useBranches";
@@ -100,6 +103,16 @@ function mapApiRow(row: DocumentDetailRow, index: number): ViewRow {
   };
 }
 
+/** Cột phải lọc theo giá trị số. */
+const NUMERIC_COLUMNS = new Set([
+  "inQty",
+  "inUnitPrice",
+  "inValue",
+  "outQty",
+  "outUnitPrice",
+  "outValue",
+]);
+
 export function StockDocumentDetailsReportPage() {
   const { data: branches } = useBranches();
   const { options: groupOptions } = useReportCategories();
@@ -132,13 +145,27 @@ export function StockDocumentDetailsReportPage() {
     ...resolvePeriodRange("this_month"),
   }));
 
+  const [gridQuery, setGridQuery] = useState<{
+    page: number;
+    pageSize: number;
+    columnFilters: Record<string, ReportColumnFilterPayload>;
+  }>({
+    page: 1,
+    pageSize: DEFAULT_PAGINATION.pageSize,
+    columnFilters: {},
+  });
+
   const apiFilters = useMemo(
-    () =>
-      buildApiFilters(filterValues, period, {
+    () => ({
+      ...buildApiFilters(filterValues, period, {
         storeFieldKey: "store",
         categoryFieldKey: "group",
       }),
-    [filterValues, period],
+      page: gridQuery.page,
+      pageSize: gridQuery.pageSize,
+      columnFilters: gridQuery.columnFilters,
+    }),
+    [filterValues, period, gridQuery],
   );
 
   const { data, isLoading } = useStockDocumentDetailsReport(apiFilters);
@@ -194,25 +221,29 @@ export function StockDocumentDetailsReportPage() {
       emptyLabel="Không có chứng từ trong kỳ."
       getRowKey={(r) => r.id}
       initialPeriod={period}
+      total={data?.total ?? 0}
+      totals={data?.totals}
+      onQueryChange={({ page, pageSize, columnFilters }) =>
+        setGridQuery({
+          page,
+          pageSize,
+          columnFilters: toColumnFilterPayload(columnFilters, NUMERIC_COLUMNS),
+        })
+      }
       onApply={(next, nextPeriod) => {
         setFilterValues(next);
         setPeriod(nextPeriod);
       }}
-      columnSummary={(rs) => {
-        const sum = rs.reduce(
-          (a, r) => ({
-            iq: a.iq + r.inQty,
-            iv: a.iv + r.inValue,
-            oq: a.oq + r.outQty,
-            ov: a.ov + r.outValue,
-          }),
-          { iq: 0, iv: 0, oq: 0, ov: 0 },
-        );
+      // Tổng của toàn tập kết quả lọc, do server tính — không phải tổng trang.
+      columnSummary={(_rows, totals) => {
+        if (!totals) return {};
+        const inValue = totals.inValue ?? 0;
+        const outValue = totals.outValue ?? 0;
         return {
-          inQty: sum.iq,
-          inValue: sum.iv ? formatMoneyInteger(sum.iv) : "",
-          outQty: sum.oq,
-          outValue: sum.ov ? formatMoneyInteger(sum.ov) : "",
+          inQty: totals.inQty ?? 0,
+          inValue: inValue ? formatMoneyInteger(inValue) : "",
+          outQty: totals.outQty ?? 0,
+          outValue: outValue ? formatMoneyInteger(outValue) : "",
         };
       }}
     />

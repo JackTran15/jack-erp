@@ -4,9 +4,11 @@ import {
   StorageReportShell,
   resolveLabel,
   buildApiFilters,
+  toColumnFilterPayload,
   type FilterField,
 } from "./_shared";
 import type { TableColumn } from "../../../components/table/BaseDataTable";
+import { DEFAULT_PAGINATION } from "../../../components/table/pagination.dto";
 import { StatusBadge } from "../../../components/status/StatusBadge";
 import {
   listTemporaryWarehouseOutGoods,
@@ -26,6 +28,14 @@ const SHIFT_OPTIONS = [
   { value: "morning", label: "Ca sáng" },
   { value: "afternoon", label: "Ca chiều" },
 ];
+/** Các cột phải lọc theo giá trị số, không phải theo chuỗi đã định dạng. */
+const NUMERIC_COLUMNS = new Set([
+  "outQty",
+  "returnQty",
+  "saleQty",
+  "remainingQty",
+]);
+
 const STATUS_OPTIONS = [
   { value: "Bán hàng trưng bày", label: "Bán hàng trưng bày" },
   { value: "Trả hàng trưng bày", label: "Trả hàng trưng bày" },
@@ -129,10 +139,13 @@ export function TemporaryIssuesReportPage() {
     },
   ];
 
+  // Server-paged: page, page size and column filters all travel to the API, so
+  // the grid and the footer describe the same set no matter how deep the user
+  // pages. `pageSize` is the real page now, not the old 200-row truncation.
   const [apiFilters, setApiFilters] = useState<InventoryReportFilters>({
     preset: "this_month",
     page: 1,
-    pageSize: 200,
+    pageSize: DEFAULT_PAGINATION.pageSize,
   });
 
   const query = useQuery({
@@ -157,30 +170,35 @@ export function TemporaryIssuesReportPage() {
       columns={columns}
       rows={rows}
       loading={query.isFetching}
+      total={query.data?.total ?? 0}
+      totals={query.data?.totals}
       onApply={(values, period) =>
-        setApiFilters(
-          buildApiFilters(values, period, { categoryFieldKey: "group" }),
-        )
+        setApiFilters((prev) => ({
+          ...buildApiFilters(values, period, { categoryFieldKey: "group" }),
+          // buildApiFilters still hands back the client-mode page size; this
+          // report pages on the server, so keep our own and restart at page 1.
+          page: 1,
+          pageSize: prev.pageSize,
+          columnFilters: prev.columnFilters,
+        }))
+      }
+      onQueryChange={({ page, pageSize, columnFilters }) =>
+        setApiFilters((prev) => ({
+          ...prev,
+          page,
+          pageSize,
+          columnFilters: toColumnFilterPayload(columnFilters, NUMERIC_COLUMNS),
+        }))
       }
       emptyLabel="Không có dữ liệu xuất kho tạm."
       getRowKey={(r, i) => `${r.sku}-${r.date}-${r.time}-${i}`}
-      columnSummary={(rs) => {
-        const sum = rs.reduce(
-          (a, r) => ({
-            o: a.o + r.outQty,
-            t: a.t + r.returnQty,
-            b: a.b + r.saleQty,
-            r: a.r + r.remainingQty,
-          }),
-          { o: 0, t: 0, b: 0, r: 0 },
-        );
-        return {
-          outQty: sum.o,
-          returnQty: sum.t,
-          saleQty: sum.b,
-          remainingQty: sum.r,
-        };
-      }}
+      // Tổng của toàn tập kết quả lọc, do server tính — không phải tổng trang.
+      columnSummary={(_rows, totals) => ({
+        outQty: totals?.outQty ?? 0,
+        returnQty: totals?.returnQty ?? 0,
+        saleQty: totals?.saleQty ?? 0,
+        remainingQty: totals?.remainingQty ?? 0,
+      })}
     />
   );
 }

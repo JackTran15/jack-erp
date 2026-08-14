@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import type { ReportTotals } from "@erp/shared-interfaces";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, SelectQueryBuilder } from "typeorm";
 import {
@@ -62,6 +63,12 @@ export interface StockSummaryQuery {
   outQty?: CompareFilterDto;
   transferOutQty?: CompareFilterDto;
   incomingQty?: CompareFilterDto;
+  /**
+   * Whole-set column totals for the grid footer. Defaults to true. The export
+   * pipeline walks the result page by page and never renders a footer, so it
+   * passes false rather than paying for the totals statement 40 times.
+   */
+  includeTotals?: boolean;
 }
 
 export interface StockSummaryRow {
@@ -96,12 +103,32 @@ export interface StockSummaryRow {
   reservedQty: number;
 }
 
+/**
+ * Column totals over **every** row matching the filters, not only the page.
+ * These back the grid footer, which must not change when the user pages.
+ */
+export interface StockSummaryTotals extends ReportTotals {
+  /** Live tồn — same number as `totalQuantity`. */
+  quantity: number;
+  openingQty: number;
+  inQty: number;
+  outQty: number;
+  /** Derived, exactly as per row: hasPeriod ? opening + in - out : quantity. */
+  closingQty: number;
+  transferOutQty: number;
+  incomingQty: number;
+  reservedQty: number;
+}
+
 export interface StockSummaryResponse {
   data: StockSummaryRow[];
   total: number;
   page: number;
   pageSize: number;
+  /** Kept alongside `totals` so existing consumers keep working. */
   totalQuantity: number;
+  /** Absent when the caller passed `includeTotals: false` (the export path). */
+  totals?: StockSummaryTotals;
 }
 
 export interface StockSummaryFilterOptions {
@@ -150,6 +177,22 @@ interface RawPageRow {
   branch_id: string;
   quantity: string;
   last_movement_at: Date | null;
+}
+
+/**
+ * One row, always. The count-only variant fills the first two columns and
+ * leaves the rest undefined; `readTotals` is only called for the full variant.
+ */
+interface RawTotalsRow {
+  total: number;
+  total_quantity: string;
+  opening_qty?: string;
+  in_qty?: string;
+  out_qty?: string;
+  transfer_out_qty?: string;
+  incoming_qty?: string;
+  pending_only_incoming_qty?: string;
+  reserved_qty?: string;
 }
 
 interface RawPeriodRow {
@@ -235,17 +278,31 @@ export class StockSummaryService {
       query.quantity,
     );
     const [aggSql, aggParams] = aggQb.getQueryAndParameters();
-    const aggregateSql = `SELECT COUNT(*)::int AS total, COALESCE(SUM(sub.quantity), 0)::numeric AS total_quantity FROM (${aggSql}) sub`;
+    // The derived-filter branch materialises every row anyway and reduces the
+    // totals in JS, so running the totals statement there would be work thrown
+    // away. Everywhere else it replaces the old count-only aggregate, keeping
+    // the round-trip count unchanged.
+    const wantsTotals = query.includeTotals !== false && !needsDerivedFilter;
+    const aggregate = wantsTotals
+      ? this.buildTotalsSql(query, aggSql, aggParams)
+      : {
+          sql: `SELECT COUNT(*)::int AS total, COALESCE(SUM(sub.quantity), 0)::numeric AS total_quantity FROM (${aggSql}) sub`,
+          params: aggParams,
+        };
 
     const [rows, aggResult] = await Promise.all([
       pageQb.getRawMany<RawPageRow>(),
-      this.balanceRepo.manager.query<
-        Array<{ total: number; total_quantity: string }>
-      >(aggregateSql, aggParams),
+      this.balanceRepo.manager.query<RawTotalsRow[]>(
+        aggregate.sql,
+        aggregate.params,
+      ),
     ]);
 
     let total = Number(aggResult?.[0]?.total ?? 0);
     const totalQuantity = Number(aggResult?.[0]?.total_quantity ?? 0);
+    const totals = wantsTotals
+      ? this.readTotals(aggResult?.[0], totalQuantity, Boolean(query.startDate || query.endDate))
+      : undefined;
 
     const periodDataMap = new Map<string, RawPeriodRow>();
     if (rows.length > 0 && (query.startDate || query.endDate)) {
@@ -523,9 +580,31 @@ export class StockSummaryService {
           matchesCompare(row.incomingQty, query.incomingQty),
       );
       const filteredTotal = data.length;
-      const filteredTotalQuantity = data.reduce(
-        (sum, row) => sum + row.quantity,
-        0,
+      // Every matching row is in memory here, so the footer totals are a plain
+      // reduce — taken after the derived filter and before the page slice, and
+      // exact by construction. The pending-only rows were appended above, i.e.
+      // before the filter, so they are already counted exactly once.
+      const filteredTotals = data.reduce<StockSummaryTotals>(
+        (sum, row) => ({
+          quantity: sum.quantity + row.quantity,
+          openingQty: sum.openingQty + row.openingQty,
+          inQty: sum.inQty + row.inQty,
+          outQty: sum.outQty + row.outQty,
+          closingQty: sum.closingQty + row.closingQty,
+          transferOutQty: sum.transferOutQty + row.transferOutQty,
+          incomingQty: sum.incomingQty + row.incomingQty,
+          reservedQty: sum.reservedQty + row.reservedQty,
+        }),
+        {
+          quantity: 0,
+          openingQty: 0,
+          inQty: 0,
+          outQty: 0,
+          closingQty: 0,
+          transferOutQty: 0,
+          incomingQty: 0,
+          reservedQty: 0,
+        },
       );
       data = data.slice((page - 1) * pageSize, page * pageSize);
       return {
@@ -533,11 +612,12 @@ export class StockSummaryService {
         total: filteredTotal,
         page,
         pageSize,
-        totalQuantity: filteredTotalQuantity,
+        totalQuantity: filteredTotals.quantity,
+        ...(query.includeTotals === false ? {} : { totals: filteredTotals }),
       };
     }
 
-    return { data, total, page, pageSize, totalQuantity };
+    return { data, total, page, pageSize, totalQuantity, totals };
   }
 
   async getDetails(
@@ -638,6 +718,191 @@ export class StockSummaryService {
     return {
       brands: brandRows.map((r) => r.brand),
       units: unitRows.map((r) => r.unit),
+    };
+  }
+
+  /**
+   * Column totals over the whole filtered set, in one statement.
+   *
+   * The page path feeds its period / pending-transfer / reservation queries a
+   * `unnest()` of the (item, storage) pairs **on the current page**, which is
+   * why the footer could only ever sum a page. Here the grouped query itself
+   * becomes the `pairs` CTE, so the same aggregates run against every matching
+   * pair. No GROUP BY: the page needs a value per pair to key a Map, the footer
+   * only needs a scalar, and dropping the grouping is what keeps this
+   * affordable at ~8k pairs.
+   *
+   * Every CTE is a single scalar row, so the final cross join is 1×1×1×1×1 and
+   * cannot multiply anything. Each one is emitted under exactly the same
+   * condition as its page-path counterpart — otherwise the footer would stop
+   * matching the column above it.
+   */
+  private buildTotalsSql(
+    query: StockSummaryQuery,
+    aggSql: string,
+    aggParams: unknown[],
+  ): { sql: string; params: unknown[] } {
+    const params = [...aggParams];
+    // aggSql already consumed $1..$n; keep numbering after it. Only parameters
+    // actually referenced get bound — Postgres rejects surplus ones.
+    const bind = (value: unknown): string => {
+      params.push(value);
+      return `$${params.length}`;
+    };
+
+    const ctes: string[] = [
+      `pairs AS (${aggSql})`,
+      `base AS (
+         SELECT COUNT(*)::int AS total,
+                COALESCE(SUM(pairs.quantity), 0)::numeric AS total_quantity
+         FROM pairs)`,
+    ];
+
+    // Period columns — mirrors the page query's condition at the call site.
+    if (query.startDate || query.endDate) {
+      const start = bind(query.startDate || "1970-01-01");
+      const end = bind(query.endDate ? addOneDay(query.endDate) : "2999-12-31");
+      const org = bind(query.organizationId);
+      ctes.push(`period AS (
+         SELECT
+           COALESCE(SUM(CASE WHEN sle.posted_at < ${start} THEN sle.quantity ELSE 0 END), 0)::numeric AS opening_qty,
+           COALESCE(SUM(CASE WHEN sle.posted_at >= ${start} AND sle.posted_at < ${end} AND sle.quantity > 0 THEN sle.quantity ELSE 0 END), 0)::numeric AS in_qty,
+           COALESCE(SUM(CASE WHEN sle.posted_at >= ${start} AND sle.posted_at < ${end} AND sle.quantity < 0 THEN ABS(sle.quantity) ELSE 0 END), 0)::numeric AS out_qty
+         FROM stock_ledger_entries sle
+         INNER JOIN locations loc ON loc.id = sle.location_id
+         INNER JOIN pairs p ON p.item_id = sle.item_id AND p.storage_id = loc.storage_id
+         WHERE sle.organization_id = ${org}
+         ${EXCLUDE_VOIDED_DOCS_SQL})`);
+    } else {
+      ctes.push(
+        `period AS (SELECT 0::numeric AS opening_qty, 0::numeric AS in_qty, 0::numeric AS out_qty)`,
+      );
+    }
+
+    // Pending transfers. The page path runs this unconditionally; a null
+    // branchId simply makes both CASE arms false. Keeping the IN_PROGRESS and
+    // deleted_at predicates in the JOIN (not a WHERE) is what stops the
+    // pairs × lines product from exploding.
+    {
+      const branch = bind(query.branchId ?? null);
+      const org = bind(query.organizationId);
+      ctes.push(`pending AS (
+         SELECT
+           COALESCE(SUM(CASE
+             WHEN t.source_branch_id = ${branch}
+              AND COALESCE(l.source_storage_id, t.source_storage_id) = p.storage_id
+             THEN l.requested_qty ELSE 0 END), 0)::numeric AS transfer_out_qty,
+           COALESCE(SUM(CASE
+             WHEN t.destination_branch_id = ${branch}
+              AND t.destination_storage_id = p.storage_id
+             THEN l.requested_qty ELSE 0 END), 0)::numeric AS incoming_qty
+         FROM pairs p
+         INNER JOIN transfer_order_lines l
+           ON l.item_id = p.item_id AND l.organization_id = ${org}
+         INNER JOIN transfer_orders t
+           ON t.id = l.transfer_order_id
+          AND t.organization_id = ${org}
+          AND t.status = 'IN_PROGRESS'
+          AND t.deleted_at IS NULL)`);
+    }
+
+    // Reservations — page path gates on branchId.
+    if (query.branchId) {
+      const branch = bind(query.branchId);
+      const org = bind(query.organizationId);
+      ctes.push(`reserved AS (
+         SELECT COALESCE(SUM(invoice_item.quantity), 0)::numeric AS reserved_qty
+         FROM pairs p
+         INNER JOIN invoice_items invoice_item
+           ON invoice_item.item_id = p.item_id
+          AND invoice_item.organization_id = ${org}
+          AND invoice_item.direction = 'OUT'
+         INNER JOIN invoices invoice
+           ON invoice.id = invoice_item.invoice_id
+          AND invoice.organization_id = ${org}
+          AND invoice.branch_id = ${branch}
+          AND invoice.type = 'SALE'
+          AND invoice.status IN ('draft', 'pending')
+         INNER JOIN locations reservation_location
+           ON reservation_location.id = invoice_item.location_id
+          AND reservation_location.organization_id = ${org}
+          AND reservation_location.storage_id = p.storage_id)`);
+    } else {
+      ctes.push(`reserved AS (SELECT 0::numeric AS reserved_qty)`);
+    }
+
+    // Incoming transfers to pairs that have no stock balance yet. The page path
+    // appends these rows only on page 1; the footer must count them on every
+    // page or it would shrink when the user pages. The NOT EXISTS guard makes
+    // this set disjoint from `pairs`, so nothing is counted twice.
+    if (query.branchId && !query.storageId) {
+      const org = bind(query.organizationId);
+      const branch = bind(query.branchId);
+      ctes.push(`pending_only AS (
+         SELECT COALESCE(SUM(transfer_line.requested_qty), 0)::numeric AS incoming_qty
+         FROM transfer_orders transfer_order
+         INNER JOIN transfer_order_lines transfer_line
+           ON transfer_line.transfer_order_id = transfer_order.id
+          AND transfer_line.organization_id = transfer_order.organization_id
+         INNER JOIN items item
+           ON item.id = transfer_line.item_id
+          AND item.organization_id = transfer_order.organization_id
+         WHERE transfer_order.organization_id = ${org}
+           AND transfer_order.destination_branch_id = ${branch}
+           AND transfer_order.status = 'IN_PROGRESS'
+           AND transfer_order.deleted_at IS NULL
+           AND NOT EXISTS (
+             SELECT 1
+             FROM stock_balances pending_balance
+             INNER JOIN locations pending_location
+               ON pending_location.id = pending_balance.location_id
+             WHERE pending_balance.organization_id = transfer_order.organization_id
+               AND pending_balance.item_id = transfer_line.item_id
+               AND pending_balance.branch_id = transfer_order.destination_branch_id
+               AND (
+                 transfer_order.destination_storage_id IS NULL
+                 OR pending_location.storage_id = transfer_order.destination_storage_id
+               )
+           ))`);
+    } else {
+      ctes.push(`pending_only AS (SELECT 0::numeric AS incoming_qty)`);
+    }
+
+    const sql = `WITH ${ctes.join(",\n")}
+      SELECT base.total,
+             base.total_quantity,
+             period.opening_qty,
+             period.in_qty,
+             period.out_qty,
+             pending.transfer_out_qty,
+             pending.incoming_qty,
+             pending_only.incoming_qty AS pending_only_incoming_qty,
+             reserved.reserved_qty
+      FROM base, period, pending, reserved, pending_only`;
+
+    return { sql, params };
+  }
+
+  /** Shapes the totals row, deriving closingQty exactly as each row does. */
+  private readTotals(
+    raw: RawTotalsRow | undefined,
+    totalQuantity: number,
+    hasPeriod: boolean,
+  ): StockSummaryTotals {
+    const openingQty = Number(raw?.opening_qty ?? 0);
+    const inQty = Number(raw?.in_qty ?? 0);
+    const outQty = Number(raw?.out_qty ?? 0);
+    return {
+      quantity: totalQuantity,
+      openingQty,
+      inQty,
+      outQty,
+      closingQty: hasPeriod ? openingQty + inQty - outQty : totalQuantity,
+      transferOutQty: Number(raw?.transfer_out_qty ?? 0),
+      incomingQty:
+        Number(raw?.incoming_qty ?? 0) +
+        Number(raw?.pending_only_incoming_qty ?? 0),
+      reservedQty: Number(raw?.reserved_qty ?? 0),
     };
   }
 

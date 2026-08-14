@@ -13,10 +13,8 @@ import {
 } from "../../../../components/table/BaseDataTable";
 import { PaginationControls } from "../../../../components/table/PaginationControls";
 import {
-  applyColumnFilter,
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
-  toComparableText,
   type ColumnFilter,
   type ColumnFilterMode,
   type PaginationStateDto,
@@ -47,11 +45,28 @@ export interface StorageReportShellProps<T> {
    * Per-column footer values aligned with the column layout. The returned
    * map is merged into each column as `column.footer`, so reordering the
    * columns automatically reorders the footer cells.
+   *
+   * In server mode the second argument carries the API's whole-set totals and
+   * `rows` is only the current page — format from `totals`, never from `rows`,
+   * or the footer goes back to describing one page.
    */
-  columnSummary?: (rows: T[]) => Record<string, React.ReactNode>;
+  columnSummary?: (
+    rows: T[],
+    totals?: Record<string, number>,
+  ) => Record<string, React.ReactNode>;
   getRowKey: (row: T, index: number) => string;
   initialPeriod?: PeriodValue;
   onApply?: (values: FilterValues, period: PeriodValue) => void;
+  /** Row count of the whole filtered set, from the API. */
+  total?: number;
+  /** Whole-set column totals from the API — the only source for the footer. */
+  totals?: Record<string, number>;
+  /** Fires whenever the page, page size or a column filter changes. */
+  onQueryChange?: (state: {
+    page: number;
+    pageSize: number;
+    columnFilters: Record<string, ColumnFilter>;
+  }) => void;
 }
 
 function buildDefaultColumnConfig<T>(
@@ -113,6 +128,9 @@ export function StorageReportShell<T>({
   getRowKey,
   initialPeriod,
   onApply,
+  total: serverTotal,
+  totals: serverTotals,
+  onQueryChange,
 }: StorageReportShellProps<T>) {
   const [columnConfigOpen, setColumnConfigOpen] = useState(false);
   const [filterValues, setFilterValues] = useState<FilterValues>(() =>
@@ -185,46 +203,31 @@ export function StorageReportShell<T>({
 
   const subtitle = useMemo(() => buildSubtitle(filterValues), [buildSubtitle, filterValues]);
 
-  /**
-   * Apply per-column filters client-side. Rows are kept only if they pass
-   * every active filter. We extract a comparable text per cell using the
-   * column's render output (good enough for primitives; complex JSX cells
-   * fall back to empty string and effectively skip filtering).
-   */
-  const filteredRows = useMemo(() => {
-    const activeEntries = Object.entries(columnFilters).filter(
-      ([, f]) => f && f.value.trim() !== "",
-    );
-    if (activeEntries.length === 0) return rows;
-    const colByKey = new Map(columns.map((c) => [c.key, c]));
-    return rows.filter((row) =>
-      activeEntries.every(([key, filter]) => {
-        const col = colByKey.get(key);
-        if (!col) return true;
-        const rendered = col.render(row);
-        const text =
-          typeof rendered === "string" || typeof rendered === "number"
-            ? toComparableText(rendered)
-            : toComparableText(
-                // Best-effort fallback: try common primitive props on the row.
-                // Caller can override by giving the column a string-returning render.
-                (row as unknown as Record<string, unknown>)[key],
-              );
-        return applyColumnFilter(text, filter);
-      }),
-    );
-  }, [rows, columns, columnFilters]);
+  // Page, page size and column filters all live on the server, so the page
+  // component has to refetch whenever any of them moves.
+  useEffect(() => {
+    onQueryChange?.({
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+      columnFilters,
+    });
+    // `onQueryChange` is intentionally not a dependency: pages pass an inline
+    // callback, and depending on it would refetch on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page, pagination.pageSize, columnFilters]);
 
-  const total = filteredRows.length;
-  const pagedRows = useMemo(() => {
-    const start = (pagination.page - 1) * pagination.pageSize;
-    return filteredRows.slice(start, start + pagination.pageSize);
-  }, [filteredRows, pagination]);
+  // Rows arrive already filtered and already paged. The shell used to filter
+  // and slice them here, which is exactly why the footer could only ever
+  // describe the page in view — and why anything past row 200 never rendered.
+  const total = serverTotal ?? 0;
+  const pagedRows = rows;
 
-  // Footer summary uses filtered rows so the totals reflect the active filters.
+  // The footer reads the API's whole-set totals. There is deliberately no
+  // fallback to summing `rows`: that fallback is the bug this replaced, and it
+  // would look right on any dataset small enough to fit one page.
   const summaryMap = useMemo(
-    () => (columnSummary ? columnSummary(filteredRows) : null),
-    [columnSummary, filteredRows],
+    () => (columnSummary && serverTotals ? columnSummary(rows, serverTotals) : null),
+    [columnSummary, rows, serverTotals],
   );
 
   const effectiveColumns = useMemo<TableColumn<T>[]>(() => {
@@ -247,16 +250,22 @@ export function StorageReportShell<T>({
   const columnFilterControl = useMemo(
     () => ({
       filters: columnFilters,
-      onModeChange: (key: string, mode: ColumnFilterMode) =>
+      onModeChange: (key: string, mode: ColumnFilterMode) => {
         setColumnFilters((prev) => ({
           ...prev,
           [key]: { ...(prev[key] ?? { mode, value: "" }), mode },
-        })),
-      onValueChange: (key: string, value: string) =>
+        }));
+        setPagination((p) => (p.page === 1 ? p : { ...p, page: 1 }));
+      },
+      onValueChange: (key: string, value: string) => {
         setColumnFilters((prev) => ({
           ...prev,
           [key]: { ...(prev[key] ?? { mode: DEFAULT_COLUMN_FILTER_MODE, value }), value },
-        })),
+        }));
+        // A narrower filter can leave the current page beyond the last one —
+        // the user would see an empty grid and read it as "no data".
+        setPagination((p) => (p.page === 1 ? p : { ...p, page: 1 }));
+      },
     }),
     [columnFilters],
   );

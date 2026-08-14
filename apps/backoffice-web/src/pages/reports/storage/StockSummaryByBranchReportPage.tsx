@@ -7,11 +7,14 @@ import {
 import {
   StorageReportShell,
   buildApiFilters,
+  toColumnFilterPayload,
   resolveLabel,
   type FilterField,
   type FilterValues,
 } from "./_shared";
 import type { TableColumn } from "../../../components/table/BaseDataTable";
+import { DEFAULT_PAGINATION } from "../../../components/table/pagination.dto";
+import type { ReportColumnFilterPayload } from "../../../api/inventory-reports";
 import { useStockSummaryByBranchReport } from "../../../hooks/use-inventory-reports";
 import type { StockPeriodRow } from "../../../api/inventory-reports";
 import { useBranches } from "../../../hooks/iam/useBranches";
@@ -63,6 +66,23 @@ function mapApiRow(row: StockPeriodRow): ViewRow {
   };
 }
 
+/** Cột phải lọc theo giá trị số. */
+const NUMERIC_COLUMNS = new Set([
+  "openingQty",
+  "openingValue",
+  "inQty",
+  "inValue",
+  "outQty",
+  "outValue",
+  "endingQty",
+  "endingValue",
+]);
+
+const COLUMN_KEY_MAP = {
+  endingQty: "closingQty",
+  endingValue: "closingValue",
+};
+
 export function StockSummaryByBranchReportPage() {
   const { data: branches } = useBranches();
   const { options: groupOptions } = useReportCategories();
@@ -95,13 +115,27 @@ export function StockSummaryByBranchReportPage() {
     ...resolvePeriodRange("this_month"),
   }));
 
+  const [gridQuery, setGridQuery] = useState<{
+    page: number;
+    pageSize: number;
+    columnFilters: Record<string, ReportColumnFilterPayload>;
+  }>({
+    page: 1,
+    pageSize: DEFAULT_PAGINATION.pageSize,
+    columnFilters: {},
+  });
+
   const apiFilters = useMemo(
-    () =>
-      buildApiFilters(filterValues, period, {
+    () => ({
+      ...buildApiFilters(filterValues, period, {
         storeFieldKey: "store",
         categoryFieldKey: "group",
       }),
-    [filterValues, period],
+      page: gridQuery.page,
+      pageSize: gridQuery.pageSize,
+      columnFilters: gridQuery.columnFilters,
+    }),
+    [filterValues, period, gridQuery],
   );
 
   const { data, isLoading } = useStockSummaryByBranchReport(apiFilters);
@@ -148,31 +182,43 @@ export function StockSummaryByBranchReportPage() {
       emptyLabel="Không có dữ liệu."
       getRowKey={(r, i) => `${r.itemId}-${r.branchId}-${i}`}
       initialPeriod={period}
+      total={data?.total ?? 0}
+      totals={data?.totals}
+      onQueryChange={({ page, pageSize, columnFilters }) =>
+        setGridQuery({
+          page,
+          pageSize,
+          columnFilters: toColumnFilterPayload(
+            columnFilters,
+            NUMERIC_COLUMNS,
+            COLUMN_KEY_MAP,
+          ),
+        })
+      }
       onApply={(next, nextPeriod) => {
+        setGridQuery((prev) => ({ ...prev, page: 1 }));
         setFilterValues(next);
         setPeriod(nextPeriod);
       }}
-      columnSummary={(rs) => {
-        const sum = rs.reduce(
-          (a, r) => ({
-            o: a.o + r.openingQty,
-            ov: a.ov + r.openingValue,
-            i: a.i + r.inQty,
-            iv: a.iv + r.inValue,
-            x: a.x + r.outQty,
-            xv: a.xv + r.outValue,
-          }),
-          { o: 0, ov: 0, i: 0, iv: 0, x: 0, xv: 0 },
-        );
+      // Tổng của toàn tập kết quả lọc, do server tính — không phải tổng trang.
+      columnSummary={(_rows, totals) => {
+        if (!totals) return {};
+        const opening = totals.openingQty ?? 0;
+        const openingValue = totals.openingValue ?? 0;
+        const inQty = totals.inQty ?? 0;
+        const inValue = totals.inValue ?? 0;
+        const outQty = totals.outQty ?? 0;
+        const outValue = totals.outValue ?? 0;
         return {
-          openingQty: sum.o,
-          openingValue: formatMoneyInteger(sum.ov),
-          inQty: sum.i,
-          inValue: formatMoneyInteger(sum.iv),
-          outQty: sum.x,
-          outValue: formatMoneyInteger(sum.xv),
-          endingQty: sum.o + sum.i - sum.x,
-          endingValue: formatMoneyInteger(sum.ov + sum.iv - sum.xv),
+          openingQty: opening,
+          openingValue: formatMoneyInteger(openingValue),
+          inQty,
+          inValue: formatMoneyInteger(inValue),
+          outQty,
+          outValue: formatMoneyInteger(outValue),
+          // Cột dẫn xuất: suy từ primitive.
+          endingQty: opening + inQty - outQty,
+          endingValue: formatMoneyInteger(openingValue + inValue - outValue),
         };
       }}
     />

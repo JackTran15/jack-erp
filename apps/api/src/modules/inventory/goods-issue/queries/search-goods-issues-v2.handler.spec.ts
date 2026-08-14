@@ -16,15 +16,24 @@ const actor: ActorContext = {
   roles: [],
 };
 
-function makeQb(result: [unknown[], number]) {
+/**
+ * The handler builds the query twice — once for rows, once for totals — so the
+ * fake repository hands out a fresh builder per `createQueryBuilder` call.
+ * `builders[0]` is the rows query, `builders[1]` the totals query.
+ */
+function makeQb(rows: unknown[], totals: { total: string; totalAmount: string }) {
   const qb: any = {
+    leftJoin: jest.fn(() => qb),
     leftJoinAndSelect: jest.fn(() => qb),
     where: jest.fn(() => qb),
     andWhere: jest.fn(() => qb),
     orderBy: jest.fn(() => qb),
     skip: jest.fn(() => qb),
     take: jest.fn(() => qb),
-    getManyAndCount: jest.fn().mockResolvedValue(result),
+    select: jest.fn(() => qb),
+    addSelect: jest.fn(() => qb),
+    getMany: jest.fn().mockResolvedValue(rows),
+    getRawOne: jest.fn().mockResolvedValue(totals),
   };
   return qb;
 }
@@ -32,12 +41,16 @@ function makeQb(result: [unknown[], number]) {
 describe('SearchGoodsIssuesV2Handler', () => {
   let handler: SearchGoodsIssuesV2Handler;
   let repo: { createQueryBuilder: jest.Mock; manager: { find: jest.Mock } };
-  let qb: ReturnType<typeof makeQb>;
+  let builders: ReturnType<typeof makeQb>[];
 
-  async function build(rows: unknown[], total = rows.length) {
-    qb = makeQb([rows, total]);
+  async function build(rows: unknown[], total = rows.length, totalAmount = '0') {
+    builders = [];
     repo = {
-      createQueryBuilder: jest.fn(() => qb),
+      createQueryBuilder: jest.fn(() => {
+        const next = makeQb(rows, { total: String(total), totalAmount });
+        builders.push(next);
+        return next;
+      }),
       manager: {
         find: jest.fn(async (entity: unknown) => {
           if (entity === CustomerEntity)
@@ -57,23 +70,27 @@ describe('SearchGoodsIssuesV2Handler', () => {
     handler = module.get(SearchGoodsIssuesV2Handler);
   }
 
+  const qbOf = () => builders[0];
+  const totalsQb = () => builders[1];
+
   it('scopes by org and active branch, hides CANCELLED, and joins relations', async () => {
     await build([]);
     await handler.execute(new SearchGoodsIssuesV2Query({}, actor));
 
-    expect(qb.where).toHaveBeenCalledWith('gi.organizationId = :orgId', {
+    expect(qbOf().where).toHaveBeenCalledWith('gi.organizationId = :orgId', {
       orgId: 'org-1',
     });
-    expect(qb.andWhere).toHaveBeenCalledWith('gi.status != :cancelled', {
+    expect(qbOf().andWhere).toHaveBeenCalledWith('gi.status != :cancelled', {
       cancelled: GoodsIssueStatus.CANCELLED,
     });
-    expect(qb.andWhere).toHaveBeenCalledWith('gi.branchId = :branchId', {
+    expect(qbOf().andWhere).toHaveBeenCalledWith('gi.branchId = :branchId', {
       branchId: 'branch-1',
     });
-    expect(qb.leftJoinAndSelect).toHaveBeenCalledWith('gi.provider', 'provider');
-    expect(qb.leftJoinAndSelect).toHaveBeenCalledWith('gi.targetBranch', 'targetBranch');
-    expect(qb.leftJoinAndSelect).toHaveBeenCalledWith('gi.lines', 'lines');
-    expect(qb.orderBy).toHaveBeenCalledWith('gi.createdAt', 'DESC');
+    expect(qbOf().leftJoinAndSelect).toHaveBeenCalledWith('gi.provider', 'provider');
+    expect(qbOf().leftJoin).toHaveBeenCalledWith('gi.targetBranch', 'targetBranch');
+    expect(qbOf().addSelect).toHaveBeenCalledWith('targetBranch');
+    expect(qbOf().leftJoinAndSelect).toHaveBeenCalledWith('gi.lines', 'lines');
+    expect(qbOf().orderBy).toHaveBeenCalledWith('gi.createdAt', 'DESC');
   });
 
   it('returns the eager rows unchanged in the { data, total, page, limit } envelope', async () => {
@@ -90,8 +107,8 @@ describe('SearchGoodsIssuesV2Handler', () => {
     const result = await handler.execute(
       new SearchGoodsIssuesV2Query({ page: 2, limit: 10 }, actor),
     );
-    expect(qb.skip).toHaveBeenCalledWith(10);
-    expect(qb.take).toHaveBeenCalledWith(10);
+    expect(qbOf().skip).toHaveBeenCalledWith(10);
+    expect(qbOf().take).toHaveBeenCalledWith(10);
     expect(result.data).toBe(rows);
     expect(result.total).toBe(12);
     expect(result.page).toBe(2);
@@ -134,7 +151,7 @@ describe('SearchGoodsIssuesV2Handler', () => {
       ),
     );
 
-    const andWhereSql = qb.andWhere.mock.calls.map((c: unknown[]) => c[0] as string);
+    const andWhereSql = qbOf().andWhere.mock.calls.map((c: unknown[]) => c[0] as string);
     expect(andWhereSql).toEqual(
       expect.arrayContaining([
         // Party = counterparty name (3 kinds) COALESCE'd with the target branch.
@@ -144,5 +161,78 @@ describe('SearchGoodsIssuesV2Handler', () => {
         expect.stringContaining('SUM(l.quantity * l.unit_price)'),
       ]),
     );
+  });
+});
+
+describe('SearchGoodsIssuesV2Handler — footer grand total', () => {
+  function setup(totals: { total: string; totalAmount: string }) {
+    const builders: any[] = [];
+    const repo = {
+      createQueryBuilder: jest.fn(() => {
+        const qb = makeQb([], totals);
+        builders.push(qb);
+        return qb;
+      }),
+      manager: { find: jest.fn().mockResolvedValue([]) },
+    };
+    return { builders, repo };
+  }
+
+  async function handlerWith(repo: unknown) {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        SearchGoodsIssuesV2Handler,
+        { provide: getRepositoryToken(GoodsIssueEntity), useValue: repo },
+      ],
+    }).compile();
+    return module.get(SearchGoodsIssuesV2Handler);
+  }
+
+  it('reads totalAmount from a second query over the whole filtered set', async () => {
+    const { builders, repo } = setup({ total: '31', totalAmount: '9250000' });
+    const handler = await handlerWith(repo);
+
+    const result = await handler.execute(new SearchGoodsIssuesV2Query({}, actor));
+
+    expect(result.totals.totalAmount).toBe(9250000);
+    expect(result.total).toBe(31);
+    expect(builders[1].select).toHaveBeenCalledWith('COUNT(*)', 'total');
+    expect(builders[1].addSelect).toHaveBeenCalledWith(
+      expect.stringContaining('SUM(l.quantity * l.unit_price)'),
+      'totalAmount',
+    );
+  });
+
+  it('never joins lines in the totals query — a multi-line issue must count once', async () => {
+    const { builders, repo } = setup({ total: '1', totalAmount: '5000' });
+    const handler = await handlerWith(repo);
+
+    await handler.execute(new SearchGoodsIssuesV2Query({}, actor));
+
+    // Joining a one-to-many `lines` here would multiply each issue by its line
+    // count and inflate the SUM behind the footer.
+    expect(builders[1].leftJoinAndSelect).not.toHaveBeenCalled();
+  });
+
+  it('keeps CANCELLED documents out of the grand total', async () => {
+    const { builders, repo } = setup({ total: '0', totalAmount: '0' });
+    const handler = await handlerWith(repo);
+
+    await handler.execute(new SearchGoodsIssuesV2Query({}, actor));
+
+    expect(builders[1].andWhere).toHaveBeenCalledWith('gi.status != :cancelled', {
+      cancelled: GoodsIssueStatus.CANCELLED,
+    });
+  });
+
+  it('is invariant to limit: page size never changes the grand total', async () => {
+    const { repo } = setup({ total: '31', totalAmount: '9250000' });
+    const handler = await handlerWith(repo);
+
+    const small = await handler.execute(new SearchGoodsIssuesV2Query({ limit: 1 }, actor));
+    const large = await handler.execute(new SearchGoodsIssuesV2Query({ limit: 100 }, actor));
+
+    expect(small.totals.totalAmount).toBe(large.totals.totalAmount);
+    expect(small.total).toBe(large.total);
   });
 });
