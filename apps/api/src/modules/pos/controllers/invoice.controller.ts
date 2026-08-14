@@ -20,6 +20,7 @@ import { ApiOkResponse } from '@nestjs/swagger';
 import { InvoiceService } from '../services/invoice.service';
 import { CheckoutInvoiceService } from '../services/checkout-invoice.service';
 import { CancelInvoiceService } from '../services/cancel-invoice.service';
+import { CancelReturnService } from '../services/cancel-return.service';
 import { InvoiceDebtService } from '../services/invoice-debt.service';
 import { ReturnEligibilityService } from '../services/return-eligibility.service';
 import { CreateReturnInvoiceService } from '../services/create-return-invoice.service';
@@ -37,6 +38,7 @@ import { CreateReturnInvoiceDto } from '../dto/create-return-invoice.dto';
 import { CreateExchangeInvoiceDto } from '../dto/create-exchange-invoice.dto';
 import { CheckoutReturnDto } from '../dto/checkout-return.dto';
 import { RedeemPointsDto } from '../dto/redeem-points.dto';
+import { InvoiceType } from '../entities/invoice.entity';
 import { DebtStatus } from '../entities/invoice-debt.entity';
 import { DebtPaymentMethod } from '../entities/debt-payment.entity';
 import { IsEnum, IsNumber, IsOptional, IsString, IsUUID, Min, ValidateIf } from 'class-validator';
@@ -71,6 +73,7 @@ export class InvoiceController {
     private readonly invoiceService: InvoiceService,
     private readonly checkoutService: CheckoutInvoiceService,
     private readonly cancelService: CancelInvoiceService,
+    private readonly cancelReturnService: CancelReturnService,
     private readonly debtService: InvoiceDebtService,
     private readonly eligibilityService: ReturnEligibilityService,
     private readonly createReturnInvoiceService: CreateReturnInvoiceService,
@@ -195,14 +198,22 @@ export class InvoiceController {
     return this.pointsRedemptionService.removeRedemption(id, actor);
   }
 
+  /**
+   * One endpoint, two flows: voiding a return/exchange is the mirror of voiding
+   * a sale (stock and money move the other way), so the document's own type
+   * picks the service rather than the caller having to know which to call.
+   */
   @Post(':id/cancel')
   @RequirePermission('pos.invoice.cancel')
-  cancel(
+  async cancel(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CancelInvoiceDto,
     @Actor() actor: ActorContext,
   ) {
-    return this.cancelService.cancel(id, dto, actor);
+    const invoice = await this.invoiceService.findOne(id, actor);
+    return invoice.type === InvoiceType.SALE
+      ? this.cancelService.cancel(id, dto, actor)
+      : this.cancelReturnService.cancel(id, dto, actor);
   }
 
   @Post(':id/debt')

@@ -40,13 +40,14 @@ const buildEvent = (
 
 describe('StockReturnConsumer', () => {
   let consumer: StockReturnConsumer;
-  let ledgerRepo: { findOne: jest.Mock; manager: never };
+  let ledgerRepo: { findOne: jest.Mock; find: jest.Mock; manager: never };
   let itemCostSnapshotService: { snapshotCosts: jest.Mock };
   let stockLedgerService: { recordBatchMovements: jest.Mock };
 
   beforeEach(async () => {
     ledgerRepo = {
       findOne: jest.fn().mockResolvedValue(null),
+      find: jest.fn().mockResolvedValue([]),
       manager: {} as never,
     };
     resolveLocationsMock.mockReset();
@@ -183,5 +184,138 @@ describe('StockReturnConsumer', () => {
   it('propagates errors so Kafka retries', async () => {
     stockLedgerService.recordBatchMovements.mockRejectedValue(new Error('balance lock'));
     await expect(consumer.handle(buildEvent())).rejects.toThrow('balance lock');
+  });
+
+  describe('cancelled return/exchange (directional lines)', () => {
+    // The exchange from the bug report: customer handed back item-A and took
+    // item-B. Cancelling hands item-A back to them and takes item-B back.
+    const exchangeEvent = () =>
+      buildEvent({
+        items: [
+          { itemId: 'item-A', locationId: 'loc-1', quantity: 2, direction: 'IN' },
+          { itemId: 'item-B', locationId: 'loc-1', quantity: 1, direction: 'OUT' },
+        ],
+      });
+
+    it('sends a returned (IN) line back out of stock and brings an OUT line back in', async () => {
+      await consumer.handle(exchangeEvent());
+
+      const movements = stockLedgerService.recordBatchMovements.mock.calls[0][0];
+      expect(movements).toHaveLength(2);
+      expect(movements[0]).toEqual(
+        expect.objectContaining({
+          itemId: 'item-A',
+          movementType: StockMovementType.SALE_ISSUE,
+          quantity: -2,
+          // Deducted from where the return-in put it, not the showroom.
+          locationId: 'loc-1',
+        }),
+      );
+      expect(movements[1]).toEqual(
+        expect.objectContaining({
+          itemId: 'item-B',
+          movementType: StockMovementType.RETURN_IN,
+          quantity: 1,
+          locationId: 'showroom-default',
+        }),
+      );
+    });
+
+    it('only resolves showroom locations for the inbound lines', async () => {
+      await consumer.handle(exchangeEvent());
+
+      expect(resolveLocationsMock).toHaveBeenCalledWith(
+        expect.anything(),
+        ['item-B'],
+        expect.anything(),
+        { showroomOnly: true },
+      );
+    });
+
+    it('keeps both legs of an item that was returned and re-sold on the same document', async () => {
+      // Same item on both sides: the replay guard has to tell the two apart by
+      // movement type, or the second leg is silently dropped.
+      await consumer.handle(
+        buildEvent({
+          items: [
+            { itemId: 'item-A', locationId: 'loc-1', quantity: 1, direction: 'IN' },
+            { itemId: 'item-A', locationId: 'loc-1', quantity: 3, direction: 'OUT' },
+          ],
+        }),
+      );
+
+      const movements = stockLedgerService.recordBatchMovements.mock.calls[0][0];
+      expect(movements).toHaveLength(2);
+      expect(movements.map((m: { quantity: number }) => m.quantity)).toEqual([-1, 3]);
+      expect(ledgerRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            movementType: StockMovementType.SALE_ISSUE,
+          }),
+        }),
+      );
+    });
+
+    it('reverses each leg at the cost its forward movement was booked at', async () => {
+      // purchase_price has moved since the exchange was posted; reversing at
+      // today's price would leave a residue in inventory value on a document
+      // whose quantity is fully undone.
+      ledgerRepo.find.mockResolvedValue([
+        { referenceType: 'RETURN_INVOICE', itemId: 'item-A', unitCost: '7.25' },
+        { referenceType: 'INVOICE', itemId: 'item-B', unitCost: '3.10' },
+      ]);
+
+      await consumer.handle(exchangeEvent());
+
+      const movements = stockLedgerService.recordBatchMovements.mock.calls[0][0];
+      expect(movements[0]).toEqual(
+        expect.objectContaining({ itemId: 'item-A', unitCost: 7.25, quantity: -2 }),
+      );
+      expect(movements[1]).toEqual(
+        expect.objectContaining({ itemId: 'item-B', unitCost: 3.1, quantity: 1 }),
+      );
+    });
+
+    it('tells the two legs of one item apart by which movement filed them', async () => {
+      // Same item returned and re-sold: the IN leg must take the return-in cost
+      // and the OUT leg the deduction cost, not whichever row came back first.
+      ledgerRepo.find.mockResolvedValue([
+        { referenceType: 'RETURN_INVOICE', itemId: 'item-A', unitCost: '7.25' },
+        { referenceType: 'INVOICE', itemId: 'item-A', unitCost: '9.99' },
+      ]);
+
+      await consumer.handle(
+        buildEvent({
+          items: [
+            { itemId: 'item-A', locationId: 'loc-1', quantity: 1, direction: 'IN' },
+            { itemId: 'item-A', locationId: 'loc-1', quantity: 3, direction: 'OUT' },
+          ],
+        }),
+      );
+
+      const movements = stockLedgerService.recordBatchMovements.mock.calls[0][0];
+      expect(movements[0].unitCost).toBe(7.25);
+      expect(movements[1].unitCost).toBe(9.99);
+    });
+
+    it('falls back to the current purchase price when the forward entry is missing', async () => {
+      ledgerRepo.find.mockResolvedValue([]);
+
+      await consumer.handle(exchangeEvent());
+
+      const movements = stockLedgerService.recordBatchMovements.mock.calls[0][0];
+      expect(movements[0].unitCost).toBe(10);
+      expect(movements[1].unitCost).toBe(5.5);
+    });
+
+    it('does not skip a returned line just because it has no showroom location', async () => {
+      resolveLocationsMock.mockResolvedValue(new Map<string, string>());
+
+      await consumer.handle(exchangeEvent());
+
+      const movements = stockLedgerService.recordBatchMovements.mock.calls[0][0];
+      expect(movements).toHaveLength(1);
+      expect(movements[0].itemId).toBe('item-A');
+    });
   });
 });

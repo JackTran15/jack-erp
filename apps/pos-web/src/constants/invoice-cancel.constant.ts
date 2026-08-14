@@ -1,17 +1,12 @@
-import type { InvoiceStatus, InvoiceType } from "@erp/pos/types/invoice.type";
+import type { InvoiceStatus } from "@erp/pos/types/invoice.type";
 
 /**
- * Vai trò được phép huỷ hoá đơn trên POS.
- *
- * Bảng `roles` không có cột mã ổn định — chỉ có `name` (tiếng Việt, unique theo
- * từng tổ chức), nên chỗ này buộc phải so theo tên hiển thị. Tổ chức nào đặt tên
- * vai trò khác thì bổ sung vào đây; backend chặn bằng quyền `pos.invoice.cancel`
- * (chỉ cấp cho 2 vai trò dưới), đây chỉ là lớp ẩn nút cho đúng người.
+ * Quyền backend chặn ở `@RequirePermission('pos.invoice.cancel')`. Gate UI theo
+ * đúng khóa này thay vì theo tên vai trò: tên vai trò là chuỗi tự do tổ chức
+ * sửa được, còn khóa quyền thì không — đổi tên "Quản lý tổng" hay cấp quyền cho
+ * một vai trò tự tạo đều không làm lệch nút bấm khỏi thứ server cho phép.
  */
-export const INVOICE_CANCEL_ROLE_NAMES: readonly string[] = [
-  "Quản trị hệ thống",
-  "Quản lý tổng",
-];
+export const INVOICE_CANCEL_PERMISSION = "pos.invoice.cancel";
 
 /** Trạng thái hoá đơn còn huỷ được — khớp `CANCELLABLE_STATUSES` phía backend. */
 export const CANCELLABLE_INVOICE_STATUSES: readonly InvoiceStatus[] = [
@@ -21,27 +16,22 @@ export const CANCELLABLE_INVOICE_STATUSES: readonly InvoiceStatus[] = [
 ];
 
 export interface CancelEligibilityInput {
-  roleNames: readonly string[];
-  invoiceType: InvoiceType | undefined;
+  permissions: readonly string[];
   invoiceStatus: InvoiceStatus;
 }
 
 /**
- * Có được hiện nút "Hủy hóa đơn" không.
+ * Có được hiện nút "Hủy hóa đơn" không. Áp cho cả hóa đơn bán lẫn phiếu đổi trả
+ * — backend tự chọn luồng huỷ theo `type` của chứng từ.
  *
  * Tách khỏi component để kiểm chứng được bằng test thuần — pos-web hiện chưa có
  * test runner (`"test": "echo test"`), nên chừng nào có thì đây là chỗ để test
  * trước tiên, thay vì phải dựng render cả dialog.
  */
 export function canCancelInvoice({
-  roleNames,
-  invoiceType,
+  permissions,
   invoiceStatus,
 }: CancelEligibilityInput): boolean {
-  const isAdmin = roleNames.some((name) =>
-    INVOICE_CANCEL_ROLE_NAMES.includes(name),
-  );
-  if (!isAdmin) return false;
-  if ((invoiceType ?? "SALE") !== "SALE") return false;
+  if (!permissions.includes(INVOICE_CANCEL_PERMISSION)) return false;
   return CANCELLABLE_INVOICE_STATUSES.includes(invoiceStatus);
 }

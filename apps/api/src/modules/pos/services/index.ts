@@ -4,6 +4,8 @@ export { PosCatalogProductService } from './pos-catalog-product.service';
 export { InvoiceService } from './invoice.service';
 export { CheckoutInvoiceService } from './checkout-invoice.service';
 export { CancelInvoiceService } from './cancel-invoice.service';
+export { CancelReturnService } from './cancel-return.service';
+export { InvoiceRefundLegsService } from './invoice-refund-legs.service';
 export { InvoiceDebtService } from './invoice-debt.service';
 export { ReturnEligibilityService } from './return-eligibility.service';
 export { CreateReturnInvoiceService } from './create-return-invoice.service';

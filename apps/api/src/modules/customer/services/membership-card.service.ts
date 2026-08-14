@@ -266,6 +266,78 @@ export class MembershipCardService {
     });
   }
 
+  /**
+   * Net points a document has already applied to the customer's card — the sum
+   * of every ledger row keyed on it, whichever flow wrote them (redeem, earn,
+   * re-credit, reversal).
+   *
+   * Voiding a document has to undo exactly what landed, and only the ledger
+   * knows that: the reversal consumer clamps its decrement at the balance
+   * available at the time, so recomputing from the invoice's own snapshots would
+   * take back points that were never taken in the first place.
+   */
+  async netPointsForInvoice(
+    invoiceId: string,
+    manager: EntityManager,
+    actor: ActorContext,
+  ): Promise<number> {
+    const row = await manager
+      .createQueryBuilder(PointHistoryEntity, 'ph')
+      .select('COALESCE(SUM(ph.delta), 0)', 'total')
+      .where('ph.invoice_id = :invoiceId', { invoiceId })
+      .andWhere('ph.organization_id = :orgId', { orgId: actor.organizationId })
+      .getRawOne<{ total: string }>();
+    return Number(row?.total ?? 0);
+  }
+
+  /**
+   * Net point adjustment for a voided document, inside the caller's transaction.
+   * Positive gives points back, negative takes them away.
+   *
+   * A negative delta is clamped at the current balance: the customer may have
+   * spent points since, and a card must never go negative — the same clamp
+   * {@link LoyaltyPointsReverseConsumer} applies. Returns what was actually
+   * applied.
+   */
+  async adjustPointsForVoid(
+    input: { customerId: string; delta: number; invoiceId: string; note: string },
+    manager: EntityManager,
+    actor: ActorContext,
+  ): Promise<number> {
+    if (input.delta === 0) return 0;
+
+    const card = await manager.findOne(MembershipCardEntity, {
+      where: {
+        customerId: input.customerId,
+        organizationId: actor.organizationId,
+        isActive: true,
+      },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!card) return 0;
+
+    const applied =
+      input.delta < 0
+        ? -Math.min(-input.delta, Number(card.points))
+        : input.delta;
+
+    if (applied > 0) {
+      await manager.increment(MembershipCardEntity, { id: card.id }, 'points', applied);
+    } else if (applied < 0) {
+      await manager.decrement(MembershipCardEntity, { id: card.id }, 'points', -applied);
+    }
+    await manager.insert(PointHistoryEntity, {
+      cardId: card.id,
+      invoiceId: input.invoiceId,
+      type: PointType.ADJUST,
+      delta: applied,
+      note: input.note,
+      organizationId: actor.organizationId,
+      createdBy: actor.userId,
+    });
+    return applied;
+  }
+
   async getPointHistory(
     cardId: string,
     actor: ActorContext,

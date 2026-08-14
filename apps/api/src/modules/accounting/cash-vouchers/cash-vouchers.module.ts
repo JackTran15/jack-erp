@@ -31,6 +31,7 @@ import { GoodsReceiptCashConsumer } from './cash-voucher-consumers/goods-receipt
 import { ExpenseCashConsumer } from './cash-voucher-consumers/expense-cash.consumer';
 import { RefundCashConsumer } from './cash-voucher-consumers/refund-cash.consumer';
 import { InvoiceCancelRefundCashConsumer } from './cash-voucher-consumers/invoice-cancel-refund-cash.consumer';
+import { InvoiceCancelCollectCashConsumer } from './cash-voucher-consumers/invoice-cancel-collect-cash.consumer';
 import { CashReceiptsService } from './cash-receipts/cash-receipts.service';
 import { CashReceiptsController } from './cash-receipts/cash-receipts.controller';
 import { CashPaymentsService } from './cash-payments/cash-payments.service';
@@ -104,6 +105,7 @@ import { SearchCashLedgerV2Handler } from './cash-ledger/queries/search-cash-led
     ExpenseCashConsumer,
     RefundCashConsumer,
     InvoiceCancelRefundCashConsumer,
+    InvoiceCancelCollectCashConsumer,
     SearchCashVouchersV2Handler,
     SearchCashLedgerV2Handler,
   ],

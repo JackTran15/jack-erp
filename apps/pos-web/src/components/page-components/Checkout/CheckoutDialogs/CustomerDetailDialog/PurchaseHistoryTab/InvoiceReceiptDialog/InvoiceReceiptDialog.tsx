@@ -133,12 +133,11 @@ export function InvoiceReceiptDialog({
   const [cancelReason, setCancelReason] = useState("");
   const [cancelError, setCancelError] = useState<string | null>(null);
 
-  // Hoá đơn trả/đổi không huỷ được; backend cũng chặn, đây chỉ là ẩn nút cho khỏi bấm.
+  // Chỉ là lớp ẩn nút cho khỏi bấm — backend mới là chỗ chặn thật.
   const canCancel =
     !!invoice &&
     canCancelInvoice({
-      roleNames: (currentUser?.roles ?? []).map((role) => role.name),
-      invoiceType: invoice.type,
+      permissions: currentUser?.permissions ?? [],
       invoiceStatus: invoice.status,
     });
 
