@@ -94,6 +94,13 @@ export function buildUpdateInvoicePayload(
 
 interface BuildCheckoutInvoiceApiPayloadInput {
   paymentLines: PaymentLine[];
+  /**
+   * Số tiền hóa đơn thực sự cần thu. Trần phân bổ cho `payments` — xem docblock
+   * của {@link buildCheckoutInvoiceApiPayload}.
+   */
+  amountDue: number;
+  /** Operator tích "Khách không lấy tiền thừa" → phần vượt thành thu nhập khác. */
+  keepChange?: boolean;
   /** Hạn thanh toán công nợ (ISO `YYYY-MM-DD`) — chỉ truyền khi tính vào công nợ. */
   dueDate?: string | null;
   /** Số ngày được nợ — chỉ truyền khi tính vào công nợ. */
@@ -106,6 +113,12 @@ interface BuildCheckoutInvoiceApiPayloadInput {
  * để caller toast và abort. Quy tắc nghiệp vụ:
  *   - Map từng PaymentLine có amount > 0, gửi `paymentAccountId` của tài khoản
  *     nhận tiền. BE tự suy ra COA account + tài khoản doanh thu / công nợ phải thu.
+ *   - `payments` là số tiền GHI VÀO hóa đơn, KHÔNG phải số tiền khách đưa: BE chặn
+ *     ∑payments > amountDue (invoice_payments không có cột tiền thừa). Ô nhập +
+ *     chip "Gợi ý tiền mặt" cho phép đưa dư, nên từng dòng bị kẹp theo phần còn
+ *     lại của `amountDue` — phần vượt là tiền trả lại khách, không đi vào sổ.
+ *   - Khách không lấy tiền thừa ⇒ phần vượt gửi kèm `keptChangeAmount`; BE ghi
+ *     nhận riêng bằng phiếu thu (thu nhập khác) nên quỹ tiền mặt khớp thực tế.
  *   - Khi "Tính vào công nợ": gửi đúng phần khách trả; phần còn lại (payments
  *     rỗng = nợ toàn phần, hoặc ∑ < amountDue = nợ một phần) được BE auto-book
  *     vào `invoice_debts` (`PARTIAL_DEBT`/`DEBT`). FE không cần cờ debt ở đây.
@@ -117,18 +130,27 @@ export function buildCheckoutInvoiceApiPayload(
   | { ok: false; error: ResolveCheckoutPayloadError } {
   const activeLines = input.paymentLines.filter((line) => line.amount > 0);
   const payments: InvoicePaymentLineBody[] = [];
+  let remaining = Math.max(0, input.amountDue);
   for (const line of activeLines) {
     if (!line.paymentAccountId) {
       return { ok: false, error: { code: "missing_payment_account" } };
     }
+    const applied = Math.min(line.amount, remaining);
+    if (applied <= 0) continue;
+    remaining -= applied;
     payments.push({
       paymentMethod: PAYMENT_METHOD_TO_API_METHOD[line.method],
-      amount: line.amount,
+      amount: applied,
       paymentAccountId: line.paymentAccountId,
     });
   }
 
   const body: CheckoutInvoiceBody = { payments };
+  const tendered = activeLines.reduce((sum, line) => sum + line.amount, 0);
+  const keptChange = Math.max(0, tendered - Math.max(0, input.amountDue));
+  if (input.keepChange && keptChange > 0) {
+    body.keptChangeAmount = keptChange;
+  }
   if (input.dueDate) body.dueDate = input.dueDate;
   if (input.creditDays != null) body.creditDays = input.creditDays;
 

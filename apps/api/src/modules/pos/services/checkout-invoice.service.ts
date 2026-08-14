@@ -22,6 +22,7 @@ import { TempWarehouseFulfillPublisher } from '../../inventory/publishers/temp-w
 import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points.publisher';
 import { JournalSalePublisher } from '../../accounting/publishers/journal-sale.publisher';
 import { CashFromPaymentPublisher } from '../../accounting/publishers/cash-from-payment.publisher';
+import { KeptChangeCashPublisher } from '../../accounting/publishers/kept-change-cash.publisher';
 import { DepositFromPaymentPublisher } from '../../accounting/deposit/deposit-from-payment.publisher';
 import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
 import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
@@ -78,6 +79,7 @@ export class CheckoutInvoiceService {
     private readonly loyaltyPointsPublisher: LoyaltyPointsPublisher,
     private readonly journalSalePublisher: JournalSalePublisher,
     private readonly cashFromPaymentPublisher: CashFromPaymentPublisher,
+    private readonly keptChangeCashPublisher: KeptChangeCashPublisher,
     private readonly depositFromPaymentPublisher: DepositFromPaymentPublisher,
     private readonly accountResolver: AccountResolverService,
     private readonly cashFundResolver: CashFundResolverService,
@@ -159,10 +161,30 @@ export class CheckoutInvoiceService {
     // passed as the async award base so the awarded balance matches this value.
     const pointsEarned = Math.floor(amountDue / POINT_EARN_VND_PER_POINT);
 
+    // `payments` are what settles the invoice, never what was tendered: cash the
+    // customer hands over above `amountDue` either goes back as change (invisible
+    // here) or stays in the drawer as `keptChangeAmount` (booked as other income
+    // below). Either way this must hold.
     if (totalPaid > amountDue) {
       throw new BadRequestException(
         `Total payments (${totalPaid}) exceed the amount due (${amountDue})`,
       );
+    }
+
+    const keptChange = round(Number(dto.keptChangeAmount ?? 0));
+    if (keptChange > 0) {
+      if (remainder > 0) {
+        throw new BadRequestException(
+          `Kept change (${keptChange}) requires the invoice to be fully settled (remaining ${remainder})`,
+        );
+      }
+      if (
+        !dto.payments.some((p) => p.paymentMethod === InvoicePaymentMethod.CASH)
+      ) {
+        throw new BadRequestException(
+          'Kept change requires at least one cash payment line',
+        );
+      }
     }
 
     if (remainder > 0 && !invoice.customerId) {
@@ -238,6 +260,7 @@ export class CheckoutInvoiceService {
         invoice.depositAmount = depositAmount;
         invoice.amountDue = amountDue;
         invoice.totalPaid = totalPaid;
+        invoice.keptChangeAmount = keptChange;
         invoice.pointsEarned = pointsEarned;
 
         // Snapshot the balance this invoice leaves the customer on. The earn is
@@ -402,6 +425,22 @@ export class CheckoutInvoiceService {
             cashAccountId: branchCashFundId,
             contraAccountId: revenueAccountId,
             amount: Number(cp.amount),
+            branchId: updatedInvoice.branchId,
+          },
+          actor,
+        );
+      }
+
+      // Change left in the drawer — a separate Phiếu thu against thu nhập khác,
+      // not revenue. Guarded above to require a cash line, so the fund resolved
+      // for the payments above is the one it lands in.
+      if (keptChange > 0) {
+        await this.keptChangeCashPublisher.publish(
+          {
+            invoiceId: updatedInvoice.id,
+            invoiceCode: realCode,
+            cashAccountId: branchCashFundId,
+            amount: keptChange,
             branchId: updatedInvoice.branchId,
           },
           actor,

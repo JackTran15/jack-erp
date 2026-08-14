@@ -15,6 +15,8 @@ export const ERP_TOPICS = {
   CASH_MOVEMENT_FROM_PAYMENT: 'erp.cash.movement.from.payment',
   // Cash voucher auto-create flows (Phase 2).
   CASH_VOUCHER_NEEDED_POS_SALE: 'erp.cash.movement.from.payment',
+  /** POS "khách không lấy tiền thừa" → Phiếu thu (DR quỹ / CR thu nhập khác). */
+  CASH_VOUCHER_NEEDED_KEPT_CHANGE: 'erp.cash.voucher.needed.kept_change',
   CASH_VOUCHER_NEEDED_DEBT_PAYMENT: 'erp.cash.voucher.needed.debt_payment',
   CASH_VOUCHER_NEEDED_GOODS_RECEIPT: 'erp.cash.voucher.needed.goods_receipt',
   CASH_VOUCHER_NEEDED_EXPENSE: 'erp.cash.voucher.needed.expense',

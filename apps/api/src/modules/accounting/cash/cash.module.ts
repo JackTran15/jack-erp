@@ -10,6 +10,7 @@ import { CashController } from './cash.controller';
 import { PosSessionEntity } from '../../pos/entities/pos-session.entity';
 import { CashFromPaymentPublisher } from '../publishers/cash-from-payment.publisher';
 import { CashRefundPublisher } from '../publishers/cash-refund.publisher';
+import { KeptChangeCashPublisher } from '../publishers/kept-change-cash.publisher';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { CashRefundPublisher } from '../publishers/cash-refund.publisher';
     BranchCashProvisioningService,
     CashFromPaymentPublisher,
     CashRefundPublisher,
+    KeptChangeCashPublisher,
   ],
   exports: [
     CashService,
@@ -30,6 +32,7 @@ import { CashRefundPublisher } from '../publishers/cash-refund.publisher';
     BranchCashProvisioningService,
     CashFromPaymentPublisher,
     CashRefundPublisher,
+    KeptChangeCashPublisher,
   ],
 })
 export class CashModule {}

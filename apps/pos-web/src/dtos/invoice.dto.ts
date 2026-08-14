@@ -84,6 +84,8 @@ export interface InvoicePaymentLineBody {
  */
 export interface CheckoutInvoiceBody {
   payments: InvoicePaymentLineBody[];
+  /** Tiền thừa khách không lấy — BE ghi phiếu thu "thu nhập khác", ngoài `payments`. */
+  keptChangeAmount?: number;
   dueDate?: string;
   creditDays?: number;
 }

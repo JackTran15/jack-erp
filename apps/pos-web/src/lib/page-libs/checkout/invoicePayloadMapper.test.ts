@@ -20,6 +20,7 @@ describe("buildCheckoutInvoiceApiPayload", () => {
   it("posts the tendered cash line (partial debt)", () => {
     const res = buildCheckoutInvoiceApiPayload({
       paymentLines: [cashLine(145_000, "acc-1")],
+      amountDue: 200_000,
     });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
@@ -34,6 +35,7 @@ describe("buildCheckoutInvoiceApiPayload", () => {
   it("sends an empty payments array when nothing is tendered (full debt)", () => {
     const res = buildCheckoutInvoiceApiPayload({
       paymentLines: [cashLine(0, "acc-1")],
+      amountDue: 145_000,
     });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
@@ -43,6 +45,7 @@ describe("buildCheckoutInvoiceApiPayload", () => {
   it("fails when a tendered line has no payment account", () => {
     const res = buildCheckoutInvoiceApiPayload({
       paymentLines: [cashLine(145_000, null)],
+      amountDue: 145_000,
     });
     expect(res.ok).toBe(false);
     if (res.ok) return;
@@ -60,6 +63,7 @@ describe("buildCheckoutInvoiceApiPayload", () => {
           amount: 45_000,
         },
       ],
+      amountDue: 145_000,
     });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
@@ -68,5 +72,67 @@ describe("buildCheckoutInvoiceApiPayload", () => {
       "cash",
       "bank_transfer",
     ]);
+  });
+
+  // Over-tender: thu ngân gõ (hoặc bấm chip "Gợi ý tiền mặt") số lớn hơn số cần
+  // thu. BE chặn ∑payments > amountDue, nên phần vượt phải bị kẹp lại ở FE.
+  it("caps the posted amount at amountDue when the customer over-tenders", () => {
+    const res = buildCheckoutInvoiceApiPayload({
+      paymentLines: [cashLine(400_000, "acc-1")],
+      amountDue: 340_000,
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.body.payments).toEqual([
+      { paymentMethod: "cash", amount: 340_000, paymentAccountId: "acc-1" },
+    ]);
+    expect(res.body.keptChangeAmount).toBeUndefined();
+  });
+
+  it("caps a split tender line by line and drops fully-covered lines", () => {
+    const res = buildCheckoutInvoiceApiPayload({
+      paymentLines: [
+        cashLine(300_000, "acc-1", "l1"),
+        {
+          id: "l2",
+          method: PaymentMethodEnum.TRANSFER,
+          paymentAccountId: "acc-2",
+          amount: 200_000,
+        },
+        cashLine(100_000, "acc-3", "l3"),
+      ],
+      amountDue: 340_000,
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.body.payments.map((p) => p.amount)).toEqual([300_000, 40_000]);
+  });
+
+  it("reports the surplus as keptChangeAmount when the customer leaves it", () => {
+    const res = buildCheckoutInvoiceApiPayload({
+      paymentLines: [cashLine(400_000, "acc-1")],
+      amountDue: 340_000,
+      keepChange: true,
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.body.payments).toEqual([
+      { paymentMethod: "cash", amount: 340_000, paymentAccountId: "acc-1" },
+    ]);
+    expect(res.body.keptChangeAmount).toBe(60_000);
+  });
+
+  // "Bớt tiền lẻ cho khách" dùng chung cờ keepChange nhưng ở chiều thu THIẾU —
+  // không có tiền thừa nào để ghi nhận.
+  it("omits keptChangeAmount when keepChange is on but nothing was over-tendered", () => {
+    const res = buildCheckoutInvoiceApiPayload({
+      paymentLines: [cashLine(339_000, "acc-1")],
+      amountDue: 340_000,
+      keepChange: true,
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.body.payments.map((p) => p.amount)).toEqual([339_000]);
+    expect(res.body.keptChangeAmount).toBeUndefined();
   });
 });
