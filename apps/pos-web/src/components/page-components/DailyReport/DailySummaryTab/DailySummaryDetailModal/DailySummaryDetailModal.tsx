@@ -47,6 +47,7 @@ export interface DailySummaryDetailModalProps {
 const FILTERABLE_KEYS = new Set<DailySummaryDetailColumnKey>([
   DailySummaryDetailColumnKey.DocumentNumber,
   DailySummaryDetailColumnKey.CustomerName,
+  DailySummaryDetailColumnKey.StaffName,
   DailySummaryDetailColumnKey.BankAccountName,
   DailySummaryDetailColumnKey.Amount,
   DailySummaryDetailColumnKey.PointsUsed,
@@ -218,7 +219,7 @@ export function DailySummaryDetailModal({
       }
       return {
         key,
-        title: DAILY_SUMMARY_DETAIL_COLUMN_LABELS[key],
+        title: config.columnLabels?.[key] ?? DAILY_SUMMARY_DETAIL_COLUMN_LABELS[key],
         align: numeric ? "right" : "left",
         cellClassName: "whitespace-nowrap",
         headerClassName: "whitespace-nowrap",
@@ -250,8 +251,14 @@ export function DailySummaryDetailModal({
     );
   }, [config, totals]);
 
+  // Dialog width is 1200, not the default 880: the staff column (NV Thu / NV Chi)
+  // pushed "Số tiền" out of view, and the amount is the whole point of the table.
+  // The floor is set by the filter row, not the data — each filterable column
+  // carries an operator control plus an input, so the row has a min width the
+  // empty-looking cells do not reveal. `width` maps to max-width on PosDialog, so
+  // narrower screens still shrink instead of overflowing.
   return (
-    <PosDialog open={category !== null} onClose={onClose} width={960}>
+    <PosDialog open={category !== null} onClose={onClose} width={1200}>
       <PosDialog.Header title={config?.title ?? ""} />
       <PosDialog.Body className="p-0">
         <div className="max-h-[60vh] overflow-auto">

@@ -13,20 +13,24 @@ import {
   InvoiceEntity,
   InvoicePaymentMethod,
   InvoiceType,
-  RefundMethod,
 } from '../../../pos/entities/invoice.entity';
 import { InvoicePaymentEntity } from '../../../pos/entities/invoice-payment.entity';
 import { InvoiceDebtEntity, DebtDocumentType } from '../../../pos/entities/invoice-debt.entity';
 import { DebtPaymentEntity } from '../../../pos/entities/debt-payment.entity';
 import { CashPaymentEntity } from '../../../accounting/cash-vouchers/cash-payments/cash-payment.entity';
 import { CashReceiptEntity } from '../../../accounting/cash-vouchers/cash-receipts/cash-receipt.entity';
-import { CashReceiptPurpose, CashVoucherStatus } from '../../../accounting/cash-vouchers/enums';
+import {
+  CashReceiptPurpose,
+  CashReceiptReferenceType,
+  CashVoucherStatus,
+} from '../../../accounting/cash-vouchers/enums';
 import { PaymentAccountEntity } from '../../../accounting/payment-accounts/payment-account.entity';
 import { PaymentAccountMethod } from '../../../accounting/payment-accounts/enums';
 import { CashAccountEntity } from '../../../accounting/cash/cash-account.entity';
 import { DepositAccountEntity } from '../../../accounting/deposit/deposit-account.entity';
 import { AccountEntity } from '../../../accounting/coa/account.entity';
 import { CustomerEntity } from '../../../customer/customer.entity';
+import { UserEntity } from '../../../auth/user.entity';
 import { RbacService } from '../../../rbac/rbac.service';
 import {
   applyBranchScope,
@@ -46,6 +50,28 @@ function invoiceTypeLabel(type: InvoiceType): string {
   if (type === InvoiceType.RETURN) return 'Đổi trả';
   if (type === InvoiceType.EXCHANGE) return 'Đổi trả, mua thêm';
   return 'Bán hàng';
+}
+
+/**
+ * "Loại chứng từ" for a phiếu thu row, derived from structured columns only —
+ * never from `reason`, which is English prose a consumer assembles ("POS sale
+ * ${code}") and a user can edit. `reference_id` → `invoices.type` is exact, and
+ * reuses the labels above so voucher rows read the same as invoice rows.
+ *
+ * Branch order is load-bearing: RETURN_CANCEL receipts carry `purpose = OTHER`,
+ * so testing purpose first would drop all of them into "Thu khác".
+ */
+function receiptTypeLabel(
+  purpose: CashReceiptPurpose,
+  referenceType: CashReceiptReferenceType | undefined | null,
+  sourceInvoiceType: InvoiceType | undefined,
+): string {
+  if (purpose === CashReceiptPurpose.DEBT_COLLECTION) return 'Thu nợ';
+  if (referenceType === CashReceiptReferenceType.RETURN_CANCEL) return 'Huỷ trả hàng';
+  if (purpose === CashReceiptPurpose.POS_SALE && sourceInvoiceType) {
+    return invoiceTypeLabel(sourceInvoiceType);
+  }
+  return 'Thu khác';
 }
 
 /** Everything a per-category row builder needs — resolved once in `execute()`. */
@@ -76,6 +102,8 @@ interface SourceRow {
   /** Row is invoice/debt-sourced — render "Khách lẻ" when `customerId` is unset, rather than leaving the cell blank. */
   showCustomerFallback?: boolean;
   customerNameDirect?: string;
+  /** Voucher-sourced rows only — resolved to a user name in `resolveDisplayFields`. */
+  staffId?: string;
   depositAccountId?: string;
   glAccountId?: string;
   cashAccountId?: string;
@@ -94,6 +122,16 @@ function cellValue(col: string, row: PosDailySummaryDetailRow): ReportCellValue 
  * Each category's row set is built to sum exactly to the matching field on
  * `GetPosDailySummaryHandler`'s result — see that handler's money-model doc
  * comment for the shared Thu/Chi/Công nợ definitions this mirrors.
+ *
+ * `RevenueCash` is the one deliberate exception (ADR-01,
+ * `.ai/features/daily-report-voucher-columns/`). It lists **phiếu thu only** —
+ * posted `cash_receipts` of every purpose, no invoice rows — so that it answers
+ * the same question as `ExpenseCash`, which has always listed phiếu chi. The
+ * aggregate `revenue.cash` still sums invoice payments, and checkout saga v2
+ * writes no phiếu thu for a POS cash sale (`post-cash.step.ts`), so this
+ * category's total is **expected to be lower than** the Thu card's figure until
+ * the vouchers are backfilled. Do not "fix" the divergence by re-adding invoice
+ * rows here; that decision has an owner and a date.
  */
 @QueryHandler(GetPosDailySummaryDetailQuery)
 export class GetPosDailySummaryDetailHandler
@@ -122,6 +160,8 @@ export class GetPosDailySummaryDetailHandler
     private readonly glAccounts: Repository<AccountEntity>,
     @InjectRepository(CustomerEntity)
     private readonly customers: Repository<CustomerEntity>,
+    @InjectRepository(UserEntity)
+    private readonly users: Repository<UserEntity>,
     private readonly rbac: RbacService,
   ) {}
 
@@ -195,7 +235,9 @@ export class GetPosDailySummaryDetailHandler
   ): Promise<SourceRow[]> {
     switch (category) {
       case PosDailySummaryDetailCategory.RevenueCash:
-        return this.buildRevenueRows(ctx, InvoicePaymentMethod.CASH, PaymentAccountMethod.CASH);
+        return this.buildRevenueRows(ctx, InvoicePaymentMethod.CASH, PaymentAccountMethod.CASH, {
+          receiptsOnly: true,
+        });
       case PosDailySummaryDetailCategory.RevenueBankTransfer:
         return this.buildRevenueRows(
           ctx,
@@ -230,13 +272,19 @@ export class GetPosDailySummaryDetailHandler
     return qb.getMany();
   }
 
+  /**
+   * @param receiptsOnly List phiếu thu alone — skip invoice payments and stop
+   *   excluding `POS_SALE`-purpose receipts. Set for `RevenueCash` only; see the
+   *   class doc comment for why that category diverges from the aggregate.
+   */
   private async buildRevenueRows(
     ctx: DetailBuildContext,
     method: InvoicePaymentMethod,
     accountMethodBucket: PaymentAccountMethod,
+    { receiptsOnly = false }: { receiptsOnly?: boolean } = {},
   ): Promise<SourceRow[]> {
     const rows: SourceRow[] = [];
-    const invoices = await this.fetchWindowInvoices(ctx);
+    const invoices = receiptsOnly ? [] : await this.fetchWindowInvoices(ctx);
     const invoiceById = new Map(invoices.map((i) => [i.id, i]));
     const invoiceIds = invoices.map((i) => i.id);
 
@@ -261,31 +309,22 @@ export class GetPosDailySummaryDetailHandler
       }
     }
 
-    // Cash-method refund netting mirrors the aggregate handler: a CASH refund is
-    // never an invoice_payments row, so it's represented here as its own negative
-    // line so the drill-down total still reconciles with revenue.cash.
-    if (method === InvoicePaymentMethod.CASH) {
-      for (const inv of invoices) {
-        if (inv.refundMethod === RefundMethod.CASH && Number(inv.refundedAmount ?? 0) > 0) {
-          rows.push({
-            documentNumber: inv.code,
-            documentType: 'Hoàn tiền mặt',
-            sortKey: toIso(inv.issuedAt ?? inv.createdAt),
-            customerId: inv.customerId,
-            showCustomerFallback: true,
-            amount: -Number(inv.refundedAmount ?? 0),
-          });
-        }
-      }
-    }
+    // The negative "Hoàn tiền mặt" line that used to sit here is gone. CASH is now
+    // the receipts-only path, so `invoices` is always empty when it would have run
+    // — the loop was unreachable and its comment claimed a reconciliation with
+    // revenue.cash that no longer happens. A cash refund issues a POSTED phiếu chi
+    // and is therefore already counted once, on the Chi side.
 
-    // Non-invoice cash inflow (Thu nợ / Thu khác) — see aggregate handler's doc
-    // comment for why POS_SALE-purpose receipts are excluded.
+    // Cash inflow recorded as a voucher. When `receiptsOnly` these are the only
+    // rows, so every purpose counts — including POS_SALE, which the aggregate
+    // excludes to avoid double-counting against the invoice payments it sums.
     const receiptQb = this.cashReceipts
       .createQueryBuilder('r')
       .where('r.organizationId = :org', { org: ctx.org })
-      .andWhere('r.status = :posted', { posted: CashVoucherStatus.POSTED })
-      .andWhere('r.purpose != :posSale', { posSale: CashReceiptPurpose.POS_SALE });
+      .andWhere('r.status = :posted', { posted: CashVoucherStatus.POSTED });
+    if (!receiptsOnly) {
+      receiptQb.andWhere('r.purpose != :posSale', { posSale: CashReceiptPurpose.POS_SALE });
+    }
     applyBranchScope(receiptQb, 'r', ctx.branchIds);
     if (ctx.from) receiptQb.andWhere('r.voucherDate >= :crFrom', { crFrom: ctx.from });
     if (ctx.to) receiptQb.andWhere('r.voucherDate <= :crTo', { crTo: ctx.to });
@@ -295,6 +334,25 @@ export class GetPosDailySummaryDetailHandler
       });
     }
     const receiptRows = await receiptQb.getMany();
+
+    // Source invoices for the "Loại chứng từ" label, fetched by reference_id and
+    // NOT reused from `fetchWindowInvoices`: that one filters on `issuedAt` while
+    // receipts filter on `voucherDate`, so a receipt raised today against last
+    // week's invoice would silently fall through to "Thu khác". Only the
+    // receipts-only path labels this way; bank transfer keeps its old labels.
+    const sourceInvoiceType = new Map<string, InvoiceType>();
+    if (receiptsOnly) {
+      const referenceIds = [
+        ...new Set(receiptRows.map((r) => r.referenceId).filter((id): id is string => Boolean(id))),
+      ];
+      if (referenceIds.length) {
+        const sourceInvoices = await this.invoices.find({
+          where: { id: In(referenceIds), organizationId: ctx.org },
+        });
+        for (const inv of sourceInvoices) sourceInvoiceType.set(inv.id, inv.type);
+      }
+    }
+
     for (const r of receiptRows) {
       const rowMethod = ctx.accountMethod.get(r.cashAccountId);
       const bucket =
@@ -304,9 +362,18 @@ export class GetPosDailySummaryDetailHandler
       if (bucket !== accountMethodBucket) continue;
       rows.push({
         documentNumber: r.documentNumber ?? r.id,
-        documentType: r.purpose === CashReceiptPurpose.DEBT_COLLECTION ? 'Thu nợ' : 'Thu khác',
+        documentType: receiptsOnly
+          ? receiptTypeLabel(
+              r.purpose,
+              r.referenceType,
+              r.referenceId ? sourceInvoiceType.get(r.referenceId) : undefined,
+            )
+          : r.purpose === CashReceiptPurpose.DEBT_COLLECTION
+            ? 'Thu nợ'
+            : 'Thu khác',
         sortKey: `${r.voucherDate}T00:00:00.000Z`,
-        customerNameDirect: r.payerName ?? undefined,
+        customerNameDirect: r.payerName ?? r.partnerNameSnapshot ?? undefined,
+        staffId: r.staffId ?? undefined,
         cashAccountId: r.cashAccountId,
         amount: Number(r.totalAmount ?? 0),
       });
@@ -362,7 +429,8 @@ export class GetPosDailySummaryDetailHandler
       rows.push({
         documentNumber: p.documentNumber ?? p.id,
         sortKey: `${p.voucherDate}T00:00:00.000Z`,
-        customerNameDirect: p.payeeName ?? undefined,
+        customerNameDirect: p.payeeName ?? p.partnerNameSnapshot ?? undefined,
+        staffId: p.staffId ?? undefined,
         cashAccountId: p.cashAccountId,
         amount: Number(p.totalAmount ?? 0),
       });
@@ -469,8 +537,11 @@ export class GetPosDailySummaryDetailHandler
     const cashAccountIds = [
       ...new Set(rows.map((r) => r.cashAccountId).filter((id): id is string => Boolean(id))),
     ];
+    const staffIds = [
+      ...new Set(rows.map((r) => r.staffId).filter((id): id is string => Boolean(id))),
+    ];
 
-    const [customers, depositAccounts, glAccounts, cashAccounts] = await Promise.all([
+    const [customers, depositAccounts, glAccounts, cashAccounts, staff] = await Promise.all([
       customerIds.length
         ? this.customers.find({ where: { id: In(customerIds), organizationId: org } })
         : Promise.resolve([]),
@@ -483,11 +554,18 @@ export class GetPosDailySummaryDetailHandler
       cashAccountIds.length
         ? this.cashAccounts.find({ where: { id: In(cashAccountIds), organizationId: org } })
         : Promise.resolve([]),
+      // Scoped by organization so a stale staff_id can never leak a name across tenants.
+      staffIds.length
+        ? this.users.find({ where: { id: In(staffIds), organizationId: org } })
+        : Promise.resolve([]),
     ]);
     const customerById = new Map(customers.map((c) => [c.id, c]));
     const depositById = new Map(depositAccounts.map((a) => [a.id, a]));
     const glById = new Map(glAccounts.map((a) => [a.id, a]));
     const cashAccountById = new Map(cashAccounts.map((a) => [a.id, a]));
+    const staffNameById = new Map(
+      staff.map((u) => [u.id, `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim()]),
+    );
 
     return rows.map((r) => {
       const customerName =
@@ -502,11 +580,15 @@ export class GetPosDailySummaryDetailHandler
           : r.cashAccountId
             ? cashAccountById.get(r.cashAccountId)?.name
             : undefined;
+      // A user row with both name parts blank trims to "", which would render an
+      // empty cell that the column filter still matches. Keep it undefined.
+      const staffName = (r.staffId && staffNameById.get(r.staffId)) || undefined;
       return {
         documentNumber: r.documentNumber,
         documentType: r.documentType,
         issuedAt: r.sortKey,
         customerName,
+        staffName,
         bankAccountName,
         amount: r.amount !== undefined ? round2(r.amount) : undefined,
         pointsUsed: r.pointsUsed,

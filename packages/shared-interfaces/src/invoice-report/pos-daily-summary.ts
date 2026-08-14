@@ -86,6 +86,13 @@ export interface PosDailySummaryDetailRow {
   documentType?: string;
   issuedAt: string;
   customerName?: string;
+  /**
+   * "NV Thu" / "NV Chi" — the voucher's `staffId` resolved to a user name. Only
+   * the two cash categories set it, and only for rows sourced from a phiếu
+   * thu/chi: `staff_id` is NULL on every consumer-generated voucher (POS sale,
+   * refund, expense, goods receipt), so the cell is legitimately empty there.
+   */
+  staffName?: string;
   bankAccountName?: string;
   amount?: number;
   pointsUsed?: number;

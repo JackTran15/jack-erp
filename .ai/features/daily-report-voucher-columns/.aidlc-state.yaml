@@ -1,0 +1,123 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: daily-report-voucher-columns
+slug: daily-report-voucher-columns
+profile: none
+created: 2026-08-14T21:39:21
+current_gate: G5
+history:
+  - gate: G0
+    action: passed
+    at: 2026-08-14T21:42:29
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-08-14T21:42:36
+    by: Akenzy
+    evidence: 6 assumptions, none blocking-and-pending; 9 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-14T21:42:45
+    by: Akenzy
+    evidence: 2 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-14T21:44:43
+    by: Akenzy
+    evidence: graph valid - 1 UoW, 3 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-14T21:45:01
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-14T21:49:41
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-14T21:49:55
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-14T21:50:01
+    by: Claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-14T21:51:24
+    by: Claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-14T21:51:24
+    by: Claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-14T22:08:18
+    by: Claude
+    ticket: T-01-03
+  - gate: G4
+    action: passed
+    at: 2026-08-14T22:08:25
+    by: Akenzy
+    evidence: all 3 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-08-14T22:08:33
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid
+  - gate: G1
+    action: reopened
+    at: 2026-08-14T22:22:39
+    by: Akenzy
+    reason: Akenzy chốt mapping Loại chứng từ cho dòng phiếu thu - thêm nhãn mới 'Huỷ trả hàng' cho RETURN_CANCEL, và gắn nhãn theo purpose + join invoices.type thay cho nhánh 2 chiều. Đây là phần A-03 cố ý hoãn ở đợt trước, nay đã có quyết định.
+  - gate: G1
+    action: passed
+    at: 2026-08-14T22:23:28
+    by: Akenzy
+    evidence: 9 assumptions, none blocking-and-pending; 14 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-14T22:24:00
+    by: Akenzy
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-14T22:25:25
+    by: Akenzy
+    evidence: graph valid - 2 UoW, 5 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-14T22:25:25
+    by: Claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-14T22:28:35
+    by: Claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-14T22:28:35
+    by: Claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-14T22:33:57
+    by: Claude
+    ticket: T-02-02
+  - gate: G4
+    action: passed
+    at: 2026-08-14T22:33:57
+    by: Akenzy
+    evidence: all 5 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-08-14T22:33:57
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

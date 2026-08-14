@@ -6,6 +6,7 @@ export enum DailySummaryDetailColumnKey {
   DocumentType = "documentType",
   IssuedAt = "issuedAt",
   CustomerName = "customerName",
+  StaffName = "staffName",
   BankAccountName = "bankAccountName",
   Amount = "amount",
   PointsUsed = "pointsUsed",
@@ -17,6 +18,8 @@ export const DAILY_SUMMARY_DETAIL_COLUMN_LABELS: Record<DailySummaryDetailColumn
   [DailySummaryDetailColumnKey.DocumentType]: "Loại chứng từ",
   [DailySummaryDetailColumnKey.IssuedAt]: "Thời gian",
   [DailySummaryDetailColumnKey.CustomerName]: "Khách hàng",
+  /** Neutral default — the two cash categories override it with "NV Thu" / "NV Chi". */
+  [DailySummaryDetailColumnKey.StaffName]: "Nhân viên",
   [DailySummaryDetailColumnKey.BankAccountName]: "Tài khoản ngân hàng",
   [DailySummaryDetailColumnKey.Amount]: "Số tiền",
   [DailySummaryDetailColumnKey.PointsUsed]: "Điểm sử dụng",
@@ -33,6 +36,12 @@ export const DAILY_SUMMARY_DETAIL_NUMERIC_COLUMNS: ReadonlySet<DailySummaryDetai
 export interface DailySummaryDetailConfig {
   title: string;
   columns: DailySummaryDetailColumnKey[];
+  /**
+   * Per-category header overrides. Needed because one column key can carry two
+   * names: the staff on a phiếu thu is "NV Thu", on a phiếu chi "NV Chi", and a
+   * flat label map cannot express that.
+   */
+  columnLabels?: Partial<Record<DailySummaryDetailColumnKey, string>>;
 }
 
 const K = DailySummaryDetailColumnKey;
@@ -41,7 +50,8 @@ const K = DailySummaryDetailColumnKey;
 export const DAILY_SUMMARY_DETAIL_CONFIG: Record<PosDailySummaryDetailCategory, DailySummaryDetailConfig> = {
   [PosDailySummaryDetailCategory.RevenueCash]: {
     title: "Tổng tiền mặt",
-    columns: [K.DocumentNumber, K.DocumentType, K.IssuedAt, K.CustomerName, K.Amount],
+    columns: [K.DocumentNumber, K.DocumentType, K.IssuedAt, K.CustomerName, K.StaffName, K.Amount],
+    columnLabels: { [K.StaffName]: "NV Thu" },
   },
   [PosDailySummaryDetailCategory.RevenueBankTransfer]: {
     title: "Tổng tiền chuyển khoản",
@@ -53,7 +63,8 @@ export const DAILY_SUMMARY_DETAIL_CONFIG: Record<PosDailySummaryDetailCategory, 
   },
   [PosDailySummaryDetailCategory.ExpenseCash]: {
     title: "Tổng chi tiền mặt",
-    columns: [K.DocumentNumber, K.IssuedAt, K.CustomerName, K.Amount],
+    columns: [K.DocumentNumber, K.IssuedAt, K.CustomerName, K.StaffName, K.Amount],
+    columnLabels: { [K.StaffName]: "NV Chi" },
   },
   [PosDailySummaryDetailCategory.ExpenseBankTransfer]: {
     title: "Tổng chi chuyển khoản",
@@ -74,17 +85,24 @@ export const DAILY_SUMMARY_DETAIL_DEFAULT_PAGE_SIZE = 100;
 
 /**
  * "Loại chứng từ" select options per category — fixed lists matching exactly what
- * `get-pos-daily-summary-detail.handler.ts` assigns (see `invoiceTypeLabel()` and
- * the Thu nợ/Thu khác cash-receipt labels). Categories with no Loại chứng từ column
- * (Chi Tiền mặt/Chuyển khoản) are absent.
+ * `get-pos-daily-summary-detail.handler.ts` assigns: `invoiceTypeLabel()` for
+ * invoice rows, `receiptTypeLabel()` for phiếu thu rows. Categories with no Loại
+ * chứng từ column (Chi Tiền mặt/Chuyển khoản) are absent.
+ *
+ * Filtering is server-side and compares these strings verbatim, so a value here
+ * that differs from the handler by even one diacritic silently matches nothing.
+ * Change both sides together.
  */
 export const DAILY_SUMMARY_DETAIL_DOCUMENT_TYPES: Partial<Record<PosDailySummaryDetailCategory, string[]>> = {
   [PosDailySummaryDetailCategory.RevenueCash]: [
     "Bán hàng",
     "Đổi trả",
     "Đổi trả, mua thêm",
+    // Left in deliberately even though the receipts-only source can never emit it:
+    // no phiếu thu means money leaving. Removing it is a separate call (A-08).
     "Hoàn tiền mặt",
     "Thu nợ",
+    "Huỷ trả hàng",
     "Thu khác",
   ],
   [PosDailySummaryDetailCategory.RevenueBankTransfer]: [
