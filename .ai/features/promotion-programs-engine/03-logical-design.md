@@ -49,33 +49,33 @@ categories). Thứ/giờ/phạm vi khách **không** lọc ở SQL — đó là 
 
 ## Alternatives rejected
 
-| Option | Why not |
-|---|---|
-| Giữ `jsonb` và mở rộng `PromotionApplyService` | Không có kiểu, không index được theo SKU, không validate được theo hình thức; 5 hình thức trộn trong một cột là nơi mọi lỗi im lặng sinh ra |
-| Dùng generic CRUD platform (`BaseCrudService`) cho CTKM | Aggregate 7 bảng, validate phân nhánh theo `type`, và một engine tính tiền — vượt xa những gì `BaseCrudService` mô tả được. Voucher thì ngược lại: một bảng phẳng, giữ ở tầng service |
-| Cộng dồn nhiều CTKM trên cùng một dòng | Số tiền cuối phụ thuộc thứ tự cộng, khách và thu ngân không giải thích được; MISA cũng không làm vậy |
-| Tự chọn tổ hợp "có lợi nhất cho khách" | Bài toán tối ưu tổ hợp, chạy chậm và không tái lập được; marketing mất quyền điều khiển bằng `priority` |
-| Một service `PromotionService` phình to thay cho `CommandBus` | Một lần ghi đụng 7 bảng với nhánh validate khác nhau theo `type`; 5 handler tách rời test dễ hơn hẳn |
-| Discriminated union DTO (`@ApiExtraModels`) theo `type` | OpenAPI generator sinh type khó dùng ở FE, trong khi form FE vốn là một `ProgramFormState` phẳng. Chọn một DTO phẳng + `@ValidateIf` |
-| `LEFT JOIN` + `GROUP BY` cho branch scope | Nhân dòng. Dùng `NOT EXISTS (…) OR EXISTS (…)` |
-| Recursive CTE để dựng đường dẫn nhóm cha | Nạp cây nhóm một lần cho org rồi dựng path trong RAM rẻ hơn và test được; chặn chu trình bằng bound độ sâu 50 |
-| Cache Redis cho `evaluate` ngay từ đầu | Chưa có số đo. Vài chục CTKM/org với index là đủ; thêm cache sau là thay đổi cục bộ (A-21) |
-| Đặt FK trên `promotion_lines.target_id` | Polymorphic trên 3 bảng — không có FK nào đúng cho cả ba |
-| Xóa hoặc migrate bảng `promotions` cũ trong epic này | POS checkout vẫn đọc nó; drop là migration riêng sau khi xác nhận hết dữ liệu |
+| Option                                                        | Why not                                                                                                                                                                               |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Giữ `jsonb` và mở rộng `PromotionApplyService`                | Không có kiểu, không index được theo SKU, không validate được theo hình thức; 5 hình thức trộn trong một cột là nơi mọi lỗi im lặng sinh ra                                           |
+| Dùng generic CRUD platform (`BaseCrudService`) cho CTKM       | Aggregate 7 bảng, validate phân nhánh theo `type`, và một engine tính tiền — vượt xa những gì `BaseCrudService` mô tả được. Voucher thì ngược lại: một bảng phẳng, giữ ở tầng service |
+| Cộng dồn nhiều CTKM trên cùng một dòng                        | Số tiền cuối phụ thuộc thứ tự cộng, khách và thu ngân không giải thích được; MISA cũng không làm vậy                                                                                  |
+| Tự chọn tổ hợp "có lợi nhất cho khách"                        | Bài toán tối ưu tổ hợp, chạy chậm và không tái lập được; marketing mất quyền điều khiển bằng `priority`                                                                               |
+| Một service `PromotionService` phình to thay cho `CommandBus` | Một lần ghi đụng 7 bảng với nhánh validate khác nhau theo `type`; 5 handler tách rời test dễ hơn hẳn                                                                                  |
+| Discriminated union DTO (`@ApiExtraModels`) theo `type`       | OpenAPI generator sinh type khó dùng ở FE, trong khi form FE vốn là một `ProgramFormState` phẳng. Chọn một DTO phẳng + `@ValidateIf`                                                  |
+| `LEFT JOIN` + `GROUP BY` cho branch scope                     | Nhân dòng. Dùng `NOT EXISTS (…) OR EXISTS (…)`                                                                                                                                        |
+| Recursive CTE để dựng đường dẫn nhóm cha                      | Nạp cây nhóm một lần cho org rồi dựng path trong RAM rẻ hơn và test được; chặn chu trình bằng bound độ sâu 50                                                                         |
+| Cache Redis cho `evaluate` ngay từ đầu                        | Chưa có số đo. Vài chục CTKM/org với index là đủ; thêm cache sau là thay đổi cục bộ (A-21)                                                                                            |
+| Đặt FK trên `promotion_lines.target_id`                       | Polymorphic trên 3 bảng — không có FK nào đúng cho cả ba                                                                                                                              |
+| Xóa hoặc migrate bảng `promotions` cũ trong epic này          | POS checkout vẫn đọc nó; drop là migration riêng sau khi xác nhận hết dữ liệu                                                                                                         |
 
 ## Domain model
 
-| Entity | Vai trò | Ghi chú |
-|---|---|---|
-| `PromotionProgram` | Aggregate root | Bất biến (`readonly`); `create()` chạy toàn bộ invariant BR-004 rồi trả instance; không có setter công khai |
-| `PromotionGroup` | Nhóm lưới | Hình thức khác `TIERED_DISCOUNT` có đúng 1 group ngầm `ordinal = 0` |
-| `PromotionLine` | Dòng lưới | `role = CONDITION \| REWARD`; `targetType` polymorphic `PRODUCT \| ITEM \| CATEGORY` |
-| `PromotionTier` | Bậc thang | Chỉ `TIERED_DISCOUNT`; `to` null = ∞ |
-| `PromotionCondition` | Tab điều kiện | 0..1 mỗi program; dùng chung bởi 3 hình thức có tab điều kiện |
-| `TimeWindow` / `DateWindow` / `CustomerScope` | Value object | Ca qua đêm, biên null, 4 chế độ sinh nhật kể cả quấn vòng năm |
-| `roundVnd` | Value object | Một nơi duy nhất làm tròn về đồng |
-| `CartContext` / `CartLine` | Input engine | `unitPrice` lấy từ request (giỏ có thể sửa giá tay), `catalog` là `Map` nạp sẵn |
-| `PromotionEvaluation` | Output engine | Thuần data: `appliedPrograms`, `availablePrograms`, `skippedPrograms` + 3 số tổng |
+| Entity                                        | Vai trò        | Ghi chú                                                                                                     |
+| --------------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------- |
+| `PromotionProgram`                            | Aggregate root | Bất biến (`readonly`); `create()` chạy toàn bộ invariant BR-004 rồi trả instance; không có setter công khai |
+| `PromotionGroup`                              | Nhóm lưới      | Hình thức khác `TIERED_DISCOUNT` có đúng 1 group ngầm `ordinal = 0`                                         |
+| `PromotionLine`                               | Dòng lưới      | `role = CONDITION \| REWARD`; `targetType` polymorphic `PRODUCT \| ITEM \| CATEGORY`                        |
+| `PromotionTier`                               | Bậc thang      | Chỉ `TIERED_DISCOUNT`; `to` null = ∞                                                                        |
+| `PromotionCondition`                          | Tab điều kiện  | 0..1 mỗi program; dùng chung bởi 3 hình thức có tab điều kiện                                               |
+| `TimeWindow` / `DateWindow` / `CustomerScope` | Value object   | Ca qua đêm, biên null, 4 chế độ sinh nhật kể cả quấn vòng năm                                               |
+| `roundVnd`                                    | Value object   | Một nơi duy nhất làm tròn về đồng                                                                           |
+| `CartContext` / `CartLine`                    | Input engine   | `unitPrice` lấy từ request (giỏ có thể sửa giá tay), `catalog` là `Map` nạp sẵn                             |
+| `PromotionEvaluation`                         | Output engine  | Thuần data: `appliedPrograms`, `availablePrograms`, `skippedPrograms` + 3 số tổng                           |
 
 ## Contracts
 
@@ -95,13 +95,13 @@ categories). Thứ/giờ/phạm vi khách **không** lọc ở SQL — đó là 
 
 ## State ownership
 
-| State | Owner | Lifetime |
-|---|---|---|
-| Aggregate CTKM | `promotion_programs` + 6 bảng con, ghi trọn gói qua `TypeormPromotionRepository` | Bền vững |
-| Tài nguyên đã bị chiếm khi tính (dòng / slot quà / slot hóa đơn) | `CartState`, dựng mới mỗi lần `resolve()` | Trong một lần gọi |
-| Danh sách + form ở backoffice | TanStack Query, key bắt đầu bằng tên tài nguyên và chứa mọi filter | Màn hình |
-| Bộ lọc, phân trang, biến thể form đang chọn | State cục bộ của page | Màn hình |
-| Kết quả evaluate | Không lưu ở đâu cả — tính lại mỗi lần gọi | Một request |
+| State                                                            | Owner                                                                            | Lifetime          |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------- |
+| Aggregate CTKM                                                   | `promotion_programs` + 6 bảng con, ghi trọn gói qua `TypeormPromotionRepository` | Bền vững          |
+| Tài nguyên đã bị chiếm khi tính (dòng / slot quà / slot hóa đơn) | `CartState`, dựng mới mỗi lần `resolve()`                                        | Trong một lần gọi |
+| Danh sách + form ở backoffice                                    | TanStack Query, key bắt đầu bằng tên tài nguyên và chứa mọi filter               | Màn hình          |
+| Bộ lọc, phân trang, biến thể form đang chọn                      | State cục bộ của page                                                            | Màn hình          |
+| Kết quả evaluate                                                 | Không lưu ở đâu cả — tính lại mỗi lần gọi                                        | Một request       |
 
 **Không** đặt dữ liệu server vào Zustand.
 
@@ -112,34 +112,34 @@ Hai họ lỗi tách bạch: *chương trình không chạy* (không phải lỗ
 
 ### Chương trình không chạy — `skippedPrograms[].reason`, union có kiểu
 
-| Reason | Điều kiện | Hiển thị |
-|---|---|---|
-| `STOPPED` | `status = STOPPED` | "Đã ngừng theo dõi" |
-| `DATE_WINDOW` | `at` ngoài `[startDate, endDate]` | "Ngoài thời gian áp dụng" |
-| `DAY_OF_WEEK` | `at` không thuộc `daysOfWeek` | "Không áp dụng cho hôm nay" |
-| `TIME_OF_DAY` | `at` ngoài `[startTime, endTime]`, có xử lý ca qua đêm | "Ngoài khung giờ áp dụng" |
-| `BRANCH_SCOPE` | Chi nhánh hiện tại không thuộc `promotion_branches` | "Không áp dụng cho chi nhánh này" |
-| `CUSTOMER_SCOPE` | Khách không khớp `applyTo` | "Không áp dụng cho khách hàng này" |
-| `CONDITION_NOT_MET` | Điều kiện áp dụng chưa thỏa, hoặc strategy không tính ra kết quả | "Chưa đủ điều kiện" |
-| `RESOURCE_TAKEN` | Tài nguyên đã bị CTKM ưu tiên cao hơn chiếm; kèm `takenBy` | "Đã áp dụng chương trình khác" |
-| `NOT_SELECTED` | `autoApply = false` và id không có trong `selectedProgramIds` | "Chưa được chọn áp dụng" |
+| Reason              | Điều kiện                                                        | Hiển thị                           |
+| ------------------- | ---------------------------------------------------------------- | ---------------------------------- |
+| `STOPPED`           | `status = STOPPED`                                               | "Đã ngừng theo dõi"                |
+| `DATE_WINDOW`       | `at` ngoài `[startDate, endDate]`                                | "Ngoài thời gian áp dụng"          |
+| `DAY_OF_WEEK`       | `at` không thuộc `daysOfWeek`                                    | "Không áp dụng cho hôm nay"        |
+| `TIME_OF_DAY`       | `at` ngoài `[startTime, endTime]`, có xử lý ca qua đêm           | "Ngoài khung giờ áp dụng"          |
+| `BRANCH_SCOPE`      | Chi nhánh hiện tại không thuộc `promotion_branches`              | "Không áp dụng cho chi nhánh này"  |
+| `CUSTOMER_SCOPE`    | Khách không khớp `applyTo`                                       | "Không áp dụng cho khách hàng này" |
+| `CONDITION_NOT_MET` | Điều kiện áp dụng chưa thỏa, hoặc strategy không tính ra kết quả | "Chưa đủ điều kiện"                |
+| `RESOURCE_TAKEN`    | Tài nguyên đã bị CTKM ưu tiên cao hơn chiếm; kèm `takenBy`       | "Đã áp dụng chương trình khác"     |
+| `NOT_SELECTED`      | `autoApply = false` và id không có trong `selectedProgramIds`    | "Chưa được chọn áp dụng"           |
 
 Bất biến: **không CTKM nào biến mất im lặng** — mọi chương trình được nạp mà không nằm trong
 `appliedPrograms` phải có đúng một dòng ở đây.
 
 ### Yêu cầu sai — HTTP
 
-| Điều kiện | Mã | Body |
-|---|---|---|
-| Vi phạm invariant BR-004 khi tạo/sửa | 400 | `{ message, issues: [{ field, code, message }] }` — **toàn bộ** lỗi một lần, không dừng ở lỗi đầu |
-| Đổi `type` khi sửa | 400 | `PROMOTION_TYPE_IMMUTABLE` |
-| `itemId` không tồn tại trong giỏ evaluate | 400 | `{ code: 'UNKNOWN_ITEM', itemIds: [...] }` |
-| `customerId` không tồn tại | 400 | `{ code: 'UNKNOWN_CUSTOMER' }` |
-| `lines` rỗng | 400 | `@ArrayMinSize(1)` |
-| Trùng mã voucher trong tổ chức | 409 | `ConflictException`, gắn vào trường `Voucher` ở FE |
-| Cùng `X-Idempotency-Key`, body khác | 409 | Từ `IdempotencyInterceptor` toàn cục |
-| Thiếu `X-Branch-Id` ở `evaluate` | 403 | Từ `BranchScopeGuard` |
-| CTKM của tổ chức khác, hoặc đã xóa mềm | 404 | Không phải 403 — không tiết lộ sự tồn tại |
+| Điều kiện                                 | Mã  | Body                                                                                              |
+| ----------------------------------------- | --- | ------------------------------------------------------------------------------------------------- |
+| Vi phạm invariant BR-004 khi tạo/sửa      | 400 | `{ message, issues: [{ field, code, message }] }` — **toàn bộ** lỗi một lần, không dừng ở lỗi đầu |
+| Đổi `type` khi sửa                        | 400 | `PROMOTION_TYPE_IMMUTABLE`                                                                        |
+| `itemId` không tồn tại trong giỏ evaluate | 400 | `{ code: 'UNKNOWN_ITEM', itemIds: [...] }`                                                        |
+| `customerId` không tồn tại                | 400 | `{ code: 'UNKNOWN_CUSTOMER' }`                                                                    |
+| `lines` rỗng                              | 400 | `@ArrayMinSize(1)`                                                                                |
+| Trùng mã voucher trong tổ chức            | 409 | `ConflictException`, gắn vào trường `Voucher` ở FE                                                |
+| Cùng `X-Idempotency-Key`, body khác       | 409 | Từ `IdempotencyInterceptor` toàn cục                                                              |
+| Thiếu `X-Branch-Id` ở `evaluate`          | 403 | Từ `BranchScopeGuard`                                                                             |
+| CTKM của tổ chức khác, hoặc đã xóa mềm    | 404 | Không phải 403 — không tiết lộ sự tồn tại                                                         |
 
 `code` của `issues[]` là hằng, không phải chuỗi tự do: `NAME_REQUIRED`,
 `END_DATE_BEFORE_START_DATE`, `DISCOUNT_VALUE_NOT_POSITIVE`, `PERCENT_OVER_100`,
