@@ -1,0 +1,133 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: quick-exchange-single-invoice
+slug: quick-exchange-single-invoice
+profile: none
+created: 2026-08-14T10:04:32
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-08-14T10:20:47
+    by: Loc Tran
+    evidence: architecture map verified by Akenzy      # signed 2026-07-27 after reviewing the Verified detail section; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-08-14T10:20:47
+    by: Loc Tran
+    evidence: 8 assumptions, none blocking-and-pending; 14 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-14T10:20:47
+    by: Loc Tran
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-14T10:20:47
+    by: Loc Tran
+    evidence: graph valid - 3 UoW, 9 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-14T10:21:12
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-14T10:24:02
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-14T10:24:02
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-14T10:26:09
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-14T10:26:14
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-14T10:27:18
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-14T10:40:55
+    by: Loc Tran
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-14T10:40:56
+    by: Loc Tran
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-14T10:40:56
+    by: Loc Tran
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-14T10:41:00
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-14T10:42:46
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-14T10:42:46
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-14T10:44:49
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-14T10:44:49
+    by: Loc Tran
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done
+    at: 2026-08-14T10:44:49
+    by: Loc Tran
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-14T10:45:01
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket review
+    at: 2026-08-14T10:50:41
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done
+    at: 2026-08-14T12:33:02
+    by: Loc Tran
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-14T12:33:02
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-14T12:33:35
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-14T12:33:35
+    by: Loc Tran
+    ticket: T-02-02

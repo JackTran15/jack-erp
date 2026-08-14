@@ -126,10 +126,20 @@ export interface CreateReturnInvoiceBody {
 /** Body cho `POST /invoices/exchanges` — tạo draft EXCHANGE (trả + mua mới). */
 export interface CreateExchangeInvoiceBody {
   sessionId: string;
-  originalInvoiceId: string;
+  /**
+   * Hóa đơn bán gốc. Bỏ trống ở luồng **đổi trả nhanh** — BE suy ra chế độ
+   * quick từ chính việc thiếu field này (không có field `mode` riêng). Phải là
+   * `undefined` chứ không phải `null`: DTO backend khai `@IsUUID` nên `null`
+   * lọt qua `JSON.stringify` sẽ bị `ValidationPipe` từ chối 400.
+   */
+  originalInvoiceId?: string;
   reason: string;
   customerId?: string;
-  /** Hàng trả lại (direction=IN), trỏ về dòng hóa đơn bán gốc. */
+  /**
+   * Hàng trả lại (direction=IN). Trỏ về dòng hóa đơn bán gốc khi có
+   * `originalInvoiceId`; ở luồng nhanh thì mọi dòng phải bỏ trống
+   * `originalInvoiceItemId`.
+   */
   returnLines: ReturnInvoiceLineBody[];
   /** Hàng mua mới (direction=OUT) — cùng shape dòng hàng SALE thường. */
   newLines: CreateInvoiceItemBody[];

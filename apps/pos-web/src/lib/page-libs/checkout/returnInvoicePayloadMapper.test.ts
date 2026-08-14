@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { PaymentMethodEnum } from "@erp/pos/constants/checkout.constant";
-import { buildCheckoutReturnPayload } from "@erp/pos/lib/page-libs/checkout/returnInvoicePayloadMapper";
+import {
+  buildCheckoutReturnPayload,
+  buildCreateExchangePayload,
+} from "@erp/pos/lib/page-libs/checkout/returnInvoicePayloadMapper";
 import type { PaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
+import type { CartLine } from "@erp/pos/interfaces/checkout.interface";
 
 function line(
   method: PaymentMethodEnum,
@@ -11,6 +15,20 @@ function line(
   id = "line-1",
 ): PaymentLine {
   return { id, method, paymentAccountId, amount };
+}
+
+function cartLine(overrides: Partial<CartLine> = {}): CartLine {
+  return {
+    lineId: "cart-1",
+    itemId: "item-1",
+    name: "Áo thun",
+    code: "SKU-1",
+    unit: "Cái",
+    unitPrice: 100_000,
+    qty: 1,
+    locationId: "loc-1",
+    ...overrides,
+  } as CartLine;
 }
 
 /**
@@ -80,5 +98,57 @@ describe("buildCheckoutReturnPayload — net refund routing", () => {
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.body.refundMethod).toBe("CASH");
+  });
+});
+
+/**
+ * `originalInvoiceId` is what tells the backend which mode to run: present →
+ * regular exchange (eligibility checked against the original sale), absent →
+ * quick exchange (free-form lines). It must be absent from the JSON entirely,
+ * not present as `null` — the backend DTO declares `@IsUUID` and the global
+ * ValidationPipe would reject a null.
+ */
+describe("buildCreateExchangePayload — originalInvoiceId is the mode discriminator", () => {
+  const base = {
+    sessionId: "session-1",
+    customer: null,
+    reason: "Đổi hàng",
+    returnLines: [cartLine({ lineId: "ret-1", originalInvoiceItemId: "orig-1" })],
+    newLines: [cartLine({ lineId: "new-1" })],
+  };
+
+  it("carries originalInvoiceId through for an invoice-backed exchange", () => {
+    const body = buildCreateExchangePayload({
+      ...base,
+      originalInvoiceId: "orig-invoice-1",
+    });
+    expect(body.originalInvoiceId).toBe("orig-invoice-1");
+  });
+
+  it("omits the key entirely for a quick exchange", () => {
+    const body = buildCreateExchangePayload({
+      ...base,
+      returnLines: [cartLine({ lineId: "ret-1" })],
+    });
+    expect(body.originalInvoiceId).toBeUndefined();
+    // The wire format is what matters: `undefined` disappears, `null` would not.
+    expect(JSON.parse(JSON.stringify(body))).not.toHaveProperty(
+      "originalInvoiceId",
+    );
+  });
+
+  it("maps return lines to IN-shaped bodies and new lines to SALE-shaped bodies", () => {
+    const body = buildCreateExchangePayload({
+      ...base,
+      returnLines: [cartLine({ lineId: "ret-1", qty: 2, unitPrice: 50_000 })],
+    });
+    expect(body.returnLines).toHaveLength(1);
+    expect(body.returnLines[0]).toMatchObject({
+      itemId: "item-1",
+      quantity: 2,
+      unitPrice: 50_000,
+      locationId: "loc-1",
+    });
+    expect(body.newLines[0]).toMatchObject({ itemId: "item-1", sortOrder: 0 });
   });
 });

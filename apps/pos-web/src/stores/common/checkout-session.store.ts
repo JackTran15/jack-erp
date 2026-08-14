@@ -696,6 +696,25 @@ export function selectIsReturnExchangeInvoice(
   );
 }
 
+/**
+ * Luồng đổi/trả KHÔNG có hoá đơn gốc ("đổi trả nhanh"). Không có công nợ gốc để
+ * cấn trừ, và phần chênh khách phải bù thì thu đủ chứ không ghi nợ — nên hai ô
+ * "Tính vào công nợ" đều vô nghĩa ở đây (ADR-03).
+ *
+ * Điều kiện bám vào `originalInvoiceId` chứ không vào `checkoutVariant`: luồng
+ * bán hàng thường vẫn phải giữ ô ghi nợ của nó.
+ */
+export function selectIsQuickReturnFlow(
+  state: PosCheckoutSessionState,
+): boolean {
+  const session = selectActiveSession(state);
+  if (!session) return false;
+  return (
+    session.checkoutVariant !== CheckoutVariantEnum.SALE &&
+    !session.originalInvoiceId
+  );
+}
+
 export function selectInvoiceTableCheckoutPane(
   state: PosCheckoutSessionState,
 ): CheckoutPane {

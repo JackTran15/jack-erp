@@ -51,10 +51,8 @@ export const CHECKOUT_TOASTS = {
     "Hàng trả thiếu thông tin kho/vị trí — vui lòng kiểm tra lại.",
   REVENUE_ACCOUNT_UNAVAILABLE:
     "Chưa lấy được tài khoản doanh thu để hạch toán đổi trả. Vui lòng thử lại.",
-  EXCHANGE_NEEDS_ORIGINAL:
-    "Đổi hàng cần chọn từ hóa đơn gốc — đổi trả nhanh chưa hỗ trợ thêm hàng mua mới.",
-  QUICK_EXCHANGE_RETURN_FAILED_AFTER_SALE:
-    "Đã tạo đơn mua nhưng chưa hoàn được hàng trả — vui lòng thử lại phần hoàn trả.",
+  /** Chỉ còn dùng cho luồng đổi trả THEO hóa đơn — thiếu hóa đơn gốc ở đó là bug. */
+  EXCHANGE_NEEDS_ORIGINAL: "Đổi hàng theo hóa đơn cần chọn hóa đơn gốc.",
   PAYMENT_FAILED: "Không thu được tiền",
   RETURN_FAILED: "Không ghi nhận được đổi trả",
   DRAFT_SAVE_FAILED: "Không lưu được hóa đơn lưu tạm",
