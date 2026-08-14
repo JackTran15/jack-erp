@@ -11,24 +11,17 @@ import { WsEventType } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { WebSocketEmitterService } from '../../websocket/websocket-emitter.service';
 import { PromotionApplyService } from '../../promotion/promotion-apply.service';
-import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
-import { AccountingDefaultAccountRole } from '../../accounting/payment-accounts/enums';
-import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
 import { LoyaltyPointsReversePublisher } from '../../customer/publishers/loyalty-points-reverse.publisher';
 import {
   InvoiceEntity,
-  InvoicePaymentMethod,
   InvoiceStatus,
   InvoiceType,
 } from '../entities/invoice.entity';
 import { InvoiceItemEntity } from '../entities/invoice-item.entity';
-import { InvoicePaymentEntity } from '../entities/invoice-payment.entity';
 import { InvoiceDebtEntity, DebtStatus } from '../entities/invoice-debt.entity';
 import { CancelInvoiceDto } from '../dto/cancel-invoice.dto';
-import {
-  InvoiceCancelledPublisher,
-  InvoiceCancelledRefundLeg,
-} from '../publishers/invoice-cancelled.publisher';
+import { InvoiceCancelledPublisher } from '../publishers/invoice-cancelled.publisher';
+import { InvoiceRefundLegsService } from './invoice-refund-legs.service';
 
 const CANCELLABLE_STATUSES: ReadonlySet<InvoiceStatus> = new Set([
   InvoiceStatus.PAID,
@@ -45,14 +38,11 @@ export class CancelInvoiceService {
     private readonly invoiceRepo: Repository<InvoiceEntity>,
     @InjectRepository(InvoiceItemEntity)
     private readonly itemRepo: Repository<InvoiceItemEntity>,
-    @InjectRepository(InvoicePaymentEntity)
-    private readonly paymentRepo: Repository<InvoicePaymentEntity>,
     private readonly dataSource: DataSource,
     private readonly promotionApplyService: PromotionApplyService,
     private readonly invoiceCancelledPublisher: InvoiceCancelledPublisher,
     private readonly wsEmitter: WebSocketEmitterService,
-    private readonly accountResolver: AccountResolverService,
-    private readonly cashFundResolver: CashFundResolverService,
+    private readonly refundLegs: InvoiceRefundLegsService,
     private readonly loyaltyPointsReversePublisher: LoyaltyPointsReversePublisher,
   ) {}
 
@@ -75,11 +65,11 @@ export class CancelInvoiceService {
       );
     }
 
-    // A RETURN/EXCHANGE already moves money the other way; cancelling one would
-    // issue a refund voucher against a document that is itself a refund.
+    // A RETURN/EXCHANGE moves money and stock the other way, so voiding one is
+    // the mirror of this flow, not this flow — CancelReturnService owns it.
     if (invoice.type !== InvoiceType.SALE) {
       throw new BadRequestException(
-        `Only sale invoices can be cancelled. Current type: ${invoice.type}`,
+        `Only sale invoices can be cancelled here. Current type: ${invoice.type}`,
       );
     }
 
@@ -89,7 +79,7 @@ export class CancelInvoiceService {
     // Resolved before the transaction on purpose: a branch with no cash fund is
     // a configuration error, and failing here leaves the invoice untouched
     // rather than emitting an event no consumer can honour.
-    const refunds = await this.buildRefundLegs(invoice, actor);
+    const refunds = await this.refundLegs.build(invoice, actor);
     const hasOutstandingDebt =
       invoice.status === InvoiceStatus.DEBT ||
       invoice.status === InvoiceStatus.PARTIAL_DEBT;
@@ -129,6 +119,7 @@ export class CancelInvoiceService {
             itemId: item.itemId,
             locationId: item.locationId!,
             quantity: Number(item.quantity),
+            direction: item.direction,
           })),
         refunds,
       },
@@ -193,92 +184,10 @@ export class CancelInvoiceService {
 
     if (settledReturns > 0) {
       throw new BadRequestException(
-        `Invoice ${invoice.code} already has a return/exchange and cannot be cancelled. ` +
-          'Use the return flow instead.',
+        `Hóa đơn ${invoice.code} đã có phiếu đổi trả — huỷ phiếu đổi trả trước, ` +
+          'rồi mới huỷ được hóa đơn này.',
       );
     }
   }
 
-  /**
-   * Group what the customer actually paid into one refund leg per destination
-   * fund. The amount is the money collected (`invoice_payments`), never
-   * `amountDue` — cancelling a partially paid invoice refunds only what was
-   * handed over; the unpaid remainder is settled as debt instead.
-   *
-   * Returns an empty array when nothing was collected, which is the normal case
-   * for a pure debt invoice and must not block the cancellation.
-   */
-  private async buildRefundLegs(
-    invoice: InvoiceEntity,
-    actor: ActorContext,
-  ): Promise<InvoiceCancelledRefundLeg[]> {
-    const payments = await this.paymentRepo.find({
-      where: { invoiceId: invoice.id, organizationId: actor.organizationId },
-    });
-    if (payments.length === 0) {
-      return [];
-    }
-
-    const contraAccountId = await this.accountResolver.resolveDefaultAccount(
-      AccountingDefaultAccountRole.REVENUE,
-      actor,
-    );
-
-    const cashPayments = payments.filter(
-      (p) => p.paymentMethod === InvoicePaymentMethod.CASH,
-    );
-    const nonCashPayments = payments.filter(
-      (p) => p.paymentMethod !== InvoicePaymentMethod.CASH,
-    );
-
-    const legs: InvoiceCancelledRefundLeg[] = [];
-
-    if (cashPayments.length > 0) {
-      // One cash fund per branch. `payment.accountId` is a COA id, not a
-      // cash_accounts id — using it here is the bug CashFundResolverService
-      // exists to prevent.
-      const cashAccountId = await this.cashFundResolver.resolveBranchCashFund(
-        actor.organizationId,
-        invoice.branchId,
-      );
-      legs.push({
-        invoicePaymentIds: cashPayments.map((p) => p.id),
-        fundKind: 'CASH',
-        cashAccountId,
-        amount: sumAmount(cashPayments),
-        contraAccountId,
-      });
-    }
-
-    // Non-cash lines are grouped by the fund they landed in: the explicit
-    // deposit fund when the payment_accounts mapping named one, otherwise the
-    // COA the line resolved to (same fallback the deposit consumer uses).
-    const byDepositAccount = new Map<string, InvoicePaymentEntity[]>();
-    for (const payment of nonCashPayments) {
-      const key = payment.depositAccountId ?? payment.accountId;
-      const group = byDepositAccount.get(key);
-      if (group) {
-        group.push(payment);
-      } else {
-        byDepositAccount.set(key, [payment]);
-      }
-    }
-
-    for (const [depositAccountId, group] of byDepositAccount) {
-      legs.push({
-        invoicePaymentIds: group.map((p) => p.id),
-        fundKind: 'DEPOSIT',
-        depositAccountId,
-        amount: sumAmount(group),
-        contraAccountId,
-      });
-    }
-
-    return legs;
-  }
-}
-
-/** Numeric columns come back as strings — sum them as numbers. */
-function sumAmount(payments: InvoicePaymentEntity[]): number {
-  return payments.reduce((total, payment) => total + Number(payment.amount), 0);
 }

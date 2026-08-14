@@ -29,6 +29,12 @@ export enum CashReceiptReferenceType {
   FUND_SWAP = 'FUND_SWAP',
   /** Destination leg of an inter-branch cash transfer; reference_id = cash_transfer.id. */
   TRANSFER = 'TRANSFER',
+  /**
+   * Cash collected back when a posted return/exchange is cancelled;
+   * reference_id = the voided return invoice id. Distinct from INVOICE, which
+   * the POS_SALE receipt already keys on for the same id space.
+   */
+  RETURN_CANCEL = 'RETURN_CANCEL',
 }
 
 export enum CashPaymentPurpose {

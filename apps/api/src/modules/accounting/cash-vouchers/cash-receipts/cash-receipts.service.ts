@@ -712,9 +712,15 @@ export class CashReceiptsService {
       [CashReceiptReferenceType.INVOICE]: 'POS_SALE',
       [CashReceiptReferenceType.INVOICE_DEBT]: 'DEBT_COLLECTION',
       [CashReceiptReferenceType.RECEIVABLE]: 'RECEIVABLE',
+      [CashReceiptReferenceType.RETURN_CANCEL]: 'RETURN_CANCEL',
     };
     let sourceDocumentNumber: string | null = null;
-    if (rt === CashReceiptReferenceType.INVOICE) {
+    // Both reference an `invoices` row — the sale that took the money in, or the
+    // return whose cancellation is bringing it back.
+    if (
+      rt === CashReceiptReferenceType.INVOICE ||
+      rt === CashReceiptReferenceType.RETURN_CANCEL
+    ) {
       const rows = await this.dataSource.query(
         `SELECT "code" FROM "invoices" WHERE "id" = $1 AND "organization_id" = $2 LIMIT 1`,
         [receipt.referenceId, organizationId],

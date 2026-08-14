@@ -15,10 +15,12 @@ import { InvoicePaymentEntity } from '../entities/invoice-payment.entity';
 import { InvoiceDebtEntity, DebtStatus } from '../entities/invoice-debt.entity';
 import { WebSocketEmitterService } from '../../websocket/websocket-emitter.service';
 import { PromotionApplyService } from '../../promotion/promotion-apply.service';
-import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
-import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
 import { LoyaltyPointsReversePublisher } from '../../customer/publishers/loyalty-points-reverse.publisher';
-import { InvoiceCancelledPublisher } from '../publishers/invoice-cancelled.publisher';
+import {
+  InvoiceCancelledPublisher,
+  InvoiceCancelledRefundLeg,
+} from '../publishers/invoice-cancelled.publisher';
+import { InvoiceRefundLegsService } from './invoice-refund-legs.service';
 
 const actor = {
   userId: 'user-1',
@@ -60,18 +62,17 @@ const itemStub = (overrides: Partial<InvoiceItemEntity> = {}): InvoiceItemEntity
     ...overrides,
   }) as InvoiceItemEntity;
 
-const paymentStub = (
-  overrides: Partial<InvoicePaymentEntity> = {},
-): InvoicePaymentEntity =>
-  ({
-    id: 'pay-1',
-    invoiceId: 'inv-1',
-    organizationId: 'org-1',
-    paymentMethod: InvoicePaymentMethod.CASH,
-    amount: 200,
-    accountId: 'coa-1111',
-    ...overrides,
-  }) as InvoicePaymentEntity;
+/** Leg composition itself lives in InvoiceRefundLegsService and is tested there. */
+const cashLegStub = (
+  overrides: Partial<InvoiceCancelledRefundLeg> = {},
+): InvoiceCancelledRefundLeg => ({
+  invoicePaymentIds: ['pay-1'],
+  fundKind: 'CASH',
+  cashAccountId: 'cash-fund-1',
+  amount: 200,
+  contraAccountId: 'coa-revenue',
+  ...overrides,
+});
 
 /** The refunds[] carried by the single published INVOICE_CANCELLED event. */
 const publishedRefunds = (publisher: { publish: jest.Mock }) =>
@@ -81,13 +82,11 @@ describe('CancelInvoiceService', () => {
   let service: CancelInvoiceService;
   let invoiceRepo: { findOne: jest.Mock; count: jest.Mock };
   let itemRepo: { find: jest.Mock };
-  let paymentRepo: { find: jest.Mock };
+  let refundLegs: { build: jest.Mock };
   let dataSource: { transaction: jest.Mock };
   let promotionApplyService: { revertPromotions: jest.Mock };
   let invoiceCancelledPublisher: { publish: jest.Mock };
   let wsEmitter: { emitToBranch: jest.Mock };
-  let accountResolver: { resolveDefaultAccount: jest.Mock };
-  let cashFundResolver: { resolveBranchCashFund: jest.Mock };
   let loyaltyPointsReversePublisher: { publish: jest.Mock };
   let mockManager: Record<string, jest.Mock>;
 
@@ -102,13 +101,7 @@ describe('CancelInvoiceService', () => {
       count: jest.fn().mockResolvedValue(0),
     };
     itemRepo = { find: jest.fn().mockResolvedValue([itemStub()]) };
-    paymentRepo = { find: jest.fn().mockResolvedValue([paymentStub()]) };
-    accountResolver = {
-      resolveDefaultAccount: jest.fn().mockResolvedValue('coa-revenue'),
-    };
-    cashFundResolver = {
-      resolveBranchCashFund: jest.fn().mockResolvedValue('cash-fund-1'),
-    };
+    refundLegs = { build: jest.fn().mockResolvedValue([cashLegStub()]) };
     dataSource = {
       transaction: jest.fn().mockImplementation((cb) => cb(mockManager)),
     };
@@ -122,13 +115,11 @@ describe('CancelInvoiceService', () => {
         CancelInvoiceService,
         { provide: getRepositoryToken(InvoiceEntity), useValue: invoiceRepo },
         { provide: getRepositoryToken(InvoiceItemEntity), useValue: itemRepo },
-        { provide: getRepositoryToken(InvoicePaymentEntity), useValue: paymentRepo },
         { provide: DataSource, useValue: dataSource },
         { provide: PromotionApplyService, useValue: promotionApplyService },
         { provide: InvoiceCancelledPublisher, useValue: invoiceCancelledPublisher },
         { provide: WebSocketEmitterService, useValue: wsEmitter },
-        { provide: AccountResolverService, useValue: accountResolver },
-        { provide: CashFundResolverService, useValue: cashFundResolver },
+        { provide: InvoiceRefundLegsService, useValue: refundLegs },
         {
           provide: LoyaltyPointsReversePublisher,
           useValue: loyaltyPointsReversePublisher,
@@ -249,7 +240,7 @@ describe('CancelInvoiceService', () => {
 
       await expect(
         service.cancel('inv-1', { reason: 'mistake' }, actor),
-      ).rejects.toThrow(/already has a return\/exchange/);
+      ).rejects.toThrow(/đã có phiếu đổi trả/);
       expect(invoiceCancelledPublisher.publish).not.toHaveBeenCalled();
       expect(dataSource.transaction).not.toHaveBeenCalled();
     });
@@ -283,74 +274,9 @@ describe('CancelInvoiceService', () => {
   });
 
   describe('refund legs (T-01-01)', () => {
-    it('builds one CASH leg for a fully paid cash invoice', async () => {
-      paymentRepo.find.mockResolvedValue([paymentStub({ amount: 1_000_000 })]);
-
-      await service.cancel('inv-1', { reason: 'mistake' }, actor);
-
-      expect(publishedRefunds(invoiceCancelledPublisher)).toEqual([
-        {
-          invoicePaymentIds: ['pay-1'],
-          fundKind: 'CASH',
-          cashAccountId: 'cash-fund-1',
-          amount: 1_000_000,
-          contraAccountId: 'coa-revenue',
-        },
-      ]);
-    });
-
-    it('refunds only what was collected on a partial_debt invoice, not amountDue', async () => {
-      invoiceRepo.findOne.mockResolvedValue(
-        invoiceStub({
-          status: InvoiceStatus.PARTIAL_DEBT,
-          amountDue: 1_000_000,
-          totalPaid: 600_000,
-        }),
-      );
-      paymentRepo.find.mockResolvedValue([paymentStub({ amount: 600_000 })]);
-
-      await service.cancel('inv-1', { reason: 'mistake' }, actor);
-
-      const refunds = publishedRefunds(invoiceCancelledPublisher);
-      expect(refunds).toHaveLength(1);
-      expect(refunds[0].amount).toBe(600_000);
-    });
-
-    it('publishes an empty refunds[] when nothing was ever collected', async () => {
-      invoiceRepo.findOne.mockResolvedValue(
-        invoiceStub({ status: InvoiceStatus.DEBT, totalPaid: 0 }),
-      );
-      paymentRepo.find.mockResolvedValue([]);
-
-      const result = await service.cancel('inv-1', { reason: 'mistake' }, actor);
-
-      expect(publishedRefunds(invoiceCancelledPublisher)).toEqual([]);
-      expect(result.status).toBe(InvoiceStatus.CANCELLED);
-      expect(cashFundResolver.resolveBranchCashFund).not.toHaveBeenCalled();
-    });
-
-    it('splits a mixed-tender invoice into one CASH leg and one DEPOSIT leg', async () => {
-      paymentRepo.find.mockResolvedValue([
-        paymentStub({ id: 'pay-cash', amount: 1_000_000 }),
-        paymentStub({
-          id: 'pay-bank',
-          paymentMethod: InvoicePaymentMethod.BANK_TRANSFER,
-          amount: 2_000_000,
-          accountId: 'coa-1121',
-          depositAccountId: 'deposit-1',
-        }),
-      ]);
-
-      await service.cancel('inv-1', { reason: 'mistake' }, actor);
-
-      expect(publishedRefunds(invoiceCancelledPublisher)).toEqual([
-        {
-          invoicePaymentIds: ['pay-cash'],
-          fundKind: 'CASH',
-          cashAccountId: 'cash-fund-1',
-          amount: 1_000_000,
-          contraAccountId: 'coa-revenue',
-        },
+    it('publishes the legs the builder produced', async () => {
+      refundLegs.build.mockResolvedValue([
+        cashLegStub({ amount: 1_000_000 }),
         {
           invoicePaymentIds: ['pay-bank'],
           fundKind: 'DEPOSIT',
@@ -359,57 +285,30 @@ describe('CancelInvoiceService', () => {
           contraAccountId: 'coa-revenue',
         },
       ]);
-    });
-
-    it('folds several cash lines into a single CASH leg', async () => {
-      paymentRepo.find.mockResolvedValue([
-        paymentStub({ id: 'pay-1', amount: 300_000 }),
-        paymentStub({ id: 'pay-2', amount: 200_000 }),
-      ]);
 
       await service.cancel('inv-1', { reason: 'mistake' }, actor);
 
-      const refunds = publishedRefunds(invoiceCancelledPublisher);
-      expect(refunds).toHaveLength(1);
-      expect(refunds[0].amount).toBe(500_000);
-      expect(refunds[0].invoicePaymentIds).toEqual(['pay-1', 'pay-2']);
-    });
-
-    it('falls back to the line COA when no deposit fund was named', async () => {
-      paymentRepo.find.mockResolvedValue([
-        paymentStub({
-          id: 'pay-card',
-          paymentMethod: InvoicePaymentMethod.CARD,
-          amount: 500_000,
-          accountId: 'coa-1121',
-          depositAccountId: undefined,
-        }),
-      ]);
-
-      await service.cancel('inv-1', { reason: 'mistake' }, actor);
-
-      const refunds = publishedRefunds(invoiceCancelledPublisher);
-      expect(refunds[0].depositAccountId).toBe('coa-1121');
-    });
-
-    it('takes cashAccountId from the fund resolver, never from the payment COA', async () => {
-      paymentRepo.find.mockResolvedValue([
-        paymentStub({ accountId: 'coa-1111', amount: 100_000 }),
-      ]);
-
-      await service.cancel('inv-1', { reason: 'mistake' }, actor);
-
-      expect(cashFundResolver.resolveBranchCashFund).toHaveBeenCalledWith(
-        'org-1',
-        'branch-1',
+      expect(refundLegs.build).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'inv-1' }),
+        actor,
       );
-      expect(publishedRefunds(invoiceCancelledPublisher)[0].cashAccountId).toBe(
-        'cash-fund-1',
+      expect(publishedRefunds(invoiceCancelledPublisher)).toHaveLength(2);
+    });
+
+    it('publishes an empty refunds[] when nothing was ever collected', async () => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({ status: InvoiceStatus.DEBT, totalPaid: 0 }),
       );
+      refundLegs.build.mockResolvedValue([]);
+
+      const result = await service.cancel('inv-1', { reason: 'mistake' }, actor);
+
+      expect(publishedRefunds(invoiceCancelledPublisher)).toEqual([]);
+      expect(result.status).toBe(InvoiceStatus.CANCELLED);
     });
 
     it('does not cancel the invoice when the branch has no cash fund', async () => {
-      cashFundResolver.resolveBranchCashFund.mockRejectedValue(
+      refundLegs.build.mockRejectedValue(
         new BadRequestException('No cash fund configured for branch branch-1'),
       );
 

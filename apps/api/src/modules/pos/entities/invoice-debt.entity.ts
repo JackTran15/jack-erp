@@ -48,8 +48,10 @@ export class InvoiceDebtEntity extends BaseEntity {
   @Column({ name: 'credit_days', type: 'int', nullable: true, comment: 'Credit term in days entered at checkout (per invoice); null = open-ended' })
   creditDays?: number;
 
+  // Nullable in TS as well as in the DB: a debt that reopens (an OFFSET return
+  // being cancelled) has to clear this, and `save()` skips undefined.
   @Column({ name: 'settled_at', type: 'timestamptz', nullable: true, comment: 'Timestamp when the debt was fully settled; null while open' })
-  settledAt?: Date;
+  settledAt?: Date | null;
 
   @Column({ type: 'enum', enum: DebtStatus, default: DebtStatus.OPEN, comment: 'Current collection status of the debt' })
   status: DebtStatus;

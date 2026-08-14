@@ -26,6 +26,11 @@ export enum BankReceiptReferenceType {
   REVERSAL = 'REVERSAL',
   /** Counterpart leg of a fund swap (FR-08); reference_id = the swap id. */
   FUND_SWAP = 'FUND_SWAP',
+  /**
+   * Deposit collected back when a posted return/exchange is cancelled;
+   * reference_id = the voided return invoice id.
+   */
+  RETURN_CANCEL = 'RETURN_CANCEL',
 }
 
 export enum BankPaymentPurpose {

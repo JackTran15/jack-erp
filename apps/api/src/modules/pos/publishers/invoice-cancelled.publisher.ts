@@ -9,6 +9,39 @@ export interface InvoiceCancelledItem {
   itemId: string;
   locationId: string;
   quantity: number;
+  /**
+   * Which way the line moved when the document was posted. OUT = handed to the
+   * customer (every SALE line, plus the "mua thêm" lines of an exchange), so it
+   * comes back into stock on a cancel; IN = the customer handed it back (only on
+   * a return/exchange), so it goes back out to them.
+   *
+   * Absent on events published before returns became cancellable — read as OUT,
+   * which is what every event back then carried.
+   */
+  direction?: 'IN' | 'OUT';
+}
+
+/**
+ * One leg of money to take BACK from the customer, the mirror of
+ * {@link InvoiceCancelledRefundLeg}: cancelling a refund has to collect what was
+ * paid out, the same way cancelling a sale has to pay back what was collected.
+ *
+ * A cancelled SALE never carries one; a cancelled return/exchange that refunded
+ * in cash or to a bank fund always does.
+ */
+export interface InvoiceCancelledCollectionLeg {
+  fundKind: 'CASH' | 'DEPOSIT';
+  /**
+   * `cash_accounts.id` of the branch fund. CASH legs only — a DEPOSIT leg names
+   * no fund because the invoice never recorded which one the refund left from;
+   * the consumer reads it off the refund voucher it is offsetting, which is the
+   * only place that fact is stored.
+   */
+  cashAccountId?: string;
+  /** Amount actually refunded to the customer, never the document total. */
+  amount: number;
+  /** Revenue COA, the contra side of the movement. */
+  contraAccountId: string;
 }
 
 /**
@@ -51,6 +84,12 @@ export interface InvoiceCancelledPayload {
    * it as `refunds ?? []`.
    */
   refunds?: InvoiceCancelledRefundLeg[];
+  /**
+   * Money to take back off the customer. Empty for a cancelled sale, and absent
+   * on events published before returns became cancellable — read as
+   * `collections ?? []`.
+   */
+  collections?: InvoiceCancelledCollectionLeg[];
 }
 
 export interface InvoiceCancelledInput {
@@ -60,6 +99,7 @@ export interface InvoiceCancelledInput {
   branchId?: string;
   items: InvoiceCancelledItem[];
   refunds: InvoiceCancelledRefundLeg[];
+  collections?: InvoiceCancelledCollectionLeg[];
 }
 
 @Injectable()
@@ -87,6 +127,7 @@ export class InvoiceCancelledPublisher {
           organizationId: actor.organizationId,
           actorId: actor.userId,
           refunds: input.refunds,
+          collections: input.collections ?? [],
         } satisfies InvoiceCancelledPayload,
       },
       input.invoiceId,
@@ -94,7 +135,8 @@ export class InvoiceCancelledPublisher {
 
     this.logger.log(
       `Published invoice cancelled event for ${input.invoiceId} ` +
-        `(${input.items.length} items, ${input.refunds.length} refund leg(s))`,
+        `(${input.items.length} items, ${input.refunds.length} refund leg(s), ` +
+        `${(input.collections ?? []).length} collection leg(s))`,
     );
   }
 }

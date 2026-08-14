@@ -240,8 +240,19 @@ export class UsersService {
     };
   }
 
-  async getMe(actor: ActorContext): Promise<UserDetail & { roles: { id: string; name: string }[] }> {
-    const [detail, roles] = await Promise.all([
+  /**
+   * `permissions` lets a client gate UI on a permission key instead of matching
+   * role display names — role names are org-editable free text, permission keys
+   * are not. Resolved through the same cached path the guards use, so it always
+   * agrees with what the server will actually allow.
+   */
+  async getMe(actor: ActorContext): Promise<
+    UserDetail & {
+      roles: { id: string; name: string }[];
+      permissions: string[];
+    }
+  > {
+    const [detail, roles, permissions] = await Promise.all([
       this.findById(actor.userId, actor),
       this.roleRepo
         .createQueryBuilder('role')
@@ -251,8 +262,9 @@ export class UsersService {
         })
         .select(['role.id', 'role.name'])
         .getMany(),
+      this.rbacService.getUserPermissions(actor.userId, actor.organizationId),
     ]);
-    return { ...detail, roles };
+    return { ...detail, roles, permissions };
   }
 
   async create(dto: CreateUserDto, actor: ActorContext): Promise<UserDetail> {
