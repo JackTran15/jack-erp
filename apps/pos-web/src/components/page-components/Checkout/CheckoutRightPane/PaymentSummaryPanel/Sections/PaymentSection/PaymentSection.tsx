@@ -13,6 +13,10 @@ import { PosSummaryRow } from "@erp/pos/components/common/PosSummaryRow/PosSumma
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 import { usePaymentAccountsQuery } from "@erp/pos/hooks/react-query/use-query-account";
 import { API_METHOD_TO_PAYMENT_METHOD } from "@erp/pos/constants/checkout.constant";
+import {
+  selectIsQuickReturnFlow,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
 
 interface PaymentSectionProps {
   paymentAmountRef: RefObject<HTMLInputElement | null>;
@@ -44,6 +48,9 @@ export function PaymentSection({
   } = useCheckoutPayment();
   const paymentAccountsQuery = usePaymentAccountsQuery();
   const accounts = paymentAccountsQuery.accounts;
+  // Đổi trả nhanh: không có hoá đơn gốc nên không có công nợ nào để cấn, và phần
+  // chênh phải thu đủ — ẩn cả hai ô ghi nợ (ADR-03).
+  const isQuickReturnFlow = usePosCheckoutSessionStore(selectIsQuickReturnFlow);
 
   // Dòng thanh toán đầu (khi chỉ có 1 dòng) bám theo "số tiền cần thanh toán" KHI
   // không ghi nợ: mỗi khi tổng đổi, ghi đè lại số tiền. Khi "Tính vào công nợ",
@@ -177,7 +184,11 @@ export function PaymentSection({
       <div className="border-t border-gray-200 px-4">
         {showKeepChange ? <KeepChangeRow /> : null}
         {showForgiveShortage ? <ForgiveShortageRow /> : null}
-        {isRefundFlow ? <RefundToDebtRow /> : <DebtCheckRow />}
+        {isQuickReturnFlow ? null : isRefundFlow ? (
+          <RefundToDebtRow />
+        ) : (
+          <DebtCheckRow />
+        )}
       </div>
       <div className="border-t border-b border-gray-200 px-4">
         <PosTextarea

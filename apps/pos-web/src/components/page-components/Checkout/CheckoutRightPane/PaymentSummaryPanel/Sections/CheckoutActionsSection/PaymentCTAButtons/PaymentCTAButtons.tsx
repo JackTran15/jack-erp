@@ -82,6 +82,9 @@ export function PaymentCTAButtons() {
         type="button"
         onClick={handleCollect}
         disabled={collectDisabled || busy}
+        // Nhãn cố định để phân biệt với "In QR thanh toán" ngay phía trên — nút
+        // này chỉ có text con nên mọi selector theo chữ đều dính cả hai.
+        aria-label={isReturnExchange ? "Thanh toán" : "Thu tiền"}
         className="inline-flex flex-[1.6] items-center justify-center gap-1.5 rounded-lg bg-[#22C55E] text-[15px] font-semibold text-white transition-colors hover:bg-[#16A34A] disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
       >
         {isReturnExchange ? "Thanh toán" : "Thu tiền"}

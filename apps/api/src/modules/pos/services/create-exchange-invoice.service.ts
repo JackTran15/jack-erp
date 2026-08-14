@@ -22,6 +22,7 @@ import { CreateExchangeInvoiceDto } from '../dto/create-exchange-invoice.dto';
 import { CreateInvoiceItemDto } from '../dto/create-invoice.dto';
 import { ReturnInvoiceLineDto } from '../dto/create-return-invoice.dto';
 import { ReturnEligibilityService } from './return-eligibility.service';
+import { ItemCostSnapshotService } from '../../inventory/location/item-cost-snapshot.service';
 
 @Injectable()
 export class CreateExchangeInvoiceService {
@@ -32,6 +33,7 @@ export class CreateExchangeInvoiceService {
     private readonly invoiceRepo: Repository<InvoiceEntity>,
     private readonly dataSource: DataSource,
     private readonly eligibility: ReturnEligibilityService,
+    private readonly itemCostSnapshot: ItemCostSnapshotService,
   ) {}
 
   async create(
@@ -45,26 +47,48 @@ export class CreateExchangeInvoiceService {
       throw new BadRequestException('EXCHANGE requires at least one newLine');
     }
 
-    // Validate return lines against the original SALE invoice, capturing each
-    // original line's costPrice snapshot so the returned (IN) leg reverses
-    // the SAME cost that was booked at sale time (see buildNewLineEntities
-    // for the new/OUT leg, which correctly uses the CURRENT purchase price).
+    // costPrice per return line — REGULAR mode (an originalInvoiceId is given)
+    // reuses the ORIGINAL sale's cost snapshot so the returned (IN) leg reverses
+    // the SAME cost that was booked at sale time. QUICK mode has no original
+    // document to reference, so it falls back to the item's current purchase
+    // price — the same fallback CreateReturnInvoiceService and
+    // StockReturnInConsumer already use. (buildNewLineEntities handles the
+    // new/OUT leg, which correctly uses the CURRENT purchase price either way.)
+    const isQuick = !dto.originalInvoiceId;
     const costPriceByOriginalItemId = new Map<string, number>();
-    for (const line of dto.returnLines) {
-      if (!line.originalInvoiceItemId) {
+    let costPriceByItemId = new Map<string, number>();
+
+    if (isQuick) {
+      // Free-form return lines, no eligibility check. A line pointing at an
+      // original sale line without an original invoice is self-contradictory —
+      // reject rather than guess which half the caller meant.
+      const strayLine = dto.returnLines.find((l) => l.originalInvoiceItemId);
+      if (strayLine) {
         throw new BadRequestException(
-          'originalInvoiceItemId required on every returnLine',
+          'originalInvoiceItemId is not allowed on a returnLine when originalInvoiceId is omitted',
         );
       }
-      const originalItem = await this.eligibility.assertLineEligible(
-        line.originalInvoiceItemId,
-        line.quantity,
-        actor,
+      costPriceByItemId = await this.itemCostSnapshot.snapshotCosts(
+        actor.organizationId,
+        [...new Set(dto.returnLines.map((l) => l.itemId))],
       );
-      costPriceByOriginalItemId.set(
-        line.originalInvoiceItemId,
-        Number(originalItem.costPrice ?? 0),
-      );
+    } else {
+      for (const line of dto.returnLines) {
+        if (!line.originalInvoiceItemId) {
+          throw new BadRequestException(
+            'originalInvoiceItemId required on every returnLine',
+          );
+        }
+        const originalItem = await this.eligibility.assertLineEligible(
+          line.originalInvoiceItemId,
+          line.quantity,
+          actor,
+        );
+        costPriceByOriginalItemId.set(
+          line.originalInvoiceItemId,
+          Number(originalItem.costPrice ?? 0),
+        );
+      }
     }
 
     const returnSubtotal = dto.returnLines.reduce(
@@ -87,7 +111,7 @@ export class CreateExchangeInvoiceService {
         sessionId: dto.sessionId,
         customerId: dto.customerId,
         type: InvoiceType.EXCHANGE,
-        originalInvoiceId: dto.originalInvoiceId,
+        originalInvoiceId: dto.originalInvoiceId ?? undefined,
         isDraft: true,
         status: InvoiceStatus.DRAFT,
         staffId: actor.userId,
@@ -127,7 +151,9 @@ export class CreateExchangeInvoiceService {
           quantity: line.quantity,
           unitPrice: line.unitPrice,
           unitPriceDefault: line.unitPrice,
-          costPrice: costPriceByOriginalItemId.get(line.originalInvoiceItemId!) ?? 0,
+          costPrice: line.originalInvoiceItemId
+            ? costPriceByOriginalItemId.get(line.originalInvoiceItemId) ?? 0
+            : costPriceByItemId.get(line.itemId) ?? 0,
           lineDiscount: line.lineDiscount ?? 0,
           lineTotal: line.quantity * line.unitPrice - (line.lineDiscount ?? 0),
           direction: ItemDirection.IN,
@@ -153,7 +179,8 @@ export class CreateExchangeInvoiceService {
     });
 
     this.logger.log(
-      `Created draft EXCHANGE invoice ${invoice.id} returnSubtotal=${returnSubtotal} newSubtotal=${newSubtotal} net=${netAmount}`,
+      `Created draft EXCHANGE invoice ${invoice.id} mode=${isQuick ? 'quick' : 'regular'} ` +
+        `returnSubtotal=${returnSubtotal} newSubtotal=${newSubtotal} net=${netAmount}`,
     );
 
     return invoice;

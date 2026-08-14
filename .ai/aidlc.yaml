@@ -44,8 +44,9 @@ verify:
         # if we wait for it: the trailing `wait` is on the POS shell logo, which mounts only
         # after both switch-branch and the store write have committed. Without it the session is
         # captured mid-flight, with branchId still null.
-        # To pin one branch: input[name="pos-branch"][value="${LOCAL_POS_BRANCH_ID}"]
-        post_login: 'wait input[name="pos-branch"]; click input[name="pos-branch"]; click button[type="submit"]; wait [aria-label="Sapo POS"]'
+        # Ghim chi nhánh theo `${LOCAL_POS_BRANCH_ID}` thay vì lấy radio đầu tiên, để mỗi
+        # máy tự chọn chi nhánh có dữ liệu qua credentials.env của mình.
+        post_login: 'wait input[name="pos-branch"]; click input[name="pos-branch"][value="${LOCAL_POS_BRANCH_ID}"]; click button[type="submit"]; wait [aria-label="Sapo POS"]'
   # Desktop only. Neither app has a mobile layout: no matchMedia/useMediaQuery anywhere, and
   # BackofficeLayout is a fixed ml-60 desktop shell.
   viewports:

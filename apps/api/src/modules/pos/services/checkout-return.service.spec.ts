@@ -214,6 +214,10 @@ describe('CheckoutReturnService — debt offset routing', () => {
   let debtRepo: { findOne: jest.Mock };
   let invoiceDebtService: { createFromInvoice: jest.Mock };
   let debtRow: Partial<InvoiceDebtEntity>;
+  // Own mocks (not the shared `noop`) so a test can tell the two stock legs
+  // apart — an EXCHANGE must fire both, a plain RETURN only the return-in one.
+  let stockReturnInPublisher: { publish: jest.Mock };
+  let stockDeductionPublisher: { publish: jest.Mock };
 
   beforeEach(async () => {
     debtRow = {
@@ -280,6 +284,9 @@ describe('CheckoutReturnService — debt offset routing', () => {
       createFromInvoice: jest.fn().mockResolvedValue({ id: 'debt-new' }),
     };
 
+    stockReturnInPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
+    stockDeductionPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
+
     const noop = { publish: jest.fn().mockResolvedValue(undefined) };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -296,8 +303,8 @@ describe('CheckoutReturnService — debt offset routing', () => {
         { provide: CashFundResolverService, useValue: cashFundResolver },
         { provide: InvoiceDebtService, useValue: invoiceDebtService },
         { provide: ReturnPostedPublisher, useValue: noop },
-        { provide: StockReturnInPublisher, useValue: noop },
-        { provide: StockDeductionPublisher, useValue: noop },
+        { provide: StockReturnInPublisher, useValue: stockReturnInPublisher },
+        { provide: StockDeductionPublisher, useValue: stockDeductionPublisher },
         { provide: CashRefundPublisher, useValue: cashRefundPublisher },
         { provide: DepositRefundPublisher, useValue: depositRefundPublisher },
         { provide: CashFromPaymentPublisher, useValue: noop },
@@ -629,6 +636,155 @@ describe('CheckoutReturnService — debt offset routing', () => {
           actor,
         ),
       ).rejects.toThrow(/payments không được cung cấp khi netAmount = 0/);
+    });
+  });
+
+  /**
+   * "Đổi trả nhanh": an EXCHANGE with no `originalInvoiceId` and no
+   * `originalInvoiceItemId` on any IN line. `CheckoutReturnService` is not
+   * modified for this — these tests lock in that it was already correct, so a
+   * later refactor of the 900-line service cannot break the quick flow silently.
+   */
+  describe('EXCHANGE without an original invoice (đổi trả nhanh)', () => {
+    /** Return a 500k line, buy a 300k line → net = −200k, refunded = 200k. */
+    const quickRefundItems = (): InvoiceItemEntity[] => [
+      { ...exchangeItems()[0], unitPrice: 500000, lineTotal: 500000 } as InvoiceItemEntity,
+      { ...exchangeItems()[1], unitPrice: 300000, lineTotal: 300000 } as InvoiceItemEntity,
+    ];
+
+    const quickDraft = (overrides: Partial<InvoiceEntity> = {}) =>
+      exchangeDraftStub({ originalInvoiceId: undefined, ...overrides });
+
+    beforeEach(() => {
+      invoiceRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(where.id === 'exc-1' ? quickDraft() : null),
+      );
+      itemRepo.find.mockResolvedValue(quickRefundItems());
+      accountResolver.resolvePaymentAccount.mockResolvedValue({
+        accountId: 'pay-acct-1',
+        depositAccountId: undefined,
+      });
+    });
+
+    it('never looks up the original invoice — there is none', async () => {
+      await service.checkout('exc-1', cashDto(), actor);
+
+      expect(invoiceRepo.findOne).toHaveBeenCalledTimes(1);
+      expect(invoiceRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ id: 'exc-1' }) }),
+      );
+    });
+
+    it('never touches returned_quantity — no original sale line to charge it against', async () => {
+      await service.checkout('exc-1', cashDto(), actor);
+
+      const updatedReturnedQty = mockManager.query.mock.calls.some(
+        ([sql]: [string]) => /returned_quantity/.test(sql),
+      );
+      expect(updatedReturnedQty).toBe(false);
+    });
+
+    it('net < 0 refunds the difference in cash and fires both stock legs', async () => {
+      const result = await service.checkout('exc-1', cashDto(), actor);
+
+      expect(result.netAmount).toBe(-200000);
+      expect(result.refundedAmount).toBe(200000);
+      expect(result.status).toBe(InvoiceStatus.PAID);
+      expect(cashRefundPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 200000, cashAccountId: CASH_FUND }),
+        actor,
+      );
+      // The returned goods come back in AND the newly bought goods go out.
+      expect(stockReturnInPublisher.publish).toHaveBeenCalled();
+      expect(stockDeductionPublisher.publish).toHaveBeenCalled();
+    });
+
+    it('net > 0 records the top-up as payment, not as the full new-goods value', async () => {
+      itemRepo.find.mockResolvedValue(exchangeItems()); // 750k in / 780k out → +30k
+
+      const result = await service.checkout(
+        'exc-1',
+        exchangeDto([{ paymentMethod: InvoicePaymentMethod.CASH, amount: 30000 }]),
+        actor,
+      );
+
+      expect(result.netAmount).toBe(30000);
+      expect(result.status).toBe(InvoiceStatus.PAID);
+      // The cashier collected 30k, not the 780k the new item is worth — that
+      // gross-in/gross-out behaviour is exactly what merging the two documents
+      // removed.
+      expect(result.totalPaid).toBe(30000);
+      expect(invoiceDebtService.createFromInvoice).not.toHaveBeenCalled();
+    });
+
+    it('net = 0 moves no money at all', async () => {
+      itemRepo.find.mockResolvedValue([
+        { ...exchangeItems()[0], unitPrice: 780000, lineTotal: 780000 } as InvoiceItemEntity,
+        exchangeItems()[1],
+      ]);
+
+      const result = await service.checkout('exc-1', offsetDto(), actor);
+
+      expect(result.netAmount).toBe(0);
+      expect(result.refundedAmount).toBe(0);
+      expect(cashRefundPublisher.publish).not.toHaveBeenCalled();
+      expect(invoiceDebtService.createFromInvoice).not.toHaveBeenCalled();
+      expect(stockReturnInPublisher.publish).toHaveBeenCalled();
+      expect(stockDeductionPublisher.publish).toHaveBeenCalled();
+    });
+
+    it('books the journal entry as an EXCHANGE, same as an invoice-backed one', async () => {
+      await service.checkout('exc-1', cashDto(), actor);
+
+      expect(journalReturnPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'EXCHANGE' }),
+        actor,
+      );
+    });
+
+    it('degrades an OFFSET refund to CASH — there is no original debt to settle', async () => {
+      const result = await service.checkout('exc-1', offsetDto(), actor);
+
+      expect(result.refundMethod).toBe(RefundMethod.CASH);
+      expect(cashRefundPublisher.publish).toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * The counterpart of the block above: when the IN line DOES point at an
+   * original sale line, the atomic quantity guard must still run. This is the
+   * regression the quick flow must not have loosened.
+   */
+  describe('returned_quantity guard on invoice-backed returns', () => {
+    const backedInLine = (): InvoiceItemEntity =>
+      ({ ...inLineStub(), originalInvoiceItemId: 'orig-item-1' }) as InvoiceItemEntity;
+
+    beforeEach(() => {
+      itemRepo.find.mockResolvedValue([backedInLine()]);
+      invoiceRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(
+          where.id === 'ret-1' ? returnDraftStub() : originalStub(InvoiceStatus.PAID),
+        ),
+      );
+    });
+
+    it('increments returned_quantity on the original sale line by the returned qty', async () => {
+      await service.checkout('ret-1', cashDto(), actor);
+
+      const call = mockManager.query.mock.calls.find(([sql]: [string]) =>
+        /returned_quantity/.test(sql),
+      );
+      expect(call).toBeDefined();
+      expect(call![1]).toEqual([2, 'orig-item-1']);
+    });
+
+    it('rejects the checkout when the guarded UPDATE matches no row (over-return)', async () => {
+      // `returned_quantity + qty <= quantity` failed → 0 rows affected.
+      mockManager.query.mockResolvedValue([undefined, 0]);
+
+      await expect(service.checkout('ret-1', cashDto(), actor)).rejects.toThrow(
+        /Vượt số lượng có thể trả/,
+      );
     });
   });
 

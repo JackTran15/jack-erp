@@ -69,14 +69,20 @@ export function buildCreateReturnPayload(
 
 interface BuildCreateExchangePayloadInput {
   sessionId: string;
-  originalInvoiceId: string;
+  /** Bỏ trống ở luồng đổi trả nhanh — BE suy ra chế độ quick từ chỗ thiếu này. */
+  originalInvoiceId?: string;
   customer: CustomerRow | null;
   reason: string;
   returnLines: CartLine[];
   newLines: CartLine[];
 }
 
-/** Body cho `POST /invoices/exchanges` (trả + mua mới, bắt buộc hóa đơn gốc). */
+/**
+ * Body cho `POST /invoices/exchanges` (trả + mua mới). `originalInvoiceId` chỉ
+ * có ở luồng đổi trả theo hóa đơn; luồng nhanh bỏ trống, và vì `undefined` bị
+ * `JSON.stringify` loại khỏi body nên BE nhận đúng "không có field" chứ không
+ * phải `null`.
+ */
 export function buildCreateExchangePayload(
   input: BuildCreateExchangePayloadInput,
 ): CreateExchangeInvoiceBody {

@@ -2,6 +2,7 @@ import { INVOICE_PAYMENT_METHOD_LABEL } from "@erp/pos/constants/checkout.consta
 import type { InvoicePayload } from "@erp/pos/dtos/invoice-printing.dto";
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
 import type { InvoiceStoreInfo } from "@erp/pos/interfaces/invoice-printing.interface";
+import { getInvoiceSignedTotal } from "@erp/pos/lib/common/invoiceAmount";
 
 /**
  * Dựng payload in từ một hoá đơn **đã lưu** (`GET /invoices/:id`).
@@ -12,6 +13,11 @@ import type { InvoiceStoreInfo } from "@erp/pos/interfaces/invoice-printing.inte
  *
  * Cột `numeric` của Postgres về FE ở dạng string, nên mọi số đều phải qua
  * `Number()` trước khi cộng.
+ *
+ * Dấu của hàng trả nằm ở `item.direction`, KHÔNG ở con số: DB lưu `quantity` và
+ * `lineTotal` luôn dương. Mọi phép chia dòng dưới đây phải đi qua `isReturnLine`,
+ * và các con số phải khớp từng đồng với `checkoutReceiptFactory` (đường in lúc
+ * thanh toán) — hai đường in cùng một hoá đơn thì phải ra cùng một tờ.
  */
 export function buildInvoiceRowPrintPayload(
   invoice: InvoiceRow,
@@ -24,17 +30,33 @@ export function buildInvoiceRowPrintPayload(
   const items = invoice.items ?? [];
   const isReturnExchange = invoice.type === "RETURN" || invoice.type === "EXCHANGE";
 
-  const totalQty = items.reduce(
-    (sum, item) => sum + Math.abs(Number(item.quantity) || 0),
+  const isReturnLine = (item: (typeof items)[number]): boolean =>
+    item.direction === "IN";
+  const purchaseOnly = items.filter((item) => !isReturnLine(item));
+  const returnOnly = items.filter(isReturnLine);
+
+  const qtyOf = (item: (typeof items)[number]) =>
+    Math.abs(Number(item.quantity) || 0);
+  const grossOf = (item: (typeof items)[number]) =>
+    (Number(item.unitPrice) || 0) * qtyOf(item);
+  const discountOf = (item: (typeof items)[number]) =>
+    Number(item.lineDiscount) || 0;
+
+  // `checkoutReceiptFactory` cộng cả hàng trả (theo trị tuyệt đối) vào "Tổng SL
+  // mua". Giữ nguyên cách đó để hai đường in khớp nhau; sửa nhãn/ngữ nghĩa là
+  // việc riêng, và phải sửa ở cả hai chỗ cùng lúc.
+  const totalQty = items.reduce((sum, item) => sum + qtyOf(item), 0);
+  // "Tiền hàng" và "Khuyến mãi" chỉ tính hàng mua — khối hàng trả tách riêng
+  // bên dưới, nên purchaseNet − returnNet === grandTotal.
+  const subtotal = purchaseOnly.reduce((sum, item) => sum + grossOf(item), 0);
+  const itemDiscountTotal = purchaseOnly.reduce(
+    (sum, item) => sum + discountOf(item),
     0,
   );
-  const subtotal = items.reduce(
-    (sum, item) =>
-      sum + (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0),
-    0,
-  );
-  const itemDiscountTotal = items.reduce(
-    (sum, item) => sum + (Number(item.lineDiscount) || 0),
+  // Khối "Tiền hàng trả lại / KM / Giá trị trả lại" — độ lớn dương.
+  const returnGross = returnOnly.reduce((sum, item) => sum + grossOf(item), 0);
+  const returnDiscount = returnOnly.reduce(
+    (sum, item) => sum + discountOf(item),
     0,
   );
 
@@ -76,24 +98,38 @@ export function buildInvoiceRowPrintPayload(
         options.cashierName?.trim() || invoice.staffName?.trim() || undefined,
       note: invoice.note?.trim() || undefined,
     },
-    lines: items.map((item, index) => ({
-      index: index + 1,
-      name: item.itemName,
-      qty: Number(item.quantity) || 0,
-      unitPrice: Number(item.unitPrice) || 0,
-      lineTotal: Number(item.lineTotal) || 0,
-      note: item.note?.trim() || undefined,
-    })),
+    lines: items.map((item, index) => {
+      const returned = isReturnLine(item);
+      const lineTotal = Math.abs(Number(item.lineTotal) || 0);
+      return {
+        index: index + 1,
+        name: item.itemName,
+        qty: returned ? -qtyOf(item) : qtyOf(item),
+        unitPrice: Number(item.unitPrice) || 0,
+        lineTotal: returned ? -lineTotal : lineTotal,
+        note: item.note?.trim() || undefined,
+      };
+    }),
     totals: {
       totalQty,
       subtotal,
       itemDiscountTotal: itemDiscountTotal > 0 ? itemDiscountTotal : undefined,
-      grandTotal: Number(invoice.amountDue) || 0,
+      // `amountDue` bị BE clamp về 0 với đơn trả (checkout-return.service.ts),
+      // nên phải đọc qua helper — cùng nguồn mà cột "Tổng thanh toán" của danh
+      // sách hoá đơn đang dùng.
+      grandTotal: getInvoiceSignedTotal(invoice),
       depositAmount: depositAmount > 0 ? depositAmount : undefined,
       paid: Number(invoice.totalPaid) || 0,
       change: 0,
       // Phần chưa thu của hoá đơn công nợ — in để khách biết còn nợ bao nhiêu.
       customerDebtIssued: remainingDebt > 0 ? remainingDebt : undefined,
+      // Khối trả ẩn hoàn toàn khi `returnNet` là undefined — hoá đơn bán không
+      // có dòng IN nào nên đi đúng đường cũ.
+      returnGross: returnOnly.length > 0 ? returnGross : undefined,
+      returnDiscount:
+        returnOnly.length > 0 && returnDiscount > 0 ? returnDiscount : undefined,
+      returnNet:
+        returnOnly.length > 0 ? returnGross - returnDiscount : undefined,
       pointsRedeemed: pointsRedeemed > 0 ? pointsRedeemed : undefined,
       pointsDiscountAmount:
         pointsRedeemed > 0
