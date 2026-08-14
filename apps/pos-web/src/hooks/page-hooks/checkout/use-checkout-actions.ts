@@ -230,20 +230,22 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       try {
         if (!isReturnFlow) {
           // ── SALE ──────────────────────────────────────────────────────────
-          const checkoutResolve = buildCheckoutInvoiceApiPayload({
+          // Dựng thử với số của FE để bắt sớm lỗi thiếu tài khoản nhận tiền —
+          // trước khi tạo draft, tránh để lại hóa đơn nháp mồ côi. Body thật
+          // dựng lại bên dưới khi đã biết `amountDue` do BE tính.
+          const precheck = buildCheckoutInvoiceApiPayload({
             paymentLines: p.paymentLines,
-            // Hạn thanh toán chỉ có nghĩa khi tính vào công nợ.
-            dueDate: p.debt ? p.paymentDueDate : null,
-            creditDays: p.debt ? p.creditDays : null,
+            amountDue: settlementAbs,
           });
-          if (!checkoutResolve.ok) {
-            toast.error(describeResolveError(checkoutResolve.error));
+          if (!precheck.ok) {
+            toast.error(describeResolveError(precheck.error));
             return;
           }
           // Tab mở từ một draft đã lưu → PATCH chính draft đó rồi checkout, để
           // hóa đơn đó rời khỏi danh sách lưu tạm. Tab thường → tạo mới.
           const sourceInvoiceId = session?.sourceInvoiceId;
           let invoiceId: string;
+          let invoiceAmountDue: number;
           if (sourceInvoiceId) {
             const updated = await updateMutation.mutateAsync({
               id: sourceInvoiceId,
@@ -255,6 +257,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
               }),
             });
             invoiceId = updated.id;
+            invoiceAmountDue = Number(updated.amountDue) || 0;
           } else {
             const created = await createMutation.mutateAsync(
               buildCreateInvoicePayload({
@@ -266,15 +269,35 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
               }),
             );
             invoiceId = created.id;
+            invoiceAmountDue = Number(created.amountDue) || 0;
           }
           // Áp đổi điểm trên draft TRƯỚC khi checkout — BE validate (thẻ active /
           // balance / giá trị đơn) tại bước này; lỗi 400 bắt ngay để không vào
           // /checkout với số tiền sai. Điểm thực sự bị trừ khi /checkout commit.
           if (pointsToRedeem > 0) {
-            await redeemPointsMutation.mutateAsync({
+            const redeemed = await redeemPointsMutation.mutateAsync({
               id: invoiceId,
               points: pointsToRedeem,
             });
+            invoiceAmountDue = Number(redeemed.amountDue) || 0;
+          }
+          // Trần phân bổ = min(số UI hiển thị, số BE chốt). Lấy số BE để không
+          // bao giờ vượt guard `∑payments ≤ amountDue`; kẹp thêm bằng số của FE
+          // để không thu quá phần thu ngân nhìn thấy khi hai bên lệch nhau
+          // (đặt cọc hiện chưa được gửi lên draft).
+          const checkoutResolve = buildCheckoutInvoiceApiPayload({
+            paymentLines: p.paymentLines,
+            amountDue: Math.min(settlementAbs, invoiceAmountDue),
+            // "Tính vào công nợ" bật thì ô "khách không lấy tiền thừa" bị bỏ qua
+            // trên UI (derivePaymentDisplay) — payload phải theo đúng như vậy.
+            keepChange: p.keepChange && !p.debt,
+            // Hạn thanh toán chỉ có nghĩa khi tính vào công nợ.
+            dueDate: p.debt ? p.paymentDueDate : null,
+            creditDays: p.debt ? p.creditDays : null,
+          });
+          if (!checkoutResolve.ok) {
+            toast.error(describeResolveError(checkoutResolve.error));
+            return;
           }
           const soldInvoice = await checkoutMutation.mutateAsync({
             id: invoiceId,

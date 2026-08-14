@@ -8,6 +8,7 @@ export enum DomainEventType {
   JOURNAL_POST_SALE_REQUESTED = 'JOURNAL_POST_SALE_REQUESTED',
   LOYALTY_POINTS_AWARD_REQUESTED = 'LOYALTY_POINTS_AWARD_REQUESTED',
   CASH_MOVEMENT_FROM_PAYMENT_REQUESTED = 'CASH_MOVEMENT_FROM_PAYMENT_REQUESTED',
+  CASH_VOUCHER_NEEDED_KEPT_CHANGE = 'CASH_VOUCHER_NEEDED_KEPT_CHANGE',
   DEPOSIT_MOVEMENT_FROM_PAYMENT_REQUESTED = 'DEPOSIT_MOVEMENT_FROM_PAYMENT_REQUESTED',
   CUSTOMER_MERGED = 'CUSTOMER_MERGED',
   SALESMAN_ASSIGNED = 'SALESMAN_ASSIGNED',
@@ -77,6 +78,23 @@ export interface CashMovementFromPaymentPayload {
   sessionId?: string;
   cashAccountId: string;
   contraAccountId: string; // revenue account
+  amount: number;
+  branchId?: string;
+  organizationId: string;
+  actorId: string;
+}
+
+/**
+ * Cash the customer declined to take back ("Khách không lấy tiền thừa"). It is
+ * NOT part of `invoice.totalPaid` — the invoice is settled at `amountDue` and this
+ * surplus is other income, so the consumer books DR cash / CR 711 + a Phiếu thu of
+ * its own. Keyed on the invoice, but under a reference type distinct from the
+ * POS_SALE receipt, which already owns (INVOICE, invoice_id).
+ */
+export interface KeptChangeCashPayload {
+  invoiceId: string;
+  invoiceCode: string;
+  cashAccountId: string;
   amount: number;
   branchId?: string;
   organizationId: string;

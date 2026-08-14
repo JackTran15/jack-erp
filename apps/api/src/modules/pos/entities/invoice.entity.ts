@@ -103,6 +103,9 @@ export class InvoiceEntity extends BaseEntity {
   @Column({ name: 'total_paid', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Total amount collected across all payment lines' })
   totalPaid: number;
 
+  @Column({ name: 'kept_change_amount', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Change the customer declined to take back ("Khách không lấy tiền thừa"). Excluded from totalPaid — booked as other income by its own Phiếu thu; cash tendered = totalPaid + keptChangeAmount' })
+  keptChangeAmount: number;
+
   @Column({ type: 'text', nullable: true, comment: 'Free-text note attached to the invoice' })
   note?: string;
 

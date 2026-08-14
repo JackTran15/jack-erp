@@ -17,6 +17,7 @@ import { TempWarehouseFulfillPublisher } from '../../inventory/publishers/temp-w
 import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points.publisher';
 import { JournalSalePublisher } from '../../accounting/publishers/journal-sale.publisher';
 import { CashFromPaymentPublisher } from '../../accounting/publishers/cash-from-payment.publisher';
+import { KeptChangeCashPublisher } from '../../accounting/publishers/kept-change-cash.publisher';
 import { DepositFromPaymentPublisher } from '../../accounting/deposit/deposit-from-payment.publisher';
 import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
 import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
@@ -108,6 +109,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
   let loyaltyPointsPublisher: { publish: jest.Mock };
   let journalSalePublisher: { publish: jest.Mock };
   let cashFromPaymentPublisher: { publish: jest.Mock };
+  let keptChangeCashPublisher: { publish: jest.Mock };
   let depositFromPaymentPublisher: { publish: jest.Mock };
   let cashFundResolver: { resolveBranchCashFund: jest.Mock };
   let membershipCardService: {
@@ -147,6 +149,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
     loyaltyPointsPublisher   = { publish: jest.fn().mockResolvedValue(true) };
     journalSalePublisher     = { publish: jest.fn().mockResolvedValue(undefined) };
     cashFromPaymentPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
+    keptChangeCashPublisher  = { publish: jest.fn().mockResolvedValue(undefined) };
     depositFromPaymentPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
     cashFundResolver = {
       resolveBranchCashFund: jest.fn().mockResolvedValue(CASH_FUND),
@@ -190,6 +193,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
         { provide: LoyaltyPointsPublisher,                useValue: loyaltyPointsPublisher },
         { provide: JournalSalePublisher,                  useValue: journalSalePublisher },
         { provide: CashFromPaymentPublisher,              useValue: cashFromPaymentPublisher },
+        { provide: KeptChangeCashPublisher,               useValue: keptChangeCashPublisher },
         { provide: DepositFromPaymentPublisher,           useValue: depositFromPaymentPublisher },
         { provide: AccountResolverService,                useValue: accountResolver },
         { provide: CashFundResolverService,               useValue: cashFundResolver },
@@ -255,6 +259,68 @@ describe('CheckoutInvoiceService (event-driven)', () => {
         payments: [{ paymentMethod: 'cash' as any, amount: 100 }],
       });
       await expect(service.checkout('inv-1', dto, actor)).rejects.toThrow(/customer/);
+    });
+
+    it('throws when kept change is sent on a partly-settled invoice', async () => {
+      const dto = cashPaymentDto({
+        payments: [{ paymentMethod: 'cash' as any, amount: 100 }],
+        keptChangeAmount: 50,
+      });
+      await expect(service.checkout('inv-1', dto, actor)).rejects.toThrow(/fully settled/);
+    });
+
+    it('throws when kept change is sent without a cash payment line', async () => {
+      const dto = cashPaymentDto({
+        payments: [{ paymentMethod: 'bank_transfer' as any, amount: 200 }],
+        keptChangeAmount: 50,
+      });
+      await expect(service.checkout('inv-1', dto, actor)).rejects.toThrow(/cash payment line/);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Kept change ("Khách không lấy tiền thừa")
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('kept change', () => {
+    const keptChangeDto = cashPaymentDto({ keptChangeAmount: 60 });
+
+    it('stores it on the invoice without inflating totalPaid', async () => {
+      const result = await service.checkout('inv-1', keptChangeDto, actor);
+      expect(result.totalPaid).toBe(200);
+      expect(result.keptChangeAmount).toBe(60);
+    });
+
+    it('publishes a separate cash event for the surplus', async () => {
+      await service.checkout('inv-1', keptChangeDto, actor);
+      expect(keptChangeCashPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          invoiceId: 'inv-1',
+          invoiceCode: 'INV-2605-00001',
+          cashAccountId: CASH_FUND,
+          amount: 60,
+        }),
+        actor,
+      );
+    });
+
+    it('leaves the sale posting untouched — revenue is still amountDue', async () => {
+      await service.checkout('inv-1', keptChangeDto, actor);
+      expect(journalSalePublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          amountDue: 200,
+          payments: [expect.objectContaining({ amount: 200 })],
+        }),
+        actor,
+      );
+      expect(cashFromPaymentPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 200 }),
+        actor,
+      );
+    });
+
+    it('publishes nothing extra when no change was kept', async () => {
+      await service.checkout('inv-1', cashPaymentDto(), actor);
+      expect(keptChangeCashPublisher.publish).not.toHaveBeenCalled();
     });
   });
 

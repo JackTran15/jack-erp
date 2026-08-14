@@ -35,6 +35,12 @@ export enum CashReceiptReferenceType {
    * the POS_SALE receipt already keys on for the same id space.
    */
   RETURN_CANCEL = 'RETURN_CANCEL',
+  /**
+   * Change the customer declined to take back on a POS sale; reference_id = the
+   * invoice id. Distinct from INVOICE for the same reason as RETURN_CANCEL: the
+   * POS_SALE receipt already keys on (INVOICE, invoice_id).
+   */
+  INVOICE_KEPT_CHANGE = 'INVOICE_KEPT_CHANGE',
 }
 
 export enum CashPaymentPurpose {

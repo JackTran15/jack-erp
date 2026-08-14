@@ -26,6 +26,7 @@ import { PartnerLookupController } from './shared/partner-lookup.controller';
 import { ReceivingAccountController } from './shared/receiving-account.controller';
 import { CashVoucherCategoryResolverService } from './shared/category-resolver.service';
 import { PosCashSaleConsumer } from './cash-voucher-consumers/pos-cash-sale.consumer';
+import { PosKeptChangeConsumer } from './cash-voucher-consumers/pos-kept-change.consumer';
 import { DebtCollectionCashConsumer } from './cash-voucher-consumers/debt-collection-cash.consumer';
 import { GoodsReceiptCashConsumer } from './cash-voucher-consumers/goods-receipt-cash.consumer';
 import { ExpenseCashConsumer } from './cash-voucher-consumers/expense-cash.consumer';
@@ -100,6 +101,7 @@ import { SearchCashLedgerV2Handler } from './cash-ledger/queries/search-cash-led
     DebtCollectionSagaService,
     SupplierDebtPaymentSagaService,
     PosCashSaleConsumer,
+    PosKeptChangeConsumer,
     DebtCollectionCashConsumer,
     GoodsReceiptCashConsumer,
     ExpenseCashConsumer,
