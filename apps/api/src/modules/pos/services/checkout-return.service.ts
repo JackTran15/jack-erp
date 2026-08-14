@@ -56,7 +56,7 @@ import { StockReturnInPublisher } from '../publishers/stock-return-in.publisher'
 import { POINT_EARN_VND_PER_POINT } from '../../customer/loyalty.constants';
 
 interface ComputedTotals {
-  /** Gross value of the returned lines. Loyalty proration is based on this. */
+  /** Gross value of the returned lines. A gate and a display value, not a base. */
   returnSubtotal: number;
   newSubtotal: number;
   /** What the customer actually paid for the returned lines — the money base. */
@@ -495,7 +495,7 @@ export class CheckoutReturnService {
     });
 
     this.logger.log(
-      `Checked out ${invoice.type} invoice ${id} code=${realCode} method=${effectiveRefundMethod} refunded=${totals.refundedAmount} net=${totals.netAmount}`,
+      `Checked out ${invoice.type} invoice ${id} code=${realCode} method=${effectiveRefundMethod} refunded=${totals.refundedAmount} net=${totals.netAmount} pointsReversed=${posted.invoice.pointsReversed}`,
     );
 
     return posted.invoice;
@@ -504,11 +504,10 @@ export class CheckoutReturnService {
   // ─── helpers ─────────────────────────────────────────────────────────────
 
   /**
-   * `returnSubtotal` stays GROSS on purpose — computeReverseBase and
-   * computeRedeemedCreditBack prorate loyalty points against the original's
-   * gross subtotal, and changing that base would silently change how many
-   * points a return gives back. `returnedNet` is a new quantity placed beside
-   * it, not a replacement.
+   * `returnSubtotal` stays GROSS, but only as a gate (`> 0`) and as the value
+   * shown on `invoice.subtotal`. It is NOT a money base and no longer a loyalty
+   * base either: `computeReverseBase` moved onto `returnedNet` so that money and
+   * points on one return document stand on the same footing.
    *
    * `returnedNet` is what the customer actually paid for the returned goods:
    *
@@ -624,48 +623,87 @@ export class CheckoutReturnService {
   }
 
   /**
-   * Money base for the loyalty points clawed back on the returned (IN) goods —
-   * proportional to the ORIGINAL sale's amountDue (net of its discounts/point
-   * redemption), so a full return reverses exactly what was earned. QUICK returns
-   * without an original fall back to the gross returned value. Shared by the
-   * on-invoice `pointsReversed` snapshot and the reverse event, so both agree.
+   * Money base for the loyalty points clawed back on the returned (IN) goods.
+   *
+   * A sale earns on its `amountDue` — `floor(amountDue / POINT_EARN_VND_PER_POINT)`
+   * in both checkout paths (`checkout-invoice.service.ts` for v1,
+   * `compute-totals.step.ts` for the v2 saga). A return therefore has to claw back
+   * on the same net basis, and `returnedNet` already *is* the slice of `amountDue`
+   * being handed back:
+   *
+   *   Σ netLine − headerResidual
+   *     = (subtotal − Σpromo) − (pointsDiscount + deposit + (discountAmount − Σpromo))
+   *     = subtotal − discountAmount − pointsDiscount − deposit
+   *     = amountDue
+   *
+   * so `amountDue × returnedNet / (Σ netLine − headerResidual)` collapses to
+   * `returnedNet`. No proration left to do.
+   *
+   * The gross basis this replaced (`amountDue × returnSubtotal / subtotal`) agreed
+   * with the net one whenever the promotion was spread evenly across the lines, or
+   * the whole invoice came back — which is why the error stayed invisible for so
+   * long. It diverged on a PARTIAL return of an UNEVENLY promoted invoice, taking
+   * more points off the promoted line than that line had ever earned and leaving
+   * the customer short on goods they still owned.
+   *
+   * The no-original branch is NOT dead code: a QUICK return has nothing to prorate
+   * against, and `computeReturnedNet` degrades to the gross value there. Keep it.
+   *
+   * Shared by the on-invoice `pointsReversed` snapshot and the reverse event, so
+   * both agree.
    */
   private computeReverseBase(
     originalInvoice: InvoiceEntity | null,
     totals: ComputedTotals,
   ): number {
     if (totals.returnSubtotal <= 0) return 0;
-    const originalSubtotal = Number(originalInvoice?.subtotal ?? 0);
-    return originalInvoice && originalSubtotal > 0
-      ? (Number(originalInvoice.amountDue) * totals.returnSubtotal) /
-          originalSubtotal
+    return originalInvoice
+      ? totals.returnedNet
       : Math.abs(totals.refundedAmount || totals.returnSubtotal);
   }
 
   /**
    * Loyalty points redeemed on the ORIGINAL sale that are given back on this
-   * return, proportional to the returned value (floored, so multiple partial
-   * returns never re-credit more than was redeemed). Shared by the
-   * `pointsBalanceAfter` snapshot and the actual refundRedeemedPoints call, so
-   * both agree.
+   * return, in proportion to the money actually handed back.
+   *
+   * The ratio is `returnedNet / amountDue`, the same pairing `computeReverseBase`
+   * relies on: `amountDue` is by definition `Σ netLine − headerResidual`, which is
+   * the denominator `returnedNet` was measured against. Prorating on
+   * `Σ netLine` instead would drop `headerResidual` from the denominator only, and
+   * a full return would then give back less than the customer actually spent.
+   *
+   * Floored, so several partial returns can never re-credit more than was
+   * redeemed — the sum of the parts lands at or just under the whole.
+   *
+   * `amountDue = 0` is a real invoice, not a hypothetical: a sale settled entirely
+   * with points leaves no money basis to prorate against (INV-202608-00010 on dev
+   * is exactly that). Fall back to the gross share there, which is the only ratio
+   * such an invoice still expresses.
+   *
+   * Shared by the `pointsBalanceAfter` snapshot and the actual
+   * refundRedeemedPoints call, so both agree.
    */
   private computeRedeemedCreditBack(
     originalInvoice: InvoiceEntity | null,
     totals: ComputedTotals,
   ): number {
-    const originalSubtotal = Number(originalInvoice?.subtotal ?? 0);
     if (
       !originalInvoice ||
       Number(originalInvoice.pointsRedeemed) <= 0 ||
-      originalSubtotal <= 0 ||
       totals.returnSubtotal <= 0
     ) {
       return 0;
     }
-    return Math.floor(
-      (Number(originalInvoice.pointsRedeemed) * totals.returnSubtotal) /
-        originalSubtotal,
-    );
+    const pointsRedeemed = Number(originalInvoice.pointsRedeemed);
+    const amountDue = Number(originalInvoice.amountDue);
+    if (amountDue <= 0) {
+      const originalSubtotal = Number(originalInvoice.subtotal ?? 0);
+      if (originalSubtotal <= 0) return 0;
+      return Math.floor(
+        (pointsRedeemed * totals.returnSubtotal) / originalSubtotal,
+      );
+    }
+    return Math.floor((pointsRedeemed * totals.returnedNet) / amountDue);
   }
 
   private validateRefundMatrix(

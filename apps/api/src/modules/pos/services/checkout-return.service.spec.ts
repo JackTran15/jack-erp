@@ -36,6 +36,7 @@ import { CashFromPaymentPublisher } from '../../accounting/publishers/cash-from-
 import { JournalReturnPublisher } from '../../accounting/publishers/journal-return.publisher';
 import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points.publisher';
 import { LoyaltyPointsReversePublisher } from '../../customer/publishers/loyalty-points-reverse.publisher';
+import { POINT_EARN_VND_PER_POINT } from '../../customer/loyalty.constants';
 
 const actor = {
   userId: 'user-1',
@@ -317,6 +318,85 @@ describe('CheckoutReturnService — debt offset routing', () => {
 
     service = module.get(CheckoutReturnService);
   });
+
+  /**
+   * Wires a return against a real original invoice: `itemRepo.find` answers
+   * per invoiceId so the returned lines and the original's lines are distinct
+   * (the shared default mock returns the same array for both).
+   *
+   * Hoisted to the outer scope in T-01-01 — the money block and the loyalty
+   * basis block both need it. Pure move, no behaviour change.
+   */
+  function setupReturn(opts: {
+    original: Partial<InvoiceEntity>;
+    originalLines: Array<Partial<InvoiceItemEntity>>;
+    returnedLines: Array<Partial<InvoiceItemEntity>>;
+  }) {
+    const originalLines = opts.originalLines.map(
+      (l, i) =>
+        ({
+          id: `orig-line-${i}`,
+          organizationId: 'org-1',
+          invoiceId: 'orig-1',
+          itemId: `item-${i}`,
+          locationId: 'loc-1',
+          itemCode: `C${i}`,
+          itemName: `N${i}`,
+          unit: 'pcs',
+          direction: ItemDirection.OUT,
+          promotionDiscount: 0,
+          sortOrder: i,
+          ...l,
+        }) as InvoiceItemEntity,
+    );
+    const returnedLines = opts.returnedLines.map(
+      (l, i) =>
+        ({
+          id: `ret-line-${i}`,
+          organizationId: 'org-1',
+          invoiceId: 'ret-1',
+          itemId: `item-${i}`,
+          locationId: 'loc-1',
+          itemCode: `C${i}`,
+          itemName: `N${i}`,
+          unit: 'pcs',
+          direction: ItemDirection.IN,
+          sortOrder: i,
+          ...l,
+        }) as InvoiceItemEntity,
+    );
+
+    itemRepo.find.mockImplementation(({ where }: any) =>
+      Promise.resolve(where.invoiceId === 'orig-1' ? originalLines : returnedLines),
+    );
+    invoiceRepo.findOne.mockImplementation(({ where }: any) =>
+      Promise.resolve(
+        where.id === 'ret-1'
+          ? returnDraftStub()
+          : ({
+              ...originalStub(InvoiceStatus.PAID),
+              pointsDiscountAmount: 0,
+              depositAmount: 0,
+              discountAmount: 0,
+              ...opts.original,
+            } as InvoiceEntity),
+      ),
+    );
+  }
+
+  const refundedAmount = () =>
+    cashRefundPublisher.publish.mock.calls[0][0].amount as number;
+
+  /**
+   * The invoice handed to `manager.save` — `save` also takes payment and debt
+   * rows, so pick the call carrying the loyalty snapshot rather than call [0].
+   */
+  const savedInvoice = () =>
+    mockManager.save.mock.calls
+      .map((c) => c[0])
+      .find(
+        (e) => e && typeof e === 'object' && 'pointsReversed' in e,
+      ) as InvoiceEntity;
 
   it('does NOT offset debt when the operator chose CASH, even against a DEBT invoice', async () => {
     invoiceRepo.findOne.mockImplementation(({ where }) =>
@@ -797,6 +877,12 @@ describe('CheckoutReturnService — debt offset routing', () => {
             : ({
                 ...originalStub(InvoiceStatus.PAID),
                 subtotal: 200,
+                // The 10 gap between subtotal and amountDue has to be attributable
+                // to a discount field, or the invoice is not one the checkout paths
+                // could ever have written: amountDue is computed as
+                // subtotal − discountAmount − pointsDiscountAmount − depositAmount.
+                // Verified against dev data — 39/39 posted sales satisfy it.
+                discountAmount: 10,
                 amountDue: 190,
               } as InvoiceEntity),
         ),
@@ -805,7 +891,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
       await service.checkout('ret-1', cashDto(), actor);
 
       // Full return of a 200 line; the original earned on its amountDue (190,
-      // after a 10 point-discount), so the reverse base is 190 — proportional,
+      // after a 10 discount), so the reverse base is 190 — proportional,
       // not the gross 200. Keeps reverse ≤ points actually earned.
       expect(loyaltyReversePublisher.publish).toHaveBeenCalledWith(
         expect.objectContaining({ returnInvoiceId: 'ret-1', subtotalDelta: 190 }),
@@ -966,71 +1052,6 @@ describe('CheckoutReturnService — debt offset routing', () => {
   });
 
   describe('refund is net of promotion and points (T-01-04, QA #1)', () => {
-    /**
-     * Wires a return against a real original invoice: `itemRepo.find` answers
-     * per invoiceId so the returned lines and the original's lines are distinct
-     * (the shared default mock returns the same array for both).
-     */
-    function setupReturn(opts: {
-      original: Partial<InvoiceEntity>;
-      originalLines: Array<Partial<InvoiceItemEntity>>;
-      returnedLines: Array<Partial<InvoiceItemEntity>>;
-    }) {
-      const originalLines = opts.originalLines.map(
-        (l, i) =>
-          ({
-            id: `orig-line-${i}`,
-            organizationId: 'org-1',
-            invoiceId: 'orig-1',
-            itemId: `item-${i}`,
-            locationId: 'loc-1',
-            itemCode: `C${i}`,
-            itemName: `N${i}`,
-            unit: 'pcs',
-            direction: ItemDirection.OUT,
-            promotionDiscount: 0,
-            sortOrder: i,
-            ...l,
-          }) as InvoiceItemEntity,
-      );
-      const returnedLines = opts.returnedLines.map(
-        (l, i) =>
-          ({
-            id: `ret-line-${i}`,
-            organizationId: 'org-1',
-            invoiceId: 'ret-1',
-            itemId: `item-${i}`,
-            locationId: 'loc-1',
-            itemCode: `C${i}`,
-            itemName: `N${i}`,
-            unit: 'pcs',
-            direction: ItemDirection.IN,
-            sortOrder: i,
-            ...l,
-          }) as InvoiceItemEntity,
-      );
-
-      itemRepo.find.mockImplementation(({ where }: any) =>
-        Promise.resolve(where.invoiceId === 'orig-1' ? originalLines : returnedLines),
-      );
-      invoiceRepo.findOne.mockImplementation(({ where }: any) =>
-        Promise.resolve(
-          where.id === 'ret-1'
-            ? returnDraftStub()
-            : ({
-                ...originalStub(InvoiceStatus.PAID),
-                pointsDiscountAmount: 0,
-                depositAmount: 0,
-                discountAmount: 0,
-                ...opts.original,
-              } as InvoiceEntity),
-        ),
-      );
-    }
-
-    const refundedAmount = () =>
-      cashRefundPublisher.publish.mock.calls[0][0].amount as number;
-
     it('refunds the line price minus its promotion — 500 with a 100 discount pays back 400 (AC-01)', async () => {
       setupReturn({
         original: { subtotal: 500, discountAmount: 100, amountDue: 400, totalPaid: 400 },
@@ -1226,7 +1247,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
       expect(refundedAmount()).toBe(480); // 600 − 200 × (600/1000)
     });
 
-    it('keeps the loyalty reverse base on the gross subtotal, unchanged by the money fix', async () => {
+    it('gross and net bases agree on a full return — the case that hid the defect', async () => {
       setupReturn({
         original: { subtotal: 1000, discountAmount: 200, amountDue: 800, totalPaid: 800 },
         originalLines: [
@@ -1244,12 +1265,453 @@ describe('CheckoutReturnService — debt offset routing', () => {
 
       await service.checkout('ret-1', cashDto(), actor);
 
-      // amountDue × returnSubtotal / subtotal = 800 × 1000/1000 — proration is
-      // still driven by the GROSS returned value, not the new net one.
+      // The whole invoice comes back, so the returned ratio is 1 and both bases
+      // land on 800: gross gives 800 × 1000/1000, net gives returnedNet =
+      // 1000 − 200. Expectation deliberately unchanged by the net switch — this
+      // is precisely the shape that kept the defect invisible, kept here as the
+      // record of it.
       expect(loyaltyReversePublisher.publish).toHaveBeenCalledWith(
         expect.objectContaining({ subtotalDelta: 800 }),
         actor,
       );
+    });
+  });
+
+  /**
+   * Loyalty reverse base must be the NET the customer paid (UOW-01, QA #3).
+   *
+   * This defect does not show itself on most invoices, which is the trap worth
+   * spelling out. A promotion spread EVENLY across every line makes the gross
+   * ratio equal the net ratio; returning the WHOLE invoice makes the ratio 1.
+   * Both are green before and after the fix, and every promoted invoice sitting
+   * in the dev database (INV-202608-00006..11) is of the even kind — measuring
+   * with one of those concludes "no bug" (A-R1).
+   *
+   * So the fixture below is deliberately UNEVEN: one promoted line next to one
+   * plain line, and only the promoted line comes back.
+   */
+  /**
+   * R1 — uneven promotion, only the promoted line comes back.
+   *   line A: gross   490.000, promo 26.000 → net   464.000
+   *   line B: gross 9.510.000, promo      0 → net 9.510.000
+   *
+   * subtotal 10.000.000 · discountAmount 26.000 · amountDue 9.974.000
+   * pointsEarned = floor(9.974.000 / 10.000) = 997
+   *
+   * Shared by the reverse-base block and the credit-back block.
+   */
+  const setupR1ReturningThePromotedLineOnly = () =>
+    setupReturn({
+      original: {
+        subtotal: 10_000_000,
+        discountAmount: 26_000,
+        amountDue: 9_974_000,
+        totalPaid: 9_974_000,
+      },
+      originalLines: [
+        { quantity: 1, unitPrice: 490_000, lineTotal: 490_000, promotionDiscount: 26_000 },
+        { quantity: 1, unitPrice: 9_510_000, lineTotal: 9_510_000, promotionDiscount: 0 },
+      ],
+      returnedLines: [
+        {
+          quantity: 1,
+          unitPrice: 490_000,
+          lineTotal: 490_000,
+          originalInvoiceItemId: 'orig-line-0',
+        },
+      ],
+    });
+
+  describe('loyalty reverse base is net of promotion (UOW-01, QA #3)', () => {
+    it('claws back only the points the returned line itself earned (AC-01)', async () => {
+      setupR1ReturningThePromotedLineOnly();
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      // The money side has been right since promotion-qa-defects/UOW-01. Pinned
+      // here so that if this number ever moves, the failure points at
+      // computeReturnedNet rather than at the loyalty path.
+      expect(refundedAmount()).toBe(464_000);
+
+      // Line A cost the customer 464.000 net, which earned floor(464.000/10.000)
+      // = 46 points. The gross basis in force today instead yields 48:
+      //   amountDue × returnSubtotal / subtotal
+      //   = 9.974.000 × 490.000 / 10.000.000 = 488.726 → floor(48,87) = 48
+      expect(mockManager.save).toHaveBeenCalledWith(
+        expect.objectContaining({ pointsReversed: 46 }),
+      );
+    });
+
+    it('reverses the whole earn when the whole invoice comes back (AC-03)', async () => {
+      setupReturn({
+        original: {
+          subtotal: 10_000_000,
+          discountAmount: 26_000,
+          amountDue: 9_974_000,
+          totalPaid: 9_974_000,
+        },
+        originalLines: [
+          { quantity: 1, unitPrice: 490_000, lineTotal: 490_000, promotionDiscount: 26_000 },
+          { quantity: 1, unitPrice: 9_510_000, lineTotal: 9_510_000, promotionDiscount: 0 },
+        ],
+        returnedLines: [
+          {
+            quantity: 1,
+            unitPrice: 490_000,
+            lineTotal: 490_000,
+            originalInvoiceItemId: 'orig-line-0',
+          },
+          {
+            quantity: 1,
+            unitPrice: 9_510_000,
+            lineTotal: 9_510_000,
+            originalInvoiceItemId: 'orig-line-1',
+          },
+        ],
+      });
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      // returnedNet lands exactly on amountDue, so the reverse lands exactly on
+      // the earn: floor(9.974.000 / 10.000) = 997. This is the end-stop that
+      // catches a wrong denominator — any basis that is not amountDue drifts here.
+      expect(mockManager.save).toHaveBeenCalledWith(
+        expect.objectContaining({ pointsReversed: 997 }),
+      );
+    });
+
+    it('leaves the customer holding exactly the points the kept goods earned (AC-02)', async () => {
+      setupR1ReturningThePromotedLineOnly();
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      const reversed = savedInvoice().pointsReversed as number;
+
+      // The invariant worth protecting is NOT "the partial reverses sum to
+      // points_earned" — every return floors independently, so Σfloor ≤ floor(Σ)
+      // and a few points can go missing to rounding on either basis (ADR-03).
+      //
+      // What must hold is about the goods the customer KEPT: after handing line A
+      // back, the points still standing against this invoice have to equal what
+      // line B would have earned on its own. Written as an equation between the
+      // two sides rather than a hard-coded 951, so it keeps meaning if the
+      // fixture's numbers ever move.
+      const R1_POINTS_EARNED = 997; // floor(9.974.000 / 10.000)
+      const KEPT_LINE_NET = 9_510_000; // line B: gross 9.510.000, no promotion
+      expect(R1_POINTS_EARNED - reversed).toBe(
+        Math.floor(KEPT_LINE_NET / POINT_EARN_VND_PER_POINT),
+      );
+
+      // The gross basis left 997 − 48 = 949 here: two points short on goods the
+      // customer never returned.
+      expect(R1_POINTS_EARNED - reversed).toBe(951);
+    });
+
+    it('leaves a v1 invoice with no per-line allocation exactly where it was (AC-04)', async () => {
+      // Every promotionDiscount is 0, so returnedNet degrades to the gross
+      // proration and the net basis must reproduce the old number precisely.
+      setupReturn({
+        original: {
+          subtotal: 10_000_000,
+          discountAmount: 2_000_000,
+          amountDue: 8_000_000,
+          totalPaid: 8_000_000,
+        },
+        originalLines: [
+          { quantity: 1, unitPrice: 6_000_000, lineTotal: 6_000_000, promotionDiscount: 0 },
+          { quantity: 1, unitPrice: 4_000_000, lineTotal: 4_000_000, promotionDiscount: 0 },
+        ],
+        returnedLines: [
+          {
+            quantity: 1,
+            unitPrice: 6_000_000,
+            lineTotal: 6_000_000,
+            originalInvoiceItemId: 'orig-line-0',
+          },
+        ],
+      });
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      // Expectation computed by hand from the OLD gross formula, deliberately not
+      // by calling the production helper — otherwise this compares the code to
+      // itself and proves nothing:
+      //   amountDue × returnSubtotal / subtotal = 8.000.000 × 6.000.000/10.000.000
+      //                                         = 4.800.000 → floor(480) = 480
+      expect(mockManager.save).toHaveBeenCalledWith(
+        expect.objectContaining({ pointsReversed: 480 }),
+      );
+    });
+
+    it('keeps the no-original fallback alive for QUICK returns — do not inline this branch (AC-05)', async () => {
+      // A QUICK return has no original invoice, so there is nothing to prorate
+      // against and computeReturnedNet degrades to the gross value. After the net
+      // switch the with-original branch is a single assignment, which makes the
+      // whole function look collapsible — it is not, and this test is the guard
+      // (ADR-02, A-R2).
+      itemRepo.find.mockResolvedValue([
+        {
+          ...inLineStub(),
+          quantity: 1,
+          unitPrice: 1_490_000,
+          lineTotal: 1_490_000,
+        } as InvoiceItemEntity,
+      ]);
+      invoiceRepo.findOne.mockImplementation(({ where }: any) =>
+        Promise.resolve(
+          where.id === 'ret-1'
+            ? returnDraftStub({
+                originalInvoiceId: undefined,
+                subtotal: 1_490_000,
+                amountDue: 1_490_000,
+              })
+            : null,
+        ),
+      );
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      const saved = savedInvoice();
+      expect(Number.isFinite(saved.pointsReversed)).toBe(true);
+      expect(Number.isNaN(saved.pointsReversed)).toBe(false);
+      // Math.abs(refundedAmount || returnSubtotal) = 1.490.000 → floor(149).
+      expect(saved.pointsReversed).toBe(149);
+    });
+
+    it('snapshots and publishes the same reverse base, never two (AC-10)', async () => {
+      setupR1ReturningThePromotedLineOnly();
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      const saved = savedInvoice();
+      const published = loyaltyReversePublisher.publish.mock.calls[0][0] as {
+        subtotalDelta: number;
+      };
+
+      // The receipt shows the snapshot while the card is decremented from the
+      // event. If these ever drift, a customer complaint cannot be reconciled
+      // without reading point_history by hand — so pin them to one base.
+      expect(saved.pointsReversed).toBe(
+        Math.floor(published.subtotalDelta / POINT_EARN_VND_PER_POINT),
+      );
+      expect(published.subtotalDelta).toBe(464_000);
+      expect(saved.pointsReversed).toBe(46);
+    });
+  });
+
+  /**
+   * Points REDEEMED on the original sale, given back on the return (UOW-02, QA #3).
+   *
+   * Same gross-vs-net split as the reverse base, in the other direction: this one
+   * gives the customer back LESS than it used to, because the gross ratio was
+   * over-crediting. That drop is intended, not a regression.
+   */
+  describe('redeemed-points credit-back is net of promotion (UOW-02, QA #3)', () => {
+    /**
+     * R2 — R1 plus 1.000 points spent on the original sale.
+     *
+     * subtotal 10.000.000 · discountAmount 26.000 · pointsRedeemed 1.000
+     * pointsDiscountAmount 500.000 · amountDue 9.474.000 · pointsEarned 947
+     */
+    const setupR2ReturningThePromotedLineOnly = () =>
+      setupReturn({
+        original: {
+          subtotal: 10_000_000,
+          discountAmount: 26_000,
+          pointsRedeemed: 1_000,
+          pointsDiscountAmount: 500_000,
+          amountDue: 9_474_000,
+          totalPaid: 9_474_000,
+        },
+        originalLines: [
+          { quantity: 1, unitPrice: 490_000, lineTotal: 490_000, promotionDiscount: 26_000 },
+          { quantity: 1, unitPrice: 9_510_000, lineTotal: 9_510_000, promotionDiscount: 0 },
+        ],
+        returnedLines: [
+          {
+            quantity: 1,
+            unitPrice: 490_000,
+            lineTotal: 490_000,
+            originalInvoiceItemId: 'orig-line-0',
+          },
+        ],
+      });
+
+    const creditedBack = () =>
+      membershipCardService.refundRedeemedPoints.mock.calls[0][0].points as number;
+
+    it('gives back points in proportion to the money returned, not the gross (AC-06)', async () => {
+      setupR2ReturningThePromotedLineOnly();
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      // returnedNet here is NOT 464.000: with 500.000 of points sitting on the
+      // header, line A carries its share of that residual too —
+      //   464.000 − 500.000 × 464.000/9.974.000 = 440.739,52
+      // Read it off the run rather than re-deriving it, since how returnedNet is
+      // built belongs to promotion-qa-defects/UOW-01, not to this test.
+      const returnedNet = refundedAmount();
+      expect(returnedNet).toBeCloseTo(440_739.52, 2);
+
+      // floor(1.000 × 440.739,52 / 9.474.000) = floor(46,52) = 46.
+      // The gross basis in force today instead yields 49:
+      //   floor(1.000 × 490.000 / 10.000.000) = 49
+      expect(creditedBack()).toBe(46);
+    });
+
+    it('gives back every redeemed point when the whole invoice comes back (AC-07)', async () => {
+      setupReturn({
+        original: {
+          subtotal: 10_000_000,
+          discountAmount: 26_000,
+          pointsRedeemed: 1_000,
+          pointsDiscountAmount: 500_000,
+          amountDue: 9_474_000,
+          totalPaid: 9_474_000,
+        },
+        originalLines: [
+          { quantity: 1, unitPrice: 490_000, lineTotal: 490_000, promotionDiscount: 26_000 },
+          { quantity: 1, unitPrice: 9_510_000, lineTotal: 9_510_000, promotionDiscount: 0 },
+        ],
+        returnedLines: [
+          {
+            quantity: 1,
+            unitPrice: 490_000,
+            lineTotal: 490_000,
+            originalInvoiceItemId: 'orig-line-0',
+          },
+          {
+            quantity: 1,
+            unitPrice: 9_510_000,
+            lineTotal: 9_510_000,
+            originalInvoiceItemId: 'orig-line-1',
+          },
+        ],
+      });
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      // returnedNet lands on amountDue, so the ratio is exactly 1. This is the
+      // end-stop that rejects a wrong denominator: prorating on Σ netLine
+      // (9.974.000) instead would hand back only 949 of the 1.000 spent.
+      expect(creditedBack()).toBe(1_000);
+    });
+
+    it('does not divide by zero on an invoice settled entirely with points (AC-08)', async () => {
+      // Shaped after INV-202608-00010, which is sitting in the dev database:
+      // subtotal 750.000, promotion 150.000, points 600.000, amount_due 0.
+      setupReturn({
+        original: {
+          subtotal: 750_000,
+          discountAmount: 150_000,
+          pointsRedeemed: 1_200,
+          pointsDiscountAmount: 600_000,
+          amountDue: 0,
+          totalPaid: 0,
+        },
+        originalLines: [
+          { quantity: 1, unitPrice: 250_000, lineTotal: 250_000, promotionDiscount: 50_000 },
+          { quantity: 1, unitPrice: 500_000, lineTotal: 500_000, promotionDiscount: 100_000 },
+        ],
+        returnedLines: [
+          {
+            quantity: 1,
+            unitPrice: 250_000,
+            lineTotal: 250_000,
+            originalInvoiceItemId: 'orig-line-0',
+          },
+        ],
+      });
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      const credited = creditedBack();
+      expect(Number.isFinite(credited)).toBe(true);
+      expect(Number.isNaN(credited)).toBe(false);
+      // No money basis survives, so the gross share is the only ratio left:
+      // floor(1.200 × 250.000 / 750.000) = 400.
+      expect(credited).toBe(400);
+
+      const saved = savedInvoice();
+      expect(Number.isNaN(saved.pointsReversed)).toBe(false);
+    });
+
+    it('never hands back more than was redeemed, however the return is split (AC-09)', async () => {
+      const R2 = {
+        original: {
+          subtotal: 10_000_000,
+          discountAmount: 26_000,
+          pointsRedeemed: 1_000,
+          pointsDiscountAmount: 500_000,
+          amountDue: 9_474_000,
+          totalPaid: 9_474_000,
+        },
+        originalLines: [
+          { quantity: 1, unitPrice: 490_000, lineTotal: 490_000, promotionDiscount: 26_000 },
+          { quantity: 1, unitPrice: 9_510_000, lineTotal: 9_510_000, promotionDiscount: 0 },
+        ],
+      };
+
+      // Line A on one return document, line B on another.
+      setupReturn({
+        ...R2,
+        returnedLines: [
+          { quantity: 1, unitPrice: 490_000, lineTotal: 490_000, originalInvoiceItemId: 'orig-line-0' },
+        ],
+      });
+      await service.checkout('ret-1', cashDto(), actor);
+
+      setupReturn({
+        ...R2,
+        returnedLines: [
+          { quantity: 1, unitPrice: 9_510_000, lineTotal: 9_510_000, originalInvoiceItemId: 'orig-line-1' },
+        ],
+      });
+      await service.checkout('ret-1', cashDto(), actor);
+
+      const total = membershipCardService.refundRedeemedPoints.mock.calls.reduce(
+        (sum, call) => sum + (call[0].points as number),
+        0,
+      );
+
+      // An inequality on purpose. Each document floors independently, so the two
+      // halves come to 46 + 953 = 999 rather than a clean 1.000 — one point lost
+      // to rounding, which ADR-03 accepts rather than carrying a remainder ledger
+      // between return documents. Pinning 999 exactly would freeze an accepted
+      // rounding artefact into a brittle expectation.
+      expect(total).toBeLessThanOrEqual(1_000);
+      expect(total).toBeGreaterThan(995);
+    });
+
+    it('snapshots the balance the reverse consumer will actually leave (AC-11)', async () => {
+      setupR2ReturningThePromotedLineOnly();
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(5_000);
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      const saved = savedInvoice();
+      // returnedNet 440.739,52 → reversed floor(44,07) = 44; creditBack 46;
+      // nothing earned (no OUT lines). 5.000 + 46 + 0 − 44 = 5.002.
+      //
+      // Unit scope: the consumer runs out of process, so what is pinned here is
+      // that the snapshot equals the arithmetic the consumer applies, not the
+      // post-consumer row itself. AC-11's end-to-end half belongs to the live demo.
+      expect(saved.pointsReversed).toBe(44);
+      expect(saved.pointsBalanceAfter).toBe(5_002);
+    });
+
+    it('clamps the snapshot at 0 exactly as the consumer caps its decrement (AC-11)', async () => {
+      // R1 has no redeemed points, so nothing is credited back to soften the
+      // reverse — with a nearly empty card the raw arithmetic goes negative and
+      // the clamp has to catch it. Without this case the clamp is never entered.
+      setupR1ReturningThePromotedLineOnly();
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(10);
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      const saved = savedInvoice();
+      expect(saved.pointsReversed).toBe(46); // 10 + 0 + 0 − 46 = −36
+      expect(saved.pointsBalanceAfter).toBe(0);
     });
   });
 });
