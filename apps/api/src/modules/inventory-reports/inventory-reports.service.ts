@@ -357,7 +357,15 @@ export class InventoryReportsService {
 
     // Query shape matches DocumentDetailQuery, so the same cache-key builder applies.
     const cacheKey = this.buildDocumentDetailCacheKey(
-      'temporary-warehouse-out-goods2',
+      // Report key, không phải namespace — nó là thành phần đầu của cache key
+      // (`${reportKey}:${orgId}:${hash}`), nên bump ở đây làm mọi entry `...goods2`
+      // thành không thể chạm tới. Bump khi công thức đổi, nếu không entry cũ mang
+      // nhãn trạng thái cũ vẫn được trả về tới hết TTL sau deploy.
+      // LƯU Ý: chỉ che được đường này. Đường report-registry (SearchInventoryReportHandler,
+      // namespace 'inventory-reports', key = sha256(orgId + dto), không có version)
+      // phục vụ chế độ chuỗi cửa hàng / Xuất khẩu / In và vẫn có thể trả nhãn cũ
+      // trong tối đa 45s (TTL của nó) sau deploy. Chấp nhận cửa sổ đó.
+      'temporary-warehouse-out-goods3',
       actor,
       reportQuery,
     );

@@ -1,3 +1,4 @@
+import { TEMP_WAREHOUSE_OUT_STATUS_OPTIONS } from "@erp/shared-interfaces";
 import { REPORT_FILTERS_LINE } from "../report-filters.constant";
 import type { ReportColumnConfig, ReportTableConfig } from "../report.interface";
 
@@ -67,13 +68,6 @@ const selectCol = (
   tableConfig: { width, dataType: "text", filterKind: "select", filterOptions },
 });
 
-// Options trạng thái — mock, BE chưa hỗ trợ chuỗi; chỉnh lại theo giá trị thật sau.
-const STATUS_FILTER_OPTIONS = [
-  { value: "exported", label: "Đã xuất" },
-  { value: "pending", label: "Chờ xử lý" },
-  { value: "cancelled", label: "Đã hủy" },
-];
-
 const columns: ReportColumnConfig[] = [
   txt("sku", "Mã SKU", 140),
   txt("name", "Tên hàng hóa", 220),
@@ -86,7 +80,7 @@ const columns: ReportColumnConfig[] = [
   num("returnQty", "SL trả", 90),
   num("saleQty", "SL bán", 90),
   num("remainingQty", "SL tồn", 90),
-  selectCol("status", "Trạng thái", 170, STATUS_FILTER_OPTIONS),
+  selectCol("status", "Trạng thái", 170, TEMP_WAREHOUSE_OUT_STATUS_OPTIONS),
   txt("invoice", "Hóa đơn bán", 130),
 ];
 columns[0].tableConfig!.pinned = "left";

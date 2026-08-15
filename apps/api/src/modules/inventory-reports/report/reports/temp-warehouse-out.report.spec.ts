@@ -1,3 +1,4 @@
+import { EXPORT_ROW_LIMIT } from '../../../reporting/report-core/report-export.service';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { InventoryReportSearchDto } from '../../dto/inventory-report-search.dto';
 import { TempWarehouseIssueRow } from '../../services/temp-warehouse-report.service';
@@ -43,7 +44,7 @@ describe('TempWarehouseOutReport', () => {
     expect(status.filterOptions!.map((o) => o.value)).toEqual([
       'Xuất không bán',
       'Trả hàng trưng bày',
-      'Bán hàng trưng bày',
+      'Bán hàng kho tạm',
       'Chuyển kho xuất đi',
       'Chuyển kho trả lại',
     ]);
@@ -68,5 +69,73 @@ describe('TempWarehouseOutReport', () => {
     );
     expect(filtered.total).toBe(1);
     expect(filtered.rows[0].sku).toBe('SKU-1');
+  });
+
+  // AC-08 — lọc theo trạng thái mới, và `totals` chỉ cộng những dòng đã lọc.
+  // Đây là con số đi thẳng vào dòng tổng của file Excel.
+  it('filters by the new "Bán hàng kho tạm" status and totals only those rows', async () => {
+    const sold: TempWarehouseIssueRow = {
+      ...engineRow,
+      sku: 'SKU-SOLD',
+      saleQty: 1,
+      remainingQty: 0,
+      status: 'Bán hàng kho tạm',
+      invoice: 'INV-1',
+    };
+    const report = build([engineRow, sold]);
+
+    const filtered = await report.buildData(
+      {
+        ...dto,
+        // `totals` chỉ dựng cho những cột được yêu cầu, nên phải xin saleQty
+        // mới kiểm được nó — đúng hành vi của `buildTotalsRow`.
+        columns: [...dto.columns!, 'saleQty'],
+        columnFilters: [{ col: 'status', equals: 'Bán hàng kho tạm' }],
+      },
+      actor,
+    );
+
+    expect(filtered.total).toBe(1);
+    expect(filtered.rows[0].sku).toBe('SKU-SOLD');
+    expect(filtered.totals!.outQty).toBe(1);
+    expect(filtered.totals!.saleQty).toBe(1);
+  });
+
+  // AC-08 — Xuất khẩu gọi buildData với limit = EXPORT_ROW_LIMIT (lấy trọn),
+  // lưới gọi với limit nhỏ (một trang). Cả hai phải cho cùng `totals` và cùng
+  // `total`; đó là thứ khiến dòng tổng trong Excel không thể lệch footer lưới.
+  //
+  // Con số trong file Excel ĐÚNG LÀ `buildData(...).totals`: report này không
+  // khai `exportSource` nên `buildFetcher` chọn nhánh single-shot, và
+  // `SingleShotFetcher.drain` trả thẳng `data.totals` cho `writer.end(totals)`.
+  // Việc đường export truyền đúng dto mà lưới dùng thì spec này không thấy được
+  // — nó tự dựng cả hai dto; phần đó đã có ở `report-export.service.spec.ts:131`
+  // (assert `buildData` được gọi với `{ page: 1, limit: EXPORT_ROW_LIMIT }`).
+  it('gives export and grid the same totals for the same filter', async () => {
+    const rows = [
+      engineRow,
+      { ...engineRow, sku: 'SKU-2' },
+      { ...engineRow, sku: 'SKU-3', status: 'Bán hàng kho tạm', invoice: 'INV-9' },
+    ];
+    const report = build(rows);
+    // Cùng MỘT bộ lọc ở cả hai đường — nếu không truyền filter thì test chỉ
+    // chứng minh "totals độc lập với trang", không phải "export áp cùng filter".
+    const filtered = {
+      ...dto,
+      columnFilters: [{ col: 'status', equals: 'Xuất không bán' }],
+    };
+
+    const grid = await report.buildData({ ...filtered, page: 1, limit: 1 }, actor);
+    const exported = await report.buildData(
+      { ...filtered, page: 1, limit: EXPORT_ROW_LIMIT },
+      actor,
+    );
+
+    expect(grid.rows).toHaveLength(1);
+    expect(exported.rows).toHaveLength(2);
+    expect(grid.total).toBe(exported.total);
+    expect(grid.totals).toEqual(exported.totals);
+    // Dòng thứ ba bị filter loại, nên tổng là 2 chứ không phải 3.
+    expect(exported.totals!.outQty).toBe(2);
   });
 });

@@ -195,8 +195,11 @@ export interface DocumentDetailRow {
 
 /**
  * Row for "Hàng hóa xuất kho tạm" (temp-warehouse out goods).
- * Mirrors backend `TempWarehouseIssueRow`. `saleQty`/`invoice` are always
- * 0/"" — there is no temp-warehouse ↔ POS invoice link in the backend yet.
+ * Mirrors backend `TempWarehouseIssueRow`. Every row is one matched issue↔return
+ * pair from the temp warehouse; `saleQty`/`invoice` are populated when the issue
+ * was consumed by a sale, and that row reads "Bán hàng kho tạm". Goods sold
+ * straight off the showroom floor never enter the temp warehouse and are out of
+ * this report's scope by design.
  */
 export interface TempWarehouseIssueRow {
   sku: string;
