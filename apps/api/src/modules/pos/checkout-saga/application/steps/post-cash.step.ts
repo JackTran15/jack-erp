@@ -1,8 +1,16 @@
 import { Injectable } from '@nestjs/common';
+import { DocumentType } from '@erp/shared-interfaces';
 import { InvoicePaymentMethod } from '../../../entities/invoice.entity';
 import { CheckoutContext, CheckoutStep, requireManager } from '../checkout-step';
 import { CashAccountEntity } from '../../../../accounting/cash/cash-account.entity';
 import { CashMovementEntity, CashMovementType } from '../../../../accounting/cash/cash-movement.entity';
+import { CashReceiptsService } from '../../../../accounting/cash-vouchers/cash-receipts/cash-receipts.service';
+import {
+  CashReceiptPurpose,
+  CashReceiptReferenceType,
+} from '../../../../accounting/cash-vouchers/enums';
+import { buildPosInvoiceParty } from '../../../../accounting/cash-vouchers/shared/voucher-party';
+import { mintDocumentNumber } from './mint-document-number';
 
 /**
  * Records one `cash_movements` row per CASH payment line, inline, in the
@@ -26,11 +34,21 @@ import { CashMovementEntity, CashMovementType } from '../../../../accounting/cas
  * bug. (v1 actually does post this twice, once from `JournalSaleConsumer` and
  * once from `PosCashSaleConsumer` → `CashReceiptsService.createAndPostInternal`
  * → `CashService.recordMovement` — a pre-existing, undocumented double-post in
- * v1 itself, out of scope for this epic; see A-26.) So this step writes only
- * the bare ledger row: balance update + `CashMovementEntity` insert, nothing
- * that touches `journal_entries`. No `cash_receipts` (Phiếu thu) voucher
- * either — that is v1's own wrapper for a different purpose (standalone
- * receipt documents), not something every POS cash sale needs in v2.
+ * v1 itself, out of scope for this epic; see A-26.) So the ledger side of this
+ * step writes only the bare row: balance update + `CashMovementEntity` insert,
+ * nothing that touches `journal_entries`.
+ *
+ * It does then write a Phiếu thu, but **voucher-only**: `createVoucherForMovement`
+ * inserts the `cash_receipts` document and its line, linking the movement above and
+ * the entry `post-journal` already posted. No second movement, no second journal
+ * entry — the invariant "one sale, one journal entry" survives. Without this the
+ * money lands in the till with no document behind it, which is what v2 did until
+ * `checkout-voucher-party`.
+ *
+ * The number comes from `mintDocumentNumber(manager, ...)`, never
+ * `DocumentNumberingService.generate`: that one opens its own SERIALIZABLE
+ * transaction, so a checkout that later rolls back would still have burned a Phiếu
+ * thu number.
  *
  * `allowNegative` guard is not checked here on purpose: every payment this
  * step processes is a CASH line already counted as `totalPaid` by
@@ -42,13 +60,16 @@ export class PostCashStep implements CheckoutStep {
   readonly name = 'post-cash';
   readonly phase = 'transactional' as const;
 
+  constructor(private readonly cashReceipts: CashReceiptsService) {}
+
   async execute(ctx: CheckoutContext): Promise<void> {
     if (ctx.replayed) return;
 
     const manager = requireManager(ctx, this.name);
     const invoice = ctx.invoice;
     const funds = ctx.funds;
-    if (!invoice || !funds) {
+    const accounts = ctx.accounts;
+    if (!invoice || !funds || !accounts) {
       throw new Error(
         'post-cash ran before its prerequisite steps populated the context',
       );
@@ -93,11 +114,59 @@ export class PostCashStep implements CheckoutStep {
       }),
     );
 
-    cashAccount.balance =
-      Number(cashAccount.balance) +
-      cashPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+    const totalCash = cashPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+    cashAccount.balance = Number(cashAccount.balance) + totalCash;
 
     await cashAccountRepo.save(cashAccount);
-    await movementRepo.save(movements);
+    const savedMovements = await movementRepo.save(movements);
+
+    if (!ctx.journalEntryId) {
+      throw new Error(
+        'post-cash ran before its prerequisite steps populated the context',
+      );
+    }
+
+    const documentNumber = await mintDocumentNumber(
+      manager,
+      DocumentType.CASH_RECEIPT,
+      ctx.actor.branchId,
+      ctx.actor,
+      // ADR-06: v1 auto-creates this rule on first use, so an organisation that has never
+      // issued a Phiếu thu has none. Throwing here would cost the sale, not just the document.
+      { ensureDefault: true },
+    );
+    const party = await buildPosInvoiceParty(
+      manager,
+      invoice.id,
+      ctx.actor.organizationId,
+    );
+
+    const { voucherId } = await this.cashReceipts.createVoucherForMovement(
+      {
+        documentNumber,
+        // One receipt per invoice for the summed CASH lines (ADR-05), so it can only link
+        // one movement. Every POS invoice today has a single cash line (A-06); with two,
+        // the document still totals both and points at the first movement.
+        cashMovementId: savedMovements[0].id,
+        journalEntryId: ctx.journalEntryId,
+        purpose: CashReceiptPurpose.POS_SALE,
+        cashAccountId: cashAccount.id,
+        contraAccountId: accounts.revenueAccountId,
+        amount: totalCash,
+        referenceType: CashReceiptReferenceType.INVOICE,
+        referenceId: invoice.id,
+        reason: `POS sale ${ctx.documentNumber}`,
+        description: `POS sale ${ctx.documentNumber}`,
+        partnerType: party.partnerType,
+        partnerId: party.partnerId,
+        partnerName: party.partnerName,
+        partnerAddress: party.partnerAddress,
+        payerName: party.personName,
+        staffId: party.staffId,
+        actor: ctx.actor,
+      },
+      manager,
+    );
+    ctx.cashReceiptId = voucherId;
   }
 }

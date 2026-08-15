@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentNumberingModule } from '../../document-numbering/document-numbering.module';
@@ -66,7 +66,7 @@ import { SearchDepositVouchersV2Handler } from './queries/search-deposit-voucher
       InvoiceDebtEntity,
       DebtPaymentEntity,
     ]),
-    DepositModule,
+    forwardRef(() => DepositModule),
     DocumentNumberingModule,
     PaymentAccountsModule,
     CashModule,

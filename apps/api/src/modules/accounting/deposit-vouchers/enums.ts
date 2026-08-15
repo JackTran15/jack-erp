@@ -20,6 +20,11 @@ export enum BankReceiptPurpose {
 
 export enum BankReceiptReferenceType {
   INVOICE_DEBT = 'INVOICE_DEBT',
+  /**
+   * A POS sale settled by transfer/card/e-wallet; reference_id = the invoice id. Distinct
+   * from INVOICE_DEBT, which is a later collection against an unpaid invoice.
+   */
+  INVOICE = 'INVOICE',
   RECEIVABLE = 'RECEIVABLE',
   TRANSFER = 'TRANSFER',
   MANUAL = 'MANUAL',

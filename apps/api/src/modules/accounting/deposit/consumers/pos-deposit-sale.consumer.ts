@@ -1,6 +1,6 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { ConflictException, forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { v4 as uuid } from 'uuid';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import {
   DomainEvent,
   DomainEventType,
@@ -19,6 +19,15 @@ import { DepositPeriodGuardService, toYearMonth } from '../../deposit-period-loc
 import { DepositAuditAction, DepositAuditEntityType } from '../../deposit-audit/deposit-audit-log.entity';
 import { DepositAuditService } from '../../deposit-audit/deposit-audit.service';
 import { DepositMovementFromPaymentPayload } from '../deposit-from-payment.publisher';
+import { BankReceiptsService } from '../../deposit-vouchers/bank-receipts/bank-receipts.service';
+import {
+  BankReceiptPurpose,
+  BankReceiptReferenceType,
+  BankVoucherPartnerType,
+} from '../../deposit-vouchers/enums';
+import { buildPosInvoiceParty } from '../../cash-vouchers/shared/voucher-party';
+import { mintDocumentNumber } from '../../../pos/checkout-saga/application/steps/mint-document-number';
+import { DocumentType } from '@erp/shared-interfaces';
 
 /** True for a Postgres unique-violation (23505), the deposit double-post guard. */
 function isUniqueViolation(err: unknown): boolean {
@@ -53,6 +62,8 @@ export class PosDepositSaleConsumer {
     private readonly periodGuard: DepositPeriodGuardService,
     private readonly audit: DepositAuditService,
     private readonly eventPublisher: EventPublisher,
+    @Inject(forwardRef(() => BankReceiptsService))
+    private readonly bankReceipts: BankReceiptsService,
   ) {}
 
   @OnDomainEvent(ERP_TOPICS.DEPOSIT_VOUCHER_NEEDED_POS_SALE)
@@ -142,6 +153,26 @@ export class PosDepositSaleConsumer {
         if (!created.replayed && feeAmount > 0) {
           await this.depositFee.postFee(created.movement, feeAmount, actor, manager);
         }
+
+        // Phiếu thu tiền gửi for the line, voucher-only: it links the movement and journal
+        // entry written just above rather than posting its own. A replay skips it for the
+        // same reason the fee leg does.
+        if (!created.replayed) {
+          await this.issueReceipt(
+            manager,
+            created.movement.id,
+            created.journalEntryId,
+            {
+              invoiceId,
+              invoiceCode,
+              depositAccountId,
+              contraAccountId,
+              amount: Number(amount),
+              docDate,
+              actor,
+            },
+          );
+        }
         return created;
       });
       this.logger.log(
@@ -156,6 +187,73 @@ export class PosDepositSaleConsumer {
       }
       throw err;
     }
+  }
+
+  /**
+   * Writes the Phiếu thu tiền gửi for one non-cash payment line.
+   *
+   * Number is minted through the consumer's own `manager` (with `ensureDefault`, ADR-06:
+   * v1's `DocumentNumberingService.generate` auto-creates a missing rule, and an
+   * organisation that has never issued one must not lose the sale over it), so a rollback
+   * gives the number back. The party snapshot never throws — a deleted customer leaves the
+   * fields blank rather than dead-lettering money already banked.
+   */
+  private async issueReceipt(
+    manager: EntityManager,
+    depositMovementId: string,
+    journalEntryId: string,
+    input: {
+      invoiceId: string;
+      invoiceCode: string;
+      depositAccountId: string;
+      contraAccountId: string;
+      amount: number;
+      docDate: string;
+      actor: ActorContext;
+    },
+  ): Promise<void> {
+    const documentNumber = await mintDocumentNumber(
+      manager,
+      DocumentType.BANK_RECEIPT,
+      input.actor.branchId,
+      input.actor,
+      { ensureDefault: true },
+    );
+    const party = await buildPosInvoiceParty(
+      manager,
+      input.invoiceId,
+      input.actor.organizationId,
+    );
+
+    const result = await this.bankReceipts.createVoucherForMovement(
+      {
+        documentNumber,
+        depositMovementId,
+        journalEntryId,
+        purpose: BankReceiptPurpose.OTHER,
+        depositAccountId: input.depositAccountId,
+        contraAccountId: input.contraAccountId,
+        amount: input.amount,
+        docDate: input.docDate,
+        referenceType: BankReceiptReferenceType.INVOICE,
+        referenceId: input.invoiceId,
+        description: `POS sale ${input.invoiceCode}`,
+        // A-07: the two partner-type enums share their string members.
+        partnerType: party.partnerType as unknown as BankVoucherPartnerType,
+        partnerId: party.partnerId,
+        partnerName: party.partnerName,
+        partnerAddress: party.partnerAddress,
+        payerName: party.personName,
+        // Bank vouchers keep the staff member in collected_by, not staff_id.
+        collectedBy: party.staffId,
+        actor: input.actor,
+      },
+      manager,
+    );
+
+    this.logger.log(
+      `POS deposit sale ${input.invoiceCode} → ${result.voucherNumber} (receipt=${result.voucherId})`,
+    );
   }
 
   private async handleLockedPeriod(

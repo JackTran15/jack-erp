@@ -157,6 +157,10 @@ export interface CheckoutContext {
   totals?: CheckoutTotals;
   documentNumber?: string;
   voucherId?: string;
+  /** Set by post-journal; read by post-cash so the Phiếu thu links the sale's own entry. */
+  journalEntryId?: string;
+  /** Set by post-cash once the Phiếu thu exists — for the trace and for close-saga. */
+  cashReceiptId?: string;
   /** Set by persist-payments; index-aligned with input.payments. */
   savedPayments?: InvoicePaymentEntity[];
   /** Set by open-saga when a completed saga with the same key is replayed. */

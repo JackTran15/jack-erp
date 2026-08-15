@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { v4 as uuid } from 'uuid';
 import {
   CashMovementFromPaymentPayload,
@@ -11,6 +12,7 @@ import { OnDomainEvent } from '../../../events/decorators/on-event.decorator';
 import { EventPublisher } from '../../../events/event-publisher.service';
 import { CashReceiptsService } from '../cash-receipts/cash-receipts.service';
 import { CashReceiptPurpose, CashReceiptReferenceType } from '../enums';
+import { buildPosInvoiceParty } from '../shared/voucher-party';
 
 /**
  * POS cash sale → Phiếu thu. POS keeps the "consumer creates everything" model:
@@ -26,6 +28,7 @@ export class PosCashSaleConsumer {
   constructor(
     private readonly cashReceiptsService: CashReceiptsService,
     private readonly eventPublisher: EventPublisher,
+    private readonly dataSource: DataSource,
   ) {}
 
   @OnDomainEvent(ERP_TOPICS.CASH_VOUCHER_NEEDED_POS_SALE)
@@ -43,6 +46,15 @@ export class PosCashSaleConsumer {
       actorId,
     } = event.payload;
 
+    // Read-only lookup, so it runs outside the voucher's own transaction on purpose: the
+    // service opens that itself, and widening the event payload to carry the customer would
+    // leave every already-queued event blank (ADR-01).
+    const party = await buildPosInvoiceParty(
+      this.dataSource.manager,
+      invoiceId,
+      organizationId,
+    );
+
     const result = await this.cashReceiptsService.createAndPostInternal({
       purpose: CashReceiptPurpose.POS_SALE,
       cashAccountId,
@@ -52,6 +64,12 @@ export class PosCashSaleConsumer {
       referenceId: invoiceId,
       reason: `POS sale ${invoiceCode}`,
       description: `POS sale ${invoiceCode}`,
+      partnerType: party.partnerType,
+      partnerId: party.partnerId,
+      partnerName: party.partnerName,
+      partnerAddress: party.partnerAddress,
+      payerName: party.personName,
+      staffId: party.staffId,
       actor: { userId: actorId, organizationId, branchId, roles: [] },
     });
 

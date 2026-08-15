@@ -4,6 +4,15 @@ import { InvoicePaymentMethod } from '../../../entities/invoice.entity';
 import { CheckoutContext, CheckoutStep, requireManager } from '../checkout-step';
 import { DepositAccountEntity } from '../../../../accounting/deposit/deposit-account.entity';
 import { DepositMovementEntity } from '../../../../accounting/deposit/deposit-movement.entity';
+import { BankReceiptsService } from '../../../../accounting/deposit-vouchers/bank-receipts/bank-receipts.service';
+import {
+  BankReceiptPurpose,
+  BankReceiptReferenceType,
+  BankVoucherPartnerType,
+} from '../../../../accounting/deposit-vouchers/enums';
+import { buildPosInvoiceParty } from '../../../../accounting/cash-vouchers/shared/voucher-party';
+import { mintDocumentNumber } from './mint-document-number';
+import { DocumentType } from '@erp/shared-interfaces';
 import { DepositPeriodGuardService } from '../../../../accounting/deposit-period-lock/deposit-period-guard.service';
 
 /**
@@ -51,7 +60,10 @@ export class PostDepositStep implements CheckoutStep {
   readonly name = 'post-deposit';
   readonly phase = 'transactional' as const;
 
-  constructor(private readonly periodGuard: DepositPeriodGuardService) {}
+  constructor(
+    private readonly periodGuard: DepositPeriodGuardService,
+    private readonly bankReceipts: BankReceiptsService,
+  ) {}
 
   async execute(ctx: CheckoutContext): Promise<void> {
     if (ctx.replayed) return;
@@ -69,6 +81,14 @@ export class PostDepositStep implements CheckoutStep {
     const docDate = new Date().toISOString().slice(0, 10);
     const depositRepo = manager.getRepository(DepositAccountEntity);
     const movementRepo = manager.getRepository(DepositMovementEntity);
+
+    // One lookup for the whole invoice — the party is a property of the sale, not of each
+    // payment line.
+    const party = await buildPosInvoiceParty(
+      manager,
+      invoice.id,
+      ctx.actor.organizationId,
+    );
 
     for (const [idx, payment] of ctx.input.payments.entries()) {
       if (payment.paymentMethod === InvoicePaymentMethod.CASH) continue;
@@ -90,7 +110,7 @@ export class PostDepositStep implements CheckoutStep {
       account.balance = Number(account.balance) + amount;
       await depositRepo.save(account);
 
-      await movementRepo.save(
+      const movement = await movementRepo.save(
         movementRepo.create({
           organizationId: ctx.actor.organizationId,
           branchId: ctx.actor.branchId!,
@@ -107,6 +127,45 @@ export class PostDepositStep implements CheckoutStep {
           documentNumber: ctx.documentNumber,
           createdBy: ctx.actor.userId,
         }),
+      );
+
+      // Phiếu thu tiền gửi per line — unlike the cash side, which sums into one document
+      // (ADR-05): each line has its own movement and can land in a different fund.
+      if (!ctx.journalEntryId) {
+        throw new Error(
+          'post-deposit ran before its prerequisite steps populated the context',
+        );
+      }
+      const documentNumber = await mintDocumentNumber(
+        manager,
+        DocumentType.BANK_RECEIPT,
+        ctx.actor.branchId,
+        ctx.actor,
+        { ensureDefault: true }, // ADR-06
+      );
+      await this.bankReceipts.createVoucherForMovement(
+        {
+          documentNumber,
+          depositMovementId: movement.id,
+          journalEntryId: ctx.journalEntryId,
+          purpose: BankReceiptPurpose.OTHER,
+          depositAccountId: account.id,
+          contraAccountId: accounts.revenueAccountId,
+          amount,
+          docDate,
+          referenceType: BankReceiptReferenceType.INVOICE,
+          referenceId: invoice.id,
+          description: `POS sale ${ctx.documentNumber}`,
+          // A-07: the two partner-type enums share their string members.
+          partnerType: party.partnerType as unknown as BankVoucherPartnerType,
+          partnerId: party.partnerId,
+          partnerName: party.partnerName,
+          partnerAddress: party.partnerAddress,
+          payerName: party.personName,
+          collectedBy: party.staffId,
+          actor: ctx.actor,
+        },
+        manager,
       );
     }
   }

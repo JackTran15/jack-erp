@@ -30,7 +30,7 @@ import {
  * the date-based monthly layout (e.g. INV-202605-00001). Prefixes match the
  * organization's standard document-code table.
  */
-const DEFAULT_DOC_NUMBER_CONFIG: Record<
+export const DEFAULT_DOC_NUMBER_CONFIG: Record<
   DocumentType,
   { prefix: string; continuous: boolean }
 > = {

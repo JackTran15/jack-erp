@@ -83,6 +83,13 @@ export interface BankReceiptCreateForMovementArgs
   extends BankReceiptCreateAndPostArgs {
   depositMovementId: string;
   journalEntryId: string;
+  /**
+   * Pre-minted by the caller inside its own transaction (checkout saga, POS deposit
+   * consumer). Omit to let this service mint one — `DocumentNumberingService.generate`
+   * opens its own SERIALIZABLE transaction, so a number it hands out survives the caller's
+   * rollback.
+   */
+  documentNumber?: string;
 }
 
 export interface ReverseBankReceiptResult {
@@ -582,23 +589,37 @@ export class BankReceiptsService {
     manager?: EntityManager,
   ): Promise<{ voucherId: string; voucherNumber: string }> {
     const run = async (m: EntityManager) => {
-      const existing = await this.findByReference(
-        m,
-        args.referenceType,
-        args.referenceId,
-        args.actor.organizationId,
-      );
+      // One invoice can settle across several deposit lines (card + e-wallet, two swipes),
+      // each with its own movement and its own voucher. Keying replay detection on the
+      // movement keeps that grain; `(referenceType, referenceId)` alone would collapse the
+      // second line into the first line's voucher.
+      const existing = args.depositMovementId
+        ? await m.findOne(BankReceiptEntity, {
+            where: {
+              organizationId: args.actor.organizationId,
+              depositMovementId: args.depositMovementId,
+              status: Not(BankVoucherStatus.REVERSED),
+            },
+          })
+        : await this.findByReference(
+            m,
+            args.referenceType,
+            args.referenceId,
+            args.actor.organizationId,
+          );
       if (existing) {
         return {
           voucherId: existing.id,
           voucherNumber: existing.documentNumber ?? '',
         };
       }
-      const documentNumber = await this.docNumbering.generate(
-        DocumentType.BANK_RECEIPT,
-        args.actor.branchId,
-        args.actor,
-      );
+      const documentNumber =
+        args.documentNumber ??
+        (await this.docNumbering.generate(
+          DocumentType.BANK_RECEIPT,
+          args.actor.branchId,
+          args.actor,
+        ));
       const voucher = await this.insertPostedVoucher(
         m,
         args,

@@ -136,6 +136,17 @@ describe('PostJournalStep', () => {
     ]);
   });
 
+  it('hands the entry id to later steps through the context', async () => {
+    // post-cash links its Phiếu thu to this entry instead of posting a second one, so an
+    // unset slot would push it into minting its own JE.
+    const { manager } = withManager();
+    const c = ctx({ manager });
+
+    await new PostJournalStep().execute(c);
+
+    expect(c.journalEntryId).toBe('jnl-entry-1');
+  });
+
   it('a credit sale with a remainder adds a debit RECEIVABLE line for the remainder', async () => {
     const { manager, lineRepo } = withManager();
     const c = ctx({

@@ -9,6 +9,55 @@ import { DepositPeriodGuardService } from '../../deposit-period-lock/deposit-per
 import { DepositAuditService } from '../../deposit-audit/deposit-audit.service';
 import { EventPublisher } from '../../../events/event-publisher.service';
 import { DepositMovementFromPaymentPayload } from '../deposit-from-payment.publisher';
+import { BankReceiptsService } from '../../deposit-vouchers/bank-receipts/bank-receipts.service';
+import { BankVoucherPartnerType } from '../../deposit-vouchers/enums';
+import {
+  DocumentNumberRuleEntity,
+  ResetPolicy,
+} from '../../../document-numbering/document-number-rule.entity';
+import { DocumentNumberCounterEntity } from '../../../document-numbering/document-number-counter.entity';
+
+const PARTY_ROW = {
+  customer_id: 'cust-1',
+  staff_id: 'user-cashier',
+  salesperson_id: 'profile-1',
+  customer_name: 'Nguyễn Văn A',
+  customer_address: '12 Lê Lợi',
+  branch_address: '45 Nguyễn Huệ',
+  salesperson_user_id: 'user-salesperson',
+};
+
+/**
+ * The manager the consumer's transaction hands its callback. Beyond the deposit work it now
+ * also serves `mintDocumentNumber` (rule + counter) and the party lookup's raw query.
+ */
+function fakeManager(partyRows: unknown[] = [PARTY_ROW]) {
+  const ruleRepo = {
+    findOne: jest.fn().mockResolvedValue({
+      id: 'rule-nttk',
+      prefix: 'NTTK',
+      includeDate: false,
+      sequenceLength: 6,
+      resetPolicy: ResetPolicy.NEVER,
+    }),
+    create: jest.fn((x: unknown) => x),
+    save: jest.fn((x: unknown) => x),
+  };
+  const counterRepo = { create: jest.fn((x: unknown) => x), save: jest.fn((x: unknown) => x) };
+  const counterQb = {
+    setLock: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    getOne: jest.fn().mockResolvedValue({ currentValue: 0 }),
+  };
+  return {
+    getRepository: jest.fn((entity: unknown) =>
+      entity === DocumentNumberRuleEntity ? ruleRepo : counterRepo,
+    ),
+    createQueryBuilder: jest.fn((_entity: unknown) => counterQb),
+    query: jest.fn().mockResolvedValue(partyRows),
+  };
+}
 
 function event(
   over: Partial<DepositMovementFromPaymentPayload> = {},
@@ -40,7 +89,8 @@ describe('PosDepositSaleConsumer', () => {
   let audit: { record: jest.Mock };
   let eventPublisher: { publish: jest.Mock };
   let dataSource: { transaction: jest.Mock };
-  const manager = { fake: 'manager' };
+  let bankReceipts: { createVoucherForMovement: jest.Mock };
+  let manager: ReturnType<typeof fakeManager>;
 
   beforeEach(() => {
     deposit = {
@@ -56,7 +106,13 @@ describe('PosDepositSaleConsumer', () => {
     periodGuard = { assertNotLocked: jest.fn().mockResolvedValue(undefined) };
     audit = { record: jest.fn().mockResolvedValue(undefined) };
     eventPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
+    manager = fakeManager();
     dataSource = { transaction: jest.fn((cb) => cb(manager)) };
+    bankReceipts = {
+      createVoucherForMovement: jest
+        .fn()
+        .mockResolvedValue({ voucherId: 'nttk-1', voucherNumber: 'NTTK000001' }),
+    };
     consumer = new PosDepositSaleConsumer(
       dataSource as unknown as DataSource,
       deposit as unknown as DepositService,
@@ -65,6 +121,7 @@ describe('PosDepositSaleConsumer', () => {
       periodGuard as unknown as DepositPeriodGuardService,
       audit as unknown as DepositAuditService,
       eventPublisher as unknown as EventPublisher,
+      bankReceipts as unknown as BankReceiptsService,
     );
   });
 
@@ -194,5 +251,86 @@ describe('PosDepositSaleConsumer', () => {
     });
     deposit.createAndPostInternal.mockRejectedValue({ code: '23505' });
     await expect(consumer.handle(event())).resolves.toBeUndefined();
+  });
+
+  describe('Phiếu thu tiền gửi (AC-13)', () => {
+    const depositTarget = {
+      fund: TargetFund.DEPOSIT,
+      depositAccountId: 'acc1',
+      feeRate: '0',
+      settlementDays: 0,
+    };
+
+    it('issues a voucher-only receipt naming the customer, staff in collectedBy', async () => {
+      routing.resolveDepositTarget.mockResolvedValue(depositTarget);
+
+      await consumer.handle(event());
+
+      expect(bankReceipts.createVoucherForMovement).toHaveBeenCalledTimes(1);
+      const [args, passedManager] = bankReceipts.createVoucherForMovement.mock.calls[0];
+      expect(args).toEqual(
+        expect.objectContaining({
+          depositMovementId: 'mv1',
+          journalEntryId: 'je1',
+          referenceId: 'inv1',
+          amount: 1135000,
+          partnerType: BankVoucherPartnerType.CUSTOMER,
+          partnerId: 'cust-1',
+          payerName: 'Nguyễn Văn A',
+          partnerAddress: '12 Lê Lợi',
+          collectedBy: 'user-salesperson',
+        }),
+      );
+      expect(args.staffId).toBeUndefined();
+      expect(passedManager).toBe(manager);
+    });
+
+    it('mints the number through the consumer transaction (ADR-06 applies here too)', async () => {
+      routing.resolveDepositTarget.mockResolvedValue(depositTarget);
+
+      await consumer.handle(event());
+
+      const [args] = bankReceipts.createVoucherForMovement.mock.calls[0];
+      expect(args.documentNumber).toBe('NTTK000001');
+    });
+
+    it('does not issue a second receipt on a replayed movement', async () => {
+      // Same guard the fee leg uses: a replay means the first delivery already committed
+      // both the movement and its document.
+      routing.resolveDepositTarget.mockResolvedValue(depositTarget);
+      deposit.createAndPostInternal.mockResolvedValue({
+        movement: { id: 'mv1' },
+        journalEntryId: 'je1',
+        replayed: true,
+      });
+
+      await consumer.handle(event());
+
+      expect(bankReceipts.createVoucherForMovement).not.toHaveBeenCalled();
+    });
+
+    it('issues no receipt for a line that maps to no deposit fund', async () => {
+      routing.resolveDepositTarget.mockResolvedValue({
+        fund: TargetFund.OTHER,
+        feeRate: '0',
+        settlementDays: 0,
+      });
+
+      await consumer.handle(event());
+
+      expect(bankReceipts.createVoucherForMovement).not.toHaveBeenCalled();
+    });
+
+    it('still issues the receipt when the party lookup resolves nothing (AC-14)', async () => {
+      routing.resolveDepositTarget.mockResolvedValue(depositTarget);
+      manager.query.mockResolvedValue([]);
+
+      await consumer.handle(event());
+
+      const [args] = bankReceipts.createVoucherForMovement.mock.calls[0];
+      expect(args.amount).toBe(1135000);
+      expect(args.partnerId).toBeUndefined();
+      expect(args.collectedBy).toBeUndefined();
+    });
   });
 });

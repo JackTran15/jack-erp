@@ -12,6 +12,7 @@ import { CashRefundPayload } from '../../publishers/cash-refund.publisher';
 import { CashPaymentsService } from '../cash-payments/cash-payments.service';
 import { CashPaymentPurpose, CashPaymentReferenceType } from '../enums';
 import { CashVoucherCategoryResolverService } from '../shared/category-resolver.service';
+import { buildPosInvoiceParty } from '../shared/voucher-party';
 
 /**
  * POS return/exchange refund paid in cash → records the WITHDRAWAL and issues a
@@ -79,6 +80,14 @@ export class RefundCashConsumer {
         'CHI_KHAC',
       );
 
+      // Who the money goes back to. The return invoice carries its own customer and
+      // salesperson, so there is nothing to trace back to the original sale.
+      const party = await buildPosInvoiceParty(
+        manager,
+        returnInvoiceId,
+        organizationId,
+      );
+
       const result = await this.cashPaymentsService.createVoucherForMovement(
         {
           cashMovementId: movement.id,
@@ -91,6 +100,12 @@ export class RefundCashConsumer {
           referenceId: returnInvoiceId,
           description: `Hoàn tiền trả hàng ${returnInvoiceCode}`,
           categoryId,
+          partnerType: party.partnerType,
+          partnerId: party.partnerId,
+          partnerName: party.partnerName,
+          partnerAddress: party.partnerAddress,
+          payeeName: party.personName,
+          staffId: party.staffId,
           actor,
         },
         manager,

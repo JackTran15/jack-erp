@@ -67,6 +67,12 @@ export interface CashReceiptCreateForMovementArgs
   extends CashReceiptCreateAndPostArgs {
   cashMovementId: string;
   journalEntryId: string;
+  /**
+   * Pre-minted by the caller inside its own transaction (checkout saga). Omit to let this
+   * service mint one — `DocumentNumberingService.generate` opens its own SERIALIZABLE
+   * transaction, so a number it hands out survives the caller's rollback.
+   */
+  documentNumber?: string;
 }
 
 export interface ReverseResult {
@@ -554,11 +560,13 @@ export class CashReceiptsService {
           voucherNumber: existing.documentNumber ?? '',
         };
       }
-      const documentNumber = await this.docNumbering.generate(
-        DocumentType.CASH_RECEIPT,
-        args.actor.branchId,
-        args.actor,
-      );
+      const documentNumber =
+        args.documentNumber ??
+        (await this.docNumbering.generate(
+          DocumentType.CASH_RECEIPT,
+          args.actor.branchId,
+          args.actor,
+        ));
       const voucher = await this.insertPostedVoucher(
         m,
         args,

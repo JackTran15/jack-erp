@@ -1,10 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { DomainEvent, DepositMovementSource } from '@erp/shared-interfaces';
 import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { OnDomainEvent } from '../../../events/decorators/on-event.decorator';
 import { DepositRefundPayload } from '../../publishers/deposit-refund.publisher';
 import { BankPaymentsService } from '../bank-payments/bank-payments.service';
-import { BankPaymentPurpose, BankPaymentReferenceType } from '../enums';
+import { BankPaymentPurpose, BankPaymentReferenceType, BankVoucherPartnerType } from '../enums';
+import { buildPosInvoiceParty } from '../../cash-vouchers/shared/voucher-party';
 
 /**
  * POS return/exchange refund routed to a deposit fund → records a deposit
@@ -18,7 +20,10 @@ import { BankPaymentPurpose, BankPaymentReferenceType } from '../enums';
 export class RefundBankConsumer {
   private readonly logger = new Logger(RefundBankConsumer.name);
 
-  constructor(private readonly bankPayments: BankPaymentsService) {}
+  constructor(
+    private readonly bankPayments: BankPaymentsService,
+    private readonly dataSource: DataSource,
+  ) {}
 
   @OnDomainEvent(ERP_TOPICS.DEPOSIT_REFUND, {
     groupId: 'erp-api.return.deposit-refund',
@@ -38,6 +43,12 @@ export class RefundBankConsumer {
 
     const actor = { userId: actorId, organizationId, branchId, roles: [] };
 
+    const party = await buildPosInvoiceParty(
+      this.dataSource.manager,
+      returnInvoiceId,
+      organizationId,
+    );
+
     const result = await this.bankPayments.createAndPostInternal({
       purpose: BankPaymentPurpose.REFUND,
       depositAccountId,
@@ -50,6 +61,15 @@ export class RefundBankConsumer {
       source: DepositMovementSource.POS_INVOICE,
       sourceRefLineId: 'REFUND',
       description: `Hoàn tiền trả hàng ${returnInvoiceCode}`,
+      // A-07: CashVoucherPartnerType and BankVoucherPartnerType are separate enums with
+      // identical string members; bridged here rather than by widening the shared snapshot.
+      partnerType: party.partnerType as unknown as BankVoucherPartnerType,
+      partnerId: party.partnerId,
+      partnerName: party.partnerName,
+      partnerAddress: party.partnerAddress,
+      payeeName: party.personName,
+      // Bank vouchers keep the staff member in paid_by, not staff_id.
+      paidBy: party.staffId,
     });
 
     this.logger.log(

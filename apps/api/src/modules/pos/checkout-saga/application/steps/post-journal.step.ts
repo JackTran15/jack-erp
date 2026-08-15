@@ -128,5 +128,8 @@ export class PostJournalStep implements CheckoutStep {
         }),
       ),
     );
+
+    // post-cash links its Phiếu thu to this entry rather than posting a second one.
+    ctx.journalEntryId = savedEntry.id;
   }
 }
