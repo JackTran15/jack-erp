@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { TEMP_WAREHOUSE_OUT_STATUS_OPTIONS } from "@erp/shared-interfaces";
 import {
   StorageReportShell,
   resolveLabel,
@@ -35,12 +36,6 @@ const NUMERIC_COLUMNS = new Set([
   "saleQty",
   "remainingQty",
 ]);
-
-const STATUS_OPTIONS = [
-  { value: "Bán hàng trưng bày", label: "Bán hàng trưng bày" },
-  { value: "Trả hàng trưng bày", label: "Trả hàng trưng bày" },
-  { value: "Xuất không bán", label: "Xuất không bán" },
-];
 
 export function TemporaryIssuesReportPage() {
   const filterFields: FilterField[] = [
@@ -128,7 +123,7 @@ export function TemporaryIssuesReportPage() {
       width: 170,
       render: (r) => <StatusBadge variant="neutral">{r.status}</StatusBadge>,
       filterKind: "select",
-      filterOptions: STATUS_OPTIONS,
+      filterOptions: TEMP_WAREHOUSE_OUT_STATUS_OPTIONS,
     },
     {
       key: "invoice",

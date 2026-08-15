@@ -1,0 +1,153 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: temp-warehouse-sale-status
+slug: temp-warehouse-sale-status
+profile: none
+created: 2026-08-15T11:29:52
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-08-15T11:31:33
+    by: Loc Tran
+    evidence: architecture map verified by Akenzy      # signed 2026-07-27 after reviewing the Verified detail section; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-08-15T11:33:27
+    by: Loc Tran
+    evidence: 13 assumptions, none blocking-and-pending; 14 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-15T11:35:24
+    by: Loc Tran
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-15T11:40:03
+    by: Loc Tran
+    evidence: graph valid - 3 UoW, 6 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-15T11:40:14
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-15T11:42:51
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-15T11:42:51
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-15T11:43:28
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-15T11:58:58
+    by: code-review
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-15T11:58:58
+    by: code-review
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-15T11:59:09
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-15T12:03:21
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-15T12:03:31
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-15T12:05:04
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done
+    at: 2026-08-15T12:29:49
+    by: code-review
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-15T12:29:49
+    by: code-review
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-15T12:31:19
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-15T12:48:06
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-15T12:48:14
+    by: claude
+    ticket: T-03-01
+  - gate: G1
+    action: reopened
+    at: 2026-08-15T12:57:46
+    by: Loc Tran
+    reason: Chu so huu chot 2026-08-15 - bo nguon ban showroom khoi bao cao. Nguon moi lam bao cao phinh tu 7 len 71 dong tren erp_dev (64/71 = hang chua tung vao kho tam), sai voi pham vi 'Hang hoa xuat kho tam'. Giu lai duy nhat phan doi nhan Ban hang kho tam. AC-02/03/05/06/07/08 khong con ap dung.
+  - gate: G1
+    action: passed
+    at: 2026-08-15T13:10:23
+    by: Loc Tran
+    evidence: 13 assumptions, none blocking-and-pending; 8 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-15T13:10:23
+    by: Loc Tran
+    evidence: 5 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-15T13:10:24
+    by: Loc Tran
+    evidence: graph valid - 3 UoW, 7 tickets, no cycles
+  - gate: G4
+    action: ticket done
+    at: 2026-08-15T13:29:11
+    by: code-review
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-15T13:29:12
+    by: claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-15T13:29:12
+    by: claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done
+    at: 2026-08-15T13:29:12
+    by: code-review
+    ticket: T-02-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-15T13:31:13
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-15T13:39:10
+    by: code-review
+    ticket: T-03-01

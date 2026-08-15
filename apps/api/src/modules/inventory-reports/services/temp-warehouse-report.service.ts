@@ -25,8 +25,24 @@ import {
  *     nghĩa là dòng đó được xử lý chuyển kho thủ công, không phải nhập/trả
  *     bình thường.
  *
- * Trạng thái (ưu tiên theo thứ tự, dừng ở nhánh khớp đầu tiên):
- *   - Dòng xuất có invoice_id           → "Bán hàng trưng bày".
+ * PHẠM VI: báo cáo chỉ đọc `temp_warehouse_lines`. Hàng ĐÃ trưng sẵn ở showroom
+ * khi bán KHÔNG có mặt ở đây — nghiệp vụ đó không sinh dòng nào trong bảng này
+ * (POS trừ tồn thẳng từ vị trí showroom qua
+ * `resolveBranchItemLocations(..., { showroomOnly: true })`, và
+ * `fulfillInvoiceFromTempWarehouse` thoát sớm khi không có dòng nào staged).
+ * Một nguồn thứ hai lấy từ `invoice_items` đã được cài rồi GỠ: nó chiếm 64/71
+ * dòng trên dữ liệu thật, tức 90% nội dung của một báo cáo tên "xuất kho tạm"
+ * lại là hàng không xuất kho tạm. Xem ADR-05 trong
+ * `.ai/features/temp-warehouse-sale-status/03-logical-design.md`. Cần con số bán
+ * hàng trưng bày thì dùng báo cáo doanh thu, không phải báo cáo này.
+ *
+ * Trạng thái (ưu tiên theo thứ tự, dừng ở nhánh khớp đầu tiên). THỨ TỰ NHÁNH LÀ
+ * RÀNG BUỘC ĐÚNG-ĐẮN, không phải phong cách:
+ *   - Dòng xuất có invoice_id           → "Bán hàng kho tạm" (hàng lấy từ kho,
+ *     scan vào kho tạm rồi mới bán). Chỉ `fulfillInvoiceFromTempWarehouse` ghi
+ *     cột đó và nó chỉ tiêu thụ dòng `warehouse_to_showroom`, nên nhánh này
+ *     KHÔNG BAO GIỜ là hàng trưng bày — đó là lý do nhãn cũ ("Bán hàng trưng
+ *     bày") sai và đã đổi.
  *   - Dòng xuất có transfer_id (không bán) → "Chuyển kho xuất đi".
  *   - Dòng trả có transfer_id           → "Chuyển kho trả lại" (kiểm tra
  *     trước cả nhánh cân bằng, vì 1 cặp ghép FIFO có thể vẫn "cân bằng" số
@@ -66,6 +82,21 @@ import {
  * Lọc: `status NOT IN ('DELETED','AUTO_BALANCED')` (loại dòng cân bằng tự động
  * vì không có carrier / không phải sự kiện xuất-trả thực; giữ ACTIVE/TRANSFERRED)
  * + chỉ 2 chiều xuất/trả + `created_at IN [startDate, endDate)`.
+ *
+ * ⚠ BIÊN KỲ LỆCH THEO MÚI GIỜ TIẾN TRÌNH (defect có sẵn, chưa sửa).
+ * `created_at` là `timestamp WITHOUT time zone` giữ giờ UTC, nhưng `$2`/`$3` là
+ * `Date` của JS. node-postgres gửi Date kèm offset local (`...+07:00`), Postgres
+ * bỏ offset và giữ giờ tường ⇒ biên kỳ dịch đúng bằng offset múi giờ của tiến
+ * trình API. Bằng 0 trong container UTC, 7 giờ trên máy dev Asia/Saigon. Đo được:
+ *   ($1::timestamp)::text với param 2026-08-01T00:00:00Z  →  2026-08-01 07:00:00
+ * Không đụng tới trong tính năng này (vị từ có trước); sửa thì ép rõ kiểu ở cả
+ * hai phía và soát các service báo cáo khác dùng cùng khuôn.
+ *
+ * Báo cáo KHÔNG join `invoices`: tín hiệu "đã bán" chỉ là `invoice_id IS NOT NULL`
+ * trên chính dòng kho tạm. Nên hóa đơn bị HỦY sau khi đã tiêu thụ kho tạm vẫn
+ * hiện là "Bán hàng kho tạm" — `cancel-invoice.service.ts` không đụng
+ * `temp_warehouse_lines`. Defect có sẵn, chưa sửa; có test e2e khóa hành vi hiện
+ * tại để lần sửa sau là có chủ đích.
  */
 
 export interface TempWarehouseIssueRow {
@@ -268,7 +299,7 @@ export class TempWarehouseReportService {
         -- phải tồn kho hiện tại của mặt hàng. Có thể âm với dòng trả lẻ.
         (p.out_qty - p.return_qty - (p.invoice_id IS NOT NULL)::int) AS remaining_qty,
         CASE
-          WHEN p.invoice_id IS NOT NULL THEN 'Bán hàng trưng bày'
+          WHEN p.invoice_id IS NOT NULL THEN 'Bán hàng kho tạm'
           WHEN p.exp_transfer_id IS NOT NULL THEN 'Chuyển kho xuất đi'
           WHEN p.ret_transfer_id IS NOT NULL THEN 'Chuyển kho trả lại'
           WHEN p.return_qty = p.out_qty THEN ''
