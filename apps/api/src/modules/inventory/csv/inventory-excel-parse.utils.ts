@@ -1,3 +1,4 @@
+import * as XLSX from 'xlsx';
 import {
   InventoryImportExcelField,
   type InventoryImportExcelRow,
@@ -25,6 +26,7 @@ function isNoFlag(normalized: string): boolean {
  * Parse numbers from import cells or DB decimals.
  * - `350.000` (VN thousands) → 350000
  * - `350000.00` (SQL decimal) → 350000
+ * - `270,000.00` (en-US, as SheetJS formats cells) → 270000
  */
 export function parseGroupedDecimal(
   value: string | undefined,
@@ -32,6 +34,20 @@ export function parseGroupedDecimal(
   if (value === undefined || value === null) return undefined;
   const trimmed = String(value).trim();
   if (!trimmed) return undefined;
+
+  const lastDot = trimmed.lastIndexOf('.');
+  const lastComma = trimmed.lastIndexOf(',');
+  if (lastDot >= 0 && lastComma >= 0) {
+    // Both separators present, so there is no ambiguity: the right-most one is
+    // the decimal mark and the other groups thousands.
+    const decimalSeparator = lastDot > lastComma ? '.' : ',';
+    const groupSeparator = decimalSeparator === '.' ? ',' : '.';
+    const n = Number(
+      trimmed.split(groupSeparator).join('').replace(decimalSeparator, '.'),
+    );
+    if (Number.isNaN(n) || n < 0) return undefined;
+    return n;
+  }
 
   if (/^\d+,\d+$/.test(trimmed)) {
     const n = Number(trimmed.replace(',', '.'));
@@ -128,6 +144,40 @@ export function isOleExcelBuffer(buffer: Buffer): boolean {
 
 export function isCsvFile(fileName: string): boolean {
   return fileName.toLowerCase().endsWith('.csv');
+}
+
+/**
+ * SheetJS renders cells with the en-US locale, so a `#,##0` money cell holding
+ * 270000 comes back as `"270,000"` — indistinguishable from the VN decimal
+ * `270,000`, which `parseGroupedDecimal` reads as 270. Import parsers therefore
+ * read the displayed text for label columns (it keeps leading zeros on numeric
+ * SKUs and barcodes, and dates stay human-readable) and the raw values for the
+ * numeric columns. Both grids walk the same sheet range, so indexes line up.
+ */
+export function sheetToGrids(sheet: XLSX.WorkSheet): {
+  display: unknown[][];
+  raw: unknown[][];
+} {
+  return {
+    display: XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+      header: 1,
+      defval: '',
+      raw: false,
+    }),
+    raw: XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+      header: 1,
+      defval: '',
+      raw: true,
+    }),
+  };
+}
+
+/** Value for a numeric import column: raw cell value, falling back to text. */
+export function numericCellToString(
+  rawCell: unknown,
+  displayValue: string,
+): string {
+  return typeof rawCell === 'number' ? String(rawCell) : displayValue;
 }
 
 export function cellToString(value: unknown): string {
