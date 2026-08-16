@@ -13,7 +13,9 @@ import {
   cellToString,
   isOleExcelBuffer,
   isZipExcelBuffer,
+  numericCellToString,
   parseGroupedDecimal,
+  sheetToGrids,
 } from "./inventory-excel-parse.utils";
 import { findImportStorage } from "./resolve-import-storage.util";
 
@@ -61,6 +63,13 @@ export interface GoodsReceiptValidationResult {
 
 const FIELD_ORDER = Object.values(GOODS_RECEIPT_IMPORT_FIELDS);
 
+/** Columns read from the cell's raw value instead of its displayed text. */
+const NUMERIC_FIELDS = new Set<string>([
+  GOODS_RECEIPT_IMPORT_FIELDS.QUANTITY,
+  GOODS_RECEIPT_IMPORT_FIELDS.UNIT_PRICE,
+  GOODS_RECEIPT_IMPORT_FIELDS.LINE_TOTAL,
+]);
+
 @Injectable()
 export class ExcelImportGoodsReceiptService {
   constructor(
@@ -106,13 +115,8 @@ export class ExcelImportGoodsReceiptService {
       }
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       if (!sheet) throw new BadRequestException("Tệp Excel không có sheet dữ liệu");
-      return this.parseGrid(
-        XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-          header: 1,
-          defval: "",
-          raw: false,
-        }),
-      );
+      const { display, raw } = sheetToGrids(sheet);
+      return this.parseGrid(display, raw);
     }
     throw new BadRequestException(
       "Định dạng tệp Excel không hợp lệ. Vui lòng dùng .xlsx hoặc .xls",
@@ -128,13 +132,8 @@ export class ExcelImportGoodsReceiptService {
     }
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     if (!sheet) return [];
-    return this.parseGrid(
-      XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-        header: 1,
-        defval: "",
-        raw: false,
-      }),
-    );
+    const { display, raw } = sheetToGrids(sheet);
+    return this.parseGrid(display, raw);
   }
 
   async validateAndNormalizeRow(
@@ -278,7 +277,10 @@ export class ExcelImportGoodsReceiptService {
     return Buffer.from(buffer);
   }
 
-  private parseGrid(grid: unknown[][]): GoodsReceiptImportRow[] {
+  private parseGrid(
+    grid: unknown[][],
+    rawGrid: unknown[][] = grid,
+  ): GoodsReceiptImportRow[] {
     const normalized = grid.map((row) => row.map(cellToString));
     const headerIndex = normalized.findIndex((row) =>
       row.some((cell) =>
@@ -313,14 +315,19 @@ export class ExcelImportGoodsReceiptService {
     }
     return normalized
       .slice(headerIndex + 1)
-      .map((source) => {
+      .map((source, offset) => {
+        const rawSource = rawGrid[headerIndex + 1 + offset] ?? [];
         const row: GoodsReceiptImportRow = {};
         headers.forEach((header, index) => {
           const field = FIELD_ORDER.find(
             (candidate) =>
               this.normalizeHeader(candidate) === this.normalizeHeader(header),
           );
-          if (field) row[field] = source[index]?.trim() ?? "";
+          if (!field) return;
+          const display = source[index]?.trim() ?? "";
+          row[field] = NUMERIC_FIELDS.has(field)
+            ? numericCellToString(rawSource[index], display)
+            : display;
         });
         return row;
       })

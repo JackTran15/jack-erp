@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { formatMoneyInteger } from "@erp/ui";
 import {
   BaseDataTable,
   type TableColumn,
@@ -57,9 +58,9 @@ const columns: TableColumn<ReviewRow>[] = [
     width: 130,
     className: "text-right",
     render: (row) =>
-      Number(
-        row.normalizedData?.unitPrice ?? row.rawData["Đơn giá"] ?? 0,
-      ).toLocaleString("vi-VN"),
+      row.normalizedData
+        ? formatMoneyInteger(row.normalizedData.unitPrice)
+        : String(row.rawData["Đơn giá"] ?? ""),
   },
   {
     key: "status",

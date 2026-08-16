@@ -1,4 +1,5 @@
 import * as ExcelJS from "exceljs";
+import * as XLSX from "xlsx";
 import { ActorContext } from "../../../common/decorators/actor-context.decorator";
 import {
   ExcelImportGoodsReceiptService,
@@ -55,6 +56,58 @@ describe("ExcelImportGoodsReceiptService", () => {
         [GOODS_RECEIPT_IMPORT_FIELDS.STORAGE]: "Kho chính",
         [GOODS_RECEIPT_IMPORT_FIELDS.QUANTITY]: "2",
         [GOODS_RECEIPT_IMPORT_FIELDS.UNIT_PRICE]: "15000",
+      }),
+    ]);
+  });
+
+  it("reads grouped money cells from a .xls file at full value", async () => {
+    // SheetJS renders a `#,##0` cell as the en-US string "270,000"; parsing that
+    // text as VN (comma = decimal mark) used to yield 270 instead of 270000.
+    // Laid out like the real MShopKeeper file: title rows above a row-6 header,
+    // empty columns C/D, hidden columns H–J, and "Đơn giá" over in column K.
+    const sheet: XLSX.WorkSheet = {
+      "!ref": "A1:K8",
+      A1: { t: "s", v: "Nhập khẩu hàng hóa nhập kho" },
+      A6: { t: "s", v: "Mã SKU (*)" },
+      B6: { t: "s", v: "Mã vạch (*)" },
+      C6: { t: "s", v: "Tên hàng hóa" },
+      D6: { t: "s", v: "Đơn vị tính" },
+      E6: { t: "s", v: "Kho" },
+      F6: { t: "s", v: "Vị trí" },
+      G6: { t: "s", v: "Số lượng (*)" },
+      K6: { t: "s", v: "Đơn giá" },
+      A7: { t: "s", v: "DNGUAB064-D-39" },
+      B7: { t: "s", v: "DNGUAB064-D-39" },
+      E7: { t: "s", v: "KHO SG" },
+      F7: { t: "s", v: "A01.01" },
+      G7: { t: "n", v: 4 },
+      K7: { t: "n", v: 270000, z: "#,##0" },
+      A8: { t: "s", v: "HQSAZ125-D-35" },
+      B8: { t: "s", v: "HQSAZ125-D-35" },
+      E8: { t: "s", v: "KHO SG" },
+      F8: { t: "s", v: "A01.01" },
+      G8: { t: "n", v: 6 },
+      K8: { t: "n", v: 198000, z: "#,##0.00" },
+    };
+    const buffer = XLSX.write(
+      { SheetNames: ["S"], Sheets: { S: sheet } },
+      { type: "buffer", bookType: "xls" },
+    ) as Buffer;
+
+    const rows = await service.parseWorkbook(buffer);
+
+    expect(rows).toEqual([
+      expect.objectContaining({
+        [GOODS_RECEIPT_IMPORT_FIELDS.SKU]: "DNGUAB064-D-39",
+        [GOODS_RECEIPT_IMPORT_FIELDS.STORAGE]: "KHO SG",
+        [GOODS_RECEIPT_IMPORT_FIELDS.LOCATION]: "A01.01",
+        [GOODS_RECEIPT_IMPORT_FIELDS.QUANTITY]: "4",
+        [GOODS_RECEIPT_IMPORT_FIELDS.UNIT_PRICE]: "270000",
+      }),
+      expect.objectContaining({
+        [GOODS_RECEIPT_IMPORT_FIELDS.SKU]: "HQSAZ125-D-35",
+        [GOODS_RECEIPT_IMPORT_FIELDS.QUANTITY]: "6",
+        [GOODS_RECEIPT_IMPORT_FIELDS.UNIT_PRICE]: "198000",
       }),
     ]);
   });

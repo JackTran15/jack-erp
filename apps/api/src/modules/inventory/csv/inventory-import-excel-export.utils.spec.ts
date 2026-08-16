@@ -32,6 +32,19 @@ describe("inventory-import-excel-export.utils", () => {
     ).toBe(350000);
   });
 
+  it("reads the right-most separator as the decimal mark when both appear", () => {
+    // SheetJS formats cells with the en-US locale: `#,##0.00` → "270,000.00".
+    expect(parseGroupedDecimal("270,000.00")).toBe(270000);
+    expect(parseGroupedDecimal("1.234.567,89")).toBe(1234567.89);
+    expect(parseGroupedDecimal("1,234,567.89")).toBe(1234567.89);
+  });
+
+  it("keeps the VN convention when a single separator kind appears", () => {
+    expect(parseGroupedDecimal("270.000")).toBe(270000);
+    expect(parseGroupedDecimal("0,5")).toBe(0.5);
+    expect(parseGroupedDecimal("1.234.567")).toBe(1234567);
+  });
+
   it("writes money columns as MISA-style grouped text", () => {
     const wb = new ExcelJS.Workbook();
     const sheet = wb.addWorksheet("t");

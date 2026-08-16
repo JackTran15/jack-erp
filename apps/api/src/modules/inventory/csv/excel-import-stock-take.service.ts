@@ -15,7 +15,9 @@ import {
   cellToString,
   isOleExcelBuffer,
   isZipExcelBuffer,
+  numericCellToString,
   parseGroupedDecimal,
+  sheetToGrids,
 } from "./inventory-excel-parse.utils";
 
 export const STOCK_TAKE_IMPORT_FIELDS = {
@@ -137,13 +139,8 @@ export class ExcelImportStockTakeService {
       if (!sheet) {
         throw new BadRequestException("Tệp Excel không có sheet dữ liệu");
       }
-      return this.parseGrid(
-        XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-          header: 1,
-          defval: "",
-          raw: false,
-        }),
-      );
+      const { display, raw } = sheetToGrids(sheet);
+      return this.parseGrid(display, raw);
     }
     throw new BadRequestException(
       "Định dạng tệp Excel không hợp lệ. Vui lòng dùng .xlsx hoặc .xls",
@@ -161,13 +158,8 @@ export class ExcelImportStockTakeService {
     }
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     if (!sheet) return [];
-    return this.parseGrid(
-      XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-        header: 1,
-        defval: "",
-        raw: false,
-      }),
-    );
+    const { display, raw } = sheetToGrids(sheet);
+    return this.parseGrid(display, raw);
   }
 
   isEmptyCountRow(
@@ -305,7 +297,10 @@ export class ExcelImportStockTakeService {
     );
   }
 
-  private parseGrid(grid: unknown[][]): StockTakeImportRow[] {
+  private parseGrid(
+    grid: unknown[][],
+    rawGrid: unknown[][] = grid,
+  ): StockTakeImportRow[] {
     const normalized = grid.map((row) => row.map(cellToString));
     // startsWith thay vì includes: tránh nhầm khối hướng dẫn
     // (có nhắc tới "Mã SKU" giữa câu) thành dòng header.
@@ -368,6 +363,7 @@ export class ExcelImportStockTakeService {
     const dataStartIndex = headerIndex + (hasGroupedHeader ? 2 : 1);
     for (let index = dataStartIndex; index < normalized.length; index++) {
       const source = normalized[index] ?? [];
+      const rawSource = rawGrid[index] ?? [];
       const firstValue = source.find((value) => value.trim())?.trim() ?? "";
       const normalizedFirstValue = this.normalizeHeader(firstValue);
       if (normalizedFirstValue.startsWith("ii.")) break;
@@ -402,10 +398,17 @@ export class ExcelImportStockTakeService {
                 source[serialIndex]?.trim() ?? "",
             }
           : {}),
-        [STOCK_TAKE_IMPORT_FIELDS.COUNTED_QTY]:
+        [STOCK_TAKE_IMPORT_FIELDS.COUNTED_QTY]: numericCellToString(
+          rawSource[countedQtyIndex],
           source[countedQtyIndex]?.trim() ?? "",
+        ),
         [STOCK_TAKE_IMPORT_FIELDS.COUNTED_VALUE]:
-          countedValueIndex >= 0 ? source[countedValueIndex]?.trim() ?? "" : "",
+          countedValueIndex >= 0
+            ? numericCellToString(
+                rawSource[countedValueIndex],
+                source[countedValueIndex]?.trim() ?? "",
+              )
+            : "",
         [STOCK_TAKE_IMPORT_FIELDS.REASON]:
           reasonIndex >= 0 ? source[reasonIndex]?.trim() ?? "" : "",
       });

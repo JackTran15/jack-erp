@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { StockTakeStatus } from "@erp/shared-interfaces";
 import * as ExcelJS from "exceljs";
+import * as XLSX from "xlsx";
 import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 import { ActorContext } from "../../../common/decorators/actor-context.decorator";
@@ -122,6 +123,38 @@ describe("ExcelImportStockTakeService", () => {
         [STOCK_TAKE_IMPORT_FIELDS.COUNTED_QTY]: expect.any(String),
       }),
     );
+  });
+
+  it("reads grouped money cells from a .xls file at full value", async () => {
+    // SheetJS renders a `#,##0` cell as the en-US string "270,000"; parsing that
+    // text as VN (comma = decimal mark) used to yield 270 instead of 270000.
+    const sheet: XLSX.WorkSheet = {
+      "!ref": "A1:E2",
+      A1: { t: "s", v: "Mã SKU (*)" },
+      B1: { t: "s", v: "Vị trí" },
+      C1: { t: "s", v: "Hạn sử dụng" },
+      D1: { t: "s", v: "Số lượng kiểm kê" },
+      E1: { t: "s", v: "Giá trị kiểm kê" },
+      A2: { t: "s", v: "SKU-1" },
+      B2: { t: "s", v: "A01" },
+      C2: { t: "s", v: "31/12/2026" },
+      D2: { t: "n", v: 9 },
+      E2: { t: "n", v: 270000, z: "#,##0" },
+    };
+    const buffer = XLSX.write(
+      { SheetNames: ["S"], Sheets: { S: sheet } },
+      { type: "buffer", bookType: "xls" },
+    ) as Buffer;
+
+    await expect(service.parseWorkbook(buffer)).resolves.toEqual([
+      expect.objectContaining({
+        [STOCK_TAKE_IMPORT_FIELDS.SKU]: "SKU-1",
+        [STOCK_TAKE_IMPORT_FIELDS.LOCATION]: "A01",
+        [STOCK_TAKE_IMPORT_FIELDS.EXPIRY_DATE]: "31/12/2026",
+        [STOCK_TAKE_IMPORT_FIELDS.COUNTED_QTY]: "9",
+        [STOCK_TAKE_IMPORT_FIELDS.COUNTED_VALUE]: "270000",
+      }),
+    ]);
   });
 
   it("treats a blank count as zero instead of skipping the row", () => {
