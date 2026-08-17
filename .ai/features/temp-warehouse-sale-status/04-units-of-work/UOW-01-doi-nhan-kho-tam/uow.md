@@ -1,14 +1,14 @@
 ---
 id: UOW-01
 slug: doi-nhan-kho-tam
-title: Dòng bán qua kho tạm đọc là "Bán hàng kho tạm", bộ lọc trạng thái đúng 5 giá trị
+title: Hai luồng bán có hai nhãn riêng, bộ lọc trạng thái đúng 6 giá trị
 demoable: true
 duration: 1d
 depends_on: []
 requirements: [US-01, US-02]
-verifies: [AC-01, AC-02, AC-03, AC-04, AC-05]   # AC có ẢNH CHỤP; AC-06/AC-07 xem 07-verification.md
+verifies: [AC-01, AC-02, AC-03, AC-04, AC-05, AC-09, AC-10]   # AC có ẢNH CHỤP; AC-06/07/11/12 xem 07-verification.md
 risk: low
-status: todo
+status: done
 rollback: revert commit; không đổi schema, không đổi hợp đồng API — chỉ một chuỗi hiển thị và một danh sách filter
 ---
 
@@ -24,7 +24,7 @@ Sau khi UOW-02 bị gỡ (ADR-05), đây là **toàn bộ** thay đổi hành vi
 2. Vào Báo cáo → Hàng hóa xuất kho tạm, đặt kỳ "Tháng này", bấm Lấy dữ liệu
 3. Mọi dòng có số ở cột "Hóa đơn bán" đọc **"Bán hàng kho tạm"** (trước đây là "Bán hàng trưng bày")
 4. Các dòng "Chuyển kho xuất đi" / "Xuất không bán" giữ nguyên nhãn như trước
-5. Mở bộ lọc cột "Trạng thái" → liệt kê đúng 5 giá trị, không có giá trị nào lọc ra rỗng
+5. Mở bộ lọc cột "Trạng thái" → liệt kê đúng 6 giá trị, không có giá trị nào lọc ra rỗng
 6. Chọn "Bán hàng kho tạm" → lưới chỉ còn dòng đó, footer cộng theo
 7. Lặp bước 5–6 ở chế độ chuỗi cửa hàng (`/reports/inventory`, chọn báo cáo Hàng hóa xuất kho tạm)
 
@@ -63,11 +63,11 @@ Hai AC không có mặt ở đây, lý do đầy đủ trong `07-verification.md
 ## Definition of done
 - [x] AC-01..AC-07 pass
 - [x] `pnpm --filter @erp/api test` xanh — 217 suite / 1991 test
-- [x] `TEMP_WAREHOUSE_OUT_STATUS_OPTIONS` là nơi duy nhất liệt kê 5 giá trị
+- [x] `TEMP_WAREHOUSE_OUT_STATUS_OPTIONS` là nơi duy nhất liệt kê 6 giá trị
 - [x] Demo chạy trên máy thật, có ảnh chụp — `evidence/local-backoffice/desktop/S1..S4.png`
 
 ## Verification evidence
-- [x] `verify.py --write` xanh trên `local-backoffice` — 4/4 bước
-- [x] Có bằng chứng cho mọi AC trong `verifies` (AC-01..AC-05), ở viewport desktop
-- [x] `08-evidence.md` đã sinh lại; `evidence_check.py` xác nhận sha `baff9990` khớp HEAD
+- [x] `verify.py --write` xanh trên `local-backoffice` — 8/8 bước
+- [x] Có bằng chứng cho mọi AC trong `verifies`, ở viewport desktop
+- [x] `08-evidence.md` sinh lại; `evidence_check.py` xác nhận sha khớp HEAD
 - [ ] Bản nháp PR đã chép và contact sheet đã đính vào mô tả PR

@@ -8,7 +8,7 @@ depends_on: [UOW-01, UOW-02]
 requirements: [US-03]
 verifies: []   # AC-08 không có bề mặt chụp được — xem ghi chú dưới
 risk: low
-status: todo
+status: done
 rollback: revert commit; chỉ chạm spec của report definition, không chạm đường sinh dữ liệu
 ---
 

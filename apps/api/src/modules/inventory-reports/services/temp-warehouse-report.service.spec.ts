@@ -86,9 +86,11 @@ describe('TempWarehouseReportService', () => {
     expect(rowsParams.slice(0, aggregateParams.length)).toEqual(aggregateParams);
   });
 
-  // AC-01 + AC-03 — khoá TOÀN BỘ khối CASE trong một assert: nhãn, điều kiện,
-  // nhánh rỗng và thứ tự. Khoá từng mảnh rời sẽ để lọt đúng những lỗi nguy hiểm
-  // nhất, ví dụ đảo hai điều kiện transfer cho nhau mà thứ tự nhãn vẫn y nguyên.
+  // Khoá TOÀN BỘ khối CASE trong một assert: nhãn, điều kiện, nhánh rỗng và thứ
+  // tự. Thứ tự là ràng buộc đúng-đắn: dòng nguồn showroom có out_qty =
+  // return_qty = 0 nên nhánh `return_qty = out_qty` sẽ nuốt nó nếu `source`
+  // không xét đầu tiên. Khoá từng mảnh rời sẽ để lọt đúng lỗi đó, và cả lỗi đảo
+  // hai điều kiện transfer cho nhau mà thứ tự nhãn vẫn y nguyên.
   it('emits the status CASE with the right labels, conditions and order', async () => {
     const query = jest
       .fn()
@@ -101,6 +103,7 @@ describe('TempWarehouseReportService', () => {
     expect(flatten(query.mock.calls[0][0] as string)).toContain(
       flatten(`
         CASE
+          WHEN p.source = 'showroom' THEN 'Bán hàng trưng bày'
           WHEN p.invoice_id IS NOT NULL THEN 'Bán hàng kho tạm'
           WHEN p.exp_transfer_id IS NOT NULL THEN 'Chuyển kho xuất đi'
           WHEN p.ret_transfer_id IS NOT NULL THEN 'Chuyển kho trả lại'
@@ -110,6 +113,84 @@ describe('TempWarehouseReportService', () => {
         END AS status
       `),
     );
+  });
+
+  // Công thức SL tồn. Assert đủ cả biểu thức chứ không chỉ alias: một dấu trừ
+  // lật thành cộng phải đỏ.
+  //
+  // Vế `transfer_id ... AND invoice_id IS NULL` là phần sửa D1 — dòng đã "Xử lý
+  // chuyển kho" hết treo ở kho tạm nên không còn tính vào SL tồn. Vế
+  // `AND invoice_id IS NULL` chặn trừ hai lần với dòng đã bán: nó mang CẢ
+  // transfer_id LẪN invoice_id vì fulfillInvoiceFromTempWarehouse ghi cùng lúc.
+  it('computes remaining as issued minus returned, sold and transferred-out', async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce([AGGREGATE_ROW])
+      .mockResolvedValueOnce([]);
+    const service = serviceWith(query);
+
+    await service.list(BASE_QUERY);
+
+    const sql = flatten(query.mock.calls[0][0] as string);
+    expect(sql).toContain('(e.invoice_id IS NOT NULL)::int AS sale_qty');
+    expect(sql).toContain(
+      flatten(`(
+        (e.id IS NOT NULL)::int
+        - (r.id IS NOT NULL)::int
+        - (e.invoice_id IS NOT NULL)::int
+        - (e.transfer_id IS NOT NULL AND e.invoice_id IS NULL)::int
+      ) AS remaining_qty`),
+    );
+    // `enriched` chỉ đọc lại, không tự suy lần nữa.
+    expect(sql).toContain('p.remaining_qty AS remaining_qty');
+  });
+
+  // temp_warehouse_lines.created_at là naive-UTC, invoices.issued_at là
+  // timestamptz. Không ép, UNION ALL nâng cả hai nhánh lên timestamptz và biểu
+  // thức render `AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh'` đổi
+  // overload — trừ 7h thay vì cộng 7h, sai ngày/giờ MỌI dòng của CẢ HAI nguồn.
+  it('keeps the union naive-UTC so the +7h render stays a +7h render', async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce([AGGREGATE_ROW])
+      .mockResolvedValueOnce([]);
+    const service = serviceWith(query);
+
+    await service.list(BASE_QUERY);
+
+    expect(flatten(query.mock.calls[0][0] as string)).toContain(
+      "COALESCE(inv.issued_at, inv.created_at) AT TIME ZONE 'UTC' AS event_at",
+    );
+  });
+
+  // POS có nút "Tách dòng" tạo nhiều dòng giỏ cho cùng itemId. LEFT JOIN gắn
+  // c.qty vào từng dòng, nên phải gộp trước khi trừ, nếu không phần kho tạm đã
+  // nhận bị trừ một lần cho MỖI dòng → thiếu SL bán.
+  it('aggregates invoice lines per (invoice, item) before subtracting the temp claim', async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce([AGGREGATE_ROW])
+      .mockResolvedValueOnce([]);
+    const service = serviceWith(query);
+
+    await service.list(BASE_QUERY);
+
+    const sql = flatten(query.mock.calls[0][0] as string);
+    expect(sql).toContain(
+      'SUM(ii.quantity) - COALESCE(MAX(c.qty), 0) AS sale_qty',
+    );
+    expect(sql).toContain('GROUP BY ii.item_id, inv.id');
+    expect(sql).toContain(
+      'HAVING SUM(ii.quantity) - COALESCE(MAX(c.qty), 0) > 0',
+    );
+    // tw_claimed KHÔNG được chặn theo kỳ: dòng stage trước kỳ vẫn mang
+    // invoice_id của hóa đơn trong kỳ, chặn theo kỳ sẽ đếm trùng.
+    const claimed = sql.slice(
+      sql.indexOf('tw_claimed AS ('),
+      sql.indexOf('GROUP BY invoice_id, item_id'),
+    );
+    expect(claimed).not.toContain('$2');
+    expect(claimed).not.toContain('$3');
   });
 
   it('maps a raw row onto the report row shape', async () => {

@@ -266,26 +266,27 @@ export const INVENTORY_DOC_KIND_LABELS_VI: Record<string, string> = {
  *
  * Values are the literal VI strings the report engine emits, not codes: they
  * already live inside saved report templates and shared URLs, so renaming one
- * breaks those. Ordered from "did not sell" through the sale flow to the
+ * breaks those. Ordered from "did not sell" through the two sale flows to the
  * transfer outcomes.
  *
  *   Xuất không bán      — issued to the floor, not yet returned or sold
  *   Trả hàng trưng bày  — returned to the warehouse (a staff return, not a customer's)
  *   Bán hàng kho tạm    — pulled from the warehouse into the temp warehouse, then sold
+ *   Bán hàng trưng bày  — already on showroom display when sold; no temp-warehouse line
  *   Chuyển kho xuất đi  — consumed by a manual "Xử lý chuyển kho" on the issue side
  *   Chuyển kho trả lại  — same, on the return side
  *
- * `Bán hàng kho tạm` replaced the older `Bán hàng trưng bày`, which named the wrong
- * business flow: that branch matches lines carrying an invoiceId, and only
- * `fulfillInvoiceFromTempWarehouse` writes that column — so it is always stock that
- * went through the temp warehouse, never display stock. Goods sold straight off the
- * showroom floor leave no temp-warehouse line at all and are out of this report's
- * scope by design; see ADR-05 in
- * `.ai/features/temp-warehouse-sale-status/03-logical-design.md`.
+ * The two sale values are not interchangeable, and the older code used the wrong one
+ * for both: `Bán hàng kho tạm` is the branch matching lines that carry an invoiceId,
+ * which only `fulfillInvoiceFromTempWarehouse` writes — always stock routed through
+ * the temp warehouse. `Bán hàng trưng bày` comes from a second source in the report
+ * query (`invoice_items` minus what the temp warehouse already claimed), because
+ * display stock sold off the floor leaves no temp-warehouse line at all.
  */
 export const TEMP_WAREHOUSE_OUT_STATUS_OPTIONS: ReportFilterOption[] = [
   { value: 'Xuất không bán', label: 'Xuất không bán' },
   { value: 'Trả hàng trưng bày', label: 'Trả hàng trưng bày' },
+  { value: 'Bán hàng trưng bày', label: 'Bán hàng trưng bày' },
   { value: 'Bán hàng kho tạm', label: 'Bán hàng kho tạm' },
   { value: 'Chuyển kho xuất đi', label: 'Chuyển kho xuất đi' },
   { value: 'Chuyển kho trả lại', label: 'Chuyển kho trả lại' },

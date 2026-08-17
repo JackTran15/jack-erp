@@ -4,7 +4,7 @@ environments: [local-backoffice]
 viewports: [desktop]
 ---
 
-# Verification — Sửa nhãn trạng thái bán trên báo cáo "Hàng hóa xuất kho tạm"
+# Verification — Tách hai luồng bán trên báo cáo "Hàng hóa xuất kho tạm"
 
 Chạy bằng `admin@erp.local`, chi nhánh **HCM** (`LOCAL_BACKOFFICE_BRANCH_NAME`) — toàn bộ 7 dòng
 `temp_warehouse_lines` của `erp_dev` đều thuộc chi nhánh này. Kỳ mặc định của trang là "Tháng này",
@@ -16,24 +16,79 @@ phải** con số đọc trên UI rồi chép lại:
 
 ```sql
 -- org f1000000-…-0001, branch HCM 69982b87-…, kỳ [2026-08-01, 2026-09-01)
-SELECT status, COUNT(*) AS n, SUM(out_qty), SUM(return_qty), SUM(sale_qty), SUM(remaining_qty)
+SELECT status, COUNT(*) AS n, SUM(out_qty), SUM(sale_qty), SUM(remaining_qty)
 FROM enriched GROUP BY status;
---  Bán hàng kho tạm | 4 | 4 | 0 | 4 | 0
---  Xuất không bán   | 3 | 3 | 0 | 0 | 3
---  → tổng: 7 dòng, SL xuất 7, SL trả 0, SL bán 4, SL tồn 3
+--  Bán hàng trưng bày | 69 | 0 | 74 | 0
+--  Bán hàng kho tạm   |  4 | 4 |  4 | 0
+--  Xuất không bán     |  3 | 3 |  0 | 3
+--  Chuyển kho xuất đi |  1 | 1 |  0 | 0   ← seed cho UOW-04
+--  Chuyển kho trả lại |  1 | 0 |  0 |-1   ← seed cho UOW-04
+--  Trả hàng trưng bày |  1 | 0 |  0 |-1   ← seed cho UOW-04
+--  (rỗng)             |  1 | 1 |  0 | 0   ← seed cho UOW-04
+--  → tổng: 80 dòng, SL xuất 9, SL trả 3, SL bán 78, SL tồn 1
 ```
 
-Điểm mấu chốt của tính năng: **4 dòng đó trước thay đổi đọc là `Bán hàng trưng bày`**. Nhãn ấy
-giờ không được phép xuất hiện ở bất cứ đâu trên trang — cả trong lưới lẫn trong danh sách lọc.
+Điểm mấu chốt: **hai luồng bán có hai nhãn riêng**. `Bán hàng kho tạm` là hàng lấy từ kho, scan vào
+kho tạm rồi bán (nguồn `temp_warehouse_lines`); `Bán hàng trưng bày` là hàng đã trưng sẵn ở showroom
+bán ra (nguồn `invoice_items`, phần dư sau khi trừ những gì kho tạm đã nhận). Trước tính năng này
+mọi dòng bán đều đọc `Bán hàng trưng bày`, kể cả loại đầu.
 
 ## Steps
 
 | ID | Step | Path | Interaction | Verifies | Assert |
 |---|---|---|---|---|---|
-| S1 | Lưới HCM 08/2026: đúng **4** dòng đọc `Bán hàng kho tạm` (khớp SQL), **0** dòng còn mang nhãn cũ, tổng 7 dòng | `/reports/storage/temporary-issues` | — | AC-01, AC-02 | `count tbody :text-is("Bán hàng kho tạm") = 4; count tbody :text-is("Bán hàng trưng bày") = 0; text=Hiển thị 1 - 7 trên 7 kết quả` |
-| S2 | Dòng tổng ở footer bằng đúng tổng SQL của toàn tập: SL xuất 7, SL bán 4, SL tồn 3 — không phải tổng trang | `/reports/storage/temporary-issues` | `scroll tfoot` | AC-04 | `count tfoot td:text-is("7") = 1; count tfoot td:text-is("4") = 1; count tfoot td:text-is("3") = 1` |
-| S3 | Dropdown lọc "Trạng thái": đúng 6 mục (5 giá trị backend phát ra + "— Tất cả —"), có `Bán hàng kho tạm`, **không còn** `Bán hàng trưng bày` — giá trị đó sẽ lọc ra rỗng vĩnh viễn | `/reports/storage/temporary-issues` | `scroll select[aria-label="Lọc Trạng thái"]` | AC-02, AC-05 | `count select[aria-label="Lọc Trạng thái"] option = 6; count select[aria-label="Lọc Trạng thái"] option:text-is("Bán hàng kho tạm") = 1; count select[aria-label="Lọc Trạng thái"] option:text-is("Bán hàng trưng bày") = 0` |
-| S4 | Trạng thái cũ giữ nguyên nghĩa: `Xuất không bán` vẫn đúng **3** dòng (khớp SQL), và mỗi dòng bán mang đúng số hóa đơn đã tiêu thụ nó | `/reports/storage/temporary-issues` | — | AC-03 | `count tbody :text-is("Xuất không bán") = 3; text=INV-202608-00018; text=INV-202608-00002` |
+| S1 | Lưới HCM 08/2026 trang 1 chứa đủ **cả bảy** trạng thái | `/reports/storage/temporary-issues` | — | AC-01, AC-02, AC-09 | `count tbody :text-is("Chuyển kho xuất đi") = 1; count tbody :text-is("Chuyển kho trả lại") = 1; count tbody :text-is("Trả hàng trưng bày") = 1` |
+| S2 | Dòng tổng ở footer bằng đúng tổng SQL của **toàn tập** (80 dòng), không phải của 20 dòng đang xem: SL xuất 9, SL trả 3, SL bán 78, SL tồn 1 | `/reports/storage/temporary-issues` | `scroll tfoot` | AC-04 | `count tfoot td:text-is("9") = 1; count tfoot td:text-is("3") = 1; count tfoot td:text-is("78") = 1; count tfoot td:text-is("1") = 1` |
+| S3 | Dropdown lọc "Trạng thái": đúng 7 mục (6 giá trị backend phát ra + "— Tất cả —"), có **cả hai** nhãn bán | `/reports/storage/temporary-issues` | `scroll select[aria-label="Lọc Trạng thái"]` | AC-02, AC-05 | `count select[aria-label="Lọc Trạng thái"] option = 7; count select[aria-label="Lọc Trạng thái"] option:text-is("Bán hàng kho tạm") = 1; count select[aria-label="Lọc Trạng thái"] option:text-is("Bán hàng trưng bày") = 1` |
+| S4 | Dòng bán trưng bày không bịa số liệu kho tạm: SL xuất/trả/tồn = 0, chỉ SL bán có số, và mang đúng số hóa đơn | `/reports/storage/temporary-issues` | — | AC-02, AC-03 | `text=INV-202608-00018` |
+
+### Bốn trạng thái kho tạm còn lại (cần seed trước)
+
+Bốn bước dưới đây cần bốn mặt hàng `VERIFY-TW-A..D` đã được seed vào chi nhánh HCM, mỗi mặt hàng
+ứng một thao tác trên màn **Chuyển kho tạm** của POS:
+
+| SKU | Thao tác POS tương ứng | Trạng thái kỳ vọng |
+| --- | --- | --- |
+| `VERIFY-TW-A` | Xuất đi + Trả lại, cùng mặt hàng, cùng người vận chuyển | *(rỗng — cặp cân bằng)* |
+| `VERIFY-TW-B` | Xuất đi → tick → **Xử lý chuyển kho** | `Chuyển kho xuất đi` |
+| `VERIFY-TW-C` | Trả lại → tick → **Xử lý chuyển kho** | `Chuyển kho trả lại` |
+| `VERIFY-TW-D` | Trả lại, không có lần xuất khớp | `Trả hàng trưng bày` |
+
+**Trạng thái nào đến từ luồng thật, trạng thái nào được seed thẳng.** Bảng trên mô tả *ý nghĩa*
+nghiệp vụ, không phải là bảng đã-chạy-qua-UI. Cụ thể:
+
+| SKU | Cách dựng |
+| --- | --- |
+| `VERIFY-TW-A`, `VERIFY-TW-D` | Gọi thật `POST /lines` — đúng endpoint nút "Thêm" gọi |
+| `VERIFY-TW-B`, `VERIFY-TW-C` | Gọi thật `POST /.../transfer-lines` (nút "Xử lý chuyển kho") nhưng consumer **lỗi** trên `erp_dev` (đẩy vào DLQ: `Stock transfer is only allowed between storages in the same branch`), nên trạng thái đích được ghi thẳng vào DB đúng như `markLinesTransferred` ghi |
+
+⚠ Hệ quả cần nói thẳng: `Chuyển kho xuất đi` và `Chuyển kho trả lại` hiện **không tạo được qua sản
+phẩm** trên `erp_dev` vì lỗi nói trên (đã mở task riêng). Bằng chứng ở đây chứng minh báo cáo gán
+nhãn đúng cho trạng thái đó, **không** chứng minh người dùng tạo ra được trạng thái đó.
+
+Không điều khiển UI POS vì runner chạy **mọi bước trên mọi environment** — environment khai ở cấp
+tài liệu (`verify.py:579`) và áp cho mọi bước, `--env` chỉ thu hẹp danh sách lúc chạy; không có cột
+env cho từng bước và không có tài liệu thứ hai. Sự thật SQL sau khi seed, chạy bằng
+đúng chuỗi truy vấn service sinh ra:
+
+```
+ sku         | status             | sl_xuat | sl_tra | sl_ban | sl_ton
+-------------+--------------------+---------+--------+--------+--------
+ VERIFY-TW-A |                    |       1 |      1 |      0 |      0
+ VERIFY-TW-B | Chuyển kho xuất đi |       1 |      0 |      0 |      0
+ VERIFY-TW-C | Chuyển kho trả lại |       0 |      1 |      0 |     -1
+ VERIFY-TW-D | Trả hàng trưng bày |       0 |      1 |      0 |     -1
+```
+
+Lọc theo tiền tố SKU nên số liệu **không trôi** dù `erp_dev` có thêm dữ liệu khác về sau — đây là
+lý do dùng mặt hàng riêng thay vì assert theo tổng số dòng.
+
+| ID | Step | Path | Interaction | Verifies | Assert |
+|---|---|---|---|---|---|
+| S5 | Lọc SKU `VERIFY-TW-`: đúng 4 dòng, ba nhãn kho tạm còn lại cùng có mặt (dòng thứ tư là cặp cân bằng, không mang nhãn nào) | `/reports/storage/temporary-issues` | `fill input[placeholder="Giá trị..."] = VERIFY-TW-` | AC-09 | `text=Hiển thị 1 - 4 trên 4 kết quả; count tbody :text-is("Chuyển kho xuất đi") = 1; count tbody :text-is("Chuyển kho trả lại") = 1; count tbody :text-is("Trả hàng trưng bày") = 1` |
+| S6 | Dòng đã "Xử lý chuyển kho" hết treo ở kho tạm: SL tồn = 0 chứ không phải 1 — phiếu đã post nên hàng đã hạch toán xong | `/reports/storage/temporary-issues` | `fill input[placeholder="Giá trị..."] = VERIFY-TW-B` | AC-10 | `count tbody tr td:nth-child(11):text-is("0") = 1; count tbody :text-is("Chuyển kho xuất đi") = 1` |
+| S7 | Trả lẻ: SL xuất = 0 và SL tồn = −1, bù cho lần xuất nằm ngoài kỳ | `/reports/storage/temporary-issues` | `fill input[placeholder="Giá trị..."] = VERIFY-TW-D` | AC-09 | `count tbody tr td:nth-child(8):text-is("0") = 1; count tbody tr td:nth-child(11):text-is("-1") = 1` |
+| S8 | Cặp cân bằng: xuất rồi trả cùng người vận chuyển gộp thành **một** dòng, cột Trạng thái để rỗng | `/reports/storage/temporary-issues` | `fill input[placeholder="Giá trị..."] = VERIFY-TW-A` | AC-09 | `text=Hiển thị 1 - 1 trên 1 kết quả; count tbody tr td:nth-child(8):text-is("1") = 1; count tbody tr td:nth-child(9):text-is("1") = 1; count tbody :text-is("Xuất không bán") = 0` |
 
 ## Not verified here
 
@@ -51,6 +106,13 @@ giờ không được phép xuất hiện ở bất cứ đâu trên trang — c
   cùng `total` trên cùng bộ lọc.
 - **AC-07 (danh sách trạng thái khai báo một lần)** là tính chất của mã nguồn, không có bề mặt UI.
   Kiểm bằng `grep`: không còn mảng trạng thái hard-code nào trong `apps/backoffice-web`.
+- **AC-11 (đóng kho tạm không đổi báo cáo)** — không dựng được bằng bước trình duyệt ở đây: đóng
+  kho tạm là thao tác bên POS, mà runner chạy **mọi bước trên mọi environment** (không có cột env
+  cho từng bước), nên không trộn được bước POS với bước backoffice trong cùng file này. Khoá ở tầng
+  dữ liệu bằng e2e `dòng AUTO_BALANCED do đóng kho tạm sinh ra không vào báo cáo`.
+- **AC-12 (ghép cặp khoá theo người vận chuyển)** — cần hai người vận chuyển khác nhau, dựng bằng
+  UI thì dài mà không thấy được gì thêm so với e2e `xuất và trả khác người vận chuyển thì không
+  ghép cặp`.
 
 ## Kiểm chứng ngoài trình duyệt — nội dung file Excel
 
@@ -65,7 +127,11 @@ POST /reports/inventory/export
 unzip → xl/worksheets/sheet1.xml
 ```
 
-| Kiểm | Trong file Excel | Lưới / SQL |
+> ⚠ **Bảng đối chiếu dưới đây là của bản MỘT NGUỒN đã ship ở `#184`, chưa chạy lại sau ADR-06.**
+> Số kỳ vọng mới: 4 ô `Bán hàng kho tạm`, 69 ô `Bán hàng trưng bày`, 3 ô `Xuất không bán`, dòng
+> tổng `7 / 0 / 78 / 3`. Phải chạy lại trước khi coi AC-08 là đã có bằng chứng.
+
+| Kiểm | Trong file Excel (bản `#184`) | Lưới / SQL (bản `#184`) |
 | --- | ---: | ---: |
 | Ô `Bán hàng kho tạm` | **4** | 4 |
 | Ô `Bán hàng trưng bày` | **0** | 0 |
@@ -74,10 +140,14 @@ unzip → xl/worksheets/sheet1.xml
 | Dòng tổng (SL xuất / trả / bán / tồn) | **7 / 0 / 4 / 3** | 7 / 0 / 4 / 3 |
 | Tiêu đề | `HÀNG HÓA XUẤT KHO TẠM` | — |
 
-Ba con số của dòng tổng trong file trùng đúng ô `tfoot` mà bước S2 chụp, nên Excel và lưới không
-chỉ "cùng nguồn theo thiết kế" mà đã được đối chiếu từng giá trị.
-
 ## Notes
+
+**Sha trong `08-evidence.md` KHÔNG phải xuất xứ tái lập được.** File đó ghi commit của HEAD, nhưng
+mọi dòng code đang được kiểm ở đây còn nằm trong working tree chưa commit. Checkout đúng sha ấy rồi
+chạy lại sẽ ra báo cáo **một nguồn**, không phải cái đã chụp. Bằng chứng chỉ trở thành xuất xứ thật
+sau khi commit và chạy lại `verify.py --write`. (`08-evidence.md` là file sinh tự động nên ghi chú
+nằm ở đây, không sửa vào đó.)
+
 
 **Vì sao assert dùng `count` chứ không phải `text=`.** Vòng chạy đầu, S1 và S4 đỏ với
 `text=Bán hàng kho tạm` / `text=Xuất không bán` — nhưng lưới hoàn toàn đúng. Nguyên nhân nằm ở
@@ -97,6 +167,18 @@ là manh mối chỉ ra vấn đề nằm ở selector chứ không ở dữ li�
 
 Trang này không có mục trên thanh điều hướng (`navConfig.ts:365` đang comment), nên phải vào bằng
 URL trực tiếp — đúng cách runner làm.
+
+**S2 còn gắn với bộ dữ liệu `erp_dev`.** (S1 đã gỡ literal tổng ở vòng review — bảy assert `count`
+mang đúng ý nghĩa của nó và không trôi.) Chúng khẳng định tính chất
+"footer mô tả toàn tập chứ không phải trang đang xem", mà tính chất đó chỉ kiểm được khi có nhiều
+trang — nên buộc phải dùng con số thật. Thêm dữ liệu vào `erp_dev` là phải chạy lại truy vấn SQL
+và cập nhật bước này. Bốn bước S5–S8 thì **không trôi**: chúng lọc theo tiền tố SKU
+`VERIFY-TW-` nên chỉ nhìn thấy dữ liệu seed của chính mình.
+
+Cách gỡ nốt phần trôi của S2, nếu ai đó thấy đáng: seed ~25 dòng dưới một tiền tố SKU riêng rồi
+assert footer của **tập đó**. Tính chất "footer mô tả toàn tập chứ không phải trang" cần một tập
+lớn hơn một trang (20 dòng), mà 4 dòng của S5–S8 thì không đủ. Chưa làm vì tính chất này đã được
+khoá ở tầng dữ liệu bởi e2e `totals không đổi theo kích thước trang`.
 
 Ba bước S1/S2/S4 dùng chung một đường dẫn và không có tương tác nào làm đổi trạng thái trang, nên
 chúng chụp cùng một màn hình ở ba góc khẳng định khác nhau. Cố ý: mỗi bước khoá một AC riêng, và

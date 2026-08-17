@@ -25,24 +25,32 @@ import {
  *     nghĩa là dòng đó được xử lý chuyển kho thủ công, không phải nhập/trả
  *     bình thường.
  *
- * PHẠM VI: báo cáo chỉ đọc `temp_warehouse_lines`. Hàng ĐÃ trưng sẵn ở showroom
- * khi bán KHÔNG có mặt ở đây — nghiệp vụ đó không sinh dòng nào trong bảng này
- * (POS trừ tồn thẳng từ vị trí showroom qua
- * `resolveBranchItemLocations(..., { showroomOnly: true })`, và
- * `fulfillInvoiceFromTempWarehouse` thoát sớm khi không có dòng nào staged).
- * Một nguồn thứ hai lấy từ `invoice_items` đã được cài rồi GỠ: nó chiếm 64/71
- * dòng trên dữ liệu thật, tức 90% nội dung của một báo cáo tên "xuất kho tạm"
- * lại là hàng không xuất kho tạm. Xem ADR-05 trong
- * `.ai/features/temp-warehouse-sale-status/03-logical-design.md`. Cần con số bán
- * hàng trưng bày thì dùng báo cáo doanh thu, không phải báo cáo này.
+ * HAI NGUỒN, hợp ở CTE `movements`:
+ *   1. `paired`   — cặp xuất↔trả ghép FIFO từ `temp_warehouse_lines` (mô tả trên).
+ *   2. `showroom` — hàng ĐÃ trưng sẵn ở showroom, bán ra. Nghiệp vụ này KHÔNG
+ *      sinh dòng `temp_warehouse_lines` nào: POS trừ tồn thẳng từ vị trí showroom
+ *      (`resolveBranchItemLocations(..., { showroomOnly: true })`) và
+ *      `fulfillInvoiceFromTempWarehouse` thoát sớm khi không có dòng nào staged.
+ *      Nên nó chỉ lộ ra như PHẦN DƯ của dòng `invoice_items`, sau khi trừ đi SL
+ *      mà kho tạm đã nhận cho cùng (invoice_id, item_id) — CTE `tw_claimed`.
+ *      Chỉ tính hóa đơn đã chốt (`is_draft = FALSE`, status khác `cancelled`) và
+ *      dòng `direction = 'OUT'`; trả hàng của khách nằm ngoài phạm vi báo cáo này.
+ *
+ * ⚠ Nguồn showroom chiếm phần LỚN số dòng: trên `erp_dev` kỳ 08/2026 là 64/71
+ * dòng, tức 90% nội dung của một báo cáo tên "xuất kho tạm" là hàng chưa từng
+ * vào kho tạm. Đây là đánh đổi CÓ CHỦ ĐÍCH của chủ sở hữu để báo cáo phủ đủ cả
+ * hai luồng bán và tổng SL bán khớp hóa đơn. Lịch sử quyết định (từng gỡ rồi
+ * khôi phục) ở `.ai/features/temp-warehouse-sale-status/03-logical-design.md`.
  *
  * Trạng thái (ưu tiên theo thứ tự, dừng ở nhánh khớp đầu tiên). THỨ TỰ NHÁNH LÀ
  * RÀNG BUỘC ĐÚNG-ĐẮN, không phải phong cách:
+ *   - Dòng nguồn showroom               → "Bán hàng trưng bày". PHẢI xét đầu
+ *     tiên: dòng này có out_qty = return_qty = 0 nên nhánh cân bằng
+ *     (`return_qty = out_qty`) sẽ nuốt nó và gán chuỗi rỗng nếu đặt sau.
  *   - Dòng xuất có invoice_id           → "Bán hàng kho tạm" (hàng lấy từ kho,
  *     scan vào kho tạm rồi mới bán). Chỉ `fulfillInvoiceFromTempWarehouse` ghi
- *     cột đó và nó chỉ tiêu thụ dòng `warehouse_to_showroom`, nên nhánh này
- *     KHÔNG BAO GIỜ là hàng trưng bày — đó là lý do nhãn cũ ("Bán hàng trưng
- *     bày") sai và đã đổi.
+ *     cột đó và nó chỉ tiêu thụ dòng `warehouse_to_showroom`, nên trên nguồn kho
+ *     tạm nhánh này KHÔNG BAO GIỜ là hàng trưng bày.
  *   - Dòng xuất có transfer_id (không bán) → "Chuyển kho xuất đi".
  *   - Dòng trả có transfer_id           → "Chuyển kho trả lại" (kiểm tra
  *     trước cả nhánh cân bằng, vì 1 cặp ghép FIFO có thể vẫn "cân bằng" số
@@ -68,12 +76,19 @@ import {
  *                    false`, `is_active = true`). Không tìm được vị trí nào
  *                    thỏa (mọi vị trí đều ngừng hoạt động / ngừng theo dõi /
  *                    hết hàng) → để trống.
- *   - remainingQty : số còn lại ở kho tạm (trưng bày) của cặp ghép =
- *                    SL xuất − SL trả − SL bán (Nhập−Xuất−Tồn kiểu MISA). Tổng
- *                    cột = số hàng còn trưng bày thực tế trong kỳ. LƯU Ý có thể
- *                    âm ở dòng "Trả hàng trưng bày" trả lẻ (lần xuất tương ứng
- *                    nằm ngoài kỳ lọc) — đúng về mặt net, để tổng cân bằng.
- *   - staff        : carrier (`users.first_name + last_name`).
+ *   - remainingQty : số đơn vị còn ĐANG TREO ở kho tạm — đã dịch chuyển vật lý
+ *                    nhưng chưa hạch toán sổ sách =
+ *                    SL xuất − SL trả − SL bán − SL đã chuyển kho.
+ *                    Kho tạm KHÔNG có tồn kho riêng (không có location nào đại
+ *                    diện cho nó trong stock_balances): chừng nào phiếu chuyển
+ *                    kho chưa post thì sổ vẫn ghi hàng ở kho nguồn. Vì vậy dòng
+ *                    đã bán HOẶC đã "Xử lý chuyển kho" đều về 0 — hàng đã hạch
+ *                    toán xong, hết treo.
+ *                    LƯU Ý có thể âm ở dòng "Trả hàng trưng bày" trả lẻ (lần xuất
+ *                    tương ứng nằm ngoài kỳ lọc) — đúng về mặt net, để tổng cân bằng.
+ *                    Dòng nguồn showroom luôn = 0 (hàng chưa từng vào kho tạm).
+ *   - staff        : carrier (`users.first_name + last_name`); với dòng nguồn
+ *                    showroom là `invoices.staff_id`.
  *
  * saleQty / invoice: điền từ liên kết hóa đơn của dòng xuất đã bán
  * (TRANSFERRED-by-sale, mang `invoice_id`/`invoice_number`). Dòng xuất chưa bán
@@ -92,11 +107,13 @@ import {
  * Không đụng tới trong tính năng này (vị từ có trước); sửa thì ép rõ kiểu ở cả
  * hai phía và soát các service báo cáo khác dùng cùng khuôn.
  *
- * Báo cáo KHÔNG join `invoices`: tín hiệu "đã bán" chỉ là `invoice_id IS NOT NULL`
- * trên chính dòng kho tạm. Nên hóa đơn bị HỦY sau khi đã tiêu thụ kho tạm vẫn
- * hiện là "Bán hàng kho tạm" — `cancel-invoice.service.ts` không đụng
- * `temp_warehouse_lines`. Defect có sẵn, chưa sửa; có test e2e khóa hành vi hiện
- * tại để lần sửa sau là có chủ đích.
+ * BẤT ĐỐI XỨNG VỀ `status` HÓA ĐƠN (defect có sẵn, chưa sửa). Nhánh showroom lọc
+ * `inv.status <> 'cancelled'`, nhưng nhánh kho tạm không hề join `invoices` —
+ * tín hiệu "đã bán" chỉ là `invoice_id IS NOT NULL` trên chính dòng kho tạm, mà
+ * `cancel-invoice.service.ts` không đụng `temp_warehouse_lines`. Nên một hóa đơn
+ * bị HỦY sau khi đã tiêu thụ kho tạm bị nhánh showroom loại nhưng nhánh kho tạm
+ * vẫn tính là "Bán hàng kho tạm". Có test e2e khóa hành vi hiện tại để lần sửa
+ * sau là có chủ đích.
  */
 
 export interface TempWarehouseIssueRow {
@@ -252,6 +269,27 @@ export class TempWarehouseReportService {
           COALESCE(e.created_at, r.created_at) AS event_at,
           (e.id IS NOT NULL)::int AS out_qty,
           (r.id IS NOT NULL)::int AS return_qty,
+          (e.invoice_id IS NOT NULL)::int AS sale_qty,
+          -- SL tồn = SL xuất − SL trả − SL bán − SL đã chuyển kho. Đây là số còn
+          -- ĐANG TREO ở kho tạm: đã dịch chuyển vật lý nhưng chưa hạch toán sổ
+          -- sách. KHÔNG phải tồn kho hiện tại của mặt hàng.
+          --
+          -- Vế cuối cần thiết vì kho tạm không có tồn kho riêng: chừng nào phiếu
+          -- chuyển kho chưa post thì sổ vẫn ghi hàng ở kho nguồn. Khi "Xử lý
+          -- chuyển kho" post phiếu, hàng hạch toán xong và không còn treo nữa —
+          -- trước đây dòng đó vẫn báo SL tồn = 1, tức nhãn nói đã chuyển đi mà
+          -- con số nói còn trong kho tạm.
+          -- "AND e.invoice_id IS NULL" để không trừ hai lần: dòng đã bán mang CẢ
+          -- transfer_id LẪN invoice_id (fulfillInvoiceFromTempWarehouse ghi cùng lúc).
+          --
+          -- Có thể âm với dòng trả lẻ (lần xuất tương ứng nằm ngoài kỳ lọc) —
+          -- đúng về mặt net, để tổng cân bằng.
+          (
+            (e.id IS NOT NULL)::int
+            - (r.id IS NOT NULL)::int
+            - (e.invoice_id IS NOT NULL)::int
+            - (e.transfer_id IS NOT NULL AND e.invoice_id IS NULL)::int
+          ) AS remaining_qty,
           -- Only an issue (warehouse_to_showroom) carries the consuming invoice.
           e.invoice_id AS invoice_id,
           e.invoice_number AS invoice_number,
@@ -259,12 +297,109 @@ export class TempWarehouseReportService {
           -- separately per side since it distinguishes chuyển-kho-xuất-đi
           -- (exp side) from chuyển-kho-trả-lại (ret side).
           e.transfer_id AS exp_transfer_id,
-          r.transfer_id AS ret_transfer_id
+          r.transfer_id AS ret_transfer_id,
+          'temp'::text AS source
         FROM exp e
         FULL OUTER JOIN ret r
           ON e.item_id = r.item_id
           AND e.carrier_user_id IS NOT DISTINCT FROM r.carrier_user_id
           AND e.rn = r.rn
+      ),
+      -- SL của mỗi (hóa đơn, mặt hàng) mà kho tạm ĐÃ nhận. Cố ý KHÔNG chặn
+      -- theo kỳ: fulfillInvoiceFromTempWarehouse lấy dòng ACTIVE theo FIFO bất
+      -- kể ngày stage, nên một dòng stage trước kỳ vẫn có thể mang invoice_id
+      -- của hóa đơn trong kỳ. Chặn theo kỳ sẽ để lọt phần đó xuống nhánh
+      -- showroom → đếm trùng. Vị từ này khớp index riêng
+      -- IDX_temp_warehouse_lines_invoice (partial, WHERE invoice_id IS NOT NULL).
+      --
+      -- RÀNG BUỘC LIÊN MODULE: ở đây cộng "quantity", còn nhánh kho tạm phát
+      -- sale_qty = 1 cho mỗi dòng. Hai bên chỉ khớp vì mọi dòng kho tạm luôn có
+      -- quantity 1.00 — addLine hard-code (temp-warehouse.service.ts:352) và
+      -- không DTO nào cho nhập số lượng. Nếu điều đó đổi, nhánh kho tạm phải
+      -- chuyển từ cờ 0/1 sang chính "quantity", nếu không sẽ thiếu SL bán ngầm.
+      tw_claimed AS (
+        SELECT invoice_id, item_id, SUM(quantity) AS qty
+        FROM temp_warehouse_lines
+        WHERE organization_id = $1
+          AND invoice_id IS NOT NULL
+          AND direction = 'warehouse_to_showroom'
+          AND status NOT IN ('DELETED', 'AUTO_BALANCED')
+        GROUP BY invoice_id, item_id
+      ),
+      -- Nguồn thứ hai: hàng ĐÃ trưng sẵn ở showroom, bán ra. Nghiệp vụ này
+      -- không sinh dòng temp_warehouse_lines nào (POS trừ tồn thẳng từ vị trí
+      -- showroom), nên nó chỉ hiện ra như PHẦN DƯ của dòng hóa đơn sau khi trừ
+      -- đi những gì kho tạm đã nhận.
+      showroom AS (
+        SELECT
+          ii.item_id,
+          inv.staff_id AS carrier_user_id,
+          inv.branch_id,
+          -- PHẢI ép về timestamp KHÔNG timezone. temp_warehouse_lines.created_at
+          -- là naive-UTC, còn invoices.issued_at là timestamptz; để nguyên thì
+          -- UNION ALL nâng CẢ HAI nhánh lên timestamptz, và biểu thức render ở
+          -- tầng enriched (AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh')
+          -- đổi sang overload khác — trừ 7h thay vì cộng 7h. Sai ngày/giờ của
+          -- MỌI dòng, kể cả dòng kho tạm.
+          COALESCE(inv.issued_at, inv.created_at) AT TIME ZONE 'UTC' AS event_at,
+          -- Hàng chưa từng đi qua kho tạm ⇒ không có sự kiện xuất/trả, và SL tồn
+          -- (còn trưng bày ở kho tạm) là 0 chứ không phải −SL bán.
+          0::numeric AS out_qty,
+          0::numeric AS return_qty,
+          -- Gộp theo (hóa đơn, mặt hàng) TRƯỚC khi trừ. Nút "Tách dòng" ở POS
+          -- cố ý tạo nhiều dòng giỏ cho cùng itemId; LEFT JOIN gắn c.qty vào
+          -- TỪNG dòng, nên không gộp thì phần kho tạm đã nhận bị trừ một lần
+          -- cho mỗi dòng → thiếu SL bán. MAX an toàn vì c.qty phụ thuộc hàm
+          -- vào đúng (invoice_id, item_id) đang gộp.
+          SUM(ii.quantity) - COALESCE(MAX(c.qty), 0) AS sale_qty,
+          0::numeric AS remaining_qty,
+          inv.id AS invoice_id,
+          inv.code AS invoice_number,
+          NULL::uuid AS exp_transfer_id,
+          NULL::uuid AS ret_transfer_id,
+          'showroom'::text AS source
+        FROM invoice_items ii
+        JOIN invoices inv ON inv.id = ii.invoice_id
+        JOIN items i
+          ON i.id = ii.item_id AND i.organization_id = $1
+        LEFT JOIN tw_claimed c
+          ON c.invoice_id = ii.invoice_id AND c.item_id = ii.item_id
+        WHERE ii.organization_id = $1
+          AND inv.organization_id = $1
+          AND inv.is_draft = FALSE
+          AND inv.status <> 'cancelled'
+          AND ii.direction = 'OUT'
+          AND COALESCE(inv.issued_at, inv.created_at) >= $2
+          AND COALESCE(inv.issued_at, inv.created_at) < $3
+          AND ($4::text[] IS NULL OR inv.branch_id = ANY($4::text[]))
+          AND ($5::uuid[] IS NULL OR i.category_id = ANY($5::uuid[]))
+          AND ($6::text IS NULL OR i.code ILIKE '%' || $6 || '%' OR i.name ILIKE '%' || $6 || '%')
+        -- inv.id là khóa chính nên chọn được staff_id/branch_id/code/issued_at
+        -- mà không phải liệt kê (phụ thuộc hàm).
+        GROUP BY ii.item_id, inv.id
+        HAVING SUM(ii.quantity) - COALESCE(MAX(c.qty), 0) > 0
+      ),
+      -- Danh sách cột khai TƯỜNG MINH: UNION ALL khớp theo vị trí, và nhiều cột
+      -- ở đây cùng kiểu (uuid, numeric), nên một nhánh sắp sai thứ tự sẽ hoán
+      -- cột âm thầm. Ép numeric ngay tại đây để hai nhánh cùng kiểu, thay vì
+      -- sửa biểu thức bên trong paired.
+      movements (
+        item_id, carrier_user_id, branch_id, event_at,
+        out_qty, return_qty, sale_qty, remaining_qty,
+        invoice_id, invoice_number, exp_transfer_id, ret_transfer_id, source
+      ) AS (
+        SELECT
+          item_id, carrier_user_id, branch_id, event_at,
+          out_qty::numeric, return_qty::numeric,
+          sale_qty::numeric, remaining_qty::numeric,
+          invoice_id, invoice_number, exp_transfer_id, ret_transfer_id, source
+        FROM paired
+        UNION ALL
+        SELECT
+          item_id, carrier_user_id, branch_id, event_at,
+          out_qty, return_qty, sale_qty, remaining_qty,
+          invoice_id, invoice_number, exp_transfer_id, ret_transfer_id, source
+        FROM showroom
       )
     `;
 
@@ -294,11 +429,10 @@ export class TempWarehouseReportService {
         TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) AS staff,
         p.out_qty AS out_qty,
         p.return_qty AS return_qty,
-        (p.invoice_id IS NOT NULL)::int AS sale_qty,
-        -- SL tồn = SL xuất − SL trả − SL bán (còn trưng bày ở kho tạm), KHÔNG
-        -- phải tồn kho hiện tại của mặt hàng. Có thể âm với dòng trả lẻ.
-        (p.out_qty - p.return_qty - (p.invoice_id IS NOT NULL)::int) AS remaining_qty,
+        p.sale_qty AS sale_qty,
+        p.remaining_qty AS remaining_qty,
         CASE
+          WHEN p.source = 'showroom' THEN 'Bán hàng trưng bày'
           WHEN p.invoice_id IS NOT NULL THEN 'Bán hàng kho tạm'
           WHEN p.exp_transfer_id IS NOT NULL THEN 'Chuyển kho xuất đi'
           WHEN p.ret_transfer_id IS NOT NULL THEN 'Chuyển kho trả lại'
@@ -308,7 +442,7 @@ export class TempWarehouseReportService {
         END AS status,
         COALESCE(p.invoice_number, '') AS invoice,
         p.event_at AS event_at
-      FROM paired p
+      FROM movements p
       JOIN items i ON i.id = p.item_id AND i.organization_id = $1
       LEFT JOIN users u ON u.id = p.carrier_user_id
       -- Item's current default shelf in a non-showroom warehouse of the

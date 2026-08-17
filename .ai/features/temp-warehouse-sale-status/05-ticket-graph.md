@@ -2,19 +2,20 @@
 
 # Ticket graph — temp-warehouse-sale-status
 
-- Units of Work: **3**
-- Tickets: **7** (7 done)
-- Total effort: **2.2d**
-- Critical path: **1.9d** across 5 tickets
-- Theoretical minimum duration with unlimited parallelism: **1.9d**
+- Units of Work: **4**
+- Tickets: **10** (10 done)
+- Total effort: **3.4d**
+- Critical path: **2.8d** across 7 tickets
+- Theoretical minimum duration with unlimited parallelism: **2.8d**
 
 ## Units of Work
 
 | UoW | Title | Risk | Effort | Elapsed | Depends on | Status |
 |-----|-------|------|--------|---------|-----------|--------|
-| UOW-01 | Dòng bán qua kho tạm đọc là "Bán hàng kho tạm", bộ lọc trạng thái đúng 5 giá trị | low | 6h | 3h | — | todo |
-| UOW-02 | Nguồn bán showroom — đã cài, chạy đúng, rồi gỡ | medium | 1.2d | 1.2d | UOW-01 | todo |
-| UOW-03 | File Excel và bản in đọc y như lưới | low | 2h | 2h | UOW-01, UOW-02 | todo |
+| UOW-01 | Hai luồng bán có hai nhãn riêng, bộ lọc trạng thái đúng 6 giá trị | low | 6h | 3h | — | done |
+| UOW-02 | Nguồn bán showroom — đã cài, chạy đúng, rồi gỡ | medium | 1.6d | 1.6d | UOW-01 | todo |
+| UOW-03 | File Excel và bản in đọc y như lưới | low | 2h | 2h | UOW-01, UOW-02 | done |
+| UOW-04 | Đủ bảy trạng thái có test và có bằng chứng, và SL tồn thôi đếm hàng đã chuyển kho | low | 6h | 6h | UOW-01, UOW-02 | todo |
 
 Effort is total person-hours. Elapsed is the longest dependency chain inside the
 slice — the floor on how fast it can finish no matter how many people work on it.
@@ -23,7 +24,7 @@ slice — the floor on how fast it can finish no matter how many people work on 
 
 ```mermaid
 graph LR
-  subgraph UOW_01["UOW-01 · Dòng bán qua kho tạm đọc là "Bán hàng kho tạm", bộ lọc trạng thái đúng 5 giá trị"]
+  subgraph UOW_01["UOW-01 · Hai luồng bán có hai nhãn riêng, bộ lọc trạng thái đúng 6 giá trị"]
     T_01_01["✓ T-01-01<br/>Đổi nhãn thành 'Bán hàng kho tạm' và chuẩn bị kết cấu union"]
     T_01_02["✓ T-01-02<br/>TEMP_WAREHOUSE_OUT_STATUS_OPTIONS liệt kê đủ 6 trạng thái"]
     T_01_03["✓ T-01-03<br/>Hai chỗ hard-code trạng thái ở frontend import lại từ hằng shared"]
@@ -32,9 +33,14 @@ graph LR
     T_02_01["✓ T-02-01<br/>CTE tw_claimed + showroom, hợp vào movements"]
     T_02_02["✓ T-02-02<br/>E2E chống đếm trùng và loại hóa đơn không hợp lệ, chạy SQL thật"]
     T_02_03["✓ T-02-03<br/>Gỡ nguồn bán showroom, đưa báo cáo về đúng phạm vi kho tạm"]
+    T_02_04["✓ T-02-04<br/>Khôi phục nguồn bán showroom sau khi chủ sở hữu đảo quyết định"]
   end
   subgraph UOW_03["UOW-03 · File Excel và bản in đọc y như lưới"]
     T_03_01["✓ T-03-01<br/>Spec report definition theo bộ trạng thái mới, đo số dòng so với trần export"]
+  end
+  subgraph UOW_04["UOW-04 · Đủ bảy trạng thái có test và có bằng chứng, và SL tồn thôi đếm hàng đã chuyển kho"]
+    T_04_01["✓ T-04-01<br/>SL tồn trừ luôn phần đã 'Xử lý chuyển kho"]
+    T_04_02["✓ T-04-02<br/>E2E và bằng chứng trình duyệt phủ nốt lưới bảy trạng thái"]
   end
   T_01_02 --> T_01_03
   T_01_01 --> T_02_01
@@ -43,8 +49,12 @@ graph LR
   T_01_03 --> T_02_03
   T_02_01 --> T_02_03
   T_02_02 --> T_02_03
+  T_02_03 --> T_02_04
   T_01_02 --> T_03_01
   T_02_03 --> T_03_01
+  T_02_04 --> T_04_01
+  T_02_04 --> T_04_02
+  T_04_01 --> T_04_02
 ```
 
 ## Execution waves
@@ -57,17 +67,25 @@ Tickets in the same wave have no dependency between them and can run in parallel
 | W2 | T-01-03, T-02-01 | 2 | 4h |
 | W3 | T-02-02 | 1 | 4h |
 | W4 | T-02-03 | 1 | 2h |
-| W5 | T-03-01 | 1 | 2h |
+| W5 | T-02-04, T-03-01 | 2 | 3h |
+| W6 | T-04-01 | 1 | 2h |
+| W7 | T-04-02 | 1 | 4h |
 
 ## Write-conflict hazards
 
-None: every pair that writes a shared path is ordered by a dependency.
+These pairs have no ordering constraint, so a scheduler may run them at the
+same time — and they write the same path. Sequential execution is safe;
+parallel agents will lose one side's work.
+
+| A | B | Contested path |
+|---|---|---|
+| T-02-04 | T-03-01 | `apps/api/src/modules/inventory-reports/report/reports/temp-warehouse-out.report.spec.ts` |
 
 ## Critical path
 
-T-01-01 → T-02-01 → T-02-02 → T-02-03 → T-03-01
+T-01-01 → T-02-01 → T-02-02 → T-02-03 → T-02-04 → T-04-01 → T-04-02
 
-Total: **1.9d**. Shortening the plan means shortening this chain;
+Total: **2.8d**. Shortening the plan means shortening this chain;
 adding people to tickets off this path will not make the feature ship sooner.
 
 ## Tickets
@@ -79,5 +97,8 @@ adding people to tickets off this path will not make the feature ship sooner.
 | T-01-03 | UOW-01 | frontend | refactor | 2h | T-01-02 | AC-05, AC-06, AC-07 | done |
 | T-02-01 | UOW-02 | service | feature | 4h | T-01-01 | — | done |
 | T-02-02 | UOW-02 | test | test | 4h | T-02-01 | — | done |
-| T-02-03 | UOW-02 | service | chore | 2h | T-01-02, T-01-03, T-02-01, T-02-02 | AC-02 | done |
+| T-02-03 | UOW-02 | service | chore | 2h | T-01-02, T-01-03, T-02-01, T-02-02 | — | done |
+| T-02-04 | UOW-02 | service | feature | 3h | T-02-03 | AC-02 | done |
 | T-03-01 | UOW-03 | test | test | 2h | T-01-02, T-02-03 | AC-08 | done |
+| T-04-01 | UOW-04 | service | refactor | 2h | T-02-04 | AC-10 | done |
+| T-04-02 | UOW-04 | test | test | 4h | T-02-04, T-04-01 | AC-09, AC-11, AC-12 | done |
