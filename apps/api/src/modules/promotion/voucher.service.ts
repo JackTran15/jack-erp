@@ -8,6 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager } from 'typeorm';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
+import { PromotionStatus } from '@erp/shared-interfaces';
 import { VoucherEntity } from './voucher.entity';
 import { CreateVoucherDto } from './dto/create-voucher.dto';
 
@@ -31,8 +32,8 @@ export class VoucherService {
 
     const entity = this.repo.create({
       ...dto,
-      validFrom: new Date(dto.validFrom),
-      validTo: new Date(dto.validTo),
+      validFrom: dto.validFrom ? new Date(dto.validFrom) : undefined,
+      validTo: dto.validTo ? new Date(dto.validTo) : undefined,
       organizationId: actor.organizationId,
       branchId: actor.branchId,
       createdBy: actor.userId,
@@ -42,6 +43,38 @@ export class VoucherService {
 
     const saved = await this.repo.save(entity);
     this.logger.log(`Created voucher "${dto.code}" (org=${actor.organizationId})`);
+    return saved;
+  }
+
+  async duplicate(id: string, newCode: string, actor: ActorContext): Promise<VoucherEntity> {
+    const original = await this.findOne(id, actor);
+
+    const existing = await this.repo.findOne({
+      where: { code: newCode, organizationId: actor.organizationId },
+    });
+    if (existing) {
+      throw new ConflictException(`Voucher code "${newCode}" already exists in this organization`);
+    }
+
+    const entity = this.repo.create({
+      code: newCode,
+      issuer: original.issuer,
+      description: original.description,
+      status: original.status,
+      faceValue: original.faceValue,
+      customerId: original.customerId,
+      validFrom: original.validFrom,
+      validTo: original.validTo,
+      isActive: original.isActive,
+      organizationId: actor.organizationId,
+      branchId: actor.branchId,
+      createdBy: actor.userId,
+      isUsed: false,
+      redeemedInvoiceId: undefined,
+    });
+
+    const saved = await this.repo.save(entity);
+    this.logger.log(`Duplicated voucher "${original.code}" as "${newCode}" (org=${actor.organizationId})`);
     return saved;
   }
 
@@ -79,17 +112,31 @@ export class VoucherService {
   ): Promise<VoucherEntity> {
     const entity = await this.findOne(id, actor);
 
-    if (dto.validFrom !== undefined) (entity as any).validFrom = new Date(dto.validFrom);
-    if (dto.validTo !== undefined) (entity as any).validTo = new Date(dto.validTo);
+    if (dto.validFrom !== undefined) entity.validFrom = dto.validFrom ? new Date(dto.validFrom) : undefined;
+    if (dto.validTo !== undefined) entity.validTo = dto.validTo ? new Date(dto.validTo) : undefined;
     if (dto.faceValue !== undefined) entity.faceValue = dto.faceValue;
     if (dto.customerId !== undefined) entity.customerId = dto.customerId;
+    if (dto.issuer !== undefined) entity.issuer = dto.issuer;
+    if (dto.description !== undefined) entity.description = dto.description;
+    if (dto.status !== undefined) entity.status = dto.status;
 
     return this.repo.save(entity);
   }
 
+  /**
+   * Stops a voucher from being tracked *and* from being redeemed.
+   *
+   * A voucher carries two independent "still valid" flags: `isActive` is the
+   * legacy gate `validate()`/`markUsed()` enforce at the till, while `status` is
+   * what the list, the filter and the badge show. Flipping only `isActive` made
+   * the button lie — the voucher stopped working at the till while the screen
+   * kept reporting it as tracked. Merging the two flags belongs to the POS epic;
+   * `isActive` is part of the legacy layer ADR-04 leaves untouched here.
+   */
   async deactivate(id: string, actor: ActorContext): Promise<VoucherEntity> {
     const entity = await this.findOne(id, actor);
     entity.isActive = false;
+    entity.status = PromotionStatus.STOPPED;
     return this.repo.save(entity);
   }
 
@@ -107,10 +154,10 @@ export class VoucherService {
     if (entity.isUsed) {
       throw new BadRequestException(`Voucher "${code}" has already been used`);
     }
-    if (now < entity.validFrom) {
+    if (entity.validFrom && now < entity.validFrom) {
       throw new BadRequestException(`Voucher "${code}" is not yet valid`);
     }
-    if (now > entity.validTo) {
+    if (entity.validTo && now > entity.validTo) {
       throw new BadRequestException(`Voucher "${code}" has expired`);
     }
     if (entity.customerId && entity.customerId !== customerId) {

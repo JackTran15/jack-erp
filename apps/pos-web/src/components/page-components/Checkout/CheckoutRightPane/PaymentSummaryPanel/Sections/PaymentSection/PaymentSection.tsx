@@ -2,9 +2,9 @@ import { useEffect, type RefObject } from "react";
 import { cn, formatVnd } from "@erp/ui";
 import { PosTextarea } from "@erp/pos/components/common/PosTextarea/PosTextarea";
 import { DebtCheckRow } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/DebtCheckRow/DebtCheckRow";
+import { DebtOffsetRow } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/DebtOffsetRow/DebtOffsetRow";
 import { ForgiveShortageRow } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/ForgiveShortageRow/ForgiveShortageRow";
 import { KeepChangeRow } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/KeepChangeRow/KeepChangeRow";
-import { RefundToDebtRow } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/RefundToDebtRow/RefundToDebtRow";
 import { PosPaymentMethodList } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import { PaymentSummaryBlock } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/PaymentSummaryBlock/PaymentSummaryBlock";
 import { QrPaymentButton } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/QrPaymentButton/QrPaymentButton";
@@ -40,7 +40,6 @@ export function PaymentSection({
     rawChangeAmount,
     rawShortageAmount,
     debt,
-    refundToDebt,
     note,
     setNote,
     preorder,
@@ -55,12 +54,12 @@ export function PaymentSection({
   // Dòng thanh toán đầu (khi chỉ có 1 dòng) bám theo "số tiền cần thanh toán" KHI
   // không ghi nợ: mỗi khi tổng đổi, ghi đè lại số tiền. Khi "Tính vào công nợ",
   // nhân viên tự quyết số thu ngay (phần còn lại vào công nợ) nên không ghi đè.
-  // Ở luồng hoàn tiền tích "Tính vào công nợ" (refundToDebt): khoản hoàn bù vào
-  // công nợ nên số tiền hình thức đổi trả về 0 (vẫn hiển thị, không ẩn).
+  // Ở luồng hoàn tiền dòng này luôn mang TOÀN BỘ khoản hoàn: phần đi cấn trừ
+  // công nợ do BE tự tách và `DebtOffsetRow` hiện rõ bên dưới.
   useEffect(() => {
     if (debt) return;
-    setFirstLineAmountAuto(refundToDebt ? 0 : settlementAbs);
-  }, [debt, refundToDebt, settlementAbs, setFirstLineAmountAuto]);
+    setFirstLineAmountAuto(settlementAbs);
+  }, [debt, settlementAbs, setFirstLineAmountAuto]);
 
   // Gán tài khoản mặc định cho dòng thanh toán chưa chọn. Dùng `setPaymentLines`
   // (functional updater → đọc state TƯƠI, KHÔNG chạy manual-edit detection) thay vì
@@ -167,6 +166,7 @@ export function PaymentSection({
       </div>
       {isRefundFlow ? (
         <>
+          <DebtOffsetRow refundAmount={refundDisplayAmount} />
           <div className="border-t border-gray-200 px-4 py-2">
             <p className="text-[13px] font-medium text-gray-900">
               Hình thức đổi trả
@@ -184,11 +184,7 @@ export function PaymentSection({
       <div className="border-t border-gray-200 px-4">
         {showKeepChange ? <KeepChangeRow /> : null}
         {showForgiveShortage ? <ForgiveShortageRow /> : null}
-        {isQuickReturnFlow ? null : isRefundFlow ? (
-          <RefundToDebtRow />
-        ) : (
-          <DebtCheckRow />
-        )}
+        {isQuickReturnFlow || isRefundFlow ? null : <DebtCheckRow />}
       </div>
       <div className="border-t border-b border-gray-200 px-4">
         <PosTextarea

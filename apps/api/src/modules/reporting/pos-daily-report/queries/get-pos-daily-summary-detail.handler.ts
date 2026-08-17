@@ -13,7 +13,6 @@ import {
   InvoiceEntity,
   InvoicePaymentMethod,
   InvoiceType,
-  RefundMethod,
 } from '../../../pos/entities/invoice.entity';
 import { InvoicePaymentEntity } from '../../../pos/entities/invoice-payment.entity';
 import { InvoiceDebtEntity, DebtDocumentType } from '../../../pos/entities/invoice-debt.entity';
@@ -261,23 +260,11 @@ export class GetPosDailySummaryDetailHandler
       }
     }
 
-    // Cash-method refund netting mirrors the aggregate handler: a CASH refund is
-    // never an invoice_payments row, so it's represented here as its own negative
-    // line so the drill-down total still reconciles with revenue.cash.
-    if (method === InvoicePaymentMethod.CASH) {
-      for (const inv of invoices) {
-        if (inv.refundMethod === RefundMethod.CASH && Number(inv.refundedAmount ?? 0) > 0) {
-          rows.push({
-            documentNumber: inv.code,
-            documentType: 'Hoàn tiền mặt',
-            sortKey: toIso(inv.issuedAt ?? inv.createdAt),
-            customerId: inv.customerId,
-            showCustomerFallback: true,
-            amount: -Number(inv.refundedAmount ?? 0),
-          });
-        }
-      }
-    }
+    // No negative refund line here, mirroring the aggregate handler: a CASH
+    // refund does issue a POSTED phiếu chi, so it already appears on the Chi
+    // side. Listing it as a negative row on the Thu side too showed the same
+    // refund on both sides of the report and made the drill-down disagree with
+    // the fund. See the long comment in get-pos-daily-summary.handler.
 
     // Non-invoice cash inflow (Thu nợ / Thu khác) — see aggregate handler's doc
     // comment for why POS_SALE-purpose receipts are excluded.

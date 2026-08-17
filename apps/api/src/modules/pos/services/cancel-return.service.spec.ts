@@ -565,4 +565,195 @@ describe('CancelReturnService', () => {
       expect(membershipCardService.netPointsForInvoice).not.toHaveBeenCalled();
     });
   });
+  describe('cancelling a split return (AC-17, AC-18)', () => {
+    /**
+     * The QA invoice, mirrored: a 765.000 return that settled 465.000 of debt and
+     * paid 300.000 out of the drawer. `refundMethod` says CASH — which is exactly
+     * why neither leg may be driven off it any more.
+     */
+    const splitReturn = () =>
+      returnStub({
+        type: InvoiceType.RETURN,
+        refundMethod: RefundMethod.CASH,
+        refundedAmount: 765_000,
+        offsetAmount: 465_000,
+        netAmount: -765_000,
+      });
+
+    const originalSale = () =>
+      ({ id: 'inv-1', organizationId: 'org-1' }) as InvoiceEntity;
+
+    const wireSplitReturn = () =>
+      invoiceRepo.findOne.mockImplementation(({ where }: any) =>
+        Promise.resolve(where.id === 'rtn-1' ? splitReturn() : originalSale()),
+      );
+
+    it('AC-17 — reopens the debt and collects back only the cash that moved', async () => {
+      const originalDebt = {
+        id: 'debt-orig',
+        invoiceId: 'inv-1',
+        originalAmount: 465_000,
+        paidAmount: 465_000,
+        remainingAmount: 0,
+        status: DebtStatus.PAID,
+        settledAt: new Date(),
+      } as InvoiceDebtEntity;
+      const adjustment = {
+        id: 'debt-adj',
+        invoiceId: 'rtn-1',
+        documentType: DebtDocumentType.ADJUSTMENT,
+        originalAmount: -465_000,
+      } as InvoiceDebtEntity;
+
+      wireSplitReturn();
+      mockManager.findOne = managerFindOne({ adjustment, originalDebt });
+
+      await service.cancel('rtn-1', { reason: 'nhầm hàng' }, actor);
+
+      expect(originalDebt.remainingAmount).toBe(465_000);
+      expect(originalDebt.status).toBe(DebtStatus.OPEN);
+      expect(originalDebt.settledAt).toBeNull();
+      // 300.000, not 765.000 — billing the customer for the offset would invent a
+      // receivable out of money they never got.
+      expect(publishedPayload(publisher).collections).toEqual([
+        {
+          fundKind: 'CASH',
+          cashAccountId: 'cash-fund-1',
+          amount: 300_000,
+          contraAccountId: 'coa-revenue',
+        },
+      ]);
+    });
+
+    it('AC-18 — a fully offset return reopens the debt and collects nothing', async () => {
+      const originalDebt = {
+        id: 'debt-orig',
+        invoiceId: 'inv-1',
+        originalAmount: 765_000,
+        paidAmount: 765_000,
+        remainingAmount: 0,
+        status: DebtStatus.PAID,
+        settledAt: new Date(),
+      } as InvoiceDebtEntity;
+      const adjustment = {
+        id: 'debt-adj',
+        invoiceId: 'rtn-1',
+        documentType: DebtDocumentType.ADJUSTMENT,
+        originalAmount: -765_000,
+      } as InvoiceDebtEntity;
+
+      invoiceRepo.findOne.mockImplementation(({ where }: any) =>
+        Promise.resolve(
+          where.id === 'rtn-1'
+            ? returnStub({
+                type: InvoiceType.RETURN,
+                refundMethod: RefundMethod.CASH,
+                refundedAmount: 765_000,
+                offsetAmount: 765_000,
+                netAmount: -765_000,
+              })
+            : originalSale(),
+        ),
+      );
+      mockManager.findOne = managerFindOne({ adjustment, originalDebt });
+
+      await service.cancel('rtn-1', { reason: 'nhầm hàng' }, actor);
+
+      expect(originalDebt.remainingAmount).toBe(765_000);
+      expect(publishedPayload(publisher).collections).toEqual([]);
+      expect(cashFundResolver.resolveBranchCashFund).not.toHaveBeenCalled();
+    });
+
+    it('collects back the cash-out part of a BANK split refund', async () => {
+      invoiceRepo.findOne.mockImplementation(({ where }: any) =>
+        Promise.resolve(
+          where.id === 'rtn-1'
+            ? returnStub({
+                type: InvoiceType.RETURN,
+                refundMethod: RefundMethod.BANK,
+                refundedAmount: 765_000,
+                offsetAmount: 465_000,
+                netAmount: -765_000,
+              })
+            : originalSale(),
+        ),
+      );
+      mockManager.findOne = managerFindOne({});
+
+      await service.cancel('rtn-1', { reason: 'nhầm hàng' }, actor);
+
+      expect(publishedPayload(publisher).collections).toEqual([
+        { fundKind: 'DEPOSIT', amount: 300_000, contraAccountId: 'coa-revenue' },
+      ]);
+    });
+
+    it('still restores a legacy OFFSET return, whose offsetAmount is 0', async () => {
+      // Documents posted before the split carry refundMethod=OFFSET and no
+      // offset_amount. The ADJUSTMENT row remains the source of truth.
+      const originalDebt = {
+        id: 'debt-orig',
+        invoiceId: 'inv-1',
+        originalAmount: 1_000_000,
+        paidAmount: 1_000_000,
+        remainingAmount: 0,
+        status: DebtStatus.PAID,
+        settledAt: new Date(),
+      } as InvoiceDebtEntity;
+      const adjustment = {
+        id: 'debt-adj',
+        invoiceId: 'rtn-1',
+        documentType: DebtDocumentType.ADJUSTMENT,
+        originalAmount: -400_000,
+      } as InvoiceDebtEntity;
+
+      invoiceRepo.findOne.mockImplementation(({ where }: any) =>
+        Promise.resolve(
+          where.id === 'rtn-1'
+            ? returnStub({
+                type: InvoiceType.RETURN,
+                refundMethod: RefundMethod.OFFSET,
+                refundedAmount: 520_000,
+                netAmount: -520_000,
+              })
+            : originalSale(),
+        ),
+      );
+      mockManager.findOne = managerFindOne({ adjustment, originalDebt });
+
+      await service.cancel('rtn-1', { reason: 'nhầm hàng' }, actor);
+
+      expect(originalDebt.remainingAmount).toBe(400_000);
+      expect(originalDebt.status).toBe(DebtStatus.OPEN);
+      // Legacy OFFSET is not CASH or BANK, so no collection leg — unchanged.
+      expect(publishedPayload(publisher).collections).toEqual([]);
+    });
+
+    it('subtracts the offset relative to what the debt owes now, not absolutely', async () => {
+      // The customer paid 100.000 more against the debt after the return posted.
+      const originalDebt = {
+        id: 'debt-orig',
+        invoiceId: 'inv-1',
+        originalAmount: 465_000,
+        paidAmount: 465_000,
+        remainingAmount: 0,
+        status: DebtStatus.PAID,
+        settledAt: new Date(),
+      } as InvoiceDebtEntity;
+      const adjustment = {
+        id: 'debt-adj',
+        invoiceId: 'rtn-1',
+        documentType: DebtDocumentType.ADJUSTMENT,
+        originalAmount: -365_000,
+      } as InvoiceDebtEntity;
+
+      wireSplitReturn();
+      mockManager.findOne = managerFindOne({ adjustment, originalDebt });
+
+      await service.cancel('rtn-1', { reason: 'nhầm hàng' }, actor);
+
+      // 465.000 paid − 365.000 put back = 100.000 genuinely collected stays paid.
+      expect(originalDebt.paidAmount).toBe(100_000);
+      expect(originalDebt.remainingAmount).toBe(365_000);
+    });
+  });
 });

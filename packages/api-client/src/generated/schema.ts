@@ -5174,6 +5174,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * One endpoint, two flows: voiding a return/exchange is the mirror of voiding
+         *     a sale (stock and money move the other way), so the document's own type
+         *     picks the service rather than the caller having to know which to call.
+         */
         post: operations["InvoiceController_cancel"];
         delete?: never;
         options?: never;
@@ -5205,6 +5210,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["InvoiceController_getEligibleReturns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices/{id}/outstanding-debt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceController_getOutstandingDebt"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5480,6 +5501,204 @@ export interface paths {
         put?: never;
         post?: never;
         delete: operations["PromotionController_removePromotion"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/promotions/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PromotionV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/promotions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PromotionV2Controller_getById_v2"];
+        put: operations["PromotionV2Controller_update_v2"];
+        post?: never;
+        delete: operations["PromotionV2Controller_delete_v2"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/promotions/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prices a cart without writing anything. Accepts either the back-office
+         *     `promotion.read` or the cashier-scoped `pos.promotion.evaluate`, because
+         *     the till needs this endpoint but must not inherit read access to the
+         *     whole promotion catalogue.
+         */
+        post: operations["PromotionV2Controller_evaluate_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/promotions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PromotionV2Controller_create_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/promotions/{id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PromotionV2Controller_duplicate_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/promotions/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["PromotionV2Controller_changeStatus_v2"];
+        trace?: never;
+    };
+    "/v2/vouchers/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["VoucherV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/vouchers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["VoucherV2Controller_create_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/vouchers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["VoucherV2Controller_update_v2"];
+        post?: never;
+        delete: operations["VoucherV2Controller_deactivate_v2"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/vouchers/{id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["VoucherV2Controller_duplicate_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/pos/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CheckoutSagaController_checkout_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/pos/checkout/sagas/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CheckoutSagaController_getSaga_v2"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -7391,7 +7610,7 @@ export interface components {
             reason?: string;
             staffId?: string;
             /** @enum {string} */
-            referenceType?: "INVOICE" | "INVOICE_DEBT" | "RECEIVABLE" | "MANUAL" | "REVERSAL" | "FUND_SWAP" | "TRANSFER";
+            referenceType?: "INVOICE" | "INVOICE_DEBT" | "RECEIVABLE" | "MANUAL" | "REVERSAL" | "FUND_SWAP" | "TRANSFER" | "RETURN_CANCEL" | "INVOICE_KEPT_CHANGE";
             referenceId?: string;
             cashAccountId: string;
             contraAccountId: string;
@@ -7907,7 +8126,7 @@ export interface components {
         };
         CreateDocumentNumberRuleDto: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP" | "PROMOTION";
             branchId?: string;
             prefix: string;
             suffix?: string;
@@ -7919,7 +8138,7 @@ export interface components {
         };
         DocumentNumberRuleEntity: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP" | "PROMOTION";
             prefix: string;
             suffix?: string;
             includeDate: boolean;
@@ -7951,7 +8170,7 @@ export interface components {
         };
         GenerateDocumentNumberDto: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP" | "PROMOTION";
             branchId?: string;
         };
         CreateMembershipCardInlineDto: {
@@ -8125,6 +8344,17 @@ export interface components {
             email?: string;
             phone?: string;
             address?: string;
+            birthDate?: string;
+            /** @enum {string} */
+            gender?: "male" | "female" | "unspecified";
+            nationalId?: string;
+            /** Format: uuid */
+            groupId?: string;
+            /** Format: uuid */
+            assignedStaffId?: string;
+            note?: string;
+            companyName?: string;
+            taxCode?: string;
             /** @enum {string} */
             status?: "ACTIVE" | "INACTIVE" | "MERGED";
             version?: number;
@@ -9891,7 +10121,7 @@ export interface components {
             totalAmount: number;
             attachmentIds: string[];
             /** @enum {string} */
-            referenceType?: "INVOICE_DEBT" | "RECEIVABLE" | "TRANSFER" | "MANUAL" | "REVERSAL" | "FUND_SWAP";
+            referenceType?: "INVOICE_DEBT" | "INVOICE" | "RECEIVABLE" | "TRANSFER" | "MANUAL" | "REVERSAL" | "FUND_SWAP" | "RETURN_CANCEL";
             referenceId?: string;
             depositMovementId?: string;
             journalEntryId?: string;
@@ -11052,6 +11282,7 @@ export interface components {
             /** @enum {string} */
             refundMethod?: "CASH" | "BANK" | "STORE_CREDIT" | "OFFSET";
             refundedAmount: number;
+            offsetAmount: number;
             netAmount: number;
             subtotal: number;
             discountAmount: number;
@@ -11069,6 +11300,7 @@ export interface components {
             depositAmount: number;
             amountDue: number;
             totalPaid: number;
+            keptChangeAmount: number;
             note?: string;
             isDraft: boolean;
             sessionId: string;
@@ -11108,6 +11340,7 @@ export interface components {
             lineDiscountType?: "percent" | "amount";
             lineDiscountValue?: number;
             lineDiscountReason?: string;
+            promotionDiscount: number;
             lineTotal: number;
             /** @enum {string} */
             direction: "OUT" | "IN";
@@ -11116,6 +11349,8 @@ export interface components {
             originalInvoiceItem?: components["schemas"]["InvoiceItemEntity"];
             note?: string;
             sortOrder: number;
+            isGift: boolean;
+            promotionProgramId?: string;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -11146,6 +11381,7 @@ export interface components {
             lineDiscountType?: "percent" | "amount";
             lineDiscountValue?: number;
             lineDiscountReason?: string;
+            promotionDiscount: number;
             lineTotal: number;
             /** @enum {string} */
             direction: "OUT" | "IN";
@@ -11154,6 +11390,8 @@ export interface components {
             originalInvoiceItem?: components["schemas"]["InvoiceItemEntity"];
             note?: string;
             sortOrder: number;
+            isGift: boolean;
+            promotionProgramId?: string;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -11186,6 +11424,11 @@ export interface components {
             /** @description UUID of the user who created this record. */
             createdBy: string;
         };
+        AppliedInvoicePromotionDto: {
+            /** @enum {string} */
+            type: "INVOICE_DISCOUNT" | "ITEM_DISCOUNT" | "TIERED_DISCOUNT" | "GIFT_ITEM" | "BUY_M_GET_N";
+            discountAmount: number;
+        };
         DraftInvoiceResponseDto: {
             /** @description Line items belonging to this draft, ordered by sortOrder. */
             items: components["schemas"]["DraftInvoiceItemDto"][];
@@ -11197,6 +11440,8 @@ export interface components {
             remainingDebt: number | null;
             /** @description Display name of the staff member (cashier) who created the invoice; null when the user no longer exists. */
             staffName: string | null;
+            /** @description Promotion programmes that actually ran at checkout, read back from the invoice_checkout_promotions snapshot. */
+            appliedPromotions: components["schemas"]["AppliedInvoicePromotionDto"][];
             code: string;
             /** Format: date-time */
             issuedAt?: string;
@@ -11209,6 +11454,7 @@ export interface components {
             /** @enum {string} */
             refundMethod?: "CASH" | "BANK" | "STORE_CREDIT" | "OFFSET";
             refundedAmount: number;
+            offsetAmount: number;
             netAmount: number;
             subtotal: number;
             discountAmount: number;
@@ -11226,6 +11472,7 @@ export interface components {
             depositAmount: number;
             amountDue: number;
             totalPaid: number;
+            keptChangeAmount: number;
             note?: string;
             isDraft: boolean;
             sessionId: string;
@@ -11321,7 +11568,7 @@ export interface components {
             dueDate?: string;
             creditDays?: number;
             /** Format: date-time */
-            settledAt?: string;
+            settledAt?: string | null;
             /** @enum {string} */
             status: "open" | "paid" | "overdue";
             note?: string;
@@ -11385,6 +11632,16 @@ export interface components {
             reference?: string;
         };
         CheckoutInvoiceDto: {
+            /**
+             * @description Change the customer declined to take back ("Khách không lấy tiền thừa").
+             *
+             *     `payments` still carry only what settles the invoice — the surplus never
+             *     inflates `totalPaid` or revenue. It is booked separately as other income
+             *     (Phiếu thu, DR quỹ / CR 711), so the drawer matches the cash physically in it.
+             *     Only valid on a fully-settled cash sale.
+             * @example 60000
+             */
+            keptChangeAmount?: number;
             /**
              * @description Credit due date (ISO `YYYY-MM-DD`). Stored on the debt record when the sale
              *     leaves a remaining balance (DEBT / PARTIAL_DEBT). Ignored when fully paid.
@@ -11462,7 +11719,15 @@ export interface components {
             newLines: components["schemas"]["CreateInvoiceItemDto"][];
         };
         CheckoutReturnDto: {
-            /** @enum {string} */
+            /**
+             * @description Which fund pays out the refund. It does NOT decide whether the original
+             *     invoice's outstanding debt is settled — that happens on every return, ahead
+             *     of any payout, and is reported back as `offsetAmount`.
+             *
+             *     `OFFSET` is accepted as a legacy alias of `CASH` so older POS builds keep
+             *     working; the resulting document is identical either way.
+             * @enum {string}
+             */
             refundMethod: "CASH" | "BANK" | "STORE_CREDIT" | "OFFSET";
             /**
              * Format: uuid
@@ -11485,7 +11750,8 @@ export interface components {
             refundAccountId?: string;
             /**
              * Format: uuid
-             * @description Required when refundMethod = OFFSET against an original AR (debt) invoice.
+             * @description Deprecated — the AR account for a debt settlement is resolved server-side.
+             *     Kept optional so an older client sending it is not rejected.
              */
             receivableAccountId?: string;
             /**
@@ -11635,12 +11901,16 @@ export interface components {
         };
         VoucherEntity: {
             code: string;
+            issuer?: string;
+            description?: string;
+            /** @enum {string} */
+            status: "TRACKING" | "STOPPED";
             faceValue: number;
             customerId?: string;
             /** Format: date-time */
-            validFrom: string;
+            validFrom?: string;
             /** Format: date-time */
-            validTo: string;
+            validTo?: string;
             isUsed: boolean;
             redeemedInvoiceId?: string;
             isActive: boolean;
@@ -11658,11 +11928,16 @@ export interface components {
         };
         CreateVoucherDto: {
             code: string;
+            issuer: string;
+            description?: string;
+            /** @enum {string} */
+            status?: "TRACKING" | "STOPPED";
             faceValue: number;
             /** Format: uuid */
             customerId?: string;
-            validFrom: string;
-            validTo: string;
+            /** @description Omit for an unlimited-duration voucher (FR-051). */
+            validFrom?: string;
+            validTo?: string;
         };
         PromotionEntity: {
             name: string;
@@ -11702,6 +11977,376 @@ export interface components {
             /** @enum {string} */
             type: "discount_code" | "voucher" | "promotion";
             code: string;
+        };
+        PromotionSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /**
+             * @description FR-005: 50 rows/page by default
+             * @default 50
+             */
+            limit: number;
+            name?: components["schemas"]["StringFilterDto"];
+            description?: components["schemas"]["StringFilterDto"];
+            type?: components["schemas"]["EnumFilterDto"];
+            /** @description Not applied by default — the "Tracking only" default is a FE-side chip (FR-004), not a hidden server filter */
+            status?: components["schemas"]["EnumFilterDto"];
+            applyTo?: components["schemas"]["EnumFilterDto"];
+            startDate?: components["schemas"]["DateRangeFilterDto"];
+            endDate?: components["schemas"]["DateRangeFilterDto"];
+        };
+        EvaluateCartLineInputDto: {
+            /** @description Client-supplied, echoed back in lineDiscounts so the client can map results without guessing by order */
+            lineId: string;
+            /** Format: uuid */
+            itemId: string;
+            quantity: number;
+            unitPrice: number;
+            /** @description Per-line discount the cashier already entered manually */
+            manualLineDiscount?: number;
+        };
+        EvaluateCartDto: {
+            /**
+             * Format: uuid
+             * @description Omit for a walk-in customer
+             */
+            customerId?: string;
+            /** @description ISO datetime; omitted = server current time */
+            at?: string;
+            /** @description Ids of auto_apply=false programs the cashier picked manually, and/or ids that should win a contested resource ahead of priority (ADR-03) */
+            selectedProgramIds?: string[];
+            /** @description Ids of programs to exclude entirely, even if auto_apply=true (ADR-07) — wins over selectedProgramIds on conflict */
+            excludedProgramIds?: string[];
+            /**
+             * @description Empty is valid on purpose: the POS promotion dialog previews the program
+             *     catalog (names, "chưa đủ điều kiện"/"có thể áp dụng" per row) before the
+             *     cashier has scanned anything, not just once the cart has lines.
+             */
+            lines: components["schemas"]["EvaluateCartLineInputDto"][];
+        };
+        PromotionLineInputDto: {
+            /** @enum {string} */
+            role: "CONDITION" | "REWARD";
+            /** @enum {string} */
+            targetType: "PRODUCT" | "ITEM" | "CATEGORY";
+            /** Format: uuid */
+            targetId: string;
+            quantity?: number;
+            /** @enum {string} */
+            discountMode?: "PERCENT" | "AMOUNT" | "FIXED_PRICE";
+            discountValue?: number;
+            /** @description "Selling price <=" filter on the gift-item grid (FR-033) */
+            maxUnitPrice?: number;
+            /** @default 0 */
+            sortOrder: number;
+        };
+        PromotionTierInputDto: {
+            fromValue: number;
+            /** @description Omit for an unbounded (infinite) upper tier */
+            toValue?: number;
+            /** @enum {string} */
+            discountMode: "PERCENT" | "AMOUNT" | "FIXED_PRICE";
+            discountValue: number;
+            /** @default 0 */
+            sortOrder: number;
+        };
+        PromotionGroupInputDto: {
+            /** @description 0 for the implicit single group of every non-TIERED_DISCOUNT type */
+            ordinal: number;
+            name?: string;
+            lines?: components["schemas"]["PromotionLineInputDto"][];
+            tiers?: components["schemas"]["PromotionTierInputDto"][];
+        };
+        PromotionConditionInputDto: {
+            /** @enum {string} */
+            type: "NONE" | "MIN_INVOICE_AMOUNT" | "SPECIFIC_QUANTITY";
+            minAmount?: number;
+            /** @enum {string} */
+            calcBasis?: "ALL_ITEMS" | "NON_PROMO_ITEMS" | "ITEM_CATEGORIES";
+            /** @enum {string} */
+            groupMatchMode?: "ANY" | "ALL";
+            /** @default false */
+            multiplyGift: boolean;
+        };
+        CreatePromotionV2Dto: {
+            /**
+             * @description Immutable after creation (FR-006) — change type by duplicating instead
+             * @enum {string}
+             */
+            type: "INVOICE_DISCOUNT" | "ITEM_DISCOUNT" | "TIERED_DISCOUNT" | "GIFT_ITEM" | "BUY_M_GET_N";
+            name: string;
+            description?: string;
+            /** @enum {string} */
+            applyTo: "ALL_CUSTOMERS" | "CUSTOMER_GROUP" | "BIRTHDAY" | "CARD_TIER";
+            /** @enum {string} */
+            birthdayMatch?: "EXACT_DAY" | "SAME_WEEK" | "SAME_MONTH" | "RANGE";
+            /** @description Only when birthdayMatch = RANGE */
+            birthdayBeforeDays?: number;
+            /** @description Only when birthdayMatch = RANGE */
+            birthdayAfterDays?: number;
+            /**
+             * Format: uuid
+             * @description Only when applyTo = CARD_TIER
+             */
+            cardTierId?: string;
+            /** @description Only when applyTo = CUSTOMER_GROUP */
+            customerGroupIds?: string[];
+            /**
+             * @description Omit for no start bound
+             * @example 2026-01-01
+             */
+            startDate?: string;
+            /**
+             * @description Omit for no end bound
+             * @example 2026-12-31
+             */
+            endDate?: string;
+            /** @description ISO day-of-week (1=Monday..7=Sunday); empty = every day */
+            daysOfWeek?: number[];
+            /** @example 18:00 */
+            startTime?: string;
+            /**
+             * @description endTime < startTime is an overnight window (FR-022), not an error
+             * @example 21:00
+             */
+            endTime?: string;
+            /** @default true */
+            autoApply: boolean;
+            /**
+             * @description Lower runs first when programs contend for the same resource (BR-001)
+             * @default 100
+             */
+            priority: number;
+            /** @description promotion_branches — empty = whole chain (BR-005) */
+            branchIds?: string[];
+            /**
+             * @description INVOICE_DISCOUNT only
+             * @enum {string}
+             */
+            invoiceScope?: "NON_PROMO_ONLY" | "ALL_ITEMS";
+            /**
+             * @description INVOICE_DISCOUNT only
+             * @enum {string}
+             */
+            discountMode?: "PERCENT" | "AMOUNT" | "FIXED_PRICE";
+            /** @description INVOICE_DISCOUNT only */
+            discountValue?: number;
+            /** @description TIERED_DISCOUNT + tierBasis=INVOICE_VALUE only */
+            maxDiscountAmount?: number;
+            /**
+             * @description TIERED_DISCOUNT only
+             * @enum {string}
+             */
+            tierBasis?: "QUANTITY" | "ITEM_VALUE" | "INVOICE_VALUE";
+            /**
+             * @description TIERED_DISCOUNT only
+             * @enum {string}
+             */
+            tierScope?: "PER_ITEM" | "ALL_ITEMS_IN_GROUP";
+            /**
+             * @description Default grid target for TIERED_DISCOUNT/BUY_M_GET_N
+             * @enum {string}
+             */
+            targetType?: "PRODUCT" | "ITEM" | "CATEGORY";
+            /**
+             * @description GIFT_ITEM only
+             * @enum {string}
+             */
+            giftMode?: "ONE_OF" | "ALL_OF";
+            /**
+             * @description BUY_M_GET_N only
+             * @enum {string}
+             */
+            buyGetPolicy?: "SPECIFIC" | "CHEAPEST";
+            /** @description BUY_M_GET_N only — the "m" in "buy m get n" */
+            buyQuantity?: number;
+            /** @description BUY_M_GET_N only — the "n" in "buy m get n" */
+            giftQuantity?: number;
+            groups: components["schemas"]["PromotionGroupInputDto"][];
+            condition?: components["schemas"]["PromotionConditionInputDto"];
+        };
+        UpdatePromotionV2Dto: {
+            /**
+             * @description Immutable after creation (FR-006) — change type by duplicating instead
+             * @enum {string}
+             */
+            type: "INVOICE_DISCOUNT" | "ITEM_DISCOUNT" | "TIERED_DISCOUNT" | "GIFT_ITEM" | "BUY_M_GET_N";
+            name: string;
+            description?: string;
+            /** @enum {string} */
+            applyTo: "ALL_CUSTOMERS" | "CUSTOMER_GROUP" | "BIRTHDAY" | "CARD_TIER";
+            /** @enum {string} */
+            birthdayMatch?: "EXACT_DAY" | "SAME_WEEK" | "SAME_MONTH" | "RANGE";
+            /** @description Only when birthdayMatch = RANGE */
+            birthdayBeforeDays?: number;
+            /** @description Only when birthdayMatch = RANGE */
+            birthdayAfterDays?: number;
+            /**
+             * Format: uuid
+             * @description Only when applyTo = CARD_TIER
+             */
+            cardTierId?: string;
+            /** @description Only when applyTo = CUSTOMER_GROUP */
+            customerGroupIds?: string[];
+            /**
+             * @description Omit for no start bound
+             * @example 2026-01-01
+             */
+            startDate?: string;
+            /**
+             * @description Omit for no end bound
+             * @example 2026-12-31
+             */
+            endDate?: string;
+            /** @description ISO day-of-week (1=Monday..7=Sunday); empty = every day */
+            daysOfWeek?: number[];
+            /** @example 18:00 */
+            startTime?: string;
+            /**
+             * @description endTime < startTime is an overnight window (FR-022), not an error
+             * @example 21:00
+             */
+            endTime?: string;
+            /** @default true */
+            autoApply: boolean;
+            /**
+             * @description Lower runs first when programs contend for the same resource (BR-001)
+             * @default 100
+             */
+            priority: number;
+            /** @description promotion_branches — empty = whole chain (BR-005) */
+            branchIds?: string[];
+            /**
+             * @description INVOICE_DISCOUNT only
+             * @enum {string}
+             */
+            invoiceScope?: "NON_PROMO_ONLY" | "ALL_ITEMS";
+            /**
+             * @description INVOICE_DISCOUNT only
+             * @enum {string}
+             */
+            discountMode?: "PERCENT" | "AMOUNT" | "FIXED_PRICE";
+            /** @description INVOICE_DISCOUNT only */
+            discountValue?: number;
+            /** @description TIERED_DISCOUNT + tierBasis=INVOICE_VALUE only */
+            maxDiscountAmount?: number;
+            /**
+             * @description TIERED_DISCOUNT only
+             * @enum {string}
+             */
+            tierBasis?: "QUANTITY" | "ITEM_VALUE" | "INVOICE_VALUE";
+            /**
+             * @description TIERED_DISCOUNT only
+             * @enum {string}
+             */
+            tierScope?: "PER_ITEM" | "ALL_ITEMS_IN_GROUP";
+            /**
+             * @description Default grid target for TIERED_DISCOUNT/BUY_M_GET_N
+             * @enum {string}
+             */
+            targetType?: "PRODUCT" | "ITEM" | "CATEGORY";
+            /**
+             * @description GIFT_ITEM only
+             * @enum {string}
+             */
+            giftMode?: "ONE_OF" | "ALL_OF";
+            /**
+             * @description BUY_M_GET_N only
+             * @enum {string}
+             */
+            buyGetPolicy?: "SPECIFIC" | "CHEAPEST";
+            /** @description BUY_M_GET_N only — the "m" in "buy m get n" */
+            buyQuantity?: number;
+            /** @description BUY_M_GET_N only — the "n" in "buy m get n" */
+            giftQuantity?: number;
+            groups: components["schemas"]["PromotionGroupInputDto"][];
+            condition?: components["schemas"]["PromotionConditionInputDto"];
+        };
+        ChangePromotionStatusV2Dto: {
+            /** @enum {string} */
+            status: "TRACKING" | "STOPPED";
+        };
+        VoucherSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            limit: number;
+            issuer?: components["schemas"]["StringFilterDto"];
+            code?: components["schemas"]["StringFilterDto"];
+            description?: components["schemas"]["StringFilterDto"];
+            startDate?: components["schemas"]["DateRangeFilterDto"];
+            endDate?: components["schemas"]["DateRangeFilterDto"];
+            status?: components["schemas"]["EnumFilterDto"];
+            faceValue?: components["schemas"]["CompareFilterDto"];
+        };
+        DuplicateVoucherDto: {
+            /** @description New voucher code (must be unique within the organization) — vouchers have no auto-numbering, so the client must supply one */
+            code: string;
+        };
+        CheckoutV2PaymentLineDto: {
+            /** @enum {string} */
+            paymentMethod: "cash" | "bank_transfer" | "card";
+            amount: number;
+            /**
+             * Format: uuid
+             * @description A configured `payment_accounts` row — e.g. which bank a transfer went
+             *     into. The server validates and derives the receiving COA account; clients
+             *     never send a COA account id directly.
+             */
+            paymentAccountId?: string;
+            reference?: string;
+        };
+        CheckoutV2Dto: {
+            /** Format: uuid */
+            invoiceId: string;
+            /** @description Payment lines. Empty array = full debt (requires a customer on the invoice). */
+            payments: components["schemas"]["CheckoutV2PaymentLineDto"][];
+            /**
+             * @description Change the customer declined to take back ("Khách không lấy tiền thừa").
+             *
+             *     `payments` still carry only what settles the invoice — the surplus never
+             *     inflates `totalPaid` or revenue. It is booked separately as other income
+             *     (Phiếu thu, DR quỹ / CR 711), so the drawer matches the cash physically in
+             *     it. Only valid on a fully-settled cash sale. Mirrors
+             *     `CheckoutInvoiceDto.keptChangeAmount` (v1).
+             * @example 60000
+             */
+            keptChangeAmount?: number;
+            /**
+             * @description Credit due date (ISO `YYYY-MM-DD`). Stored on the debt record when the sale leaves a remaining balance.
+             * @example 2026-06-25
+             */
+            dueDate?: string;
+            /**
+             * @description Credit term in days entered at checkout (per invoice).
+             * @example 9
+             */
+            creditDays?: number;
+            /**
+             * @description Dual meaning (ADR-03 in 03-logical-design.md, deliberately one field, not
+             *     two). The server always recomputes the discount itself (ADR-06) — this
+             *     list only selects *which* programs run:
+             *     1. Turns on an `auto_apply=false` program — without this, it never runs.
+             *     2. Makes a listed program win a contested resource ahead of `priority`
+             *        (PromotionResolver.resolve) — including one that's `auto_apply=true`
+             *        and currently winning. Ids for programs not eligible/not contesting
+             *        anything are simply ignored.
+             */
+            selectedProgramIds?: string[];
+            /**
+             * @description ADR-07 (pos-promotion-apply/03-logical-design.md) — ids to keep out of
+             *     the race entirely, filtered out before `selectedProgramIds` is even
+             *     consulted. The inverse of `selectedProgramIds`: always exclude, never
+             *     add. Wins on conflict if an id is in both.
+             */
+            excludedProgramIds?: string[];
+            /** @description Voucher code to redeem against this checkout. Not consumed until T-05-01. */
+            voucherCode?: string;
+            /**
+             * @description Run every preflight step and report the result without writing anything.
+             *     Only `true` is supported until UOW-02 lands the transactional phase.
+             */
+            dryRun?: boolean;
         };
         AsyncReportDto: {
             /** @enum {string} */
@@ -22191,6 +22836,27 @@ export interface operations {
             };
         };
     };
+    InvoiceController_getOutstandingDebt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     InvoiceController_createReturn: {
         parameters: {
             query?: never;
@@ -22680,6 +23346,339 @@ export interface operations {
             path: {
                 invoiceId: string;
                 promotionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PromotionV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromotionSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PromotionV2Controller_getById_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PromotionV2Controller_update_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePromotionV2Dto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PromotionV2Controller_delete_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PromotionV2Controller_evaluate_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvaluateCartDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PromotionV2Controller_create_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePromotionV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PromotionV2Controller_duplicate_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PromotionV2Controller_changeStatus_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePromotionStatusV2Dto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    VoucherV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoucherSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    VoucherV2Controller_create_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateVoucherDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoucherEntity"];
+                };
+            };
+        };
+    };
+    VoucherV2Controller_update_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoucherEntity"];
+                };
+            };
+        };
+    };
+    VoucherV2Controller_deactivate_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoucherEntity"];
+                };
+            };
+        };
+    };
+    VoucherV2Controller_duplicate_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DuplicateVoucherDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoucherEntity"];
+                };
+            };
+        };
+    };
+    CheckoutSagaController_checkout_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CheckoutSagaController_getSaga_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
             };
             cookie?: never;
         };

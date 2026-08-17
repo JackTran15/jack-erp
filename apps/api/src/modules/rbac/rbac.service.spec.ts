@@ -126,6 +126,58 @@ describe('RbacService', () => {
     });
   });
 
+  describe('hasAnyPermission', () => {
+    it('returns true when the user holds the first of the listed keys', async () => {
+      cacheService.getOrSet.mockResolvedValue(['promotion.read']);
+
+      const result = await service.hasAnyPermission('user-1', 'org-1', [
+        'promotion.read',
+        'pos.promotion.evaluate',
+      ]);
+
+      expect(result).toBe(true);
+    });
+
+    it('returns true when the user holds the last of the listed keys', async () => {
+      cacheService.getOrSet.mockResolvedValue(['pos.promotion.evaluate']);
+
+      const result = await service.hasAnyPermission('user-1', 'org-1', [
+        'promotion.read',
+        'pos.promotion.evaluate',
+      ]);
+
+      expect(result).toBe(true);
+    });
+
+    it('returns false when the user holds none of the listed keys', async () => {
+      cacheService.getOrSet.mockResolvedValue(['customer.read']);
+
+      const result = await service.hasAnyPermission('user-1', 'org-1', [
+        'promotion.read',
+        'pos.promotion.evaluate',
+      ]);
+
+      expect(result).toBe(false);
+    });
+
+    it('denies an empty key list rather than waving it through', async () => {
+      cacheService.getOrSet.mockResolvedValue(['promotion.read']);
+
+      const result = await service.hasAnyPermission('user-1', 'org-1', []);
+
+      expect(result).toBe(false);
+      expect(cacheService.getOrSet).not.toHaveBeenCalled();
+    });
+
+    it('resolves the permission set once regardless of how many keys are listed', async () => {
+      cacheService.getOrSet.mockResolvedValue(['pos.promotion.evaluate']);
+
+      await service.hasAnyPermission('user-1', 'org-1', ['a', 'b', 'c', 'd']);
+
+      expect(cacheService.getOrSet).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('permissions cached after first lookup', () => {
     it('calls cache getOrSet on every call (caching delegated to CacheService)', async () => {
       cacheService.getOrSet.mockResolvedValue(['customer.read']);

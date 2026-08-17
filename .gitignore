@@ -18,10 +18,22 @@ test_logs/
 .code-review-graph/
 graphify-out
 
+# AI-DLC generated artifacts — functions of the tickets, rebuilt by uow_graph.py --write.
+# Everything with judgement in it (intent, assumptions, requirements, design, UoW, tickets,
+# gate state) stays tracked.
+.ai/features/*/05-ticket-graph.md
+.ai/features/*/06-traceability.md
+.ai/features/*/registry.yaml
+
 # ai-dlc-verify: local-only skill, its generated evidence, and its secrets.
 # `.env.*` above does not cover credentials.env — that pattern matches a basename
 # beginning with .env, not one ending in it.
 .claude/skills/ai-dlc-verify/
+
+# ai-dlc-verify — secrets and generated evidence.
+# `.ai/credentials.env` is NOT matched by a `.env*` pattern (that matches a basename
+# *beginning* with .env, not one ending in it), and `.ai/.auth/` holds live session
+# state — a committed one is a working credential. Verified with `git check-ignore -v`.
 .ai/credentials.env
 .ai/.auth/
 .ai/features/*/08-evidence.md

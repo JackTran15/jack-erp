@@ -15,6 +15,7 @@ import { useCheckoutGrandTotal } from "@erp/pos/hooks/page-hooks/checkout/use-ch
 import {
   selectPaymentDraft,
   selectPointsDiscountAmount,
+  selectPromotionDiscountAmount,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
@@ -33,12 +34,6 @@ interface UseCheckoutPaymentResult {
   debt: boolean;
   setDebt: (value: Updater<boolean>) => void;
   handleDebtChange: (
-    next: boolean,
-    selectedCustomer: CustomerRow | null,
-  ) => void;
-  refundToDebt: boolean;
-  setRefundToDebt: (value: Updater<boolean>) => void;
-  handleRefundToDebtChange: (
     next: boolean,
     selectedCustomer: CustomerRow | null,
   ) => void;
@@ -93,6 +88,9 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
   const pointsDiscountAmount = usePosCheckoutSessionStore(
     selectPointsDiscountAmount,
   );
+  const promotionDiscountAmount = usePosCheckoutSessionStore(
+    selectPromotionDiscountAmount,
+  );
 
   // Slice payment của tab đang active (reference ổn định theo session).
   const payment = usePosCheckoutSessionStore(selectPaymentDraft);
@@ -100,7 +98,6 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
     paymentLines,
     keepChange,
     debt,
-    refundToDebt,
     note,
     printInvoice,
     printDuplicate,
@@ -151,14 +148,6 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
       updateDraftSlice("payment", (p) => ({
         ...p,
         debt: apply(p.debt, value),
-      })),
-    [updateDraftSlice],
-  );
-  const setRefundToDebt = useCallback(
-    (value: Updater<boolean>) =>
-      updateDraftSlice("payment", (p) => ({
-        ...p,
-        refundToDebt: apply(p.refundToDebt ?? false, value),
       })),
     [updateDraftSlice],
   );
@@ -249,6 +238,7 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
         deposit,
         returnFee,
         pointsDiscountAmount,
+        promotionDiscountAmount,
         paymentLines,
         keepChange,
         debt,
@@ -258,6 +248,7 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
       deposit,
       returnFee,
       pointsDiscountAmount,
+      promotionDiscountAmount,
       paymentLines,
       keepChange,
       debt,
@@ -301,21 +292,6 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
     [setKeepChange, setDebt, setPaymentLines],
   );
 
-  // Luồng hoàn tiền: "Tính vào công nợ" bù trừ khoản hoàn vào công nợ hóa đơn
-  // gốc → cần đã chọn khách (công nợ theo khách).
-  const handleRefundToDebtChange = useCallback(
-    (next: boolean, selectedCustomer: CustomerRow | null) => {
-      if (next && !selectedCustomer) {
-        usePosCheckoutUiStore
-          .getState()
-          .setCartError(CHECKOUT_ERRORS.CUSTOMER_REQUIRED);
-        return;
-      }
-      setRefundToDebt(next);
-    },
-    [setRefundToDebt],
-  );
-
   const handleRequireCustomerForDeposit = useCallback(() => {
     usePosCheckoutUiStore
       .getState()
@@ -332,9 +308,6 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
     setDebt,
     handleDebtChange,
     // Persisted draft cũ chưa có field → coerce về false cho checkbox controlled.
-    refundToDebt: refundToDebt ?? false,
-    setRefundToDebt,
-    handleRefundToDebtChange,
     handleRequireCustomerForDeposit,
     note,
     setNote,

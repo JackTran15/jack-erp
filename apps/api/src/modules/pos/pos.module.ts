@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentNumberingModule } from '../document-numbering/document-numbering.module';
@@ -63,6 +63,7 @@ import { InvoiceCancelledPublisher } from './publishers/invoice-cancelled.publis
 import { DebtPaymentVoucherLinkConsumer } from './consumers/debt-payment-voucher-link.consumer';
 import { ReturnPostedPublisher } from './publishers/return-posted.publisher';
 import { StockReturnInPublisher } from './publishers/stock-return-in.publisher';
+import { CheckoutSagaModule } from './checkout-saga/checkout-saga.module';
 
 @Module({
   imports: [
@@ -98,6 +99,10 @@ import { StockReturnInPublisher } from './publishers/stock-return-in.publisher';
     PromotionModule,
     CustomerModule,
     CqrsModule,
+    // Circular with CheckoutSagaModule (it needs InvoiceDebtService, exported
+    // below) — forwardRef on both sides, same pattern as GoodsIssueModule ↔
+    // TransferOrderModule elsewhere in this repo.
+    forwardRef(() => CheckoutSagaModule),
   ],
   controllers: [
     PosController,

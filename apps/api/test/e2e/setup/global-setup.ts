@@ -1,7 +1,7 @@
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { config as loadEnv } from 'dotenv';
+import { config as loadEnv, parse as parseEnv } from 'dotenv';
 
 /**
  * Runs once before the entire E2E suite.
@@ -9,13 +9,24 @@ import { config as loadEnv } from 'dotenv';
  *
  * Jest does not load apps/api/.env automatically (unlike Nest ConfigModule).
  * Load it here so DB_* match docker-compose / local dev credentials.
+ *
+ * Prefers `.env.test` over `.env` — the suite calls `ds.synchronize(true)`
+ * (`resetDatabase()`), a full schema drop+recreate, before every fixture.
+ * `.env` alone points at whatever `DB_NAME` a developer's dev environment
+ * uses; without a `.env.test` override that drop runs against the real dev
+ * database. Discovered live (T-02-05): it failed harmlessly only because an
+ * unrelated Postgres extension made the drop error out mid-transaction —
+ * with that extension absent it would have silently wiped `erp_dev`.
  */
 
 /** Only ever let the suite point at a database whose name marks it as throwaway. */
 const DEFAULT_E2E_DB_NAME = 'erp_test';
 
 export default async function globalSetup() {
-  const envPath = path.resolve(__dirname, '../../../.env');
+  const testEnvPath = path.resolve(__dirname, '../../../.env.test');
+  const envPath = fs.existsSync(testEnvPath)
+    ? testEnvPath
+    : path.resolve(__dirname, '../../../.env');
   if (fs.existsSync(envPath)) {
     loadEnv({ path: envPath });
   }
@@ -24,14 +35,34 @@ export default async function globalSetup() {
   const dbPort = process.env.DB_PORT || '5432';
   const dbUser = process.env.DB_USER || 'postgres';
   const dbPass = process.env.DB_PASS || 'postgres';
-  // NEVER fall back to DB_NAME from .env: that is the dev database, and the
-  // suite calls `synchronize(true)` (drops every table) in resetDatabase().
-  // Override with E2E_DB_NAME only; the name must still look like a test DB.
+
+  // The suite drops and rebuilds every table (`synchronize(true)` in
+  // resetDatabase), so it must never touch the dev database. Read
+  // apps/api/.env's own DB_NAME directly from disk (via dotenv's `parse`,
+  // which never touches process.env) rather than trusting `process.env.DB_NAME`
+  // — by this point that may already hold `.env.test`'s value (loaded above,
+  // preferred over `.env` whenever it exists), which made every normal run
+  // compare "erp_test" against itself and refuse to start at all.
+  const devEnvPath = path.resolve(__dirname, '../../../.env');
+  const devDbName = fs.existsSync(devEnvPath)
+    ? parseEnv(fs.readFileSync(devEnvPath)).DB_NAME
+    : undefined;
   const dbName = process.env.E2E_DB_NAME || DEFAULT_E2E_DB_NAME;
+  if (dbName === devDbName) {
+    throw new Error(
+      `Refusing to run E2E against "${dbName}": the suite drops every table in it. ` +
+        'Point E2E_DB_NAME at a throwaway database.',
+    );
+  }
+
+  // Hard stop, not a warning: `resetDatabase()` drops this database's entire
+  // schema on every fixture. A name that doesn't look disposable is refused
+  // outright rather than risking a repeat of the incident above.
   if (!/test/i.test(dbName)) {
     throw new Error(
-      `Refusing to run E2E against "${dbName}": the suite drops every table. ` +
-        `E2E_DB_NAME must contain "test".`,
+      `refusing to run E2E against database "${dbName}" — its name doesn't contain ` +
+        '"test", and resetDatabase() drops its entire schema on every run. ' +
+        `Add ${testEnvPath} with a disposable DB_NAME (e.g. erp_test) before running test:e2e.`,
     );
   }
 
@@ -45,14 +76,38 @@ export default async function globalSetup() {
   process.env.REDIS_HOST = process.env.REDIS_HOST || 'localhost';
   process.env.REDIS_PORT = process.env.REDIS_PORT || '6379';
 
+  // `-d postgres` because psql otherwise connects to a database named after the
+  // user, which does not exist — the probe always failed and fell through to
+  // createdb.
+  const psql = `PGPASSWORD=${dbPass} psql -h ${dbHost} -p ${dbPort} -U ${dbUser}`;
   try {
     execSync(
-      `PGPASSWORD=${dbPass} psql -h ${dbHost} -p ${dbPort} -U ${dbUser} -tc "SELECT 1 FROM pg_database WHERE datname = '${dbName}'" | grep -q 1 || PGPASSWORD=${dbPass} createdb -h ${dbHost} -p ${dbPort} -U ${dbUser} ${dbName}`,
+      `${psql} -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '${dbName}'" | grep -q 1 || PGPASSWORD=${dbPass} createdb -h ${dbHost} -p ${dbPort} -U ${dbUser} ${dbName}`,
       { stdio: 'inherit' },
     );
   } catch {
     console.warn(
       'Could not auto-create test database. Ensure it exists before running E2E tests.',
     );
+  }
+
+  // Specs rebuild the schema themselves via resetDatabase(), but AppModule
+  // queries `permissions` while booting — so createTestApp() fails on a
+  // brand-new database unless a schema already exists. Bootstrap it only when
+  // the database is genuinely empty: synchronize(true) drops TypeORM's own
+  // `migrations` table too, so re-running migrations over a database a previous
+  // suite already populated fails on "relation already exists".
+  const tableCount = execSync(
+    `${psql} -d ${dbName} -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'"`,
+  )
+    .toString()
+    .trim();
+
+  if (tableCount === '0') {
+    execSync('pnpm migration:run', {
+      cwd: path.resolve(__dirname, '..', '..', '..'),
+      stdio: 'inherit',
+      env: { ...process.env, DB_NAME: dbName },
+    });
   }
 }

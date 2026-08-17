@@ -1,7 +1,7 @@
+import type { EvaluateCartResponse } from "@erp/shared-interfaces";
 import type { PaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import type { PaymentMethod } from "@erp/pos/constants/checkout.constant";
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
-import type { PromotionItem } from "@erp/pos/interfaces/promotion.interface";
 import type { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import type { PosProductKind } from "@erp/pos/types/catalog.type";
 import type { VoucherFormResult } from "@erp/pos/dtos/voucher.dto";
@@ -181,9 +181,9 @@ export interface CheckoutPaymentDraft {
   keepChange: boolean;
   debt: boolean;
   /**
-   * Chỉ dùng ở luồng hoàn tiền (return/exchange net<0): tích "Tính vào công nợ"
-   * để bù trừ khoản hoàn vào công nợ hóa đơn gốc (refundMethod=OFFSET) thay vì
-   * chi tiền mặt. Optional cho draft cũ đã persist (coerce về false khi đọc).
+   * @deprecated Bỏ từ bản vá "trả hàng đơn còn nợ": khoản hoàn luôn tự trừ công
+   * nợ hóa đơn gốc trước rồi mới chi phần còn lại, không còn ô tích nào cả. Giữ
+   * lại optional để draft cũ đã persist vẫn đọc được; không đọc giá trị này nữa.
    */
   refundToDebt?: boolean;
   note: string;
@@ -208,7 +208,21 @@ export interface CheckoutPaymentDraft {
 }
 
 export interface CheckoutPromotionDraft {
-  appliedPromotion: PromotionItem | null;
+  /**
+   * Id các CTKM `auto_apply=false` thu ngân tự chọn (dialog "Chương trình
+   * khuyến mãi", các CTKM `auto_apply=true` không nằm ở đây — server tự áp).
+   * Mirror `EvaluateCartRequest.selectedProgramIds`/`CheckoutV2Dto`. Server
+   * luôn là nơi tính lại tiền giảm (A-07) — mảng này chỉ là lựa chọn, không
+   * mang theo số tiền.
+   */
+  selectedProgramIds: string[];
+  /**
+   * Id các CTKM thu ngân bỏ hẳn khỏi giỏ hàng, kể cả CTKM `auto_apply=true`
+   * server đã tự áp (UOW-09/ADR-07, đóng A-13). Ngược nghĩa hoàn toàn với
+   * `selectedProgramIds`: mảng này luôn là "loại ra", không phải "thêm vào".
+   * Mirror `EvaluateCartRequest.excludedProgramIds`/`CheckoutV2Dto`.
+   */
+  excludedProgramIds: string[];
   /**
    * Số điểm khách dùng để giảm giá (1 điểm = 1.000đ, hằng số khớp BE
    * `POINT_REDEMPTION_VALUE_VND`). Lưu trong draft local, chỉ thực sự áp lên
@@ -247,11 +261,39 @@ export interface CheckoutCatalogDraft {
   catalogCollapsed: boolean;
 }
 
+/**
+ * Kết quả `POST /v2/promotions/evaluate` cho giỏ hàng của tab hiện tại.
+ *
+ * Tách hẳn khỏi `CheckoutPromotionDraft`: slice kia giữ **lựa chọn của thu
+ * ngân**, slice này giữ **kết quả server trả về**. Trộn hai thứ vào một chỗ là
+ * cách chắc chắn để sau này không ai biết cái nào là nguồn sự thật khi số tiền
+ * lệch nhau.
+ *
+ * Số tiền ở đây chỉ để hiển thị. Server luôn tự tính lại lúc checkout
+ * (ADR-06 của `checkout-saga`), nên không bao giờ gửi ngược số này lên.
+ */
+export interface CheckoutPromotionPreview {
+  /**
+   * `idle` — giỏ rỗng, chưa có gì để tính (và **không** phát lời gọi nào).
+   * `loading` — đang chờ server. `ready` — có `data`.
+   * `unavailable` — gọi hỏng; hiển thị chỉ báo nhưng **không** chặn thanh toán.
+   */
+  status: "idle" | "loading" | "ready" | "unavailable";
+  data: EvaluateCartResponse | null;
+  error: string | null;
+}
+
 /** Toàn bộ trạng thái soạn thảo per-tab, nhúng trong `InvoiceSession.draft`. */
 export interface CheckoutDraft {
   customer: CheckoutCustomerDraft;
   payment: CheckoutPaymentDraft;
   promotion: CheckoutPromotionDraft;
+  /**
+   * Không được khôi phục từ localStorage khi hydrate — xem `ensureDraftShape`.
+   * Một con số tiền cũ hiện lại sau khi tải lại trang là sai lệch tệ hơn hẳn
+   * so với việc tính lại mất 300ms.
+   */
+  promotionPreview: CheckoutPromotionPreview;
   labels: CheckoutLabelsDraft;
   meta: CheckoutMetaDraft;
   catalog: CheckoutCatalogDraft;

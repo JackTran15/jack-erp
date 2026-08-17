@@ -13,7 +13,7 @@ const actor: ActorContext = {
 } as unknown as ActorContext;
 
 const summary: PosDailySummaryResult = {
-  revenue: { cash: 1887118000, card: 585000, bankTransfer: 12400000, voucher: 0, points: 50835000, total: 1950938000 },
+  revenue: { cash: 1887118000, card: 585000, bankTransfer: 12400000, voucher: 0, promotion: 0, points: 50835000, total: 1950938000 },
   expense: { cash: 805636500, bankTransfer: 672222, total: 806308722 },
   netCashFlow: 1144629278,
   debt: { newDebt: 16175000, debtCollected: 0 },

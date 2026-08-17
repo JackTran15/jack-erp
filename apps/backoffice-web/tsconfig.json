@@ -2,7 +2,11 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "outDir": "./dist",
     "rootDir": "./src",
     "moduleResolution": "bundler",
@@ -10,10 +14,10 @@
     "isolatedModules": false,
     "strictPropertyInitialization": false
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "exclude": [
-    "**/*Backup copy",
-    "**/* copy",
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
     "src/**/*.spec.ts",

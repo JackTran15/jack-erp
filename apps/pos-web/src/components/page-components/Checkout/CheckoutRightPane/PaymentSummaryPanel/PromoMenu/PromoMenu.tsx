@@ -16,15 +16,25 @@ import { lineTotal } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
   computeVoucherLineSource,
   selectCustomerDraft,
+  selectPaymentDraft,
+  selectPromotionDiscountAmount,
   selectPromotionDraft,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
+import { useCheckoutGrandTotal } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-grand-total";
 
 export interface PromoMenuProps {
   /** Visibility — caller (PaymentSummaryPanel) owns the open state. */
   open: boolean;
   /** Close on outside click / Esc / option pick. */
   onClose: () => void;
+  /**
+   * "Khuyến mãi" — mở cùng dialog `PromotionSelectionModal` mà icon quà tặng
+   * bên ngoài mở (dialog do `PaymentSummaryPanel` sở hữu state, PromoMenu chỉ
+   * gọi ra ngoài). Trước đây thiếu nhánh này — bấm "Khuyến mãi" chỉ đóng menu
+   * + phát announce, không mở gì cả.
+   */
+  onOpenPromotionDialog: () => void;
 }
 
 interface MenuItem {
@@ -53,7 +63,7 @@ const ITEMS: MenuItem[] = [
  * còn lại các handlers (announce, voucher data) đọc trực tiếp từ promotion
  * hook + session/customer stores.
  */
-export function PromoMenu({ open, onClose }: PromoMenuProps) {
+export function PromoMenu({ open, onClose, onOpenPromotionDialog }: PromoMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
@@ -70,6 +80,23 @@ export function PromoMenu({ open, onClose }: PromoMenuProps) {
   const pointsRedeemed = usePosCheckoutSessionStore(
     (s) => selectPromotionDraft(s).pointsRedeemed,
   );
+  // Trần điểm đơn này hấp thụ được — dùng đúng các số mà `deriveSettlement`
+  // dùng, để gợi ý trên dialog không lệch với "Còn phải thu" ngay cạnh nó.
+  // Chỉ là **gợi ý**: chốt thật nằm ở bước saga `clamp-points` phía server, và
+  // ước lượng này chưa trừ voucher (server mới cộng voucher vào lúc
+  // `resolve-funds`). Nhập quá thì server tự hạ, khách không mất điểm — nên
+  // không chặn cứng ô nhập.
+  const grandTotal = useCheckoutGrandTotal();
+  const promotionDiscountAmount = usePosCheckoutSessionStore(
+    selectPromotionDiscountAmount,
+  );
+  const { deposit, returnFee } = usePosCheckoutSessionStore(selectPaymentDraft);
+  const maxUsablePoints = useMemo(() => {
+    const payable =
+      grandTotal - deposit + (returnFee ?? 0) - promotionDiscountAmount;
+    return Math.max(0, Math.floor(payable / POINT_REDEMPTION_VALUE_VND));
+  }, [grandTotal, deposit, returnFee, promotionDiscountAmount]);
+
   const sessionState = usePosCheckoutSessionStore();
   const voucherLines = useMemo(
     () => computeVoucherLineSource(sessionState),
@@ -109,10 +136,11 @@ export function PromoMenu({ open, onClose }: PromoMenuProps) {
     (key: PromoMenuOption) => {
       if (key === PromoMenuOptionEnum.PROMO) setDiscountDialogOpen(true);
       if (key === PromoMenuOptionEnum.VOUCHER) setVoucherDialogOpen(true);
+      if (key === PromoMenuOptionEnum.DISCOUNT) onOpenPromotionDialog();
       pickPromoOption(key);
       onClose();
     },
-    [pickPromoOption, onClose],
+    [pickPromoOption, onClose, onOpenPromotionDialog],
   );
 
   const { highlightIdx, setHighlightIdx, handleKeyDown } =
@@ -199,6 +227,7 @@ export function PromoMenu({ open, onClose }: PromoMenuProps) {
       ) : null}
 
       <DiscountPointDialog
+        maxUsablePoints={maxUsablePoints}
         open={discountDialogOpen}
         onClose={() => setDiscountDialogOpen(false)}
         data={discountData}

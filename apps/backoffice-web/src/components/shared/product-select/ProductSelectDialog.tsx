@@ -38,6 +38,13 @@ export interface ProductSelectResult {
   standaloneItemIds: string[];
   /** Every directly-selected item id (excludes not-yet-loaded auto-selected variants). */
   allSelectedItemIds: string[];
+  /**
+   * Row data for `fullySelectedProductIds`, so a caller that stores
+   * product-level references can show a code and a name without a second
+   * lookup. Parallel to `lines` (which is item-level) — the ids alone say
+   * nothing displayable about a product.
+   */
+  fullySelectedProducts: ProductGroupRow[];
 }
 
 type UnitPriceSource = "purchasePrice" | "sellingPrice" | "none";
@@ -143,6 +150,7 @@ export function ProductSelectDialog({
   const variantCache = useRef<Map<string, ProductVariantRow[]>>(new Map());
   // Accumulate full data for every item rendered, so confirm can return rich rows
   const itemDataById = useRef<Map<string, SelectedProduct>>(new Map());
+  const productDataById = useRef<Map<string, ProductGroupRow>>(new Map());
 
   const groupsQuery = useProductGroups({
     page,
@@ -160,6 +168,13 @@ export function ProductSelectDialog({
   rows.forEach((row) => {
     if (row.type === "orphan")
       itemDataById.current.set(row.id, orphanToSelected(row));
+  });
+
+  // Same idea one level up: a product checked on page 1 must still be
+  // describable after the user pages away, since `rows` only holds the current
+  // page while `autoSelectIds` persists across pages.
+  rows.forEach((row) => {
+    if (row.type === "product") productDataById.current.set(row.id, row);
   });
 
   const defaultUnitPrice = useCallback(
@@ -487,6 +502,9 @@ export function ProductSelectDialog({
       fullySelectedProductIds,
       standaloneItemIds,
       allSelectedItemIds,
+      fullySelectedProducts: fullySelectedProductIds
+        .map((productId) => productDataById.current.get(productId))
+        .filter((row): row is ProductGroupRow => row !== undefined),
     });
   }
 

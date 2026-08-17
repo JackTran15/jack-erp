@@ -1,42 +1,14 @@
-import {
-  IsString,
-  IsOptional,
-  IsEmail,
-  IsEnum,
-  MinLength,
-  MaxLength,
-  IsInt,
-  Min,
-} from 'class-validator';
+import { PartialType, OmitType } from '@nestjs/swagger';
+import { IsOptional, IsEnum, IsInt, Min } from 'class-validator';
 import { CustomerStatus } from '@erp/shared-interfaces';
+import { CreateCustomerDto } from './create-customer.dto';
 
-export class UpdateCustomerDto {
-  @IsOptional()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(50)
-  code?: string;
-
-  @IsOptional()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(200)
-  name?: string;
-
-  @IsOptional()
-  @IsEmail()
-  email?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(30)
-  phone?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  address?: string;
-
+// Membership card is omitted on purpose: create() handles the inline card in its
+// own transaction, update() (inherited from BaseCrudService) has no such branch.
+// Card edits go through PATCH /customers/:id/membership-card.
+export class UpdateCustomerDto extends PartialType(
+  OmitType(CreateCustomerDto, ['membershipCard'] as const),
+) {
   @IsOptional()
   @IsEnum(CustomerStatus)
   status?: CustomerStatus;

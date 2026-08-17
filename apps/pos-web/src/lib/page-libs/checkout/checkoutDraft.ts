@@ -24,7 +24,6 @@ export function initialCheckoutDraft(): CheckoutDraft {
       paymentLines: [createPaymentLine(PaymentMethodEnum.CASH)],
       keepChange: false,
       debt: false,
-      refundToDebt: false,
       note: "",
       printInvoice: true,
       printDuplicate: false,
@@ -36,9 +35,15 @@ export function initialCheckoutDraft(): CheckoutDraft {
       creditDays: null,
     },
     promotion: {
-      appliedPromotion: null,
+      selectedProgramIds: [],
+      excludedProgramIds: [],
       pointsRedeemed: 0,
       appliedVoucher: null,
+    },
+    promotionPreview: {
+      status: "idle",
+      data: null,
+      error: null,
     },
     labels: {
       selectedLabelIds: [],
@@ -77,6 +82,10 @@ export function ensureDraftShape(maybe: unknown): CheckoutDraft {
           : base.payment.paymentLines,
     },
     promotion: { ...base.promotion, ...(d.promotion ?? {}) },
+    // Cố tình KHÔNG khôi phục từ dữ liệu persisted: preview là số tiền server
+    // tính cho một giỏ hàng tại một thời điểm. Hiện lại số cũ sau khi tải lại
+    // trang là sai lệch tệ hơn nhiều so với việc tính lại mất 300ms.
+    promotionPreview: base.promotionPreview,
     labels: {
       ...base.labels,
       ...(d.labels ?? {}),

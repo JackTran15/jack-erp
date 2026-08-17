@@ -22,10 +22,14 @@ import {
 import { useCheckoutCustomer } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-customer";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 import { useCheckoutPromotion } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-promotion";
+import { useCheckoutExcludePreview } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-exclude-preview";
+import { mapEvaluateResponseToPromotionItems } from "@erp/pos/lib/page-libs/checkout/promotionPresentation";
 import {
   selectCheckoutVariant,
+  selectPromotionPreview,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
+import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 
 export interface PaymentSummaryPanelProps {
@@ -48,11 +52,32 @@ export function PaymentSummaryPanel({
     paymentLines,
     handleRequireCustomerForDeposit,
   } = useCheckoutPayment();
-  const { appliedPromotion, applyPromotion } = useCheckoutPromotion();
+  const { selectedProgramIds, applyPromotion, toggleExcludeProgram } =
+    useCheckoutPromotion();
+  const { previewExcluding } = useCheckoutExcludePreview();
+  const promotionPreview = usePosCheckoutSessionStore(selectPromotionPreview);
+  const requestPromotionPreviewRetry = usePosCheckoutUiStore(
+    (s) => s.requestPromotionPreviewRetry,
+  );
 
   // Tab trả theo hóa đơn → khóa khách (lấy từ hóa đơn gốc, không cho đổi/thêm).
   const variant = usePosCheckoutSessionStore(selectCheckoutVariant);
   const customerLocked = variant === CheckoutVariantEnum.INVOICE_RETURN;
+
+  // Đọc theo `data`, không theo `status === "ready"` — untick/tick lại CTKM
+  // (T-09-03/T-09-04) không đóng dialog như luồng chọn/hoán đổi cũ nữa, nên
+  // thu ngân nhìn thấy nguyên khoảng "loading" của lần evaluate kế tiếp. Lúc
+  // đó `data` vẫn giữ nguyên kết quả cũ (`use-checkout-promotion-preview.ts`
+  // spread `...prev` khi chuyển sang loading, chỉ nhánh lỗi thật mới set
+  // `data: null`) — đọc thẳng `data` giữ nguyên danh sách cũ trong lúc chờ,
+  // tránh dialog chớp về rỗng rồi mới hiện lại.
+  const dialogPromotions = useMemo(
+    () =>
+      promotionPreview.data
+        ? mapEvaluateResponseToPromotionItems(promotionPreview.data)
+        : [],
+    [promotionPreview],
+  );
 
   const [promotionDialogOpen, setPromotionDialogOpen] = useState(false);
   const [promoMenuOpen, setPromoMenuOpen] = useState(false);
@@ -98,6 +123,7 @@ export function PaymentSummaryPanel({
           <PromoMenu
             open={promoMenuOpen}
             onClose={() => setPromoMenuOpen(false)}
+            onOpenPromotionDialog={() => setPromotionDialogOpen(true)}
           />
         ),
         keepWhenSelected: true,
@@ -185,9 +211,23 @@ export function PaymentSummaryPanel({
       <PromotionSelectionModal
         open={promotionDialogOpen}
         onClose={() => setPromotionDialogOpen(false)}
-        promotions={[]}
-        initialSelectedId={appliedPromotion?.id ?? null}
+        promotions={dialogPromotions}
+        initialSelectedId={selectedProgramIds[0] ?? null}
         onConfirm={applyPromotion}
+        onToggleExclude={(promotion) => toggleExcludeProgram(promotion.id)}
+        onPreviewExclude={async (programIds) => {
+          const result = await previewExcluding(programIds);
+          return result?.amountAfterPromotion ?? null;
+        }}
+        // Cùng lý do với dialogPromotions ở trên — đọc thẳng `data`, không
+        // ràng buộc `status === "ready"`.
+        amountAfterPromotion={promotionPreview.data?.amountAfterPromotion}
+        loadError={
+          promotionPreview.status === "unavailable"
+            ? "Chưa tải được danh sách chương trình"
+            : undefined
+        }
+        onRetry={requestPromotionPreviewRetry}
       />
     </aside>
   );

@@ -34,7 +34,8 @@ function cartLine(overrides: Partial<CartLine> = {}): CartLine {
 /**
  * A net refund (returnSubtotal > newSubtotal) routes to the fund the operator
  * picked in "Hình thức đổi trả": a cash line → CASH, a bank/card account → BANK
- * + its payment_accounts id, and "Tính vào công nợ" → OFFSET regardless.
+ * + its payment_accounts id. Luồng hoàn tiền không bao giờ gửi OFFSET nữa: BE tự
+ * trừ công nợ hóa đơn gốc trước rồi mới chi phần còn lại qua quỹ này.
  */
 describe("buildCheckoutReturnPayload — net refund routing", () => {
   it("routes a cash fund selection to CASH", () => {
@@ -42,7 +43,6 @@ describe("buildCheckoutReturnPayload — net refund routing", () => {
       returnSubtotal: 200_000,
       newSubtotal: 0,
       paymentLines: [line(PaymentMethodEnum.CASH, 200_000, "cash-acc")],
-      offsetToDebt: false,
     });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
@@ -55,7 +55,6 @@ describe("buildCheckoutReturnPayload — net refund routing", () => {
       returnSubtotal: 200_000,
       newSubtotal: 0,
       paymentLines: [line(PaymentMethodEnum.TRANSFER, 200_000, "bank-acc-1")],
-      offsetToDebt: false,
     });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
@@ -63,17 +62,16 @@ describe("buildCheckoutReturnPayload — net refund routing", () => {
     expect(res.body.refundAccountId).toBe("bank-acc-1");
   });
 
-  it("routes to OFFSET when the operator ticked Tính vào công nợ, ignoring the fund", () => {
+  it("never sends OFFSET on a refund — the debt offset is BE-side now (AC-15)", () => {
     const res = buildCheckoutReturnPayload({
       returnSubtotal: 200_000,
       newSubtotal: 0,
       paymentLines: [line(PaymentMethodEnum.TRANSFER, 200_000, "bank-acc-1")],
-      offsetToDebt: true,
     });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
-    expect(res.body.refundMethod).toBe("OFFSET");
-    expect(res.body.refundAccountId).toBeUndefined();
+    expect(res.body.refundMethod).toBe("BANK");
+    expect(res.body.refundAccountId).toBe("bank-acc-1");
   });
 
   it("errors when a bank refund line has no account selected", () => {
@@ -81,7 +79,6 @@ describe("buildCheckoutReturnPayload — net refund routing", () => {
       returnSubtotal: 200_000,
       newSubtotal: 0,
       paymentLines: [line(PaymentMethodEnum.TRANSFER, 200_000, null)],
-      offsetToDebt: false,
     });
     expect(res.ok).toBe(false);
     if (res.ok) return;
@@ -93,7 +90,6 @@ describe("buildCheckoutReturnPayload — net refund routing", () => {
       returnSubtotal: 200_000,
       newSubtotal: 0,
       paymentLines: [],
-      offsetToDebt: false,
     });
     expect(res.ok).toBe(true);
     if (!res.ok) return;

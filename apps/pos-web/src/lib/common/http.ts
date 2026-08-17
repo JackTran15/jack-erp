@@ -153,10 +153,20 @@ export const http = {
     return request<T>(path, { method: "GET" });
   },
 
-  post<T>(path: string, body?: unknown): Promise<T> {
+  /**
+   * `signal` lets a caller cancel a request that is no longer relevant — the
+   * promotion preview fires on every cart change, so a slow reply for an old
+   * cart must not land after a newer one and overwrite the amount on screen.
+   */
+  post<T>(
+    path: string,
+    body?: unknown,
+    opts?: { signal?: AbortSignal },
+  ): Promise<T> {
     return request<T>(path, {
       method: "POST",
       body: body != null ? JSON.stringify(body) : undefined,
+      signal: opts?.signal,
     });
   },
 

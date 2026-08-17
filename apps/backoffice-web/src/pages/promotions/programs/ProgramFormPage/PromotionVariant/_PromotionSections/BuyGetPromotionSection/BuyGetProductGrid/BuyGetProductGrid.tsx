@@ -1,7 +1,13 @@
+import { useState } from "react";
 import { Button, Input } from "@erp/ui";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, PackageSearch, Trash2 } from "lucide-react";
 import { blankBuyGetRow } from "../../../../../program-form.constants";
 import type { BuyGetRow } from "../../../../../program-form.types";
+import { PromotionTargetPicker } from "../../../../../../components/PromotionTargetPicker/PromotionTargetPicker";
+import {
+  mergeTargetsIntoGrid,
+  type TargetPickMode,
+} from "../../../../../../components/PromotionTargetPicker/promotion-target";
 
 interface Props {
   value: BuyGetRow[];
@@ -9,6 +15,9 @@ interface Props {
   codeLabel: string;
   nameLabel: string;
   quantityLabel: string;
+  /** Cấp chọn của lưới này — lưới điều kiện mua theo `buyGetPurchaseTarget`, lưới quà luôn ITEM. */
+  pickMode: TargetPickMode;
+  pickerTitle: string;
 }
 
 const CELL_INPUT_CLASS =
@@ -24,13 +33,32 @@ export function BuyGetProductGrid({
   codeLabel,
   nameLabel,
   quantityLabel,
+  pickMode,
+  pickerTitle,
 }: Props) {
+  const [pickerOpen, setPickerOpen] = useState(false);
   const updateRow = (id: string, patch: Partial<BuyGetRow>) => {
     onChange(value.map((row) => (row.id === id ? { ...row, ...patch } : row)));
   };
 
   const removeRow = (id: string) => {
     onChange(value.filter((row) => row.id !== id));
+  };
+
+  const addFromPicker = (drafts: Parameters<typeof mergeTargetsIntoGrid>[1]) => {
+    onChange(
+      mergeTargetsIntoGrid<BuyGetRow>(value, drafts, {
+        targetIdOf: (row) => row.targetId,
+        isBlank: (row) => !row.targetId && !row.code.trim() && !row.name.trim(),
+        toRow: (draft) => ({
+          ...blankBuyGetRow(),
+          targetId: draft.targetId,
+          code: draft.code,
+          name: draft.name,
+          unit: draft.unit,
+        }),
+      }),
+    );
   };
 
   const addRow = () => {
@@ -112,12 +140,30 @@ export function BuyGetProductGrid({
           </tbody>
         </table>
       </div>
-      <div className="px-3 py-2">
+      <div className="flex items-center gap-1 px-3 py-2">
         <Button type="button" variant="ghost" size="sm" onClick={addRow}>
           <Plus className="mr-1.5 h-4 w-4" />
           Thêm dòng
         </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setPickerOpen(true)}
+        >
+          <PackageSearch className="mr-1.5 h-4 w-4" />
+          Chọn hàng hóa
+        </Button>
       </div>
+
+      <PromotionTargetPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        mode={pickMode}
+        title={pickerTitle}
+        selectedIds={new Set(value.map((row) => row.targetId).filter(Boolean))}
+        onSelect={addFromPicker}
+      />
     </div>
   );
 }

@@ -1,65 +1,33 @@
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { X } from "lucide-react";
 import {
+  Badge,
   DocumentListShell,
   PageToolbar,
   type ToolbarItem,
 } from "@erp/ui";
 import { TOOLBAR_REGISTRY } from "../../../constants/toolbar-actions";
 import { PaginationControls } from "../../../components/table/PaginationControls";
+import { ConfirmActionModal } from "../../../components/table/ConfirmActionModal";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
-  applyColumnFilter,
   type ColumnFilter,
   type ColumnFilterMode,
 } from "../../../components/table/pagination.dto";
+import { useDebouncedValue } from "../../../lib/use-debounced-value";
 import { VouchersTable } from "./VouchersTable/VouchersTable";
-import { MOCK_VOUCHER_ROWS } from "./_mock/mock-vouchers";
-import type { VoucherRow } from "./vouchers.types";
-
-/** Cột số dùng toán tử ≤ (number-range). */
-const NUMERIC_KEYS = new Set<string>([
-  "faceValue",
-  "totalQuantity",
-  "totalVoucherValue",
-  "totalAppliedValue",
-]);
-
-function numericValueFor(row: VoucherRow, key: string): number {
-  switch (key) {
-    case "faceValue":
-      return row.faceValue;
-    case "totalQuantity":
-      return row.totalQuantity;
-    case "totalVoucherValue":
-      return row.totalVoucherValue;
-    case "totalAppliedValue":
-      return row.totalAppliedValue;
-    default:
-      return 0;
-  }
-}
-
-/** Chuỗi so sánh của một dòng theo cột text/date/select. */
-function textComparableFor(row: VoucherRow, key: string): string {
-  switch (key) {
-    case "issuer":
-      return row.issuer;
-    case "code":
-      return row.code;
-    case "startDate":
-      return row.startDate ?? "";
-    case "endDate":
-      return row.endDate ?? "";
-    case "description":
-      return row.description ?? "";
-    case "status":
-      return row.status;
-    default:
-      return "";
-  }
-}
+import {
+  VoucherFormDialog,
+  type VoucherFormMode,
+} from "./VoucherFormDialog/VoucherFormDialog";
+import { buildVoucherChips, buildVoucherFilters } from "./vouchers-filter";
+import {
+  useDeactivateVoucher,
+  useVouchersQuery,
+  type VoucherSummaryRow,
+} from "../api/use-vouchers";
 
 export function VouchersPage() {
   const [pagination, setPagination] = useState(DEFAULT_PAGINATION);
@@ -67,55 +35,52 @@ export function VouchersPage() {
   const [columnFilters, setColumnFilters] = useState<
     Record<string, ColumnFilter>
   >({});
-  const [sortBy, setSortBy] = useState<string | undefined>(undefined);
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  /**
+   * Cùng chuẩn FR-004 với màn CTKM (đảo ngược 2026-08-10, T-03-06/T-06-06):
+   * mặc định KHÔNG lọc trạng thái — chip chỉ hiện khi tự chọn.
+   */
+  const [trackingOnly, setTrackingOnly] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [formMode, setFormMode] = useState<VoucherFormMode | undefined>(
+    undefined,
+  );
 
-  const filteredRows = useMemo(() => {
-    const rows = MOCK_VOUCHER_ROWS.filter((row) =>
-      Object.entries(columnFilters).every(([key, filter]) => {
-        if (!filter?.value) return true;
-        if (NUMERIC_KEYS.has(key)) {
-          // Toán tử ≤: giữ dòng có giá trị ≤ số nhập vào.
-          const limit = Number(filter.value);
-          if (Number.isNaN(limit)) return true;
-          return numericValueFor(row, key) <= limit;
-        }
-        return applyColumnFilter(textComparableFor(row, key), filter);
-      }),
-    );
+  // Lọc chạy ở server — gõ từng ký tự mà gọi ngay là mỗi ký tự một request.
+  const debouncedFilters = useDebouncedValue(columnFilters, 300);
 
-    if (!sortBy) return rows;
-    const dir = sortOrder === "asc" ? 1 : -1;
-    return [...rows].sort((a, b) => {
-      if (NUMERIC_KEYS.has(sortBy)) {
-        return (numericValueFor(a, sortBy) - numericValueFor(b, sortBy)) * dir;
-      }
-      return (
-        textComparableFor(a, sortBy).localeCompare(
-          textComparableFor(b, sortBy),
-          "vi",
-        ) * dir
-      );
-    });
-  }, [columnFilters, sortBy, sortOrder]);
+  const filters = useMemo(
+    () => buildVoucherFilters(debouncedFilters, trackingOnly),
+    [debouncedFilters, trackingOnly],
+  );
 
-  const pagedRows = useMemo(() => {
-    const start = (pagination.page - 1) * pagination.pageSize;
-    return filteredRows.slice(start, start + pagination.pageSize);
-  }, [filteredRows, pagination]);
+  const deactivateVoucher = useDeactivateVoucher();
+  const { data, isFetching, refetch } = useVouchersQuery(
+    pagination.page,
+    pagination.pageSize,
+    filters,
+  );
+
+  const rows = data?.data ?? [];
+  const total = data?.total ?? 0;
+  const summary = data?.summary;
+  const chips = useMemo(
+    () => buildVoucherChips(columnFilters, trackingOnly),
+    [columnFilters, trackingOnly],
+  );
 
   const allSelected =
-    filteredRows.length > 0 &&
-    filteredRows.every((row) => selectedIds.has(row.id));
+    rows.length > 0 && rows.every((row) => selectedIds.has(row.id));
   const selectedCount = selectedIds.size;
+  const selectedRow = useMemo(
+    () => rows.find((row) => selectedIds.has(row.id)),
+    [rows, selectedIds],
+  );
 
   const handleToggleAll = useCallback(
     (checked: boolean) => {
-      setSelectedIds(
-        checked ? new Set(filteredRows.map((row) => row.id)) : new Set(),
-      );
+      setSelectedIds(checked ? new Set(rows.map((row) => row.id)) : new Set());
     },
-    [filteredRows],
+    [rows],
   );
 
   const handleToggleRow = useCallback((id: string) => {
@@ -150,63 +115,113 @@ export function VouchersPage() {
     setPagination((p) => ({ ...p, page: 1 }));
   }, []);
 
-  const handleSort = useCallback((key: string) => {
-    setSortBy((prevKey) => {
-      if (prevKey === key) {
-        setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
-        return key;
-      }
-      setSortOrder("asc");
-      return key;
+  const clearChip = useCallback((id: string) => {
+    setPagination((p) => ({ ...p, page: 1 }));
+    if (id === "trackingOnly") {
+      setTrackingOnly(false);
+      return;
+    }
+    setColumnFilters((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
     });
   }, []);
 
   const handleRefresh = useCallback(() => {
     setSelectedIds(new Set());
-    toast.info("Đã nạp lại danh sách.");
-  }, []);
+    void refetch();
+  }, [refetch]);
 
-  const openEdit = useCallback((row: VoucherRow) => {
-    toast.info(`Sửa voucher: ${row.code}`);
+  /**
+   * `DELETE /v2/vouchers/:id` là `VoucherService.deactivate` — chuyển sang
+   * "Ngừng theo dõi", **không** xóa cứng. Nhãn và câu xác nhận nói đúng việc đó
+   * thay vì dùng chữ "Xóa" cho một hành động không xóa.
+   */
+  const confirmDeactivate = useCallback(async () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    setDeleteConfirmOpen(false);
+    try {
+      for (const id of ids) await deactivateVoucher.mutateAsync(id);
+      setSelectedIds(new Set());
+      toast.success(`Đã ngừng theo dõi ${ids.length} voucher.`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Ngừng theo dõi thất bại.",
+      );
+    }
+  }, [selectedIds, deactivateVoucher]);
+
+  const openEdit = useCallback((row: VoucherSummaryRow) => {
+    setFormMode({ kind: "edit", source: row });
   }, []);
 
   const toolbarItems = useMemo<ToolbarItem[]>(
     () => [
       {
         ...TOOLBAR_REGISTRY.create,
-        onClick: () => toast.info("Thêm mới voucher."),
+        onClick: () => setFormMode({ kind: "create" }),
       },
       { id: "sep-1", type: "separator" },
       {
         ...TOOLBAR_REGISTRY.duplicate,
         disabled: selectedCount !== 1,
-        onClick: () => toast.info("Nhân bản voucher đã chọn."),
+        onClick: () => {
+          if (selectedRow)
+            setFormMode({ kind: "duplicate", source: selectedRow });
+        },
       },
       {
         ...TOOLBAR_REGISTRY.edit,
         disabled: selectedCount !== 1,
-        onClick: () => toast.info("Sửa voucher đã chọn."),
+        onClick: () => {
+          if (selectedRow) setFormMode({ kind: "edit", source: selectedRow });
+        },
       },
       {
         ...TOOLBAR_REGISTRY.delete,
         disabled: selectedCount === 0,
-        onClick: () => toast.info(`Xóa ${selectedCount} voucher đã chọn.`),
+        onClick: () => setDeleteConfirmOpen(true),
       },
       { id: "sep-2", type: "separator" },
       { ...TOOLBAR_REGISTRY.refresh, onClick: handleRefresh },
     ],
-    [selectedCount, handleRefresh],
+    [selectedCount, selectedRow, handleRefresh],
   );
 
   return (
     <DocumentListShell
       title="Thẻ voucher"
       toolbar={<PageToolbar items={toolbarItems} tone="primary" />}
+      filters={
+        chips.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {chips.map((chip) => (
+              <Badge
+                key={chip.id}
+                variant="secondary"
+                className="gap-1 py-1 pl-2 pr-1"
+              >
+                {chip.label}
+                <button
+                  type="button"
+                  aria-label={`Xóa lọc ${chip.label}`}
+                  className="rounded-sm p-0.5 hover:bg-background/60"
+                  onClick={() => clearChip(chip.id)}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        ) : undefined
+      }
       pagination={
         <PaginationControls
           page={pagination.page}
           pageSize={pagination.pageSize}
-          total={filteredRows.length}
+          total={total}
           onPageChange={(p) => setPagination((prev) => ({ ...prev, page: p }))}
           onPageSizeChange={(s) =>
             setPagination((prev) => ({ ...prev, page: 1, pageSize: s }))
@@ -215,10 +230,37 @@ export function VouchersPage() {
         />
       }
     >
+      {deleteConfirmOpen ? (
+        <ConfirmActionModal
+          title="Ngừng theo dõi voucher"
+          message={
+            selectedCount === 1
+              ? "Voucher đã chọn sẽ chuyển sang trạng thái Ngừng theo dõi. Tiếp tục?"
+              : `${selectedCount} voucher đã chọn sẽ chuyển sang trạng thái Ngừng theo dõi. Tiếp tục?`
+          }
+          confirmLabel="Ngừng theo dõi"
+          loading={deactivateVoucher.isPending}
+          onConfirm={() => void confirmDeactivate()}
+          onCancel={() => setDeleteConfirmOpen(false)}
+        />
+      ) : null}
+
+      {formMode ? (
+        <VoucherFormDialog
+          mode={formMode}
+          onClose={() => setFormMode(undefined)}
+          onSaved={() => {
+            setFormMode(undefined);
+            setSelectedIds(new Set());
+          }}
+        />
+      ) : null}
+
       <div className="flex min-h-0 flex-1 flex-col p-4">
         <VouchersTable
-          rows={pagedRows}
-          loading={false}
+          rows={rows}
+          loading={isFetching}
+          summary={summary}
           selectedIds={selectedIds}
           allSelected={allSelected}
           onToggleAll={handleToggleAll}
@@ -227,9 +269,6 @@ export function VouchersPage() {
           columnFilters={columnFilters}
           onFilterModeChange={handleFilterModeChange}
           onFilterValueChange={handleFilterValueChange}
-          sortBy={sortBy}
-          sortOrder={sortOrder}
-          onSort={handleSort}
         />
       </div>
     </DocumentListShell>

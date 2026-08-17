@@ -163,7 +163,10 @@ export class PosDailySummaryExportService {
     section('1. Thu');
     dataRow('Tiền mặt', summary.revenue.cash, 'Voucher', summary.revenue.voucher);
     dataRow('Thẻ', summary.revenue.card, 'Điểm', summary.revenue.points);
-    dataRow('Chuyển khoản', summary.revenue.bankTransfer);
+    dataRow('Chuyển khoản', summary.revenue.bankTransfer, 'Khuyến mại', summary.revenue.promotion);
+    // "Điểm" and "Khuyến mại" are discounts, not money into a fund, so they are
+    // reported but excluded from Tổng thu / Thu - chi — same rule as the screen.
+    dataRow('(Điểm và Khuyến mại là khoản giảm giá, không tính vào tổng thu)', undefined);
     section('2. Chi');
     dataRow('Tiền mặt', summary.expense.cash, 'Chuyển khoản', summary.expense.bankTransfer);
     section('II. Công nợ');

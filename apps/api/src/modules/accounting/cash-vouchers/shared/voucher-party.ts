@@ -1,6 +1,9 @@
+import { Logger } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { CashVoucherPartnerType } from '../enums';
 import { PartnerResolverService } from './partner-resolver.service';
+
+const logger = new Logger('voucherParty');
 
 /**
  * The party/staff fields an auto-generated voucher inherits from the voucher (or
@@ -78,6 +81,89 @@ export async function resolvePartySnapshot(
 function blankToUndefined(value?: string | null): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
+}
+
+/** One row of {@link POS_INVOICE_PARTY_SQL}. */
+interface PosInvoicePartyRow {
+  customer_id: string | null;
+  staff_id: string | null;
+  salesperson_id: string | null;
+  customer_name: string | null;
+  customer_address: string | null;
+  branch_address: string | null;
+  salesperson_user_id: string | null;
+}
+
+/**
+ * `invoices.branch_id` is a varchar while `branches.id` is a uuid, hence the cast — without
+ * it this fails at runtime, not at compile time.
+ *
+ * Parameterised SQL rather than entity lookups, same as `PartnerResolverService`: it keeps
+ * the cash-vouchers module from depending on the pos / customer / rbac entity classes.
+ */
+const POS_INVOICE_PARTY_SQL = `
+  SELECT i."customer_id", i."staff_id", i."salesperson_id",
+         c."name"    AS "customer_name",
+         c."address" AS "customer_address",
+         b."address" AS "branch_address",
+         ep."user_id" AS "salesperson_user_id"
+  FROM "invoices" i
+  LEFT JOIN "customers" c
+         ON c."id" = i."customer_id" AND c."organization_id" = i."organization_id"
+  LEFT JOIN "branches" b
+         ON b."id" = i."branch_id"::uuid
+  LEFT JOIN "employee_profiles" ep
+         ON ep."id" = i."salesperson_id" AND ep."organization_id" = i."organization_id"
+  WHERE i."id" = $1 AND i."organization_id" = $2
+  LIMIT 1
+`;
+
+/**
+ * The party fields a voucher auto-generated from a POS invoice inherits: who paid, where they
+ * live, and which staff member handled the money.
+ *
+ * **Never throws.** Deliberately does not reuse {@link PartnerResolverService}, which raises a
+ * 400 for an unresolvable partner id — the manual voucher form needs that, but here the same
+ * throw would dead-letter a receipt for money already taken, and inside the v2 checkout
+ * transaction it would lose the whole sale over a display field. Missing rows degrade to
+ * undefined; only genuine infrastructure faults propagate.
+ *
+ * `staffId` carries the salesperson's **users.id**, reached through
+ * `employee_profiles.user_id`: `invoices.salesperson_id` is an `employee_profiles.id`, while
+ * the voucher dialog resolves this field via `GET /admin/users/:id`. Writing the profile id
+ * would populate the column and still render an empty "Nhân viên thu".
+ */
+export async function buildPosInvoiceParty(
+  manager: EntityManager,
+  invoiceId: string,
+  organizationId: string,
+): Promise<VoucherPartySnapshot> {
+  const rows: PosInvoicePartyRow[] = await manager.query(POS_INVOICE_PARTY_SQL, [
+    invoiceId,
+    organizationId,
+  ]);
+  const row = rows?.[0];
+  if (!row) {
+    logger.warn(
+      `No invoice ${invoiceId} in organization ${organizationId} — voucher party left empty`,
+    );
+    return {};
+  }
+
+  // A customer row that did not join back (hard-deleted, or an id from another org) leaves
+  // the party blank rather than pointing the voucher at an id nothing can resolve.
+  const customerName = blankToUndefined(row.customer_name);
+  const hasCustomer = Boolean(row.customer_id && customerName);
+
+  return {
+    partnerType: hasCustomer ? CashVoucherPartnerType.CUSTOMER : undefined,
+    partnerId: hasCustomer ? (row.customer_id ?? undefined) : undefined,
+    partnerName: hasCustomer ? customerName : undefined,
+    partnerAddress:
+      blankToUndefined(row.customer_address) ?? blankToUndefined(row.branch_address),
+    personName: hasCustomer ? customerName : undefined,
+    staffId: row.salesperson_user_id ?? row.staff_id ?? undefined,
+  };
 }
 
 /**

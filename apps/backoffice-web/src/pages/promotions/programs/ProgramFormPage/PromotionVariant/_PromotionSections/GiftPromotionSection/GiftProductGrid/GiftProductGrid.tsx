@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { Button, Input } from "@erp/ui";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, PackageSearch, Trash2 } from "lucide-react";
 import { blankGiftProduct } from "../../../../../program-form.constants";
 import type { GiftProduct } from "../../../../../program-form.types";
+import { PromotionTargetPicker } from "../../../../../../components/PromotionTargetPicker/PromotionTargetPicker";
+import { mergeTargetsIntoGrid } from "../../../../../../components/PromotionTargetPicker/promotion-target";
 
 interface Props {
   value: GiftProduct[];
@@ -16,6 +19,8 @@ const toNumberOrEmpty = (raw: string): number | "" =>
 
 /** Grid 5 cột hàng hóa quà tặng (spec 4.14). */
 export function GiftProductGrid({ value, onChange }: Props) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+
   const updateRow = (id: string, patch: Partial<GiftProduct>) => {
     onChange(value.map((row) => (row.id === id ? { ...row, ...patch } : row)));
   };
@@ -26,6 +31,23 @@ export function GiftProductGrid({ value, onChange }: Props) {
 
   const addRow = () => {
     onChange([...value, blankGiftProduct()]);
+  };
+
+  // Quà tặng luôn ở cấp mẫu mã — `promotion_lines.target_type = ITEM`.
+  const addFromPicker = (drafts: Parameters<typeof mergeTargetsIntoGrid>[1]) => {
+    onChange(
+      mergeTargetsIntoGrid<GiftProduct>(value, drafts, {
+        targetIdOf: (row) => row.itemId,
+        isBlank: (row) => !row.itemId && !row.sku.trim() && !row.name.trim(),
+        toRow: (draft) => ({
+          ...blankGiftProduct(),
+          itemId: draft.targetId,
+          sku: draft.code,
+          name: draft.name,
+          unit: draft.unit,
+        }),
+      }),
+    );
   };
 
   return (
@@ -126,12 +148,30 @@ export function GiftProductGrid({ value, onChange }: Props) {
           </tbody>
         </table>
       </div>
-      <div className="px-3 py-2">
+      <div className="flex items-center gap-1 px-3 py-2">
         <Button type="button" variant="ghost" size="sm" onClick={addRow}>
           <Plus className="mr-1.5 h-4 w-4" />
           Thêm dòng
         </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setPickerOpen(true)}
+        >
+          <PackageSearch className="mr-1.5 h-4 w-4" />
+          Chọn hàng hóa
+        </Button>
       </div>
+
+      <PromotionTargetPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        mode="ITEM"
+        title="Chọn hàng hóa quà tặng"
+        selectedIds={new Set(value.map((row) => row.itemId).filter(Boolean))}
+        onSelect={addFromPicker}
+      />
     </div>
   );
 }

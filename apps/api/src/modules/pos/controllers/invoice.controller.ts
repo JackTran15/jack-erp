@@ -237,6 +237,15 @@ export class InvoiceController {
     return this.eligibilityService.getEligibleLines(id, actor);
   }
 
+  @Get(':id/outstanding-debt')
+  @RequirePermission('pos.return.create')
+  getOutstandingDebt(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.eligibilityService.getOutstandingDebt(id, actor);
+  }
+
   @Post('returns')
   @RequirePermission('pos.return.create')
   createReturn(

@@ -20,8 +20,6 @@ export type CheckoutValidationResult =
 export interface CheckoutValidationInput {
   hasAnyCartLines: boolean;
   debt: boolean;
-  /** Luồng hoàn tiền tích "Tính vào công nợ" → bù trừ vào nợ, không cần chi tiền. */
-  refundToDebt: boolean;
   keepChange: boolean;
   selectedCustomer: CustomerRow | null;
   purchaseCart: ReadonlyArray<CartLine>;
@@ -38,7 +36,6 @@ export function validateCheckout(
   const {
     hasAnyCartLines,
     debt,
-    refundToDebt,
     keepChange,
     selectedCustomer,
     purchaseCart,
@@ -57,7 +54,7 @@ export function validateCheckout(
     };
   }
 
-  if ((debt || refundToDebt) && !selectedCustomer) {
+  if (debt && !selectedCustomer) {
     return {
       ok: false,
       code: CHECKOUT_ERROR_CODES.DEBT_REQUIRES_CUSTOMER,
@@ -76,8 +73,6 @@ export function validateCheckout(
 
   const saleNetReturnToCustomer = changeAmount - shortageAmount;
   const debtCovered = debt && Boolean(selectedCustomer);
-  // Hoàn tiền bù vào công nợ hóa đơn gốc → không cần nhập số tiền chi trả khách.
-  const refundOffsetCovered = refundToDebt && Boolean(selectedCustomer);
 
   if (
     settlementGrandTotal > 0 &&
@@ -96,8 +91,7 @@ export function validateCheckout(
     settlementGrandTotal < 0 &&
     totalPaid < settlementAbs &&
     !keepChange &&
-    !debtCovered &&
-    !refundOffsetCovered
+    !debtCovered
   ) {
     return {
       ok: false,
@@ -106,7 +100,7 @@ export function validateCheckout(
     };
   }
 
-  if (settlementGrandTotal < 0 && !refundOffsetCovered && totalPaid > settlementAbs) {
+  if (settlementGrandTotal < 0 && totalPaid > settlementAbs) {
     return {
       ok: false,
       code: CHECKOUT_ERROR_CODES.OVERPAID_RETURN,

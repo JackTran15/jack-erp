@@ -5,6 +5,7 @@ import { CheckoutRightPane } from "@erp/pos/components/page-components/Checkout/
 import { useCheckoutBootstrap } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-bootstrap";
 import { useCheckoutFocusManager } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-focus-manager";
 import { useCheckoutHotkeys } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-hotkeys";
+import { useCheckoutPromotionPreview } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-promotion-preview";
 import { useSyncCartOnHand } from "@erp/pos/hooks/page-hooks/checkout/use-sync-cart-on-hand";
 
 export function CheckoutPage() {
@@ -13,6 +14,7 @@ export function CheckoutPage() {
   useCheckoutBootstrap();
   useCheckoutHotkeys({ refs: focus.refs });
   useSyncCartOnHand();
+  useCheckoutPromotionPreview();
 
   return (
     <div className="flex grow flex-col bg-gray-100 text-gray-900 overflow-hidden">

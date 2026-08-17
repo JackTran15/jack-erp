@@ -47,6 +47,7 @@ export const SAMPLE_INVOICE_DRAFT_DEFAULTS: SampleInvoiceDraft = {
   numbers: {
     "totals.totalQty": 33,
     "totals.subtotal": 19790000,
+    "totals.manualDiscountTotal": 500000,
     "totals.itemDiscountTotal": 1650000,
     "totals.invoiceDiscountTotal": 200000,
     "totals.voucherDiscount": 100000,
@@ -106,6 +107,7 @@ export const SAMPLE_INVOICE_DRAFT_DEFAULTS: SampleInvoiceDraft = {
 
     "totals.totalQty": true,
     "totals.subtotal": true,
+    "totals.manualDiscountTotal": true,
     "totals.itemDiscountTotal": true,
     "totals.invoiceDiscountTotal": false,
     "totals.voucherDiscount": false,
@@ -269,6 +271,12 @@ export const SAMPLE_INVOICE_FIELD_GROUPS: readonly SampleFieldGroup[] = [
         hint: "Tổng SL × ĐG của mọi dòng hàng, TRƯỚC khuyến mãi.",
       },
       {
+        key: "totals.manualDiscountTotal",
+        label: "Giảm giá",
+        kind: "money",
+        hint: "Tổng giảm giá tay của thu ngân trên từng dòng hàng — tách riêng khỏi khối \"Khuyến mãi\" bên dưới.",
+      },
+      {
         key: "totals.itemDiscountTotal",
         label: "KM theo mặt hàng",
         kind: "money",
@@ -278,7 +286,6 @@ export const SAMPLE_INVOICE_FIELD_GROUPS: readonly SampleFieldGroup[] = [
         key: "totals.invoiceDiscountTotal",
         label: "KM theo hóa đơn",
         kind: "money",
-        slot: true,
       },
       {
         key: "totals.voucherDiscount",

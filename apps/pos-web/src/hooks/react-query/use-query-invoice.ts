@@ -36,6 +36,7 @@ import type {
 } from "@erp/pos/interfaces/invoice.interface";
 import type {
   EligibleReturnLine,
+  OutstandingDebtRow,
   ReturnInvoiceRow,
 } from "@erp/pos/interfaces/return-goods.interface";
 
@@ -355,6 +356,22 @@ export function useEligibleReturnsQuery(
     queryFn: () => invoiceService.getEligibleReturns(invoiceId as string),
     enabled: Boolean(invoiceId),
     staleTime: 30_000,
+  });
+}
+
+/**
+ * `GET /invoices/:id/outstanding-debt` — dư nợ hóa đơn gốc, cho khối xem trước
+ * khoản tách ở màn hình thanh toán. Không cache lâu: một phiếu thu nợ ở quầy
+ * khác có thể vừa làm số này đổi.
+ */
+export function useOutstandingDebtQuery(
+  invoiceId: string | undefined,
+): UseQueryResult<OutstandingDebtRow, Error> {
+  return useQuery<OutstandingDebtRow, Error>({
+    queryKey: INVOICE_KEYS.OUTSTANDING_DEBT(invoiceId ?? ""),
+    queryFn: () => invoiceService.getOutstandingDebt(invoiceId as string),
+    enabled: Boolean(invoiceId),
+    staleTime: 10_000,
   });
 }
 

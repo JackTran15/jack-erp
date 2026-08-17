@@ -1,8 +1,9 @@
-import { Module, OnModuleInit } from '@nestjs/common';
+import { forwardRef, Module, OnModuleInit } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EntityRegistryService } from '../../crud/entity-registry.service';
 import { JournalModule } from '../journal/journal.module';
+import { DepositVouchersModule } from '../deposit-vouchers/deposit-vouchers.module';
 import { CashModule } from '../cash/cash.module';
 import { AccountEntity } from '../coa/account.entity';
 import { BankEntity } from './bank.entity';
@@ -54,6 +55,9 @@ import {
     CashModule,
     DepositAuditModule,
     CqrsModule,
+    // DepositVouchersModule imports this module back (it needs DepositService), so the
+    // Phiếu thu tiền gửi that PosDepositSaleConsumer now issues costs a forwardRef.
+    forwardRef(() => DepositVouchersModule),
   ],
   controllers: [DepositLedgerV2Controller, DepositLedgerController],
   providers: [

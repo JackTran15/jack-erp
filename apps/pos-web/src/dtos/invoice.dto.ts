@@ -88,6 +88,48 @@ export interface CheckoutInvoiceBody {
   keptChangeAmount?: number;
   dueDate?: string;
   creditDays?: number;
+  /**
+   * Id các CTKM tùy chọn thu ngân đã chọn (luồng SALE, `VITE_CHECKOUT_V2` mới
+   * nhận). `invoiceService.checkout` tự lược field này khỏi payload nhánh v1
+   * cũ (`/invoices/:id/checkout` không khai báo trường này —
+   * `forbidNonWhitelisted` của backend sẽ 400 nếu gửi nhầm).
+   */
+  selectedProgramIds?: string[];
+  /**
+   * Id các CTKM thu ngân bỏ hẳn, kể cả `auto_apply=true` (UOW-09/ADR-07, đóng
+   * A-13). Cùng ngoại lệ nhánh v1 như `selectedProgramIds` ở trên.
+   */
+  excludedProgramIds?: string[];
+}
+
+/**
+ * Body cho `POST /v2/pos/checkout` — luồng checkout saga (T-05-03, cờ
+ * `VITE_CHECKOUT_V2`). Khác `CheckoutInvoiceBody`: `invoiceId` nằm trong
+ * body vì endpoint không có `:id` trên path.
+ */
+export interface CheckoutV2Body {
+  invoiceId: string;
+  payments: InvoicePaymentLineBody[];
+  /** Mirror `CheckoutInvoiceBody.keptChangeAmount` — xem docblock ở đó. */
+  keptChangeAmount?: number;
+  dueDate?: string;
+  creditDays?: number;
+  /** Mirror `CheckoutInvoiceBody.selectedProgramIds` — xem docblock ở đó. */
+  selectedProgramIds?: string[];
+  /** Mirror `CheckoutInvoiceBody.excludedProgramIds` — xem docblock ở đó. */
+  excludedProgramIds?: string[];
+}
+
+/**
+ * Đáp trả thô của `POST /v2/pos/checkout` — KHÔNG phải `InvoiceRow` đầy đủ,
+ * chỉ tổng kết saga. `invoiceService.checkout` tự gọi lại `getById` sau khi
+ * commit để lấy đúng hình dạng phần còn lại của app đang mong đợi.
+ */
+export interface CheckoutV2Response {
+  committed: boolean;
+  invoiceId: string;
+  sagaId: string;
+  documentNumber?: string;
 }
 
 // ─── Return / Exchange (EPIC-011) ──────────────────────────────────────────

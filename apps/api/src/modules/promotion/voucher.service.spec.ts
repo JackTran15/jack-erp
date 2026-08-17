@@ -7,6 +7,7 @@ import {
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
+import { PromotionStatus } from '@erp/shared-interfaces';
 import { VoucherEntity } from './voucher.entity';
 import { VoucherService } from './voucher.service';
 
@@ -30,6 +31,7 @@ const voucherStub = (overrides: Partial<VoucherEntity> = {}): VoucherEntity =>
     isUsed: false,
     redeemedInvoiceId: undefined,
     isActive: true,
+    status: PromotionStatus.TRACKING,
     createdBy: 'user-1',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -79,6 +81,7 @@ describe('VoucherService', () => {
         service.create(
           {
             code: 'VOUCHER100',
+            issuer: 'Shop A',
             faceValue: 100,
             validFrom: '2026-01-01',
             validTo: '2026-12-31',
@@ -94,6 +97,7 @@ describe('VoucherService', () => {
       const result = await service.create(
         {
           code: 'NEWVOUCHER',
+          issuer: 'Shop A',
           faceValue: 200,
           validFrom: '2026-03-01',
           validTo: '2026-06-30',
@@ -116,6 +120,55 @@ describe('VoucherService', () => {
       );
       expect(repo.save).toHaveBeenCalled();
       expect(result).toBeDefined();
+    });
+
+    it('creates an unlimited-duration voucher when validFrom/validTo are omitted (FR-051)', async () => {
+      repo.findOne.mockResolvedValue(null);
+
+      await service.create({ code: 'NOEXPIRY', issuer: 'Shop A', faceValue: 50 }, actor);
+
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ validFrom: undefined, validTo: undefined }),
+      );
+    });
+  });
+
+  // =========================================================================
+  // duplicate
+  // =========================================================================
+  describe('duplicate', () => {
+    it('copies every field except id, code, isUsed, redeemedInvoiceId', async () => {
+      const original = voucherStub({
+        issuer: 'Shop A',
+        description: 'Tet promo',
+        customerId: 'customer-1',
+        isUsed: true,
+        redeemedInvoiceId: 'invoice-1',
+      } as Partial<VoucherEntity>);
+      repo.findOne.mockResolvedValueOnce(original).mockResolvedValueOnce(null);
+
+      await service.duplicate('voucher-1', 'VOUCHER200', actor);
+
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: 'VOUCHER200',
+          issuer: 'Shop A',
+          description: 'Tet promo',
+          customerId: 'customer-1',
+          faceValue: original.faceValue,
+          validFrom: original.validFrom,
+          validTo: original.validTo,
+          isActive: original.isActive,
+          isUsed: false,
+          redeemedInvoiceId: undefined,
+        }),
+      );
+    });
+
+    it('throws ConflictException when the new code already exists', async () => {
+      repo.findOne.mockResolvedValueOnce(voucherStub()).mockResolvedValueOnce(voucherStub({ code: 'VOUCHER200' }));
+
+      await expect(service.duplicate('voucher-1', 'VOUCHER200', actor)).rejects.toThrow(ConflictException);
     });
   });
 
@@ -229,6 +282,25 @@ describe('VoucherService', () => {
 
       expect(result).toBe(stub);
     });
+
+    it('returns entity when validFrom/validTo are both null (unlimited-duration voucher, FR-051)', async () => {
+      jest.setSystemTime(new Date('2026-06-01'));
+      const stub = voucherStub({ isActive: true, isUsed: false, validFrom: undefined, validTo: undefined });
+      repo.findOne.mockResolvedValue(stub);
+
+      const result = await service.validate('VOUCHER100', undefined, actor);
+
+      expect(result).toBe(stub);
+    });
+
+    it('still enforces validFrom when only validTo is null', async () => {
+      jest.setSystemTime(new Date('2025-12-31'));
+      repo.findOne.mockResolvedValue(
+        voucherStub({ isActive: true, isUsed: false, validFrom: new Date('2026-01-01'), validTo: undefined }),
+      );
+
+      await expect(service.validate('VOUCHER100', undefined, actor)).rejects.toThrow(BadRequestException);
+    });
   });
 
   // =========================================================================
@@ -264,6 +336,32 @@ describe('VoucherService', () => {
       expect(mockManagerRepo.update).toHaveBeenCalledWith(
         { id: 'voucher-1', isUsed: false, isActive: true },
         { isUsed: true, redeemedInvoiceId: 'invoice-1' },
+      );
+    });
+  });
+
+  // Voucher mang hai cờ "còn hiệu lực": `isActive` là cổng chặn ở quầy
+  // (`validate`/`markUsed` đọc), còn `status` là cái danh sách/bộ lọc/badge hiển
+  // thị. Hạ mỗi `isActive` thì thẻ hết dùng được mà màn hình vẫn báo đang theo dõi.
+  describe('deactivate', () => {
+    it('lowers both the legacy redemption gate and the displayed status', async () => {
+      const entity = voucherStub({ isActive: true, status: PromotionStatus.TRACKING });
+      repo.findOne.mockResolvedValue(entity);
+      repo.save.mockImplementation(async (v: VoucherEntity) => v);
+
+      const result = await service.deactivate('voucher-1', actor);
+
+      expect(result.isActive).toBe(false);
+      expect(result.status).toBe(PromotionStatus.STOPPED);
+    });
+
+    it('keeps rejecting a deactivated voucher at validate()', async () => {
+      repo.findOne.mockResolvedValue(
+        voucherStub({ isActive: false, status: PromotionStatus.STOPPED }),
+      );
+
+      await expect(service.validate('VOUCHER100', undefined, actor)).rejects.toThrow(
+        BadRequestException,
       );
     });
   });

@@ -109,19 +109,21 @@ describe('GetPosDailySummaryHandler', () => {
     };
     const res = await handler.execute(new GetPosDailySummaryQuery(dto, actor));
 
-    // Revenue: cash 100000, card 20000, transfer 30000, voucher 10000, points 5000
+    // Revenue: cash 100000, card 20000, transfer 30000, voucher 10000
     expect(res.revenue.cash).toBe(100000);
     expect(res.revenue.card).toBe(20000);
     expect(res.revenue.bankTransfer).toBe(30000);
     expect(res.revenue.voucher).toBe(10000);
+    // Reported, but NOT in the total: point redemption is a discount, no money
+    // reaches a fund. Counting it inflated netCashFlow by exactly this amount.
     expect(res.revenue.points).toBe(5000);
-    expect(res.revenue.total).toBe(165000);
+    expect(res.revenue.total).toBe(160000);
 
     // Expense: cashAcc → cash 15000, bankAcc → transfer 25000
     expect(res.expense.cash).toBe(15000);
     expect(res.expense.bankTransfer).toBe(25000);
     expect(res.expense.total).toBe(40000);
-    expect(res.netCashFlow).toBe(125000);
+    expect(res.netCashFlow).toBe(120000);
 
     // Debt
     expect(res.debt.newDebt).toBe(50000);
@@ -283,7 +285,19 @@ describe('GetPosDailySummaryHandler', () => {
     ]);
   });
 
-  it('nets CASH-method invoice-header refunds out of revenue.cash (they never hit invoice_payments or cash_payments)', async () => {
+  /**
+   * QA #10. This used to assert that a CASH refund is netted out of
+   * `revenue.cash`, on the stated premise that it "never hits invoice_payments
+   * or cash_payments". The premise is false: refund-cash.consumer records a
+   * `cash_movements` WITHDRAWAL *and* issues a POSTED phiếu chi, which the
+   * expense query counts. The old fixture simply omitted that voucher, so the
+   * double-count it caused in production was invisible here.
+   *
+   * The fixture now includes the phiếu chi a real refund produces, and the
+   * reconciled figure (25,200,000 − 11,250,000) is asserted where it belongs —
+   * on `netCashFlow`, not on `revenue.cash`.
+   */
+  it('counts a CASH refund exactly once — on the expense side, where its phiếu chi lands', async () => {
     const invoices = [
       { id: 'i1', type: InvoiceType.SALE, pointsDiscountAmount: 0 },
       {
@@ -293,7 +307,6 @@ describe('GetPosDailySummaryHandler', () => {
         refundMethod: RefundMethod.CASH,
         refundedAmount: 11250000,
       },
-      // A BANK-method refund must NOT touch revenue.cash.
       {
         id: 'i3',
         type: InvoiceType.RETURN,
@@ -305,11 +318,131 @@ describe('GetPosDailySummaryHandler', () => {
     const payments = [
       { invoiceId: 'i1', paymentMethod: InvoicePaymentMethod.CASH, amount: 25200000 },
     ];
+    // The phiếu chi the CASH refund actually creates (purpose = REFUND).
+    const cashPayments = [{ cashAccountId: 'cashAcc', totalAmount: 11250000 }];
+    const paymentAccounts = [
+      { accountId: 'cashAcc', paymentMethod: PaymentAccountMethod.CASH },
+    ];
 
     const handler = new GetPosDailySummaryHandler(
       repoStub<InvoiceEntity>(invoices),
       repoStub<InvoiceItemEntity>([]),
       repoStub<InvoicePaymentEntity>(payments),
+      repoStub<InvoicePromotionEntity>([]),
+      repoStub<InvoiceDebtEntity>([]),
+      repoStub<DebtPaymentEntity>([]),
+      repoStub<CashPaymentEntity>(cashPayments),
+      repoStub<CashReceiptEntity>([]),
+      repoStub<PaymentAccountEntity>(paymentAccounts),
+      { hasPermission: () => Promise.resolve(false) } as unknown as RbacService,
+    );
+
+    const dto: PosDailySummaryDto = { issuedAt: { from: '2026-01-01', to: '2026-07-29' } };
+    const res = await handler.execute(new GetPosDailySummaryQuery(dto, actor));
+
+    // Thu stays gross — the refund is not subtracted here any more.
+    expect(res.revenue.cash).toBe(25200000);
+    // Chi owns it, once.
+    expect(res.expense.cash).toBe(11250000);
+    // The reconciled figure the fund actually moved.
+    expect(res.netCashFlow).toBe(13950000);
+  });
+
+  /**
+   * The exact 13/08/2026 dataset QA reported, reconciled against Sổ quỹ tiền mặt.
+   * Before the fix this reported −943,000 while the fund had actually moved
+   * +2,527,000 — the refunds were charged twice and the points customers spent
+   * were counted as income.
+   */
+  it('reconciles the QA day against the cash book: +2,527,000, not −943,000', async () => {
+    const invoices = [
+      { id: 's1', type: InvoiceType.SALE, pointsDiscountAmount: 0, discountAmount: 0 },
+      { id: 's2', type: InvoiceType.SALE, pointsDiscountAmount: 0, discountAmount: 0 },
+      { id: 's3', type: InvoiceType.SALE, pointsDiscountAmount: 500000, discountAmount: 0 },
+      { id: 's4', type: InvoiceType.SALE, pointsDiscountAmount: 0, discountAmount: 719000 },
+      { id: 's5', type: InvoiceType.SALE, pointsDiscountAmount: 0, discountAmount: 0 },
+      {
+        id: 'r1',
+        type: InvoiceType.RETURN,
+        pointsDiscountAmount: 0,
+        discountAmount: 0,
+        refundMethod: RefundMethod.CASH,
+        refundedAmount: 1430000,
+      },
+      {
+        id: 'r2',
+        type: InvoiceType.RETURN,
+        pointsDiscountAmount: 0,
+        discountAmount: 0,
+        refundMethod: RefundMethod.CASH,
+        refundedAmount: 580000,
+      },
+      {
+        id: 'r3',
+        type: InvoiceType.RETURN,
+        pointsDiscountAmount: 0,
+        discountAmount: 0,
+        refundMethod: RefundMethod.CASH,
+        refundedAmount: 580000,
+      },
+    ];
+    // Thu tiền mặt per the cash book: 1,229 + 1,430 + 1,229 + 1,229 + 1,380 = 6,497,000
+    const payments = [
+      { invoiceId: 's1', paymentMethod: InvoicePaymentMethod.CASH, amount: 1229000 },
+      { invoiceId: 's2', paymentMethod: InvoicePaymentMethod.CASH, amount: 1430000 },
+      { invoiceId: 's3', paymentMethod: InvoicePaymentMethod.CASH, amount: 1229000 },
+      { invoiceId: 's4', paymentMethod: InvoicePaymentMethod.CASH, amount: 1229000 },
+      { invoiceId: 's5', paymentMethod: InvoicePaymentMethod.CASH, amount: 1380000 },
+    ];
+    // Chi tiền mặt: PC000001..04 = 1,430 + 580 + 580 + 1,380 = 3,970,000
+    const cashPayments = [
+      { cashAccountId: 'cashAcc', totalAmount: 1430000 },
+      { cashAccountId: 'cashAcc', totalAmount: 580000 },
+      { cashAccountId: 'cashAcc', totalAmount: 580000 },
+      { cashAccountId: 'cashAcc', totalAmount: 1380000 },
+    ];
+    const paymentAccounts = [
+      { accountId: 'cashAcc', paymentMethod: PaymentAccountMethod.CASH },
+    ];
+
+    const handler = new GetPosDailySummaryHandler(
+      repoStub<InvoiceEntity>(invoices),
+      repoStub<InvoiceItemEntity>([]),
+      repoStub<InvoicePaymentEntity>(payments),
+      repoStub<InvoicePromotionEntity>([]),
+      repoStub<InvoiceDebtEntity>([]),
+      repoStub<DebtPaymentEntity>([]),
+      repoStub<CashPaymentEntity>(cashPayments),
+      repoStub<CashReceiptEntity>([]),
+      repoStub<PaymentAccountEntity>(paymentAccounts),
+      { hasPermission: () => Promise.resolve(false) } as unknown as RbacService,
+    );
+
+    const dto: PosDailySummaryDto = { issuedAt: { from: '2026-08-13', to: '2026-08-13' } };
+    const res = await handler.execute(new GetPosDailySummaryQuery(dto, actor));
+
+    expect(res.revenue.cash).toBe(6497000);
+    expect(res.expense.cash).toBe(3970000);
+    expect(res.netCashFlow).toBe(2527000);
+    // Both reported, neither in the total.
+    expect(res.revenue.points).toBe(500000);
+    expect(res.revenue.promotion).toBe(719000);
+  });
+
+  it('reports promotion money given away, which no field used to carry (QA #10)', async () => {
+    // 719,000đ of promotion on the day QA tested reported as 0 because nothing
+    // read invoices.discount_amount — the one column the v2 saga writes it to.
+    const invoices = [
+      { id: 'i1', type: InvoiceType.SALE, pointsDiscountAmount: 0, discountAmount: 500000 },
+      { id: 'i2', type: InvoiceType.SALE, pointsDiscountAmount: 0, discountAmount: 219000 },
+      // A return gives promotion back, so it signs negative like every other figure.
+      { id: 'i3', type: InvoiceType.RETURN, pointsDiscountAmount: 0, discountAmount: 19000 },
+    ];
+
+    const handler = new GetPosDailySummaryHandler(
+      repoStub<InvoiceEntity>(invoices),
+      repoStub<InvoiceItemEntity>([]),
+      repoStub<InvoicePaymentEntity>([]),
       repoStub<InvoicePromotionEntity>([]),
       repoStub<InvoiceDebtEntity>([]),
       repoStub<DebtPaymentEntity>([]),
@@ -322,8 +455,10 @@ describe('GetPosDailySummaryHandler', () => {
     const dto: PosDailySummaryDto = { issuedAt: { from: '2026-01-01', to: '2026-07-29' } };
     const res = await handler.execute(new GetPosDailySummaryQuery(dto, actor));
 
-    // Matches the reconciled backoffice figure: 25,200,000 − 11,250,000.
-    expect(res.revenue.cash).toBe(13950000);
+    expect(res.revenue.promotion).toBe(700000); // 500000 + 219000 − 19000
+    // Informational only — a discount moves no money into a fund.
+    expect(res.revenue.total).toBe(0);
+    expect(res.netCashFlow).toBe(0);
   });
 
   it('folds non-invoice cash receipts (Thu nợ / Thu khác) into revenue.cash/bankTransfer, excluding POS_SALE-purpose receipts', async () => {

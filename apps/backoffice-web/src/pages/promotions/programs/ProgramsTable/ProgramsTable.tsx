@@ -6,30 +6,37 @@ import type {
   ColumnFilter,
   ColumnFilterMode,
 } from "../../../../components/table/pagination.dto";
+import { PromotionStatus } from "@erp/shared-interfaces";
+import type { PromotionProgramSummary } from "@erp/shared-interfaces";
 import {
-  PROMOTION_APPLY_TO_LABELS,
-  PROMOTION_APPLY_TO_OPTIONS,
-  PROMOTION_FORM_LABELS,
-  PROMOTION_FORM_OPTIONS,
-  PROMOTION_STATUS_LABELS,
-  PROMOTION_STATUS_OPTIONS,
+  PROMOTION_APPLY_TO_FILTER_OPTIONS,
+  PROMOTION_APPLY_TO_LABELS_VI,
+  PROMOTION_STATUS_FILTER_OPTIONS,
+  PROMOTION_STATUS_LABELS_VI,
+  PROMOTION_TYPE_FILTER_OPTIONS,
+  PROMOTION_TYPE_LABELS_VI,
 } from "../programs.constants";
-import type { PromotionProgramRow, PromotionStatus } from "../programs.types";
 
 interface Props {
-  rows: PromotionProgramRow[];
+  rows: PromotionProgramSummary[];
   loading: boolean;
   selectedIds: Set<string>;
   allSelected: boolean;
   onToggleAll: (checked: boolean) => void;
   onToggleRow: (id: string) => void;
-  onOpenProgram: (row: PromotionProgramRow) => void;
+  onOpenProgram: (row: PromotionProgramSummary) => void;
   columnFilters: Record<string, ColumnFilter>;
   onFilterModeChange: (key: string, mode: ColumnFilterMode) => void;
   onFilterValueChange: (key: string, value: string) => void;
+  /**
+   * Sắp xếp theo cột: API `POST /v2/promotions/search` **không** nhận tham số
+   * sort — nó luôn trả `priority ASC, createdAt DESC`, vì `priority` chính là
+   * thứ tự áp dụng thật (BR-001) và người dùng cần thấy đúng thứ tự đó. Sắp xếp
+   * trong RAM sẽ chỉ sắp đúng trang hiện tại, nên bỏ hẳn thay vì làm nửa vời.
+   */
   sortBy?: string;
   sortOrder?: "asc" | "desc";
-  onSort: (key: string) => void;
+  onSort?: (key: string) => void;
 }
 
 /** dd/MM/yyyy từ chuỗi ISO yyyy-MM-dd. */
@@ -44,10 +51,25 @@ const STATUS_BADGE_VARIANT: Record<
   PromotionStatus,
   "default" | "secondary" | "outline"
 > = {
-  TRACKING: "default",
-  PAUSED: "secondary",
-  ENDED: "outline",
+  [PromotionStatus.TRACKING]: "default",
+  [PromotionStatus.STOPPED]: "secondary",
 };
+
+/**
+ * "Đã kết thúc" là trạng thái **suy ra ở client**, không phải giá trị lưu:
+ * chương trình vẫn `TRACKING` nhưng đã qua ngày kết thúc. Xem `docs/26-promotion-design.md`
+ * §10.1 — pg enum chỉ có 2 giá trị, khớp radio FR-010.
+ */
+function statusLabel(row: PromotionProgramSummary, today: string): string {
+  if (
+    row.status === PromotionStatus.TRACKING &&
+    row.endDate &&
+    row.endDate < today
+  ) {
+    return "Đã kết thúc";
+  }
+  return PROMOTION_STATUS_LABELS_VI[row.status];
+}
 
 export function ProgramsTable({
   rows,
@@ -64,7 +86,9 @@ export function ProgramsTable({
   sortOrder,
   onSort,
 }: Props) {
-  const columns = useMemo<TableColumn<PromotionProgramRow>[]>(
+  const today = new Date().toISOString().slice(0, 10);
+
+  const columns = useMemo<TableColumn<PromotionProgramSummary>[]>(
     () => [
       {
         key: "name",
@@ -106,16 +130,16 @@ export function ProgramsTable({
         label: "Áp dụng cho",
         width: 180,
         filterKind: "select",
-        filterOptions: PROMOTION_APPLY_TO_OPTIONS,
-        render: (row) => PROMOTION_APPLY_TO_LABELS[row.applyTo],
+        filterOptions: PROMOTION_APPLY_TO_FILTER_OPTIONS,
+        render: (row) => PROMOTION_APPLY_TO_LABELS_VI[row.applyTo],
       },
       {
-        key: "form",
+        key: "type",
         label: "Hình thức khuyến mại",
         width: 190,
         filterKind: "select",
-        filterOptions: PROMOTION_FORM_OPTIONS,
-        render: (row) => PROMOTION_FORM_LABELS[row.form],
+        filterOptions: PROMOTION_TYPE_FILTER_OPTIONS,
+        render: (row) => PROMOTION_TYPE_LABELS_VI[row.type],
       },
       {
         key: "description",
@@ -129,15 +153,15 @@ export function ProgramsTable({
         label: "Trạng thái",
         width: 150,
         filterKind: "select",
-        filterOptions: PROMOTION_STATUS_OPTIONS,
+        filterOptions: PROMOTION_STATUS_FILTER_OPTIONS,
         render: (row) => (
           <Badge variant={STATUS_BADGE_VARIANT[row.status]}>
-            {PROMOTION_STATUS_LABELS[row.status]}
+            {statusLabel(row, today)}
           </Badge>
         ),
       },
     ],
-    [onOpenProgram],
+    [onOpenProgram, today],
   );
 
   return (

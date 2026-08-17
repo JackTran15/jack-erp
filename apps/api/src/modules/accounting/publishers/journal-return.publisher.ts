@@ -11,6 +11,10 @@ export interface JournalPostReturnPayload {
   source: 'RETURN' | 'EXCHANGE';
   refundMethod: RefundMethod;
   refundedAmount: number;
+  /** Part of `refundedAmount` that settled the original sale's debt instead of
+   * leaving the till (DR revenue / CR receivable). The cash-out remainder is
+   * booked by the treasury movement, not here. Defaults to 0 for older events. */
+  offsetAmount?: number;
   netAmount: number;
   /** EXCHANGE net > 0 portion booked as customer debt (DR receivable / CR revenue).
    * The cash portion is booked by the cash-from-payment consumer. Defaults to 0. */
@@ -47,6 +51,7 @@ export class JournalReturnPublisher {
         payload: {
           ...input,
           refundedAmount: Number(input.refundedAmount),
+          offsetAmount: Number(input.offsetAmount ?? 0),
           netAmount: Number(input.netAmount),
           debtAmount: Number(input.debtAmount ?? 0),
           organizationId: actor.organizationId,
@@ -57,7 +62,7 @@ export class JournalReturnPublisher {
     );
 
     this.logger.log(
-      `Published journal-return event for ${input.returnInvoiceCode} (source=${input.source}, method=${input.refundMethod}, refunded=${input.refundedAmount})`,
+      `Published journal-return event for ${input.returnInvoiceCode} (source=${input.source}, method=${input.refundMethod}, refunded=${input.refundedAmount}, offset=${input.offsetAmount ?? 0})`,
     );
   }
 }

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { v4 as uuid } from 'uuid';
 import {
   CashVoucherCreatedPayload,
@@ -14,6 +15,7 @@ import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
 import { CashReceiptsService } from '../cash-receipts/cash-receipts.service';
 import { CashReceiptPurpose, CashReceiptReferenceType } from '../enums';
 import { CashVoucherCategoryResolverService } from '../shared/category-resolver.service';
+import { buildPosInvoiceParty } from '../shared/voucher-party';
 
 /**
  * "Khách không lấy tiền thừa" → Phiếu thu thu nhập khác.
@@ -34,6 +36,7 @@ export class PosKeptChangeConsumer {
     private readonly accountResolver: AccountResolverService,
     private readonly categoryResolver: CashVoucherCategoryResolverService,
     private readonly eventPublisher: EventPublisher,
+    private readonly dataSource: DataSource,
   ) {}
 
   @OnDomainEvent(ERP_TOPICS.CASH_VOUCHER_NEEDED_KEPT_CHANGE)
@@ -58,6 +61,12 @@ export class PosKeptChangeConsumer {
       'THU_KHAC',
     );
 
+    const party = await buildPosInvoiceParty(
+      this.dataSource.manager,
+      invoiceId,
+      organizationId,
+    );
+
     const result = await this.cashReceiptsService.createAndPostInternal({
       purpose: CashReceiptPurpose.OTHER_INCOME,
       cashAccountId,
@@ -68,6 +77,12 @@ export class PosKeptChangeConsumer {
       reason: `Kept change ${invoiceCode}`,
       description: `Khách không lấy tiền thừa - HĐ ${invoiceCode}`,
       categoryId,
+      partnerType: party.partnerType,
+      partnerId: party.partnerId,
+      partnerName: party.partnerName,
+      partnerAddress: party.partnerAddress,
+      payerName: party.personName,
+      staffId: party.staffId,
       actor,
     });
 

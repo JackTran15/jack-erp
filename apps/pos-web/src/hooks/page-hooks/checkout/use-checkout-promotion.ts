@@ -12,8 +12,33 @@ import {
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface UseCheckoutPromotionResult {
-  appliedPromotion: PromotionItem | null;
+  /**
+   * Id các CTKM tùy chọn (`auto_apply=false`) thu ngân đã tick — không gồm
+   * CTKM `auto_apply=true` (server tự áp, không cần chọn). Nguồn sự thật cho
+   * số tiền là `promotionPreview` (đọc qua `selectPromotionPreview`), không
+   * phải mảng này — mảng chỉ là lựa chọn gửi lên `evaluate`/`checkout`.
+   */
+  selectedProgramIds: string[];
+  /**
+   * Id các CTKM thu ngân đã bỏ hẳn (UOW-09/ADR-07, đóng A-13) — kể cả CTKM
+   * `auto_apply=true` server đã tự áp. Nguồn sự thật cho số tiền vẫn là
+   * `promotionPreview`, không phải mảng này.
+   */
+  excludedProgramIds: string[];
   applyPromotion: (promotion: PromotionItem | null) => void;
+  /**
+   * Bật/tắt loại trừ một CTKM. Gọi khi thu ngân untick dòng "Đã áp dụng"
+   * (loại) hoặc tick lại dòng "Đã bỏ áp dụng" (khôi phục) trong dialog, hoặc
+   * bấm X ở dòng tổng "Khuyến mại" (T-09-04). Xác nhận trước khi gọi (khi
+   * loại) là việc của UI gọi hàm này, không phải của hàm này.
+   */
+  toggleExcludeProgram: (programId: string) => void;
+  /**
+   * Bỏ hẳn nhiều CTKM cùng lúc — nút X ở dòng tổng "Khuyến mại" (T-09-04),
+   * loại toàn bộ `appliedPrograms` hiện tại chứ không phải một dòng. Gộp
+   * thêm vào `excludedProgramIds` hiện có, không ghi đè.
+   */
+  excludeAllApplied: (programIds: string[]) => void;
   pickPromoOption: (option: PromoMenuOption) => void;
   searchVoucher: (code: string) => void;
   applyVoucher: (result: VoucherFormResult) => void;
@@ -28,12 +53,16 @@ export interface UseCheckoutPromotionResult {
 }
 
 /**
- * Promotion + voucher handlers — đọc ui store và phát announce. Hiện
- * `promotions` list ở Page là static `[]` nên không expose từ đây.
+ * Promotion + voucher handlers — đọc ui store và phát announce. Danh sách
+ * CTKM hiển thị trong dialog đến từ `promotionPreview` (T-02-02), không phải
+ * từ đây — hook này chỉ giữ lựa chọn tùy chọn của thu ngân.
  */
 export function useCheckoutPromotion(): UseCheckoutPromotionResult {
-  const appliedPromotion = usePosCheckoutSessionStore(
-    (s) => selectPromotionDraft(s).appliedPromotion,
+  const selectedProgramIds = usePosCheckoutSessionStore(
+    (s) => selectPromotionDraft(s).selectedProgramIds,
+  );
+  const excludedProgramIds = usePosCheckoutSessionStore(
+    (s) => selectPromotionDraft(s).excludedProgramIds,
   );
   const updateDraftSlice = usePosCheckoutSessionStore(
     (s) => s.updateActiveDraftSlice,
@@ -41,9 +70,11 @@ export function useCheckoutPromotion(): UseCheckoutPromotionResult {
 
   const applyPromotion = useCallback(
     (promotion: PromotionItem | null) => {
+      // Dialog vẫn chọn-1 (chưa multi-select) — mảng chỉ có 0 hoặc 1 phần tử
+      // cho tới khi có UoW cho phép chọn nhiều CTKM tùy chọn cùng lúc.
       updateDraftSlice("promotion", (p) => ({
         ...p,
-        appliedPromotion: promotion,
+        selectedProgramIds: promotion ? [promotion.id] : [],
       }));
       usePosCheckoutUiStore
         .getState()
@@ -52,6 +83,34 @@ export function useCheckoutPromotion(): UseCheckoutPromotionResult {
             ? CHECKOUT_ANNOUNCEMENTS.promotionApplied(promotion.name)
             : CHECKOUT_ANNOUNCEMENTS.PROMOTION_CLEARED,
         );
+    },
+    [updateDraftSlice],
+  );
+
+  // T-09-03/T-09-04 — bật/tắt loại trừ. Tick lại (khôi phục) và loại lần đầu
+  // dùng cùng một hàm — cả hai chỉ là "id có trong mảng hay không", khác biệt
+  // duy nhất (có cần hộp xác nhận hay không) đã được UI xử lý trước khi gọi.
+  const toggleExcludeProgram = useCallback(
+    (programId: string) => {
+      updateDraftSlice("promotion", (p) => {
+        const isExcluded = p.excludedProgramIds.includes(programId);
+        return {
+          ...p,
+          excludedProgramIds: isExcluded
+            ? p.excludedProgramIds.filter((id) => id !== programId)
+            : [...p.excludedProgramIds, programId],
+        };
+      });
+    },
+    [updateDraftSlice],
+  );
+
+  const excludeAllApplied = useCallback(
+    (programIds: string[]) => {
+      updateDraftSlice("promotion", (p) => ({
+        ...p,
+        excludedProgramIds: [...new Set([...p.excludedProgramIds, ...programIds])],
+      }));
     },
     [updateDraftSlice],
   );
@@ -111,8 +170,11 @@ export function useCheckoutPromotion(): UseCheckoutPromotionResult {
   }, [updateDraftSlice]);
 
   return {
-    appliedPromotion,
+    selectedProgramIds,
+    excludedProgramIds,
     applyPromotion,
+    toggleExcludeProgram,
+    excludeAllApplied,
     pickPromoOption,
     searchVoucher,
     applyVoucher,

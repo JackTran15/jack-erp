@@ -708,6 +708,56 @@ describe('CheckoutInvoiceService (event-driven)', () => {
       expect(result.pointsEarned).toBe(95);
     });
 
+    /**
+     * QA #4. A walk-in invoice used to record `points_earned` anyway — 122 on
+     * the reported receipt — even though LoyaltyPointsPublisher refuses to emit
+     * without a customerId, so no card moved and no point_history row existed.
+     * The printed figure was pure fiction.
+     */
+    it('records no points for a walk-in invoice with no customer', async () => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({
+          customerId: undefined,
+          subtotal: 1_220_000,
+          amountDue: 1_220_000,
+          pointsRedeemed: 0,
+          pointsDiscountAmount: 0,
+        }),
+      );
+      itemRepo.find.mockResolvedValue([
+        invoiceItemStub({ quantity: 1, unitPrice: 1_220_000, lineTotal: 1_220_000 }),
+      ]);
+
+      const result = await service.checkout(
+        'inv-1',
+        { payments: [{ paymentMethod: 'cash' as any, amount: 1_220_000 }] },
+        actor,
+      );
+
+      // floor(1,220,000 / 10,000) = 122 — the exact figure QA saw printed.
+      expect(result.pointsEarned).toBe(0);
+      expect(result.pointsBalanceAfter).toBeNull();
+    });
+
+    it('still earns nothing when a customer buys an invoice discounted to zero — for the formula, not the guard', async () => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({
+          subtotal: 5_000,
+          amountDue: 0,
+          pointsRedeemed: 0,
+          pointsDiscountAmount: 0,
+          discountAmount: 5_000,
+        }),
+      );
+      itemRepo.find.mockResolvedValue([
+        invoiceItemStub({ quantity: 1, unitPrice: 5_000, lineTotal: 5_000 }),
+      ]);
+
+      const result = await service.checkout('inv-1', { payments: [] }, actor);
+
+      expect(result.pointsEarned).toBe(0);
+    });
+
     it('publishes the award event with base = amountDue (950k), not subtotal (1tr)', async () => {
       setupBigInvoice();
 

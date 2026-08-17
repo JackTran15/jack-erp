@@ -13,6 +13,10 @@ import {
   lineTotal,
   resolvePaymentMethodLabel,
 } from "./checkoutUtils";
+import {
+  groupPromotionsForPrint,
+  type PromotionAmount,
+} from "./printing/promotionPrintBuckets";
 
 /** Receipt number generator: YYMMDD + 4 random digits — e.g. "2605050007". */
 function generateInvoiceNumber(d: Date): string {
@@ -102,6 +106,13 @@ interface BuildCheckoutInvoicePayloadInput {
   isReturnExchange?: boolean;
   /** Thông tin cửa hàng (chi nhánh đang chọn); rỗng → fallback STORE_INFO. */
   store?: InvoiceStoreInfo;
+  /**
+   * CTKM đã áp tại thời điểm in — `promotionPreview.data.appliedPrograms` của
+   * tab đang checkout (T-08-03). Gom bằng `groupPromotionsForPrint` thành
+   * "KM theo mặt hàng"/"KM theo hoá đơn", tách biệt hoàn toàn khỏi giảm giá
+   * tay của thu ngân (A-17) — không cộng vào `itemDiscountTotal` cũ.
+   */
+  promotionEngineDiscounts?: PromotionAmount[];
 }
 
 /** Trim + rỗng → undefined, cho các field info ẩn được trên bản in. */
@@ -139,6 +150,7 @@ export function buildCheckoutInvoicePayload({
   printDuplicate,
   isReturnExchange,
   store,
+  promotionEngineDiscounts,
 }: BuildCheckoutInvoicePayloadInput): InvoicePayload | null {
   if (!printInvoice || cart.length === 0) return null;
 
@@ -160,10 +172,11 @@ export function buildCheckoutInvoicePayload({
     (sum, l) => sum + l.unitPrice * l.qty,
     0,
   );
-  const itemDiscountTotal = purchaseOnly.reduce(
+  const manualDiscountTotal = purchaseOnly.reduce(
     (sum, l) => sum + lineDiscountAmount(l),
     0,
   );
+  const engineBuckets = groupPromotionsForPrint(promotionEngineDiscounts ?? []);
   // Khối "Tiền hàng trả lại / KM / Giá trị trả lại" — độ lớn dương.
   const returnGross = returnOnly.reduce(
     (sum, l) => sum + l.unitPrice * Math.abs(l.qty),
@@ -224,7 +237,9 @@ export function buildCheckoutInvoicePayload({
     totals: {
       totalQty,
       subtotal: grossSubtotal,
-      itemDiscountTotal: itemDiscountTotal > 0 ? itemDiscountTotal : undefined,
+      manualDiscountTotal: manualDiscountTotal > 0 ? manualDiscountTotal : undefined,
+      itemDiscountTotal: engineBuckets.itemDiscountTotal,
+      invoiceDiscountTotal: engineBuckets.invoiceDiscountTotal,
       grandTotal,
       depositAmount: deposit > 0 ? deposit : undefined,
       paid,

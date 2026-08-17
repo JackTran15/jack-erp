@@ -7,7 +7,6 @@ import {
   InvoiceEntity,
   InvoicePaymentMethod,
   InvoiceType,
-  RefundMethod,
 } from '../../../pos/entities/invoice.entity';
 import { InvoiceItemEntity, ItemDirection } from '../../../pos/entities/invoice-item.entity';
 import { InvoicePaymentEntity } from '../../../pos/entities/invoice-payment.entity';
@@ -40,20 +39,26 @@ const dateOnly = (iso?: string): string | undefined =>
  * a heterogeneous summary object rather than a columnar `ReportRow[]`.
  *
  * Money model (mirrors "Tổng hợp bán hàng theo ngày" for revenue):
- * - Revenue (Thu) = invoice payments by method + voucher (invoice_promotions) + points
- *   (pointsDiscountAmount), each signed by invoice type, PLUS non-invoice cash inflow
- *   posted as "Phiếu thu" (cash_receipts) — debt collected in cash/transfer (Thu nợ,
+ * - Revenue (Thu) = invoice payments by method + voucher (invoice_promotions),
+ *   each signed by invoice type, PLUS non-invoice cash inflow posted as "Phiếu thu"
+ *   (cash_receipts) — debt collected in cash/transfer (Thu nợ,
  *   `purpose = DEBT_COLLECTION`) and any other misc receipt (Thu khác), excluding
  *   `POS_SALE`-purpose receipts to avoid double-counting a cash sale already counted
  *   via invoice_payments. Returns collect no payment, so their invoice_payments
- *   contribution is naturally empty. Cash refunds are captured on the invoice header
- *   (refundMethod + refundedAmount), never as an invoice_payments row and not reliably
- *   as a cash-payment voucher either — so a CASH-method refund's refundedAmount is
- *   netted directly out of revenue.cash, mirroring daily-sales-summary.report.ts's
- *   cashRefund/refundInputs handling. Debt collected in cash also feeds `debt.debtCollected`
- *   separately — same event, two lenses (cash inflow vs. debt reduction), not a double count.
+ *   contribution is naturally empty. Debt collected in cash also feeds
+ *   `debt.debtCollected` separately — same event, two lenses (cash inflow vs. debt
+ *   reduction), not a double count.
  * - Expense (Chi) = posted cash-payment vouchers in the window, split into cash /
- *   bank-transfer by the payment-account method of the source fund account.
+ *   bank-transfer by the payment-account method of the source fund account. This
+ *   is where a CASH refund lands: refund-cash.consumer issues a POSTED phiếu chi
+ *   for it, so the expense side owns refunds outright and revenue must not net
+ *   them out again (it used to, and charged every refund twice).
+ * - `revenue.points` and `revenue.promotion` are reported but excluded from
+ *   `revenue.total` / `netCashFlow`: both are discounts already deducted from
+ *   `amountDue`, so neither moves money into a fund.
+ *
+ * The resulting `netCashFlow` reconciles with Sổ quỹ tiền mặt (CashLedgerService),
+ * which signs `cash_movements` directly and is the reference this must match.
  */
 @QueryHandler(GetPosDailySummaryQuery)
 export class GetPosDailySummaryHandler
@@ -123,6 +128,13 @@ export class GetPosDailySummaryHandler
 
     const signByInvoice = new Map<string, number>();
     let points = 0;
+    // Promotion money actually given away. `invoices.discount_amount` is the
+    // one column that carries it on the v2 checkout path — the engine's
+    // per-programme rows go to `invoice_checkout_promotions`, and the voucher is
+    // folded straight into this header field by resolve-funds. Nothing in this
+    // report read it before, which is why a day with 719,000đ of promotions
+    // reported zero.
+    let promotion = 0;
     const other = {
       totalInvoices: invoices.length,
       saleInvoices: 0,
@@ -136,6 +148,7 @@ export class GetPosDailySummaryHandler
       const sign = invoiceTypeSign(inv.type);
       signByInvoice.set(inv.id, sign);
       points += sign * Number(inv.pointsDiscountAmount ?? 0);
+      promotion += sign * Number(inv.discountAmount ?? 0);
       if (inv.type === InvoiceType.SALE) other.saleInvoices += 1;
       else if (inv.type === InvoiceType.RETURN) other.returnInvoices += 1;
       else if (inv.type === InvoiceType.EXCHANGE) other.exchangeInvoices += 1;
@@ -159,7 +172,7 @@ export class GetPosDailySummaryHandler
     );
 
     // ── Revenue: payments by method (signed) ────────────────────────────────────
-    const revenue = { cash: 0, card: 0, bankTransfer: 0, voucher: 0, points, total: 0 };
+    const revenue = { cash: 0, card: 0, bankTransfer: 0, voucher: 0, points, promotion, total: 0 };
     if (invoiceIds.length) {
       const paymentRows = await this.payments.find({
         where: { invoiceId: In(invoiceIds) },
@@ -186,14 +199,20 @@ export class GetPosDailySummaryHandler
         }
       }
     }
-    // Cash refunds live on the invoice header (never an invoice_payments row, and
-    // not reliably a cash-payment voucher either) — net them out directly, unsigned
-    // (the refunded amount is already an outflow regardless of the invoice's sign).
-    for (const inv of invoices) {
-      if (inv.refundMethod === RefundMethod.CASH) {
-        revenue.cash -= Number(inv.refundedAmount ?? 0);
-      }
-    }
+    // A cash refund is NOT netted out of revenue here, deliberately.
+    //
+    // This used to subtract `invoice.refundedAmount` from `revenue.cash` on the
+    // belief that a refund "never reaches a cash-payment voucher". That belief
+    // was wrong: refund-cash.consumer records a `cash_movements` WITHDRAWAL and
+    // also issues a POSTED phiếu chi, which the Expense query below counts (it
+    // has no purpose filter). Subtracting here as well charged every refund
+    // twice — the day QA tested reported −943,000 against a real fund movement
+    // of +2,527,000.
+    //
+    // The expense side is the correct owner: its total matches Sổ quỹ tiền mặt
+    // exactly. A pure RETURN also creates no invoice_payments row at all (only
+    // an EXCHANGE with netAmount > 0 does), so nothing here double-counts the
+    // inflow either.
     // Cash inflow that isn't an invoice payment — debt collected in cash/transfer
     // (Thu nợ) and other misc receipts (Thu khác) — posted via the accounting
     // module's "Phiếu thu" (cash_receipts), never through invoice_payments.
@@ -222,8 +241,14 @@ export class GetPosDailySummaryHandler
     revenue.bankTransfer = round2(revenue.bankTransfer);
     revenue.voucher = round2(revenue.voucher);
     revenue.points = round2(revenue.points);
+    revenue.promotion = round2(revenue.promotion);
+    // `points` and `promotion` are reported but deliberately excluded: both are
+    // discounts already deducted from `amountDue`, so no money reaches a fund.
+    // Including `points` made netCashFlow overstate the day by exactly the
+    // value of the points customers spent. Kept as display fields so the tab
+    // can still show them (see the contract in shared-interfaces).
     revenue.total = round2(
-      revenue.cash + revenue.card + revenue.bankTransfer + revenue.voucher + revenue.points,
+      revenue.cash + revenue.card + revenue.bankTransfer + revenue.voucher,
     );
 
     // ── Goods sold / returned (line direction split, un-netted) ────────────────

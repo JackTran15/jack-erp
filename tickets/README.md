@@ -1696,15 +1696,15 @@ flowchart LR
 
 Ba màn Tiền gửi bỏ ràng buộc "phải chọn một quỹ", mặc định xem toàn bộ quỹ của chi nhánh; thêm sub-nav chuyển nhanh giữa 3 màn; rút nhóm sidebar TIỀN GỬI còn 3 mục vận hành.
 
-| Ticket | Mô tả |
-| ------ | ----- |
-| [TKT-DEP-01](./tickets/TKT-DEP-01-deposit-ledger-branch-scope.md) | `GET /deposit-ledger` bỏ bắt buộc `depositAccountId`; số dư luỹ kế gộp chi nhánh, tách 2 chân chuyển quỹ nội bộ (ticket BE duy nhất) |
-| [TKT-DEP-02](./tickets/TKT-DEP-02-openapi-snapshot.md) | OpenAPI regen + snapshot |
-| [TKT-DEP-03](./tickets/TKT-DEP-03-fe-deposit-tabbar.md) | FE `DepositTabBar` — tái dùng `PageTabBar` + prop `tabs` của `DocumentListShell` |
-| [TKT-DEP-04](./tickets/TKT-DEP-04-fe-receipts-recon-all-accounts.md) | FE Thu-chi & Đối chiếu bỏ gate chọn quỹ, thêm `Tất cả`, thêm cột Số tài khoản (BE đã sẵn sàng) |
-| [TKT-DEP-05](./tickets/TKT-DEP-05-fe-ledger-all-accounts.md) | FE Sổ chi tiết chế độ Tất cả |
-| [TKT-DEP-06](./tickets/TKT-DEP-06-navconfig-regroup.md) | navConfig: TIỀN GỬI còn 3 mục, 6 mục kia chuyển nhóm (giữ route) |
-| [TKT-DEP-07](./tickets/TKT-DEP-07-e2e-test-plan.md) | E2E + checklist QA thủ công |
+| Ticket                                                               | Mô tả                                                                                                                                |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| [TKT-DEP-01](./tickets/TKT-DEP-01-deposit-ledger-branch-scope.md)    | `GET /deposit-ledger` bỏ bắt buộc `depositAccountId`; số dư luỹ kế gộp chi nhánh, tách 2 chân chuyển quỹ nội bộ (ticket BE duy nhất) |
+| [TKT-DEP-02](./tickets/TKT-DEP-02-openapi-snapshot.md)               | OpenAPI regen + snapshot                                                                                                             |
+| [TKT-DEP-03](./tickets/TKT-DEP-03-fe-deposit-tabbar.md)              | FE `DepositTabBar` — tái dùng `PageTabBar` + prop `tabs` của `DocumentListShell`                                                     |
+| [TKT-DEP-04](./tickets/TKT-DEP-04-fe-receipts-recon-all-accounts.md) | FE Thu-chi & Đối chiếu bỏ gate chọn quỹ, thêm `Tất cả`, thêm cột Số tài khoản (BE đã sẵn sàng)                                       |
+| [TKT-DEP-05](./tickets/TKT-DEP-05-fe-ledger-all-accounts.md)         | FE Sổ chi tiết chế độ Tất cả                                                                                                         |
+| [TKT-DEP-06](./tickets/TKT-DEP-06-navconfig-regroup.md)              | navConfig: TIỀN GỬI còn 3 mục, 6 mục kia chuyển nhóm (giữ route)                                                                     |
+| [TKT-DEP-07](./tickets/TKT-DEP-07-e2e-test-plan.md)                  | E2E + checklist QA thủ công                                                                                                          |
 
 ```mermaid
 flowchart LR
@@ -1721,13 +1721,13 @@ flowchart LR
 
 "Thêm mới Phiếu chi" tiền gửi hợp nhất 3 luồng đã tồn tại rời rạc (chuyển quỹ, chuyển liên chi nhánh, trả nợ NCC) vào một dropdown "Mục đích chi"/"Hình thức chi" 2 cấp, khớp UI MISA. Không entity/migration/endpoint mới — thuần orchestration FE lên 3 saga BE đã có sẵn và đã verify chạy đúng.
 
-| Ticket | Mô tả |
-| ------ | ----- |
-| [TKT-CHI-01](./tickets/TKT-CHI-01-purpose-constants.md) | Constants Mục đích chi/Hình thức chi (tiền gửi) — thêm mới, không đụng constants của Phiếu chi tiền mặt |
+| Ticket                                                   | Mô tả                                                                                                             |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| [TKT-CHI-01](./tickets/TKT-CHI-01-purpose-constants.md)  | Constants Mục đích chi/Hình thức chi (tiền gửi) — thêm mới, không đụng constants của Phiếu chi tiền mặt           |
 | [TKT-CHI-02](./tickets/TKT-CHI-02-dialog-restructure.md) | DepositPaymentVoucherDialog — UI 2 cấp + nhúng trực tiếp field chuyển quỹ/chuyển liên chi nhánh (ticket lớn nhất) |
-| [TKT-CHI-03](./tickets/TKT-CHI-03-page-wiring.md) | TreasuryDepositReceiptsPage — điều hướng 2 kind kết quả lưu mới tới đúng mutation (bắt buộc đi cùng CHI-02) |
-| [TKT-CHI-04](./tickets/TKT-CHI-04-debt-mode-polish.md) | Trả nợ — polish nhãn "Nhà cung cấp" + khoá Nhân viên chi khớp ảnh MISA |
-| [TKT-CHI-05](./tickets/TKT-CHI-05-manual-test-plan.md) | Checklist QA thủ công 13 bước trên erp_dev thật |
+| [TKT-CHI-03](./tickets/TKT-CHI-03-page-wiring.md)        | TreasuryDepositReceiptsPage — điều hướng 2 kind kết quả lưu mới tới đúng mutation (bắt buộc đi cùng CHI-02)       |
+| [TKT-CHI-04](./tickets/TKT-CHI-04-debt-mode-polish.md)   | Trả nợ — polish nhãn "Nhà cung cấp" + khoá Nhân viên chi khớp ảnh MISA                                            |
+| [TKT-CHI-05](./tickets/TKT-CHI-05-manual-test-plan.md)   | Checklist QA thủ công 13 bước trên erp_dev thật                                                                   |
 
 ```mermaid
 flowchart LR
@@ -1742,13 +1742,13 @@ flowchart LR
 
 Checkbox "Tự động sinh phiếu thu tiền ngay sau khi chi" (chiều DEPOSIT_TO_CASH) trở thành tuỳ chọn thật thay vì luôn-tick-disabled — bỏ tick chỉ rút quỹ tiền gửi, tiền treo ở TK 113, không tự sinh phiếu thu tiền mặt (đúng cách MISA làm, không cần màn xác nhận riêng). Áp dụng đồng bộ ở cả 2 điểm vào FE cùng gọi `/fund-swaps`.
 
-| Ticket | Mô tả |
-| ------ | ----- |
-| [TKT-FSW-01](./tickets/TKT-FSW-01-service-dto.md) | `CreateFundSwapDto` + `FundSwapsService` — `autoCreateReceipt` optional, validate CASH_TO_DEPOSIT không áp dụng |
-| [TKT-FSW-02](./tickets/TKT-FSW-02-openapi-fe-type.md) | OpenAPI regen + `CreateFundSwapBody` FE |
-| [TKT-FSW-03](./tickets/TKT-FSW-03-payment-dialog-checkbox.md) | `DepositPaymentVoucherDialog` — checkbox thật (sub-mode Chuyển tiền gửi thành tiền mặt) |
-| [TKT-FSW-04](./tickets/TKT-FSW-04-fund-swap-dialog-checkbox.md) | `FundSwapDialog` độc lập — thêm checkbox mới (trước đây không có) |
-| [TKT-FSW-05](./tickets/TKT-FSW-05-test-plan.md) | Checklist QA thủ công 10 bước + validate lỗi qua curl |
+| Ticket                                                          | Mô tả                                                                                                           |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| [TKT-FSW-01](./tickets/TKT-FSW-01-service-dto.md)               | `CreateFundSwapDto` + `FundSwapsService` — `autoCreateReceipt` optional, validate CASH_TO_DEPOSIT không áp dụng |
+| [TKT-FSW-02](./tickets/TKT-FSW-02-openapi-fe-type.md)           | OpenAPI regen + `CreateFundSwapBody` FE                                                                         |
+| [TKT-FSW-03](./tickets/TKT-FSW-03-payment-dialog-checkbox.md)   | `DepositPaymentVoucherDialog` — checkbox thật (sub-mode Chuyển tiền gửi thành tiền mặt)                         |
+| [TKT-FSW-04](./tickets/TKT-FSW-04-fund-swap-dialog-checkbox.md) | `FundSwapDialog` độc lập — thêm checkbox mới (trước đây không có)                                               |
+| [TKT-FSW-05](./tickets/TKT-FSW-05-test-plan.md)                 | Checklist QA thủ công 10 bước + validate lỗi qua curl                                                           |
 
 ```mermaid
 flowchart LR
@@ -1763,12 +1763,12 @@ flowchart LR
 
 Nút "Đối chiếu" ở `/treasury/deposit-reconciliation` luôn xám khi filter "Số tài khoản" = Tất cả (`disabled … || !accountId`), và tooltip giải thích cũng không hiện được. Bỏ ràng buộc: `POST /deposit-recon/reconcile` nhận `groups[]` (một group = một tài khoản, có tổng sao kê + ghi chú riêng) và tạo N lô trong **một** transaction; dialog nhập tổng sao kê riêng cho từng tài khoản. Không entity/migration mới.
 
-| Ticket | Mô tả |
-| ------ | ----- |
+| Ticket                                                             | Mô tả                                                                                      |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
 | [TKT-MRC-01](./tickets/TKT-MRC-01-reconcile-dto-service-groups.md) | `ReconcileDto.groups[]` + `reconcileGroup()` lặp trong 1 transaction, chặn group chồng lấn |
-| [TKT-MRC-02](./tickets/TKT-MRC-02-openapi-fe-types.md) | OpenAPI regen + `ReconcileBody`/`ReconcileResponse` FE |
-| [TKT-MRC-03](./tickets/TKT-MRC-03-fe-page-dialog-multi-account.md) | Bỏ `!accountId`, chọn dòng bằng `Map<id,row>`, dialog một khối/tài khoản |
-| [TKT-MRC-04](./tickets/TKT-MRC-04-tests-e2e.md) | Unit (2 lô, rollback, group chồng lấn) + E2E UAT-09 shape mới |
+| [TKT-MRC-02](./tickets/TKT-MRC-02-openapi-fe-types.md)             | OpenAPI regen + `ReconcileBody`/`ReconcileResponse` FE                                     |
+| [TKT-MRC-03](./tickets/TKT-MRC-03-fe-page-dialog-multi-account.md) | Bỏ `!accountId`, chọn dòng bằng `Map<id,row>`, dialog một khối/tài khoản                   |
+| [TKT-MRC-04](./tickets/TKT-MRC-04-tests-e2e.md)                    | Unit (2 lô, rollback, group chồng lấn) + E2E UAT-09 shape mới                              |
 
 ```mermaid
 flowchart LR
@@ -1784,13 +1784,13 @@ flowchart LR
 
 `/treasury/cash/receipts-expenses` đang gọi 2 API (`/cash-receipts` + `/cash-payments`, mỗi cái `pageSize=100`) rồi gộp/lọc/phân trang/cộng tổng trong trình duyệt — nên bộ lọc cột và ô "Tổng tiền" chỉ thấy 100+100 dòng đầu; `/treasury/cash/ledger` thì không lọc được cột nào vì `description`/`counterparty` resolve bằng Map JS sau truy vấn trang. Đưa cả hai về đúng mô hình deposit (commit `b4bf7907`): mỗi màn **một** endpoint CQRS, lọc + sắp xếp + phân trang + tổng tiền chạy ở DB. Cột ngày đổi sang `created_at` (lọc **và** `ORDER BY created_at DESC`); `documentKind` 3 giá trị (thêm `GOODS_RECEIPT_PAYMENT`). Không migration, không permission key mới.
 
-| Ticket | Mô tả |
-| ------ | ----- |
+| Ticket                                                        | Mô tả                                                                                                                 |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | [TKT-CVS-01](./tickets/TKT-CVS-01-cash-voucher-search-api.md) | `POST /v2/cash-vouchers/search` — CQRS + UNION ALL CTE trên `cash_receipts` ∪ `cash_payments`, `totalAmount` toàn tập |
-| [TKT-CVS-02](./tickets/TKT-CVS-02-cash-ledger-search-api.md) | Refactor `CashLedgerService` (LATERAL joins thay `loadVouchers`) + `POST /v2/cash-ledger/search`; v1 thành adapter |
-| [TKT-CVS-03](./tickets/TKT-CVS-03-openapi-snapshot.md) | OpenAPI regen + commit snapshot |
-| [TKT-CVS-04](./tickets/TKT-CVS-04-fe-receipts-expenses.md) | FE màn Thu, chi tiền mặt → search server-side; xóa `use-merged-receipt-payments` |
-| [TKT-CVS-05](./tickets/TKT-CVS-05-fe-cash-ledger.md) | FE sổ quỹ tiền mặt → bật bộ lọc theo cột |
+| [TKT-CVS-02](./tickets/TKT-CVS-02-cash-ledger-search-api.md)  | Refactor `CashLedgerService` (LATERAL joins thay `loadVouchers`) + `POST /v2/cash-ledger/search`; v1 thành adapter    |
+| [TKT-CVS-03](./tickets/TKT-CVS-03-openapi-snapshot.md)        | OpenAPI regen + commit snapshot                                                                                       |
+| [TKT-CVS-04](./tickets/TKT-CVS-04-fe-receipts-expenses.md)    | FE màn Thu, chi tiền mặt → search server-side; xóa `use-merged-receipt-payments`                                      |
+| [TKT-CVS-05](./tickets/TKT-CVS-05-fe-cash-ledger.md)          | FE sổ quỹ tiền mặt → bật bộ lọc theo cột                                                                              |
 
 ```mermaid
 flowchart LR
@@ -1806,16 +1806,16 @@ flowchart LR
 
 Màn Thu, chi tiền mặt chỉ tạo được phiếu chi "Chi khác" / "Trả nợ"; hai mục đích "Chuyển tiền mặt thành tiền gửi" và "Chuyển tiền đến cửa hàng khác" đã khai báo sẵn trong `PaymentOtherSubOption` nhưng bị lọc ẩn khỏi dropdown kèm comment "follow-up work". Mục đích 1 chủ yếu là việc FE (`FundSwapsService` chiều `CASH_TO_DEPOSIT` đã có sẵn); mục đích 2 cần backend mới — bảng `cash_transfer` + `CashTransferService` 2 bước `DANG_CHUYEN` → `HOAN_TAT`/`DA_HUY`, chân đích là **phiếu thu tiền mặt hoặc phiếu thu tiền gửi** tuỳ "Hình thức nhận", cả 2 chân bắc cầu qua COA 113. Chiều `CASH_TO_DEPOSIT` cũng được mở khoá bỏ tick "Tự động sinh phiếu thu" cho đối xứng với EPIC-19072026.
 
-| Ticket | Mô tả |
-| ------ | ----- |
-| [TKT-CTF-01](./tickets/TKT-CTF-01-schema-enums.md) | 2 migration viết tay (ALTER TYPE ADD VALUE tách riêng / CREATE TABLE `cash_transfer`) + entity |
-| [TKT-CTF-02](./tickets/TKT-CTF-02-cash-transfer-service.md) | `CashTransferService` create/confirm/cancel/list + DTOs; `CashPaymentsService.reverse` nhận `manager` |
-| [TKT-CTF-03](./tickets/TKT-CTF-03-controller-permissions.md) | `CashTransferController` 5 route + 4 permission key + wiring `DepositVouchersModule` |
+| Ticket                                                                | Mô tả                                                                                                      |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| [TKT-CTF-01](./tickets/TKT-CTF-01-schema-enums.md)                    | 2 migration viết tay (ALTER TYPE ADD VALUE tách riêng / CREATE TABLE `cash_transfer`) + entity             |
+| [TKT-CTF-02](./tickets/TKT-CTF-02-cash-transfer-service.md)           | `CashTransferService` create/confirm/cancel/list + DTOs; `CashPaymentsService.reverse` nhận `manager`      |
+| [TKT-CTF-03](./tickets/TKT-CTF-03-controller-permissions.md)          | `CashTransferController` 5 route + 4 permission key + wiring `DepositVouchersModule`                       |
 | [TKT-CTF-04](./tickets/TKT-CTF-04-fund-swap-optional-receipt-cash.md) | `FundSwapsService` cho bỏ tick sinh phiếu thu ở chiều `CASH_TO_DEPOSIT` (thay ràng buộc cũ của TKT-FSW-01) |
-| [TKT-CTF-05](./tickets/TKT-CTF-05-openapi-fe-types-hooks.md) | OpenAPI regen + commit snapshot; `use-cash-transfers.ts` + mirror enum FE |
-| [TKT-CTF-06](./tickets/TKT-CTF-06-payment-dialog-submodes.md) | `PaymentVoucherDialog` bật 2 sub-mode + union `CashPaymentSaveResult` |
-| [TKT-CTF-07](./tickets/TKT-CTF-07-cash-transfer-page.md) | Trang `/treasury/cash-transfers` (xác nhận / huỷ) + route + nav |
-| [TKT-CTF-08](./tickets/TKT-CTF-08-tests.md) | Unit + e2e 2 chân + checklist QA thủ công 9 bước |
+| [TKT-CTF-05](./tickets/TKT-CTF-05-openapi-fe-types-hooks.md)          | OpenAPI regen + commit snapshot; `use-cash-transfers.ts` + mirror enum FE                                  |
+| [TKT-CTF-06](./tickets/TKT-CTF-06-payment-dialog-submodes.md)         | `PaymentVoucherDialog` bật 2 sub-mode + union `CashPaymentSaveResult`                                      |
+| [TKT-CTF-07](./tickets/TKT-CTF-07-cash-transfer-page.md)              | Trang `/treasury/cash-transfers` (xác nhận / huỷ) + route + nav                                            |
+| [TKT-CTF-08](./tickets/TKT-CTF-08-tests.md)                           | Unit + e2e 2 chân + checklist QA thủ công 9 bước                                                           |
 
 ```mermaid
 flowchart LR
@@ -1834,18 +1834,18 @@ flowchart LR
 - [EPIC-27072026 Báo cáo theo ngày (POS Daily Report)](./epics/EPIC-27072026-pos-daily-report.md)
 - Dựng trang **"Báo cáo theo ngày"** trong **pos-web** (menu `bao-cao-theo-ngay` đã có, chưa có route/page) — báo cáo cuối ngày kiểu KiotViet/MISA, 2 tab: **Tổng hợp** (Thu/Chi/Công nợ, Hàng bán/trả, KHÁC, BÀN GIAO TIỀN) + **Doanh thu theo mặt hàng** (tái dùng report `revenue-by-item`, thêm cột Đơn giá). BE thêm **endpoint mới** `POST /reports/pos/daily-summary` (module con CQRS, gộp Thu incl. Điểm/Chi từ `cash_payments`/Công nợ/Hàng/KHÁC, tính trong JS, tái dùng `report-query.util` + logic `daily-sales-summary`) — **không entity/migration mới**. Filter Thu ngân/NVBH áp cả 2 tab (kể cả Chi/Công nợ, thêm ở PDR-10); custom range from–to qua modal "Chọn thời gian". BÀN GIAO TIỀN + kiểm đếm = FE-only (nhập tay + in), tự động điền "Tiền bàn giao" để Chênh lệch về 0. In client-side (A80), **Xuất server-side `.xlsx`** (`exceljs`, đổi từ client-side `.xls` ở PDR-10 để khớp chính xác file mẫu). TAB 2 In/Xuất tạm hoãn.
 
-| Ticket | Mô tả |
-| ------ | ----- |
-| [TKT-PDR-01](./tickets/TKT-PDR-01-shared-interfaces-daily-summary.md) | shared-interfaces: type `PosDailySummaryResult` (+ sub-shapes) additive |
-| [TKT-PDR-02](./tickets/TKT-PDR-02-revenue-by-item-unit-price.md) | BE: cột `unitPrice` (Đơn giá) cho `revenue-by-item` (weighted avg, totals null) + specs |
-| [TKT-PDR-03](./tickets/TKT-PDR-03-daily-summary-endpoint.md) | BE: `POST /reports/pos/daily-summary` (module + DTO + CQRS query/handler; Thu/Chi/Công nợ/Hàng/KHÁC) |
-| [TKT-PDR-04](./tickets/TKT-PDR-04-openapi-regen.md) | BE: `openapi:generate` + commit snapshot + `schema.ts` |
-| [TKT-PDR-05](./tickets/TKT-PDR-05-fe-data-layer-shell-tab2.md) | FE: data layer + page shell + route `/daily-report` + menu + TAB 2 table (cột Đơn giá, phân trang, dòng tổng) |
-| [TKT-PDR-06](./tickets/TKT-PDR-06-fe-toolbar-filters-custom-range.md) | FE: toolbar + filter Thu ngân/NVBH (cả 2 tab) + wire preset "Khác" + modal "Chọn thời gian" from–to |
-| [TKT-PDR-07](./tickets/TKT-PDR-07-fe-summary-panels-handover.md) | FE: TAB 1 panels (Thu/Chi/Công nợ/Hàng/KHÁC) + BÀN GIAO TIỀN (FE-only) + modal "Chi tiết kiểm đếm" |
-| [TKT-PDR-08](./tickets/TKT-PDR-08-fe-print-export.md) | FE: In + Xuất client-side tài liệu "BÁO CÁO TỔNG HỢP" (chỉ tab Tổng hợp) — phần Xuất bị thay thế bởi PDR-10 |
-| [TKT-PDR-09](./tickets/TKT-PDR-09-tests-e2e-dod.md) | Tests (unit + e2e) + verify FE trên app thật + no-regress + DoD |
-| [TKT-PDR-10](./tickets/TKT-PDR-10-export-be-rewrite-hardening.md) | Xuất → BE-generated `.xlsx` (`exceljs`) + hardening (tên nhân viên, branch scope, cash-refund netting, Chi/Công nợ filter theo staff) |
+| Ticket                                                                | Mô tả                                                                                                                                 |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| [TKT-PDR-01](./tickets/TKT-PDR-01-shared-interfaces-daily-summary.md) | shared-interfaces: type `PosDailySummaryResult` (+ sub-shapes) additive                                                               |
+| [TKT-PDR-02](./tickets/TKT-PDR-02-revenue-by-item-unit-price.md)      | BE: cột `unitPrice` (Đơn giá) cho `revenue-by-item` (weighted avg, totals null) + specs                                               |
+| [TKT-PDR-03](./tickets/TKT-PDR-03-daily-summary-endpoint.md)          | BE: `POST /reports/pos/daily-summary` (module + DTO + CQRS query/handler; Thu/Chi/Công nợ/Hàng/KHÁC)                                  |
+| [TKT-PDR-04](./tickets/TKT-PDR-04-openapi-regen.md)                   | BE: `openapi:generate` + commit snapshot + `schema.ts`                                                                                |
+| [TKT-PDR-05](./tickets/TKT-PDR-05-fe-data-layer-shell-tab2.md)        | FE: data layer + page shell + route `/daily-report` + menu + TAB 2 table (cột Đơn giá, phân trang, dòng tổng)                         |
+| [TKT-PDR-06](./tickets/TKT-PDR-06-fe-toolbar-filters-custom-range.md) | FE: toolbar + filter Thu ngân/NVBH (cả 2 tab) + wire preset "Khác" + modal "Chọn thời gian" from–to                                   |
+| [TKT-PDR-07](./tickets/TKT-PDR-07-fe-summary-panels-handover.md)      | FE: TAB 1 panels (Thu/Chi/Công nợ/Hàng/KHÁC) + BÀN GIAO TIỀN (FE-only) + modal "Chi tiết kiểm đếm"                                    |
+| [TKT-PDR-08](./tickets/TKT-PDR-08-fe-print-export.md)                 | FE: In + Xuất client-side tài liệu "BÁO CÁO TỔNG HỢP" (chỉ tab Tổng hợp) — phần Xuất bị thay thế bởi PDR-10                           |
+| [TKT-PDR-09](./tickets/TKT-PDR-09-tests-e2e-dod.md)                   | Tests (unit + e2e) + verify FE trên app thật + no-regress + DoD                                                                       |
+| [TKT-PDR-10](./tickets/TKT-PDR-10-export-be-rewrite-hardening.md)     | Xuất → BE-generated `.xlsx` (`exceljs`) + hardening (tên nhân viên, branch scope, cash-refund netting, Chi/Công nợ filter theo staff) |
 
 ### Ticket dependency graph (EPIC-27072026 pos-daily-report)
 
@@ -1868,16 +1868,16 @@ flowchart LR
 
 Backoffice đang để nền trắng tinh (`--background: 0 0% 100%`) đi với chữ gần đen (~19:1) và chrome hardcode `bg-gray-900 + text-white` (~17:1), nhìn lâu mỏi mắt. Epic hạ tương phản về mức dễ chịu (body ~10–11:1, vẫn AAA) theo tông xám-lạnh dịu — nền `#f4f6f8`, card trắng, chữ slate `#2b3644`, chrome `#26303f` — và quan trọng hơn là **token hoá toàn bộ màu**: ~250 lượt class Tailwind thô ở 59 file cùng ~99 hex literal được đưa về biến CSS, tái dùng bộ `--sidebar-*` vốn đã khai báo sẵn nhưng chưa ai dùng, cộng nhóm token trạng thái mới `success/warning/info` + `-subtle`. Sau epic, đổi theme chỉ cần sửa khối `:root` trong `index.css`. Thuần FE, không đụng `packages/ui` nên pos-web giữ nguyên.
 
-| Ticket | Mô tả |
-| ------ | ----- |
-| [TKT-THM-01](./tickets/TKT-THM-01-token-layer.md) | Viết lại `:root` (surfaces/brand/status/chrome) + map token mới trong `tailwind.config.js` |
-| [TKT-THM-02](./tickets/TKT-THM-02-chrome-tokens.md) | `AppHeader`/`AppSidebar`/`MegaMenuPanel`/`BranchSelector`/`UserMenu` → `bg-sidebar`, `text-sidebar-foreground`, `bg-sidebar-active` |
+| Ticket                                                         | Mô tả                                                                                                                               |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| [TKT-THM-01](./tickets/TKT-THM-01-token-layer.md)              | Viết lại `:root` (surfaces/brand/status/chrome) + map token mới trong `tailwind.config.js`                                          |
+| [TKT-THM-02](./tickets/TKT-THM-02-chrome-tokens.md)            | `AppHeader`/`AppSidebar`/`MegaMenuPanel`/`BranchSelector`/`UserMenu` → `bg-sidebar`, `text-sidebar-foreground`, `bg-sidebar-active` |
 | [TKT-THM-03](./tickets/TKT-THM-03-surface-border-migration.md) | ~55 file: `bg-white`→`bg-card`, `bg-gray-50/100`→`bg-muted`, `border-gray-*`→`border-border`, `text-gray-*`→`text-muted-foreground` |
-| [TKT-THM-04](./tickets/TKT-THM-04-status-color-tokens.md) | Badge/chỉ số green·amber·blue·rose → `success`/`warning`/`info`/`destructive` (+ `-subtle`) |
-| [TKT-THM-05](./tickets/TKT-THM-05-hex-literal-cleanup.md) | Hex `#1e3a6e`/`#172e57`/`#2563eb`/`#667085` trong import-wizard → token; giữ hex trong SVG minh hoạ |
-| [TKT-THM-06](./tickets/TKT-THM-06-verify-theming-doc.md) | Build + grep gate + bảng tương phản + `apps/backoffice-web/THEMING.md` |
-| [TKT-THM-07](./tickets/TKT-THM-07-theme-switcher.md) | Màn `Cấu hình → Giao diện` + 3 khối `[data-theme]` (MISA / MISA tối / Cổ điển) + store `store/common/theme/` |
-| [TKT-THM-08](./tickets/TKT-THM-08-ui-package-tokens.md) | Tách `--primary-blue-foreground`; `packages/ui` (PageToolbar/LineItemGrid/DocumentFormDialog) dùng token |
+| [TKT-THM-04](./tickets/TKT-THM-04-status-color-tokens.md)      | Badge/chỉ số green·amber·blue·rose → `success`/`warning`/`info`/`destructive` (+ `-subtle`)                                         |
+| [TKT-THM-05](./tickets/TKT-THM-05-hex-literal-cleanup.md)      | Hex `#1e3a6e`/`#172e57`/`#2563eb`/`#667085` trong import-wizard → token; giữ hex trong SVG minh hoạ                                 |
+| [TKT-THM-06](./tickets/TKT-THM-06-verify-theming-doc.md)       | Build + grep gate + bảng tương phản + `apps/backoffice-web/THEMING.md`                                                              |
+| [TKT-THM-07](./tickets/TKT-THM-07-theme-switcher.md)           | Màn `Cấu hình → Giao diện` + 3 khối `[data-theme]` (MISA / MISA tối / Cổ điển) + store `store/common/theme/`                        |
+| [TKT-THM-08](./tickets/TKT-THM-08-ui-package-tokens.md)        | Tách `--primary-blue-foreground`; `packages/ui` (PageToolbar/LineItemGrid/DocumentFormDialog) dùng token                            |
 
 Đợt 2 (THM-08 → THM-07): bảng màu chốt ở đợt 1 chưa vừa ý khi dùng thật, nên thay vì đoán tiếp, biến bảng màu thành lựa chọn của người dùng. Ba theme `misa` (mặc định, bám bảng màu MISA eShop) / `dark` (bản tối cùng họ navy) / `classic`; mỗi theme là một khối `[data-theme="..."]` khai đủ token, đổi theme = đổi một attribute trên `<html>`. Thêm theme về sau = 1 khối CSS + 1 entry registry, không đụng component.
 
@@ -1892,4 +1892,57 @@ flowchart LR
   T5 --> T6
   T6 --> T8["THM-08 primary-blue-fg + packages/ui"]
   T8 --> T7["THM-07 Theme switcher + theme MISA"]
+### EPIC-22072026 Khuyến mại — schema chuẩn hóa, domain engine & evaluate API
+
+- [EPIC-22072026 Promotion programs & engine](./epics/EPIC-22072026-promotion-programs-engine.md)
+
+`docs/promotions/` (REQ-KM-001 + khảo sát MISA eShop) đặc tả 5 hình thức khuyến mại; repo lệch khỏi đặc tả theo hai hướng ngược nhau. FE backoffice **đã dựng xong khung** (`pages/promotions/` có đủ section cho cả 5 hình thức, route + nav đã có) nhưng chạy hoàn toàn trên mock — `ProgramFormPage.handleSave` chỉ `navigate()`. BE thì là **stub**: `promotions` lưu `conditions`/`benefits` dạng `jsonb` không kiểu, `PromotionApplyService.computePromotionAmount` chỉ hiểu giảm giá phẳng trên `subtotal` và **trả về 0 cho mọi promotion gift / buy-x-get-y**. Epic này đóng khoảng cách ở backend: 7 bảng chuẩn hóa, domain engine thuần TS tính đúng cả 5 hình thức, `POST /v2/promotions/evaluate`, và gỡ mock ở backoffice. Bảng `promotions` cũ không đụng tới. **Ngoài phạm vi:** tích hợp POS checkout và Excel import/export → epic sau.
+
+Hai sai lệch chủ ý so với convention repo, đã cân nhắc: (1) dùng `CommandBus` cho write dù skill `cqrs-search-endpoint` ghi "commands are not used in this repo" — một lần ghi CTKM đụng 7 bảng trong cùng transaction; (2) `modules/promotion/` là module đầu tiên phân lớp clean architecture (`domain/` thuần TS, `application/`, `infrastructure/`, `interface/`).
+
+Quyết định nghiệp vụ chốt: **BR-001** sắp theo `priority ASC, createdAt ASC`, first-match-wins theo từng tài nguyên bị tranh chấp (dòng hàng / slot hóa đơn / slot quà) — không cộng dồn.
+
+| Ticket                                                | Mô tả                                                                                           |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| [TKT-KM-01](./tickets/TKT-KM-01-design-doc.md)        | `docs/26-promotion-design.md` — use case, ERD, sequence, bảng truy vết FR/BR                    |
+| [TKT-KM-02](./tickets/TKT-KM-02-schema-migration.md)  | 3 migration viết tay (7 bảng + 15 enum), `DocumentType.PROMOTION` prefix `KM`, 3 permission key |
+| [TKT-KM-03](./tickets/TKT-KM-03-shared-interfaces.md) | `packages/shared-interfaces/src/promotion/` — enum + DTO type dùng chung                        |
+| [TKT-KM-04](./tickets/TKT-KM-04-domain-model.md)      | Domain model + ports; invariants BR-004; thuần TS, cấm import Nest/TypeORM                      |
+| [TKT-KM-05](./tickets/TKT-KM-05-domain-engine.md)     | 5 strategy + `PromotionResolver`; unit test phủ AC-01…AC-09                                     |
+| [TKT-KM-06](./tickets/TKT-KM-06-infrastructure.md)    | 7 TypeORM entity + repository adapter + catalog/customer reader + mapper                        |
+| [TKT-KM-07](./tickets/TKT-KM-07-commands.md)          | create / update / duplicate / change-status / delete + DTO phân nhánh theo `type`               |
+| [TKT-KM-08](./tickets/TKT-KM-08-queries-crud.md)      | `POST /v2/promotions/search` (FilterBuilder) + `GET /v2/promotions/:id`                         |
+| [TKT-KM-09](./tickets/TKT-KM-09-evaluate-api.md)      | `POST /v2/promotions/evaluate` — đọc thuần, kèm `skippedPrograms[]` giải thích CTKM thua        |
+| [TKT-KM-10](./tickets/TKT-KM-10-vouchers.md)          | Mở rộng `vouchers` (issuer/description/status, ngày nullable) + search v2 + CRUD                |
+| [TKT-KM-11](./tickets/TKT-KM-11-openapi.md)           | OpenAPI regen + commit snapshot                                                                 |
+| [TKT-KM-12](./tickets/TKT-KM-12-fe-data-layer.md)     | TanStack hooks + mapper `ProgramFormState` ↔ DTO (round-trip test 5 hình thức)                  |
+| [TKT-KM-13](./tickets/TKT-KM-13-fe-programs.md)       | `ProgramsPage` + `ProgramFormPage` bỏ mock; chip bộ lọc FR-004; giữ auto-apply FR-023           |
+| [TKT-KM-14](./tickets/TKT-KM-14-fe-vouchers.md)       | `VouchersPage` bỏ mock + dialog FR-051 + dòng tổng cộng                                         |
+| [TKT-KM-15](./tickets/TKT-KM-15-fe-item-picker.md)    | Nối 6 lưới vào `ProductSelectDialog` **có sẵn** (không dựng dialog mới) + chế độ chọn nhóm      |
+| [TKT-KM-16](./tickets/TKT-KM-16-e2e.md)               | E2E phủ AC-01…AC-11 + checklist QA thủ công                                                     |
+
+```mermaid
+flowchart LR
+  T1["KM-01 Design doc"] --> T2["KM-02 Schema"]
+  T2 --> T3["KM-03 shared-interfaces"]
+  T3 --> T4["KM-04 Domain model"]
+  T4 --> T5["KM-05 Domain engine"]
+  T2 --> T6["KM-06 Infrastructure"]
+  T4 --> T6
+  T6 --> T7["KM-07 Commands"]
+  T6 --> T8["KM-08 Queries CRUD"]
+  T5 --> T9["KM-09 Evaluate API"]
+  T6 --> T9
+  T2 --> T10["KM-10 Vouchers"]
+  T7 --> T11["KM-11 OpenAPI"]
+  T8 --> T11
+  T9 --> T11
+  T10 --> T11
+  T11 --> T12["KM-12 FE data layer"]
+  T12 --> T13["KM-13 FE programs"]
+  T12 --> T14["KM-14 FE vouchers"]
+  T12 --> T15["KM-15 FE item picker"]
+  T13 --> T16["KM-16 E2E"]
+  T14 --> T16
+  T15 --> T16
 ```

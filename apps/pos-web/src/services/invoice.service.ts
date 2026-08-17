@@ -3,6 +3,8 @@ import type {
   CancelInvoiceBody,
   CheckoutInvoiceBody,
   CheckoutReturnBody,
+  CheckoutV2Body,
+  CheckoutV2Response,
   CreateExchangeInvoiceBody,
   CreateInvoiceBody,
   CreateReturnInvoiceBody,
@@ -16,7 +18,10 @@ import type {
   UpdateInvoiceBody,
 } from "@erp/pos/dtos/invoice.dto";
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
-import type { EligibleReturnLine } from "@erp/pos/interfaces/return-goods.interface";
+import type {
+  EligibleReturnLine,
+  OutstandingDebtRow,
+} from "@erp/pos/interfaces/return-goods.interface";
 import type { Paginated } from "@erp/pos/interfaces/paginated.interface";
 import type { CustomerDebtRow } from "@erp/pos/interfaces/debt.interface";
 
@@ -74,11 +79,47 @@ export const invoiceService = {
     return http.get<Paginated<InvoiceRow>>(`/invoices${suffix}`);
   },
 
-  checkout: (id: string, body: CheckoutInvoiceBody): Promise<InvoiceRow> =>
-    http.post<InvoiceRow>(
-      `/invoices/${encodeURIComponent(id)}/checkout`,
-      body,
-    ),
+  /**
+   * `VITE_CHECKOUT_V2=true` → `POST /v2/pos/checkout` (saga mới, T-05-01..04);
+   * mặc định → `POST /invoices/:id/checkout` (luồng cũ). Chữ ký hàm không đổi
+   * nên `use-query-invoice.ts` (chỗ gọi duy nhất, A-08) không phải sửa gì —
+   * đó là toàn bộ lý do cờ nằm ở tầng service chứ không ở tầng hook.
+   *
+   * `/v2/pos/checkout` không trả `InvoiceRow` đầy đủ, chỉ tổng kết saga
+   * (`CheckoutV2Response`) — gọi lại `getById` sau khi commit để trả đúng
+   * hình dạng phần còn lại của app đang mong đợi, giống hệt luồng cũ.
+   *
+   * `body.selectedProgramIds` chỉ đi vào request khi cờ v2 bật — nhánh v1
+   * build payload riêng, không spread `body`, nên field này không lọt qua.
+   */
+  checkout: async (id: string, body: CheckoutInvoiceBody): Promise<InvoiceRow> => {
+    if (import.meta.env.VITE_CHECKOUT_V2 === "true") {
+      const v2Body: CheckoutV2Body = {
+        invoiceId: id,
+        payments: body.payments,
+        keptChangeAmount: body.keptChangeAmount,
+        dueDate: body.dueDate,
+        creditDays: body.creditDays,
+        ...(body.selectedProgramIds?.length
+          ? { selectedProgramIds: body.selectedProgramIds }
+          : {}),
+        ...(body.excludedProgramIds?.length
+          ? { excludedProgramIds: body.excludedProgramIds }
+          : {}),
+      };
+      await http.post<CheckoutV2Response>("/v2/pos/checkout", v2Body);
+      return http.get<InvoiceRow>(`/invoices/${encodeURIComponent(id)}`);
+    }
+    // Nhánh v1 không khai báo `selectedProgramIds` — build payload tách riêng
+    // thay vì spread nguyên `body`, để field mới (nếu caller lỡ truyền) không
+    // lọt qua và bị `forbidNonWhitelisted` của ValidationPipe từ chối 400.
+    return http.post<InvoiceRow>(`/invoices/${encodeURIComponent(id)}/checkout`, {
+      payments: body.payments,
+      keptChangeAmount: body.keptChangeAmount,
+      dueDate: body.dueDate,
+      creditDays: body.creditDays,
+    });
+  },
 
   delete: (id: string): Promise<void> =>
     http.delete<void>(`/invoices/${encodeURIComponent(id)}`),
@@ -96,6 +137,17 @@ export const invoiceService = {
   getEligibleReturns: (id: string): Promise<EligibleReturnLine[]> =>
     http.get<EligibleReturnLine[]>(
       `/invoices/${encodeURIComponent(id)}/eligible-returns`,
+    ),
+
+  /**
+   * `GET /invoices/:id/outstanding-debt` — dư nợ còn lại của hóa đơn gốc.
+   *
+   * Chỉ để hiển thị: BE tính lại dưới khoá lúc tất toán nên số cuối cùng trên
+   * chứng từ mới là số đúng.
+   */
+  getOutstandingDebt: (id: string): Promise<OutstandingDebtRow> =>
+    http.get<OutstandingDebtRow>(
+      `/invoices/${encodeURIComponent(id)}/outstanding-debt`,
     ),
 
   /** `POST /invoices/returns` — tạo draft RETURN (mode quick|regular). */

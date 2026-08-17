@@ -310,10 +310,15 @@ export class CancelReturnService {
   }
 
   /**
-   * Put back the debt an OFFSET return settled on the original sale. The amount
-   * comes off the ADJUSTMENT row the return wrote, not `refundedAmount` — the
-   * offset is capped at what was still owed, so those two differ whenever the
-   * refund was larger than the remaining debt.
+   * Put back the debt this return settled on the original sale. The amount comes
+   * off the ADJUSTMENT row the return wrote, not `refundedAmount` — the offset is
+   * capped at what was still owed, so those two differ whenever the refund was
+   * larger than the remaining debt.
+   *
+   * Deliberately NOT gated on `refundMethod`: since the debt-first split, a return
+   * settles debt AND pays cash on the same document, and its `refundMethod` names
+   * the fund that paid the remainder. The ADJUSTMENT row is the only thing that
+   * says whether a debt was touched.
    */
   private async restoreOriginalDebt(
     manager: EntityManager,
@@ -321,7 +326,7 @@ export class CancelReturnService {
     originalInvoice: InvoiceEntity | null,
     now: Date,
   ): Promise<void> {
-    if (invoice.refundMethod !== RefundMethod.OFFSET || !originalInvoice) return;
+    if (!originalInvoice) return;
 
     const adjustment = await manager.findOne(InvoiceDebtEntity, {
       where: {
@@ -330,8 +335,8 @@ export class CancelReturnService {
         documentType: DebtDocumentType.ADJUSTMENT,
       },
     });
-    // No adjustment row means the OFFSET found nothing to settle and fell back
-    // to a cash refund, which the collection legs already cover.
+    // No adjustment row means this return settled no debt — the whole refund was
+    // paid out, which the collection legs already cover.
     if (!adjustment) return;
 
     const applied = Math.abs(Number(adjustment.originalAmount));
@@ -400,19 +405,25 @@ export class CancelReturnService {
   }
 
   /**
-   * Money to collect back off the customer: what this document refunded them.
+   * Money to collect back off the customer: what actually left the till, which is
+   * the refund minus the part that settled the original sale's debt.
    *
-   * STORE_CREDIT and OFFSET moved no money — the credit row and the original
-   * sale's debt are put back inside the transaction instead — so they produce no
-   * leg here.
+   * Collecting the whole `refundedAmount` would bill the customer for money they
+   * never received — the mirror of the payout bug this split fixed. STORE_CREDIT
+   * and the debt portion moved no money: the credit row and the original sale's
+   * debt are put back inside the transaction instead.
    */
   private async buildCollectionLegs(
     invoice: InvoiceEntity,
     contraAccountId: string,
     actor: ActorContext,
   ): Promise<InvoiceCancelledCollectionLeg[]> {
-    const refunded = Number(invoice.refundedAmount);
-    if (refunded <= 0) return [];
+    const cashOut = Number(
+      (
+        Number(invoice.refundedAmount) - Number(invoice.offsetAmount ?? 0)
+      ).toFixed(2),
+    );
+    if (cashOut <= 0) return [];
 
     if (invoice.refundMethod === RefundMethod.CASH) {
       const cashAccountId = await this.cashFundResolver.resolveBranchCashFund(
@@ -420,12 +431,12 @@ export class CancelReturnService {
         invoice.branchId,
       );
       return [
-        { fundKind: 'CASH', cashAccountId, amount: refunded, contraAccountId },
+        { fundKind: 'CASH', cashAccountId, amount: cashOut, contraAccountId },
       ];
     }
 
     if (invoice.refundMethod === RefundMethod.BANK) {
-      return [{ fundKind: 'DEPOSIT', amount: refunded, contraAccountId }];
+      return [{ fundKind: 'DEPOSIT', amount: cashOut, contraAccountId }];
     }
 
     return [];

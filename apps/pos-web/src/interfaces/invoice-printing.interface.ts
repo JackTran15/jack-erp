@@ -60,10 +60,20 @@ export interface InvoiceTotals {
   /** "Tiền hàng" — gross line total before any promotion / discount. */
   subtotal: number;
   /**
-   * Optional "Khuyến mãi" block: total per-line discount (KM theo mặt hàng).
-   * Omitted/undefined when there is no discount → renderer hides the block.
+   * Optional "Khuyến mãi" block, "KM theo mặt hàng" sub-row — item-level
+   * promotion discount only (`ITEM_DISCOUNT`/`TIERED_DISCOUNT`/`BUY_M_GET_N`,
+   * via `groupPromotionsForPrint`). NOT the cashier's manual line discount —
+   * see `manualDiscountTotal` for that (T-08-03, A-17: kept as separate
+   * lines, never summed together). Omitted/undefined when there is no
+   * promotion discount → renderer hides the "KM theo mặt hàng" sub-row.
    */
   itemDiscountTotal?: number;
+  /**
+   * "Giảm giá" line: sum of the cashier's manual per-line discounts
+   * (`CartLine.lineDiscount`) — independent of the "Khuyến mãi" block above.
+   * Omitted/undefined or ≤ 0 → renderer hides the line.
+   */
+  manualDiscountTotal?: number;
   /** "Tổng thanh toán" — net amount the customer is asked to pay. */
   grandTotal: number;
   /**
@@ -101,8 +111,8 @@ export interface InvoiceTotals {
   /** "Phí đổi trả" — từ payment draft. */
   returnFee?: number;
 
-  // ── Khuyến mãi hóa đơn / voucher (slot — BE chưa trả amount) ─────────────
-  /** "KM theo hóa đơn" — slot, `appliedPromotion` chưa có amount. */
+  // ── Khuyến mãi hóa đơn / voucher ──────────────────────────────────────────
+  /** "KM theo hóa đơn" sub-row — `INVOICE_DISCOUNT` total (T-08-03). */
   invoiceDiscountTotal?: number;
   /** "Mã ưu đãi (<code>)" / dòng "Voucher" — slot, voucher chưa có amount. */
   voucherDiscount?: number;

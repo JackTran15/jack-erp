@@ -1,10 +1,8 @@
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { LineItemGrid, type LineColumn } from "@erp/ui";
 import { LookupField } from "../../../../../../../../components/forms/LookupField";
-import {
-  ProductSelectDialog,
-  type ProductSelectResult,
-} from "../../../../../../../../components/shared/product-select/ProductSelectDialog";
+import { PromotionTargetPicker } from "../../../../../../components/PromotionTargetPicker/PromotionTargetPicker";
+import { mergeTargetsIntoGrid } from "../../../../../../components/PromotionTargetPicker/promotion-target";
 import { useTrailingEmptyRow } from "../../../../../../../../hooks/useTrailingEmptyRow";
 import { apiClient } from "../../../../../../../../lib/api-axios";
 import { blankApplicableGood } from "../../../../../program-form.constants";
@@ -71,25 +69,24 @@ export function ApplicableGoodsGrid({ value, onChange, disabled }: Props) {
   const removeRow = (id: string) =>
     onChange(value.filter((r) => r.id !== id));
 
-  // Thêm hàng hóa từ dialog chọn hàng loạt (dedupe theo itemId; bỏ row trống,
-  // useTrailingEmptyRow sẽ tự thêm lại row trống cuối).
-  const addFromPicker = (result: ProductSelectResult) => {
-    const existingIds = new Set(
-      value.filter((r) => r.itemId).map((r) => r.itemId),
+  // Đi qua `PromotionTargetPicker` như 5 lưới còn lại, thay vì tự map kết quả
+  // dialog — dedupe và dọn dòng trống nằm chung ở `mergeTargetsIntoGrid`.
+  // `useTrailingEmptyRow` sẽ tự thêm lại dòng trống cuối.
+  const addFromPicker = (drafts: Parameters<typeof mergeTargetsIntoGrid>[1]) => {
+    onChange(
+      mergeTargetsIntoGrid<ApplicableGood>(value, drafts, {
+        targetIdOf: (row) => row.itemId,
+        isBlank: (row) => !row.itemId,
+        toRow: (draft) => ({
+          id: crypto.randomUUID(),
+          itemId: draft.targetId,
+          sku: draft.code,
+          name: draft.name,
+          unit: draft.unit,
+          minQuantity: "",
+        }),
+      }),
     );
-    const newRows: ApplicableGood[] = result.lines
-      .filter((line) => !existingIds.has(line.itemId))
-      .map((line) => ({
-        id: crypto.randomUUID(),
-        itemId: line.itemId,
-        sku: line.sku,
-        name: line.name,
-        unit: line.unit,
-        minQuantity: "",
-      }));
-    if (newRows.length) {
-      onChange([...value.filter((r) => r.itemId), ...newRows]);
-    }
     setPickerOpen(false);
   };
 
@@ -188,14 +185,15 @@ export function ApplicableGoodsGrid({ value, onChange, disabled }: Props) {
       />
 
       {pickerOpen ? (
-        <ProductSelectDialog
+        <PromotionTargetPicker
           open
           onOpenChange={setPickerOpen}
+          mode="ITEM"
           title="Chọn hàng hóa"
-          initialSelectedIds={
+          selectedIds={
             new Set(value.filter((r) => r.itemId).map((r) => r.itemId))
           }
-          onConfirm={addFromPicker}
+          onSelect={addFromPicker}
         />
       ) : null}
     </>

@@ -1,7 +1,13 @@
+import { useState } from "react";
 import { Button, Input } from "@erp/ui";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, PackageSearch, Trash2 } from "lucide-react";
 import { blankTierProduct } from "../../../../../program-form.constants";
 import type { TierProduct, TierTarget } from "../../../../../program-form.types";
+import { PromotionTargetPicker } from "../../../../../../components/PromotionTargetPicker/PromotionTargetPicker";
+import {
+  mergeTargetsIntoGrid,
+  pickModeForTierTarget,
+} from "../../../../../../components/PromotionTargetPicker/promotion-target";
 
 interface Props {
   value: TierProduct[];
@@ -26,6 +32,23 @@ const NAME_LABEL: Record<TierTarget, string> = {
 
 /** Grid chọn hàng hóa của một nhóm khuyến mại theo mức (spec 4.17). */
 export function ProductSelectionGrid({ value, onChange, target }: Props) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const addFromPicker = (drafts: Parameters<typeof mergeTargetsIntoGrid>[1]) => {
+    onChange(
+      mergeTargetsIntoGrid<TierProduct>(value, drafts, {
+        targetIdOf: (row) => row.targetId,
+        isBlank: (row) => !row.targetId && !row.code.trim() && !row.name.trim(),
+        toRow: (draft) => ({
+          ...blankTierProduct(),
+          targetId: draft.targetId,
+          code: draft.code,
+          name: draft.name,
+          unit: draft.unit,
+        }),
+      }),
+    );
+  };
   const updateRow = (id: string, patch: Partial<TierProduct>) => {
     onChange(value.map((row) => (row.id === id ? { ...row, ...patch } : row)));
   };
@@ -98,12 +121,30 @@ export function ProductSelectionGrid({ value, onChange, target }: Props) {
           </tbody>
         </table>
       </div>
-      <div className="px-3 py-2">
+      <div className="flex items-center gap-1 px-3 py-2">
         <Button type="button" variant="ghost" size="sm" onClick={addRow}>
           <Plus className="mr-1.5 h-4 w-4" />
           Thêm dòng
         </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setPickerOpen(true)}
+        >
+          <PackageSearch className="mr-1.5 h-4 w-4" />
+          {target === "GROUP" ? "Chọn nhóm hàng hóa" : "Chọn hàng hóa"}
+        </Button>
       </div>
+
+      <PromotionTargetPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        mode={pickModeForTierTarget(target)}
+        title={target === "GROUP" ? "Chọn nhóm hàng hóa" : "Chọn hàng hóa"}
+        selectedIds={new Set(value.map((row) => row.targetId).filter(Boolean))}
+        onSelect={addFromPicker}
+      />
     </div>
   );
 }

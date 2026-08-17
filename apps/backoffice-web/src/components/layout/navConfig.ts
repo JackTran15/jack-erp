@@ -294,7 +294,11 @@ export const navConfig: NavModule[] = [
             label: "Chương trình khuyến mãi",
             permission: "pos.promotion.read",
           },
-          // { to: "/promotions/vouchers", label: "Thẻ voucher" },
+          {
+            to: "/promotions/vouchers",
+            label: "Thẻ voucher",
+            permission: "pos.promotion.read",
+          },
         ],
       },
     ],

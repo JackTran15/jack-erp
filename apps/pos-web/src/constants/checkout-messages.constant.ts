@@ -3,6 +3,8 @@
 // Mục tiêu: không hard-code chuỗi rải rác trong hook/component → dễ chỉnh & nhất
 // quán. Chuỗi có tham số khai báo dạng arrow function (giống pattern react-query-key).
 
+import { formatVnd } from "@erp/ui";
+
 /** Lỗi hiển thị ở thanh cartError / field error trong luồng checkout. */
 export const CHECKOUT_ERRORS = {
   OUT_OF_STOCK: "Hết tồn.",
@@ -42,6 +44,43 @@ export const CHECKOUT_ANNOUNCEMENTS = {
     `Đã ghi nhận thanh toán${who}, ${amountText}, ${methodLabel}.`,
   returnRecorded: (who: string, amountText: string) =>
     `Đã ghi nhận đổi trả${who}, ${amountText}.`,
+} as const;
+
+/**
+ * Hộp xác nhận hoán đổi CTKM đang thắng (UOW-04/T-04-03) — khi thu ngân tick
+ * một CTKM đang bị chương trình khác giành mất tài nguyên. Giữ đúng nội dung
+ * tham chiếu MISA ("CTKM A và B cùng áp dụng cho 1 hàng hóa...") vì thu ngân
+ * đã quen câu này; chỉ thay bằng tên hai chương trình thật thay vì A/B.
+ */
+export const PROMOTION_SWAP_CONFIRM = {
+  TITLE: "Đổi chương trình khuyến mãi",
+  message: (incumbentName: string, candidateName: string) =>
+    `Chương trình "${incumbentName}" và "${candidateName}" cùng áp dụng cho 1 hàng hóa. Bạn có muốn đổi thành áp dụng chương trình "${candidateName}" không?`,
+  CONFIRM_LABEL: "Đổi chương trình",
+  CANCEL_LABEL: "Huỷ",
+} as const;
+
+/**
+ * Hộp xác nhận bỏ hẳn một CTKM đang áp (UOW-09/T-09-03, đóng A-13) — thu ngân
+ * untick dòng "Đã áp dụng" trong dialog, hoặc bấm X ở dòng tổng "Khuyến mại"
+ * (T-09-04, dùng chung constant này). Bỏ tick lại một CTKM đã loại (dòng "Đã
+ * bỏ áp dụng") không qua hộp này — chỉ hành động loại mới cần xác nhận.
+ * Nêu rõ số tiền còn phải thu trước/sau (AC-34) — không chỉ tên chương trình.
+ */
+export const PROMOTION_EXCLUDE_CONFIRM = {
+  TITLE: "Bỏ áp dụng khuyến mại",
+  message: (programName: string, beforeAmount: number, afterAmount: number) =>
+    `Bỏ áp dụng chương trình "${programName}"? Còn phải thu sẽ đổi từ ${formatVnd(beforeAmount)} thành ${formatVnd(afterAmount)}.`,
+  messageAll: (programNames: string[], beforeAmount: number, afterAmount: number) =>
+    `Bỏ áp dụng ${programNames.length > 1 ? "các chương trình" : "chương trình"} ${programNames.map((n) => `"${n}"`).join(", ")}? Còn phải thu sẽ đổi từ ${formatVnd(beforeAmount)} thành ${formatVnd(afterAmount)}.`,
+  /** Không có số tiền để tính (chưa có preview) — chỉ nêu tên, không nên xảy ra bình thường. */
+  messageNoAmount: (programName: string) =>
+    `Bỏ áp dụng chương trình "${programName}"? Số tiền được giảm cho hóa đơn này sẽ thay đổi.`,
+  /** Bản `messageAll` không kèm số tiền — cùng lý do với `messageNoAmount`. */
+  messageAllNoAmount: (programNames: string[]) =>
+    `Bỏ áp dụng ${programNames.length > 1 ? "các chương trình" : "chương trình"} ${programNames.map((n) => `"${n}"`).join(", ")}? Số tiền được giảm cho hóa đơn này sẽ thay đổi.`,
+  CONFIRM_LABEL: "Bỏ áp dụng",
+  CANCEL_LABEL: "Huỷ",
 } as const;
 
 /** Toast (sonner) cho thành công/thất bại của thao tác checkout. */

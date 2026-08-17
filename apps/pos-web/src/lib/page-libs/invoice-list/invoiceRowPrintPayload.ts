@@ -3,6 +3,7 @@ import type { InvoicePayload } from "@erp/pos/dtos/invoice-printing.dto";
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
 import type { InvoiceStoreInfo } from "@erp/pos/interfaces/invoice-printing.interface";
 import { getInvoiceSignedTotal } from "@erp/pos/lib/common/invoiceAmount";
+import { groupPromotionsForPrint } from "@erp/pos/lib/page-libs/checkout/printing/promotionPrintBuckets";
 
 /**
  * Dựng payload in từ một hoá đơn **đã lưu** (`GET /invoices/:id`).
@@ -49,7 +50,8 @@ export function buildInvoiceRowPrintPayload(
   // "Tiền hàng" và "Khuyến mãi" chỉ tính hàng mua — khối hàng trả tách riêng
   // bên dưới, nên purchaseNet − returnNet === grandTotal.
   const subtotal = purchaseOnly.reduce((sum, item) => sum + grossOf(item), 0);
-  const itemDiscountTotal = purchaseOnly.reduce(
+  // Giảm giá thu ngân gõ tay trên dòng — tách hẳn khỏi CTKM của engine bên dưới.
+  const manualDiscountTotal = purchaseOnly.reduce(
     (sum, item) => sum + discountOf(item),
     0,
   );
@@ -59,6 +61,9 @@ export function buildInvoiceRowPrintPayload(
     (sum, item) => sum + discountOf(item),
     0,
   );
+  // CTKM đã chạy lúc checkout (T-08-01) — tách hoàn toàn khỏi giảm giá tay ở
+  // trên, cùng quy tắc A-17 đã áp cho hóa đơn vừa thanh toán (T-08-03).
+  const engineBuckets = groupPromotionsForPrint(invoice.appliedPromotions ?? []);
 
   const paymentRows = invoice.payments ?? [];
   const payments =
@@ -113,7 +118,10 @@ export function buildInvoiceRowPrintPayload(
     totals: {
       totalQty,
       subtotal,
-      itemDiscountTotal: itemDiscountTotal > 0 ? itemDiscountTotal : undefined,
+      manualDiscountTotal:
+        manualDiscountTotal > 0 ? manualDiscountTotal : undefined,
+      itemDiscountTotal: engineBuckets.itemDiscountTotal,
+      invoiceDiscountTotal: engineBuckets.invoiceDiscountTotal,
       // `amountDue` bị BE clamp về 0 với đơn trả (checkout-return.service.ts),
       // nên phải đọc qua helper — cùng nguồn mà cột "Tổng thanh toán" của danh
       // sách hoá đơn đang dùng.

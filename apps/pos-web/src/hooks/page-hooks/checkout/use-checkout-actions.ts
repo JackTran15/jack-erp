@@ -57,7 +57,9 @@ import {
   selectMetaDraft,
   selectPaymentDraft,
   selectPointsDiscountAmount,
+  selectPromotionDiscountAmount,
   selectPromotionDraft,
+  selectPromotionPreview,
   selectPurchaseCart,
   selectReturnCart,
   usePosCheckoutSessionStore,
@@ -134,6 +136,15 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
 
       const grandTotal = selectGrandTotal(sessionState);
       const pointsDiscountAmount = selectPointsDiscountAmount(sessionState);
+      const promotionDiscountAmount = selectPromotionDiscountAmount(sessionState);
+      // `grandTotal` (từ `selectGrandTotal`) chỉ trừ giảm giá tay per-line —
+      // KHÔNG biết gì về CTKM (đến từ preview `evaluate`, một nguồn riêng).
+      // "Tổng thanh toán" trên hóa đơn in đứng ngay sau khối "Khuyến mãi"
+      // (xem renderInvoiceHtml.ts) nên phải trừ luôn phần này, nếu không hóa
+      // đơn in ra hiện giá gốc dù dòng "Khuyến mãi" đã trừ đúng ngay bên trên
+      // nó — bắt được sống 12/08/2026. Không trừ `pointsDiscountAmount`/deposit
+      // ở đây — hai cái đó in thành dòng riêng NGAY DƯỚI "Tổng thanh toán".
+      const receiptGrandTotal = grandTotal - promotionDiscountAmount;
       const pointsToRedeem = selectEffectivePointsRedeemed(sessionState);
       const {
         settlementGrandTotal,
@@ -146,6 +157,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
         deposit: p.deposit,
         returnFee: p.returnFee,
         pointsDiscountAmount,
+        promotionDiscountAmount,
         paymentLines: p.paymentLines,
         keepChange: p.keepChange,
         debt: p.debt,
@@ -158,7 +170,6 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       const result = validateCheckout({
         hasAnyCartLines: selectHasAnyCartLines(sessionState),
         debt: p.debt,
-        refundToDebt: p.refundToDebt ?? false,
         keepChange: p.keepChange,
         selectedCustomer,
         purchaseCart,
@@ -194,7 +205,8 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       const cashierName = currentUser
         ? `${currentUser.firstName} ${currentUser.lastName}`.trim()
         : (sessionState.cashierDisplayName ?? undefined);
-      const appliedVoucher = selectPromotionDraft(sessionState).appliedVoucher;
+      const promotionDraft = selectPromotionDraft(sessionState);
+      const appliedVoucher = promotionDraft.appliedVoucher;
       const activeBranchId = usePosBranchStore.getState().branchId;
       const store = buildStoreInfoFromBranch(
         branches?.find((b) => b.id === activeBranchId),
@@ -203,7 +215,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       const receiptPayload = buildCheckoutInvoicePayload({
         printInvoice: p.printInvoice,
         cart: computeReceiptLines(sessionState),
-        grandTotal,
+        grandTotal: receiptGrandTotal,
         settlementTotal: settlementGrandTotal,
         deposit: p.deposit,
         totalPaid,
@@ -225,6 +237,8 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
         printDuplicate: p.printDuplicate,
         isReturnExchange: isReturnFlow,
         store,
+        promotionEngineDiscounts: selectPromotionPreview(sessionState).data
+          ?.appliedPrograms,
       });
 
       try {
@@ -294,6 +308,11 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             // Hạn thanh toán chỉ có nghĩa khi tính vào công nợ.
             dueDate: p.debt ? p.paymentDueDate : null,
             creditDays: p.debt ? p.creditDays : null,
+            // CTKM tùy chọn — chỉ luồng SALE (đơn trả/đổi có bài toán hoàn
+            // khuyến mại riêng, ngoài phạm vi UOW-02, giống preview evaluate).
+            selectedProgramIds: promotionDraft.selectedProgramIds,
+            // CTKM đã bỏ hẳn (UOW-09) — cùng phạm vi SALE-only như trên.
+            excludedProgramIds: promotionDraft.excludedProgramIds,
           });
           if (!checkoutResolve.ok) {
             toast.error(describeResolveError(checkoutResolve.error));
@@ -356,7 +375,6 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             returnSubtotal,
             newSubtotal,
             paymentLines: p.paymentLines,
-            offsetToDebt: allowsDebt && (p.refundToDebt ?? false),
             // Đơn ĐỔI net>0: tích "Tính vào công nợ" (DebtCheckRow) → ghi phần
             // chênh chưa thu vào công nợ khách, kèm hạn nợ như đơn bán nợ.
             putOnDebt,
@@ -414,14 +432,6 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             receiptPayload.totals.pointsReversed = posted.pointsReversed;
             receiptPayload.totals.pointsBalanceAfter =
               posted.pointsBalanceAfter ?? undefined;
-          }
-          // Operator tích "Tính vào công nợ" nhưng hóa đơn gốc không còn nợ để
-          // bù trừ → BE tự chi tiền mặt; báo cho thu ngân biết. Chỉ có nghĩa khi
-          // luồng này thực sự được phép cấn nợ.
-          if (allowsDebt && p.refundToDebt && posted.refundMethod === "CASH") {
-            toast.info(
-              "Khách hàng không còn công nợ — đã chi tiền mặt cho khoản hoàn.",
-            );
           }
         }
       } catch (err) {

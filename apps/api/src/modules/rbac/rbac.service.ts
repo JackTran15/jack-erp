@@ -46,6 +46,24 @@ export class RbacService {
     return permissions.includes(permissionKey);
   }
 
+  /**
+   * True when the user holds *any* of `permissionKeys` (OR).
+   *
+   * Resolves the permission set once rather than calling `hasPermission` per
+   * key, so widening an endpoint to accept several keys does not multiply
+   * lookups. An empty list denies — "required nothing" is expressed by not
+   * applying the decorator at all, never by an empty array.
+   */
+  async hasAnyPermission(
+    userId: string,
+    orgId: string,
+    permissionKeys: string[],
+  ): Promise<boolean> {
+    if (permissionKeys.length === 0) return false;
+    const permissions = await this.getUserPermissions(userId, orgId);
+    return permissionKeys.some((key) => permissions.includes(key));
+  }
+
   async invalidateUserPermissions(
     userId: string,
     orgId: string,

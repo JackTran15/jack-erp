@@ -27,7 +27,9 @@ import {
   selectMetaDraft,
   selectPaymentDraft,
   selectPointsDiscountAmount,
+  selectPromotionDiscountAmount,
   selectPromotionDraft,
+  selectPromotionPreview,
   selectPurchaseCart,
   selectReturnCart,
   usePosCheckoutSessionStore,
@@ -67,6 +69,10 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
     const p = selectPaymentDraft(sessionState);
     const grandTotal = selectGrandTotal(sessionState);
     const pointsDiscountAmount = selectPointsDiscountAmount(sessionState);
+    const promotionDiscountAmount = selectPromotionDiscountAmount(sessionState);
+    // Cùng lý do với use-checkout-actions.ts::finalizeCheckoutAndPrint —
+    // "Tổng thanh toán" trên bản in phải trừ CTKM, `grandTotal` thì không.
+    const receiptGrandTotal = grandTotal - promotionDiscountAmount;
     const pointsRedeemed = selectEffectivePointsRedeemed(sessionState);
     const selectedCustomer = selectCustomerDraft(sessionState).selectedCustomer;
     const selectedSalesperson =
@@ -95,6 +101,7 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
       deposit: p.deposit,
       returnFee: p.returnFee,
       pointsDiscountAmount,
+      promotionDiscountAmount,
       paymentLines: p.paymentLines,
       keepChange: p.keepChange,
       debt: p.debt,
@@ -108,7 +115,7 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
       printInvoice: true,
       provisional: true,
       cart: computeReceiptLines(sessionState),
-      grandTotal,
+      grandTotal: receiptGrandTotal,
       settlementTotal: settlementGrandTotal,
       deposit: p.deposit,
       totalPaid,
@@ -130,6 +137,8 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
       printDuplicate: p.printDuplicate,
       isReturnExchange: variant !== CheckoutVariantEnum.SALE,
       store,
+      promotionEngineDiscounts: selectPromotionPreview(sessionState).data
+        ?.appliedPrograms,
     });
     if (!receiptPayload) return;
 

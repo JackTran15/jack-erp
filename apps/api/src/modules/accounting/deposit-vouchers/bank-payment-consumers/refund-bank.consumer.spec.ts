@@ -1,7 +1,11 @@
 import { DomainEvent, DepositMovementSource } from '@erp/shared-interfaces';
 import { RefundBankConsumer } from './refund-bank.consumer';
 import { BankPaymentsService } from '../bank-payments/bank-payments.service';
-import { BankPaymentPurpose, BankPaymentReferenceType } from '../enums';
+import {
+  BankPaymentPurpose,
+  BankPaymentReferenceType,
+  BankVoucherPartnerType,
+} from '../enums';
 import { DepositRefundPayload } from '../../publishers/deposit-refund.publisher';
 
 function event(
@@ -23,6 +27,21 @@ function event(
   } as DomainEvent<DepositRefundPayload>;
 }
 
+const PARTY_ROW = {
+  customer_id: 'cust-1',
+  staff_id: 'user-cashier',
+  salesperson_id: 'profile-1',
+  customer_name: 'Nguyễn Văn A',
+  customer_address: '12 Lê Lợi',
+  branch_address: '45 Nguyễn Huệ',
+  salesperson_user_id: 'user-salesperson',
+};
+
+/** DataSource stubbed down to the single query `buildPosInvoiceParty` runs. */
+function dataSourceReturning(rows: unknown[]) {
+  return { manager: { query: jest.fn().mockResolvedValue(rows) } };
+}
+
 describe('RefundBankConsumer', () => {
   let consumer: RefundBankConsumer;
   let bankPayments: { createAndPostInternal: jest.Mock };
@@ -38,6 +57,7 @@ describe('RefundBankConsumer', () => {
     };
     consumer = new RefundBankConsumer(
       bankPayments as unknown as BankPaymentsService,
+      dataSourceReturning([PARTY_ROW]) as any,
     );
   });
 
@@ -63,6 +83,41 @@ describe('RefundBankConsumer', () => {
         }),
       }),
     );
+  });
+
+  it('names the customer and puts the staff member in paidBy, not staffId (AC-07)', async () => {
+    await consumer.handle(event());
+
+    const args = bankPayments.createAndPostInternal.mock.calls[0][0];
+    expect(args).toEqual(
+      expect.objectContaining({
+        partnerType: BankVoucherPartnerType.CUSTOMER,
+        partnerId: 'cust-1',
+        partnerName: 'Nguyễn Văn A',
+        partnerAddress: '12 Lê Lợi',
+        payeeName: 'Nguyễn Văn A',
+        paidBy: 'user-salesperson',
+      }),
+    );
+    // bank_payments has no staff_id column — passing one would silently drop the field.
+    expect(args.staffId).toBeUndefined();
+  });
+
+  it('still posts the refund when the return invoice resolves no customer (AC-07, AC-14)', async () => {
+    consumer = new RefundBankConsumer(
+      bankPayments as unknown as BankPaymentsService,
+      dataSourceReturning([
+        { ...PARTY_ROW, customer_id: null, customer_name: null, customer_address: null },
+      ]) as any,
+    );
+
+    await consumer.handle(event());
+
+    const args = bankPayments.createAndPostInternal.mock.calls[0][0];
+    expect(args.amount).toBe(200000);
+    expect(args.partnerType).toBeUndefined();
+    expect(args.payeeName).toBeUndefined();
+    expect(args.paidBy).toBe('user-salesperson');
   });
 
   it('is a no-op on replay — createAndPostInternal is idempotent by (REFUND, returnInvoiceId)', async () => {
