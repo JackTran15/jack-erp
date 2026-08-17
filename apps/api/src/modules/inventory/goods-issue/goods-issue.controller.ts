@@ -4,6 +4,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Patch,
   Body,
   Param,
   Query,
@@ -129,6 +130,60 @@ class CreateGoodsIssueDto {
   lines: GoodsIssueLineDto[];
 }
 
+/**
+ * Fields an edit may touch. No `purpose`, no `targetBranchId` — changing
+ * either changes what kind of document this is, which is a cancel-and-recreate,
+ * not an edit (A-11).
+ */
+class UpdateGoodsIssueDto {
+  @IsOptional()
+  @IsUUID()
+  locationId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  providerId?: string;
+
+  @IsOptional()
+  @IsEnum(DocCounterpartyKind)
+  counterpartyKind?: DocCounterpartyKind;
+
+  @IsOptional()
+  @IsUUID()
+  counterpartyId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  reasonId?: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsString()
+  deliverer?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  references?: string[];
+
+  @IsOptional()
+  @IsDateString()
+  occurredAt?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => GoodsIssueLineDto)
+  lines?: GoodsIssueLineDto[];
+}
+
 class GoodsIssueQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(GoodsIssueStatus)
@@ -196,6 +251,17 @@ export class GoodsIssueController {
       new VoucherXlsxWriter(payload),
       new HttpResponseSink(res, payload.title),
     ).run(doc.header, doc.columns);
+  }
+
+  @Patch(':id')
+  @RequirePermission('inventory.goods-issue.update')
+  @RequireBranchScope()
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateGoodsIssueDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.update(id, dto, actor);
   }
 
   @Post(':id/post')

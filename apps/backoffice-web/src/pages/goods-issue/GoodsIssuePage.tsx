@@ -372,7 +372,10 @@ export function GoodsIssuePage() {
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !selectedIssue || selectedIssue.status !== "DRAFT",
+      // Allow editing any non-cancelled row. BE update() handles POSTED by
+      // writing the difference as a stock-ledger adjustment instead of
+      // overwriting what was already posted.
+      disabled: !selectedIssue || selectedIssue.status === "CANCELLED",
       onClick: () => {
         if (!selectedIssue) return;
         setEditingIssue(selectedIssue);

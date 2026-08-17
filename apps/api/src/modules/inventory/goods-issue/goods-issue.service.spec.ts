@@ -11,6 +11,7 @@ import {
 } from '@erp/shared-interfaces';
 import { GoodsIssueService } from './goods-issue.service';
 import { GoodsIssueEntity } from './goods-issue.entity';
+import { GoodsIssueLineEntity } from './goods-issue-line.entity';
 import { IssueReasonEntity } from '../issue-reason/issue-reason.entity';
 import { BranchEntity } from '../../branch/branch.entity';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
@@ -48,6 +49,12 @@ describe('GoodsIssueService', () => {
     const manager = {
       update: jest.fn().mockResolvedValue(undefined),
       findOne: jest.fn(),
+      // FOR UPDATE row-lock query in update()/cancel(); most tests post a
+      // fresh POSTED, revision-0 issue and don't care about this beyond it
+      // resolving to something iterable — override per test when it matters.
+      query: jest.fn().mockResolvedValue([{ status: GoodsIssueStatus.POSTED, revision: 0 }]),
+      delete: jest.fn().mockResolvedValue(undefined),
+      save: jest.fn().mockImplementation((_entity, rows) => Promise.resolve(rows)),
     };
     dataSource = {
       transaction: jest.fn().mockImplementation((cb) => cb(manager)),
@@ -62,6 +69,7 @@ describe('GoodsIssueService', () => {
     transferOrderService = {
       assertExportIssueCanBeCancelled: jest.fn().mockResolvedValue(undefined),
       cancelFromExportIssue: jest.fn().mockResolvedValue(undefined),
+      applyLegRevision: jest.fn().mockResolvedValue(undefined),
     };
     // Default: actor holds every purpose permission so unrelated create() tests
     // are unaffected; the enforcement block below overrides per-case.
@@ -394,6 +402,452 @@ describe('GoodsIssueService', () => {
       await service.cancel('gi-1', actor);
 
       expect(transferOrderService.cancelFromExportIssue).not.toHaveBeenCalled();
+    });
+
+    it('reverses the full line at its already-posted cost (INV-1/INV-2 to 0) (T-04-04)', async () => {
+      giRepo.findOne.mockResolvedValue({ ...postedTransferIssue });
+
+      await service.cancel('gi-1', actor);
+
+      expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({
+            itemId: 'item-1',
+            quantity: 2,
+            lineValue: 2000, // reversed at the posted unitPrice (1000), not a fresh average
+            unitCost: 1000,
+          }),
+        ],
+        dataSource._manager,
+      );
+      expect(dataSource._manager.update).toHaveBeenCalledWith(
+        GoodsIssueEntity,
+        'gi-1',
+        expect.objectContaining({ status: GoodsIssueStatus.CANCELLED, revision: 1 }),
+      );
+    });
+
+    it('rejects a second concurrent cancel and reverses stock exactly once (T-04-04)', async () => {
+      giRepo.findOne.mockResolvedValue({ ...postedTransferIssue });
+      let calls = 0;
+      dataSource._manager.query.mockImplementation(() => {
+        calls += 1;
+        return Promise.resolve([
+          { status: GoodsIssueStatus.POSTED, revision: calls === 1 ? 0 : 1 },
+        ]);
+      });
+
+      const outcomes = await Promise.allSettled([
+        service.cancel('gi-1', actor),
+        service.cancel('gi-1', actor),
+      ]);
+
+      expect(outcomes.filter((o) => o.status === 'fulfilled')).toHaveLength(1);
+      expect(outcomes.filter((o) => o.status === 'rejected')).toHaveLength(1);
+      expect(ledgerService.recordBatchMovements).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('update on a posted issue', () => {
+    /** A posted, unsettled issue: one line, 10 units at 80. */
+    function postedIssue(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'gi-9',
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        status: GoodsIssueStatus.POSTED,
+        purpose: GoodsIssuePurpose.OTHER,
+        documentNumber: 'XK0009',
+        revision: 0,
+        locationId: 'loc-A01',
+        references: [],
+        lines: [
+          { itemId: 'item-1', locationId: 'loc-A01', quantity: 10, unitPrice: '80.00' },
+        ],
+        ...overrides,
+      };
+    }
+
+    const editedLines = [
+      { itemId: 'item-1', locationId: 'loc-A01', quantity: 7, unitPrice: 80 },
+    ];
+
+    beforeEach(() => {
+      dataSource._manager.query.mockResolvedValue([
+        { status: GoodsIssueStatus.POSTED, revision: 0 },
+      ]);
+      // Only consulted when a line's issued quantity goes up (T-04-02).
+      ledgerService.getInstantAverageCost.mockResolvedValue({
+        itemId: 'item-1',
+        branchId: 'branch-A',
+        quantity: 100,
+        inventoryValue: 9000,
+        unitCost: 90,
+        source: 'LEDGER',
+      });
+    });
+
+    it('writes one ledger adjustment with the ledger-side sign flipped', async () => {
+      giRepo.findOne.mockResolvedValue(postedIssue());
+
+      await service.update('gi-9', { lines: editedLines }, actor);
+
+      // Line quantity drops by 3 (10 -> 7); the ledger, which stores issues as
+      // negative, moves the opposite way: +3 (less stock leaves).
+      expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({
+            itemId: 'item-1',
+            quantity: 3,
+            lineValue: 240,
+            movementType: StockMovementType.ADJUSTMENT_INCREASE,
+            referenceType: 'GOODS_ISSUE',
+            referenceId: 'gi-9',
+          }),
+        ],
+        dataSource._manager,
+      );
+      expect(dataSource._manager.update).toHaveBeenCalledWith(
+        GoodsIssueEntity,
+        'gi-9',
+        expect.objectContaining({ revision: 1 }),
+      );
+    });
+
+    it('writes a negative-ledger adjustment, costed at today\'s average, when the issued quantity increases', async () => {
+      giRepo.findOne.mockResolvedValue(postedIssue());
+
+      await service.update(
+        'gi-9',
+        { lines: [{ ...editedLines[0], quantity: 13 }] }, // 10 -> 13: +3 issued
+        actor,
+      );
+
+      // T-04-02: the extra 3 units are costed at today's average (90), not the
+      // 80 the line was originally posted at.
+      expect(ledgerService.getInstantAverageCost).toHaveBeenCalledWith(
+        'item-1',
+        actor.organizationId,
+        'branch-A',
+      );
+      expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({
+            quantity: -3,
+            lineValue: -270,
+            unitCost: 90,
+            movementType: StockMovementType.ADJUSTMENT_DECREASE,
+          }),
+        ],
+        dataSource._manager,
+      );
+      // The line is re-priced to the blended average across both cost bases:
+      // (10 @ 80 + 3 @ 90) / 13 = 1070 / 13 ≈ 82.31.
+      expect(dataSource._manager.save).toHaveBeenCalledWith(
+        GoodsIssueLineEntity,
+        [expect.objectContaining({ unitPrice: '82.31', lineTotal: '1070.00' })],
+      );
+    });
+
+    it('leaves the ledger alone when only header fields change', async () => {
+      giRepo.findOne.mockResolvedValue(postedIssue());
+
+      await service.update('gi-9', { notes: 'ghi chú mới' }, actor);
+
+      expect(ledgerService.recordBatchMovements).not.toHaveBeenCalled();
+      expect(dataSource._manager.update).toHaveBeenCalledWith(
+        GoodsIssueEntity,
+        'gi-9',
+        expect.objectContaining({ notes: 'ghi chú mới' }),
+      );
+    });
+
+    it('rejects the edit when another request already revised the issue', async () => {
+      giRepo.findOne.mockResolvedValue(postedIssue());
+      dataSource._manager.query.mockResolvedValue([
+        { status: GoodsIssueStatus.POSTED, revision: 1 },
+      ]);
+
+      await expect(
+        service.update('gi-9', { lines: editedLines }, actor),
+      ).rejects.toThrow('modified by another request');
+      expect(ledgerService.recordBatchMovements).not.toHaveBeenCalled();
+    });
+
+    it('rejects an edit on a cancelled issue', async () => {
+      giRepo.findOne.mockResolvedValue(postedIssue({ status: GoodsIssueStatus.CANCELLED }));
+
+      await expect(
+        service.update('gi-9', { lines: editedLines }, actor),
+      ).rejects.toThrow('can no longer be edited');
+    });
+
+    it('allows an edit that drives stock negative', async () => {
+      giRepo.findOne.mockResolvedValue(postedIssue());
+
+      await service.update(
+        'gi-9',
+        { lines: [{ ...editedLines[0], quantity: 50 }] },
+        actor,
+      );
+
+      expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
+        [expect.objectContaining({ quantity: -40 })],
+        dataSource._manager,
+      );
+    });
+
+    it('does not blow up dividing by zero when the item has never had a cost (T-04-02)', async () => {
+      giRepo.findOne.mockResolvedValue(postedIssue());
+      ledgerService.getInstantAverageCost.mockResolvedValue({
+        itemId: 'item-1',
+        branchId: 'branch-A',
+        quantity: 0,
+        inventoryValue: 0,
+        unitCost: 0,
+        source: 'PURCHASE_PRICE_FALLBACK',
+      });
+
+      await service.update(
+        'gi-9',
+        { lines: [{ ...editedLines[0], quantity: 13 }] },
+        actor,
+      );
+
+      expect(dataSource._manager.save).toHaveBeenCalledWith(
+        GoodsIssueLineEntity,
+        [expect.objectContaining({ unitPrice: '61.54' })], // (10*80 + 0) / 13
+      );
+    });
+
+    it('rejects changing the reason for a purpose that does not carry one', async () => {
+      giRepo.findOne.mockResolvedValue(
+        postedIssue({ purpose: GoodsIssuePurpose.SALE }),
+      );
+
+      await expect(
+        service.update('gi-9', { reasonId: 'reason-1' }, actor),
+      ).rejects.toThrow('Không thể đổi lý do');
+    });
+
+    it('reverses a removed line and posts an added one', async () => {
+      giRepo.findOne.mockResolvedValue(postedIssue());
+
+      await service.update(
+        'gi-9',
+        {
+          lines: [{ itemId: 'item-2', locationId: 'loc-A01', quantity: 4, unitPrice: 25 }],
+        },
+        actor,
+      );
+
+      expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
+        [
+          // Removed line reverses at its own already-posted price (80).
+          expect.objectContaining({ itemId: 'item-1', quantity: 10, lineValue: 800 }),
+          // Added line is a full increase, costed at today's average (90) —
+          // the 25 the request sent for item-2 is not used (T-04-02).
+          expect.objectContaining({ itemId: 'item-2', quantity: -4, lineValue: -360, unitCost: 90 }),
+        ],
+        dataSource._manager,
+      );
+    });
+
+    it('holds INV-1 (ledger quantity matches the line) through two consecutive edits', async () => {
+      // Mutable stand-in for "the books": every movement handed to the ledger.
+      const ledger: { itemId: string; quantity: number }[] = [
+        { itemId: 'item-1', quantity: -10 }, // original posting: 10 issued
+      ];
+      const issue = postedIssue();
+      giRepo.findOne.mockImplementation(() => Promise.resolve({ ...issue }));
+      dataSource._manager.query.mockImplementation(() =>
+        Promise.resolve([{ status: issue.status, revision: issue.revision }]),
+      );
+      ledgerService.recordBatchMovements.mockImplementation(
+        (movements: { itemId: string; quantity: number }[]) => {
+          ledger.push(...movements);
+          return Promise.resolve([]);
+        },
+      );
+      dataSource._manager.save.mockImplementation((_entity: unknown, rows: unknown) => {
+        issue.lines = rows as typeof issue.lines;
+        return Promise.resolve(rows);
+      });
+      dataSource._manager.update.mockImplementation(
+        (_entity: unknown, _id: string, patch: Record<string, unknown>) => {
+          Object.assign(issue, patch);
+          return Promise.resolve(undefined);
+        },
+      );
+
+      function assertInv1() {
+        const ledgerQty = ledger
+          .filter((m) => m.itemId === 'item-1')
+          .reduce((s, m) => s + m.quantity, 0);
+        const lineQty = (issue.lines as { itemId: string; quantity: number }[])
+          .filter((l) => l.itemId === 'item-1')
+          .reduce((s, l) => s + l.quantity, 0);
+        expect(ledgerQty).toBe(-lineQty);
+      }
+
+      assertInv1();
+      await service.update(
+        'gi-9',
+        { lines: [{ itemId: 'item-1', locationId: 'loc-A01', quantity: 6, unitPrice: 80 }] },
+        actor,
+      );
+      assertInv1();
+      await service.update(
+        'gi-9',
+        { lines: [{ itemId: 'item-1', locationId: 'loc-A01', quantity: 15, unitPrice: 80 }] },
+        actor,
+      );
+      assertInv1();
+    });
+
+    it('cascades an edit to the linked transfer order (T-05-02)', async () => {
+      giRepo.findOne.mockResolvedValue(
+        postedIssue({
+          referenceType: GoodsIssueReferenceType.TRANSFER_ORDER,
+          referenceId: 'to-1',
+        }),
+      );
+
+      await service.update('gi-9', { lines: editedLines }, actor); // 10 -> 7
+
+      expect(transferOrderService.applyLegRevision).toHaveBeenCalledWith(
+        'to-1',
+        [expect.objectContaining({ itemId: 'item-1', quantityDelta: -3 })],
+        actor,
+        'export',
+      );
+    });
+
+    it('does not cascade when cascadeTransferOrder is false — the loop-breaker (T-05-02)', async () => {
+      giRepo.findOne.mockResolvedValue(
+        postedIssue({
+          referenceType: GoodsIssueReferenceType.TRANSFER_ORDER,
+          referenceId: 'to-1',
+        }),
+      );
+
+      await service.update(
+        'gi-9',
+        { lines: editedLines },
+        actor,
+        { cascadeTransferOrder: false },
+      );
+
+      expect(transferOrderService.applyLegRevision).not.toHaveBeenCalled();
+    });
+
+    it('does not cascade when the issue is not linked to a transfer order', async () => {
+      giRepo.findOne.mockResolvedValue(postedIssue());
+
+      await service.update('gi-9', { lines: editedLines }, actor);
+
+      expect(transferOrderService.applyLegRevision).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('full lifecycle: post, edit up, edit down, cancel (T-04-05)', () => {
+    it('holds INV-1/INV-2 through a moving average, two edits and a cancel', async () => {
+      // "The books": every movement handed to the ledger, plus a running
+      // average cost that changes independently of this issue (a purchase
+      // came in at a higher price between the two edits).
+      const ledger: { itemId: string; quantity: number; lineValue?: number }[] = [
+        { itemId: 'item-1', quantity: -5, lineValue: -400 }, // posted: 5 @ 80
+      ];
+      const issue = {
+        id: 'gi-lifecycle',
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        status: GoodsIssueStatus.POSTED,
+        purpose: GoodsIssuePurpose.OTHER,
+        documentNumber: 'XK0099',
+        revision: 0,
+        locationId: 'loc-A01',
+        references: [],
+        lines: [
+          { itemId: 'item-1', locationId: 'loc-A01', quantity: 5, unitPrice: '80.00' },
+        ],
+      };
+
+      giRepo.findOne.mockImplementation(() => Promise.resolve({ ...issue }));
+      dataSource._manager.query.mockImplementation(() =>
+        Promise.resolve([{ status: issue.status, revision: issue.revision }]),
+      );
+      ledgerService.recordBatchMovements.mockImplementation(
+        (movements: { itemId: string; quantity: number; lineValue?: number }[]) => {
+          ledger.push(...movements);
+          return Promise.resolve([]);
+        },
+      );
+      dataSource._manager.save.mockImplementation((_entity: unknown, rows: unknown) => {
+        issue.lines = rows as typeof issue.lines;
+        return Promise.resolve(rows);
+      });
+      dataSource._manager.update.mockImplementation(
+        (_entity: unknown, _id: string, patch: Record<string, unknown>) => {
+          Object.assign(issue, patch);
+          return Promise.resolve(undefined);
+        },
+      );
+
+      function assertInvariants() {
+        const ledgerQty = ledger
+          .filter((m) => m.itemId === 'item-1')
+          .reduce((s, m) => s + m.quantity, 0);
+        const ledgerValue = ledger
+          .filter((m) => m.itemId === 'item-1')
+          .reduce((s, m) => s + (m.lineValue ?? 0), 0);
+        const line = (issue.lines as { itemId: string; quantity: string | number }[]).find(
+          (l) => l.itemId === 'item-1',
+        );
+        const lineQty = line ? Number(line.quantity) : 0;
+        expect(ledgerQty).toBeCloseTo(-lineQty, 3);
+        // The header's own value: quantity × its (possibly blended) unitPrice.
+        const lineValue = line
+          ? Number(line.quantity) *
+            Number((issue.lines as { unitPrice: string }[])[0].unitPrice)
+          : 0;
+        expect(ledgerValue).toBeCloseTo(-lineValue, 2);
+      }
+
+      assertInvariants();
+
+      // 1. Average cost rises to 100 (a purchase came in higher), then edit up: 5 -> 8.
+      ledgerService.getInstantAverageCost.mockResolvedValue({
+        itemId: 'item-1',
+        branchId: 'branch-A',
+        quantity: 50,
+        inventoryValue: 5000,
+        unitCost: 100,
+        source: 'LEDGER',
+      });
+      await service.update(
+        'gi-lifecycle',
+        { lines: [{ itemId: 'item-1', locationId: 'loc-A01', quantity: 8, unitPrice: 999 }] },
+        actor,
+      );
+      assertInvariants();
+      expect(issue.revision).toBe(1);
+
+      // 2. Edit down: 8 -> 3. The reversed 5 units unwind at the *blended*
+      // price this line now carries — not the original 80 nor the new 100 —
+      // because the line was re-priced to a single weighted average in step 1.
+      await service.update(
+        'gi-lifecycle',
+        { lines: [{ itemId: 'item-1', locationId: 'loc-A01', quantity: 3, unitPrice: 999 }] },
+        actor,
+      );
+      assertInvariants();
+      expect(issue.revision).toBe(2);
+
+      // 3. Cancel: everything unwinds to zero.
+      await service.cancel('gi-lifecycle', actor);
+      expect(ledger.reduce((s, m) => s + m.quantity, 0)).toBe(0);
+      expect(ledger.reduce((s, m) => s + (m.lineValue ?? 0), 0)).toBeCloseTo(0, 2);
     });
   });
 

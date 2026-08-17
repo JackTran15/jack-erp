@@ -37,6 +37,7 @@ describe('TransferOrderService', () => {
   let storageRepo: Record<string, jest.Mock>;
   let goodsIssueService: Record<string, jest.Mock>;
   let goodsReceiptService: Record<string, jest.Mock>;
+  let dataSourceManagerQuery: jest.Mock;
 
   const actorSource = {
     userId: 'user-1',
@@ -107,11 +108,16 @@ describe('TransferOrderService', () => {
     goodsIssueService = {
       createAndPost: jest.fn().mockResolvedValue({ id: 'gi-1' }),
       cancel: jest.fn().mockResolvedValue({ id: 'gi-1' }),
+      getById: jest.fn(),
+      update: jest.fn().mockResolvedValue(undefined),
     };
     goodsReceiptService = {
       createAndPost: jest.fn().mockResolvedValue({ id: 'gr-1' }),
       cancel: jest.fn().mockResolvedValue(undefined),
+      getById: jest.fn(),
+      update: jest.fn().mockResolvedValue(undefined),
     };
+    dataSourceManagerQuery = jest.fn().mockResolvedValue(undefined);
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -134,6 +140,7 @@ describe('TransferOrderService', () => {
                 save: jest.fn().mockResolvedValue(undefined),
               }),
             ),
+            manager: { query: dataSourceManagerQuery },
           },
         },
         {
@@ -851,6 +858,257 @@ describe('TransferOrderService', () => {
 
       expect(goodsReceiptService.cancel).not.toHaveBeenCalled();
       expect(toRepo.softDelete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('applyLegRevision (T-05-01)', () => {
+    it('updates requested_qty when the destination has not imported yet (AC-16)', async () => {
+      toRepo.findOne.mockResolvedValue(
+        baseOrder({ importGoodsReceiptId: null }),
+      );
+
+      await service.applyLegRevision(
+        'to-1',
+        [{ itemId: 'item-1', quantityDelta: -4 }],
+        actorSource,
+        'export',
+      );
+
+      expect(dataSourceManagerQuery).toHaveBeenCalledWith(
+        expect.stringContaining('requested_qty'),
+        [-4, 'to-1', 'item-1'],
+      );
+      expect(goodsReceiptService.update).not.toHaveBeenCalled();
+    });
+
+    it('applies the delta to the import receipt at the destination branch (AC-17)', async () => {
+      toRepo.findOne.mockResolvedValue(
+        baseOrder({ importGoodsReceiptId: 'gr-1' }),
+      );
+      goodsReceiptService.getById.mockResolvedValue({
+        id: 'gr-1',
+        lines: [
+          { itemId: 'item-1', locationId: 'loc-B01', uomCode: 'pcs', quantity: '10', unitPrice: '50' },
+        ],
+      });
+
+      await service.applyLegRevision(
+        'to-1',
+        [{ itemId: 'item-1', quantityDelta: -4 }],
+        actorSource, // called from the source branch (export was edited)
+        'export',
+      );
+
+      // The receipt's own branch (destination), not the caller's, drives the lookup.
+      expect(goodsReceiptService.getById).toHaveBeenCalledWith(
+        'gr-1',
+        expect.objectContaining({ branchId: 'branch-B' }),
+      );
+      expect(goodsReceiptService.update).toHaveBeenCalledWith(
+        'gr-1',
+        {
+          lines: [
+            expect.objectContaining({ itemId: 'item-1', quantity: 6 }),
+          ],
+        },
+        expect.objectContaining({ branchId: 'branch-B' }),
+        // Suppresses the ping-pong back into applyLegRevision (T-05-02).
+        { cascadeTransferOrder: false },
+      );
+    });
+
+    it('applies the delta back to the export issue when the import leg was edited (T-05-03 direction)', async () => {
+      toRepo.findOne.mockResolvedValue(
+        baseOrder({ exportGoodsIssueId: 'gi-1', importGoodsReceiptId: 'gr-1' }),
+      );
+      goodsIssueService.getById.mockResolvedValue({
+        id: 'gi-1',
+        lines: [
+          { itemId: 'item-1', locationId: 'loc-A01', quantity: '10', unitPrice: '50' },
+        ],
+      });
+
+      await service.applyLegRevision(
+        'to-1',
+        [{ itemId: 'item-1', quantityDelta: 3 }],
+        actorDest,
+        'import',
+      );
+
+      expect(goodsIssueService.getById).toHaveBeenCalledWith(
+        'gi-1',
+        expect.objectContaining({ branchId: 'branch-A' }),
+      );
+      expect(goodsIssueService.update).toHaveBeenCalledWith(
+        'gi-1',
+        { lines: [expect.objectContaining({ itemId: 'item-1', quantity: 13 })] },
+        expect.objectContaining({ branchId: 'branch-A' }),
+        { cascadeTransferOrder: false },
+      );
+    });
+
+    it('rejects when the order has already been cancelled', async () => {
+      toRepo.findOne.mockResolvedValue(
+        baseOrder({ status: TransferOrderStatus.CANCELLED }),
+      );
+
+      await expect(
+        service.applyLegRevision(
+          'to-1',
+          [{ itemId: 'item-1', quantityDelta: -1 }],
+          actorSource,
+          'export',
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(goodsReceiptService.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an import-side edit when the order has not been exported yet', async () => {
+      toRepo.findOne.mockResolvedValue(
+        baseOrder({ exportGoodsIssueId: undefined }),
+      );
+
+      await expect(
+        service.applyLegRevision(
+          'to-1',
+          [{ itemId: 'item-1', quantityDelta: -1 }],
+          actorDest,
+          'import',
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('is a no-op when the delta list is empty', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder());
+
+      await service.applyLegRevision('to-1', [], actorSource, 'export');
+
+      expect(toRepo.findOne).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('two-branch synchronization through a full lifecycle (T-05-03)', () => {
+    // Each branch's on-hand stock is modelled as a plain map of itemId ->
+    // quantity. What's exported but not yet received sits in neither map —
+    // it's "in transit", tracked as issueLines - receiptLines — so the real
+    // invariant under test is stockA + stockB + inTransit staying constant,
+    // the same identity a physical shipment satisfies at every point along
+    // its journey. GoodsIssueService/GoodsReceiptService are mocked, but their
+    // `getById`/`update` mocks read and write this shared model exactly the
+    // way the real services' own ledger writes would — this isolates
+    // applyLegRevision's orchestration (does it move the counterpart leg by
+    // the right amount, in both directions) from ledger-writing mechanics
+    // already covered by each service's own spec.
+    let stockA: Record<string, number>;
+    let stockB: Record<string, number>;
+    let issueLines: { itemId: string; locationId: string; quantity: number; unitPrice: number }[];
+    let receiptLines: { itemId: string; locationId: string; quantity: number; unitPrice: number }[];
+
+    beforeEach(() => {
+      // Starting point: A held 20 before the transfer, exported 10 of it —
+      // 10 remain at A, 10 are in transit, nothing yet received at B.
+      stockA = { 'item-1': 10 };
+      stockB = { 'item-1': 0 };
+      issueLines = [{ itemId: 'item-1', locationId: 'loc-A01', quantity: 10, unitPrice: 100 }];
+      receiptLines = [];
+
+      goodsIssueService.getById.mockImplementation(() =>
+        Promise.resolve({ id: 'gi-1', lines: [...issueLines] }),
+      );
+      goodsReceiptService.getById.mockImplementation(() =>
+        Promise.resolve({ id: 'gr-1', lines: [...receiptLines] }),
+      );
+    });
+
+    function inTransit(itemId: string): number {
+      const issued = issueLines.find((l) => l.itemId === itemId)?.quantity ?? 0;
+      const received = receiptLines.find((l) => l.itemId === itemId)?.quantity ?? 0;
+      return issued - received;
+    }
+
+    function total(itemId: string): number {
+      return (stockA[itemId] ?? 0) + (stockB[itemId] ?? 0) + inTransit(itemId);
+    }
+
+    /** Simulates the export leg's own ledger write, the part applyLegRevision never does itself. */
+    function applyOwnExportDelta(quantityDelta: number) {
+      stockA['item-1'] += -quantityDelta; // issuing more drains A; issuing less returns stock to A
+      issueLines = issueLines.map((l) => ({ ...l, quantity: l.quantity + quantityDelta }));
+    }
+
+    /** Simulates the import leg's own ledger write. */
+    function applyOwnImportDelta(quantityDelta: number) {
+      stockB['item-1'] = (stockB['item-1'] ?? 0) + quantityDelta;
+      receiptLines = receiptLines.map((l) => ({ ...l, quantity: l.quantity + quantityDelta }));
+    }
+
+    it('holds stockA + stockB + inTransit constant through export-edit, import, import-edit and the reverse direction', async () => {
+      const startTotal = total('item-1');
+      expect(startTotal).toBe(20);
+
+      // 1. Destination has not imported yet: sửa xuất giảm 10 -> 6. Only
+      //    requested_qty moves (AC-16) — nothing is posted at B to adjust.
+      applyOwnExportDelta(-4);
+      toRepo.findOne.mockResolvedValue(
+        baseOrder({ exportGoodsIssueId: 'gi-1', importGoodsReceiptId: null }),
+      );
+      await service.applyLegRevision(
+        'to-1',
+        [{ itemId: 'item-1', quantityDelta: -4 }],
+        actorSource,
+        'export',
+      );
+      expect(goodsReceiptService.update).not.toHaveBeenCalled();
+      expect(total('item-1')).toBe(startTotal);
+
+      // 2. Destination now imports 6 (matches the edited export) — modelled
+      //    directly, the way confirmImport would.
+      receiptLines = [{ itemId: 'item-1', locationId: 'loc-B01', quantity: 6, unitPrice: 100 }];
+      stockB['item-1'] = 6;
+      expect(total('item-1')).toBe(startTotal);
+
+      // 3. Destination has imported: sửa xuất further, 6 -> 4 (AC-17). Now the
+      //    import leg's stock must move too, by the same delta.
+      applyOwnExportDelta(-2);
+      toRepo.findOne.mockResolvedValue(
+        baseOrder({ exportGoodsIssueId: 'gi-1', importGoodsReceiptId: 'gr-1' }),
+      );
+      await service.applyLegRevision(
+        'to-1',
+        [{ itemId: 'item-1', quantityDelta: -2 }],
+        actorSource,
+        'export',
+      );
+      expect(goodsReceiptService.update).toHaveBeenCalledWith(
+        'gr-1',
+        { lines: [expect.objectContaining({ quantity: 4 })] },
+        expect.objectContaining({ branchId: 'branch-B' }),
+        { cascadeTransferOrder: false },
+      );
+      // The mock only asserts the call shape; apply its effect to the shared
+      // model the same way the real GoodsReceiptService.update() would.
+      receiptLines = [{ itemId: 'item-1', locationId: 'loc-B01', quantity: 4, unitPrice: 100 }];
+      stockB['item-1'] = 4;
+      expect(total('item-1')).toBe(startTotal);
+
+      // 4. The reverse direction: destination edits its receipt up, 4 -> 5 —
+      //    the export leg must absorb the same +1 (T-05-03's "chiều ngược lại").
+      applyOwnImportDelta(1);
+      await service.applyLegRevision(
+        'to-1',
+        [{ itemId: 'item-1', quantityDelta: 1 }],
+        actorDest,
+        'import',
+      );
+      expect(goodsIssueService.update).toHaveBeenCalledWith(
+        'gi-1',
+        { lines: [expect.objectContaining({ quantity: 5 })] },
+        expect.objectContaining({ branchId: 'branch-A' }),
+        { cascadeTransferOrder: false },
+      );
+      issueLines = [{ itemId: 'item-1', locationId: 'loc-A01', quantity: 5, unitPrice: 100 }];
+      stockA['item-1'] -= 1;
+      expect(total('item-1')).toBe(startTotal);
     });
   });
 });

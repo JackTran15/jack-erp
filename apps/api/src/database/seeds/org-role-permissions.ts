@@ -176,6 +176,7 @@ export const WAREHOUSE_PERMISSION_KEYS: string[] = [
   // Phiếu xuất kho
   'inventory.goods-issue.read',
   'inventory.goods-issue.create',
+  'inventory.goods-issue.update',
   'inventory.goods-issue.post',
   'inventory.goods-issue.cancel',
   'inventory.goods-issue.other-issue',

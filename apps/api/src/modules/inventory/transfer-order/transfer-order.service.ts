@@ -156,6 +156,7 @@ export class TransferOrderService {
     private readonly documentNumberingService: DocumentNumberingService,
     @Inject(forwardRef(() => GoodsIssueService))
     private readonly goodsIssueService: GoodsIssueService,
+    @Inject(forwardRef(() => GoodsReceiptService))
     private readonly goodsReceiptService: GoodsReceiptService,
   ) {}
 
@@ -1439,6 +1440,160 @@ export class TransferOrderService {
     this.logger.log(
       `Transfer order ${toId} cancelled via export goods issue deletion`,
     );
+  }
+
+  /**
+   * Applies a warehouse-voucher edit's per-item quantity delta to the *other*
+   * leg of a transfer order (ADR-07). Called from `GoodsIssueService.update()`
+   * / `GoodsReceiptService.update()` when the phiếu being edited turns out to
+   * be one leg of a transfer order — this service is the only place that
+   * knows both legs.
+   *
+   * `origin: 'export'` — the export leg (goods issue at the source branch) was
+   * edited; the delta is applied to the import leg if it exists yet
+   * (`importGoodsReceiptId`), or to `transfer_order_lines.requestedQty`
+   * otherwise (nothing has posted at the destination to adjust).
+   * `origin: 'import'` — the import leg was edited; the delta is applied back
+   * to the export leg, which always exists once an order has been exported.
+   *
+   * Deltas are keyed by `itemId` only, not `(itemId, locationId)` — the two
+   * legs live in different branches with different bins, so their location
+   * ids never match. This assumes at most one line per item per leg, true for
+   * every transfer order this feature can create.
+   *
+   * The counterpart update runs with the *counterpart's own branch* on the
+   * actor, never the caller's — a request made in branch A can legitimately
+   * change stock in branch B, and every guard/lock downstream keys off that
+   * branch, not the actor's.
+   */
+  async applyLegRevision(
+    orderId: string,
+    deltas: { itemId: string; quantityDelta: number }[],
+    actor: ActorContext,
+    origin: "export" | "import",
+  ): Promise<void> {
+    if (deltas.length === 0) return;
+    const to = await this.findOrFail(orderId, actor.organizationId);
+    if (to.status === TransferOrderStatus.CANCELLED) {
+      throw new ConflictException(
+        "Lệnh điều chuyển đã huỷ, không thể điều chỉnh",
+      );
+    }
+
+    if (origin === "export") {
+      if (to.importGoodsReceiptId) {
+        await this.applyDeltaToLines(
+          () =>
+            this.goodsReceiptService.getById(to.importGoodsReceiptId!, {
+              ...actor,
+              branchId: to.destinationBranchId,
+            }),
+          (id, lines, a) =>
+            this.goodsReceiptService.update(id, { lines }, a, {
+              cascadeTransferOrder: false,
+            }),
+          to.importGoodsReceiptId,
+          to.destinationBranchId,
+          deltas,
+          actor,
+        );
+        this.logger.log(
+          `Transfer order ${orderId}: export edit applied to import receipt ` +
+            `${to.importGoodsReceiptId} at branch ${to.destinationBranchId}`,
+        );
+      } else {
+        await this.adjustRequestedQty(orderId, deltas);
+      }
+    } else {
+      if (!to.exportGoodsIssueId) {
+        throw new ConflictException(
+          "Lệnh điều chuyển chưa xuất, không có phiếu xuất để điều chỉnh",
+        );
+      }
+      await this.applyDeltaToLines(
+        () =>
+          this.goodsIssueService.getById(to.exportGoodsIssueId!, {
+            ...actor,
+            branchId: to.sourceBranchId,
+          }),
+        (id, lines, a) =>
+          this.goodsIssueService.update(id, { lines }, a, {
+            cascadeTransferOrder: false,
+          }),
+        to.exportGoodsIssueId,
+        to.sourceBranchId,
+        deltas,
+        actor,
+      );
+      this.logger.log(
+        `Transfer order ${orderId}: import edit applied to export issue ` +
+          `${to.exportGoodsIssueId} at branch ${to.sourceBranchId}`,
+      );
+    }
+  }
+
+  /**
+   * Shared shape for both directions of {@link applyLegRevision}: load the
+   * counterpart voucher, add each delta to its matching line's quantity (by
+   * itemId), and save via the voucher's own `update()` — so it goes through
+   * the same locking, revision bump and ledger adjustment as any other edit.
+   */
+  private async applyDeltaToLines(
+    load: () => Promise<{
+      lines: {
+        itemId: string;
+        locationId?: string;
+        binId?: string;
+        uomCode?: string;
+        quantity: string | number;
+        unitPrice?: string | number;
+        note?: string;
+        notes?: string;
+      }[];
+    }>,
+    save: (id: string, lines: any[], actor: ActorContext) => Promise<unknown>,
+    id: string,
+    branchId: string,
+    deltas: { itemId: string; quantityDelta: number }[],
+    actor: ActorContext,
+  ): Promise<void> {
+    const counterpartActor = { ...actor, branchId };
+    const voucher = await load();
+    const deltaByItem = new Map(deltas.map((d) => [d.itemId, d.quantityDelta]));
+    const nextLines = voucher.lines
+      .map((line) => {
+        const quantityDelta = deltaByItem.get(line.itemId) ?? 0;
+        return {
+          itemId: line.itemId,
+          locationId: line.locationId,
+          binId: line.binId,
+          uomCode: line.uomCode,
+          quantity: Number(line.quantity) + quantityDelta,
+          unitPrice: Number(line.unitPrice ?? 0),
+          note: line.note ?? line.notes,
+        };
+      })
+      .filter((line) => line.quantity > 0);
+    await save(id, nextLines, counterpartActor);
+  }
+
+  /**
+   * Destination hasn't imported yet — nothing is posted there to adjust, so
+   * the edit only updates how much stock the two-phase import screen expects.
+   */
+  private async adjustRequestedQty(
+    orderId: string,
+    deltas: { itemId: string; quantityDelta: number }[],
+  ): Promise<void> {
+    for (const d of deltas) {
+      if (d.quantityDelta === 0) continue;
+      await this.dataSource.manager.query(
+        `UPDATE transfer_order_lines
+           SET requested_qty = GREATEST(requested_qty + $1, 0)
+         WHERE transfer_order_id = $2 AND item_id = $3`,
+        [d.quantityDelta, orderId, d.itemId],
+      );
+    }
   }
 
   async assertExportIssueCanBeCancelled(

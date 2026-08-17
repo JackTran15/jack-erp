@@ -26,7 +26,7 @@ import { TransferOrderController } from './transfer-order.controller';
     ]),
     DocumentNumberingModule,
     forwardRef(() => GoodsIssueModule),
-    GoodsReceiptModule,
+    forwardRef(() => GoodsReceiptModule),
   ],
   controllers: [TransferOrderController],
   providers: [TransferOrderService],

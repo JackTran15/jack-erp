@@ -176,7 +176,14 @@ export function PurchaseOrderFormDialog({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isView = mode === "view";
-  const canEdit = isView && initial?.status === "DRAFT";
+  const isEdit = mode === "edit";
+  // Any non-terminal row can be edited — BE writes the difference as a
+  // stock-ledger + accounting adjustment instead of overwriting what was
+  // already posted (see the warehouse-voucher-edit-delete feature).
+  const canEdit =
+    isView &&
+    initial?.status !== "CANCELLED" &&
+    initial?.status !== "REVERSED";
   const isPurchaseImport = documentKind === "purchase-import";
   // Resolve preferred shelves for many lines in a single request, then apply
   // each result back to its row. The (idx, itemId, storageId) guard prevents a
@@ -1666,7 +1673,12 @@ export function PurchaseOrderFormDialog({
                     setPurchaseTab("receipt");
                     markDirty();
                   }}
-                  disabled={isView}
+                  disabled={isView || isEdit}
+                  title={
+                    isEdit
+                      ? "Không thể đổi hình thức thanh toán khi sửa phiếu; hãy hủy phiếu và tạo phiếu mới"
+                      : undefined
+                  }
                 />
                 Ghi nợ nhà cung cấp
               </label>
@@ -1678,7 +1690,12 @@ export function PurchaseOrderFormDialog({
                     setSettlementMode("CASH");
                     markDirty();
                   }}
-                  disabled={isView}
+                  disabled={isView || isEdit}
+                  title={
+                    isEdit
+                      ? "Không thể đổi hình thức thanh toán khi sửa phiếu; hãy hủy phiếu và tạo phiếu mới"
+                      : undefined
+                  }
                 />
                 Thanh toán ngay
               </label>

@@ -37,6 +37,25 @@ import { RbacService } from '../../rbac/rbac.service';
 import { GoodsIssueEntity } from './goods-issue.entity';
 import { GoodsIssueLineEntity } from './goods-issue-line.entity';
 import { assertPurposePermission } from './assert-purpose-permission';
+import {
+  computeVoucherDelta,
+  VoucherLineSnapshot,
+} from '../voucher-delta.util';
+
+/** Both persisted lines and freshly built ones expose the fields the delta needs. */
+function toLineSnapshot(line: {
+  itemId: string;
+  locationId: string;
+  quantity: string | number;
+  unitPrice: string | number;
+}): VoucherLineSnapshot {
+  return {
+    itemId: line.itemId,
+    locationId: line.locationId,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice,
+  };
+}
 
 export interface CreateGoodsIssueDto {
   locationId: string;
@@ -61,6 +80,31 @@ export interface CreateGoodsIssueDto {
   /** User-entered issue date+time (ISO); falls back to createdAt when omitted. */
   occurredAt?: string;
   lines: {
+    itemId: string;
+    locationId?: string;
+    quantity: number;
+    unitPrice?: number;
+    notes?: string;
+  }[];
+}
+
+/**
+ * Fields an edit may touch. Deliberately narrower than {@link CreateGoodsIssueDto}:
+ * no `purpose`, no `targetBranchId` — changing either changes what kind of
+ * document this is, which is a cancel-and-recreate, not an edit (A-11).
+ */
+export interface UpdateGoodsIssueDto {
+  locationId?: string;
+  providerId?: string;
+  counterpartyKind?: DocCounterpartyKind;
+  counterpartyId?: string;
+  reasonId?: string;
+  reason?: string;
+  notes?: string;
+  deliverer?: string;
+  references?: string[];
+  occurredAt?: string;
+  lines?: {
     itemId: string;
     locationId?: string;
     quantity: number;
@@ -282,6 +326,286 @@ export class GoodsIssueService {
     return this.findOrFail(id, actor.organizationId, actor.branchId);
   }
 
+  // ─── Update (DRAFT or POSTED) ─────────────────────────────────────────────
+  //
+  // Same shape as GoodsReceiptService.update(): a posted issue is edited in
+  // place, and the delta engine writes one stock-ledger adjustment per (item,
+  // location) pair that moved. Sign is flipped from the receipt side — a goods
+  // issue stores its lines positive but its ledger movements negative, so a
+  // positive line-quantity delta (more issued) becomes a *more negative*
+  // ledger movement. Goods issues carry no accounting in this feature's scope,
+  // so there is no credit/cash branch here.
+
+  async update(
+    id: string,
+    dto: UpdateGoodsIssueDto,
+    actor: ActorContext,
+    options: { cascadeTransferOrder?: boolean } = {},
+  ): Promise<GoodsIssueEntity> {
+    const gi = await this.findOrFail(id, actor.organizationId, actor.branchId);
+    if (gi.status === GoodsIssueStatus.CANCELLED) {
+      throw new ConflictException('A cancelled goods issue can no longer be edited');
+    }
+    const wasPosted = gi.status === GoodsIssueStatus.POSTED;
+    const branchId = gi.branchId ?? actor.branchId;
+    if (wasPosted && !branchId) {
+      throw new BadRequestException(
+        'Không xác định được chi nhánh để điều chỉnh tồn kho',
+      );
+    }
+
+    if (dto.locationId !== undefined) gi.locationId = dto.locationId;
+    if (dto.counterpartyKind !== undefined || dto.counterpartyId !== undefined) {
+      const counterparty = await resolveDocCounterparty(
+        this.dataSource.manager,
+        dto,
+        actor.organizationId,
+      );
+      // providerId is nullable; clear it for a customer/employee đối tượng.
+      gi.providerId = (counterparty.providerId ?? null) as unknown as
+        string | undefined;
+      gi.counterpartyKind = counterparty.counterpartyKind;
+      gi.counterpartyId = counterparty.counterpartyId;
+    } else if (dto.providerId !== undefined) {
+      gi.providerId = dto.providerId;
+    }
+    if (dto.reasonId !== undefined) {
+      // Only OTHER/DISPOSAL carry a user-chosen reason; TRANSFER_OUT's reason
+      // is derived from the (unchangeable) target branch, SALE's from the POS
+      // flow. `create()`'s resolveReasonContext handles the same split.
+      if (
+        gi.purpose === GoodsIssuePurpose.OTHER ||
+        gi.purpose === GoodsIssuePurpose.DISPOSAL
+      ) {
+        const reasonEntity = await this.reasonRepo.findOne({
+          where: { id: dto.reasonId, organizationId: actor.organizationId },
+        });
+        if (!reasonEntity) {
+          throw new BadRequestException(
+            `Lý do xuất kho ${dto.reasonId} không tồn tại`,
+          );
+        }
+        gi.reasonId = reasonEntity.id;
+        gi.reason = reasonEntity.name;
+      } else {
+        throw new BadRequestException(
+          `Không thể đổi lý do cho phiếu xuất mục đích ${gi.purpose}`,
+        );
+      }
+    } else if (dto.reason !== undefined) {
+      gi.reason = dto.reason;
+    }
+    if (dto.notes !== undefined) gi.notes = dto.notes;
+    if (dto.deliverer !== undefined) gi.deliverer = dto.deliverer;
+    if (dto.references !== undefined) gi.references = dto.references;
+    if (dto.occurredAt !== undefined) gi.occurredAt = new Date(dto.occurredAt);
+
+    // Cost on a goods issue is never client-supplied — `post()` already
+    // overrides whatever price the client sent with the instant average cost,
+    // and edits keep that contract (T-04-02): unitPrice/lineTotal below are
+    // placeholders, overwritten once the per-pair cost rule is resolved.
+    const nextLines = dto.lines
+      ? dto.lines.map((l) => {
+          const line = new GoodsIssueLineEntity();
+          line.itemId = l.itemId;
+          line.locationId = l.locationId ?? gi.locationId;
+          line.quantity = l.quantity;
+          line.unitPrice = '0.00';
+          line.lineTotal = '0.00';
+          line.notes = l.notes;
+          return line;
+        })
+      : null;
+
+    const nextRevision = (gi.revision ?? 0) + 1;
+    // computeVoucherDelta only pairs quantities here — its valueDelta and
+    // unitCostForDelta are discarded below in favour of the two-directional
+    // cost rule (T-04-02): the "after" unitPrice fed in is a throwaway 0.
+    const rawDeltas =
+      wasPosted && nextLines
+        ? computeVoucherDelta(
+            gi.lines.map(toLineSnapshot),
+            nextLines.map(toLineSnapshot),
+          )
+        : [];
+
+    const beforeByKey = new Map(
+      gi.lines.map((l) => [
+        `${l.itemId}::${l.locationId}`,
+        { quantity: Number(l.quantity), unitPrice: Number(l.unitPrice) },
+      ]),
+    );
+    const averageCostByItem = new Map<string, number>();
+    const resolvedDeltas: {
+      itemId: string;
+      locationId: string;
+      quantityDelta: number;
+      valueDelta: number;
+      unitCostForDelta: number;
+    }[] = [];
+    for (const d of rawDeltas) {
+      let unitCostForDelta: number;
+      if (d.quantityDelta > 0) {
+        // Issuing more than before: cost the extra at today's moving average,
+        // not whatever was on the line originally.
+        if (!averageCostByItem.has(d.itemId)) {
+          const average = await this.ledgerService.getInstantAverageCost(
+            d.itemId,
+            gi.organizationId,
+            branchId!,
+          );
+          averageCostByItem.set(d.itemId, average.unitCost);
+        }
+        unitCostForDelta = averageCostByItem.get(d.itemId)!;
+      } else {
+        // Issuing less (or a line removed outright): reverse at the cost this
+        // issue was actually posted at, not a fresh average.
+        const before = beforeByKey.get(`${d.itemId}::${d.locationId}`);
+        unitCostForDelta = before?.unitPrice ?? 0;
+      }
+      resolvedDeltas.push({
+        itemId: d.itemId,
+        locationId: d.locationId,
+        quantityDelta: d.quantityDelta,
+        valueDelta: Number((d.quantityDelta * unitCostForDelta).toFixed(2)),
+        unitCostForDelta,
+      });
+    }
+
+    const movements: RecordMovementParams[] = resolvedDeltas.map((d) => {
+      // The delta is in the line's own (positive) direction; the ledger for a
+      // goods issue stores the opposite sign.
+      const ledgerQuantityDelta = -d.quantityDelta;
+      const ledgerValueDelta = -d.valueDelta;
+      return {
+        itemId: d.itemId,
+        locationId: d.locationId,
+        branchId: branchId!,
+        organizationId: gi.organizationId,
+        movementType:
+          (ledgerQuantityDelta !== 0 ? ledgerQuantityDelta : ledgerValueDelta) > 0
+            ? StockMovementType.ADJUSTMENT_INCREASE
+            : StockMovementType.ADJUSTMENT_DECREASE,
+        quantity: ledgerQuantityDelta,
+        referenceType: 'GOODS_ISSUE',
+        referenceId: gi.id,
+        notes: `Adjustment for ${gi.documentNumber ?? gi.id} rev ${nextRevision}`,
+        actorContext: actor,
+        unitCost: d.unitCostForDelta,
+        lineValue: ledgerValueDelta,
+        // A revision must land even when the storage was deactivated afterwards.
+        skipInactiveStorageGuard: true,
+      };
+    });
+
+    // Re-price each surviving line as the weighted average of everything ever
+    // posted for it: (what was already on the ledger) + (this edit's delta),
+    // divided by the new quantity — so INV-2 holds even when one line now
+    // carries two cost bases (part at the old price, part at today's average).
+    if (nextLines) {
+      const deltaByKey = new Map(
+        resolvedDeltas.map((d) => [`${d.itemId}::${d.locationId}`, d]),
+      );
+      for (const line of nextLines) {
+        const key = `${line.itemId}::${line.locationId}`;
+        const before = beforeByKey.get(key);
+        const beforeTotal = before ? before.quantity * before.unitPrice : 0;
+        const valueDelta = deltaByKey.get(key)?.valueDelta ?? 0;
+        const afterTotal = beforeTotal + valueDelta;
+        const afterQuantity = Number(line.quantity);
+        const unitPrice = afterQuantity !== 0 ? afterTotal / afterQuantity : 0;
+        line.unitPrice = unitPrice.toFixed(2);
+        line.lineTotal = afterTotal.toFixed(2);
+      }
+    }
+
+    const ledgerEntries = await this.dataSource.transaction(async (manager) => {
+      // Lock the voucher row and re-read its state inside the transaction — see
+      // GoodsReceiptService.update() for why this has to happen before writing.
+      const [locked] = await manager.query(
+        `SELECT status, revision FROM goods_issues WHERE id = $1 AND organization_id = $2 FOR UPDATE`,
+        [gi.id, gi.organizationId],
+      );
+      if (!locked) {
+        throw new NotFoundException(`Phiếu xuất hàng ${id} không tìm thấy`);
+      }
+      if (locked.status === GoodsIssueStatus.CANCELLED) {
+        throw new ConflictException('A cancelled goods issue can no longer be edited');
+      }
+      if (Number(locked.revision ?? 0) !== (gi.revision ?? 0)) {
+        throw new ConflictException(
+          'This goods issue was modified by another request; reload it and try again',
+        );
+      }
+
+      const entries =
+        movements.length > 0
+          ? await this.ledgerService.recordBatchMovements(movements, manager)
+          : [];
+
+      if (nextLines) {
+        await manager.delete(GoodsIssueLineEntity, { goodsIssueId: gi.id });
+        await manager.save(
+          GoodsIssueLineEntity,
+          nextLines.map((line) => {
+            line.goodsIssueId = gi.id;
+            return line;
+          }),
+        );
+      }
+
+      await manager.update(GoodsIssueEntity, gi.id, {
+        locationId: gi.locationId,
+        providerId: gi.providerId,
+        counterpartyKind: gi.counterpartyKind ?? null,
+        counterpartyId: gi.counterpartyId ?? null,
+        reason: gi.reason,
+        // Already normalised above: only ever set to a resolved reason's id, or
+        // left as whatever the loaded entity had.
+        reasonId: gi.reasonId,
+        notes: gi.notes,
+        deliverer: gi.deliverer,
+        references: gi.references,
+        occurredAt: gi.occurredAt,
+        ...(wasPosted ? { revision: nextRevision } : {}),
+      });
+
+      return entries;
+    });
+
+    await this.ledgerService.publishMovementEvents(ledgerEntries);
+
+    this.logger.log(
+      `Goods issue ${id} updated (${gi.status}) by ${actor.userId}: ` +
+        `${resolvedDeltas.length} ledger adjustment(s), rev ${wasPosted ? nextRevision : gi.revision ?? 0}`,
+    );
+
+    // This issue is the export leg of a transfer order — apply the same delta
+    // to its import leg (ADR-07). `cascadeTransferOrder: false` is what
+    // TransferOrderService.applyLegRevision itself passes when it calls back
+    // in here, so the two legs don't ping-pong each other.
+    if (
+      options.cascadeTransferOrder !== false &&
+      wasPosted &&
+      resolvedDeltas.length > 0 &&
+      gi.referenceType === GoodsIssueReferenceType.TRANSFER_ORDER &&
+      gi.referenceId
+    ) {
+      await this.transferOrderService.applyLegRevision(
+        gi.referenceId,
+        resolvedDeltas.map((d) => ({ itemId: d.itemId, quantityDelta: d.quantityDelta })),
+        actor,
+        'export',
+      );
+    }
+
+    return this.findOrFail(id, actor.organizationId, actor.branchId);
+  }
+
+  // Cancel is an edit down to nothing (ADR-02): the same delta engine that
+  // powers update() reverses every line via computeVoucherDelta(before, []),
+  // and a row lock — missing before this ticket — keeps two concurrent
+  // cancels of the same issue from both reversing the stock.
   async cancel(
     id: string,
     actor: ActorContext,
@@ -304,37 +628,74 @@ export class GoodsIssueService {
       );
     }
 
-    if (gi.status === GoodsIssueStatus.POSTED) {
-      const branchId = gi.branchId ?? actor.branchId;
-      if (!branchId) {
-        throw new BadRequestException(
-          'Không xác định được chi nhánh để đảo bút tồn kho',
-        );
-      }
-      const entries = await this.dataSource.transaction(async (manager) => {
-        const reversals: RecordMovementParams[] = gi.lines.map((line) => ({
-          itemId: line.itemId,
-          locationId: line.locationId,
-          branchId,
-          organizationId: gi.organizationId,
-          movementType: StockMovementType.ADJUSTMENT_INCREASE,
-          quantity: Number(line.quantity),
-          referenceType: 'GOODS_ISSUE',
-          referenceId: gi.id,
-          notes: `Huỷ phiếu xuất kho ${gi.documentNumber ?? gi.id}`,
-          actorContext: actor,
-          unitCost: Number(line.unitPrice ?? 0),
-          // Đảo bút huỷ phiếu đã posted: cho phép kể cả khi kho đã ngừng hoạt động.
-          skipInactiveStorageGuard: true,
-        }));
-        return this.ledgerService.recordBatchMovements(reversals, manager);
-      });
-      await this.ledgerService.publishMovementEvents(entries);
+    const wasPosted = gi.status === GoodsIssueStatus.POSTED;
+    const branchId = gi.branchId ?? actor.branchId;
+    if (wasPosted && !branchId) {
+      throw new BadRequestException(
+        'Không xác định được chi nhánh để đảo bút tồn kho',
+      );
     }
 
-    gi.status = GoodsIssueStatus.CANCELLED;
-    const saved = await this.giRepo.save(gi);
+    const nextRevision = (gi.revision ?? 0) + 1;
+    const deltas = wasPosted
+      ? computeVoucherDelta(gi.lines.map(toLineSnapshot), [])
+      : [];
+    const movements: RecordMovementParams[] = deltas.map((d) => {
+      const ledgerQuantityDelta = -d.quantityDelta;
+      const ledgerValueDelta = -d.valueDelta;
+      return {
+        itemId: d.itemId,
+        locationId: d.locationId,
+        branchId: branchId!,
+        organizationId: gi.organizationId,
+        movementType: StockMovementType.ADJUSTMENT_INCREASE,
+        quantity: ledgerQuantityDelta,
+        referenceType: 'GOODS_ISSUE',
+        referenceId: gi.id,
+        notes: `Huỷ phiếu xuất kho ${gi.documentNumber ?? gi.id}`,
+        actorContext: actor,
+        // Full reversal is always the "issued less" direction — reverse at
+        // the cost this issue actually posted at (T-04-02), not a fresh
+        // average.
+        unitCost: d.unitCostForDelta,
+        lineValue: ledgerValueDelta,
+        // Đảo bút huỷ phiếu đã posted: cho phép kể cả khi kho đã ngừng hoạt động.
+        skipInactiveStorageGuard: true,
+      };
+    });
+
+    const entries = await this.dataSource.transaction(async (manager) => {
+      // Khoá row + đọc lại status/revision trong transaction để chặn 2 request
+      // huỷ trùng nhau ghi đúp bút toán đảo.
+      const [locked] = await manager.query(
+        `SELECT status, revision FROM goods_issues WHERE id = $1 AND organization_id = $2 FOR UPDATE`,
+        [gi.id, gi.organizationId],
+      );
+      if (!locked || locked.status === GoodsIssueStatus.CANCELLED) {
+        throw new ConflictException('Phiếu đã huỷ, không thể xoá lại');
+      }
+      if (Number(locked.revision ?? 0) !== (gi.revision ?? 0)) {
+        throw new ConflictException(
+          'This goods issue was modified by another request; reload it and try again',
+        );
+      }
+
+      const reversalEntries =
+        movements.length > 0
+          ? await this.ledgerService.recordBatchMovements(movements, manager)
+          : [];
+
+      await manager.update(GoodsIssueEntity, gi.id, {
+        status: GoodsIssueStatus.CANCELLED,
+        ...(wasPosted ? { revision: nextRevision } : {}),
+      });
+
+      return reversalEntries;
+    });
+    await this.ledgerService.publishMovementEvents(entries);
+
     this.logger.log(`Goods issue ${id} cancelled by ${actor.userId}`);
+    const saved = await this.findOrFail(id, actor.organizationId, actor.branchId);
 
     // When this issue is the export leg of a transfer order, deleting it must
     // also roll back the transfer: reverse the destination goods receipt (if the

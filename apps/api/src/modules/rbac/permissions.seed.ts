@@ -40,6 +40,7 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "inventory.purchase-order.cancel", module: "inventory" },
   { key: "inventory.goods-issue.read", module: "inventory" },
   { key: "inventory.goods-issue.create", module: "inventory" },
+  { key: "inventory.goods-issue.update", module: "inventory" },
   { key: "inventory.goods-issue.approve", module: "inventory" },
   { key: "inventory.goods-issue.post", module: "inventory" },
   { key: "inventory.goods-issue.cancel", module: "inventory" },

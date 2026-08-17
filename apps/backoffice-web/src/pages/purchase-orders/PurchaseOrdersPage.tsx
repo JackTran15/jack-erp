@@ -418,7 +418,13 @@ export function PurchaseOrdersPage({
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !selectedOrder || selectedOrder.status !== "DRAFT",
+      // Allow editing any non-terminal row. BE update() handles POSTED by
+      // writing the difference as a stock-ledger + accounting adjustment
+      // instead of overwriting what was already posted.
+      disabled:
+        !selectedOrder ||
+        selectedOrder.status === "CANCELLED" ||
+        selectedOrder.status === "REVERSED",
       onClick: () => {
         if (!selectedOrder) return;
         setEditingOrder(selectedOrder);

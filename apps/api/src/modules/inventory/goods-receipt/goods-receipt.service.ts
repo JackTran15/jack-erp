@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
+  forwardRef,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -27,7 +29,6 @@ import {
   RecordMovementParams,
   StockLedgerService,
 } from "../ledger/stock-ledger.service";
-import { StockLedgerEntryEntity } from "../ledger/stock-ledger-entry.entity";
 import { DocumentNumberingService } from "../../document-numbering/document-numbering.service";
 import { EventPublisher } from "../../events/event-publisher.service";
 import { CashService } from "../../accounting/cash/cash.service";
@@ -63,6 +64,36 @@ import {
 import { mapGoodsReceiptToVoucherPayload } from "./goods-receipt-print.mapper";
 import { UserEntity } from "../../auth/user.entity";
 import { TransferOrderEntity } from "../transfer-order/transfer-order.entity";
+import { TransferOrderService } from "../transfer-order/transfer-order.service";
+import {
+  computeVoucherDelta,
+  VoucherLineSnapshot,
+} from "../voucher-delta.util";
+import { deterministicVoucherRevisionReferenceId } from "../voucher-revision-reference.util";
+import { CashPaymentsService } from "../../accounting/cash-vouchers/cash-payments/cash-payments.service";
+import { CashReceiptsService } from "../../accounting/cash-vouchers/cash-receipts/cash-receipts.service";
+import {
+  CashPaymentPurpose,
+  CashPaymentReferenceType,
+  CashReceiptPurpose,
+  CashReceiptReferenceType,
+  CashVoucherPartnerType,
+} from "../../accounting/cash-vouchers/enums";
+
+/** Both persisted lines and freshly built ones expose the fields the delta needs. */
+function toLineSnapshot(line: {
+  itemId: string;
+  locationId: string;
+  quantity: string | number;
+  unitPrice: string | number;
+}): VoucherLineSnapshot {
+  return {
+    itemId: line.itemId,
+    locationId: line.locationId,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice,
+  };
+}
 
 export interface GoodsReceiptQuery extends PaginationQuery {
   status?: GoodsReceiptStatus;
@@ -88,6 +119,10 @@ export class GoodsReceiptService {
     private readonly journalService: JournalService,
     private readonly outboxService: OutboxService,
     private readonly eventPublisher: EventPublisher,
+    private readonly cashPaymentsService: CashPaymentsService,
+    private readonly cashReceiptsService: CashReceiptsService,
+    @Inject(forwardRef(() => TransferOrderService))
+    private readonly transferOrderService: TransferOrderService,
   ) {}
 
   // ─── Create (DRAFT) ───────────────────────────────────────────────────────
@@ -185,21 +220,44 @@ export class GoodsReceiptService {
     }
   }
 
-  // ─── Update (only DRAFT) ──────────────────────────────────────────────────
+  // ─── Update (DRAFT or POSTED) ─────────────────────────────────────────────
+  //
+  // A posted receipt is edited in place: its lines are overwritten and the stock
+  // ledger receives one adjustment row per (item, location) pair that moved. The
+  // ledger itself stays append-only — no posted row is ever updated or deleted.
 
   async update(
     id: string,
     dto: UpdateGoodsReceiptDto,
     actor: ActorContext,
+    options: { cascadeTransferOrder?: boolean } = {},
   ): Promise<GoodsReceiptEntity> {
     const receipt = await this.findOrFail(
       id,
       actor.organizationId,
       actor.branchId,
     );
-    if (receipt.status !== GoodsReceiptStatus.DRAFT) {
+    if (
+      receipt.status === GoodsReceiptStatus.CANCELLED ||
+      receipt.status === GoodsReceiptStatus.REVERSED
+    ) {
       throw new ConflictException(
-        `Chỉ có thể sửa phiếu ở trạng thái DRAFT (hiện tại: ${receipt.status})`,
+        `A ${receipt.status.toLowerCase()} goods receipt can no longer be edited`,
+      );
+    }
+    if (
+      dto.paymentMethod !== undefined &&
+      dto.paymentMethod !== receipt.paymentMethod
+    ) {
+      throw new BadRequestException(
+        'The settlement method of a goods receipt cannot be changed; cancel it and create a new one',
+      );
+    }
+    const wasPosted = receipt.status === GoodsReceiptStatus.POSTED;
+    const branchId = receipt.branchId ?? actor.branchId;
+    if (wasPosted && !branchId) {
+      throw new BadRequestException(
+        'Cannot resolve the branch to adjust stock for this goods receipt',
       );
     }
 
@@ -255,24 +313,185 @@ export class GoodsReceiptService {
       actor.branchId,
     );
 
-    if (dto.lines) {
-      await this.lineRepo.delete({ goodsReceiptId: receipt.id });
-      receipt.lines = dto.lines.map((l) =>
-        this.makeLine(
-          l,
-          receipt.organizationId,
-          receipt.branchId,
-          actor.userId,
-        ),
+    const nextLines = dto.lines
+      ? dto.lines.map((l) =>
+          this.makeLine(l, receipt.organizationId, receipt.branchId, actor.userId),
+        )
+      : null;
+
+    // What the books currently say against what the user just submitted. A draft
+    // has nothing on the books yet, so it has nothing to adjust.
+    const nextRevision = (receipt.revision ?? 0) + 1;
+    const deltas =
+      wasPosted && nextLines
+        ? computeVoucherDelta(
+            receipt.lines.map(toLineSnapshot),
+            nextLines.map(toLineSnapshot),
+          )
+        : [];
+
+    const movements: RecordMovementParams[] = deltas.map((d) => ({
+      itemId: d.itemId,
+      locationId: d.locationId,
+      branchId: branchId!,
+      organizationId: receipt.organizationId,
+      movementType:
+        (d.quantityDelta !== 0 ? d.quantityDelta : d.valueDelta) > 0
+          ? StockMovementType.ADJUSTMENT_INCREASE
+          : StockMovementType.ADJUSTMENT_DECREASE,
+      quantity: d.quantityDelta,
+      referenceType: 'GOODS_RECEIPT',
+      referenceId: receipt.id,
+      notes: `Adjustment for ${receipt.documentNumber ?? receipt.id} rev ${nextRevision}`,
+      actorContext: actor,
+      unitCost: d.unitCostForDelta,
+      lineValue: d.valueDelta,
+      // A revision must land even when the storage was deactivated afterwards.
+      skipInactiveStorageGuard: true,
+    }));
+
+    // Total value delta drives the credit-side accounting below. `nextLines`
+    // is null when the request did not touch `lines` — nothing moved in value.
+    const totalBefore = receipt.lines.reduce(
+      (sum, l) => sum + Number(l.quantity) * Number(l.unitPrice),
+      0,
+    );
+    const totalAfter = nextLines
+      ? nextLines.reduce(
+          (sum, l) => sum + Number(l.quantity) * Number(l.unitPrice),
+          0,
+        )
+      : totalBefore;
+    const totalDelta = Number((totalAfter - totalBefore).toFixed(2));
+    const isCredit =
+      wasPosted &&
+      receipt.paymentMethod === GoodsReceiptPaymentMethod.CREDIT &&
+      totalDelta !== 0;
+    if (isCredit && !receipt.providerId) {
+      throw new BadRequestException(
+        'Phiếu nhập kho công nợ phải có nhà cung cấp',
+      );
+    }
+    const isCash =
+      wasPosted &&
+      receipt.paymentMethod === GoodsReceiptPaymentMethod.CASH &&
+      totalDelta !== 0;
+
+    const ledgerEntries = await this.dataSource.transaction(async (manager) => {
+      // Lock the voucher row and re-read its state inside the transaction: two
+      // concurrent edits would otherwise both diff against the same snapshot and
+      // write their adjustments twice over.
+      const [locked] = await manager.query(
+        `SELECT status, revision FROM goods_receipts WHERE id = $1 AND organization_id = $2 FOR UPDATE`,
+        [receipt.id, receipt.organizationId],
+      );
+      if (!locked) {
+        throw new NotFoundException(`Phiếu nhập kho ${id} không tìm thấy`);
+      }
+      if (
+        locked.status === GoodsReceiptStatus.CANCELLED ||
+        locked.status === GoodsReceiptStatus.REVERSED
+      ) {
+        throw new ConflictException(
+          `A ${String(locked.status).toLowerCase()} goods receipt can no longer be edited`,
+        );
+      }
+      if (Number(locked.revision ?? 0) !== (receipt.revision ?? 0)) {
+        throw new ConflictException(
+          'This goods receipt was modified by another request; reload it and try again',
+        );
+      }
+
+      if (isCredit) {
+        await this.applyCreditDelta(
+          manager,
+          receipt,
+          totalDelta,
+          totalAfter,
+          nextRevision,
+          actor,
+        );
+      }
+      if (isCash) {
+        await this.applyCashDelta(manager, receipt, totalDelta, nextRevision, actor);
+      }
+
+      const entries =
+        movements.length > 0
+          ? await this.stockLedger.recordBatchMovements(movements, manager)
+          : [];
+
+      if (nextLines) {
+        await manager.delete(GoodsReceiptLineEntity, {
+          goodsReceiptId: receipt.id,
+        });
+        await manager.save(
+          GoodsReceiptLineEntity,
+          nextLines.map((line) => {
+            line.goodsReceiptId = receipt.id;
+            return line;
+          }),
+        );
+      }
+
+      await manager.update(GoodsReceiptEntity, receipt.id, {
+        purpose: receipt.purpose,
+        // Already normalised above: null when the đối tượng is not a supplier,
+        // undefined when the request did not touch it (TypeORM then skips it).
+        providerId: receipt.providerId,
+        counterpartyKind: receipt.counterpartyKind ?? null,
+        counterpartyId: receipt.counterpartyId ?? null,
+        deliveredBy: receipt.deliveredBy,
+        purchasingEmployeeId: receipt.purchasingEmployeeId ?? null,
+        reason: receipt.reason,
+        description: receipt.description,
+        referenceId: receipt.referenceId,
+        referenceType: receipt.referenceType,
+        sourceBranchId: receipt.sourceBranchId,
+        receivedAt: receipt.receivedAt,
+        locationId: receipt.locationId,
+        attachmentIds: receipt.attachmentIds,
+        ...(wasPosted ? { revision: nextRevision } : {}),
+      });
+
+      return entries;
+    });
+
+    await this.stockLedger.publishMovementEvents(ledgerEntries);
+
+    this.logger.log(
+      `Goods receipt ${id} updated (${receipt.status}) by ${actor.userId}: ` +
+        `${deltas.length} ledger adjustment(s), rev ${wasPosted ? nextRevision : receipt.revision ?? 0}`,
+    );
+
+    // This receipt is the import leg of a transfer order — apply the same
+    // delta to its export leg (ADR-07). `cascadeTransferOrder: false` is what
+    // TransferOrderService.applyLegRevision itself passes when it calls back
+    // in here, so the two legs don't ping-pong each other.
+    if (
+      options.cascadeTransferOrder !== false &&
+      wasPosted &&
+      deltas.length > 0 &&
+      receipt.referenceType === GoodsReceiptReferenceType.STOCK_TRANSFER &&
+      receipt.referenceId
+    ) {
+      await this.transferOrderService.applyLegRevision(
+        receipt.referenceId,
+        deltas.map((d) => ({ itemId: d.itemId, quantityDelta: d.quantityDelta })),
+        actor,
+        "import",
       );
     }
 
-    const saved = await this.receiptRepo.save(receipt);
-    this.logger.log(`Goods receipt ${id} updated (DRAFT) by ${actor.userId}`);
-    return this.findOrFail(saved.id, actor.organizationId, actor.branchId);
+    return this.findOrFail(id, actor.organizationId, actor.branchId);
   }
 
-  // ─── Soft cancel (DRAFT only) ─────────────────────────────────────────────
+  // ─── Cancel (delete = edit down to nothing, ADR-02) ───────────────────────
+  //
+  // Deleting a voucher is the same computation as editing it, with `after = []`:
+  // the same delta engine reverses the stock ledger, and — for a credit receipt
+  // — the same credit-side accounting brings the payable and the supplier debt
+  // back to zero. See `update()`, which this mirrors.
 
   async cancel(id: string, actor: ActorContext): Promise<void> {
     const receipt = await this.findOrFail(
@@ -297,13 +516,46 @@ export class GoodsReceiptService {
       );
     }
 
+    const nextRevision = (receipt.revision ?? 0) + 1;
+    const deltas = wasPosted
+      ? computeVoucherDelta(receipt.lines.map(toLineSnapshot), [])
+      : [];
+    const movements: RecordMovementParams[] = deltas.map((d) => ({
+      itemId: d.itemId,
+      locationId: d.locationId,
+      branchId: branchId!,
+      organizationId: receipt.organizationId,
+      movementType: StockMovementType.ADJUSTMENT_DECREASE,
+      quantity: d.quantityDelta,
+      referenceType: "GOODS_RECEIPT",
+      referenceId: receipt.id,
+      notes: `Huỷ phiếu nhập kho ${receipt.documentNumber ?? receipt.id}`,
+      actorContext: actor,
+      unitCost: d.unitCostForDelta,
+      lineValue: d.valueDelta,
+      // Đảo bút huỷ phiếu đã posted: cho phép kể cả khi kho đã ngừng hoạt động.
+      skipInactiveStorageGuard: true,
+    }));
+    const totalBefore = receipt.lines.reduce(
+      (sum, l) => sum + Number(l.quantity) * Number(l.unitPrice),
+      0,
+    );
+    const isCredit =
+      wasPosted &&
+      receipt.paymentMethod === GoodsReceiptPaymentMethod.CREDIT &&
+      totalBefore !== 0;
+    const isCash =
+      wasPosted &&
+      receipt.paymentMethod === GoodsReceiptPaymentMethod.CASH &&
+      totalBefore !== 0;
+
     const entries = await this.dataSource.transaction(async (manager) => {
       // Khoá row + đọc lại status mới nhất trong transaction để chặn 2 request
       // huỷ trùng nhau ghi đúp bút toán đảo (status trước đây chỉ được cập
       // nhật SAU khi ghi ledger + publish Kafka, để hở khoảng thời gian dài
       // cho request huỷ thứ 2 vẫn thấy status POSTED và lọt qua guard phía trên).
       const [locked] = await manager.query(
-        `SELECT status FROM goods_receipts WHERE id = $1 AND organization_id = $2 FOR UPDATE`,
+        `SELECT status, revision FROM goods_receipts WHERE id = $1 AND organization_id = $2 FOR UPDATE`,
         [receipt.id, receipt.organizationId],
       );
       if (
@@ -315,56 +567,37 @@ export class GoodsReceiptService {
           `Phiếu đã ${locked?.status === GoodsReceiptStatus.CANCELLED ? "huỷ" : "đảo bút"}, không thể xoá lại`,
         );
       }
-
-      let reversalEntries: StockLedgerEntryEntity[] = [];
-      if (wasPosted) {
-        const reversals: RecordMovementParams[] = receipt.lines.map((line) => ({
-          itemId: line.itemId,
-          locationId: line.locationId,
-          branchId: branchId!,
-          organizationId: receipt.organizationId,
-          movementType: StockMovementType.ADJUSTMENT_DECREASE,
-          quantity: -Number(line.quantity),
-          referenceType: "GOODS_RECEIPT",
-          referenceId: receipt.id,
-          notes: `Huỷ phiếu nhập kho ${receipt.documentNumber ?? receipt.id}`,
-          actorContext: actor,
-          unitCost: Number(line.unitPrice),
-          // Đảo bút huỷ phiếu đã posted: cho phép kể cả khi kho đã ngừng hoạt động.
-          skipInactiveStorageGuard: true,
-        }));
-        reversalEntries = await this.stockLedger.recordBatchMovements(
-          reversals,
-          manager,
+      if (Number(locked.revision ?? 0) !== (receipt.revision ?? 0)) {
+        throw new ConflictException(
+          "This goods receipt was modified by another request; reload it and try again",
         );
-
-        // Void the supplier-debt ledger row (nợ NCC) for a CREDIT receipt.
-        // Refuse if it has already received any payment (partially settled).
-        if (receipt.paymentMethod === GoodsReceiptPaymentMethod.CREDIT) {
-          const debtRows = await manager.query(
-            `SELECT id FROM supplier_debts WHERE goods_receipt_id = $1 AND organization_id = $2`,
-            [receipt.id, receipt.organizationId],
-          );
-          if (debtRows.length > 0) {
-            const paid = await manager.query(
-              `SELECT 1 FROM supplier_debt_payments WHERE debt_id = $1 LIMIT 1`,
-              [debtRows[0].id],
-            );
-            if (paid.length > 0) {
-              throw new ConflictException(
-                "Không thể huỷ phiếu nhập: công nợ NCC đã có thanh toán",
-              );
-            }
-            await manager.delete(SupplierDebtEntity, debtRows[0].id);
-          }
-        }
       }
+
+      if (isCredit) {
+        await this.applyCreditDelta(
+          manager,
+          receipt,
+          -totalBefore,
+          0,
+          nextRevision,
+          actor,
+        );
+      }
+      if (isCash) {
+        await this.applyCashDelta(manager, receipt, -totalBefore, nextRevision, actor);
+      }
+
+      const reversalEntries =
+        movements.length > 0
+          ? await this.stockLedger.recordBatchMovements(movements, manager)
+          : [];
 
       // Chuyển trạng thái CANCELLED ngay trong cùng transaction, trước khi
       // publish Kafka, để bất kỳ request huỷ trùng nào đang chờ lock cũng
       // thấy status đã đổi thay vì vẫn còn POSTED.
       await manager.update(GoodsReceiptEntity, receipt.id, {
         status: GoodsReceiptStatus.CANCELLED,
+        ...(wasPosted ? { revision: nextRevision } : {}),
       });
       await manager.softDelete(GoodsReceiptEntity, receipt.id);
 
@@ -626,6 +859,191 @@ export class GoodsReceiptService {
       `Goods receipt ${id} posted as ${documentNumber} by ${actor.userId}`,
     );
     return this.findOrFail(id, actor.organizationId, actor.branchId);
+  }
+
+  /**
+   * Posts the DR156/CR331 (or reverse) journal adjustment for a credit receipt's
+   * value delta, and updates its `supplier_debts` row to match the new total.
+   *
+   * `paidAmount` is left untouched — this only ever changes what is owed, never
+   * what has actually been paid. A receipt edited below what the supplier has
+   * already been paid leaves `remainingAmount` negative (status OVERPAID, A-03);
+   * no refund voucher is generated for that automatically.
+   */
+  private async applyCreditDelta(
+    manager: import("typeorm").EntityManager,
+    receipt: GoodsReceiptEntity,
+    totalDelta: number,
+    totalAfter: number,
+    revision: number,
+    actor: ActorContext,
+  ): Promise<void> {
+    const inventoryAccountId = await this.resolveAccountId(
+      manager,
+      receipt.organizationId,
+      "156",
+    );
+    const payableAccountId = await this.resolveAccountId(
+      manager,
+      receipt.organizationId,
+      "331",
+    );
+    const magnitude = Math.abs(totalDelta);
+    const increased = totalDelta > 0;
+    await this.journalService.post(
+      {
+        source: JournalSource.MANUAL,
+        sourceReferenceId: receipt.id,
+        description: `Adjustment for ${receipt.documentNumber ?? receipt.id} rev ${revision} (credit)`,
+        lines: [
+          {
+            accountId: increased ? inventoryAccountId : payableAccountId,
+            debitAmount: magnitude,
+            creditAmount: 0,
+            description: increased ? "Inventory (debit)" : "Payable (debit)",
+            lineOrder: 1,
+          },
+          {
+            accountId: increased ? payableAccountId : inventoryAccountId,
+            debitAmount: 0,
+            creditAmount: magnitude,
+            description: increased ? "Payable (credit)" : "Inventory (credit)",
+            lineOrder: 2,
+          },
+        ],
+      },
+      actor,
+      manager,
+    );
+
+    const [debt] = await manager.query(
+      `SELECT id, paid_amount FROM supplier_debts WHERE goods_receipt_id = $1 AND organization_id = $2`,
+      [receipt.id, receipt.organizationId],
+    );
+    if (!debt) {
+      // Predates the credit path, or the debt row was somehow dropped — create
+      // it fresh rather than leave the receipt's edit unaccounted for.
+      await manager.save(
+        manager.create(SupplierDebtEntity, {
+          organizationId: receipt.organizationId,
+          branchId: receipt.branchId,
+          createdBy: actor.userId,
+          referenceCode: receipt.documentNumber ?? receipt.id,
+          goodsReceiptId: receipt.id,
+          supplierId: receipt.providerId!,
+          documentType: SupplierDebtDocumentType.GOODS_RECEIPT,
+          originalAmount: totalAfter,
+          paidAmount: 0,
+          remainingAmount: totalAfter,
+          issuedAt: new Date(receipt.receivedAt ?? Date.now())
+            .toISOString()
+            .slice(0, 10),
+          status: totalAfter > 0 ? SupplierDebtStatus.OPEN : SupplierDebtStatus.PAID,
+        }),
+      );
+      return;
+    }
+
+    const paidAmount = Number(debt.paid_amount);
+    const remainingAmount = Number((totalAfter - paidAmount).toFixed(2));
+    if (totalAfter === 0 && remainingAmount === 0) {
+      // Receipt edited or cancelled down to nothing, and nothing was ever paid
+      // against it — drop the row rather than leave a closed, zero-value debt.
+      await manager.delete(SupplierDebtEntity, debt.id);
+      return;
+    }
+    const status =
+      remainingAmount < 0
+        ? SupplierDebtStatus.OVERPAID
+        : remainingAmount === 0
+          ? SupplierDebtStatus.PAID
+          : SupplierDebtStatus.OPEN;
+    await manager.update(SupplierDebtEntity, debt.id, {
+      originalAmount: totalAfter,
+      remainingAmount,
+      status,
+    });
+  }
+
+  /**
+   * Posts the cash-side adjustment for a cash receipt's value delta: a Phiếu
+   * chi bổ sung (additional payment out) when the total went up, a Phiếu thu
+   * hoàn (refund receipt) when it went down. Goes through the treasury
+   * module's own `createAndPostInternal` — never `CashService.recordMovement`
+   * directly — so the cash movement, its journal entry and its voucher stay
+   * owned by exactly one writer each way (ADR-05).
+   *
+   * `referenceId` is a synthetic id keyed off `(receipt.id, revision)`, not the
+   * receipt's own id: the receipt's first posting already occupies
+   * `(GOODS_RECEIPT, receipt.id)` in the dedupe index that
+   * `createAndPostInternal` checks, and every edit after that needs its own
+   * slot (ADR-06 / `deterministicVoucherRevisionReferenceId`).
+   */
+  private async applyCashDelta(
+    manager: import("typeorm").EntityManager,
+    receipt: GoodsReceiptEntity,
+    totalDelta: number,
+    revision: number,
+    actor: ActorContext,
+  ): Promise<void> {
+    const inventoryAccountId = await this.resolveAccountId(
+      manager,
+      receipt.organizationId,
+      "156",
+    );
+    const cashAccountId = await this.cashFundResolver.resolveOrDefault(
+      receipt.organizationId,
+      receipt.branchId!,
+      receipt.cashAccountId,
+      manager,
+    );
+    const referenceId = deterministicVoucherRevisionReferenceId(
+      receipt.id,
+      revision,
+    );
+    const description = `Adjustment for ${receipt.documentNumber ?? receipt.id} rev ${revision}`;
+    const partnerType = receipt.providerId
+      ? CashVoucherPartnerType.SUPPLIER
+      : undefined;
+
+    if (totalDelta > 0) {
+      // Receipt got more expensive: pay the extra out of the fund.
+      await this.cashPaymentsService.createAndPostInternal(
+        {
+          purpose: CashPaymentPurpose.PURCHASE,
+          cashAccountId,
+          contraAccountId: inventoryAccountId,
+          amount: totalDelta,
+          actor,
+          referenceType: CashPaymentReferenceType.GOODS_RECEIPT,
+          referenceId,
+          partnerType,
+          partnerId: receipt.providerId,
+          description,
+          reason: description,
+        },
+        manager,
+      );
+    } else {
+      // Receipt got cheaper (or was cancelled): refund the difference into
+      // the fund.
+      await this.cashReceiptsService.createAndPostInternal(
+        {
+          purpose: CashReceiptPurpose.OTHER,
+          cashAccountId,
+          contraAccountId: inventoryAccountId,
+          amount: -totalDelta,
+          actor,
+          referenceType: CashReceiptReferenceType.MANUAL,
+          referenceId,
+          partnerType,
+          partnerId: receipt.providerId,
+          description,
+          reason: description,
+        },
+        manager,
+      );
+    }
   }
 
   /** Resolve an account id by code within an org (for inventory/payable contra). */

@@ -103,6 +103,13 @@ export class GoodsIssueEntity extends BaseEntity {
   @Column({ name: 'approved_at', type: 'timestamptz', nullable: true })
   approvedAt?: Date;
 
+  @Column({
+    type: 'int',
+    default: 0,
+    comment: 'Number of times this posted voucher has been edited; 0 = never edited',
+  })
+  revision: number;
+
   @Column({ name: 'posted_by', type: 'uuid', nullable: true })
   postedBy?: string;
 

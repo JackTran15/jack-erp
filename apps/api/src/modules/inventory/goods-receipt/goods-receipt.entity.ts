@@ -124,6 +124,13 @@ export class GoodsReceiptEntity extends BaseEntity {
   @Column({ name: 'cash_receipt_id', type: 'uuid', nullable: true })
   cashReceiptId?: string;
 
+  @Column({
+    type: 'int',
+    default: 0,
+    comment: 'Number of times this posted voucher has been edited; 0 = never edited',
+  })
+  revision: number;
+
   @Column({ name: 'posted_at', type: 'timestamptz', nullable: true })
   postedAt?: Date;
 

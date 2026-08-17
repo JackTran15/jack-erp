@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { StockLedgerModule } from '../ledger/stock-ledger.module';
@@ -6,6 +6,8 @@ import { DocumentNumberingModule } from '../../document-numbering/document-numbe
 import { EventsModule } from '../../events/events.module';
 import { CashModule } from '../../accounting/cash/cash.module';
 import { JournalModule } from '../../accounting/journal/journal.module';
+import { CashVouchersModule } from '../../accounting/cash-vouchers/cash-vouchers.module';
+import { TransferOrderModule } from '../transfer-order/transfer-order.module';
 import { GoodsReceiptEntity } from './goods-receipt.entity';
 import { GoodsReceiptLineEntity } from './goods-receipt-line.entity';
 import { SupplierDebtEntity } from '../supplier-debt/supplier-debt.entity';
@@ -33,6 +35,8 @@ import { GoodsReceiptVoucherLinkConsumer } from './consumers/goods-receipt-vouch
     EventsModule,
     CashModule,
     JournalModule,
+    CashVouchersModule,
+    forwardRef(() => TransferOrderModule),
   ],
   controllers: [
     GoodsReceiptController,
