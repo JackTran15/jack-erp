@@ -170,7 +170,6 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       const result = validateCheckout({
         hasAnyCartLines: selectHasAnyCartLines(sessionState),
         debt: p.debt,
-        refundToDebt: p.refundToDebt ?? false,
         keepChange: p.keepChange,
         selectedCustomer,
         purchaseCart,
@@ -376,7 +375,6 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             returnSubtotal,
             newSubtotal,
             paymentLines: p.paymentLines,
-            offsetToDebt: allowsDebt && (p.refundToDebt ?? false),
             // Đơn ĐỔI net>0: tích "Tính vào công nợ" (DebtCheckRow) → ghi phần
             // chênh chưa thu vào công nợ khách, kèm hạn nợ như đơn bán nợ.
             putOnDebt,
@@ -434,14 +432,6 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             receiptPayload.totals.pointsReversed = posted.pointsReversed;
             receiptPayload.totals.pointsBalanceAfter =
               posted.pointsBalanceAfter ?? undefined;
-          }
-          // Operator tích "Tính vào công nợ" nhưng hóa đơn gốc không còn nợ để
-          // bù trừ → BE tự chi tiền mặt; báo cho thu ngân biết. Chỉ có nghĩa khi
-          // luồng này thực sự được phép cấn nợ.
-          if (allowsDebt && p.refundToDebt && posted.refundMethod === "CASH") {
-            toast.info(
-              "Khách hàng không còn công nợ — đã chi tiền mặt cho khoản hoàn.",
-            );
           }
         }
       } catch (err) {

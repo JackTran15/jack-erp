@@ -14,6 +14,14 @@ import { RefundMethod } from '../entities/invoice.entity';
 import { InvoicePaymentLineDto } from './checkout-invoice.dto';
 
 export class CheckoutReturnDto {
+  /**
+   * Which fund pays out the refund. It does NOT decide whether the original
+   * invoice's outstanding debt is settled — that happens on every return, ahead
+   * of any payout, and is reported back as `offsetAmount`.
+   *
+   * `OFFSET` is accepted as a legacy alias of `CASH` so older POS builds keep
+   * working; the resulting document is identical either way.
+   */
   @IsEnum(RefundMethod)
   refundMethod: RefundMethod;
 
@@ -38,7 +46,8 @@ export class CheckoutReturnDto {
   @IsUUID()
   refundAccountId?: string;
 
-  /** Required when refundMethod = OFFSET against an original AR (debt) invoice. */
+  /** Deprecated — the AR account for a debt settlement is resolved server-side.
+   * Kept optional so an older client sending it is not rejected. */
   @IsOptional()
   @IsUUID()
   receivableAccountId?: string;

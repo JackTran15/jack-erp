@@ -5174,6 +5174,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * One endpoint, two flows: voiding a return/exchange is the mirror of voiding
+         *     a sale (stock and money move the other way), so the document's own type
+         *     picks the service rather than the caller having to know which to call.
+         */
         post: operations["InvoiceController_cancel"];
         delete?: never;
         options?: never;
@@ -5205,6 +5210,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["InvoiceController_getEligibleReturns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices/{id}/outstanding-debt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceController_getOutstandingDebt"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7589,7 +7610,7 @@ export interface components {
             reason?: string;
             staffId?: string;
             /** @enum {string} */
-            referenceType?: "INVOICE" | "INVOICE_DEBT" | "RECEIVABLE" | "MANUAL" | "REVERSAL" | "FUND_SWAP" | "TRANSFER";
+            referenceType?: "INVOICE" | "INVOICE_DEBT" | "RECEIVABLE" | "MANUAL" | "REVERSAL" | "FUND_SWAP" | "TRANSFER" | "RETURN_CANCEL" | "INVOICE_KEPT_CHANGE";
             referenceId?: string;
             cashAccountId: string;
             contraAccountId: string;
@@ -10100,7 +10121,7 @@ export interface components {
             totalAmount: number;
             attachmentIds: string[];
             /** @enum {string} */
-            referenceType?: "INVOICE_DEBT" | "RECEIVABLE" | "TRANSFER" | "MANUAL" | "REVERSAL" | "FUND_SWAP";
+            referenceType?: "INVOICE_DEBT" | "INVOICE" | "RECEIVABLE" | "TRANSFER" | "MANUAL" | "REVERSAL" | "FUND_SWAP" | "RETURN_CANCEL";
             referenceId?: string;
             depositMovementId?: string;
             journalEntryId?: string;
@@ -11261,6 +11282,7 @@ export interface components {
             /** @enum {string} */
             refundMethod?: "CASH" | "BANK" | "STORE_CREDIT" | "OFFSET";
             refundedAmount: number;
+            offsetAmount: number;
             netAmount: number;
             subtotal: number;
             discountAmount: number;
@@ -11278,6 +11300,7 @@ export interface components {
             depositAmount: number;
             amountDue: number;
             totalPaid: number;
+            keptChangeAmount: number;
             note?: string;
             isDraft: boolean;
             sessionId: string;
@@ -11431,6 +11454,7 @@ export interface components {
             /** @enum {string} */
             refundMethod?: "CASH" | "BANK" | "STORE_CREDIT" | "OFFSET";
             refundedAmount: number;
+            offsetAmount: number;
             netAmount: number;
             subtotal: number;
             discountAmount: number;
@@ -11448,6 +11472,7 @@ export interface components {
             depositAmount: number;
             amountDue: number;
             totalPaid: number;
+            keptChangeAmount: number;
             note?: string;
             isDraft: boolean;
             sessionId: string;
@@ -11543,7 +11568,7 @@ export interface components {
             dueDate?: string;
             creditDays?: number;
             /** Format: date-time */
-            settledAt?: string;
+            settledAt?: string | null;
             /** @enum {string} */
             status: "open" | "paid" | "overdue";
             note?: string;
@@ -11607,6 +11632,16 @@ export interface components {
             reference?: string;
         };
         CheckoutInvoiceDto: {
+            /**
+             * @description Change the customer declined to take back ("Khách không lấy tiền thừa").
+             *
+             *     `payments` still carry only what settles the invoice — the surplus never
+             *     inflates `totalPaid` or revenue. It is booked separately as other income
+             *     (Phiếu thu, DR quỹ / CR 711), so the drawer matches the cash physically in it.
+             *     Only valid on a fully-settled cash sale.
+             * @example 60000
+             */
+            keptChangeAmount?: number;
             /**
              * @description Credit due date (ISO `YYYY-MM-DD`). Stored on the debt record when the sale
              *     leaves a remaining balance (DEBT / PARTIAL_DEBT). Ignored when fully paid.
@@ -11684,7 +11719,15 @@ export interface components {
             newLines: components["schemas"]["CreateInvoiceItemDto"][];
         };
         CheckoutReturnDto: {
-            /** @enum {string} */
+            /**
+             * @description Which fund pays out the refund. It does NOT decide whether the original
+             *     invoice's outstanding debt is settled — that happens on every return, ahead
+             *     of any payout, and is reported back as `offsetAmount`.
+             *
+             *     `OFFSET` is accepted as a legacy alias of `CASH` so older POS builds keep
+             *     working; the resulting document is identical either way.
+             * @enum {string}
+             */
             refundMethod: "CASH" | "BANK" | "STORE_CREDIT" | "OFFSET";
             /**
              * Format: uuid
@@ -11707,7 +11750,8 @@ export interface components {
             refundAccountId?: string;
             /**
              * Format: uuid
-             * @description Required when refundMethod = OFFSET against an original AR (debt) invoice.
+             * @description Deprecated — the AR account for a debt settlement is resolved server-side.
+             *     Kept optional so an older client sending it is not rejected.
              */
             receivableAccountId?: string;
             /**
@@ -12257,6 +12301,17 @@ export interface components {
             invoiceId: string;
             /** @description Payment lines. Empty array = full debt (requires a customer on the invoice). */
             payments: components["schemas"]["CheckoutV2PaymentLineDto"][];
+            /**
+             * @description Change the customer declined to take back ("Khách không lấy tiền thừa").
+             *
+             *     `payments` still carry only what settles the invoice — the surplus never
+             *     inflates `totalPaid` or revenue. It is booked separately as other income
+             *     (Phiếu thu, DR quỹ / CR 711), so the drawer matches the cash physically in
+             *     it. Only valid on a fully-settled cash sale. Mirrors
+             *     `CheckoutInvoiceDto.keptChangeAmount` (v1).
+             * @example 60000
+             */
+            keptChangeAmount?: number;
             /**
              * @description Credit due date (ISO `YYYY-MM-DD`). Stored on the debt record when the sale leaves a remaining balance.
              * @example 2026-06-25
@@ -22777,6 +22832,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    InvoiceController_getOutstandingDebt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
                 };
             };
         };

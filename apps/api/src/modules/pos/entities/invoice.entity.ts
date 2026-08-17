@@ -58,11 +58,14 @@ export class InvoiceEntity extends BaseEntity {
   @JoinColumn({ name: 'original_invoice_id' })
   originalInvoice?: InvoiceEntity;
 
-  @Column({ name: 'refund_method', type: 'enum', enum: RefundMethod, nullable: true, comment: 'How refund was settled: CASH / BANK / STORE_CREDIT / OFFSET (RETURN + EXCHANGE only)' })
+  @Column({ name: 'refund_method', type: 'enum', enum: RefundMethod, nullable: true, comment: 'Fund the cash-out part of a refund went through: CASH / BANK / STORE_CREDIT. OFFSET is legacy — the debt settlement is now offset_amount, not a method (RETURN + EXCHANGE only)' })
   refundMethod?: RefundMethod;
 
   @Column({ name: 'refunded_amount', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Amount refunded to customer (max(returnSubtotal - newSubtotal, 0))' })
   refundedAmount: number;
+
+  @Column({ name: 'offset_amount', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Part of refundedAmount applied against the original invoice debt; cash paid out = refundedAmount - offsetAmount' })
+  offsetAmount: number;
 
   @Column({ name: 'net_amount', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'EXCHANGE net = newSubtotal - returnSubtotal (positive = customer pays more)' })
   netAmount: number;

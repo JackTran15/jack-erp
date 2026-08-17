@@ -152,8 +152,8 @@ export class CheckoutReturnService {
       );
     }
 
-    // Load the original invoice up-front — needed for OFFSET (settling the
-    // original's debt), the loyalty re-credit below, and the refund amount
+    // Load the original invoice up-front — needed for the debt settlement, the
+    // loyalty re-credit below, and the refund amount
     // itself (computeTotals prorates the original's net onto the returned
     // lines, so it must run after this).
     let originalInvoice: InvoiceEntity | null = null;
@@ -174,31 +174,15 @@ export class CheckoutReturnService {
 
     const totals = this.computeTotals(items, originalInvoice, originalItems);
 
-    // The refund method is the operator's explicit choice (FE sends OFFSET only
-    // when they tick "Tính vào công nợ"). When they opt into OFFSET but the
-    // original invoice has no outstanding debt to settle, fall back to a cash
-    // refund rather than silently doing nothing.
-    const wantsOffset =
-      dto.refundMethod === RefundMethod.OFFSET && totals.refundedAmount > 0;
-    let originalDebt: InvoiceDebtEntity | null = null;
-    if (wantsOffset && originalInvoice) {
-      originalDebt = await this.debtRepo.findOne({
-        where: {
-          invoiceId: originalInvoice.id,
-          organizationId: actor.organizationId,
-        },
-      });
-    }
-    const canOffset =
-      wantsOffset &&
-      !!originalDebt &&
-      originalDebt.status !== DebtStatus.PAID &&
-      Number(originalDebt.remainingAmount) > 0;
+    // `refundMethod` no longer decides the fate of the whole refund — it names the
+    // fund that pays out whatever is left AFTER the original invoice's debt has
+    // been settled. Settling that debt is not the operator's choice any more: it
+    // is the first charge on every refund, computed under a lock inside the
+    // transaction below. `OFFSET` from an older POS build is therefore just an
+    // alias for CASH — the split produces the same document either way.
     const effectiveRefundMethod =
       dto.refundMethod === RefundMethod.OFFSET
-        ? canOffset
-          ? RefundMethod.OFFSET
-          : RefundMethod.CASH
+        ? RefundMethod.CASH
         : dto.refundMethod;
 
     this.validateRefundMatrix(invoice, dto, totals, effectiveRefundMethod);
@@ -219,13 +203,31 @@ export class CheckoutReturnService {
         ? Number((totals.netAmount - netPaid).toFixed(2))
         : 0;
 
+    // Unlocked pre-read of the original invoice's debt, used only to decide which
+    // accounts and funds to resolve BEFORE the transaction, so a missing config
+    // fails fast instead of half-way through posting. The authoritative read is
+    // the locked one inside the transaction; a debt receipt landing in between can
+    // only shrink the remainder, which is handled where the split is applied.
+    const preReadDebt =
+      originalInvoice && totals.refundedAmount > 0
+        ? await this.debtRepo.findOne({
+            where: {
+              invoiceId: originalInvoice.id,
+              organizationId: actor.organizationId,
+              documentType: DebtDocumentType.CREDIT_INVOICE,
+            },
+          })
+        : null;
+    const estimatedOffset = this.offsetFor(preReadDebt, totals.refundedAmount);
+    const estimatedCashOut = Number(
+      (totals.refundedAmount - estimatedOffset).toFixed(2),
+    );
+
     // Resolve the AR (receivable) COA account server-side (branch override → org
-    // default) so the FE never supplies it — both for an OFFSET refund settling
-    // an existing debt, and for an EXCHANGE net > 0 booked as new customer debt.
-    const needsReceivable =
-      (effectiveRefundMethod === RefundMethod.OFFSET &&
-        totals.refundedAmount > 0) ||
-      exchangeDebtAmount > 0;
+    // default) so the FE never supplies it — both for the part of a refund that
+    // settles an existing debt, and for an EXCHANGE net > 0 booked as new
+    // customer debt.
+    const needsReceivable = estimatedOffset > 0 || exchangeDebtAmount > 0;
     const receivableAccountId = needsReceivable
       ? (dto.receivableAccountId ??
         (await this.accountResolver.resolveDefaultAccount(
@@ -241,12 +243,13 @@ export class CheckoutReturnService {
     );
 
     // One cash fund per branch: resolve it only when a cash movement is needed
-    // (a cash refund, or an exchange with a positive net paid in cash).
+    // (a cash refund that survives the debt offset, or an exchange with a positive
+    // net paid in cash). A refund swallowed whole by the debt moves no cash, so a
+    // branch is not forced to have a configured fund for it.
     const needsCashFund =
-      (effectiveRefundMethod === RefundMethod.CASH &&
-        totals.refundedAmount > 0) ||
+      (effectiveRefundMethod === RefundMethod.CASH && estimatedCashOut > 0) ||
       (totals.netAmount > 0 && this.hasCashPayments(dto));
-    const resolvedCashAccountId = needsCashFund
+    let resolvedCashAccountId = needsCashFund
       ? await this.cashFundResolver.resolveBranchCashFund(
           actor.organizationId,
           invoice.branchId,
@@ -258,10 +261,7 @@ export class CheckoutReturnService {
     // exact bank/deposit fund the "Sổ chi tiết tiền gửi" ledger displays. Resolve
     // before the transaction so an invalid/unlinked mapping fails fast.
     let resolvedDepositAccountId: string | undefined;
-    if (
-      effectiveRefundMethod === RefundMethod.BANK &&
-      totals.refundedAmount > 0
-    ) {
+    if (effectiveRefundMethod === RefundMethod.BANK && estimatedCashOut > 0) {
       const resolved = await this.accountResolver.resolvePaymentAccountById(
         dto.refundAccountId!,
         actor,
@@ -301,6 +301,21 @@ export class CheckoutReturnService {
     const now = new Date();
 
     const posted = await this.dataSource.transaction(async (manager) => {
+      // The debt offset is the first charge on every refund, ahead of any cash
+      // leaving the till. Reading the row FOR UPDATE inside the transaction is
+      // what makes `offsetAmount` impossible to overshoot: a concurrent debt
+      // receipt either lands before this read (smaller remainder, smaller offset)
+      // or waits for the commit.
+      const originalDebt = await this.lockOriginalDebt(
+        manager,
+        originalInvoice,
+        totals.refundedAmount,
+      );
+      const offsetAmount = this.offsetFor(originalDebt, totals.refundedAmount);
+      const cashOutAmount = Number(
+        (totals.refundedAmount - offsetAmount).toFixed(2),
+      );
+
       invoice.isDraft = false;
       invoice.status =
         exchangeDebtAmount > 0
@@ -315,6 +330,7 @@ export class CheckoutReturnService {
       invoice.totalPaid = totals.netAmount > 0 ? netPaid : 0;
       invoice.refundMethod = effectiveRefundMethod;
       invoice.refundedAmount = totals.refundedAmount;
+      invoice.offsetAmount = offsetAmount;
       invoice.netAmount = totals.netAmount;
       // Loyalty earn is on the newly purchased (OUT) goods — a "Mua thêm" line is
       // a real sale and earns on its own value, independent of what was returned
@@ -417,31 +433,20 @@ export class CheckoutReturnService {
         );
       }
 
-      // OFFSET against original DEBT invoice.
-      if (
-        effectiveRefundMethod === RefundMethod.OFFSET &&
-        totals.refundedAmount > 0 &&
-        originalInvoice &&
-        (originalInvoice.status === InvoiceStatus.DEBT ||
-          originalInvoice.status === InvoiceStatus.PARTIAL_DEBT)
-      ) {
-        const applied = await this.offsetOriginalDebt(
-          manager,
-          originalInvoice,
-          totals.refundedAmount,
-          now,
-        );
+      // Settle the original sale's debt with the offset share. The locked row is
+      // the only authority here — the original invoice's `status` is not consulted,
+      // because a stale status must never be able to pay money out twice.
+      if (offsetAmount > 0 && originalDebt && originalInvoice) {
+        await this.applyOffsetToDebt(manager, originalDebt, offsetAmount, now);
         // Record the return as its own debt-ledger row so it is visible and
         // clickable in the customer's debt (Công nợ) tab, keyed on the return id.
-        if (applied > 0) {
-          await this.createReturnDebtAdjustment(
-            manager,
-            savedInvoice,
-            originalInvoice,
-            applied,
-            now,
-          );
-        }
+        await this.createReturnDebtAdjustment(
+          manager,
+          savedInvoice,
+          originalInvoice,
+          offsetAmount,
+          now,
+        );
       }
 
       // Re-credit loyalty points that were redeemed on the original sale,
@@ -460,8 +465,26 @@ export class CheckoutReturnService {
         );
       }
 
-      return { invoice: savedInvoice, payments: savedPayments };
+      return {
+        invoice: savedInvoice,
+        payments: savedPayments,
+        cashOutAmount,
+      };
     });
+
+    // The pre-read said no cash would move, but the locked read disagreed (a debt
+    // receipt landed in between and shrank the remainder). Resolve the fund now so
+    // the money still reaches the customer.
+    if (
+      effectiveRefundMethod === RefundMethod.CASH &&
+      posted.cashOutAmount > 0 &&
+      !resolvedCashAccountId
+    ) {
+      resolvedCashAccountId = await this.cashFundResolver.resolveBranchCashFund(
+        actor.organizationId,
+        invoice.branchId,
+      );
+    }
 
     // Fan-out events (after commit).
     await this.fanOutEvents(
@@ -469,6 +492,7 @@ export class CheckoutReturnService {
       posted.payments,
       items,
       totals,
+      posted.cashOutAmount,
       dto,
       effectiveRefundMethod,
       receivableAccountId,
@@ -523,9 +547,14 @@ export class CheckoutReturnService {
    * Deliberately NOT capped at the original's `totalPaid`: debt repayments are
    * recorded in `debt_payments` and never written back to `invoices.total_paid`
    * (see invoice-debt.service), so a credit sale settled in full still reads
-   * `totalPaid = 0`. Capping on it would refund such a customer nothing. Paying
-   * out more than was collected on a still-unpaid credit sale remains possible
-   * and is tracked separately — the operator chooses OFFSET for that case.
+   * `totalPaid = 0`. Capping on it would refund such a customer nothing.
+   *
+   * `refundedAmount` is the whole value handed back, which is NOT the same as the
+   * money that leaves the till. The caller splits it — debt first, remainder in
+   * cash — and that split is what keeps the payout within what was collected:
+   * since `remainingAmount = amountDue − collected`, paying out
+   * `refunded − min(refunded, remaining)` can never exceed `collected`. No cap on
+   * this number is needed, and none based on `totalPaid` would be correct.
    *
    * Falls back to the gross behaviour when there is no original invoice (QUICK
    * return); degrades to a plain proration of `amountDue` for v1 invoices,
@@ -737,12 +766,12 @@ export class CheckoutReturnService {
         );
       }
     } else if (netAmount < 0) {
-      // RETURN or EXCHANGE refund.
+      // RETURN or EXCHANGE refund. OFFSET is not listed: the caller has already
+      // mapped it onto CASH, because settling debt is no longer a payout method.
       if (
         effectiveRefundMethod !== RefundMethod.CASH &&
         effectiveRefundMethod !== RefundMethod.BANK &&
-        effectiveRefundMethod !== RefundMethod.STORE_CREDIT &&
-        effectiveRefundMethod !== RefundMethod.OFFSET
+        effectiveRefundMethod !== RefundMethod.STORE_CREDIT
       ) {
         throw new BadRequestException(
           `refundMethod ${effectiveRefundMethod} không hợp lệ khi netAmount<0`,
@@ -769,8 +798,8 @@ export class CheckoutReturnService {
           'STORE_CREDIT yêu cầu creditLiabilityAccountId',
         );
       }
-      // OFFSET receivableAccountId is resolved server-side (org AR default) —
-      // the FE no longer needs to supply it.
+      // The receivable account for a debt settlement is resolved server-side
+      // (org AR default) — the FE never needs to supply it.
       if (dto.payments && dto.payments.length > 0) {
         throw new BadRequestException(
           'payments không được cung cấp khi netAmount <= 0',
@@ -807,35 +836,57 @@ export class CheckoutReturnService {
   }
 
   /**
-   * Reduce the original SALE invoice's outstanding debt by the refunded amount.
-   * Returns the amount actually applied (0 when there is no debt to settle).
+   * The original SALE invoice's credit-debt row, locked for update.
+   *
+   * Filtered to CREDIT_INVOICE so it can never pick up an ADJUSTMENT marker: those
+   * are keyed on a *return* invoice id, but the filter costs nothing and removes a
+   * whole category of "why did the debt move twice" incident.
    */
-  private async offsetOriginalDebt(
+  private async lockOriginalDebt(
     manager: EntityManager,
-    originalInvoice: InvoiceEntity,
+    originalInvoice: InvoiceEntity | null,
     refundedAmount: number,
-    now: Date,
-  ): Promise<number> {
-    const debt = await manager.findOne(InvoiceDebtEntity, {
+  ): Promise<InvoiceDebtEntity | null> {
+    if (!originalInvoice || refundedAmount <= 0) return null;
+    return manager.findOne(InvoiceDebtEntity, {
       where: {
         invoiceId: originalInvoice.id,
         organizationId: originalInvoice.organizationId,
+        documentType: DebtDocumentType.CREDIT_INVOICE,
       },
+      lock: { mode: 'pessimistic_write' },
     });
-    if (!debt) {
-      this.logger.warn(
-        `OFFSET: no debt record found for invoice ${originalInvoice.id} — skipping settlement`,
-      );
-      return 0;
-    }
-    if (debt.status === DebtStatus.PAID) {
-      this.logger.warn(
-        `OFFSET: debt ${debt.id} already PAID — skipping`,
-      );
-      return 0;
-    }
-    const applied = Math.min(refundedAmount, Number(debt.remainingAmount));
-    debt.paidAmount = Number((Number(debt.paidAmount) + applied).toFixed(2));
+  }
+
+  /**
+   * How much of a refund goes to settling debt rather than leaving the till.
+   *
+   * This single `min` is what makes the whole feature safe: because
+   * `remainingAmount = amountDue − (everything the customer has actually paid)`,
+   * paying out `refunded − offset` can never exceed what was collected. No cap on
+   * `invoices.total_paid` is needed — and none would work, since debt repayments
+   * are recorded in `debt_payments` and never written back to that column.
+   */
+  private offsetFor(
+    debt: InvoiceDebtEntity | null,
+    refundedAmount: number,
+  ): number {
+    if (!debt || refundedAmount <= 0) return 0;
+    if (debt.status === DebtStatus.PAID) return 0;
+    const remaining = Math.max(0, Number(debt.remainingAmount));
+    return Number(Math.min(refundedAmount, remaining).toFixed(2));
+  }
+
+  /** Apply an already-computed offset to a locked debt row. */
+  private async applyOffsetToDebt(
+    manager: EntityManager,
+    debt: InvoiceDebtEntity,
+    offsetAmount: number,
+    now: Date,
+  ): Promise<void> {
+    debt.paidAmount = Number(
+      (Number(debt.paidAmount) + offsetAmount).toFixed(2),
+    );
     debt.remainingAmount = Number(
       (Number(debt.originalAmount) - debt.paidAmount).toFixed(2),
     );
@@ -845,11 +896,10 @@ export class CheckoutReturnService {
       debt.settledAt = now;
     }
     await manager.save(debt);
-    return applied;
   }
 
   /**
-   * Record a return/exchange OFFSET as its own `invoice_debts` row so the return
+   * Record the debt settlement as its own `invoice_debts` row so the return
    * invoice is visible and clickable in the customer's debt (Công nợ) tab. This is
    * a settled reduction marker (documentType=adjustment, negative amount, remaining
    * 0), NOT an outstanding receivable — the actual debt reduction is applied to the
@@ -887,6 +937,7 @@ export class CheckoutReturnService {
     payments: InvoicePaymentEntity[],
     items: InvoiceItemEntity[],
     totals: ComputedTotals,
+    cashOutAmount: number,
     dto: CheckoutReturnDto,
     effectiveRefundMethod: RefundMethod,
     receivableAccountId: string | undefined,
@@ -956,6 +1007,7 @@ export class CheckoutReturnService {
         source: invoice.type === InvoiceType.EXCHANGE ? 'EXCHANGE' : 'RETURN',
         refundMethod: effectiveRefundMethod,
         refundedAmount: totals.refundedAmount,
+        offsetAmount: Number(invoice.offsetAmount ?? 0),
         netAmount: totals.netAmount,
         debtAmount,
         revenueAccountId,
@@ -967,10 +1019,12 @@ export class CheckoutReturnService {
       actor,
     );
 
-    // 4. CASH_REFUND — only refundMethod=CASH AND refundedAmount > 0.
+    // 4. CASH_REFUND — only what survives the debt settlement leaves the till.
+    // A refund swallowed whole by the debt publishes nothing, so no 0đ voucher
+    // ever appears in the cash book.
     if (
       effectiveRefundMethod === RefundMethod.CASH &&
-      totals.refundedAmount > 0 &&
+      cashOutAmount > 0 &&
       resolvedCashAccountId
     ) {
       await this.cashRefundPublisher.publish(
@@ -979,7 +1033,7 @@ export class CheckoutReturnService {
           returnInvoiceCode: invoice.code,
           cashAccountId: resolvedCashAccountId,
           contraAccountId: revenueAccountId,
-          amount: totals.refundedAmount,
+          amount: cashOutAmount,
           sessionId: undefined,
           branchId,
         },
@@ -993,7 +1047,7 @@ export class CheckoutReturnService {
     // movement, so journal-return posts nothing for the refunded portion.
     if (
       effectiveRefundMethod === RefundMethod.BANK &&
-      totals.refundedAmount > 0 &&
+      cashOutAmount > 0 &&
       resolvedDepositAccountId
     ) {
       await this.depositRefundPublisher.publish(
@@ -1002,7 +1056,7 @@ export class CheckoutReturnService {
           returnInvoiceCode: invoice.code,
           depositAccountId: resolvedDepositAccountId,
           contraAccountId: revenueAccountId,
-          amount: totals.refundedAmount,
+          amount: cashOutAmount,
           docDate: (invoice.issuedAt ?? new Date())
             .toISOString()
             .slice(0, 10),

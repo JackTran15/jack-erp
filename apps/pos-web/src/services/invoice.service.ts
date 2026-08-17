@@ -18,7 +18,10 @@ import type {
   UpdateInvoiceBody,
 } from "@erp/pos/dtos/invoice.dto";
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
-import type { EligibleReturnLine } from "@erp/pos/interfaces/return-goods.interface";
+import type {
+  EligibleReturnLine,
+  OutstandingDebtRow,
+} from "@erp/pos/interfaces/return-goods.interface";
 import type { Paginated } from "@erp/pos/interfaces/paginated.interface";
 import type { CustomerDebtRow } from "@erp/pos/interfaces/debt.interface";
 
@@ -134,6 +137,17 @@ export const invoiceService = {
   getEligibleReturns: (id: string): Promise<EligibleReturnLine[]> =>
     http.get<EligibleReturnLine[]>(
       `/invoices/${encodeURIComponent(id)}/eligible-returns`,
+    ),
+
+  /**
+   * `GET /invoices/:id/outstanding-debt` — dư nợ còn lại của hóa đơn gốc.
+   *
+   * Chỉ để hiển thị: BE tính lại dưới khoá lúc tất toán nên số cuối cùng trên
+   * chứng từ mới là số đúng.
+   */
+  getOutstandingDebt: (id: string): Promise<OutstandingDebtRow> =>
+    http.get<OutstandingDebtRow>(
+      `/invoices/${encodeURIComponent(id)}/outstanding-debt`,
     ),
 
   /** `POST /invoices/returns` — tạo draft RETURN (mode quick|regular). */

@@ -234,8 +234,10 @@ describe('CheckoutReturnService — debt offset routing', () => {
     mockManager = {
       save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
       create: jest.fn().mockImplementation((_e, data) => ({ id: 'gen-1', ...data })),
-      // offsetOriginalDebt looks up the original invoice's debt row.
-      findOne: jest.fn().mockResolvedValue(debtRow),
+      // lockOriginalDebt reads the original invoice's debt row FOR UPDATE. Default
+      // fixture is a sale with nothing outstanding — tests that exercise the split
+      // opt in by resolving `debtRow` from BOTH this and `debtRepo.findOne`.
+      findOne: jest.fn().mockResolvedValue(null),
       // Atomic returned_quantity guard (unused here — IN line has no originalInvoiceItemId).
       query: jest.fn().mockResolvedValue([undefined, 1]),
     };
@@ -279,8 +281,9 @@ describe('CheckoutReturnService — debt offset routing', () => {
       refundRedeemedPoints: jest.fn().mockResolvedValue(undefined),
       getPointBalanceForUpdate: jest.fn().mockResolvedValue(null),
     };
-    // Up-front debt lookup (only queried when the operator opts into OFFSET).
-    debtRepo = { findOne: jest.fn().mockResolvedValue(debtRow) };
+    // Up-front (unlocked) debt pre-read, used to decide which accounts to resolve
+    // before the transaction. Null = the original sale carries no open debt.
+    debtRepo = { findOne: jest.fn().mockResolvedValue(null) };
     invoiceDebtService = {
       createFromInvoice: jest.fn().mockResolvedValue({ id: 'debt-new' }),
     };
@@ -398,7 +401,13 @@ describe('CheckoutReturnService — debt offset routing', () => {
         (e) => e && typeof e === 'object' && 'pointsReversed' in e,
       ) as InvoiceEntity;
 
-  it('does NOT offset debt when the operator chose CASH, even against a DEBT invoice', async () => {
+  /** Both reads (unlocked pre-read + locked read) see the same outstanding debt. */
+  const withOpenDebt = (row: Partial<InvoiceDebtEntity> = debtRow) => {
+    debtRepo.findOne.mockResolvedValue(row);
+    mockManager.findOne.mockResolvedValue(row);
+  };
+
+  it('offsets an open debt even when the operator chose CASH (QA #8)', async () => {
     invoiceRepo.findOne.mockImplementation(({ where }) =>
       Promise.resolve(
         where.id === 'ret-1'
@@ -406,24 +415,42 @@ describe('CheckoutReturnService — debt offset routing', () => {
           : originalStub(InvoiceStatus.DEBT),
       ),
     );
+    withOpenDebt();
 
     await service.checkout('ret-1', cashDto(), actor);
 
-    // No debt is looked up or settled — the customer is paid cash instead.
-    expect(debtRepo.findOne).not.toHaveBeenCalled();
-    expect(mockManager.findOne).not.toHaveBeenCalled();
-    expect(accountResolver.resolveDefaultAccount).not.toHaveBeenCalledWith(
-      AccountingDefaultAccountRole.RECEIVABLE,
-      actor,
+    // The debt is the first charge on the refund — the operator no longer has to
+    // ask for it, and cannot decline it. Refund 200 against 500 outstanding.
+    expect(mockManager.save).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'debt-1', paidAmount: 200, remainingAmount: 300 }),
     );
-    expect(cashRefundPublisher.publish).toHaveBeenCalled();
-    expect(journalReturnPublisher.publish).toHaveBeenCalledWith(
-      expect.objectContaining({ refundMethod: RefundMethod.CASH }),
-      actor,
-    );
+    expect(savedInvoice().offsetAmount).toBe(200);
+    // Nothing left over, so no cash leaves the till.
+    expect(cashRefundPublisher.publish).not.toHaveBeenCalled();
   });
 
-  it('offsets the original invoice debt when the operator chose OFFSET and debt exists', async () => {
+  it('splits the refund: debt first, the rest in cash (AC-01)', async () => {
+    invoiceRepo.findOne.mockImplementation(({ where }) =>
+      Promise.resolve(
+        where.id === 'ret-1'
+          ? returnDraftStub()
+          : originalStub(InvoiceStatus.PARTIAL_DEBT),
+      ),
+    );
+    // Customer owes 120 of the 200 being refunded — 80 was money they handed over.
+    withOpenDebt({ ...debtRow, originalAmount: 120, remainingAmount: 120 });
+
+    await service.checkout('ret-1', cashDto(), actor);
+
+    expect(mockManager.save).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'debt-1', paidAmount: 120, remainingAmount: 0 }),
+    );
+    const inv = savedInvoice();
+    expect(inv.offsetAmount).toBe(120);
+    expect(Number(inv.refundedAmount)).toBe(200);
+  });
+
+  it('resolves the receivable account when part of the refund settles debt', async () => {
     invoiceRepo.findOne.mockImplementation(({ where }) =>
       Promise.resolve(
         where.id === 'ret-1'
@@ -431,27 +458,41 @@ describe('CheckoutReturnService — debt offset routing', () => {
           : originalStub(InvoiceStatus.DEBT),
       ),
     );
-    debtRepo.findOne.mockResolvedValue(debtRow);
+    withOpenDebt();
 
-    await service.checkout('ret-1', offsetDto(), actor);
+    await service.checkout('ret-1', cashDto(), actor);
 
     // Receivable account resolved server-side (FE never supplies it).
     expect(accountResolver.resolveDefaultAccount).toHaveBeenCalledWith(
       AccountingDefaultAccountRole.RECEIVABLE,
       actor,
     );
-    // Debt row settled by the refunded amount: 500 - 200 = 300 remaining.
-    expect(mockManager.save).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'debt-1', paidAmount: 200, remainingAmount: 300 }),
-    );
     expect(journalReturnPublisher.publish).toHaveBeenCalledWith(
       expect.objectContaining({
-        refundMethod: RefundMethod.OFFSET,
         receivableAccountId: RECEIVABLE_ACCOUNT,
       }),
       actor,
     );
-    expect(cashRefundPublisher.publish).not.toHaveBeenCalled();
+  });
+
+  it('treats a legacy OFFSET refundMethod as CASH and still splits (backward compat)', async () => {
+    invoiceRepo.findOne.mockImplementation(({ where }) =>
+      Promise.resolve(
+        where.id === 'ret-1'
+          ? returnDraftStub()
+          : originalStub(InvoiceStatus.DEBT),
+      ),
+    );
+    withOpenDebt();
+
+    await service.checkout('ret-1', offsetDto(), actor);
+
+    expect(savedInvoice().refundMethod).toBe(RefundMethod.CASH);
+    expect(savedInvoice().offsetAmount).toBe(200);
+    expect(journalReturnPublisher.publish).toHaveBeenCalledWith(
+      expect.objectContaining({ refundMethod: RefundMethod.CASH }),
+      actor,
+    );
   });
 
   it('records the return as its own adjustment debt row when offsetting', async () => {
@@ -462,7 +503,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
           : originalStub(InvoiceStatus.DEBT),
       ),
     );
-    debtRepo.findOne.mockResolvedValue(debtRow);
+    withOpenDebt();
 
     await service.checkout('ret-1', offsetDto(), actor);
 
@@ -489,7 +530,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
     );
   });
 
-  it('falls back to CASH when the operator chose OFFSET but there is no debt to settle', async () => {
+  it('pays the whole refund in cash when there is no debt to settle', async () => {
     invoiceRepo.findOne.mockImplementation(({ where }) =>
       Promise.resolve(
         where.id === 'ret-1'
@@ -501,9 +542,9 @@ describe('CheckoutReturnService — debt offset routing', () => {
 
     await service.checkout('ret-1', offsetDto(), actor);
 
-    // Offset opt-in, but nothing to offset → cash refund, no debt settlement,
-    // and no adjustment row (nothing was applied to any debt).
-    expect(mockManager.findOne).not.toHaveBeenCalled();
+    // Nothing to offset → full cash refund, no debt settlement, and no adjustment
+    // row. This is the case a `total_paid`-based cap would have paid 0 for.
+    expect(savedInvoice().offsetAmount).toBe(0);
     expect(mockManager.create).not.toHaveBeenCalled();
     expect(accountResolver.resolveDefaultAccount).not.toHaveBeenCalledWith(
       AccountingDefaultAccountRole.RECEIVABLE,
@@ -1712,6 +1753,326 @@ describe('CheckoutReturnService — debt offset routing', () => {
       const saved = savedInvoice();
       expect(saved.pointsReversed).toBe(46); // 10 + 0 + 0 − 46 = −36
       expect(saved.pointsBalanceAfter).toBe(0);
+    });
+  });
+  /**
+   * Trả hàng trên hoá đơn còn nợ — tách khoản hoàn (QA #8).
+   *
+   * The fixture is the reported invoice: 765.000 receivable, 300.000 collected at
+   * the till, 465.000 still owed. Before this feature the whole 765.000 left the
+   * drawer while the 465.000 debt stayed open — 930.000 lost on a 765.000 sale.
+   */
+  describe('debt-first refund split (QA #8)', () => {
+    const DUE = 765_000;
+
+    /** Full-value return of a single-line 765.000 sale. */
+    function setupFullReturn(returnedTotal = DUE) {
+      setupReturn({
+        original: { amountDue: DUE, subtotal: DUE },
+        originalLines: [{ quantity: 1, lineTotal: DUE }],
+        returnedLines: [
+          {
+            quantity: 1,
+            lineTotal: returnedTotal,
+            originalInvoiceItemId: 'orig-line-0',
+          },
+        ],
+      });
+    }
+
+    /** Partial return: `part` of the original single line comes back. */
+    function setupPartialReturn(part: number) {
+      setupReturn({
+        original: { amountDue: DUE, subtotal: DUE },
+        originalLines: [{ quantity: DUE, lineTotal: DUE }],
+        returnedLines: [
+          {
+            quantity: part,
+            lineTotal: part,
+            originalInvoiceItemId: 'orig-line-0',
+          },
+        ],
+      });
+    }
+
+    const openDebt = (remaining: number, originalAmount = remaining) => {
+      const row = {
+        ...debtRow,
+        originalAmount,
+        paidAmount: originalAmount - remaining,
+        remainingAmount: remaining,
+        status: DebtStatus.OPEN,
+      };
+      debtRepo.findOne.mockResolvedValue(row);
+      mockManager.findOne.mockResolvedValue(row);
+      return row;
+    };
+
+    const settledDebtRow = () =>
+      mockManager.save.mock.calls
+        .map((c) => c[0])
+        .find((e) => e && typeof e === 'object' && e.id === 'debt-1');
+
+    const cashOut = () =>
+      cashRefundPublisher.publish.mock.calls.length === 0
+        ? 0
+        : (cashRefundPublisher.publish.mock.calls[0][0].amount as number);
+
+    const bankOut = () =>
+      depositRefundPublisher.publish.mock.calls.length === 0
+        ? 0
+        : (depositRefundPublisher.publish.mock.calls[0][0].amount as number);
+
+    it('AC-01 — settles the 465.000 debt and pays out only the 300.000 collected', async () => {
+      setupFullReturn();
+      openDebt(465_000, 465_000);
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(savedInvoice().offsetAmount).toBe(465_000);
+      expect(Number(savedInvoice().refundedAmount)).toBe(DUE);
+      expect(settledDebtRow()).toMatchObject({
+        remainingAmount: 0,
+        status: DebtStatus.PAID,
+      });
+      expect(cashOut()).toBe(300_000);
+    });
+
+    it('AC-02 — a partial return smaller than the debt pays out nothing', async () => {
+      setupPartialReturn(300_000);
+      openDebt(465_000, 465_000);
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(savedInvoice().offsetAmount).toBe(300_000);
+      expect(settledDebtRow()).toMatchObject({ remainingAmount: 165_000 });
+      expect(cashRefundPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('AC-03 — a credit sale already paid off refunds in full (total_paid still reads 0)', async () => {
+      setupFullReturn();
+      const paidOff = {
+        ...debtRow,
+        originalAmount: 465_000,
+        paidAmount: 465_000,
+        remainingAmount: 0,
+        status: DebtStatus.PAID,
+      };
+      debtRepo.findOne.mockResolvedValue(paidOff);
+      mockManager.findOne.mockResolvedValue(paidOff);
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      // The trap a `total_paid` cap would have fallen into: this customer settled
+      // their debt through `debt_payments`, so `invoices.total_paid` is still 0.
+      expect(savedInvoice().offsetAmount).toBe(0);
+      expect(cashOut()).toBe(DUE);
+    });
+
+    it('AC-04 — a cash sale with no debt row is untouched', async () => {
+      setupFullReturn();
+      debtRepo.findOne.mockResolvedValue(null);
+      mockManager.findOne.mockResolvedValue(null);
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(savedInvoice().offsetAmount).toBe(0);
+      expect(cashOut()).toBe(DUE);
+      expect(mockManager.create).not.toHaveBeenCalled();
+    });
+
+    it('AC-05 — a fully unpaid credit sale refunds 100% into the debt, 0 in cash', async () => {
+      setupFullReturn();
+      openDebt(DUE, DUE);
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(savedInvoice().offsetAmount).toBe(DUE);
+      expect(settledDebtRow()).toMatchObject({
+        remainingAmount: 0,
+        status: DebtStatus.PAID,
+      });
+      expect(cashRefundPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('AC-06 — a QUICK return with no original invoice never looks up debt', async () => {
+      invoiceRepo.findOne.mockImplementation(({ where }: any) =>
+        Promise.resolve(
+          where.id === 'ret-1'
+            ? returnDraftStub({ originalInvoiceId: undefined })
+            : null,
+        ),
+      );
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(debtRepo.findOne).not.toHaveBeenCalled();
+      expect(mockManager.findOne).not.toHaveBeenCalled();
+      expect(savedInvoice().offsetAmount).toBe(0);
+      expect(cashOut()).toBe(200); // the default 200 line stub
+    });
+
+    it('AC-07 — offset + cash out = refunded, and cash out never exceeds what was collected', async () => {
+      // Deterministic LCG rather than Math.random: a property test that cannot be
+      // replayed is a property test you cannot debug.
+      let seed = 20260816;
+      const next = () => {
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        return seed / 2147483648;
+      };
+      // Guards against a vacuous pass: if every sample happened to be fully
+      // offset, `paidOut <= collected` would hold trivially at 0 <= x.
+      let sawCashOut = 0;
+      let sawFullOffset = 0;
+
+      for (let i = 0; i < 200; i++) {
+        jest.clearAllMocks();
+        cashFundResolver.resolveBranchCashFund.mockResolvedValue(CASH_FUND);
+        accountResolver.resolveDefaultAccount.mockImplementation((role: any) =>
+          Promise.resolve(
+            role === AccountingDefaultAccountRole.REVENUE
+              ? REVENUE_ACCOUNT
+              : RECEIVABLE_ACCOUNT,
+          ),
+        );
+        mockManager.save.mockImplementation((e: any) => Promise.resolve(e));
+        mockManager.create.mockImplementation((_e: any, data: any) => ({
+          id: 'gen-1',
+          ...data,
+        }));
+        mockManager.query.mockResolvedValue([undefined, 1]);
+        membershipCardService.getPointBalanceForUpdate.mockResolvedValue(null);
+
+        const due = Math.round(next() * 5_000_000) + 1_000;
+        const remaining = Math.round(next() * due);
+        const returned = Math.max(1, Math.round(next() * due));
+
+        setupReturn({
+          original: { amountDue: due, subtotal: due },
+          originalLines: [{ quantity: due, lineTotal: due }],
+          returnedLines: [
+            {
+              quantity: returned,
+              lineTotal: returned,
+              originalInvoiceItemId: 'orig-line-0',
+            },
+          ],
+        });
+        if (remaining > 0) openDebt(remaining, remaining);
+        else {
+          debtRepo.findOne.mockResolvedValue(null);
+          mockManager.findOne.mockResolvedValue(null);
+        }
+
+        await service.checkout('ret-1', cashDto(), actor);
+
+        const saved = savedInvoice();
+        const offset = Number(saved.offsetAmount);
+        const refunded = Number(saved.refundedAmount);
+        const paidOut = cashOut();
+        const collected = due - remaining;
+
+        expect(offset).toBeGreaterThanOrEqual(0);
+        expect(paidOut).toBeGreaterThanOrEqual(0);
+        expect(offset + paidOut).toBeCloseTo(refunded, 2);
+        expect(paidOut).toBeLessThanOrEqual(collected + 0.005);
+        if (paidOut > 0) sawCashOut++;
+        if (offset > 0 && paidOut === 0) sawFullOffset++;
+      }
+
+      expect(sawCashOut).toBeGreaterThan(20);
+      expect(sawFullOffset).toBeGreaterThan(20);
+    });
+
+    it('AC-08 — an EXCHANGE with a negative net splits the same way', async () => {
+      // Return 765.000, buy 200.000 more → refund 565.000 against a 465.000 debt.
+      setupReturn({
+        original: { amountDue: DUE, subtotal: DUE },
+        originalLines: [{ quantity: 1, lineTotal: DUE }],
+        returnedLines: [
+          {
+            quantity: 1,
+            lineTotal: DUE,
+            originalInvoiceItemId: 'orig-line-0',
+          },
+          {
+            id: 'ret-line-out',
+            quantity: 1,
+            lineTotal: 200_000,
+            direction: ItemDirection.OUT,
+          },
+        ],
+      });
+      openDebt(465_000, 465_000);
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(Number(savedInvoice().refundedAmount)).toBe(565_000);
+      expect(savedInvoice().offsetAmount).toBe(465_000);
+      expect(cashOut()).toBe(100_000);
+    });
+
+    it('AC-09 — two partial returns pay out the collected 300.000 in total, never more', async () => {
+      // Round 1: 400.000 back against a 465.000 debt → all of it offsets.
+      setupPartialReturn(400_000);
+      const row = openDebt(465_000, 465_000);
+      await service.checkout('ret-1', cashDto(), actor);
+
+      const afterFirst = settledDebtRow();
+      expect(savedInvoice().offsetAmount).toBe(400_000);
+      expect(afterFirst).toMatchObject({ remainingAmount: 65_000 });
+      const firstCash = cashOut();
+
+      // Round 2: the remaining 365.000 meets a debt already down to 65.000.
+      jest.clearAllMocks();
+      cashFundResolver.resolveBranchCashFund.mockResolvedValue(CASH_FUND);
+      accountResolver.resolveDefaultAccount.mockImplementation((role: any) =>
+        Promise.resolve(
+          role === AccountingDefaultAccountRole.REVENUE
+            ? REVENUE_ACCOUNT
+            : RECEIVABLE_ACCOUNT,
+        ),
+      );
+      mockManager.save.mockImplementation((e: any) => Promise.resolve(e));
+      mockManager.create.mockImplementation((_e: any, data: any) => ({
+        id: 'gen-1',
+        ...data,
+      }));
+      mockManager.query.mockResolvedValue([undefined, 1]);
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(null);
+
+      setupPartialReturn(365_000);
+      debtRepo.findOne.mockResolvedValue(row);
+      mockManager.findOne.mockResolvedValue(row);
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(savedInvoice().offsetAmount).toBe(65_000);
+      expect(settledDebtRow()).toMatchObject({
+        remainingAmount: 0,
+        status: DebtStatus.PAID,
+      });
+      expect(firstCash + cashOut()).toBe(300_000);
+    });
+
+    it('AC-10 — a BANK refund withdraws only the cash-out part from the deposit fund', async () => {
+      setupFullReturn();
+      openDebt(465_000, 465_000);
+
+      await service.checkout('ret-1', bankDto(), actor);
+
+      expect(savedInvoice().offsetAmount).toBe(465_000);
+      expect(bankOut()).toBe(300_000);
+      expect(cashRefundPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('AC-12 — a fully offset refund creates no treasury voucher at all', async () => {
+      setupFullReturn();
+      openDebt(DUE, DUE);
+
+      await service.checkout('ret-1', bankDto(), actor);
+
+      expect(cashRefundPublisher.publish).not.toHaveBeenCalled();
+      expect(depositRefundPublisher.publish).not.toHaveBeenCalled();
     });
   });
 });

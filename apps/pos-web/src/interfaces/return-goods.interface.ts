@@ -72,3 +72,13 @@ export interface EligibleReturnLine {
   returnedQuantity: number;
   maxReturnable: number;
 }
+
+/**
+ * Dư nợ còn lại của hóa đơn gốc (`GET /invoices/:id/outstanding-debt`).
+ *
+ * Khoản hoàn của phiếu trả luôn trừ dư nợ này trước, phần còn lại mới chi ra
+ * quỹ — màn hình thanh toán dùng số này để hiện trước hai dòng đó.
+ */
+export interface OutstandingDebtRow {
+  remainingDebt: number;
+}

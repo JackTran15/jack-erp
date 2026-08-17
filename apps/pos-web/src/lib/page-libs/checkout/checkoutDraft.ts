@@ -24,7 +24,6 @@ export function initialCheckoutDraft(): CheckoutDraft {
       paymentLines: [createPaymentLine(PaymentMethodEnum.CASH)],
       keepChange: false,
       debt: false,
-      refundToDebt: false,
       note: "",
       printInvoice: true,
       printDuplicate: false,

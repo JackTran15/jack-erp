@@ -103,11 +103,6 @@ interface BuildCheckoutReturnPayloadInput {
   newSubtotal: number;
   paymentLines: PaymentLine[];
   /**
-   * Operator tích "Tính vào công nợ" (chỉ ở luồng hoàn tiền, net<0) → bù trừ
-   * khoản hoàn vào công nợ hóa đơn gốc (OFFSET). Mặc định false ⇒ chi tiền mặt.
-   */
-  offsetToDebt?: boolean;
-  /**
    * Đơn ĐỔI net>0 (khách nợ thêm): operator tích "Tính vào công nợ" → phần chênh
    * chưa thu (net − Σpayments) ghi vào công nợ khách. `dueDate`/`creditDays` là hạn
    * nợ (BE tự resolve tài khoản phải thu). Mặc định false ⇒ ép thu đủ tiền mặt.
@@ -123,10 +118,14 @@ interface BuildCheckoutReturnPayloadInput {
  * `netAmount = newSubtotal − returnSubtotal` (đúng ma trận BE):
  *   - net > 0  → khách trả thêm: CASH + `payments` (map từ dòng thanh toán).
  *   - net = 0  → bù trừ ngang: OFFSET.
- *   - net < 0  → hoàn tiền khách: OFFSET nếu operator tích "Tính vào công nợ";
- *     ngược lại theo quỹ operator chọn ở "Hình thức đổi trả" — tiền mặt ⇒ CASH,
- *     tài khoản ngân hàng/thẻ ⇒ BANK + `refundAccountId` (payment_accounts.id).
- *     BE tự chuyển OFFSET→CASH nếu hóa đơn gốc không còn công nợ để bù trừ.
+ *   - net < 0  → hoàn tiền khách theo quỹ operator chọn ở "Hình thức đổi trả":
+ *     tiền mặt ⇒ CASH, tài khoản ngân hàng/thẻ ⇒ BANK + `refundAccountId`
+ *     (payment_accounts.id).
+ *
+ * `refundMethod` KHÔNG quyết định việc cấn trừ công nợ: BE luôn trừ dư nợ hóa
+ * đơn gốc trước rồi mới chi phần còn lại qua quỹ này, và trả về `offsetAmount`.
+ * Vì vậy FE không còn gửi `OFFSET` ở luồng hoàn tiền.
+ *
  * BE tự resolve tài khoản doanh thu (contra) — FE không gửi `revenueAccountId`;
  * `cashAccountId` để trống ⇒ BE lấy theo quỹ chi nhánh.
  */
@@ -169,8 +168,7 @@ export function buildCheckoutReturnPayload(
   }
 
   // net === 0: bù trừ ngang (không có tiền đổi chủ) ⇒ OFFSET.
-  // net < 0 + "Tính vào công nợ" ⇒ OFFSET (cấn trừ công nợ hóa đơn gốc).
-  if (net === 0 || input.offsetToDebt) {
+  if (net === 0) {
     return {
       ok: true,
       body: {
@@ -181,8 +179,9 @@ export function buildCheckoutReturnPayload(
   }
 
   // net < 0: hoàn tiền theo quỹ operator chọn ở "Hình thức đổi trả". Dòng hoàn
-  // (amount = số tiền hoàn) mang method + tài khoản đã chọn: tiền mặt ⇒ CASH,
-  // ngân hàng/thẻ ⇒ BANK + payment_accounts.id để BE trừ đúng quỹ tiền gửi.
+  // (amount = TOÀN BỘ khoản hoàn) mang method + tài khoản đã chọn: tiền mặt ⇒
+  // CASH, ngân hàng/thẻ ⇒ BANK + payment_accounts.id để BE trừ đúng quỹ tiền gửi.
+  // BE chỉ chi ra phần còn lại sau khi đã cấn trừ công nợ hóa đơn gốc.
   const selected =
     input.paymentLines.find((line) => line.amount > 0) ??
     input.paymentLines[0];

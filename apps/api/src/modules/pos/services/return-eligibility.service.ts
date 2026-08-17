@@ -13,6 +13,16 @@ import {
   InvoiceType,
 } from '../entities/invoice.entity';
 import { InvoiceItemEntity } from '../entities/invoice-item.entity';
+import {
+  InvoiceDebtEntity,
+  DebtDocumentType,
+  DebtStatus,
+} from '../entities/invoice-debt.entity';
+
+export interface OutstandingDebt {
+  /** What the customer still owes on this invoice; 0 when it was paid in full. */
+  remainingDebt: number;
+}
 
 export interface EligibleLine {
   originalInvoiceItemId: string;
@@ -43,7 +53,43 @@ export class ReturnEligibilityService {
     private readonly invoiceRepo: Repository<InvoiceEntity>,
     @InjectRepository(InvoiceItemEntity)
     private readonly itemRepo: Repository<InvoiceItemEntity>,
+    @InjectRepository(InvoiceDebtEntity)
+    private readonly debtRepo: Repository<InvoiceDebtEntity>,
   ) {}
+
+  /**
+   * Outstanding debt on a SALE invoice, for the POS refund preview.
+   *
+   * The checkout applies `min(refund, remainingDebt)` against this same row under
+   * a lock, so what this returns is advisory: a concurrent debt receipt can move
+   * it between the preview and the post. The posted document is authoritative.
+   */
+  async getOutstandingDebt(
+    invoiceId: string,
+    actor: ActorContext,
+  ): Promise<OutstandingDebt> {
+    const invoice = await this.invoiceRepo.findOne({
+      where: { id: invoiceId, organizationId: actor.organizationId },
+      select: { id: true },
+    });
+    if (!invoice) {
+      throw new NotFoundException(`Invoice ${invoiceId} not found`);
+    }
+
+    const debt = await this.debtRepo.findOne({
+      where: {
+        invoiceId,
+        organizationId: actor.organizationId,
+        documentType: DebtDocumentType.CREDIT_INVOICE,
+      },
+    });
+    if (!debt || debt.status === DebtStatus.PAID) {
+      return { remainingDebt: 0 };
+    }
+    // Historical rows can carry a negative remainder; treat it as settled rather
+    // than letting a negative propagate into the split arithmetic.
+    return { remainingDebt: Math.max(0, Number(debt.remainingAmount)) };
+  }
 
   /** Returns per-line returnable amounts for the original SALE invoice. */
   async getEligibleLines(

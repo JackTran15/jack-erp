@@ -181,9 +181,9 @@ export interface CheckoutPaymentDraft {
   keepChange: boolean;
   debt: boolean;
   /**
-   * Chỉ dùng ở luồng hoàn tiền (return/exchange net<0): tích "Tính vào công nợ"
-   * để bù trừ khoản hoàn vào công nợ hóa đơn gốc (refundMethod=OFFSET) thay vì
-   * chi tiền mặt. Optional cho draft cũ đã persist (coerce về false khi đọc).
+   * @deprecated Bỏ từ bản vá "trả hàng đơn còn nợ": khoản hoàn luôn tự trừ công
+   * nợ hóa đơn gốc trước rồi mới chi phần còn lại, không còn ô tích nào cả. Giữ
+   * lại optional để draft cũ đã persist vẫn đọc được; không đọc giá trị này nữa.
    */
   refundToDebt?: boolean;
   note: string;

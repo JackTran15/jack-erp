@@ -18,7 +18,6 @@ const fakeCustomer: CustomerRow = {
 const baseInput: CheckoutValidationInput = {
   hasAnyCartLines: true,
   debt: false,
-  refundToDebt: false,
   keepChange: false,
   selectedCustomer: null,
   purchaseCart: [],
@@ -109,22 +108,26 @@ describe("validateCheckout", () => {
     }
   });
 
-  it("refundToDebt + selectedCustomer does not trigger UNDERPAID_RETURN", () => {
+  it("a refund line short of the full amount is still blocked (AC-15)", () => {
+    // Không còn ô "Tính vào công nợ" để miễn: dòng hoàn phải mang TOÀN BỘ khoản
+    // hoàn, BE mới là nơi tách phần cấn trừ công nợ ra khỏi phần chi thật.
     const result = validateCheckout({
       ...baseInput,
-      refundToDebt: true,
       selectedCustomer: fakeCustomer,
       settlementGrandTotal: -100_000,
       settlementAbs: 100_000,
       totalPaid: 0,
     });
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe(CHECKOUT_ERROR_CODES.UNDERPAID_RETURN);
+    }
   });
 
-  it("refundToDebt without a customer is blocked (DEBT_REQUIRES_CUSTOMER)", () => {
+  it("a sale on debt without a customer is blocked (DEBT_REQUIRES_CUSTOMER)", () => {
     const result = validateCheckout({
       ...baseInput,
-      refundToDebt: true,
+      debt: true,
       selectedCustomer: null,
       settlementGrandTotal: -100_000,
       settlementAbs: 100_000,

@@ -47,6 +47,9 @@ export const INVOICE_KEYS = {
   /** Danh sách dòng hàng được phép trả của một hóa đơn gốc. */
   ELIGIBLE_RETURNS: (id: string) =>
     ["invoices", "eligible-returns", id] as const,
+  /** Dư nợ còn lại của hóa đơn gốc — dùng cho khối xem trước khoản tách. */
+  OUTSTANDING_DEBT: (id: string) =>
+    ["invoices", "outstanding-debt", id] as const,
 } as const;
 
 export const CUSTOMER_KEYS = {
