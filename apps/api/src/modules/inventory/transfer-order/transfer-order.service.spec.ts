@@ -17,6 +17,7 @@ import {
 } from '@erp/shared-interfaces';
 import { TransferOrderService } from './transfer-order.service';
 import { TransferOrderEntity } from './transfer-order.entity';
+import { TransferOrderLineEntity } from './transfer-order-line.entity';
 import { LocationEntity } from '../location/location.entity';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { GoodsIssueEntity } from '../goods-issue/goods-issue.entity';
@@ -28,7 +29,7 @@ import { GoodsReceiptService } from '../goods-receipt/goods-receipt.service';
 
 describe('TransferOrderService', () => {
   let service: TransferOrderService;
-  let toRepo: Record<string, jest.Mock>;
+  let toRepo: Record<string, any>;
   let locationRepo: Record<string, jest.Mock>;
   let balanceRepo: Record<string, jest.Mock>;
   let balanceQb: Record<string, jest.Mock>;
@@ -78,6 +79,7 @@ describe('TransferOrderService', () => {
       softDelete: jest.fn().mockResolvedValue(undefined),
       findAndCount: jest.fn().mockResolvedValue([[], 0]),
       find: jest.fn().mockResolvedValue([]),
+      manager: { findAndCount: jest.fn().mockResolvedValue([[], 0]) },
     };
     locationRepo = {
       findOne: jest.fn().mockResolvedValue({ id: 'loc-unassigned' }),
@@ -1109,6 +1111,86 @@ describe('TransferOrderService', () => {
       issueLines = [{ itemId: 'item-1', locationId: 'loc-A01', quantity: 5, unitPrice: 100 }];
       stockA['item-1'] -= 1;
       expect(total('item-1')).toBe(startTotal);
+    });
+  });
+
+  describe('list (T-03-01)', () => {
+    it('bypasses eager lines/item via loadEagerRelations: false, without changing where/skip/take/order', async () => {
+      toRepo.findAndCount.mockResolvedValue([[{ id: 'to-1', documentNumber: 'LDC000001' }], 1]);
+
+      const result = await service.list({
+        organizationId: 'org-1',
+        page: 2,
+        pageSize: 10,
+      });
+
+      expect(toRepo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { organizationId: 'org-1' },
+          skip: 10,
+          take: 10,
+          order: { createdAt: 'DESC' },
+          loadEagerRelations: false,
+        }),
+      );
+      expect(result.data[0]).not.toHaveProperty('lines');
+      expect(result.total).toBe(1);
+    });
+  });
+
+  describe('getLines (T-03-02)', () => {
+    it('returns a paginated page of lines with hasMore=true when more remain', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder());
+      const items = [{ id: 'line-1' }, { id: 'line-2' }];
+      toRepo.manager.findAndCount.mockResolvedValue([items, 5]);
+
+      const result = await service.getLines('to-1', actorSource, 1, 2);
+
+      expect(toRepo.findOne).toHaveBeenCalledWith({
+        where: { id: 'to-1', organizationId: 'org-1' },
+        loadEagerRelations: false,
+      });
+      expect(toRepo.manager.findAndCount).toHaveBeenCalledWith(TransferOrderLineEntity, {
+        where: { transferOrderId: 'to-1', organizationId: 'org-1' },
+        order: { createdAt: 'ASC' },
+        skip: 0,
+        take: 2,
+      });
+      expect(result).toEqual({ items, page: 1, pageSize: 2, hasMore: true, total: 5 });
+    });
+
+    it('reports hasMore=false on the last page', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder());
+      toRepo.manager.findAndCount.mockResolvedValue([[{ id: 'line-5' }], 5]);
+
+      const result = await service.getLines('to-1', actorSource, 3, 2);
+
+      expect(result.hasMore).toBe(false);
+      expect(result.total).toBe(5);
+    });
+
+    it('returns an empty page for an order with zero lines, not an error', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder());
+      toRepo.manager.findAndCount.mockResolvedValue([[], 0]);
+
+      const result = await service.getLines('to-1', actorSource, 1, 20);
+
+      expect(result).toEqual({ items: [], page: 1, pageSize: 20, hasMore: false, total: 0 });
+    });
+
+    it('404s for a nonexistent id, without touching the line query', async () => {
+      toRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.getLines('missing', actorSource, 1, 20)).rejects.toThrow();
+      expect(toRepo.manager.findAndCount).not.toHaveBeenCalled();
+    });
+
+    it('404s (not-found, not forbidden) when the actor participates in neither branch', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder());
+      const outsider = { ...actorSource, branchId: 'branch-C' };
+
+      await expect(service.getLines('to-1', outsider, 1, 20)).rejects.toThrow(NotFoundException);
+      expect(toRepo.manager.findAndCount).not.toHaveBeenCalled();
     });
   });
 });

@@ -28,6 +28,7 @@ function ctx(overrides: Partial<CheckoutContext> = {}): CheckoutContext {
       remainder: 0,
       keptChange: 0,
       pointsEarned: 73,
+      pointsBlocked: false,
       newStatus: InvoiceStatus.PAID,
     },
     ...overrides,
@@ -139,6 +140,40 @@ describe('PersistInvoiceStep', () => {
     };
     const invoice: any = { id: 'inv-1', customerId: 'cust-1', pointsRedeemed: 0 };
     const c = ctx({ invoice, manager: withManager(invoiceRepo) });
+
+    await new PersistInvoiceStep(membershipCardService as any).execute(c);
+
+    expect(invoice.pointsEarned).toBe(73);
+  });
+
+  it('records no points for a customer invoice when totals.pointsBlocked is true (AC-06, AC-09)', async () => {
+    const invoiceRepo = { save: jest.fn((x: unknown) => x) };
+    const membershipCardService = {
+      getPointBalanceForUpdate: jest.fn().mockResolvedValue(100),
+    };
+    const invoice: any = { id: 'inv-1', customerId: 'cust-1', pointsRedeemed: 0 };
+    const c = ctx({
+      invoice,
+      manager: withManager(invoiceRepo),
+      totals: { ...ctx().totals!, pointsBlocked: true },
+    });
+
+    await new PersistInvoiceStep(membershipCardService as any).execute(c);
+
+    expect(invoice.pointsEarned).toBe(0);
+  });
+
+  it('still records points for a customer invoice when totals.pointsBlocked is false (AC-08, AC-10, AC-11)', async () => {
+    const invoiceRepo = { save: jest.fn((x: unknown) => x) };
+    const membershipCardService = {
+      getPointBalanceForUpdate: jest.fn().mockResolvedValue(100),
+    };
+    const invoice: any = { id: 'inv-1', customerId: 'cust-1', pointsRedeemed: 0 };
+    const c = ctx({
+      invoice,
+      manager: withManager(invoiceRepo),
+      totals: { ...ctx().totals!, pointsBlocked: false },
+    });
 
     await new PersistInvoiceStep(membershipCardService as any).execute(c);
 

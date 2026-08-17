@@ -167,6 +167,8 @@ export interface PromotionProgramDetail {
   /** promotion_branches — empty = whole chain (BR-005). */
   branchIds: string[];
   invoiceScope?: PromotionInvoiceScope;
+  /** INVOICE_DISCOUNT only — whether this program lets the invoice it applies to earn loyalty points. */
+  accruePoints?: boolean;
   discountMode?: PromotionDiscountMode;
   discountValue?: number;
   maxDiscountAmount?: number;
@@ -251,6 +253,12 @@ export interface AppliedProgram {
    */
   discountMode?: PromotionDiscountMode;
   discountValue?: number;
+  /**
+   * Only set when `type === INVOICE_DISCOUNT` — mirrors discountMode/discountValue above.
+   * Undefined (never `false`) on the other 4 types, so a checkout that applies one of them
+   * can never have its points blocked by this field's absence of meaning for that type.
+   */
+  accruePoints?: boolean;
 }
 
 /** auto_apply=false programs that were eligible but not run — cashier can still pick them. */

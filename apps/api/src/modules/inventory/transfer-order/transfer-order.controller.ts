@@ -411,6 +411,16 @@ export class TransferOrderController {
     return this.service.getById(id, actor);
   }
 
+  @Get(":id/lines")
+  @RequirePermission("inventory.transfer.read")
+  getLines(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: PaginationQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.getLines(id, actor, query.page, query.pageSize);
+  }
+
   @Get(":id/print-payload")
   @RequirePermission("inventory.transfer.read")
   getPrintPayload(

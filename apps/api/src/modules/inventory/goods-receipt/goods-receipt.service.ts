@@ -102,6 +102,14 @@ export interface GoodsReceiptQuery extends PaginationQuery {
   branchId?: string;
 }
 
+export interface GoodsReceiptLinesPage {
+  items: GoodsReceiptLineEntity[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+  total: number;
+}
+
 @Injectable()
 export class GoodsReceiptService {
   private readonly logger = new Logger(GoodsReceiptService.name);
@@ -1083,6 +1091,39 @@ export class GoodsReceiptService {
       actor.organizationId,
     );
     return receipt;
+  }
+
+  /**
+   * Paginated lines for one receipt (T-01-02) — the existence/scope check is a
+   * deliberately lean `findOne` with `loadEagerRelations: false`, NOT
+   * `findOrFail`, so it doesn't pull the receipt's eager `lines` just to prove
+   * the receipt exists and is in scope.
+   */
+  async getLines(
+    id: string,
+    actor: ActorContext,
+    page: number,
+    pageSize: number,
+  ): Promise<GoodsReceiptLinesPage> {
+    const exists = await this.receiptRepo.findOne({
+      where: {
+        id,
+        organizationId: actor.organizationId,
+        ...(actor.branchId ? { branchId: actor.branchId } : {}),
+      },
+      loadEagerRelations: false,
+    });
+    if (!exists)
+      throw new NotFoundException(`Phiếu nhập kho ${id} không tìm thấy`);
+
+    const [items, total] = await this.lineRepo.findAndCount({
+      where: { goodsReceiptId: id, organizationId: actor.organizationId },
+      order: { createdAt: "ASC" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    });
+
+    return { items, page, pageSize, hasMore: page * pageSize < total, total };
   }
 
   /** Print/export payload for one receipt (T-03-02, UOW-08) — reuses `getById`'s 404. */

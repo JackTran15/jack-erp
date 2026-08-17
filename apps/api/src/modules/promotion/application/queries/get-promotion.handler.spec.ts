@@ -27,6 +27,7 @@ function programWithLines(): PromotionProgram {
     daysOfWeek: [],
     autoApply: true,
     branchIds: [],
+    accruePoints: false,
     groups: [
       {
         id: 'group-1',
@@ -103,6 +104,7 @@ describe('GetPromotionHandler', () => {
       daysOfWeek: [],
       autoApply: true,
       branchIds: [],
+      accruePoints: false,
       discountValue: 10,
       groups: [{ id: 'group-1', ordinal: 0, lines: [], tiers: [] }],
       createdBy: 'user-1',

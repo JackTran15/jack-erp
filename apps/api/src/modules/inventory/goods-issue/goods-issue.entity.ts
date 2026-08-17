@@ -128,4 +128,11 @@ export class GoodsIssueEntity extends BaseEntity {
    * counterparties (no provider join) render their name instead of "—".
    */
   counterparty?: CounterpartyDisplay | null;
+
+  /**
+   * Transient (not a column): per-issue Tổng tiền, inlined by the v2 search
+   * handler via a correlated subquery so the list's money column works
+   * without joining `lines` (which the list query no longer does).
+   */
+  totalAmount?: number;
 }

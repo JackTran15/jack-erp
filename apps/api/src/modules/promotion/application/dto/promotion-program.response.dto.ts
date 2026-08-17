@@ -122,6 +122,7 @@ export function toDetail(program: PromotionProgram, resolveTarget: TargetResolve
     autoApply: program.autoApply,
     branchIds: program.branchIds,
     invoiceScope: program.invoiceScope,
+    accruePoints: program.accruePoints,
     discountMode: program.discountMode,
     discountValue: program.discountValue,
     maxDiscountAmount: program.maxDiscountAmount,

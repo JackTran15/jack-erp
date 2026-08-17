@@ -36991,6 +36991,11 @@
             "type": "string",
             "description": "INVOICE_DISCOUNT only"
           },
+          "accruePoints": {
+            "type": "boolean",
+            "default": false,
+            "description": "INVOICE_DISCOUNT only"
+          },
           "discountMode": {
             "enum": [
               "PERCENT",
@@ -37191,6 +37196,11 @@
               "ALL_ITEMS"
             ],
             "type": "string",
+            "description": "INVOICE_DISCOUNT only"
+          },
+          "accruePoints": {
+            "type": "boolean",
+            "default": false,
             "description": "INVOICE_DISCOUNT only"
           },
           "discountMode": {

@@ -27,9 +27,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
+      const explicitCode = (exception as { code?: unknown }).code;
 
       body = {
-        code: `HTTP_${status}`,
+        code:
+          typeof explicitCode === 'string' && explicitCode
+            ? explicitCode
+            : `HTTP_${status}`,
         message:
           typeof exceptionResponse === 'string'
             ? exceptionResponse

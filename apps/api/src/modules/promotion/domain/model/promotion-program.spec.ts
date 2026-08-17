@@ -67,6 +67,7 @@ function baseProps(overrides: Partial<PromotionProgramProps> = {}): PromotionPro
     daysOfWeek: [],
     autoApply: true,
     branchIds: [],
+    accruePoints: false,
     discountMode: PromotionDiscountMode.PERCENT,
     discountValue: 30,
     groups: [aGroup()],
@@ -92,6 +93,16 @@ describe('PromotionProgram.create', () => {
     const program = PromotionProgram.create(baseProps());
     expect(program.name).toBe('Test promotion');
     expect(program.type).toBe(PromotionProgramType.INVOICE_DISCOUNT);
+  });
+
+  it('exposes accruePoints=true (T-02-06)', () => {
+    const program = PromotionProgram.create(baseProps({ accruePoints: true }));
+    expect(program.accruePoints).toBe(true);
+  });
+
+  it('exposes accruePoints=false (T-02-06)', () => {
+    const program = PromotionProgram.create(baseProps({ accruePoints: false }));
+    expect(program.accruePoints).toBe(false);
   });
 
   it('is immutable — every field is readonly and no public setters exist', () => {

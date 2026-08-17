@@ -119,6 +119,14 @@ export interface GoodsIssueQuery extends PaginationQuery {
   branchId?: string;
 }
 
+export interface GoodsIssueLinesPage {
+  items: GoodsIssueLineEntity[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+  total: number;
+}
+
 const VALID_TRANSITIONS: Record<GoodsIssueStatus, GoodsIssueStatus[]> = {
   [GoodsIssueStatus.DRAFT]: [GoodsIssueStatus.POSTED, GoodsIssueStatus.CANCELLED],
   [GoodsIssueStatus.APPROVED]: [GoodsIssueStatus.POSTED, GoodsIssueStatus.CANCELLED],
@@ -719,6 +727,42 @@ export class GoodsIssueService {
     const gi = await this.findOrFail(id, actor.organizationId, actor.branchId);
     await attachCounterparties(this.giRepo.manager, [gi], actor.organizationId);
     return gi;
+  }
+
+  /**
+   * Paginated lines for one issue (T-02-02) — the existence/scope check is a
+   * deliberately lean `findOne` with `loadEagerRelations: false`, NOT
+   * `findOrFail`, so it doesn't pull the issue's eager `lines` just to prove
+   * the issue exists and is in scope.
+   *
+   * Ordered by `id ASC`: `GoodsIssueLineEntity` has no `createdAt` column
+   * (unlike its GR/TO counterparts), so `id` is the stable, deterministic
+   * ordering infinite-scroll accumulation needs.
+   */
+  async getLines(
+    id: string,
+    actor: ActorContext,
+    page: number,
+    pageSize: number,
+  ): Promise<GoodsIssueLinesPage> {
+    const exists = await this.giRepo.findOne({
+      where: {
+        id,
+        organizationId: actor.organizationId,
+        ...(actor.branchId ? { branchId: actor.branchId } : {}),
+      },
+      loadEagerRelations: false,
+    });
+    if (!exists) throw new NotFoundException(`Phiếu xuất hàng ${id} không tìm thấy`);
+
+    const [items, total] = await this.giRepo.manager.findAndCount(GoodsIssueLineEntity, {
+      where: { goodsIssueId: id },
+      order: { id: 'ASC' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    });
+
+    return { items, page, pageSize, hasMore: page * pageSize < total, total };
   }
 
   /** Print/export payload for one issue (T-03-02, UOW-08) — reuses `getById`'s 404. */

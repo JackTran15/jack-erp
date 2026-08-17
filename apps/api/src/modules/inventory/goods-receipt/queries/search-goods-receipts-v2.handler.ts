@@ -42,14 +42,12 @@ export class SearchGoodsReceiptsV2Handler implements IQueryHandler<SearchGoodsRe
     const limit = dto.limit ?? 20;
 
     // Eager relations are joined explicitly so the row shape is identical to the
-    // current find()-based list (provider, location, lines + line item/location);
-    // the detail panel and view dialog rely on `lines`.
+    // current find()-based list (provider, location). Line detail is fetched
+    // lazily via GET /goods-receipts/:id/lines once a document is opened, not
+    // as part of the list response.
     const rowsQb = this.buildQuery(dto, actor)
       .leftJoinAndSelect("gr.provider", "provider")
       .leftJoinAndSelect("gr.location", "location")
-      .leftJoinAndSelect("gr.lines", "lines")
-      .leftJoinAndSelect("lines.item", "lineItem")
-      .leftJoinAndSelect("lines.location", "lineLocation")
       .orderBy("gr.receivedAt", "DESC")
       .skip((page - 1) * limit)
       .take(limit);
@@ -72,6 +70,25 @@ export class SearchGoodsReceiptsV2Handler implements IQueryHandler<SearchGoodsRe
       data,
       actor.organizationId,
     );
+
+    // Per-row Tổng tiền: the list's money column used to be derived client-side
+    // from `lines` (now dropped, see rowsQb above). Reuse the same correlated
+    // subquery as the footer total, scoped to just this page's ids, so the
+    // column keeps working without joining `lines`/`item`/`location` per line.
+    if (data.length) {
+      const rowTotals = await this.repo
+        .createQueryBuilder("gr")
+        .select("gr.id", "id")
+        .addSelect(TOTAL_AMOUNT_SUBQUERY, "totalAmount")
+        .where("gr.id IN (:...ids)", { ids: data.map((row) => row.id) })
+        .getRawMany<{ id: string; totalAmount: string }>();
+      const totalById = new Map(
+        rowTotals.map((row) => [row.id, Number(row.totalAmount)]),
+      );
+      for (const row of data) {
+        row.totalAmount = totalById.get(row.id) ?? 0;
+      }
+    }
 
     return {
       data,

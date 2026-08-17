@@ -225,6 +225,17 @@ export class GoodsIssueController {
     return this.service.getById(id, actor);
   }
 
+  @Get(':id/lines')
+  @RequirePermission('inventory.goods-issue.read')
+  @RequireBranchScope()
+  getLines(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: PaginationQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.getLines(id, actor, query.page, query.pageSize);
+  }
+
   @Get(':id/print-payload')
   @RequirePermission('inventory.goods-issue.read')
   @RequireBranchScope()

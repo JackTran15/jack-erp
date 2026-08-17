@@ -129,6 +129,8 @@ export interface CheckoutTotals {
    */
   keptChange: number;
   pointsEarned: number;
+  /** True when any applied program's `accruePoints === false` (ADR-02) — zeroes pointsEarned and skips the LOYALTY_POINTS_AWARD outbox event. */
+  pointsBlocked: boolean;
   newStatus: InvoiceStatus;
 }
 

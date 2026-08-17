@@ -1,5 +1,6 @@
 import { PosCheckbox } from "@erp/pos/components/common/PosCheckbox/PosCheckbox";
 import { PosToggle } from "@erp/pos/components/common/PosToggle/PosToggle";
+import { SHOW_DEPOSIT_ORDER_CONTROLS } from "@erp/pos/constants/feature-flags.constant";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 import {
   selectIsReturnExchangeInvoice,
@@ -48,7 +49,7 @@ export function PrintAndOrderRow() {
         />
         In 2 liên
       </label>
-      {isReturnExchange ? null : (
+      {isReturnExchange || !SHOW_DEPOSIT_ORDER_CONTROLS ? null : (
         <label className="inline-flex cursor-pointer items-center gap-2">
           <PosCheckbox
             checked={preorder}

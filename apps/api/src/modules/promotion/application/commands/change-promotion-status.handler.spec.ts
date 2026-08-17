@@ -21,6 +21,7 @@ function existingProgram(): PromotionProgram {
     daysOfWeek: [],
     autoApply: true,
     branchIds: [],
+    accruePoints: false,
     discountMode: PromotionDiscountMode.PERCENT,
     discountValue: 10,
     groups: [{ id: 'group-1', ordinal: 0, lines: [], tiers: [] }],

@@ -27,6 +27,7 @@ function ctx(overrides: Partial<CheckoutContext> = {}): CheckoutContext {
       remainder: 0,
       keptChange: 0,
       pointsEarned: 0,
+      pointsBlocked: false,
       newStatus: InvoiceStatus.PAID,
     },
     ...overrides,
@@ -123,6 +124,62 @@ describe('EnqueueOutboxStep', () => {
       subtotal: 200,
     });
     expect(loyaltyCall![3]).toBe('cust-1'); // partitionKey
+  });
+
+  it('does NOT enqueue LOYALTY_POINTS_AWARD when totals.pointsBlocked is true, even with a customer (AC-07, AC-09)', async () => {
+    const { manager, outbox, enqueue } = withManager();
+    const c = ctx({
+      manager,
+      invoice: { id: 'inv-1', branchId: 'b1', customerId: 'cust-1' } as any,
+      totals: { ...ctx().totals!, pointsBlocked: true },
+    });
+
+    await new EnqueueOutboxStep(outbox as any).execute(c);
+
+    const topics = enqueue.mock.calls.map((call) => call[1]);
+    expect(topics).not.toContain('erp.loyalty.points.award');
+    // This feature must not affect the other outbox events either way.
+    expect(topics).toEqual(
+      expect.arrayContaining(['erp.sale.posted', 'erp.temp-warehouse.invoice-fulfill']),
+    );
+  });
+
+  it('still enqueues LOYALTY_POINTS_AWARD, unchanged payload, when totals.pointsBlocked is false (AC-08, AC-10, AC-11)', async () => {
+    const { manager, outbox, enqueue } = withManager();
+    const c = ctx({
+      manager,
+      invoice: { id: 'inv-1', branchId: 'b1', customerId: 'cust-1' } as any,
+      totals: { ...ctx().totals!, pointsBlocked: false },
+    });
+
+    await new EnqueueOutboxStep(outbox as any).execute(c);
+
+    const loyaltyCall = enqueue.mock.calls.find((call) => call[1] === 'erp.loyalty.points.award');
+    expect(loyaltyCall).toBeDefined();
+    expect(loyaltyCall![2].payload).toMatchObject({
+      invoiceId: 'inv-1',
+      customerId: 'cust-1',
+      subtotal: c.totals!.amountDue,
+    });
+    const topics = enqueue.mock.calls.map((call) => call[1]);
+    expect(topics).toEqual(
+      expect.arrayContaining(['erp.sale.posted', 'erp.temp-warehouse.invoice-fulfill', 'erp.loyalty.points.award']),
+    );
+  });
+
+  it('still enqueues the kept-change voucher row when totals.pointsBlocked is true — unrelated to points', async () => {
+    const { manager, outbox, enqueue } = withManager();
+    const c = ctx({
+      manager,
+      funds: { cashAccountId: 'till-1' },
+      totals: { ...ctx().totals!, keptChange: 15_000, pointsBlocked: true },
+    });
+
+    await new EnqueueOutboxStep(outbox as any).execute(c);
+
+    const topics = enqueue.mock.calls.map((call) => call[1]);
+    expect(topics).toContain('erp.cash.voucher.needed.kept_change');
+    expect(topics).not.toContain('erp.loyalty.points.award'); // customerId undefined on ctx()'s default invoice anyway, but pointsBlocked would also block it
   });
 
   it('every enqueue call passes the manager and uses invoiceId as the partitionKey (SALE_POSTED / fulfill)', async () => {

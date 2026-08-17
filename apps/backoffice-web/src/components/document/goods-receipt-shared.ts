@@ -64,6 +64,12 @@ export interface GoodsReceipt {
   } | null;
   attachmentIds?: string[];
   lines: GoodsReceiptLine[];
+  /**
+   * Per-row Tổng tiền, present on `/v2/goods-receipts/search` list rows (which
+   * no longer carry `lines`) but not on the `GET /:id` shape — that one keeps
+   * `lines` and callers compute the total from it when needed.
+   */
+  totalAmount?: number;
   cashPaymentId?: string | null;
   cashReceiptId?: string | null;
   postedAt?: string | null;

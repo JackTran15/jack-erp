@@ -117,3 +117,34 @@ describe("deriveSettlement — discounts never push a sale below zero", () => {
     expect(r.settlementGrandTotal).toBe(-580_000);
   });
 });
+
+/**
+ * T-01-03 (AC-06) — the "Đặt cọc" control is hidden, so `deposit` is pinned
+ * at its default `0` forever. A zero deposit must be a true no-op on
+ * settlement math: `settlementGrandTotal` reduces to
+ * `grandTotal + (returnFee ?? 0)`, exactly matching pre-hide behaviour.
+ */
+describe("deriveSettlement — deposit: 0 is a no-op on settlement math (regression)", () => {
+  it("settlementGrandTotal equals grandTotal + returnFee for a plain sale", () => {
+    const r = deriveSettlement({
+      grandTotal: 1_500_000,
+      deposit: 0,
+      returnFee: 20_000,
+      keepChange: false,
+      paymentLines: [],
+      debt: false,
+    });
+    expect(r.settlementGrandTotal).toBe(1_500_000 + 20_000);
+  });
+
+  it("settlementGrandTotal equals grandTotal when there is no returnFee either", () => {
+    const r = deriveSettlement({
+      grandTotal: 1_500_000,
+      deposit: 0,
+      keepChange: false,
+      paymentLines: [],
+      debt: false,
+    });
+    expect(r.settlementGrandTotal).toBe(1_500_000);
+  });
+});

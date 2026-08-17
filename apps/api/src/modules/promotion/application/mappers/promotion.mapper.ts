@@ -156,6 +156,7 @@ export function toDomain(row: PromotionProgramRow): PromotionProgram {
     autoApply: row.program.autoApply,
     branchIds: row.branchIds,
     invoiceScope: fromDb(row.program.invoiceScope),
+    accruePoints: row.program.accruePoints,
     discountMode: fromDb(row.program.discountMode),
     discountValue: toDomainNumber(row.program.discountValue),
     maxDiscountAmount: toDomainNumber(row.program.maxDiscountAmount),
@@ -224,6 +225,7 @@ export function toPersistence(aggregate: PromotionProgram): PromotionPersistence
   program.endTime = formatTimeOfDay(aggregate.endTime);
   program.autoApply = aggregate.autoApply;
   program.invoiceScope = nullify(aggregate.invoiceScope);
+  program.accruePoints = aggregate.accruePoints;
   program.discountMode = nullify(aggregate.discountMode);
   program.discountValue = toDbNumeric(aggregate.discountValue);
   program.maxDiscountAmount = toDbNumeric(aggregate.maxDiscountAmount);

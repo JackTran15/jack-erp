@@ -88,6 +88,17 @@ export class GoodsReceiptController {
     return this.service.getById(id, actor);
   }
 
+  @Get(':id/lines')
+  @RequirePermission('goods_receipt.read')
+  @RequireBranchScope()
+  getLines(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: PaginationQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.getLines(id, actor, query.page, query.pageSize);
+  }
+
   @Get(':id/print-payload')
   @RequirePermission('goods_receipt.read')
   @RequireBranchScope()

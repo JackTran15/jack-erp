@@ -66,6 +66,7 @@ class ProgramBuilder {
     daysOfWeek: [],
     autoApply: true,
     branchIds: [],
+    accruePoints: false,
     discountMode: PromotionDiscountMode.PERCENT,
     discountValue: 10,
     groups: [aGroup()],

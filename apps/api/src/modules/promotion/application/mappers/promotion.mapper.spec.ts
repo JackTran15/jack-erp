@@ -58,6 +58,24 @@ describe('promotion.mapper round-trip', () => {
     expect(roundTrip(original)).toEqual(original);
   });
 
+  it('accruePoints=true round-trips losslessly through toPersistence/toDomain (T-02-06)', () => {
+    const original = aProgram().ofType(PromotionProgramType.INVOICE_DISCOUNT).with({ accruePoints: true }).build();
+
+    const result = roundTrip(original);
+
+    expect(result.accruePoints).toBe(true);
+    expect(result).toEqual(original);
+  });
+
+  it('accruePoints=false round-trips losslessly through toPersistence/toDomain (T-02-06)', () => {
+    const original = aProgram().ofType(PromotionProgramType.INVOICE_DISCOUNT).with({ accruePoints: false }).build();
+
+    const result = roundTrip(original);
+
+    expect(result.accruePoints).toBe(false);
+    expect(result).toEqual(original);
+  });
+
   it('ITEM_DISCOUNT with reward lines targeting PRODUCT/ITEM/CATEGORY', () => {
     const original = aProgram()
       .ofType(PromotionProgramType.ITEM_DISCOUNT)

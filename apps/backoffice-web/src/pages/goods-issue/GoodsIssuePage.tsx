@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { erpApi, requireErpData } from "../../lib/erp-api";
 import {
   navigateToBarcodePrint,
   type BarcodePrefillItem,
@@ -57,6 +59,7 @@ import {
 } from "../../components/document/goods-issue-shared";
 import type {
   GoodsIssue,
+  GoodsIssueLine,
   GoodsIssueStatus,
   GoodsIssuePurposeUI,
   InventoryProvider,
@@ -119,7 +122,10 @@ const STATUS_LABELS: Record<GoodsIssueStatus, string> = {
 };
 
 function issueTotal(o: GoodsIssue): number {
-  return o.lines.reduce((s, l) => s + lineSubtotal(l), 0);
+  // List rows carry a server-computed `totalAmount` (no `lines` to sum
+  // client-side); full-detail fetches (GET /:id) still carry `lines`.
+  if (o.totalAmount !== undefined) return o.totalAmount;
+  return (o.lines ?? []).reduce((s, l) => s + lineSubtotal(l), 0);
 }
 
 function renderStatusBadge(status: GoodsIssueStatus) {
@@ -132,6 +138,17 @@ function renderStatusBadge(status: GoodsIssueStatus) {
 
   return <StatusBadge variant={variant}>{STATUS_LABELS[status]}</StatusBadge>;
 }
+
+/** GET /inventory/goods-issues/:id/lines response shape (paginated). */
+interface GoodsIssueLinesPage {
+  items: GoodsIssueLine[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+  total: number;
+}
+
+const LINES_PAGE_SIZE = 50;
 
 function isUuidLike(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -289,14 +306,27 @@ export function GoodsIssuePage() {
   }, [storages]);
 
   const getIssueId = useCallback((issue: GoodsIssue) => issue.id, []);
-  const {
-    selectedId,
-    setSelectedId,
-    activeRecord: selectedIssue,
-  } = useDocumentListSelection({
+  const { selectedId, setSelectedId } = useDocumentListSelection({
     rows: records?.data ?? [],
     getRowId: getIssueId,
   });
+
+  // List rows no longer carry `lines` (v2 search trims them, see
+  // search-goods-issues-v2.handler.ts). The selected document's full detail
+  // (header + lines) is fetched separately via the unchanged GET /:id, so the
+  // barcode toolbar, the duplicate/view/edit dialog, and DetailPanel all read
+  // from this instead of the stale list row.
+  const { data: selectedIssueData } = useQuery({
+    queryKey: ["goods-issue", selectedId],
+    queryFn: async () =>
+      requireErpData(
+        await erpApi.GET<GoodsIssue>("/inventory/goods-issues/{id}", {
+          params: { path: { id: selectedId! } },
+        }),
+      ),
+    enabled: !!selectedId,
+  });
+  const selectedIssue = selectedIssueData ?? null;
 
   // ─── Row actions ──────────────────────────────────────────────────────────────
 
@@ -463,8 +493,20 @@ export function GoodsIssuePage() {
           onClick={(e) => {
             e.stopPropagation();
             setSelectedId(row.id);
-            setEditingIssue(row);
-            setDialogMode("view");
+            // Row no longer carries `lines` — fetch the full document before
+            // opening the view dialog (mirrors the openDocumentId deep-link
+            // fetch above).
+            void (async () => {
+              try {
+                const { data } = await apiClient.get<GoodsIssue>(
+                  `/inventory/goods-issues/${row.id}`,
+                );
+                setEditingIssue(data);
+                setDialogMode("view");
+              } catch (err) {
+                toast.error(getUserFacingApiErrorMessage(err));
+              }
+            })();
           }}
           title={row.documentNumber ?? row.id}
         >
@@ -718,6 +760,54 @@ function DetailPanel({
   issue: GoodsIssue | null;
   storageNameById: Map<string, string>;
 }) {
+  const issueId = issue?.id ?? null;
+
+  // Paginated, independent from the header (`issue`) query's cache key so a
+  // header refetch doesn't discard already-scrolled line pages.
+  const linesQuery = useInfiniteQuery({
+    queryKey: ["goods-issue-lines", issueId],
+    queryFn: async ({ pageParam }) =>
+      requireErpData(
+        await erpApi.GET<GoodsIssueLinesPage>("/inventory/goods-issues/{id}/lines", {
+          params: {
+            path: { id: issueId! },
+            query: { page: pageParam, pageSize: LINES_PAGE_SIZE },
+          },
+        }),
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
+    enabled: !!issueId,
+  });
+
+  const lines = useMemo(
+    () => linesQuery.data?.pages.flatMap((p) => p.items) ?? [],
+    [linesQuery.data],
+  );
+
+  const hasNextPage = linesQuery.hasNextPage;
+  const isFetchingNextPage = linesQuery.isFetchingNextPage;
+  const fetchNextPage = linesQuery.fetchNextPage;
+
+  // Sentinel row, observed instead of a scroll listener: the actual scroll
+  // container (DocumentListShell's resizable detail-panel wrapper) lives
+  // outside this component, so we can't attach onScroll to it directly.
+  const sentinelRef = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !isFetchingNextPage) {
+          void fetchNextPage();
+        }
+      },
+      { threshold: 0.1 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, lines.length]);
+
   return (
     <div className="px-4 py-3">
       <div className="mb-2 inline-block border-b-2 border-primary px-2 pb-1 text-sm font-semibold">
@@ -727,7 +817,9 @@ function DetailPanel({
         <p className="text-sm text-muted-foreground">
           Chọn một phiếu để xem chi tiết.
         </p>
-      ) : issue.lines.length === 0 ? (
+      ) : linesQuery.isLoading ? (
+        <p className="text-sm text-muted-foreground">Đang tải...</p>
+      ) : lines.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Phiếu này chưa có dòng hàng.
         </p>
@@ -763,7 +855,7 @@ function DetailPanel({
             </tr>
           </thead>
           <tbody>
-            {issue.lines.map((line) => {
+            {lines.map((line) => {
               const itemCode =
                 line.item?.code ?? line.itemCode ?? line.itemId.slice(0, 8);
               const itemName = line.item?.name ?? line.itemName ?? "—";
@@ -799,6 +891,13 @@ function DetailPanel({
                 </tr>
               );
             })}
+            {hasNextPage && (
+              <tr ref={sentinelRef}>
+                <td colSpan={20} className="py-2 text-center text-xs text-muted-foreground">
+                  {isFetchingNextPage ? "Đang tải thêm..." : ""}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       )}

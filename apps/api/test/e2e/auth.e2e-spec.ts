@@ -1,6 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
+import * as jwt from 'jsonwebtoken';
+import { AuthErrorCode } from '@erp/shared-interfaces';
 import {
   createTestApp,
   resetDatabase,
@@ -96,6 +98,83 @@ describe('Auth (E2E)', () => {
         .get('/auth/session')
         .set('Authorization', 'Bearer invalid.token.here')
         .expect(401);
+    });
+  });
+
+  // ─── AuthErrorCode taxonomy (T-01-04) ────────────────────────────
+
+  describe('AuthGuard error codes', () => {
+    it('returns TOKEN_EXPIRED for an access token whose exp has passed', async () => {
+      const expiredToken = jwt.sign(
+        {
+          userId: seed.userId,
+          organizationId: seed.organizationId,
+          roles: ['admin'],
+          branchIds: [seed.branchId],
+          branchId: seed.branchId,
+          jti: 'expired-jti',
+        },
+        'e2e-test-secret',
+        { expiresIn: -10 },
+      );
+
+      const res = await request(app.getHttpServer())
+        .get('/auth/session')
+        .set('Authorization', authHeader(expiredToken))
+        .expect(401);
+
+      expect(res.body.code).toBe(AuthErrorCode.TOKEN_EXPIRED);
+    });
+
+    it('returns TOKEN_MALFORMED for a garbage bearer token', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/auth/session')
+        .set('Authorization', 'Bearer this-is-not-a-jwt')
+        .expect(401);
+
+      expect(res.body.code).toBe(AuthErrorCode.TOKEN_MALFORMED);
+    });
+
+    it('returns SESSION_REVOKED for a structurally valid token whose session was logged out', async () => {
+      const loginRes = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email: 'admin@test.com',
+          password: 'password123',
+          organizationId: seed.organizationId,
+        })
+        .expect(200);
+
+      const token = loginRes.body.accessToken;
+
+      await request(app.getHttpServer())
+        .post('/auth/logout')
+        .set('Authorization', authHeader(token))
+        .expect(204);
+
+      const res = await request(app.getHttpServer())
+        .get('/auth/session')
+        .set('Authorization', authHeader(token))
+        .expect(401);
+
+      expect(res.body.code).toBe(AuthErrorCode.SESSION_REVOKED);
+    });
+
+    it('yields pairwise distinct codes for the three failure subtypes', () => {
+      const codes = new Set([
+        AuthErrorCode.TOKEN_EXPIRED,
+        AuthErrorCode.TOKEN_MALFORMED,
+        AuthErrorCode.SESSION_REVOKED,
+      ]);
+      expect(codes.size).toBe(3);
+    });
+
+    it('leaves an untouched 401 path (missing Authorization header) as HTTP_401', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/auth/session')
+        .expect(401);
+
+      expect(res.body.code).toBe('HTTP_401');
     });
   });
 

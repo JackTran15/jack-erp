@@ -252,6 +252,11 @@ export class CreatePromotionV2Dto {
   @IsEnum(PromotionInvoiceScope)
   invoiceScope?: PromotionInvoiceScope;
 
+  @ApiPropertyOptional({ default: false, description: 'INVOICE_DISCOUNT only' })
+  @IsOptional()
+  @IsBoolean()
+  accruePoints?: boolean;
+
   @ApiPropertyOptional({ enum: PromotionDiscountMode, description: 'INVOICE_DISCOUNT only' })
   @IsOptional()
   @IsEnum(PromotionDiscountMode)

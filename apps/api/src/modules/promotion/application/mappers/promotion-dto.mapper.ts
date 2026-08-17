@@ -102,6 +102,7 @@ export function dtoToProgramProps(dto: CreatePromotionV2Dto, context: DtoToProps
     autoApply: dto.autoApply ?? true,
     branchIds: dto.branchIds ?? [],
     invoiceScope: dto.invoiceScope,
+    accruePoints: dto.accruePoints ?? false,
     discountMode: dto.discountMode,
     discountValue: dto.discountValue,
     maxDiscountAmount: dto.maxDiscountAmount,

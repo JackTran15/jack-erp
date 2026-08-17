@@ -135,6 +135,14 @@ export interface TransferOrderQuery extends PaginationQuery {
   branchId?: string;
 }
 
+export interface TransferOrderLinesPage {
+  items: TransferOrderLineEntity[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+  total: number;
+}
+
 @Injectable()
 export class TransferOrderService {
   private readonly logger = new Logger(TransferOrderService.name);
@@ -448,6 +456,38 @@ export class TransferOrderService {
     return to;
   }
 
+  /**
+   * Paginated lines for one transfer order (T-03-02) — the existence/scope
+   * check is a deliberately lean `findOne` with `loadEagerRelations: false`,
+   * NOT `findOrFail`, so it doesn't pull the order's eager `lines` just to
+   * prove it exists and the actor participates in it. Does not reuse
+   * `findOrFail` — that method's eager `lines` load is relied on by
+   * `getPrintPayload` and `applyDeltaToLines` (see ADR-01 in
+   * 03-logical-design.md).
+   */
+  async getLines(
+    id: string,
+    actor: ActorContext,
+    page: number,
+    pageSize: number,
+  ): Promise<TransferOrderLinesPage> {
+    const exists = await this.toRepo.findOne({
+      where: { id, organizationId: actor.organizationId },
+      loadEagerRelations: false,
+    });
+    if (!exists) throw new NotFoundException(`Transfer order ${id} not found`);
+    this.assertParticipantBranch(exists, actor);
+
+    const [items, total] = await this.toRepo.manager.findAndCount(TransferOrderLineEntity, {
+      where: { transferOrderId: id, organizationId: actor.organizationId },
+      order: { createdAt: "ASC" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    });
+
+    return { items, page, pageSize, hasMore: page * pageSize < total, total };
+  }
+
   async list(
     query: TransferOrderQuery,
   ): Promise<PaginatedResponse<TransferOrderEntity>> {
@@ -467,6 +507,12 @@ export class TransferOrderService {
       skip: (page - 1) * pageSize,
       take: pageSize,
       order: { createdAt: "DESC" },
+      // Bypass TransferOrderEntity.lines/TransferOrderLineEntity.item's
+      // eager: true (transfer-order.entity.ts) for this list query only — see
+      // ADR-02 in 03-logical-design.md. Every other find*() caller of this
+      // entity (findOrFail, getByCode, listIssuable, listImportable, …) is
+      // untouched and keeps receiving eager lines/item as before.
+      loadEagerRelations: false,
     });
     return { data, total, page, pageSize };
   }

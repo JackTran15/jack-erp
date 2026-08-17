@@ -21,6 +21,7 @@ function ctx(overrides: Partial<CheckoutContext> = {}): CheckoutContext {
       remainder: 100,
       keptChange: 0,
       pointsEarned: 0,
+      pointsBlocked: false,
       newStatus: InvoiceStatus.PARTIAL_DEBT,
     },
     ...overrides,

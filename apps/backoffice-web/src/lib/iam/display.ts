@@ -27,7 +27,9 @@ export function formatIamDate(value?: string | null): string {
   if (!value) return "";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value;
-  return new Intl.DateTimeFormat("vi-VN").format(d);
+  return new Intl.DateTimeFormat("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+  }).format(d);
 }
 
 /** Ngày + giờ:phút (vd. đăng nhập gần nhất). */
@@ -38,6 +40,7 @@ export function formatIamDateTime(value?: string | null): string {
   return new Intl.DateTimeFormat("vi-VN", {
     dateStyle: "short",
     timeStyle: "short",
+    timeZone: "Asia/Ho_Chi_Minh",
   }).format(d);
 }
 

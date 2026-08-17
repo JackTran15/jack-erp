@@ -48,8 +48,9 @@ export class SearchGoodsIssuesV2Handler
     const limit = dto.limit ?? 20;
 
     // Eager relations are joined explicitly so the row shape matches the
-    // current find()-based list (provider, targetBranch, reasonRef, location,
-    // lines + line item); the detail panel and view dialog rely on `lines`.
+    // current find()-based list (provider, targetBranch, reasonRef, location).
+    // Line detail is fetched lazily via GET /inventory/goods-issues/:id/lines
+    // once a document is opened, not as part of the list response.
     const rowsQb = this.buildQuery(dto, actor)
       // buildQuery only joins targetBranch (the party filter needs its alias);
       // selecting it is the rows query's business. This is exactly what
@@ -58,9 +59,6 @@ export class SearchGoodsIssuesV2Handler
       .leftJoinAndSelect('gi.provider', 'provider')
       .leftJoinAndSelect('gi.reasonRef', 'reasonRef')
       .leftJoinAndSelect('gi.location', 'location')
-      .leftJoinAndSelect('gi.lines', 'lines')
-      .leftJoinAndSelect('lines.item', 'lineItem')
-      .leftJoinAndSelect('lines.location', 'lineLocation')
       .orderBy('gi.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
@@ -78,6 +76,25 @@ export class SearchGoodsIssuesV2Handler
     // Inline the resolved "Đối tượng"; TRANSFER_OUT rows keep targetBranch as
     // their party (counterparty is null there).
     await attachCounterparties(this.repo.manager, data, actor.organizationId);
+
+    // Per-row Tổng tiền (see search-goods-receipts-v2.handler.ts for the same
+    // fix + rationale): the list's money column used to be derived
+    // client-side from `lines` (now dropped above). Reuse the same correlated
+    // subquery as the footer total, scoped to just this page's ids.
+    if (data.length) {
+      const rowTotals = await this.repo
+        .createQueryBuilder('gi')
+        .select('gi.id', 'id')
+        .addSelect(TOTAL_AMOUNT_SUBQUERY, 'totalAmount')
+        .where('gi.id IN (:...ids)', { ids: data.map((row) => row.id) })
+        .getRawMany<{ id: string; totalAmount: string }>();
+      const totalById = new Map(
+        rowTotals.map((row) => [row.id, Number(row.totalAmount)]),
+      );
+      for (const row of data) {
+        row.totalAmount = totalById.get(row.id) ?? 0;
+      }
+    }
 
     return {
       data,

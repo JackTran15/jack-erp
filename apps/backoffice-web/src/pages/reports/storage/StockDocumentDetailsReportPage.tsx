@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   formatMoneyInteger,
+  formatViDate,
   resolvePeriodRange,
   type PeriodValue,
 } from "@erp/ui";
@@ -25,12 +26,6 @@ const DOC_TYPE_OPTIONS = [
   { value: "PXK", label: "Phiếu xuất kho bán hàng" },
   { value: "PCC", label: "Phiếu điều chuyển kho" },
 ];
-
-const DATE_FMT = new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
 
 const DOC_KIND_LABEL: Record<DocumentDetailRow["docKind"], string> = {
   GOODS_RECEIPT: "Phiếu nhập kho mua hàng",
@@ -73,7 +68,7 @@ function mapApiRow(row: DocumentDetailRow, index: number): ViewRow {
   const posted = new Date(row.postedAt);
   return {
     id: `${row.documentNumber}-${row.sku}-${index}`,
-    date: Number.isNaN(posted.valueOf()) ? "" : DATE_FMT.format(posted),
+    date: formatViDate(posted),
     documentType: DOC_KIND_LABEL[row.docKind] ?? row.docKind,
     warehouse: row.locationName ?? row.branchName ?? "",
     documentNumber: row.documentNumber,

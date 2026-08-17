@@ -21,7 +21,7 @@ import { RbacService } from '../../rbac/rbac.service';
 
 describe('GoodsIssueService', () => {
   let service: GoodsIssueService;
-  let giRepo: Record<string, jest.Mock>;
+  let giRepo: Record<string, any>;
   let branchRepo: Record<string, jest.Mock>;
   let dataSource: Record<string, any>;
   let ledgerService: Record<string, jest.Mock>;
@@ -42,6 +42,7 @@ describe('GoodsIssueService', () => {
       save: jest.fn().mockImplementation((d) => Promise.resolve({ ...d, id: 'gi-1' })),
       findOne: jest.fn(),
       delete: jest.fn().mockResolvedValue(undefined),
+      manager: { findAndCount: jest.fn() },
     };
     branchRepo = {
       findOne: jest.fn().mockResolvedValue({ id: 'branch-B', name: 'Cần Thơ' }),
@@ -862,6 +863,58 @@ describe('GoodsIssueService', () => {
         organizationId: actor.organizationId,
         branchId: actor.branchId,
       },
+    });
+  });
+
+  describe('getLines (T-02-02)', () => {
+    it('returns a paginated page of lines with hasMore=true when more remain', async () => {
+      giRepo.findOne.mockResolvedValue({ id: 'gi-1' });
+      const items = [{ id: 'line-1' }, { id: 'line-2' }];
+      giRepo.manager.findAndCount.mockResolvedValue([items, 5]);
+
+      const result = await service.getLines('gi-1', actor, 1, 2);
+
+      expect(giRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          id: 'gi-1',
+          organizationId: actor.organizationId,
+          branchId: actor.branchId,
+        },
+        loadEagerRelations: false,
+      });
+      expect(giRepo.manager.findAndCount).toHaveBeenCalledWith(GoodsIssueLineEntity, {
+        where: { goodsIssueId: 'gi-1' },
+        order: { id: 'ASC' },
+        skip: 0,
+        take: 2,
+      });
+      expect(result).toEqual({ items, page: 1, pageSize: 2, hasMore: true, total: 5 });
+    });
+
+    it('reports hasMore=false on the last page', async () => {
+      giRepo.findOne.mockResolvedValue({ id: 'gi-1' });
+      giRepo.manager.findAndCount.mockResolvedValue([[{ id: 'line-5' }], 5]);
+
+      const result = await service.getLines('gi-1', actor, 3, 2);
+
+      expect(result.hasMore).toBe(false);
+      expect(result.total).toBe(5);
+    });
+
+    it('returns an empty page for an issue with zero lines, not an error', async () => {
+      giRepo.findOne.mockResolvedValue({ id: 'gi-1' });
+      giRepo.manager.findAndCount.mockResolvedValue([[], 0]);
+
+      const result = await service.getLines('gi-1', actor, 1, 20);
+
+      expect(result).toEqual({ items: [], page: 1, pageSize: 20, hasMore: false, total: 0 });
+    });
+
+    it('404s for a nonexistent or out-of-scope issue, without touching the line query', async () => {
+      giRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.getLines('missing', actor, 1, 20)).rejects.toThrow();
+      expect(giRepo.manager.findAndCount).not.toHaveBeenCalled();
     });
   });
 });

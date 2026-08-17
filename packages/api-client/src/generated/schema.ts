@@ -12126,6 +12126,11 @@ export interface components {
             invoiceScope?: "NON_PROMO_ONLY" | "ALL_ITEMS";
             /**
              * @description INVOICE_DISCOUNT only
+             * @default false
+             */
+            accruePoints: boolean;
+            /**
+             * @description INVOICE_DISCOUNT only
              * @enum {string}
              */
             discountMode?: "PERCENT" | "AMOUNT" | "FIXED_PRICE";
@@ -12221,6 +12226,11 @@ export interface components {
              * @enum {string}
              */
             invoiceScope?: "NON_PROMO_ONLY" | "ALL_ITEMS";
+            /**
+             * @description INVOICE_DISCOUNT only
+             * @default false
+             */
+            accruePoints: boolean;
             /**
              * @description INVOICE_DISCOUNT only
              * @enum {string}

@@ -1,29 +1,4 @@
-const viDateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
-
-const viDateTimeWithSecondsFormatter = new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-});
-
-function partsOf(d: Date): Intl.DateTimeFormatPart[] {
-  return viDateTimeFormatter.formatToParts(d);
-}
-
-function part(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatPartTypes): string {
-  return parts.find((p) => p.type === type)?.value ?? "";
-}
+import { formatViDateTime as formatViDateTimeShared } from "@erp/ui";
 
 export interface FormatViDateTimeOptions {
   separator?: "dash" | "space";
@@ -39,10 +14,25 @@ export function formatViDateTime(
     return typeof input === "string" ? input : "";
   }
   const { separator = "dash", withSeconds = false } = options;
-  if (withSeconds) return viDateTimeWithSecondsFormatter.format(d).replace(",", "");
-  const parts = partsOf(d);
+
+  // The shared util always outputs "dd/MM/yyyy HH:mm[:ss]" (date first, one
+  // space, Asia/Ho_Chi_Minh-pinned). Reassemble into this module's own
+  // historical shapes below so no existing caller's visible output changes —
+  // only the underlying Intl.DateTimeFormat construction (now TZ-safe).
+  const shared = formatViDateTimeShared(d, { withSeconds });
+  const spaceIdx = shared.indexOf(" ");
+  const datePart = shared.slice(0, spaceIdx);
+  const timePart = shared.slice(spaceIdx + 1);
+
+  if (withSeconds) {
+    // Historical behaviour: time-first, single space, `separator` ignored —
+    // the old code returned early via `.format()` before the separator logic
+    // ran at all.
+    return `${timePart} ${datePart}`;
+  }
+
   const separatorValue = separator === "space" ? " " : " - ";
-  return `${part(parts, "day")}/${part(parts, "month")}/${part(parts, "year")}${separatorValue}${part(parts, "hour")}:${part(parts, "minute")}`;
+  return `${datePart}${separatorValue}${timePart}`;
 }
 
 /**

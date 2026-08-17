@@ -25,6 +25,10 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'erp_dev',
   username: process.env.DB_USER || 'erp_user',
   password: process.env.DB_PASS || 'erp_secret',
+  // Postgres has no top-level `timezone` DataSource option (that's a mysql2-only
+  // TypeORM field) — pin the session's TimeZone GUC via the pg `options` startup
+  // parameter instead, which TypeORM merges verbatim into the pg.Pool config.
+  extra: { options: '-c timezone=Asia/Ho_Chi_Minh' },
   entities: [path.join(__dirname, '..', '**', '*.entity.{ts,js}')],
   migrations: [path.join(__dirname, 'migrations', '*.{ts,js}')],
   // Commit each migration in its own transaction. Postgres forbids using a

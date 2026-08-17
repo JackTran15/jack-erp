@@ -17,6 +17,9 @@ describe('GoodsReceiptService', () => {
     softDelete: jest.fn(),
     manager: { findOne: jest.fn(), update: jest.fn() },
   };
+  const lineRepo = {
+    findAndCount: jest.fn(),
+  };
   // Manager handed to the `dataSource.transaction(...)` callback in `cancel()`
   // — row-lock query + status flip both happen through this, inside the tx.
   const txManager = {
@@ -75,7 +78,7 @@ describe('GoodsReceiptService', () => {
     jest.clearAllMocks();
     service = new GoodsReceiptService(
       receiptRepo as never,
-      {} as never,
+      lineRepo as never,
       dataSource as never,
       stockLedger as never,
       documentNumberingService as never,
@@ -1508,6 +1511,64 @@ describe('GoodsReceiptService', () => {
         organizationId: actor.organizationId,
         branchId: actor.branchId,
       },
+    });
+  });
+
+  describe('getLines (T-01-02)', () => {
+    it('returns a paginated page of lines with hasMore=true when more remain', async () => {
+      receiptRepo.findOne.mockResolvedValue({ id: 'receipt-1' });
+      const items = [{ id: 'line-1' }, { id: 'line-2' }];
+      lineRepo.findAndCount.mockResolvedValue([items, 5]);
+
+      const result = await service.getLines('receipt-1', actor, 1, 2);
+
+      expect(receiptRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          id: 'receipt-1',
+          organizationId: actor.organizationId,
+          branchId: actor.branchId,
+        },
+        loadEagerRelations: false,
+      });
+      expect(lineRepo.findAndCount).toHaveBeenCalledWith({
+        where: { goodsReceiptId: 'receipt-1', organizationId: actor.organizationId },
+        order: { createdAt: 'ASC' },
+        skip: 0,
+        take: 2,
+      });
+      expect(result).toEqual({
+        items,
+        page: 1,
+        pageSize: 2,
+        hasMore: true,
+        total: 5,
+      });
+    });
+
+    it('reports hasMore=false on the last page', async () => {
+      receiptRepo.findOne.mockResolvedValue({ id: 'receipt-1' });
+      lineRepo.findAndCount.mockResolvedValue([[{ id: 'line-5' }], 5]);
+
+      const result = await service.getLines('receipt-1', actor, 3, 2);
+
+      expect(result.hasMore).toBe(false);
+      expect(result.total).toBe(5);
+    });
+
+    it('returns an empty page for a document with zero lines, not an error', async () => {
+      receiptRepo.findOne.mockResolvedValue({ id: 'receipt-1' });
+      lineRepo.findAndCount.mockResolvedValue([[], 0]);
+
+      const result = await service.getLines('receipt-1', actor, 1, 20);
+
+      expect(result).toEqual({ items: [], page: 1, pageSize: 20, hasMore: false, total: 0 });
+    });
+
+    it('404s for a nonexistent or out-of-scope receipt, without touching lineRepo', async () => {
+      receiptRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.getLines('missing', actor, 1, 20)).rejects.toThrow();
+      expect(lineRepo.findAndCount).not.toHaveBeenCalled();
     });
   });
 });

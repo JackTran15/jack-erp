@@ -67,8 +67,10 @@ export class PersistInvoiceStep implements CheckoutStep {
     // award publisher refuses to emit without a customerId, so a non-zero figure
     // here is an orphan: the receipt showed "Điểm được tích" while no card was
     // credited and no point_history row existed. `pointsBalanceAfter` just below
-    // has always been guarded this way; only the earn was left open.
-    invoice.pointsEarned = invoice.customerId ? totals.pointsEarned : 0;
+    // has always been guarded this way; only the earn was left open. `pointsBlocked`
+    // (ADR-02) is the second, independent reason to zero this out: at least one
+    // applied program had "Tích điểm cho khách hàng" unchecked.
+    invoice.pointsEarned = invoice.customerId && !totals.pointsBlocked ? totals.pointsEarned : 0;
 
     const cardBalance = invoice.customerId
       ? await this.membershipCardService.getPointBalanceForUpdate(

@@ -3,7 +3,7 @@ import axios, {
   type AxiosInstance,
   type InternalAxiosRequestConfig,
 } from "axios";
-import type { RefreshResponse } from "@erp/shared-interfaces";
+import { AuthErrorCode, type RefreshResponse } from "@erp/shared-interfaces";
 import { resolveApiBaseUrl } from "./api-base";
 import { getAccessToken, setAccessToken, clearAccessToken } from "./access-token";
 import { getRefreshToken, persistRefreshResponse, clearSession } from "./auth-storage";
@@ -67,6 +67,15 @@ apiClient.interceptors.response.use(undefined, async (error: AxiosError) => {
   if (!original || error.response?.status !== 401) {
     return Promise.reject(error);
   }
+
+  const authErrorCode = (error.response?.data as { code?: string } | undefined)
+    ?.code as AuthErrorCode | undefined;
+  if (authErrorCode === AuthErrorCode.TOKEN_EXPIRED) {
+    // access token expired — refresh-and-retry below runs exactly as today
+  }
+  // else: no code, or a code this branch doesn't special-case yet (SESSION_REVOKED,
+  // TOKEN_MALFORMED, or a legacy uncoded 401) — still falls through to the same
+  // refresh-and-retry logic below (AC-05 regression guard, non-negotiable)
 
   if ((original as any).__isRetry) {
     clearSession();

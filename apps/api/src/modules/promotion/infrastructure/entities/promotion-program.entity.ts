@@ -99,6 +99,9 @@ export class PromotionProgramEntity extends BaseEntity {
   })
   invoiceScope?: PromotionInvoiceScope | null;
 
+  @Column({ name: 'accrue_points', type: 'boolean', default: false })
+  accruePoints: boolean;
+
   @Column({
     name: 'discount_mode',
     type: 'enum',

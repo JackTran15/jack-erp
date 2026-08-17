@@ -164,4 +164,11 @@ export class GoodsReceiptEntity extends BaseEntity {
 
   /** Transient (not a column): resolved { id, name } of purchasingEmployeeId, inlined on read. */
   purchasingEmployee?: { id: string; name: string } | null;
+
+  /**
+   * Transient (not a column): per-receipt Tổng tiền, inlined by the v2 search
+   * handler via a correlated subquery so the list's money column works without
+   * joining `lines` (which the list query no longer does).
+   */
+  totalAmount?: number;
 }
