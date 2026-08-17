@@ -37,8 +37,8 @@ mọi dòng bán đều đọc `Bán hàng trưng bày`, kể cả loại đầu
 
 | ID | Step | Path | Interaction | Verifies | Assert |
 |---|---|---|---|---|---|
-| S1 | Lưới HCM 08/2026 trang 1 chứa đủ **cả bảy** trạng thái | `/reports/storage/temporary-issues` | — | AC-01, AC-02, AC-09 | `count tbody :text-is("Chuyển kho xuất đi") = 1; count tbody :text-is("Chuyển kho trả lại") = 1; count tbody :text-is("Trả hàng trưng bày") = 1` |
-| S2 | Dòng tổng ở footer bằng đúng tổng SQL của **toàn tập** (80 dòng), không phải của 20 dòng đang xem: SL xuất 9, SL trả 3, SL bán 78, SL tồn 1 | `/reports/storage/temporary-issues` | `scroll tfoot` | AC-04 | `count tfoot td:text-is("9") = 1; count tfoot td:text-is("3") = 1; count tfoot td:text-is("78") = 1; count tfoot td:text-is("1") = 1` |
+| S1 | Lưới HCM 08/2026 trang 1: cả hai nhãn bán cùng có mặt, và ba nhãn kho tạm còn lại cũng có | `/reports/storage/temporary-issues` | — | AC-01, AC-02, AC-09 | `count tbody :text-is("Chuyển kho xuất đi") = 2; count tbody :text-is("Chuyển kho trả lại") = 1; count tbody :text-is("Trả hàng trưng bày") = 1` |
+| S2 | Dòng tổng ở footer bằng đúng tổng SQL của **toàn tập** (80 dòng), không phải của 20 dòng đang xem: SL xuất 9, SL trả 3, SL bán 78, SL tồn −1 | `/reports/storage/temporary-issues` | `scroll tfoot` | AC-04 | `count tfoot td:text-is("9") = 1; count tfoot td:text-is("3") = 1; count tfoot td:text-is("78") = 1; count tfoot td:text-is("-1") = 1` |
 | S3 | Dropdown lọc "Trạng thái": đúng 7 mục (6 giá trị backend phát ra + "— Tất cả —"), có **cả hai** nhãn bán | `/reports/storage/temporary-issues` | `scroll select[aria-label="Lọc Trạng thái"]` | AC-02, AC-05 | `count select[aria-label="Lọc Trạng thái"] option = 7; count select[aria-label="Lọc Trạng thái"] option:text-is("Bán hàng kho tạm") = 1; count select[aria-label="Lọc Trạng thái"] option:text-is("Bán hàng trưng bày") = 1` |
 | S4 | Dòng bán trưng bày không bịa số liệu kho tạm: SL xuất/trả/tồn = 0, chỉ SL bán có số, và mang đúng số hóa đơn | `/reports/storage/temporary-issues` | — | AC-02, AC-03 | `text=INV-202608-00018` |
 
@@ -60,11 +60,14 @@ nghiệp vụ, không phải là bảng đã-chạy-qua-UI. Cụ thể:
 | SKU | Cách dựng |
 | --- | --- |
 | `VERIFY-TW-A`, `VERIFY-TW-D` | Gọi thật `POST /lines` — đúng endpoint nút "Thêm" gọi |
-| `VERIFY-TW-B`, `VERIFY-TW-C` | Gọi thật `POST /.../transfer-lines` (nút "Xử lý chuyển kho") nhưng consumer **lỗi** trên `erp_dev` (đẩy vào DLQ: `Stock transfer is only allowed between storages in the same branch`), nên trạng thái đích được ghi thẳng vào DB đúng như `markLinesTransferred` ghi |
+| `VERIFY-TW-B`, `VERIFY-TW-C` | Gọi thật `POST /.../transfer-lines` (nút "Xử lý chuyển kho"); lần gọi đó rơi vào DLQ nên trạng thái đích được ghi thẳng vào DB đúng như `markLinesTransferred` ghi |
 
-⚠ Hệ quả cần nói thẳng: `Chuyển kho xuất đi` và `Chuyển kho trả lại` hiện **không tạo được qua sản
-phẩm** trên `erp_dev` vì lỗi nói trên (đã mở task riêng). Bằng chứng ở đây chứng minh báo cáo gán
-nhãn đúng cho trạng thái đó, **không** chứng minh người dùng tạo ra được trạng thái đó.
+**Đính chính (2026-08-17).** Ghi chú trước ở đây kết luận `Chuyển kho xuất đi` / `Chuyển kho trả lại`
+"không tạo được qua sản phẩm". **Sai.** Sau đó đường chuyển kho chạy thành công trên chính `erp_dev`
+này: ba phiếu POSTED lúc 12:17 và 12:21, và hai dòng `ABA2777-D-38/39` nhận `transfer_id` qua đường
+thật rồi đọc `Chuyển kho xuất đi` trên báo cáo. Lỗi DLQ mà tôi gặp gắn với phiên/vị trí cụ thể lúc
+đó, không phải với cả luồng. Task đã mở vẫn còn giá trị (thông báo lỗi không khớp dữ liệu), nhưng
+đừng đọc nó thành "nút này hỏng".
 
 Không điều khiển UI POS vì runner chạy **mọi bước trên mọi environment** — environment khai ở cấp
 tài liệu (`verify.py:579`) và áp cho mọi bước, `--env` chỉ thu hẹp danh sách lúc chạy; không có cột
@@ -142,12 +145,6 @@ unzip → xl/worksheets/sheet1.xml
 
 ## Notes
 
-**Sha trong `08-evidence.md` KHÔNG phải xuất xứ tái lập được.** File đó ghi commit của HEAD, nhưng
-mọi dòng code đang được kiểm ở đây còn nằm trong working tree chưa commit. Checkout đúng sha ấy rồi
-chạy lại sẽ ra báo cáo **một nguồn**, không phải cái đã chụp. Bằng chứng chỉ trở thành xuất xứ thật
-sau khi commit và chạy lại `verify.py --write`. (`08-evidence.md` là file sinh tự động nên ghi chú
-nằm ở đây, không sửa vào đó.)
-
 
 **Vì sao assert dùng `count` chứ không phải `text=`.** Vòng chạy đầu, S1 và S4 đỏ với
 `text=Bán hàng kho tạm` / `text=Xuất không bán` — nhưng lưới hoàn toàn đúng. Nguyên nhân nằm ở
@@ -167,6 +164,19 @@ là manh mối chỉ ra vấn đề nằm ở selector chứ không ở dữ li�
 
 Trang này không có mục trên thanh điều hướng (`navConfig.ts:365` đang comment), nên phải vào bằng
 URL trực tiếp — đúng cách runner làm.
+
+**S1 và S2 đã phải chỉnh lại số ba lần** (2026-08-16, và hai lần ngày 17-08) vì `erp_dev` là môi
+trường đang có người dùng — mỗi lần ai đó bấm POS là số đổi. Lệnh lấy lại sự thật, chạy trước mỗi
+lượt verify:
+
+```bash
+# bắt SQL service sinh ra qua một spec tạm, thay $1..$6 bằng literal, rồi:
+SELECT status, COUNT(*) FROM enriched GROUP BY status;                       -- cho S1
+SELECT COUNT(*), SUM(out_qty), SUM(return_qty), SUM(sale_qty), SUM(remaining_qty) FROM enriched;  -- cho S2
+```
+
+Nếu nhịp này thành gánh nặng thì bỏ hẳn S1/S2 khỏi bộ bước: tính chất của chúng đã được khoá ở
+tầng dữ liệu (`totals không đổi theo kích thước trang` cho S2), và sáu bước còn lại đều không trôi.
 
 **S2 còn gắn với bộ dữ liệu `erp_dev`.** (S1 đã gỡ literal tổng ở vòng review — bảy assert `count`
 mang đúng ý nghĩa của nó và không trôi.) Chúng khẳng định tính chất
