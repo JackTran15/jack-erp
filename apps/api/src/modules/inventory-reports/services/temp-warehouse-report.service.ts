@@ -193,6 +193,12 @@ interface RawRow {
   remaining_qty: string;
   status: string;
   invoice: string;
+  /** Tổng của TOÀN TẬP đã lọc, tính bằng window nên dòng nào cũng mang. */
+  w_total: number;
+  w_out_qty: string;
+  w_return_qty: string;
+  w_sale_qty: string;
+  w_remaining_qty: string;
 }
 
 @Injectable()
@@ -305,12 +311,31 @@ export class TempWarehouseReportService {
           AND e.carrier_user_id IS NOT DISTINCT FROM r.carrier_user_id
           AND e.rn = r.rn
       ),
-      -- SL của mỗi (hóa đơn, mặt hàng) mà kho tạm ĐÃ nhận. Cố ý KHÔNG chặn
-      -- theo kỳ: fulfillInvoiceFromTempWarehouse lấy dòng ACTIVE theo FIFO bất
-      -- kể ngày stage, nên một dòng stage trước kỳ vẫn có thể mang invoice_id
-      -- của hóa đơn trong kỳ. Chặn theo kỳ sẽ để lọt phần đó xuống nhánh
-      -- showroom → đếm trùng. Vị từ này khớp index riêng
-      -- IDX_temp_warehouse_lines_invoice (partial, WHERE invoice_id IS NOT NULL).
+      -- Những hóa đơn thuộc phạm vi báo cáo. Khai một lần rồi dùng cho CẢ
+      -- tw_claimed lẫn showroom: hai bên buộc phải nói về cùng một tập hóa đơn,
+      -- và trước đây vị từ này được chép hai chỗ — lệch một chữ là đếm trùng.
+      scoped_invoices AS (
+        SELECT inv.id
+        FROM invoices inv
+        WHERE inv.organization_id = $1
+          AND inv.is_draft = FALSE
+          AND inv.status <> 'cancelled'
+          AND COALESCE(inv.issued_at, inv.created_at) >= $2
+          AND COALESCE(inv.issued_at, inv.created_at) < $3
+          AND ($4::text[] IS NULL OR inv.branch_id = ANY($4::text[]))
+      ),
+      -- SL của mỗi (hóa đơn, mặt hàng) mà kho tạm ĐÃ nhận. KHÔNG chặn theo
+      -- created_at của chính dòng kho tạm: fulfillInvoiceFromTempWarehouse lấy
+      -- dòng ACTIVE theo FIFO bất kể ngày stage, nên một dòng stage trước kỳ vẫn
+      -- có thể mang invoice_id của hóa đơn trong kỳ. Chặn theo ngày stage sẽ để
+      -- lọt phần đó xuống nhánh showroom → đếm trùng.
+      --
+      -- Chặn theo HÓA ĐƠN thì khác hẳn và an toàn: dòng mang hóa đơn ngoài phạm
+      -- vi vốn không join được với gì trong "showroom", nên loại sớm không đổi
+      -- kết quả — chỉ thôi quét toàn bộ lịch sử kho tạm của tổ chức ở mỗi lần
+      -- mở báo cáo. Giữ "invoice_id IS NOT NULL" tường minh dù JOIN đã hàm ý:
+      -- index partial (idx_twl_claimed_by_invoice) chỉ dùng được khi vị từ của
+      -- nó xuất hiện thành câu chữ.
       --
       -- RÀNG BUỘC LIÊN MODULE: ở đây cộng "quantity", còn nhánh kho tạm phát
       -- sale_qty = 1 cho mỗi dòng. Hai bên chỉ khớp vì mọi dòng kho tạm luôn có
@@ -318,13 +343,14 @@ export class TempWarehouseReportService {
       -- không DTO nào cho nhập số lượng. Nếu điều đó đổi, nhánh kho tạm phải
       -- chuyển từ cờ 0/1 sang chính "quantity", nếu không sẽ thiếu SL bán ngầm.
       tw_claimed AS (
-        SELECT invoice_id, item_id, SUM(quantity) AS qty
-        FROM temp_warehouse_lines
-        WHERE organization_id = $1
-          AND invoice_id IS NOT NULL
-          AND direction = 'warehouse_to_showroom'
-          AND status NOT IN ('DELETED', 'AUTO_BALANCED')
-        GROUP BY invoice_id, item_id
+        SELECT l.invoice_id, l.item_id, SUM(l.quantity) AS qty
+        FROM temp_warehouse_lines l
+        JOIN scoped_invoices si ON si.id = l.invoice_id
+        WHERE l.organization_id = $1
+          AND l.invoice_id IS NOT NULL
+          AND l.direction = 'warehouse_to_showroom'
+          AND l.status NOT IN ('DELETED', 'AUTO_BALANCED')
+        GROUP BY l.invoice_id, l.item_id
       ),
       -- Nguồn thứ hai: hàng ĐÃ trưng sẵn ở showroom, bán ra. Nghiệp vụ này
       -- không sinh dòng temp_warehouse_lines nào (POS trừ tồn thẳng từ vị trí
@@ -359,19 +385,18 @@ export class TempWarehouseReportService {
           NULL::uuid AS ret_transfer_id,
           'showroom'::text AS source
         FROM invoice_items ii
+        JOIN scoped_invoices si ON si.id = ii.invoice_id
+        -- Vẫn join thẳng bảng "invoices" (không lấy các cột này qua CTE): chỉ
+        -- khi "inv" là bảng thật thì Postgres mới biết "inv.id" là khóa chính,
+        -- và GROUP BY dưới kia mới được phép chọn staff_id/branch_id/code mà
+        -- không liệt kê chúng ra.
         JOIN invoices inv ON inv.id = ii.invoice_id
         JOIN items i
           ON i.id = ii.item_id AND i.organization_id = $1
         LEFT JOIN tw_claimed c
           ON c.invoice_id = ii.invoice_id AND c.item_id = ii.item_id
         WHERE ii.organization_id = $1
-          AND inv.organization_id = $1
-          AND inv.is_draft = FALSE
-          AND inv.status <> 'cancelled'
           AND ii.direction = 'OUT'
-          AND COALESCE(inv.issued_at, inv.created_at) >= $2
-          AND COALESCE(inv.issued_at, inv.created_at) < $3
-          AND ($4::text[] IS NULL OR inv.branch_id = ANY($4::text[]))
           AND ($5::uuid[] IS NULL OR i.category_id = ANY($5::uuid[]))
           AND ($6::text IS NULL OR i.code ILIKE '%' || $6 || '%' OR i.name ILIKE '%' || $6 || '%')
         -- inv.id là khóa chính nên chọn được staff_id/branch_id/code/issued_at
@@ -412,10 +437,15 @@ export class TempWarehouseReportService {
       search,
     ];
 
-    // One outer stage shared by the rows, count and totals queries. The two
-    // LATERALs resolve the item's shelf; they already ran for the whole matching
-    // set before (ORDER BY + LIMIT forces a full sort), so hoisting them here
-    // costs the rows query nothing and lets the footer see the same columns.
+    // One outer stage shared by the rows, count and totals queries — every
+    // displayed column EXCEPT `location`, which is deliberately absent here.
+    //
+    // Resolving the shelf costs two LATERALs per row and they are 65% of the
+    // report's buffers (measured: 3079 → 1355 shared hits on an 80-row period).
+    // Keeping them out of `enriched` means the count/totals query never pays
+    // for them at all, and the rows query pays only for the page it returns —
+    // the sort key is `event_at`, which does not depend on the shelf, so the
+    // LIMIT can be applied before the shelf is looked up.
     const enrichedCte = `
       ${pairedCte},
       enriched AS (
@@ -423,7 +453,6 @@ export class TempWarehouseReportService {
         i.code AS sku,
         i.name AS name,
         i.unit AS unit,
-        COALESCE(preferred.code, fallback.code) AS location,
         to_char(p.event_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh', 'DD/MM/YYYY') AS date,
         to_char(p.event_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI:SS') AS time,
         TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) AS staff,
@@ -441,10 +470,22 @@ export class TempWarehouseReportService {
           ELSE 'Xuất không bán'
         END AS status,
         COALESCE(p.invoice_number, '') AS invoice,
-        p.event_at AS event_at
+        p.event_at AS event_at,
+        p.item_id AS item_id,
+        p.branch_id AS branch_id
       FROM movements p
       JOIN items i ON i.id = p.item_id AND i.organization_id = $1
       LEFT JOIN users u ON u.id = p.carrier_user_id
+      )
+    `;
+
+    // Adds `location` to any relation that carries `item_id` + `branch_id`.
+    // Applied to a 20-row page in the normal case; only applied to the whole
+    // set when the user filters ON the shelf, which the filter cannot see
+    // otherwise.
+    const withShelf = (src: string) => `
+      SELECT src.*, COALESCE(preferred.code, fallback.code) AS location
+      FROM ${src} src
       -- Item's current default shelf in a non-showroom warehouse of the
       -- line's branch — same priority order as loadItemLocations in
       -- profit-by-item/revenue-by-item: preferred shelf first.
@@ -457,9 +498,9 @@ export class TempWarehouseReportService {
           ON sb.item_id = isl.item_id
           AND sb.location_id = isl.location_id
           AND sb.organization_id = $1
-        WHERE isl.item_id = p.item_id
+        WHERE isl.item_id = src.item_id
           AND isl.organization_id = $1
-          AND st.branch_id::text = p.branch_id
+          AND st.branch_id::text = src.branch_id
           AND st.is_main_storage = FALSE
           AND st.is_active = TRUE
           AND loc.is_active = TRUE
@@ -473,22 +514,21 @@ export class TempWarehouseReportService {
         FROM stock_balances sb
         JOIN locations loc ON loc.id = sb.location_id
         JOIN storages st ON st.id = loc.storage_id
-        WHERE sb.item_id = p.item_id
+        WHERE sb.item_id = src.item_id
           AND sb.organization_id = $1
           AND sb.quantity > 0
           AND sb.is_tracked = TRUE
-          AND st.branch_id::text = p.branch_id
+          AND st.branch_id::text = src.branch_id
           AND st.is_main_storage = FALSE
           AND st.is_active = TRUE
           AND loc.is_active = TRUE
         ORDER BY sb.quantity DESC
         LIMIT 1
       ) fallback ON preferred.code IS NULL
-      )
     `;
 
-    // Column filters are applied to `enriched`, the one stage where the row the
-    // user sees exists. Rows, count and totals all read from it, so the footer
+    // Column filters are applied to the stage where the row the user sees
+    // exists. Rows, count and totals all read from the same one, so the footer
     // cannot describe a different set than the grid.
     const columnFilter = buildReportColumnFilter(
       query.columnFilters,
@@ -498,46 +538,86 @@ export class TempWarehouseReportService {
     const filterWhere = columnFilter.where ? `WHERE ${columnFilter.where}` : '';
     const filteredParams = [...baseParams, ...columnFilter.params];
 
-    const [aggregate]: Array<{
-      total: string;
-      out_qty: string;
-      return_qty: string;
-      sale_qty: string;
-      remaining_qty: string;
-    }> = await this.dataSource.query(
-      `${enrichedCte}
-       SELECT COUNT(*)::int AS total,
-              COALESCE(SUM(out_qty), 0)::numeric AS out_qty,
-              COALESCE(SUM(return_qty), 0)::numeric AS return_qty,
-              COALESCE(SUM(sale_qty), 0)::numeric AS sale_qty,
-              COALESCE(SUM(remaining_qty), 0)::numeric AS remaining_qty
-       FROM enriched ${filterWhere}`,
-      filteredParams,
-    );
-    const total = Number(aggregate?.total ?? 0);
-    const totals = {
-      outQty: Number(aggregate?.out_qty ?? 0),
-      returnQty: Number(aggregate?.return_qty ?? 0),
-      saleQty: Number(aggregate?.sale_qty ?? 0),
-      remainingQty: Number(aggregate?.remaining_qty ?? 0),
-    };
+    // `location` is a filterable column, and it is the one column the cheap
+    // stage does not have. When it is filtered on, the shelf must be resolved
+    // before the filter runs — so the whole set pays, as it did before.
+    const filtersOnShelf = query.columnFilters?.location !== undefined;
+    const filterable = filtersOnShelf ? `(${withShelf('enriched')}) e` : 'enriched';
 
-    if (total === 0) {
-      return { data: [], total: 0, totals };
-    }
+    // The footer's four sums and the row count ride along on every row, as
+    // window functions over the filtered set. Windows are evaluated after WHERE
+    // and before ORDER BY/LIMIT, so each row of the page carries the totals of
+    // the WHOLE set — which is exactly what the footer means. It also means the
+    // CTE chain (base → paired, showroom, movements) is built once per request
+    // instead of twice; that chain, not the page, is what grows with the data.
+    const windowTotals = `
+      COUNT(*) OVER ()::int AS w_total,
+      SUM(out_qty) OVER ()::numeric AS w_out_qty,
+      SUM(return_qty) OVER ()::numeric AS w_return_qty,
+      SUM(sale_qty) OVER ()::numeric AS w_sale_qty,
+      SUM(remaining_qty) OVER ()::numeric AS w_remaining_qty
+    `;
+
+    const limitOffset = `LIMIT $${filteredParams.length + 1} OFFSET $${filteredParams.length + 2}`;
+    const paged = `
+      SELECT * FROM (
+        SELECT *, ${windowTotals} FROM ${filterable} ${filterWhere}
+      ) f
+      ORDER BY event_at DESC
+      ${limitOffset}
+    `;
+    // Normal path: page first, resolve the shelf for those rows only. When the
+    // shelf itself is filtered on, `filterable` already carries it.
+    const pagedWithShelf = filtersOnShelf ? paged : withShelf(`(${paged})`);
 
     const rows: RawRow[] = await this.dataSource.query(
       `
       ${enrichedCte}
       SELECT sku, name, unit, location, date, time, staff,
-             out_qty, return_qty, sale_qty, remaining_qty, status, invoice
-      FROM enriched
-      ${filterWhere}
+             out_qty, return_qty, sale_qty, remaining_qty, status, invoice,
+             w_total, w_out_qty, w_return_qty, w_sale_qty, w_remaining_qty
+      FROM (${pagedWithShelf}) page
       ORDER BY event_at DESC
-      LIMIT $${filteredParams.length + 1} OFFSET $${filteredParams.length + 2}
       `,
       [...filteredParams, pageSize, offset],
     );
+
+    let total = Number(rows[0]?.w_total ?? 0);
+    let totals = {
+      outQty: Number(rows[0]?.w_out_qty ?? 0),
+      returnQty: Number(rows[0]?.w_return_qty ?? 0),
+      saleQty: Number(rows[0]?.w_sale_qty ?? 0),
+      remainingQty: Number(rows[0]?.w_remaining_qty ?? 0),
+    };
+
+    // An empty page past the end (user was on page 4, then filtered down to one
+    // page) has no row to carry the totals — but the set is not empty, and the
+    // footer still has to describe it. Only then does the count cost anything.
+    if (rows.length === 0 && offset > 0) {
+      const [aggregate]: Array<{
+        total: string;
+        out_qty: string;
+        return_qty: string;
+        sale_qty: string;
+        remaining_qty: string;
+      }> = await this.dataSource.query(
+        `${enrichedCte}
+         SELECT COUNT(*)::int AS total,
+                COALESCE(SUM(out_qty), 0)::numeric AS out_qty,
+                COALESCE(SUM(return_qty), 0)::numeric AS return_qty,
+                COALESCE(SUM(sale_qty), 0)::numeric AS sale_qty,
+                COALESCE(SUM(remaining_qty), 0)::numeric AS remaining_qty
+         FROM ${filterable} ${filterWhere}`,
+        filteredParams,
+      );
+      total = Number(aggregate?.total ?? 0);
+      totals = {
+        outQty: Number(aggregate?.out_qty ?? 0),
+        returnQty: Number(aggregate?.return_qty ?? 0),
+        saleQty: Number(aggregate?.sale_qty ?? 0),
+        remainingQty: Number(aggregate?.remaining_qty ?? 0),
+      };
+    }
 
     const data: TempWarehouseIssueRow[] = rows.map((r) => ({
       sku: r.sku,

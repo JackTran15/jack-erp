@@ -3,6 +3,8 @@ import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
 import {
+  BranchStatus,
+  LocationType,
   TempWarehouseDirection,
   TempWarehouseLineStatus,
   TempWarehouseSessionStatus,
@@ -14,6 +16,11 @@ import {
 import { TempWarehouseSessionEntity } from '../../src/modules/inventory/temp-warehouse/temp-warehouse-session.entity';
 import { TempWarehouseLineEntity } from '../../src/modules/inventory/temp-warehouse/temp-warehouse-line.entity';
 import { ItemEntity } from '../../src/modules/inventory/location/item.entity';
+import { BranchEntity } from '../../src/modules/branch/branch.entity';
+import { StorageEntity } from '../../src/modules/inventory/location/storage.entity';
+import { LocationEntity } from '../../src/modules/inventory/location/location.entity';
+import { ItemStorageLocationEntity } from '../../src/modules/inventory/product/item-storage-location.entity';
+import { StockBalanceEntity } from '../../src/modules/inventory/ledger/stock-balance.entity';
 import {
   InvoiceEntity,
   InvoiceStatus,
@@ -233,6 +240,20 @@ describe('Temp-warehouse out-goods report (e2e)', () => {
       branchId: randomUUID(),
       userId: randomUUID(),
     };
+
+    // `storages.branch_id` có khóa ngoại tới `branches`; các fixture khác không
+    // chạm bảng đó nên trước đây không cần. Kệ hàng thì cần.
+    const branchRepo = ds.getRepository(BranchEntity);
+    await branchRepo.save(
+      branchRepo.create({
+        id: seed.branchId,
+        organizationId: seed.organizationId,
+        name: 'Chi nhánh E2E',
+        status: BranchStatus.ACTIVE,
+        isMainBranch: true,
+        createdBy: seed.userId,
+      }),
+    );
 
     const sessionRepo = ds.getRepository(TempWarehouseSessionEntity);
     const session = await sessionRepo.save(
@@ -616,5 +637,217 @@ describe('Temp-warehouse out-goods report (e2e)', () => {
     expect(data).toHaveLength(1);
     expect(data[0]!.status).toBe('Bán hàng kho tạm');
     expect(data[0]!.saleQty).toBe(1);
+  });
+
+  // Tổng đi kèm từng dòng bằng window, nên một trang RỖNG không chở được tổng.
+  // Trang vượt quá cuối tập (đang ở trang 4 rồi lọc còn 1 trang) vẫn phải cho
+  // footer đúng — service chạy thêm một câu đếm đúng và chỉ đúng lúc này.
+  it('trang vượt quá cuối tập vẫn cho tổng của toàn tập', async () => {
+    const code = 'PAGE-PAST-END-SKU';
+    const itemId = await createItem(code);
+    await addLine({ itemId, createdAt: IN_PERIOD });
+    await addLine({ itemId, createdAt: IN_PERIOD });
+
+    const firstPage = await report.list({
+      organizationId: seed.organizationId,
+      startDate: PERIOD_START,
+      endDate: PERIOD_END,
+      search: code,
+      page: 1,
+      pageSize: 100,
+    });
+    expect(firstPage.data).toHaveLength(2);
+
+    const pastEnd = await report.list({
+      organizationId: seed.organizationId,
+      startDate: PERIOD_START,
+      endDate: PERIOD_END,
+      search: code,
+      page: 9,
+      pageSize: 100,
+    });
+
+    expect(pastEnd.data).toEqual([]);
+    // Tập không rỗng, nên total và totals phải y hệt trang 1.
+    expect(pastEnd.total).toBe(firstPage.total);
+    expect(pastEnd.totals).toEqual(firstPage.totals);
+  });
+
+  // ---------------------------------------------------------------------
+  // Cột "Mã vị trí" — hai LATERAL giải mã kệ hàng.
+  //
+  // Chúng đã được dời ra khỏi câu tổng và xuống SAU `LIMIT` của câu dòng, để
+  // chi phí bám theo kích thước TRANG thay vì theo toàn tập (đo được: 3079 →
+  // 1355 buffers trên kỳ 80 dòng). Trước đó không test nào đọc cột này, nên
+  // phép dời đó không có cổng kiểm nào — bốn test dưới đây là cổng đó.
+  // ---------------------------------------------------------------------
+
+  /** Kệ ưu tiên của mặt hàng: item_storage_locations trong một kho không phải kho chính. */
+  const givePreferredShelf = async (itemId: string, code: string) => {
+    const storage = await ds.getRepository(StorageEntity).save({
+      organizationId: seed.organizationId,
+      branchId: seed.branchId,
+      name: `Kho ${code}`,
+      isMainStorage: false,
+      isDefaultReceiving: false,
+      isActive: true,
+      createdBy: seed.userId,
+    });
+    const location = await ds.getRepository(LocationEntity).save({
+      organizationId: seed.organizationId,
+      branchId: seed.branchId,
+      storageId: storage.id,
+      code,
+      name: code,
+      type: LocationType.SHELF,
+      isActive: true,
+      isUnassigned: false,
+      isDefault: false,
+      createdBy: seed.userId,
+    });
+    await ds.getRepository(ItemStorageLocationEntity).save({
+      organizationId: seed.organizationId,
+      branchId: seed.branchId,
+      itemId,
+      storageId: storage.id,
+      locationId: location.id,
+      createdBy: seed.userId,
+    });
+    return { storageId: storage.id, locationId: location.id };
+  };
+
+  /** Kệ dự phòng: chỉ có tồn kho, không có item_storage_locations. */
+  const giveFallbackShelf = async (
+    itemId: string,
+    code: string,
+    quantity: number,
+  ) => {
+    const storage = await ds.getRepository(StorageEntity).save({
+      organizationId: seed.organizationId,
+      branchId: seed.branchId,
+      name: `Kho ${code}`,
+      isMainStorage: false,
+      isDefaultReceiving: false,
+      isActive: true,
+      createdBy: seed.userId,
+    });
+    const location = await ds.getRepository(LocationEntity).save({
+      organizationId: seed.organizationId,
+      branchId: seed.branchId,
+      storageId: storage.id,
+      code,
+      name: code,
+      type: LocationType.SHELF,
+      isActive: true,
+      isUnassigned: false,
+      isDefault: false,
+      createdBy: seed.userId,
+    });
+    await ds.getRepository(StockBalanceEntity).save({
+      organizationId: seed.organizationId,
+      branchId: seed.branchId,
+      itemId,
+      locationId: location.id,
+      quantity,
+      isTracked: true,
+      createdBy: seed.userId,
+    });
+  };
+
+  it('cột Mã vị trí lấy kệ ưu tiên của mặt hàng', async () => {
+    const code = 'SHELF-PREFERRED-SKU';
+    const itemId = await createItem(code);
+    await givePreferredShelf(itemId, 'KE-A1');
+    await addLine({ itemId, createdAt: IN_PERIOD });
+
+    const { data } = await runReport(code);
+
+    expect(data).toHaveLength(1);
+    expect(data[0]!.location).toBe('KE-A1');
+  });
+
+  it('không có kệ ưu tiên thì lấy vị trí còn tồn nhiều nhất', async () => {
+    const code = 'SHELF-FALLBACK-SKU';
+    const itemId = await createItem(code);
+    await giveFallbackShelf(itemId, 'KE-ÍT', 2);
+    await giveFallbackShelf(itemId, 'KE-NHIỀU', 9);
+    await addLine({ itemId, createdAt: IN_PERIOD });
+
+    const { data } = await runReport(code);
+
+    expect(data).toHaveLength(1);
+    expect(data[0]!.location).toBe('KE-NHIỀU');
+  });
+
+  // Cái mà phép dời LATERAL dễ làm hỏng nhất: nếu kệ được giải mã TRƯỚC rồi
+  // mới phân trang, hoặc ngược lại mà nối sai, thì dòng ở trang 2 sẽ mang kệ
+  // của dòng khác. Ba mặt hàng, ba kệ khác nhau, đọc từng trang một.
+  it('kệ vẫn khớp đúng dòng của nó khi phân trang', async () => {
+    const codes = ['SHELF-PAGE-1', 'SHELF-PAGE-2', 'SHELF-PAGE-3'];
+    // Cách nhau về thời gian để thứ tự `event_at DESC` xác định: mã 3 mới nhất.
+    for (const [i, code] of codes.entries()) {
+      const itemId = await createItem(code);
+      await givePreferredShelf(itemId, `KE-${code}`);
+      await addLine({
+        itemId,
+        createdAt: new Date(IN_PERIOD.getTime() + i * 60_000),
+      });
+    }
+
+    const seen: Array<[string, string | null]> = [];
+    for (let page = 1; page <= 3; page += 1) {
+      const { data } = await report.list({
+        organizationId: seed.organizationId,
+        startDate: PERIOD_START,
+        endDate: PERIOD_END,
+        search: 'SHELF-PAGE-',
+        page,
+        pageSize: 1,
+      });
+      expect(data).toHaveLength(1);
+      seen.push([data[0]!.sku, data[0]!.location]);
+    }
+
+    expect(seen).toEqual([
+      ['SHELF-PAGE-3', 'KE-SHELF-PAGE-3'],
+      ['SHELF-PAGE-2', 'KE-SHELF-PAGE-2'],
+      ['SHELF-PAGE-1', 'KE-SHELF-PAGE-1'],
+    ]);
+  });
+
+  // Lọc THEO cột kệ là đường SQL riêng: kệ phải được giải mã trước bộ lọc, nên
+  // câu tổng cũng phải mang hai LATERAL. Không có test này thì nhánh đó không
+  // ai chạy.
+  it('lọc theo cột Mã vị trí lọc cả lưới lẫn dòng tổng', async () => {
+    const hit = 'SHELF-FILTER-HIT';
+    const miss = 'SHELF-FILTER-MISS';
+    for (const [code, shelf] of [
+      [hit, 'KE-TÌM'],
+      [miss, 'KE-BỎ'],
+    ]) {
+      const itemId = await createItem(code!);
+      await givePreferredShelf(itemId, shelf!);
+      await addLine({ itemId, createdAt: IN_PERIOD });
+    }
+
+    const all = await runReport('SHELF-FILTER-');
+    expect(all.total).toBe(2);
+    expect(all.totals.outQty).toBe(2);
+
+    const filtered = await report.list({
+      organizationId: seed.organizationId,
+      startDate: PERIOD_START,
+      endDate: PERIOD_END,
+      search: 'SHELF-FILTER-',
+      page: 1,
+      pageSize: 100,
+      columnFilters: { location: { operator: '=', value: 'KE-TÌM' } },
+    });
+
+    expect(filtered.total).toBe(1);
+    expect(filtered.data[0]!.sku).toBe(hit);
+    expect(filtered.data[0]!.location).toBe('KE-TÌM');
+    // Dòng tổng mô tả đúng tập đã lọc, không phải toàn kỳ.
+    expect(filtered.totals.outQty).toBe(1);
   });
 });
