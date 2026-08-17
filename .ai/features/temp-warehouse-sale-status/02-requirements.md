@@ -1,7 +1,7 @@
 ---
 feature: temp-warehouse-sale-status
-stories: 3
-acceptance_criteria: 8
+stories: 4
+acceptance_criteria: 12
 ---
 
 # Requirements — Sửa nhãn trạng thái bán trên báo cáo "Hàng hóa xuất kho tạm"
@@ -32,11 +32,12 @@ When báo cáo chạy cho kỳ chứa dòng đó
 Then cột Trạng thái của dòng đó bằng "Bán hàng kho tạm"
 ```
 
-**AC-02** — Không dòng nào mang nhãn `Bán hàng trưng bày`
+**AC-02** — Hàng trưng showroom bán ra đọc là `Bán hàng trưng bày`
 ```gherkin
-Given bất kỳ bộ dữ liệu nào
-When báo cáo chạy
-Then không dòng nào có Trạng thái "Bán hàng trưng bày"
+Given một hóa đơn đã chốt bán mặt hàng X mà không dòng kho tạm nào nhận
+When báo cáo chạy cho kỳ chứa hóa đơn đó
+Then có một dòng Trạng thái "Bán hàng trưng bày", SL bán = SL trên hóa đơn
+And SL xuất = 0, SL trả = 0, SL tồn = 0 (hàng chưa từng vào kho tạm)
 And nhãn "Trả hàng trưng bày" vẫn giữ nguyên nghĩa cũ (trả hàng VỀ KHO, không phải khách trả)
 ```
 
@@ -66,8 +67,8 @@ thực sự phát ra, để lọc ra kết quả thay vì lưới rỗng.
 ```gherkin
 Given trang báo cáo ở chế độ đơn cửa hàng và ở chế độ chuỗi cửa hàng
 When mở bộ lọc cột Trạng thái
-Then cả hai nơi liệt kê đúng 5 giá trị: "Xuất không bán", "Trả hàng trưng bày",
-     "Bán hàng kho tạm", "Chuyển kho xuất đi", "Chuyển kho trả lại"
+Then cả hai nơi liệt kê đúng 6 giá trị: "Xuất không bán", "Trả hàng trưng bày",
+     "Bán hàng kho tạm", "Bán hàng trưng bày", "Chuyển kho xuất đi", "Chuyển kho trả lại"
 And không có giá trị nào không bao giờ khớp dòng nào
 ```
 
@@ -101,6 +102,56 @@ When bấm Xuất khẩu và mở file Excel
 Then cột Trạng thái chứa đúng bộ giá trị như trên lưới, gồm "Bán hàng kho tạm"
 And dòng tổng trong file bằng dòng tổng ở footer lưới
 And bản in (print-payload) chứa cùng các dòng và cùng dòng tổng
+```
+
+---
+
+## US-04 — Bảy trạng thái phủ đúng lưới nghiệp vụ
+
+Là quản lý kho, tôi muốn mọi trạng thái báo cáo phát ra đều tương ứng một thao tác có thật trên
+màn Chuyển kho tạm, để đọc báo cáo là biết chuyện gì đã xảy ra.
+
+Kho tạm **không có tồn kho riêng**: lúc quét vào, sổ vẫn ghi hàng ở kho nguồn; nó chỉ dịch chuyển
+khi một phiếu chuyển kho được post. Nên trạng thái là lưới **chiều × đã hạch toán chưa**:
+
+| | Chưa post phiếu | Đã post, không bán | Đã post + đã bán |
+| --- | --- | --- | --- |
+| **Xuất đi** | `Xuất không bán` | `Chuyển kho xuất đi` | `Bán hàng kho tạm` |
+| **Trả lại** | `Trả hàng trưng bày` | `Chuyển kho trả lại` | *(không tồn tại)* |
+
+**AC-09** — Bốn trạng thái kho tạm còn lại đọc đúng thao tác đã làm
+```gherkin
+Given tab Xuất đi quét một mặt hàng rồi bấm "Xử lý chuyển kho"
+Then dòng đó đọc "Chuyển kho xuất đi"
+Given tab Trả lại quét một mặt hàng rồi bấm "Xử lý chuyển kho"
+Then dòng đó đọc "Chuyển kho trả lại"
+Given tab Trả lại quét một mặt hàng không khớp lần xuất nào trong kỳ
+Then dòng đó đọc "Trả hàng trưng bày", SL xuất = 0, SL tồn = −1
+Given tab Xuất đi và tab Trả lại cùng quét một mặt hàng, cùng người vận chuyển
+Then hai sự kiện gộp thành đúng một dòng, cột Trạng thái để rỗng
+```
+
+**AC-10** — SL tồn không tính phần đã chuyển kho
+```gherkin
+Given một dòng đã bấm "Xử lý chuyển kho" (có transfer_id, không có invoice_id)
+When đọc cột SL tồn của dòng đó
+Then SL tồn = 0, vì phiếu đã post nên hàng hết treo ở kho tạm
+And dòng đã bán (mang cả transfer_id lẫn invoice_id) vẫn chỉ bị trừ một lần
+```
+
+**AC-11** — Đóng kho tạm không đổi báo cáo
+```gherkin
+Given một phiên kho tạm được đóng bằng bất kỳ chế độ nào
+When báo cáo chạy lại cho cùng kỳ
+Then không dòng nào đổi trạng thái hay số liệu
+And dòng AUTO_BALANCED do chế độ "Xuất đi/Trả lại kho tạm" sinh ra không vào báo cáo
+```
+
+**AC-12** — Ghép cặp khoá theo người vận chuyển
+```gherkin
+Given một lần xuất của người A và một lần trả cùng mặt hàng của người B
+When báo cáo chạy
+Then hai dòng riêng biệt: "Xuất không bán" và "Trả hàng trưng bày", không gộp thành cặp cân bằng
 ```
 
 ---

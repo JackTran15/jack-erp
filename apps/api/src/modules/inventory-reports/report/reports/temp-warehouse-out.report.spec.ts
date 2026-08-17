@@ -44,6 +44,7 @@ describe('TempWarehouseOutReport', () => {
     expect(status.filterOptions!.map((o) => o.value)).toEqual([
       'Xuất không bán',
       'Trả hàng trưng bày',
+      'Bán hàng trưng bày',
       'Bán hàng kho tạm',
       'Chuyển kho xuất đi',
       'Chuyển kho trả lại',

@@ -151,3 +151,43 @@ history:
     at: 2026-08-15T13:39:10
     by: code-review
     ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T18:35:49
+    by: claude
+    ticket: T-04-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-17T18:35:49
+    by: claude
+    ticket: T-04-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-17T18:35:49
+    by: claude
+    ticket: T-04-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T18:47:29
+    by: claude
+    ticket: T-02-04
+  - gate: G4
+    action: ticket review
+    at: 2026-08-17T18:47:29
+    by: claude
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done
+    at: 2026-08-17T18:52:32
+    by: code-review
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done
+    at: 2026-08-17T18:52:32
+    by: code-review
+    ticket: T-04-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-17T18:52:32
+    by: code-review
+    ticket: T-04-02

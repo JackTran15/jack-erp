@@ -195,11 +195,11 @@ export interface DocumentDetailRow {
 
 /**
  * Row for "Hàng hóa xuất kho tạm" (temp-warehouse out goods).
- * Mirrors backend `TempWarehouseIssueRow`. Every row is one matched issue↔return
- * pair from the temp warehouse; `saleQty`/`invoice` are populated when the issue
- * was consumed by a sale, and that row reads "Bán hàng kho tạm". Goods sold
- * straight off the showroom floor never enter the temp warehouse and are out of
- * this report's scope by design.
+ * Mirrors backend `TempWarehouseIssueRow`. A row comes from one of two sources:
+ * a matched issue↔return pair in the temp warehouse, or a sale drawn from stock
+ * already on the showroom floor — the latter carries `outQty`/`returnQty`/
+ * `remainingQty` of 0 and reads "Bán hàng trưng bày". `saleQty`/`invoice` are
+ * populated on both sale flows.
  */
 export interface TempWarehouseIssueRow {
   sku: string;

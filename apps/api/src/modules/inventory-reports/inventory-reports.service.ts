@@ -365,7 +365,7 @@ export class InventoryReportsService {
       // namespace 'inventory-reports', key = sha256(orgId + dto), không có version)
       // phục vụ chế độ chuỗi cửa hàng / Xuất khẩu / In và vẫn có thể trả nhãn cũ
       // trong tối đa 45s (TTL của nó) sau deploy. Chấp nhận cửa sổ đó.
-      'temporary-warehouse-out-goods3',
+      'temporary-warehouse-out-goods',
       actor,
       reportQuery,
     );

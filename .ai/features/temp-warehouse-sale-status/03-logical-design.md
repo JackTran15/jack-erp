@@ -1,14 +1,14 @@
 ---
 feature: temp-warehouse-sale-status
-adrs: 5
+adrs: 7
 ---
 
 # Logical design — Sửa nhãn trạng thái bán trên báo cáo "Hàng hóa xuất kho tạm"
 
-> **Sửa phạm vi 2026-08-15.** Bản đầu của tài liệu này thiết kế thêm một nguồn dữ liệu thứ hai
-> (`invoice_items`) để hàng trưng showroom bán ra hiện trong báo cáo. Nguồn đó đã cài xong rồi
-> **gỡ** — xem **ADR-05**, nơi ghi cả lý do lẫn ba defect mà việc theo đuổi nó phát hiện ra.
-> Phần dưới đây mô tả thiết kế **sau khi gỡ**.
+> **Trạng thái hiện hành: HAI NGUỒN (ADR-06, 2026-08-16).** Tài liệu này đã qua hai lần đảo trên
+> cùng một câu hỏi phạm vi. Nguồn `invoice_items` được thiết kế (ADR-01), **gỡ** (ADR-05, ship ở
+> `#184`), rồi **khôi phục** (ADR-06). Phần Approach/Contracts dưới đây mô tả thiết kế hiện hành.
+> Đọc ADR-05 để hiểu vì sao từng gỡ — đánh đổi đó vẫn còn nguyên, chỉ là đã được chọn ngược lại.
 
 ## Approach
 
@@ -18,47 +18,42 @@ Lưới đơn cửa hàng (REST cũ), chế độ chuỗi cửa hàng, Xuất kh
 `TempWarehouseReportService.list`, nên sửa ở đây là cả bốn đường khớp nhau theo cấu trúc,
 không phải nhờ kỷ luật.
 
-Chuỗi CTE giữ nguyên `base → exp/ret → paired → enriched`. **Không thêm nguồn, không thêm CTE,
-không đổi số dòng.** Chỉ hai dịch chuyển:
+Chuỗi CTE: `base → exp/ret → paired` cho nguồn kho tạm, `tw_claimed → showroom` cho nguồn thứ hai,
+hợp ở `movements` rồi mới vào `enriched`:
 
-1. **Đổi nhãn.** Nhánh đầu của CASE trạng thái:
+```
+base ──► exp ──┐
+       └► ret ──┴► paired ────┐
+                              ├► movements ──► enriched ──► {count+totals, rows}
+tw_claimed ──► showroom ──────┘
+```
 
-   ```sql
-   CASE
-     WHEN p.invoice_id IS NOT NULL       THEN 'Bán hàng kho tạm'   -- was 'Bán hàng trưng bày'
-     WHEN p.exp_transfer_id IS NOT NULL  THEN 'Chuyển kho xuất đi'
-     WHEN p.ret_transfer_id IS NOT NULL  THEN 'Chuyển kho trả lại'
-     WHEN p.return_qty = p.out_qty       THEN ''
-     WHEN p.return_qty = 1               THEN 'Trả hàng trưng bày'
-     ELSE 'Xuất không bán'
-   END
-   ```
+Ba điểm mấu chốt:
 
-   `invoice_id` chỉ được ghi bởi `fulfillInvoiceFromTempWarehouse`, vốn chỉ tiêu thụ dòng
-   `warehouse_to_showroom` — nên nhánh này luôn là hàng đi qua kho tạm, không bao giờ là hàng
-   trưng bày. Thứ tự bốn nhánh sau giữ nguyên tuyệt đối (AC-03).
-
-2. **`sale_qty` / `remaining_qty` tính ở `paired` thay vì `enriched`.** Giá trị không đổi
-   (kiểm chứng bằng test), nhưng đặt công thức cạnh nơi `out_qty`/`return_qty` sinh ra thì đọc
-   dễ hơn là suy lại từ `p.invoice_id` ở tầng trên.
+1. **`sale_qty` / `remaining_qty` tính ở từng nhánh**, không ở `enriched`: nhánh kho tạm suy từ
+   `invoice_id`, nhánh showroom lấy phần dư và luôn để `remaining_qty = 0`.
+2. **`tw_claimed` cố ý KHÔNG chặn theo kỳ** — dòng stage trước kỳ vẫn mang `invoice_id` của hóa đơn
+   trong kỳ; chặn theo kỳ sẽ để lọt phần đó xuống nhánh showroom và đếm trùng.
+3. **Nhánh `source = 'showroom'` phải xét ĐẦU TIÊN** trong CASE: dòng showroom có
+   `out_qty = return_qty = 0` nên nhánh cân bằng `return_qty = out_qty` sẽ nuốt nó nếu đặt sau.
 
 `enriched` giữ vai trò "tầng duy nhất nơi tồn tại đúng dòng người dùng nhìn thấy" — rows, count
 và totals đều đọc từ đó, nên footer không thể mô tả một tập khác lưới, và `buildReportColumnFilter`
-vẫn áp trên đúng một chỗ (AC-06).
+vẫn áp trên đúng một chỗ.
 
 Frontend không có logic mới: hai chỗ hard-code danh sách trạng thái đổi thành import
 `TEMP_WAREHOUSE_OUT_STATUS_OPTIONS` (AC-07).
 
 ## Contracts
 
-**Không đổi schema, không migration, không thêm bảng nào vào truy vấn.**
+**Không đổi schema, không migration.** Truy vấn đọc thêm `invoices` / `invoice_items` (đã có sẵn).
 
 | Hợp đồng | Trạng thái | Ghi chú |
 |---|---|---|
 | `TempWarehouseIssueRow` (13 field) | **không đổi** | |
 | `TempWarehouseReportResult` `{data, total, totals}` | **không đổi** | |
 | `TempWarehouseReportQuery` | **không đổi** | 6 tham số, giữ nguyên thứ tự |
-| `TEMP_WAREHOUSE_OUT_STATUS_OPTIONS` | 5 → 5, **thay một giá trị** | `Bán hàng trưng bày` → `Bán hàng kho tạm`. Không giữ lại giá trị cũ: sau thay đổi không dòng nào mang nhãn đó, để lại chỉ tạo một lựa chọn lọc luôn rỗng |
+| `TEMP_WAREHOUSE_OUT_STATUS_OPTIONS` | 5 → **6** | Thêm `Bán hàng kho tạm`; `Bán hàng trưng bày` giữ lại nhưng đổi nghĩa — giờ là hàng showroom bán ra thật, không còn là nhãn sai của luồng kho tạm |
 | Cột báo cáo (`COLUMNS` trong `temp-warehouse-out.report.ts`) | **không đổi** | 13 cột, nhãn VI giữ nguyên |
 | Report key của cache | `...goods2` → `...goods3` | **Không phải** `CACHE_NAMESPACE` (vẫn `'inventory-reports:v2'`) — nó là thành phần đầu của cache key `${reportKey}:${orgId}:${hash}`. Chỉ che đường REST v1; đường report-registry (`SearchInventoryReportHandler`, key `sha256(orgId + dto)`, không có version token) vẫn trả nhãn cũ tối đa 45s sau deploy — chấp nhận |
 | OpenAPI / `packages/api-client` | **không đổi** | Không endpoint mới, không field mới ⇒ không cần `pnpm openapi:generate` |
@@ -70,9 +65,8 @@ báo cáo người dùng đã lưu và URL đã chia sẻ.
 
 | Option | Why not |
 |---|---|
-| Thêm nguồn `invoice_items` để hàng trưng showroom bán ra hiện trong báo cáo | Đã cài, chạy đúng, rồi gỡ: chiếm 64/71 dòng trên dữ liệu thật, làm báo cáo không còn đúng tên (ADR-05) |
-| Giữ nguồn showroom nhưng ẩn sau một bộ lọc "Nguồn hàng", mặc định tắt | Giữ được cả hai nghiệp vụ, nhưng thêm một trục lọc cho một nghiệp vụ vốn thuộc về báo cáo doanh thu. Chủ sở hữu chọn gỡ hẳn |
-| Giữ `Bán hàng trưng bày` trong danh sách lọc cho tương thích ngược | Sau khi gỡ nguồn, không dòng nào mang nhãn đó — một lựa chọn lọc luôn trả về rỗng còn tệ hơn là không có |
+| Bỏ hẳn nguồn showroom, báo cáo chỉ đọc `temp_warehouse_lines` | Đã ship ở `#184` rồi bị đảo: chủ sở hữu cần báo cáo phủ cả hai luồng bán (ADR-06). Đánh đổi tỉ lệ dòng vẫn còn, đã được chấp nhận |
+| Giữ nguồn showroom nhưng ẩn sau bộ lọc "Nguồn hàng", mặc định tắt | Vẫn là phương án chưa dùng tới. Nếu tỉ lệ dòng thành vấn đề thật khi vận hành, đây là chỗ quay lại trước tiên |
 | Tách theo `temp_warehouse_lines.source_location_id` (kho thường vs showroom) | Cột đi theo `direction` của chính dòng đó, nullable, do người dùng chọn tay ở toolbar POS; đường checkout không bao giờ ghi nó (A-R2) |
 | Tách theo `temp_warehouse_sessions.direction` | Mọi dòng đã bán đều thuộc phiên `warehouse_to_showroom` (`:1266-1271` hard-code chiều này) ⇒ không phân biệt được gì |
 | Backfill `invoice_id` cho dòng trước 25/06/2026 bằng ghép FIFO theo (mặt hàng, thời gian, chi nhánh) | Không có khóa ghép ngược nào (A-R3); ghi đè chứng từ đã post bằng phỏng đoán (ADR-03) |
@@ -82,18 +76,71 @@ báo cáo người dùng đã lưu và URL đã chia sẻ.
 | Tình huống | Xử lý | Nơi phát |
 |---|---|---|
 | Cột hoặc khóa lọc không có trong catalog | `BadRequestException` | `assertKnownColumns` (`report-data.util.ts:21`) — hành vi sẵn có, không đổi |
-| Kết quả vượt 50.000 dòng | `BadRequestException` "narrow the period or filters" | `assertUnderRowCap` (`row-cap.util.ts:24`) — **không có áp lực mới**, số dòng bằng đúng trước thay đổi |
+| Kết quả vượt 50.000 dòng | `BadRequestException` "narrow the period or filters" | `assertUnderRowCap` (`row-cap.util.ts:24`) — **áp lực tăng** do nguồn showroom; kỳ lọc rộng có thể chạm trần và fail export. Chưa chạm trên dữ liệu hiện có |
 | Không có dòng nào khớp | `{data: [], total: 0, totals: <các số 0>}`, không ném lỗi | `list()` thoát sớm — giữ nguyên |
 | `carrier_user_id` không tra được người dùng | `LEFT JOIN users` → `staff` rỗng, không lỗi | `enriched` — giữ nguyên |
 | Không resolve được vị trí kệ | Hai LATERAL trả NULL → `location` rỗng | Giữ nguyên |
 | Dữ liệu trước 25/06/2026 không có `invoice_id` | **Không phải lỗi runtime**; dòng đó đọc `Chuyển kho xuất đi` hoặc `Xuất không bán`. Hạn chế đã biết, ADR-03 | — |
-| Hóa đơn bị hủy sau khi đã tiêu thụ kho tạm | **Defect có sẵn, không sửa ở đây**: dòng vẫn đọc `Bán hàng kho tạm`. Có test e2e khẳng định hành vi hiện tại | ADR-05 mục 3 |
+| Đóng kho tạm (mọi chế độ) | **Không đổi dòng nào trên báo cáo.** `NONE` không đụng gì; `NET_OFFSET` chèn dòng `AUTO_BALANCED` mà báo cáo lọc bỏ, dòng gốc vẫn ACTIVE; `CREATE_TRANSFERS` post phiếu thật nhưng chỉ ghi cột trên *session*, `temp_warehouse_lines.transfer_id` vẫn NULL. Hành vi có chủ đích, có test khoá | AC-11 |
+| Hóa đơn bị hủy sau khi đã tiêu thụ kho tạm | **Defect có sẵn, không sửa ở đây**: nhánh showroom loại nó qua `inv.status <> 'cancelled'`, nhánh kho tạm không join `invoices` nên vẫn đọc `Bán hàng kho tạm`. Có test e2e khẳng định hành vi hiện tại | ADR-05 mục 3 |
 
 ## ADRs
 
+### ADR-07 — SL tồn trừ luôn phần đã "Xử lý chuyển kho"
+
+**Status:** accepted (2026-08-17)
+
+**Bối cảnh.** Cột SL tồn được mô tả là "số còn lại ở kho tạm", công thức
+`SL xuất − SL trả − SL bán`. Nó **không đọc `transfer_id`**, nên một dòng đã bấm "Xử lý chuyển kho"
+báo SL tồn = 1: nhãn nói hàng đã chuyển đi, con số nói còn nằm trong kho tạm.
+
+Điều làm rõ vấn đề là mô hình tồn kho: **kho tạm không có tồn kho riêng** — không có location nào
+đại diện cho nó trong `stock_balances`, và `addLine` không ghi sổ gì cả. Hàng chỉ dịch chuyển khi
+một phiếu chuyển kho được post. Nên "còn ở kho tạm" thực chất nghĩa là **đã dịch chuyển vật lý
+nhưng chưa hạch toán**. Phiếu post xong thì hết treo, bất kể vì bán hay vì chuyển kho thủ công.
+
+**Quyết định.** Trừ thêm một vế ở `paired`:
+```sql
+- (e.transfer_id IS NOT NULL AND e.invoice_id IS NULL)::int
+```
+Vế `AND e.invoice_id IS NULL` là bắt buộc: dòng đã bán mang **cả** `transfer_id` lẫn `invoice_id`
+(`fulfillInvoiceFromTempWarehouse` ghi cùng lúc), không chặn thì bị trừ hai lần và SL tồn ra −1.
+
+**Hệ quả.** Trên `erp_dev` không đổi số nào — chi nhánh HCM có 0 dòng chuyển kho thủ công, nên
+defect này chưa từng lộ ra trên dữ liệu thật. Đó cũng là lý do nó sống sót tới giờ. Sau khi seed
+một dòng chuyển kho thủ công, dòng đó về đúng SL tồn = 0.
+
+Không đụng phía trả: một dòng trả lẻ vẫn giữ SL tồn = −1 kể cả khi đã chuyển kho — con số đó bù cho
+lần xuất nằm ngoài kỳ, là thiết bị net chứ không phải đếm vật lý.
+
+### ADR-06 — Khôi phục nguồn bán showroom; báo cáo phủ cả hai luồng bán
+
+**Status:** accepted (2026-08-16) — **thay thế ADR-05**
+
+**Bối cảnh.** ADR-05 gỡ nguồn `invoice_items` vì nó chiếm 64/71 dòng, làm 90% nội dung của một báo
+cáo tên "xuất kho tạm" là hàng chưa từng vào kho tạm. Bản một-nguồn đã ship (`#184`).
+
+Chủ sở hữu đảo quyết định ngày 2026-08-16: báo cáo cần **cả hai** nhãn. Đánh đổi tỉ lệ dòng được
+nêu lại trước khi làm và vẫn được chọn.
+
+**Quyết định.** Khôi phục `tw_claimed`, `showroom`, `movements`, cột `source` và nhánh
+`WHEN p.source = 'showroom'`. `TEMP_WAREHOUSE_OUT_STATUS_OPTIONS` về 6 giá trị.
+
+**Hệ quả.** Trên `erp_dev` kỳ 08/2026 chi nhánh HCM: 76 dòng, trong đó 69 `Bán hàng trưng bày`,
+4 `Bán hàng kho tạm`, 3 `Xuất không bán`. Bất biến "tổng SL bán mỗi hóa đơn = SL OUT của hóa đơn"
+giữ trên 22/22 hóa đơn. Rủi ro chạm trần 50.000 dòng khi xuất Excel quay lại — chưa chạm, theo dõi.
+
+**Điều đáng ghi hơn cả quyết định.** Đây là lần đảo thứ hai trên cùng một câu hỏi phạm vi. Cái giá
+không nằm ở việc viết lại SQL — nó nằm ở chỗ **bản hai nguồn chưa từng được commit**: nó chỉ sống
+trong working tree của phiên trước, nên lần này phải dựng lại từ đặc tả trong `T-02-01`/`T-02-02`
+thay vì `git revert`. Đặc tả đủ chi tiết để dựng lại đúng, kể cả ba bản vá từ review (ép
+`AT TIME ZONE 'UTC'`, gộp `SUM/MAX` trước khi trừ, danh sách cột tường minh cho `movements`) — đó
+là lý do duy nhất việc này rẻ. Bài học: khi một hướng đã chạy đúng và có test, **commit nó lại**
+trước khi gỡ, dù đang định gỡ; một commit bị revert rẻ hơn một bản dựng lại từ trí nhớ.
+
 ### ADR-05 — Gỡ nguồn bán showroom; báo cáo chỉ đọc `temp_warehouse_lines`
 
-**Status:** accepted (2026-08-15) — **thay thế ADR-01 và ADR-02**
+**Status:** superseded by ADR-06 (2026-08-16) — đã ship ở `#184` rồi bị đảo
 
 **Bối cảnh.** ADR-01 thêm nguồn thứ hai (`invoice_items` trừ đi phần kho tạm đã nhận) để nghiệp vụ
 "hàng trưng showroom bán ra" hiện trong báo cáo. Nó được cài xong, chạy đúng, và kiểm chứng đủ:
@@ -148,7 +195,7 @@ container UTC, 7 giờ trên máy dev Asia/Saigon).
 
 ### ADR-01 — Suy ra luồng bán từ "POS có tiêu thụ dòng kho tạm hay không", bằng phép trừ trên `invoice_items`
 
-**Status:** superseded by ADR-05 (2026-08-15) — đã cài rồi gỡ, giữ lại để hiểu git history
+**Status:** accepted lại theo ADR-06 (2026-08-16) — cách suy diễn này quay lại hiệu lực
 
 **Bối cảnh.** Hai luồng bán cần phân biệt, nhưng chỉ luồng kho tạm để lại dấu vết trong
 `temp_warehouse_lines`. Luồng bán hàng trưng bày không sinh dòng nào: POS trừ tồn thẳng từ vị trí
@@ -170,7 +217,7 @@ AC-02 đòi (một dòng cho một cặp hóa đơn+mặt hàng). Đổi lại: 
 
 ### ADR-02 — Không thêm cột provenance vào `invoice_items`
 
-**Status:** superseded by ADR-05 (2026-08-15) — câu hỏi không còn đặt ra khi báo cáo không đọc `invoice_items`
+**Status:** accepted lại theo ADR-06 (2026-08-16) — báo cáo đọc `invoice_items` trở lại, nên quyết định "không thêm cột provenance" lại có hiệu lực
 
 **Bối cảnh.** Ghi thẳng "bán từ kho tạm / bán từ trưng bày" lúc checkout sẽ chính xác hơn suy diễn
 và rẻ hơn khi đọc.
@@ -201,7 +248,7 @@ không đáng. Phương án dự phòng nếu sau này cần: chặn nhánh show
 
 ### ADR-04 — `source = 'showroom'` xét đầu tiên trong CASE trạng thái
 
-**Status:** superseded by ADR-05 (2026-08-15) — nhánh `source` đã gỡ; ràng buộc thứ tự nhánh vẫn đúng nếu sau này thêm nguồn khác
+**Status:** accepted lại theo ADR-06 (2026-08-16) — nhánh `source` đã quay lại và ĐANG đứng đầu CASE đúng vì ADR này; đây là ràng buộc đúng-đắn còn hiệu lực, không phải lịch sử
 
 **Bối cảnh.** Dòng showroom có `out_qty = 0` và `return_qty = 0`. Nhánh sẵn có
 `WHEN p.return_qty = p.out_qty THEN ''` khớp `0 = 0`, nên sẽ gán chuỗi rỗng cho mọi dòng showroom

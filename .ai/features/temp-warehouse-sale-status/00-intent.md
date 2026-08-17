@@ -11,16 +11,13 @@ status: draft            # draft | approved | in_construction | done | abandoned
 Nguồn: yêu cầu của chủ sở hữu ngày 2026-08-15, kèm ảnh chụp báo cáo chi nhánh Buôn Ma Thuật
 (Tháng 08/2026, 67 dòng) và màn hình Chuyển kho tạm của chi nhánh Nha Trang.
 
-> **Sửa phạm vi 2026-08-15, sau khi đã cài rồi gỡ.** Bản đầu của intent này có hai vế: đổi nhãn,
-> **và** thêm nguồn `invoice_items` để hàng trưng showroom bán ra hiện thành `Bán hàng trưng bày`.
-> Vế thứ hai đã cài xong, chạy đúng, kiểm chứng đủ — rồi **gỡ** theo quyết định của chủ sở hữu:
-> trên `erp_dev` kỳ 08/2026 nó làm báo cáo phình từ 7 lên 71 dòng, trong đó **64/71 là hàng chưa
-> từng vào kho tạm**. Một báo cáo tên "Hàng hóa xuất kho tạm" mà 90% nội dung không xuất kho tạm.
-> Lý do đầy đủ và những gì học được ở **ADR-05**.
+> **Trạng thái hiện hành (ADR-06, 2026-08-16): CẢ HAI vế.** Intent này đã qua hai lần đảo. Vế thứ
+> hai — thêm nguồn `invoice_items` để hàng trưng showroom bán ra hiện thành `Bán hàng trưng bày` —
+> được cài, rồi **gỡ** (ADR-05, ship ở `#184`), rồi **khôi phục** (ADR-06).
 >
-> Phạm vi còn lại: **chỉ đổi nhãn**. Sau thay đổi, không dòng nào mang nhãn `Bán hàng trưng bày`,
-> nên giá trị đó bị gỡ khỏi danh sách lọc. Nghiệp vụ bán hàng trưng bày vẫn nằm ngoài báo cáo này —
-> đúng như trước, nhưng giờ là có chủ đích chứ không phải do thiếu sót.
+> Đánh đổi đã biết và đã chấp nhận: nguồn showroom chiếm phần lớn số dòng (trên `erp_dev` kỳ
+> 08/2026 chi nhánh HCM là 69/76). Đổi lại, báo cáo phủ đủ cả hai luồng bán và tổng SL bán khớp
+> hóa đơn — kiểm chứng 22/22 hóa đơn, 0 lệch.
 
 ## Problem
 
@@ -51,15 +48,16 @@ cửa hàng hiện **không lọc được gì**.
 | Persona | Hành vi hiện tại | Hành vi mong muốn |
 | --- | --- | --- |
 | Quản lý cửa hàng | Đọc "Bán hàng trưng bày" tưởng là hàng trưng showroom bán ra; thực chất là hàng kho scan kho tạm | Nhãn đọc đúng luồng đã xảy ra: `Bán hàng kho tạm` |
-| Kế toán kho | Không chắc "SL bán" đang đếm nghiệp vụ nào | Biết chắc mọi dòng đều là hàng đã đi qua kho tạm |
+| Kế toán kho | "SL bán" chỉ đếm phần đi qua kho tạm, không đối chiếu được với doanh thu | SL bán phủ cả hai luồng; cộng theo hóa đơn thì khớp SL OUT trên hóa đơn |
 | Người dùng chế độ chuỗi | Chọn filter Trạng thái, lưới trả về rỗng | Dropdown liệt kê đúng các giá trị backend phát ra, chọn giá trị nào cũng lọc đúng |
 
 ## Success signal
 
-Mọi dòng báo cáo đều đến từ `temp_warehouse_lines` — **số dòng không đổi** so với trước thay đổi,
-chỉ nhãn trạng thái đổi. Trên bộ dữ liệu `erp_dev` kỳ 08/2026: 7 dòng trước, 7 dòng sau; 4 dòng có
-số hóa đơn chuyển từ `Bán hàng trưng bày` sang `Bán hàng kho tạm`, 3 dòng `Xuất không bán` giữ
-nguyên. Kiểm chứng bằng test chạy SQL thật và bằng ảnh chụp trước/sau ở G4.
+Trên cùng một kỳ và một chi nhánh, cộng cột **SL bán** của mọi dòng mang cùng một số hóa đơn bằng
+đúng tổng SL dòng `OUT` của hóa đơn đó — không thiếu (luồng showroom đã có mặt) và không trùng
+(phần kho tạm đã nhận không bị đếm lại). Kiểm chứng trên `erp_dev` chi nhánh HCM kỳ 08/2026:
+**22 hóa đơn, 0 lệch**; 76 dòng chia thành 69 `Bán hàng trưng bày`, 4 `Bán hàng kho tạm`,
+3 `Xuất không bán`.
 
 Chỉ báo phụ: dropdown Trạng thái liệt kê đúng những giá trị backend thực sự phát ra ở cả hai chế độ
 (đơn cửa hàng và chuỗi cửa hàng), và file Excel xuất khẩu đọc cùng bộ đó — cả ba đi chung
@@ -67,12 +65,6 @@ Chỉ báo phụ: dropdown Trạng thái liệt kê đúng những giá trị ba
 
 ## Out of scope
 
-- **Bán hàng trưng bày (hàng đã trưng sẵn ở showroom, bán ra).** Nghiệp vụ này không sinh dòng
-  `temp_warehouse_lines` nào — POS trừ tồn thẳng từ vị trí showroom
-  (`resolveBranchItemLocations(..., { showroomOnly: true })`) và `fulfillInvoiceFromTempWarehouse`
-  thoát sớm khi không có dòng nào staged. Đã cài thử bằng nguồn `invoice_items` trừ đi phần kho tạm
-  đã nhận, chạy đúng, rồi gỡ: nó chiếm 64/71 dòng và làm báo cáo không còn đúng tên. Xem ADR-05.
-  Muốn con số này thì dùng báo cáo doanh thu, không phải báo cáo kho tạm.
 - **Backfill dữ liệu trước 25/06/2026.** Luồng fulfill và cột `invoice_id` (trên cả
   `temp_warehouse_lines` lẫn `stock_transfers`) cùng ra đời ở commit `ddaacee3` ngày 25/06/2026;
   module kho tạm có từ 16/05/2026. Trong cửa sổ đó, hàng scan kho tạm rồi bán không được ghi
@@ -80,8 +72,6 @@ Chỉ báo phụ: dropdown Trạng thái liệt kê đúng những giá trị ba
   Không ghép ngược được — phiếu chuyển kho thời đó không mang bất kỳ tham chiếu hóa đơn nào
   (cả cột `invoice_id` lẫn chuỗi mô tả `fulfillTransferDescription` đều sinh ra ở đúng commit đó).
   Chủ sở hữu chốt 2026-08-15: chấp nhận, ghi thành ADR, không đoán bằng FIFO.
-  *(Sau khi gỡ nguồn showroom, ảnh hưởng nhẹ hơn hẳn: dòng cũ đó chỉ đơn giản không xuất hiện, thay
-  vì xuất hiện dưới nhãn sai.)*
 - **Trả hàng của khách (RETURN / dòng `direction = 'IN'`).** Báo cáo này chưa từng mô hình hóa
   trả hàng của khách; nhãn `Trả hàng trưng bày` sẵn có nghĩa là *trả về kho*, không phải khách trả.
   Đưa dòng IN vào sẽ đổi nghĩa một nhãn đang dùng.
@@ -94,8 +84,6 @@ Chỉ báo phụ: dropdown Trạng thái liệt kê đúng những giá trị ba
 ## Constraints
 
 - **Không migration, không đổi schema.** Trạng thái là biểu thức `CASE` tính lúc query, không lưu.
-- **Không đổi số dòng của báo cáo.** Đây là ràng buộc rút ra từ lần đảo phạm vi: mọi dòng phải đến
-  từ `temp_warehouse_lines`. Thêm nguồn khác là đổi bản chất báo cáo, không phải sửa nhãn.
 - **Một nguồn sự thật duy nhất**: mọi thay đổi công thức nằm trong
   `apps/api/src/modules/inventory-reports/services/temp-warehouse-report.service.ts`. Lưới (REST cũ),
   chế độ chuỗi cửa hàng, Xuất khẩu và In đều đi qua đó — sửa một chỗ là cả bốn khớp.
@@ -112,6 +100,7 @@ Chỉ báo phụ: dropdown Trạng thái liệt kê đúng những giá trị ba
 
 ## Rủi ro theo dõi
 
-Không còn rủi ro trần 50.000 dòng: sau khi gỡ nguồn showroom, số dòng báo cáo trở về đúng như
-trước thay đổi, nên `assertUnderRowCap` (`temp-warehouse-out.report.ts:95-105`) không gặp áp lực
-mới nào.
+`TempWarehouseOutReport.buildData` nạp `pageSize: MAX_REPORT_ROWS` rồi `assertUnderRowCap`
+(`temp-warehouse-out.report.ts:95-105`, trần 50.000). Nguồn showroom làm số dòng tăng đáng kể —
+kỳ lọc rộng có thể chạm trần và **fail export**. Chưa chạm trên dữ liệu hiện có; nếu chạm thì van
+xả đầu tiên là bộ lọc "Nguồn hàng" mặc định tắt (xem Alternatives trong `03-logical-design.md`).
