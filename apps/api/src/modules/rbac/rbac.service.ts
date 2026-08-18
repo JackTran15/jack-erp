@@ -116,6 +116,36 @@ export class RbacService {
     return result;
   }
 
+  /**
+   * Of `roleIds`, the ones the actor may grant: a role is grantable only when
+   * every permission key it carries is one the actor already holds.
+   *
+   * This is the single definition of "a role above me" — used both to reject a
+   * grant (users.service) and to hide the role in the UI (roles.service), so
+   * the two can never disagree. Deliberately keyed off permission sets rather
+   * than role identity: roles here have no `code`, only an editable name.
+   */
+  async getGrantableRoleIds(
+    userId: string,
+    orgId: string,
+    roleIds: string[],
+  ): Promise<Set<string>> {
+    if (roleIds.length === 0) return new Set();
+
+    const [actorKeys, keysByRole] = await Promise.all([
+      this.getUserPermissions(userId, orgId),
+      this.getRolePermissionKeys(roleIds),
+    ]);
+    const actorSet = new Set(actorKeys);
+
+    const grantable = new Set<string>();
+    for (const roleId of roleIds) {
+      const roleKeys = keysByRole.get(roleId) ?? [];
+      if (roleKeys.every((key) => actorSet.has(key))) grantable.add(roleId);
+    }
+    return grantable;
+  }
+
   private async resolvePermissions(
     userId: string,
     orgId: string,

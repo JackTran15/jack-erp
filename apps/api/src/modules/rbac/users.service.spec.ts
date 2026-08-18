@@ -61,6 +61,8 @@ describe('UsersService', () => {
       | 'invalidateOrgPermissions'
       | 'getUserPermissions'
       | 'getRolePermissionKeys'
+      | 'hasPermission'
+      | 'getGrantableRoleIds'
     >
   >;
   let manager: ReturnType<typeof makeMockManager>;
@@ -80,6 +82,26 @@ describe('UsersService', () => {
       // branch scoping. Tests that exercise scoping override this.
       getUserPermissions: jest.fn().mockResolvedValue(['iam.user.read.all']),
       getRolePermissionKeys: jest.fn().mockResolvedValue(new Map()),
+      // Mirrors the real implementation on top of the two mocks above, so the
+      // per-test overrides of getUserPermissions / getRolePermissionKeys keep
+      // driving what the service is allowed to grant.
+      hasPermission: jest.fn(
+        async (userId: string, orgId: string, key: string) =>
+          (await rbac.getUserPermissions(userId, orgId)).includes(key),
+      ),
+      getGrantableRoleIds: jest.fn(
+        async (userId: string, orgId: string, roleIds: string[]) => {
+          const actorKeys = new Set(
+            await rbac.getUserPermissions(userId, orgId),
+          );
+          const keysByRole = await rbac.getRolePermissionKeys(roleIds);
+          return new Set(
+            roleIds.filter((id) =>
+              (keysByRole.get(id) ?? []).every((key) => actorKeys.has(key)),
+            ),
+          );
+        },
+      ),
     };
 
     const dataSource = {
@@ -587,6 +609,97 @@ describe('UsersService', () => {
         ),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(manager.save).not.toHaveBeenCalled();
+    });
+  });
+  /**
+   * `iam.user.branches.write` alone used to let a branch manager staff any
+   * branch of the chain: nothing compared the requested branches against the
+   * actor's own. Only `iam.user.branches.write.all` lifts that scope.
+   */
+  describe('branch assignment scope', () => {
+    const OTHER = { id: 'b-other', name: 'Chi Nhánh Nha Trang' };
+    const MINE = { id: 'b-mine', name: 'Chi nhánh MT46' };
+
+    /** Actor belongs to b-mine only; both branches exist in the org. */
+    function arrangeBranches(actorKeys: string[]) {
+      userRepo.exist.mockResolvedValue(true);
+      userRoleRepo.find.mockResolvedValue([]);
+      userBranchRepo.find.mockResolvedValue([{ branchId: MINE.id }]);
+      branchRepo.find.mockImplementation(async ({ where }: any) => {
+        const requested: string[] = where.id?._value ?? [];
+        return [MINE, OTHER].filter((b) => requested.includes(b.id));
+      });
+      rbac.getUserPermissions.mockResolvedValue(actorKeys);
+    }
+
+    const newUser = (branchIds: string[]) => ({
+      email: 'a@example.com',
+      firstName: 'A',
+      lastName: 'B',
+      temporaryPassword: 'Pwd@1234',
+      branchIds,
+    });
+
+    it('create refuses branches the actor does not belong to', async () => {
+      arrangeBranches(['iam.user.read.all', 'iam.user.branches.write']);
+      userRepo.findOne.mockResolvedValue(null); // no duplicate email
+
+      await expect(service.create(newUser([OTHER.id]), actor)).rejects.toThrow(
+        /Cannot assign branches you do not belong to: Chi Nhánh Nha Trang/,
+      );
+      expect(manager.save).not.toHaveBeenCalled();
+    });
+
+    it('create accepts branches the actor belongs to', async () => {
+      arrangeBranches(['iam.user.read.all', 'iam.user.branches.write']);
+      userRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce({
+        id: 'new-id',
+        email: 'a@example.com',
+        firstName: 'A',
+        lastName: 'B',
+        isActive: true,
+        lastLoginAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      await expect(
+        service.create(newUser([MINE.id]), actor),
+      ).resolves.toBeDefined();
+    });
+
+    it('create accepts any branch once the actor holds iam.user.branches.write.all', async () => {
+      arrangeBranches(['iam.user.read.all', 'iam.user.branches.write.all']);
+      userRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce({
+        id: 'new-id',
+        email: 'a@example.com',
+        firstName: 'A',
+        lastName: 'B',
+        isActive: true,
+        lastLoginAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      await expect(
+        service.create(newUser([OTHER.id]), actor),
+      ).resolves.toBeDefined();
+    });
+
+    it('setBranches refuses branches the actor does not belong to', async () => {
+      arrangeBranches(['iam.user.read.all', 'iam.user.branches.write']);
+
+      await expect(
+        service.setBranches('u-1', [OTHER.id], actor),
+      ).rejects.toThrow(/Cannot assign branches you do not belong to/);
+    });
+
+    it('setBranches accepts branches the actor belongs to', async () => {
+      arrangeBranches(['iam.user.read.all', 'iam.user.branches.write']);
+
+      await expect(service.setBranches('u-1', [MINE.id], actor)).resolves.toEqual([
+        MINE.id,
+      ]);
     });
   });
 });

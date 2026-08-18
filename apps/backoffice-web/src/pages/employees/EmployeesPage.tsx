@@ -307,7 +307,10 @@ export function EmployeesPage() {
       label: "Nhân bản",
       icon: Copy,
       onClick: openDuplicate,
-      disabled: !selectedId || !canWrite,
+      // Same gate as "Sửa": the copy carries the source account's roleIds, and the
+      // Vai trò tab hides exactly the roles the caller may not grant — so the user
+      // cannot untick what the server will reject, and only finds out on save.
+      disabled: !selectedId || !canWrite || !canEditSelected,
     },
     {
       id: "edit",

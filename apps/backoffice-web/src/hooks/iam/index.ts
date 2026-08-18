@@ -30,7 +30,7 @@ export {
   useUpdateRole,
 } from "./useRoleMutations";
 export { useRole, useRoles } from "./useRoles";
-export { useBranches } from "./useBranches";
+export { useAssignableBranches, useBranches } from "./useBranches";
 export {
   syncRoleUserAssignments,
   useSetUserBranches,

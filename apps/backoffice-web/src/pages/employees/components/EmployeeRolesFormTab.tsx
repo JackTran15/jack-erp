@@ -1,6 +1,7 @@
+import { useMemo } from "react";
 import { FormField, cn } from "@erp/ui";
 import type { EmployeeFormDraft } from "../employee.types";
-import { useBranches, useRoles } from "../../../hooks/iam";
+import { useAssignableBranches, useRoles } from "../../../hooks/iam";
 
 interface EmployeeRolesFormTabProps {
   draft: EmployeeFormDraft;
@@ -11,8 +12,19 @@ export function EmployeeRolesFormTab({
   draft,
   onChange,
 }: EmployeeRolesFormTabProps) {
-  const { data: roles = [], isLoading: rolesLoading } = useRoles();
-  const { data: branches = [], isLoading: branchesLoading } = useBranches();
+  const { data: allRoles = [], isLoading: rolesLoading } = useRoles();
+  const { data: branches = [], isLoading: branchesLoading } =
+    useAssignableBranches();
+
+  // A role is hidden unless the server says the signed-in user may grant it —
+  // i.e. it carries no permission the user lacks. Hiding only affects what is
+  // rendered: ids already on the employee stay in the draft and are saved back
+  // untouched, so editing never silently strips a role or branch the editor
+  // cannot see.
+  const roles = useMemo(
+    () => allRoles.filter((role) => role.assignable),
+    [allRoles],
+  );
 
   const toggleRole = (roleId: string, checked: boolean) => {
     const next = checked
@@ -38,7 +50,9 @@ export function EmployeeRolesFormTab({
         {rolesLoading ? (
           <p className="text-sm text-muted-foreground">Đang tải vai trò…</p>
         ) : roles.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Chưa có vai trò.</p>
+          <p className="text-sm text-muted-foreground">
+            Bạn không có quyền gán vai trò nào.
+          </p>
         ) : (
           <div className="grid gap-2 sm:grid-cols-2">
             {roles.map((role) => (
@@ -76,7 +90,9 @@ export function EmployeeRolesFormTab({
               Đang tải chi nhánh…
             </p>
           ) : branches.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Chưa có chi nhánh.</p>
+            <p className="text-sm text-muted-foreground">
+              Bạn không có quyền gán chi nhánh nào.
+            </p>
           ) : (
             <div className="grid gap-2 sm:grid-cols-2">
               {branches.map((branch) => (

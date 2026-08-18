@@ -17,6 +17,7 @@ import {
   EmployeeProfileView,
   EmploymentStatus,
   EmployeeAccessMode,
+  IAM_PERMISSION_KEYS,
 } from "@erp/shared-interfaces";
 import { ActorContext } from "../../common/decorators/actor-context.decorator";
 import { UserEntity } from "../auth/user.entity";
@@ -285,6 +286,7 @@ export class UsersService {
     }
     if (dto.branchIds?.length) {
       await this.assertBranchesExist(dto.branchIds, actor.organizationId);
+      await this.assertBranchesInActorScope(dto.branchIds, actor);
     }
 
     const passwordHash = await bcrypt.hash(dto.temporaryPassword, BCRYPT_COST);
@@ -480,6 +482,7 @@ export class UsersService {
     await this.assertCanManageUser(id, actor);
     if (branchIds.length) {
       await this.assertBranchesExist(branchIds, actor.organizationId);
+      await this.assertBranchesInActorScope(branchIds, actor);
     }
 
     await this.dataSource.transaction(async (manager) => {
@@ -540,26 +543,30 @@ export class UsersService {
     roleIds: string[],
     actor: ActorContext,
   ): Promise<void> {
-    const actorKeys = new Set(
-      await this.rbacService.getUserPermissions(
-        actor.userId,
-        actor.organizationId,
-      ),
+    const grantable = await this.rbacService.getGrantableRoleIds(
+      actor.userId,
+      actor.organizationId,
+      roleIds,
     );
-    const keysByRole = await this.rbacService.getRolePermissionKeys(roleIds);
+    const rejected = roleIds.find((id) => !grantable.has(id));
+    if (!rejected) return;
 
-    for (const [roleId, roleKeys] of keysByRole) {
-      const excess = roleKeys.filter((key) => !actorKeys.has(key));
-      if (excess.length === 0) continue;
-
-      const role = await this.roleRepo.findOne({ where: { id: roleId } });
-      this.logger.warn(
-        `User ${actor.userId} tried to grant role ${roleId} with ${excess.length} permission(s) they lack: ${excess.join(", ")}`,
-      );
-      throw new ForbiddenException(
-        `Cannot grant role "${role?.name ?? roleId}": it includes ${excess.length} permission(s) you do not have`,
-      );
-    }
+    // Only on the rejection path: name the offending keys for the message.
+    const [actorKeys, keysByRole, role] = await Promise.all([
+      this.rbacService.getUserPermissions(actor.userId, actor.organizationId),
+      this.rbacService.getRolePermissionKeys([rejected]),
+      this.roleRepo.findOne({ where: { id: rejected } }),
+    ]);
+    const actorSet = new Set(actorKeys);
+    const excess = (keysByRole.get(rejected) ?? []).filter(
+      (key) => !actorSet.has(key),
+    );
+    this.logger.warn(
+      `User ${actor.userId} tried to grant role ${rejected} with ${excess.length} permission(s) they lack: ${excess.join(", ")}`,
+    );
+    throw new ForbiddenException(
+      `Cannot grant role "${role?.name ?? rejected}": it includes ${excess.length} permission(s) you do not have`,
+    );
   }
 
   /**
@@ -569,22 +576,17 @@ export class UsersService {
    * the organization has.
    */
   private async elevatedRoleIds(actor: ActorContext): Promise<Set<string>> {
-    const [actorKeys, roles] = await Promise.all([
-      this.rbacService.getUserPermissions(actor.userId, actor.organizationId),
-      this.roleRepo.find({
-        where: { organizationId: actor.organizationId },
-        select: { id: true },
-      }),
-    ]);
-    const actorSet = new Set(actorKeys);
-    const keysByRole = await this.rbacService.getRolePermissionKeys(
-      roles.map((r) => r.id),
+    const roles = await this.roleRepo.find({
+      where: { organizationId: actor.organizationId },
+      select: { id: true },
+    });
+    const roleIds = roles.map((r) => r.id);
+    const grantable = await this.rbacService.getGrantableRoleIds(
+      actor.userId,
+      actor.organizationId,
+      roleIds,
     );
-    const elevated = new Set<string>();
-    for (const [roleId, roleKeys] of keysByRole) {
-      if (roleKeys.some((key) => !actorSet.has(key))) elevated.add(roleId);
-    }
-    return elevated;
+    return new Set(roleIds.filter((id) => !grantable.has(id)));
   }
 
   /** User ids in the org holding at least one of the given roles. */
@@ -600,15 +602,20 @@ export class UsersService {
     return new Set(rows.map((r) => r.userId));
   }
 
+  /** Branch ids the actor is assigned to, read live rather than from the JWT. */
+  private async actorBranchIds(actor: ActorContext): Promise<Set<string>> {
+    const rows = await this.userBranchRepo.find({
+      where: { userId: actor.userId, organizationId: actor.organizationId },
+      select: { branchId: true },
+    });
+    return new Set(rows.map((r) => r.branchId));
+  }
+
   /** User ids sharing at least one branch with the actor. */
   private async userIdsInActorBranches(
     actor: ActorContext,
   ): Promise<Set<string>> {
-    const mine = await this.userBranchRepo.find({
-      where: { userId: actor.userId, organizationId: actor.organizationId },
-      select: { branchId: true },
-    });
-    const branchIds = mine.map((b) => b.branchId);
+    const branchIds = [...(await this.actorBranchIds(actor))];
     if (branchIds.length === 0) return new Set([actor.userId]);
     const rows = await this.userBranchRepo.find({
       where: { branchId: In(branchIds), organizationId: actor.organizationId },
@@ -650,6 +657,43 @@ export class UsersService {
     );
     throw new ForbiddenException(
       `Cannot manage this account: it holds ${excess.length} permission(s) you do not have`,
+    );
+  }
+
+  /**
+   * Branches the actor may hand out. Without `iam.user.branches.write.all` an
+   * actor can only staff the branches they themselves belong to — otherwise a
+   * branch manager holding `iam.user.branches.write` could create an employee
+   * straight into any branch of the chain.
+   *
+   * Reads the assignments from the database rather than `actor.branchIds`: that
+   * list is baked into a 15-minute access token, so it can outlive a
+   * reassignment.
+   */
+  private async assertBranchesInActorScope(
+    branchIds: string[],
+    actor: ActorContext,
+  ): Promise<void> {
+    const unrestricted = await this.rbacService.hasPermission(
+      actor.userId,
+      actor.organizationId,
+      IAM_PERMISSION_KEYS.USER_BRANCHES_WRITE_ALL,
+    );
+    if (unrestricted) return;
+
+    const allowed = await this.actorBranchIds(actor);
+    const rejected = branchIds.filter((bid) => !allowed.has(bid));
+    if (rejected.length === 0) return;
+
+    const branches = await this.branchRepo.find({
+      where: { id: In(rejected), organizationId: actor.organizationId },
+    });
+    const names = branches.map((b) => b.name);
+    this.logger.warn(
+      `User ${actor.userId} tried to assign ${rejected.length} branch(es) outside their own scope: ${rejected.join(", ")}`,
+    );
+    throw new ForbiddenException(
+      `Cannot assign branches you do not belong to: ${(names.length ? names : rejected).join(", ")}`,
     );
   }
 

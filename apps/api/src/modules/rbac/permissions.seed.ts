@@ -239,6 +239,8 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "iam.role.permissions.write", module: "iam" },
   { key: "iam.user.roles.write", module: "iam" },
   { key: "iam.user.branches.write", module: "iam" },
+  // Without this, iam.user.branches.write only reaches the actor's own branches.
+  { key: "iam.user.branches.write.all", module: "iam" },
   { key: "iam.permission.read", module: "iam" },
 ];
 

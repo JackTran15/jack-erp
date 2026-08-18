@@ -47,6 +47,23 @@ verify:
         # The trailing wait is on the trigger showing the new name, which only
         # happens after the component's window.location.reload() has settled.
         post_login: 'click button[aria-haspopup="menu"]; click [role="menuitemradio"]:has-text("${LOCAL_BACKOFFICE_BRANCH_NAME}"); wait button:has-text("${LOCAL_BACKOFFICE_BRANCH_NAME}")'
+    # Quản lý chi nhánh trên backoffice. Cùng URL, cùng selector với local-backoffice —
+    # khác duy nhất ở tài khoản, và đó chính là thứ cần chứng minh: một tài khoản toàn quyền
+    # nhìn thấy mọi thứ nên không phân biệt được "ẩn đúng" với "chưa lọc gì".
+    # Không có post_login: tài khoản này chỉ thuộc một chi nhánh nên không có menu chuyển.
+    local-backoffice-bm:
+      url: http://localhost:3000
+      required: true
+      auth:
+        recipe: form
+        path: /login
+        landing: /
+        ready_when: { gone: 'text=Đang khôi phục phiên' }
+        selectors:
+          organization: '#login-org-id'
+          identifier: '#login-email'
+          password: '#login-password'
+          submit: 'button[type="submit"]'
     local-pos:
       url: http://localhost:3001
       required: true

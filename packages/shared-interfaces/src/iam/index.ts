@@ -295,6 +295,13 @@ export interface RoleSummary {
   description: string | null;
   /** When true, the role was auto-created during org setup and cannot be renamed/deleted. */
   isSystem: boolean;
+  /**
+   * True when the caller may grant this role: it holds no permission key the
+   * caller lacks. Computed per request from the caller's own permission set —
+   * never from a role hierarchy — so it always agrees with the 403 the server
+   * would raise on POST /admin/users/:id/roles.
+   */
+  assignable: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -354,6 +361,7 @@ export const IAM_PERMISSION_KEYS = {
   ROLE_PERMISSIONS_WRITE: "iam.role.permissions.write",
   USER_ROLES_WRITE: "iam.user.roles.write",
   USER_BRANCHES_WRITE: "iam.user.branches.write",
+  USER_BRANCHES_WRITE_ALL: "iam.user.branches.write.all",
   PERMISSION_READ: "iam.permission.read",
 } as const;
 
