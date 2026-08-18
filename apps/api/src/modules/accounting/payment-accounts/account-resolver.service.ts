@@ -134,6 +134,7 @@ export class AccountResolverService {
           `Payment account ${paymentAccountId} is not configured for method ${method}`,
         );
       }
+      this.assertDepositFundLinked(method, row);
       return { accountId: row.accountId, depositAccountId: row.depositAccountId };
     }
 
@@ -162,10 +163,29 @@ export class AccountResolverService {
         `Multiple payment accounts configured for method ${method} (branch ${actor.branchId}); a paymentAccountId must be specified`,
       );
     }
+    this.assertDepositFundLinked(method, candidates[0]);
     return {
       accountId: candidates[0].accountId,
       depositAccountId: candidates[0].depositAccountId,
     };
+  }
+
+  /**
+   * A non-cash payment must name the deposit fund it lands in. "Quỹ tiền > Tiền gửi"
+   * reports off `deposit_movements`, and a mapping with no fund yields no movement at
+   * all: `DepositRoutingService` returns TargetFund.OTHER and `PosDepositSaleConsumer`
+   * returns early, so the payment disappears from the report instead of failing. Cash
+   * has no deposit-fund concept and is exempt. Mirrors the guard the BANK refund path
+   * already applies in checkout-return.service.ts.
+   */
+  private assertDepositFundLinked(
+    method: PaymentAccountMethod,
+    row: PaymentAccountEntity,
+  ): void {
+    if (method === PaymentAccountMethod.CASH || row.depositAccountId) return;
+    throw new BadRequestException(
+      'Tài khoản thanh toán chưa liên kết quỹ tiền gửi',
+    );
   }
 
   /**

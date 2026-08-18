@@ -151,6 +151,15 @@ describe('AccountResolverService', () => {
         ).resolves.toEqual({ accountId: 'org-cash-coa', depositAccountId: undefined });
       });
 
+      it('throws when the single non-cash mapping names no deposit fund', async () => {
+        paymentAccountRepo.find.mockResolvedValue([
+          { branchId: null, accountId: 'bank-coa', depositAccountId: null },
+        ]);
+        await expect(
+          service.resolvePaymentAccount(PaymentAccountMethod.BANK_TRANSFER, actor),
+        ).rejects.toThrow('Tài khoản thanh toán chưa liên kết quỹ tiền gửi');
+      });
+
       it('throws when no mapping is configured for the method', async () => {
         paymentAccountRepo.find.mockResolvedValue([]);
         await expect(
@@ -174,6 +183,7 @@ describe('AccountResolverService', () => {
         paymentAccountRepo.findOne.mockResolvedValue({
           branchId: null,
           accountId: 'bank-tcb-coa',
+          depositAccountId: 'deposit-tcb-1',
           paymentMethod: PaymentAccountMethod.BANK_TRANSFER,
         });
         await expect(
@@ -182,7 +192,10 @@ describe('AccountResolverService', () => {
             actor,
             'pa-tcb',
           ),
-        ).resolves.toEqual({ accountId: 'bank-tcb-coa', depositAccountId: undefined });
+        ).resolves.toEqual({
+          accountId: 'bank-tcb-coa',
+          depositAccountId: 'deposit-tcb-1',
+        });
         expect(paymentAccountRepo.findOne).toHaveBeenCalledWith(
           expect.objectContaining({
             where: expect.objectContaining({
@@ -199,6 +212,7 @@ describe('AccountResolverService', () => {
         paymentAccountRepo.findOne.mockResolvedValue({
           branchId: 'branch-1',
           accountId: 'branch-bank-coa',
+          depositAccountId: 'deposit-shb-1',
           paymentMethod: PaymentAccountMethod.BANK_TRANSFER,
         });
         await expect(
@@ -207,7 +221,10 @@ describe('AccountResolverService', () => {
             actor,
             'pa-branch',
           ),
-        ).resolves.toEqual({ accountId: 'branch-bank-coa', depositAccountId: undefined });
+        ).resolves.toEqual({
+          accountId: 'branch-bank-coa',
+          depositAccountId: 'deposit-shb-1',
+        });
       });
 
       it('returns the linked depositAccountId when the mapping names one', async () => {
@@ -227,6 +244,22 @@ describe('AccountResolverService', () => {
           accountId: 'branch-bank-coa',
           depositAccountId: 'deposit-shb-1',
         });
+      });
+
+      it('throws when a non-cash mapping names no deposit fund', async () => {
+        paymentAccountRepo.findOne.mockResolvedValue({
+          branchId: null,
+          accountId: 'bank-coa',
+          depositAccountId: null,
+          paymentMethod: PaymentAccountMethod.BANK_TRANSFER,
+        });
+        await expect(
+          service.resolvePaymentAccount(
+            PaymentAccountMethod.BANK_TRANSFER,
+            actor,
+            'pa-unlinked',
+          ),
+        ).rejects.toThrow('Tài khoản thanh toán chưa liên kết quỹ tiền gửi');
       });
 
       it('throws when the mapping is not found', async () => {

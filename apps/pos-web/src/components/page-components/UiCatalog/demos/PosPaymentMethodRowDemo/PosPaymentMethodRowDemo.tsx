@@ -9,9 +9,9 @@ import type { PaymentAccountRow } from "@erp/pos/interfaces/account.interface";
 import type { CatalogEntry } from "@erp/pos/components/page-components/UiCatalog/ui-catalog.types";
 
 const ACCOUNTS: PaymentAccountRow[] = [
-  { id: "acc-cash", paymentMethod: "cash", label: "Tiền mặt", depositAccountName: null, bankName: null, bankCode: null, accountNumber: null, sortOrder: 0 },
-  { id: "acc-vcb", paymentMethod: "bank_transfer", label: null, depositAccountName: "Quỹ VCB chính", bankName: "Vietcombank", bankCode: "VCB", accountNumber: "0123456789", sortOrder: 1 },
-  { id: "acc-tcb", paymentMethod: "bank_transfer", label: null, depositAccountName: "Quỹ TCB dự phòng", bankName: "Techcombank", bankCode: "TCB", accountNumber: "0987654321", sortOrder: 2 },
+  { id: "acc-cash", paymentMethod: "cash", label: "Tiền mặt", depositAccountName: null, bankName: null, bankCode: null, accountNumber: null, depositLinked: false, sortOrder: 0 },
+  { id: "acc-vcb", paymentMethod: "bank_transfer", label: null, depositAccountName: "Quỹ VCB chính", bankName: "Vietcombank", bankCode: "VCB", accountNumber: "0123456789", depositLinked: true, sortOrder: 1 },
+  { id: "acc-tcb", paymentMethod: "bank_transfer", label: null, depositAccountName: "Quỹ TCB dự phòng", bankName: "Techcombank", bankCode: "TCB", accountNumber: "0987654321", depositLinked: true, sortOrder: 2 },
 ];
 
 export const PosPaymentMethodRowDemo = () => {

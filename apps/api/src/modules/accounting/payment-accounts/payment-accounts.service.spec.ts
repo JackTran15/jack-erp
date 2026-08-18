@@ -66,6 +66,7 @@ describe('PaymentAccountsService', () => {
         bankCode: 'SHB',
         accountNumber: '123123123',
         label: null,
+        depositLinked: true,
         sortOrder: 0,
       },
     ]);
@@ -93,6 +94,9 @@ describe('PaymentAccountsService', () => {
     expect(rows[0].bankName).toBeNull();
     expect(rows[0].bankCode).toBeNull();
     expect(rows[0].accountNumber).toBeNull();
+    // The POS blocks a non-cash payment on this flag, so it must follow the mapping's
+    // own deposit link rather than the joined display fields.
+    expect(rows[0].depositLinked).toBe(false);
     expect(depositAccountRepo.find).not.toHaveBeenCalled();
   });
 

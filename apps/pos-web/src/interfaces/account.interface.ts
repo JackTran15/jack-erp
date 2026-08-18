@@ -23,5 +23,11 @@ export interface PaymentAccountRow {
   bankCode: string | null;
   accountNumber: string | null;
   label: string | null;
+  /**
+   * Mapping đã gắn quỹ tiền gửi hay chưa. BE chặn thanh toán non-cash khi chưa gắn,
+   * nên POS dùng đúng cờ này để chặn sớm ở màn hình thu tiền thay vì để lỗi 400 nổ ra
+   * sau khi thu ngân đã nhập xong.
+   */
+  depositLinked: boolean;
   sortOrder: number;
 }
