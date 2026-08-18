@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 import type { CartLine } from "@erp/pos/interfaces/checkout.interface";
+import type { PaymentAccountRow } from "@erp/pos/interfaces/account.interface";
+import { PaymentMethodEnum } from "@erp/pos/constants/checkout.constant";
+import { createPaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import {
   CHECKOUT_ERROR_CODES,
   validateCheckout,
@@ -26,7 +29,25 @@ const baseInput: CheckoutValidationInput = {
   totalPaid: 100_000,
   changeAmount: 0,
   shortageAmount: 0,
+  paymentLines: [],
+  paymentAccounts: [],
 };
+
+const makeAccount = (
+  id: string,
+  paymentMethod: PaymentAccountRow["paymentMethod"],
+  depositLinked: boolean,
+): PaymentAccountRow => ({
+  id,
+  paymentMethod,
+  depositAccountName: depositLinked ? "Quỹ VCB" : null,
+  bankName: depositLinked ? "Vietcombank" : null,
+  bankCode: depositLinked ? "VCB" : null,
+  accountNumber: depositLinked ? "0123456789" : null,
+  label: depositLinked ? null : "Chuyển khoản",
+  depositLinked,
+  sortOrder: 0,
+});
 
 const makeReturnCreditLine = (qty: number, maxQty: number): CartLine => ({
   lineId: "l1",
@@ -230,6 +251,48 @@ describe("validateCheckout", () => {
       settlementAbs: 100_000,
       totalPaid: 100_000,
     });
+    expect(result.ok).toBe(true);
+  });
+
+  it("returns PAYMENT_ACCOUNT_NOT_LINKED when a transfer line points at an account with no deposit fund", () => {
+    const account = makeAccount("acc-unlinked", "bank_transfer", false);
+    const result = validateCheckout({
+      ...baseInput,
+      paymentLines: [
+        { ...createPaymentLine(PaymentMethodEnum.TRANSFER, 100_000), paymentAccountId: account.id },
+      ],
+      paymentAccounts: [account],
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe(CHECKOUT_ERROR_CODES.PAYMENT_ACCOUNT_NOT_LINKED);
+    expect(result.message).toContain("Quỹ tiền > Tiền gửi");
+  });
+
+  it("allows a transfer line whose account is linked to a deposit fund", () => {
+    const account = makeAccount("acc-linked", "bank_transfer", true);
+    const result = validateCheckout({
+      ...baseInput,
+      paymentLines: [
+        { ...createPaymentLine(PaymentMethodEnum.TRANSFER, 100_000), paymentAccountId: account.id },
+      ],
+      paymentAccounts: [account],
+    });
+
+    expect(result.ok).toBe(true);
+  });
+
+  it("never blocks a cash line, which has no deposit fund to link", () => {
+    const account = makeAccount("acc-cash", "cash", false);
+    const result = validateCheckout({
+      ...baseInput,
+      paymentLines: [
+        { ...createPaymentLine(PaymentMethodEnum.CASH, 100_000), paymentAccountId: account.id },
+      ],
+      paymentAccounts: [account],
+    });
+
     expect(result.ok).toBe(true);
   });
 });

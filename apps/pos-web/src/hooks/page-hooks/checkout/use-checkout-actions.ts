@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useInvoicePrinter } from "@erp/pos/hooks/page-hooks/checkout/use-invoice-printer";
 import { useCurrentUserQuery } from "@erp/pos/hooks/react-query/use-query-user";
 import { useMyBranchesQuery } from "@erp/pos/hooks/react-query/use-query-branch";
+import { usePaymentAccountsQuery } from "@erp/pos/hooks/react-query/use-query-account";
 import {
   useCheckoutInvoiceMutation,
   useCheckoutReturnMutation,
@@ -109,6 +110,9 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
   const currentUser = currentUserQuery.data;
   const branchesQuery = useMyBranchesQuery();
   const branches = branchesQuery.data;
+  // Cùng queryKey với PaymentSection nên dùng chung cache, không phát sinh request mới.
+  // Cần ở đây để validateCheckout biết tài khoản đã chọn có gắn quỹ tiền gửi hay chưa.
+  const { accounts: paymentAccounts } = usePaymentAccountsQuery();
 
   const printReceiptIfNeeded = useCallback(
     async (payload: InvoicePayload | null) => {
@@ -178,6 +182,8 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
         totalPaid,
         changeAmount,
         shortageAmount,
+        paymentLines: p.paymentLines,
+        paymentAccounts,
       });
 
       if (!result.ok) {
@@ -484,6 +490,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       checkoutReturnMutation,
       currentUser,
       branches,
+      paymentAccounts,
       printReceiptIfNeeded,
     ],
   );

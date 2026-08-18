@@ -25,10 +25,11 @@ import { DepositService } from '../../src/modules/accounting/deposit/deposit.ser
  * DepositService.createAndPostInternal) and the deposit detail ledger, asserting concrete
  * balances / row counts rather than HTTP status alone.
  *
- * Routing is COA-derived: a non-cash payment line lands in a deposit fund iff the payment
- * line's resolved COA (invoice_payments.account_id) matches an ACTIVE deposit_accounts.account_id
- * in the same org+branch. So the seed maps card + bank_transfer → the bank COA (1121), and a
- * branch-A deposit_accounts row carries account_id = that COA.
+ * Routing is explicit: `AccountResolverService` rejects a non-cash payment whose
+ * `payment_accounts` mapping names no deposit fund, so card + bank_transfer are seeded with
+ * `deposit_account_id` = branch A's fund (which still carries account_id = the bank COA 1121,
+ * since `accountId` mirrors the linked fund's own COA). Cash keeps a plain COA — it has no
+ * deposit fund to name.
  *
  * The e2e harness rebuilds the schema from entity metadata (resetDatabase → synchronize(true)),
  * which does NOT recreate the migration-only composite unique index
@@ -242,18 +243,22 @@ describe('Deposit Fund Foundation (E2E)', () => {
       [bankId, seed.organizationId, seed.userId],
     );
 
-    // ---- payment_accounts (org-wide, branch NULL): card + bank_transfer → bank COA; cash → 1111 ----
-    const seedPaymentAccount = async (method: string, accountId: string) => {
+    // ---- payment_accounts (org-wide, branch NULL) -------------------------
+    // Seeded AFTER deposit_accounts: a non-cash mapping must name the fund it credits,
+    // so it cannot be created before that fund exists.
+    const seedPaymentAccount = async (
+      method: string,
+      accountId: string,
+      depositAccountId: string | null = null,
+    ) => {
       await ds.query(
         `INSERT INTO payment_accounts
-           (id, organization_id, branch_id, payment_method, account_id, is_active, sort_order, created_by, created_at, updated_at)
-         VALUES (gen_random_uuid(), $1, NULL, $2, $3, true, 0, $4, NOW(), NOW())`,
-        [seed.organizationId, method, accountId, seed.userId],
+           (id, organization_id, branch_id, payment_method, account_id, deposit_account_id,
+            is_active, sort_order, created_by, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1, NULL, $2, $3, $4, true, 0, $5, NOW(), NOW())`,
+        [seed.organizationId, method, accountId, depositAccountId, seed.userId],
       );
     };
-    await seedPaymentAccount('card', coaBankId);
-    await seedPaymentAccount('bank_transfer', coaBankId);
-    await seedPaymentAccount('cash', cashGlId);
 
     // ---- deposit_accounts -------------------------------------------------
     const seedDepositAccount = async (opts: {
@@ -296,6 +301,12 @@ describe('Deposit Fund Foundation (E2E)', () => {
       openingBalance: 0,
       balance: 0,
     });
+
+    // card + bank_transfer credit branch A's fund; cash has none. Every checkout in this
+    // suite runs under branch A, so an org-wide mapping naming A's fund resolves cleanly.
+    await seedPaymentAccount('card', coaBankId, depositAccountA);
+    await seedPaymentAccount('bank_transfer', coaBankId, depositAccountA);
+    await seedPaymentAccount('cash', cashGlId);
 
     // Branch B + its deposit fund (isolation).
     await ds.query(

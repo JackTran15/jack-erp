@@ -27,6 +27,15 @@ export interface PaymentAccountListItem {
   bankCode: string | null;
   accountNumber: string | null;
   label: string | null;
+  /**
+   * Whether this mapping names a deposit fund. Non-cash payments are rejected at
+   * checkout without one (see `AccountResolverService.resolvePaymentAccount`), so the
+   * POS needs the same predicate the server uses in order to block before the cashier
+   * finishes the sale. Deliberately `Boolean(depositAccountId)` rather than "the
+   * display fields are non-null" — those also go null when the linked fund is deleted,
+   * which would make client and server disagree.
+   */
+  depositLinked: boolean;
   sortOrder: number;
 }
 
@@ -99,6 +108,7 @@ export class PaymentAccountsService {
         bankCode: deposit?.bank?.code ?? null,
         accountNumber: deposit?.accountNo ?? null,
         label: r.label ?? null,
+        depositLinked: Boolean(r.depositAccountId),
         sortOrder: r.sortOrder,
       };
     });

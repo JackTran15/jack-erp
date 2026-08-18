@@ -170,11 +170,44 @@ export class PaymentAccountsCrudService extends BaseCrudService<
   }
 
   protected override async beforeUpdate(
-    _id: string,
+    id: string,
     payload: UpdatePaymentAccountDto,
     actor: ActorContext,
   ): Promise<UpdatePaymentAccountDto> {
+    await this.assertNonCashKeepsDepositFund(id, payload, actor);
     return this.syncAccountId(payload, actor);
+  }
+
+  /**
+   * `validateBusinessRules` receives only a partial payload and never the row's id, so
+   * it can enforce "non-cash needs a deposit fund" on create alone. An update that
+   * clears `depositAccountId`, or flips an existing cash mapping to bank_transfer,
+   * would otherwise slip through — and the damage only surfaces at the till, where
+   * `AccountResolverService` now rejects the payment. Merge the payload over the
+   * stored row and re-check the effective result instead.
+   */
+  private async assertNonCashKeepsDepositFund(
+    id: string,
+    payload: UpdatePaymentAccountDto,
+    actor: ActorContext,
+  ): Promise<void> {
+    const existing = await this.repository.findOne({
+      where: { id, organizationId: actor.organizationId },
+    });
+    // Missing row is the base service's 404 to report, not ours.
+    if (!existing) return;
+
+    const method = payload.paymentMethod ?? existing.paymentMethod;
+    const depositAccountId =
+      payload.depositAccountId !== undefined
+        ? payload.depositAccountId
+        : existing.depositAccountId;
+
+    if (method !== PaymentAccountMethod.CASH && !depositAccountId) {
+      throw new BadRequestException(
+        'depositAccountId is required for non-cash payment methods',
+      );
+    }
   }
 
   /** accountId (COA) always mirrors the linked deposit fund's own COA — never chosen independently. */
