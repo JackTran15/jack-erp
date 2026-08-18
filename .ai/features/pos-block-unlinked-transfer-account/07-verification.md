@@ -4,34 +4,41 @@ environments: [local-pos]
 viewports: [desktop]
 ---
 
-# Verification — POS chặn thu tiền khi tài khoản chuyển khoản/thẻ chưa gắn quỹ tiền gửi
+# Verification — POS chặn thanh toán khi tài khoản chuyển khoản/thẻ chưa liên kết quỹ tiền gửi
 
-Môi trường `erp_dev` đang ở đúng trạng thái lỗi cần chứng minh: cả ba mapping
-`payment_accounts` (cash / bank_transfer / card) đều là org-wide và **không** có
-`deposit_account_id`. Vì vậy ca chặn tái hiện được ngay, không cần dựng dữ liệu.
+Máy local đang ở đúng trạng thái lỗi cần chứng minh: mapping `payment_accounts` cho
+`bank_transfer` do seed baseline tạo ra không gắn `deposit_account_id` nào, nên select
+"Tài khoản nhận tiền" chỉ hiện nhãn fallback "Chuyển khoản" thay vì tên quỹ + số tài khoản.
+Không cần dựng thêm dữ liệu.
 
-Giỏ hàng của POS được lưu vào localStorage nên tồn tại xuyên suốt các bước — S2 và S3
-cố ý dựa vào giỏ mà S1 đã tạo thay vì thêm hàng lại từ đầu.
+Hai bước là một cặp: S1 chứng minh luật chặn đúng ca hỏng, S2 chứng minh nó không chặn nhầm
+tiền mặt. Thiếu S2 thì một build chặn sạch mọi phương thức vẫn xanh.
 
 ## Steps
 
 | ID | Step | Path | Interaction | Verifies | Assert |
 |---|---|---|---|---|---|
-| S1 | Thêm 1 mặt hàng vào hóa đơn rồi đổi phương thức sang "Chuyển khoản" — select "Tài khoản nhận tiền" hiện ra, nghĩa là mapping có tồn tại (chỉ là chưa gắn quỹ) | `/` | `click [aria-label="Danh sách sản phẩm tư vấn"] button; wait button:has-text("Đồng ý"); click tbody tr td:first-child label; click button:has-text("Đồng ý"); click [aria-label="Phương thức thanh toán"]; click [role="option"]:has-text("Chuyển khoản")` | AC-01 | `count [aria-label="Tài khoản nhận tiền"] = 1` |
-| S2 | Bấm "Thu tiền" với dòng chuyển khoản chưa gắn quỹ — POS chặn bằng dialog cảnh báo, hóa đơn không được tạo | `/` | `click [aria-label="Thu tiền"]` | AC-02 | `text=chưa liên kết tài khoản ngân hàng` |
-| S3 | Bỏ khuyến mại, đổi lại "Tiền mặt" rồi bấm "Thu tiền" — thu tiền chạy trọn vẹn, giỏ hàng được dọn, chứng minh guard không chặn nhầm tiền mặt | `/` | `click [aria-label="Bỏ áp dụng khuyến mại"]; click button:has-text("Bỏ áp dụng"); click [aria-label="Phương thức thanh toán"]; click [role="option"]:has-text("Tiền mặt"); click [aria-label="Thu tiền"]` | AC-03 | `text=Chưa có hàng nào; no-text=chưa liên kết tài khoản ngân hàng` |
+| S1 | Thêm hàng, chọn "Chuyển khoản" (tài khoản chưa gắn quỹ), bấm "Thu tiền" → bị chặn | `/` | `wait [aria-label="Danh sách sản phẩm tư vấn"] button; click [aria-label="Danh sách sản phẩm tư vấn"] button; wait tbody input[type="checkbox"]; click tbody label:has(input[type="checkbox"]); click button:has-text("Đồng ý"); click [aria-label="Phương thức thanh toán"]; click [role="option"]:has-text("Chuyển khoản"); click [aria-label="Thu tiền"]` | AC-01 | `text=chưa liên kết tài khoản ngân hàng` |
+| S2 | Cùng giỏ hàng đó, đổi sang "Tiền mặt", bấm "Thu tiền" → bán được | `/` | `wait [aria-label="Phương thức thanh toán"]; click [aria-label="Phương thức thanh toán"]; click [role="option"]:has-text("Tiền mặt"); click [aria-label="Thu tiền"]` | AC-02 | `text=Chưa có hàng nào` |
 
 ## Notes
 
-- S3 tạo một hóa đơn thật trong `erp_dev`. Đó là cái giá để chứng minh guard không chặn
-  nhầm tiền mặt. Chromium headless không bật hộp thoại in của hệ điều hành nên toggle
-  "In hóa đơn" cứ để nguyên.
-- S3 phải bỏ khuyến mại trước khi thu tiền. Không liên quan tới thay đổi này: giữ nguyên
-  chương trình KM thì API trả 400 "Invoice must have a customer when there is a remaining
-  debt balance" — số "Còn phải thu" mà POS hiển thị không khớp số API tính. Xem ghi chú
-  bàn giao.
-- Không kiểm ở đây: nhánh "tài khoản ĐÃ gắn quỹ thì thu tiền bình thường". Muốn dựng ca
-  đó phải tạo quỹ tiền gửi + sửa mapping ở Backoffice, tức là thay đổi cấu hình của môi
-  trường dev. Nhánh này được phủ bằng unit test
-  `account-resolver.service.spec.ts` ("returns the linked depositAccountId when the
-  mapping names one") và e2e `deposit-fund.e2e-spec.ts` (10/10 xanh sau khi fixture gắn quỹ).
+- S2 hoàn tất một hóa đơn thật trên DB `erp_dev`. Đây là cái giá để chứng minh guard không
+  chặn nhầm — không có cách nào khác kiểm được điều đó qua UI.
+- S2 khẳng định `text=Chưa có hàng nào` (giỏ rỗng trở lại sau khi bán xong) chứ KHÔNG dùng
+  `no-text=chưa liên kết`. Một assert phủ định ở đây từng xanh giả: lần chạy trước nó vẫn pass
+  trong khi màn hình đang hiện toast HTTP 400 — bất kỳ lỗi nào cũng thỏa mãn "không thấy chữ".
+  Chỉ một lần bán thành công mới làm giỏ hàng rỗng lại.
+- Cần `apps/pos-web/.env` với `VITE_CHECKOUT_V2=true` (file local, đã gitignore). Thiếu nó,
+  POS rơi về `POST /invoices/:id/checkout` (v1) — nhánh này không chạy promotion engine, nên
+  client trừ khuyến mại 10% còn hóa đơn nháp trên server thì không, phần chênh bị coi là công
+  nợ và checkout bị từ chối vì thiếu khách hàng. Đó là cấu hình thiếu, không phải lỗi của
+  thay đổi này; guard nằm ở `AccountResolverService` nên phủ cả hai nhánh như nhau.
+- S1 và S2 phụ thuộc thứ tự: giỏ hàng do S1 tạo được localStorage giữ lại qua lần điều hướng
+  của S2, nên S2 không thêm hàng nữa.
+
+## Not verified here
+
+- Guard phía BE (`AccountResolverService.resolvePaymentAccount`) phủ cả ba đường checkout —
+  đã có unit test `account-resolver.service.spec.ts` và e2e `deposit-fund.e2e-spec.ts`.
+- Luật validate khi UPDATE cấu hình `payment_accounts` — thuộc Backoffice, ngoài phạm vi POS.
