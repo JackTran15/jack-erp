@@ -39,7 +39,12 @@ export class RolesService {
       where: { organizationId: actor.organizationId },
       order: { createdAt: 'ASC' },
     });
-    return roles.map((r) => this.toView(r));
+    const grantable = await this.rbacService.getGrantableRoleIds(
+      actor.userId,
+      actor.organizationId,
+      roles.map((r) => r.id),
+    );
+    return roles.map((r) => this.toView(r, grantable.has(r.id)));
   }
 
   async findById(id: string, actor: ActorContext): Promise<RoleDetail> {
@@ -49,8 +54,13 @@ export class RolesService {
     if (!role) {
       throw new NotFoundException(`Role ${id} not found`);
     }
-    const permissionKeys = await this.getPermissionKeys(role.id);
-    return { ...this.toView(role), permissionKeys };
+    const [permissionKeys, grantable] = await Promise.all([
+      this.getPermissionKeys(role.id),
+      this.rbacService.getGrantableRoleIds(actor.userId, actor.organizationId, [
+        role.id,
+      ]),
+    ]);
+    return { ...this.toView(role, grantable.has(role.id)), permissionKeys };
   }
 
   async create(
@@ -243,12 +253,13 @@ export class RolesService {
     return permissions.map((p) => p.key);
   }
 
-  private toView(r: RoleEntity): RoleSummary {
+  private toView(r: RoleEntity, assignable: boolean): RoleSummary {
     return {
       id: r.id,
       name: r.name,
       description: r.description,
       isSystem: r.isSystem,
+      assignable,
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
     };

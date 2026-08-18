@@ -1,6 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UseQueryResult } from "@tanstack/react-query";
+import { IAM_PERMISSION_KEYS } from "@erp/shared-interfaces";
 import { erpApi, requireErpData } from "../../lib/erp-api";
+import { usePermissionCheck } from "../usePermissionCheck";
 
 export interface BranchOption {
   id: string;
@@ -16,8 +18,9 @@ interface BranchListResponse {
 
 const BRANCHES_QUERY_KEY = ["branches", "all"] as const;
 
-export function useBranches(): UseQueryResult<BranchOption[]> {
+export function useBranches(enabled = true): UseQueryResult<BranchOption[]> {
   return useQuery({
+    enabled,
     queryKey: BRANCHES_QUERY_KEY,
     queryFn: async () => {
       const res = requireErpData(
@@ -31,8 +34,9 @@ export function useBranches(): UseQueryResult<BranchOption[]> {
   });
 }
 
-export function useMyBranches(): UseQueryResult<BranchOption[]> {
+export function useMyBranches(enabled = true): UseQueryResult<BranchOption[]> {
   return useQuery({
+    enabled,
     queryKey: ["branches", "me"] as const,
     queryFn: async () => {
       const res = requireErpData(
@@ -42,6 +46,23 @@ export function useMyBranches(): UseQueryResult<BranchOption[]> {
     },
     staleTime: 5 * 60_000,
   });
+}
+
+/**
+ * Branches the signed-in user may assign to an employee. `iam.user.branches.write.all`
+ * lifts the scope to the whole organization; without it the user can only staff
+ * the branches they belong to, so `/branches/me` (already filtered server-side
+ * against `user_branch_assignments`) is the right source.
+ */
+export function useAssignableBranches(): UseQueryResult<BranchOption[]> {
+  const { has } = usePermissionCheck();
+  const unrestricted = has(IAM_PERMISSION_KEYS.USER_BRANCHES_WRITE_ALL);
+
+  // Both hooks run unconditionally (rules of hooks); `enabled` keeps the unused
+  // one from firing a request.
+  const all = useBranches(unrestricted);
+  const mine = useMyBranches(!unrestricted);
+  return unrestricted ? all : mine;
 }
 
 export function useInvalidateBranches(): () => void {

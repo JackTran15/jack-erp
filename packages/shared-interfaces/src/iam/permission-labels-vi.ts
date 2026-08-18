@@ -249,6 +249,7 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
   'iam.role.permissions.write': 'Gán/thu hồi quyền cho vai trò',
   'iam.user.roles.write': 'Gán vai trò cho người dùng',
   'iam.user.branches.write': 'Gán chi nhánh cho người dùng',
+  'iam.user.branches.write.all': 'Gán người dùng vào mọi chi nhánh',
   'iam.permission.read': 'Xem danh mục quyền',
 };
 

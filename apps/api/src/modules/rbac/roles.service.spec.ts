@@ -34,7 +34,12 @@ describe('RolesService', () => {
   let rolePermissionRepo: ReturnType<typeof makeMockRepo>;
   let userRoleRepo: ReturnType<typeof makeMockRepo>;
   let rbac: jest.Mocked<
-    Pick<RbacService, 'invalidateUserPermissions' | 'invalidateOrgPermissions'>
+    Pick<
+      RbacService,
+      | 'invalidateUserPermissions'
+      | 'invalidateOrgPermissions'
+      | 'getGrantableRoleIds'
+    >
   >;
 
   beforeEach(async () => {
@@ -45,6 +50,11 @@ describe('RolesService', () => {
     rbac = {
       invalidateUserPermissions: jest.fn().mockResolvedValue(undefined),
       invalidateOrgPermissions: jest.fn().mockResolvedValue(undefined),
+      // Everything grantable unless a test says otherwise.
+      getGrantableRoleIds: jest.fn(
+        async (_userId: string, _orgId: string, roleIds: string[]) =>
+          new Set(roleIds),
+      ),
     };
 
     const manager = {
@@ -78,6 +88,33 @@ describe('RolesService', () => {
     }).compile();
 
     service = module.get(RolesService);
+  });
+
+  describe('list', () => {
+    /**
+     * The UI hides roles it may not grant. That verdict has to come from the
+     * same permission-set comparison the write path enforces, or the form would
+     * offer a role the server then rejects with 403.
+     */
+    it('flags each role assignable only when the caller may grant it', async () => {
+      const now = new Date('2025-01-01T00:00:00.000Z');
+      roleRepo.find.mockResolvedValue([
+        { id: 'r-staff', name: 'Nhân viên bán hàng', description: null, isSystem: false, createdAt: now, updatedAt: now },
+        { id: 'r-super', name: 'Quản trị hệ thống', description: null, isSystem: true, createdAt: now, updatedAt: now },
+      ]);
+      rbac.getGrantableRoleIds.mockResolvedValue(new Set(['r-staff']));
+
+      const roles = await service.list(actor);
+
+      expect(rbac.getGrantableRoleIds).toHaveBeenCalledWith('admin-1', 'org-1', [
+        'r-staff',
+        'r-super',
+      ]);
+      expect(roles.map((r) => [r.id, r.assignable])).toEqual([
+        ['r-staff', true],
+        ['r-super', false],
+      ]);
+    });
   });
 
   describe('update', () => {
