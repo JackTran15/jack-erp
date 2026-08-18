@@ -59,6 +59,59 @@ function makeStockBalance(overrides: Record<string, unknown> = {}): any {
   };
 }
 
+/**
+ * Chainable QueryBuilder stub for resolveItemSourceBatch: records every
+ * where/order clause so the tests can assert the SQL filters, and replays the
+ * given raw rows from getRawMany().
+ */
+function makeQueryBuilder(rawRows: any[]) {
+  const clauses: string[] = [];
+  const orders: Array<[string, string]> = [];
+  const qb: any = {
+    clauses,
+    orders,
+    rawRows,
+    innerJoin: jest.fn(() => qb),
+    select: jest.fn(() => qb),
+    addSelect: jest.fn(() => qb),
+    where: jest.fn((clause: string) => {
+      clauses.push(clause);
+      return qb;
+    }),
+    andWhere: jest.fn((clause: string) => {
+      clauses.push(clause);
+      return qb;
+    }),
+    orderBy: jest.fn((sort: string, order: string) => {
+      orders.push([sort, order]);
+      return qb;
+    }),
+    addOrderBy: jest.fn((sort: string, order: string) => {
+      orders.push([sort, order]);
+      return qb;
+    }),
+    getRawMany: jest.fn(async () => rawRows),
+  };
+  return qb;
+}
+
+/** One "Chi tiết vị trí hàng hóa" row as returned by the raw query. */
+function makeCandidateRow(overrides: Record<string, unknown> = {}): any {
+  return {
+    itemId: 'item-1',
+    quantity: '5',
+    lastMovementAt: new Date('2026-03-01T10:00:00Z'),
+    locationId: 'loc-wh',
+    locationCode: 'A-01',
+    locationName: 'Kệ A-01',
+    storageId: 'storage-wh',
+    storageCode: 'WH000001',
+    storageName: 'Kho MT46',
+    isMainStorage: false,
+    ...overrides,
+  };
+}
+
 const actor = {
   userId: 'user-1',
   organizationId: 'org-1',
@@ -148,14 +201,19 @@ describe('InventoryLocationStockService', () => {
       findOne: jest.fn().mockResolvedValue(null),
       findAndCount: jest.fn().mockResolvedValue([[], 0]),
       delete: jest.fn().mockResolvedValue({ affected: 1 }),
+      createQueryBuilder: jest.fn(() => makeQueryBuilder([])),
     };
-    locationRepo = { findOne: jest.fn().mockResolvedValue(null) };
+    locationRepo = {
+      findOne: jest.fn().mockResolvedValue(null),
+      find: jest.fn().mockResolvedValue([]),
+    };
     thresholdRepo = { find: jest.fn().mockResolvedValue([]) };
     barcodeRepo = { find: jest.fn().mockResolvedValue([]) };
     itemProviderRepo = { find: jest.fn().mockResolvedValue([]) };
     itemRepo = { findOne: jest.fn().mockResolvedValue(null) };
     pslService = {
       listByItem: jest.fn().mockResolvedValue([]),
+      listByItems: jest.fn().mockResolvedValue([]),
       setLocation: jest.fn().mockResolvedValue(undefined),
       setLocationByItem: jest.fn().mockResolvedValue(undefined),
       validateAndAssignByLocation: jest.fn().mockResolvedValue(undefined),
@@ -1280,6 +1338,249 @@ describe('InventoryLocationStockService', () => {
       expect(
         stockTransferService.postIntraWarehouseMoves,
       ).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resolveItemSourceBatch', () => {
+    /** Point stockBalanceRepo.createQueryBuilder at a stub replaying `rows`. */
+    function withCandidates(rows: any[]) {
+      const qb = makeQueryBuilder(rows);
+      stockBalanceRepo.createQueryBuilder.mockReturnValue(qb);
+      return qb;
+    }
+
+    const showroomRow = makeCandidateRow({
+      quantity: '0',
+      locationId: 'loc-showroom',
+      locationCode: 'MĐ',
+      locationName: 'Mặc định',
+      storageId: 'storage-showroom',
+      storageCode: 'WH000002',
+      storageName: 'Showroom MT46',
+      isMainStorage: true,
+    });
+
+    it('moves the line to the kho where the mã is tracked, even at quantity 0', async () => {
+      withCandidates([showroomRow]);
+
+      await expect(
+        service.resolveItemSourceBatch(
+          [{ itemId: 'item-1', preferredStorageId: 'storage-wh' }],
+          {},
+          actor,
+        ),
+      ).resolves.toEqual([
+        {
+          itemId: 'item-1',
+          storage: {
+            id: 'storage-showroom',
+            code: 'WH000002',
+            name: 'Showroom MT46',
+          },
+          shelf: { id: 'loc-showroom', code: 'MĐ', name: 'Mặc định' },
+        },
+      ]);
+    });
+
+    it('keeps the proposed kho when the mã is tracked there', async () => {
+      withCandidates([makeCandidateRow(), showroomRow]);
+
+      const [row] = await service.resolveItemSourceBatch(
+        [{ itemId: 'item-1', preferredStorageId: 'storage-showroom' }],
+        {},
+        actor,
+      );
+
+      expect(row.storage?.id).toBe('storage-showroom');
+      expect(row.shelf?.id).toBe('loc-showroom');
+    });
+
+    it('picks the fullest kho when the proposed kho holds nothing', async () => {
+      // Rows arrive quantity DESC from SQL; storage-b leads.
+      withCandidates([
+        makeCandidateRow({
+          quantity: '9',
+          storageId: 'storage-b',
+          storageName: 'Kho B',
+          locationId: 'loc-b',
+        }),
+        makeCandidateRow({
+          quantity: '2',
+          storageId: 'storage-a',
+          storageName: 'Kho A',
+          locationId: 'loc-a',
+        }),
+      ]);
+
+      const [row] = await service.resolveItemSourceBatch(
+        [{ itemId: 'item-1', preferredStorageId: 'storage-empty' }],
+        {},
+        actor,
+      );
+
+      expect(row.storage?.id).toBe('storage-b');
+      expect(row.shelf?.id).toBe('loc-b');
+    });
+
+    it('orders candidates by quantity then last movement', async () => {
+      const qb = withCandidates([]);
+
+      await service.resolveItemSourceBatch([{ itemId: 'item-1' }], {}, actor);
+
+      expect(qb.orders).toEqual([
+        ['sb.quantity', 'DESC'],
+        ['sb.last_movement_at', 'DESC'],
+      ]);
+    });
+
+    it('only considers tracked balances on an active bin of an active kho, scoped by the kho branch', async () => {
+      const qb = withCandidates([]);
+
+      await service.resolveItemSourceBatch([{ itemId: 'item-1' }], {}, actor);
+
+      expect(qb.clauses).toEqual(
+        expect.arrayContaining([
+          'sb.is_tracked = true',
+          'loc.is_active = true',
+          'loc.is_unassigned = false',
+          'storage.is_active = true',
+          'storage.branch_id = :branchId',
+        ]),
+      );
+      // stock_balances.branch_id is stale after imports — never scope on it.
+      expect(qb.clauses).not.toContain('sb.branch_id = :branchId');
+    });
+
+    it('prefers the preferred-shelf mapping over the fullest bin inside the chosen kho', async () => {
+      withCandidates([
+        makeCandidateRow({ quantity: '9', locationId: 'loc-full' }),
+        makeCandidateRow({ quantity: '1', locationId: 'loc-mapped' }),
+      ]);
+      pslService.listByItems.mockResolvedValue([
+        {
+          itemId: 'item-1',
+          storageId: 'storage-wh',
+          locationId: 'loc-mapped',
+        },
+      ]);
+
+      const [row] = await service.resolveItemSourceBatch(
+        [{ itemId: 'item-1', preferredStorageId: 'storage-wh' }],
+        {},
+        actor,
+      );
+
+      expect(row.shelf?.id).toBe('loc-mapped');
+    });
+
+    it('ignores a preferred-shelf mapping pointing at a bin that is no longer tracked', async () => {
+      withCandidates([makeCandidateRow({ locationId: 'loc-full' })]);
+      pslService.listByItems.mockResolvedValue([
+        {
+          itemId: 'item-1',
+          storageId: 'storage-wh',
+          locationId: 'loc-untracked',
+        },
+      ]);
+
+      const [row] = await service.resolveItemSourceBatch(
+        [{ itemId: 'item-1', preferredStorageId: 'storage-wh' }],
+        {},
+        actor,
+      );
+
+      expect(row.shelf?.id).toBe('loc-full');
+    });
+
+    it('sinks showroom kho below kho lưu trữ when resolving a transfer source', async () => {
+      withCandidates([
+        makeCandidateRow({
+          quantity: '9',
+          storageId: 'storage-showroom',
+          storageName: 'Showroom MT46',
+          locationId: 'loc-showroom',
+          isMainStorage: true,
+        }),
+        makeCandidateRow({ quantity: '2', locationId: 'loc-wh' }),
+      ]);
+
+      const [row] = await service.resolveItemSourceBatch(
+        [{ itemId: 'item-1' }],
+        { deprioritizeMainStorage: true },
+        actor,
+      );
+
+      expect(row.storage?.id).toBe('storage-wh');
+      expect(row.shelf?.id).toBe('loc-wh');
+    });
+
+    it('falls back to the proposed kho and its "Mặc định" bin when the mã is tracked nowhere', async () => {
+      withCandidates([]);
+      locationRepo.find.mockResolvedValue([
+        {
+          id: 'loc-default',
+          code: 'MĐ',
+          name: 'Mặc định',
+          storageId: 'storage-wh',
+          storage: { code: 'WH000001', name: 'Kho MT46' },
+        },
+      ]);
+
+      await expect(
+        service.resolveItemSourceBatch(
+          [{ itemId: 'item-1', preferredStorageId: 'storage-wh' }],
+          {},
+          actor,
+        ),
+      ).resolves.toEqual([
+        {
+          itemId: 'item-1',
+          storage: { id: 'storage-wh', code: 'WH000001', name: 'Kho MT46' },
+          shelf: { id: 'loc-default', code: 'MĐ', name: 'Mặc định' },
+        },
+      ]);
+    });
+
+    it('returns nulls when the mã is tracked nowhere and no kho was proposed', async () => {
+      withCandidates([]);
+
+      await expect(
+        service.resolveItemSourceBatch([{ itemId: 'item-1' }], {}, actor),
+      ).resolves.toEqual([
+        { itemId: 'item-1', storage: null, shelf: null },
+      ]);
+      expect(locationRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('resolves many lines in one query round, keeping request order', async () => {
+      withCandidates([
+        makeCandidateRow(),
+        makeCandidateRow({
+          itemId: 'item-2',
+          storageId: 'storage-showroom',
+          storageName: 'Showroom MT46',
+          locationId: 'loc-showroom',
+          isMainStorage: true,
+        }),
+      ]);
+
+      const rows = await service.resolveItemSourceBatch(
+        [
+          { itemId: 'item-2', preferredStorageId: 'storage-wh' },
+          { itemId: 'item-1', preferredStorageId: 'storage-wh' },
+          { itemId: 'item-2', preferredStorageId: 'storage-wh' },
+        ],
+        {},
+        actor,
+      );
+
+      expect(rows.map((r) => r.storage?.id)).toEqual([
+        'storage-showroom',
+        'storage-wh',
+        'storage-showroom',
+      ]);
+      expect(stockBalanceRepo.createQueryBuilder).toHaveBeenCalledTimes(1);
+      expect(pslService.listByItems).toHaveBeenCalledTimes(1);
     });
   });
 });

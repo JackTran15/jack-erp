@@ -41,6 +41,10 @@ import {
   BatchTransferPreferredShelfRequestDto,
   BatchTransferPreferredShelfResponseDto,
 } from './dto/batch-transfer-preferred-shelf.dto';
+import {
+  ResolveItemSourceRequestDto,
+  ResolveItemSourceResponseDto,
+} from './dto/resolve-item-source.dto';
 import { InventoryLocationStockService } from './inventory-location-stock.service';
 
 class AddItemToLocationDto {
@@ -128,6 +132,31 @@ export class InventoryLocationStockController {
   ): Promise<BatchTransferPreferredShelfResponseDto> {
     const data = await this.service.getPreferredShelfTransferBatch(
       dto.pairs,
+      actor,
+    );
+    return { data };
+  }
+
+  @Post('resolve-item-source/batch')
+  @HttpCode(200)
+  @RequirePermission('inventory.read')
+  @RequireBranchScope()
+  @ApiOperation({
+    summary:
+      'Chọn kho + vị trí xuất cho nhiều mã hàng theo Chi tiết vị trí hàng hóa',
+    description:
+      'Với mỗi mã hàng: giữ kho đề xuất nếu mã đang được theo dõi ở kho đó, ' +
+      'ngược lại chuyển sang kho có tồn lớn nhất. Trả storage = null khi không ' +
+      'kết luận được — client giữ nguyên kho đang hiển thị.',
+  })
+  @ApiResponse({ status: 200, type: ResolveItemSourceResponseDto })
+  async resolveItemSource(
+    @Body() dto: ResolveItemSourceRequestDto,
+    @Actor() actor: ActorContext,
+  ): Promise<ResolveItemSourceResponseDto> {
+    const data = await this.service.resolveItemSourceBatch(
+      dto.pairs,
+      { deprioritizeMainStorage: dto.deprioritizeMainStorage },
       actor,
     );
     return { data };

@@ -38,6 +38,42 @@ export async function getPreferredShelf(
   return result?.shelf ?? null;
 }
 
+export interface ResolveItemSourcePair {
+  itemId: string;
+  /** Kho the form is currently proposing for that line. */
+  preferredStorageId?: string;
+}
+
+export interface ResolvedStorage {
+  id: string;
+  code: string | null;
+  name: string;
+}
+
+export interface ResolveItemSourceRow {
+  itemId: string;
+  storage: ResolvedStorage | null;
+  shelf: PreferredShelf | null;
+}
+
+/**
+ * Resolve the Kho + Vị trí a line should issue from, from the item's "Chi tiết
+ * vị trí hàng hóa" rows. The proposed kho is kept when the item is tracked
+ * there; otherwise the resolver moves to the kho that actually holds it. A null
+ * `storage` means "nothing better to say" — keep whatever the line shows.
+ */
+export async function resolveItemSourceBatch(
+  pairs: ResolveItemSourcePair[],
+  options: { deprioritizeMainStorage?: boolean } = {},
+): Promise<ResolveItemSourceRow[]> {
+  const { data } = requireErpData<{ data: ResolveItemSourceRow[] }>(
+    await erpApi.POST("/inventory/locations/resolve-item-source/batch", {
+      body: { pairs, ...options },
+    }),
+  );
+  return data;
+}
+
 export interface TransferPreferredShelfPair {
   itemId: string;
   sourceStorageId: string;

@@ -1842,6 +1842,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/locations/resolve-item-source/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Chọn kho + vị trí xuất cho nhiều mã hàng theo Chi tiết vị trí hàng hóa
+         * @description Với mỗi mã hàng: giữ kho đề xuất nếu mã đang được theo dõi ở kho đó, ngược lại chuyển sang kho có tồn lớn nhất. Trả storage = null khi không kết luận được — client giữ nguyên kho đang hiển thị.
+         */
+        post: operations["InventoryLocationStockController_resolveItemSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/locations/{locationId}/stock-items": {
         parameters: {
             query?: never;
@@ -8570,6 +8590,38 @@ export interface components {
         };
         BatchTransferPreferredShelfResponseDto: {
             data: components["schemas"]["BatchTransferPreferredShelfRowDto"][];
+        };
+        ResolveItemSourcePairDto: {
+            /** Format: uuid */
+            itemId: string;
+            /**
+             * Format: uuid
+             * @description Kho form đang đề xuất (kho dòng trên / kho mặc định). Được giữ lại nếu mã hàng có vị trí đang theo dõi trong kho đó; ngược lại dùng làm kho fallback.
+             */
+            preferredStorageId?: string;
+        };
+        ResolveItemSourceRequestDto: {
+            pairs: components["schemas"]["ResolveItemSourcePairDto"][];
+            /**
+             * @description Xếp kho showroom (is_main_storage) xuống cuối danh sách ứng viên — dùng cho kho nguồn của phiếu chuyển kho, vốn ưu tiên xuất từ kho lưu trữ.
+             * @default false
+             */
+            deprioritizeMainStorage: boolean;
+        };
+        ResolvedStorageDto: {
+            /** Format: uuid */
+            id: string;
+            code: string | null;
+            name: string;
+        };
+        ResolveItemSourceRowDto: {
+            /** Format: uuid */
+            itemId: string;
+            storage: components["schemas"]["ResolvedStorageDto"] | null;
+            shelf: components["schemas"]["PreferredShelfResponseDto"] | null;
+        };
+        ResolveItemSourceResponseDto: {
+            data: components["schemas"]["ResolveItemSourceRowDto"][];
         };
         StockByLocationProviderDto: {
             /** Format: uuid */
@@ -16934,6 +16986,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BatchTransferPreferredShelfResponseDto"];
+                };
+            };
+        };
+    };
+    InventoryLocationStockController_resolveItemSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveItemSourceRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolveItemSourceResponseDto"];
                 };
             };
         };
