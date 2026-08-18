@@ -44,6 +44,7 @@ import { printHtmlDocument } from "../../lib/print/print-html-document";
 import {
   getPreferredShelf,
   getPreferredShelfBatch,
+  resolveItemSourceBatch,
 } from "../../api/inventory-location-preferences";
 import { LookupField } from "../../components/forms/LookupField";
 import { STORAGE_LOOKUP_COLUMNS } from "../../components/forms/storage-lookup";
@@ -248,6 +249,57 @@ export function GoodsIssueFormDialog({
       fillPreferredShelfBatch([{ idx, itemId, storageId }]),
     [fillPreferredShelfBatch],
   );
+
+  // Kho + Vị trí for lines whose warehouse the form only *guessed* (typing a
+  // SKU, the picker, the scanner). The server answers from the item's "Chi tiết
+  // vị trí hàng hóa" rows, so a mã only stocked in the showroom lands on the
+  // showroom instead of the default kho with an empty Vị trí. Same
+  // (idx, itemId, proposed storage) guard as fillPreferredShelfBatch: a row the
+  // user has since retargeted by hand keeps their choice.
+  const fillLineSourceBatch = useCallback((
+    rows: { idx: number; itemId: string; preferredStorageId: string }[],
+  ) => {
+    const valid = rows.filter((r) => r.itemId);
+    if (valid.length === 0) return;
+    const pairs = [
+      ...new Map(
+        valid.map((r) => [
+          `${r.itemId}:${r.preferredStorageId}`,
+          {
+            itemId: r.itemId,
+            ...(r.preferredStorageId
+              ? { preferredStorageId: r.preferredStorageId }
+              : {}),
+          },
+        ]),
+      ).values(),
+    ];
+    void resolveItemSourceBatch(pairs)
+      .then((results) => {
+        const byItemId = new Map(results.map((r) => [r.itemId, r]));
+        setLines((currentLines) =>
+          currentLines.map((line, lineIdx) => {
+            const match = valid.find(
+              (r) =>
+                r.idx === lineIdx &&
+                line.itemId === r.itemId &&
+                line.storageId === r.preferredStorageId,
+            );
+            if (!match) return line;
+            const resolved = byItemId.get(match.itemId);
+            if (!resolved) return line;
+            return {
+              ...line,
+              storageId: resolved.storage?.id ?? line.storageId,
+              storageLabel: resolved.storage?.name ?? line.storageLabel,
+              locationId: resolved.shelf?.id ?? "",
+              locationLabel: resolved.shelf?.code ?? "",
+            };
+          }),
+        );
+      })
+      .catch(() => {});
+  }, []);
 
   // Resolve the eager-loaded provider first, then fall back to a customer lookup
   // for legacy rows that pre-date the provider column.
@@ -1065,11 +1117,11 @@ export function GoodsIssueFormDialog({
     const startIdx = base.length;
     setLines(normalizeFormLines([...base, ...fresh]));
     markDirty();
-    fillPreferredShelfBatch(
+    fillLineSourceBatch(
       fresh.map((line, i) => ({
         idx: startIdx + i,
         itemId: line.itemId,
-        storageId: line.storageId,
+        preferredStorageId: line.storageId,
       })),
     );
     fresh.forEach((line, i) => {
@@ -1124,8 +1176,12 @@ export function GoodsIssueFormDialog({
     const startIdx = base.length;
     setLines(normalizeFormLines([...base, newLine]));
     markDirty();
-    fillPreferredShelfBatch([
-      { idx: startIdx, itemId: newLine.itemId, storageId: newLine.storageId },
+    fillLineSourceBatch([
+      {
+        idx: startIdx,
+        itemId: newLine.itemId,
+        preferredStorageId: newLine.storageId,
+      },
     ]);
     if (newLine.itemId && newLine.unitPrice <= 0) {
       void getInstantAverageCost(newLine.itemId)
@@ -1200,9 +1256,9 @@ export function GoodsIssueFormDialog({
       ),
     );
 
-    if (selectedStorageId) {
-      fillPreferredShelf(idx, item.id, selectedStorageId);
-    }
+    fillLineSourceBatch([
+      { idx, itemId: item.id, preferredStorageId: selectedStorageId },
+    ]);
     void getInstantAverageCost(item.id)
       .then((unitCost) => {
         setLines((current) =>
@@ -1217,7 +1273,7 @@ export function GoodsIssueFormDialog({
         // Keep purchase price fallback already shown in the row.
       });
     markDirty();
-  }, [fillPreferredShelf, markDirty]);
+  }, [fillLineSourceBatch, markDirty]);
 
   // Memoized: a fresh array here would rebuild every column object and every
   // renderEditor closure on each render, re-rendering all rows. Everything it

@@ -48,6 +48,11 @@ import {
   BatchTransferPreferredShelfRowDto,
   TransferPreferredShelfPairDto,
 } from './dto/batch-transfer-preferred-shelf.dto';
+import {
+  ResolvedStorageDto,
+  ResolveItemSourcePairDto,
+  ResolveItemSourceRowDto,
+} from './dto/resolve-item-source.dto';
 import { BatchAssignItemsDto } from './inventory-location-stock.controller';
 import { InventoryLocationService } from './inventory-location.service';
 
@@ -766,6 +771,268 @@ export class InventoryLocationStockService {
     return null;
   }
 
+  /**
+   * Resolve which Kho + Vị trí a document line should issue from, driven by the
+   * item's "Chi tiết vị trí hàng hóa" rows — a tracked stock_balance on an active
+   * bin of an active kho — instead of a client-side guess at the kho.
+   *
+   * The kho the caller proposes wins whenever the item is actually tracked there;
+   * otherwise the item's other kho are tried by quantity, then last movement:
+   * "kho nào không có mã hàng thì tìm kho tiếp theo". An item tracked nowhere
+   * keeps today's behaviour — the proposed kho plus its preferred shelf.
+   *
+   * Query count is fixed (3, plus 1 when some item is tracked nowhere) regardless
+   * of how many lines are resolved, so the multi-select picker stays one round trip.
+   */
+  async resolveItemSourceBatch(
+    pairs: ResolveItemSourcePairDto[],
+    options: { deprioritizeMainStorage?: boolean },
+    actor: ActorContext,
+  ): Promise<ResolveItemSourceRowDto[]> {
+    const itemIds = [...new Set(pairs.map((p) => p.itemId))];
+    if (itemIds.length === 0) return [];
+
+    const candidatesByItem = await this.findTrackedCandidates(itemIds, actor);
+    const pslByKey = await this.findPreferredShelfCandidates(
+      itemIds,
+      candidatesByItem,
+      actor,
+    );
+
+    // Items tracked nowhere fall back to the proposed kho's default shelf —
+    // resolved in one query for all of them rather than per line.
+    const fallbackStorageIds = [
+      ...new Set(
+        pairs
+          .filter((p) => !candidatesByItem.get(p.itemId)?.length)
+          .map((p) => p.preferredStorageId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const fallbackByStorage = await this.findDefaultShelves(
+      fallbackStorageIds,
+      actor,
+    );
+
+    const storageRefs = new Map<string, ResolvedStorageDto>();
+    for (const rows of candidatesByItem.values()) {
+      for (const row of rows) {
+        storageRefs.set(row.storageId, {
+          id: row.storageId,
+          code: row.storageCode,
+          name: row.storageName,
+        });
+      }
+    }
+    for (const [storageId, fallback] of fallbackByStorage) {
+      storageRefs.set(storageId, fallback.storage);
+    }
+
+    return pairs.map((pair) => {
+      const candidates = candidatesByItem.get(pair.itemId) ?? [];
+      if (candidates.length === 0) {
+        const storageId = pair.preferredStorageId;
+        return {
+          itemId: pair.itemId,
+          storage: storageId ? (storageRefs.get(storageId) ?? null) : null,
+          shelf: storageId
+            ? (fallbackByStorage.get(storageId)?.shelf ?? null)
+            : null,
+        };
+      }
+
+      const storageId = this.pickSourceStorage(
+        candidates,
+        pair.preferredStorageId,
+        options.deprioritizeMainStorage ?? false,
+      );
+      const inStorage = candidates.filter((c) => c.storageId === storageId);
+      // The preferred-shelf mapping wins when it is still one of the item's
+      // tracked bins in that kho; otherwise take the fullest bin — same priority
+      // order as getPreferredShelf, computed in memory.
+      const pslLocationId = pslByKey.get(`${pair.itemId}:${storageId}`);
+      const chosen =
+        inStorage.find((c) => c.locationId === pslLocationId) ?? inStorage[0];
+
+      return {
+        itemId: pair.itemId,
+        storage: storageRefs.get(storageId) ?? null,
+        shelf: chosen
+          ? {
+              id: chosen.locationId,
+              code: chosen.locationCode,
+              name: chosen.locationName,
+            }
+          : null,
+      };
+    });
+  }
+
+  /**
+   * Every (item, kho, vị trí) the item is tracked at, grouped per item and
+   * ordered fullest bin first. Mirrors the filters behind "Chi tiết vị trí hàng
+   * hóa" (getBalances), minus the virtual "Chưa xếp" bin which is never a valid
+   * auto-fill target.
+   */
+  private async findTrackedCandidates(
+    itemIds: string[],
+    actor: ActorContext,
+  ): Promise<Map<string, ItemSourceCandidate[]>> {
+    const qb = this.stockBalanceRepo
+      .createQueryBuilder('sb')
+      .innerJoin('locations', 'loc', 'loc.id = sb.location_id')
+      .innerJoin('storages', 'storage', 'storage.id = loc.storage_id')
+      .select('sb.item_id', 'itemId')
+      .addSelect('sb.quantity', 'quantity')
+      .addSelect('sb.last_movement_at', 'lastMovementAt')
+      .addSelect('loc.id', 'locationId')
+      .addSelect('loc.code', 'locationCode')
+      .addSelect('loc.name', 'locationName')
+      .addSelect('storage.id', 'storageId')
+      .addSelect('storage.code', 'storageCode')
+      .addSelect('storage.name', 'storageName')
+      .addSelect('storage.is_main_storage', 'isMainStorage')
+      .where('sb.organization_id = :organizationId', {
+        organizationId: actor.organizationId,
+      })
+      .andWhere('sb.item_id IN (:...itemIds)', { itemIds })
+      .andWhere('sb.is_tracked = true')
+      .andWhere('loc.is_active = true')
+      .andWhere('loc.is_unassigned = false')
+      .andWhere('storage.is_active = true');
+
+    if (actor.branchId) {
+      // The kho is the authoritative branch owner — stock_balances.branch_id can
+      // be stale after imports/migrations (same rule as getBalances).
+      qb.andWhere('storage.branch_id = :branchId', { branchId: actor.branchId });
+    }
+
+    const rows = await qb
+      .orderBy('sb.quantity', 'DESC')
+      .addOrderBy('sb.last_movement_at', 'DESC', 'NULLS LAST')
+      .getRawMany<{
+        itemId: string;
+        quantity: string | number;
+        lastMovementAt: Date | string | null;
+        locationId: string;
+        locationCode: string;
+        locationName: string;
+        storageId: string;
+        storageCode: string | null;
+        storageName: string;
+        isMainStorage: boolean;
+      }>();
+
+    const byItem = new Map<string, ItemSourceCandidate[]>();
+    for (const row of rows) {
+      const list = byItem.get(row.itemId) ?? [];
+      list.push({
+        locationId: row.locationId,
+        locationCode: row.locationCode,
+        locationName: row.locationName,
+        storageId: row.storageId,
+        storageCode: row.storageCode,
+        storageName: row.storageName,
+        isMainStorage: Boolean(row.isMainStorage),
+        quantity: Number(row.quantity) || 0,
+        lastMovementAt: row.lastMovementAt
+          ? new Date(row.lastMovementAt).getTime()
+          : 0,
+      });
+      byItem.set(row.itemId, list);
+    }
+    return byItem;
+  }
+
+  /** (itemId:storageId) → preferred-shelf locationId, kept only when that bin is a tracked candidate. */
+  private async findPreferredShelfCandidates(
+    itemIds: string[],
+    candidatesByItem: Map<string, ItemSourceCandidate[]>,
+    actor: ActorContext,
+  ): Promise<Map<string, string>> {
+    const mappings = await this.pslService.listByItems(itemIds, actor);
+    const result = new Map<string, string>();
+    for (const mapping of mappings) {
+      const candidates = candidatesByItem.get(mapping.itemId) ?? [];
+      const usable = candidates.some(
+        (c) =>
+          c.locationId === mapping.locationId &&
+          c.storageId === mapping.storageId,
+      );
+      if (usable) {
+        result.set(`${mapping.itemId}:${mapping.storageId}`, mapping.locationId);
+      }
+    }
+    return result;
+  }
+
+  /** Each kho's "Mặc định" bin — the last-resort shelf for an item tracked nowhere. */
+  private async findDefaultShelves(
+    storageIds: string[],
+    actor: ActorContext,
+  ): Promise<
+    Map<
+      string,
+      {
+        storage: ResolvedStorageDto;
+        shelf: { id: string; code: string; name: string };
+      }
+    >
+  > {
+    if (storageIds.length === 0) return new Map();
+    const locations = await this.locationRepo.find({
+      where: {
+        storageId: In(storageIds),
+        organizationId: actor.organizationId,
+        isActive: true,
+        isUnassigned: false,
+        isDefault: true,
+        ...(actor.branchId ? { storage: { branchId: actor.branchId } } : {}),
+      },
+      relations: { storage: true },
+    });
+    return new Map(
+      locations.map((loc) => [
+        loc.storageId,
+        {
+          storage: {
+            id: loc.storageId,
+            code: loc.storage?.code ?? null,
+            name: loc.storage?.name ?? '',
+          },
+          shelf: { id: loc.id, code: loc.code, name: loc.name },
+        },
+      ]),
+    );
+  }
+
+  /**
+   * "Ưu tiên kho đang chọn, rồi tới tồn": keep the proposed kho when the item is
+   * tracked there, otherwise the kho holding the most stock (ties broken by the
+   * most recent movement). Showroom kho sink to the bottom for transfer sources,
+   * which are meant to ship from kho lưu trữ when the item sits in both.
+   */
+  private pickSourceStorage(
+    candidates: ItemSourceCandidate[],
+    preferredStorageId: string | undefined,
+    deprioritizeMainStorage: boolean,
+  ): string {
+    if (
+      preferredStorageId &&
+      candidates.some((c) => c.storageId === preferredStorageId)
+    ) {
+      return preferredStorageId;
+    }
+    // `candidates` is already sorted fullest-bin first, so the first row of each
+    // kho is that kho's best row and a stable sort keeps that ranking.
+    const best = deprioritizeMainStorage
+      ? [...candidates].sort(
+          (a, b) => Number(a.isMainStorage) - Number(b.isMainStorage),
+        )
+      : candidates;
+    return best[0].storageId;
+  }
+
   async getPreferredShelfBatch(
     pairs: PreferredShelfPairDto[],
     actor: ActorContext,
@@ -875,6 +1142,19 @@ export class InventoryLocationStockService {
       name: location.name,
     };
   }
+}
+
+interface ItemSourceCandidate {
+  locationId: string;
+  locationCode: string;
+  locationName: string;
+  storageId: string;
+  storageCode: string | null;
+  storageName: string;
+  isMainStorage: boolean;
+  quantity: number;
+  /** Epoch ms; 0 when the bin has never moved. */
+  lastMovementAt: number;
 }
 
 function escapeLike(value: string): string {

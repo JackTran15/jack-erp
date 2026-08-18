@@ -5303,6 +5303,39 @@
         ]
       }
     },
+    "/inventory/locations/resolve-item-source/batch": {
+      "post": {
+        "description": "Với mỗi mã hàng: giữ kho đề xuất nếu mã đang được theo dõi ở kho đó, ngược lại chuyển sang kho có tồn lớn nhất. Trả storage = null khi không kết luận được — client giữ nguyên kho đang hiển thị.",
+        "operationId": "InventoryLocationStockController_resolveItemSource",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveItemSourceRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveItemSourceResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Chọn kho + vị trí xuất cho nhiều mã hàng theo Chi tiết vị trí hàng hóa",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/inventory/locations/{locationId}/stock-items": {
       "get": {
         "operationId": "InventoryLocationStockController_listStockByLocation",
@@ -26385,6 +26418,111 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/BatchTransferPreferredShelfRowDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ResolveItemSourcePairDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "preferredStorageId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Kho form đang đề xuất (kho dòng trên / kho mặc định). Được giữ lại nếu mã hàng có vị trí đang theo dõi trong kho đó; ngược lại dùng làm kho fallback."
+          }
+        },
+        "required": [
+          "itemId"
+        ]
+      },
+      "ResolveItemSourceRequestDto": {
+        "type": "object",
+        "properties": {
+          "pairs": {
+            "minItems": 1,
+            "maxItems": 10000,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResolveItemSourcePairDto"
+            }
+          },
+          "deprioritizeMainStorage": {
+            "type": "boolean",
+            "default": false,
+            "description": "Xếp kho showroom (is_main_storage) xuống cuối danh sách ứng viên — dùng cho kho nguồn của phiếu chuyển kho, vốn ưu tiên xuất từ kho lưu trữ."
+          }
+        },
+        "required": [
+          "pairs"
+        ]
+      },
+      "ResolvedStorageDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
+      "ResolveItemSourceRowDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "storage": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ResolvedStorageDto"
+              }
+            ]
+          },
+          "shelf": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PreferredShelfResponseDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "itemId",
+          "storage",
+          "shelf"
+        ]
+      },
+      "ResolveItemSourceResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResolveItemSourceRowDto"
             }
           }
         },

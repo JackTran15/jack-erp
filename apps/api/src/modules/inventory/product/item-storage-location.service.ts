@@ -255,6 +255,20 @@ export class ItemStorageLocationService {
     await this.setLocation(itemId, location.storageId, locationId, actor);
   }
 
+  /** Batch variant of {@link listByItem} — one query for many items. */
+  async listByItems(
+    itemIds: string[],
+    actor: ActorContext,
+  ): Promise<ItemStorageLocationEntity[]> {
+    if (itemIds.length === 0) return [];
+    return this.islRepo.find({
+      where: {
+        itemId: In(itemIds),
+        organizationId: actor.organizationId,
+      },
+    });
+  }
+
   async listByItem(
     itemId: string,
     actor: ActorContext,
