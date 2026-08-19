@@ -10,6 +10,9 @@ import { StockSummaryService } from "./stock-summary.service";
 import { StockSummaryController } from "./stock-summary.controller";
 import { StockSummaryV2Controller } from "./stock-summary-v2.controller";
 import { SearchStockSummaryV2Handler } from "./queries/search-stock-summary-v2.handler";
+import { StockSummaryDetailService } from "./stock-summary-detail.service";
+import { GetSkuBreakdownHandler } from "./queries/get-sku-breakdown.handler";
+import { GetStockLedgerCardHandler } from "./queries/get-stock-ledger-card.handler";
 import {
   InventoryStockBalanceCrudService,
   INVENTORY_STOCK_BALANCE_ENTITY_CONFIG,
@@ -50,6 +53,9 @@ import { StockSummaryExportService } from "./stock-summary-export.service";
     StockSummaryService,
     StockSummaryExportService,
     SearchStockSummaryV2Handler,
+    StockSummaryDetailService,
+    GetSkuBreakdownHandler,
+    GetStockLedgerCardHandler,
     InventoryStockBalanceCrudService,
     {
       provide: INVENTORY_STOCK_BALANCE_SERVICE_TOKEN,

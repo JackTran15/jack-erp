@@ -2,10 +2,8 @@ import { Type } from "class-transformer";
 import {
   IsBoolean,
   IsDateString,
-  IsEnum,
   IsInt,
   IsOptional,
-  IsString,
   IsUUID,
   Max,
   Min,
@@ -15,37 +13,23 @@ import {
   CompareFilterDto,
   StringFilterDto,
 } from "../../../../common/filters/filter.dto";
-import {
-  StockStateFilter,
-  StockSummaryGroupBy,
-} from "./stock-summary-query.dto";
-import { StockSummaryExportVariant } from "../stock-summary-export.service";
 
-export class StockSummarySearchV2Dto {
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number = 1;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(200)
-  limit?: number = 50;
-
-  @IsOptional()
+/**
+ * "Chi tiết hàng hóa" — the variants of one SKU inside one storage, broken
+ * down by location.
+ */
+export class StockSkuBreakdownDto {
+  /**
+   * The grid row's `groupKey`: the parent product id, or the item id for items
+   * that have no parent. Rows whose `storageId` starts with `pending:` are
+   * synthetic incoming-transfer rows with nothing to break down — the client
+   * must not open the dialog for them.
+   */
   @IsUUID()
-  storageId?: string;
+  groupKey: string;
 
-  @IsOptional()
   @IsUUID()
-  categoryId?: string;
-
-  @IsOptional()
-  @IsString()
-  search?: string;
+  storageId: string;
 
   @IsOptional()
   @IsDateString()
@@ -56,32 +40,21 @@ export class StockSummarySearchV2Dto {
   endDate?: string;
 
   @IsOptional()
-  @IsDateString()
-  movementFrom?: string;
-
-  @IsOptional()
-  @IsDateString()
-  movementTo?: string;
-
-  @IsOptional()
   @IsBoolean()
   excludeReservations?: boolean;
 
   @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
 
   @IsOptional()
-  @IsBoolean()
-  isPosVisible?: boolean;
-
-  @IsOptional()
-  @IsEnum(StockStateFilter)
-  stockState?: StockStateFilter;
-
-  @IsOptional()
-  @IsEnum(StockSummaryGroupBy)
-  groupBy?: StockSummaryGroupBy;
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  limit?: number;
 
   @IsOptional()
   @ValidateNested()
@@ -101,17 +74,12 @@ export class StockSummarySearchV2Dto {
   @IsOptional()
   @ValidateNested()
   @Type(() => StringFilterDto)
-  category?: StringFilterDto;
+  locationCode?: StringFilterDto;
 
   @IsOptional()
   @ValidateNested()
   @Type(() => StringFilterDto)
-  brand?: StringFilterDto;
-
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => StringFilterDto)
-  storage?: StringFilterDto;
+  locationName?: StringFilterDto;
 
   @IsOptional()
   @ValidateNested()
@@ -142,9 +110,4 @@ export class StockSummarySearchV2Dto {
   @ValidateNested()
   @Type(() => CompareFilterDto)
   incomingQty?: CompareFilterDto;
-}
-
-export class StockSummaryExportDto extends StockSummarySearchV2Dto {
-  @IsEnum(StockSummaryExportVariant)
-  variant: StockSummaryExportVariant;
 }

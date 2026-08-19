@@ -1,4 +1,5 @@
 import { StockSummaryService } from "./stock-summary.service";
+import { StockSummaryGroupBy } from "./dto/stock-summary-query.dto";
 import {
   CompareOperator,
   StringOperator,
@@ -62,7 +63,9 @@ describe("StockSummaryService", () => {
 
   it("calculates period values from startDate/endDate while preserving movement filters", async () => {
     const row = {
-      item_id: "11111111-1111-4111-8111-111111111111",
+      group_key: "11111111-1111-4111-8111-111111111111",
+      product_id: null,
+      item_ids: ["11111111-1111-4111-8111-111111111111"],
       item_code: "SKU-1",
       item_name: "Hàng hóa 1",
       item_unit: "Cái",
@@ -82,7 +85,7 @@ describe("StockSummaryService", () => {
         .mockResolvedValueOnce([{ total: 1, total_quantity: "9" }])
         .mockResolvedValueOnce([
           {
-            item_id: row.item_id,
+            item_id: row.group_key,
             storage_id: row.storage_id,
             opening_qty: "5",
             opening_value: "50",
@@ -94,7 +97,7 @@ describe("StockSummaryService", () => {
         ])
         .mockResolvedValueOnce([
           {
-            item_id: row.item_id,
+            item_id: row.group_key,
             storage_id: row.storage_id,
             transfer_out_qty: "3",
             incoming_qty: "4",
@@ -102,7 +105,7 @@ describe("StockSummaryService", () => {
         ])
         .mockResolvedValueOnce([
           {
-            item_id: row.item_id,
+            item_id: row.group_key,
             storage_id: row.storage_id,
             reserved_qty: "2",
           },
@@ -158,7 +161,9 @@ describe("StockSummaryService", () => {
 
   it("counts draft and pending sale OUT lines as branch-scoped customer reservations", async () => {
     const row = {
-      item_id: "11111111-1111-4111-8111-111111111111",
+      group_key: "11111111-1111-4111-8111-111111111111",
+      product_id: null,
+      item_ids: ["11111111-1111-4111-8111-111111111111"],
       item_code: "SKU-1",
       item_name: "Hàng hóa 1",
       item_unit: "Cái",
@@ -179,7 +184,7 @@ describe("StockSummaryService", () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([
           {
-            item_id: row.item_id,
+            item_id: row.group_key,
             storage_id: row.storage_id,
             reserved_qty: "3",
           },
@@ -215,7 +220,8 @@ describe("StockSummaryService", () => {
         .mockResolvedValueOnce([{ total: 0, total_quantity: "0" }])
         .mockResolvedValueOnce([
           {
-            item_id: "item-1",
+            group_key: "item-1",
+            product_id: null,
             item_code: "SKU-1",
             item_name: "Hàng hóa 1",
             item_unit: "Cái",
@@ -251,6 +257,114 @@ describe("StockSummaryService", () => {
         storage: expect.objectContaining({ name: "Chưa chọn kho nhận" }),
       }),
     );
+  });
+
+  describe("groupBy: SKU", () => {
+    it("groups on the parent product and sums every variant's period figures", async () => {
+      const row = {
+        group_key: "product-1",
+        product_id: "product-1",
+        item_ids: ["item-A", "item-B"],
+        item_code: "ABA2813",
+        item_name: "Giày ABA2813",
+        item_unit: "Đôi",
+        item_brand: null,
+        item_is_active: true,
+        category_name: null,
+        storage_id: "storage-1",
+        storage_name: "Kho 1",
+        branch_id: "branch-1",
+        quantity: "31",
+        last_movement_at: null,
+      };
+      const qb = createQueryBuilder([row]);
+      const manager = {
+        query: jest
+          .fn()
+          .mockResolvedValueOnce([{ total: 1, total_quantity: "31" }])
+          // One row per variant — the grid row is their sum.
+          .mockResolvedValueOnce([
+            {
+              item_id: "item-A",
+              storage_id: "storage-1",
+              opening_qty: "2",
+              opening_value: "0",
+              in_qty: "3",
+              in_value: "0",
+              out_qty: "1",
+              out_value: "0",
+            },
+            {
+              item_id: "item-B",
+              storage_id: "storage-1",
+              opening_qty: "5",
+              opening_value: "0",
+              in_qty: "4",
+              in_value: "0",
+              out_qty: "2",
+              out_value: "0",
+            },
+          ])
+          .mockResolvedValue([]),
+      };
+      const service = new StockSummaryService({
+        createQueryBuilder: jest.fn().mockReturnValue(qb),
+        manager,
+      } as never);
+
+      const result = await service.getSummary({
+        organizationId: "org-1",
+        branchId: "branch-1",
+        groupBy: StockSummaryGroupBy.SKU,
+        startDate: "2026-05-01",
+        endDate: "2026-05-31",
+      });
+
+      expect(qb.groupBy).toHaveBeenCalledWith(
+        "COALESCE(item.product_id::text, item.id::text)",
+      );
+      // The period pass still pairs on (item, storage), so both variants have
+      // to be in the array — a group key alone would match nothing.
+      expect(manager.query.mock.calls[1][1]).toEqual(
+        expect.arrayContaining([["item-A", "item-B"]]),
+      );
+      expect(result.data[0]).toEqual(
+        expect.objectContaining({
+          groupKey: "product-1",
+          productId: "product-1",
+          openingQty: 7,
+          inQty: 7,
+          outQty: 3,
+          closingQty: 11,
+        }),
+      );
+    });
+
+    it("scopes the pending-only guard to the whole model, so the footer cannot double count", async () => {
+      const qb = createQueryBuilder([]);
+      const manager = {
+        query: jest
+          .fn()
+          .mockResolvedValueOnce([{ total: 0, total_quantity: "0" }])
+          .mockResolvedValue([]),
+      };
+      const service = new StockSummaryService({
+        createQueryBuilder: jest.fn().mockReturnValue(qb),
+        manager,
+      } as never);
+
+      await service.getSummary({
+        organizationId: "org-1",
+        branchId: "branch-B",
+        groupBy: StockSummaryGroupBy.SKU,
+      });
+
+      const pendingOnlySql = manager.query.mock.calls[1][0] as string;
+      expect(pendingOnlySql).toContain("INNER JOIN items sibling");
+      expect(pendingOnlySql).not.toContain(
+        "pending_balance.item_id = transfer_line.item_id",
+      );
+    });
   });
 
   describe("whole-set column totals (grid footer)", () => {
@@ -357,12 +471,14 @@ describe("StockSummaryService", () => {
       expect(result.totals).toBeUndefined();
       expect(result.totalQuantity).toBe(9);
       // The cheap count-only aggregate, not the CTE chain.
-      expect(manager.query.mock.calls[0][0]).not.toContain("WITH pairs AS");
+      expect(manager.query.mock.calls[0][0]).not.toContain("WITH groups AS");
     });
 
     it("reduces the totals in memory when a derived-column filter is active", async () => {
       const rows = [1, 2].map((n) => ({
-        item_id: `item-${n}`,
+        group_key: `item-${n}`,
+        product_id: null,
+        item_ids: [`item-${n}`],
         item_code: `SKU-${n}`,
         item_name: `Hàng hóa ${n}`,
         item_unit: "Cái",
@@ -426,69 +542,7 @@ describe("StockSummaryService", () => {
       );
       // No totals statement is worth running when every row is already loaded.
       const sqlSeen = manager.query.mock.calls.map(([sql]) => String(sql));
-      expect(sqlSeen.some((sql) => sql.includes("WITH pairs AS"))).toBe(false);
-    });
-  });
-
-  it("returns organization-scoped ledger details for one item and storage", async () => {
-    const manager = {
-      query: jest
-        .fn()
-        .mockResolvedValueOnce([
-          {
-            reference_type: "GOODS_RECEIPT",
-            reference_id: "55555555-5555-4555-8555-555555555555",
-            posted_at: new Date("2026-06-10T00:00:00.000Z"),
-            quantity: "3",
-            unit_cost: "12.5",
-            line_value: "37.5",
-            notes: "Nhập hàng",
-          },
-        ])
-        .mockResolvedValueOnce([{ total: 1 }]),
-    };
-    const service = new StockSummaryService({ manager } as never);
-
-    const result = await service.getDetails({
-      organizationId: "44444444-4444-4444-8444-444444444444",
-      branchId: "33333333-3333-4333-8333-333333333333",
-      itemId: "11111111-1111-4111-8111-111111111111",
-      storageId: "22222222-2222-4222-8222-222222222222",
-      startDate: "2026-06-01",
-      endDate: "2026-06-30",
-      page: 1,
-      pageSize: 20,
-    });
-
-    expect(manager.query).toHaveBeenNthCalledWith(
-      1,
-      expect.stringContaining("sle.organization_id = $1"),
-      [
-        "44444444-4444-4444-8444-444444444444",
-        "11111111-1111-4111-8111-111111111111",
-        "22222222-2222-4222-8222-222222222222",
-        "33333333-3333-4333-8333-333333333333",
-        "2026-06-01",
-        "2026-07-01",
-        20,
-        0,
-      ],
-    );
-    expect(result).toEqual({
-      data: [
-        {
-          referenceType: "GOODS_RECEIPT",
-          referenceId: "55555555-5555-4555-8555-555555555555",
-          postedAt: "2026-06-10T00:00:00.000Z",
-          quantity: 3,
-          unitCost: 12.5,
-          lineValue: 37.5,
-          notes: "Nhập hàng",
-        },
-      ],
-      total: 1,
-      page: 1,
-      pageSize: 20,
+      expect(sqlSeen.some((sql) => sql.includes("WITH groups AS"))).toBe(false);
     });
   });
 });

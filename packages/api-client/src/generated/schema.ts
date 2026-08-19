@@ -2593,22 +2593,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/inventory/stock/summary/details": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["StockSummaryController_getDetails"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v2/inventory/stock/summary/search": {
         parameters: {
             query?: never;
@@ -2619,6 +2603,40 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["StockSummaryV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory/stock/summary/sku-breakdown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** "Chi tiết hàng hóa" — the variants behind one SKU row, by location. */
+        post: operations["StockSummaryV2Controller_skuBreakdown_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory/stock/summary/ledger-card": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** "Chi tiết tồn kho" — the stock card of one variant in one storage. */
+        post: operations["StockSummaryV2Controller_ledgerCard_v2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9484,6 +9502,8 @@ export interface components {
             isPosVisible?: boolean;
             /** @enum {string} */
             stockState?: "ALL" | "IN_STOCK" | "OUT_OF_STOCK" | "NEGATIVE";
+            /** @enum {string} */
+            groupBy?: "VARIANT" | "SKU";
             itemCode?: components["schemas"]["StringFilterDto"];
             itemName?: components["schemas"]["StringFilterDto"];
             unit?: components["schemas"]["StringFilterDto"];
@@ -9496,6 +9516,58 @@ export interface components {
             outQty?: components["schemas"]["CompareFilterDto"];
             transferOutQty?: components["schemas"]["CompareFilterDto"];
             incomingQty?: components["schemas"]["CompareFilterDto"];
+        };
+        StockSkuBreakdownDto: {
+            /**
+             * Format: uuid
+             * @description The grid row's `groupKey`: the parent product id, or the item id for items
+             *     that have no parent. Rows whose `storageId` starts with `pending:` are
+             *     synthetic incoming-transfer rows with nothing to break down — the client
+             *     must not open the dialog for them.
+             */
+            groupKey: string;
+            /** Format: uuid */
+            storageId: string;
+            startDate?: string;
+            endDate?: string;
+            excludeReservations?: boolean;
+            page?: number;
+            limit?: number;
+            itemCode?: components["schemas"]["StringFilterDto"];
+            itemName?: components["schemas"]["StringFilterDto"];
+            unit?: components["schemas"]["StringFilterDto"];
+            locationCode?: components["schemas"]["StringFilterDto"];
+            locationName?: components["schemas"]["StringFilterDto"];
+            quantity?: components["schemas"]["CompareFilterDto"];
+            openingQty?: components["schemas"]["CompareFilterDto"];
+            inQty?: components["schemas"]["CompareFilterDto"];
+            outQty?: components["schemas"]["CompareFilterDto"];
+            transferOutQty?: components["schemas"]["CompareFilterDto"];
+            incomingQty?: components["schemas"]["CompareFilterDto"];
+        };
+        StockLedgerCardDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            storageId: string;
+            /**
+             * Format: uuid
+             * @description Narrows the card to a single location; omit for the whole storage.
+             */
+            locationId?: string;
+            startDate?: string;
+            endDate?: string;
+            page?: number;
+            limit?: number;
+            /** @description `Loại chứng từ` — exact `reference_type`, from the filter-options list. */
+            documentType?: components["schemas"]["StringFilterDto"];
+            /** @description `Ngày chứng từ` — the grid's date-compare cell (`=`, `<=`, `>` …). */
+            documentDate?: components["schemas"]["CompareFilterDto"];
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            description?: components["schemas"]["StringFilterDto"];
+            balanceQty?: components["schemas"]["CompareFilterDto"];
+            inQty?: components["schemas"]["CompareFilterDto"];
+            outQty?: components["schemas"]["CompareFilterDto"];
         };
         StockSummaryExportDto: {
             /** @default 1 */
@@ -9516,6 +9588,8 @@ export interface components {
             isPosVisible?: boolean;
             /** @enum {string} */
             stockState?: "ALL" | "IN_STOCK" | "OUT_OF_STOCK" | "NEGATIVE";
+            /** @enum {string} */
+            groupBy?: "VARIANT" | "SKU";
             itemCode?: components["schemas"]["StringFilterDto"];
             itemName?: components["schemas"]["StringFilterDto"];
             unit?: components["schemas"]["StringFilterDto"];
@@ -18446,32 +18520,6 @@ export interface operations {
             };
         };
     };
-    StockSummaryController_getDetails: {
-        parameters: {
-            query: {
-                itemId: string;
-                storageId: string;
-                startDate?: string;
-                endDate?: string;
-                page?: number;
-                pageSize?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
     StockSummaryV2Controller_search_v2: {
         parameters: {
             query?: never;
@@ -18486,6 +18534,52 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    StockSummaryV2Controller_skuBreakdown_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockSkuBreakdownDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    StockSummaryV2Controller_ledgerCard_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockLedgerCardDto"];
+            };
+        };
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

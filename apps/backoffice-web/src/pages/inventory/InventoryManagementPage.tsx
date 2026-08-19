@@ -48,23 +48,19 @@ import { useDebouncedValue } from "../../lib/use-debounced-value";
 import { useStorageOptions } from "../../hooks/use-filter-options";
 import {
   DEFAULT_ADVANCED_FILTERS,
-  StockSummaryFilterDialog,
+  StockSummaryFilterPopover,
   type StockSummaryAdvancedFilters,
-} from "./_components/StockSummaryFilterDialog";
-import { StockDetailDrawer } from "./_components/StockDetailDrawer";
+} from "./_components/StockSummaryFilterPopover/StockSummaryFilterPopover";
+import {
+  SkuBreakdownDialog,
+  type SkuBreakdownTarget,
+} from "./_components/SkuBreakdownDialog/SkuBreakdownDialog";
 
 interface AppliedFilters {
   search: string;
   period: PeriodValue;
   advanced: StockSummaryAdvancedFilters;
   requestVersion: number;
-}
-
-interface SelectedStockItem {
-  id: string;
-  code: string;
-  name: string;
-  storageId: string;
 }
 
 const STOCK_SUMMARY_FILTER_KEYS = [
@@ -86,6 +82,9 @@ type StockSummaryFilterKey = (typeof STOCK_SUMMARY_FILTER_KEYS)[number];
 
 const STOCK_SUMMARY_SEARCH: V2SearchConfig = {
   path: "/v2/inventory/stock/summary/search",
+  // Một dòng = một mẫu mã (SKU) × kho. Biến thể được gộp lại; muốn xem từng
+  // biến thể thì mở dialog "Chi tiết hàng hóa" ở cột Tên hàng hóa.
+  defaults: { groupBy: "SKU" },
   fields: {
     itemCode: "string",
     itemName: "string",
@@ -142,10 +141,9 @@ export function InventoryManagementPage() {
     advanced: DEFAULT_ADVANCED_FILTERS,
     requestVersion: 0,
   });
-  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [columnFilters, setColumnFilters] = useState(createColumnFilters);
   const debouncedColumnFilters = useDebouncedValue(columnFilters, 300);
-  const [selectedItem, setSelectedItem] = useState<SelectedStockItem | null>(
+  const [selectedSku, setSelectedSku] = useState<SkuBreakdownTarget | null>(
     null,
   );
   const [exportingVariant, setExportingVariant] =
@@ -167,9 +165,6 @@ export function InventoryManagementPage() {
       stockState: toStockState(applied.advanced.stockState),
       startDate: applied.period.from || undefined,
       endDate: applied.period.to || undefined,
-      movementFrom: applied.advanced.movementFrom || undefined,
-      movementTo: applied.advanced.movementTo || undefined,
-      excludeReservations: applied.advanced.excludeReservations,
     }),
     [applied, pagination.page, pagination.pageSize],
   );
@@ -197,9 +192,6 @@ export function InventoryManagementPage() {
       stockState: query.stockState,
       startDate: query.startDate,
       endDate: query.endDate,
-      movementFrom: query.movementFrom,
-      movementTo: query.movementTo,
-      excludeReservations: query.excludeReservations,
     };
   }, [debouncedColumnFilters, pagination.page, pagination.pageSize, query]);
 
@@ -237,7 +229,6 @@ export function InventoryManagementPage() {
       advanced,
       requestVersion: previous.requestVersion + 1,
     }));
-    setFilterDialogOpen(false);
   };
 
   const response = summaryQuery.isError ? undefined : summaryQuery.data;
@@ -264,14 +255,29 @@ export function InventoryManagementPage() {
         label: "Tên hàng hóa",
         width: 220,
         render: (row) => (
-          <span className="text-primary-blue hover:underline">
+          <button
+            type="button"
+            className="text-left text-primary-blue hover:underline disabled:cursor-default disabled:no-underline"
+            // Dòng "pending:" là hàng đang chuyển về mà kho đích chưa có tồn —
+            // không có gì để khoan xuống.
+            disabled={row.storageId.startsWith("pending:")}
+            onClick={() =>
+              setSelectedSku({
+                groupKey: row.groupKey,
+                code: row.item.code,
+                name: row.item.name,
+                storageId: row.storageId,
+                storageName: row.storage.name,
+              })
+            }
+          >
             {row.item.name}
             {!row.item.isActive ? (
               <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
                 Ngừng
               </span>
             ) : null}
-          </span>
+          </button>
         ),
       },
       {
@@ -302,12 +308,9 @@ export function InventoryManagementPage() {
         "quantity",
         "SL tồn",
         // `closingQty` của server đã theo đúng ngữ nghĩa cột này ở cả hai
-        // trường hợp (có kỳ = tồn cuối kỳ, không kỳ = tồn live), nên chỉ cần
-        // trừ phần giữ chỗ giống hệt displayStockQuantity làm cho từng dòng.
-        totals &&
-          totals.closingQty -
-            (applied.advanced.excludeReservations ? totals.reservedQty : 0),
-        (row) => displayStockQuantity(row, applied.advanced.excludeReservations),
+        // trường hợp: có kỳ = tồn cuối kỳ, không kỳ = tồn live.
+        totals?.closingQty,
+        (row) => row.closingQty,
       ),
       quantityColumn("openingQty", "Tồn đầu kỳ", totals?.openingQty),
       quantityColumn("inQty", "SL nhập", totals?.inQty),
@@ -315,7 +318,7 @@ export function InventoryManagementPage() {
       quantityColumn("transferOutQty", "Đang chuyển đi", totals?.transferOutQty),
       quantityColumn("incomingQty", "Sắp nhận về", totals?.incomingQty),
     ],
-    [applied.advanced.excludeReservations, totals],
+    [totals],
   );
 
   const activeAdvancedCount = [
@@ -326,9 +329,6 @@ export function InventoryManagementPage() {
     applied.advanced.stockState !== "ALL" ? "x" : "",
     applied.advanced.storageId,
     applied.advanced.categoryId,
-    applied.advanced.movementFrom,
-    applied.advanced.movementTo,
-    applied.advanced.excludeReservations ? "x" : "",
   ].filter(Boolean).length;
 
   const columnFilterControl = useMemo(
@@ -387,14 +387,12 @@ export function InventoryManagementPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              <Button type="button" onClick={() => setFilterDialogOpen(true)}>
-                Bộ lọc
-                {activeAdvancedCount > 0 ? (
-                  <span className="ml-1.5 rounded-full bg-primary-foreground px-1.5 text-[10px] font-semibold leading-4 text-primary">
-                    {activeAdvancedCount}
-                  </span>
-                ) : null}
-              </Button>
+              <StockSummaryFilterPopover
+                value={applied.advanced}
+                activeCount={activeAdvancedCount}
+                onApply={applyAdvanced}
+                storageOptions={storageOptions}
+              />
               <Input
                 type="search"
                 placeholder="Nhập mã hàng hóa, tên hàng hóa..."
@@ -474,29 +472,13 @@ export function InventoryManagementPage() {
             ? "Không có dữ liệu tồn kho phù hợp với bộ lọc."
             : "Chưa có dữ liệu tồn kho."
         }
-        getRowKey={(row) => `${row.itemId}:${row.storageId}`}
+        getRowKey={(row) => `${row.groupKey}:${row.storageId}`}
         columnFilterControl={columnFilterControl}
-        onRowClick={(row) => {
-          if (row.storageId.startsWith("pending:")) return;
-          setSelectedItem({
-            id: row.item.id,
-            code: row.item.code,
-            name: row.item.name,
-            storageId: row.storageId,
-          });
-        }}
       />
-      <StockSummaryFilterDialog
-        open={filterDialogOpen}
-        initial={applied.advanced}
-        onCancel={() => setFilterDialogOpen(false)}
-        onApply={applyAdvanced}
-        storageOptions={storageOptions}
-      />
-      <StockDetailDrawer
-        item={selectedItem}
+      <SkuBreakdownDialog
+        target={selectedSku}
         period={applied.period}
-        onClose={() => setSelectedItem(null)}
+        onClose={() => setSelectedSku(null)}
       />
     </DocumentListShell>
   );
@@ -525,16 +507,6 @@ function quantityColumn(
         </span>
       ),
   };
-}
-
-function displayStockQuantity(
-  row: StockSummaryRow,
-  excludeReservations: boolean,
-): number {
-  // closingQty = tồn cuối kỳ (đầu kỳ + nhập - xuất) khi có chọn "Từ ngày/Đến
-  // ngày"; backend tự trả về closingQty = quantity (tồn live) khi không có kỳ,
-  // nên dùng closingQty luôn khớp đúng ngữ nghĩa cột "SL tồn" cho cả 2 trường hợp.
-  return row.closingQty - (excludeReservations ? row.reservedQty : 0);
 }
 
 const STOCK_SUMMARY_EXPORT_OPTIONS: Array<{

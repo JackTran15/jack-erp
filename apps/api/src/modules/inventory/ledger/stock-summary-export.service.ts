@@ -7,6 +7,7 @@ import { applyWorkbookFont } from "../../../common/utils/excel-workbook-font.uti
 import { BranchEntity } from "../../branch/branch.entity";
 import { ItemEntity } from "../location/item.entity";
 import { ItemAttributeValueEntity } from "../product/item-attribute-value.entity";
+import { StockSummaryGroupBy } from "./dto/stock-summary-query.dto";
 import {
   StockSummaryQuery,
   StockSummaryRow,
@@ -96,6 +97,10 @@ export class StockSummaryExportService {
         branchId: actor.branchId,
         page,
         pageSize: 200,
+        // The workbook builds its own model rollup from variant rows, so it
+        // always needs the ungrouped result even when the grid that produced
+        // these filters was showing SKU rows.
+        groupBy: StockSummaryGroupBy.VARIANT,
         // The export has no footer to fill, and this loop runs once per 200
         // rows — paying for the whole-set totals statement on every pass would
         // be ~40 wasted heavy queries on a full catalogue.

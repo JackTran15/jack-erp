@@ -21,6 +21,19 @@ function parseBool(value: unknown): boolean | undefined {
   return undefined;
 }
 
+/**
+ * Row granularity of the summary grid.
+ *
+ * - `VARIANT`: one row per inventory item (SKU/variant) × storage — the
+ *   historical behaviour, still used by the Excel export.
+ * - `SKU`: one row per parent product × storage. Items without a parent
+ *   (`items.product_id IS NULL`) form a group of their own.
+ */
+export enum StockSummaryGroupBy {
+  VARIANT = 'VARIANT',
+  SKU = 'SKU',
+}
+
 export enum StockStateFilter {
   ALL = 'ALL',
   IN_STOCK = 'IN_STOCK',

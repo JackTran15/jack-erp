@@ -9,7 +9,10 @@ import {
 } from "../../../common/filters/filter.dto";
 import { FilterBuilder } from "../../../common/filters/filter.builder";
 import { StockBalanceEntity } from "./stock-balance.entity";
-import { StockStateFilter } from "./dto/stock-summary-query.dto";
+import {
+  StockStateFilter,
+  StockSummaryGroupBy,
+} from "./dto/stock-summary-query.dto";
 
 /**
  * Loại bút toán của phiếu đã xoá khỏi báo cáo nhập-xuất-tồn (parity MISA):
@@ -17,7 +20,7 @@ import { StockStateFilter } from "./dto/stock-summary-query.dto";
  * (status CANCELLED). Bút toán gốc + bút toán đảo dùng chung reference nên cả
  * hai cùng bị loại. Dùng alias `sle` cho stock_ledger_entries.
  */
-const EXCLUDE_VOIDED_DOCS_SQL = `
+export const EXCLUDE_VOIDED_DOCS_SQL = `
         AND NOT EXISTS (
           SELECT 1 FROM goods_receipts grx
           WHERE grx.id = sle.reference_id
@@ -64,6 +67,12 @@ export interface StockSummaryQuery {
   transferOutQty?: CompareFilterDto;
   incomingQty?: CompareFilterDto;
   /**
+   * Row granularity. Defaults to `VARIANT` (one row per item × storage), which
+   * is what the Excel export needs. The grid asks for `SKU` (one row per parent
+   * product × storage).
+   */
+  groupBy?: StockSummaryGroupBy;
+  /**
    * Whole-set column totals for the grid footer. Defaults to true. The export
    * pipeline walks the result page by page and never renders a footer, so it
    * passes false rather than paying for the totals statement 40 times.
@@ -74,6 +83,14 @@ export interface StockSummaryQuery {
 export interface StockSummaryRow {
   itemId: string;
   storageId: string;
+  /**
+   * Identity of the row's item dimension: the item id in `VARIANT` mode, the
+   * parent product id (or the item id for parentless items) in `SKU` mode.
+   * The grid keys rows on `groupKey:storageId` and drills down with it.
+   */
+  groupKey: string;
+  /** Parent product, or null for items that have none. */
+  productId: string | null;
   item: {
     id: string;
     code: string;
@@ -136,36 +153,11 @@ export interface StockSummaryFilterOptions {
   units: string[];
 }
 
-export interface StockSummaryDetailsQuery {
-  organizationId: string;
-  branchId: string;
-  itemId: string;
-  storageId: string;
-  startDate?: string;
-  endDate?: string;
-  page?: number;
-  pageSize?: number;
-}
-
-export interface StockSummaryDetailRow {
-  referenceType: string;
-  referenceId: string;
-  postedAt: string;
-  quantity: number;
-  unitCost: number;
-  lineValue: number;
-  notes: string | null;
-}
-
-export interface StockSummaryDetailsResponse {
-  data: StockSummaryDetailRow[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
-
 interface RawPageRow {
-  item_id: string;
+  group_key: string;
+  product_id: string | null;
+  /** Every item folded into this row — one entry in `VARIANT` mode. */
+  item_ids: string[];
   item_code: string;
   item_name: string;
   item_unit: string;
@@ -220,7 +212,8 @@ interface RawReservationRow {
 }
 
 interface RawPendingOnlyRow {
-  item_id: string;
+  group_key: string;
+  product_id: string | null;
   item_code: string;
   item_name: string;
   item_unit: string;
@@ -231,16 +224,6 @@ interface RawPendingOnlyRow {
   storage_name: string | null;
   branch_id: string;
   incoming_qty: string | number | null;
-}
-
-interface RawDetailRow {
-  reference_type: string;
-  reference_id: string;
-  posted_at: Date;
-  quantity: string | number;
-  unit_cost: string | number | null;
-  line_value: string | number | null;
-  notes: string | null;
 }
 
 @Injectable()
@@ -261,13 +244,18 @@ export class StockSummaryService {
       query.incomingQty,
     );
 
+    const group = this.groupExpressions(query);
     const pageQb = this.applyHaving(
       this.buildGroupedQuery(query),
       query.stockState,
       query.quantity,
     )
-      .orderBy("item.code", "ASC")
-      .addOrderBy("storage.name", "ASC");
+      .orderBy(group.aggCode, "ASC")
+      .addOrderBy("storage.name", "ASC")
+      // Tiebreakers: neither the displayed code nor the storage name is unique,
+      // and without a total order OFFSET paging silently repeats/drops rows.
+      .addOrderBy(group.key, "ASC")
+      .addOrderBy("storage.id", "ASC");
     if (!needsDerivedFilter) {
       pageQb.limit(pageSize).offset((page - 1) * pageSize);
     }
@@ -304,12 +292,22 @@ export class StockSummaryService {
       ? this.readTotals(aggResult?.[0], totalQuantity, Boolean(query.startDate || query.endDate))
       : undefined;
 
+    // The follow-up queries below stay keyed on (item, storage) even when the
+    // page is grouped by SKU: one row then contributes every variant it folds
+    // in, and the per-variant results are summed back per row when mapping.
+    const itemIds: string[] = [];
+    const storageIds: string[] = [];
+    for (const row of rows) {
+      for (const memberId of row.item_ids ?? []) {
+        itemIds.push(memberId);
+        storageIds.push(row.storage_id);
+      }
+    }
+
     const periodDataMap = new Map<string, RawPeriodRow>();
     if (rows.length > 0 && (query.startDate || query.endDate)) {
       const startDate = query.startDate || "1970-01-01";
       const endDate = query.endDate ? addOneDay(query.endDate) : "2999-12-31";
-      const itemIds = rows.map((r) => r.item_id);
-      const storageIds = rows.map((r) => r.storage_id);
 
       const periodQuery = `
         SELECT
@@ -341,8 +339,6 @@ export class StockSummaryService {
 
     const pendingTransferMap = new Map<string, RawPendingTransferRow>();
     if (rows.length > 0) {
-      const itemIds = rows.map((r) => r.item_id);
-      const storageIds = rows.map((r) => r.storage_id);
       const pendingTransferQuery = `
         SELECT
           pairs.item_id,
@@ -389,8 +385,6 @@ export class StockSummaryService {
 
     const reservationMap = new Map<string, RawReservationRow>();
     if (rows.length > 0 && query.branchId) {
-      const itemIds = rows.map((r) => r.item_id);
-      const storageIds = rows.map((r) => r.storage_id);
       const reservationQuery = `
         SELECT
           pairs.item_id,
@@ -428,15 +422,33 @@ export class StockSummaryService {
     }
 
     let data: StockSummaryRow[] = rows.map((r) => {
-      const pd = periodDataMap.get(`${r.item_id}:${r.storage_id}`);
-      const pending = pendingTransferMap.get(`${r.item_id}:${r.storage_id}`);
-      const reservation = reservationMap.get(`${r.item_id}:${r.storage_id}`);
-      const openingQty = Number(pd?.opening_qty ?? 0);
-      const openingValue = Number(pd?.opening_value ?? 0);
-      const inQty = Number(pd?.in_qty ?? 0);
-      const inValue = Number(pd?.in_value ?? 0);
-      const outQty = Number(pd?.out_qty ?? 0);
-      const outValue = Number(pd?.out_value ?? 0);
+      // In SKU mode a row folds several variants, so every follow-up figure is
+      // the sum over its members. VARIANT mode has exactly one member, which
+      // makes these loops a no-op rename of the old direct lookups.
+      let openingQty = 0;
+      let openingValue = 0;
+      let inQty = 0;
+      let inValue = 0;
+      let outQty = 0;
+      let outValue = 0;
+      let transferOutQty = 0;
+      let incomingQty = 0;
+      let reservedQty = 0;
+      for (const memberId of r.item_ids ?? []) {
+        const pairKey = `${memberId}:${r.storage_id}`;
+        const pd = periodDataMap.get(pairKey);
+        const pending = pendingTransferMap.get(pairKey);
+        const reservation = reservationMap.get(pairKey);
+        openingQty += Number(pd?.opening_qty ?? 0);
+        openingValue += Number(pd?.opening_value ?? 0);
+        inQty += Number(pd?.in_qty ?? 0);
+        inValue += Number(pd?.in_value ?? 0);
+        outQty += Number(pd?.out_qty ?? 0);
+        outValue += Number(pd?.out_value ?? 0);
+        transferOutQty += Number(pending?.transfer_out_qty ?? 0);
+        incomingQty += Number(pending?.incoming_qty ?? 0);
+        reservedQty += Number(reservation?.reserved_qty ?? 0);
+      }
       const hasPeriod = query.startDate || query.endDate;
       const closingQty = hasPeriod
         ? openingQty + inQty - outQty
@@ -444,10 +456,12 @@ export class StockSummaryService {
       const closingValue = hasPeriod ? openingValue + inValue - outValue : 0;
 
       return {
-        itemId: r.item_id,
+        itemId: r.group_key,
         storageId: r.storage_id,
+        groupKey: r.group_key,
+        productId: r.product_id,
         item: {
-          id: r.item_id,
+          id: r.group_key,
           code: r.item_code,
           name: r.item_name,
           unit: r.item_unit,
@@ -472,9 +486,9 @@ export class StockSummaryService {
         outValue,
         closingQty,
         closingValue,
-        transferOutQty: Number(pending?.transfer_out_qty ?? 0),
-        incomingQty: Number(pending?.incoming_qty ?? 0),
-        reservedQty: Number(reservation?.reserved_qty ?? 0),
+        transferOutQty,
+        incomingQty,
+        reservedQty,
       };
     });
 
@@ -483,13 +497,14 @@ export class StockSummaryService {
         (await this.balanceRepo.manager.query<RawPendingOnlyRow[]>(
           `
             SELECT
-              item.id AS item_id,
-              item.code AS item_code,
-              item.name AS item_name,
-              item.unit AS item_unit,
-              item.brand AS item_brand,
-              item.is_active AS item_is_active,
-              category.name AS category_name,
+              ${group.key} AS group_key,
+              MIN(item.product_id::text) AS product_id,
+              ${group.aggCode} AS item_code,
+              ${group.aggName} AS item_name,
+              ${group.sku ? "MIN(item.unit)" : "item.unit"} AS item_unit,
+              ${group.sku ? "MIN(item.brand)" : "item.brand"} AS item_brand,
+              ${group.sku ? "BOOL_OR(item.is_active)" : "item.is_active"} AS item_is_active,
+              ${group.sku ? "MIN(category.name)" : "category.name"} AS category_name,
               destination_storage.id AS storage_id,
               destination_storage.name AS storage_name,
               transfer_order.destination_branch_id AS branch_id,
@@ -501,6 +516,8 @@ export class StockSummaryService {
             INNER JOIN items item
               ON item.id = transfer_line.item_id
              AND item.organization_id = transfer_order.organization_id
+            LEFT JOIN products prod
+              ON prod.id = item.product_id
             LEFT JOIN inventory_item_categories category
               ON category.id = item.category_id
             LEFT JOIN storages destination_storage
@@ -510,35 +527,29 @@ export class StockSummaryService {
               AND transfer_order.destination_branch_id = $2
               AND transfer_order.status = 'IN_PROGRESS'
               AND transfer_order.deleted_at IS NULL
-              AND NOT EXISTS (
-                SELECT 1
-                FROM stock_balances pending_balance
-                INNER JOIN locations pending_location
-                  ON pending_location.id = pending_balance.location_id
-                WHERE pending_balance.organization_id = transfer_order.organization_id
-                  AND pending_balance.item_id = transfer_line.item_id
-                  AND pending_balance.branch_id = transfer_order.destination_branch_id
-                  AND (
-                    transfer_order.destination_storage_id IS NULL
-                    OR pending_location.storage_id = transfer_order.destination_storage_id
-                  )
-              )
-            GROUP BY item.id, item.code, item.name, item.unit, item.brand,
-                     item.is_active, category.name, destination_storage.id,
+              AND NOT EXISTS (${this.pendingOnlyGuardSql(group.sku)})
+            GROUP BY ${group.sku
+              ? "prod.code, prod.name"
+              : "item.code, item.name, item.unit, item.brand, item.is_active, category.name"},
+                     ${group.groupBy}, destination_storage.id,
                      destination_storage.name, transfer_order.destination_branch_id
           `,
           [query.organizationId, query.branchId],
         )) ?? [];
-      const existingKeys = new Set(data.map((row) => `${row.itemId}:${row.storageId}`));
+      const existingKeys = new Set(
+        data.map((row) => `${row.groupKey}:${row.storageId}`),
+      );
       let appended = 0;
       for (const row of pendingOnlyRows) {
         const storageId = row.storage_id ?? `pending:${row.branch_id}`;
-        if (existingKeys.has(`${row.item_id}:${storageId}`)) continue;
+        if (existingKeys.has(`${row.group_key}:${storageId}`)) continue;
         data.push({
-          itemId: row.item_id,
+          itemId: row.group_key,
           storageId,
+          groupKey: row.group_key,
+          productId: row.product_id,
           item: {
-            id: row.item_id,
+            id: row.group_key,
             code: row.item_code,
             name: row.item_name,
             unit: row.item_unit,
@@ -620,77 +631,6 @@ export class StockSummaryService {
     return { data, total, page, pageSize, totalQuantity, totals };
   }
 
-  async getDetails(
-    query: StockSummaryDetailsQuery,
-  ): Promise<StockSummaryDetailsResponse> {
-    const page = Math.max(1, Number(query.page ?? 1));
-    const pageSize = Math.min(200, Math.max(1, Number(query.pageSize ?? 20)));
-    const offset = (page - 1) * pageSize;
-    const startDate = query.startDate || "1970-01-01";
-    const endDate = query.endDate ? addOneDay(query.endDate) : "2999-12-31";
-    const params = [
-      query.organizationId,
-      query.itemId,
-      query.storageId,
-      query.branchId,
-      startDate,
-      endDate,
-    ];
-
-    const baseSql = `
-      FROM stock_ledger_entries sle
-      INNER JOIN locations loc ON loc.id = sle.location_id
-      WHERE sle.organization_id = $1
-        AND sle.item_id = $2
-        AND loc.storage_id = $3
-        AND sle.branch_id = $4
-        AND sle.posted_at >= $5
-        AND sle.posted_at < $6
-        ${EXCLUDE_VOIDED_DOCS_SQL}
-    `;
-    const dataSql = `
-      SELECT
-        sle.reference_type,
-        sle.reference_id,
-        sle.posted_at,
-        sle.quantity,
-        sle.unit_cost,
-        sle.line_value,
-        sle.notes
-      ${baseSql}
-      ORDER BY sle.posted_at DESC, sle.id DESC
-      LIMIT $7 OFFSET $8
-    `;
-    const countSql = `SELECT COUNT(*)::int AS total ${baseSql}`;
-
-    const [rows, countRows] = await Promise.all([
-      this.balanceRepo.manager.query<RawDetailRow[]>(dataSql, [
-        ...params,
-        pageSize,
-        offset,
-      ]),
-      this.balanceRepo.manager.query<Array<{ total: number | string }>>(
-        countSql,
-        params,
-      ),
-    ]);
-
-    return {
-      data: rows.map((row) => ({
-        referenceType: row.reference_type,
-        referenceId: row.reference_id,
-        postedAt: row.posted_at.toISOString(),
-        quantity: Number(row.quantity),
-        unitCost: Number(row.unit_cost ?? 0),
-        lineValue: Number(row.line_value ?? 0),
-        notes: row.notes ?? null,
-      })),
-      total: Number(countRows[0]?.total ?? 0),
-      page,
-      pageSize,
-    };
-  }
-
   async getFilterOptions(
     organizationId: string,
   ): Promise<StockSummaryFilterOptions> {
@@ -750,12 +690,19 @@ export class StockSummaryService {
       return `$${params.length}`;
     };
 
+    // `groups` is one row per grid row (so COUNT/SUM below match the grid),
+    // while `pairs` expands each row back to the (item, storage) pairs the
+    // ledger/transfer/reservation CTEs join on. They are the same set in
+    // VARIANT mode and differ only when a row folds several variants.
     const ctes: string[] = [
-      `pairs AS (${aggSql})`,
+      `groups AS (${aggSql})`,
+      `pairs AS (
+         SELECT DISTINCT member_id AS item_id, g.storage_id
+         FROM groups g, unnest(g.item_ids) AS member_id)`,
       `base AS (
          SELECT COUNT(*)::int AS total,
-                COALESCE(SUM(pairs.quantity), 0)::numeric AS total_quantity
-         FROM pairs)`,
+                COALESCE(SUM(groups.quantity), 0)::numeric AS total_quantity
+         FROM groups)`,
     ];
 
     // Period columns — mirrors the page query's condition at the call site.
@@ -851,19 +798,9 @@ export class StockSummaryService {
            AND transfer_order.destination_branch_id = ${branch}
            AND transfer_order.status = 'IN_PROGRESS'
            AND transfer_order.deleted_at IS NULL
-           AND NOT EXISTS (
-             SELECT 1
-             FROM stock_balances pending_balance
-             INNER JOIN locations pending_location
-               ON pending_location.id = pending_balance.location_id
-             WHERE pending_balance.organization_id = transfer_order.organization_id
-               AND pending_balance.item_id = transfer_line.item_id
-               AND pending_balance.branch_id = transfer_order.destination_branch_id
-               AND (
-                 transfer_order.destination_storage_id IS NULL
-                 OR pending_location.storage_id = transfer_order.destination_storage_id
-               )
-           ))`);
+           AND NOT EXISTS (${this.pendingOnlyGuardSql(
+             query.groupBy === StockSummaryGroupBy.SKU,
+           )}))`);
     } else {
       ctes.push(`pending_only AS (SELECT 0::numeric AS incoming_qty)`);
     }
@@ -906,29 +843,112 @@ export class StockSummaryService {
     };
   }
 
+  /**
+   * SQL fragments that differ between the two row granularities. `key` is what
+   * a row is identified by; `code`/`name` are the pre-aggregation expressions
+   * used by WHERE filters, `aggCode`/`aggName` their SELECT counterparts.
+   */
+  private groupExpressions(query: StockSummaryQuery, itemAlias = "item") {
+    if (query.groupBy === StockSummaryGroupBy.SKU) {
+      return {
+        sku: true,
+        key: `COALESCE(${itemAlias}.product_id::text, ${itemAlias}.id::text)`,
+        groupBy: `COALESCE(${itemAlias}.product_id::text, ${itemAlias}.id::text)`,
+        code: "COALESCE(prod.code, item.code)",
+        name: "COALESCE(prod.name, item.name)",
+        aggCode: `COALESCE(prod.code, MIN(${itemAlias}.code))`,
+        aggName: `COALESCE(prod.name, MIN(${itemAlias}.name))`,
+      };
+    }
+    return {
+      sku: false,
+      key: `${itemAlias}.id::text`,
+      groupBy: `${itemAlias}.id`,
+      code: "item.code",
+      name: "item.name",
+      aggCode: `${itemAlias}.code`,
+      aggName: `${itemAlias}.name`,
+    };
+  }
+
+  /**
+   * "This destination has no stock balance yet", the guard that makes the
+   * pending-only set disjoint from the paged set — the footer would otherwise
+   * count the same incoming quantity twice.
+   *
+   * In SKU mode the test has to run over the whole model: if one variant
+   * already has a balance the group is on the page, and pass 2 has already
+   * counted the incoming of *every* variant in it.
+   *
+   * Assumes `transfer_order`, `transfer_line` and `item` are in scope.
+   */
+  private pendingOnlyGuardSql(sku: boolean): string {
+    const balanceItem = sku
+      ? `INNER JOIN items sibling
+             ON sibling.organization_id = transfer_order.organization_id
+            AND sibling.id = pending_balance.item_id
+            AND (
+              CASE WHEN item.product_id IS NULL
+                   THEN sibling.id = item.id
+                   ELSE sibling.product_id = item.product_id
+              END
+            )`
+      : "";
+    return `
+                SELECT 1
+                FROM stock_balances pending_balance
+                INNER JOIN locations pending_location
+                  ON pending_location.id = pending_balance.location_id
+                ${balanceItem}
+                WHERE pending_balance.organization_id = transfer_order.organization_id
+                  ${sku ? "" : "AND pending_balance.item_id = transfer_line.item_id"}
+                  AND pending_balance.branch_id = transfer_order.destination_branch_id
+                  AND (
+                    transfer_order.destination_storage_id IS NULL
+                    OR pending_location.storage_id = transfer_order.destination_storage_id
+                  )`;
+  }
+
   private buildGroupedQuery(
     query: StockSummaryQuery,
   ): SelectQueryBuilder<StockBalanceEntity> {
-    return this.buildBaseQuery(query)
-      .select("item.id", "item_id")
-      .addSelect("item.code", "item_code")
-      .addSelect("item.name", "item_name")
-      .addSelect("item.unit", "item_unit")
-      .addSelect("item.brand", "item_brand")
-      .addSelect("item.is_active", "item_is_active")
-      .addSelect("cat.name", "category_name")
+    const group = this.groupExpressions(query);
+    const qb = this.buildBaseQuery(query)
+      .select(group.key, "group_key")
+      .addSelect("MIN(item.product_id::text)", "product_id")
+      .addSelect("array_agg(DISTINCT item.id)", "item_ids")
+      .addSelect(group.aggCode, "item_code")
+      .addSelect(group.aggName, "item_name")
       .addSelect("storage.id", "storage_id")
       .addSelect("storage.name", "storage_name")
       .addSelect("storage.branch_id", "branch_id")
       .addSelect("SUM(sb.quantity)", "quantity")
       .addSelect("MAX(sb.last_movement_at)", "last_movement_at")
-      .groupBy("item.id")
-      .addGroupBy("item.code")
-      .addGroupBy("item.name")
-      .addGroupBy("item.unit")
-      .addGroupBy("item.brand")
-      .addGroupBy("item.is_active")
-      .addGroupBy("cat.name")
+      .groupBy(group.groupBy);
+
+    if (group.sku) {
+      // Aggregated because a product's variants may in theory disagree; in
+      // practice they share unit/brand/category and any of them is the answer.
+      qb.addSelect("MIN(item.unit)", "item_unit")
+        .addSelect("MIN(item.brand)", "item_brand")
+        .addSelect("BOOL_OR(item.is_active)", "item_is_active")
+        .addSelect("MIN(cat.name)", "category_name")
+        .addGroupBy("prod.code")
+        .addGroupBy("prod.name");
+    } else {
+      qb.addSelect("item.unit", "item_unit")
+        .addSelect("item.brand", "item_brand")
+        .addSelect("item.is_active", "item_is_active")
+        .addSelect("cat.name", "category_name")
+        .addGroupBy("item.code")
+        .addGroupBy("item.name")
+        .addGroupBy("item.unit")
+        .addGroupBy("item.brand")
+        .addGroupBy("item.is_active")
+        .addGroupBy("cat.name");
+    }
+
+    return qb
       .addGroupBy("storage.id")
       .addGroupBy("storage.name")
       .addGroupBy("storage.branch_id");
@@ -963,12 +983,18 @@ export class StockSummaryService {
   private buildBaseQuery(
     query: StockSummaryQuery,
   ): SelectQueryBuilder<StockBalanceEntity> {
+    const group = this.groupExpressions(query);
     const qb = this.balanceRepo
       .createQueryBuilder("sb")
       .innerJoin("items", "item", "item.id = sb.item_id")
       .innerJoin("locations", "loc", "loc.id = sb.location_id")
       .innerJoin("storages", "storage", "storage.id = loc.storage_id")
       .leftJoin("inventory_item_categories", "cat", "cat.id = item.category_id")
+      .leftJoin(
+        "products",
+        "prod",
+        "prod.id = item.product_id AND prod.organization_id = item.organization_id",
+      )
       .where("sb.organization_id = :organizationId", {
         organizationId: query.organizationId,
       });
@@ -987,13 +1013,13 @@ export class StockSummaryService {
       });
     }
     if (query.search && query.search.trim()) {
-      qb.andWhere("(item.code ILIKE :q OR item.name ILIKE :q)", {
+      qb.andWhere(`(${group.code} ILIKE :q OR ${group.name} ILIKE :q)`, {
         q: `%${query.search.trim()}%`,
       });
     }
     new FilterBuilder(qb)
-      .applyString("item.code", query.itemCode)
-      .applyString("item.name", query.itemName)
+      .applyString(group.code, query.itemCode)
+      .applyString(group.name, query.itemName)
       .applyString(
         "item.unit",
         typeof query.unit === "object" ? query.unit : undefined,
@@ -1081,7 +1107,7 @@ function matchesCompare(value: number, filter?: CompareFilterDto): boolean {
   }
 }
 
-function addOneDay(isoDate: string): string {
+export function addOneDay(isoDate: string): string {
   const d = new Date(`${isoDate}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString().slice(0, 10);

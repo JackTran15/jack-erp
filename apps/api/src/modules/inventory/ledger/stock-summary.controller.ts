@@ -13,7 +13,6 @@ import { BranchScopeGuard } from '../../rbac/branch-scope.guard';
 import { AuditInterceptor } from '../../crud/audit.interceptor';
 import { StockSummaryService } from './stock-summary.service';
 import { StockSummaryQueryDto } from './dto/stock-summary-query.dto';
-import { StockSummaryDetailsQueryDto } from './dto/stock-summary-details-query.dto';
 
 @ApiTags('inventory')
 @Controller('inventory/stock')
@@ -40,18 +39,5 @@ export class StockSummaryController {
   @RequirePermission('inventory.read')
   getFilterOptions(@Actor() actor: ActorContext) {
     return this.service.getFilterOptions(actor.organizationId);
-  }
-
-  @Get('summary/details')
-  @RequirePermission('inventory.read')
-  getDetails(
-    @Query() query: StockSummaryDetailsQueryDto,
-    @Actor() actor: ActorContext,
-  ) {
-    return this.service.getDetails({
-      ...query,
-      organizationId: actor.organizationId,
-      branchId: actor.branchId!,
-    });
   }
 }

@@ -7975,85 +7975,6 @@
         ]
       }
     },
-    "/inventory/stock/summary/details": {
-      "get": {
-        "operationId": "StockSummaryController_getDetails",
-        "parameters": [
-          {
-            "name": "itemId",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "storageId",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "startDate",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "date",
-              "type": "string"
-            }
-          },
-          {
-            "name": "endDate",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "date",
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 200,
-              "default": 20,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "inventory"
-        ]
-      }
-    },
     "/v2/inventory/stock/summary/search": {
       "post": {
         "operationId": "StockSummaryV2Controller_search_v2",
@@ -8080,6 +8001,70 @@
             }
           }
         },
+        "tags": [
+          "StockSummaryV2"
+        ]
+      }
+    },
+    "/v2/inventory/stock/summary/sku-breakdown": {
+      "post": {
+        "operationId": "StockSummaryV2Controller_skuBreakdown_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockSkuBreakdownDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "\"Chi tiết hàng hóa\" — the variants behind one SKU row, by location.",
+        "tags": [
+          "StockSummaryV2"
+        ]
+      }
+    },
+    "/v2/inventory/stock/summary/ledger-card": {
+      "post": {
+        "operationId": "StockSummaryV2Controller_ledgerCard_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockLedgerCardDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "\"Chi tiết tồn kho\" — the stock card of one variant in one storage.",
         "tags": [
           "StockSummaryV2"
         ]
@@ -29287,6 +29272,13 @@
               "NEGATIVE"
             ]
           },
+          "groupBy": {
+            "type": "string",
+            "enum": [
+              "VARIANT",
+              "SKU"
+            ]
+          },
           "itemCode": {
             "$ref": "#/components/schemas/StringFilterDto"
           },
@@ -29324,6 +29316,143 @@
             "$ref": "#/components/schemas/CompareFilterDto"
           }
         }
+      },
+      "StockSkuBreakdownDto": {
+        "type": "object",
+        "properties": {
+          "groupKey": {
+            "type": "string",
+            "description": "The grid row's `groupKey`: the parent product id, or the item id for items\nthat have no parent. Rows whose `storageId` starts with `pending:` are\nsynthetic incoming-transfer rows with nothing to break down — the client\nmust not open the dialog for them.",
+            "format": "uuid"
+          },
+          "storageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "endDate": {
+            "type": "string"
+          },
+          "excludeReservations": {
+            "type": "boolean"
+          },
+          "page": {
+            "type": "number",
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "itemCode": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "itemName": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "locationCode": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "locationName": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "quantity": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "openingQty": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "inQty": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "outQty": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "transferOutQty": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "incomingQty": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          }
+        },
+        "required": [
+          "groupKey",
+          "storageId"
+        ]
+      },
+      "StockLedgerCardDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "storageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "locationId": {
+            "type": "string",
+            "description": "Narrows the card to a single location; omit for the whole storage.",
+            "format": "uuid"
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "endDate": {
+            "type": "string"
+          },
+          "page": {
+            "type": "number",
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "documentType": {
+            "description": "`Loại chứng từ` — exact `reference_type`, from the filter-options list.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "documentDate": {
+            "description": "`Ngày chứng từ` — the grid's date-compare cell (`=`, `<=`, `>` …).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "documentNumber": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "description": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "balanceQty": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "inQty": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "outQty": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          }
+        },
+        "required": [
+          "itemId",
+          "storageId"
+        ]
       },
       "StockSummaryExportDto": {
         "type": "object",
@@ -29377,6 +29506,13 @@
               "IN_STOCK",
               "OUT_OF_STOCK",
               "NEGATIVE"
+            ],
+            "type": "string"
+          },
+          "groupBy": {
+            "enum": [
+              "VARIANT",
+              "SKU"
             ],
             "type": "string"
           },
