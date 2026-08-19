@@ -13,16 +13,28 @@ import {
   InvoiceEntity,
   InvoicePaymentMethod,
   InvoiceType,
+  RefundMethod,
 } from '../../../pos/entities/invoice.entity';
 import { InvoicePaymentEntity } from '../../../pos/entities/invoice-payment.entity';
 import { InvoiceDebtEntity, DebtDocumentType } from '../../../pos/entities/invoice-debt.entity';
-import { DebtPaymentEntity } from '../../../pos/entities/debt-payment.entity';
-import { CashPaymentEntity } from '../../../accounting/cash-vouchers/cash-payments/cash-payment.entity';
+import {
+  DebtPaymentEntity,
+  DebtPaymentMethod,
+} from '../../../pos/entities/debt-payment.entity';
 import { CashReceiptEntity } from '../../../accounting/cash-vouchers/cash-receipts/cash-receipt.entity';
-import { CashReceiptPurpose, CashVoucherStatus } from '../../../accounting/cash-vouchers/enums';
-import { PaymentAccountEntity } from '../../../accounting/payment-accounts/payment-account.entity';
-import { PaymentAccountMethod } from '../../../accounting/payment-accounts/enums';
-import { CashAccountEntity } from '../../../accounting/cash/cash-account.entity';
+import { CashPaymentEntity } from '../../../accounting/cash-vouchers/cash-payments/cash-payment.entity';
+import {
+  CashPaymentPurpose,
+  CashReceiptReferenceType,
+  CashVoucherStatus,
+} from '../../../accounting/cash-vouchers/enums';
+import { BankPaymentEntity } from '../../../accounting/deposit-vouchers/bank-payments/bank-payment.entity';
+import { BankReceiptEntity } from '../../../accounting/deposit-vouchers/bank-receipts/bank-receipt.entity';
+import {
+  BankPaymentPurpose,
+  BankReceiptReferenceType,
+  BankVoucherStatus,
+} from '../../../accounting/deposit-vouchers/enums';
 import { DepositAccountEntity } from '../../../accounting/deposit/deposit-account.entity';
 import { AccountEntity } from '../../../accounting/coa/account.entity';
 import { CustomerEntity } from '../../../customer/customer.entity';
@@ -47,13 +59,32 @@ function invoiceTypeLabel(type: InvoiceType): string {
   return 'Bán hàng';
 }
 
+/** Money handed back on one invoice that actually left a fund. See the aggregate handler. */
+function paidOutOf(inv: InvoiceEntity): number {
+  return Number(inv.refundedAmount ?? 0) - Number(inv.offsetAmount ?? 0);
+}
+
+/** "Loại chứng từ" for a non-refund payout voucher, so Chi rows say what the money was for. */
+const VOUCHER_PURPOSE_LABELS: Record<string, string> = {
+  [CashPaymentPurpose.SUPPLIER_PAYMENT]: 'Trả nợ nhà cung cấp',
+  [CashPaymentPurpose.PURCHASE]: 'Mua hàng',
+  [CashPaymentPurpose.EXPENSE]: 'Chi phí',
+  [CashPaymentPurpose.SALARY]: 'Lương',
+  [CashPaymentPurpose.DEPOSIT_TRANSFER]: 'Nộp vào tài khoản',
+  [CashPaymentPurpose.INTER_BRANCH_OUT]: 'Chuyển chi nhánh',
+  [BankPaymentPurpose.CASH_TRANSFER]: 'Rút về quỹ tiền mặt',
+  [BankPaymentPurpose.BANK_FEE]: 'Phí ngân hàng',
+};
+const voucherPurposeLabel = (purpose: string): string =>
+  VOUCHER_PURPOSE_LABELS[purpose] ?? 'Chi khác';
+
 /** Everything a per-category row builder needs — resolved once in `execute()`. */
 interface DetailBuildContext {
   org: string;
   branchIds: string[] | null;
-  accountMethod: Map<string, PaymentAccountMethod>;
   from?: string;
   to?: string;
+  /** Vouchers carry one staff reference, so either role filter narrows them. */
   voucherStaffIds: string[];
   issuedAt: { from?: string; to?: string };
   cashierId?: string;
@@ -64,8 +95,8 @@ interface DetailBuildContext {
 /**
  * A source row before customer/account display names are resolved. Only one
  * of {@link customerId}/{@link customerNameDirect} and one of
- * {@link depositAccountId}/{@link glAccountId}/{@link cashAccountId} is ever set,
- * depending on which entity the row came from.
+ * {@link depositAccountId}/{@link glAccountId} is ever set, depending on which
+ * entity the row came from.
  */
 interface SourceRow {
   documentNumber: string;
@@ -77,7 +108,6 @@ interface SourceRow {
   customerNameDirect?: string;
   depositAccountId?: string;
   glAccountId?: string;
-  cashAccountId?: string;
   amount?: number;
   pointsUsed?: number;
   pointsValue?: number;
@@ -92,7 +122,9 @@ function cellValue(col: string, row: PosDailySummaryDetailRow): ReportCellValue 
  * Drill-down ("xem chi tiết") row list backing one Tab 1 summary line item.
  * Each category's row set is built to sum exactly to the matching field on
  * `GetPosDailySummaryHandler`'s result — see that handler's money-model doc
- * comment for the shared Thu/Chi/Công nợ definitions this mirrors.
+ * comment for the shared Thu/Chi/Công nợ definitions this mirrors — including
+ * why the Chi categories read both the invoice (refunds) and the non-refund
+ * payout vouchers, while Thu reads the invoice domain only.
  */
 @QueryHandler(GetPosDailySummaryDetailQuery)
 export class GetPosDailySummaryDetailHandler
@@ -107,14 +139,14 @@ export class GetPosDailySummaryDetailHandler
     private readonly invoiceDebts: Repository<InvoiceDebtEntity>,
     @InjectRepository(DebtPaymentEntity)
     private readonly debtPayments: Repository<DebtPaymentEntity>,
-    @InjectRepository(CashPaymentEntity)
-    private readonly cashPayments: Repository<CashPaymentEntity>,
     @InjectRepository(CashReceiptEntity)
     private readonly cashReceipts: Repository<CashReceiptEntity>,
-    @InjectRepository(PaymentAccountEntity)
-    private readonly paymentAccounts: Repository<PaymentAccountEntity>,
-    @InjectRepository(CashAccountEntity)
-    private readonly cashAccounts: Repository<CashAccountEntity>,
+    @InjectRepository(CashPaymentEntity)
+    private readonly cashPayments: Repository<CashPaymentEntity>,
+    @InjectRepository(BankPaymentEntity)
+    private readonly bankPayments: Repository<BankPaymentEntity>,
+    @InjectRepository(BankReceiptEntity)
+    private readonly bankReceipts: Repository<BankReceiptEntity>,
     @InjectRepository(DepositAccountEntity)
     private readonly depositAccounts: Repository<DepositAccountEntity>,
     @InjectRepository(AccountEntity)
@@ -141,14 +173,9 @@ export class GetPosDailySummaryDetailHandler
       actor,
     );
 
-    const accountMethod = new Map<string, PaymentAccountMethod>();
-    const accounts = await this.paymentAccounts.find({ where: { organizationId: org } });
-    for (const a of accounts) accountMethod.set(a.accountId, a.paymentMethod);
-
     const ctx: DetailBuildContext = {
       org,
       branchIds,
-      accountMethod,
       from: dateOnly(dto.issuedAt?.from),
       to: dateOnly(dto.issuedAt?.to),
       voucherStaffIds: [dto.cashierId, dto.salespersonId].filter(
@@ -194,19 +221,19 @@ export class GetPosDailySummaryDetailHandler
   ): Promise<SourceRow[]> {
     switch (category) {
       case PosDailySummaryDetailCategory.RevenueCash:
-        return this.buildRevenueRows(ctx, InvoicePaymentMethod.CASH, PaymentAccountMethod.CASH);
+        return this.buildRevenueRows(ctx, InvoicePaymentMethod.CASH, DebtPaymentMethod.CASH);
       case PosDailySummaryDetailCategory.RevenueBankTransfer:
         return this.buildRevenueRows(
           ctx,
           InvoicePaymentMethod.BANK_TRANSFER,
-          PaymentAccountMethod.BANK_TRANSFER,
+          DebtPaymentMethod.BANK_TRANSFER,
         );
       case PosDailySummaryDetailCategory.RevenuePoints:
         return this.buildRevenuePointsRows(ctx);
       case PosDailySummaryDetailCategory.ExpenseCash:
-        return this.buildExpenseRows(ctx, PaymentAccountMethod.CASH);
+        return this.buildExpenseRows(ctx, RefundMethod.CASH);
       case PosDailySummaryDetailCategory.ExpenseBankTransfer:
-        return this.buildExpenseRows(ctx, PaymentAccountMethod.BANK_TRANSFER);
+        return this.buildExpenseRows(ctx, RefundMethod.BANK);
       case PosDailySummaryDetailCategory.DebtIncrease:
         return this.buildDebtIncreaseRows(ctx);
       case PosDailySummaryDetailCategory.DebtDecrease:
@@ -216,7 +243,7 @@ export class GetPosDailySummaryDetailHandler
     }
   }
 
-  /** Shared invoice fetch for the 3 revenue categories (Tiền mặt / Chuyển khoản / Điểm). */
+  /** Shared invoice fetch for the revenue + expense categories. */
   private async fetchWindowInvoices(ctx: DetailBuildContext): Promise<InvoiceEntity[]> {
     const qb = this.invoices
       .createQueryBuilder('invoice')
@@ -232,7 +259,7 @@ export class GetPosDailySummaryDetailHandler
   private async buildRevenueRows(
     ctx: DetailBuildContext,
     method: InvoicePaymentMethod,
-    accountMethodBucket: PaymentAccountMethod,
+    debtMethod: DebtPaymentMethod,
   ): Promise<SourceRow[]> {
     const rows: SourceRow[] = [];
     const invoices = await this.fetchWindowInvoices(ctx);
@@ -260,43 +287,63 @@ export class GetPosDailySummaryDetailHandler
       }
     }
 
-    // No negative refund line here, mirroring the aggregate handler: a CASH
-    // refund does issue a POSTED phiếu chi, so it already appears on the Chi
-    // side. Listing it as a negative row on the Thu side too showed the same
-    // refund on both sides of the report and made the drill-down disagree with
-    // the fund. See the long comment in get-pos-daily-summary.handler.
+    // Thu nợ — debt repayments received by this method. No negative refund row
+    // here: a refund is money out, and the Chi categories own it outright.
+    rows.push(
+      ...(await this.fetchDebtPaymentSourceRows(ctx, {
+        method: debtMethod,
+        documentType: 'Thu nợ',
+      })),
+    );
 
-    // Non-invoice cash inflow (Thu nợ / Thu khác) — see aggregate handler's doc
-    // comment for why POS_SALE-purpose receipts are excluded.
-    const receiptQb = this.cashReceipts
-      .createQueryBuilder('r')
-      .where('r.organizationId = :org', { org: ctx.org })
-      .andWhere('r.status = :posted', { posted: CashVoucherStatus.POSTED })
-      .andWhere('r.purpose != :posSale', { posSale: CashReceiptPurpose.POS_SALE });
-    applyBranchScope(receiptQb, 'r', ctx.branchIds);
-    if (ctx.from) receiptQb.andWhere('r.voucherDate >= :crFrom', { crFrom: ctx.from });
-    if (ctx.to) receiptQb.andWhere('r.voucherDate <= :crTo', { crTo: ctx.to });
-    if (ctx.voucherStaffIds.length) {
-      receiptQb.andWhere('r.staffId IN (:...voucherStaffIds)', {
-        voucherStaffIds: ctx.voucherStaffIds,
-      });
-    }
-    const receiptRows = await receiptQb.getMany();
-    for (const r of receiptRows) {
-      const rowMethod = ctx.accountMethod.get(r.cashAccountId);
-      const bucket =
-        rowMethod === PaymentAccountMethod.BANK_TRANSFER
-          ? PaymentAccountMethod.BANK_TRANSFER
-          : PaymentAccountMethod.CASH;
-      if (bucket !== accountMethodBucket) continue;
-      rows.push({
-        documentNumber: r.documentNumber ?? r.id,
-        documentType: r.purpose === CashReceiptPurpose.DEBT_COLLECTION ? 'Thu nợ' : 'Thu khác',
-        sortKey: `${r.voucherDate}T00:00:00.000Z`,
-        customerNameDirect: r.payerName ?? undefined,
-        cashAccountId: r.cashAccountId,
-        amount: Number(r.totalAmount ?? 0),
-      });
+    // Fund-swap inflow leg — pairs with the payout leg the Chi categories count.
+    // See the aggregate handler for why this is keyed on referenceType.
+    if (method === InvoicePaymentMethod.CASH) {
+      const qb = this.cashReceipts
+        .createQueryBuilder('r')
+        .where('r.organizationId = :org', { org: ctx.org })
+        .andWhere('r.status = :posted', { posted: CashVoucherStatus.POSTED })
+        .andWhere('r.referenceType = :swap', {
+          swap: CashReceiptReferenceType.FUND_SWAP,
+        });
+      applyBranchScope(qb, 'r', ctx.branchIds);
+      if (ctx.from) qb.andWhere('r.voucherDate >= :crFrom', { crFrom: ctx.from });
+      if (ctx.to) qb.andWhere('r.voucherDate <= :crTo', { crTo: ctx.to });
+      if (ctx.voucherStaffIds.length) {
+        qb.andWhere('r.staffId IN (:...voucherStaffIds)', {
+          voucherStaffIds: ctx.voucherStaffIds,
+        });
+      }
+      for (const r of await qb.getMany()) {
+        rows.push({
+          documentNumber: r.documentNumber ?? r.id,
+          documentType: 'Chuyển quỹ',
+          sortKey: `${r.voucherDate}T00:00:00.000Z`,
+          customerNameDirect: r.payerName ?? undefined,
+          amount: Number(r.totalAmount ?? 0),
+        });
+      }
+    } else {
+      const qb = this.bankReceipts
+        .createQueryBuilder('br')
+        .where('br.organizationId = :org', { org: ctx.org })
+        .andWhere('br.status = :bposted', { bposted: BankVoucherStatus.POSTED })
+        .andWhere('br.referenceType = :bswap', {
+          bswap: BankReceiptReferenceType.FUND_SWAP,
+        });
+      applyBranchScope(qb, 'br', ctx.branchIds);
+      if (ctx.from) qb.andWhere('br.docDate >= :brFrom', { brFrom: ctx.from });
+      if (ctx.to) qb.andWhere('br.docDate <= :brTo', { brTo: ctx.to });
+      for (const br of await qb.getMany()) {
+        rows.push({
+          documentNumber: br.documentNumber ?? br.id,
+          documentType: 'Chuyển quỹ',
+          sortKey: `${br.docDate}T00:00:00.000Z`,
+          customerNameDirect: br.payerName ?? undefined,
+          depositAccountId: br.depositAccountId,
+          amount: Number(br.totalAmount ?? 0),
+        });
+      }
     }
 
     return rows;
@@ -322,37 +369,76 @@ export class GetPosDailySummaryDetailHandler
     return rows;
   }
 
+  /**
+   * Chi rows, both sources of the aggregate's expense side:
+   *   1. RETURN/EXCHANGE invoices whose refund left a fund through
+   *      `refundMethod`. Amount is `refundedAmount − offsetAmount`, unsigned —
+   *      the offset share settled the original debt and never left the till.
+   *   2. Non-refund payout vouchers (`purpose <> REFUND`), which have no
+   *      invoice behind them.
+   */
   private async buildExpenseRows(
     ctx: DetailBuildContext,
-    accountMethodBucket: PaymentAccountMethod,
+    refundMethod: RefundMethod,
   ): Promise<SourceRow[]> {
-    const qb = this.cashPayments
-      .createQueryBuilder('p')
-      .where('p.organizationId = :org', { org: ctx.org })
-      .andWhere('p.status = :posted', { posted: CashVoucherStatus.POSTED });
-    applyBranchScope(qb, 'p', ctx.branchIds);
-    if (ctx.from) qb.andWhere('p.voucherDate >= :cpFrom', { cpFrom: ctx.from });
-    if (ctx.to) qb.andWhere('p.voucherDate <= :cpTo', { cpTo: ctx.to });
-    if (ctx.voucherStaffIds.length) {
-      qb.andWhere('p.staffId IN (:...voucherStaffIds)', { voucherStaffIds: ctx.voucherStaffIds });
-    }
-    const cashRows = await qb.getMany();
+    const invoices = await this.fetchWindowInvoices(ctx);
     const rows: SourceRow[] = [];
-    for (const p of cashRows) {
-      // Unmapped funds default to cash, mirroring the aggregate handler.
-      const method = ctx.accountMethod.get(p.cashAccountId);
-      const bucket =
-        method === PaymentAccountMethod.BANK_TRANSFER
-          ? PaymentAccountMethod.BANK_TRANSFER
-          : PaymentAccountMethod.CASH;
-      if (bucket !== accountMethodBucket) continue;
+    for (const inv of invoices) {
+      if (inv.refundMethod !== refundMethod) continue;
+      const paidOut = paidOutOf(inv);
+      if (paidOut <= 0) continue;
       rows.push({
-        documentNumber: p.documentNumber ?? p.id,
-        sortKey: `${p.voucherDate}T00:00:00.000Z`,
-        customerNameDirect: p.payeeName ?? undefined,
-        cashAccountId: p.cashAccountId,
-        amount: Number(p.totalAmount ?? 0),
+        documentNumber: inv.code,
+        documentType: invoiceTypeLabel(inv.type),
+        sortKey: toIso(inv.issuedAt ?? inv.createdAt),
+        customerId: inv.customerId,
+        showCustomerFallback: true,
+        amount: paidOut,
       });
+    }
+
+    if (refundMethod === RefundMethod.CASH) {
+      const qb = this.cashPayments
+        .createQueryBuilder('p')
+        .where('p.organizationId = :org', { org: ctx.org })
+        .andWhere('p.status = :posted', { posted: CashVoucherStatus.POSTED })
+        .andWhere('p.purpose != :refund', { refund: CashPaymentPurpose.REFUND });
+      applyBranchScope(qb, 'p', ctx.branchIds);
+      if (ctx.from) qb.andWhere('p.voucherDate >= :cpFrom', { cpFrom: ctx.from });
+      if (ctx.to) qb.andWhere('p.voucherDate <= :cpTo', { cpTo: ctx.to });
+      if (ctx.voucherStaffIds.length) {
+        qb.andWhere('p.staffId IN (:...voucherStaffIds)', {
+          voucherStaffIds: ctx.voucherStaffIds,
+        });
+      }
+      for (const p of await qb.getMany()) {
+        rows.push({
+          documentNumber: p.documentNumber ?? p.id,
+          documentType: voucherPurposeLabel(p.purpose),
+          sortKey: `${p.voucherDate}T00:00:00.000Z`,
+          customerNameDirect: p.payeeName ?? undefined,
+          amount: Number(p.totalAmount ?? 0),
+        });
+      }
+    } else {
+      const qb = this.bankPayments
+        .createQueryBuilder('b')
+        .where('b.organizationId = :org', { org: ctx.org })
+        .andWhere('b.status = :bposted', { bposted: BankVoucherStatus.POSTED })
+        .andWhere('b.purpose != :brefund', { brefund: BankPaymentPurpose.REFUND });
+      applyBranchScope(qb, 'b', ctx.branchIds);
+      if (ctx.from) qb.andWhere('b.docDate >= :bpFrom', { bpFrom: ctx.from });
+      if (ctx.to) qb.andWhere('b.docDate <= :bpTo', { bpTo: ctx.to });
+      for (const b of await qb.getMany()) {
+        rows.push({
+          documentNumber: b.documentNumber ?? b.id,
+          documentType: voucherPurposeLabel(b.purpose),
+          sortKey: `${b.docDate}T00:00:00.000Z`,
+          customerNameDirect: b.payeeName ?? undefined,
+          depositAccountId: b.depositAccountId,
+          amount: Number(b.totalAmount ?? 0),
+        });
+      }
     }
     return rows;
   }
@@ -390,18 +476,36 @@ export class GetPosDailySummaryDetailHandler
     }));
   }
 
-  private async buildDebtDecreaseRows(ctx: DetailBuildContext): Promise<SourceRow[]> {
+  private buildDebtDecreaseRows(ctx: DetailBuildContext): Promise<SourceRow[]> {
+    return this.fetchDebtPaymentSourceRows(ctx, {});
+  }
+
+  /**
+   * Debt repayments (`debt_payments`) resolved into display rows. Backs two
+   * categories — the Thu drill-down (folded into Tiền mặt / Chuyển khoản as
+   * "Thu nợ") and Giảm nợ — so the cash-in and debt-reduction lenses share one
+   * resolver and cannot drift.
+   *
+   * Batch-resolves the owning debt (→ `customerId`, `invoiceId`) rather than
+   * joining in SQL — keeps the cashier/salesperson narrow (which needs the
+   * invoice, one hop further) a plain in-memory filter instead of a fragile
+   * raw-column join.
+   */
+  private async fetchDebtPaymentSourceRows(
+    ctx: DetailBuildContext,
+    opts: { method?: DebtPaymentMethod; documentType?: string },
+  ): Promise<SourceRow[]> {
     const qb = this.debtPayments
       .createQueryBuilder('dp')
       .where('dp.organizationId = :org', { org: ctx.org });
     applyBranchScope(qb, 'dp', ctx.branchIds);
     new FilterBuilder(qb).applyDateRange('dp.paidAt', ctx.issuedAt);
-    const repayRows = await qb.getMany();
+    const allRows = await qb.getMany();
+    const repayRows = opts.method
+      ? allRows.filter((r) => r.paymentMethod === opts.method)
+      : allRows;
     if (!repayRows.length) return [];
 
-    // Batch-resolve the owning debt (→ customerId, invoiceId) rather than joining
-    // in SQL — keeps the cashier/salesperson narrow (which needs the invoice, one
-    // hop further) a plain in-memory filter instead of a fragile raw-column join.
     const debtIds = [...new Set(repayRows.map((r) => r.debtId))];
     const debts = await this.invoiceDebts.find({ where: { id: In(debtIds) } });
     const debtById = new Map(debts.map((d) => [d.id, d]));
@@ -430,7 +534,8 @@ export class GetPosDailySummaryDetailHandler
       rows.push({
         documentNumber:
           (r.cashReceiptId && receiptById.get(r.cashReceiptId)?.documentNumber) || r.id,
-        documentType: invoiceTypeLabel(invoice?.type ?? InvoiceType.SALE),
+        documentType:
+          opts.documentType ?? invoiceTypeLabel(invoice?.type ?? InvoiceType.SALE),
         sortKey: toIso(r.paidAt),
         customerId: debt.customerId,
         showCustomerFallback: true,
@@ -453,11 +558,8 @@ export class GetPosDailySummaryDetailHandler
     const glAccountIds = [
       ...new Set(rows.map((r) => r.glAccountId).filter((id): id is string => Boolean(id))),
     ];
-    const cashAccountIds = [
-      ...new Set(rows.map((r) => r.cashAccountId).filter((id): id is string => Boolean(id))),
-    ];
 
-    const [customers, depositAccounts, glAccounts, cashAccounts] = await Promise.all([
+    const [customers, depositAccounts, glAccounts] = await Promise.all([
       customerIds.length
         ? this.customers.find({ where: { id: In(customerIds), organizationId: org } })
         : Promise.resolve([]),
@@ -467,14 +569,10 @@ export class GetPosDailySummaryDetailHandler
       glAccountIds.length
         ? this.glAccounts.find({ where: { id: In(glAccountIds), organizationId: org } })
         : Promise.resolve([]),
-      cashAccountIds.length
-        ? this.cashAccounts.find({ where: { id: In(cashAccountIds), organizationId: org } })
-        : Promise.resolve([]),
     ]);
     const customerById = new Map(customers.map((c) => [c.id, c]));
     const depositById = new Map(depositAccounts.map((a) => [a.id, a]));
     const glById = new Map(glAccounts.map((a) => [a.id, a]));
-    const cashAccountById = new Map(cashAccounts.map((a) => [a.id, a]));
 
     return rows.map((r) => {
       const customerName =
@@ -486,9 +584,7 @@ export class GetPosDailySummaryDetailHandler
         ? depositById.get(r.depositAccountId)?.name
         : r.glAccountId
           ? glById.get(r.glAccountId)?.name
-          : r.cashAccountId
-            ? cashAccountById.get(r.cashAccountId)?.name
-            : undefined;
+          : undefined;
       return {
         documentNumber: r.documentNumber,
         documentType: r.documentType,

@@ -53,11 +53,13 @@ export const DAILY_SUMMARY_DETAIL_CONFIG: Record<PosDailySummaryDetailCategory, 
   },
   [PosDailySummaryDetailCategory.ExpenseCash]: {
     title: "Tổng chi tiền mặt",
-    columns: [K.DocumentNumber, K.IssuedAt, K.CustomerName, K.Amount],
+    columns: [K.DocumentNumber, K.DocumentType, K.IssuedAt, K.CustomerName, K.Amount],
   },
+  // Cột Tài khoản ngân hàng chỉ có giá trị ở dòng phiếu chi ngân hàng; dòng hoàn
+  // tiền từ hoá đơn để trống vì hoá đơn không lưu tài khoản đã hoàn.
   [PosDailySummaryDetailCategory.ExpenseBankTransfer]: {
     title: "Tổng chi chuyển khoản",
-    columns: [K.DocumentNumber, K.IssuedAt, K.CustomerName, K.BankAccountName, K.Amount],
+    columns: [K.DocumentNumber, K.DocumentType, K.IssuedAt, K.CustomerName, K.BankAccountName, K.Amount],
   },
   [PosDailySummaryDetailCategory.DebtIncrease]: {
     title: "Tổng ghi nợ",
@@ -75,26 +77,48 @@ export const DAILY_SUMMARY_DETAIL_DEFAULT_PAGE_SIZE = 100;
 /**
  * "Loại chứng từ" select options per category — fixed lists matching exactly what
  * `get-pos-daily-summary-detail.handler.ts` assigns (see `invoiceTypeLabel()` and
- * the Thu nợ/Thu khác cash-receipt labels). Categories with no Loại chứng từ column
- * (Chi Tiền mặt/Chuyển khoản) are absent.
+ * the "Thu nợ" label on debt-repayment rows).
  */
 export const DAILY_SUMMARY_DETAIL_DOCUMENT_TYPES: Partial<Record<PosDailySummaryDetailCategory, string[]>> = {
   [PosDailySummaryDetailCategory.RevenueCash]: [
     "Bán hàng",
     "Đổi trả",
     "Đổi trả, mua thêm",
-    "Hoàn tiền mặt",
     "Thu nợ",
-    "Thu khác",
+    "Chuyển quỹ",
   ],
   [PosDailySummaryDetailCategory.RevenueBankTransfer]: [
     "Bán hàng",
     "Đổi trả",
     "Đổi trả, mua thêm",
     "Thu nợ",
-    "Thu khác",
+    "Chuyển quỹ",
   ],
   [PosDailySummaryDetailCategory.RevenuePoints]: ["Bán hàng", "Đổi trả", "Đổi trả, mua thêm"],
+  // Chi gồm hoàn tiền từ hoá đơn đổi trả, cộng các phiếu chi không phải hoàn tiền
+  // (nhãn theo `purpose`, xem VOUCHER_PURPOSE_LABELS trong detail handler).
+  [PosDailySummaryDetailCategory.ExpenseCash]: [
+    "Đổi trả",
+    "Đổi trả, mua thêm",
+    "Trả nợ nhà cung cấp",
+    "Mua hàng",
+    "Chi phí",
+    "Lương",
+    "Nộp vào tài khoản",
+    "Chuyển chi nhánh",
+    "Chi khác",
+  ],
+  [PosDailySummaryDetailCategory.ExpenseBankTransfer]: [
+    "Đổi trả",
+    "Đổi trả, mua thêm",
+    "Trả nợ nhà cung cấp",
+    "Mua hàng",
+    "Chi phí",
+    "Rút về quỹ tiền mặt",
+    "Phí ngân hàng",
+    "Chuyển chi nhánh",
+    "Chi khác",
+  ],
   [PosDailySummaryDetailCategory.DebtIncrease]: ["Bán hàng", "Đổi trả", "Đổi trả, mua thêm"],
   [PosDailySummaryDetailCategory.DebtDecrease]: ["Bán hàng", "Đổi trả", "Đổi trả, mua thêm"],
 };

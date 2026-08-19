@@ -7,17 +7,30 @@ import {
   InvoiceEntity,
   InvoicePaymentMethod,
   InvoiceType,
+  RefundMethod,
 } from '../../../pos/entities/invoice.entity';
 import { InvoiceItemEntity, ItemDirection } from '../../../pos/entities/invoice-item.entity';
 import { InvoicePaymentEntity } from '../../../pos/entities/invoice-payment.entity';
 import { InvoiceDebtEntity, DebtDocumentType } from '../../../pos/entities/invoice-debt.entity';
-import { DebtPaymentEntity } from '../../../pos/entities/debt-payment.entity';
+import {
+  DebtPaymentEntity,
+  DebtPaymentMethod,
+} from '../../../pos/entities/debt-payment.entity';
 import { InvoicePromotionEntity } from '../../../promotion/invoice-promotion.entity';
 import { CashPaymentEntity } from '../../../accounting/cash-vouchers/cash-payments/cash-payment.entity';
 import { CashReceiptEntity } from '../../../accounting/cash-vouchers/cash-receipts/cash-receipt.entity';
-import { CashReceiptPurpose, CashVoucherStatus } from '../../../accounting/cash-vouchers/enums';
-import { PaymentAccountEntity } from '../../../accounting/payment-accounts/payment-account.entity';
-import { PaymentAccountMethod } from '../../../accounting/payment-accounts/enums';
+import {
+  CashPaymentPurpose,
+  CashReceiptReferenceType,
+  CashVoucherStatus,
+} from '../../../accounting/cash-vouchers/enums';
+import { BankPaymentEntity } from '../../../accounting/deposit-vouchers/bank-payments/bank-payment.entity';
+import { BankReceiptEntity } from '../../../accounting/deposit-vouchers/bank-receipts/bank-receipt.entity';
+import {
+  BankPaymentPurpose,
+  BankReceiptReferenceType,
+  BankVoucherStatus,
+} from '../../../accounting/deposit-vouchers/enums';
 import { RbacService } from '../../../rbac/rbac.service';
 import {
   applyBranchScope,
@@ -38,27 +51,75 @@ const dateOnly = (iso?: string): string | undefined =>
  * conventions (org + branch scope, status filter, sign returns by type) but returns
  * a heterogeneous summary object rather than a columnar `ReportRow[]`.
  *
- * Money model (mirrors "Tổng hợp bán hàng theo ngày" for revenue):
- * - Revenue (Thu) = invoice payments by method + voucher (invoice_promotions),
- *   each signed by invoice type, PLUS non-invoice cash inflow posted as "Phiếu thu"
- *   (cash_receipts) — debt collected in cash/transfer (Thu nợ,
- *   `purpose = DEBT_COLLECTION`) and any other misc receipt (Thu khác), excluding
- *   `POS_SALE`-purpose receipts to avoid double-counting a cash sale already counted
- *   via invoice_payments. Returns collect no payment, so their invoice_payments
- *   contribution is naturally empty. Debt collected in cash also feeds
- *   `debt.debtCollected` separately — same event, two lenses (cash inflow vs. debt
- *   reduction), not a double count.
- * - Expense (Chi) = posted cash-payment vouchers in the window, split into cash /
- *   bank-transfer by the payment-account method of the source fund account. This
- *   is where a CASH refund lands: refund-cash.consumer issues a POSTED phiếu chi
- *   for it, so the expense side owns refunds outright and revenue must not net
- *   them out again (it used to, and charged every refund twice).
- * - `revenue.points` and `revenue.promotion` are reported but excluded from
- *   `revenue.total` / `netCashFlow`: both are discounts already deducted from
- *   `amountDue`, so neither moves money into a fund.
+ * Money model — "how much invoice value was settled, and by which instrument",
+ * NOT "how much cash entered the fund". Thu reads the invoice domain only.
+ * Chi reads the invoice domain for refunds AND the payment vouchers for
+ * everything else, because an expense/salary/supplier payout has no sales
+ * invoice behind it and would otherwise be invisible on a cashier's report.
  *
- * The resulting `netCashFlow` reconciles with Sổ quỹ tiền mặt (CashLedgerService),
- * which signs `cash_movements` directly and is the reference this must match.
+ * - Revenue (Thu), every bucket counted in `total`:
+ *     cash         = invoice_payments CASH (signed by type) + debt_payments cash
+ *                    + cash_receipts whose referenceType is FUND_SWAP
+ *     card         = invoice_payments CARD (signed)
+ *     bankTransfer = invoice_payments BANK_TRANSFER (signed) + debt_payments bank_transfer
+ *                    + bank_receipts whose referenceType is FUND_SWAP
+ *     voucher      = invoice_promotions where promotionType='voucher' (signed)
+ *     points       = Σ sign × invoice.pointsDiscountAmount
+ *   Voucher and points are settlement instruments the customer applies against
+ *   `amountDue`, so they belong in `total` exactly like the three cash-ish
+ *   methods. A promotion (CTKM, `invoices.discount_amount`) is a price cut, not
+ *   a settlement instrument, and is not reported at all.
+ *
+ * - Expense (Chi), two sources that partition cleanly by `purpose`:
+ *     1. Refunds, from the RETURN/EXCHANGE invoice header:
+ *          paidOut = refundedAmount − offsetAmount  (offset settles debt, no fund moves)
+ *          refundMethod CASH → cash, BANK → bankTransfer;
+ *          STORE_CREDIT / OFFSET / null move no money and are skipped.
+ *        `paidOut` is a positive magnitude — do NOT apply `invoiceTypeSign`.
+ *        That sign is what made a refund count twice before.
+ *     2. Every other payout, from the vouchers: posted `cash_payments` → cash,
+ *        posted `bank_payments` → bankTransfer, both filtered to
+ *        `purpose <> REFUND`.
+ *
+ *   A fund swap is the one voucher pair Thu has to match: its payout leg is not
+ *   REFUND, so Chi counts it, and without the receipt leg the report would book
+ *   an outflow for money that only changed fund. See the FUND_SWAP block below.
+ *
+ *   The `purpose <> REFUND` filter is the whole seam. Every REFUND-purpose
+ *   voucher is auto-issued from an invoice (refund-cash/refund-bank consumers
+ *   for a return, invoice-cancel-refund-cash for a cancellation), so source 1
+ *   owns them; counting them here as well is exactly the double-charge this
+ *   report started with. Everything else — EXPENSE, SALARY, PURCHASE,
+ *   SUPPLIER_PAYMENT, DEPOSIT_TRANSFER, INTER_BRANCH_OUT, OTHER — has no
+ *   invoice behind it and can only come from the voucher.
+ *
+ *   Dropping cancellation refunds along with return refunds is deliberate, not
+ *   collateral: `applyInvoiceStatusFilter` excludes cancelled invoices, so a
+ *   cancelled sale contributes to neither Thu nor Chi and nets to zero. Letting
+ *   its refund voucher back in would book the outflow without the matching
+ *   inflow. On the QA branch that alone was 4.089.000đ of phantom Chi.
+ *
+ *   No fund-account lookup is involved: a `cash_payments` row *is* cash and a
+ *   `bank_payments` row *is* a transfer. The previous code mapped both through
+ *   `payment_accounts` keyed on a COA account id while passing a
+ *   `cash_accounts.id`, so the lookup always missed and `Chi › Chuyển khoản`
+ *   could never be anything but 0.
+ *
+ * A pure RETURN writes no invoice_payments row at all (checkout-return.service
+ * gates payment creation on `netAmount > 0`), and an EXCHANGE has either
+ * `netAmount > 0` or `refundedAmount > 0` but never both — so one document can
+ * only ever land on Thu or on Chi, never on both.
+ *
+ * One `debt_payments` row feeds both `revenue.cash|bankTransfer` (cash-in lens)
+ * and `debt.debtCollected` (debt-reduction lens); that is two lenses on the same
+ * event, not a double count — a credit sale books Thu 0 + Ghi nợ, and only the
+ * later repayment books Thu. Paying a supplier debt is the mirror image and
+ * needs no special case: it already issues a SUPPLIER_PAYMENT voucher, which
+ * source 2 picks up.
+ *
+ * `netCashFlow` still does not reconcile 1-1 with Sổ quỹ tiền mặt: Thu counts
+ * voucher/points settlement that never reaches a fund, and ignores the phiếu thu
+ * a POS cash sale issues. That book remains the authority on fund movements.
  */
 @QueryHandler(GetPosDailySummaryQuery)
 export class GetPosDailySummaryHandler
@@ -79,10 +140,12 @@ export class GetPosDailySummaryHandler
     private readonly debtPayments: Repository<DebtPaymentEntity>,
     @InjectRepository(CashPaymentEntity)
     private readonly cashPayments: Repository<CashPaymentEntity>,
+    @InjectRepository(BankPaymentEntity)
+    private readonly bankPayments: Repository<BankPaymentEntity>,
     @InjectRepository(CashReceiptEntity)
     private readonly cashReceipts: Repository<CashReceiptEntity>,
-    @InjectRepository(PaymentAccountEntity)
-    private readonly paymentAccounts: Repository<PaymentAccountEntity>,
+    @InjectRepository(BankReceiptEntity)
+    private readonly bankReceipts: Repository<BankReceiptEntity>,
     private readonly rbac: RbacService,
   ) {}
 
@@ -109,7 +172,7 @@ export class GetPosDailySummaryHandler
       actor,
     );
 
-    // ── Invoices in window (drives revenue / goods / other) ────────────────────
+    // ── Invoices in window (drives revenue / expense / goods / other) ──────────
     const invoiceQb = this.invoices
       .createQueryBuilder('invoice')
       .where('invoice.organizationId = :org', { org });
@@ -128,13 +191,9 @@ export class GetPosDailySummaryHandler
 
     const signByInvoice = new Map<string, number>();
     let points = 0;
-    // Promotion money actually given away. `invoices.discount_amount` is the
-    // one column that carries it on the v2 checkout path — the engine's
-    // per-programme rows go to `invoice_checkout_promotions`, and the voucher is
-    // folded straight into this header field by resolve-funds. Nothing in this
-    // report read it before, which is why a day with 719,000đ of promotions
-    // reported zero.
-    let promotion = 0;
+    // Chi is accumulated in the same pass: it is a pure function of the invoice
+    // header (refundMethod + refundedAmount − offsetAmount), so no second query.
+    const expense = { cash: 0, bankTransfer: 0, total: 0 };
     const other = {
       totalInvoices: invoices.length,
       saleInvoices: 0,
@@ -148,31 +207,34 @@ export class GetPosDailySummaryHandler
       const sign = invoiceTypeSign(inv.type);
       signByInvoice.set(inv.id, sign);
       points += sign * Number(inv.pointsDiscountAmount ?? 0);
-      promotion += sign * Number(inv.discountAmount ?? 0);
       if (inv.type === InvoiceType.SALE) other.saleInvoices += 1;
       else if (inv.type === InvoiceType.RETURN) other.returnInvoices += 1;
       else if (inv.type === InvoiceType.EXCHANGE) other.exchangeInvoices += 1;
+
+      // Money that actually left a fund on this document. Unsigned: it is an
+      // outflow magnitude, and the Chi column already means "paid out".
+      const paidOut =
+        Number(inv.refundedAmount ?? 0) - Number(inv.offsetAmount ?? 0);
+      if (paidOut > 0) {
+        if (inv.refundMethod === RefundMethod.CASH) expense.cash += paidOut;
+        else if (inv.refundMethod === RefundMethod.BANK) {
+          expense.bankTransfer += paidOut;
+        }
+        // STORE_CREDIT / legacy OFFSET / unset: no fund moved.
+      }
     }
     const invoiceIds = invoices.map((i) => i.id);
 
-    // ── Shared lookups: fund-account method map + date/staff bounds ────────────
-    // Used by both Revenue (cash-receipt vouchers) and Expense (cash-payment
-    // vouchers) to classify a voucher's fund account as cash vs bank-transfer.
-    const accountMethod = new Map<string, PaymentAccountMethod>();
-    const accounts = await this.paymentAccounts.find({ where: { organizationId: org } });
-    for (const a of accounts) accountMethod.set(a.accountId, a.paymentMethod);
     const from = dateOnly(dto.issuedAt?.from);
     const to = dateOnly(dto.issuedAt?.to);
-    // cash_payments/cash_receipts have one staff reference (whoever recorded the
-    // voucher), not separate cashier/salesperson roles like invoices — match it
-    // against either filter when set, so Thu/Chi still narrow when only one
-    // filter is chosen.
+    // Vouchers carry one staff reference (whoever recorded them), not separate
+    // cashier/salesperson roles, so match either filter when set.
     const voucherStaffIds = [dto.cashierId, dto.salespersonId].filter(
       (id): id is string => Boolean(id),
     );
 
     // ── Revenue: payments by method (signed) ────────────────────────────────────
-    const revenue = { cash: 0, card: 0, bankTransfer: 0, voucher: 0, points, promotion, total: 0 };
+    const revenue = { cash: 0, card: 0, bankTransfer: 0, voucher: 0, points, total: 0 };
     if (invoiceIds.length) {
       const paymentRows = await this.payments.find({
         where: { invoiceId: In(invoiceIds) },
@@ -199,57 +261,133 @@ export class GetPosDailySummaryHandler
         }
       }
     }
-    // A cash refund is NOT netted out of revenue here, deliberately.
+
+    // ── Debt repayments (Thu nợ) — money in against an earlier credit sale ─────
+    // Read once, reported through two lenses: as cash inflow here, and as
+    // `debt.debtCollected` below. `debt_payments` carries its own method, so it
+    // needs no fund-account lookup.
+    const debtCollectedQb = this.debtPayments
+      .createQueryBuilder('dp')
+      .where('dp.organizationId = :org', { org });
+    applyBranchScope(debtCollectedQb, 'dp', branchIds);
+    new FilterBuilder(debtCollectedQb).applyDateRange('dp.paidAt', dto.issuedAt);
+    if (dto.cashierId || dto.salespersonId) {
+      debtCollectedQb
+        .innerJoin(InvoiceDebtEntity, 'paidDebt', 'paidDebt.id = dp.debtId')
+        .innerJoin(InvoiceEntity, 'paidDebtInvoice', 'paidDebtInvoice.id = paidDebt.invoiceId');
+      if (dto.cashierId) {
+        debtCollectedQb.andWhere('paidDebtInvoice.staffId = :cashier2', {
+          cashier2: dto.cashierId,
+        });
+      }
+      if (dto.salespersonId) {
+        debtCollectedQb.andWhere('paidDebtInvoice.salespersonId = :sp2', {
+          sp2: dto.salespersonId,
+        });
+      }
+    }
+    // ── Fund swaps: the inflow leg ────────────────────────────────────────────
+    // A swap ("Chuyển tiền gửi thành tiền mặt" / "Nộp tiền mặt vào tài khoản")
+    // writes a payout voucher on one fund and a receipt on the other. Chi counts
+    // the payout leg (DEPOSIT_TRANSFER / CASH_TRANSFER are not REFUND), so the
+    // receipt leg has to be counted here or the report books an outflow for money
+    // that never left the branch — it only changed fund. Keyed on
+    // `referenceType = FUND_SWAP`, not on `purpose`, because both legs are
+    // written with the catch-all purpose OTHER; filtering on that would sweep in
+    // every unrelated misc receipt.
     //
-    // This used to subtract `invoice.refundedAmount` from `revenue.cash` on the
-    // belief that a refund "never reaches a cash-payment voucher". That belief
-    // was wrong: refund-cash.consumer records a `cash_movements` WITHDRAWAL and
-    // also issues a POSTED phiếu chi, which the Expense query below counts (it
-    // has no purpose filter). Subtracting here as well charged every refund
-    // twice — the day QA tested reported −943,000 against a real fund movement
-    // of +2,527,000.
-    //
-    // The expense side is the correct owner: its total matches Sổ quỹ tiền mặt
-    // exactly. A pure RETURN also creates no invoice_payments row at all (only
-    // an EXCHANGE with netAmount > 0 does), so nothing here double-counts the
-    // inflow either.
-    // Cash inflow that isn't an invoice payment — debt collected in cash/transfer
-    // (Thu nợ) and other misc receipts (Thu khác) — posted via the accounting
-    // module's "Phiếu thu" (cash_receipts), never through invoice_payments.
-    // `POS_SALE`-purpose receipts are excluded so a POS cash sale is never
-    // counted twice (once via invoice_payments here, once via its own receipt).
-    const receiptQb = this.cashReceipts
+    // Inter-branch transfers are deliberately NOT paired here: INTER_BRANCH_OUT
+    // is a genuine outflow for the sending branch, and its INTER_BRANCH_IN
+    // receipt belongs to the receiving branch's own report.
+    const swapCashQb = this.cashReceipts
       .createQueryBuilder('r')
       .where('r.organizationId = :org', { org })
       .andWhere('r.status = :posted', { posted: CashVoucherStatus.POSTED })
-      .andWhere('r.purpose != :posSale', { posSale: CashReceiptPurpose.POS_SALE });
-    applyBranchScope(receiptQb, 'r', branchIds);
-    if (from) receiptQb.andWhere('r.voucherDate >= :crFrom', { crFrom: from });
-    if (to) receiptQb.andWhere('r.voucherDate <= :crTo', { crTo: to });
+      .andWhere('r.referenceType = :swap', {
+        swap: CashReceiptReferenceType.FUND_SWAP,
+      });
+    applyBranchScope(swapCashQb, 'r', branchIds);
+    if (from) swapCashQb.andWhere('r.voucherDate >= :crFrom', { crFrom: from });
+    if (to) swapCashQb.andWhere('r.voucherDate <= :crTo', { crTo: to });
     if (voucherStaffIds.length) {
-      receiptQb.andWhere('r.staffId IN (:...voucherStaffIds)', { voucherStaffIds });
+      swapCashQb.andWhere('r.staffId IN (:...voucherStaffIds)', { voucherStaffIds });
     }
-    const receiptRows = await receiptQb.getMany();
-    for (const r of receiptRows) {
-      const amount = Number(r.totalAmount ?? 0);
-      const method = accountMethod.get(r.cashAccountId);
-      if (method === PaymentAccountMethod.BANK_TRANSFER) revenue.bankTransfer += amount;
-      else revenue.cash += amount;
+    for (const r of await swapCashQb.getMany()) {
+      revenue.cash += Number(r.totalAmount ?? 0);
     }
+
+    const swapBankQb = this.bankReceipts
+      .createQueryBuilder('br')
+      .where('br.organizationId = :org', { org })
+      .andWhere('br.status = :bposted', { bposted: BankVoucherStatus.POSTED })
+      .andWhere('br.referenceType = :bswap', {
+        bswap: BankReceiptReferenceType.FUND_SWAP,
+      });
+    applyBranchScope(swapBankQb, 'br', branchIds);
+    if (from) swapBankQb.andWhere('br.docDate >= :brFrom', { brFrom: from });
+    if (to) swapBankQb.andWhere('br.docDate <= :brTo', { brTo: to });
+    for (const br of await swapBankQb.getMany()) {
+      revenue.bankTransfer += Number(br.totalAmount ?? 0);
+    }
+
+    const repayRows = await debtCollectedQb.getMany();
+    let debtCollected = 0;
+    for (const r of repayRows) {
+      const amount = Number(r.amount ?? 0);
+      debtCollected += amount;
+      if (r.paymentMethod === DebtPaymentMethod.BANK_TRANSFER) {
+        revenue.bankTransfer += amount;
+      } else revenue.cash += amount;
+    }
+    debtCollected = round2(debtCollected);
+
     revenue.cash = round2(revenue.cash);
     revenue.card = round2(revenue.card);
     revenue.bankTransfer = round2(revenue.bankTransfer);
     revenue.voucher = round2(revenue.voucher);
     revenue.points = round2(revenue.points);
-    revenue.promotion = round2(revenue.promotion);
-    // `points` and `promotion` are reported but deliberately excluded: both are
-    // discounts already deducted from `amountDue`, so no money reaches a fund.
-    // Including `points` made netCashFlow overstate the day by exactly the
-    // value of the points customers spent. Kept as display fields so the tab
-    // can still show them (see the contract in shared-interfaces).
     revenue.total = round2(
-      revenue.cash + revenue.card + revenue.bankTransfer + revenue.voucher,
+      revenue.cash +
+        revenue.card +
+        revenue.bankTransfer +
+        revenue.voucher +
+        revenue.points,
     );
+
+    // ── Expense, source 2: payouts with no invoice behind them ────────────────
+    // `purpose <> REFUND` is the seam against source 1 — see the class doc.
+    const cashQb = this.cashPayments
+      .createQueryBuilder('p')
+      .where('p.organizationId = :org', { org })
+      .andWhere('p.status = :posted', { posted: CashVoucherStatus.POSTED })
+      .andWhere('p.purpose != :refund', { refund: CashPaymentPurpose.REFUND });
+    applyBranchScope(cashQb, 'p', branchIds);
+    if (from) cashQb.andWhere('p.voucherDate >= :cpFrom', { cpFrom: from });
+    if (to) cashQb.andWhere('p.voucherDate <= :cpTo', { cpTo: to });
+    if (voucherStaffIds.length) {
+      cashQb.andWhere('p.staffId IN (:...voucherStaffIds)', { voucherStaffIds });
+    }
+    for (const p of await cashQb.getMany()) {
+      expense.cash += Number(p.totalAmount ?? 0);
+    }
+
+    // `bank_payments` has no staff column, so the cashier/salesperson filter
+    // cannot narrow it — a filtered view still shows every bank payout.
+    const bankQb = this.bankPayments
+      .createQueryBuilder('b')
+      .where('b.organizationId = :org', { org })
+      .andWhere('b.status = :bposted', { bposted: BankVoucherStatus.POSTED })
+      .andWhere('b.purpose != :brefund', { brefund: BankPaymentPurpose.REFUND });
+    applyBranchScope(bankQb, 'b', branchIds);
+    if (from) bankQb.andWhere('b.docDate >= :bpFrom', { bpFrom: from });
+    if (to) bankQb.andWhere('b.docDate <= :bpTo', { bpTo: to });
+    for (const b of await bankQb.getMany()) {
+      expense.bankTransfer += Number(b.totalAmount ?? 0);
+    }
+
+    expense.cash = round2(expense.cash);
+    expense.bankTransfer = round2(expense.bankTransfer);
+    expense.total = round2(expense.cash + expense.bankTransfer);
 
     // ── Goods sold / returned (line direction split, un-netted) ────────────────
     const goodsSold = { quantity: 0, value: 0 };
@@ -269,35 +407,9 @@ export class GetPosDailySummaryHandler
     goodsReturned.quantity = round2(goodsReturned.quantity);
     goodsReturned.value = round2(goodsReturned.value);
 
-    // ── Expense: posted cash-payment vouchers (phiếu chi), split cash / transfer ─
-    const expense = { cash: 0, bankTransfer: 0, total: 0 };
-    const cashQb = this.cashPayments
-      .createQueryBuilder('p')
-      .where('p.organizationId = :org', { org })
-      .andWhere('p.status = :posted', { posted: CashVoucherStatus.POSTED });
-    applyBranchScope(cashQb, 'p', branchIds);
-    if (from) cashQb.andWhere('p.voucherDate >= :cpFrom', { cpFrom: from });
-    if (to) cashQb.andWhere('p.voucherDate <= :cpTo', { cpTo: to });
-    if (voucherStaffIds.length) {
-      cashQb.andWhere('p.staffId IN (:...voucherStaffIds)', { voucherStaffIds });
-    }
-    const cashRows = await cashQb.getMany();
-    for (const p of cashRows) {
-      const amount = Number(p.totalAmount ?? 0);
-      // The source fund account's method decides the bucket; unmapped funds are
-      // treated as cash (the fund is a cash box by default).
-      const method = accountMethod.get(p.cashAccountId);
-      if (method === PaymentAccountMethod.CASH || method === undefined) expense.cash += amount;
-      else expense.bankTransfer += amount;
-    }
-    expense.cash = round2(expense.cash);
-    expense.bankTransfer = round2(expense.bankTransfer);
-    expense.total = round2(expense.cash + expense.bankTransfer);
-
-    // ── Debt: new credit debt recorded + repayments collected ──────────────────
-    // Both queries join back to the source invoice (invoice_debts.invoiceId is a
-    // real 1:1 FK; debt_payments reaches it via debtId) so cashier/salesperson
-    // filters narrow debt the same way they narrow revenue.
+    // ── Debt: new credit debt recorded ─────────────────────────────────────────
+    // Joins back to the source invoice (invoice_debts.invoiceId is a real 1:1 FK)
+    // so cashier/salesperson filters narrow debt the same way they narrow revenue.
     const newDebtQb = this.invoiceDebts
       .createQueryBuilder('d')
       .where('d.organizationId = :org', { org })
@@ -319,31 +431,6 @@ export class GetPosDailySummaryHandler
     const debtRows = await newDebtQb.getMany();
     const newDebt = round2(
       debtRows.reduce((s, d) => s + Number(d.originalAmount ?? 0), 0),
-    );
-
-    const debtCollectedQb = this.debtPayments
-      .createQueryBuilder('dp')
-      .where('dp.organizationId = :org', { org });
-    applyBranchScope(debtCollectedQb, 'dp', branchIds);
-    new FilterBuilder(debtCollectedQb).applyDateRange('dp.paidAt', dto.issuedAt);
-    if (dto.cashierId || dto.salespersonId) {
-      debtCollectedQb
-        .innerJoin(InvoiceDebtEntity, 'paidDebt', 'paidDebt.id = dp.debtId')
-        .innerJoin(InvoiceEntity, 'paidDebtInvoice', 'paidDebtInvoice.id = paidDebt.invoiceId');
-      if (dto.cashierId) {
-        debtCollectedQb.andWhere('paidDebtInvoice.staffId = :cashier2', {
-          cashier2: dto.cashierId,
-        });
-      }
-      if (dto.salespersonId) {
-        debtCollectedQb.andWhere('paidDebtInvoice.salespersonId = :sp2', {
-          sp2: dto.salespersonId,
-        });
-      }
-    }
-    const repayRows = await debtCollectedQb.getMany();
-    const debtCollected = round2(
-      repayRows.reduce((s, r) => s + Number(r.amount ?? 0), 0),
     );
 
     return {
