@@ -16,7 +16,11 @@ export interface InvoiceDetailLine {
   unitPrice: number;
   /** quantity × unitPrice, before line discount. Negative on a returned line. */
   lineAmount: number;
-  /** Per-line discount amount. Negative on a returned line. */
+  /**
+   * Per-line discount amount, always positive — it is a magnitude. It moves the
+   * line towards zero: subtract it from a sale, add it back on a returned line
+   * (which is negative to begin with).
+   */
   discount: number;
   /** Final line amount (lineAmount − discount). Negative on a returned line. */
   lineTotal: number;

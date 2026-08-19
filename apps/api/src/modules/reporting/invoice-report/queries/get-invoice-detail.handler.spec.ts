@@ -144,7 +144,8 @@ describe('GetInvoiceDetailHandler', () => {
       // List price stays on the row; only the refunded value is netted.
       unitPrice: 750000,
       lineAmount: -750000,
-      discount: -150000,
+      // A magnitude: -750.000 + 150.000 = -600.000.
+      discount: 150000,
       lineTotal: -600000,
     });
     expect(detail.subtotal).toBe(1800000);

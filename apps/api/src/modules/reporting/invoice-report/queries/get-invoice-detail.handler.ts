@@ -132,7 +132,11 @@ export class GetInvoiceDetailHandler
           quantity,
           unitPrice,
           lineAmount: signed(1, quantity * unitPrice),
-          discount: signed(sign, discount),
+          // Unsigned: "Tiền KM" is the size of the discount, and a discount
+          // always moves the line TOWARDS zero — subtracted from a sale,
+          // added back to a refund. Signing it here would make the row read
+          // -750.000 minus -150.000, which nobody does in their head.
+          discount: signed(1, discount),
           lineTotal: signed(
             sign,
             Number(l.lineTotal ?? 0) -
