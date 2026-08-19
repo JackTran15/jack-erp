@@ -73,8 +73,24 @@ const returnDraftStub = (overrides: Partial<InvoiceEntity> = {}): InvoiceEntity 
     ...overrides,
   }) as InvoiceEntity;
 
-const originalStub = (status: InvoiceStatus): InvoiceEntity =>
-  ({
+/**
+ * The original sale a return is taken against.
+ *
+ * `pointsEarned` is derived from the effective `amountDue` rather than defaulted,
+ * because the return path now caps its reversal at this column (ADR-02) — a fixture
+ * that leaves it unset describes an invoice that earned nothing, and every cap
+ * would bind to 0. That is not hypothetical: it is exactly the shape of the 27 real
+ * rows `BackfillInvoicePointsEarnedFromLedger1789000000000` had to repair.
+ *
+ * Pass overrides here rather than spreading afterwards, so the derivation sees the
+ * final `amountDue`. Set `pointsEarned` explicitly to model a sale whose accrual a
+ * promotion blocked.
+ */
+const originalStub = (
+  status: InvoiceStatus,
+  overrides: Partial<InvoiceEntity> = {},
+): InvoiceEntity => {
+  const base = {
     id: 'orig-1',
     organizationId: 'org-1',
     branchId: 'branch-1',
@@ -84,7 +100,15 @@ const originalStub = (status: InvoiceStatus): InvoiceEntity =>
     type: InvoiceType.SALE,
     subtotal: 500,
     pointsRedeemed: 0,
-  }) as InvoiceEntity;
+    ...overrides,
+  };
+  return {
+    ...base,
+    pointsEarned:
+      overrides.pointsEarned ??
+      Math.floor(Number(base.amountDue ?? 0) / POINT_EARN_VND_PER_POINT),
+  } as InvoiceEntity;
+};
 
 /** Single returned (IN) line, no originalInvoiceItemId → skips the qty guard. */
 const inLineStub = (): InvoiceItemEntity =>
@@ -376,13 +400,12 @@ describe('CheckoutReturnService — debt offset routing', () => {
       Promise.resolve(
         where.id === 'ret-1'
           ? returnDraftStub()
-          : ({
-              ...originalStub(InvoiceStatus.PAID),
+          : (originalStub(InvoiceStatus.PAID, {
               pointsDiscountAmount: 0,
               depositAmount: 0,
               discountAmount: 0,
               ...opts.original,
-            } as InvoiceEntity),
+              }) as InvoiceEntity),
       ),
     );
   }
@@ -915,8 +938,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
         Promise.resolve(
           where.id === 'ret-1'
             ? returnDraftStub()
-            : ({
-                ...originalStub(InvoiceStatus.PAID),
+            : (originalStub(InvoiceStatus.PAID, {
                 subtotal: 200,
                 // The 10 gap between subtotal and amountDue has to be attributable
                 // to a discount field, or the invoice is not one the checkout paths
@@ -925,7 +947,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
                 // Verified against dev data — 39/39 posted sales satisfy it.
                 discountAmount: 10,
                 amountDue: 190,
-              } as InvoiceEntity),
+                }) as InvoiceEntity),
         ),
       );
 
@@ -969,11 +991,10 @@ describe('CheckoutReturnService — debt offset routing', () => {
                 subtotal: 500,
                 amountDue: 0,
               })
-            : ({
-                ...originalStub(InvoiceStatus.PAID),
+            : (originalStub(InvoiceStatus.PAID, {
                 subtotal: 500,
                 amountDue: 500,
-              } as InvoiceEntity),
+                }) as InvoiceEntity),
         ),
       );
 
@@ -1006,11 +1027,10 @@ describe('CheckoutReturnService — debt offset routing', () => {
         Promise.resolve(
           where.id === 'ret-1'
             ? returnDraftStub({ subtotal: 1_490_000, amountDue: 1_490_000 })
-            : ({
-                ...originalStub(InvoiceStatus.PAID),
+            : (originalStub(InvoiceStatus.PAID, {
                 subtotal: 1_490_000,
                 amountDue: 1_490_000,
-              } as InvoiceEntity),
+                }) as InvoiceEntity),
         ),
       );
 
@@ -1035,15 +1055,62 @@ describe('CheckoutReturnService — debt offset routing', () => {
         Promise.resolve(
           where.id === 'ret-1'
             ? returnDraftStub({ subtotal: 1_490_000, amountDue: 1_490_000 })
-            : ({
-                ...originalStub(InvoiceStatus.PAID),
+            : (originalStub(InvoiceStatus.PAID, {
                 subtotal: 1_490_000,
                 amountDue: 1_490_000,
                 ...originalOverrides,
-              } as InvoiceEntity),
+                }) as InvoiceEntity),
         ),
       );
     };
+
+    /**
+     * QA #16's sibling on the return path, found during discovery rather than by QA.
+     * A promotion with "Tích điểm cho khách hàng" unchecked leaves the original at
+     * pointsEarned = 0, so returning it must claw back nothing — the money basis
+     * alone would take floor(1.490.000 / 10.000) = 149 points that were never granted.
+     */
+    it('reverses nothing when the original sale earned nothing (blocked accrual)', async () => {
+      setupFullReturnOf149({ pointsEarned: 0 });
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(mockManager.save).toHaveBeenCalledWith(
+        expect.objectContaining({ pointsReversed: 0 }),
+      );
+      expect(loyaltyReversePublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ points: 0 }),
+        actor,
+      );
+    });
+
+    it('caps a PARTIAL return of a blocked original at nothing too', async () => {
+      // Guards the direction of the cap: written as Math.max instead of Math.min this
+      // still returns 149 on a full return and would only be caught here.
+      setupFullReturnOf149({ pointsEarned: 0, amountDue: 2_980_000, subtotal: 2_980_000 });
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(loyaltyReversePublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ points: 0 }),
+        actor,
+      );
+    });
+
+    it('still reverses the whole earn when an accruing original comes fully back', async () => {
+      setupFullReturnOf149();
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      // The cap binds exactly and changes nothing: floor(1.490.000/10.000) = 149 = pointsEarned.
+      expect(mockManager.save).toHaveBeenCalledWith(
+        expect.objectContaining({ pointsReversed: 149 }),
+      );
+      expect(loyaltyReversePublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ points: 149 }),
+        actor,
+      );
+    });
 
     it('snapshots pointsBalanceAfter = balance + creditBack + earned − reversed', async () => {
       // Bản gốc đã đổi 10 điểm → trả toàn bộ hoàn lại đúng 10 điểm.
@@ -1517,6 +1584,12 @@ describe('CheckoutReturnService — debt offset routing', () => {
       expect(Number.isNaN(saved.pointsReversed)).toBe(false);
       // Math.abs(refundedAmount || returnSubtotal) = 1.490.000 → floor(149).
       expect(saved.pointsReversed).toBe(149);
+      // AC-09: a QUICK return has no original to read pointsEarned from, so the cap
+      // has nothing to bind against and the money derivation stands uncapped.
+      expect(loyaltyReversePublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ points: 149 }),
+        actor,
+      );
     });
 
     it('snapshots and publishes the same reverse base, never two (AC-10)', async () => {
@@ -1536,6 +1609,11 @@ describe('CheckoutReturnService — debt offset routing', () => {
         Math.floor(published.subtotalDelta / POINT_EARN_VND_PER_POINT),
       );
       expect(published.subtotalDelta).toBe(464_000);
+      // AC-08 partial: below the original's pointsEarned, so the cap does not bind and
+      // the number is byte-identical to what this file pinned before ADR-02.
+      expect(
+        (loyaltyReversePublisher.publish.mock.calls[0][0] as { points: number }).points,
+      ).toBe(46);
       expect(saved.pointsReversed).toBe(46);
     });
   });

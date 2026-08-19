@@ -1,0 +1,213 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: promotion-points-reverse-defects
+slug: promotion-points-reverse-defects
+profile: none
+created: 2026-08-19T18:50:37
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-08-19T19:09:51
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-08-19T19:09:51
+    by: Akenzy
+    evidence: 7 assumptions, none blocking-and-pending; 12 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-19T19:19:44
+    by: Akenzy
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-19T19:19:44
+    by: Akenzy
+    evidence: graph valid - 4 UoW, 9 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-19T19:20:20
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-19T19:20:20
+    by: Claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-19T19:20:20
+    by: Claude
+    ticket: T-04-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-19T19:22:37
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-19T19:22:37
+    by: Claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-19T19:25:29
+    by: Claude
+    ticket: T-04-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-19T19:30:40
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-19T19:30:40
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-19T19:30:40
+    by: Akenzy
+    ticket: T-04-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-19T19:30:48
+    by: Claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-19T19:30:48
+    by: Claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-19T19:30:48
+    by: Claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-19T19:30:48
+    by: Claude
+    ticket: T-04-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-19T19:36:26
+    by: Claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-19T19:36:26
+    by: Claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-19T19:39:38
+    by: Claude
+    ticket: T-04-02
+  - gate: G2
+    action: reopened
+    at: 2026-08-19T19:39:38
+    by: Claude
+    reason: ADR-02 assumes invoices.points_earned records what was earned; the clone shows 24 posted customer sales with points_earned=0 but a real ledger earn totalling 3224 points, all issued before 2026-07-20. The cap would refuse to reverse them.
+  - gate: G2
+    action: passed
+    at: 2026-08-19T20:18:47
+    by: Akenzy
+    evidence: 5 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-19T20:18:47
+    by: Akenzy
+    evidence: graph valid - 5 UoW, 11 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-19T20:18:54
+    by: Claude
+    ticket: T-05-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-19T20:24:11
+    by: Claude
+    ticket: T-05-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-19T20:31:51
+    by: Akenzy
+    ticket: T-05-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-19T20:31:51
+    by: Claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-19T20:34:27
+    by: Claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-19T20:47:39
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-19T20:47:39
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-19T20:47:39
+    by: Akenzy
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-19T20:47:39
+    by: Akenzy
+    ticket: T-04-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-19T20:47:40
+    by: Claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-19T20:47:40
+    by: Claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-19T20:47:40
+    by: Claude
+    ticket: T-05-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-19T20:51:24
+    by: Claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-19T20:51:24
+    by: Claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-19T20:51:24
+    by: Claude
+    ticket: T-05-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-19T20:51:24
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done
+    at: 2026-08-19T20:51:24
+    by: Akenzy
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-19T20:51:25
+    by: Akenzy
+    ticket: T-05-02

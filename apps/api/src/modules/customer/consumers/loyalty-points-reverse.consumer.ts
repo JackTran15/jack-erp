@@ -25,7 +25,7 @@ export class LoyaltyPointsReverseConsumer {
     groupId: 'erp-api.return.loyalty-reverse',
   })
   async handle(event: DomainEvent<LoyaltyPointsReversePayload>): Promise<void> {
-    const { returnInvoiceId, customerId, subtotalDelta, organizationId, actorId } =
+    const { returnInvoiceId, customerId, subtotalDelta, points, organizationId, actorId } =
       event.payload;
 
     // The return transaction may already have written an ADJUST row against this
@@ -57,12 +57,20 @@ export class LoyaltyPointsReverseConsumer {
       return;
     }
 
-    const requestedDelta = Math.floor(
-      Math.abs(Number(subtotalDelta)) / POINT_EARN_VND_PER_POINT,
-    );
+    // The producer sends the count the invoice actually recorded; money is only the
+    // fallback for events published before promotion-points-reverse-defects (ADR-01).
+    // Re-deriving from money is wrong whenever a promotion blocked accrual — an
+    // 800.000đ sale that earned nothing would otherwise claw back 80 points the
+    // customer never had (QA #16). `??` and not `||`: `points: 0` is exactly the case
+    // this exists to honour, and `||` would fall straight through to the money path.
+    const source = points == null ? 'money-fallback' : 'payload';
+    const requestedDelta =
+      points ?? Math.floor(Math.abs(Number(subtotalDelta)) / POINT_EARN_VND_PER_POINT);
     if (requestedDelta <= 0) {
       this.logger.log(
-        `Loyalty reverse: zero delta for return ${returnInvoiceId}, recording NO-OP history`,
+        `Loyalty reverse: zero points to reverse for return ${returnInvoiceId} ` +
+          `(source=${source}, subtotalDelta=${subtotalDelta}) — accrual was blocked or ` +
+          `the amount is below one point; recording NO-OP history`,
       );
       await this.historyRepo.insert({
         cardId: card.id,
@@ -79,7 +87,7 @@ export class LoyaltyPointsReverseConsumer {
     const actualDelta = Math.min(requestedDelta, card.points);
     if (actualDelta < requestedDelta) {
       this.logger.warn(
-        `Insufficient points to fully reverse ${returnInvoiceId}: requested=${requestedDelta}, available=${card.points}, applied=${actualDelta}`,
+        `Insufficient points to fully reverse ${returnInvoiceId}: requested=${requestedDelta} (source=${source}), available=${card.points}, applied=${actualDelta}`,
       );
     }
 
@@ -99,7 +107,7 @@ export class LoyaltyPointsReverseConsumer {
     });
 
     this.logger.log(
-      `Reversed ${actualDelta} loyalty point(s) for return ${returnInvoiceId} customer ${customerId}`,
+      `Reversed ${actualDelta} loyalty point(s) for return ${returnInvoiceId} customer ${customerId} (source=${source})`,
     );
   }
 }

@@ -165,7 +165,16 @@ export class CancelInvoiceService {
         {
           returnInvoiceId: id,
           customerId: invoice.customerId,
+          // `subtotalDelta` stays as the audit value and keeps the publisher's
+          // `<= 0` guard firing, but it is no longer what decides the point count.
+          // Sending money alone let the consumer re-derive floor(amountDue / 10.000),
+          // which claws back points a blocked-accrual invoice never earned: QA #16 saw
+          // an 800.000đ sale with points_earned = 0 still debit 80 points off the card.
+          // A cancel voids the whole sale, so the ratio is 1 and the number to reverse
+          // is exactly what the invoice recorded — the same value `pointsReversed` and
+          // `pointsBalanceAfter` above already use.
           subtotalDelta: Number(invoice.amountDue),
+          points: Number(invoice.pointsEarned ?? 0),
           branchId: invoice.branchId,
         },
         actor,
