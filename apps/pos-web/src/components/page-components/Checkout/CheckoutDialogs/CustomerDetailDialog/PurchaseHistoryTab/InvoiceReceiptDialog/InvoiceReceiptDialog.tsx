@@ -40,6 +40,21 @@ export interface InvoiceReceiptDialogProps {
   customerPhone?: string | null;
 }
 
+/**
+ * Số lượng trên bảng hàng hóa.
+ *
+ * API trả `numeric` của Postgres dưới dạng chuỗi ("1.00"), in thẳng ra sẽ thành
+ * "1.00" giữa một cột toàn số nguyên. `Number()` bỏ phần thập phân thừa mà vẫn
+ * giữ nguyên nếu sau này thực sự bán theo số lẻ.
+ *
+ * Dòng trả hiện số âm — đó là dấu hiệu duy nhất phân biệt hàng khách trả lại
+ * với hàng bán ra trong cùng một hóa đơn đổi.
+ */
+function formatQty(quantity: number | string, isReturn: boolean): number {
+  const qty = Number(quantity) || 0;
+  return isReturn ? -Math.abs(qty) : qty;
+}
+
 interface SummaryLine {
   label: string;
   value: number;
@@ -307,7 +322,7 @@ export function InvoiceReceiptDialog({
                           isReturn ? " text-[#E5403A]" : ""
                         }`}
                       >
-                        {isReturn ? -Math.abs(Number(it.quantity)) : it.quantity}
+                        {formatQty(it.quantity, isReturn)}
                       </td>
                       <td className="px-3 py-2.5 text-right tabular-nums">
                         {formatVnd(it.unitPrice)}
