@@ -12,6 +12,7 @@ import {
 } from '@erp/shared-interfaces';
 import { PromotionResolver } from './promotion-resolver';
 import { aProgram, aGroup, aLine, aTier, aCondition, aCart, aCartLine, aCatalogItem } from './__fixtures__/promotion-fixture';
+import { PromotionGroup } from '../model/promotion-group';
 
 describe('PromotionResolver', () => {
   const resolver = new PromotionResolver();
@@ -38,6 +39,79 @@ describe('PromotionResolver', () => {
     expect(evaluation.appliedPrograms[0].lineDiscounts).toEqual([
       { lineId: cartLine.lineId, discountAmount: 205_500, unitPriceAfter: 479_500 },
     ]);
+  });
+
+  describe('accruePoints on AppliedProgram (INVOICE_DISCOUNT only)', () => {
+    it('surfaces accruePoints=true from an applied INVOICE_DISCOUNT program', () => {
+      const program = aProgram().ofType(PromotionProgramType.INVOICE_DISCOUNT).with({ accruePoints: true }).build();
+      const cart = aCart({ lines: [aCartLine({ unitPrice: 100_000, quantity: 1 })] });
+
+      const evaluation = resolver.resolve([program], cart);
+
+      expect(evaluation.appliedPrograms).toHaveLength(1);
+      expect(evaluation.appliedPrograms[0].accruePoints).toBe(true);
+    });
+
+    it('surfaces accruePoints=false from an applied INVOICE_DISCOUNT program', () => {
+      const program = aProgram().ofType(PromotionProgramType.INVOICE_DISCOUNT).with({ accruePoints: false }).build();
+      const cart = aCart({ lines: [aCartLine({ unitPrice: 100_000, quantity: 1 })] });
+
+      const evaluation = resolver.resolve([program], cart);
+
+      expect(evaluation.appliedPrograms[0].accruePoints).toBe(false);
+    });
+
+    it.each([
+      ['ITEM_DISCOUNT', PromotionProgramType.ITEM_DISCOUNT],
+      ['TIERED_DISCOUNT', PromotionProgramType.TIERED_DISCOUNT],
+      ['BUY_M_GET_N', PromotionProgramType.BUY_M_GET_N],
+      ['GIFT_ITEM', PromotionProgramType.GIFT_ITEM],
+    ])(
+      '%s never carries accruePoints, even when the underlying column is true',
+      (_label, type) => {
+        const cartLine = aCartLine({ itemId: 'sku-1', unitPrice: 100_000, quantity: 5 });
+        let groups: PromotionGroup[];
+        if (type === PromotionProgramType.TIERED_DISCOUNT) {
+          groups = [
+            aGroup({
+              lines: [aLine({ role: PromotionLineRole.REWARD, targetId: 'sku-1' })],
+              tiers: [aTier({ fromValue: 1, discountMode: PromotionDiscountMode.PERCENT, discountValue: 10, sortOrder: 0 })],
+            }),
+          ];
+        } else if (type === PromotionProgramType.BUY_M_GET_N) {
+          groups = [aGroup({ lines: [aLine({ role: PromotionLineRole.CONDITION, targetId: 'sku-1' })] })];
+        } else if (type === PromotionProgramType.GIFT_ITEM) {
+          groups = [aGroup({ lines: [aLine({ role: PromotionLineRole.REWARD, targetId: 'sku-1' })] })];
+        } else {
+          groups = [
+            aGroup({
+              lines: [aLine({ role: PromotionLineRole.REWARD, targetId: 'sku-1', discountMode: PromotionDiscountMode.PERCENT, discountValue: 10 })],
+            }),
+          ];
+        }
+        const program = aProgram()
+          .ofType(type)
+          .with({
+            discountMode: undefined,
+            discountValue: undefined,
+            accruePoints: true,
+            ...(type === PromotionProgramType.BUY_M_GET_N
+              ? { buyGetPolicy: PromotionBuyGetPolicy.CHEAPEST, buyQuantity: 5, giftQuantity: 1 }
+              : {}),
+          })
+          .withGroups(groups)
+          .build();
+        const cart = aCart({
+          lines: [cartLine],
+          catalog: new Map([['sku-1', aCatalogItem({ itemId: 'sku-1', sellingPrice: 100_000 })]]),
+        });
+
+        const evaluation = resolver.resolve([program], cart);
+
+        expect(evaluation.appliedPrograms).toHaveLength(1);
+        expect(evaluation.appliedPrograms[0].accruePoints).toBeUndefined();
+      },
+    );
   });
 
   it('AC-03: a STOPPED program never applies and is skipped with reason STOPPED', () => {

@@ -103,6 +103,13 @@ export class GoodsIssueEntity extends BaseEntity {
   @Column({ name: 'approved_at', type: 'timestamptz', nullable: true })
   approvedAt?: Date;
 
+  @Column({
+    type: 'int',
+    default: 0,
+    comment: 'Number of times this posted voucher has been edited; 0 = never edited',
+  })
+  revision: number;
+
   @Column({ name: 'posted_by', type: 'uuid', nullable: true })
   postedBy?: string;
 
@@ -121,4 +128,11 @@ export class GoodsIssueEntity extends BaseEntity {
    * counterparties (no provider join) render their name instead of "—".
    */
   counterparty?: CounterpartyDisplay | null;
+
+  /**
+   * Transient (not a column): per-issue Tổng tiền, inlined by the v2 search
+   * handler via a correlated subquery so the list's money column works
+   * without joining `lines` (which the list query no longer does).
+   */
+  totalAmount?: number;
 }

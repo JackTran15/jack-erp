@@ -5,6 +5,8 @@ export enum SupplierDebtStatus {
   OPEN = 'open',
   PAID = 'paid',
   OVERDUE = 'overdue',
+  /** remainingAmount < 0 — the supplier has been paid more than the (edited) receipt owes. */
+  OVERPAID = 'overpaid',
 }
 
 export enum SupplierDebtDocumentType {

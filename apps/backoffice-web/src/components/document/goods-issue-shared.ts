@@ -70,6 +70,12 @@ export interface GoodsIssue {
   postedAt?: string;
   lines: GoodsIssueLine[];
   createdAt: string;
+  /**
+   * Per-row Tổng tiền, present on `/v2/inventory/goods-issues/search` list rows
+   * (which no longer carry `lines`) but not on the `GET /:id` shape — that one
+   * keeps `lines` and callers compute the total from it when needed.
+   */
+  totalAmount?: number;
 }
 
 export interface PaginatedResponse<T> {

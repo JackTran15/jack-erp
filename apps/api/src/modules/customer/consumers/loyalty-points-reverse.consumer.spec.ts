@@ -70,6 +70,59 @@ describe('LoyaltyPointsReverseConsumer', () => {
     );
   });
 
+  it('reverses nothing when the payload says 0 points, however much money moved (QA #16)', async () => {
+    historyRepo.findOne.mockResolvedValue(null);
+    cardRepo.findOne.mockResolvedValue({ id: 'card-1', points: 7_575 });
+
+    await consumer.handle(buildEvent({ subtotalDelta: 800_000, points: 0 }));
+
+    // The card is untouched: the sale earned nothing because a promotion blocked
+    // accrual, so there is nothing to claw back. Deriving from the 800.000đ would
+    // take 80 points the customer never had.
+    expect(manager.decrement).not.toHaveBeenCalled();
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+    // The NO-OP row still goes in — it is what the replay guard keys on.
+    expect(historyRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ type: PointType.ADJUST, delta: 0 }),
+    );
+  });
+
+  it('uses the payload point count verbatim rather than re-deriving it from money', async () => {
+    historyRepo.findOne.mockResolvedValue(null);
+    cardRepo.findOne.mockResolvedValue({ id: 'card-1', points: 500 });
+
+    await consumer.handle(buildEvent({ subtotalDelta: 464_000, points: 46 }));
+
+    expect(manager.decrement).toHaveBeenCalledWith(
+      MembershipCardEntity,
+      { id: 'card-1' },
+      'points',
+      46,
+    );
+    expect(manager.insert).toHaveBeenCalledWith(
+      PointHistoryEntity,
+      expect.objectContaining({ type: PointType.ADJUST, delta: -46 }),
+    );
+  });
+
+  it('falls back to the money derivation for an event published before `points` existed', async () => {
+    historyRepo.findOne.mockResolvedValue(null);
+    cardRepo.findOne.mockResolvedValue({ id: 'card-1', points: 500 });
+
+    // An event already sitting in the topic at deploy time carries no `points` key.
+    const event = buildEvent({ subtotalDelta: 464_000 });
+    expect(event.payload.points).toBeUndefined();
+
+    await consumer.handle(event);
+
+    expect(manager.decrement).toHaveBeenCalledWith(
+      MembershipCardEntity,
+      { id: 'card-1' },
+      'points',
+      46,
+    );
+  });
+
   it('caps the reversal at the available balance', async () => {
     historyRepo.findOne.mockResolvedValue(null);
     cardRepo.findOne.mockResolvedValue({ id: 'card-1', points: 40 });

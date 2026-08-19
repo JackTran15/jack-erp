@@ -28,6 +28,7 @@ function ctx(overrides: Partial<CheckoutContext> = {}): CheckoutContext {
       remainder: 0,
       keptChange: 0,
       pointsEarned: 73,
+      pointsBlocked: false,
       newStatus: InvoiceStatus.PAID,
     },
     ...overrides,
@@ -103,6 +104,50 @@ describe('PersistInvoiceStep', () => {
     expect(invoice.pointsBalanceAfter).toBe(100 - 20 + 73); // 153
   });
 
+  /**
+   * QA #15. A promotion with "Tích điểm cho khách hàng" unchecked sets pointsBlocked,
+   * so the invoice earns nothing — but the balance projection kept adding the raw
+   * totals.pointsEarned, and a card holding 7.575 printed 7.655 on the receipt.
+   * The numbers below are QA's, so a reader can match the test against the report.
+   */
+  it('adds no earn to pointsBalanceAfter when a promotion blocked accrual', async () => {
+    const invoiceRepo = { save: jest.fn((x: unknown) => x) };
+    const membershipCardService = {
+      getPointBalanceForUpdate: jest.fn().mockResolvedValue(7575),
+    };
+    const invoice: any = { id: 'inv-1', customerId: 'cust-1', pointsRedeemed: 0 };
+    const c = ctx({
+      invoice,
+      manager: withManager(invoiceRepo),
+      totals: { ...ctx().totals!, amountDue: 800000, pointsEarned: 80, pointsBlocked: true },
+    });
+
+    await new PersistInvoiceStep(membershipCardService as any).execute(c);
+
+    // Both, in one case: the whole defect was these two disagreeing.
+    expect(invoice.pointsEarned).toBe(0);
+    expect(invoice.pointsBalanceAfter).toBe(7575);
+  });
+
+  it('still subtracts redeemed points when a promotion blocked accrual', async () => {
+    const invoiceRepo = { save: jest.fn((x: unknown) => x) };
+    const membershipCardService = {
+      getPointBalanceForUpdate: jest.fn().mockResolvedValue(7575),
+    };
+    const invoice: any = { id: 'inv-1', customerId: 'cust-1', pointsRedeemed: 100 };
+    const c = ctx({
+      invoice,
+      manager: withManager(invoiceRepo),
+      totals: { ...ctx().totals!, amountDue: 800000, pointsEarned: 80, pointsBlocked: true },
+    });
+
+    await new PersistInvoiceStep(membershipCardService as any).execute(c);
+
+    // Proved separately from the case above so a sign error cannot cancel out.
+    expect(invoice.pointsEarned).toBe(0);
+    expect(invoice.pointsBalanceAfter).toBe(7475);
+  });
+
   it('does not query the card, and leaves pointsBalanceAfter null, for a walk-in customer', async () => {
     const invoiceRepo = { save: jest.fn((x: unknown) => x) };
     const membershipCardService = { getPointBalanceForUpdate: jest.fn() };
@@ -139,6 +184,40 @@ describe('PersistInvoiceStep', () => {
     };
     const invoice: any = { id: 'inv-1', customerId: 'cust-1', pointsRedeemed: 0 };
     const c = ctx({ invoice, manager: withManager(invoiceRepo) });
+
+    await new PersistInvoiceStep(membershipCardService as any).execute(c);
+
+    expect(invoice.pointsEarned).toBe(73);
+  });
+
+  it('records no points for a customer invoice when totals.pointsBlocked is true (AC-06, AC-09)', async () => {
+    const invoiceRepo = { save: jest.fn((x: unknown) => x) };
+    const membershipCardService = {
+      getPointBalanceForUpdate: jest.fn().mockResolvedValue(100),
+    };
+    const invoice: any = { id: 'inv-1', customerId: 'cust-1', pointsRedeemed: 0 };
+    const c = ctx({
+      invoice,
+      manager: withManager(invoiceRepo),
+      totals: { ...ctx().totals!, pointsBlocked: true },
+    });
+
+    await new PersistInvoiceStep(membershipCardService as any).execute(c);
+
+    expect(invoice.pointsEarned).toBe(0);
+  });
+
+  it('still records points for a customer invoice when totals.pointsBlocked is false (AC-08, AC-10, AC-11)', async () => {
+    const invoiceRepo = { save: jest.fn((x: unknown) => x) };
+    const membershipCardService = {
+      getPointBalanceForUpdate: jest.fn().mockResolvedValue(100),
+    };
+    const invoice: any = { id: 'inv-1', customerId: 'cust-1', pointsRedeemed: 0 };
+    const c = ctx({
+      invoice,
+      manager: withManager(invoiceRepo),
+      totals: { ...ctx().totals!, pointsBlocked: false },
+    });
 
     await new PersistInvoiceStep(membershipCardService as any).execute(c);
 

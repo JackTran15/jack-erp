@@ -18831,6 +18831,44 @@
         "tags": [
           "GoodsIssue"
         ]
+      },
+      "patch": {
+        "operationId": "GoodsIssueController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGoodsIssueDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoodsIssueEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "GoodsIssue"
+        ]
       }
     },
     "/inventory/goods-issues/{id}/print-payload": {
@@ -37227,6 +37265,11 @@
             "type": "string",
             "description": "INVOICE_DISCOUNT only"
           },
+          "accruePoints": {
+            "type": "boolean",
+            "default": false,
+            "description": "INVOICE_DISCOUNT only"
+          },
           "discountMode": {
             "enum": [
               "PERCENT",
@@ -37427,6 +37470,11 @@
               "ALL_ITEMS"
             ],
             "type": "string",
+            "description": "INVOICE_DISCOUNT only"
+          },
+          "accruePoints": {
+            "type": "boolean",
+            "default": false,
             "description": "INVOICE_DISCOUNT only"
           },
           "discountMode": {
@@ -38927,6 +38975,9 @@
             "format": "date-time",
             "type": "string"
           },
+          "revision": {
+            "type": "number"
+          },
           "postedBy": {
             "type": "string"
           },
@@ -38975,6 +39026,7 @@
           "status",
           "purpose",
           "references",
+          "revision",
           "lines",
           "id",
           "organizationId",
@@ -39029,6 +39081,10 @@
           "unitPrice",
           "lineTotal"
         ]
+      },
+      "UpdateGoodsIssueDto": {
+        "type": "object",
+        "properties": {}
       },
       "GoodsIssueSearchV2Dto": {
         "type": "object",
@@ -39830,6 +39886,9 @@
           "cashReceiptId": {
             "type": "string"
           },
+          "revision": {
+            "type": "number"
+          },
           "postedAt": {
             "format": "date-time",
             "type": "string"
@@ -39904,6 +39963,7 @@
           "locationId",
           "attachmentIds",
           "references",
+          "revision",
           "lines",
           "id",
           "organizationId",
@@ -39998,6 +40058,14 @@
               "OTHER",
               "TRANSFER_IN",
               "STOCK_TAKE"
+            ]
+          },
+          "paymentMethod": {
+            "type": "string",
+            "description": "Accepted so the edit form can round-trip the value it loaded — the global\n`forbidNonWhitelisted` pipe rejects the whole request otherwise. Changing it\nis refused by the service: it would change what the receipt owes and to whom.",
+            "enum": [
+              "CASH",
+              "CREDIT"
             ]
           },
           "providerId": {

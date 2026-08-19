@@ -70,3 +70,10 @@ export interface JwtPayload {
   iat: number;
   exp: number;
 }
+
+export enum AuthErrorCode {
+  TOKEN_MALFORMED = '4014001',
+  SESSION_REVOKED = '4014002',
+  TOKEN_EXPIRED = '4014003',
+  REFRESH_TOKEN_INVALID = '4014004',
+}

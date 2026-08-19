@@ -1,0 +1,278 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: warehouse-voucher-edit-delete
+slug: warehouse-voucher-edit-delete
+profile: none
+created: 2026-08-17T09:21:56
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-08-17T09:34:07
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-08-17T09:34:07
+    by: Akenzy
+    evidence: 14 assumptions, none blocking-and-pending; 21 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-17T09:42:36
+    by: Akenzy
+    evidence: 7 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-17T09:52:53
+    by: Akenzy
+    evidence: graph valid - 6 UoW, 25 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T09:53:28
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T09:54:53
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T09:54:53
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T09:57:06
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T09:57:06
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T09:59:53
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T09:59:53
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T10:04:27
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T10:04:27
+    by: claude
+    ticket: T-01-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T10:06:37
+    by: claude
+    ticket: T-01-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T10:18:44
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T10:20:05
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T10:20:05
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T10:23:52
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T10:23:52
+    by: claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T10:27:40
+    by: claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T10:27:40
+    by: claude
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T10:30:28
+    by: claude
+    ticket: T-02-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T10:30:57
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T10:40:39
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T10:40:50
+    by: claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T10:42:57
+    by: claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T10:43:12
+    by: claude
+    ticket: T-03-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T10:44:48
+    by: claude
+    ticket: T-03-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T10:44:48
+    by: claude
+    ticket: T-03-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T10:53:03
+    by: claude
+    ticket: T-03-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T10:53:12
+    by: claude
+    ticket: T-04-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T10:58:17
+    by: claude
+    ticket: T-04-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T11:02:51
+    by: claude
+    ticket: T-04-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T11:03:00
+    by: claude
+    ticket: T-04-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T11:03:00
+    by: claude
+    ticket: T-04-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T11:06:38
+    by: claude
+    ticket: T-04-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T11:06:45
+    by: claude
+    ticket: T-04-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T11:09:56
+    by: claude
+    ticket: T-04-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T11:10:04
+    by: claude
+    ticket: T-04-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T11:11:24
+    by: claude
+    ticket: T-04-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T11:11:31
+    by: claude
+    ticket: T-05-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T11:17:06
+    by: claude
+    ticket: T-05-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T11:17:38
+    by: claude
+    ticket: T-05-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T11:24:34
+    by: claude
+    ticket: T-05-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T11:24:34
+    by: claude
+    ticket: T-05-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T11:28:11
+    by: claude
+    ticket: T-05-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T11:28:21
+    by: claude
+    ticket: T-06-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T11:30:30
+    by: claude
+    ticket: T-06-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T11:30:31
+    by: claude
+    ticket: T-06-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T11:33:15
+    by: claude
+    ticket: T-06-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T11:33:15
+    by: claude
+    ticket: T-06-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T11:40:31
+    by: claude
+    ticket: T-06-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-17T11:40:31
+    by: claude
+    ticket: T-06-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-17T11:45:01
+    by: claude
+    ticket: T-06-04

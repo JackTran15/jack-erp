@@ -6406,7 +6406,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        patch: operations["GoodsIssueController_update"];
         trace?: never;
     };
     "/inventory/goods-issues/{id}/print-payload": {
@@ -12252,6 +12252,11 @@ export interface components {
             invoiceScope?: "NON_PROMO_ONLY" | "ALL_ITEMS";
             /**
              * @description INVOICE_DISCOUNT only
+             * @default false
+             */
+            accruePoints: boolean;
+            /**
+             * @description INVOICE_DISCOUNT only
              * @enum {string}
              */
             discountMode?: "PERCENT" | "AMOUNT" | "FIXED_PRICE";
@@ -12347,6 +12352,11 @@ export interface components {
              * @enum {string}
              */
             invoiceScope?: "NON_PROMO_ONLY" | "ALL_ITEMS";
+            /**
+             * @description INVOICE_DISCOUNT only
+             * @default false
+             */
+            accruePoints: boolean;
             /**
              * @description INVOICE_DISCOUNT only
              * @enum {string}
@@ -12916,6 +12926,7 @@ export interface components {
             approvedBy?: string;
             /** Format: date-time */
             approvedAt?: string;
+            revision: number;
             postedBy?: string;
             /** Format: date-time */
             postedAt?: string;
@@ -12951,6 +12962,7 @@ export interface components {
             item?: components["schemas"]["ItemEntity"];
             location?: components["schemas"]["LocationEntity"];
         };
+        UpdateGoodsIssueDto: Record<string, never>;
         GoodsIssueSearchV2Dto: {
             /** @default 1 */
             page: number;
@@ -13220,6 +13232,7 @@ export interface components {
             journalEntryId?: string;
             cashPaymentId?: string;
             cashReceiptId?: string;
+            revision: number;
             /** Format: date-time */
             postedAt?: string;
             postedBy?: string;
@@ -13276,6 +13289,13 @@ export interface components {
         UpdateGoodsReceiptDto: {
             /** @enum {string} */
             purpose?: "PURCHASE" | "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
+            /**
+             * @description Accepted so the edit form can round-trip the value it loaded — the global
+             *     `forbidNonWhitelisted` pipe rejects the whole request otherwise. Changing it
+             *     is refused by the service: it would change what the receipt owes and to whom.
+             * @enum {string}
+             */
+            paymentMethod?: "CASH" | "CREDIT";
             /** Format: uuid */
             providerId?: string;
             /** @enum {string} */
@@ -25023,6 +25043,31 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueEntity"];
+                };
+            };
+        };
+    };
+    GoodsIssueController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateGoodsIssueDto"];
+            };
+        };
         responses: {
             200: {
                 headers: {

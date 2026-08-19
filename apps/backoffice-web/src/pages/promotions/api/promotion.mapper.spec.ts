@@ -96,8 +96,11 @@ describe("promotion.mapper round-trip", () => {
     expect(form.applicableGoods).toHaveLength(1);
     expect(form.applicableGoods[0]).toMatchObject({ itemId: "item-1", sku: "SKU1", minQuantity: 3 });
 
+    // Scope lock (ADR-01): even though the loaded program hydrated
+    // form.applyScope to NON_PROMO_ONLY above, the save path must ignore it
+    // and always emit ALL_ITEMS (AC-01/AC-02).
     const dto = toCreateDto(form, PromotionProgramType.INVOICE_DISCOUNT);
-    expect(dto.invoiceScope).toBe(PromotionInvoiceScope.NON_PROMO_ONLY);
+    expect(dto.invoiceScope).toBe(PromotionInvoiceScope.ALL_ITEMS);
     expect(dto.discountMode).toBe(PromotionDiscountMode.PERCENT);
     expect(dto.discountValue).toBe(15);
     expect(dto.condition).toMatchObject({ type: PromotionConditionType.SPECIFIC_QUANTITY });
@@ -108,6 +111,35 @@ describe("promotion.mapper round-trip", () => {
       targetId: "item-1",
       quantity: 3,
     });
+  });
+
+  it("INVOICE_DISCOUNT: accruePoints round-trips true/false, and defaults to false when absent from the response (T-02-06)", () => {
+    const checkedDetail = baseDetail({
+      type: PromotionProgramType.INVOICE_DISCOUNT,
+      accruePoints: true,
+      groups: [{ id: "g0", ordinal: 0, lines: [], tiers: [] }],
+    });
+    const checkedForm = toFormState(checkedDetail);
+    expect(checkedForm.accruePoints).toBe(true);
+    expect(toCreateDto(checkedForm, PromotionProgramType.INVOICE_DISCOUNT).accruePoints).toBe(true);
+
+    const uncheckedDetail = baseDetail({
+      type: PromotionProgramType.INVOICE_DISCOUNT,
+      accruePoints: false,
+      groups: [{ id: "g0", ordinal: 0, lines: [], tiers: [] }],
+    });
+    const uncheckedForm = toFormState(uncheckedDetail);
+    expect(uncheckedForm.accruePoints).toBe(false);
+    expect(toCreateDto(uncheckedForm, PromotionProgramType.INVOICE_DISCOUNT).accruePoints).toBe(false);
+
+    // A stale cached response from before this migration ran would omit the field entirely —
+    // must default to false, not crash and not stay undefined.
+    const staleDetail = baseDetail({
+      type: PromotionProgramType.INVOICE_DISCOUNT,
+      groups: [{ id: "g0", ordinal: 0, lines: [], tiers: [] }],
+    });
+    const staleForm = toFormState(staleDetail);
+    expect(staleForm.accruePoints).toBe(false);
   });
 
   it("ITEM_DISCOUNT: PRODUCT-scope reward lines + PRODUCT_GROUP condition", () => {

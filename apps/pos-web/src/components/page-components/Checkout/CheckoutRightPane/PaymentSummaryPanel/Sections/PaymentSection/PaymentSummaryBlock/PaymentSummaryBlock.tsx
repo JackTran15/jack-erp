@@ -4,6 +4,7 @@ import { CountBadge } from "@erp/pos/components/page-components/Checkout/Checkou
 import { PosSummaryRow } from "@erp/pos/components/common/PosSummaryRow/PosSummaryRow";
 import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
 import { CloseIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
+import { SHOW_DEPOSIT_ORDER_CONTROLS } from "@erp/pos/constants/feature-flags.constant";
 import { useCheckoutGrandTotal } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-grand-total";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 import { useCheckoutPromotion } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-promotion";
@@ -126,22 +127,24 @@ export function PaymentSummaryBlock({
       ) : promotionPreview.status === "unavailable" ? (
         <p className="text-[13px] text-gray-400">Chưa tính được khuyến mại</p>
       ) : null}
-      <PosSummaryRow
-        label={
-          onDepositClick ? (
-            <button
-              type="button"
-              onClick={onDepositClick}
-              className="text-sm  text-indigo-600 hover:text-indigo-700"
-            >
-              Đặt cọc
-            </button>
-          ) : (
-            "Đặt cọc"
-          )
-        }
-        value={formatVnd(deposit)}
-      />
+      {SHOW_DEPOSIT_ORDER_CONTROLS ? (
+        <PosSummaryRow
+          label={
+            onDepositClick ? (
+              <button
+                type="button"
+                onClick={onDepositClick}
+                className="text-sm  text-indigo-600 hover:text-indigo-700"
+              >
+                Đặt cọc
+              </button>
+            ) : (
+              "Đặt cọc"
+            )
+          }
+          value={formatVnd(deposit)}
+        />
+      ) : null}
       {pointsRedeemed > 0 ? (
         <PosSummaryRow
           label={

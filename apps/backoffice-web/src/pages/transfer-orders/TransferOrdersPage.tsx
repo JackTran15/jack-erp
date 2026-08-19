@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { erpApi, requireErpData } from "../../lib/erp-api";
 import {
   Button,
   DocumentFormDialog,
@@ -121,6 +123,17 @@ interface TransferOrder {
   lines: TransferOrderLine[];
   createdAt: string;
 }
+
+/** GET /inventory/transfer-orders/:id/lines response shape (paginated). */
+interface TransferOrderLinesPage {
+  items: TransferOrderLine[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+  total: number;
+}
+
+const LINES_PAGE_SIZE = 50;
 
 interface PaginatedResponse<T> {
   data: T[];
@@ -274,14 +287,27 @@ export function TransferOrdersPage() {
   }, [storages]);
 
   const getOrderId = useCallback((order: TransferOrder) => order.id, []);
-  const {
-    selectedId,
-    setSelectedId,
-    activeRecord: selectedOrder,
-  } = useDocumentListSelection({
+  const { selectedId, setSelectedId } = useDocumentListSelection({
     rows: records?.data ?? [],
     getRowId: getOrderId,
   });
+
+  // List rows no longer carry `lines` (list() bypasses TransferOrderEntity's
+  // eager lines/item, see transfer-order.service.ts `list()`). The selected
+  // order's full detail (header + lines) is fetched separately via the
+  // unchanged GET /:id, so the duplicate/view/edit dialog and DetailPanel
+  // both read from this instead of the stale list row.
+  const { data: selectedOrderData } = useQuery({
+    queryKey: ["transfer-order", selectedId],
+    queryFn: async () =>
+      requireErpData(
+        await erpApi.GET<TransferOrder>("/inventory/transfer-orders/{id}", {
+          params: { path: { id: selectedId! } },
+        }),
+      ),
+    enabled: !!selectedId,
+  });
+  const selectedOrder = selectedOrderData ?? null;
 
   const reloadAfterMutation = useCallback(async () => {
     await loadRecords();
@@ -396,8 +422,19 @@ export function TransferOrdersPage() {
             onClick={(e) => {
               e.stopPropagation();
               setSelectedId(row.id);
-              setEditingOrder(row);
-              setDialogMode("view");
+              // Row no longer carries `lines` — fetch the full document
+              // before opening the view dialog.
+              void (async () => {
+                try {
+                  const { data } = await apiClient.get<TransferOrder>(
+                    `/inventory/transfer-orders/${row.id}`,
+                  );
+                  setEditingOrder(data);
+                  setDialogMode("view");
+                } catch (err) {
+                  toast.error(getUserFacingApiErrorMessage(err));
+                }
+              })();
             }}
             title={row.documentNumber}
           >
@@ -591,6 +628,54 @@ function DetailPanel({
   order: TransferOrder | null;
   storageNameById: Map<string, string>;
 }) {
+  const orderId = order?.id ?? null;
+
+  // Paginated, independent from the header (`order`) query's cache key so a
+  // header refetch doesn't discard already-scrolled line pages.
+  const linesQuery = useInfiniteQuery({
+    queryKey: ["transfer-order-lines", orderId],
+    queryFn: async ({ pageParam }) =>
+      requireErpData(
+        await erpApi.GET<TransferOrderLinesPage>("/inventory/transfer-orders/{id}/lines", {
+          params: {
+            path: { id: orderId! },
+            query: { page: pageParam, pageSize: LINES_PAGE_SIZE },
+          },
+        }),
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
+    enabled: !!orderId,
+  });
+
+  const lines = useMemo(
+    () => linesQuery.data?.pages.flatMap((p) => p.items) ?? [],
+    [linesQuery.data],
+  );
+
+  const hasNextPage = linesQuery.hasNextPage;
+  const isFetchingNextPage = linesQuery.isFetchingNextPage;
+  const fetchNextPage = linesQuery.fetchNextPage;
+
+  // Sentinel row, observed instead of a scroll listener: the actual scroll
+  // container (DocumentListShell's resizable detail-panel wrapper) lives
+  // outside this component, so we can't attach onScroll to it directly.
+  const sentinelRef = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !isFetchingNextPage) {
+          void fetchNextPage();
+        }
+      },
+      { threshold: 0.1 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, lines.length]);
+
   return (
     <div className="px-4 py-3">
       <div className="mb-2 inline-block border-b-2 border-primary px-2 pb-1 text-sm font-semibold">
@@ -609,7 +694,9 @@ function DetailPanel({
         <p className="text-sm text-muted-foreground">
           Chọn một lệnh để xem chi tiết.
         </p>
-      ) : order.lines.length === 0 ? (
+      ) : linesQuery.isLoading ? (
+        <p className="text-sm text-muted-foreground">Đang tải...</p>
+      ) : lines.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Lệnh này chưa có dòng hàng.
         </p>
@@ -636,7 +723,7 @@ function DetailPanel({
             </tr>
           </thead>
           <tbody>
-            {order.lines.map((line) => {
+            {lines.map((line) => {
               const code = line.item?.code ?? line.itemId.slice(0, 8);
               const name = line.item?.name ?? "—";
               const unit = line.item?.unit ?? "—";
@@ -657,6 +744,13 @@ function DetailPanel({
                 </tr>
               );
             })}
+            {hasNextPage && (
+              <tr ref={sentinelRef}>
+                <td colSpan={20} className="py-2 text-center text-xs text-muted-foreground">
+                  {isFetchingNextPage ? "Đang tải thêm..." : ""}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       )}

@@ -204,7 +204,10 @@ export function GoodsIssueFormDialog({
 }) {
   const navigate = useNavigate();
   const isView = mode === "view";
-  const canEdit = isView && initial?.status === "DRAFT";
+  const isEdit = mode === "edit";
+  // Any non-cancelled row can be edited — BE writes the difference as a
+  // stock-ledger adjustment instead of overwriting what was already posted.
+  const canEdit = isView && initial?.status !== "CANCELLED";
   // Resolve preferred shelves for many lines in a single request, then apply
   // each result back to its row. The (idx, itemId, storageId) guard prevents a
   // stale response from overwriting a row the user has since changed.
@@ -889,7 +892,25 @@ export function GoodsIssueFormDialog({
         }
       }
 
-      if (sourceTransferOrderId) {
+      if (mode === "edit" && initial?.id) {
+        // Editing an already-posted issue: PATCH the same document instead of
+        // creating a new one. Purpose and cửa hàng đích cannot change here
+        // (A-11) — the DTO doesn't accept them.
+        await apiClient.patch(`/inventory/goods-issues/${initial.id}`, {
+          locationId: headerLocationId,
+          counterpartyKind: counterpartyKind || undefined,
+          counterpartyId: customerId || undefined,
+          reasonId:
+            (purpose === "OTHER" || purpose === "DISPOSAL") && reasonId
+              ? reasonId
+              : undefined,
+          notes: notes || undefined,
+          deliverer: deliveryPerson || undefined,
+          references: references.length ? references : undefined,
+          occurredAt: combineDateTime(docDate, docTime),
+          lines: issueLines,
+        });
+      } else if (sourceTransferOrderId) {
         // Saving the export leg of a transfer order: this posts the goods issue
         // and advances the transfer order DRAFT → IN_PROGRESS server-side. Carry
         // the form's header fields so the spawned issue round-trips them too.
@@ -941,7 +962,9 @@ export function GoodsIssueFormDialog({
       setDirty(false);
       // "Lưu" tạo + thực hiện luôn (giống MISA): phiếu trả về đã ở trạng thái
       // đã xuất kho, đã ghi sổ tồn kho.
-      toast.success("Đã xuất kho.");
+      toast.success(
+        mode === "edit" ? "Đã cập nhật phiếu xuất kho." : "Đã xuất kho.",
+      );
       await onSaved();
       return true;
     } catch (err) {
@@ -1520,7 +1543,12 @@ export function GoodsIssueFormDialog({
               onChange={(e) =>
                 handlePurposeChange(e.target.value as GoodsIssuePurposeUI)
               }
-              disabled={isView || sourceTransferOrderId !== null}
+              disabled={isView || isEdit || sourceTransferOrderId !== null}
+              title={
+                isEdit
+                  ? "Không thể đổi mục đích xuất kho khi sửa phiếu; hãy hủy phiếu và tạo phiếu mới"
+                  : undefined
+              }
             >
               {visiblePurposes.map((p) => (
                 <option key={p} value={p}>
@@ -1596,7 +1624,7 @@ export function GoodsIssueFormDialog({
                     { key: "name", label: "Tên cửa hàng", render: (b) => b.name },
                     { key: "address", label: "Địa chỉ", render: (b) => b.address ?? "—" },
                   ]}
-                  disabled={isView}
+                  disabled={isView || isEdit}
                 />
               </div>
             ) : null}

@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { erpApi, requireErpData } from "../../lib/erp-api";
 import {
   navigateToBarcodePrint,
   type BarcodePrefillItem,
@@ -118,7 +120,10 @@ function lineSubtotal(l: {
 }
 
 function orderTotal(o: PurchaseOrder): number {
-  return o.lines.reduce((s, l) => s + lineSubtotal(l), 0);
+  // List rows carry a server-computed `totalAmount` (no `lines` to sum
+  // client-side); full-detail fetches (GET /:id) still carry `lines`.
+  if (o.totalAmount !== undefined) return o.totalAmount;
+  return (o.lines ?? []).reduce((s, l) => s + lineSubtotal(l), 0);
 }
 
 function purchasePurposeLabel(purpose: PurchaseOrder["purpose"]): string {
@@ -135,6 +140,17 @@ function renderStatusBadge(status: PurchaseOrderStatus) {
 
   return <StatusBadge variant={variant}>{STATUS_LABEL[status]}</StatusBadge>;
 }
+
+/** GET /goods-receipts/:id/lines response shape (paginated). */
+interface GoodsReceiptLinesPage {
+  items: PurchaseOrderLine[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+  total: number;
+}
+
+const LINES_PAGE_SIZE = 50;
 
 type PurchaseOrdersPageMode = "inventory" | "purchase";
 
@@ -333,14 +349,27 @@ export function PurchaseOrdersPage({
   }, [providers, records]);
 
   const getOrderId = useCallback((order: PurchaseOrder) => order.id, []);
-  const {
-    selectedId,
-    setSelectedId,
-    activeRecord: selectedOrder,
-  } = useDocumentListSelection({
+  const { selectedId, setSelectedId } = useDocumentListSelection({
     rows: records?.data ?? [],
     getRowId: getOrderId,
   });
+
+  // List rows no longer carry `lines` (v2 search trims them, see
+  // search-goods-receipts-v2.handler.ts). The selected document's full detail
+  // (header + lines) is fetched separately via the unchanged GET /:id, so the
+  // barcode toolbar, the duplicate/view/edit dialog, and DetailPanel all read
+  // from this instead of the stale list row.
+  const { data: selectedOrderData } = useQuery({
+    queryKey: ["goods-receipt", selectedId],
+    queryFn: async () =>
+      requireErpData(
+        await erpApi.GET<PurchaseOrder>("/goods-receipts/{id}", {
+          params: { path: { id: selectedId! } },
+        }),
+      ),
+    enabled: !!selectedId,
+  });
+  const selectedOrder = selectedOrderData ?? null;
 
   // ─── Row actions ──────────────────────────────────────────────────────────────
 
@@ -418,7 +447,13 @@ export function PurchaseOrdersPage({
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !selectedOrder || selectedOrder.status !== "DRAFT",
+      // Allow editing any non-terminal row. BE update() handles POSTED by
+      // writing the difference as a stock-ledger + accounting adjustment
+      // instead of overwriting what was already posted.
+      disabled:
+        !selectedOrder ||
+        selectedOrder.status === "CANCELLED" ||
+        selectedOrder.status === "REVERSED",
       onClick: () => {
         if (!selectedOrder) return;
         setEditingOrder(selectedOrder);
@@ -502,8 +537,20 @@ export function PurchaseOrdersPage({
           onClick={(e) => {
             e.stopPropagation();
             setSelectedId(row.id);
-            setEditingOrder(row);
-            setDialogMode("view");
+            // Row no longer carries `lines` — fetch the full document before
+            // opening the view dialog (mirrors the openDocumentId deep-link
+            // fetch above).
+            void (async () => {
+              try {
+                const { data } = await apiClient.get<PurchaseOrder>(
+                  `/goods-receipts/${row.id}`,
+                );
+                setEditingOrder(data);
+                setDialogMode("view");
+              } catch (err) {
+                toast.error(getUserFacingApiErrorMessage(err));
+              }
+            })();
           }}
           title={row.documentNumber ?? row.id}
         >
@@ -800,6 +847,54 @@ function DetailPanel({
   storageNameById: Map<string, string>;
   isPurchaseMode: boolean;
 }) {
+  const orderId = order?.id ?? null;
+
+  // Paginated, independent from the header (`order`) query's cache key so a
+  // header refetch doesn't discard already-scrolled line pages.
+  const linesQuery = useInfiniteQuery({
+    queryKey: ["goods-receipt-lines", orderId],
+    queryFn: async ({ pageParam }) =>
+      requireErpData(
+        await erpApi.GET<GoodsReceiptLinesPage>("/goods-receipts/{id}/lines", {
+          params: {
+            path: { id: orderId! },
+            query: { page: pageParam, pageSize: LINES_PAGE_SIZE },
+          },
+        }),
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
+    enabled: !!orderId,
+  });
+
+  const lines = useMemo(
+    () => linesQuery.data?.pages.flatMap((p) => p.items) ?? [],
+    [linesQuery.data],
+  );
+
+  const hasNextPage = linesQuery.hasNextPage;
+  const isFetchingNextPage = linesQuery.isFetchingNextPage;
+  const fetchNextPage = linesQuery.fetchNextPage;
+
+  // Sentinel row, observed instead of a scroll listener: the actual scroll
+  // container (DocumentListShell's resizable detail-panel wrapper) lives
+  // outside this component, so we can't attach onScroll to it directly.
+  const sentinelRef = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !isFetchingNextPage) {
+          void fetchNextPage();
+        }
+      },
+      { threshold: 0.1 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, lines.length]);
+
   return (
     <div className="px-4 py-3">
       <div className="mb-2 inline-block border-b-2 border-primary px-2 pb-1 text-sm font-semibold">
@@ -809,7 +904,9 @@ function DetailPanel({
         <p className="text-sm text-muted-foreground">
           Chọn một phiếu để xem chi tiết.
         </p>
-      ) : order.lines.length === 0 ? (
+      ) : linesQuery.isLoading ? (
+        <p className="text-sm text-muted-foreground">Đang tải...</p>
+      ) : lines.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Phiếu này chưa có dòng hàng.
         </p>
@@ -869,7 +966,7 @@ function DetailPanel({
             </tr>
           </thead>
           <tbody>
-            {order.lines.map((rawLine) => {
+            {lines.map((rawLine) => {
               const line = rawLine as PurchaseOrderLine;
               const itemCode =
                 line.item?.code ?? line.itemCode ?? line.itemId.slice(0, 8);
@@ -928,6 +1025,13 @@ function DetailPanel({
                 </tr>
               );
             })}
+            {hasNextPage && (
+              <tr ref={sentinelRef}>
+                <td colSpan={20} className="py-2 text-center text-xs text-muted-foreground">
+                  {isFetchingNextPage ? "Đang tải thêm..." : ""}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       )}

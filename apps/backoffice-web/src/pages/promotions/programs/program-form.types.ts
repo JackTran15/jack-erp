@@ -214,6 +214,7 @@ export interface ProgramFormState {
   storeScope: StoreScope;
   storeIds: string[];
   applyScope: ApplyScope;
+  accruePoints: boolean;
   discountType: DiscountType;
   discountPercent: number | "";
   discountAmount: number | "";

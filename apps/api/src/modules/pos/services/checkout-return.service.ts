@@ -345,10 +345,7 @@ export class CheckoutReturnService {
       );
       // Snapshot the points clawed back on the returned goods so receipts can show
       // "Điểm trừ" without querying point_history. Same base as the reverse event.
-      invoice.pointsReversed = Math.floor(
-        this.computeReverseBase(originalInvoice, totals) /
-          POINT_EARN_VND_PER_POINT,
-      );
+      invoice.pointsReversed = this.computeReversePoints(originalInvoice, totals);
       // Balance this document leaves the customer on: the locked card balance
       // plus everything this transaction is about to apply (creditBack, below)
       // and everything the async consumers will apply (earn / reverse). The
@@ -700,6 +697,51 @@ export class CheckoutReturnService {
     return originalInvoice
       ? totals.returnedNet
       : Math.abs(totals.refundedAmount || totals.returnSubtotal);
+  }
+
+  /**
+   * How many loyalty points this return claws back.
+   *
+   * The money basis above answers "how much value came back", and dividing it by
+   * the earn rate used to answer "how many points" too — correct only while every
+   * invoice satisfied `pointsEarned = floor(amountDue / rate)`. A promotion with
+   * "Tích điểm cho khách hàng" unchecked breaks that identity: money moves, nothing
+   * is earned. Reversing on money alone then takes points the sale never granted,
+   * which is what cancelling did in QA #16.
+   *
+   * So: derive from money as before, then cap at what the original actually
+   * recorded (ADR-02). A blocked original caps to 0. A full return caps to exactly
+   * `pointsEarned`. A partial return sits below the cap and keeps the number it has
+   * today — which is why this is a cap and not a re-proration of `pointsEarned`:
+   * prorating rounds differently and would move expectations this file pins, for no
+   * correctness gain.
+   *
+   * The cap only works because `invoices.points_earned` can be trusted. It could
+   * not before `BackfillInvoicePointsEarnedFromLedger1789000000000`: 27 invoices
+   * read 0 while the ledger held a real earn, and capping on them would have
+   * refused to reverse 3.439 points — the mirror image of the defect being fixed.
+   * That migration is why UOW-05 blocks this code, and why it ships as a migration
+   * rather than an ops script (ADR-05).
+   *
+   * The cap is one-way. It can never reverse more than was earned, and makes no
+   * attempt to detect an under-earn — not a defect class that exists here.
+   *
+   * QUICK returns have no original invoice and therefore no recorded earn to cap
+   * against, so they keep the uncapped derivation. The caller logs when that happens.
+   *
+   * Shared by the on-invoice `pointsReversed` snapshot and the reverse event, so the
+   * two can never disagree the way the cancel path's did.
+   */
+  private computeReversePoints(
+    originalInvoice: InvoiceEntity | null,
+    totals: ComputedTotals,
+  ): number {
+    const derived = Math.floor(
+      this.computeReverseBase(originalInvoice, totals) / POINT_EARN_VND_PER_POINT,
+    );
+    return originalInvoice
+      ? Math.min(derived, Number(originalInvoice.pointsEarned ?? 0))
+      : derived;
   }
 
   /**
@@ -1125,12 +1167,22 @@ export class CheckoutReturnService {
       // returns without an original fall back to the gross returned value.
       if (totals.returnSubtotal > 0) {
         const delta = this.computeReverseBase(originalInvoice, totals);
+        const reversePoints = this.computeReversePoints(originalInvoice, totals);
+        if (!originalInvoice) {
+          this.logger.log(
+            `Loyalty reverse for ${invoice.id} has no original invoice to cap against ` +
+              `(QUICK return); using the uncapped money derivation: ${reversePoints} point(s)`,
+          );
+        }
         if (delta > 0) {
           await this.loyaltyPointsReversePublisher.publish(
             {
               returnInvoiceId: invoice.id,
               customerId: invoice.customerId,
               subtotalDelta: delta,
+              // Same function as the `pointsReversed` snapshot above — the snapshot
+              // and the card disagreeing is exactly what QA #16 was.
+              points: reversePoints,
               branchId,
             },
             actor,

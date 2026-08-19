@@ -3,6 +3,7 @@ import axios, {
   type AxiosError,
   type InternalAxiosRequestConfig,
 } from "axios";
+import { AuthErrorCode } from "@erp/shared-interfaces";
 import { resolveApiBaseUrl } from "./api-base";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 
@@ -94,6 +95,14 @@ apiClient.interceptors.response.use(
       originalRequest &&
       !originalRequest._retry
     ) {
+      const authErrorCode = (error.response?.data as { code?: string } | undefined)
+        ?.code as AuthErrorCode | undefined;
+      if (authErrorCode === AuthErrorCode.TOKEN_EXPIRED) {
+        // access token expired — refreshOnce() below runs exactly as today
+      }
+      // else: no code, or a code not special-cased yet — still falls through to the
+      // same refreshOnce() call below (AC-05 regression guard, non-negotiable)
+
       originalRequest._retry = true;
       const refreshed = await refreshOnce();
       if (refreshed) {

@@ -32,11 +32,61 @@ function messageFromMissingPermission(apiMessage: string): string | null {
   return PERMISSION_MESSAGES[key] ?? "Bạn không có quyền thực hiện thao tác này. Liên hệ quản trị viên.";
 }
 
+/**
+ * Sửa/xoá phiếu nhập-xuất kho (warehouse-voucher-edit-delete): the backend
+ * throws these in English by design (03-logical-design.md, Error taxonomy —
+ * Vietnamese copy belongs at this layer, not on the exception). Pattern-tested
+ * rather than exact-matched since a few carry dynamic content (status,
+ * amounts) the backend fills in.
+ */
+const VOUCHER_EDIT_ERROR_PATTERNS: { test: RegExp; toMessage: (m: RegExpMatchArray) => string }[] = [
+  {
+    test: /^A (cancelled|reversed) goods (receipt|issue) can no longer be edited$/i,
+    toMessage: (m) =>
+      m[1].toLowerCase() === "cancelled"
+        ? "Phiếu đã huỷ, không sửa được nữa."
+        : "Phiếu đã đảo bút, không sửa được nữa.",
+  },
+  {
+    test: /modified by another request; reload it and try again$/i,
+    toMessage: () => "Phiếu vừa được người khác sửa, vui lòng tải lại trang.",
+  },
+  {
+    test: /settlement method of a goods receipt cannot be changed/i,
+    toMessage: () =>
+      "Không thể đổi hình thức thanh toán khi sửa phiếu; hãy huỷ phiếu và tạo phiếu mới.",
+  },
+  {
+    test: /Cannot resolve the branch to adjust stock/i,
+    toMessage: () => "Không xác định được chi nhánh để điều chỉnh tồn kho.",
+  },
+  {
+    // CashService.recordMovement's own message: "Insufficient cash balance.
+    // Current: <n>, requested: <WITHDRAWAL|DEPOSIT> <n>" — the type word
+    // between "requested:" and the amount is skipped, not shown to the user.
+    test: /^Insufficient cash balance\.\s*Current:\s*([\d.]+),\s*requested:\s*(?:\S+\s+)?([\d.]+)/i,
+    toMessage: (m) =>
+      `Quỹ tiền mặt không đủ để ghi nhận chênh lệch: hiện còn ${m[1]}, cần ${m[2]}.`,
+  },
+  {
+    test: /^Account (\S+) is not configured in the chart of accounts$/i,
+    toMessage: (m) => `Chưa cấu hình tài khoản kế toán ${m[1]}. Liên hệ quản trị viên.`,
+  },
+];
+
+function messageFromVoucherEditError(apiMessage: string): string | null {
+  for (const { test, toMessage } of VOUCHER_EDIT_ERROR_PATTERNS) {
+    const match = apiMessage.match(test);
+    if (match) return toMessage(match);
+  }
+  return null;
+}
+
 function mapKnownBodyMessage(message: string): string | null {
   if (message === "Authentication context missing") {
     return "Phiên làm việc không hợp lệ. Vui lòng đăng nhập lại.";
   }
-  return messageFromMissingPermission(message);
+  return messageFromMissingPermission(message) ?? messageFromVoucherEditError(message);
 }
 
 /**

@@ -114,6 +114,7 @@ export interface CreatePromotionRequest {
   priority?: number;
   branchIds?: string[];
   invoiceScope?: PromotionInvoiceScope;
+  accruePoints?: boolean;
   discountMode?: PromotionDiscountMode;
   discountValue?: number;
   maxDiscountAmount?: number;
@@ -520,7 +521,8 @@ function commonFromDetail(detail: PromotionProgramDetail): ProgramFormState {
 function invoiceDiscountToDto(form: ProgramFormState): Partial<CreatePromotionRequest> {
   const { condition, conditionLines } = buildCondition(form);
   return {
-    invoiceScope: applyScopeToApi(form.applyScope),
+    invoiceScope: PromotionInvoiceScope.ALL_ITEMS,
+    accruePoints: form.accruePoints,
     discountMode: form.discountType === DiscountType.PERCENT ? PromotionDiscountMode.PERCENT : PromotionDiscountMode.AMOUNT,
     discountValue:
       form.discountType === DiscountType.PERCENT ? numOrUndefined(form.discountPercent) : numOrUndefined(form.discountAmount),
@@ -531,6 +533,7 @@ function invoiceDiscountToDto(form: ProgramFormState): Partial<CreatePromotionRe
 
 function invoiceDiscountFromDetail(base: ProgramFormState, detail: PromotionProgramDetail): ProgramFormState {
   base.applyScope = applyScopeFromApi(detail.invoiceScope);
+  base.accruePoints = detail.accruePoints ?? false;
   base.discountType = detail.discountMode === PromotionDiscountMode.AMOUNT ? DiscountType.AMOUNT : DiscountType.PERCENT;
   if (base.discountType === DiscountType.PERCENT) {
     base.discountPercent = detail.discountValue ?? "";

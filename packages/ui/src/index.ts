@@ -8,6 +8,11 @@ export {
   parseMoneyIntegerString,
   formatVnd,
 } from "./lib/money-format";
+export {
+  formatViDate,
+  formatViDateTime,
+  type FormatViDateTimeOptions,
+} from "./lib/date-time-format";
 export { Textarea } from "./components/textarea";
 export { Label } from "./components/label";
 export { Badge, badgeVariants, type BadgeProps } from "./components/badge";

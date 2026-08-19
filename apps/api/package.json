@@ -27,6 +27,7 @@
     "seed:report-types": "ts-node src/database/seeds/report-types.seed.ts",
     "seed:demo": "ts-node src/database/seeds/inventory-demo.seed.ts",
     "seed:all": "pnpm seed:inventory && pnpm seed:demo",
+    "audit:voucher-invariants": "ts-node src/database/seeds/voucher-invariant-audit.script.ts",
     "migrate:legacy-items": "ts-node src/scripts/migrate-legacy-items.ts",
     "migrate:legacy-items:rollback": "ts-node src/scripts/migrate-legacy-items.ts --rollback",
     "fix:double-cancelled-receipts": "ts-node src/scripts/fix-double-cancelled-goods-receipts.ts"

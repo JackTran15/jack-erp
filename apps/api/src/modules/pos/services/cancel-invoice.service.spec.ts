@@ -345,8 +345,79 @@ describe('CancelInvoiceService', () => {
           returnInvoiceId: 'inv-1',
           customerId: 'cust-1',
           subtotalDelta: 200,
+          // The count the invoice recorded, not floor(amountDue / 10.000) — which for
+          // this fixture would be 0 and would contradict pointsReversed = 20.
+          points: 20,
           branchId: 'branch-1',
         },
+        actor,
+      );
+    });
+
+    /**
+     * QA #16, the reported case. A promotion with "Tích điểm cho khách hàng"
+     * unchecked means the sale earned nothing while 800.000đ still moved. Publishing
+     * the money alone let the consumer re-derive floor(800000 / 10000) = 80 and debit
+     * a card that never received them.
+     */
+    it('reverses nothing when the sale earned nothing, however much money moved', async () => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({ customerId: 'cust-1', amountDue: 800_000, pointsEarned: 0 }),
+      );
+
+      const result = await service.cancel('inv-1', { reason: 'mistake' }, actor);
+
+      expect(result.pointsReversed).toBe(0);
+      expect(loyaltyPointsReversePublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          points: 0,
+          // The money stays on the payload: it is the audit value, and the
+          // publisher's `subtotalDelta <= 0` guard is what still fires the event so
+          // the consumer writes the replay marker.
+          subtotalDelta: 800_000,
+        }),
+        actor,
+      );
+    });
+
+    it('still reverses the full earn on an ordinary sale — the number did not change', async () => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({ customerId: 'cust-1', amountDue: 800_000, pointsEarned: 80 }),
+      );
+
+      const result = await service.cancel('inv-1', { reason: 'mistake' }, actor);
+
+      expect(result.pointsReversed).toBe(80);
+      expect(loyaltyPointsReversePublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ points: 80, subtotalDelta: 800_000 }),
+        actor,
+      );
+    });
+
+    it('gives redeemed points back on a blocked sale without clawing anything else', async () => {
+      // Card holds 7.575; the sale earned nothing and spent 100.
+      // Cancelling: +100 back, −0 clawed back → 7.675.
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(7_575);
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({
+          customerId: 'cust-1',
+          amountDue: 800_000,
+          pointsEarned: 0,
+          pointsRedeemed: 100,
+        }),
+      );
+
+      const result = await service.cancel('inv-1', { reason: 'mistake' }, actor);
+
+      expect(membershipCardService.refundRedeemedPoints).toHaveBeenCalledWith(
+        { customerId: 'cust-1', points: 100, invoiceId: 'inv-1' },
+        mockManager,
+        actor,
+      );
+      expect(result.pointsReversed).toBe(0);
+      expect(result.pointsBalanceAfter).toBe(7_675);
+      expect(loyaltyPointsReversePublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ points: 0 }),
         actor,
       );
     });

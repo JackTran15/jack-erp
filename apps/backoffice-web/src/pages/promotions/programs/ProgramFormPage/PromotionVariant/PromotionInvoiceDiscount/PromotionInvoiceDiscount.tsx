@@ -8,6 +8,7 @@ import { ApplyScopePromotionSection } from "../_PromotionSections/ApplyScopeProm
 import { DiscountPromotionSection } from "../_PromotionSections/DiscountPromotionSection/DiscountPromotionSection";
 import { ConditionPromotionSection } from "../_PromotionSections/ConditionPromotionSection/ConditionPromotionSection";
 import { AutoApplyCheckbox } from "../_PromotionSections/AutoApplyCheckbox/AutoApplyCheckbox";
+import { AccruePointsCheckbox } from "../_PromotionSections/AccruePointsCheckbox/AccruePointsCheckbox";
 import type { ProgramFormState } from "../../../program-form.types";
 
 type FormTab = "km" | "conditions";
@@ -39,6 +40,10 @@ export function PromotionInvoiceDiscount({ form, onChange }: Props) {
               <StoreScopePromotionSection form={form} onChange={onChange} />
             ) : null}
             <ApplyScopePromotionSection form={form} onChange={onChange} />
+            <AccruePointsCheckbox
+              checked={form.accruePoints}
+              onChange={(v) => onChange({ accruePoints: v })}
+            />
             <DiscountPromotionSection form={form} onChange={onChange} />
           </div>
         ) : (

@@ -140,7 +140,7 @@ export class EnqueueOutboxStep implements CheckoutStep {
       invoice.id,
     );
 
-    if (invoice.customerId) {
+    if (invoice.customerId && !totals.pointsBlocked) {
       const loyaltyPayload: LoyaltyPointsAwardPayload = {
         invoiceId: invoice.id,
         customerId: invoice.customerId,

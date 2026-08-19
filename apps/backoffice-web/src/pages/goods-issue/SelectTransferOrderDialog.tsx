@@ -11,6 +11,7 @@ import {
 import { Check, Download, Inbox, X } from "lucide-react";
 import { toast } from "sonner";
 import type { IssuableTransferOrderListItem } from "@erp/shared-interfaces";
+import { formatViDate } from "@erp/ui";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 
@@ -60,12 +61,9 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: "Đã hủy",
 };
 
-const dateFmt = new Intl.DateTimeFormat("vi-VN");
-
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "—" : dateFmt.format(d);
+  return formatViDate(iso) || "—";
 }
 
 function ymd(d: Date): string {

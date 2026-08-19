@@ -28,6 +28,7 @@ function originalProgram(): PromotionProgram {
     daysOfWeek: [],
     autoApply: true,
     branchIds: ['branch-a'],
+    accruePoints: false,
     groups: [
       {
         id: 'group-1',

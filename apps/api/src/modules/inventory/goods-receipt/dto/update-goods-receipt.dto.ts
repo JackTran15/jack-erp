@@ -18,11 +18,21 @@ import {
   CashSettlementDto,
   GoodsReceiptLineDto,
 } from './create-goods-receipt.dto';
+import { GoodsReceiptPaymentMethod } from '../goods-receipt.entity';
 
 export class UpdateGoodsReceiptDto {
   @IsOptional()
   @IsEnum(GoodsReceiptPurpose)
   purpose?: GoodsReceiptPurpose;
+
+  /**
+   * Accepted so the edit form can round-trip the value it loaded — the global
+   * `forbidNonWhitelisted` pipe rejects the whole request otherwise. Changing it
+   * is refused by the service: it would change what the receipt owes and to whom.
+   */
+  @IsOptional()
+  @IsEnum(GoodsReceiptPaymentMethod)
+  paymentMethod?: GoodsReceiptPaymentMethod;
 
   @IsOptional()
   @IsUUID()

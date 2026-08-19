@@ -10,7 +10,8 @@ import { ConfigService } from '@nestjs/config';
 import * as jwt from 'jsonwebtoken';
 import { SessionStore } from '../../modules/redis/session.store';
 import { IS_PUBLIC_KEY } from '../../modules/auth/decorators/public.decorator';
-import type { JwtPayload } from '@erp/shared-interfaces';
+import { AuthErrorCode, type JwtPayload } from '@erp/shared-interfaces';
+import { AuthException } from '../exceptions/auth.exception';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -47,13 +48,16 @@ export class AuthGuard implements CanActivate {
       payload = jwt.verify(token, this.jwtSecret) as JwtPayload;
     } catch (err: any) {
       this.logger.debug(`JWT verification failed: ${err.message}`);
-      throw new UnauthorizedException('Invalid or expired token');
+      if (err instanceof jwt.TokenExpiredError) {
+        throw new AuthException(AuthErrorCode.TOKEN_EXPIRED, 'Invalid or expired token');
+      }
+      throw new AuthException(AuthErrorCode.TOKEN_MALFORMED, 'Invalid or expired token');
     }
 
     const sessionActive = await this.sessionStore.isSessionActive(payload.jti);
     if (!sessionActive) {
       this.logger.debug(`Session revoked or expired: jti=${payload.jti}`);
-      throw new UnauthorizedException('Session revoked or expired');
+      throw new AuthException(AuthErrorCode.SESSION_REVOKED, 'Session revoked or expired');
     }
 
     request.user = payload;

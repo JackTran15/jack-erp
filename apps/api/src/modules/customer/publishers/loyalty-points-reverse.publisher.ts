@@ -8,8 +8,19 @@ import { ActorContext } from '../../../common/decorators/actor-context.decorator
 export interface LoyaltyPointsReversePayload {
   returnInvoiceId: string;
   customerId: string;
-  /** Absolute value of the subtotal being reversed (>=0). Consumer decrements `floor(subtotalDelta / POINT_EARN_VND_PER_POINT)`. */
+  /**
+   * Absolute value of the subtotal being reversed (>=0). Audit value, and the
+   * consumer's fallback: it decrements `floor(subtotalDelta / POINT_EARN_VND_PER_POINT)`
+   * only when `points` is absent.
+   */
   subtotalDelta: number;
+  /**
+   * Authoritative point count to reverse. When present the consumer uses it verbatim
+   * instead of re-deriving points from money — the derivation is wrong for any invoice
+   * whose accrual was blocked by a promotion, where money moved but nothing was earned.
+   * Absent only on events published before promotion-points-reverse-defects (ADR-01).
+   */
+  points?: number;
   branchId?: string;
   organizationId: string;
   actorId: string;
@@ -20,6 +31,8 @@ export interface LoyaltyPointsReverseInput {
   customerId?: string | null;
   /** Refund subtotal (positive number). For partial returns this is the amount being refunded. */
   subtotalDelta: number;
+  /** Points actually to reverse. Omit only when no invoice-recorded count is available. */
+  points?: number;
   branchId?: string;
 }
 
@@ -50,6 +63,9 @@ export class LoyaltyPointsReversePublisher {
           returnInvoiceId: input.returnInvoiceId,
           customerId: input.customerId,
           subtotalDelta: Number(input.subtotalDelta),
+          // `Number(undefined)` is NaN, and NaN on the wire reads as "present" to the
+          // consumer's `??` — so absence has to stay absence.
+          points: input.points == null ? undefined : Number(input.points),
           branchId: input.branchId,
           organizationId: actor.organizationId,
           actorId: actor.userId,

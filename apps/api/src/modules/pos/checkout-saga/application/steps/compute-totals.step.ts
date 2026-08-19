@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import type { LineDiscount } from '@erp/shared-interfaces';
+import type { AppliedProgram, LineDiscount } from '@erp/shared-interfaces';
 import { POINT_EARN_VND_PER_POINT } from '../../../../customer/loyalty.constants';
 import { computeAmountDue } from '../../../services/invoice-amount.util';
 import { InvoicePaymentMethod, InvoiceStatus } from '../../../entities/invoice.entity';
@@ -82,6 +82,14 @@ export class ComputeTotalsStep implements CheckoutStep {
     const remainder = round(amountDue - totalPaid);
     const pointsEarned = Math.floor(amountDue / POINT_EARN_VND_PER_POINT);
 
+    // ADR-02: computed exactly once, here — persist-invoice and enqueue-outbox both
+    // read ctx.totals.pointsBlocked rather than re-deriving it. Does not need to filter
+    // by type === INVOICE_DISCOUNT: T-03-01 already guarantees accruePoints is undefined
+    // (never false) on every non-invoice-discount applied program, so this check is
+    // naturally correct without an extra type guard.
+    const appliedPrograms = (ctx.promotion?.appliedPrograms ?? []) as AppliedProgram[];
+    const pointsBlocked = appliedPrograms.some((p) => p.accruePoints === false);
+
     if (totalPaid > amountDue) {
       throw new BadRequestException({
         code: 'PAYMENT_INVALID',
@@ -151,6 +159,7 @@ export class ComputeTotalsStep implements CheckoutStep {
       remainder,
       keptChange,
       pointsEarned,
+      pointsBlocked,
       newStatus,
     };
   }

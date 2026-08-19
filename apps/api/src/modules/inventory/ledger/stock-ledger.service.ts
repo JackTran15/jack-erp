@@ -49,6 +49,14 @@ export interface RecordMovementParams {
    * fall back to items.purchasePrice when the source has no price column.
    */
   unitCost?: number;
+  /**
+   * Signed value of this movement, when it cannot be derived as
+   * `quantity × unitCost`. Editing a posted voucher can change a line's price
+   * without changing its quantity: the adjustment carries `quantity = 0` and a
+   * non-zero value, which the derived formula would flatten to 0 and leave the
+   * moving-average cost stale. Omit it and the derived formula applies as before.
+   */
+  lineValue?: number;
 }
 
 export interface LedgerQuery extends PaginationQuery {
@@ -858,16 +866,27 @@ export class StockLedgerService {
   private deriveCostFields(
     params: RecordMovementParams,
   ): { unitCost?: number; lineValue?: number } {
-    if (params.unitCost === undefined || params.unitCost === null) {
-      return { unitCost: undefined, lineValue: undefined };
+    const cost =
+      params.unitCost === undefined || params.unitCost === null
+        ? undefined
+        : Math.abs(Number(params.unitCost));
+    const validCost = cost !== undefined && Number.isFinite(cost) ? cost : undefined;
+
+    // An explicit value wins: a voucher revision can move value without moving
+    // quantity, and the derived formula cannot express that.
+    if (params.lineValue !== undefined && params.lineValue !== null) {
+      const explicit = Number(params.lineValue);
+      if (Number.isFinite(explicit)) {
+        return { unitCost: validCost, lineValue: Number(explicit.toFixed(2)) };
+      }
     }
-    const cost = Math.abs(Number(params.unitCost));
-    if (!Number.isFinite(cost)) {
+
+    if (validCost === undefined) {
       return { unitCost: undefined, lineValue: undefined };
     }
     const signedQty = Number(params.quantity);
-    const lineValue = Number((signedQty * cost).toFixed(2));
-    return { unitCost: cost, lineValue };
+    const lineValue = Number((signedQty * validCost).toFixed(2));
+    return { unitCost: validCost, lineValue };
   }
 
   private async upsertBalance(

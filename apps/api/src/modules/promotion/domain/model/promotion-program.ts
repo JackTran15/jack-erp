@@ -43,6 +43,7 @@ export interface PromotionProgramProps {
   /** promotion_branches — empty = whole chain (BR-005). */
   branchIds: string[];
   invoiceScope?: PromotionInvoiceScope;
+  accruePoints: boolean;
   discountMode?: PromotionDiscountMode;
   discountValue?: number;
   maxDiscountAmount?: number;
@@ -257,6 +258,7 @@ export class PromotionProgram {
   readonly autoApply: boolean;
   readonly branchIds: string[];
   readonly invoiceScope?: PromotionInvoiceScope;
+  readonly accruePoints: boolean;
   readonly discountMode?: PromotionDiscountMode;
   readonly discountValue?: number;
   readonly maxDiscountAmount?: number;
@@ -296,6 +298,7 @@ export class PromotionProgram {
     this.autoApply = props.autoApply;
     this.branchIds = props.branchIds;
     this.invoiceScope = props.invoiceScope;
+    this.accruePoints = props.accruePoints;
     this.discountMode = props.discountMode;
     this.discountValue = props.discountValue;
     this.maxDiscountAmount = props.maxDiscountAmount;
@@ -350,6 +353,7 @@ export class PromotionProgram {
       autoApply: this.autoApply,
       branchIds: this.branchIds,
       invoiceScope: this.invoiceScope,
+      accruePoints: this.accruePoints,
       discountMode: this.discountMode,
       discountValue: this.discountValue,
       maxDiscountAmount: this.maxDiscountAmount,

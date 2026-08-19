@@ -24,14 +24,20 @@ interface FakeQb {
   addSelect: jest.Mock;
   getMany: jest.Mock;
   getRawOne: jest.Mock;
+  getRawMany: jest.Mock;
 }
 
 /**
- * The handler builds the query twice — once for rows, once for totals — so the
- * fake repository hands out a fresh builder per `createQueryBuilder` call and
- * records them in order: [0] = rows, [1] = totals.
+ * The handler builds the query up to three times per request — rows, totals,
+ * and (only when rows is non-empty) a per-row Tổng tiền lookup — so the fake
+ * repository hands out a fresh builder per `createQueryBuilder` call and
+ * records them in order: [0] = rows, [1] = totals, [2] = row totals.
  */
-function makeQb(rows: unknown[], totals: { total: string; totalAmount: string }): FakeQb {
+function makeQb(
+  rows: unknown[],
+  totals: { total: string; totalAmount: string },
+  rowTotals: { id: string; totalAmount: string }[],
+): FakeQb {
   const qb: Partial<FakeQb> = {};
   const self = () => qb as FakeQb;
   Object.assign(qb, {
@@ -45,6 +51,7 @@ function makeQb(rows: unknown[], totals: { total: string; totalAmount: string })
     addSelect: jest.fn(self),
     getMany: jest.fn().mockResolvedValue(rows),
     getRawOne: jest.fn().mockResolvedValue(totals),
+    getRawMany: jest.fn().mockResolvedValue(rowTotals),
   });
   return qb as FakeQb;
 }
@@ -56,11 +63,12 @@ describe('SearchGoodsReceiptsV2Handler', () => {
   async function build(
     rows: unknown[],
     totals: { total: string; totalAmount: string } = { total: '0', totalAmount: '0' },
+    rowTotals: { id: string; totalAmount: string }[] = [],
   ) {
     builders = [];
     const repo = {
       createQueryBuilder: jest.fn(() => {
-        const qb = makeQb(rows, totals);
+        const qb = makeQb(rows, totals, rowTotals);
         builders.push(qb);
         return qb;
       }),
@@ -77,8 +85,9 @@ describe('SearchGoodsReceiptsV2Handler', () => {
 
   const rowsQb = () => builders[0];
   const totalsQb = () => builders[1];
+  const rowTotalsQb = () => builders[2];
 
-  it('scopes by organizationId and active branch, and joins provider + lines', async () => {
+  it('scopes by organizationId and active branch, joins provider + location, and never joins lines', async () => {
     await build([]);
     await handler.execute(new SearchGoodsReceiptsV2Query({}, actor));
 
@@ -89,29 +98,59 @@ describe('SearchGoodsReceiptsV2Handler', () => {
       branchId: 'branch-1',
     });
     expect(rowsQb().leftJoinAndSelect).toHaveBeenCalledWith('gr.provider', 'provider');
-    expect(rowsQb().leftJoinAndSelect).toHaveBeenCalledWith('gr.lines', 'lines');
+    expect(rowsQb().leftJoinAndSelect).toHaveBeenCalledWith('gr.location', 'location');
+    expect(rowsQb().leftJoinAndSelect).not.toHaveBeenCalledWith('gr.lines', 'lines');
+    expect(rowsQb().leftJoinAndSelect).not.toHaveBeenCalledWith('lines.item', 'lineItem');
+    expect(rowsQb().leftJoinAndSelect).not.toHaveBeenCalledWith('lines.location', 'lineLocation');
     expect(rowsQb().orderBy).toHaveBeenCalledWith('gr.receivedAt', 'DESC');
   });
 
-  it('returns the eager rows unchanged in the { data, total, page, limit } envelope', async () => {
+  it('returns the eager rows unchanged in the { data, total, page, limit } envelope, without a lines field', async () => {
     const rows = [
       {
         id: 'gr-1',
         documentNumber: 'PNK-1',
         provider: { id: 'pv-1', name: 'Acme' },
-        lines: [{ quantity: '2', unitPrice: '1000' }],
       },
     ];
-    await build(rows, { total: '7', totalAmount: '2000' });
+    await build(
+      rows,
+      { total: '7', totalAmount: '2000' },
+      [{ id: 'gr-1', totalAmount: '1500000' }],
+    );
     const result = await handler.execute(
       new SearchGoodsReceiptsV2Query({ page: 3, limit: 5 }, actor),
     );
     expect(rowsQb().skip).toHaveBeenCalledWith(10);
     expect(rowsQb().take).toHaveBeenCalledWith(5);
     expect(result.data).toBe(rows);
+    expect(result.data[0]).not.toHaveProperty('lines');
     expect(result.total).toBe(7);
     expect(result.page).toBe(3);
     expect(result.limit).toBe(5);
+  });
+
+  it("attaches each row's own totalAmount (list money column no longer has `lines` to sum client-side)", async () => {
+    const rows = [{ id: 'gr-1' }, { id: 'gr-2' }];
+    await build(rows, undefined, [
+      { id: 'gr-1', totalAmount: '1000000' },
+      { id: 'gr-2', totalAmount: '500000' },
+    ]);
+    const result = await handler.execute(new SearchGoodsReceiptsV2Query({}, actor));
+
+    expect(rowTotalsQb().where).toHaveBeenCalledWith('gr.id IN (:...ids)', {
+      ids: ['gr-1', 'gr-2'],
+    });
+    expect(result.data[0]).toMatchObject({ id: 'gr-1', totalAmount: 1000000 });
+    expect(result.data[1]).toMatchObject({ id: 'gr-2', totalAmount: 500000 });
+  });
+
+  it('skips the row-totals query entirely for an empty page', async () => {
+    await build([]);
+    await handler.execute(new SearchGoodsReceiptsV2Query({}, actor));
+
+    // Only rows + totals builders — no third createQueryBuilder call.
+    expect(builders).toHaveLength(2);
   });
 
   it('applies documentNumber, party and totalAmount filters', async () => {

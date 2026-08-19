@@ -2,6 +2,7 @@ export const LEDGER_CASH_VI_DATE: Intl.DateTimeFormatOptions = {
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
+  timeZone: "Asia/Ho_Chi_Minh",
 };
 
 export const LEDGER_CASH_VI_DATE_TIME: Intl.DateTimeFormatOptions = {
@@ -10,6 +11,7 @@ export const LEDGER_CASH_VI_DATE_TIME: Intl.DateTimeFormatOptions = {
   year: "numeric",
   hour: "2-digit",
   minute: "2-digit",
+  timeZone: "Asia/Ho_Chi_Minh",
 };
 
 export const VOUCHER_FORM_LABEL_WIDTH = "10rem";

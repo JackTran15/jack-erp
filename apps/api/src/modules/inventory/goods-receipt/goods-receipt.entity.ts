@@ -124,6 +124,13 @@ export class GoodsReceiptEntity extends BaseEntity {
   @Column({ name: 'cash_receipt_id', type: 'uuid', nullable: true })
   cashReceiptId?: string;
 
+  @Column({
+    type: 'int',
+    default: 0,
+    comment: 'Number of times this posted voucher has been edited; 0 = never edited',
+  })
+  revision: number;
+
   @Column({ name: 'posted_at', type: 'timestamptz', nullable: true })
   postedAt?: Date;
 
@@ -157,4 +164,11 @@ export class GoodsReceiptEntity extends BaseEntity {
 
   /** Transient (not a column): resolved { id, name } of purchasingEmployeeId, inlined on read. */
   purchasingEmployee?: { id: string; name: string } | null;
+
+  /**
+   * Transient (not a column): per-receipt Tổng tiền, inlined by the v2 search
+   * handler via a correlated subquery so the list's money column works without
+   * joining `lines` (which the list query no longer does).
+   */
+  totalAmount?: number;
 }

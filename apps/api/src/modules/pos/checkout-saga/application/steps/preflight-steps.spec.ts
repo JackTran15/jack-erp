@@ -594,6 +594,46 @@ describe('ComputeTotalsStep', () => {
     await step.execute(c);
     expect(c.totals!.newStatus).toBe(InvoiceStatus.PAID);
   });
+
+  describe('pointsBlocked (T-03-04)', () => {
+    function withPrograms(appliedPrograms: Array<{ accruePoints?: boolean }>): CheckoutContext {
+      return withDraft({
+        invoice: { discountAmount: 0, pointsDiscountAmount: 0, depositAmount: 0, customerId: 'cust-1' } as any,
+        promotion: { promotionDiscount: 0, appliedPrograms, lineDiscounts: [] },
+        input: { invoiceId: 'inv-1', payments: [{ paymentMethod: InvoicePaymentMethod.CASH, amount: 785000 }] },
+      });
+    }
+
+    it('AC-06 groundwork: one applied program with accruePoints=false blocks points', async () => {
+      const c = withPrograms([{ accruePoints: false }]);
+      await step.execute(c);
+      expect(c.totals!.pointsBlocked).toBe(true);
+    });
+
+    it('AC-08 groundwork: one applied program with accruePoints=true does not block points', async () => {
+      const c = withPrograms([{ accruePoints: true }]);
+      await step.execute(c);
+      expect(c.totals!.pointsBlocked).toBe(false);
+    });
+
+    it('AC-09 groundwork: two applied programs, one true one false — any unchecked wins', async () => {
+      const c = withPrograms([{ accruePoints: true }, { accruePoints: false }]);
+      await step.execute(c);
+      expect(c.totals!.pointsBlocked).toBe(true);
+    });
+
+    it('AC-10 groundwork: two applied programs, both true — points not blocked', async () => {
+      const c = withPrograms([{ accruePoints: true }, { accruePoints: true }]);
+      await step.execute(c);
+      expect(c.totals!.pointsBlocked).toBe(false);
+    });
+
+    it('AC-11 groundwork: no applied programs — unaffected regression', async () => {
+      const c = withPrograms([]);
+      await step.execute(c);
+      expect(c.totals!.pointsBlocked).toBe(false);
+    });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

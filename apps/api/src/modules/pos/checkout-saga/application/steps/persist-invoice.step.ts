@@ -66,9 +66,10 @@ export class PersistInvoiceStep implements CheckoutStep {
     // No customer, no points — same rule as v1 (checkout-invoice.service). The
     // award publisher refuses to emit without a customerId, so a non-zero figure
     // here is an orphan: the receipt showed "Điểm được tích" while no card was
-    // credited and no point_history row existed. `pointsBalanceAfter` just below
-    // has always been guarded this way; only the earn was left open.
-    invoice.pointsEarned = invoice.customerId ? totals.pointsEarned : 0;
+    // credited and no point_history row existed. `pointsBlocked` (ADR-02) is the
+    // second, independent reason to zero this out: at least one applied program
+    // had "Tích điểm cho khách hàng" unchecked.
+    invoice.pointsEarned = invoice.customerId && !totals.pointsBlocked ? totals.pointsEarned : 0;
 
     const cardBalance = invoice.customerId
       ? await this.membershipCardService.getPointBalanceForUpdate(
@@ -77,12 +78,19 @@ export class PersistInvoiceStep implements CheckoutStep {
           ctx.actor,
         )
       : null;
+    // Projected from the columns persisted on this very row — `invoice.pointsEarned`,
+    // never the pre-gate `totals.pointsEarned` (promotion-points-reverse-defects
+    // ADR-03). Reading the raw total here is what shipped QA #15: an 800.000đ sale
+    // under a "Tích điểm cho khách hàng" unchecked programme stored pointsEarned = 0
+    // and still projected +80, so a card holding 7.575 printed 7.655 on the receipt.
+    // Both gates on the assignment above — customerId and pointsBlocked — have to
+    // reach this number too, and reading the assigned field is how they do.
     invoice.pointsBalanceAfter =
       cardBalance == null
         ? null
         : Math.max(
             0,
-            cardBalance - Number(invoice.pointsRedeemed ?? 0) + totals.pointsEarned,
+            cardBalance - Number(invoice.pointsRedeemed ?? 0) + invoice.pointsEarned,
           );
 
     await manager.getRepository(InvoiceEntity).save(invoice);

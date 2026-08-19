@@ -188,6 +188,59 @@ describe('StockLedgerService', () => {
       expect(result.unitCost).toBeUndefined();
       expect(result.lineValue).toBeUndefined();
     });
+
+    it('persists an explicit line_value on a zero-quantity adjustment', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+
+      // A voucher revision that only changed a line's price: quantity does not
+      // move, value does. The derived formula would flatten this to 0.
+      const result = await service.recordMovement({
+        ...baseParams,
+        quantity: 0,
+        unitCost: 120,
+        lineValue: 200,
+      });
+
+      expect(result).toEqual(
+        expect.objectContaining({ unitCost: 120, lineValue: 200 }),
+      );
+    });
+
+    it('lets an explicit line_value win over the derived formula', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+
+      const result = await service.recordMovement({
+        ...baseParams,
+        quantity: -3,
+        unitCost: 100,
+        lineValue: -160,
+      });
+
+      // Derived would be -3 × 100 = -300; the caller knows the real value change.
+      expect(result).toEqual(
+        expect.objectContaining({ unitCost: 100, lineValue: -160 }),
+      );
+    });
+  });
+
+  describe('getInstantAverageCost', () => {
+    it('counts a value-only adjustment in the moving average', async () => {
+      // Ledger holds 10 units bought at 100, plus a zero-quantity adjustment of
+      // +200 written when the voucher's price was corrected to 120.
+      ledgerRepo.query.mockResolvedValue([
+        {
+          quantity: '10',
+          inventory_value: '1200',
+          missing_value_count: 0,
+          purchase_price: '100',
+        },
+      ]);
+
+      const result = await service.getInstantAverageCost('item-1', 'org-1', 'branch-1');
+
+      expect(result.unitCost).toBe(120);
+      expect(result.source).toBe('LEDGER');
+    });
   });
 
   describe('recordBatchMovements', () => {
