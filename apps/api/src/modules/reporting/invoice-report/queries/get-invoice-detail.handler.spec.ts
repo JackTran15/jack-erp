@@ -114,6 +114,43 @@ describe('GetInvoiceDetailHandler', () => {
     expect(detail.lines.reduce((s, l) => s + l.lineTotal, 0)).toBe(detail.subtotal);
   });
 
+  // The promotion the original sale gave on the returned pair is money the
+  // customer never paid, so it is not refunded — and taking it off here is what
+  // makes the lines add up to the "Tiền hàng" printed under them.
+  it('refunds a returned line net of the promotion carried from the original sale', async () => {
+    const handler = makeHandler({
+      invoice: invoice({
+        code: 'RTN-022',
+        type: InvoiceType.EXCHANGE,
+        subtotal: 2400000,
+        netAmount: 1800000,
+      }),
+      lines: [
+        line({
+          itemCode: 'ABA2777-D-39',
+          direction: ItemDirection.IN,
+          unitPrice: 750000,
+          lineTotal: 750000,
+          promotionDiscount: 150000,
+        }),
+        line({ itemCode: 'AK1163023-D-35', unitPrice: 1200000, lineTotal: 1200000 }),
+        line({ itemCode: 'AK1163023-D-36', unitPrice: 1200000, lineTotal: 1200000 }),
+      ],
+    });
+
+    const detail = await handler.execute({ code: 'RTN-022', actor } as any);
+    expect(detail.lines[0]).toMatchObject({
+      quantity: -1,
+      // List price stays on the row; only the refunded value is netted.
+      unitPrice: 750000,
+      lineAmount: -750000,
+      discount: -150000,
+      lineTotal: -600000,
+    });
+    expect(detail.subtotal).toBe(1800000);
+    expect(detail.lines.reduce((s, l) => s + l.lineTotal, 0)).toBe(detail.subtotal);
+  });
+
   it('shows a return as money leaving the drawer', async () => {
     const handler = makeHandler({
       invoice: invoice({

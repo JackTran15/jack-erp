@@ -9,6 +9,7 @@ import type {
 import { deriveInvoiceTotals } from "./checkoutSettlement";
 import {
   formatLineDiscountLabel,
+  effectiveUnitPrice,
   lineDiscountAmount,
   lineTotal,
   resolvePaymentMethodLabel,
@@ -182,8 +183,14 @@ export function buildCheckoutInvoicePayload({
     (sum, l) => sum + l.unitPrice * Math.abs(l.qty),
     0,
   );
+  // Gồm cả khuyến mãi mang sang từ hóa đơn gốc — khoản khách chưa từng trả nên
+  // cũng không được hoàn. Nhờ vậy "Giá trị trả lại" khớp số BE thực hoàn, và
+  // "Tiền hàng" − "Giá trị trả lại" ra đúng "Tổng thanh toán".
   const returnDiscount = returnOnly.reduce(
-    (sum, l) => sum + lineDiscountAmount(l),
+    (sum, l) =>
+      sum +
+      lineDiscountAmount(l) +
+      (l.unitPrice - effectiveUnitPrice(l)) * Math.abs(l.qty),
     0,
   );
   // Bản in phản ánh đúng số khách trả: khi "Tính vào công nợ", phần đã trả (nếu

@@ -187,6 +187,14 @@ export function InvoiceReceiptDialog({
   };
 
   const items = invoice?.items ?? [];
+  // "Thành tiền" = tổng các dòng ĐANG hiện trên bảng, tức đã trừ hàng trả (và
+  // trừ khuyến mãi phân bổ của dòng trả). `invoice.subtotal` chỉ cộng hàng bán
+  // nên trên phiếu đổi trả nó không khớp với những gì người dùng nhìn thấy.
+  const goodsSubtotal = items.reduce((sum, it) => {
+    const net =
+      Math.abs(Number(it.lineTotal) || 0) - (Number(it.promotionDiscount) || 0);
+    return sum + (it.direction === "IN" ? -net : net);
+  }, 0);
   const customerLabel = customerName
     ? `${customerName}${customerPhone ? ` (${customerPhone})` : ""}`
     : "—";
@@ -360,7 +368,7 @@ export function InvoiceReceiptDialog({
                   Thành tiền
                 </span>
                 <span className="text-[14px] font-semibold tabular-nums text-[#1F2937]">
-                  {formatVnd(invoice.subtotal)}
+                  {formatVnd(goodsSubtotal)}
                 </span>
               </div>
               <div className="flex flex-col gap-2">

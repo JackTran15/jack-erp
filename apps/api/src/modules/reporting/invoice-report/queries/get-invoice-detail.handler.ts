@@ -116,6 +116,15 @@ export class GetInvoiceDetailHandler
         // Unsigned: a rate, not an amount — returning goods does not make them
         // cost a negative price per unit.
         const unitPrice = Number(l.unitPrice ?? 0);
+        // A returned line carries the promotion the original sale gave on it:
+        // money the customer never paid, so it is not refunded either. Taking it
+        // off here is what makes the lines add up to "Tiền hàng" below, which is
+        // the exchange net the customer actually settled.
+        const discount =
+          Number(l.lineDiscount ?? 0) +
+          (l.direction === ItemDirection.IN
+            ? Number(l.promotionDiscount ?? 0)
+            : 0);
         return {
           sku: l.itemCode,
           name: l.itemName,
@@ -123,8 +132,14 @@ export class GetInvoiceDetailHandler
           quantity,
           unitPrice,
           lineAmount: signed(1, quantity * unitPrice),
-          discount: signed(sign, l.lineDiscount),
-          lineTotal: signed(sign, l.lineTotal),
+          discount: signed(sign, discount),
+          lineTotal: signed(
+            sign,
+            Number(l.lineTotal ?? 0) -
+              (l.direction === ItemDirection.IN
+                ? Number(l.promotionDiscount ?? 0)
+                : 0),
+          ),
           note: l.note ?? null,
         };
       }),

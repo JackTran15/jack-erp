@@ -57,8 +57,12 @@ export function buildInvoiceRowPrintPayload(
   );
   // Khối "Tiền hàng trả lại / KM / Giá trị trả lại" — độ lớn dương.
   const returnGross = returnOnly.reduce((sum, item) => sum + grossOf(item), 0);
+  // Cộng cả khuyến mãi mang sang từ hóa đơn gốc (lưu trên dòng trả lúc
+  // checkout) — cùng quy tắc với `checkoutReceiptFactory`, để bản in lại và bản
+  // in ngay sau thanh toán ra cùng một con số.
   const returnDiscount = returnOnly.reduce(
-    (sum, item) => sum + discountOf(item),
+    (sum, item) =>
+      sum + discountOf(item) + (Number(item.promotionDiscount) || 0),
     0,
   );
   // CTKM đã chạy lúc checkout (T-08-01) — tách hoàn toàn khỏi giảm giá tay ở
