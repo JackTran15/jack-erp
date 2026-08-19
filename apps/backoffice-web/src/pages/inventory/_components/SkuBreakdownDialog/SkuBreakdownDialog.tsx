@@ -210,7 +210,7 @@ export function SkuBreakdownDialog({ target, period, onClose }: Props) {
         title="Chi tiết hàng hóa"
         defaultWidth={1000}
         defaultHeight={640}
-        bodyClassName="overflow-hidden"
+        bodyClassName="flex flex-col gap-2 overflow-hidden"
         footer={
           <div className="flex justify-end">
             <Button type="button" variant="outline" onClick={onClose}>
@@ -220,58 +220,53 @@ export function SkuBreakdownDialog({ target, period, onClose }: Props) {
           </div>
         }
       >
-        <div className="flex h-full flex-col gap-2 pt-2">
-          <div className="text-center">
-            <h2 className="text-base font-bold uppercase tracking-wide">
-              Chi tiết hàng hóa
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {describePeriod(period)} · Mã SKU{" "}
-              <span className="font-semibold text-foreground">
-                {target?.code}
-              </span>{" "}
-              · Tên hàng hóa{" "}
-              <span className="font-semibold text-foreground">
-                {target?.name}
-              </span>{" "}
-              · Kho{" "}
-              <span className="font-semibold text-foreground">
-                {target?.storageName}
-              </span>
-            </p>
-          </div>
-
-          <div className="min-h-0 flex-1">
-            <BaseDataTable
-              columns={columns}
-              rows={response?.data ?? []}
-              loading={breakdownQuery.isLoading}
-              emptyLabel={
-                breakdownQuery.isError
-                  ? "Không thể tải chi tiết hàng hóa."
-                  : "Không có hàng hóa nào trong kho này."
-              }
-              getRowKey={(row) => `${row.itemId}:${row.locationId}`}
-              columnFilterControl={control}
-            />
-          </div>
-
-          <div className="flex items-center justify-between border-t pt-2 text-sm">
-            <span className="text-muted-foreground">
-              Số hàng hóa = {response?.itemCount ?? 0}
+        <div className="shrink-0 text-center">
+          <h2 className="text-base font-bold uppercase tracking-wide">
+            Chi tiết hàng hóa
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {describePeriod(period)} · Mã SKU{" "}
+            <span className="font-semibold text-foreground">{target?.code}</span>{" "}
+            · Tên hàng hóa{" "}
+            <span className="font-semibold text-foreground">{target?.name}</span>{" "}
+            · Kho{" "}
+            <span className="font-semibold text-foreground">
+              {target?.storageName}
             </span>
-            <PaginationControls
-              page={page}
-              pageSize={pageSize}
-              total={response?.total ?? 0}
-              onPageChange={setPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setPage(1);
-              }}
-              onRefresh={() => void breakdownQuery.refetch()}
-            />
-          </div>
+          </p>
+        </div>
+
+        <BaseDataTable
+          columns={columns}
+          rows={response?.data ?? []}
+          loading={breakdownQuery.isLoading}
+          emptyLabel={
+            breakdownQuery.isError
+              ? "Không thể tải chi tiết hàng hóa."
+              : "Không có hàng hóa nào trong kho này."
+          }
+          getRowKey={(row) => `${row.itemId}:${row.locationId}`}
+          columnFilterControl={control}
+        />
+
+        {/* `PaginationControls` tự vẽ `border-t`, nên hàng này giữ đường kẻ
+            còn nó bỏ đi — nếu không sẽ thành hai vạch chồng nhau. */}
+        <div className="flex shrink-0 items-center border-t text-sm">
+          <span className="shrink-0 pl-2 text-muted-foreground">
+            Số hàng hóa = {response?.itemCount ?? 0}
+          </span>
+          <PaginationControls
+            className="!border-t-0 flex-1"
+            page={page}
+            pageSize={pageSize}
+            total={response?.total ?? 0}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+            onRefresh={() => void breakdownQuery.refetch()}
+          />
         </div>
       </AppModal>
 
