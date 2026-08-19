@@ -55,6 +55,15 @@ export interface CartLine {
    */
   isReturnCredit?: boolean;
   /**
+   * Chỉ dòng `isReturnCredit`: giá trị hoàn cho MỘT đơn vị, đã trừ khuyến mãi
+   * phân bổ trên hóa đơn gốc (BE trả về ở `eligible-returns`). Tiền của dòng
+   * tính trên số này; `unitPrice` giữ nguyên giá niêm yết để hiển thị cột
+   * "Đơn giá" và để gạch ngang phần chênh lệch.
+   *
+   * Vắng mặt (hóa đơn cũ / trả nhanh không có hóa đơn gốc) → bằng `unitPrice`.
+   */
+  refundableUnitPrice?: number;
+  /**
    * Đơn trả `regular`: id của dòng hóa đơn bán gốc (`invoice_items.id`) mà dòng
    * trả này tham chiếu. Bắt buộc để BE cộng `returned_quantity` đúng dòng. Bỏ
    * trống ở đơn trả `quick` (không có hóa đơn gốc).

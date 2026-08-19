@@ -1,6 +1,6 @@
 import type { CartLine } from "@erp/pos/interfaces/checkout.interface";
 import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
-import { lineTotal } from "./checkoutUtils";
+import { effectiveUnitPrice, lineTotal } from "./checkoutUtils";
 
 /** Sum of line totals for a list (uses `isReturnCredit` on each line). */
 export function sumLineTotals(lines: CartLine[]): number {
@@ -9,7 +9,7 @@ export function sumLineTotals(lines: CartLine[]): number {
 
 /** Positive magnitude: return bucket in quick_exchange (no isReturnCredit on those lines). */
 export function sumReturnBucket(lines: CartLine[]): number {
-  return lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
+  return lines.reduce((s, l) => s + effectiveUnitPrice(l) * l.qty, 0);
 }
 
 /**

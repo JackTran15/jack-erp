@@ -25,6 +25,14 @@ export interface InvoiceItemRow {
   /** Giá trị KM thô (numeric → API trả string, `Number()` khi dùng). */
   lineDiscountValue?: number;
   lineDiscountReason?: string;
+  /**
+   * Dòng trả (`direction = IN`): phần khuyến mãi của hóa đơn gốc phân bổ cho
+   * dòng này — khoản khách chưa từng trả nên cũng không được hoàn. Giá trị hoàn
+   * thực tế = `lineTotal - promotionDiscount`.
+   *
+   * Chỉ có trên phiếu trả/đổi lập sau khi tính năng này lên; phiếu cũ = 0.
+   */
+  promotionDiscount?: number;
   lineTotal: number;
   note?: string;
   sortOrder?: number;

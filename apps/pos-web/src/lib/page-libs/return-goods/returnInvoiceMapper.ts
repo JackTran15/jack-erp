@@ -48,6 +48,9 @@ export function mapEligibleLineToReturnableItem(
     unit: line.unit,
     locationId: line.locationId,
     unitPrice: Number(line.unitPrice) || 0,
+    // Hóa đơn cũ (trước khi BE trả field này) rơi về giá niêm yết như trước.
+    refundableUnitPrice:
+      Number(line.refundableUnitPrice ?? line.unitPrice) || 0,
     allowedQty: Number(line.maxReturnable) || 0,
   };
 }

@@ -24,6 +24,7 @@ export function buildInvoiceReturnCartLines(
       code: item.code,
       unit: item.unit || "Cái",
       unitPrice: item.unitPrice,
+      refundableUnitPrice: item.refundableUnitPrice,
       qty: q,
       locationId: item.locationId ?? "",
       maxQty: item.allowedQty,

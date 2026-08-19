@@ -13,6 +13,7 @@ import {
   InvoiceType,
 } from '../entities/invoice.entity';
 import { InvoiceItemEntity } from '../entities/invoice-item.entity';
+import { refundableUnitValues } from './refundable-value.util';
 import {
   InvoiceDebtEntity,
   DebtDocumentType,
@@ -31,6 +32,16 @@ export interface EligibleLine {
   itemName: string;
   unit: string;
   unitPrice: number;
+  /**
+   * What ONE unit is worth back to the customer: `unitPrice` net of the
+   * promotion allocated to that line and its share of the invoice-level money
+   * never paid. Equals `unitPrice` when the sale carried no discount.
+   *
+   * POS must price return credits on THIS, not on `unitPrice` — the checkout
+   * refunds the net, so crediting the list price undercharges the exchange by
+   * the discount and leaves the difference behind as phantom debt.
+   */
+  refundableUnitPrice: number;
   lineDiscount: number;
   locationId?: string;
   soldQuantity: number;
@@ -118,6 +129,8 @@ export class ReturnEligibilityService {
       order: { sortOrder: 'ASC' },
     });
 
+    const refundable = refundableUnitValues(invoice, items);
+
     return items.map((it) => {
       const sold = Number(it.quantity);
       const returned = Number(it.returnedQuantity ?? 0);
@@ -128,6 +141,7 @@ export class ReturnEligibilityService {
         itemName: it.itemName,
         unit: it.unit,
         unitPrice: Number(it.unitPrice),
+        refundableUnitPrice: refundable.get(it.id) ?? Number(it.unitPrice),
         lineDiscount: Number(it.lineDiscount ?? 0),
         locationId: it.locationId,
         soldQuantity: sold,
