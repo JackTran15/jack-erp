@@ -288,6 +288,7 @@ export class RevenueByItemReport implements ReportDefinition {
         quantity: Number(li.quantity ?? 0),
         unitPrice: Number(li.unitPrice ?? 0),
         lineDiscount: Number(li.lineDiscount ?? 0),
+        promotionDiscount: Number(li.promotionDiscount ?? 0),
         lineTotal: Number(li.lineTotal ?? 0),
       };
     });

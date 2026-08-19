@@ -258,8 +258,15 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
           direction: li.direction,
           quantity: Number(li.quantity ?? 0),
           unitPrice: Number(li.unitPrice ?? 0),
-          lineDiscount: Number(li.lineDiscount ?? 0),
-          lineTotal: Number(li.lineTotal ?? 0),
+          // Cùng lý do như "Doanh thu theo mặt hàng": CTKM engine nằm ở
+          // `promotion_discount`, bỏ nó thì cột "Khuyến mại" luôn bằng 0.
+          lineDiscount:
+            Number(li.lineDiscount ?? 0) + Number(li.promotionDiscount ?? 0),
+          // `lineTotal` mới trừ giảm giá gõ tay, CTKM engine trừ ở cấp hóa đơn.
+          // Trừ nốt ở đây để "Thành tiền" = "Tiền hàng" − "Khuyến mại" trên
+          // từng dòng, và để footer khớp doanh thu thực.
+          lineTotal:
+            Number(li.lineTotal ?? 0) - Number(li.promotionDiscount ?? 0),
           itemNote: li.note ?? null,
           itemCategory: categoryByItemId.get(li.itemId) ?? null,
           locationCode: location?.code ?? null,
