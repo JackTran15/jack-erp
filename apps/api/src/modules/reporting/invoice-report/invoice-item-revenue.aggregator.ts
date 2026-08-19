@@ -55,6 +55,18 @@ export interface InvoiceItemRowInput {
 const NON_SUMMABLE = new Set<string>(['unitPrice']);
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
+/**
+ * Whether a column carries a signed amount, i.e. one that reverses on the
+ * return leg of an exchange.
+ *
+ * Quantity and every money column do; `unitPrice` does not — it is a rate, and
+ * a return does not make a pair of shoes cost minus a million đồng. Deliberately
+ * the same predicate the footer sums on, so footer === sum of visible rows.
+ */
+const isSignedColumn = (col: string, type: ReportColumnDataType): boolean =>
+  !NON_SUMMABLE.has(col) &&
+  (type === ReportColumnDataType.CURRENCY || type === ReportColumnDataType.NUMBER);
+
 const fieldValue = (
   field: ItemRevenueField,
   r: InvoiceItemRowInput,
@@ -128,17 +140,27 @@ export function itemCellValue(
 ): ReportCellValue {
   const def = getItemRevenueColumnDef(col);
   if (!def) return null;
-  switch (def.source.kind) {
-    case 'placeholder':
-      return def.source.placeholder;
-    case 'field':
-      return fieldValue(def.source.field, r);
-    case 'relation':
-      return relationValue(def.source.rel, r);
-    case 'computed':
-      // lineAmount — gross line value before discount.
-      return round2(r.quantity * r.unitPrice);
-  }
+  const raw = ((): ReportCellValue => {
+    switch (def.source.kind) {
+      case 'placeholder':
+        return def.source.placeholder;
+      case 'field':
+        return fieldValue(def.source.field, r);
+      case 'relation':
+        return relationValue(def.source.rel, r);
+      case 'computed':
+        // lineAmount — gross line value before discount.
+        return round2(r.quantity * r.unitPrice);
+    }
+  })();
+  // The return leg of an exchange takes goods back, so its quantity and money
+  // read negative — the row now says what it does to revenue, and the footer
+  // is a plain sum of what is on screen instead of silently re-signing it.
+  return isSignedColumn(col, def.type) &&
+    r.direction === ItemDirection.IN &&
+    typeof raw === 'number'
+    ? -raw
+    : raw;
 }
 
 export function itemColumnType(col: string): ReportColumnDataType {
@@ -161,21 +183,11 @@ export function buildItemTotals(
 ): ReportRow {
   const out: ReportRow = {};
   for (const col of columns) {
-    const type = itemColumnType(col);
-    const summable =
-      !NON_SUMMABLE.has(col) &&
-      (type === ReportColumnDataType.CURRENCY ||
-        type === ReportColumnDataType.NUMBER);
-    // Footer nets returns/exchanges: OUT lines add, IN (return leg) subtract.
-    out[col] = summable
+    // Return legs are already negative in the cells, so the footer nets
+    // returns/exchanges by plain addition — re-signing here would undo it.
+    out[col] = isSignedColumn(col, itemColumnType(col))
       ? round2(
-          rows.reduce(
-            (sum, r) =>
-              sum +
-              (r.direction === ItemDirection.IN ? -1 : 1) *
-                Number(itemCellValue(col, r) ?? 0),
-            0,
-          ),
+          rows.reduce((sum, r) => sum + Number(itemCellValue(col, r) ?? 0), 0),
         )
       : null;
   }
