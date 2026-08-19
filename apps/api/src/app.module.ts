@@ -50,6 +50,7 @@ import { MobileModule } from './modules/mobile/mobile.module';
 // Runs at import time, before Nest evaluates the TypeORM factory below, so no
 // pool is ever created with the driver's process-timezone date handling.
 applyUtcTimestampCodec();
+import { ApiKeyModule } from './modules/api-key/api-key.module';
 
 @Module({
   imports: [
@@ -134,6 +135,7 @@ applyUtcTimestampCodec();
     AdminSearchModule,
     CounterpartyModule,
     MobileModule,
+    ApiKeyModule,
   ],
 })
 export class AppModule {}
