@@ -28,6 +28,12 @@ import { usePosFastStockTransferPickerStore } from "@erp/pos/stores/page-stores/
 import { useFastStockTransferData } from "./use-fast-stock-transfer-data";
 import { useTempWarehouseMutations } from "@erp/pos/hooks/react-query/use-query-temp-warehouse";
 
+/**
+ * Lượt tra kệ ưu tiên đang chạy cho một mặt hàng. Giữ cả promise chứ không chỉ
+ * `itemId`, để `handleAddRow` đợi được nó trước khi gửi dòng lên (ADR-05).
+ */
+type PendingShelfLookup = { itemId: string; promise: Promise<void> } | null;
+
 function resolveStorageIdForShelf(
   direction: TempWarehouseDirection,
   filters: FastStockTransferFilters,
@@ -122,35 +128,51 @@ export function useFastStockTransferActions() {
   const filters = usePosFastStockTransferWorkflowStore((s) => s.filters);
 
   const lookupPreferredShelf = useLookupPreferredShelf();
-  const pendingToolbarItemIdRef = useRef<string | null>(null);
-  const pendingEditItemIdRef = useRef<string | null>(null);
+  const pendingToolbarShelfRef = useRef<PendingShelfLookup>(null);
+  const pendingEditShelfRef = useRef<PendingShelfLookup>(null);
+  const addInFlightRef = useRef(false);
 
   const applyPreferredShelf = useCallback(
     (
       product: PosCatalogLine,
-      pendingRef: { current: string | null },
+      pendingRef: { current: PendingShelfLookup },
       setLocation: (
         location: FastStockTransferToolbarDraft["location"],
       ) => void,
     ) => {
+      // Việc đầu tiên, trước mọi nhánh thoát: ô Vị trí không bao giờ được phép
+      // giữ kệ của mặt hàng quét trước đó, kể cả trong lúc chờ API trả về.
+      setLocation(null);
+
       const storageId = resolveStorageIdForShelf(direction, filters);
-      if (!storageId) return;
-      pendingRef.current = product.itemId;
-      void lookupPreferredShelf([{ itemId: product.itemId, storageId }]).then(
-        (results) => {
-          if (pendingRef.current !== product.itemId) return;
+      if (!storageId) {
+        // Vẫn phải gán một promise đã settle: `handleAddRow` await ref này.
+        pendingRef.current = {
+          itemId: product.itemId,
+          promise: Promise.resolve(),
+        };
+        return;
+      }
+
+      const promise = lookupPreferredShelf([
+        { itemId: product.itemId, storageId },
+      ])
+        .then((results) => {
+          // Người dùng có thể đã quét mặt hàng khác trong lúc chờ.
+          if (pendingRef.current?.itemId !== product.itemId) return;
           const shelf = results[0]?.shelf;
-          if (shelf) {
-            setLocation({
-              locationId: shelf.id,
-              name: shelf.name || shelf.code,
-              quantity: 0,
-            });
-          } else {
-            setLocation(null);
-          }
-        },
-      );
+          if (!shelf) return;
+          setLocation({
+            locationId: shelf.id,
+            name: shelf.name || shelf.code,
+            quantity: 0,
+          });
+        })
+        // Promise phải luôn settle: ADR-05 dựa vào điều này thay cho một timeout
+        // nhân tạo. Lỗi tra kệ thì để Vị trí trống, dòng vẫn thêm được.
+        .catch(() => undefined);
+
+      pendingRef.current = { itemId: product.itemId, promise };
     },
     [direction, filters, lookupPreferredShelf],
   );
@@ -158,7 +180,7 @@ export function useFastStockTransferActions() {
   const createDraftProductHandler = useCallback(
     (
       setProduct: (product: PosCatalogLine | null) => void,
-      pendingRef: { current: string | null },
+      pendingRef: { current: PendingShelfLookup },
       setLocation: (location: FastStockTransferToolbarDraft["location"]) => void,
     ) =>
       (product: PosCatalogLine | null) => {
@@ -175,7 +197,7 @@ export function useFastStockTransferActions() {
   const handleToolbarDraftProduct = useCallback(
     createDraftProductHandler(
       setToolbarProduct,
-      pendingToolbarItemIdRef,
+      pendingToolbarShelfRef,
       setToolbarLocation,
     ),
     [createDraftProductHandler, setToolbarProduct, setToolbarLocation],
@@ -184,7 +206,7 @@ export function useFastStockTransferActions() {
   const handleEditDraftProduct = useCallback(
     createDraftProductHandler(
       setEditDraftProduct,
-      pendingEditItemIdRef,
+      pendingEditShelfRef,
       setEditDraftLocation,
     ),
     [createDraftProductHandler, setEditDraftProduct, setEditDraftLocation],
@@ -220,55 +242,88 @@ export function useFastStockTransferActions() {
   }, [refetchLinesData, resetDialogs, resetWorkflow]);
 
   const handleAddRow = useCallback(
-    (onSuccess?: () => void) => {
-      if (!data.branchId) {
-        setPageError("Chưa chọn chi nhánh.");
-        return;
-      }
-      if (data.isSessionClosed) {
-        setPageError("Phiên kho tạm đã đóng. Không thể thêm dòng.");
-        return;
-      }
-      if (!data.toolbarDraft.carrier?.id) {
-        setPageError("Vui lòng chọn người vận chuyển.");
-        return;
-      }
-      if (!isFastStockTransferDraftCompleteForAdd(data.toolbarDraft)) {
-        setPageError("Vui lòng chọn hàng hóa và vị trí (nếu có).");
-        return;
-      }
-      const body = mapDraftToAddBody(
-        data.toolbarDraft,
-        data.branchId,
-        data.direction,
-      );
-      if (data.toolbarDraft.carrier?.id) {
-        body.carrierUserId = data.toolbarDraft.carrier.id;
-      }
+    async (callbacks?: {
+      onAdded?: () => void;
+      onMissingCarrier?: () => void;
+    }) => {
+      // Chặn Enter dồn: máy quét có thể bắn phím kế tiếp trước khi POST xong.
+      // Dùng ref chứ không dùng `addLineMutation.isPending` — cờ của React Query
+      // là giá trị của lần render trước, hai lần Enter trong cùng một tick đều
+      // đọc ra `false`.
+      if (addInFlightRef.current) return;
+      // Khoá ngay, trước `await` phía dưới: nếu để tới lúc `mutate` mới khoá thì
+      // hai lần Enter liên tiếp đều lọt qua rào rồi cùng gửi lên.
+      addInFlightRef.current = true;
+      let submitted = false;
+      try {
+        if (!data.branchId) {
+          setPageError("Chưa chọn chi nhánh.");
+          return;
+        }
+        if (data.isSessionClosed) {
+          setPageError("Phiên kho tạm đã đóng. Không thể thêm dòng.");
+          return;
+        }
 
-      // Pin the session's storages from the "Kho xuất"/"Kho nhập" pickers so the
-      // BE opens it with distinct warehouse vs showroom locations. The warehouse
-      // side is a storage id; the showroom side is a showroom id → its storageId.
-      const showroomStorageOf = (id: string) =>
-        data.showrooms.find((s) => s.id === id)?.storageId;
-      const isW2s =
-        data.direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM;
-      const warehouseStorageId = isW2s
-        ? data.filters.sourceWarehouse
-        : data.filters.destinationWarehouse;
-      const showroomStorageId = isW2s
-        ? showroomStorageOf(data.filters.destinationWarehouse)
-        : showroomStorageOf(data.filters.sourceWarehouse);
-      if (warehouseStorageId) body.warehouseStorageId = warehouseStorageId;
-      if (showroomStorageId) body.showroomStorageId = showroomStorageId;
+        // Đọc draft ngay lúc gọi, không qua closure: Enter có thể tới cùng tick
+        // với lúc chọn hàng, khi đó `data.toolbarDraft` của lần render trước còn rỗng.
+        let draft = usePosFastStockTransferWorkflowStore.getState().toolbarDraft;
 
-      addLineMutation.mutate(body, {
-        onSuccess: () => {
-          resetToolbarAfterAdd(null);
-          onSuccess?.();
-        },
-        onError: (err) => setPageError(getErrorMessage(err)),
-      });
+        // Đợi lượt tra kệ của chính mặt hàng đang chọn, nếu nó còn đang bay.
+        // Không đợi thì dòng được lưu với Vị trí trống dù mặt hàng có kệ (ADR-05).
+        const pendingShelf = pendingToolbarShelfRef.current;
+        if (pendingShelf && pendingShelf.itemId === draft.product?.itemId) {
+          await pendingShelf.promise;
+          // Đọc lại: `setLocation` vừa chạy trong lúc chờ nên bản đọc trước đã cũ.
+          draft = usePosFastStockTransferWorkflowStore.getState().toolbarDraft;
+        }
+
+        const carrier = draft.carrier;
+        if (!carrier?.id) {
+          setPageError("Vui lòng chọn người vận chuyển.");
+          callbacks?.onMissingCarrier?.();
+          return;
+        }
+        if (!isFastStockTransferDraftCompleteForAdd(draft)) {
+          setPageError("Vui lòng chọn hàng hóa và vị trí (nếu có).");
+          return;
+        }
+        const body = mapDraftToAddBody(draft, data.branchId, data.direction);
+        body.carrierUserId = carrier.id;
+
+        // Pin the session's storages from the "Kho xuất"/"Kho nhập" pickers so the
+        // BE opens it with distinct warehouse vs showroom locations. The warehouse
+        // side is a storage id; the showroom side is a showroom id → its storageId.
+        const showroomStorageOf = (id: string) =>
+          data.showrooms.find((s) => s.id === id)?.storageId;
+        const isW2s =
+          data.direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM;
+        const warehouseStorageId = isW2s
+          ? data.filters.sourceWarehouse
+          : data.filters.destinationWarehouse;
+        const showroomStorageId = isW2s
+          ? showroomStorageOf(data.filters.destinationWarehouse)
+          : showroomStorageOf(data.filters.sourceWarehouse);
+        if (warehouseStorageId) body.warehouseStorageId = warehouseStorageId;
+        if (showroomStorageId) body.showroomStorageId = showroomStorageId;
+
+        addLineMutation.mutate(body, {
+          onSuccess: () => {
+            addInFlightRef.current = false;
+            // Giữ người vận chuyển để quét tiếp không phải chọn lại.
+            resetToolbarAfterAdd(carrier);
+            callbacks?.onAdded?.();
+          },
+          onError: (err) => {
+            addInFlightRef.current = false;
+            setPageError(getErrorMessage(err));
+          },
+        });
+        submitted = true;
+      } finally {
+        // Chỉ nhả khoá ở đây khi chưa gửi được; đã gửi thì callback của mutation nhả.
+        if (!submitted) addInFlightRef.current = false;
+      }
     },
     [addLineMutation, data, resetToolbarAfterAdd, setPageError],
   );

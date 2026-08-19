@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useImperativeHandle,
   useRef,
   useState,
   type KeyboardEvent,
@@ -26,6 +27,15 @@ import {
 export interface SearchSuggestion<T> {
   item: T;
   disabled?: boolean;
+}
+
+/**
+ * Điều khiển popover từ ngoài. Cần cho consumer nào chọn item bằng đường không
+ * đi qua `selectItem` (vd tự chọn sau khi tra mã vạch) — không có nó thì popover
+ * ở lại với danh sách rỗng và render khung "Không có kết quả." treo dưới ô.
+ */
+export interface PosSearchPopoverHandle {
+  close: () => void;
 }
 
 export type PosSearchPopoverVariant = "boxed" | "underline";
@@ -94,6 +104,15 @@ export interface PosSearchPopoverProps<T> {
   debounceMs?: number;
   maxSuggestions?: number;
 
+  /**
+   * Làm nổi sẵn dòng đầu tiên ngay khi danh sách gợi ý hiện ra, để Enter chọn
+   * được nó mà không phải bấm mũi tên hay chạm chuột.
+   *
+   * Mặc định tắt, và phải giữ như vậy: `PosSelect` cũng dựng trên component này,
+   * nên bật mặc định là đổi hành vi Enter của mọi dropdown trong POS.
+   */
+  autoHighlightFirst?: boolean;
+
   /** Extra slots — rendered before/after the input inside the wrapper. */
   prefix?: ReactNode;
   suffix?: ReactNode;
@@ -103,6 +122,9 @@ export interface PosSearchPopoverProps<T> {
   inputClassName?: string;
 
   inputRef?: Ref<HTMLInputElement>;
+
+  /** Handle để consumer đóng popover bằng lệnh — xem `PosSearchPopoverHandle`. */
+  popoverRef?: Ref<PosSearchPopoverHandle>;
 
   /**
    * When provided and `value` is non-empty, the preset chrome renders a
@@ -141,11 +163,13 @@ export function PosSearchPopover<T>({
   minChars = 2,
   debounceMs = 300,
   maxSuggestions = 8,
+  autoHighlightFirst = false,
   prefix,
   suffix,
   containerClassName,
   inputClassName,
   inputRef,
+  popoverRef,
   onClear,
   emptyAction,
 }: PosSearchPopoverProps<T>) {
@@ -157,6 +181,11 @@ export function PosSearchPopover<T>({
   // Bỏ qua lần search do refocus ngay sau khi clear (value lúc đó vẫn là giá trị
   // cũ chưa flush → tránh dropdown lọc theo option vừa xóa).
   const skipFocusSearchRef = useRef(false);
+  // Số thứ tự lượt tra: chỉ lượt mới nhất được phép ghi kết quả. Không có nó,
+  // một kết quả về trễ của chuỗi đã cũ có thể ghi đè danh sách của chuỗi hiện tại
+  // — với `autoHighlightFirst` bật thì nó còn làm sáng sẵn dòng đầu của kết quả cũ,
+  // đủ để phím Enter kế tiếp chọn nhầm mặt hàng.
+  const searchSeqRef = useRef(0);
 
   const [suggestions, setSuggestions] = useState<SearchSuggestion<T>[]>([]);
   const [open, setOpen] = useState(false);
@@ -179,17 +208,23 @@ export function PosSearchPopover<T>({
         setSuggestions([]);
         return;
       }
+      const seq = ++searchSeqRef.current;
       setLoading(true);
       try {
         const results = await search(q);
-        setSuggestions(results.slice(0, maxSuggestions));
+        if (seq !== searchSeqRef.current) return;
+        const shown = results.slice(0, maxSuggestions);
+        setSuggestions(shown);
+        setHighlightIdx(autoHighlightFirst && shown.length > 0 ? 0 : -1);
       } catch {
+        if (seq !== searchSeqRef.current) return;
         setSuggestions([]);
+        setHighlightIdx(-1);
       } finally {
-        setLoading(false);
+        if (seq === searchSeqRef.current) setLoading(false);
       }
     },
-    [search, minChars, maxSuggestions],
+    [autoHighlightFirst, search, minChars, maxSuggestions],
   );
 
   const handleChange = useCallback(
@@ -227,14 +262,22 @@ export function PosSearchPopover<T>({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
+  const closePopover = useCallback(() => {
+    setOpen(false);
+    setSuggestions([]);
+    setHighlightIdx(-1);
+  }, []);
+
+  useImperativeHandle(popoverRef, () => ({ close: closePopover }), [
+    closePopover,
+  ]);
+
   const selectItem = useCallback(
     (item: T) => {
       onSelect(item);
-      setOpen(false);
-      setSuggestions([]);
-      setHighlightIdx(-1);
+      closePopover();
     },
-    [onSelect],
+    [closePopover, onSelect],
   );
 
   const handleClear = useCallback(() => {

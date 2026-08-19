@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import { FastStockTransferCarrierSearchInput } from "@erp/pos/components/page-components/FastStockTransfer/FastStockTransferToolbar/AddLineRow/FastStockTransferCarrierSearchInput/FastStockTransferCarrierSearchInput";
 import { FastStockTransferProductSearchInput } from "@erp/pos/components/page-components/FastStockTransfer/FastStockTransferToolbar/AddLineRow/FastStockTransferProductSearchInput/FastStockTransferProductSearchInput";
@@ -31,6 +31,23 @@ export function AddLineRow() {
     el.focus();
     el.select();
   }, []);
+
+  // Thêm xong thì con trỏ về ô Hàng hóa, không về ô Người vận chuyển: người vận
+  // chuyển được giữ lại nên thủ kho quét mã kế tiếp mà không phải chạm gì thêm.
+  //
+  // Không focus thẳng trong callback thành công được: lúc đó `isMutating` vẫn còn
+  // bật nên ô đang `disabled`, và trình duyệt bỏ focus trên phần tử disabled. Đặt
+  // cờ rồi để effect nhặt lại khi ô mở khóa.
+  const [focusProductPending, setFocusProductPending] = useState(false);
+
+  useEffect(() => {
+    if (!focusProductPending) return;
+    const el = productInputRef.current;
+    if (!el || el.disabled) return;
+    el.focus();
+    el.select();
+    setFocusProductPending(false);
+  }, [focusProductPending, isMutating]);
 
   useEffect(() => {
     if (focusedForDirectionRef.current === direction) return;
@@ -70,7 +87,8 @@ export function AddLineRow() {
           <FastStockTransferProductSearchInput
             disabled={isSessionClosed || isMutating}
             inputRef={productInputRef}
-            onAfterSelect={() => addButtonRef.current?.focus()}
+            onAdded={() => setFocusProductPending(true)}
+            onMissingCarrier={focusCarrier}
           />
         </div>
       </div>
@@ -83,6 +101,7 @@ export function AddLineRow() {
             items={locationItems}
             itemKey={(l) => l.locationId}
             renderItem={(l) => catalogLocationName(l)}
+            placeholder="Chưa có vị trí"
             variant="boxed"
             disabled
           />
@@ -91,7 +110,12 @@ export function AddLineRow() {
       <button
         ref={addButtonRef}
         type="button"
-        onClick={() => handleAddRow(focusCarrier)}
+        onClick={() =>
+          void handleAddRow({
+            onAdded: () => setFocusProductPending(true),
+            onMissingCarrier: focusCarrier,
+          })
+        }
         disabled={isSessionClosed || isMutating}
         className="inline-flex h-9 shrink-0 items-center rounded-md border border-[#4F46E5] px-6 text-[13px] font-semibold text-[#4F46E5] hover:bg-[#EEF2FF] disabled:opacity-50"
       >
