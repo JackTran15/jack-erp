@@ -7,9 +7,25 @@ import { UserEntity } from '../../../auth/user.entity';
 import { CustomerEntity } from '../../../customer/customer.entity';
 import { CustomerGroupEntity } from '../../../customer/customer-group.entity';
 import { InvoiceEntity } from '../../../pos/entities/invoice.entity';
-import { InvoiceItemEntity } from '../../../pos/entities/invoice-item.entity';
+import {
+  InvoiceItemEntity,
+  ItemDirection,
+} from '../../../pos/entities/invoice-item.entity';
 import { InvoicePaymentEntity } from '../../../pos/entities/invoice-payment.entity';
+import {
+  invoiceTypeSign,
+  signedGoods,
+} from '../../report-core/report-query.util';
 import { GetInvoiceDetailQuery } from './get-invoice-detail.query';
+
+/**
+ * Apply a sign without producing `-0`, which `Intl.NumberFormat` faithfully
+ * renders as "-0" — a refund of nothing should not look like a negative number.
+ */
+const signed = (sign: number, value: unknown): number => {
+  const n = sign * Number(value ?? 0);
+  return n === 0 ? 0 : n;
+};
 
 @QueryHandler(GetInvoiceDetailQuery)
 export class GetInvoiceDetailHandler
@@ -73,8 +89,11 @@ export class GetInvoiceDetailHandler
           )?.name ?? null
         : null;
 
-    const totalAmount = Number(invoice.amountDue ?? 0);
-    const totalPaid = Number(invoice.totalPaid ?? 0);
+    // Same signing the reports use, so this dialog agrees with the "Bảng kê"
+    // row it was opened from instead of restating a return as a positive sale.
+    const headerSign = invoiceTypeSign(invoice.type);
+    const totalAmount = signed(headerSign, invoice.amountDue);
+    const totalPaid = signed(headerSign, invoice.totalPaid);
 
     return {
       code: invoice.code,
@@ -89,7 +108,13 @@ export class GetInvoiceDetailHandler
       customerGroup,
       salesChannel: 'Tại cửa hàng',
       lines: lines.map((l) => {
-        const quantity = Number(l.quantity ?? 0);
+        // IN = goods coming back from the customer. On an EXCHANGE both legs
+        // sit on one invoice, so without a sign the returned pair and the
+        // replacement look identical; negative is what tells them apart.
+        const sign = l.direction === ItemDirection.IN ? -1 : 1;
+        const quantity = signed(sign, l.quantity);
+        // Unsigned: a rate, not an amount — returning goods does not make them
+        // cost a negative price per unit.
         const unitPrice = Number(l.unitPrice ?? 0);
         return {
           sku: l.itemCode,
@@ -97,19 +122,23 @@ export class GetInvoiceDetailHandler
           unit: l.unit,
           quantity,
           unitPrice,
-          lineAmount: quantity * unitPrice,
-          discount: Number(l.lineDiscount ?? 0),
-          lineTotal: Number(l.lineTotal ?? 0),
+          lineAmount: signed(1, quantity * unitPrice),
+          discount: signed(sign, l.lineDiscount),
+          lineTotal: signed(sign, l.lineTotal),
           note: l.note ?? null,
         };
       }),
-      subtotal: Number(invoice.subtotal ?? 0),
+      // Σ of the signed line totals above: −subtotal for a RETURN, and the
+      // exchange net (new − returned) for an EXCHANGE.
+      subtotal: signed(1, signedGoods(invoice)),
       totalAmount,
       totalPaid,
-      debt: totalAmount - totalPaid,
+      debt: signed(1, totalAmount - totalPaid),
       payments: payments.map((p) => ({
         method: p.paymentMethod,
-        amount: Number(p.amount ?? 0),
+        // Signed with the header: a refund is money leaving the drawer, and the
+        // tender breakdown has to add up to the "Khách trả" above it.
+        amount: signed(headerSign, p.amount),
       })),
     };
   }
