@@ -1,6 +1,5 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 
-import type { SearchSuggestion } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
 import {
   POS_CATALOG_QUERY_LIMIT,
   useLookupCatalogByCode,
@@ -22,12 +21,12 @@ interface ProductToolbarState {
 interface UseFastStockTransferProductPickerResult {
   productToolbar: ProductToolbarState;
   setProductToolbar: (value: Updater<ProductToolbarState>) => void;
-  /** Lookup exact code trước; không khớp thì fallback `catalog?search` ILIKE. */
-  productHybridAdapter: (
-    q: string,
-    onAutoSelect?: (product: PosCatalogLine) => void,
-  ) => Promise<SearchSuggestion<PosCatalogLine>[]>;
-  resetLookupGuard: () => void;
+  /**
+   * Tra ứng viên cho một chuỗi: khớp tuyệt đối mã vạch/SKU trước, trượt mới rơi
+   * về `catalog?search` ILIKE. Chỉ trả dữ liệu — việc chọn hàng do popover hoặc
+   * đường Enter quyết định (ADR-03), nên hàm này không tự gọi callback nào.
+   */
+  resolveCandidates: (q: string) => Promise<PosCatalogLine[]>;
   findProduct: (itemId: string) => PosCatalogLine | null;
 }
 
@@ -35,7 +34,6 @@ export function useFastStockTransferProductPicker(): UseFastStockTransferProduct
   const branchId = usePosBranchStore((s) => s.branchId);
   const lookup = useLookupCatalogByCode();
   const searchCatalog = useSearchCatalog();
-  const claimRef = useRef<string | null>(null);
 
   const productToolbar = usePosFastStockTransferPickerStore(
     (s) => s.productToolbar,
@@ -48,12 +46,8 @@ export function useFastStockTransferProductPicker(): UseFastStockTransferProduct
   );
   const findProduct = usePosFastStockTransferPickerStore((s) => s.findProduct);
 
-  const resetLookupGuard = useCallback(() => {
-    claimRef.current = null;
-  }, []);
-
-  const productSearchAdapter = useCallback(
-    async (q: string): Promise<SearchSuggestion<PosCatalogLine>[]> => {
+  const searchByText = useCallback(
+    async (q: string): Promise<PosCatalogLine[]> => {
       const normalized = q.trim();
       if (normalized.length < PRODUCT_QUERY_MIN_CHARS || !branchId) {
         return [];
@@ -65,17 +59,13 @@ export function useFastStockTransferProductPicker(): UseFastStockTransferProduct
 
       return rows
         .filter((p) => matchesCatalogQuery(p, normalized))
-        .slice(0, POS_CATALOG_QUERY_LIMIT)
-        .map((item) => ({ item }));
+        .slice(0, POS_CATALOG_QUERY_LIMIT);
     },
     [branchId, searchCatalog, upsertProducts],
   );
 
-  const productHybridAdapter = useCallback(
-    async (
-      q: string,
-      onAutoSelect?: (product: PosCatalogLine) => void,
-    ): Promise<SearchSuggestion<PosCatalogLine>[]> => {
+  const resolveCandidates = useCallback(
+    async (q: string): Promise<PosCatalogLine[]> => {
       const code = q.trim();
       if (code.length < PRODUCT_QUERY_MIN_CHARS || !branchId) {
         return [];
@@ -90,38 +80,21 @@ export function useFastStockTransferProductPicker(): UseFastStockTransferProduct
 
       if (lookupRows.length > 0) {
         upsertProducts(lookupRows);
-
-        if (lookupRows.length === 1 && onAutoSelect) {
-          if (claimRef.current === code) return [];
-          claimRef.current = code;
-          onAutoSelect(lookupRows[0]!);
-          return [];
-        }
-
-        claimRef.current = null;
-        return lookupRows.map((item) => ({ item }));
+        return lookupRows;
       }
 
-      claimRef.current = null;
-      return productSearchAdapter(q);
+      return searchByText(q);
     },
-    [branchId, lookup, productSearchAdapter, upsertProducts],
+    [branchId, lookup, searchByText, upsertProducts],
   );
 
   return useMemo(
     () => ({
       productToolbar,
       setProductToolbar,
-      productHybridAdapter,
-      resetLookupGuard,
+      resolveCandidates,
       findProduct,
     }),
-    [
-      productToolbar,
-      setProductToolbar,
-      productHybridAdapter,
-      resetLookupGuard,
-      findProduct,
-    ],
+    [productToolbar, setProductToolbar, resolveCandidates, findProduct],
   );
 }
