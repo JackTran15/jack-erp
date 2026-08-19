@@ -23,6 +23,7 @@ import { JournalReturnPublisher } from '../../accounting/publishers/journal-retu
 import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points.publisher';
 import { LoyaltyPointsReversePublisher } from '../../customer/publishers/loyalty-points-reverse.publisher';
 import { StockDeductionPublisher } from '../../inventory/publishers/stock-deduction.publisher';
+import { TempWarehouseFulfillPublisher } from '../../inventory/publishers/temp-warehouse-fulfill.publisher';
 import { CustomerCreditService } from '../../customer/services/customer-credit.service';
 import { MembershipCardService } from '../../customer/services/membership-card.service';
 import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
@@ -108,6 +109,7 @@ export class CheckoutReturnService {
     private readonly returnPostedPublisher: ReturnPostedPublisher,
     private readonly stockReturnInPublisher: StockReturnInPublisher,
     private readonly stockDeductionPublisher: StockDeductionPublisher,
+    private readonly tempWarehouseFulfillPublisher: TempWarehouseFulfillPublisher,
     private readonly cashRefundPublisher: CashRefundPublisher,
     private readonly depositRefundPublisher: DepositRefundPublisher,
     private readonly cashFromPaymentPublisher: CashFromPaymentPublisher,
@@ -996,6 +998,45 @@ export class CheckoutReturnService {
         branchId,
         actor,
       );
+
+      // 2b. TEMP_WAREHOUSE_INVOICE_FULFILL — the second beat every sale already
+      // has and this path was missing. The exchange's buy-more (OUT) leg deducts
+      // from the showroom exactly like a sale (create-exchange-invoice resolves
+      // it with showroomOnly: true), so it needs the same warehouse -> showroom
+      // backfill: without it, an item staged in the temp warehouse is sold out of
+      // a showroom that never received it, and the balance goes negative.
+      //
+      // OUT lines only. Returned (IN) stock is credited straight back to the
+      // showroom and was never staged, so it has nothing to consume — and netting
+      // the two legs would be a rule no other path in this codebase applies.
+      // Quantities are stored positive (direction, not sign, separates the legs).
+      //
+      // Always published when there is an OUT line: the consumer no-ops when the
+      // branch has no ACTIVE session or no staged line matches. Deduplication is
+      // keyed on this invoice's own id, which is distinct from the original sale's.
+      const fulfillByItem = new Map<string, number>();
+      for (const item of outLines) {
+        fulfillByItem.set(
+          item.itemId,
+          (fulfillByItem.get(item.itemId) ?? 0) + Number(item.quantity),
+        );
+      }
+      await this.tempWarehouseFulfillPublisher.publish({
+        organizationId: actor.organizationId,
+        branchId,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.code,
+        actor: {
+          userId: actor.userId,
+          organizationId: actor.organizationId,
+          branchId: actor.branchId,
+          roles: actor.roles,
+        },
+        lines: [...fulfillByItem.entries()].map(([itemId, quantity]) => ({
+          itemId,
+          quantity,
+        })),
+      });
     }
 
     // 3. JOURNAL_POST_RETURN — always. For an EXCHANGE net > 0 the cash portion is

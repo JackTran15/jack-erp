@@ -30,6 +30,7 @@ import { AccountingDefaultAccountRole } from '../../accounting/payment-accounts/
 import { ReturnPostedPublisher } from '../publishers/return-posted.publisher';
 import { StockReturnInPublisher } from '../publishers/stock-return-in.publisher';
 import { StockDeductionPublisher } from '../../inventory/publishers/stock-deduction.publisher';
+import { TempWarehouseFulfillPublisher } from '../../inventory/publishers/temp-warehouse-fulfill.publisher';
 import { CashRefundPublisher } from '../../accounting/publishers/cash-refund.publisher';
 import { DepositRefundPublisher } from '../../accounting/publishers/deposit-refund.publisher';
 import { CashFromPaymentPublisher } from '../../accounting/publishers/cash-from-payment.publisher';
@@ -219,6 +220,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
   // apart — an EXCHANGE must fire both, a plain RETURN only the return-in one.
   let stockReturnInPublisher: { publish: jest.Mock };
   let stockDeductionPublisher: { publish: jest.Mock };
+  let tempWarehouseFulfillPublisher: { publish: jest.Mock };
 
   beforeEach(async () => {
     debtRow = {
@@ -290,6 +292,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
 
     stockReturnInPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
     stockDeductionPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
+    tempWarehouseFulfillPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
 
     const noop = { publish: jest.fn().mockResolvedValue(undefined) };
     const module: TestingModule = await Test.createTestingModule({
@@ -309,6 +312,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
         { provide: ReturnPostedPublisher, useValue: noop },
         { provide: StockReturnInPublisher, useValue: stockReturnInPublisher },
         { provide: StockDeductionPublisher, useValue: stockDeductionPublisher },
+        { provide: TempWarehouseFulfillPublisher, useValue: tempWarehouseFulfillPublisher },
         { provide: CashRefundPublisher, useValue: cashRefundPublisher },
         { provide: DepositRefundPublisher, useValue: depositRefundPublisher },
         { provide: CashFromPaymentPublisher, useValue: noop },
@@ -868,6 +872,123 @@ describe('CheckoutReturnService — debt offset routing', () => {
 
       expect(result.refundMethod).toBe(RefundMethod.CASH);
       expect(cashRefundPublisher.publish).toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * The temp-warehouse leg (UOW-01). A sale is two beats: deduct from the
+   * showroom, then pull the staged unit warehouse -> showroom to cover it. The
+   * exchange path fired only the first, so a "Mua thêm" line on an item sitting
+   * in the temp warehouse drove the showroom balance negative (production, MT 211
+   * Lê Duẩn, YMT25017-D-38, 2026-08-19). These tests are what stops a later
+   * refactor of fanOutEvents from dropping the second beat again.
+   */
+  describe('temp-warehouse fulfillment on EXCHANGE (UOW-01)', () => {
+    const draft = () => exchangeDraftStub({ originalInvoiceId: undefined });
+
+    /** Return 3.000k, buy 500k → net < 0, so the plain cash-refund path runs. */
+    const refundingExchangeItems = (): InvoiceItemEntity[] => [
+      { ...exchangeItems()[0], unitPrice: 3000000, lineTotal: 3000000 } as InvoiceItemEntity,
+      { ...exchangeItems()[1], unitPrice: 500000, lineTotal: 500000 } as InvoiceItemEntity,
+    ];
+
+    beforeEach(() => {
+      invoiceRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(where.id === 'exc-1' ? draft() : null),
+      );
+      itemRepo.find.mockResolvedValue(refundingExchangeItems());
+      accountResolver.resolvePaymentAccount.mockResolvedValue({
+        accountId: 'pay-acct-1',
+        depositAccountId: undefined,
+      });
+    });
+
+    it('publishes the fulfill event for the OUT leg, keyed on the exchange invoice', async () => {
+      await service.checkout('exc-1', cashDto(), actor);
+
+      expect(tempWarehouseFulfillPublisher.publish).toHaveBeenCalledTimes(1);
+      expect(tempWarehouseFulfillPublisher.publish).toHaveBeenCalledWith({
+        organizationId: 'org-1',
+        branchId: 'branch-1',
+        invoiceId: 'exc-1',
+        // Its OWN document number, not the original sale's — dedupe in
+        // processed_events is keyed on this invoice id.
+        invoiceNumber: 'RET-0001',
+        actor: {
+          userId: 'user-1',
+          organizationId: 'org-1',
+          branchId: 'branch-1',
+          roles: [],
+        },
+        lines: [{ itemId: 'item-new', quantity: 1 }],
+      });
+    });
+
+    it('sends a positive quantity — direction, not sign, separates the legs', async () => {
+      await service.checkout('exc-1', cashDto(), actor);
+
+      const [payload] = tempWarehouseFulfillPublisher.publish.mock.calls[0];
+      for (const line of payload.lines) {
+        expect(line.quantity).toBeGreaterThan(0);
+      }
+    });
+
+    it('aggregates OUT lines per item and never lets an IN line into the payload', async () => {
+      itemRepo.find.mockResolvedValue([
+        // Returned: same item id as the two bought lines below.
+        {
+          ...exchangeItems()[0],
+          id: 'exc-in-same',
+          itemId: 'item-x',
+          quantity: 1,
+          unitPrice: 3000000,
+          lineTotal: 3000000,
+        } as InvoiceItemEntity,
+        {
+          ...exchangeItems()[1],
+          id: 'exc-out-a',
+          itemId: 'item-x',
+          quantity: 1,
+          unitPrice: 500000,
+          lineTotal: 500000,
+        } as InvoiceItemEntity,
+        {
+          ...exchangeItems()[1],
+          id: 'exc-out-b',
+          itemId: 'item-x',
+          quantity: 2,
+          unitPrice: 500000,
+          lineTotal: 1000000,
+          sortOrder: 2,
+        } as InvoiceItemEntity,
+      ]);
+
+      await service.checkout('exc-1', cashDto(), actor);
+
+      const [payload] = tempWarehouseFulfillPublisher.publish.mock.calls[0];
+      // 1 + 2 from the OUT lines. The IN line's own 1 is NOT netted off:
+      // gross, per ADR-01, exactly like every other sale path.
+      expect(payload.lines).toEqual([{ itemId: 'item-x', quantity: 3 }]);
+    });
+
+    it('publishes nothing for a plain RETURN — no OUT leg to cover', async () => {
+      invoiceRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(where.id === 'ret-1' ? returnDraftStub() : null),
+      );
+      itemRepo.find.mockResolvedValue([inLineStub()]);
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(tempWarehouseFulfillPublisher.publish).not.toHaveBeenCalled();
+      // The returned goods still go back into the showroom, untouched by this change.
+      expect(stockReturnInPublisher.publish).toHaveBeenCalled();
+    });
+
+    it('leaves the return-in leg alone on an exchange', async () => {
+      await service.checkout('exc-1', cashDto(), actor);
+
+      expect(stockReturnInPublisher.publish).toHaveBeenCalled();
+      expect(stockDeductionPublisher.publish).toHaveBeenCalled();
     });
   });
 
