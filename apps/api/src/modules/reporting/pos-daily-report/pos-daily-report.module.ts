@@ -7,10 +7,10 @@ import { InvoicePaymentEntity } from '../../pos/entities/invoice-payment.entity'
 import { InvoiceDebtEntity } from '../../pos/entities/invoice-debt.entity';
 import { DebtPaymentEntity } from '../../pos/entities/debt-payment.entity';
 import { InvoicePromotionEntity } from '../../promotion/invoice-promotion.entity';
-import { CashPaymentEntity } from '../../accounting/cash-vouchers/cash-payments/cash-payment.entity';
 import { CashReceiptEntity } from '../../accounting/cash-vouchers/cash-receipts/cash-receipt.entity';
-import { PaymentAccountEntity } from '../../accounting/payment-accounts/payment-account.entity';
-import { CashAccountEntity } from '../../accounting/cash/cash-account.entity';
+import { CashPaymentEntity } from '../../accounting/cash-vouchers/cash-payments/cash-payment.entity';
+import { BankPaymentEntity } from '../../accounting/deposit-vouchers/bank-payments/bank-payment.entity';
+import { BankReceiptEntity } from '../../accounting/deposit-vouchers/bank-receipts/bank-receipt.entity';
 import { DepositAccountEntity } from '../../accounting/deposit/deposit-account.entity';
 import { AccountEntity } from '../../accounting/coa/account.entity';
 import { CustomerEntity } from '../../customer/customer.entity';
@@ -33,10 +33,10 @@ import { PosDailySummaryExportService } from './pos-daily-summary-export.service
       InvoiceDebtEntity,
       DebtPaymentEntity,
       InvoicePromotionEntity,
-      CashPaymentEntity,
       CashReceiptEntity,
-      PaymentAccountEntity,
-      CashAccountEntity,
+      CashPaymentEntity,
+      BankPaymentEntity,
+      BankReceiptEntity,
       DepositAccountEntity,
       AccountEntity,
       CustomerEntity,

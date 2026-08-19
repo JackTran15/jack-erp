@@ -121,20 +121,15 @@ export function DailySummaryTab({
           onClick={() => onOpenDetail(PosDailySummaryDetailCategory.RevenueBankTransfer)}
         />
         <Row label="Voucher" value={s?.revenue.voucher ?? 0} />
-
-        {/* "Điểm" và "Khuyến mại" là khoản giảm giá, không phải tiền vào quỹ —
-            chúng đã bị trừ trong amountDue nên KHÔNG cộng vào "Tổng (1) - (2)".
-            Vì vậy tổng hiển thị không bằng tổng số học của các dòng trong mục
-            Thu; chú thích bên dưới để người đọc không tưởng báo cáo cộng sai. */}
+        {/* Voucher và Điểm là công cụ thanh toán khách dùng để trừ vào số phải
+            trả, nên cả hai đều nằm trong tổng Thu — cộng tay 5 dòng ra đúng
+            "Tổng (1) - (2)". Khuyến mại (CTKM) là giảm giá bán, không phải
+            khoản thu, nên không hiển thị ở đây. */}
         <Row
           label="Điểm"
           value={s?.revenue.points ?? 0}
           onClick={() => onOpenDetail(PosDailySummaryDetailCategory.RevenuePoints)}
         />
-        <Row label="Khuyến mại" value={s?.revenue.promotion ?? 0} />
-        <p className="pl-3 pt-1 text-[11px] italic leading-snug text-[#8A90A2]">
-          Điểm và Khuyến mại là khoản giảm giá, không tính vào tổng thu.
-        </p>
 
         <SubHeading label="Chi (2)" />
         <Row
@@ -167,9 +162,11 @@ export function DailySummaryTab({
           <Row label="Số lượng" value={s?.goodsSold.quantity ?? 0} indent={false}/>
           <Row label="Giá trị" value={s?.goodsSold.value ?? 0} indent={false} />
         </SectionCard>
+        {/* Hàng trả hiển thị số âm — hàng rời khỏi tổng đã bán, cùng quy ước với
+            bản in (buildSummaryRows). */}
         <SectionCard title="Hàng trả" icon={TruckIcon}>
-          <Row label="Số lượng" value={s?.goodsReturned.quantity ?? 0} indent={false} />
-          <Row label="Giá trị" value={s?.goodsReturned.value ?? 0} indent={false} />
+          <Row label="Số lượng" value={-(s?.goodsReturned.quantity ?? 0)} indent={false} />
+          <Row label="Giá trị" value={-(s?.goodsReturned.value ?? 0)} indent={false} />
         </SectionCard>
         <SectionCard title="Khác" icon={GridIcon}>
           <Row

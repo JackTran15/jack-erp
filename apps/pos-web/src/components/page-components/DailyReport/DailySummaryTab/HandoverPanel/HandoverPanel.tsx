@@ -183,6 +183,13 @@ export function HandoverPanel({
         <GridButton onClick={openCashCount}>Chi tiết kiểm đếm</GridButton>
 
         <GridValue label="Chênh lệch" value={variance} />
+        {/* Từ khi Chi đọc cả phiếu chi (trừ loại hoàn tiền), chênh lệch đã trừ
+            được tiền rút khỏi két bằng phiếu chi. Phần còn thiếu là tiền thừa
+            khách không lấy lại — nằm ngoài invoice_payments nên không vào Thu. */}
+        <p className="pl-3 pt-1 text-[11px] italic leading-snug text-[#8A90A2]">
+          Chênh lệch tính theo thu/chi tiền mặt của hóa đơn và phiếu chi; chưa
+          gồm tiền thừa khách không lấy lại.
+        </p>
 
         <GridValue
           label="Tổng SL hóa đơn"

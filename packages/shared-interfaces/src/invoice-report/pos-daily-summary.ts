@@ -6,30 +6,46 @@
  * Consumed by pos-web via the generated api-client. Additive to invoice-report.
  */
 
-/** Revenue (Thu): payment methods + voucher/points payment-equivalents. */
+/**
+ * Revenue (Thu): how much invoice value was settled in the window, split by the
+ * instrument that settled it. Sourced from the invoice domain only — invoice
+ * payments by method, voucher promotions, redeemed points, plus debt repayments
+ * (`debt_payments`, folded into `cash`/`bankTransfer` by their own method).
+ * Manual "Phiếu thu" (`cash_receipts`) are deliberately not included.
+ */
 export interface PosDailySummaryRevenue {
   cash: number;
   card: number;
   bankTransfer: number;
+  /** Value settled with a voucher (`invoice_promotions`, promotionType='voucher'). */
   voucher: number;
   /**
-   * Value settled with loyalty points. Shown as a settlement method for parity
-   * with MISA, but NOT included in {@link total} or `netCashFlow`: point
-   * redemption is a discount already deducted from `amountDue`, so no money
-   * ever reaches a fund. Adding it inflated the day's cash flow.
+   * Value settled with loyalty points (`invoices.points_discount_amount`).
+   * Counted in {@link total} like every other instrument: the customer used it
+   * to settle part of the invoice, exactly as a voucher does.
    */
   points: number;
-  /**
-   * Promotion money given away in the window (CTKM + voucher + manual
-   * discount), from `invoices.discount_amount`. Informational, like `points`:
-   * never part of {@link total}.
-   */
-  promotion: number;
-  /** Cash + card + bank transfer + voucher. Excludes `points` and `promotion`. */
+  /** Cash + card + bank transfer + voucher + points. */
   total: number;
 }
 
-/** Expense (Chi): from posted cash-payment vouchers (phiếu chi). */
+/**
+ * Expense (Chi): every payout in the window, from two non-overlapping sources.
+ *
+ * 1. Refunds, read off the RETURN/EXCHANGE invoice: `refundedAmount −
+ *    offsetAmount`, bucketed by `refundMethod` (CASH → {@link cash}, BANK →
+ *    {@link bankTransfer}). STORE_CREDIT and the legacy OFFSET method move no
+ *    money and are excluded, as is the offset share that settled the original
+ *    debt instead of leaving a fund.
+ * 2. Everything else, read off the payout vouchers: posted `cash_payments` →
+ *    {@link cash}, posted `bank_payments` → {@link bankTransfer}, both filtered
+ *    to `purpose <> REFUND`. This is where an expense, salary, purchase or
+ *    supplier payment enters — none of which has a sales invoice behind it.
+ *
+ * `purpose <> REFUND` is what keeps the two sources disjoint: a REFUND voucher
+ * is always auto-issued from an invoice, so source 1 already owns it. Counting
+ * it twice is the defect this report started with.
+ */
 export interface PosDailySummaryExpense {
   cash: number;
   bankTransfer: number;
@@ -64,7 +80,10 @@ export interface PosDailySummaryOther {
 export interface PosDailySummaryResult {
   revenue: PosDailySummaryRevenue;
   expense: PosDailySummaryExpense;
-  /** Net cash flow (Thu − Chi). */
+  /**
+   * Thu − Chi. Not a fund balance: both sides are invoice-sourced, so this does
+   * not reconcile 1-1 with Sổ quỹ tiền mặt, which also carries manual vouchers.
+   */
   netCashFlow: number;
   debt: PosDailySummaryDebt;
   goodsSold: PosDailySummaryGoods;
@@ -95,7 +114,7 @@ export enum PosDailySummaryDetailCategory {
  */
 export interface PosDailySummaryDetailRow {
   documentNumber: string;
-  /** "Loại chứng từ" — e.g. "Bán hàng" / "Đổi trả" / "Thu nợ" / "Thu khác". Absent for Chi categories. */
+  /** "Loại chứng từ" — e.g. "Bán hàng" / "Đổi trả" / "Đổi trả, mua thêm" / "Thu nợ". */
   documentType?: string;
   issuedAt: string;
   customerName?: string;
