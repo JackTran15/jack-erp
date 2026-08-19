@@ -24,6 +24,10 @@ import { ProfitReportFilterDto } from '../dto/profit-report-filter.dto';
 import { ProfitReportSearchDto } from '../dto/profit-report-search.dto';
 import { CountedRows } from '../../report-core/report-definition';
 import {
+  ItemWarehouseLocationRepos,
+  resolveItemWarehouseLocations,
+} from '../../report-core/item-warehouse-location.util';
+import {
   aggregateProfitByItem,
   buildItemGroupRow,
   buildItemGroupTotals,
@@ -87,6 +91,15 @@ export class ProfitByItemReport implements ReportDefinition {
     private readonly stockBalances: Repository<StockBalanceEntity>,
     private readonly rbac: RbacService,
   ) {}
+
+  private get locationRepos(): ItemWarehouseLocationRepos {
+    return {
+      storages: this.storages,
+      locations: this.locations,
+      itemStorageLocations: this.itemStorageLocations,
+      stockBalances: this.stockBalances,
+    };
+  }
 
   async buildColumns(
     _actor: ActorContext,
@@ -200,12 +213,21 @@ export class ProfitByItemReport implements ReportDefinition {
     const grain = resolveGrain(dto.filters.statBy);
     // "Vị trí" only resolved at item grain, and only when actually requested.
     const needsLocation = grain === 'item' && referenced.includes('location');
-    const locationByItemId = needsLocation
-      ? await this.loadItemLocations(
-          [...new Set(lines.map((l) => l.itemId).filter((id): id is string => !!id))],
-          actor,
-        )
-      : new Map<string, string | null>();
+    // Shelves belong to a branch, so this is the acting branch's warehouse —
+    // `ReportTableConfigSync` drops the column entirely in chain mode.
+    const locationByItemId =
+      needsLocation && actor.branchId
+        ? new Map(
+            [
+              ...(await resolveItemWarehouseLocations(
+                this.locationRepos,
+                [...new Set(lines.map((l) => l.itemId).filter((id): id is string => !!id))],
+                actor.organizationId,
+                actor.branchId,
+              )),
+            ].map(([itemId, loc]) => [itemId, loc.code]),
+          )
+        : new Map<string, string | null>();
 
     let rows: ProfitByItemRowInput[] = lines.map((li) => {
       const meta = li.itemId ? metaByItemId.get(li.itemId) : undefined;
@@ -292,92 +314,6 @@ export class ProfitByItemReport implements ReportDefinition {
         parentSku: parent?.code ?? null,
         parentName: parent?.name ?? null,
       });
-    }
-    return map;
-  }
-
-  /**
-   * "Vị trí" — each item's current location in the acting branch's WAREHOUSE
-   * (non-showroom) storage(s), explicitly excluding the showroom — mirrors
-   * `resolve-item-locations.handler.ts`'s priority order (preferred shelf,
-   * then highest-stock location) but scoped to `isMainStorage=false` only.
-   */
-  private async loadItemLocations(
-    itemIds: string[],
-    actor: ActorContext,
-  ): Promise<Map<string, string | null>> {
-    const map = new Map<string, string | null>();
-    if (!itemIds.length || !actor.branchId) return map;
-
-    const warehouses = await this.storages.find({
-      where: {
-        organizationId: actor.organizationId,
-        branchId: actor.branchId,
-        isMainStorage: false,
-        isActive: true,
-      },
-    });
-    const warehouseIds = warehouses.map((w) => w.id);
-    if (!warehouseIds.length) return map;
-
-    const locationIdByItemId = new Map<string, string>();
-
-    const preferred = await this.itemStorageLocations.find({
-      where: {
-        itemId: In(itemIds),
-        storageId: In(warehouseIds),
-        organizationId: actor.organizationId,
-      },
-    });
-    for (const p of preferred) {
-      if (!locationIdByItemId.has(p.itemId)) locationIdByItemId.set(p.itemId, p.locationId);
-    }
-
-    const remaining = itemIds.filter((id) => !locationIdByItemId.has(id));
-    if (remaining.length) {
-      const balances = await this.stockBalances
-        .createQueryBuilder('sb')
-        .innerJoin(LocationEntity, 'loc', 'loc.id = sb.locationId')
-        .where('sb.itemId IN (:...remaining)', { remaining })
-        .andWhere('sb.organizationId = :orgId', { orgId: actor.organizationId })
-        .andWhere('sb.quantity > 0')
-        .andWhere('sb.isTracked = true')
-        .andWhere('loc.storageId IN (:...warehouseIds)', { warehouseIds })
-        .orderBy('sb.quantity', 'DESC')
-        .select('sb.itemId', 'itemId')
-        .addSelect('sb.locationId', 'locationId')
-        .getRawMany<{ itemId: string; locationId: string }>();
-      for (const b of balances) {
-        if (!locationIdByItemId.has(b.itemId)) locationIdByItemId.set(b.itemId, b.locationId);
-      }
-    }
-
-    // The preferred-shelf mapping (ItemStorageLocationEntity) has no isTracked
-    // flag of its own — cross-check its (item, location) pair against
-    // StockBalanceEntity and drop it if that specific pair was explicitly
-    // "Ngừng theo dõi" (blank, not a different location — matches how the
-    // Inventory Items UI hides untracked pairs rather than substituting one).
-    if (locationIdByItemId.size) {
-      const untracked = await this.stockBalances.find({
-        where: [...locationIdByItemId.entries()].map(([itemId, locationId]) => ({
-          itemId,
-          locationId,
-          organizationId: actor.organizationId,
-          isTracked: false,
-        })),
-      });
-      for (const u of untracked) locationIdByItemId.delete(u.itemId);
-    }
-
-    const locationIds = [...new Set(locationIdByItemId.values())];
-    const locations = locationIds.length
-      ? await this.locations.find({ where: { id: In(locationIds) } })
-      : [];
-    const codeByLocationId = new Map(locations.map((l) => [l.id, l.code]));
-
-    for (const itemId of itemIds) {
-      const locationId = locationIdByItemId.get(itemId);
-      map.set(itemId, locationId ? codeByLocationId.get(locationId) ?? null : null);
     }
     return map;
   }

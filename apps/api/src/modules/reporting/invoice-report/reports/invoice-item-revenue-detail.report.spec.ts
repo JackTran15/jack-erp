@@ -46,12 +46,26 @@ function makeReport(opts: {
   locations?: any[];
   itemProviders?: any[];
   providers?: any[];
+  storages?: any[];
+  itemStorageLocations?: any[];
+  stockBalances?: any[];
+  /** Rows the highest-stock fallback query returns. */
+  stockBalanceRaw?: any[];
   hasConsolidated?: boolean;
 }) {
   const qb: any = {
     where: jest.fn(() => qb),
     andWhere: jest.fn(() => qb),
     getMany: jest.fn(async () => opts.invoices ?? []),
+  };
+  const stockBalanceQb: any = {
+    innerJoin: jest.fn(() => stockBalanceQb),
+    where: jest.fn(() => stockBalanceQb),
+    andWhere: jest.fn(() => stockBalanceQb),
+    orderBy: jest.fn(() => stockBalanceQb),
+    select: jest.fn(() => stockBalanceQb),
+    addSelect: jest.fn(() => stockBalanceQb),
+    getRawMany: jest.fn(async () => opts.stockBalanceRaw ?? []),
   };
   const repo = (rows?: any[]) => ({ find: jest.fn(async () => rows ?? []) });
   return new InvoiceItemRevenueDetailReport(
@@ -67,6 +81,12 @@ function makeReport(opts: {
     repo(opts.locations) as any,
     repo(opts.itemProviders) as any,
     repo(opts.providers) as any,
+    repo(opts.storages) as any,
+    repo(opts.itemStorageLocations) as any,
+    {
+      ...repo(opts.stockBalances),
+      createQueryBuilder: jest.fn(() => stockBalanceQb),
+    } as any,
     { hasPermission: jest.fn(async () => opts.hasConsolidated ?? false) } as any,
   );
 }
@@ -142,7 +162,9 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
         { id: 'it2', categoryId: null },
       ],
       categories: [{ id: 'cat1', name: 'Giày dép' }],
-      locations: [{ id: 'loc1', code: 'A-01', name: 'Kệ A1' }],
+      locations: [{ id: 'loc1', code: 'A-01', name: 'Kệ A1', isActive: true }],
+      storages: [{ id: 'wh1', branchId: 'b1', isMainStorage: false, isActive: true }],
+      itemStorageLocations: [{ itemId: 'it1', storageId: 'wh1', locationId: 'loc1' }],
       itemProviders: [{ itemId: 'it1', providerId: 'p1', isPrimary: true }],
       providers: [{ id: 'p1', name: 'NCC ABC' }],
     });
@@ -210,6 +232,50 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
     expect(totals['unitPrice']).toBeNull();
     expect(totals['date']).toBeNull();
     expect(totals['sku']).toBeNull();
+  });
+
+  // The location columns describe where the goods are NOW, in the warehouse of
+  // the branch that sold them — not invoice_items.location_id, which POS always
+  // sets to the showroom's "Mặc định" shelf.
+  it('reports the item\'s current warehouse shelf, not the showroom shelf it sold from', async () => {
+    const report = makeReport({
+      invoices: [inv()],
+      // The line still carries the showroom shelf POS deducted from.
+      lines: [line({ locationId: 'showroom-default' })],
+      items: [{ id: 'it1', categoryId: null }],
+      storages: [{ id: 'wh1', branchId: 'b1', isMainStorage: false, isActive: true }],
+      itemStorageLocations: [{ itemId: 'it1', storageId: 'wh1', locationId: 'loc1' }],
+      locations: [{ id: 'loc1', code: 'A-01', name: 'Kệ A1', isActive: true }],
+    });
+    const result = await report.buildData(
+      {
+        columns: ['sku', 'locationCode', 'locationName'],
+        filters: { issuedAt: { from: '2026-06-01', to: '2026-06-30' } },
+      } as any,
+      actor,
+    );
+    expect(result.rows[0]).toMatchObject({
+      locationCode: 'A-01',
+      locationName: 'Kệ A1',
+    });
+  });
+
+  it('leaves the location empty when the branch has no warehouse shelf for the item', async () => {
+    const report = makeReport({
+      invoices: [inv()],
+      lines: [line()],
+      items: [{ id: 'it1', categoryId: null }],
+      // Showroom only — no warehouse storage in this branch.
+      storages: [{ id: 'sr1', branchId: 'b1', isMainStorage: true, isActive: true }],
+    });
+    const result = await report.buildData(
+      {
+        columns: ['sku', 'locationCode', 'locationName'],
+        filters: { issuedAt: { from: '2026-06-01', to: '2026-06-30' } },
+      } as any,
+      actor,
+    );
+    expect(result.rows[0]).toMatchObject({ locationCode: null, locationName: null });
   });
 
   it('applies a per-column filter post-build and recomputes totals', async () => {

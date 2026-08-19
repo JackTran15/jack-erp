@@ -49,6 +49,11 @@ import {
   ReportDefinition,
 } from '../report-definition';
 import { CountedRows } from '../../report-core/report-definition';
+import {
+  ItemWarehouseLocation,
+  ItemWarehouseLocationRepos,
+  resolveItemWarehouseLocations,
+} from '../../report-core/item-warehouse-location.util';
 
 const band = (id: string | null): ReportColumnGroup | null =>
   id ? { id, name: INVOICE_REPORT_BAND_LABELS_VI[id] ?? id } : null;
@@ -125,6 +130,15 @@ export class RevenueByItemReport implements ReportDefinition {
     private readonly stockBalances: Repository<StockBalanceEntity>,
     private readonly rbac: RbacService,
   ) {}
+
+  private get locationRepos(): ItemWarehouseLocationRepos {
+    return {
+      storages: this.storages,
+      locations: this.locations,
+      itemStorageLocations: this.itemStorageLocations,
+      stockBalances: this.stockBalances,
+    };
+  }
 
   async buildColumns(
     _actor: ActorContext,
@@ -246,12 +260,13 @@ export class RevenueByItemReport implements ReportDefinition {
       !!locationBranchId &&
       referenced.some((c) => c === 'locationCode' || c === 'locationName');
     const locationByItemId = needsLocation
-      ? await this.loadItemLocations(
+      ? await resolveItemWarehouseLocations(
+          this.locationRepos,
           [...new Set(lines.map((l) => l.itemId).filter((id): id is string => !!id))],
           actor.organizationId,
           locationBranchId!,
         )
-      : new Map<string, { code: string | null; name: string | null }>();
+      : new Map<string, ItemWarehouseLocation>();
 
     let rows: RevenueByItemRowInput[] = lines.map((li) => {
       const meta = li.itemId ? metaByItemId.get(li.itemId) : undefined;
@@ -346,96 +361,6 @@ export class RevenueByItemReport implements ReportDefinition {
         parentSku: parent?.code ?? null,
         parentName: parent?.name ?? null,
       });
-    }
-    return map;
-  }
-
-  /**
-   * "Vị trí"/"Mã vị trí" — each item's current location in the given branch's
-   * WAREHOUSE (non-showroom) storage(s), explicitly excluding the showroom.
-   *
-   * Same priority order as the "Hàng hóa xuất kho tạm" report (and
-   * `ProfitByItemReport.loadItemLocations`): the item's preferred shelf in one
-   * of the branch's warehouses first, then its highest-stock shelf there.
-   * Only active storages and active locations count, and a pair explicitly set
-   * to "Ngừng theo dõi" is skipped. Nothing left → empty cell.
-   *
-   * Differs from those two only in taking the branch as a parameter (see
-   * `resolveLocationBranchId`) and returning both code and name.
-   */
-  private async loadItemLocations(
-    itemIds: string[],
-    organizationId: string,
-    branchId: string,
-  ): Promise<Map<string, { code: string | null; name: string | null }>> {
-    const map = new Map<string, { code: string | null; name: string | null }>();
-    if (!itemIds.length) return map;
-
-    const warehouses = await this.storages.find({
-      where: { organizationId, branchId, isMainStorage: false, isActive: true },
-    });
-    const warehouseIds = warehouses.map((w) => w.id);
-    if (!warehouseIds.length) return map;
-
-    // Only shelves still in use can be reported — a location switched off
-    // ("Ngừng hoạt động") is not where the goods are.
-    const activeLocations = await this.locations.find({
-      where: { storageId: In(warehouseIds), isActive: true },
-    });
-    const byLocationId = new Map(activeLocations.map((l) => [l.id, l]));
-
-    const locationIdByItemId = new Map<string, string>();
-
-    const preferred = await this.itemStorageLocations.find({
-      where: { itemId: In(itemIds), storageId: In(warehouseIds), organizationId },
-    });
-    for (const p of preferred) {
-      if (!locationIdByItemId.has(p.itemId) && byLocationId.has(p.locationId)) {
-        locationIdByItemId.set(p.itemId, p.locationId);
-      }
-    }
-
-    // The preferred-shelf mapping has no isTracked flag of its own — cross-check
-    // its (item, location) pair against StockBalanceEntity and drop it if that
-    // specific pair was explicitly "Ngừng theo dõi". Dropped BEFORE the fallback
-    // runs so such an item still resolves to its highest-stock shelf instead of
-    // reporting no location at all.
-    if (locationIdByItemId.size) {
-      const untracked = await this.stockBalances.find({
-        where: [...locationIdByItemId.entries()].map(([itemId, locationId]) => ({
-          itemId,
-          locationId,
-          organizationId,
-          isTracked: false,
-        })),
-      });
-      for (const u of untracked) locationIdByItemId.delete(u.itemId);
-    }
-
-    const remaining = itemIds.filter((id) => !locationIdByItemId.has(id));
-    if (remaining.length) {
-      const balances = await this.stockBalances
-        .createQueryBuilder('sb')
-        .innerJoin(LocationEntity, 'loc', 'loc.id = sb.locationId')
-        .where('sb.itemId IN (:...remaining)', { remaining })
-        .andWhere('sb.organizationId = :orgId', { orgId: organizationId })
-        .andWhere('sb.quantity > 0')
-        .andWhere('sb.isTracked = true')
-        .andWhere('loc.isActive = true')
-        .andWhere('loc.storageId IN (:...warehouseIds)', { warehouseIds })
-        .orderBy('sb.quantity', 'DESC')
-        .select('sb.itemId', 'itemId')
-        .addSelect('sb.locationId', 'locationId')
-        .getRawMany<{ itemId: string; locationId: string }>();
-      for (const b of balances) {
-        if (!locationIdByItemId.has(b.itemId)) locationIdByItemId.set(b.itemId, b.locationId);
-      }
-    }
-
-    for (const itemId of itemIds) {
-      const locationId = locationIdByItemId.get(itemId);
-      const loc = locationId ? byLocationId.get(locationId) : undefined;
-      map.set(itemId, { code: loc?.code ?? null, name: loc?.name ?? null });
     }
     return map;
   }
