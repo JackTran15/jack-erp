@@ -565,6 +565,11 @@ export const navConfig: NavModule[] = [
             label: "Quản lý vai trò",
             permission: "iam.role.read",
           },
+          {
+            to: "/admin/api-keys",
+            label: "API Key",
+            permission: "api-key.read",
+          },
           { to: "/settings/appearance", label: "Giao diện" },
         ],
       },

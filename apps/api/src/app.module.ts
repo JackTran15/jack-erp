@@ -44,6 +44,7 @@ import { JobPositionModule } from './modules/hr/job-position/job-position.module
 import { InventoryReportsModule } from './modules/inventory-reports/inventory-reports.module';
 import { AdminSearchModule } from './modules/admin-search/admin-search.module';
 import { CounterpartyModule } from './modules/counterparty/counterparty.module';
+import { ApiKeyModule } from './modules/api-key/api-key.module';
 
 @Module({
   imports: [
@@ -118,6 +119,7 @@ import { CounterpartyModule } from './modules/counterparty/counterparty.module';
     InventoryReportsModule,
     AdminSearchModule,
     CounterpartyModule,
+    ApiKeyModule,
   ],
 })
 export class AppModule {}

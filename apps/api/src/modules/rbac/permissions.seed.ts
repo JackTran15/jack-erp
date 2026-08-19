@@ -227,6 +227,12 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "crud.entity.update", module: "crud" },
   { key: "crud.entity.delete", module: "crud" },
 
+  // API Key (third-party integration credentials)
+  { key: "api-key.read", module: "api-key" },
+  { key: "api-key.create", module: "api-key" },
+  { key: "api-key.update", module: "api-key" },
+  { key: "api-key.delete", module: "api-key" },
+
   // IAM
   { key: "iam.user.read", module: "iam" },
   // Without this, iam.user.read only reaches employees of the actor's own branches.
