@@ -24,6 +24,7 @@ const row = (over: Partial<RevenueByItemRowInput> = {}): RevenueByItemRowInput =
   quantity: 2,
   unitPrice: 1000,
   lineDiscount: 100,
+  promotionDiscount: 0,
   lineTotal: 1900,
   ...over,
 });
@@ -251,5 +252,57 @@ describe('buildItemGroupRow / buildItemGroupTotals', () => {
     expect(totals['itemName']).toBeNull();
     expect(totals['revenue.promoRate']).toBeNull();
     expect(totals['unitPrice']).toBeNull();
+  });
+});
+
+// CTKM chạy tự động và phân bổ xuống `promotion_discount`; thu ngân gần như
+// không bao giờ gõ giảm giá tay, nên bỏ nguồn này là cột "Khuyến mại" rỗng.
+describe('aggregateByItem — khuyến mãi engine', () => {
+  it('cộng khuyến mãi phân bổ vào cột Khuyến mại', () => {
+    const [g] = aggregateByItem(
+      [row({ quantity: 1, unitPrice: 750, lineDiscount: 0, promotionDiscount: 150, lineTotal: 750 })],
+      'item',
+    );
+    expect(itemGroupCellValue('revenue.discount', g)).toBe(150);
+  });
+
+  it('trừ khuyến mãi khỏi Doanh thu để đúng (6)=(3)-(4)-(9)', () => {
+    const [g] = aggregateByItem(
+      [row({ quantity: 1, unitPrice: 750, lineDiscount: 0, promotionDiscount: 150, lineTotal: 750 })],
+      'item',
+    );
+    const goods = Number(itemGroupCellValue('revenue.goods', g));
+    const discount = Number(itemGroupCellValue('revenue.discount', g));
+    const points = Number(itemGroupCellValue('revenue.promoPoints', g));
+    expect(itemGroupCellValue('revenue.total', g)).toBe(goods - discount - points);
+    expect(itemGroupCellValue('revenue.total', g)).toBe(600);
+  });
+
+  it('gộp cả giảm giá gõ tay lẫn khuyến mãi engine', () => {
+    const [g] = aggregateByItem(
+      [row({ quantity: 1, unitPrice: 1000, lineDiscount: 100, promotionDiscount: 150, lineTotal: 900 })],
+      'item',
+    );
+    expect(itemGroupCellValue('revenue.discount', g)).toBe(250);
+    expect(itemGroupCellValue('revenue.total', g)).toBe(750);
+  });
+
+  it('dòng trả đảo dấu cả khuyến mãi', () => {
+    const [g] = aggregateByItem(
+      [
+        row({ quantity: 1, unitPrice: 750, lineDiscount: 0, promotionDiscount: 150, lineTotal: 750 }),
+        row({
+          direction: ItemDirection.IN,
+          quantity: 1,
+          unitPrice: 750,
+          lineDiscount: 0,
+          promotionDiscount: 150,
+          lineTotal: 750,
+        }),
+      ],
+      'item',
+    );
+    expect(itemGroupCellValue('revenue.discount', g)).toBe(0);
+    expect(itemGroupCellValue('revenue.total', g)).toBe(0);
   });
 });

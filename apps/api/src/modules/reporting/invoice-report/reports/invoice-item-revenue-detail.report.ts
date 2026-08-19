@@ -19,6 +19,9 @@ import { ItemCategoryEntity } from '../../../inventory/location/item-category.en
 import { ItemProviderEntity } from '../../../inventory/location/item-provider.entity';
 import { LocationEntity } from '../../../inventory/location/location.entity';
 import { ProviderEntity } from '../../../inventory/location/provider.entity';
+import { StorageEntity } from '../../../inventory/location/storage.entity';
+import { ItemStorageLocationEntity } from '../../../inventory/product/item-storage-location.entity';
+import { StockBalanceEntity } from '../../../inventory/ledger/stock-balance.entity';
 import { InvoiceEntity } from '../../../pos/entities/invoice.entity';
 import { InvoiceItemEntity } from '../../../pos/entities/invoice-item.entity';
 import { EmployeeProfileEntity } from '../../../rbac/employee/employee-profile.entity';
@@ -44,6 +47,11 @@ import {
   statDateColumn,
 } from '../../report-core/report-query.util';
 import { ReportDefinition } from '../report-definition';
+import {
+  ItemWarehouseLocation,
+  ItemWarehouseLocationRepos,
+  resolveItemWarehouseLocations,
+} from '../../report-core/item-warehouse-location.util';
 
 const band = (id: string | null): ReportColumnGroup | null =>
   id ? { id, name: INVOICE_REPORT_BAND_LABELS_VI[id] ?? id } : null;
@@ -84,8 +92,23 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
     private readonly itemProviders: Repository<ItemProviderEntity>,
     @InjectRepository(ProviderEntity)
     private readonly providers: Repository<ProviderEntity>,
+    @InjectRepository(StorageEntity)
+    private readonly storages: Repository<StorageEntity>,
+    @InjectRepository(ItemStorageLocationEntity)
+    private readonly itemStorageLocations: Repository<ItemStorageLocationEntity>,
+    @InjectRepository(StockBalanceEntity)
+    private readonly stockBalances: Repository<StockBalanceEntity>,
     private readonly rbac: RbacService,
   ) {}
+
+  private get locationRepos(): ItemWarehouseLocationRepos {
+    return {
+      storages: this.storages,
+      locations: this.locations,
+      itemStorageLocations: this.itemStorageLocations,
+      stockBalances: this.stockBalances,
+    };
+  }
 
   async buildColumns(_actor: ActorContext): Promise<ReportColumnHeader[]> {
     // Revenue measures band under "Doanh thu"; no dynamic payment-method
@@ -208,9 +231,9 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
     const supplierByItemId = needsSupplier
       ? await this.loadSuppliers(lines, actor.organizationId)
       : new Map<string, string>();
-    const locationById = needsLocation
-      ? await this.loadLocations(lines, actor.organizationId)
-      : new Map<string, { code: string | null; name: string | null }>();
+    const locationByBranchItem = needsLocation
+      ? await this.loadItemLocations(lines, invoiceById, actor.organizationId)
+      : new Map<string, ItemWarehouseLocation>();
 
     const rows: InvoiceItemRowInput[] = lines
       .map((li) => {
@@ -220,7 +243,9 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
         const salesperson = inv.salespersonId
           ? salespersonById.get(inv.salespersonId)
           : undefined;
-        const location = li.locationId ? locationById.get(li.locationId) : undefined;
+        const location = li.itemId
+          ? locationByBranchItem.get(`${inv.branchId}:${li.itemId}`)
+          : undefined;
         return {
           invoiceId: li.invoiceId,
           sortOrder: li.sortOrder,
@@ -233,8 +258,15 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
           direction: li.direction,
           quantity: Number(li.quantity ?? 0),
           unitPrice: Number(li.unitPrice ?? 0),
-          lineDiscount: Number(li.lineDiscount ?? 0),
-          lineTotal: Number(li.lineTotal ?? 0),
+          // Cùng lý do như "Doanh thu theo mặt hàng": CTKM engine nằm ở
+          // `promotion_discount`, bỏ nó thì cột "Khuyến mại" luôn bằng 0.
+          lineDiscount:
+            Number(li.lineDiscount ?? 0) + Number(li.promotionDiscount ?? 0),
+          // `lineTotal` mới trừ giảm giá gõ tay, CTKM engine trừ ở cấp hóa đơn.
+          // Trừ nốt ở đây để "Thành tiền" = "Tiền hàng" − "Khuyến mại" trên
+          // từng dòng, và để footer khớp doanh thu thực.
+          lineTotal:
+            Number(li.lineTotal ?? 0) - Number(li.promotionDiscount ?? 0),
           itemNote: li.note ?? null,
           itemCategory: categoryByItemId.get(li.itemId) ?? null,
           locationCode: location?.code ?? null,
@@ -427,18 +459,42 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
     return map;
   }
 
-  /** Location code + name per locationId (line items reference locations.id). */
-  private async loadLocations(
+  /**
+   * "Vị trí"/"Mã vị trí" per line, keyed `branchId:itemId`.
+   *
+   * NOT `invoice_items.location_id`: that records where POS deducted the stock,
+   * which is always the showroom's "Mặc định" shelf, so every row printed the
+   * same meaningless value. Resolve the item's current WAREHOUSE shelf instead,
+   * exactly like "Doanh thu theo mặt hàng" and "Hàng hóa xuất kho tạm".
+   *
+   * Resolved per invoice branch rather than per report scope — this report is at
+   * line grain, so every row already knows which branch sold it, and the columns
+   * stay correct when the report spans several stores.
+   */
+  private async loadItemLocations(
     lines: InvoiceItemEntity[],
+    invoiceById: Map<string, InvoiceEntity>,
     organizationId: string,
-  ): Promise<Map<string, { code: string | null; name: string | null }>> {
-    const ids = [
-      ...new Set(lines.map((l) => l.locationId).filter((id): id is string => !!id)),
-    ];
-    const map = new Map<string, { code: string | null; name: string | null }>();
-    if (!ids.length) return map;
-    const rows = await this.locations.find({ where: { id: In(ids), organizationId } });
-    for (const loc of rows) map.set(loc.id, { code: loc.code, name: loc.name });
+  ): Promise<Map<string, ItemWarehouseLocation>> {
+    const itemIdsByBranch = new Map<string, Set<string>>();
+    for (const li of lines) {
+      const branchId = invoiceById.get(li.invoiceId)?.branchId;
+      if (!branchId || !li.itemId) continue;
+      const bucket = itemIdsByBranch.get(branchId) ?? new Set<string>();
+      bucket.add(li.itemId);
+      itemIdsByBranch.set(branchId, bucket);
+    }
+
+    const map = new Map<string, ItemWarehouseLocation>();
+    for (const [branchId, itemIds] of itemIdsByBranch) {
+      const resolved = await resolveItemWarehouseLocations(
+        this.locationRepos,
+        [...itemIds],
+        organizationId,
+        branchId,
+      );
+      for (const [itemId, loc] of resolved) map.set(`${branchId}:${itemId}`, loc);
+    }
     return map;
   }
 }

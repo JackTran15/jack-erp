@@ -45,8 +45,21 @@ export function lineDiscountAmount(line: CartLine): number {
   return Math.min(Math.max(0, d.value), gross);
 }
 
+/**
+ * Giá dùng để tính tiền của một dòng.
+ *
+ * Dòng trả tính trên `refundableUnitPrice` — số khách đã thực trả sau khuyến
+ * mãi của hóa đơn gốc — chứ không phải giá niêm yết. Đây là con số BE hoàn lại;
+ * lấy giá niêm yết sẽ thu thiếu đúng phần khuyến mãi và để lại công nợ ảo.
+ */
+export function effectiveUnitPrice(line: CartLine): number {
+  return line.isReturnCredit
+    ? line.refundableUnitPrice ?? line.unitPrice
+    : line.unitPrice;
+}
+
 export function lineTotal(line: CartLine): number {
-  const base = line.unitPrice * line.qty;
+  const base = effectiveUnitPrice(line) * line.qty;
   const net = Math.max(0, base - lineDiscountAmount(line));
   return line.isReturnCredit ? -net : net;
 }

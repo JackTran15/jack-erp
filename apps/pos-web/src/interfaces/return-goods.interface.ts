@@ -48,8 +48,16 @@ export interface ReturnableItem {
   unit: string;
   /** Kho/vị trí xuất gốc (UUID) — BE yêu cầu khi nhập trả. */
   locationId?: string;
-  /** "Đơn giá" — original sale unit price. */
+  /** "Đơn giá" — original sale unit price (giá niêm yết, dùng để hiển thị). */
   unitPrice: number;
+  /**
+   * Giá trị hoàn lại cho MỘT đơn vị: `unitPrice` đã trừ khuyến mãi phân bổ cho
+   * dòng đó trên hóa đơn gốc. Bằng `unitPrice` khi hóa đơn gốc không giảm giá.
+   *
+   * Tiền trả/đổi phải tính trên số này — BE hoàn đúng số khách đã trả, nên lấy
+   * giá niêm yết sẽ thu thiếu đúng phần khuyến mãi và đẻ ra công nợ ảo.
+   */
+  refundableUnitPrice: number;
   /** "SL được trả" — max quantity still eligible to return (`maxReturnable`). */
   allowedQty: number;
 }
@@ -66,6 +74,8 @@ export interface EligibleReturnLine {
   itemName: string;
   unit: string;
   unitPrice: number;
+  /** Giá trị hoàn cho 1 đơn vị, đã trừ khuyến mãi phân bổ (xem `ReturnableItem`). */
+  refundableUnitPrice: number;
   lineDiscount: number;
   locationId?: string;
   soldQuantity: number;

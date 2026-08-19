@@ -40,6 +40,21 @@ export interface InvoiceReceiptDialogProps {
   customerPhone?: string | null;
 }
 
+/**
+ * Số lượng trên bảng hàng hóa.
+ *
+ * API trả `numeric` của Postgres dưới dạng chuỗi ("1.00"), in thẳng ra sẽ thành
+ * "1.00" giữa một cột toàn số nguyên. `Number()` bỏ phần thập phân thừa mà vẫn
+ * giữ nguyên nếu sau này thực sự bán theo số lẻ.
+ *
+ * Dòng trả hiện số âm — đó là dấu hiệu duy nhất phân biệt hàng khách trả lại
+ * với hàng bán ra trong cùng một hóa đơn đổi.
+ */
+function formatQty(quantity: number | string, isReturn: boolean): number {
+  const qty = Number(quantity) || 0;
+  return isReturn ? -Math.abs(qty) : qty;
+}
+
 interface SummaryLine {
   label: string;
   value: number;
@@ -187,6 +202,14 @@ export function InvoiceReceiptDialog({
   };
 
   const items = invoice?.items ?? [];
+  // "Thành tiền" = tổng các dòng ĐANG hiện trên bảng, tức đã trừ hàng trả (và
+  // trừ khuyến mãi phân bổ của dòng trả). `invoice.subtotal` chỉ cộng hàng bán
+  // nên trên phiếu đổi trả nó không khớp với những gì người dùng nhìn thấy.
+  const goodsSubtotal = items.reduce((sum, it) => {
+    const net =
+      Math.abs(Number(it.lineTotal) || 0) - (Number(it.promotionDiscount) || 0);
+    return sum + (it.direction === "IN" ? -net : net);
+  }, 0);
   const customerLabel = customerName
     ? `${customerName}${customerPhone ? ` (${customerPhone})` : ""}`
     : "—";
@@ -280,6 +303,12 @@ export function InvoiceReceiptDialog({
                             })}
                           </div>
                         ) : null}
+                        {isReturn && Number(it.promotionDiscount) > 0 ? (
+                          <div className="text-[12px] italic text-[#E5403A]">
+                            Trừ khuyến mãi theo hóa đơn gốc:{" "}
+                            {formatVnd(Number(it.promotionDiscount))}
+                          </div>
+                        ) : null}
                         {it.note ? (
                           <div className="text-[12px] italic text-[#6B7280]">
                             Ghi chú:{" "}
@@ -288,8 +317,12 @@ export function InvoiceReceiptDialog({
                         ) : null}
                       </td>
                       <td className="px-3 py-2.5">{it.unit}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums">
-                        {it.quantity}
+                      <td
+                        className={`px-3 py-2.5 text-right tabular-nums${
+                          isReturn ? " text-[#E5403A]" : ""
+                        }`}
+                      >
+                        {formatQty(it.quantity, isReturn)}
                       </td>
                       <td className="px-3 py-2.5 text-right tabular-nums">
                         {formatVnd(it.unitPrice)}
@@ -303,12 +336,26 @@ export function InvoiceReceiptDialog({
                           const gross =
                             Number(it.unitPrice) * Number(it.quantity);
                           const finalTotal = Number(it.lineTotal);
-                          // Dòng có KM: gạch giá gốc, hiển thị giá sau giảm bên dưới.
-                          if (
-                            !isReturn &&
-                            Number(it.lineDiscount) > 0 &&
-                            gross > finalTotal
-                          ) {
+                          // Dòng trả: hoàn theo số khách đã thực trả, tức đã trừ
+                          // khuyến mãi phân bổ từ hóa đơn gốc. Gạch ngang giá
+                          // niêm yết để thấy rõ vì sao hoàn ít hơn.
+                          if (isReturn) {
+                            const promo = Number(it.promotionDiscount) || 0;
+                            const refunded = Math.abs(finalTotal) - promo;
+                            if (promo > 0) {
+                              return (
+                                <div className="flex flex-col items-end leading-tight">
+                                  <span className="text-[12px] text-[#9CA3AF] line-through">
+                                    {formatVnd(-Math.abs(finalTotal))}
+                                  </span>
+                                  <span>{formatVnd(-refunded)}</span>
+                                </div>
+                              );
+                            }
+                            return formatVnd(-Math.abs(finalTotal));
+                          }
+                          // Dòng bán có KM: gạch giá gốc, hiển thị giá sau giảm.
+                          if (Number(it.lineDiscount) > 0 && gross > finalTotal) {
                             return (
                               <div className="flex flex-col items-end leading-tight">
                                 <span className="text-[12px] text-[#9CA3AF] line-through">
@@ -318,9 +365,7 @@ export function InvoiceReceiptDialog({
                               </div>
                             );
                           }
-                          return formatVnd(
-                            isReturn ? -Math.abs(finalTotal) : finalTotal,
-                          );
+                          return formatVnd(finalTotal);
                         })()}
                       </td>
                     </tr>
@@ -338,7 +383,7 @@ export function InvoiceReceiptDialog({
                   Thành tiền
                 </span>
                 <span className="text-[14px] font-semibold tabular-nums text-[#1F2937]">
-                  {formatVnd(invoice.subtotal)}
+                  {formatVnd(goodsSubtotal)}
                 </span>
               </div>
               <div className="flex flex-col gap-2">

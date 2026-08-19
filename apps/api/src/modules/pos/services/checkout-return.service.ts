@@ -54,6 +54,10 @@ import { InvoiceDebtService } from './invoice-debt.service';
 import { ReturnPostedPublisher } from '../publishers/return-posted.publisher';
 import { StockReturnInPublisher } from '../publishers/stock-return-in.publisher';
 import { POINT_EARN_VND_PER_POINT } from '../../customer/loyalty.constants';
+import {
+  refundableFactor,
+  refundableUnitValues,
+} from './refundable-value.util';
 
 interface ComputedTotals {
   /** Gross value of the returned lines. A gate and a display value, not a base. */
@@ -373,6 +377,31 @@ export class CheckoutReturnService {
 
       // Atomic returned_quantity guard on each original SALE line referenced.
       const inLines = items.filter((it) => it.direction === ItemDirection.IN);
+
+      // Record the promotion carried over from the original invoice onto each
+      // returned line. The refund is already computed net of it; persisting it
+      // means every screen that opens this document afterwards can show the
+      // list price alongside what the customer actually paid, instead of having
+      // to reach back into the original invoice to re-derive it.
+      if (originalInvoice && originalItems.length) {
+        const perUnitRefund = refundableUnitValues(originalInvoice, originalItems);
+        const touched: InvoiceItemEntity[] = [];
+        for (const line of inLines) {
+          const unit = line.originalInvoiceItemId
+            ? perUnitRefund.get(line.originalInvoiceItemId)
+            : undefined;
+          if (unit === undefined) continue;
+          const allocated =
+            Math.round(
+              (Number(line.lineTotal) - unit * Number(line.quantity)) * 100,
+            ) / 100;
+          if (allocated > 0) {
+            line.promotionDiscount = allocated;
+            touched.push(line);
+          }
+        }
+        if (touched.length) await manager.save(touched);
+      }
       for (const line of inLines) {
         if (!line.originalInvoiceItemId) continue; // QUICK return — skip
         const qty = Number(line.quantity);
@@ -605,50 +634,32 @@ export class CheckoutReturnService {
     // QUICK return: nothing to prorate against, keep the gross behaviour.
     if (!originalInvoice || originalItems.length === 0) return returnSubtotal;
 
-    const originalById = new Map(originalItems.map((it) => [it.id, it]));
-    const totalPromotionDiscount = originalItems.reduce(
-      (sum, it) => sum + Number(it.promotionDiscount ?? 0),
-      0,
-    );
+    // The per-unit refundable values POS was handed when the cart was built, so
+    // the amount charged here is the amount the cashier saw and collected.
+    const perUnit = refundableUnitValues(originalInvoice, originalItems);
+    const factor = refundableFactor(originalInvoice, originalItems);
     const sumNetLine = originalItems.reduce(
       (sum, it) => sum + Number(it.lineTotal) - Number(it.promotionDiscount ?? 0),
       0,
     );
     if (sumNetLine <= 0) return returnSubtotal;
 
-    // Per returned line: its share of the original line, net of that line's
-    // promotion. Lines with no traceable original (or v1 invoices, where
-    // promotionDiscount is 0 throughout) fall back to their gross amount, which
-    // is exactly what the old behaviour produced.
+    // Lines with no traceable original (or v1 invoices, where promotionDiscount
+    // is 0 throughout) fall back to their gross amount, which is exactly what
+    // the old behaviour produced.
     let returnedNet = 0;
     for (const it of items) {
       if (it.direction !== ItemDirection.IN) continue;
-      const origin = it.originalInvoiceItemId
-        ? originalById.get(it.originalInvoiceItemId)
+      const unit = it.originalInvoiceItemId
+        ? perUnit.get(it.originalInvoiceItemId)
         : undefined;
-      if (!origin) {
-        returnedNet += Number(it.lineTotal);
-        continue;
-      }
-      const originQty = Number(origin.quantity);
-      const originNet =
-        Number(origin.lineTotal) - Number(origin.promotionDiscount ?? 0);
       returnedNet +=
-        originQty > 0 ? (originNet * Number(it.quantity)) / originQty : originNet;
+        unit === undefined
+          ? Number(it.lineTotal) * factor
+          : unit * Number(it.quantity);
     }
 
-    // Invoice-level money the customer also never paid, spread over the same
-    // proportion. `discountAmount` holds manual + promotion + voucher together,
-    // so subtract the part already allocated per line to avoid counting it twice.
-    const headerResidual =
-      Number(originalInvoice.pointsDiscountAmount ?? 0) +
-      Number(originalInvoice.depositAmount ?? 0) +
-      Math.max(
-        0,
-        Number(originalInvoice.discountAmount ?? 0) - totalPromotionDiscount,
-      );
-    const share = Math.min(1, returnedNet / sumNetLine);
-    return round(Math.max(0, returnedNet - headerResidual * share));
+    return round(Math.max(0, returnedNet));
   }
 
   /**

@@ -41,6 +41,12 @@ export interface RevenueByItemRowInput {
   quantity: number;
   unitPrice: number;
   lineDiscount: number;
+  /**
+   * Khuyến mãi do engine phân bổ cho dòng (`invoice_items.promotion_discount`).
+   * Tách khỏi `lineDiscount` (giảm giá thu ngân gõ tay) vì hai nguồn khác nhau,
+   * nhưng cả hai cùng vào cột "Khuyến mại".
+   */
+  promotionDiscount: number;
   lineTotal: number;
 }
 
@@ -187,8 +193,13 @@ export function aggregateByItem(
     const sign = r.direction === ItemDirection.IN ? -1 : 1;
     agg.quantity += sign * r.quantity;
     agg.goods += sign * r.quantity * r.unitPrice;
-    agg.discount += sign * r.lineDiscount;
-    agg.total += sign * r.lineTotal;
+    // "Khuyến mại" gộp cả hai nguồn: giảm giá gõ tay trên dòng và khuyến mãi
+    // engine phân bổ. Bỏ nguồn thứ hai là bỏ gần như toàn bộ số liệu — CTKM
+    // chạy tự động, thu ngân hiếm khi gõ tay.
+    agg.discount += sign * (r.lineDiscount + r.promotionDiscount);
+    // `lineTotal` chưa trừ khuyến mãi engine (nó được trừ ở cấp hóa đơn), nên
+    // phải trừ ở đây để "Doanh thu" đúng là (3)-(4)-(9) như tiêu đề cột.
+    agg.total += sign * (r.lineTotal - r.promotionDiscount);
   }
   return [...byKey.values()]
     .map((a) => ({

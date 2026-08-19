@@ -119,4 +119,40 @@ describe('buildItemTotals', () => {
     expect(totals['quantity']).toBe(2);
     expect(totals['lineRevenue']).toBe(200);
   });
+
+  it('renders an IN (return) line negative — quantity, amount and revenue', () => {
+    const r = row({
+      direction: ItemDirection.IN,
+      quantity: 2,
+      unitPrice: 1000,
+      lineDiscount: 100,
+      lineTotal: 1900,
+    });
+    expect(buildItemRow(
+      ['quantity', 'lineAmount', 'lineDiscount', 'lineRevenue', 'unitPrice'],
+      r,
+    )).toMatchObject({
+      quantity: -2,
+      lineAmount: -2000,
+      lineDiscount: -100,
+      lineRevenue: -1900,
+      // A rate, not an amount: returning goods does not make them cost -1000.
+      unitPrice: 1000,
+    });
+  });
+
+  it('keeps the footer equal to the sum of the rows on screen', () => {
+    const cols = ['quantity', 'lineRevenue'];
+    const rows = [
+      row({ direction: ItemDirection.OUT, quantity: 3, lineTotal: 300 }),
+      row({ direction: ItemDirection.IN, quantity: 1, lineTotal: 100 }),
+    ];
+    const totals = buildItemTotals(cols, rows);
+    for (const col of cols) {
+      const onScreen = rows
+        .map((r) => Number(buildItemRow(cols, r)[col]))
+        .reduce((a, b) => a + b, 0);
+      expect(totals[col]).toBe(onScreen);
+    }
+  });
 });

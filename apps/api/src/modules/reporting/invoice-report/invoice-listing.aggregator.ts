@@ -1,4 +1,5 @@
 import {
+  INVOICE_STATUS_OPTIONS,
   ReportCellValue,
   ReportColumnDataType,
   ReportRow,
@@ -134,12 +135,37 @@ export function listingColumnType(col: string): ReportColumnDataType {
   return getListingColumnDef(col)?.type ?? ReportColumnDataType.STRING;
 }
 
+/**
+ * Vietnamese label per invoice status, from the very list the "Trạng thái"
+ * select is built out of — one source of truth, so the cell can never read
+ * `paid` while the filter above it offers "Hoàn thành".
+ */
+const STATUS_LABEL_VI = new Map(
+  INVOICE_STATUS_OPTIONS.map((o) => [o.value, o.label]),
+);
+
+/**
+ * Display value of a cell. Same as `listingCellValue` except that `status` is
+ * translated.
+ *
+ * The translation lives HERE and not in `listingCellValue` on purpose: that one
+ * also feeds the per-column filters, which receive the option *value* (`paid`)
+ * from the select. Translating there would leave the filter comparing "Hoàn
+ * thành" against `paid` and matching nothing.
+ */
+function listingDisplayValue(col: string, r: InvoiceRowInput): ReportCellValue {
+  const value = listingCellValue(col, r);
+  if (col !== 'status' || typeof value !== 'string') return value;
+  // An unmapped status prints as-is rather than blank — visible, not lost.
+  return STATUS_LABEL_VI.get(value) ?? value;
+}
+
 export function buildInvoiceRow(
   columns: string[],
   r: InvoiceRowInput,
 ): ReportRow {
   const row: ReportRow = {};
-  for (const col of columns) row[col] = listingCellValue(col, r);
+  for (const col of columns) row[col] = listingDisplayValue(col, r);
   return row;
 }
 

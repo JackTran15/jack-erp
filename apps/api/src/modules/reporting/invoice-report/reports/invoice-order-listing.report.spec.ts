@@ -200,7 +200,7 @@ describe('InvoiceOrderListingReport.buildData', () => {
       date: '2026-06-03',
       time: '08:30',
       invoiceCode: 'HD000001',
-      status: 'paid',
+      status: 'Hoàn thành', // VI label, not the raw enum
       'revenue.total': 18000000, // 20m - 2m
       'payment.cash': 18000000,
       [`payment.method.${ACC}`]: 18000000,
@@ -277,6 +277,31 @@ describe('InvoiceOrderListingReport.buildData', () => {
     expect(result.total).toBe(1);
     expect(result.rows[0].invoiceCode).toBe('HD000002');
     expect(result.totals!['revenue.goods']).toBe(5000000);
+  });
+
+  // The "Trạng thái" select offers Vietnamese labels but submits the enum
+  // behind them, so the cell is translated for display while the filter keeps
+  // comparing on the raw value.
+  it('filters status on the enum while showing the Vietnamese label', async () => {
+    const report = makeReport({
+      invoices: [
+        inv(),
+        inv({ id: 'i2', code: 'HD000002', status: 'cancelled' }),
+      ],
+    });
+    const result = await report.buildData(
+      {
+        columns: ['invoiceCode', 'status'],
+        filters: { issuedAt: { from: '2026-06-01', to: '2026-06-30' } },
+        columnFilters: [{ col: 'status', equals: 'paid' }],
+      } as any,
+      actor,
+    );
+    expect(result.total).toBe(1);
+    expect(result.rows[0]).toMatchObject({
+      invoiceCode: 'HD000001',
+      status: 'Hoàn thành',
+    });
   });
 });
 
