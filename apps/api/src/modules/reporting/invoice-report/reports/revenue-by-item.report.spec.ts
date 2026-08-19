@@ -37,6 +37,8 @@ function makeReport(opts: {
   locations?: any[];
   itemStorageLocations?: any[];
   stockBalances?: any[];
+  /** Rows the highest-stock fallback query returns. */
+  stockBalanceRaw?: any[];
   hasConsolidated?: boolean;
 }) {
   const qb: any = {
@@ -51,7 +53,7 @@ function makeReport(opts: {
     orderBy: jest.fn(() => stockBalanceQb),
     select: jest.fn(() => stockBalanceQb),
     addSelect: jest.fn(() => stockBalanceQb),
-    getRawMany: jest.fn(async () => []),
+    getRawMany: jest.fn(async () => opts.stockBalanceRaw ?? []),
   };
   const repo = (rows?: any[]) => ({ find: jest.fn(async () => rows ?? []) });
   return new RevenueByItemReport(
@@ -231,6 +233,76 @@ describe('RevenueByItemReport.buildData', () => {
       actor,
     );
     expect(res.rows[0]).toMatchObject({ locationCode: 'A-01', locationName: 'Aisle A' });
+  });
+
+  // The reported defect: a user with consolidated access who never touches the
+  // "Cửa hàng" filter sends no store scope at all, so the invoice query is not
+  // restricted to one branch — the shelf still comes from the branch selected
+  // in the ERP header, not from nowhere.
+  it('resolves the location from the active branch when no store filter is sent', async () => {
+    const report = makeReport({
+      hasConsolidated: true,
+      invoices: [inv()],
+      lines: [line()],
+      items: [{ id: 'it1', categoryId: 'cat1', brand: 'Nike' }],
+      categories: [{ id: 'cat1', name: 'Shoes' }],
+      storages: [{ id: 'wh1', branchId: 'b1', isMainStorage: false, isActive: true }],
+      itemStorageLocations: [{ itemId: 'it1', storageId: 'wh1', locationId: 'loc1' }],
+      locations: [{ id: 'loc1', code: 'A-01', name: 'Aisle A', isActive: true }],
+    });
+    const res = await report.buildData(
+      baseDto({ columns: ['sku', 'locationCode', 'locationName'] }) as any,
+      actor,
+    );
+    expect(res.rows[0]).toMatchObject({ locationCode: 'A-01', locationName: 'Aisle A' });
+  });
+
+  it('leaves the location null when the query explicitly spans every store', async () => {
+    const report = makeReport({
+      hasConsolidated: true,
+      invoices: [inv()],
+      lines: [line()],
+      items: [{ id: 'it1', categoryId: 'cat1', brand: 'Nike' }],
+      categories: [{ id: 'cat1', name: 'Shoes' }],
+      storages: [{ id: 'wh1', branchId: 'b1', isMainStorage: false, isActive: true }],
+      itemStorageLocations: [{ itemId: 'it1', storageId: 'wh1', locationId: 'loc1' }],
+      locations: [{ id: 'loc1', code: 'A-01', name: 'Aisle A', isActive: true }],
+    });
+    const res = await report.buildData(
+      baseDto({
+        columns: ['sku', 'locationCode', 'locationName'],
+        filters: {
+          issuedAt: { from: '2026-06-01' },
+          store: { scope: 'all', storeIds: [] },
+        },
+      }) as any,
+      actor,
+    );
+    expect(res.rows[0]).toMatchObject({ locationCode: null, locationName: null });
+  });
+
+  it('falls back to the highest-stock shelf when the preferred one is "Ngừng theo dõi"', async () => {
+    const report = makeReport({
+      invoices: [inv()],
+      lines: [line()],
+      items: [{ id: 'it1', categoryId: 'cat1', brand: 'Nike' }],
+      categories: [{ id: 'cat1', name: 'Shoes' }],
+      storages: [{ id: 'wh1', branchId: 'b1', isMainStorage: false, isActive: true }],
+      itemStorageLocations: [{ itemId: 'it1', storageId: 'wh1', locationId: 'loc1' }],
+      locations: [
+        { id: 'loc1', code: 'A-01', name: 'Aisle A', isActive: true },
+        { id: 'loc2', code: 'B-02', name: 'Aisle B', isActive: true },
+      ],
+      // loc1 is the preferred shelf but that exact pair is untracked…
+      stockBalances: [{ itemId: 'it1', locationId: 'loc1', isTracked: false }],
+      // …so the highest-stock tracked shelf wins instead of an empty cell.
+      stockBalanceRaw: [{ itemId: 'it1', locationId: 'loc2' }],
+    });
+    const res = await report.buildData(
+      baseDto({ columns: ['sku', 'locationCode', 'locationName'] }) as any,
+      actor,
+    );
+    expect(res.rows[0]).toMatchObject({ locationCode: 'B-02', locationName: 'Aisle B' });
   });
 
   it('leaves locationCode/locationName null when statBy is not item', async () => {
