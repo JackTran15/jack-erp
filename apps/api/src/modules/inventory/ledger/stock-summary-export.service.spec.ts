@@ -117,6 +117,25 @@ describe("StockSummaryExportService", () => {
     }
   });
 
+  it("ép lấy dòng theo biến thể kể cả khi lưới đang gộp theo SKU", async () => {
+    const service = createService([createRow()]);
+
+    // `StockSummaryExportDto extends StockSummarySearchV2Dto`, nên client gửi
+    // luôn bộ lọc của lưới — trong đó có groupBy=SKU. Workbook tự gộp mẫu mã từ
+    // dòng biến thể, nhận dòng đã gộp sẵn là hỏng cả 4 kiểu xuất.
+    await service.exportBuffer(
+      {
+        variant: StockSummaryExportVariant.MODEL_AND_VARIANTS,
+        groupBy: "SKU",
+      } as never,
+      actor as never,
+    );
+
+    for (const [arg] of lastSummaryService.getSummary.mock.calls) {
+      expect(arg.groupBy).toBe("VARIANT");
+    }
+  });
+
   it("xuất cột 'Số lượng tồn' theo closingQty, không lấy số dư thô stock_balances", async () => {
     const service = createService([createRow()]);
 

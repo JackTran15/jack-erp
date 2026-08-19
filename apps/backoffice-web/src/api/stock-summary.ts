@@ -11,6 +11,12 @@ export type StockSummaryExportVariant =
 export interface StockSummaryRow {
   itemId: string;
   storageId: string;
+  /**
+   * Identity of the row's item dimension — the parent product id when the grid
+   * groups by SKU, the item id otherwise. Row key and drill-down argument.
+   */
+  groupKey: string;
+  productId: string | null;
   item: {
     id: string;
     code: string;
@@ -145,35 +151,92 @@ export async function getStockSummaryFilterOptions(): Promise<StockSummaryFilter
   );
 }
 
-export interface StockSummaryDetailRow {
-  referenceType: string;
-  referenceId: string;
-  postedAt: string;
+export interface SkuBreakdownRow {
+  itemId: string;
+  itemCode: string;
+  itemName: string;
+  unit: string;
+  locationId: string;
+  locationCode: string;
+  locationName: string;
   quantity: number;
-  unitCost: number;
-  lineValue: number;
-  notes: string | null;
+  openingQty: number;
+  inQty: number;
+  outQty: number;
+  transferOutQty: number;
+  incomingQty: number;
+  /**
+   * Pending transfers exist per (hàng hóa × kho), not per vị trí, so the server
+   * puts the figure on one row per item and leaves the rest blank.
+   */
+  isPendingAnchor: boolean;
+  reservedQty: number;
 }
 
-export interface StockSummaryDetailsResponse {
-  data: StockSummaryDetailRow[];
+export interface SkuBreakdownTotals {
+  quantity: number;
+  openingQty: number;
+  inQty: number;
+  outQty: number;
+  transferOutQty: number;
+  incomingQty: number;
+  reservedQty: number;
+}
+
+export interface SkuBreakdownResponse {
+  data: SkuBreakdownRow[];
   total: number;
   page: number;
   pageSize: number;
+  itemCount: number;
+  totals: SkuBreakdownTotals;
 }
 
-export async function listStockSummaryDetails(params: {
-  itemId: string;
-  storageId: string;
-  startDate?: string;
-  endDate?: string;
-  page?: number;
-  pageSize?: number;
-}): Promise<StockSummaryDetailsResponse> {
+export async function searchSkuBreakdown(
+  body: Record<string, unknown>,
+): Promise<SkuBreakdownResponse> {
   return requireErpData(
-    await erpApi.GET<StockSummaryDetailsResponse>(
-      "/inventory/stock/summary/details",
-      { params: { query: params } },
+    await erpApi.POST<SkuBreakdownResponse>(
+      "/v2/inventory/stock/summary/sku-breakdown",
+      { body },
+    ),
+  );
+}
+
+export interface StockLedgerCardRow {
+  id: string;
+  documentType: string;
+  documentTypeLabel: string;
+  documentNumber: string | null;
+  postedAt: string;
+  description: string | null;
+  inQty: number;
+  outQty: number;
+  /** Số dư luỹ kế tính từ số dư đầu kỳ. */
+  balanceQty: number;
+}
+
+export interface StockLedgerCardResponse {
+  data: StockLedgerCardRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  unit: string;
+  openingQty: number;
+  closingQty: number;
+  totals: { inQty: number; outQty: number };
+  pendingTransferOutQty: number;
+  pendingIncomingQty: number;
+  documentTypeOptions: Array<{ value: string; label: string }>;
+}
+
+export async function searchStockLedgerCard(
+  body: Record<string, unknown>,
+): Promise<StockLedgerCardResponse> {
+  return requireErpData(
+    await erpApi.POST<StockLedgerCardResponse>(
+      "/v2/inventory/stock/summary/ledger-card",
+      { body },
     ),
   );
 }
