@@ -6,9 +6,11 @@ import { LoggingInterceptor } from './interceptors/logging.interceptor';
 import { IdempotencyInterceptor } from './interceptors/idempotency.interceptor';
 import { MetricsInterceptor } from '../modules/metrics/metrics.interceptor';
 import { AuthGuard } from './guards/auth.guard';
+import { ApiKeyModule } from '../modules/api-key/api-key.module';
 
 @Global()
 @Module({
+  imports: [ApiKeyModule],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: RequestIdInterceptor },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },

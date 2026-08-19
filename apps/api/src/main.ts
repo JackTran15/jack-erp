@@ -14,6 +14,27 @@ import { RedisIoAdapter } from './modules/websocket/redis-io.adapter';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const logger = new Logger('Bootstrap');
+  const configService = app.get(ConfigService);
+
+  // Production sits behind a reverse proxy/load balancer, so the raw socket
+  // address is the proxy's, not the caller's. `trust proxy` makes Express
+  // derive `req.ip` from X-Forwarded-For instead — required for the API-key
+  // guard's IP whitelist check to see the real client (see ADR-03,
+  // .ai/features/api-key-auth/03-logical-design.md). Hop count is
+  // env-configurable since it depends on the real deploy topology.
+  //
+  // Number(...) is load-bearing, not defensive style: ConfigService.get()
+  // returns whatever dotenv loaded — a STRING — whenever the key comes from
+  // an env file (including .env.example's last-resort default), and
+  // Express's `trust proxy` treats a string completely differently from a
+  // number (it tries to parse it as a trusted-IP list, not a hop count).
+  // `app.set('trust proxy', '1')` silently does NOT trust X-Forwarded-For at
+  // all — verified live: it broke every IP-whitelist check until this cast
+  // was added.
+  app.set(
+    'trust proxy',
+    Number(configService.get<string | number>('TRUST_PROXY_HOPS', 1)),
+  );
 
   // Default body-parser limit is 100kb, which bulk goods-receipt/goods-issue
   // payloads (many line items) can exceed → PayloadTooLargeError.
@@ -52,7 +73,6 @@ async function bootstrap() {
     exposedHeaders: ['X-Request-Id', 'X-Total-Count', 'Content-Disposition'],
   });
 
-  const configService = app.get(ConfigService);
   const redisIoAdapter = new RedisIoAdapter(app, configService);
   await redisIoAdapter.connectToRedis();
   app.useWebSocketAdapter(redisIoAdapter);
@@ -88,6 +108,10 @@ async function bootstrap() {
       .addApiKey(
         { type: 'apiKey', name: 'X-Idempotency-Key', in: 'header' },
         'idempotency-key',
+      )
+      .addApiKey(
+        { type: 'apiKey', name: 'X-Api-Key', in: 'header' },
+        'api-key',
       )
       .build();
 

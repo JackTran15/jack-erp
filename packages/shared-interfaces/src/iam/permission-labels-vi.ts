@@ -16,6 +16,7 @@ export const PERMISSION_MODULE_LABELS_VI: Record<string, string> = {
   crud: 'Dữ liệu danh mục',
   iam: 'Phân quyền & người dùng',
   promotion: 'Khuyến mại',
+  'api-key': 'API Key',
 };
 
 /** Vietnamese labels for permission keys (role editor checkboxes). */
@@ -251,6 +252,12 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
   'iam.user.branches.write': 'Gán chi nhánh cho người dùng',
   'iam.user.branches.write.all': 'Gán người dùng vào mọi chi nhánh',
   'iam.permission.read': 'Xem danh mục quyền',
+
+  // API Key
+  'api-key.read': 'Xem API key',
+  'api-key.create': 'Tạo API key',
+  'api-key.update': 'Sửa API key',
+  'api-key.delete': 'Thu hồi API key',
 };
 
 export function permissionLabelVi(
