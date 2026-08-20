@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { applyUtcTimestampCodec } from './database/utc-timestamp-codec';
 import { HealthModule } from './modules/health/health.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { RedisModule } from './modules/redis/redis.module';
@@ -45,6 +46,10 @@ import { InventoryReportsModule } from './modules/inventory-reports/inventory-re
 import { AdminSearchModule } from './modules/admin-search/admin-search.module';
 import { CounterpartyModule } from './modules/counterparty/counterparty.module';
 
+// Runs at import time, before Nest evaluates the TypeORM factory below, so no
+// pool is ever created with the driver's process-timezone date handling.
+applyUtcTimestampCodec();
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -73,7 +78,8 @@ import { CounterpartyModule } from './modules/counterparty/counterparty.module';
         // Postgres has no top-level `timezone` DataSource option (that's a mysql2-only
         // TypeORM field) — pin the session's TimeZone GUC via the pg `options` startup
         // parameter instead, which TypeORM merges verbatim into the pg.Pool config.
-        extra: { options: '-c timezone=Asia/Ho_Chi_Minh' },
+        // UTC, not the business zone — see the note in `database/data-source.ts`.
+        extra: { options: '-c timezone=UTC' },
         autoLoadEntities: true,
         synchronize: false,
       }),

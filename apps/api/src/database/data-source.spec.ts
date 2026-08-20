@@ -5,14 +5,14 @@ describe('AppDataSource — timezone pin', () => {
     // Force a non-Vietnam TZ before the module under test is imported, so the
     // assertion is meaningfully independent of the host's real TZ, not just
     // coincidentally correct on this machine.
-    process.env.TZ = 'UTC';
+    process.env.TZ = 'Asia/Ho_Chi_Minh';
   });
 
   afterAll(() => {
     process.env.TZ = originalTz;
   });
 
-  it('pins the Postgres session timezone to Asia/Ho_Chi_Minh regardless of process.env.TZ', () => {
+  it('pins the Postgres session timezone to UTC regardless of process.env.TZ', () => {
     // Imported inside the test (after TZ is forced) rather than at module top,
     // since `AppDataSource` is a `new DataSource({...})` literal evaluated at
     // import time.
@@ -21,8 +21,10 @@ describe('AppDataSource — timezone pin', () => {
     // Postgres has no top-level `timezone` DataSource option in TypeORM (that's
     // mysql2-only) — the pin lives in `extra.options`, which TypeORM merges
     // verbatim into the pg.Pool config as a libpq startup parameter.
-    expect(AppDataSource.options.extra?.options).toBe(
-      '-c timezone=Asia/Ho_Chi_Minh',
-    );
+    //
+    // UTC, not the business zone: this GUC is what `DEFAULT now()` casts
+    // through when Postgres fills a `timestamp without time zone` column, and
+    // the whole app reads those columns as UTC.
+    expect(AppDataSource.options.extra?.options).toBe('-c timezone=UTC');
   });
 });

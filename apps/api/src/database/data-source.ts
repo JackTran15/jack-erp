@@ -2,6 +2,9 @@ import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import * as path from 'path';
 import { config as dotenvConfig } from 'dotenv';
+import { applyUtcTimestampCodec } from './utc-timestamp-codec';
+
+applyUtcTimestampCodec();
 
 // dotenv.config() does NOT override already-set process.env keys, so files
 // loaded earlier win. Order = highest precedence first:
@@ -28,7 +31,16 @@ export const AppDataSource = new DataSource({
   // Postgres has no top-level `timezone` DataSource option (that's a mysql2-only
   // TypeORM field) — pin the session's TimeZone GUC via the pg `options` startup
   // parameter instead, which TypeORM merges verbatim into the pg.Pool config.
-  extra: { options: '-c timezone=Asia/Ho_Chi_Minh' },
+  //
+  // The value must be UTC, not the business zone. The GUC is what a naive
+  // column's `DEFAULT now()` / `CURRENT_TIMESTAMP` casts through, so it decides
+  // what the 198 `timestamp without time zone` columns actually store; the rest
+  // of the app (report SQL, e2e fixtures, every row written before the pin
+  // existed) reads them as UTC. Pinning the business zone here silently made
+  // those columns hold Vietnam wall clock instead, which shifted every report
+  // that renders one by +7h. Display timezone is a presentation concern and is
+  // pinned in the frontend formatters, not on the connection.
+  extra: { options: '-c timezone=UTC' },
   entities: [path.join(__dirname, '..', '**', '*.entity.{ts,js}')],
   migrations: [path.join(__dirname, 'migrations', '*.{ts,js}')],
   // Commit each migration in its own transaction. Postgres forbids using a
