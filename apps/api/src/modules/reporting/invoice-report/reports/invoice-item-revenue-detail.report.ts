@@ -165,7 +165,7 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
     applyBranchScope(qb, 'invoice', branchIds);
     applyInvoiceStatusFilter(qb, 'invoice', dto.filters);
     new FilterBuilder(qb)
-      .applyDateRange(statDateColumn('invoice', dto.filters), dto.filters.issuedAt)
+      .applyLocalDateRange(statDateColumn('invoice', dto.filters), dto.filters.issuedAt)
       .applyEnum('invoice.type', dto.filters.type?.value)
       .applyEnum('invoice.customerId', dto.filters.customerId)
       .applyEnum('invoice.staffId', dto.filters.cashierId)

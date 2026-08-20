@@ -33,8 +33,9 @@ const row = (over: Partial<InvoiceRowInput> = {}): InvoiceRowInput => ({
 describe('listingCellValue', () => {
   it('reads backed invoice fields, splitting date and time', () => {
     const r = row();
+    // Read in business time: 08:30 UTC is 15:30 that afternoon in the shop.
     expect(listingCellValue('date', r)).toBe('2026-06-03');
-    expect(listingCellValue('time', r)).toBe('08:30');
+    expect(listingCellValue('time', r)).toBe('15:30');
     expect(listingCellValue('invoiceCode', r)).toBe('HD000001');
     expect(listingCellValue('status', r)).toBe('paid');
     expect(listingCellValue('revenue.goods', r)).toBe(20000000);

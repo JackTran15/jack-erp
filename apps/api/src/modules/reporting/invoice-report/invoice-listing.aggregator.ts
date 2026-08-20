@@ -6,6 +6,10 @@ import {
 } from '@erp/shared-interfaces';
 import { parseDynamicColumnKey } from './invoice-report.columns';
 import {
+  toBusinessDate,
+  toBusinessTime,
+} from '../../../common/utils/business-timezone.util';
+import {
   getListingColumnDef,
   ListingInvoiceField,
   ListingRelation,
@@ -52,9 +56,9 @@ const invoiceFieldValue = (
 ): ReportCellValue => {
   switch (field) {
     case 'issuedAtDate':
-      return r.issuedAt.toISOString().slice(0, 10);
+      return toBusinessDate(r.issuedAt);
     case 'issuedAtTime':
-      return r.issuedAt.toISOString().slice(11, 16);
+      return toBusinessTime(r.issuedAt);
     case 'code':
       return r.code;
     case 'status':

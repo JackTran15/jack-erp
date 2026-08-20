@@ -6,6 +6,11 @@ import {
   StringFilterDto,
   StringOperator,
 } from './filter.dto';
+import {
+  businessDayEndExclusive,
+  businessDayStart,
+  isCalendarDate,
+} from '../utils/business-timezone.util';
 
 let _seq = 0;
 
@@ -115,6 +120,43 @@ export class FilterBuilder<T extends ObjectLiteral> {
       // component (e.g. `to = '2026-05-26'` must match rows at 2026-05-26 18:48).
       this.qb.andWhere(`${col} < (:${k}::date + INTERVAL '1 day')`, {
         [k]: filter.to,
+      });
+    }
+
+    return this;
+  }
+
+  /**
+   * Date range for a `timestamptz` column whose bounds arrive as business-local
+   * calendar dates — what every report date picker sends.
+   *
+   * `applyDateRange` binds those strings straight through, so Postgres reads
+   * them in the connection's timezone (UTC) and the whole window lands seven
+   * hours off: a filter on the 19th actually selects 07:00 on the 19th through
+   * 07:00 on the 20th, local time. This resolves each bound to the UTC instant
+   * that really opens and closes the local day. A bound that already carries a
+   * time is an exact instant and is passed through untouched.
+   */
+  applyLocalDateRange(col: string, filter?: DateRangeFilterDto): this {
+    if (!filter) return this;
+
+    if (filter.from) {
+      const k = this.key(`${col}_from`);
+      this.qb.andWhere(`${col} >= :${k}`, {
+        [k]: isCalendarDate(filter.from)
+          ? businessDayStart(filter.from)
+          : filter.from,
+      });
+    }
+
+    if (filter.to) {
+      const k = this.key(`${col}_to`);
+      // Half-open: everything strictly before the next local day begins, so the
+      // whole of `to` counts however late in the evening a row was written.
+      this.qb.andWhere(`${col} < :${k}`, {
+        [k]: isCalendarDate(filter.to)
+          ? businessDayEndExclusive(filter.to)
+          : filter.to,
       });
     }
 

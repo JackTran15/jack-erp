@@ -188,7 +188,8 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
     const row0 = result.rows[0];
     expect(row0).toMatchObject({
       date: '2026-06-03',
-      time: '08:30',
+      time: '15:30', // business time — the fixture is 08:30 UTC
+
       invoiceCode: 'HD000001',
       sku: 'SKU001',
       itemName: 'Giày',

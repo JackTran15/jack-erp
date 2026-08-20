@@ -196,7 +196,7 @@ export class RevenueByItemReport implements ReportDefinition {
     applyBranchScope(qb, 'invoice', branchIds);
     applyInvoiceStatusFilter(qb, 'invoice', dto.filters);
     new FilterBuilder(qb)
-      .applyDateRange('invoice.issuedAt', dto.filters.issuedAt)
+      .applyLocalDateRange('invoice.issuedAt', dto.filters.issuedAt)
       .applyEnum('invoice.type', dto.filters.type?.value);
     return { qb, branchIds };
   }

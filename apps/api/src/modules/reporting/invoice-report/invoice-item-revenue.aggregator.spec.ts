@@ -40,8 +40,9 @@ const row = (over: Partial<InvoiceItemRowInput> = {}): InvoiceItemRowInput => ({
 describe('itemCellValue', () => {
   it('reads backed line/invoice fields, splitting date and time', () => {
     const r = row();
+    // Read in business time: 08:30 UTC is 15:30 that afternoon in the shop.
     expect(itemCellValue('date', r)).toBe('2026-06-03');
-    expect(itemCellValue('time', r)).toBe('08:30');
+    expect(itemCellValue('time', r)).toBe('15:30');
     expect(itemCellValue('invoiceCode', r)).toBe('HD000001');
     expect(itemCellValue('sku', r)).toBe('SKU001');
     expect(itemCellValue('itemName', r)).toBe('Giày thể thao');
