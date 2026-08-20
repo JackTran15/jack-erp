@@ -9,6 +9,10 @@ import {
   ItemRevenueRelation,
 } from './invoice-item-revenue.columns';
 import { ItemDirection } from '../../pos/entities/invoice-item.entity';
+import {
+  toBusinessDate,
+  toBusinessTime,
+} from '../../../common/utils/business-timezone.util';
 
 /**
  * One invoice LINE ITEM, with its parent invoice header fields and all relations
@@ -73,9 +77,9 @@ const fieldValue = (
 ): ReportCellValue => {
   switch (field) {
     case 'issuedAtDate':
-      return r.issuedAt.toISOString().slice(0, 10);
+      return toBusinessDate(r.issuedAt);
     case 'issuedAtTime':
-      return r.issuedAt.toISOString().slice(11, 16);
+      return toBusinessTime(r.issuedAt);
     case 'invoiceCode':
       return r.invoiceCode;
     case 'invoiceNote':

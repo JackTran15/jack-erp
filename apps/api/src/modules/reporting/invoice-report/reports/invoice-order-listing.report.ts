@@ -52,10 +52,32 @@ import {
   statDateColumn,
 } from '../../report-core/report-query.util';
 import { ReportDefinition } from '../report-definition';
+import {
+  businessDayEnd,
+  businessDayStart,
+  isCalendarDate,
+} from '../../../../common/utils/business-timezone.util';
 import { ReportExportSource } from '../../report-core/report-definition';
 
 const band = (id: ListingBandId | null): ReportColumnGroup | null =>
   id ? { id, name: INVOICE_REPORT_BAND_LABELS_VI[id] ?? id } : null;
+
+/** A period picked by day, widened to the instants that day spans locally. */
+const toInstantRange = (
+  period?: { from?: string; to?: string },
+): { from?: string; to?: string } | null => {
+  if (!period) return null;
+  return {
+    from:
+      period.from && isCalendarDate(period.from)
+        ? businessDayStart(period.from)
+        : period.from,
+    to:
+      period.to && isCalendarDate(period.to)
+        ? businessDayEnd(period.to)
+        : period.to,
+  };
+};
 
 /** MISA-style invoice & order listing — one row per invoice (status != cancelled). */
 @Injectable()
@@ -208,7 +230,7 @@ export class InvoiceOrderListingReport implements ReportDefinition {
     applyBranchScope(qb, 'invoice', branchIds);
     applyInvoiceStatusFilter(qb, 'invoice', dto.filters);
     new FilterBuilder(qb)
-      .applyDateRange(statDateColumn('invoice', dto.filters), dto.filters.issuedAt)
+      .applyLocalDateRange(statDateColumn('invoice', dto.filters), dto.filters.issuedAt)
       .applyEnum('invoice.type', dto.filters.type?.value);
     return qb;
   }
@@ -301,7 +323,11 @@ export class InvoiceOrderListingReport implements ReportDefinition {
   readonly exportSource: ReportExportSource<InvoiceReportSearchDto> = {
     // The table sorts oldest first; the file has to read the same way.
     order: 'asc',
-    range: (dto) => dto.filters?.issuedAt ?? null,
+    // The windows are compared against a `timestamptz`, so the picked days have
+    // to be resolved to the instants that open and close them locally — a bare
+    // `YYYY-MM-DD` reads as UTC midnight, which both shifts the window seven
+    // hours and collapses a single-day export to its first millisecond.
+    range: (dto) => toInstantRange(dto.filters?.issuedAt),
     summable: (columns) =>
       columns.filter((col) => {
         const type = listingColumnType(col);

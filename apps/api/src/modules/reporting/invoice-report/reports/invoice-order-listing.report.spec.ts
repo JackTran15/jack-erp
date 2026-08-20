@@ -198,7 +198,8 @@ describe('InvoiceOrderListingReport.buildData', () => {
     const row0 = result.rows[0];
     expect(row0).toMatchObject({
       date: '2026-06-03',
-      time: '08:30',
+      time: '15:30', // business time — the fixture is 08:30 UTC
+
       invoiceCode: 'HD000001',
       status: 'Hoàn thành', // VI label, not the raw enum
       'revenue.total': 18000000, // 20m - 2m
@@ -393,11 +394,13 @@ const wholeMonth = {
 };
 
 describe('InvoiceOrderListingReport.exportSource', () => {
-  it('reads the period straight off the report filters', () => {
+  it('widens the picked days into the instants they span locally', () => {
     const { report } = makeKeysetReport([]);
+    // June opens at 17:00 UTC on 31 May and closes a millisecond before 17:00
+    // UTC on 30 June — the whole of the last day, not just its first instant.
     expect(report.exportSource.range(exportDto())).toEqual({
-      from: '2026-06-01',
-      to: '2026-06-30',
+      from: '2026-05-31T17:00:00.000Z',
+      to: '2026-06-30T16:59:59.999Z',
     });
     expect(report.exportSource.range(exportDto({ filters: {} }))).toBeNull();
   });

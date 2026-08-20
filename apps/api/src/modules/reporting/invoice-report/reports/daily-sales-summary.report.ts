@@ -12,6 +12,7 @@ import {
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { FilterBuilder } from '../../../../common/filters/filter.builder';
+import { toBusinessDate } from '../../../../common/utils/business-timezone.util';
 import { PaymentAccountEntity } from '../../../accounting/payment-accounts/payment-account.entity';
 import { PaymentAccountMethod } from '../../../accounting/payment-accounts/enums';
 import { InvoiceEntity, RefundMethod } from '../../../pos/entities/invoice.entity';
@@ -150,7 +151,7 @@ export class DailySalesSummaryReport implements ReportDefinition {
     applyBranchScope(qb, 'invoice', branchIds);
     applyInvoiceStatusFilter(qb, 'invoice', dto.filters);
     new FilterBuilder(qb)
-      .applyDateRange('invoice.issuedAt', dto.filters.issuedAt)
+      .applyLocalDateRange('invoice.issuedAt', dto.filters.issuedAt)
       .applyEnum('invoice.type', dto.filters.type?.value);
     const invoiceRows = await qb.getMany();
 
@@ -171,7 +172,7 @@ export class DailySalesSummaryReport implements ReportDefinition {
           i.refundMethod === RefundMethod.CASH ? Number(i.refundedAmount ?? 0) : 0;
         return {
           id: i.id,
-          day: i.issuedAt!.toISOString().slice(0, 10),
+          day: toBusinessDate(i.issuedAt!),
           subtotal: signedGoods(i),
           discountAmount: sign * Number(i.discountAmount ?? 0),
           pointsDiscountAmount: sign * Number(i.pointsDiscountAmount ?? 0),
