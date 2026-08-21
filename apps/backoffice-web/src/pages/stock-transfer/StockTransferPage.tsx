@@ -1324,19 +1324,30 @@ function TransferFormDialog({
   // Barcode scan: existing item -> accumulate the quantity; new item -> add a line (default
   // source storage) then auto-fill the source/destination locations like the item-pick flow.
   const handleScanResolved = async (item: ItemLookupResult, qty: number) => {
-    const existingIdx = lines.findIndex((l) => l.itemId === item.itemId);
+    // linesRef chứ không phải `lines`: máy quét bắn mã kế tiếp trước khi React
+    // render lại, đọc state của lần render trước sẽ thêm dòng trùng thay vì cộng
+    // dồn. Mỗi nhánh dưới đây tự ghi lại ref ngay sau khi dựng mảng mới.
+    const current = linesRef.current;
+    const existingIdx = current.findIndex((l) => l.itemId === item.itemId);
     if (existingIdx >= 0) {
-      setLines((prev) =>
-        prev.map((l, i) =>
-          i === existingIdx ? { ...l, quantity: (l.quantity || 0) + qty } : l,
-        ),
+      const accumulated = current.map((l, i) =>
+        i === existingIdx ? { ...l, quantity: (l.quantity || 0) + qty } : l,
       );
+      linesRef.current = accumulated;
+      setLines(accumulated);
       markDirty();
       return;
     }
     const sources = await resolveItemSources([item.itemId]);
+    // Kho nhập phải tự kế thừa từ dòng đang có: `emptyLine()` để trống nó và
+    // `sourceFieldsFrom` chỉ đụng phía xuất. Thiếu `destStorageId` thì
+    // `fillTransferLocations` lọc dòng này ra và cả Kho lẫn Vị trí nhập đều trống.
+    // Đường nhập mã trong bảng không dính vì nó ghi đè lên dòng cũ (`...current`).
+    const dest = linesRef.current.find((l) => l.destStorageId);
     const newLine: FormLine = {
       ...emptyLine(),
+      destStorageId: dest?.destStorageId ?? "",
+      destStorageLabel: dest?.destStorageLabel ?? "",
       itemId: item.itemId,
       itemLabel: item.code,
       itemName: item.name,
@@ -1345,7 +1356,22 @@ function TransferFormDialog({
       quantity: qty > 0 ? qty : 1,
       unitPrice: "", // leave empty -> server computes it from cost (same as addLinesFromPicker)
     };
-    setLines((prev) => normalizeLines([...getPersistableFormLines(prev), newLine]));
+    // Dòng trắng kế tiếp phải mang theo hai kho, giống nhánh `appendBlank` của
+    // `fillLineFromItem`: nó là dòng mà người dùng gõ mã tay sau khi quét, và
+    // `fillLineFromItem` chỉ ghi đè lên dòng cũ chứ không tự dựng kho nhập.
+    const appended = normalizeLines([
+      ...getPersistableFormLines(linesRef.current),
+      newLine,
+      {
+        ...emptyLine(),
+        sourceStorageId: newLine.sourceStorageId,
+        sourceStorageLabel: newLine.sourceStorageLabel,
+        destStorageId: newLine.destStorageId,
+        destStorageLabel: newLine.destStorageLabel,
+      },
+    ]);
+    linesRef.current = appended;
+    setLines(appended);
     markDirty();
     void fillTransferLocations([newLine]); // auto-fill source/destination locations like the picker flow
   };
