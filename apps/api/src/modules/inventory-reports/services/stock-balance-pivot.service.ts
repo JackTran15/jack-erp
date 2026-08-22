@@ -1,12 +1,121 @@
-import { Injectable } from '@nestjs/common';
-import type { ReportTotals } from '@erp/shared-interfaces';
-import type { ReportColumnFilterDto } from '../dto/report-column-filter.dto';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { parseBranchQtyColumnKey, type ReportTotals } from '@erp/shared-interfaces';
 import { DataSource } from 'typeorm';
+import {
+  buildReportColumnFilter,
+  type ReportColumnFilters,
+  type ReportColumnSpecs,
+  type ReportFilterFragment,
+} from './report-column-filter.util';
 import { type ItemGroupBy } from './stock-period.service';
 
+/** One definition each, so the predicate and the rendered cell cannot drift. */
+const PIVOT_COLOR_SQL = `(SELECT pao.value_label FROM item_attribute_values iav
+         JOIN product_attribute_definitions pad ON pad.id = iav.attribute_definition_id
+         JOIN product_attribute_options pao ON pao.id = iav.option_id
+         WHERE iav.item_id = i.id AND LOWER(pad.name) IN ('màu sắc', 'màu', 'color')
+         LIMIT 1)`;
+
+const PIVOT_SIZE_SQL = `(SELECT pao.value_label FROM item_attribute_values iav
+         JOIN product_attribute_definitions pad ON pad.id = iav.attribute_definition_id
+         JOIN product_attribute_options pao ON pao.id = iav.option_id
+         WHERE iav.item_id = i.id AND LOWER(pad.name) = 'size'
+         LIMIT 1)`;
+
+/**
+ * The joins the item-level specs resolve against.
+ *
+ * `itemPageSql` and `itemCountSql` both joined only `items`, because until now
+ * this engine hashed `columnFilters` into the cache key and never compiled them
+ * into SQL at all. Both take the same fragment, so any spec naming `ic` or `pr`
+ * has to find the relation in both (ADR-04). Many-to-one, so the count is
+ * unchanged.
+ */
+const PIVOT_ITEM_JOINS = `
+        LEFT JOIN inventory_item_categories ic ON ic.id = i.category_id
+        LEFT JOIN products pr ON pr.id = i.product_id AND pr.organization_id = $1`;
+
+/**
+ * Columns the pivot can filter on, at the stage where the item for a row is
+ * chosen — before the per-branch cells fan out. A predicate applied after that
+ * fan-out would filter cells rather than rows.
+ */
+const PIVOT_COLUMN_SPECS: ReportColumnSpecs = {
+  sku: { sql: 'i.code', kind: 'text' },
+  name: { sql: 'i.name', kind: 'text' },
+  unit: { sql: 'i.unit', kind: 'text' },
+  brand: { sql: 'i.brand', kind: 'text' },
+  group: { sql: 'ic.name', kind: 'text' },
+  parentSku: { sql: 'pr.code', kind: 'text' },
+  parentName: { sql: 'pr.name', kind: 'text' },
+  color: { sql: PIVOT_COLOR_SQL, kind: 'text' },
+  size: { sql: PIVOT_SIZE_SQL, kind: 'text' },
+};
+
+/**
+ * The row's org-wide quantity, rebuilt at the item-choosing step.
+ *
+ * The grid's "Tổng" only exists after `foldCells` adds the per-branch cells up
+ * in JS, so filtering it has to recreate the sum in SQL — and under the same
+ * branch scope the page uses, or the total would count branches the request
+ * excluded.
+ */
+const PIVOT_TOTAL_SQL = `(
+        SELECT COALESCE(SUM(sbt.quantity), 0)
+        FROM stock_balances sbt
+        WHERE sbt.item_id = i.id AND sbt.organization_id = $1
+          AND ($2::text[] IS NULL OR sbt.branch_id = ANY($2::text[]))
+      )`;
+
+/** A UUID, and nothing that could reach SQL as anything else. */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Specs for the per-branch columns, generated for the keys a request actually
+ * filters on.
+ *
+ * The pivot's branch columns are `branch.qty.<branchId>`, so how many there are
+ * depends on the organisation — a static map cannot express them. This is the
+ * one place in the report layer where a key supplied by the caller takes part in
+ * building SQL, which is why the id is validated as a UUID and then bound as a
+ * positional parameter rather than interpolated: `bind` appends to the same
+ * params array the rest of the fragment uses.
+ */
+function pivotBranchSpecs(
+  filters: ReportColumnFilters | undefined,
+  startIndex: number,
+): { specs: ReportColumnSpecs; params: string[] } {
+  const specs: ReportColumnSpecs = {};
+  const params: string[] = [];
+
+  for (const key of Object.keys(filters ?? {})) {
+    const branchId = parseBranchQtyColumnKey(key);
+    if (!branchId) continue;
+    if (!UUID_RE.test(branchId)) {
+      throw new BadRequestException(`Cột "${key}" không phải mã chi nhánh hợp lệ`);
+    }
+    // Bound ahead of the filter values so the index is fixed and known here;
+    // `buildReportColumnFilter` then starts numbering after these.
+    params.push(branchId);
+    const index = startIndex + params.length;
+    specs[key] = {
+      sql: `(
+        SELECT COALESCE(SUM(sbb.quantity), 0)
+        FROM stock_balances sbb
+        WHERE sbb.item_id = i.id AND sbb.organization_id = $1
+          AND sbb.branch_id = $${index}
+      )`,
+      kind: 'number',
+    };
+  }
+
+  return { specs, params };
+}
+
 export interface StockBalancePivotQuery {
-  /** Lọc theo cột — hiện chỉ vào khoá cache; áp vào SQL ở UOW-06 (T-06-03). */
-  columnFilters?: Record<string, ReportColumnFilterDto>;
+  /** Lọc theo cột, áp phía server nên tác dụng trên toàn tập. */
+  columnFilters?: ReportColumnFilters;
   organizationId: string;
   itemGroupBy?: ItemGroupBy;
   branchIds?: string[];
@@ -77,25 +186,36 @@ export class StockBalancePivotService {
    * Dùng đúng bộ điều kiện chọn mã hàng của `itemCountSql` — cùng một tập, nên
    * cột "Tổng" ở footer luôn bằng tổng các cột chi nhánh.
    */
+  /**
+   * The footer.
+   *
+   * It is a separate query from the grid's, which makes it the easiest place to
+   * forget a predicate — and a footer describing a different set than the rows
+   * above it is exactly what ADR-04 exists to prevent. Hence the same fragment.
+   */
   private async loadBranchTotals(
     orgId: string,
     branchIds: string[] | null,
     categoryIds: string[] | null,
     search: string | null,
+    columnFilter: ReportFilterFragment,
   ): Promise<ReportTotals> {
+    const filterWhere = columnFilter.where ? `AND ${columnFilter.where}` : '';
     const rows: Array<{ branch_id: string | null; qty: string }> =
       await this.dataSource.query(
         `
         SELECT sb.branch_id AS branch_id, COALESCE(SUM(sb.quantity), 0)::numeric AS qty
         FROM stock_balances sb
         JOIN items i ON i.id = sb.item_id AND i.organization_id = $1
+        ${PIVOT_ITEM_JOINS}
         WHERE sb.organization_id = $1
           AND ($2::text[] IS NULL OR sb.branch_id = ANY($2::text[]))
           AND ($3::uuid[] IS NULL OR i.category_id = ANY($3))
           AND ($4::text IS NULL OR i.code ILIKE '%' || $4 || '%' OR i.name ILIKE '%' || $4 || '%')
+          ${filterWhere}
         GROUP BY sb.branch_id
       `,
-        [orgId, branchIds, categoryIds, search],
+        [orgId, branchIds, categoryIds, search, ...columnFilter.params],
       );
 
     const totals: ReportTotals = { total: 0 };
@@ -117,13 +237,44 @@ export class StockBalancePivotService {
     const pageSize = Math.max(1, query.pageSize);
     const offset = (page - 1) * pageSize;
 
+    // Built once and spliced into the page query, the count query and the
+    // footer query, so the three cannot describe different sets (ADR-04).
+    //
+    // The parent/group grain gets an empty spec map on purpose: a row there is a
+    // product or a category, not an item, so `color` or `size` have no value to
+    // compare against. Filtering one answers 400 rather than being dropped
+    // silently, which would leave the grid looking filtered while it is not.
+    const branch = itemGroupBy === 'item'
+      ? pivotBranchSpecs(query.columnFilters, 4)
+      : { specs: {}, params: [] as string[] };
+
+    const columnFilter = buildReportColumnFilter(
+      query.columnFilters,
+      itemGroupBy === 'item'
+        ? {
+            ...PIVOT_COLUMN_SPECS,
+            total: { sql: PIVOT_TOTAL_SQL, kind: 'number' },
+            ...branch.specs,
+          }
+        : {},
+      4 + branch.params.length,
+    );
+    // The branch ids sit between the scope parameters and the filter values, so
+    // both halves keep the indices they were built with.
+    const filterFragment: ReportFilterFragment = {
+      where: columnFilter.where,
+      params: [...branch.params, ...columnFilter.params],
+    };
+
     if (itemGroupBy === 'item') {
       return this.aggregateByItem(
         query.organizationId, branchIds, categoryIds, search, page, pageSize, offset,
+        filterFragment,
       );
     }
     return this.aggregateByAgg(
       query.organizationId, branchIds, categoryIds, search, page, pageSize, offset, itemGroupBy,
+      filterFragment,
     );
   }
 
@@ -137,10 +288,16 @@ export class StockBalancePivotService {
     page: number,
     pageSize: number,
     offset: number,
+    columnFilter: ReportFilterFragment,
   ): Promise<StockBalancePivotResult> {
+    const filterWhere = columnFilter.where ? `AND ${columnFilter.where}` : '';
+    const baseParams = [orgId, branchIds, categoryIds, search, ...columnFilter.params];
+    const limitIndex = baseParams.length + 1;
+
     const itemPageSql = `
       SELECT i.id AS item_id, i.code AS sku
       FROM items i
+      ${PIVOT_ITEM_JOINS}
       WHERE i.organization_id = $1
         AND EXISTS (
           SELECT 1 FROM stock_balances sb
@@ -149,12 +306,14 @@ export class StockBalancePivotService {
         )
         AND ($3::uuid[] IS NULL OR i.category_id = ANY($3))
         AND ($4::text IS NULL OR i.code ILIKE '%' || $4 || '%' OR i.name ILIKE '%' || $4 || '%')
+        ${filterWhere}
       ORDER BY i.code ASC
-      LIMIT $5 OFFSET $6
+      LIMIT $${limitIndex} OFFSET $${limitIndex + 1}
     `;
     const itemCountSql = `
       SELECT COUNT(*)::int AS total
       FROM items i
+      ${PIVOT_ITEM_JOINS}
       WHERE i.organization_id = $1
         AND EXISTS (
           SELECT 1 FROM stock_balances sb
@@ -163,13 +322,13 @@ export class StockBalancePivotService {
         )
         AND ($3::uuid[] IS NULL OR i.category_id = ANY($3))
         AND ($4::text IS NULL OR i.code ILIKE '%' || $4 || '%' OR i.name ILIKE '%' || $4 || '%')
+        ${filterWhere}
     `;
-    const baseParams = [orgId, branchIds, categoryIds, search];
 
     const [itemRows, countRows, totals] = await Promise.all([
       this.dataSource.query(itemPageSql, [...baseParams, pageSize, offset]),
       this.dataSource.query(itemCountSql, baseParams),
-      this.loadBranchTotals(orgId, branchIds, categoryIds, search),
+      this.loadBranchTotals(orgId, branchIds, categoryIds, search, columnFilter),
     ]);
 
     const total = Number(countRows[0]?.total ?? 0);
@@ -230,6 +389,7 @@ export class StockBalancePivotService {
     pageSize: number,
     offset: number,
     itemGroupBy: 'parent' | 'group',
+    columnFilter: ReportFilterFragment,
   ): Promise<StockBalancePivotResult> {
     const isParent = itemGroupBy === 'parent';
 
@@ -285,7 +445,7 @@ export class StockBalancePivotService {
       this.dataSource.query(aggCountSql, pageParams),
       // Cùng tập stock_balances bên dưới, nên tổng ở chế độ gộp phải bằng đúng
       // tổng ở chế độ theo mã hàng — một bất biến đáng khẳng định bằng test.
-      this.loadBranchTotals(orgId, branchIds, categoryIds, search),
+      this.loadBranchTotals(orgId, branchIds, categoryIds, search, columnFilter),
     ]);
 
     const total = Number(countRows[0]?.total ?? 0);

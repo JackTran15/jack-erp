@@ -6,7 +6,6 @@ import { ReportExportService } from '../reporting/report-core/report-export.serv
 import { ReportTemplateEntity } from '../reporting/report-core/report-template.entity';
 import { ItemEntity } from '../inventory/location/item.entity';
 import { ItemCategoryEntity } from '../inventory/location/item-category.entity';
-import { ItemProviderEntity } from '../inventory/location/item-provider.entity';
 import { LocationEntity } from '../inventory/location/location.entity';
 import { StorageEntity } from '../inventory/location/storage.entity';
 import { CreateInventoryReportTemplateHandler } from './commands/create-inventory-report-template.handler';
@@ -72,7 +71,6 @@ const REPORT_DEFINITIONS = [
       BranchEntity,
       ItemEntity,
       ItemCategoryEntity,
-      ItemProviderEntity,
       LocationEntity,
       StorageEntity,
       ReportTemplateEntity,

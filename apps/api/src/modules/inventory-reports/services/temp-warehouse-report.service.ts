@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { ReportTotals } from '@erp/shared-interfaces';
 import { DataSource } from 'typeorm';
-import type { ReportColumnFilterDto } from '../dto/report-column-filter.dto';
 import {
   buildReportColumnFilter,
+  type ReportColumnFilters,
   type ReportColumnSpecs,
 } from './report-column-filter.util';
 
@@ -146,7 +146,7 @@ export interface TempWarehouseReportQuery {
   page: number;
   pageSize: number;
   /** Lọc theo cột, áp phía server nên tác dụng trên toàn tập. */
-  columnFilters?: Record<string, ReportColumnFilterDto>;
+  columnFilters?: ReportColumnFilters;
 }
 
 export interface TempWarehouseReportResult {

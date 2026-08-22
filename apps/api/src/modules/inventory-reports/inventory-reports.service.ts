@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import type { ActorContext } from '../../common/decorators/actor-context.decorator';
 import { CacheService } from '../redis/cache.service';
 import type { ReportColumnFilterDto } from './dto/report-column-filter.dto';
+import type { ReportColumnFilters } from './services/report-column-filter.util';
 import { InventoryReportQueryDto } from './dto/inventory-report-query.dto';
 import { TransferByBranchQueryDto } from './dto/transfer-by-branch-query.dto';
 import { resolvePeriod } from './services/date-range-resolver';
@@ -51,8 +52,8 @@ const CACHE_TTL_SECONDS = 45;
  * requests differing only in key order must hit the same entry.
  */
 function normaliseColumnFilters(
-  filters: Record<string, ReportColumnFilterDto> | undefined,
-): Array<[string, ReportColumnFilterDto]> | null {
+  filters: ReportColumnFilters | undefined,
+): Array<[string, ReportColumnFilterDto | ReportColumnFilterDto[]]> | null {
   const entries = Object.entries(filters ?? {}).filter(([, f]) => f);
   if (entries.length === 0) return null;
   return entries.sort(([a], [b]) => a.localeCompare(b));

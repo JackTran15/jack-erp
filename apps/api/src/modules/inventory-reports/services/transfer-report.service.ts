@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { ReportTotals } from '@erp/shared-interfaces';
-import type { ReportColumnFilterDto } from '../dto/report-column-filter.dto';
 import {
   buildReportColumnFilter,
+  type ReportColumnFilters,
   type ReportColumnSpecs,
 } from './report-column-filter.util';
 import { DataSource } from 'typeorm';
@@ -71,7 +71,7 @@ const TRANSFER_SUMMARY_TOTAL_FIELDS = [
 
 export interface TransferByBranchQuery {
   /** Lọc theo cột, áp phía server nên tác dụng trên toàn tập. */
-  columnFilters?: Record<string, ReportColumnFilterDto>;
+  columnFilters?: ReportColumnFilters;
   organizationId: string;
   startDate: Date;
   endDate: Date;
@@ -126,17 +126,47 @@ const TRANSFER_BY_BRANCH_TOTALS = [
 ] as const;
 
 /** Cột lọc được của báo cáo 7, chiếu ở tầng ngoài. */
+/** One definition each, so the predicate and the rendered cell cannot drift. */
+const TRANSFER_COLOR_SQL = `(SELECT pao.value_label FROM item_attribute_values iav
+           JOIN product_attribute_definitions pad ON pad.id = iav.attribute_definition_id
+           JOIN product_attribute_options pao ON pao.id = iav.option_id
+           WHERE iav.item_id = i.id AND LOWER(pad.name) IN ('màu sắc', 'màu', 'color')
+           LIMIT 1)`;
+
+const TRANSFER_SIZE_SQL = `(SELECT pao.value_label FROM item_attribute_values iav
+           JOIN product_attribute_definitions pad ON pad.id = iav.attribute_definition_id
+           JOIN product_attribute_options pao ON pao.id = iav.option_id
+           WHERE iav.item_id = i.id AND LOWER(pad.name) = 'size'
+           LIMIT 1)`;
+
 function transferByBranchSpecs(alias: string, withText: boolean): ReportColumnSpecs {
   const specs: ReportColumnSpecs = {
     outQty: { sql: `${alias}.out_qty`, kind: 'number' },
     outValue: { sql: `${alias}.out_value`, kind: 'number' },
     inQty: { sql: `${alias}.in_qty`, kind: 'number' },
     inValue: { sql: `${alias}.in_value`, kind: 'number' },
+    // Filterable but never summed: the average of averages is not an average,
+    // which is why these two stay out of `TRANSFER_BY_BRANCH_TOTALS`.
+    outAvgPrice: {
+      sql: `(${alias}.out_value / NULLIF(${alias}.out_qty, 0))`,
+      kind: 'number',
+    },
+    inAvgPrice: {
+      sql: `(${alias}.in_value / NULLIF(${alias}.in_qty, 0))`,
+      kind: 'number',
+    },
   };
   if (withText) {
     specs.sku = { sql: 'i.code', kind: 'text' };
     specs.itemName = { sql: 'i.name', kind: 'text' };
     specs.unit = { sql: 'i.unit', kind: 'text' };
+    specs.brand = { sql: 'i.brand', kind: 'text' };
+    specs.categoryName = { sql: 'ic.name', kind: 'text' };
+    specs.parentSku = { sql: 'pr.code', kind: 'text' };
+    specs.parentName = { sql: 'pr.name', kind: 'text' };
+    specs.color = { sql: TRANSFER_COLOR_SQL, kind: 'text' };
+    specs.size = { sql: TRANSFER_SIZE_SQL, kind: 'text' };
+    specs.destinationBranchName = { sql: 'b.name', kind: 'text' };
   }
   return specs;
 }
@@ -540,6 +570,7 @@ export class TransferReportService {
         JOIN  branches b ON b.id = c.other_branch_id AND b.organization_id = $1
         WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
           AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
+          ${filterWhere}
         ORDER BY i.code ASC, b.name ASC
         LIMIT $${limitIndex} OFFSET $${limitIndex + 1}
       `;
@@ -551,6 +582,9 @@ export class TransferReportService {
                ).join(',\n               ')}
         FROM combined c
         JOIN items i ON i.id = c.item_id AND i.organization_id = $1
+        LEFT JOIN inventory_item_categories ic ON ic.id = i.category_id
+        LEFT JOIN products pr ON pr.id = i.product_id AND pr.organization_id = i.organization_id
+        JOIN branches b ON b.id = c.other_branch_id AND b.organization_id = $1
         WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
           AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
           ${filterWhere}
@@ -616,6 +650,7 @@ export class TransferReportService {
         FROM item_agg ia
         ${joinLookup}
         JOIN branches b ON b.id = ia.other_branch_id AND b.organization_id = $1
+        WHERE TRUE ${filterWhere}
         ORDER BY ${orderByCol} ASC NULLS LAST, b.name ASC
         LIMIT $${limitIndex} OFFSET $${limitIndex + 1}
       `;

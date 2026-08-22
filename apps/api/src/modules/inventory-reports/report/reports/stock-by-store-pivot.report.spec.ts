@@ -36,14 +36,34 @@ const pivotRow: StockBalancePivotRow = {
   },
 };
 
-function build(rows: StockBalancePivotRow[], orgBranches = ORG_BRANCHES) {
+function build(rows: StockBalancePivotRow[], orgBranches = ORG_BRANCHES, total = rows.length) {
   const engine = {
-    aggregate: jest
-      .fn()
-      .mockResolvedValue({ data: rows, branches: [], total: rows.length }),
+    // Stands in for SQL: one page, plus the whole-set count and totals. The
+    // engine keys per-branch totals as `perBranch.<id>`, which is what the
+    // report has to translate to the grid's `branch.qty.<id>`.
+    aggregate: jest.fn().mockImplementation(({ page = 1, pageSize = 20 }) => {
+      const offset = (page - 1) * pageSize;
+      const totals: Record<string, number> = { total: 0 };
+      for (const r of rows) {
+        totals.total += Number(r.totalQty ?? 0);
+        for (const [id, cell] of Object.entries(r.perBranch ?? {})) {
+          totals[`perBranch.${id}`] =
+            (totals[`perBranch.${id}`] ?? 0) + Number(cell?.qty ?? 0);
+        }
+      }
+      return Promise.resolve({
+        data: rows.slice(offset, offset + pageSize),
+        branches: [],
+        total,
+        totals,
+      });
+    }),
   };
   const branches = { find: jest.fn().mockResolvedValue(orgBranches) };
-  return new StockByStorePivotReport(engine as never, branches as never);
+  return Object.assign(
+    new StockByStorePivotReport(engine as never, branches as never),
+    { engine },
+  ) as StockByStorePivotReport & { engine: { aggregate: jest.Mock } };
 }
 
 const dto: InventoryReportSearchDto = {
@@ -86,7 +106,9 @@ describe('StockByStorePivotReport', () => {
 
   it('restricts the branch catalog to the actor branch permissions', async () => {
     const engine = {
-      aggregate: jest.fn().mockResolvedValue({ data: [], branches: [], total: 0 }),
+      aggregate: jest
+        .fn()
+        .mockResolvedValue({ data: [], branches: [], total: 0, totals: { total: 0 } }),
     };
     const branches = { find: jest.fn().mockResolvedValue([]) };
     const report = new StockByStorePivotReport(engine as never, branches as never);
@@ -104,5 +126,67 @@ describe('StockByStorePivotReport', () => {
     const cols = await report.buildColumns(noAccess);
     expect(cols.some((c) => c.col.startsWith('branch.qty.'))).toBe(false);
     expect(branches.find).not.toHaveBeenCalled();
+  });
+
+  it('answers a page of an over-cap organisation instead of refusing (AC-22)', async () => {
+    const report = build([pivotRow], ORG_BRANCHES, 74_515);
+
+    const result = await report.buildData({ ...dto, page: 1, limit: 50 }, actor);
+
+    expect(result.total).toBe(74_515);
+  });
+
+  it('pushes page, limit and column filters down', async () => {
+    const report = build([pivotRow]);
+    const engine = report.engine;
+
+    await report.buildData(
+      {
+        ...dto,
+        page: 2,
+        limit: 50,
+        columnFilters: [{ col: 'group', equals: 'Giày nam' }],
+      },
+      actor,
+    );
+
+    expect(engine.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page: 2,
+        pageSize: 50,
+        columnFilters: { group: { operator: '=', value: 'Giày nam' } },
+      }),
+    );
+  });
+
+  it('forwards a dynamic branch column filter untouched', async () => {
+    // The engine turns the key into a correlated subquery; the report just has
+    // to not mangle it on the way through.
+    const report = build([pivotRow]);
+    const engine = report.engine;
+
+    await report.buildData(
+      { ...dto, columnFilters: [{ col: 'branch.qty.b1', gt: 0 }] },
+      actor,
+    );
+
+    expect(engine.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        columnFilters: { 'branch.qty.b1': { operator: '>', value: 0 } },
+      }),
+    );
+  });
+
+  it('offers countRows so the export path keeps its cap (ADR-01)', async () => {
+    const report = build([pivotRow], ORG_BRANCHES, 74_515);
+    const engine = report.engine;
+
+    await expect(report.countRows(dto, actor)).resolves.toEqual({
+      total: 74_515,
+      subject: 'rows',
+    });
+    expect(engine.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({ page: 1, pageSize: 1 }),
+    );
   });
 });

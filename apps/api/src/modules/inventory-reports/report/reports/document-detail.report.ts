@@ -23,13 +23,11 @@ import {
   InventoryColumnDef,
   numericKeys,
 } from '../inventory-report-column.util';
+import { toEngineFilters } from '../report-column-mapper.util';
 import {
-  applyColumnFilters,
   assertKnownColumns,
-  assertUnderRowCap,
-  buildTotalsRow,
-  MAX_REPORT_ROWS,
-  paginateRows,
+  projectRows,
+  toTotalsRow,
 } from '../report-data.util';
 import { resolveInventoryBranchIds } from '../report-scope.util';
 import { ReportExportSource } from '../../../reporting/report-core/report-definition';
@@ -67,6 +65,18 @@ const COLUMNS: InventoryColumnDef[] = [
 ];
 
 const CATALOG_KEYS = new Set(COLUMNS.map((c) => c.key));
+
+/**
+ * Report column key → the field `DocumentDetailService` knows it by (ADR-03).
+ *
+ * `branchCode` and `receiverBranchCode` are absent on purpose: `toRow` hard-codes
+ * both to null because `branches` has no code column, so there is nothing to
+ * filter and the engine answers 400 rather than looking active.
+ */
+const KEY_MAP = {
+  name: 'itemName',
+  reference: 'referenceNumber',
+} as const;
 const NUMERIC = numericKeys(COLUMNS);
 /** Unit/sale prices are per-line — summing them is meaningless. */
 const NON_ADDITIVE = new Set([
@@ -106,18 +116,14 @@ export class DocumentDetailReport implements InventoryReportDefinition {
 
     const result = await this.documentDetail.list({
       ...query,
-      page: 1,
-      pageSize: MAX_REPORT_ROWS,
+      page: dto.page ?? 1,
+      pageSize: dto.limit ?? 20,
     });
-    assertUnderRowCap(result.total);
-
-    let rows = result.data.map((r) => this.toRow(r));
-    rows = applyColumnFilters(rows, dto.columnFilters);
 
     return {
-      rows: paginateRows(rows, dto.columns, dto.page ?? 1, dto.limit ?? 20),
-      totals: buildTotalsRow(dto.columns, rows, NUMERIC, NON_ADDITIVE),
-      total: rows.length,
+      rows: projectRows(result.data.map((r) => this.toRow(r)), dto.columns),
+      totals: toTotalsRow(dto.columns, result.totals, KEY_MAP, NON_ADDITIVE),
+      total: result.total,
     };
   }
 
@@ -147,6 +153,9 @@ export class DocumentDetailReport implements InventoryReportDefinition {
       branchIds,
       categoryIds: filters.categoryId ? [filters.categoryId] : undefined,
       search: filters.search,
+      // Shared by the grid and the keyset export, so the file can never cover a
+      // different set than the table it was exported from.
+      columnFilters: toEngineFilters(dto.columnFilters, KEY_MAP),
     };
   }
 
@@ -190,10 +199,7 @@ export class DocumentDetailReport implements InventoryReportDefinition {
         cursor,
       });
 
-      const rows = applyColumnFilters(
-        result.data.map((r) => this.toRow(r)),
-        dto.columnFilters,
-      );
+      const rows = result.data.map((r) => this.toRow(r));
       return {
         rows: rows.map((row) => {
           const projected: ReportRow = {};

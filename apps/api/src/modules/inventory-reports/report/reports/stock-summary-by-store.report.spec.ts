@@ -34,9 +34,18 @@ const engineRow: StockPeriodRow = {
   incomingValue: 0,
 };
 
-function build(rows: StockPeriodRow[]) {
+function build(rows: StockPeriodRow[], total = rows.length) {
   const engine = {
-    aggregate: jest.fn().mockResolvedValue({ data: rows, total: rows.length }),
+    // Stands in for SQL: one page, plus the whole-set count and totals.
+    aggregate: jest.fn().mockImplementation(({ page = 1, pageSize = 20 }) => {
+      const offset = (page - 1) * pageSize;
+      const totals: Record<string, number> = {};
+      for (const key of ['openingQty', 'openingValue', 'inQty', 'inValue',
+        'outQty', 'outValue', 'closingQty', 'closingValue'] as const) {
+        totals[key] = rows.reduce((sum, r) => sum + Number(r[key] ?? 0), 0);
+      }
+      return Promise.resolve({ data: rows.slice(offset, offset + pageSize), total, totals });
+    }),
   };
   const branches = { find: jest.fn().mockResolvedValue([]) };
   return {
@@ -79,5 +88,70 @@ describe('StockSummaryByStoreReport', () => {
       id: 'ending',
       name: 'Tồn cuối kỳ',
     });
+  });
+
+  it('answers a page of an over-cap organisation instead of refusing (AC-22)', async () => {
+    const { report } = build([engineRow], 74_515);
+
+    const result = await report.buildData({ ...dto, page: 1, limit: 50 }, actor);
+
+    expect(result.total).toBe(74_515);
+    expect(result.rows).toHaveLength(1);
+  });
+
+  it('pushes the branch column filter down under its engine name', async () => {
+    const { report, engine } = build([engineRow]);
+
+    await report.buildData(
+      { ...dto, columnFilters: [{ col: 'branch', equals: 'CN Cần Thơ' }] },
+      actor,
+    );
+
+    expect(engine.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        columnFilters: { branchName: { operator: '=', value: 'CN Cần Thơ' } },
+      }),
+    );
+  });
+
+  it('pushes page, limit and the unit/brand dropdowns down', async () => {
+    const { report, engine } = build([engineRow]);
+
+    await report.buildData(
+      { ...dto, page: 3, limit: 50, filters: { ...dto.filters, unit: 'Cái' } },
+      actor,
+    );
+
+    expect(engine.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page: 3,
+        pageSize: 50,
+        columnFilters: { unit: { operator: '=', value: 'Cái' } },
+      }),
+    );
+  });
+
+  it('takes totals from the engine and maps endingQty onto closingQty', async () => {
+    const { report } = build([engineRow]);
+
+    const result = await report.buildData(
+      { ...dto, columns: ['sku', 'endingQty', 'endingValue'] },
+      actor,
+    );
+
+    expect(result.totals!.endingQty).toBe(12);
+    expect(result.totals!.endingValue).toBe(1200);
+  });
+
+  it('offers countRows so the export path keeps its cap (ADR-01)', async () => {
+    const { report, engine } = build([engineRow], 74_515);
+
+    await expect(report.countRows(dto, actor)).resolves.toEqual({
+      total: 74_515,
+      subject: 'rows',
+    });
+    expect(engine.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({ page: 1, pageSize: 1 }),
+    );
   });
 });

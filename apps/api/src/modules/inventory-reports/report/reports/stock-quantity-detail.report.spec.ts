@@ -41,9 +41,23 @@ const engineRow: StockPeriodRow = {
   outQtyAdjustOut: 0,
 };
 
-function build(rows: StockPeriodRow[]) {
+const BREAKDOWN_KEYS = [
+  'openingQty', 'inQty', 'inQtyPurchase', 'inQtyTransferIn', 'inQtyReturn',
+  'inQtyAdjustIn', 'outQty', 'outQtySale', 'outQtyTransferOut',
+  'outQtyAdjustOut', 'closingQty',
+] as const;
+
+function build(rows: StockPeriodRow[], total = rows.length) {
   const engine = {
-    aggregate: jest.fn().mockResolvedValue({ data: rows, total: rows.length }),
+    // Stands in for SQL: one page, plus the whole-set count and totals.
+    aggregate: jest.fn().mockImplementation(({ page = 1, pageSize = 20 }) => {
+      const offset = (page - 1) * pageSize;
+      const totals: Record<string, number> = {};
+      for (const key of BREAKDOWN_KEYS) {
+        totals[key] = rows.reduce((sum, r) => sum + Number(r[key] ?? 0), 0);
+      }
+      return Promise.resolve({ data: rows.slice(offset, offset + pageSize), total, totals });
+    }),
   };
   const repo = { find: jest.fn().mockResolvedValue([]) };
   return {
@@ -97,5 +111,67 @@ describe('StockQuantityDetailReport', () => {
     // Null-valued numeric columns total to 0-sum of nulls → stays numeric 0;
     // they must not fabricate values in rows themselves (asserted above).
     expect(result.totals!.inTotal).toBe(9);
+  });
+
+  it('answers a page of an over-cap organisation instead of refusing (AC-22)', async () => {
+    const { report } = build([engineRow], 74_515);
+
+    const result = await report.buildData({ ...dto, page: 1, limit: 50 }, actor);
+
+    expect(result.total).toBe(74_515);
+    expect(result.rows).toHaveLength(1);
+  });
+
+  it('pushes the breakdown filters down under their engine names (AC-16)', async () => {
+    const { report, engine } = build([engineRow]);
+
+    await report.buildData(
+      {
+        ...dto,
+        columnFilters: [
+          { col: 'inPurchase', gte: 1 },
+          { col: 'outTotal', gte: 2 },
+          { col: 'endingQty', gte: 3 },
+        ],
+      },
+      actor,
+    );
+
+    expect(engine.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        columnFilters: {
+          inQtyPurchase: { operator: '>=', value: 1 },
+          outQty: { operator: '>=', value: 2 },
+          closingQty: { operator: '>=', value: 3 },
+        },
+      }),
+    );
+  });
+
+  // AC-17 — the six columns toRow assigns null because nothing backs them yet.
+  // They pass through untranslated, so the engine has no spec and refuses. An
+  // empty page that looks filtered would be the worse answer.
+  it.each(['inWh', 'inOther', 'outPurchaseReturn', 'outWh', 'outVoid', 'outOther'])(
+    'leaves %s untranslated, so the engine refuses to filter it',
+    async (col) => {
+      const { report, engine } = build([engineRow]);
+
+      await report.buildData({ ...dto, columnFilters: [{ col, gte: 1 }] }, actor);
+
+      const [[query]] = engine.aggregate.mock.calls;
+      expect(Object.keys(query.columnFilters)).toEqual([col]);
+    },
+  );
+
+  it('offers countRows so the export path keeps its cap (ADR-01)', async () => {
+    const { report, engine } = build([engineRow], 74_515);
+
+    await expect(report.countRows(dto, actor)).resolves.toEqual({
+      total: 74_515,
+      subject: 'rows',
+    });
+    expect(engine.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({ page: 1, pageSize: 1, includeBreakdown: true }),
+    );
   });
 });
