@@ -159,6 +159,8 @@ interface Transfer {
   transferredAt?: string;
   /** Tổng tiền (∑ line_value), inlined by the v2 search handler. */
   totalAmount?: number;
+  /** Phiếu tự sinh (kho tạm / bán hàng / xếp kệ) — chỉ xem, không sửa được. */
+  isSystemGenerated?: boolean;
   lines: TransferLine[];
   createdAt: string;
   approvedAt?: string;
@@ -399,9 +401,16 @@ export function StockTransferPage() {
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      // POSTED phiếu are editable — the BE reverses + reposts the stock. Only a
-      // voided (CANCELLED) phiếu cannot be edited.
-      disabled: !selected || selected.status === "CANCELLED",
+      // POSTED phiếu are editable — the BE reverses + reposts the stock. A voided
+      // (CANCELLED) phiếu and a phiếu tự sinh (kho tạm / bán hàng / xếp kệ) are
+      // not: the BE rejects both, so the button stays disabled.
+      disabled:
+        !selected ||
+        selected.status === "CANCELLED" ||
+        Boolean(selected.isSystemGenerated),
+      tooltip: selected?.isSystemGenerated
+        ? "Phiếu tự sinh (kho tạm / bán hàng) không sửa được. Chỉ sửa phiếu tạo bằng Thêm mới."
+        : undefined,
       onClick: () => {
         if (!selected) return;
         setEditing(selected);
@@ -413,8 +422,16 @@ export function StockTransferPage() {
       label: "Xóa",
       icon: Trash2,
       variant: "danger",
-      // BE cancel() reverses the stock movements before voiding a POSTED doc.
-      disabled: !selected || selected.status === "CANCELLED",
+      // BE cancel() reverses the stock movements before voiding a POSTED doc —
+      // and rejects a phiếu tự sinh, which the owning flow (kho tạm / bán hàng /
+      // xếp kệ) is responsible for.
+      disabled:
+        !selected ||
+        selected.status === "CANCELLED" ||
+        Boolean(selected.isSystemGenerated),
+      tooltip: selected?.isSystemGenerated
+        ? "Phiếu tự sinh (kho tạm / bán hàng) không xóa được. Chỉ xóa phiếu tạo bằng Thêm mới."
+        : undefined,
       onClick: () => selected && setConfirmDelete(selected),
     },
     { id: "sep1", type: "separator" },

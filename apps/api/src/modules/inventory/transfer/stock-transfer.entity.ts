@@ -90,6 +90,15 @@ export class StockTransferEntity extends BaseEntity {
   })
   invoiceNumber?: string | null;
 
+  @Column({
+    name: 'is_system_generated',
+    type: 'boolean',
+    default: false,
+    comment:
+      'True when the document was materialized by a system flow (temp warehouse session, POS checkout fulfillment, shelf arrangement) instead of the "Thêm mới" form. System-generated transfers cannot be edited.',
+  })
+  isSystemGenerated: boolean;
+
   @OneToMany(() => StockTransferLineEntity, (line) => line.transfer, {
     cascade: ['insert'],
     eager: true,

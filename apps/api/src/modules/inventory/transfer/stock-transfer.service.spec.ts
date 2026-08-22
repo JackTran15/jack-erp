@@ -257,6 +257,22 @@ describe('StockTransferService', () => {
       expect(transferRepo.save).toHaveBeenCalled();
     });
 
+    it('rejects deleting a system-generated transfer (temp warehouse / POS fulfillment)', async () => {
+      transferRepo.findOne.mockResolvedValue({
+        id: 'xfer-1',
+        organizationId: 'org-1',
+        status: TransferStatus.POSTED,
+        isSystemGenerated: true,
+        lines: [],
+      });
+
+      await expect(service.cancel('xfer-1', actor)).rejects.toThrow(
+        /system-generated/i,
+      );
+      expect(ledgerService.recordBatchMovements).not.toHaveBeenCalled();
+      expect(transferRepo.save).not.toHaveBeenCalled();
+    });
+
     it('reverses both ledger legs and sets CANCELLED for a POSTED transfer', async () => {
       const posted = {
         id: 'xfer-1',
@@ -664,6 +680,18 @@ describe('StockTransferService', () => {
 
       await expect(service.update('xfer-1', editDto, actor)).rejects.toThrow(
         /cancelled/i,
+      );
+      expect(ledgerService.recordBatchMovements).not.toHaveBeenCalled();
+    });
+
+    it('rejects editing a system-generated transfer (temp warehouse / POS fulfillment)', async () => {
+      transferRepo.findOne.mockResolvedValue({
+        ...postedTransfer,
+        isSystemGenerated: true,
+      });
+
+      await expect(service.update('xfer-1', editDto, actor)).rejects.toThrow(
+        /system-generated/i,
       );
       expect(ledgerService.recordBatchMovements).not.toHaveBeenCalled();
     });

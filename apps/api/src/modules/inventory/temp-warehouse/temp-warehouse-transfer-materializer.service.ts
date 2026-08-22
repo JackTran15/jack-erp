@@ -101,6 +101,10 @@ export class TempWarehouseTransferMaterializerService {
         (payload.kind === TempWarehouseTransferKind.PARTIAL
           ? `Partial from temp warehouse session ${payload.sessionId}`
           : `From temp warehouse session ${payload.sessionId}`),
+      // Every transfer built here mirrors a temp-warehouse session (or a POS
+      // checkout consuming one), so it must not be editable from the Chuyển kho
+      // form — see StockTransferService.update().
+      isSystemGenerated: true,
       lines,
     };
   }
