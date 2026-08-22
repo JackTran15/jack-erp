@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, IsNull } from 'typeorm';
 import { DocumentType } from '@erp/shared-interfaces';
@@ -322,6 +322,57 @@ describe('DocumentNumberingService', () => {
       // Continuous rules (no date, no suffix) join directly — see
       // formatDocumentNumber. Was "INV-0011" before that change.
       expect(result).toBe('INV0011');
+    });
+  });
+
+  // =========================================================================
+  // organization-scoped document types
+  // =========================================================================
+  describe('organization-scoped document types', () => {
+    it('refuses a branch-scoped rule for a type whose records are unique per organization', async () => {
+      // Each branch would get its own counter while `uq_customer_org_code` still
+      // spans the organization, so both branches issue KH000001 and the second
+      // insert is rejected.
+      await expect(
+        service.createRule(
+          { documentType: DocumentType.CUSTOMER, branchId: 'branch-1', prefix: 'KH' },
+          actor,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(ruleRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('still allows a branch-scoped rule for a real document type', async () => {
+      ruleRepo.findOne.mockResolvedValueOnce(null);
+
+      await expect(
+        service.createRule(
+          { documentType: DocumentType.GOODS_RECEIPT, branchId: 'branch-1', prefix: 'NK' },
+          actor,
+        ),
+      ).resolves.toMatchObject({ branchId: 'branch-1' });
+    });
+
+    it('ignores the branch argument when resolving an organization-scoped type', async () => {
+      // A rule that predates the guard, or one seeded straight into the table,
+      // must not split the counter either — so the branch lookup is skipped
+      // rather than merely refused at creation time.
+      ruleRepo.findOne.mockResolvedValueOnce(null);
+
+      await service.preview(DocumentType.SUPPLIER, 'branch-1', actor);
+
+      // One lookup, not two: the branch-scoped lookup that precedes it for
+      // ordinary document types never runs.
+      expect(ruleRepo.findOne).toHaveBeenCalledTimes(1);
+      expect(ruleRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          organizationId: 'org-1',
+          branchId: IsNull(),
+          documentType: DocumentType.SUPPLIER,
+          isActive: true,
+        },
+      });
     });
   });
 });

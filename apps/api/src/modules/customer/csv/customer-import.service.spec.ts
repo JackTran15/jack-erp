@@ -110,7 +110,7 @@ describe("CustomerImportService", () => {
     createQueryBuilder: jest.fn(() => queryBuilderStub(() => existingProfiles)),
   };
   const dataSource = { transaction: jest.fn() };
-  const docNumbering = { generate: jest.fn(async () => "KH000001") };
+  const customerCode = { issue: jest.fn(async () => "KH000001") };
   const wsEmitter = { emitToOrg: jest.fn() };
 
   const service = new CustomerImportService(
@@ -121,7 +121,7 @@ describe("CustomerImportService", () => {
     cardRepo as never,
     employeeProfileRepo as never,
     dataSource as never,
-    docNumbering as never,
+    customerCode as never,
     new CustomerImportWorkbookService(),
     wsEmitter as never,
   );

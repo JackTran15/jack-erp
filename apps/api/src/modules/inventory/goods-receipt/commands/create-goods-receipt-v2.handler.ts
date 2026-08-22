@@ -66,6 +66,7 @@ export class CreateGoodsReceiptV2Handler
       DocumentType.GOODS_RECEIPT,
       actor.branchId,
       actor,
+      manager,
     );
 
     // A supplier counterparty also populates the legacy provider_id so the proven

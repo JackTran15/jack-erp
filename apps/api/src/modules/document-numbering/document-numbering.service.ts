@@ -6,7 +6,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, IsNull, Repository } from "typeorm";
+import { DataSource, EntityManager, IsNull, Repository } from "typeorm";
 import {
   DocumentType,
   PaginationQuery,
@@ -68,6 +68,25 @@ export const DEFAULT_DOC_NUMBER_CONFIG: Record<
   [DocumentType.PROMOTION]: { prefix: "KM", continuous: true },
 };
 
+/**
+ * Document types whose records are unique per organization rather than per
+ * branch — customers, suppliers, employees and the other master-data codes.
+ *
+ * A branch-scoped rule for one of these gives each branch its own counter while
+ * the table behind it still enforces uniqueness across the whole organization
+ * (`uq_customer_org_code` and friends), so two branches issue the same code and
+ * whichever writes second is rejected. Branch overrides stay legal for real
+ * documents, where per-branch prefixes are a deliberate feature.
+ */
+export const ORGANIZATION_SCOPED_DOC_TYPES: ReadonlySet<DocumentType> = new Set([
+  DocumentType.CUSTOMER,
+  DocumentType.CUSTOMER_GROUP,
+  DocumentType.SUPPLIER,
+  DocumentType.EMPLOYEE,
+  DocumentType.DELIVERY_PARTNER,
+  DocumentType.PROMOTION,
+]);
+
 @Injectable()
 export class DocumentNumberingService {
   private readonly logger = new Logger(DocumentNumberingService.name);
@@ -84,6 +103,13 @@ export class DocumentNumberingService {
     dto: CreateDocumentNumberRuleDto,
     actor: ActorContext,
   ): Promise<DocumentNumberRuleEntity> {
+    if (dto.branchId && ORGANIZATION_SCOPED_DOC_TYPES.has(dto.documentType)) {
+      throw new BadRequestException(
+        `${dto.documentType} records are unique per organization, so their numbering ` +
+          `cannot be scoped to a branch. Omit branchId to configure the organization-wide rule.`,
+      );
+    }
+
     const existing = await this.ruleRepo.findOne({
       where: {
         organizationId: actor.organizationId,
@@ -186,19 +212,28 @@ export class DocumentNumberingService {
     return { data, total, page: query.page, pageSize: query.pageSize };
   }
 
+  /**
+   * `manager` must be passed whenever the caller already holds a transaction.
+   * Without it this opens its own, which means a second connection is checked
+   * out of the pool while the caller still holds the first — enough concurrent
+   * callers and every connection is held by a transaction waiting for one that
+   * will never come free, and the pool deadlocks.
+   */
   async generate(
     documentType: DocumentType,
     branchId: string | undefined,
     actor: ActorContext,
+    manager?: EntityManager,
   ): Promise<string> {
     let rule = await this.resolveActiveRule(
       documentType,
       branchId,
       actor.organizationId,
+      manager,
     );
 
     if (!rule) {
-      rule = await this.ensureDefaultActiveRule(documentType, actor);
+      rule = await this.ensureDefaultActiveRule(documentType, actor, manager);
     }
 
     if (!rule) {
@@ -209,7 +244,7 @@ export class DocumentNumberingService {
 
     const now = new Date();
     const resetKey = this.computeResetKey(rule.resetPolicy, now);
-    const nextValue = await this.atomicIncrement(rule, resetKey, actor);
+    const nextValue = await this.atomicIncrement(rule, resetKey, actor, manager);
 
     return this.formatDocumentNumber(rule, now, nextValue);
   }
@@ -245,13 +280,73 @@ export class DocumentNumberingService {
     return this.formatDocumentNumber(rule, now, nextValue);
   }
 
+  /**
+   * Raise the counter so the next generated number is at least `minValue + 1`.
+   * No-op when the counter is already ahead — a counter is never lowered.
+   *
+   * The counter is not always the only writer of the column it numbers: SQL
+   * seeds and spreadsheet imports insert codes of the same shape without going
+   * through `generate`, which then keeps re-issuing numbers an existing row
+   * already holds until the insert dies on that table's unique index. Callers
+   * that hit such a collision re-sync the counter here instead of skipping past
+   * the drift one number at a time.
+   */
+  async ensureSequenceAtLeast(
+    documentType: DocumentType,
+    branchId: string | undefined,
+    actor: ActorContext,
+    minValue: number,
+    callerManager?: EntityManager,
+  ): Promise<void> {
+    const rule = await this.resolveActiveRule(
+      documentType,
+      branchId,
+      actor.organizationId,
+      callerManager,
+    );
+    if (!rule) return;
+
+    const resetKey = this.computeResetKey(rule.resetPolicy, new Date());
+
+    const fastForward = async (manager: EntityManager): Promise<void> => {
+      const counterRepo = manager.getRepository(DocumentNumberCounterEntity);
+      const counter = await counterRepo.findOne({
+        where: { ruleId: rule.id, resetKey },
+        lock: { mode: "pessimistic_write" },
+      });
+      // No counter row means nothing has been issued for this period yet, so
+      // the caller's next `generate` creates it — there is no drift to correct.
+      if (!counter || Number(counter.currentValue) >= minValue) return;
+
+      counter.currentValue = minValue;
+      await counterRepo.save(counter);
+      this.logger.warn(
+        `Fast-forwarded ${documentType} counter to ${minValue} in organization ${actor.organizationId} — ` +
+          `existing records held numbers the counter never issued`,
+      );
+    };
+
+    // See `generate` — a caller that already holds a transaction must lend it,
+    // or this checks out a second connection while holding the first.
+    if (callerManager) {
+      await fastForward(callerManager);
+      return;
+    }
+    await this.dataSource.transaction(fastForward);
+  }
+
   private async resolveActiveRule(
     documentType: DocumentType,
     branchId: string | undefined,
     organizationId: string,
+    manager?: EntityManager,
   ): Promise<DocumentNumberRuleEntity | null> {
-    if (branchId) {
-      const branchRule = await this.ruleRepo.findOne({
+    const ruleRepo = manager
+      ? manager.getRepository(DocumentNumberRuleEntity)
+      : this.ruleRepo;
+
+    if (branchId && !ORGANIZATION_SCOPED_DOC_TYPES.has(documentType)) {
+      const branchRule = await ruleRepo.findOne({
         where: {
           organizationId,
           branchId,
@@ -262,7 +357,7 @@ export class DocumentNumberingService {
       if (branchRule) return branchRule;
     }
 
-    return this.ruleRepo.findOne({
+    return ruleRepo.findOne({
       where: {
         organizationId,
         branchId: IsNull(),
@@ -275,10 +370,14 @@ export class DocumentNumberingService {
   private async ensureDefaultActiveRule(
     documentType: DocumentType,
     actor: ActorContext,
+    manager?: EntityManager,
   ): Promise<DocumentNumberRuleEntity | null> {
+    const ruleRepo = manager
+      ? manager.getRepository(DocumentNumberRuleEntity)
+      : this.ruleRepo;
     // continuous numbering (e.g. "NK000001", "NK000002", ...) — no date segment, never reset
     const useContinuous = DEFAULT_DOC_NUMBER_CONFIG[documentType].continuous;
-    const defaultRule = this.ruleRepo.create({
+    const defaultRule = ruleRepo.create({
       organizationId: actor.organizationId,
       branchId: undefined,
       documentType,
@@ -293,12 +392,19 @@ export class DocumentNumberingService {
     });
 
     try {
-      const savedRule = await this.ruleRepo.save(defaultRule);
+      const savedRule = await ruleRepo.save(defaultRule);
       this.logger.warn(
         `Auto-created default numbering rule for ${documentType} in organization ${actor.organizationId}`,
       );
       return savedRule;
     } catch (error) {
+      // A concurrent caller won the race and `UQ_doc_rule_org_default` rejected
+      // this insert, so the winner's rule is committed and visible — re-read it.
+      // Only safe on our own connection: inside the caller's transaction the
+      // failed statement has already aborted it, so nothing can be read back
+      // and the caller has to roll back and retry instead.
+      if (manager) throw error;
+
       this.logger.warn(
         `Failed to auto-create default rule for ${documentType}, re-checking active rule`,
       );
@@ -347,34 +453,23 @@ export class DocumentNumberingService {
     rule: DocumentNumberRuleEntity,
     resetKey: string,
     actor: ActorContext,
+    callerManager?: EntityManager,
   ): Promise<number> {
+    // In the caller's transaction there is nothing to retry into: a failed
+    // statement aborts the whole transaction, so the caller rolls back and
+    // retries. `pessimistic_write` alone serializes concurrent callers
+    // correctly once the counter row exists, which is every call but the first
+    // of a reset period.
+    if (callerManager) {
+      return this.lockAndIncrement(callerManager, rule, resetKey, actor);
+    }
+
     const maxAttempts = 5;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        return await this.dataSource.transaction("SERIALIZABLE", async (manager) => {
-          const counterRepo = manager.getRepository(DocumentNumberCounterEntity);
-
-          let counter = await counterRepo.findOne({
-            where: { ruleId: rule.id, resetKey },
-            lock: { mode: "pessimistic_write" },
-          });
-
-          if (!counter) {
-            counter = counterRepo.create({
-              ruleId: rule.id,
-              organizationId: actor.organizationId,
-              branchId: rule.branchId,
-              resetKey,
-              currentValue: 1,
-            });
-            await counterRepo.save(counter);
-            return 1;
-          }
-
-          counter.currentValue = Number(counter.currentValue) + 1;
-          await counterRepo.save(counter);
-          return counter.currentValue;
-        });
+        return await this.dataSource.transaction("SERIALIZABLE", (manager) =>
+          this.lockAndIncrement(manager, rule, resetKey, actor),
+        );
       } catch (err) {
         if (this.isSerializationFailure(err) && attempt < maxAttempts) {
           continue;
@@ -384,6 +479,37 @@ export class DocumentNumberingService {
     }
     /* istanbul ignore next -- unreachable: the loop always returns or throws */
     throw new Error("atomicIncrement: exhausted retry attempts");
+  }
+
+  /** Locks the counter row for (rule, resetKey) and returns the next value. */
+  private async lockAndIncrement(
+    manager: EntityManager,
+    rule: DocumentNumberRuleEntity,
+    resetKey: string,
+    actor: ActorContext,
+  ): Promise<number> {
+    const counterRepo = manager.getRepository(DocumentNumberCounterEntity);
+
+    let counter = await counterRepo.findOne({
+      where: { ruleId: rule.id, resetKey },
+      lock: { mode: "pessimistic_write" },
+    });
+
+    if (!counter) {
+      counter = counterRepo.create({
+        ruleId: rule.id,
+        organizationId: actor.organizationId,
+        branchId: rule.branchId,
+        resetKey,
+        currentValue: 1,
+      });
+      await counterRepo.save(counter);
+      return 1;
+    }
+
+    counter.currentValue = Number(counter.currentValue) + 1;
+    await counterRepo.save(counter);
+    return counter.currentValue;
   }
 
   /** Postgres 40001 (serialization_failure) — safe and expected to retry. */
