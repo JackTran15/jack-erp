@@ -57,6 +57,11 @@ export interface GoodsIssue {
   targetBranch?: { id: string; name: string } | null;
   referenceId?: string | null;
   referenceType?: string | null;
+  /**
+   * Transfer-out leg whose destination has already confirmed import. The server
+   * refuses both edit and delete on those, so the list disables the buttons.
+   */
+  transferImported?: boolean;
   status: GoodsIssueStatus;
   issueDate?: string;
   occurredAt?: string | null;

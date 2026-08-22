@@ -25,6 +25,8 @@ import {
 } from "@erp/shared-interfaces";
 import { ERP_TOPICS } from "@erp/shared-kafka-client";
 import { ActorContext } from "../../../common/decorators/actor-context.decorator";
+import { RbacService } from '../../rbac/rbac.service';
+import { assertReceiptPurposePermission } from './assert-purpose-permission';
 import {
   RecordMovementParams,
   StockLedgerService,
@@ -131,6 +133,7 @@ export class GoodsReceiptService {
     private readonly cashReceiptsService: CashReceiptsService,
     @Inject(forwardRef(() => TransferOrderService))
     private readonly transferOrderService: TransferOrderService,
+    private readonly rbacService: RbacService,
   ) {}
 
   // ─── Create (DRAFT) ───────────────────────────────────────────────────────
@@ -140,6 +143,7 @@ export class GoodsReceiptService {
     actor: ActorContext,
   ): Promise<GoodsReceiptEntity> {
     this.validateBusinessRules(dto, actor.branchId);
+    await assertReceiptPurposePermission(this.rbacService, actor, dto.purpose);
     await this.assertPurchasingEmployee(
       dto.purchasingEmployeeId,
       actor.organizationId,

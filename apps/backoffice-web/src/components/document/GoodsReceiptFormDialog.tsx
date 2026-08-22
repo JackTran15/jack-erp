@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
+import { hasPermission } from "../../lib/permissions";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import {
   getPreferredShelf,
@@ -303,6 +304,11 @@ export function PurchaseOrderFormDialog({
     : (defaultStorage?.name ?? "");
   const [storageId, setStorageId] = useState(initialStorageId);
   const [storageQuery, setStorageQuery] = useState(initialStorageLabel);
+  // "Nhập khác" creates stock with no counterparty document behind it, so it is
+  // gated on its own key — mirroring the server check in the create path. When
+  // the user lacks it, a brand-new receipt starts on "Điều chuyển" instead;
+  // an existing OTHER receipt still opens as OTHER so it stays readable.
+  const canCreateOtherReceipt = hasPermission("goods_receipt.other-receipt");
   const [purpose, setPurpose] = useState<"PURCHASE" | "OTHER" | "TRANSFER">(
     isPurchaseImport
       ? "PURCHASE"
@@ -310,7 +316,9 @@ export function PurchaseOrderFormDialog({
         ? "TRANSFER"
         : initial?.purpose === "PURCHASE"
           ? "PURCHASE"
-          : "OTHER",
+          : initial || canCreateOtherReceipt
+            ? "OTHER"
+            : "TRANSFER",
   );
   const [settlementMode, setSettlementMode] = useState<"CREDIT" | "CASH">(
     initial?.paymentMethod === "CASH" ? "CASH" : "CREDIT",
@@ -1724,7 +1732,14 @@ export function PurchaseOrderFormDialog({
           ) : (
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
               <span className="text-muted-foreground">Mục đích nhập kho</span>
-              <label className="flex items-center gap-1.5">
+              <label
+                className="flex items-center gap-1.5"
+                title={
+                  canCreateOtherReceipt
+                    ? undefined
+                    : "Bạn không có quyền tạo phiếu nhập khác."
+                }
+              >
                 <input
                   type="radio"
                   checked={purpose === "OTHER"}
@@ -1734,7 +1749,7 @@ export function PurchaseOrderFormDialog({
                     setSourceBranchLabel("");
                     markDirty();
                   }}
-                  disabled={isView}
+                  disabled={isView || !canCreateOtherReceipt}
                 />
                 Khác
               </label>

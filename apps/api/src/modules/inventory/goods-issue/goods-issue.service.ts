@@ -354,6 +354,21 @@ export class GoodsIssueService {
     if (gi.status === GoodsIssueStatus.CANCELLED) {
       throw new ConflictException('A cancelled goods issue can no longer be edited');
     }
+    // Editing a posted transfer-out cascades into the destination's goods
+    // receipt via applyLegRevision — so once that receipt exists, the edit would
+    // rewrite a document another branch has already posted. Deletion was already
+    // blocked at this point; editing was not. Same condition as the cascade
+    // below, so internal callers passing cascadeTransferOrder: false are unaffected.
+    if (
+      options.cascadeTransferOrder !== false &&
+      gi.referenceType === GoodsIssueReferenceType.TRANSFER_ORDER &&
+      gi.referenceId
+    ) {
+      await this.transferOrderService.assertExportIssueCanBeEdited(
+        gi.referenceId,
+        actor,
+      );
+    }
     const wasPosted = gi.status === GoodsIssueStatus.POSTED;
     const branchId = gi.branchId ?? actor.branchId;
     if (wasPosted && !branchId) {
@@ -726,7 +741,33 @@ export class GoodsIssueService {
   async getById(id: string, actor: ActorContext): Promise<GoodsIssueEntity> {
     const gi = await this.findOrFail(id, actor.organizationId, actor.branchId);
     await attachCounterparties(this.giRepo.manager, [gi], actor.organizationId);
+    // The detail route is what the list page reads its selected row from (the
+    // list row is deliberately treated as stale), so the freeze marker has to
+    // be here too — otherwise the toolbar re-enables Sửa/Xóa on a document
+    // update() will refuse.
+    gi.transferImported = await this.isTransferImported(gi, actor);
     return gi;
+  }
+
+  /**
+   * True when this is a transfer-out leg whose destination has already
+   * confirmed import — the state that freezes the document. Mirrors the guard
+   * in {@link update}; false for anything that is not a transfer leg.
+   */
+  private async isTransferImported(
+    gi: GoodsIssueEntity,
+    actor: ActorContext,
+  ): Promise<boolean> {
+    if (
+      gi.referenceType !== GoodsIssueReferenceType.TRANSFER_ORDER ||
+      !gi.referenceId
+    ) {
+      return false;
+    }
+    return this.transferOrderService.hasImportReceipt(
+      gi.referenceId,
+      actor.organizationId,
+    );
   }
 
   /**

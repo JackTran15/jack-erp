@@ -135,4 +135,12 @@ export class GoodsIssueEntity extends BaseEntity {
    * without joining `lines` (which the list query no longer does).
    */
   totalAmount?: number;
+
+  /**
+   * Transient (not a column): true when this is a transfer-out leg whose
+   * destination has already confirmed import. Such a row is frozen — editing it
+   * would cascade into a phiếu nhập another branch has posted — so the list
+   * disables Sửa/Xóa up front instead of failing on click.
+   */
+  transferImported?: boolean;
 }

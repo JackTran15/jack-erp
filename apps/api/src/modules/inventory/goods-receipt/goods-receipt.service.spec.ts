@@ -72,6 +72,9 @@ describe('GoodsReceiptService', () => {
     permissions: [],
   };
 
+  // Permissive by default; the purpose gate has its own tests.
+  const rbacService = { hasPermission: jest.fn(async () => true) };
+
   let service: GoodsReceiptService;
 
   beforeEach(() => {
@@ -90,6 +93,7 @@ describe('GoodsReceiptService', () => {
       cashPaymentsService as never,
       cashReceiptsService as never,
       transferOrderService as never,
+      rbacService as never,
     );
   });
 

@@ -166,7 +166,7 @@ function ToolbarButton({ action, tone }: ToolbarButtonProps) {
     );
   }
 
-  return (
+  const button = (
     <button
       type="button"
       onClick={action.onClick}
@@ -177,5 +177,16 @@ function ToolbarButton({ action, tone }: ToolbarButtonProps) {
       {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
       <span>{action.label}</span>
     </button>
+  );
+
+  // A disabled button takes no pointer events (see buttonClassName), so its own
+  // `title` never surfaces — which is exactly the case the prop documents. Wrap
+  // it only then, so every enabled button renders byte-identical to before.
+  return action.disabled && action.tooltip ? (
+    <span title={action.tooltip} className="inline-flex">
+      {button}
+    </span>
+  ) : (
+    button
   );
 }

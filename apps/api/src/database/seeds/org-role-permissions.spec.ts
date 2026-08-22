@@ -9,32 +9,54 @@ import {
 } from './org-role-permissions';
 
 const OTHER_ISSUE_KEY = 'inventory.goods-issue.other-issue';
+const OTHER_RECEIPT_KEY = 'goods_receipt.other-receipt';
 const DISPOSAL_KEY = 'inventory.goods-issue.disposal';
 
 describe('goods-issue purpose permission seeds', () => {
   const seededKeys = PERMISSION_SEEDS.map((p) => p.key);
 
-  it('registers both purpose permission keys in the catalogue', () => {
+  it('registers every purpose permission key in the catalogue', () => {
     expect(seededKeys).toContain(OTHER_ISSUE_KEY);
+    expect(seededKeys).toContain(OTHER_RECEIPT_KEY);
     expect(seededKeys).toContain(DISPOSAL_KEY);
   });
+
+  /**
+   * "Nhập khác" / "Xuất khác" / "Hủy hàng" move stock with no purchase, sale or
+   * transfer behind them, so no counterparty document can be reconciled against
+   * them — they write off value on the branch's own say-so. All three are
+   * reserved for the two org-wide roles.
+   */
+  const RESERVED_PURPOSE_KEYS = [
+    OTHER_ISSUE_KEY,
+    OTHER_RECEIPT_KEY,
+    DISPOSAL_KEY,
+  ];
 
   it.each([
     ['SYSTEM_ADMIN', SYSTEM_ADMIN_PERMISSION_KEYS],
     ['GENERAL_MANAGER', GENERAL_MANAGER_PERMISSION_KEYS],
-    ['BRANCH_MANAGER', BRANCH_MANAGER_PERMISSION_KEYS],
-    ['WAREHOUSE', WAREHOUSE_PERMISSION_KEYS],
-  ])('grants both purpose keys to %s', (_role, keys) => {
-    expect(keys).toContain(OTHER_ISSUE_KEY);
-    expect(keys).toContain(DISPOSAL_KEY);
+  ])('grants every reserved purpose key to %s', (_role, keys) => {
+    for (const key of RESERVED_PURPOSE_KEYS) expect(keys).toContain(key);
   });
 
   it.each([
+    ['BRANCH_MANAGER', BRANCH_MANAGER_PERMISSION_KEYS],
+    ['WAREHOUSE', WAREHOUSE_PERMISSION_KEYS],
     ['SALES', SALES_PERMISSION_KEYS],
     ['CASHIER', CASHIER_PERMISSION_KEYS],
-  ])('does not grant the purpose keys to %s', (_role, keys) => {
-    expect(keys).not.toContain(OTHER_ISSUE_KEY);
-    expect(keys).not.toContain(DISPOSAL_KEY);
+  ])('withholds every reserved purpose key from %s', (_role, keys) => {
+    for (const key of RESERVED_PURPOSE_KEYS) expect(keys).not.toContain(key);
+  });
+
+  /**
+   * Điều chuyển is what is left: the warehouse still moves stock between
+   * branches, and that leg always has the receiving branch's phiếu nhập on the
+   * other side.
+   */
+  it('leaves the transfer keys with WAREHOUSE', () => {
+    expect(WAREHOUSE_PERMISSION_KEYS).toContain('inventory.goods-issue.create');
+    expect(WAREHOUSE_PERMISSION_KEYS).toContain('inventory.transfer.export');
   });
 });
 

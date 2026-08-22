@@ -16,11 +16,15 @@ function makeHandler(opts: {
     save: jest.fn(async (r: Record<string, unknown>) => ({ ...r, id: 'gr1' })),
   };
   const documentNumbering = { generate: jest.fn(async () => 'PNK-1') };
+  // Permissive by default: these cases are about the write path, not the
+  // purpose gate. The gate has its own tests.
+  const rbac = { hasPermission: jest.fn(async () => true) };
   const handler = new CreateGoodsReceiptV2Handler(
     { manager } as never,
     documentNumbering as never,
+    rbac as never,
   );
-  return { handler, manager, documentNumbering };
+  return { handler, manager, documentNumbering, rbac };
 }
 
 const line = (itemId: string, locationId: string) => ({

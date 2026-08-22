@@ -9,6 +9,8 @@ import {
   GoodsReceiptStatus,
 } from '@erp/shared-interfaces';
 import { DocumentNumberingService } from '../../../document-numbering/document-numbering.service';
+import { RbacService } from '../../../rbac/rbac.service';
+import { assertReceiptPurposePermission } from '../assert-purpose-permission';
 import { assertProductUniformLocation } from '../../location/services/product-location.util';
 import { ItemEntity } from '../../location/item.entity';
 import { ProviderEntity } from '../../location/provider.entity';
@@ -25,6 +27,7 @@ export class CreateGoodsReceiptV2Handler
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly documentNumbering: DocumentNumberingService,
+    private readonly rbacService: RbacService,
   ) {}
 
   async execute({
@@ -34,6 +37,10 @@ export class CreateGoodsReceiptV2Handler
     if (!actor.branchId) {
       throw new BadRequestException('An active branch is required to create a goods receipt');
     }
+    // Note this path defaults an omitted purpose to OTHER below, so the check
+    // has to run on the effective value — see assertReceiptPurposePermission.
+    await assertReceiptPurposePermission(this.rbacService, actor, dto.purpose);
+
     const manager = this.dataSource.manager;
     const orgId = actor.organizationId;
 

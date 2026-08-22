@@ -1,9 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { DocCounterpartyKind, GoodsIssueStatus } from '@erp/shared-interfaces';
+import {
+  DocCounterpartyKind,
+  GoodsIssueReferenceType,
+  GoodsIssueStatus,
+} from '@erp/shared-interfaces';
 import { StringOperator, CompareOperator } from '../../../../common/filters/filter.dto';
 import { CustomerEntity } from '../../../customer/customer.entity';
 import { UserEntity } from '../../../auth/user.entity';
+import { TransferOrderEntity } from '../../transfer-order/transfer-order.entity';
 import { GoodsIssueEntity } from '../goods-issue.entity';
 import { SearchGoodsIssuesV2Handler } from './search-goods-issues-v2.handler';
 import { SearchGoodsIssuesV2Query } from './search-goods-issues-v2.query';
@@ -49,6 +54,8 @@ describe('SearchGoodsIssuesV2Handler', () => {
   let handler: SearchGoodsIssuesV2Handler;
   let repo: { createQueryBuilder: jest.Mock; manager: { find: jest.Mock } };
   let builders: ReturnType<typeof makeQb>[];
+  /** Transfer orders the fake manager hands back; set per test. */
+  let transferOrders: { id: string; importGoodsReceiptId: string | null }[] = [];
 
   async function build(
     rows: unknown[],
@@ -57,6 +64,7 @@ describe('SearchGoodsIssuesV2Handler', () => {
     rowTotals: { id: string; totalAmount: string }[] = [],
   ) {
     builders = [];
+    transferOrders = transferOrders ?? [];
     repo = {
       createQueryBuilder: jest.fn(() => {
         const next = makeQb(rows, { total: String(total), totalAmount }, rowTotals);
@@ -69,6 +77,7 @@ describe('SearchGoodsIssuesV2Handler', () => {
             return [{ id: 'cust-1', code: 'KH001', name: 'Khach A' }];
           if (entity === UserEntity)
             return [{ id: 'emp-1', firstName: 'Nguyen', lastName: 'Van A' }];
+          if (entity === TransferOrderEntity) return transferOrders;
           return [];
         }),
       },
@@ -192,6 +201,48 @@ describe('SearchGoodsIssuesV2Handler', () => {
       ]),
     );
   });
+  describe('transferImported', () => {
+    const transferRow = (id: string, referenceId: string | null) => ({
+      id,
+      referenceType: GoodsIssueReferenceType.TRANSFER_ORDER,
+      referenceId,
+      status: GoodsIssueStatus.POSTED,
+    });
+
+    /**
+     * The list disables Sửa/Xóa from this flag, and the server refuses those
+     * edits outright — so a wrong flag either blocks a legal edit or offers an
+     * illegal one.
+     */
+    it('marks only the legs whose destination already has a receipt', async () => {
+      transferOrders = [
+        { id: 'to-received', importGoodsReceiptId: 'gr-1' },
+        { id: 'to-open', importGoodsReceiptId: null },
+      ];
+      await build([
+        transferRow('gi-1', 'to-received'),
+        transferRow('gi-2', 'to-open'),
+      ]);
+
+      const res = await handler.execute({ dto: {}, actor } as never);
+
+      expect(res.data.map((r: any) => [r.id, r.transferImported])).toEqual([
+        ['gi-1', true],
+        ['gi-2', false],
+      ]);
+    });
+
+    it('leaves non-transfer rows false without querying transfer orders', async () => {
+      transferOrders = [];
+      await build([
+        { id: 'gi-3', referenceType: null, referenceId: null, status: GoodsIssueStatus.POSTED },
+      ]);
+
+      const res = await handler.execute({ dto: {}, actor } as never);
+
+      expect((res.data[0] as any).transferImported).toBe(false);
+    });
+  });
 });
 
 describe('SearchGoodsIssuesV2Handler — footer grand total', () => {
@@ -265,4 +316,5 @@ describe('SearchGoodsIssuesV2Handler — footer grand total', () => {
     expect(small.totals.totalAmount).toBe(large.totals.totalAmount);
     expect(small.total).toBe(large.total);
   });
+
 });

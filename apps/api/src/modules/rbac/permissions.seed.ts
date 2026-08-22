@@ -49,6 +49,9 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "goods_receipt.read", module: "inventory" },
   { key: "goods_receipt.write", module: "inventory" },
   { key: "goods_receipt.post", module: "inventory" },
+  // "Nhập khác" (purpose OTHER) — stock arriving without a purchase or a
+  // transfer behind it, so it has no counterparty document to reconcile against.
+  { key: "goods_receipt.other-receipt", module: "inventory" },
   { key: "inventory.transfer.read", module: "inventory" },
   { key: "inventory.transfer.create", module: "inventory" },
   { key: "inventory.transfer.export", module: "inventory" },
