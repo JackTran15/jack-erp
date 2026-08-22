@@ -27,17 +27,49 @@ import {
  * Default numbering config per document type, used to auto-create a rule when
  * none is configured. `continuous` types render as "<prefix><6-digit-seq>" with
  * no date and never reset (e.g. NV000001); the legacy accounting/POS types keep
- * the date-based monthly layout (e.g. INV-202605-00001). Prefixes match the
+ * the date-based monthly layout (e.g. JNL-202605-00001). Prefixes match the
  * organization's standard document-code table.
+ *
+ * Every field past `continuous` is optional and defaults to exactly what the two
+ * rule creators used to hardcode, so a type that does not name one keeps the
+ * shape it has always had. INVOICE and RETURN are the only types that override
+ * them today: a customer reads the number off a printed receipt, so it carries
+ * the date and a per-day sequence instead of a prefix and a monthly one.
  */
 export const DEFAULT_DOC_NUMBER_CONFIG: Record<
   DocumentType,
-  { prefix: string; continuous: boolean }
+  {
+    prefix: string;
+    continuous: boolean;
+    dateFormat?: string;
+    sequenceLength?: number;
+    resetPolicy?: ResetPolicy;
+    separator?: string;
+    suffix?: string;
+  }
 > = {
+  // Receipt-facing types — YYMMDD + a 4-digit sequence that restarts every day, no
+  // separator. RETURN shares the shape and is told apart by the TH suffix, so a
+  // sale and a return issued the same day never collide on invoices.code.
+  [DocumentType.INVOICE]: {
+    prefix: "",
+    continuous: false,
+    dateFormat: "YYMMDD",
+    sequenceLength: 4,
+    resetPolicy: ResetPolicy.DAILY,
+    separator: "",
+  },
+  [DocumentType.RETURN]: {
+    prefix: "",
+    continuous: false,
+    dateFormat: "YYMMDD",
+    sequenceLength: 4,
+    resetPolicy: ResetPolicy.DAILY,
+    separator: "",
+    suffix: "TH",
+  },
   // Legacy accounting / POS types — date-based, monthly reset, 5-digit
-  [DocumentType.INVOICE]: { prefix: "INV", continuous: false },
   [DocumentType.SALE]: { prefix: "SAL", continuous: false },
-  [DocumentType.RETURN]: { prefix: "RTN", continuous: false },
   [DocumentType.ADJUSTMENT]: { prefix: "ADJ", continuous: false },
   [DocumentType.JOURNAL]: { prefix: "JNL", continuous: false },
   [DocumentType.PAYABLE]: { prefix: "PAY", continuous: false },
@@ -376,17 +408,21 @@ export class DocumentNumberingService {
       ? manager.getRepository(DocumentNumberRuleEntity)
       : this.ruleRepo;
     // continuous numbering (e.g. "NK000001", "NK000002", ...) — no date segment, never reset
-    const useContinuous = DEFAULT_DOC_NUMBER_CONFIG[documentType].continuous;
+    const config = DEFAULT_DOC_NUMBER_CONFIG[documentType];
+    const useContinuous = config.continuous;
     const defaultRule = ruleRepo.create({
       organizationId: actor.organizationId,
       branchId: undefined,
       documentType,
       prefix: this.getDefaultPrefix(documentType),
-      suffix: undefined,
+      suffix: config.suffix,
       includeDate: !useContinuous,
-      dateFormat: "YYYYMM",
-      sequenceLength: useContinuous ? 6 : 5,
-      resetPolicy: useContinuous ? ResetPolicy.NEVER : ResetPolicy.MONTHLY,
+      dateFormat: config.dateFormat ?? "YYYYMM",
+      sequenceLength: config.sequenceLength ?? (useContinuous ? 6 : 5),
+      separator: config.separator ?? "-",
+      resetPolicy:
+        config.resetPolicy ??
+        (useContinuous ? ResetPolicy.NEVER : ResetPolicy.MONTHLY),
       isActive: true,
       createdBy: actor.userId,
     });
@@ -525,9 +561,9 @@ export class DocumentNumberingService {
   ): string {
     const seq = sequence.toString().padStart(rule.sequenceLength, "0");
     // Continuous rules (no date, no suffix) render as "<prefix><seq>" so users
-    // see "NK000001" instead of "NK-000001". Rules with a date or suffix keep
-    // the legacy hyphen-separated layout — readability wins when there are
-    // multiple segments to scan.
+    // see "NK000001" instead of "NK-000001". Rules with a date or suffix join
+    // their segments with the rule's own separator — "-" for the legacy layout,
+    // "" for run-together numbers like 2608210001.
     if (!rule.includeDate && !rule.suffix) {
       return `${rule.prefix}${seq}`;
     }
@@ -540,7 +576,7 @@ export class DocumentNumberingService {
     if (rule.suffix) {
       parts.push(rule.suffix);
     }
-    return parts.join("-");
+    return parts.join(rule.separator);
   }
 
   private formatDate(format: string, date: Date): string {
@@ -549,6 +585,7 @@ export class DocumentNumberingService {
     const day = date.getDate().toString().padStart(2, "0");
 
     const replacements: Record<string, string> = {
+      YYMMDD: `${year.slice(-2)}${month}${day}`,
       YYYYMMDD: `${year}${month}${day}`,
       YYYYMM: `${year}${month}`,
       YYYY: year,

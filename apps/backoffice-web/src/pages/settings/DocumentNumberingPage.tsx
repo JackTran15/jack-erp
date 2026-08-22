@@ -24,8 +24,10 @@ interface DocumentNumberRule {
   documentType: DocumentType;
   prefix: string;
   suffix?: string | null;
+  /** Chuỗi nối các đoạn. "" = dính liền ("2608210001"); "-" = kiểu cũ. */
+  separator: string;
   includeDate: boolean;
-  dateFormat: "YYYYMMDD" | "YYYYMM" | "YYYY" | "MMDD" | "MM" | "DD";
+  dateFormat: "YYMMDD" | "YYYYMMDD" | "YYYYMM" | "YYYY" | "MMDD" | "MM" | "DD";
   sequenceLength: number;
   resetPolicy: ResetPolicy;
   isActive: boolean;
@@ -45,8 +47,9 @@ interface RuleFormState {
   branchId: string;
   prefix: string;
   suffix: string;
+  separator: string;
   includeDate: boolean;
-  dateFormat: "YYYYMMDD" | "YYYYMM" | "YYYY" | "MMDD" | "MM" | "DD";
+  dateFormat: "YYMMDD" | "YYYYMMDD" | "YYYYMM" | "YYYY" | "MMDD" | "MM" | "DD";
   sequenceLength: number;
   resetPolicy: ResetPolicy;
 }
@@ -57,6 +60,7 @@ const DOCUMENT_TYPE_OPTIONS = Object.values(DocumentType).map((value) => ({
 }));
 
 const DATE_FORMAT_OPTIONS: RuleFormState["dateFormat"][] = [
+  "YYMMDD",
   "YYYYMMDD",
   "YYYYMM",
   "YYYY",
@@ -77,6 +81,7 @@ const DEFAULT_FORM: RuleFormState = {
   branchId: "",
   prefix: "PDH",
   suffix: "",
+  separator: "-",
   includeDate: false,
   dateFormat: "YYYYMM",
   sequenceLength: 6,
@@ -329,6 +334,7 @@ function DocumentNumberRuleModal({
       branchId: rule.branchId ?? "",
       prefix: rule.prefix,
       suffix: rule.suffix ?? "",
+      separator: rule.separator ?? "-",
       includeDate: rule.includeDate,
       dateFormat: rule.dateFormat,
       sequenceLength: Number(rule.sequenceLength),
@@ -343,10 +349,6 @@ function DocumentNumberRuleModal({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!form.prefix.trim()) {
-      setError("Prefix không được để trống.");
-      return;
-    }
     if (form.sequenceLength < 1 || form.sequenceLength > 12) {
       setError("Độ dài số thứ tự phải từ 1 đến 12.");
       return;
@@ -359,6 +361,7 @@ function DocumentNumberRuleModal({
         await apiClient.patch(`/document-number-rules/${rule.id}`, {
           prefix: form.prefix.trim(),
           suffix: form.suffix.trim() || undefined,
+          separator: form.separator,
           includeDate: form.includeDate,
           dateFormat: form.dateFormat,
           sequenceLength: Number(form.sequenceLength),
@@ -370,6 +373,7 @@ function DocumentNumberRuleModal({
           branchId: form.branchId.trim() || undefined,
           prefix: form.prefix.trim(),
           suffix: form.suffix.trim() || undefined,
+          separator: form.separator,
           includeDate: form.includeDate,
           dateFormat: form.dateFormat,
           sequenceLength: Number(form.sequenceLength),
@@ -447,8 +451,7 @@ function DocumentNumberRuleModal({
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, prefix: event.target.value }))
               }
-              placeholder="Ví dụ: PO"
-              required
+              placeholder="Để trống nếu số bắt đầu bằng ngày"
             />
           </div>
           <div className="flex flex-col gap-1">
@@ -460,6 +463,24 @@ function DocumentNumberRuleModal({
               }
               placeholder="Không bắt buộc"
             />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium">Dấu phân cách</label>
+            <Input
+              value={form.separator}
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, separator: event.target.value }))
+              }
+              maxLength={5}
+              placeholder="Để trống = dính liền"
+            />
+            <p className="text-xs text-muted-foreground">
+              Chuỗi nối tiền tố / ngày / số thứ tự / hậu tố. Để trống cho số dạng
+              2608210001.
+            </p>
           </div>
         </div>
 
@@ -593,9 +614,9 @@ function formatResetPolicy(resetPolicy: ResetPolicy): string {
 
 function defaultPrefix(documentType: DocumentType): string {
   const prefixMap: Record<DocumentType, string> = {
-    [DocumentType.INVOICE]: "INV",
+    [DocumentType.INVOICE]: "",
     [DocumentType.SALE]: "SAL",
-    [DocumentType.RETURN]: "RTN",
+    [DocumentType.RETURN]: "",
     [DocumentType.ADJUSTMENT]: "ADJ",
     [DocumentType.JOURNAL]: "JNL",
     [DocumentType.PAYABLE]: "PAY",
@@ -627,16 +648,52 @@ function defaultPrefix(documentType: DocumentType): string {
   return prefixMap[documentType];
 }
 
+/**
+ * Phải phản chiếu đúng `formatDocumentNumber` phía server, **gồm cả nhánh tắt**:
+ * rule không ngày không hậu tố dựng thẳng `<prefix><seq>` không dấu, nên "Phiếu thu"
+ * xem trước là `PT000000` chứ không phải `PT-000000`. Bỏ nhánh đó đi là ô xem trước
+ * nói dối — đúng loại lệch mà feature này đang đi sửa, chỉ khác chỗ hiển thị.
+ *
+ * Xem trước theo **token** (`YYMMDD0000`), không phải ngày thật — giữ nguyên quy ước
+ * sẵn có của màn này.
+ */
+function composePreview(parts: {
+  prefix: string;
+  suffix: string;
+  separator: string;
+  includeDate: boolean;
+  dateFormat: string;
+  sequenceLength: number;
+}): string {
+  const seq = "0".repeat(parts.sequenceLength || 5);
+  if (!parts.includeDate && !parts.suffix) {
+    return `${parts.prefix}${seq}`;
+  }
+  const segments = [parts.prefix];
+  if (parts.includeDate) segments.push(parts.dateFormat);
+  segments.push(seq);
+  if (parts.suffix) segments.push(parts.suffix);
+  return segments.join(parts.separator);
+}
+
 function buildPreview(form: RuleFormState): string {
-  const datePart = form.includeDate ? `-${form.dateFormat}` : "";
-  const sequencePart = `-${"0".repeat(Number(form.sequenceLength) || 5)}`;
-  const suffixPart = form.suffix.trim() ? `-${form.suffix.trim()}` : "";
-  return `${form.prefix.trim() || "PREFIX"}${datePart}${sequencePart}${suffixPart}`;
+  return composePreview({
+    prefix: form.prefix.trim(),
+    suffix: form.suffix.trim(),
+    separator: form.separator,
+    includeDate: form.includeDate,
+    dateFormat: form.dateFormat,
+    sequenceLength: Number(form.sequenceLength),
+  });
 }
 
 function buildFormatPreview(rule: DocumentNumberRule): string {
-  const datePart = rule.includeDate ? `-${rule.dateFormat}` : "";
-  const sequencePart = `-${"0".repeat(Number(rule.sequenceLength))}`;
-  const suffixPart = rule.suffix ? `-${rule.suffix}` : "";
-  return `${rule.prefix}${datePart}${sequencePart}${suffixPart}`;
+  return composePreview({
+    prefix: rule.prefix,
+    suffix: rule.suffix ?? "",
+    separator: rule.separator ?? "-",
+    includeDate: rule.includeDate,
+    dateFormat: rule.dateFormat,
+    sequenceLength: Number(rule.sequenceLength),
+  });
 }

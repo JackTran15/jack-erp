@@ -9,8 +9,16 @@ import type {
 
 export interface InvoicePayload {
   store: InvoiceStoreInfo;
-  /** Receipt number, e.g. "2605010007". */
-  invoiceNumber: string;
+  /**
+   * Số hoá đơn do **server** cấp (`invoices.code`), ví dụ "2608210001".
+   *
+   * Tuỳ chọn vì biên lai được dựng **trước** khi gọi API thanh toán, nên lúc dựng
+   * chưa có số; `use-checkout-actions` gán vào sau khi response về. Phiếu tạm
+   * tính thì không bao giờ có số. Vắng mặt → renderer ẩn hẳn dòng "Số:".
+   * Tuyệt đối không sinh số ở phía client: một con số trông đúng mà tra không ra
+   * chính là bug mà trường này tồn tại để chặn.
+   */
+  invoiceNumber?: string;
   /** When the receipt was issued. Renderer formats to vi-VN DD/MM/YYYY HH:mm. */
   issuedAt: Date;
   /** Info rows dưới tiêu đề (KH/SĐT/NV…). Field rỗng → renderer ẩn dòng. */

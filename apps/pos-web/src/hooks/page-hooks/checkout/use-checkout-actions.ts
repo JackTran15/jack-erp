@@ -328,9 +328,11 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             id: invoiceId,
             body: checkoutResolve.body,
           });
-          // Điểm được tích do BE tính (floor(amountDue/rate)) — chỉ biết sau khi
-          // checkout xong, nên gắn vào biên lai (dựng trước) trước khi in.
+          // Số hoá đơn và điểm tích đều do BE chốt, chỉ biết sau khi checkout
+          // xong, nên gắn vào biên lai (dựng trước) trước khi in. Số phải là
+          // `code` thật: số sinh ở client thì khách tra không ra hoá đơn nào.
           if (receiptPayload) {
+            receiptPayload.invoiceNumber = soldInvoice.code;
             receiptPayload.totals.pointsEarned = soldInvoice.pointsEarned;
             receiptPayload.totals.pointsBalanceAfter =
               soldInvoice.pointsBalanceAfter ?? undefined;
@@ -434,6 +436,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             body: checkoutResolve.body,
           });
           if (receiptPayload) {
+            receiptPayload.invoiceNumber = posted.code;
             receiptPayload.totals.pointsEarned = posted.pointsEarned;
             receiptPayload.totals.pointsReversed = posted.pointsReversed;
             receiptPayload.totals.pointsBalanceAfter =

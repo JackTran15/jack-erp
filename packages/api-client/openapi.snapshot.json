@@ -25215,7 +25215,7 @@
           "prefix": {
             "type": "string",
             "maxLength": 50,
-            "pattern": "^[A-Za-z0-9\\-_/]+$"
+            "pattern": "^[A-Za-z0-9\\-_/]*$"
           },
           "suffix": {
             "type": "string",
@@ -25241,6 +25241,10 @@
               "MONTHLY",
               "YEARLY"
             ]
+          },
+          "separator": {
+            "type": "string",
+            "maxLength": 5
           }
         },
         "required": [
@@ -25292,6 +25296,9 @@
           "suffix": {
             "type": "string"
           },
+          "separator": {
+            "type": "string"
+          },
           "includeDate": {
             "type": "boolean"
           },
@@ -25340,6 +25347,7 @@
         "required": [
           "documentType",
           "prefix",
+          "separator",
           "includeDate",
           "dateFormat",
           "sequenceLength",
@@ -25358,7 +25366,7 @@
           "prefix": {
             "type": "string",
             "maxLength": 50,
-            "pattern": "^[A-Za-z0-9\\-_/]+$"
+            "pattern": "^[A-Za-z0-9\\-_/]*$"
           },
           "suffix": {
             "type": "string",
@@ -25384,6 +25392,10 @@
               "MONTHLY",
               "YEARLY"
             ]
+          },
+          "separator": {
+            "type": "string",
+            "maxLength": 5
           }
         }
       },
@@ -29704,6 +29716,10 @@
           "isPosVisible": {
             "type": "boolean"
           },
+          "includeTotals": {
+            "type": "boolean",
+            "description": "Whole-set column totals for the grid footer. Defaults to true, and it is by\nfar the most expensive part of the response: the footer aggregates the\nledger over the entire result set, not over the page. A client that only\nneeds rows — or that already holds the footer for the current filter set —\nshould send false."
+          },
           "stockState": {
             "type": "string",
             "enum": [
@@ -29940,6 +29956,10 @@
           },
           "isPosVisible": {
             "type": "boolean"
+          },
+          "includeTotals": {
+            "type": "boolean",
+            "description": "Whole-set column totals for the grid footer. Defaults to true, and it is by\nfar the most expensive part of the response: the footer aggregates the\nledger over the entire result set, not over the page. A client that only\nneeds rows — or that already holds the footer for the current filter set —\nshould send false."
           },
           "stockState": {
             "enum": [

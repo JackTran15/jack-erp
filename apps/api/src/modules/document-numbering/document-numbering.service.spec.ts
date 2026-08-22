@@ -10,6 +10,7 @@ import {
 import { DocumentNumberCounterEntity } from './document-number-counter.entity';
 import { DocumentNumberingService } from './document-numbering.service';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
+import { mintDocumentNumber } from '../pos/checkout-saga/application/steps/mint-document-number';
 
 const actor: ActorContext = {
   userId: 'user-1',
@@ -29,6 +30,7 @@ const ruleStub = (overrides: Partial<DocumentNumberRuleEntity> = {}): DocumentNu
     includeDate: true,
     dateFormat: 'YYYYMMDD',
     sequenceLength: 5,
+    separator: '-',
     resetPolicy: ResetPolicy.NEVER,
     isActive: true,
     createdBy: 'user-1',
@@ -373,6 +375,319 @@ describe('DocumentNumberingService', () => {
           isActive: true,
         },
       });
+    });
+  });
+
+  // Regression net for AC-08. Every rule shape that actually exists on erp_dev
+  // today, asserted as a whole string: adding `separator` to the join must not
+  // move a single character of any of them. Shapes, not document types — two
+  // rules that differ only by prefix exercise the same code path.
+  describe('formatDocumentNumber — existing rule shapes render unchanged (AC-08)', () => {
+    const AUG_2026 = new Date('2026-08-21T10:00:00.000+07:00');
+
+    const cases: Array<[string, Partial<DocumentNumberRuleEntity>, number, string]> = [
+      ['INVOICE (INV, YYYYMM, 5)', { prefix: 'INV', includeDate: true, dateFormat: 'YYYYMM', sequenceLength: 5 }, 13, 'INV-202608-00013'],
+      ['RETURN (RTN, YYYYMM, 5)', { prefix: 'RTN', includeDate: true, dateFormat: 'YYYYMM', sequenceLength: 5 }, 35, 'RTN-202608-00035'],
+      ['JOURNAL (JNL, YYYYMM, 5)', { prefix: 'JNL', includeDate: true, dateFormat: 'YYYYMM', sequenceLength: 5 }, 1, 'JNL-202608-00001'],
+      ['CASH_RECEIPT (PT, no date, 6)', { prefix: 'PT', includeDate: false, sequenceLength: 6 }, 12, 'PT000012'],
+      ['CASH_PAYMENT (PC, no date, 6)', { prefix: 'PC', includeDate: false, sequenceLength: 6 }, 51, 'PC000051'],
+      ['GOODS_RECEIPT (IMP, no date, 6)', { prefix: 'IMP', includeDate: false, sequenceLength: 6 }, 45, 'IMP000045'],
+      ['GOODS_ISSUE (XK, no date, 6)', { prefix: 'XK', includeDate: false, sequenceLength: 6 }, 7, 'XK000007'],
+      ['TRANSFER (CK, no date, 6)', { prefix: 'CK', includeDate: false, sequenceLength: 6 }, 7, 'CK000007'],
+      ['TRANSFER_ORDER (LDC, no date, 6)', { prefix: 'LDC', includeDate: false, sequenceLength: 6 }, 7, 'LDC000007'],
+      ['BANK_RECEIPT (NTTK, no date, 6)', { prefix: 'NTTK', includeDate: false, sequenceLength: 6 }, 3, 'NTTK000003'],
+      ['BANK_PAYMENT (UNC, no date, 6)', { prefix: 'UNC', includeDate: false, sequenceLength: 6 }, 3, 'UNC000003'],
+      ['CUSTOMER (KH, no date, 6)', { prefix: 'KH', includeDate: false, sequenceLength: 6 }, 201, 'KH000201'],
+      ['SUPPLIER (NCC, no date, 6)', { prefix: 'NCC', includeDate: false, sequenceLength: 6 }, 4, 'NCC000004'],
+      ['EMPLOYEE (NV, no date, 6)', { prefix: 'NV', includeDate: false, sequenceLength: 6 }, 9, 'NV000009'],
+      ['WAREHOUSE (WH, no date, 6)', { prefix: 'WH', includeDate: false, sequenceLength: 6 }, 2, 'WH000002'],
+      ['PROMOTION (KM, no date, 6)', { prefix: 'KM', includeDate: false, sequenceLength: 6 }, 6, 'KM000006'],
+    ];
+
+    for (const [label, overrides, sequence, expected] of cases) {
+      it(`${label} → ${expected}`, () => {
+        const rule = ruleStub({ separator: '-', suffix: undefined, ...overrides });
+        expect(service['formatDocumentNumber'](rule, AUG_2026, sequence)).toBe(expected);
+      });
+    }
+  });
+
+  // The two shapes this feature introduces. Same formatter, no special-casing
+  // by document type — only rule data differs.
+  describe('formatDocumentNumber — the YYMMDD invoice shapes (AC-01, AC-04)', () => {
+    const AUG_21 = new Date('2026-08-21T10:00:00.000+07:00');
+
+    it('empty prefix + YYMMDD + empty separator renders 2608210001', () => {
+      const rule = ruleStub({
+        prefix: '',
+        suffix: undefined,
+        includeDate: true,
+        dateFormat: 'YYMMDD',
+        sequenceLength: 4,
+        separator: '',
+      });
+      expect(service['formatDocumentNumber'](rule, AUG_21, 1)).toBe('2608210001');
+    });
+
+    it('the TH suffix rides on the same shape and renders 2608210001TH', () => {
+      const rule = ruleStub({
+        prefix: '',
+        suffix: 'TH',
+        includeDate: true,
+        dateFormat: 'YYMMDD',
+        sequenceLength: 4,
+        separator: '',
+      });
+      expect(service['formatDocumentNumber'](rule, AUG_21, 1)).toBe('2608210001TH');
+    });
+
+    it('YYMMDD takes the last two digits of the year, not the first two', () => {
+      expect(service['formatDate']('YYMMDD', new Date('2026-08-21T10:00:00.000+07:00'))).toBe('260821');
+      expect(service['formatDate']('YYMMDD', new Date('2030-01-05T10:00:00.000+07:00'))).toBe('300105');
+    });
+  });
+
+  // T-01-03: both rule creators read DEFAULT_DOC_NUMBER_CONFIG, so an org that
+  // the migration never touched still issues receipt-shaped numbers instead of
+  // silently falling back to INV-202609-00001.
+  describe('auto-created default rules follow DEFAULT_DOC_NUMBER_CONFIG', () => {
+    const AUG_22 = new Date('2026-08-22T10:00:00.000+07:00');
+
+    const withFreshCounter = () => {
+      const mockCounterRepo = {
+        findOne: jest.fn().mockResolvedValue(null),
+        create: jest.fn((dto: any) => ({ id: 'counter-new', ...dto })),
+        save: jest.fn((entity: any) => Promise.resolve(entity)),
+      };
+      dataSource.transaction.mockImplementation(
+        async (_isolation: string, work: (manager: any) => Promise<any>) =>
+          work({ getRepository: () => mockCounterRepo }),
+      );
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(AUG_22);
+      ruleRepo.findOne.mockResolvedValue(null);
+      withFreshCounter();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('INVOICE auto-creates a YYMMDD/4/DAILY rule and issues 2608220001', async () => {
+      const result = await service.generate(DocumentType.INVOICE, undefined, actor);
+
+      expect(result).toBe('2608220001');
+      expect(ruleRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          documentType: DocumentType.INVOICE,
+          prefix: '',
+          suffix: undefined,
+          includeDate: true,
+          dateFormat: 'YYMMDD',
+          sequenceLength: 4,
+          separator: '',
+          resetPolicy: ResetPolicy.DAILY,
+        }),
+      );
+    });
+
+    it('RETURN auto-creates the same shape with a TH suffix and issues 2608220001TH', async () => {
+      const result = await service.generate(DocumentType.RETURN, undefined, actor);
+
+      expect(result).toBe('2608220001TH');
+      expect(ruleRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          documentType: DocumentType.RETURN,
+          prefix: '',
+          suffix: 'TH',
+          dateFormat: 'YYMMDD',
+          sequenceLength: 4,
+          separator: '',
+          resetPolicy: ResetPolicy.DAILY,
+        }),
+      );
+    });
+
+    it('a type that overrides nothing keeps the shape it always had', async () => {
+      const result = await service.generate(DocumentType.CASH_RECEIPT, undefined, actor);
+
+      expect(result).toBe('PT000001');
+      expect(ruleRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prefix: 'PT',
+          suffix: undefined,
+          includeDate: false,
+          dateFormat: 'YYYYMM',
+          sequenceLength: 6,
+          separator: '-',
+          resetPolicy: ResetPolicy.NEVER,
+        }),
+      );
+    });
+
+    it('JOURNAL, which the feature does not touch, still resets monthly on YYYYMM', async () => {
+      const result = await service.generate(DocumentType.JOURNAL, undefined, actor);
+
+      expect(result).toBe('JNL-202608-00001');
+      expect(ruleRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prefix: 'JNL',
+          includeDate: true,
+          dateFormat: 'YYYYMM',
+          sequenceLength: 5,
+          separator: '-',
+          resetPolicy: ResetPolicy.MONTHLY,
+        }),
+      );
+    });
+  });
+
+  // The saga cannot call the service (ADR-05), so it carries its own creator.
+  // This is the chokepoint that catches the two drifting apart — the same role
+  // document-number-format.spec.ts plays for the formatter.
+  describe('mintDocumentNumber creates a rule identical to the service (ADR-05)', () => {
+    const AUG_22 = new Date('2026-08-22T10:00:00.000+07:00');
+
+    beforeEach(() => jest.useFakeTimers().setSystemTime(AUG_22));
+    afterEach(() => jest.useRealTimers());
+
+    for (const documentType of [
+      DocumentType.INVOICE,
+      DocumentType.RETURN,
+      DocumentType.CASH_RECEIPT,
+      DocumentType.JOURNAL,
+    ]) {
+      it(`${documentType}`, async () => {
+        // Service side.
+        ruleRepo.findOne.mockResolvedValue(null);
+        const serviceCounter = {
+          findOne: jest.fn().mockResolvedValue(null),
+          create: jest.fn((dto: any) => dto),
+          save: jest.fn((e: any) => Promise.resolve(e)),
+        };
+        dataSource.transaction.mockImplementation(
+          async (_i: string, work: (m: any) => Promise<any>) =>
+            work({ getRepository: () => serviceCounter }),
+        );
+        await service.generate(documentType, undefined, actor);
+        const fromService = ruleRepo.create.mock.calls.at(-1)?.[0];
+
+        // Saga side, through the caller's own manager.
+        const sagaRuleRepo = {
+          findOne: jest.fn().mockResolvedValue(null),
+          create: jest.fn((dto: any) => ({ id: 'rule-saga', ...dto })),
+          save: jest.fn((e: any) => Promise.resolve(e)),
+        };
+        const sagaCounterRepo = {
+          create: jest.fn((dto: any) => dto),
+          save: jest.fn((e: any) => Promise.resolve(e)),
+        };
+        const manager = {
+          getRepository: (target: unknown) =>
+            target === DocumentNumberRuleEntity ? sagaRuleRepo : sagaCounterRepo,
+          createQueryBuilder: () => ({
+            setLock: () => ({
+              where: () => ({ andWhere: () => ({ getOne: async () => null }) }),
+            }),
+          }),
+        };
+        await mintDocumentNumber(manager as any, documentType, undefined, actor, {
+          ensureDefault: true,
+        });
+        const fromSaga = sagaRuleRepo.create.mock.calls.at(-1)?.[0];
+
+        expect(fromSaga).toEqual(fromService);
+      });
+    }
+  });
+
+  // T-01-05 — the return-side dial. Returns and exchanges both travel through
+  // DocumentNumberingService.generate (checkout-return.service.ts), which is a
+  // different path from the sale (ADR-05).
+  describe('RETURN shares one dial with EXCHANGE and stays clear of sales (AC-05, AC-06)', () => {
+    const AUG_21 = new Date('2026-08-21T17:09:00.000+07:00');
+
+    const returnRule = ruleStub({
+      id: 'rule-return',
+      documentType: DocumentType.RETURN,
+      prefix: '',
+      suffix: 'TH',
+      includeDate: true,
+      dateFormat: 'YYMMDD',
+      sequenceLength: 4,
+      separator: '',
+      resetPolicy: ResetPolicy.DAILY,
+    });
+
+    const invoiceRule = ruleStub({
+      id: 'rule-invoice',
+      documentType: DocumentType.INVOICE,
+      prefix: '',
+      suffix: undefined,
+      includeDate: true,
+      dateFormat: 'YYMMDD',
+      sequenceLength: 4,
+      separator: '',
+      resetPolicy: ResetPolicy.DAILY,
+    });
+
+    // One counter store shared by both rules, keyed the way the real table is —
+    // so a leak between the two dials would show up as a skipped number.
+    const withCounterStore = () => {
+      const rows = new Map<string, { currentValue: number }>();
+      dataSource.transaction.mockImplementation(
+        async (_i: string, work: (m: any) => Promise<any>) =>
+          work({
+            getRepository: () => ({
+              findOne: jest.fn(async ({ where }: any) => {
+                const key = `${where.ruleId}|${where.resetKey}`;
+                return rows.get(key) ? { ...rows.get(key), ...where } : null;
+              }),
+              create: jest.fn((dto: any) => dto),
+              save: jest.fn(async (entity: any) => {
+                rows.set(`${entity.ruleId}|${entity.resetKey}`, {
+                  currentValue: Number(entity.currentValue),
+                });
+                return entity;
+              }),
+            }),
+          }),
+      );
+      return rows;
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(AUG_21);
+      withCounterStore();
+    });
+
+    afterEach(() => jest.useRealTimers());
+
+    it('a return and the exchange after it walk the same dial (AC-05)', async () => {
+      ruleRepo.findOne.mockResolvedValue(returnRule);
+
+      const first = await service.generate(DocumentType.RETURN, undefined, actor);
+      const second = await service.generate(DocumentType.RETURN, undefined, actor);
+
+      expect(first).toBe('2608210001TH');
+      expect(second).toBe('2608210002TH');
+    });
+
+    it('a sale and a return issued the same day are both 0001 and do not collide (AC-06)', async () => {
+      ruleRepo.findOne.mockImplementation(async ({ where }: any) =>
+        where.documentType === DocumentType.INVOICE ? invoiceRule : returnRule,
+      );
+
+      const sale = await service.generate(DocumentType.INVOICE, undefined, actor);
+      const refund = await service.generate(DocumentType.RETURN, undefined, actor);
+
+      // Both start at 1 — separate counters. The TH suffix is what keeps the two
+      // strings distinct under uq_invoice_org_code, not the sequence.
+      expect(sale).toBe('2608210001');
+      expect(refund).toBe('2608210001TH');
+      expect(sale).not.toBe(refund);
     });
   });
 });
