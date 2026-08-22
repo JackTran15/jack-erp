@@ -374,3 +374,15 @@ export {
   permissionLabelVi,
   permissionModuleLabelVi,
 } from "./permission-labels-vi";
+
+export {
+  PERMISSION_RESOURCE_LABELS_VI,
+  PERMISSION_RESOURCE_ALIASES,
+  PERMISSION_ACTION_LABELS_VI,
+  PERMISSION_ACTION_ORDER,
+  PERMISSION_SHORT_LABELS_VI,
+  resolvePermissionResource,
+  permissionResourceLabelVi,
+  permissionShortLabelVi,
+  permissionActionWeight,
+} from "./permission-vocabulary-vi";

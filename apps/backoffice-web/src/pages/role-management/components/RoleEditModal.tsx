@@ -50,8 +50,8 @@ export function RoleEditModal({
         if (!o) onClose();
       }}
       title={title}
-      defaultWidth={960}
-      defaultHeight={700}
+      defaultWidth={1280}
+      defaultHeight={780}
       showFooter={true}
       footer={
         <div className="flex w-full justify-end gap-2">
