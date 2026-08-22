@@ -350,6 +350,9 @@ export function useFastStockTransferActions() {
               unit: line.item.unit,
               sellingPrice: 0,
               quantityOnHand: 0,
+              // Dòng dựng tại chỗ cho Chuyển kho nhanh, không đi qua cảnh báo
+              // vượt tồn của màn bán hàng — giữ 0 như `quantityOnHand`.
+              showroomQuantity: 0,
               locations: (() => {
                 const loc =
                   line.direction ===

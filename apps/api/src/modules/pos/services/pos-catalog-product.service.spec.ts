@@ -7,6 +7,7 @@ import { ProductEntity } from '../../inventory/product/product.entity';
 import { StockBalanceEntity } from '../../inventory/ledger/stock-balance.entity';
 import { LocationEntity } from '../../inventory/location/location.entity';
 import { ShowroomEntity } from '../../inventory/location/showroom.entity';
+import { StorageEntity } from '../../inventory/location/storage.entity';
 import { ProductAttributeDefinitionEntity } from '../../inventory/product/product-attribute-definition.entity';
 import { ItemAttributeValueEntity } from '../../inventory/product/item-attribute-value.entity';
 import { ItemCategoryEntity } from '../../inventory/location/item-category.entity';
@@ -104,6 +105,7 @@ describe('PosCatalogProductService', () => {
   let balanceRepo: RepoMock;
   let locationRepo: RepoMock;
   let showroomRepo: RepoMock;
+  let storageRepo: RepoMock;
   let attrDefRepo: RepoMock;
   let itemAttrValueRepo: RepoMock;
   let categoryRepo: RepoMock;
@@ -115,6 +117,10 @@ describe('PosCatalogProductService', () => {
     balanceRepo = repoMock();
     locationRepo = repoMock();
     showroomRepo = repoMock();
+    storageRepo = repoMock();
+    // Most cases care about neither classification; an empty storage set keeps
+    // showroom totals at 0 without touching what they do assert.
+    storageRepo.find.mockResolvedValue([]);
     attrDefRepo = repoMock();
     itemAttrValueRepo = repoMock();
     categoryRepo = repoMock();
@@ -132,6 +138,7 @@ describe('PosCatalogProductService', () => {
         { provide: getRepositoryToken(StockBalanceEntity), useValue: balanceRepo },
         { provide: getRepositoryToken(LocationEntity), useValue: locationRepo },
         { provide: getRepositoryToken(ShowroomEntity), useValue: showroomRepo },
+        { provide: getRepositoryToken(StorageEntity), useValue: storageRepo },
         { provide: getRepositoryToken(ProductAttributeDefinitionEntity), useValue: attrDefRepo },
         { provide: getRepositoryToken(ItemAttributeValueEntity), useValue: itemAttrValueRepo },
         { provide: getRepositoryToken(ItemCategoryEntity), useValue: categoryRepo },
@@ -301,6 +308,61 @@ describe('PosCatalogProductService', () => {
       await expect(
         service.getProductDetail('branch-1', 'missing', undefined, actor),
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  // Field reproduced from branch MT46: BX140 sits 8 at a warehouse shelf and 4
+  // at the showroom's default shelf. POS deducts from the branch's main
+  // (showroom) storages only, so the variant dialog has to warn against 4.
+  describe('showroom-only stock basis', () => {
+    const bxLocations = [
+      { id: 'L-WH', name: '999', storageId: 'S-WH' },
+      { id: 'L-SR', name: 'Mặc định', storageId: 'S-MAIN' },
+    ];
+    const bxBalances = [
+      { itemId: 'I3', locationId: 'L-WH', quantity: 8 },
+      { itemId: 'I3', locationId: 'L-SR', quantity: 4 },
+    ];
+
+    beforeEach(() => {
+      productRepo.findOne.mockResolvedValue(null);
+      itemRepo.findOne.mockResolvedValue(standalone);
+      balanceRepo.find.mockResolvedValue(bxBalances);
+      locationRepo.find.mockResolvedValue(bxLocations);
+      storageRepo.find.mockResolvedValue([
+        { id: 'S-MAIN', isMainStorage: true },
+        { id: 'S-WH', isMainStorage: false },
+      ]);
+    });
+
+    it('keeps quantityOnHand as the branch-wide total', async () => {
+      const res = await service.getProductDetail('branch-1', 'I3', undefined, actor);
+
+      expect(res.variants[0].quantityOnHand).toBe(12);
+    });
+
+    it('exposes showroomQuantity from main-storage locations only', async () => {
+      const res = await service.getProductDetail('branch-1', 'I3', undefined, actor);
+
+      expect(res.variants[0].showroomQuantity).toBe(4);
+    });
+
+    it('leaves the direction filter on its own showrooms-table classification', async () => {
+      // Guards ADR-02. The `showrooms` row deliberately points at the storage
+      // that is NOT the main one, so the two classifications disagree: if
+      // anyone repointed `direction` at is_main_storage the total would come
+      // back 4 instead of 8, and fast stock transfer would silently change
+      // which stock it offers.
+      showroomRepo.find.mockResolvedValue([{ storageId: 'S-WH' }]);
+      itemRepo.createQueryBuilder.mockReturnValue(queryBuilderMock([standalone]));
+
+      const res = await service.listProducts('branch-1', actor, {
+        page: 1,
+        pageSize: 20,
+        direction: 'showroom',
+      } as any);
+
+      expect(res.data[0].quantityOnHand).toBe(8);
     });
   });
 });

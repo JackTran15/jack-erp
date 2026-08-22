@@ -8,7 +8,15 @@ export interface PosCatalogLine {
   name: string;
   unit: string;
   sellingPrice: number;
+  /** Tổng tồn toàn chi nhánh — KHÔNG phải cơ sở cảnh báo vượt tồn. */
   quantityOnHand: number;
+  /**
+   * Tồn ở các kho chính (showroom) của chi nhánh — đúng tập kho mà POS trừ hàng
+   * (`resolveBranchItemLocations`, `showroomOnly`). Đây là cơ sở của cảnh báo
+   * bán vượt tồn: bán hàng không bao giờ xuất từ kho lưu trữ, nên đếm cả tồn
+   * kho làm cảnh báo bật muộn đúng bằng lượng hàng nằm trong kho.
+   */
+  showroomQuantity: number;
   locations: { locationId: string; name: string; quantity: number }[];
   defaultLocationId: string;
 }
@@ -64,7 +72,10 @@ export interface PosProductVariant {
   sellingPrice: number;
   imageUrl: string | null;
   attributes: PosVariantAttribute[];
+  /** Tổng tồn toàn chi nhánh — KHÔNG phải cơ sở cảnh báo vượt tồn. */
   quantityOnHand: number;
+  /** Tồn ở các kho chính (showroom) — cơ sở cảnh báo vượt tồn, xem `PosCatalogLine`. */
+  showroomQuantity: number;
   locations: PosVariantLocation[];
 }
 

@@ -13,6 +13,17 @@ export type PosCatalogLineDto = {
   sellingPrice: number;
   /** Tổng tồn tại chi nhánh (cộng mọi vị trí lưu). */
   quantityOnHand: number;
+  /**
+   * On-hand at the branch's main (showroom) storages only — the same storage
+   * set POS deducts from (`resolveBranchItemLocations`, `showroomOnly: true`).
+   *
+   * This, not `quantityOnHand`, is the oversell-warning basis: a POS sale never
+   * leaves a warehouse, so counting warehouse stock makes the warning fire late
+   * by exactly the amount sitting in the back. `quantityOnHand` stays the
+   * branch-wide total for the callers that legitimately want it (fast stock
+   * transfer).
+   */
+  showroomQuantity: number;
   locations: { locationId: string; name: string; quantity: number }[];
   /** Vị trí ưu tiên trừ khi bán (kho còn nhiều nhất). */
   defaultLocationId: string;
@@ -56,6 +67,7 @@ export class PosCatalogService {
       locationName: string | null;
       quantity: string;
       isShowroom: boolean;
+      isMainStorage: boolean | null;
       code: string;
       name: string;
       unit: string;
@@ -71,6 +83,7 @@ export class PosCatalogService {
                 WHERE sr.storage_id = l.storage_id
                   AND sr.organization_id = sb.organization_id
               ) AS "isShowroom",
+              COALESCE(st.is_main_storage, false) AS "isMainStorage",
               i.code,
               i.name,
               i.unit,
@@ -80,6 +93,14 @@ export class PosCatalogService {
          ON i.id = sb.item_id AND i.organization_id = sb.organization_id
        LEFT JOIN locations l
          ON l.id = sb.location_id
+       -- storages.branch_id is uuid while stock_balances.branch_id is varchar, so
+       -- the branch parameter is compared as text on both sides: casting $2 to
+       -- uuid here would make Postgres deduce two conflicting types for the same
+       -- parameter and reject the statement.
+       LEFT JOIN storages st
+         ON st.id = l.storage_id
+        AND st.organization_id = $1
+        AND st.branch_id::text = $2
        WHERE sb.organization_id = $1
          AND sb.branch_id = $2
          AND i.is_active = true
@@ -122,7 +143,8 @@ export class PosCatalogService {
                   WHERE sr.storage_id = l.storage_id
                     AND sr.organization_id = sb.organization_id
                 )
-              END AS "isShowroom"
+              END AS "isShowroom",
+              COALESCE(st.is_main_storage, false) AS "isMainStorage"
        FROM items i
        LEFT JOIN item_barcodes b
          ON b.item_id = i.id AND b.organization_id = i.organization_id
@@ -137,6 +159,10 @@ export class PosCatalogService {
         )
        LEFT JOIN locations l
          ON l.id = sb.location_id
+       LEFT JOIN storages st
+         ON st.id = l.storage_id
+        AND st.organization_id = $1
+        AND st.branch_id::text = $2
        WHERE i.organization_id = $1
          AND i.is_active = true
          AND i.is_pos_visible = true
@@ -166,6 +192,7 @@ export class PosCatalogService {
       locationName: string | null;
       quantity: string | null;
       isShowroom?: boolean | null;
+      isMainStorage?: boolean | null;
       code: string;
       name: string;
       unit: string;
@@ -193,6 +220,7 @@ export class PosCatalogService {
         unit: string;
         sellingPrice: number;
         quantityOnHand: number;
+        showroomQuantity: number;
         locations: { locationId: string; name: string; quantity: number }[];
         locationIds: Set<string>;
       }
@@ -208,6 +236,7 @@ export class PosCatalogService {
           unit: r.unit,
           sellingPrice: Number(r.sellingPrice) || 0,
           quantityOnHand: 0,
+          showroomQuantity: 0,
           locations: [],
           locationIds: new Set<string>(),
         });
@@ -217,6 +246,13 @@ export class PosCatalogService {
       a.locationIds.add(r.locationId);
       const qty = Number(r.quantity) || 0;
       a.quantityOnHand += qty;
+      // Showroom is classified by `storages.is_main_storage` scoped to the
+      // branch — the exact filter `resolveBranchItemLocations(..., showroomOnly)`
+      // uses to pick where a POS sale deducts from. The `showrooms` table above
+      // classifies the `direction` parameter (fast stock transfer) and is left
+      // alone: two notions of "showroom" live in this file on purpose, and this
+      // one has to predict the deduction.
+      if (r.isMainStorage === true) a.showroomQuantity += qty;
       a.locations.push({
         locationId: r.locationId,
         name: r.locationName ?? '',
@@ -238,6 +274,7 @@ export class PosCatalogService {
         unit: a.unit,
         sellingPrice: a.sellingPrice,
         quantityOnHand: a.quantityOnHand,
+        showroomQuantity: a.showroomQuantity,
         locations: locs,
         defaultLocationId: locs[0]?.locationId ?? '',
       });
@@ -277,6 +314,7 @@ export class PosCatalogService {
       locationId: string | null;
       locationName: string | null;
       quantity: string | null;
+      isMainStorage: boolean | null;
     }> = await this.dataSource.query(
       `SELECT i.id                  AS "itemId",
               i.product_id          AS "productId",
@@ -286,7 +324,8 @@ export class PosCatalogService {
               i.selling_price::text AS "sellingPrice",
               sb.location_id        AS "locationId",
               l.name                AS "locationName",
-              sb.quantity::text     AS "quantity"
+              sb.quantity::text     AS "quantity",
+              COALESCE(st.is_main_storage, false) AS "isMainStorage"
        FROM items i
        LEFT JOIN item_barcodes b
          ON b.item_id = i.id AND b.organization_id = i.organization_id
@@ -301,6 +340,10 @@ export class PosCatalogService {
         )
        LEFT JOIN locations l
          ON l.id = sb.location_id
+       LEFT JOIN storages st
+         ON st.id = l.storage_id
+        AND st.organization_id = $1
+        AND st.branch_id::text = $2
        WHERE i.organization_id = $1
          AND i.is_active = true
          AND i.is_pos_visible = true

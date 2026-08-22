@@ -75,6 +75,12 @@ export class PosProductVariantDto {
   @ApiProperty({ type: [PosVariantAttributeDto] }) attributes: PosVariantAttributeDto[];
   @ApiProperty({ description: 'Total on-hand quantity of this variant at the branch.' })
   quantityOnHand: number;
+  @ApiProperty({
+    description:
+      "On-hand at the branch's main (showroom) storages only — the storage set a POS sale " +
+      'deducts from. This, not quantityOnHand, is the oversell-warning basis.',
+  })
+  showroomQuantity: number;
   @ApiProperty({ type: [PosVariantLocationDto] }) locations: PosVariantLocationDto[];
 }
 

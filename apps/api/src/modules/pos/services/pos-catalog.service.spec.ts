@@ -178,6 +178,44 @@ describe('PosCatalogService.lookupByCode', () => {
 
     expect(res).toEqual([]);
   });
+
+  // Barcode scan and typed search must land on the same oversell threshold for
+  // the same item. lookupByCode shares aggregateStockRows with getCatalog but
+  // its own query selects no classification flag at all (A-10), so this is the
+  // case that catches "scanning warns at a different number than typing".
+  it('reports the same showroom-only basis as the search path (A-10)', async () => {
+    query.mockResolvedValue([
+      {
+        itemId: 'BX140',
+        productId: null,
+        code: 'BX140',
+        name: 'BX140',
+        unit: 'CHAI',
+        sellingPrice: '140000',
+        locationId: 'L-WH',
+        locationName: '999',
+        quantity: '8',
+        isMainStorage: false,
+      },
+      {
+        itemId: 'BX140',
+        productId: null,
+        code: 'BX140',
+        name: 'BX140',
+        unit: 'CHAI',
+        sellingPrice: '140000',
+        locationId: 'L-SR',
+        locationName: 'Mặc định',
+        quantity: '4',
+        isMainStorage: true,
+      },
+    ]);
+
+    const res = await service.lookupByCode('branch-1', actor, 'BX140');
+
+    expect(res[0].showroomQuantity).toBe(4);
+    expect(res[0].quantityOnHand).toBe(12);
+  });
 });
 
 describe('PosCatalogService.getCatalog', () => {
@@ -249,5 +287,90 @@ describe('PosCatalogService.getCatalog', () => {
     const [sql, params] = query.mock.calls[0];
     expect(params).toEqual(['org-1', 'branch-1']);
     expect(sql).not.toContain('ILIKE');
+  });
+
+  // Field reproduced from branch MT46: BX140 sits 8 at a warehouse shelf and 4
+  // at the showroom's default shelf. POS deducts from the branch's main
+  // (showroom) storages only — resolveBranchItemLocations(..., showroomOnly) —
+  // so 4, not 12, is what the oversell warning has to compare against.
+  const bx140Rows = [
+    {
+      itemId: 'BX140',
+      productId: null,
+      code: 'BX140',
+      name: 'BX140',
+      unit: 'CHAI',
+      sellingPrice: '140000',
+      locationId: 'L-WH',
+      locationName: '999',
+      quantity: '8',
+      isShowroom: false,
+      isMainStorage: false,
+    },
+    {
+      itemId: 'BX140',
+      productId: null,
+      code: 'BX140',
+      name: 'BX140',
+      unit: 'CHAI',
+      sellingPrice: '140000',
+      locationId: 'L-SR',
+      locationName: 'Mặc định',
+      quantity: '4',
+      isShowroom: true,
+      isMainStorage: true,
+    },
+  ];
+
+  it('sums showroomQuantity from main-storage locations only', async () => {
+    query.mockResolvedValue(bx140Rows);
+
+    const res = await service.getCatalog('branch-1', actor);
+
+    expect(res).toHaveLength(1);
+    expect(res[0].showroomQuantity).toBe(4);
+  });
+
+  it('keeps quantityOnHand as the branch-wide total', async () => {
+    // quantityOnHand still means "every location in the branch" — fast stock
+    // transfer reads it and nothing tells it the meaning moved (A-07).
+    query.mockResolvedValue(bx140Rows);
+
+    const res = await service.getCatalog('branch-1', actor);
+
+    expect(res[0].quantityOnHand).toBe(12);
+    expect(res[0].locations).toHaveLength(2);
+    expect(res[0].defaultLocationId).toBe('L-WH');
+  });
+
+  // This case exists to block the tempting one-line fix: passing
+  // direction=showroom. aggregateStockRows filters *rows* before grouping, so
+  // an item stocked only in a warehouse would drop out of the catalogue
+  // entirely — unsearchable, unsellable, no oversell to warn about (A-04).
+  // Showing it with showroomQuantity 0 is the point: warn, do not hide.
+  it('keeps warehouse-only items in the result with showroomQuantity 0', async () => {
+    query.mockResolvedValue([
+      ...bx140Rows,
+      {
+        itemId: 'I-WH-ONLY',
+        productId: null,
+        code: 'WH-ONLY',
+        name: 'Hàng chưa ra quầy',
+        unit: 'cái',
+        sellingPrice: '50000',
+        locationId: 'L-WH',
+        locationName: '999',
+        quantity: '7',
+        isShowroom: false,
+        isMainStorage: false,
+      },
+    ]);
+
+    const res = await service.getCatalog('branch-1', actor);
+
+    expect(res.map((r) => r.itemId).sort()).toEqual(['BX140', 'I-WH-ONLY']);
+    const whOnly = res.find((r) => r.itemId === 'I-WH-ONLY')!;
+    expect(whOnly.showroomQuantity).toBe(0);
+    expect(whOnly.quantityOnHand).toBe(7);
   });
 });

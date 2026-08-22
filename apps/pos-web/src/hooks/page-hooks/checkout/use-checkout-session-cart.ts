@@ -13,7 +13,10 @@ import type {
   CatalogProduct,
 } from "@erp/pos/interfaces/checkout.interface";
 import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
-import { isCartLineWarning } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
+import {
+  isCartLineWarning,
+  readShowroomOnHand,
+} from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
   clampPosCheckoutQtyNumber,
   isPosQtyRawNegative,
@@ -166,10 +169,14 @@ export function useCheckoutSessionCart() {
       if (!session) return null;
       // Cho phép bán khống: KHÔNG chặn khi hết tồn. `onHand` chỉ còn dùng làm
       // `maxQty` (snapshot tồn) để đánh dấu cảnh báo vượt tồn + bật dialog xác nhận
-      // bán khống lúc thanh toán. Dùng `quantityOnHand` (SUM toàn chi nhánh) —
-      // KHÔNG dùng tồn per-location: BE trừ kho ở vị trí showroom mặc định nên
-      // breakdown locations[] có thể chứa cặp +/− bù trừ, chỉ SUM là chuẩn.
-      const onHand = product.quantityOnHand;
+      // bán khống lúc thanh toán. Cơ sở là `showroomQuantity` (tồn tại các kho
+      // chính của chi nhánh) chứ KHÔNG phải `quantityOnHand` (SUM toàn chi
+      // nhánh): POS luôn trừ kho ở showroom, nên đếm cả tồn kho lưu trữ làm cảnh
+      // báo bật muộn đúng bằng lượng hàng nằm trong kho.
+      // Vẫn KHÔNG được tự cộng/lọc `locations[]` để suy ra con số này: FE không
+      // biết vị trí nào thuộc showroom, và breakdown per-location có thể chứa
+      // cặp +/− bù trừ. Phân loại nằm ở BE.
+      const onHand = readShowroomOnHand(product);
       const delta = clampPosCheckoutQtyNumber(Number(qtyToAdd) || 0);
 
       // Read the latest cart state from the store so we can compute the
@@ -203,7 +210,12 @@ export function useCheckoutSessionCart() {
           // merge giữ snapshot từ lần thêm đầu sẽ báo vượt tồn sai.
           return prev.map((l) =>
             l.lineId === existingInPrev.lineId
-              ? { ...l, qty: l.qty + delta, maxQty: onHand, onHandUnknown: false }
+              ? {
+                  ...l,
+                  qty: l.qty + delta,
+                  maxQty: onHand ?? 0,
+                  onHandUnknown: onHand === null,
+                }
               : l,
           );
         }
@@ -216,7 +228,8 @@ export function useCheckoutSessionCart() {
           unitPrice: product.sellingPrice ?? 0,
           qty: delta,
           locationId: product.defaultLocationId,
-          maxQty: onHand,
+          maxQty: onHand ?? 0,
+          onHandUnknown: onHand === null,
         };
         if (activeCheckoutPane === CheckoutPane.RETURN) {
           if (variant === CheckoutVariantEnum.QUICK_EXCHANGE) {

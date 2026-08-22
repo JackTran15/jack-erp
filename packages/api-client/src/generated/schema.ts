@@ -11396,6 +11396,8 @@ export interface components {
             attributes: components["schemas"]["PosVariantAttributeDto"][];
             /** @description Total on-hand quantity of this variant at the branch. */
             quantityOnHand: number;
+            /** @description On-hand at the branch's main (showroom) storages only — the storage set a POS sale deducts from. This, not quantityOnHand, is the oversell-warning basis. */
+            showroomQuantity: number;
             locations: components["schemas"]["PosVariantLocationDto"][];
         };
         PosProductDetailDto: {

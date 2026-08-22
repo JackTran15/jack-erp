@@ -8,6 +8,7 @@ import { ProductEntity } from '../../inventory/product/product.entity';
 import { StockBalanceEntity } from '../../inventory/ledger/stock-balance.entity';
 import { LocationEntity } from '../../inventory/location/location.entity';
 import { ShowroomEntity } from '../../inventory/location/showroom.entity';
+import { StorageEntity } from '../../inventory/location/storage.entity';
 import { ItemCategoryEntity } from '../../inventory/location/item-category.entity';
 import { ProductAttributeDefinitionEntity } from '../../inventory/product/product-attribute-definition.entity';
 import { ItemAttributeValueEntity } from '../../inventory/product/item-attribute-value.entity';
@@ -30,7 +31,16 @@ import {
 } from '../dto/pos-catalog-product.response.dto';
 
 /** Aggregated branch stock for a single item: total quantity plus per-location breakdown. */
-type ItemStock = { total: number; locations: PosVariantLocationDto[] };
+type ItemStock = {
+  total: number;
+  /**
+   * On-hand at the branch's main (showroom) storages only — the storage set
+   * `resolveBranchItemLocations(..., showroomOnly)` deducts a POS sale from,
+   * and therefore the basis the oversell warning has to compare against.
+   */
+  showroomTotal: number;
+  locations: PosVariantLocationDto[];
+};
 
 /** A variant's attribute value annotated with its dimension sort order, for display ordering. */
 type VariantAttr = { name: string; value: string; sortOrder: number };
@@ -76,6 +86,8 @@ export class PosCatalogProductService {
     private readonly locationRepo: Repository<LocationEntity>,
     @InjectRepository(ShowroomEntity)
     private readonly showroomRepo: Repository<ShowroomEntity>,
+    @InjectRepository(StorageEntity)
+    private readonly storageRepo: Repository<StorageEntity>,
     @InjectRepository(ProductAttributeDefinitionEntity)
     private readonly attrDefRepo: Repository<ProductAttributeDefinitionEntity>,
     @InjectRepository(ItemAttributeValueEntity)
@@ -432,6 +444,7 @@ export class PosCatalogProductService {
       imageUrl: null,
       attributes,
       quantityOnHand: stock?.total ?? 0,
+      showroomQuantity: stock?.showroomTotal ?? 0,
       locations: stock?.locations ?? [],
     };
   }
@@ -470,6 +483,22 @@ export class PosCatalogProductService {
     });
     const locById = new Map(locations.map((l) => [l.id, l]));
 
+    // Classification for the oversell-warning basis: the branch's main
+    // storages, matching resolveBranchItemLocations(..., showroomOnly). This is
+    // deliberately NOT the `showrooms` lookup below — that one classifies the
+    // `direction` parameter for fast stock transfer and is left alone. Two
+    // notions of "showroom" coexist here on purpose; this is the one that has
+    // to predict where a sale deducts from.
+    // Loaded by branch and filtered in memory, exactly as
+    // resolveBranchItemLocations does — same query shape, same result set, so
+    // the two cannot drift apart over a `where` clause.
+    const branchStorages = await this.storageRepo.find({
+      where: { organizationId: orgId, branchId },
+    });
+    const mainStorageIds = new Set(
+      branchStorages.filter((st) => st.isMainStorage).map((st) => st.id),
+    );
+
     let showroomStorageIds: Set<string> | null = null;
     if (direction) {
       const showrooms = await this.showroomRepo.find({
@@ -493,10 +522,11 @@ export class PosCatalogProductService {
       const qty = Number(b.quantity) || 0;
       let agg = map.get(b.itemId);
       if (!agg) {
-        agg = { total: 0, locations: [] };
+        agg = { total: 0, showroomTotal: 0, locations: [] };
         map.set(b.itemId, agg);
       }
       agg.total += qty;
+      if (mainStorageIds.has(loc.storageId)) agg.showroomTotal += qty;
       agg.locations.push({ locationId: b.locationId, name: loc?.name ?? '', quantity: qty });
     }
 
