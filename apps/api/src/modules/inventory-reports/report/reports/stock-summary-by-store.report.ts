@@ -20,15 +20,13 @@ import { InventoryReportDefinition } from '../inventory-report-definition';
 import {
   buildInventoryHeaders,
   InventoryColumnDef,
-  numericKeys,
 } from '../inventory-report-column.util';
+import { CountedRows } from '../../../reporting/report-core/report-definition';
+import { toEngineFilters } from '../report-column-mapper.util';
 import {
-  applyColumnFilters,
   assertKnownColumns,
-  assertUnderRowCap,
-  buildTotalsRow,
-  MAX_REPORT_ROWS,
-  paginateRows,
+  projectRows,
+  toTotalsRow,
 } from '../report-data.util';
 import { resolveInventoryBranchIds } from '../report-scope.util';
 
@@ -57,7 +55,21 @@ const COLUMNS: InventoryColumnDef[] = [
 ];
 
 const CATALOG_KEYS = new Set(COLUMNS.map((c) => c.key));
-const NUMERIC = numericKeys(COLUMNS);
+
+/**
+ * Report column key → the field `StockPeriodService` knows it by (ADR-03).
+ *
+ * `branchCode` is absent on purpose: `branches` has no code column, so every
+ * query selects `NULL::text` for it. Filtering a column that can only ever be
+ * null answers 400 instead of looking active while matching nothing.
+ */
+const KEY_MAP = {
+  name: 'itemName',
+  group: 'categoryName',
+  branch: 'branchName',
+  endingQty: 'closingQty',
+  endingValue: 'closingValue',
+} as const;
 
 /** "Tổng hợp nhập xuất tồn kho theo cửa hàng" — one row per item × branch. */
 @Injectable()
@@ -79,6 +91,37 @@ export class StockSummaryByStoreReport implements InventoryReportDefinition {
     actor: ActorContext,
   ): Promise<InventoryReportResult> {
     assertKnownColumns(dto, CATALOG_KEYS);
+    const scope = await this.scopedQuery(dto, actor);
+
+    const result = await this.stockPeriod.aggregate({
+      ...scope,
+      page: dto.page ?? 1,
+      pageSize: dto.limit ?? 20,
+    });
+
+    return {
+      rows: projectRows(result.data.map((r) => this.toRow(r)), dto.columns),
+      totals: toTotalsRow(dto.columns, result.totals, KEY_MAP),
+      total: result.total,
+    };
+  }
+
+  /** Whole-set count for the export path's cap check (ADR-01). */
+  async countRows(
+    dto: InventoryReportSearchDto,
+    actor: ActorContext,
+  ): Promise<CountedRows> {
+    const scope = await this.scopedQuery(dto, actor);
+    const result = await this.stockPeriod.aggregate({
+      ...scope,
+      page: 1,
+      pageSize: 1,
+    });
+    return { total: result.total, subject: 'rows' };
+  }
+
+  /** Shared by buildData and countRows so the two can never disagree. */
+  private async scopedQuery(dto: InventoryReportSearchDto, actor: ActorContext) {
     const filters = dto.filters;
     const period = resolvePeriod({
       preset: filters.period?.from || filters.period?.to ? undefined : filters.preset,
@@ -91,30 +134,20 @@ export class StockSummaryByStoreReport implements InventoryReportDefinition {
       actor,
     );
 
-    const result = await this.stockPeriod.aggregate({
+    return {
       organizationId: actor.organizationId,
       startDate: period.startDate,
       endDate: period.endDate,
-      groupBy: 'item_branch',
+      groupBy: 'item_branch' as const,
       itemGroupBy: filters.statBy,
       branchIds,
       categoryIds: filters.categoryId ? [filters.categoryId] : undefined,
       search: filters.search,
       hideZeroRows: filters.hideZeroRows ?? true,
-      page: 1,
-      pageSize: MAX_REPORT_ROWS,
-    });
-    assertUnderRowCap(result.total);
-
-    let rows = result.data.map((r) => this.toRow(r));
-    if (filters.unit) rows = rows.filter((r) => r.unit === filters.unit);
-    if (filters.brand) rows = rows.filter((r) => r.brand === filters.brand);
-    rows = applyColumnFilters(rows, dto.columnFilters);
-
-    return {
-      rows: paginateRows(rows, dto.columns, dto.page ?? 1, dto.limit ?? 20),
-      totals: buildTotalsRow(dto.columns, rows, NUMERIC),
-      total: rows.length,
+      columnFilters: toEngineFilters(dto.columnFilters, KEY_MAP, {
+        unit: filters.unit,
+        brand: filters.brand,
+      }),
     };
   }
 

@@ -21,15 +21,13 @@ import { InventoryReportDefinition } from '../inventory-report-definition';
 import {
   buildInventoryHeaders,
   InventoryColumnDef,
-  numericKeys,
 } from '../inventory-report-column.util';
+import { CountedRows } from '../../../reporting/report-core/report-definition';
+import { toEngineFilters } from '../report-column-mapper.util';
 import {
-  applyColumnFilters,
   assertKnownColumns,
-  assertUnderRowCap,
-  buildTotalsRow,
-  MAX_REPORT_ROWS,
-  paginateRows,
+  projectRows,
+  toTotalsRow,
 } from '../report-data.util';
 import { resolveInventoryBranchIds } from '../report-scope.util';
 
@@ -58,7 +56,16 @@ const COLUMNS: InventoryColumnDef[] = [
 ];
 
 const CATALOG_KEYS = new Set(COLUMNS.map((c) => c.key));
-const NUMERIC = numericKeys(COLUMNS);
+
+/**
+ * Report column key → engine field name (ADR-03).
+ *
+ * Empty because this report's catalog and `TempWarehouseIssueRow` already agree
+ * on all thirteen names — which is exactly why it went first: it exercises the
+ * pushdown machinery without any SQL of its own to get wrong. Declared rather
+ * than omitted so the next reader can see the match was checked, not assumed.
+ */
+const KEY_MAP = {};
 
 /** "Hàng hóa xuất kho tạm" — one row per matched issue↔return pair. */
 @Injectable()
@@ -80,6 +87,52 @@ export class TempWarehouseOutReport implements InventoryReportDefinition {
     actor: ActorContext,
   ): Promise<InventoryReportResult> {
     assertKnownColumns(dto, CATALOG_KEYS);
+    const scope = await this.scopedQuery(dto, actor);
+
+    // Filtering, counting, totalling and paging all happen in SQL now. The
+    // definition's job is down to naming columns and shaping the envelope.
+    const result = await this.tempWarehouse.list({
+      ...scope,
+      page: dto.page ?? 1,
+      pageSize: dto.limit ?? 20,
+      columnFilters: toEngineFilters(dto.columnFilters, KEY_MAP),
+    });
+
+    return {
+      rows: projectRows(result.data.map((r) => this.toRow(r)), dto.columns),
+      totals: toTotalsRow(dto.columns, result.totals, KEY_MAP),
+      total: result.total,
+    };
+  }
+
+  /**
+   * Row count for the whole set, without loading a single row.
+   *
+   * The export path is the only caller. It has to reject an oversized workbook
+   * before the sink writes a byte, and `ReportExportService` will only enforce
+   * the cap for definitions that offer this method — so removing
+   * `assertUnderRowCap` from `buildData` without adding it here would leave the
+   * export path with nothing guarding it at all (ADR-01).
+   */
+  async countRows(
+    dto: InventoryReportSearchDto,
+    actor: ActorContext,
+  ): Promise<CountedRows> {
+    const scope = await this.scopedQuery(dto, actor);
+    const result = await this.tempWarehouse.list({
+      ...scope,
+      page: 1,
+      pageSize: 1,
+      columnFilters: toEngineFilters(dto.columnFilters, KEY_MAP),
+    });
+    return { total: result.total, subject: 'rows' };
+  }
+
+  /**
+   * Period and branch scope for one request, shared by `buildData` and
+   * `countRows` so the count can never describe a different set than the rows.
+   */
+  private async scopedQuery(dto: InventoryReportSearchDto, actor: ActorContext) {
     const filters = dto.filters;
     const period = resolvePeriod({
       preset: filters.period?.from || filters.period?.to ? undefined : filters.preset,
@@ -91,26 +144,13 @@ export class TempWarehouseOutReport implements InventoryReportDefinition {
       filters.store,
       actor,
     );
-
-    const result = await this.tempWarehouse.list({
+    return {
       organizationId: actor.organizationId,
       startDate: period.startDate,
       endDate: period.endDate,
       branchIds,
       categoryIds: filters.categoryId ? [filters.categoryId] : undefined,
       search: filters.search,
-      page: 1,
-      pageSize: MAX_REPORT_ROWS,
-    });
-    assertUnderRowCap(result.total);
-
-    let rows = result.data.map((r) => this.toRow(r));
-    rows = applyColumnFilters(rows, dto.columnFilters);
-
-    return {
-      rows: paginateRows(rows, dto.columns, dto.page ?? 1, dto.limit ?? 20),
-      totals: buildTotalsRow(dto.columns, rows, NUMERIC),
-      total: rows.length,
     };
   }
 

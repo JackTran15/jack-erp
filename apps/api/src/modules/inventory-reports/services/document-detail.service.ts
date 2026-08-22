@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import type { ReportTotals } from '@erp/shared-interfaces';
-import type { ReportColumnFilterDto } from '../dto/report-column-filter.dto';
+import { INVENTORY_DOC_KIND_LABELS_VI, type ReportTotals } from '@erp/shared-interfaces';
 import {
   buildReportColumnFilter,
+  type ReportColumnFilters,
   type ReportColumnSpecs,
 } from './report-column-filter.util';
 import { DataSource } from 'typeorm';
@@ -99,7 +99,7 @@ export interface DocumentDetailQuery {
   /** Start a keyset walk at the first page. Implied when `cursor` is set. */
   keyset?: boolean;
   /** Lọc theo cột, áp phía server nên tác dụng trên toàn tập. */
-  columnFilters?: Record<string, ReportColumnFilterDto>;
+  columnFilters?: ReportColumnFilters;
 }
 
 /**
@@ -126,7 +126,93 @@ export interface DocumentDetailResult {
 }
 
 /** Cột lọc được, chiếu ở tầng ngoài (`lines l` + `items i`). */
+/**
+ * The counterparty name, resolved from whichever table the line points at.
+ *
+ * One definition, used by the SELECT list and by the `customer` filter spec, so
+ * a user filtering the column matches exactly what the column shows.
+ */
+const COUNTERPARTY_SQL = `(CASE
+           WHEN l.counterparty_kind = 'supplier' THEN
+             (SELECT p.name FROM inventory_providers p WHERE p.id::text = l.counterparty_id AND p.organization_id = $1)
+           WHEN l.counterparty_kind = 'customer' THEN
+             (SELECT c.name FROM customers c WHERE c.id::text = l.counterparty_id AND c.organization_id = $1)
+           WHEN l.counterparty_kind = 'employee' THEN
+             (SELECT (u.first_name || ' ' || u.last_name) FROM users u WHERE u.id::text = l.counterparty_id AND u.organization_id = $1::uuid)
+           WHEN l.provider_id IS NOT NULL THEN
+             (SELECT p2.name FROM inventory_providers p2 WHERE p2.id::text = l.provider_id AND p2.organization_id = $1)
+           ELSE NULL
+         END)`;
+
+/**
+ * `doc_kind` → the Vietnamese label the grid renders, built from the shared
+ * constant so the two cannot drift. Filtering "Phiếu điều chuyển kho" has to
+ * match the cell showing that text, not the enum behind it.
+ */
+const DOC_KIND_LABEL_SQL = `(CASE ${Object.entries(INVENTORY_DOC_KIND_LABELS_VI)
+  .map(([kind, label]) => `WHEN l.doc_kind = '${kind}' THEN '${label.replace(/'/g, "''")}'`)
+  .join(' ')} ELSE l.doc_kind END)`;
+
+/**
+ * The joins the outer-stage specs resolve against.
+ *
+ * `dataSql` has always carried these; `countSql` joined only `items`. Both take
+ * the same filter fragment, so a spec naming `ic.name` or `bs.name` breaks the
+ * count with 42P01 unless the join lands in both (ADR-04). All are many-to-one,
+ * so the row count is unchanged.
+ */
+const OUTER_JOINS = `
+      LEFT JOIN inventory_item_categories ic ON ic.id = i.category_id
+      LEFT JOIN products pr ON pr.id = i.product_id AND pr.organization_id = i.organization_id
+      LEFT JOIN branches bs ON bs.id::text = l.branch_id AND bs.organization_id = $1
+      LEFT JOIN branches br ON br.id::text = l.receiver_branch_id AND br.organization_id = $1
+      LEFT JOIN locations loc ON loc.id = l.location_id`;
+
+/** One definition each, so the predicate and the rendered cell cannot drift. */
+const DOC_COLOR_SQL = `(SELECT pao.value_label FROM item_attribute_values iav
+         JOIN product_attribute_definitions pad ON pad.id = iav.attribute_definition_id
+         JOIN product_attribute_options pao ON pao.id = iav.option_id
+         WHERE iav.item_id = i.id AND LOWER(pad.name) IN ('màu sắc', 'màu', 'color')
+         LIMIT 1)`;
+
+const DOC_SIZE_SQL = `(SELECT pao.value_label FROM item_attribute_values iav
+         JOIN product_attribute_definitions pad ON pad.id = iav.attribute_definition_id
+         JOIN product_attribute_options pao ON pao.id = iav.option_id
+         WHERE iav.item_id = i.id AND LOWER(pad.name) = 'size'
+         LIMIT 1)`;
+
 const DOCUMENT_DETAIL_COLUMN_SPECS: ReportColumnSpecs = {
+  color: { sql: DOC_COLOR_SQL, kind: 'text' },
+  size: { sql: DOC_SIZE_SQL, kind: 'text' },
+  // The grid renders this column as dd/MM/yyyy text with a TEXT filter box, so
+  // the predicate matches the displayed form. Range mode still compares those
+  // strings lexicographically, which is as wrong as it was before this change —
+  // preserved deliberately rather than silently redefined here.
+  date: { sql: `to_char(l.posted_at, 'DD/MM/YYYY')`, kind: 'text' },
+  documentType: { sql: DOC_KIND_LABEL_SQL, kind: 'text' },
+  warehouse: { sql: 'COALESCE(loc.name, bs.name)', kind: 'text' },
+  notes: { sql: 'l.notes', kind: 'text' },
+  customer: { sql: COUNTERPARTY_SQL, kind: 'text' },
+  branchName: { sql: 'bs.name', kind: 'text' },
+  // Only stock transfers carry a receiver, so the other two streams select NULL
+  // for it. A predicate here therefore drops receipts and issues — which is what
+  // filtering on "chi nhánh nhận" means, not a bug.
+  receiverBranchName: { sql: 'br.name', kind: 'text' },
+  // branchCode / receiverBranchCode get no spec: `toRow` hard-codes both to
+  // null because `branches` has no code column. Filtering a column that can
+  // only ever be null answers 400 instead of looking active and matching
+  // nothing.
+  group: { sql: 'ic.name', kind: 'text' },
+  parentSku: { sql: 'pr.code', kind: 'text' },
+  parentName: { sql: 'pr.name', kind: 'text' },
+  inSalePrice: {
+    sql: `(CASE WHEN l.doc_kind = 'GOODS_RECEIPT' THEN i.selling_price ELSE 0 END)`,
+    kind: 'number',
+  },
+  outSalePrice: {
+    sql: `(CASE WHEN l.doc_kind <> 'GOODS_RECEIPT' THEN i.selling_price ELSE 0 END)`,
+    kind: 'number',
+  },
   documentNumber: { sql: 'l.document_number', kind: 'text' },
   referenceNumber: { sql: 'l.reference_number', kind: 'text' },
   sku: { sql: 'i.code', kind: 'text' },
@@ -314,16 +400,8 @@ export class DocumentDetailService {
         ic.id AS category_id,
         ic.name AS category_name,
         i.brand AS brand,
-        (SELECT pao.value_label FROM item_attribute_values iav
-         JOIN product_attribute_definitions pad ON pad.id = iav.attribute_definition_id
-         JOIN product_attribute_options pao ON pao.id = iav.option_id
-         WHERE iav.item_id = i.id AND LOWER(pad.name) IN ('màu sắc', 'màu', 'color')
-         LIMIT 1) AS color,
-        (SELECT pao.value_label FROM item_attribute_values iav
-         JOIN product_attribute_definitions pad ON pad.id = iav.attribute_definition_id
-         JOIN product_attribute_options pao ON pao.id = iav.option_id
-         WHERE iav.item_id = i.id AND LOWER(pad.name) = 'size'
-         LIMIT 1) AS size,
+        ${DOC_COLOR_SQL} AS color,
+        ${DOC_SIZE_SQL} AS size,
         bs.id AS branch_id,
         bs.name AS branch_name,
         br.id AS receiver_branch_id,
@@ -339,27 +417,13 @@ export class DocumentDetailService {
         l.out_unit_price,
         l.out_value,
         (CASE WHEN l.doc_kind <> 'GOODS_RECEIPT' THEN i.selling_price ELSE 0 END) AS out_sale_price,
-        (CASE
-           WHEN l.counterparty_kind = 'supplier' THEN
-             (SELECT p.name FROM inventory_providers p WHERE p.id::text = l.counterparty_id AND p.organization_id = $1)
-           WHEN l.counterparty_kind = 'customer' THEN
-             (SELECT c.name FROM customers c WHERE c.id::text = l.counterparty_id AND c.organization_id = $1)
-           WHEN l.counterparty_kind = 'employee' THEN
-             (SELECT (u.first_name || ' ' || u.last_name) FROM users u WHERE u.id::text = l.counterparty_id AND u.organization_id = $1::uuid)
-           WHEN l.provider_id IS NOT NULL THEN
-             (SELECT p2.name FROM inventory_providers p2 WHERE p2.id::text = l.provider_id AND p2.organization_id = $1)
-           ELSE NULL
-         END) AS customer_name,
+        ${COUNTERPARTY_SQL} AS customer_name,
         l.notes,
         l.posted_at::text AS cursor_at,
         (l.doc_kind || ':' || l.line_id) AS cursor_id
       FROM lines l
       JOIN items i ON i.id = l.item_id AND i.organization_id = $1
-      LEFT JOIN inventory_item_categories ic ON ic.id = i.category_id
-      LEFT JOIN products pr ON pr.id = i.product_id AND pr.organization_id = i.organization_id
-      LEFT JOIN branches bs ON bs.id::text = l.branch_id AND bs.organization_id = $1
-      LEFT JOIN branches br ON br.id::text = l.receiver_branch_id AND br.organization_id = $1
-      LEFT JOIN locations loc ON loc.id = l.location_id
+      ${OUTER_JOINS}
       WHERE ($5::uuid[] IS NULL OR i.category_id = ANY($5))
         AND ($6::text IS NULL OR i.code ILIKE '%' || $6 || '%' OR i.name ILIKE '%' || $6 || '%')
         ${filterWhere}
@@ -377,6 +441,7 @@ export class DocumentDetailService {
              ).join(',\n             ')}
       FROM lines l
       JOIN items i ON i.id = l.item_id AND i.organization_id = $1
+      ${OUTER_JOINS}
       WHERE ($5::uuid[] IS NULL OR i.category_id = ANY($5))
         AND ($6::text IS NULL OR i.code ILIKE '%' || $6 || '%' OR i.name ILIKE '%' || $6 || '%')
         ${filterWhere}

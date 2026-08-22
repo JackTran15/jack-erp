@@ -1,21 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { ColumnFilter, ReportRow } from '@erp/shared-interfaces';
+import { ColumnFilter, ReportRow, ReportTotals } from '@erp/shared-interfaces';
 import { matchColumnFilter } from '../../reporting/report-core/column-filter.util';
 import { InventoryReportSearchDto } from '../dto/inventory-report-search.dto';
-
-/**
- * Upper bound on the rows a definition may materialize for in-memory
- * column-filtering + totals. Beyond this the user must narrow the period
- * or filters — silently truncating would produce wrong totals.
- *
- * Declared in report-core so the export pipeline can enforce it too; re-exported
- * here because every inventory report already imports it from this file.
- */
-export {
-  assertUnderRowCap,
-  MAX_REPORT_ROWS,
-} from '../../reporting/report-core/row-cap.util';
 
 /** Reject requested/filtered column keys not present in the catalog. */
 export function assertKnownColumns(
@@ -34,7 +21,13 @@ export function assertKnownColumns(
   }
 }
 
-/** Apply every per-column filter (AND) on the keyed rows. */
+/**
+ * Apply every per-column filter (AND) on the keyed rows.
+ *
+ * The seven paged inventory reports no longer use this — they compile their
+ * filters into SQL. It stays for `transfer-summary`, whose engine returns one
+ * row per branch and so has nothing to page or cap.
+ */
 export function applyColumnFilters(
   rows: ReportRow[],
   filters: ColumnFilter[] | undefined,
@@ -70,6 +63,21 @@ export function buildTotalsRow(
   return totals;
 }
 
+/**
+ * Project each row onto the requested columns, in the requested order.
+ *
+ * What is left of `paginateRows` once the slicing moves into SQL: the engine
+ * hands back the page already, and all that remains is trimming each row to the
+ * columns the grid asked for.
+ */
+export function projectRows(rows: ReportRow[], columns: string[]): ReportRow[] {
+  return rows.map((row) => {
+    const projected: ReportRow = {};
+    for (const col of columns) projected[col] = row[col] ?? null;
+    return projected;
+  });
+}
+
 /** Slice one page and project each row onto the requested columns. */
 export function paginateRows(
   rows: ReportRow[],
@@ -78,11 +86,7 @@ export function paginateRows(
   limit: number,
 ): ReportRow[] {
   const offset = (page - 1) * limit;
-  return rows.slice(offset, offset + limit).map((row) => {
-    const projected: ReportRow = {};
-    for (const col of columns) projected[col] = row[col] ?? null;
-    return projected;
-  });
+  return projectRows(rows.slice(offset, offset + limit), columns);
 }
 
 /** Deterministic cache key of one search request (must include the org). */
@@ -94,4 +98,38 @@ export function searchCacheKey(
     .update(organizationId)
     .update(JSON.stringify(dto))
     .digest('hex');
+}
+
+/**
+ * Project the engine's whole-set totals onto the requested columns.
+ *
+ * The in-memory sibling `buildTotalsRow` sums the rows it was handed, which is
+ * only correct while every row is in hand. Once paging moves into SQL the
+ * footer has to come from the engine's own aggregate — this turns that map
+ * (keyed by engine field name) into a row keyed by report column, in the order
+ * the grid asked for.
+ *
+ * A column missing from `totals` becomes `null`, never `0`: zero is a claim
+ * about the data, and a column the engine does not aggregate has no such claim
+ * to make. `nonAdditive` marks columns whose sum would be meaningless — unit
+ * prices and averages, where the average of averages is simply wrong.
+ */
+export function toTotalsRow(
+  columns: string[],
+  totals: ReportTotals | undefined,
+  keyMap: Readonly<Record<string, string>> = {},
+  nonAdditive?: Set<string>,
+): ReportRow | null {
+  if (!totals || Object.keys(totals).length === 0) return null;
+
+  const row: ReportRow = {};
+  for (const col of columns) {
+    if (nonAdditive?.has(col)) {
+      row[col] = null;
+      continue;
+    }
+    const value = totals[keyMap[col] ?? col];
+    row[col] = typeof value === 'number' ? value : null;
+  }
+  return row;
 }

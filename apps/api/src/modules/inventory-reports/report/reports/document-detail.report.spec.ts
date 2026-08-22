@@ -42,12 +42,29 @@ function engineRow(overrides: Partial<DocumentDetailRow>): DocumentDetailRow {
   };
 }
 
-function build(rows: DocumentDetailRow[]) {
+function build(rows: DocumentDetailRow[], total = rows.length) {
   const engine = {
-    list: jest.fn().mockResolvedValue({ data: rows, total: rows.length }),
+    // Stands in for SQL: one page, plus the whole-set count and totals.
+    list: jest.fn().mockImplementation(({ page = 1, pageSize = 20 }) => {
+      const offset = (page - 1) * pageSize;
+      const totals: Record<string, number> = {};
+      for (const key of ['inQty', 'inValue', 'outQty', 'outValue'] as const) {
+        totals[key] = rows.reduce((sum, r) => sum + Number(r[key] ?? 0), 0);
+      }
+      return Promise.resolve({
+        data: rows.slice(offset, offset + pageSize),
+        total,
+        totals,
+        nextCursor: null,
+        hasMore: false,
+      });
+    }),
   };
   const branches = { find: jest.fn().mockResolvedValue([]) };
-  return new DocumentDetailReport(engine as never, branches as never);
+  return Object.assign(
+    new DocumentDetailReport(engine as never, branches as never),
+    { engine },
+  ) as DocumentDetailReport & { engine: { list: jest.Mock } };
 }
 
 const dto: InventoryReportSearchDto = {
@@ -258,5 +275,87 @@ describe('DocumentDetailReport.exportSource', () => {
     );
 
     expect(Object.keys(page.rows[0])).toEqual(['documentNumber', 'inQty']);
+  });
+
+  it('answers a page of an over-cap organisation instead of refusing (AC-22)', async () => {
+    const report = build([engineRow({})], 74_515);
+
+    const result = await report.buildData({ ...dto, page: 1, limit: 50 }, actor);
+
+    expect(result.total).toBe(74_515);
+    expect(result.rows).toHaveLength(1);
+  });
+
+  it('pushes page, limit and column filters down under their engine names', async () => {
+    const report = build([engineRow({})]);
+
+    await report.buildData(
+      {
+        ...dto,
+        page: 2,
+        limit: 50,
+        columnFilters: [
+          { col: 'name', contains: 'giày' },
+          { col: 'reference', contains: 'PO-1' },
+          { col: 'warehouse', contains: 'Kho' },
+        ],
+      },
+      actor,
+    );
+
+    expect(report.engine.list).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page: 2,
+        pageSize: 50,
+        columnFilters: {
+          itemName: { operator: '*', value: 'giày' },
+          referenceNumber: { operator: '*', value: 'PO-1' },
+          warehouse: { operator: '*', value: 'Kho' },
+        },
+      }),
+    );
+  });
+
+  it('keeps no countRows, because the export streams by cursor (ADR-01)', () => {
+    // ReportExportService only enforces the cap for definitions WITHOUT an
+    // exportSource. This one streams, so the cap has nothing to protect and is
+    // deliberately absent — not an oversight.
+    const report = build([]);
+
+    expect(report.exportSource).toBeDefined();
+    expect((report as { countRows?: unknown }).countRows).toBeUndefined();
+  });
+
+  it('gives the keyset export the same predicate as the grid (AC-20)', async () => {
+    // Two read paths, one filter. If the export built its own, the file would
+    // quietly cover a different set than the table it was exported from.
+    const report = build([engineRow({})]);
+    const filters = [{ col: 'warehouse', contains: 'Kho' }];
+
+    await report.buildData({ ...dto, columnFilters: filters }, actor);
+    await report.exportSource!.page({ ...dto, columnFilters: filters }, actor, {
+      partition: {},
+      cursor: null,
+      size: 500,
+    } as never);
+
+    const [[gridQuery], [exportQuery]] = report.engine.list.mock.calls;
+    expect(exportQuery.columnFilters).toEqual(gridQuery.columnFilters);
+    // And the export walks by cursor rather than by offset.
+    expect(exportQuery.keyset).toBe(true);
+  });
+
+  it('no longer re-filters the exported page in memory', async () => {
+    // SQL already applied the predicate. Filtering again after the cursor sized
+    // the page could only shorten it, which confuses the walk.
+    const report = build([engineRow({}), engineRow({ sku: 'SKU-2' })]);
+
+    const page = await report.exportSource!.page(
+      { ...dto, columnFilters: [{ col: 'name', contains: 'no-such-item' }] },
+      actor,
+      { partition: {}, cursor: null, size: 500 } as never,
+    );
+
+    expect(page.rows).toHaveLength(2);
   });
 });

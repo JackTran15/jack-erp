@@ -21,6 +21,20 @@ export interface ReportColumnSpec {
 
 export type ReportColumnSpecs = Record<string, ReportColumnSpec>;
 
+/**
+ * The filters one report request carries, keyed by engine field name.
+ *
+ * A key may hold several filters, which are AND-ed. That happens when a column
+ * is constrained from two places at once — the filter bar's unit/brand
+ * dropdowns and the grid's own filter row both land on `unit` (ADR-06). Keeping
+ * one and dropping the other would return rows the user did not ask for while
+ * the UI shows both filters as active.
+ */
+export type ReportColumnFilters = Record<
+  string,
+  ReportColumnFilterDto | ReportColumnFilterDto[]
+>;
+
 export interface ReportFilterFragment {
   /** `WHERE`-ready clause, already parenthesised. Empty when nothing applies. */
   where: string;
@@ -47,7 +61,7 @@ const COMPARE_SQL: Record<CompareOperator, string> = {
  *                   emitted placeholders start at `startIndex + 1`.
  */
 export function buildReportColumnFilter(
-  filters: Record<string, ReportColumnFilterDto> | undefined,
+  filters: ReportColumnFilters | undefined,
   specs: ReportColumnSpecs,
   startIndex: number,
 ): ReportFilterFragment {
@@ -58,8 +72,8 @@ export function buildReportColumnFilter(
     return `$${startIndex + params.length}`;
   };
 
-  for (const [key, filter] of Object.entries(filters ?? {})) {
-    if (!filter) continue;
+  for (const [key, entry] of Object.entries(filters ?? {})) {
+    if (!entry) continue;
     const spec = specs[key];
     // An unknown key is a contract mismatch between grid and report, not a
     // reason to silently return unfiltered rows under a filtered-looking UI.
@@ -69,14 +83,16 @@ export function buildReportColumnFilter(
       );
     }
 
-    if (spec.kind === 'number') {
-      const clause = numberClause(spec.sql, filter, bind);
+    // Several filters on one column all have to hold, so each contributes its
+    // own clause to the same AND-ed list.
+    for (const filter of Array.isArray(entry) ? entry : [entry]) {
+      if (!filter) continue;
+      const clause =
+        spec.kind === 'number'
+          ? numberClause(spec.sql, filter, bind)
+          : textClause(spec.sql, filter, bind);
       if (clause) clauses.push(clause);
-      continue;
     }
-
-    const clause = textClause(spec.sql, filter, bind);
-    if (clause) clauses.push(clause);
   }
 
   return { where: clauses.join(' AND '), params };

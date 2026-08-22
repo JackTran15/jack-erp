@@ -9,6 +9,7 @@ import {
   ReportColumnDataType,
   ReportColumnHeader,
   ReportRow,
+  ReportTotals,
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { BranchEntity } from '../../../branch/branch.entity';
@@ -23,19 +24,29 @@ import {
   InventoryColumnDef,
   numericKeys,
 } from '../inventory-report-column.util';
-import {
-  applyColumnFilters,
-  assertUnderRowCap,
-  buildTotalsRow,
-  MAX_REPORT_ROWS,
-  paginateRows,
-} from '../report-data.util';
+import { CountedRows } from '../../../reporting/report-core/report-definition';
+import { toEngineFilters } from '../report-column-mapper.util';
+import { projectRows, toTotalsRow } from '../report-data.util';
 import {
   permittedBranchIds,
   resolveInventoryBranchIds,
 } from '../report-scope.util';
 
 const { STRING, NUMBER } = ReportColumnDataType;
+
+/**
+ * Grid column key → the key the engine reports its totals under.
+ *
+ * The fixed columns match by name; only the per-branch cells differ, and they
+ * are generated per organisation rather than declared (ADR-03).
+ */
+function branchTotalsKeyMap(
+  orgBranches: Array<{ id: string }>,
+): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const b of orgBranches) map[branchQtyColumnKey(b.id)] = `perBranch.${b.id}`;
+  return map;
+}
 
 const FIXED_COLUMNS: InventoryColumnDef[] = [
   { key: 'sku', type: STRING, width: 140 },
@@ -51,7 +62,6 @@ const FIXED_COLUMNS: InventoryColumnDef[] = [
 ];
 
 const FIXED_KEYS = new Set(FIXED_COLUMNS.map((c) => c.key));
-const FIXED_NUMERIC = numericKeys(FIXED_COLUMNS);
 
 /**
  * "Số lượng tồn kho theo cửa hàng" — current balance pivot: fixed identity
@@ -101,27 +111,81 @@ export class StockByStorePivotReport implements InventoryReportDefinition {
     );
 
     const result = await this.pivot.aggregate({
+      ...this.engineQuery(dto, actor, branchIds),
+      page: dto.page ?? 1,
+      pageSize: dto.limit ?? 20,
+    });
+
+    return {
+      rows: projectRows(
+        result.data.map((r) => this.toRow(r, orgBranches)),
+        dto.columns,
+      ),
+      // Engine keys for the per-branch cells are `perBranch.<id>`; the grid
+      // calls the same column `branch.qty.<id>`.
+      totals: this.branchTotals(dto.columns, result.totals, orgBranches),
+      total: result.total,
+    };
+  }
+
+  /**
+   * Footer for the pivot.
+   *
+   * `toTotalsRow` leaves a column absent from the engine totals as null, because
+   * zero would otherwise be a claim the data does not make. A branch column is
+   * the exception: `toRow` already renders a missing cell as 0, so a branch that
+   * simply holds no stock has a real total of zero, and a blank footer under a
+   * column of zeroes would read as "unknown" instead.
+   */
+  private branchTotals(
+    columns: string[],
+    totals: ReportTotals | undefined,
+    orgBranches: BranchEntity[],
+  ): ReportRow | null {
+    const row = toTotalsRow(columns, totals, branchTotalsKeyMap(orgBranches));
+    if (!row) return null;
+    for (const b of orgBranches) {
+      const key = branchQtyColumnKey(b.id);
+      if (columns.includes(key) && row[key] === null) row[key] = 0;
+    }
+    return row;
+  }
+
+  /** Whole-set count for the export path's cap check (ADR-01). */
+  async countRows(
+    dto: InventoryReportSearchDto,
+    actor: ActorContext,
+  ): Promise<CountedRows> {
+    const branchIds = await resolveInventoryBranchIds(
+      this.branches,
+      dto.filters.store,
+      actor,
+    );
+    const result = await this.pivot.aggregate({
+      ...this.engineQuery(dto, actor, branchIds),
+      page: 1,
+      pageSize: 1,
+    });
+    return { total: result.total, subject: 'rows' };
+  }
+
+  /** Everything the engine needs except paging, shared by both callers. */
+  private engineQuery(
+    dto: InventoryReportSearchDto,
+    actor: ActorContext,
+    branchIds: string[] | undefined,
+  ) {
+    const filters = dto.filters;
+    return {
       organizationId: actor.organizationId,
       itemGroupBy: filters.statBy,
       branchIds,
       categoryIds: filters.categoryId ? [filters.categoryId] : undefined,
       search: filters.search,
-      page: 1,
-      pageSize: MAX_REPORT_ROWS,
-    });
-    assertUnderRowCap(result.total);
-
-    const dynamicKeys = orgBranches.map((b) => branchQtyColumnKey(b.id));
-    let rows = result.data.map((r) => this.toRow(r, orgBranches));
-    if (filters.unit) rows = rows.filter((r) => r.unit === filters.unit);
-    if (filters.brand) rows = rows.filter((r) => r.brand === filters.brand);
-    rows = applyColumnFilters(rows, dto.columnFilters);
-
-    const numeric = new Set([...FIXED_NUMERIC, ...dynamicKeys]);
-    return {
-      rows: paginateRows(rows, dto.columns, dto.page ?? 1, dto.limit ?? 20),
-      totals: buildTotalsRow(dto.columns, rows, numeric),
-      total: rows.length,
+      columnFilters: toEngineFilters(dto.columnFilters, {}, {
+        unit: filters.unit,
+        brand: filters.brand,
+      }),
     };
   }
 

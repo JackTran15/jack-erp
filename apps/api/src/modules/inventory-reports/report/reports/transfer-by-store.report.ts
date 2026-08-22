@@ -26,13 +26,12 @@ import {
   InventoryColumnDef,
   numericKeys,
 } from '../inventory-report-column.util';
+import { CountedRows } from '../../../reporting/report-core/report-definition';
+import { toEngineFilters } from '../report-column-mapper.util';
 import {
-  applyColumnFilters,
   assertKnownColumns,
-  assertUnderRowCap,
-  buildTotalsRow,
-  MAX_REPORT_ROWS,
-  paginateRows,
+  projectRows,
+  toTotalsRow,
 } from '../report-data.util';
 import { permittedBranchIds } from '../report-scope.util';
 
@@ -58,6 +57,13 @@ const COLUMNS: InventoryColumnDef[] = [
 ];
 
 const CATALOG_KEYS = new Set(COLUMNS.map((c) => c.key));
+
+/** Report column key → the field `TransferReportService` knows it by (ADR-03). */
+const KEY_MAP = {
+  name: 'itemName',
+  group: 'categoryName',
+  targetBranch: 'destinationBranchName',
+} as const;
 const NUMERIC = numericKeys(COLUMNS);
 /** Average prices must not be summed. */
 const NON_ADDITIVE = new Set(['outAvgPrice', 'inAvgPrice']);
@@ -82,6 +88,42 @@ export class TransferByStoreReport implements InventoryReportDefinition {
     actor: ActorContext,
   ): Promise<InventoryReportResult> {
     assertKnownColumns(dto, CATALOG_KEYS);
+    const scope = await this.resolveScope(dto, actor);
+
+    const result = await this.transferReport.byBranch({
+      ...this.engineQuery(dto, actor, scope),
+      page: dto.page ?? 1,
+      pageSize: dto.limit ?? 20,
+    });
+
+    return {
+      rows: projectRows(result.data.map((r) => this.toRow(r)), dto.columns),
+      totals: toTotalsRow(dto.columns, result.totals, KEY_MAP, NON_ADDITIVE),
+      total: result.total,
+    };
+  }
+
+  /** Whole-set count for the export path's cap check (ADR-01). */
+  async countRows(
+    dto: InventoryReportSearchDto,
+    actor: ActorContext,
+  ): Promise<CountedRows> {
+    const scope = await this.resolveScope(dto, actor);
+    const result = await this.transferReport.byBranch({
+      ...this.engineQuery(dto, actor, scope),
+      page: 1,
+      pageSize: 1,
+    });
+    return { total: result.total, subject: 'rows' };
+  }
+
+  /**
+   * Period plus the validated source branch.
+   *
+   * The permission checks live here rather than in `buildData` so that
+   * `countRows` — reached from the export path — cannot skip them.
+   */
+  private async resolveScope(dto: InventoryReportSearchDto, actor: ActorContext) {
     const filters = dto.filters;
     const period = resolvePeriod({
       preset: filters.period?.from || filters.period?.to ? undefined : filters.preset,
@@ -96,9 +138,7 @@ export class TransferByStoreReport implements InventoryReportDefinition {
       );
     }
     if (!permittedBranchIds(actor).has(sourceBranchId)) {
-      throw new ForbiddenException(
-        `Access denied for stores: ${sourceBranchId}`,
-      );
+      throw new ForbiddenException(`Access denied for stores: ${sourceBranchId}`);
     }
     const owned = await this.branches.findOne({
       where: { id: sourceBranchId, organizationId: actor.organizationId },
@@ -108,29 +148,29 @@ export class TransferByStoreReport implements InventoryReportDefinition {
       throw new BadRequestException(`Unknown store ids: ${sourceBranchId}`);
     }
 
-    const result = await this.transferReport.byBranch({
+    return { period, sourceBranchId };
+  }
+
+  /** Everything the engine needs except paging, shared by both callers. */
+  private engineQuery(
+    dto: InventoryReportSearchDto,
+    actor: ActorContext,
+    scope: { period: { startDate: Date; endDate: Date }; sourceBranchId: string },
+  ) {
+    const filters = dto.filters;
+    return {
       organizationId: actor.organizationId,
-      startDate: period.startDate,
-      endDate: period.endDate,
-      sourceBranchId,
+      startDate: scope.period.startDate,
+      endDate: scope.period.endDate,
+      sourceBranchId: scope.sourceBranchId,
       destinationBranchIds: filters.receivingStoreIds,
       categoryIds: filters.categoryId ? [filters.categoryId] : undefined,
       search: filters.search,
       itemGroupBy: filters.statBy,
-      page: 1,
-      pageSize: MAX_REPORT_ROWS,
-    });
-    assertUnderRowCap(result.total);
-
-    let rows = result.data.map((r) => this.toRow(r));
-    if (filters.unit) rows = rows.filter((r) => r.unit === filters.unit);
-    if (filters.brand) rows = rows.filter((r) => r.brand === filters.brand);
-    rows = applyColumnFilters(rows, dto.columnFilters);
-
-    return {
-      rows: paginateRows(rows, dto.columns, dto.page ?? 1, dto.limit ?? 20),
-      totals: buildTotalsRow(dto.columns, rows, NUMERIC, NON_ADDITIVE),
-      total: rows.length,
+      columnFilters: toEngineFilters(dto.columnFilters, KEY_MAP, {
+        unit: filters.unit,
+        brand: filters.brand,
+      }),
     };
   }
 

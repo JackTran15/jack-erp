@@ -33,9 +33,18 @@ const engineRow: TransferByBranchRow = {
   inValue: 500,
 };
 
-function build(rows: TransferByBranchRow[], ownedBranch = true) {
+function build(rows: TransferByBranchRow[], ownedBranch = true, total = rows.length) {
   const engine = {
-    byBranch: jest.fn().mockResolvedValue({ data: rows, total: rows.length }),
+    // Stands in for SQL: one page, plus the whole-set count and totals. The two
+    // average-price columns are absent on purpose — the engine never sums them.
+    byBranch: jest.fn().mockImplementation(({ page = 1, pageSize = 20 }) => {
+      const offset = (page - 1) * pageSize;
+      const totals: Record<string, number> = {};
+      for (const key of ['outQty', 'outValue', 'inQty', 'inValue'] as const) {
+        totals[key] = rows.reduce((sum, r) => sum + Number(r[key] ?? 0), 0);
+      }
+      return Promise.resolve({ data: rows.slice(offset, offset + pageSize), total, totals });
+    }),
   };
   const branches = {
     find: jest.fn().mockResolvedValue([]),
@@ -87,5 +96,87 @@ describe('TransferByStoreReport', () => {
     expect(result.totals!.outQty).toBe(8);
     expect(result.totals!.outValue).toBe(800);
     expect(result.totals!.outAvgPrice).toBeNull();
+  });
+
+  it('answers a page of an over-cap organisation instead of refusing (AC-22)', async () => {
+    const { report } = build([engineRow], true, 74_515);
+
+    const result = await report.buildData({ ...dto, page: 1, limit: 50 }, actorWithBranch);
+
+    expect(result.total).toBe(74_515);
+    expect(result.rows).toHaveLength(1);
+  });
+
+  it('pushes page, limit and column filters down under their engine names', async () => {
+    const { report, engine } = build([engineRow]);
+
+    await report.buildData(
+      {
+        ...dto,
+        page: 2,
+        limit: 50,
+        columnFilters: [
+          { col: 'targetBranch', contains: 'Hà' },
+          { col: 'name', contains: 'giày' },
+          { col: 'group', equals: 'Giày nam' },
+        ],
+      },
+      actorWithBranch,
+    );
+
+    expect(engine.byBranch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page: 2,
+        pageSize: 50,
+        columnFilters: {
+          destinationBranchName: { operator: '*', value: 'Hà' },
+          itemName: { operator: '*', value: 'giày' },
+          categoryName: { operator: '=', value: 'Giày nam' },
+        },
+      }),
+    );
+  });
+
+  it('pushes the unit and brand dropdowns down too', async () => {
+    const { report, engine } = build([engineRow]);
+
+    await report.buildData(
+      { ...dto, filters: { ...dto.filters, unit: 'Đôi', brand: 'Bitis' } },
+      actorWithBranch,
+    );
+
+    expect(engine.byBranch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        columnFilters: {
+          unit: { operator: '=', value: 'Đôi' },
+          brand: { operator: '=', value: 'Bitis' },
+        },
+      }),
+    );
+  });
+
+  it('offers countRows so the export path keeps its cap (ADR-01)', async () => {
+    const { report, engine } = build([engineRow], true, 74_515);
+
+    await expect(report.countRows(dto, actorWithBranch)).resolves.toEqual({
+      total: 74_515,
+      subject: 'rows',
+    });
+    expect(engine.byBranch).toHaveBeenCalledWith(
+      expect.objectContaining({ page: 1, pageSize: 1 }),
+    );
+  });
+
+  it('enforces the branch permission on the export path as well', async () => {
+    // countRows is reached from /export. If the checks only lived in buildData,
+    // an export could read a branch the caller has no access to.
+    const { report } = build([engineRow]);
+
+    await expect(
+      report.countRows(
+        { ...dto, filters: { ...dto.filters, sourceStoreId: 'branch-foreign' } },
+        actorWithBranch,
+      ),
+    ).rejects.toThrow(/Access denied/);
   });
 });
