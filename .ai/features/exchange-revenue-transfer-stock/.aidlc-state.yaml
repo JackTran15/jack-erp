@@ -1,0 +1,8 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: exchange-revenue-transfer-stock
+slug: exchange-revenue-transfer-stock
+profile: none
+created: 2026-08-20T15:53:31
+current_gate: none
+history:

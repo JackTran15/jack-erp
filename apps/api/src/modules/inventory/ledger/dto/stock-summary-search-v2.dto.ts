@@ -75,6 +75,17 @@ export class StockSummarySearchV2Dto {
   @IsBoolean()
   isPosVisible?: boolean;
 
+  /**
+   * Whole-set column totals for the grid footer. Defaults to true, and it is by
+   * far the most expensive part of the response: the footer aggregates the
+   * ledger over the entire result set, not over the page. A client that only
+   * needs rows — or that already holds the footer for the current filter set —
+   * should send false.
+   */
+  @IsOptional()
+  @IsBoolean()
+  includeTotals?: boolean;
+
   @IsOptional()
   @IsEnum(StockStateFilter)
   stockState?: StockStateFilter;
