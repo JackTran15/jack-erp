@@ -304,12 +304,23 @@ export class StockSummaryService {
       }
     }
 
-    const periodDataMap = new Map<string, RawPeriodRow>();
-    if (rows.length > 0 && (query.startDate || query.endDate)) {
-      const startDate = query.startDate || "1970-01-01";
-      const endDate = query.endDate ? addOneDay(query.endDate) : "2999-12-31";
+    // Deduped item ids for the `= ANY(...)` hints below. The (item, storage)
+    // arrays feeding `unnest` must keep their positional pairing, so only this
+    // copy can be deduped.
+    const pageItemIds = [...new Set(itemIds)];
+    const wantsPeriod =
+      rows.length > 0 && Boolean(query.startDate || query.endDate);
+    const wantsPendingOnly =
+      Boolean(query.branchId) && !query.storageId && page === 1;
+    const periodStart = query.startDate || "1970-01-01";
+    const periodEnd = query.endDate ? addOneDay(query.endDate) : "2999-12-31";
 
-      const periodQuery = `
+    // `unnest(...)` carries no statistics, so the planner sizes the pair set at
+    // its 100-row default and can pick a hash join that scans the whole ledger /
+    // invoice_items / transfer_order_lines. The `= ANY(...)` predicates below are
+    // implied by the pair join and select exactly the same rows, but being plain
+    // restrictions on item_id they let the per-item indexes drive the scan.
+    const periodQuery = `
         SELECT
           sle.item_id,
           loc.storage_id,
@@ -325,21 +336,12 @@ export class StockSummaryService {
           ON pair.item_id = sle.item_id
          AND pair.storage_id = loc.storage_id
         WHERE sle.organization_id = $3
+          AND sle.item_id = ANY($6::uuid[])
         ${EXCLUDE_VOIDED_DOCS_SQL}
         GROUP BY sle.item_id, loc.storage_id
       `;
-      const periodResult = await this.balanceRepo.manager.query<RawPeriodRow[]>(
-        periodQuery,
-        [startDate, endDate, query.organizationId, itemIds, storageIds],
-      );
-      for (const row of periodResult) {
-        periodDataMap.set(`${row.item_id}:${row.storage_id}`, row);
-      }
-    }
 
-    const pendingTransferMap = new Map<string, RawPendingTransferRow>();
-    if (rows.length > 0) {
-      const pendingTransferQuery = `
+    const pendingTransferQuery = `
         SELECT
           pairs.item_id,
           pairs.storage_id,
@@ -362,6 +364,7 @@ export class StockSummaryService {
         FROM unnest($3::uuid[], $4::uuid[]) AS pairs(item_id, storage_id)
         LEFT JOIN transfer_order_lines line
           ON line.item_id = pairs.item_id
+         AND line.item_id = ANY($5::uuid[])
          AND line.organization_id = $2
         LEFT JOIN transfer_orders transfer_order
           ON transfer_order.id = line.transfer_order_id
@@ -370,22 +373,8 @@ export class StockSummaryService {
          AND transfer_order.deleted_at IS NULL
         GROUP BY pairs.item_id, pairs.storage_id
       `;
-      const pendingRows = await this.balanceRepo.manager.query<
-        RawPendingTransferRow[]
-      >(pendingTransferQuery, [
-        query.branchId,
-        query.organizationId,
-        itemIds,
-        storageIds,
-      ]);
-      for (const row of pendingRows) {
-        pendingTransferMap.set(`${row.item_id}:${row.storage_id}`, row);
-      }
-    }
 
-    const reservationMap = new Map<string, RawReservationRow>();
-    if (rows.length > 0 && query.branchId) {
-      const reservationQuery = `
+    const reservationQuery = `
         SELECT
           pairs.item_id,
           pairs.storage_id,
@@ -393,6 +382,7 @@ export class StockSummaryService {
         FROM unnest($3::uuid[], $4::uuid[]) AS pairs(item_id, storage_id)
         LEFT JOIN invoice_items invoice_item
           ON invoice_item.item_id = pairs.item_id
+         AND invoice_item.item_id = ANY($5::uuid[])
          AND invoice_item.organization_id = $2
          AND invoice_item.direction = 'OUT'
         LEFT JOIN invoices invoice
@@ -408,17 +398,107 @@ export class StockSummaryService {
           AND reservation_location.storage_id = pairs.storage_id
         GROUP BY pairs.item_id, pairs.storage_id
       `;
-      const reservationRows = await this.balanceRepo.manager.query<
-        RawReservationRow[]
-      >(reservationQuery, [
-        query.branchId,
-        query.organizationId,
-        itemIds,
-        storageIds,
+
+    const pendingOnlyQuery = `
+            SELECT
+              ${group.key} AS group_key,
+              MIN(item.product_id::text) AS product_id,
+              ${group.aggCode} AS item_code,
+              ${group.aggName} AS item_name,
+              ${group.sku ? "MIN(item.unit)" : "item.unit"} AS item_unit,
+              ${group.sku ? "MIN(item.brand)" : "item.brand"} AS item_brand,
+              ${group.sku ? "BOOL_OR(item.is_active)" : "item.is_active"} AS item_is_active,
+              ${group.sku ? "MIN(category.name)" : "category.name"} AS category_name,
+              destination_storage.id AS storage_id,
+              destination_storage.name AS storage_name,
+              transfer_order.destination_branch_id AS branch_id,
+              SUM(transfer_line.requested_qty)::numeric AS incoming_qty
+            FROM transfer_orders transfer_order
+            INNER JOIN transfer_order_lines transfer_line
+              ON transfer_line.transfer_order_id = transfer_order.id
+             AND transfer_line.organization_id = transfer_order.organization_id
+            INNER JOIN items item
+              ON item.id = transfer_line.item_id
+             AND item.organization_id = transfer_order.organization_id
+            LEFT JOIN products prod
+              ON prod.id = item.product_id
+            LEFT JOIN inventory_item_categories category
+              ON category.id = item.category_id
+            LEFT JOIN storages destination_storage
+              ON destination_storage.id = transfer_order.destination_storage_id
+             AND destination_storage.organization_id = transfer_order.organization_id
+            WHERE transfer_order.organization_id = $1
+              AND transfer_order.destination_branch_id = $2
+              AND transfer_order.status = 'IN_PROGRESS'
+              AND transfer_order.deleted_at IS NULL
+              AND NOT EXISTS (${this.pendingOnlyGuardSql(group.sku)})
+            GROUP BY ${group.sku
+              ? "prod.code, prod.name"
+              : "item.code, item.name, item.unit, item.brand, item.is_active, category.name"},
+                     ${group.groupBy}, destination_storage.id,
+                     destination_storage.name, transfer_order.destination_branch_id
+          `;
+
+    // None of these four reads depends on another's result, and they were four
+    // serial round trips. Batched, the stage costs the slowest one instead of
+    // their sum.
+    const [periodResult, pendingRows, reservationRows, pendingOnlyRows] =
+      await Promise.all([
+        wantsPeriod
+          ? this.balanceRepo.manager.query<RawPeriodRow[]>(periodQuery, [
+              periodStart,
+              periodEnd,
+              query.organizationId,
+              itemIds,
+              storageIds,
+              pageItemIds,
+            ])
+          : Promise.resolve([] as RawPeriodRow[]),
+        rows.length > 0
+          ? this.balanceRepo.manager.query<RawPendingTransferRow[]>(
+              pendingTransferQuery,
+              [
+                query.branchId,
+                query.organizationId,
+                itemIds,
+                storageIds,
+                pageItemIds,
+              ],
+            )
+          : Promise.resolve([] as RawPendingTransferRow[]),
+        rows.length > 0 && query.branchId
+          ? this.balanceRepo.manager.query<RawReservationRow[]>(
+              reservationQuery,
+              [
+                query.branchId,
+                query.organizationId,
+                itemIds,
+                storageIds,
+                pageItemIds,
+              ],
+            )
+          : Promise.resolve([] as RawReservationRow[]),
+        wantsPendingOnly
+          ? this.balanceRepo.manager.query<RawPendingOnlyRow[]>(
+              pendingOnlyQuery,
+              [query.organizationId, query.branchId],
+            )
+          : Promise.resolve([] as RawPendingOnlyRow[]),
       ]);
-      for (const row of reservationRows) {
-        reservationMap.set(`${row.item_id}:${row.storage_id}`, row);
-      }
+
+    const periodDataMap = new Map<string, RawPeriodRow>();
+    for (const row of periodResult ?? []) {
+      periodDataMap.set(`${row.item_id}:${row.storage_id}`, row);
+    }
+
+    const pendingTransferMap = new Map<string, RawPendingTransferRow>();
+    for (const row of pendingRows ?? []) {
+      pendingTransferMap.set(`${row.item_id}:${row.storage_id}`, row);
+    }
+
+    const reservationMap = new Map<string, RawReservationRow>();
+    for (const row of reservationRows ?? []) {
+      reservationMap.set(`${row.item_id}:${row.storage_id}`, row);
     }
 
     let data: StockSummaryRow[] = rows.map((r) => {
@@ -492,55 +572,12 @@ export class StockSummaryService {
       };
     });
 
-    if (query.branchId && !query.storageId && page === 1) {
-      const pendingOnlyRows =
-        (await this.balanceRepo.manager.query<RawPendingOnlyRow[]>(
-          `
-            SELECT
-              ${group.key} AS group_key,
-              MIN(item.product_id::text) AS product_id,
-              ${group.aggCode} AS item_code,
-              ${group.aggName} AS item_name,
-              ${group.sku ? "MIN(item.unit)" : "item.unit"} AS item_unit,
-              ${group.sku ? "MIN(item.brand)" : "item.brand"} AS item_brand,
-              ${group.sku ? "BOOL_OR(item.is_active)" : "item.is_active"} AS item_is_active,
-              ${group.sku ? "MIN(category.name)" : "category.name"} AS category_name,
-              destination_storage.id AS storage_id,
-              destination_storage.name AS storage_name,
-              transfer_order.destination_branch_id AS branch_id,
-              SUM(transfer_line.requested_qty)::numeric AS incoming_qty
-            FROM transfer_orders transfer_order
-            INNER JOIN transfer_order_lines transfer_line
-              ON transfer_line.transfer_order_id = transfer_order.id
-             AND transfer_line.organization_id = transfer_order.organization_id
-            INNER JOIN items item
-              ON item.id = transfer_line.item_id
-             AND item.organization_id = transfer_order.organization_id
-            LEFT JOIN products prod
-              ON prod.id = item.product_id
-            LEFT JOIN inventory_item_categories category
-              ON category.id = item.category_id
-            LEFT JOIN storages destination_storage
-              ON destination_storage.id = transfer_order.destination_storage_id
-             AND destination_storage.organization_id = transfer_order.organization_id
-            WHERE transfer_order.organization_id = $1
-              AND transfer_order.destination_branch_id = $2
-              AND transfer_order.status = 'IN_PROGRESS'
-              AND transfer_order.deleted_at IS NULL
-              AND NOT EXISTS (${this.pendingOnlyGuardSql(group.sku)})
-            GROUP BY ${group.sku
-              ? "prod.code, prod.name"
-              : "item.code, item.name, item.unit, item.brand, item.is_active, category.name"},
-                     ${group.groupBy}, destination_storage.id,
-                     destination_storage.name, transfer_order.destination_branch_id
-          `,
-          [query.organizationId, query.branchId],
-        )) ?? [];
+    if (wantsPendingOnly) {
       const existingKeys = new Set(
         data.map((row) => `${row.groupKey}:${row.storageId}`),
       );
       let appended = 0;
-      for (const row of pendingOnlyRows) {
+      for (const row of pendingOnlyRows ?? []) {
         const storageId = row.storage_id ?? `pending:${row.branch_id}`;
         if (existingKeys.has(`${row.group_key}:${storageId}`)) continue;
         data.push({
