@@ -99,16 +99,32 @@ export function RoleEmployeePickerModal({
         leadingColumn={{
           width: 40,
           header: <span className="sr-only">Chọn</span>,
-          cell: (row) => (
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-input"
-              aria-label={`Chọn ${joinFullName(row.firstName, row.lastName)}`}
-              checked={pendingIds.includes(row.id)}
-              onChange={(e) => toggleUser(row.id, e.target.checked)}
-              onClick={(e) => e.stopPropagation()}
-            />
-          ),
+          cell: (row) => {
+            // Same gate as the remove button in RoleUsersTab: unticking an
+            // account the caller may not manage goes down the identical
+            // POST /admin/users/:id/roles path and is refused there.
+            const manageable = row.canEdit ?? true;
+            return (
+              // Title on the wrapper — a disabled input shows no tooltip of its own.
+              <span
+                title={
+                  manageable
+                    ? undefined
+                    : "Tài khoản này có quyền cao hơn bạn nên bạn không đổi vai trò của họ được."
+                }
+              >
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-input"
+                  aria-label={`Chọn ${joinFullName(row.firstName, row.lastName)}`}
+                  checked={pendingIds.includes(row.id)}
+                  disabled={!manageable}
+                  onChange={(e) => toggleUser(row.id, e.target.checked)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </span>
+            );
+          },
         }}
       />
     </AppModal>

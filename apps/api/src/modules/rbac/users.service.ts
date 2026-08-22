@@ -438,6 +438,7 @@ export class UsersService {
   ): Promise<string[]> {
     await this.ensureUserExists(id, actor);
     await this.assertCanManageUser(id, actor);
+    await this.assertNotSelfDemotion(id, roleIds, actor);
     if (roleIds.length) {
       await this.assertRolesExist(roleIds, actor.organizationId);
       await this.assertCanGrantRoles(roleIds, actor);
@@ -532,6 +533,41 @@ export class UsersService {
         `Roles not found in this organization: ${missing.join(", ")}`,
       );
     }
+  }
+
+  /**
+   * You cannot strip your own permissions. {@link assertCanManageUser} exempts
+   * self on purpose — otherwise nobody could edit their own profile — and that
+   * exemption reaches the role set too, so the last Quản trị hệ thống of an
+   * organization could de-role themselves and leave it with no administrator at
+   * all, which no one else can undo.
+   *
+   * Blocking only *self*-demotion is enough to guarantee an org always keeps an
+   * administrator: removing the role of an equal-ranking admin stays allowed
+   * (their key sets match, so `assertCanManageUser` passes), so the last one
+   * standing is always the actor — and the actor is refused here.
+   */
+  private async assertNotSelfDemotion(
+    targetId: string,
+    roleIds: string[],
+    actor: ActorContext,
+  ): Promise<void> {
+    if (targetId !== actor.userId) return;
+
+    const [currentKeys, keysByRole] = await Promise.all([
+      this.rbacService.getUserPermissions(actor.userId, actor.organizationId),
+      this.rbacService.getRolePermissionKeys(roleIds),
+    ]);
+    const nextKeys = new Set([...keysByRole.values()].flat());
+    const lost = currentKeys.filter((key) => !nextKeys.has(key));
+    if (lost.length === 0) return;
+
+    this.logger.warn(
+      `User ${actor.userId} tried to drop ${lost.length} of their own permission(s): ${lost.join(", ")}`,
+    );
+    throw new ForbiddenException(
+      `Cannot remove your own permissions: this would drop ${lost.length} permission(s) you currently hold. Ask another administrator to do it.`,
+    );
   }
 
   /**

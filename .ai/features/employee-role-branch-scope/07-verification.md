@@ -72,6 +72,29 @@ cùng lúc với `Sửa`.
 |---|---|---|---|---|---|
 | S8 | Chọn `Admin User`: `Nhân bản` cũng phải xám như `Sửa` | `/admin/employees` | `click [aria-label^="Chọn nhân viên Admin User"]` | AC-08 | `count [aria-label^="Chọn nhân viên Admin User"]:checked = 1; count button:has-text("Nhân bản"):disabled = 1` |
 
+### Màn "Quản lý vai trò" — gỡ người dùng khỏi vai trò
+
+Quản lý chi nhánh nhìn thấy 9 tài khoản (chi nhánh HCM + các tài khoản cấp cao hơn). Số dòng
+mỗi vai trò dưới đây lấy từ `erp_dev`, giao với đúng tập 9 tài khoản đó:
+
+```sql
+SELECT r.name, count(ur.user_id) FROM roles r
+LEFT JOIN user_roles ur ON ur.role_id = r.id
+WHERE r.organization_id::text = '<My Company>' GROUP BY r.name;
+--  Quản lý tổng = 1  ·  Quản trị hệ thống = 1  ·  Nhân viên bán hàng = 4
+-- Trong 4 người "Nhân viên bán hàng" có 1 người ở Chi nhánh 2, ngoài tầm nhìn
+-- của Quản lý chi nhánh, nên lưới chỉ hiện 3.
+```
+
+| ID | Step | Path | Interaction | Verifies | Assert |
+|---|---|---|---|---|---|
+| S9 | Chọn vai trò `Quản lý tổng`: dòng người dùng vẫn hiện, nhưng nút gỡ bị khóa | `/role-management` | `click [aria-label="Chọn vai trò Quản lý tổng"]` | AC-09 | `count [aria-label^="Gỡ"] = 1; count [aria-label^="Gỡ"]:disabled = 1` |
+| S10 | Đối chứng: chọn `Nhân viên bán hàng` thì cả 3 nút gỡ đều bật — nút không phải lúc nào cũng xám | `/role-management` | `click [aria-label="Chọn vai trò Nhân viên bán hàng"]` | AC-10 | `count [aria-label^="Gỡ"]:enabled = 3; count [aria-label^="Gỡ"]:disabled = 0` |
+| S11 | Hộp "Chọn người dùng": đúng 2 ô tick bị khóa — `Admin User` và `QuanLyTong` | `/role-management` | `click [aria-label="Chọn vai trò Nhân viên bán hàng"]; click button:has-text("Chọn"); wait [role="dialog"]` | AC-09 | `count [role="dialog"] input[type="checkbox"]:disabled = 2` |
+
+S10 là bước bắt buộc, không phải bước thừa: thiếu nó thì "nút bị khóa" ở S9 có thể chỉ là nút
+luôn khóa — đúng cái bẫy đã làm một bước đỏ oan ở vòng trước.
+
 ## Not verified here
 
 - **AC-03** (quyền thấy-mọi-chi-nhánh đến từ permission chứ không từ số chi nhánh được gán):
