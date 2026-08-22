@@ -2497,6 +2497,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/stock/balances/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tồn của nhiều (mặt hàng, vị trí|kho) trong một lượt. POST vì danh sách cặp
+         *     dài hơn nhiều so với giới hạn query string của một phiếu vài trăm dòng —
+         *     cùng lối với `POST /inventory/locations/preferred-shelf/batch`.
+         */
+        post: operations["StockLedgerController_batchBalances"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/stock/balances/tracking": {
         parameters: {
             query?: never;
@@ -6409,6 +6430,22 @@ export interface paths {
         patch: operations["GoodsIssueController_update"];
         trace?: never;
     };
+    "/inventory/goods-issues/{id}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsIssueController_getLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/goods-issues/{id}/print-payload": {
         parameters: {
             query?: never;
@@ -6619,6 +6656,22 @@ export interface paths {
         patch: operations["TransferOrderController_update"];
         trace?: never;
     };
+    "/inventory/transfer-orders/{id}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferOrderController_getLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/transfer-orders/{id}/print-payload": {
         parameters: {
             query?: never;
@@ -6713,6 +6766,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["GoodsReceiptController_update"];
+        trace?: never;
+    };
+    "/goods-receipts/{id}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsReceiptController_getLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/goods-receipts/{id}/print-payload": {
@@ -9433,6 +9502,30 @@ export interface components {
             total: number;
             page: number;
             pageSize: number;
+        };
+        BalancePairDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            locationId?: string;
+            /** Format: uuid */
+            storageId?: string;
+        };
+        BatchBalanceRequestDto: {
+            pairs: components["schemas"]["BalancePairDto"][];
+        };
+        BatchBalanceRowDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            locationId?: string | null;
+            /** Format: uuid */
+            storageId?: string | null;
+            /** @description Tồn hiện có; 0 khi chưa có dòng tồn nào. */
+            quantity: number;
+        };
+        BatchBalanceResponseDto: {
+            data: components["schemas"]["BatchBalanceRowDto"][];
         };
         BalanceTrackingEntryDto: {
             /**
@@ -12937,6 +13030,19 @@ export interface components {
              *     counterparties (no provider join) render their name instead of "—".
              */
             counterparty?: Record<string, never> | null;
+            /**
+             * @description Transient (not a column): per-issue Tổng tiền, inlined by the v2 search
+             *     handler via a correlated subquery so the list's money column works
+             *     without joining `lines` (which the list query no longer does).
+             */
+            totalAmount?: number;
+            /**
+             * @description Transient (not a column): true when this is a transfer-out leg whose
+             *     destination has already confirmed import. Such a row is frozen — editing it
+             *     would cascade into a phiếu nhập another branch has posted — so the list
+             *     disables Sửa/Xóa up front instead of failing on click.
+             */
+            transferImported?: boolean;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -13252,6 +13358,12 @@ export interface components {
                 id: string;
                 name: string;
             };
+            /**
+             * @description Transient (not a column): per-receipt Tổng tiền, inlined by the v2 search
+             *     handler via a correlated subquery so the list's money column works without
+             *     joining `lines` (which the list query no longer does).
+             */
+            totalAmount?: number;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -18383,6 +18495,29 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    StockLedgerController_batchBalances: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchBalanceRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchBalanceResponseDto"];
+                };
             };
         };
     };
@@ -25079,6 +25214,36 @@ export interface operations {
             };
         };
     };
+    GoodsIssueController_getLines: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     GoodsIssueController_getPrintPayload: {
         parameters: {
             query?: never;
@@ -25422,6 +25587,36 @@ export interface operations {
             };
         };
     };
+    TransferOrderController_getLines: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     TransferOrderController_getPrintPayload: {
         parameters: {
             query?: never;
@@ -25643,6 +25838,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GoodsReceiptEntity"];
+                };
+            };
+        };
+    };
+    GoodsReceiptController_getLines: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
+                includeInactive?: boolean;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
                 };
             };
         };

@@ -84,6 +84,11 @@ import {
   type SelectedLine,
 } from "../../components/shared/product-select/ProductSelectDialog";
 import { BarcodeScanRow } from "../../components/shared/BarcodeScanRow";
+import { OverstockConfirmDialog } from "../../components/document/OverstockConfirmDialog";
+import {
+  findOverstockRows,
+  type OverstockWarningRow,
+} from "../../api/overstock";
 import type { DocumentLineImportJobRow } from "../inventory/_components/document-import/document-line-import.types";
 
 type TransferStatus = "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
@@ -800,6 +805,9 @@ function TransferFormDialog({
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [overstockWarnings, setOverstockWarnings] = useState<
+    OverstockWarningRow[] | null
+  >(null);
   const [dirty, setDirty] = useState(false);
   const [chooseWarehousesOpen, setChooseWarehousesOpen] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
@@ -964,30 +972,56 @@ function TransferFormDialog({
     return { totalQty: qty, totalAmount: amount };
   }, [lines]);
 
-  const handleSave = useCallback(async () => {
+  /**
+   * `skipOverstockConfirm` = người dùng đã bấm "Tiếp tục" ở cảnh báo xuất quá
+   * tồn, nên bỏ qua vòng kiểm tra và lưu luôn.
+   */
+  const handleSave = useCallback(async (skipOverstockConfirm = false): Promise<boolean> => {
     const persistableLines = getPersistableFormLines(lines);
     if (persistableLines.length === 0) {
       setError("Cần ít nhất 1 dòng hàng hợp lệ.");
-      return;
+      return false;
     }
     for (const [i, l] of persistableLines.entries()) {
       if (!l.sourceStorageId || !l.destStorageId) {
         setError(`Dòng ${i + 1}: vui lòng chọn Kho xuất và Kho nhập.`);
-        return;
+        return false;
       }
       if (!(Number(l.quantity) > 0)) {
         setError(`Dòng ${i + 1}: số lượng phải lớn hơn 0.`);
-        return;
+        return false;
       }
     }
     setSaving(true);
     setError(null);
     try {
+      // Cảnh báo (không chặn) khi chuyển quá tồn — dùng chung với phiếu xuất kho.
+      if (!skipOverstockConfirm) {
+        const warnings = await findOverstockRows(
+          persistableLines.map((l) => ({
+            itemId: l.itemId,
+            itemName: l.itemName || l.itemLabel,
+            unit: l.unit,
+            storageName: l.sourceStorageLabel,
+            quantity: Number(l.quantity),
+            locationId: l.sourceLocationId || undefined,
+            storageId: l.sourceStorageId || undefined,
+          })),
+        );
+        if (warnings.length > 0) {
+          setOverstockWarnings(warnings);
+          return false;
+        }
+      }
+
       const transferredAt =
         docDate && docTime
           ? new Date(`${docDate}T${docTime}`).toISOString()
           : undefined;
       const payload = {
+        // Sổ kho cho phép âm; cảnh báo phía trên là chốt chặn duy nhất nên
+        // server không được từ chối vì thiếu tồn (giống phiếu xuất kho).
+        allowNegative: true,
         notes: notes || undefined,
         counterpartyKind: counterpartyKind || undefined,
         counterpartyId: counterpartyId || undefined,
@@ -1014,8 +1048,10 @@ function TransferFormDialog({
       }
       setDirty(false);
       await onSaved();
+      return true;
     } catch (err) {
       setError(getUserFacingApiErrorMessage(err));
+      return false;
     } finally {
       setSaving(false);
     }
@@ -1041,8 +1077,10 @@ function TransferFormDialog({
 
   const handleUnsavedChoice = async (choice: UnsavedChangesChoice) => {
     if (choice === "save") {
-      await handleSave();
-      onClose();
+      // Chỉ đóng phiếu khi lưu thành công — lưu hỏng hoặc đang chờ xác nhận
+      // xuất quá tồn thì giữ form lại để người dùng xử lý tiếp.
+      const ok = await handleSave();
+      if (ok) onClose();
     } else if (choice === "discard") {
       onClose();
     }
@@ -1052,21 +1090,6 @@ function TransferFormDialog({
     { id: "prev", label: "Trước", icon: ChevronLeft, disabled: true, onClick: () => {} },
     { id: "next", label: "Sau", icon: ChevronRight, disabled: true, onClick: () => {} },
     { id: "sep1", type: "separator" },
-    {
-      id: "new",
-      label: "Thêm mới",
-      icon: Plus,
-      onClick: () => {
-        setCounterpartyId("");
-        setCounterpartyCode("");
-        setCounterpartyName("");
-        setCounterpartyKind("");
-        setNotes("");
-        setLines([makeEmptyLine()]);
-        setDirty(false);
-        setError(null);
-      },
-    },
     {
       id: "save",
       label: "Lưu",
@@ -1818,9 +1841,11 @@ function TransferFormDialog({
         />
       )}
 
+      {/* Truyền nguyên storage: cắt xuống {id, name} là mất `code`, và cột
+          "Mã kho" của dropdown chọn kho rơi về "—". */}
       {chooseWarehousesOpen && (
         <ChooseTransferWarehousesDialog
-          storages={storages.map((s) => ({ id: s.id, name: s.name }))}
+          storages={storages}
           defaultSourceId={defaultStorage?.id}
           onClose={() => setChooseWarehousesOpen(false)}
           onConfirm={({ source, dest }) => applyTransferWarehouses(source, dest)}
@@ -1870,6 +1895,18 @@ function TransferFormDialog({
         ]}
         onApplyDraft={handleApplyDraftImport}
       />
+
+      {overstockWarnings && (
+        <OverstockConfirmDialog
+          rows={overstockWarnings}
+          loading={saving}
+          onCancel={() => setOverstockWarnings(null)}
+          onConfirm={() => {
+            setOverstockWarnings(null);
+            void handleSave(true);
+          }}
+        />
+      )}
     </>
   );
 }

@@ -593,6 +593,65 @@ describe('StockLedgerService', () => {
     });
   });
 
+  describe('getBalancesForPairs', () => {
+    function mockRows(rows: Array<Record<string, unknown>>) {
+      const qb = {
+        innerJoin: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue(rows),
+      };
+      balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+      return qb;
+    }
+
+    it('resolves a location pair exactly and a storage pair as the sum of its locations', async () => {
+      const qb = mockRows([
+        { itemId: 'item-1', locationId: 'loc-A', storageId: 'stor-1', quantity: '3' },
+        { itemId: 'item-1', locationId: 'loc-B', storageId: 'stor-1', quantity: '4' },
+      ]);
+
+      const result = await service.getBalancesForPairs(
+        [
+          { itemId: 'item-1', locationId: 'loc-A' },
+          { itemId: 'item-1', storageId: 'stor-1' },
+        ],
+        'org-1',
+        'branch-1',
+      );
+
+      expect(result).toEqual([
+        { itemId: 'item-1', locationId: 'loc-A', storageId: null, quantity: 3 },
+        { itemId: 'item-1', locationId: null, storageId: 'stor-1', quantity: 7 },
+      ]);
+      // One SQL round trip regardless of how many pairs were asked for.
+      expect(qb.getRawMany).toHaveBeenCalledTimes(1);
+      expect(balanceRepo.createQueryBuilder).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 0 for a pair with no balance row instead of dropping it', async () => {
+      mockRows([]);
+
+      const result = await service.getBalancesForPairs(
+        [{ itemId: 'item-1', locationId: 'loc-A' }],
+        'org-1',
+      );
+
+      expect(result).toEqual([
+        { itemId: 'item-1', locationId: 'loc-A', storageId: null, quantity: 0 },
+      ]);
+    });
+
+    it('does not query at all for an empty pair list', async () => {
+      balanceRepo.createQueryBuilder = jest.fn();
+
+      await expect(service.getBalancesForPairs([], 'org-1')).resolves.toEqual([]);
+      expect(balanceRepo.createQueryBuilder).not.toHaveBeenCalled();
+    });
+  });
+
   describe('reconstructBalance', () => {
     it('should sum all ledger entries for the given item/location', async () => {
       const mockQb = {

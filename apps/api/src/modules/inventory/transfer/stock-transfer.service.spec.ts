@@ -555,6 +555,24 @@ describe('StockTransferService', () => {
       expect(transferRepo.delete).toHaveBeenCalledWith({ id: 'xfer-1' });
     });
 
+    it('posts despite insufficient on-hand when validateOnHand is off (kho xuất âm)', async () => {
+      storageRepo.find.mockResolvedValue([storageA, storageB]);
+      mockDefaultLocations();
+      balanceQb.getOne.mockResolvedValue({ quantity: 1 }); // need 3, have 1
+      transferRepo.findOne
+        .mockResolvedValueOnce(draftTransfer) // create() reload
+        .mockResolvedValueOnce(draftTransfer) // post() load
+        .mockResolvedValueOnce({ ...draftTransfer, status: TransferStatus.POSTED });
+
+      const result = await service.createAndPost(khoToKhoDto, actor, {
+        validateOnHand: false,
+      });
+
+      expect(result.status).toBe(TransferStatus.POSTED);
+      expect(transferRepo.delete).not.toHaveBeenCalled();
+      expect(ledgerService.recordBatchMovements).toHaveBeenCalled();
+    });
+
     it('rejects a transporter that does not belong to the organization', async () => {
       storageRepo.find.mockResolvedValue([storageA, storageB]);
       userRepo.findOne.mockResolvedValue(null);
@@ -652,6 +670,22 @@ describe('StockTransferService', () => {
         BadRequestException,
       );
       expect(ledgerService.recordBatchMovements).not.toHaveBeenCalled();
+    });
+
+    it('allows the edit to drive a location negative when allowNegative is set', async () => {
+      storageRepo.find.mockResolvedValue([storageA, storageB]);
+      mockDefaultLocations();
+      balanceQb.getOne.mockResolvedValue({ quantity: 1 }); // old dest has 1, reversal needs 3
+      transferRepo.findOne
+        .mockResolvedValueOnce(postedTransfer)
+        .mockResolvedValueOnce(postedTransfer); // final reload
+
+      const result = await service.update('xfer-1', editDto, actor, {
+        allowNegative: true,
+      });
+
+      expect(result.status).toBe(TransferStatus.POSTED);
+      expect(ledgerService.recordBatchMovements).toHaveBeenCalled();
     });
 
     it('rejects editing a CANCELLED transfer', async () => {

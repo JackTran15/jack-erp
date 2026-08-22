@@ -23,6 +23,7 @@ import {
   IsOptional,
   IsEnum,
   IsArray,
+  IsBoolean,
   IsISO8601,
   ValidateIf,
   ValidateNested,
@@ -91,6 +92,14 @@ class CreateTransferDto {
   @IsISO8601()
   transferredAt?: string;
 
+  /**
+   * Cho phép chuyển kho vượt tồn (kho xuất âm). Client gửi `true` sau khi người
+   * dùng xác nhận cảnh báo "xuất quá số lượng tồn"; mặc định vẫn chặn.
+   */
+  @IsOptional()
+  @IsBoolean()
+  allowNegative?: boolean;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => TransferLineDto)
@@ -116,7 +125,9 @@ export class StockTransferController {
   @Post()
   @RequirePermission('inventory.transfer.create')
   create(@Body() dto: CreateTransferDto, @Actor() actor: ActorContext) {
-    return this.service.createAndPost(dto, actor);
+    return this.service.createAndPost(dto, actor, {
+      validateOnHand: !dto.allowNegative,
+    });
   }
 
   @Patch(':id')
@@ -126,7 +137,9 @@ export class StockTransferController {
     @Body() dto: CreateTransferDto,
     @Actor() actor: ActorContext,
   ) {
-    return this.service.update(id, dto, actor);
+    return this.service.update(id, dto, actor, {
+      allowNegative: dto.allowNegative,
+    });
   }
 
   @Post('intra-warehouse')
