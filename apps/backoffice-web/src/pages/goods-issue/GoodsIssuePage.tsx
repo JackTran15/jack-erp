@@ -366,6 +366,10 @@ export function GoodsIssuePage() {
 
   // ─── Toolbar config ───────────────────────────────────────────────────────────
 
+  // Frozen once the receiving branch confirms import: editing would cascade
+  // into their already-posted phiếu nhập, and deleting was already refused.
+  const receivedByDestination = selectedIssue?.transferImported === true;
+
   const toolbarItems: ToolbarItem[] = [
     {
       id: "create",
@@ -404,8 +408,16 @@ export function GoodsIssuePage() {
       icon: Pencil,
       // Allow editing any non-cancelled row. BE update() handles POSTED by
       // writing the difference as a stock-ledger adjustment instead of
-      // overwriting what was already posted.
-      disabled: !selectedIssue || selectedIssue.status === "CANCELLED",
+      // overwriting what was already posted — except once the destination
+      // branch has received the transfer, when that adjustment would rewrite
+      // their posted phiếu nhập and the BE refuses outright.
+      tooltip: receivedByDestination
+        ? "Chi nhánh nhận đã nhập phiếu này nên không sửa được nữa."
+        : undefined,
+      disabled:
+        !selectedIssue ||
+        selectedIssue.status === "CANCELLED" ||
+        receivedByDestination,
       onClick: () => {
         if (!selectedIssue) return;
         setEditingIssue(selectedIssue);
@@ -418,8 +430,15 @@ export function GoodsIssuePage() {
       icon: Trash2,
       variant: "danger",
       // Allow deleting any non-cancelled row. BE cancel() handles POSTED by
-      // reversing the stock movements before marking the doc cancelled.
-      disabled: !selectedIssue || selectedIssue.status === "CANCELLED",
+      // reversing the stock movements before marking the doc cancelled. The
+      // received-transfer lock has always applied here on the server side.
+      tooltip: receivedByDestination
+        ? "Chi nhánh nhận đã nhập phiếu này, phải xoá phiếu nhập trước."
+        : undefined,
+      disabled:
+        !selectedIssue ||
+        selectedIssue.status === "CANCELLED" ||
+        receivedByDestination,
       onClick: () => selectedIssue && setConfirmDelete(selectedIssue),
     },
     { id: "sep1", type: "separator" },

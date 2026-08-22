@@ -31,6 +31,11 @@ export const GENERAL_MANAGER_PERMISSION_KEYS: string[] = ALL_PERMISSION_KEYS.fil
  * invoice — both reverse posted money movements.
  */
 const ROOT_AND_GENERAL_MANAGER_ONLY_KEYS: ReadonlySet<string> = new Set([
+  // "Nhập khác" / "Xuất khác": stock moving in or out with no purchase, sale or
+  // transfer behind it, so nothing on the other side can be reconciled against.
+  // A branch runs on documents that have a counterparty; these do not.
+  'goods_receipt.other-receipt',
+  'inventory.goods-issue.other-issue',
   'accounting.cash_receipt.delete',
   'accounting.cash_payment.delete',
   'accounting.bank_receipt.delete',
@@ -179,7 +184,6 @@ export const WAREHOUSE_PERMISSION_KEYS: string[] = [
   'inventory.goods-issue.update',
   'inventory.goods-issue.post',
   'inventory.goods-issue.cancel',
-  'inventory.goods-issue.other-issue',
   'inventory.goods-issue.disposal',
   // Chuyển kho + lệnh điều chuyển
   'inventory.transfer.read',

@@ -69,6 +69,7 @@ describe('GoodsIssueService', () => {
     };
     transferOrderService = {
       assertExportIssueCanBeCancelled: jest.fn().mockResolvedValue(undefined),
+      assertExportIssueCanBeEdited: jest.fn().mockResolvedValue(undefined),
       cancelFromExportIssue: jest.fn().mockResolvedValue(undefined),
       applyLegRevision: jest.fn().mockResolvedValue(undefined),
     };
@@ -704,6 +705,28 @@ describe('GoodsIssueService', () => {
         actor,
       );
       assertInv1();
+    });
+
+    /**
+     * Deleting the export leg was already blocked once the destination had
+     * received it; editing was not, and the edit cascades straight into that
+     * already-posted receipt.
+     */
+    it('refuses the edit once the destination has received the transfer', async () => {
+      giRepo.findOne.mockResolvedValue(
+        postedIssue({
+          referenceType: GoodsIssueReferenceType.TRANSFER_ORDER,
+          referenceId: 'to-1',
+        }),
+      );
+      transferOrderService.assertExportIssueCanBeEdited.mockRejectedValueOnce(
+        new ConflictException('Chi nhánh nhận đã nhập phiếu này'),
+      );
+
+      await expect(
+        service.update('gi-9', { lines: editedLines }, actor),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(transferOrderService.applyLegRevision).not.toHaveBeenCalled();
     });
 
     it('cascades an edit to the linked transfer order (T-05-02)', async () => {

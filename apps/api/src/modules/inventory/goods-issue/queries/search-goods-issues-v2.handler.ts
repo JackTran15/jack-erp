@@ -1,10 +1,11 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
-import { GoodsIssueStatus } from '@erp/shared-interfaces';
+import { Repository, SelectQueryBuilder, In } from 'typeorm';
+import { GoodsIssueStatus, GoodsIssueReferenceType } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { FilterBuilder } from '../../../../common/filters/filter.builder';
 import { GoodsIssueEntity } from '../goods-issue.entity';
+import { TransferOrderEntity } from '../../transfer-order/transfer-order.entity';
 import { GoodsIssueSearchV2Dto } from '../dto/goods-issue-search-v2.dto';
 import {
   attachCounterparties,
@@ -94,6 +95,39 @@ export class SearchGoodsIssuesV2Handler
       for (const row of data) {
         row.totalAmount = totalById.get(row.id) ?? 0;
       }
+    }
+
+    // Freeze marker for transfer-out legs the destination has already received
+    // (TransferOrderService.assertExportIssueCanBeEdited refuses those edits).
+    // One extra query per page, same shape as the per-row total above.
+    const transferIds = [
+      ...new Set(
+        data
+          .filter(
+            (row) =>
+              row.referenceType === GoodsIssueReferenceType.TRANSFER_ORDER &&
+              row.referenceId,
+          )
+          .map((row) => row.referenceId as string),
+      ),
+    ];
+    const importedById = new Map<string, boolean>();
+    if (transferIds.length) {
+      const orders = await this.repo.manager.find(TransferOrderEntity, {
+        where: { id: In(transferIds), organizationId: actor.organizationId },
+        select: { id: true, importGoodsReceiptId: true },
+      });
+      for (const order of orders) {
+        importedById.set(order.id, Boolean(order.importGoodsReceiptId));
+      }
+    }
+    // Set on every row, not just the transfer ones: an undefined flag would read
+    // as "unknown" on the client and quietly re-enable the buttons on any page
+    // that happens to contain no transfer legs.
+    for (const row of data) {
+      row.transferImported = row.referenceId
+        ? (importedById.get(row.referenceId) ?? false)
+        : false;
     }
 
     return {

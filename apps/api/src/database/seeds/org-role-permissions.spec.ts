@@ -9,31 +9,54 @@ import {
 } from './org-role-permissions';
 
 const OTHER_ISSUE_KEY = 'inventory.goods-issue.other-issue';
+const OTHER_RECEIPT_KEY = 'goods_receipt.other-receipt';
 const DISPOSAL_KEY = 'inventory.goods-issue.disposal';
 
 describe('goods-issue purpose permission seeds', () => {
   const seededKeys = PERMISSION_SEEDS.map((p) => p.key);
 
-  it('registers both purpose permission keys in the catalogue', () => {
+  it('registers every purpose permission key in the catalogue', () => {
     expect(seededKeys).toContain(OTHER_ISSUE_KEY);
+    expect(seededKeys).toContain(OTHER_RECEIPT_KEY);
     expect(seededKeys).toContain(DISPOSAL_KEY);
   });
 
+  /**
+   * "Nhập khác" / "Xuất khác" move stock with no purchase, sale or transfer
+   * behind them, so no counterparty document can be reconciled against them.
+   * They are reserved for the two org-wide roles; a branch runs on documents
+   * that have a counterparty.
+   */
   it.each([
     ['SYSTEM_ADMIN', SYSTEM_ADMIN_PERMISSION_KEYS],
     ['GENERAL_MANAGER', GENERAL_MANAGER_PERMISSION_KEYS],
+  ])('grants the OTHER purpose keys to %s', (_role, keys) => {
+    expect(keys).toContain(OTHER_ISSUE_KEY);
+    expect(keys).toContain(OTHER_RECEIPT_KEY);
+  });
+
+  it.each([
     ['BRANCH_MANAGER', BRANCH_MANAGER_PERMISSION_KEYS],
     ['WAREHOUSE', WAREHOUSE_PERMISSION_KEYS],
-  ])('grants both purpose keys to %s', (_role, keys) => {
-    expect(keys).toContain(OTHER_ISSUE_KEY);
+    ['SALES', SALES_PERMISSION_KEYS],
+    ['CASHIER', CASHIER_PERMISSION_KEYS],
+  ])('withholds the OTHER purpose keys from %s', (_role, keys) => {
+    expect(keys).not.toContain(OTHER_ISSUE_KEY);
+    expect(keys).not.toContain(OTHER_RECEIPT_KEY);
+  });
+
+  // Hủy hàng is unchanged: it still belongs to whoever runs the warehouse.
+  it.each([
+    ['BRANCH_MANAGER', BRANCH_MANAGER_PERMISSION_KEYS],
+    ['WAREHOUSE', WAREHOUSE_PERMISSION_KEYS],
+  ])('still grants the disposal key to %s', (_role, keys) => {
     expect(keys).toContain(DISPOSAL_KEY);
   });
 
   it.each([
     ['SALES', SALES_PERMISSION_KEYS],
     ['CASHIER', CASHIER_PERMISSION_KEYS],
-  ])('does not grant the purpose keys to %s', (_role, keys) => {
-    expect(keys).not.toContain(OTHER_ISSUE_KEY);
+  ])('does not grant the disposal key to %s', (_role, keys) => {
     expect(keys).not.toContain(DISPOSAL_KEY);
   });
 });

@@ -1642,16 +1642,53 @@ export class TransferOrderService {
     }
   }
 
+  /**
+   * Once the destination has confirmed import, the export leg is frozen: the
+   * receiving branch holds a posted phiếu nhập whose lines mirror this one, and
+   * both cancelling and editing here would rewrite a document that another
+   * branch already closed its books on. The way back is for the destination to
+   * delete its receipt, which clears `importGoodsReceiptId` and reopens the order.
+   */
+  private async assertExportIssueNotImported(
+    toId: string,
+    actor: ActorContext,
+    message: string,
+  ): Promise<void> {
+    const to = await this.findOrFail(toId, actor.organizationId);
+    if (to.importGoodsReceiptId) {
+      throw new ConflictException(message);
+    }
+  }
+
+  /** Whether the destination has already confirmed import for this order. */
+  async hasImportReceipt(toId: string, organizationId: string): Promise<boolean> {
+    const to = await this.toRepo.findOne({
+      where: { id: toId, organizationId },
+      select: { id: true, importGoodsReceiptId: true },
+    });
+    return Boolean(to?.importGoodsReceiptId);
+  }
+
   async assertExportIssueCanBeCancelled(
     toId: string,
     actor: ActorContext,
   ): Promise<void> {
-    const to = await this.findOrFail(toId, actor.organizationId);
-    if (to.importGoodsReceiptId) {
-      throw new ConflictException(
-        "Phiếu xuất đã có phiếu nhập tham chiếu, vui lòng xoá phiếu nhập trước",
-      );
-    }
+    await this.assertExportIssueNotImported(
+      toId,
+      actor,
+      "Phiếu xuất đã có phiếu nhập tham chiếu, vui lòng xoá phiếu nhập trước",
+    );
+  }
+
+  async assertExportIssueCanBeEdited(
+    toId: string,
+    actor: ActorContext,
+  ): Promise<void> {
+    await this.assertExportIssueNotImported(
+      toId,
+      actor,
+      "Chi nhánh nhận đã nhập phiếu này nên không sửa được nữa. Chi nhánh nhận phải xoá phiếu nhập trước.",
+    );
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
