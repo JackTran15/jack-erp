@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@erp/ui";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { usePermissions } from "../../../hooks/iam";
-import type { PermissionModuleView } from "../role-management.types";
+import type {
+  PermissionCard,
+  PermissionPage,
+  PermissionSection,
+} from "../permission-taxonomy";
+import { buildPermissionSections } from "../permission-taxonomy";
 
 interface RolePermissionsEditorProps {
   permissionKeys: string[];
@@ -15,51 +21,43 @@ export function RolePermissionsEditor({
   readOnly = false,
 }: RolePermissionsEditorProps) {
   const { modules, isLoading, isError } = usePermissions();
-  const [activeModuleId, setActiveModuleId] = useState("");
+  const sections = useMemo(() => buildPermissionSections(modules), [modules]);
+
+  const [activePageId, setActivePageId] = useState("");
+  const [collapsedSections, setCollapsedSections] = useState<string[]>([]);
+
+  const activePage = useMemo(
+    () =>
+      sections
+        .flatMap((section) => section.pages)
+        .find((page) => page.id === activePageId),
+    [sections, activePageId],
+  );
 
   useEffect(() => {
-    if (modules.length > 0 && !activeModuleId) {
-      setActiveModuleId(modules[0].module);
-    }
-  }, [modules, activeModuleId]);
+    if (activePage || sections.length === 0) return;
+    const first = sections.find((section) => section.pages.length > 0);
+    if (first) setActivePageId(first.pages[0].id);
+  }, [sections, activePage]);
 
-  const activeModule = useMemo(
-    () => modules.find((m) => m.module === activeModuleId),
-    [modules, activeModuleId],
-  );
+  const selected = useMemo(() => new Set(permissionKeys), [permissionKeys]);
 
-  const modulePermissionKeys = useMemo(
-    () => activeModule?.permissions.map((p) => p.key) ?? [],
-    [activeModule],
-  );
-
-  const allModuleSelected =
-    modulePermissionKeys.length > 0 &&
-    modulePermissionKeys.every((key) => permissionKeys.includes(key));
-
-  const someModuleSelected =
-    !allModuleSelected &&
-    modulePermissionKeys.some((key) => permissionKeys.includes(key));
-
-  const toggleModule = (checked: boolean) => {
+  const setKeys = (keys: string[], checked: boolean) => {
     if (readOnly) return;
     if (checked) {
-      onChange([...new Set([...permissionKeys, ...modulePermissionKeys])]);
+      onChange([...new Set([...permissionKeys, ...keys])]);
       return;
     }
-    onChange(
-      permissionKeys.filter((key) => !modulePermissionKeys.includes(key)),
+    const removed = new Set(keys);
+    onChange(permissionKeys.filter((key) => !removed.has(key)));
+  };
+
+  const toggleSection = (sectionId: string) =>
+    setCollapsedSections((prev) =>
+      prev.includes(sectionId)
+        ? prev.filter((id) => id !== sectionId)
+        : [...prev, sectionId],
     );
-  };
-
-  const togglePermission = (permKey: string, checked: boolean) => {
-    if (readOnly) return;
-    if (checked) {
-      onChange([...new Set([...permissionKeys, permKey])]);
-      return;
-    }
-    onChange(permissionKeys.filter((key) => key !== permKey));
-  };
 
   if (isLoading) {
     return (
@@ -76,83 +74,27 @@ export function RolePermissionsEditor({
   }
 
   return (
-    <PermissionEditorGrid
-      modules={modules}
-      activeModuleId={activeModuleId}
-      onActiveModuleChange={setActiveModuleId}
-      activeModule={activeModule}
-      permissionKeys={permissionKeys}
-      readOnly={readOnly}
-      allModuleSelected={allModuleSelected}
-      someModuleSelected={someModuleSelected}
-      onToggleModule={toggleModule}
-      onTogglePermission={togglePermission}
-    />
-  );
-}
-
-interface PermissionEditorGridProps {
-  modules: PermissionModuleView[];
-  activeModuleId: string;
-  onActiveModuleChange: (id: string) => void;
-  activeModule: PermissionModuleView | undefined;
-  permissionKeys: string[];
-  readOnly: boolean;
-  allModuleSelected: boolean;
-  someModuleSelected: boolean;
-  onToggleModule: (checked: boolean) => void;
-  onTogglePermission: (permKey: string, checked: boolean) => void;
-}
-
-function PermissionEditorGrid({
-  modules,
-  activeModuleId,
-  onActiveModuleChange,
-  activeModule,
-  permissionKeys,
-  readOnly,
-  allModuleSelected,
-  someModuleSelected,
-  onToggleModule,
-  onTogglePermission,
-}: PermissionEditorGridProps) {
-  return (
     <div
       className={cn(
-        "flex min-h-[320px] overflow-hidden rounded-md border",
+        "flex min-h-[380px] overflow-hidden rounded-md border",
         readOnly && "opacity-90",
       )}
     >
       <nav
-        className="w-56 shrink-0 overflow-y-auto border-r bg-muted/30"
+        className="w-60 shrink-0 overflow-y-auto border-r bg-muted/30"
         aria-label="Nhóm quyền"
       >
-        {modules.map((mod) => {
-          const isActive = mod.module === activeModuleId;
-          const count = mod.permissions.filter((p) =>
-            permissionKeys.includes(p.key),
-          ).length;
-          return (
-            <button
-              key={mod.module}
-              type="button"
-              className={cn(
-                "flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors",
-                isActive
-                  ? "bg-primary/10 font-medium text-primary"
-                  : "text-foreground hover:bg-muted",
-              )}
-              onClick={() => onActiveModuleChange(mod.module)}
-            >
-              <span className="truncate">{mod.label}</span>
-              {count > 0 && (
-                <span className="ml-1 shrink-0 text-xs text-muted-foreground">
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
+        {sections.map((section) => (
+          <SectionNav
+            key={section.id}
+            section={section}
+            collapsed={collapsedSections.includes(section.id)}
+            activePageId={activePageId}
+            selected={selected}
+            onToggleCollapse={() => toggleSection(section.id)}
+            onSelectPage={setActivePageId}
+          />
+        ))}
       </nav>
 
       <div className="flex-1 overflow-y-auto p-4">
@@ -161,53 +103,215 @@ function PermissionEditorGrid({
             Chế độ chỉ xem — không chỉnh quyền.
           </p>
         )}
-        {activeModule ? (
-          <div className="space-y-4">
-            <label
-              className={cn(
-                "flex items-center gap-2 text-sm font-semibold",
-                readOnly ? "cursor-default" : "cursor-pointer",
-              )}
-            >
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-input"
-                checked={allModuleSelected}
-                disabled={readOnly}
-                ref={(el) => {
-                  if (el) el.indeterminate = someModuleSelected;
-                }}
-                onChange={(e) => onToggleModule(e.target.checked)}
-              />
-              <span>{activeModule.label}</span>
-            </label>
-            <div className="space-y-3 pl-6">
-              {activeModule.permissions.map((perm) => (
-                <label
-                  key={perm.key}
-                  className={cn(
-                    "flex items-start gap-2 text-sm",
-                    readOnly ? "cursor-default" : "cursor-pointer",
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-input"
-                    checked={permissionKeys.includes(perm.key)}
-                    disabled={readOnly}
-                    onChange={(e) =>
-                      onTogglePermission(perm.key, e.target.checked)
-                    }
-                  />
-                  <span>{perm.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
+        {activePage ? (
+          <PagePanel
+            page={activePage}
+            selected={selected}
+            readOnly={readOnly}
+            onSetKeys={setKeys}
+          />
         ) : (
           <p className="text-sm text-muted-foreground">Chọn nhóm quyền.</p>
         )}
       </div>
     </div>
+  );
+}
+
+function countSelected(keys: string[], selected: Set<string>) {
+  return keys.filter((key) => selected.has(key)).length;
+}
+
+interface SectionNavProps {
+  section: PermissionSection;
+  collapsed: boolean;
+  activePageId: string;
+  selected: Set<string>;
+  onToggleCollapse: () => void;
+  onSelectPage: (pageId: string) => void;
+}
+
+function SectionNav({
+  section,
+  collapsed,
+  activePageId,
+  selected,
+  onToggleCollapse,
+  onSelectPage,
+}: SectionNavProps) {
+  const count = countSelected(section.keys, selected);
+  const Chevron = collapsed ? ChevronRight : ChevronDown;
+
+  return (
+    <div className="border-b last:border-b-0">
+      <button
+        type="button"
+        className="flex w-full items-center gap-1 px-2 py-2 text-left text-sm font-semibold text-foreground hover:bg-muted"
+        onClick={onToggleCollapse}
+        aria-expanded={!collapsed}
+      >
+        <Chevron className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <span className="flex-1 truncate">{section.label}</span>
+        {count > 0 && (
+          <span className="shrink-0 text-xs font-normal text-muted-foreground">
+            {count}
+          </span>
+        )}
+      </button>
+
+      {!collapsed &&
+        section.pages.map((page) => {
+          const isActive = page.id === activePageId;
+          const pageCount = countSelected(page.keys, selected);
+          return (
+            <button
+              key={page.id}
+              type="button"
+              className={cn(
+                "flex w-full items-center justify-between py-1.5 pl-7 pr-3 text-left text-sm transition-colors",
+                isActive
+                  ? "bg-primary/10 font-medium text-primary"
+                  : "text-foreground hover:bg-muted",
+              )}
+              onClick={() => onSelectPage(page.id)}
+            >
+              <span className="truncate">{page.label}</span>
+              <span className="ml-1 shrink-0 text-xs text-muted-foreground">
+                {pageCount}/{page.keys.length}
+              </span>
+            </button>
+          );
+        })}
+    </div>
+  );
+}
+
+interface PagePanelProps {
+  page: PermissionPage;
+  selected: Set<string>;
+  readOnly: boolean;
+  onSetKeys: (keys: string[], checked: boolean) => void;
+}
+
+function PagePanel({ page, selected, readOnly, onSetKeys }: PagePanelProps) {
+  const count = countSelected(page.keys, selected);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between border-b pb-2">
+        <TriStateCheckbox
+          label={page.label}
+          total={page.keys.length}
+          selectedCount={count}
+          readOnly={readOnly}
+          className="text-sm font-semibold"
+          onToggle={(checked) => onSetKeys(page.keys, checked)}
+        />
+        <span className="text-xs text-muted-foreground">
+          Đã chọn {count}/{page.keys.length}
+        </span>
+      </div>
+
+      <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
+        {page.cards.map((card) => (
+          <CardBlock
+            key={card.id}
+            card={card}
+            selected={selected}
+            readOnly={readOnly}
+            onSetKeys={onSetKeys}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface CardBlockProps {
+  card: PermissionCard;
+  selected: Set<string>;
+  readOnly: boolean;
+  onSetKeys: (keys: string[], checked: boolean) => void;
+}
+
+function CardBlock({ card, selected, readOnly, onSetKeys }: CardBlockProps) {
+  const keys = card.items.map((item) => item.key);
+  const count = countSelected(keys, selected);
+
+  return (
+    <div className="space-y-2">
+      <TriStateCheckbox
+        label={card.label}
+        total={keys.length}
+        selectedCount={count}
+        readOnly={readOnly}
+        className="text-sm font-semibold"
+        onToggle={(checked) => onSetKeys(keys, checked)}
+      />
+      <div className="space-y-1.5 pl-6">
+        {card.items.map((item) => (
+          <label
+            key={item.key}
+            title={item.fullLabel}
+            className={cn(
+              "flex items-start gap-2 text-sm",
+              readOnly ? "cursor-default" : "cursor-pointer",
+            )}
+          >
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input"
+              checked={selected.has(item.key)}
+              disabled={readOnly}
+              onChange={(e) => onSetKeys([item.key], e.target.checked)}
+            />
+            <span>{item.label}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface TriStateCheckboxProps {
+  label: string;
+  total: number;
+  selectedCount: number;
+  readOnly: boolean;
+  className?: string;
+  onToggle: (checked: boolean) => void;
+}
+
+function TriStateCheckbox({
+  label,
+  total,
+  selectedCount,
+  readOnly,
+  className,
+  onToggle,
+}: TriStateCheckboxProps) {
+  const all = total > 0 && selectedCount === total;
+  const some = !all && selectedCount > 0;
+
+  return (
+    <label
+      className={cn(
+        "flex items-center gap-2",
+        readOnly ? "cursor-default" : "cursor-pointer",
+        className,
+      )}
+    >
+      <input
+        type="checkbox"
+        className="h-4 w-4 rounded border-input"
+        checked={all}
+        disabled={readOnly}
+        ref={(el) => {
+          if (el) el.indeterminate = some;
+        }}
+        onChange={(e) => onToggle(e.target.checked)}
+      />
+      <span>{label}</span>
+    </label>
   );
 }
