@@ -1,3 +1,7 @@
+import {
+  POS_ACCESS_TOKEN_KEY,
+  POS_REFRESH_TOKEN_KEY,
+} from "@erp/pos/constants/common.constant";
 import axios, {
   type AxiosInstance,
   type AxiosError,
@@ -7,8 +11,6 @@ import { AuthErrorCode } from "@erp/shared-interfaces";
 import { resolveApiBaseUrl } from "./api-base";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 
-const ACCESS_TOKEN_KEY = "access_token";
-const REFRESH_TOKEN_KEY = "refresh_token";
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: resolveApiBaseUrl(),
@@ -16,7 +18,7 @@ export const apiClient: AxiosInstance = axios.create({
 });
 
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const token = localStorage.getItem(POS_ACCESS_TOKEN_KEY);
   if (token) {
     config.headers.set("Authorization", `Bearer ${token}`);
   }
@@ -45,7 +47,7 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 let refreshPromise: Promise<boolean> | null = null;
 
 async function tryRefreshToken(): Promise<boolean> {
-  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  const refreshToken = localStorage.getItem(POS_REFRESH_TOKEN_KEY);
   if (!refreshToken) return false;
 
   try {
@@ -61,15 +63,15 @@ async function tryRefreshToken(): Promise<boolean> {
     };
 
     if (data.accessToken) {
-      localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
+      localStorage.setItem(POS_ACCESS_TOKEN_KEY, data.accessToken);
     }
     if (data.refreshToken) {
-      localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+      localStorage.setItem(POS_REFRESH_TOKEN_KEY, data.refreshToken);
     }
     return !!data.accessToken;
   } catch {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(POS_ACCESS_TOKEN_KEY);
+    localStorage.removeItem(POS_REFRESH_TOKEN_KEY);
     return false;
   }
 }
@@ -106,15 +108,15 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
       const refreshed = await refreshOnce();
       if (refreshed) {
-        const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+        const token = localStorage.getItem(POS_ACCESS_TOKEN_KEY);
         if (token) {
           originalRequest.headers.set("Authorization", `Bearer ${token}`);
         }
         return apiClient(originalRequest);
       }
 
-      localStorage.removeItem(ACCESS_TOKEN_KEY);
-      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      localStorage.removeItem(POS_ACCESS_TOKEN_KEY);
+      localStorage.removeItem(POS_REFRESH_TOKEN_KEY);
       window.location.href = `${import.meta.env.BASE_URL}dang-nhap`;
     }
 

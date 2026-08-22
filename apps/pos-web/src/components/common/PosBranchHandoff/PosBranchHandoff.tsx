@@ -1,3 +1,4 @@
+import { POS_ACCESS_TOKEN_KEY } from "@erp/pos/constants/common.constant";
 import { useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { authService } from "@erp/pos/services/auth.service";
@@ -29,7 +30,7 @@ export const PosBranchHandoff = () => {
       strip();
       return;
     }
-    const token = localStorage.getItem("access_token");
+    const token = localStorage.getItem(POS_ACCESS_TOKEN_KEY);
     const payload = token ? parseAccessTokenPayload(token) : null;
     if (!payload || !payload.branchIds.includes(incoming)) {
       strip();

@@ -1,3 +1,4 @@
+import { POS_ACCESS_TOKEN_KEY } from "@erp/pos/constants/common.constant";
 import { useCallback, useEffect, useId, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { branchService } from "@erp/pos/services/branch.service";
@@ -23,7 +24,7 @@ export function BranchSelectPage() {
   const load = useCallback(async () => {
     setLoadError(null);
     setLoading(true);
-    const token = localStorage.getItem("access_token");
+    const token = localStorage.getItem(POS_ACCESS_TOKEN_KEY);
     if (!token) {
       setLoadError("Chưa có phiên đăng nhập. Mở ứng dụng quản trị hoặc đăng nhập, sau đó thử lại.");
       setLoading(false);

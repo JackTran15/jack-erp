@@ -14,3 +14,22 @@ export const DATE_RANGE_FILTER_CHOICES: ReadonlyArray<PosDateRangeFilterChoice> 
   { value: "SIX_MONTHS_AGO", label: "Sáu tháng trước" },
   { value: "OTHER", label: "Khác" },
 ];
+
+/**
+ * localStorage keys for the POS session.
+ *
+ * Namespaced with `pos_` because POS and the ERP backoffice are served from the
+ * SAME origin (erp.giaymt.com.vn/ and /pos/), so they share one localStorage.
+ * Un-namespaced keys collided: the backoffice deletes "access_token" on login,
+ * and both apps wrote "refresh_token" — and since /auth/refresh rotates and
+ * revokes, whichever app refreshed first silently logged the other out.
+ *
+ * POS deliberately keeps its own session (see PosLoginPage + the /auth/handoff
+ * flow); it does not share one with the backoffice. Matches the existing
+ * `pos_active_branch_id` convention in lib/common/posBranchStorage.ts.
+ *
+ * Never remove the un-namespaced keys from POS — they belong to the backoffice.
+ */
+export const POS_ACCESS_TOKEN_KEY = "pos_access_token";
+export const POS_REFRESH_TOKEN_KEY = "pos_refresh_token";
+export const POS_ORGANIZATION_ID_KEY = "pos_organization_id";

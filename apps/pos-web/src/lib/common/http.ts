@@ -1,8 +1,10 @@
+import {
+  POS_ACCESS_TOKEN_KEY,
+  POS_REFRESH_TOKEN_KEY,
+} from "@erp/pos/constants/common.constant";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { resolveApiBaseUrl } from "./api-base";
 
-const ACCESS_TOKEN_KEY = "access_token";
-const REFRESH_TOKEN_KEY = "refresh_token";
 
 function requestId(): string {
   return crypto.randomUUID();
@@ -11,7 +13,7 @@ function requestId(): string {
 let refreshPromise: Promise<boolean> | null = null;
 
 async function tryRefreshToken(): Promise<boolean> {
-  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  const refreshToken = localStorage.getItem(POS_REFRESH_TOKEN_KEY);
   if (!refreshToken) return false;
 
   try {
@@ -22,8 +24,8 @@ async function tryRefreshToken(): Promise<boolean> {
     });
 
     if (!res.ok) {
-      localStorage.removeItem(ACCESS_TOKEN_KEY);
-      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      localStorage.removeItem(POS_ACCESS_TOKEN_KEY);
+      localStorage.removeItem(POS_REFRESH_TOKEN_KEY);
       return false;
     }
 
@@ -33,10 +35,10 @@ async function tryRefreshToken(): Promise<boolean> {
     };
 
     if (data.accessToken) {
-      localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
+      localStorage.setItem(POS_ACCESS_TOKEN_KEY, data.accessToken);
     }
     if (data.refreshToken) {
-      localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+      localStorage.setItem(POS_REFRESH_TOKEN_KEY, data.refreshToken);
     }
     return !!data.accessToken;
   } catch {
@@ -56,7 +58,7 @@ function refreshOnce(): Promise<boolean> {
 function buildHeaders(init: RequestInit = {}): Headers {
   const headers = new Headers(init.headers);
 
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const token = localStorage.getItem(POS_ACCESS_TOKEN_KEY);
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
@@ -97,8 +99,8 @@ async function request<T>(
   }
 
   if (res.status === 401) {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(POS_ACCESS_TOKEN_KEY);
+    localStorage.removeItem(POS_REFRESH_TOKEN_KEY);
     window.location.href = `${import.meta.env.BASE_URL}dang-nhap`;
     throw new Error("Phiên hết hạn. Đang chuyển hướng đăng nhập.");
   }
@@ -134,8 +136,8 @@ async function requestBlob(path: string, init: RequestInit = {}): Promise<Blob> 
   }
 
   if (res.status === 401) {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(POS_ACCESS_TOKEN_KEY);
+    localStorage.removeItem(POS_REFRESH_TOKEN_KEY);
     window.location.href = `${import.meta.env.BASE_URL}dang-nhap`;
     throw new Error("Phiên hết hạn. Đang chuyển hướng đăng nhập.");
   }

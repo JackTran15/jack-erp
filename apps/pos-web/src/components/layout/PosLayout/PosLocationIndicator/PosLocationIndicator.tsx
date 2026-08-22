@@ -1,3 +1,4 @@
+import { POS_ACCESS_TOKEN_KEY } from "@erp/pos/constants/common.constant";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -34,7 +35,7 @@ export function PosLocationIndicator() {
     // derives actor.branchId from the JWT — not the X-Branch-Id header — so a
     // mismatch makes branch-scoped reads (e.g. preferred-shelf lookup) hit the
     // wrong branch. Re-issue the token to match the selected branch.
-    const token = localStorage.getItem("access_token");
+    const token = localStorage.getItem(POS_ACCESS_TOKEN_KEY);
     const jwtBranchId = token
       ? parseAccessTokenPayload(token)?.branchId ?? null
       : null;
