@@ -68,8 +68,9 @@ export async function mintDocumentNumber(
 /**
  * Ported from `DocumentNumberingService.ensureDefaultActiveRule`, minus its own transaction.
  * Continuous types (PT, PC, NTTK…) get a date-free, never-resetting 6-digit sequence; the
- * rest get monthly YYYYMM with 5 digits — same shape the service would have created, so a
- * number minted here and one minted by v1 are indistinguishable.
+ * rest get monthly YYYYMM with 5 digits unless `DEFAULT_DOC_NUMBER_CONFIG` overrides the
+ * shape (INVOICE and RETURN do) — same rule the service would have created, so a number
+ * minted here and one minted by v1 are indistinguishable.
  *
  * Written through the caller's manager on purpose: a checkout that rolls back takes the rule
  * with it, and the next sale simply creates it again.
@@ -88,11 +89,14 @@ async function createDefaultRule(
     branchId: undefined,
     documentType,
     prefix: config.prefix,
-    suffix: undefined,
+    suffix: config.suffix,
     includeDate: !config.continuous,
-    dateFormat: 'YYYYMM',
-    sequenceLength: config.continuous ? 6 : 5,
-    resetPolicy: config.continuous ? ResetPolicy.NEVER : ResetPolicy.MONTHLY,
+    dateFormat: config.dateFormat ?? 'YYYYMM',
+    sequenceLength: config.sequenceLength ?? (config.continuous ? 6 : 5),
+    separator: config.separator ?? '-',
+    resetPolicy:
+      config.resetPolicy ??
+      (config.continuous ? ResetPolicy.NEVER : ResetPolicy.MONTHLY),
     isActive: true,
     createdBy: actor.userId,
   });

@@ -19,15 +19,6 @@ import {
   type PromotionAmount,
 } from "./printing/promotionPrintBuckets";
 
-/** Receipt number generator: YYMMDD + 4 random digits — e.g. "2605050007". */
-function generateInvoiceNumber(d: Date): string {
-  const yy = String(d.getFullYear()).slice(-2);
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  const seq = String(Math.floor(Math.random() * 10_000)).padStart(4, "0");
-  return `${yy}${mm}${dd}${seq}`;
-}
-
 const STORE_INFO = {
   name: "Giày MT Cần Thơ",
   address: "95-97 Nguyễn Trãi, Ninh Kiều, Cần Thơ",
@@ -216,7 +207,9 @@ export function buildCheckoutInvoicePayload({
 
   return {
     store: store ?? STORE_INFO,
-    invoiceNumber: generateInvoiceNumber(new Date()),
+    // Không có `invoiceNumber` ở đây: biên lai được dựng TRƯỚC khi gọi API nên
+    // lúc này hoá đơn chưa tồn tại, chưa có số. `use-checkout-actions` gán
+    // `invoice.code` do server trả về vào ngay sau khi checkout xong.
     issuedAt: new Date(),
     info: {
       customerName: trimmedOrUndefined(customerName),

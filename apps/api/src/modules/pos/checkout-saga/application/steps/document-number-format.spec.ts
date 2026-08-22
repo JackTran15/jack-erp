@@ -56,7 +56,7 @@ describe('document-number-format — parity with DocumentNumberingService (AC-14
   });
 
   describe('formatDate — every format token × all 4 moments', () => {
-    for (const format of ['YYYYMMDD', 'YYYYMM', 'YYYY', 'MMDD', 'MM', 'DD', 'UNRECOGNIZED']) {
+    for (const format of ['YYMMDD', 'YYYYMMDD', 'YYYYMM', 'YYYY', 'MMDD', 'MM', 'DD', 'UNRECOGNIZED']) {
       for (const moment of MOMENTS) {
         it(`${format} @ ${moment.toISOString()}`, () => {
           expect(formatDate(format, moment)).toBe(real.formatDate(format, moment));
@@ -65,15 +65,27 @@ describe('document-number-format — parity with DocumentNumberingService (AC-14
     }
   });
 
-  describe('formatDocumentNumber — 3 rule shapes × 3 sequences (12+ cases, AC-14)', () => {
+  describe('formatDocumentNumber — 5 rule shapes × 3 sequences (15+ cases, AC-14)', () => {
     const rules: Array<[string, DocumentNumberRuleShape]> = [
       [
         'continuous (no date, no suffix, 6-digit sequence)',
-        { prefix: 'NV', includeDate: false, dateFormat: 'YYYYMM', sequenceLength: 6 },
+        {
+          prefix: 'NV',
+          includeDate: false,
+          dateFormat: 'YYYYMM',
+          sequenceLength: 6,
+          separator: '-',
+        },
       ],
       [
         'dated (YYYYMM, 5-digit sequence)',
-        { prefix: 'INV', includeDate: true, dateFormat: 'YYYYMM', sequenceLength: 5 },
+        {
+          prefix: 'INV',
+          includeDate: true,
+          dateFormat: 'YYYYMM',
+          sequenceLength: 5,
+          separator: '-',
+        },
       ],
       [
         'dated with suffix (YYYYMMDD, 4-digit sequence)',
@@ -83,6 +95,28 @@ describe('document-number-format — parity with DocumentNumberingService (AC-14
           includeDate: true,
           dateFormat: 'YYYYMMDD',
           sequenceLength: 4,
+          separator: '-',
+        },
+      ],
+      [
+        'invoice (empty prefix, YYMMDD, 4-digit, empty separator)',
+        {
+          prefix: '',
+          includeDate: true,
+          dateFormat: 'YYMMDD',
+          sequenceLength: 4,
+          separator: '',
+        },
+      ],
+      [
+        'return (empty prefix, YYMMDD, 4-digit, empty separator, TH suffix)',
+        {
+          prefix: '',
+          suffix: 'TH',
+          includeDate: true,
+          dateFormat: 'YYMMDD',
+          sequenceLength: 4,
+          separator: '',
         },
       ],
     ];
@@ -104,6 +138,7 @@ describe('document-number-format — parity with DocumentNumberingService (AC-14
         includeDate: false,
         dateFormat: 'YYYYMM',
         sequenceLength: 6,
+        separator: '-',
       };
       expect(formatDocumentNumber(rule, MOMENTS[0], 1)).toBe('NV000001');
     });
@@ -114,10 +149,27 @@ describe('document-number-format — parity with DocumentNumberingService (AC-14
         includeDate: false,
         dateFormat: 'YYYYMM',
         sequenceLength: 5,
+        separator: '-',
       };
       const long: DocumentNumberRuleShape = { ...short, sequenceLength: 6 };
       expect(formatDocumentNumber(short, MOMENTS[0], 7)).toBe('A00007');
       expect(formatDocumentNumber(long, MOMENTS[0], 7)).toBe('A000007');
+    });
+
+    // The separator is the whole reason the invoice format is expressible at
+    // all: same rule, one character of data apart, two very different numbers.
+    it('the separator alone decides whether the segments run together', () => {
+      const dashed: DocumentNumberRuleShape = {
+        prefix: '',
+        includeDate: true,
+        dateFormat: 'YYMMDD',
+        sequenceLength: 4,
+        separator: '-',
+      };
+      const joined: DocumentNumberRuleShape = { ...dashed, separator: '' };
+      const moment = new Date('2026-08-21T10:00:00.000+07:00');
+      expect(formatDocumentNumber(dashed, moment, 1)).toBe('-260821-0001');
+      expect(formatDocumentNumber(joined, moment, 1)).toBe('2608210001');
     });
   });
 });

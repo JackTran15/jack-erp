@@ -218,7 +218,7 @@ export function renderInvoiceHtml(
 <html lang="vi">
   <head>
     <meta charset="utf-8" />
-    <title>Hóa đơn ${escapeHtml(invoiceNumber)}</title>
+    <title>Hóa đơn ${escapeHtml(invoiceNumber ?? "")}</title>
     <style>
       ${pageRule(layout)}
       * { box-sizing: border-box; }
@@ -386,8 +386,11 @@ export function renderInvoiceHtml(
             : invoice.isReturnExchange
               ? "HÓA ĐƠN ĐỔI TRẢ"
               : "HÓA ĐƠN"
-        }</h1>
-        <div class="doc-number">Số: ${escapeHtml(invoiceNumber)}</div>
+        }</h1>${
+          invoiceNumber
+            ? `\n        <div class="doc-number">Số: ${escapeHtml(invoiceNumber)}</div>`
+            : ""
+        }
       </section>
 
       <p class="date-line"><span class="label">Ngày:</span> ${escapeHtml(formatViDateTime(issuedAt, { separator: "space" }))}</p>

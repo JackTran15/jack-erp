@@ -85,6 +85,7 @@ describe('NextDocumentNumberStep', () => {
         includeDate: true,
         dateFormat: 'YYYYMM',
         sequenceLength: 5,
+        separator: '-',
         resetPolicy: ResetPolicy.MONTHLY,
       },
       existingCounter: { currentValue: 3 },
@@ -107,6 +108,7 @@ describe('NextDocumentNumberStep', () => {
         includeDate: true,
         dateFormat: 'YYYYMM',
         sequenceLength: 5,
+        separator: '-',
         resetPolicy: ResetPolicy.MONTHLY,
       },
       existingCounter: { currentValue: 41 },
@@ -153,6 +155,7 @@ describe('NextDocumentNumberStep', () => {
         includeDate: true,
         dateFormat: 'YYYYMM',
         sequenceLength: 5,
+        separator: '-',
         resetPolicy: ResetPolicy.MONTHLY,
       },
       existingCounter: null,
@@ -173,5 +176,98 @@ describe('NextDocumentNumberStep', () => {
     });
 
     await expect(new NextDocumentNumberStep().execute(ctx({ manager }))).rejects.toBe(boom);
+  });
+});
+
+// T-01-05 — the sale-side number over time and across branches. The step is the
+// only path a SALE takes (ADR-05), so proving it on the service side proves
+// nothing about this.
+describe('NextDocumentNumberStep — the YYMMDD sequence (AC-02, AC-03, AC-07)', () => {
+  const invoiceRule: Partial<DocumentNumberRuleEntity> = {
+    id: 'rule-invoice',
+    prefix: '',
+    includeDate: true,
+    dateFormat: 'YYMMDD',
+    sequenceLength: 4,
+    separator: '',
+    resetPolicy: ResetPolicy.DAILY,
+  };
+
+  afterEach(() => jest.useRealTimers());
+
+  const at = (iso: string) => jest.useFakeTimers().setSystemTime(new Date(iso));
+
+  it('the first sale of the day is 0001', async () => {
+    at('2026-08-21T09:00:00.000+07:00');
+    const { manager } = withManager({ rule: invoiceRule, existingCounter: null });
+
+    const c = ctx({ manager });
+    await new NextDocumentNumberStep().execute(c);
+
+    expect(c.documentNumber).toBe('2608210001');
+  });
+
+  it('the next sale the same day increments (AC-02)', async () => {
+    at('2026-08-21T17:09:00.000+07:00');
+    const { manager } = withManager({
+      rule: invoiceRule,
+      existingCounter: { currentValue: 1 },
+    });
+
+    const c = ctx({ manager });
+    await new NextDocumentNumberStep().execute(c);
+
+    expect(c.documentNumber).toBe('2608210002');
+  });
+
+  it('a new day asks for a new counter period and starts over at 0001 (AC-03)', async () => {
+    at('2026-08-21T23:59:00.000+07:00');
+    const day1 = withManager({ rule: invoiceRule, existingCounter: { currentValue: 6 } });
+    const c1 = ctx({ manager: day1.manager });
+    await new NextDocumentNumberStep().execute(c1);
+    expect(c1.documentNumber).toBe('2608210007');
+    expect(day1.qb.andWhere).toHaveBeenCalledWith('counter.resetKey = :resetKey', {
+      resetKey: '2026-08-21',
+    });
+
+    // Next day: DAILY means a different resetKey, so the lookup misses and the
+    // fresh counter starts at 1 — not 8.
+    at('2026-08-22T08:00:00.000+07:00');
+    const day2 = withManager({ rule: invoiceRule, existingCounter: null });
+    const c2 = ctx({ manager: day2.manager });
+    await new NextDocumentNumberStep().execute(c2);
+    expect(c2.documentNumber).toBe('2608220001');
+    expect(day2.qb.andWhere).toHaveBeenCalledWith('counter.resetKey = :resetKey', {
+      resetKey: '2026-08-22',
+    });
+  });
+
+  it('two branches share one org-wide counter, so their numbers differ (AC-07)', async () => {
+    at('2026-08-21T10:00:00.000+07:00');
+
+    // Branch A: nothing issued yet today.
+    const a = withManager({ rule: invoiceRule, branchRule: null, existingCounter: null });
+    const ca = ctx({ manager: a.manager, invoice: { id: 'inv-a', branchId: 'branch-a' } as any });
+    await new NextDocumentNumberStep().execute(ca);
+
+    // Branch B, same organisation: no branch-scoped rule of its own, so it falls
+    // through to the same org-wide rule and therefore the same counter row.
+    const b = withManager({
+      rule: invoiceRule,
+      branchRule: null,
+      existingCounter: { currentValue: 1 },
+    });
+    const cb = ctx({ manager: b.manager, invoice: { id: 'inv-b', branchId: 'branch-b' } as any });
+    await new NextDocumentNumberStep().execute(cb);
+
+    expect(ca.documentNumber).toBe('2608210001');
+    expect(cb.documentNumber).toBe('2608210002');
+    // Same counter, not one per branch — that is what keeps them apart under
+    // uq_invoice_org_code (organization_id, code).
+    for (const qb of [a.qb, b.qb]) {
+      expect(qb.where).toHaveBeenCalledWith('counter.ruleId = :ruleId', {
+        ruleId: 'rule-invoice',
+      });
+    }
   });
 });

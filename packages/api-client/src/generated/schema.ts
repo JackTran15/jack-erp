@@ -8242,12 +8242,14 @@ export interface components {
             sequenceLength?: number;
             /** @enum {string} */
             resetPolicy?: "NEVER" | "DAILY" | "MONTHLY" | "YEARLY";
+            separator?: string;
         };
         DocumentNumberRuleEntity: {
             /** @enum {string} */
             documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP" | "PROMOTION";
             prefix: string;
             suffix?: string;
+            separator: string;
             includeDate: boolean;
             dateFormat: string;
             sequenceLength: number;
@@ -8274,6 +8276,7 @@ export interface components {
             sequenceLength?: number;
             /** @enum {string} */
             resetPolicy?: "NEVER" | "DAILY" | "MONTHLY" | "YEARLY";
+            separator?: string;
         };
         GenerateDocumentNumberDto: {
             /** @enum {string} */
@@ -9593,6 +9596,14 @@ export interface components {
             excludeReservations?: boolean;
             isActive?: boolean;
             isPosVisible?: boolean;
+            /**
+             * @description Whole-set column totals for the grid footer. Defaults to true, and it is by
+             *     far the most expensive part of the response: the footer aggregates the
+             *     ledger over the entire result set, not over the page. A client that only
+             *     needs rows — or that already holds the footer for the current filter set —
+             *     should send false.
+             */
+            includeTotals?: boolean;
             /** @enum {string} */
             stockState?: "ALL" | "IN_STOCK" | "OUT_OF_STOCK" | "NEGATIVE";
             /** @enum {string} */
@@ -9679,6 +9690,14 @@ export interface components {
             excludeReservations?: boolean;
             isActive?: boolean;
             isPosVisible?: boolean;
+            /**
+             * @description Whole-set column totals for the grid footer. Defaults to true, and it is by
+             *     far the most expensive part of the response: the footer aggregates the
+             *     ledger over the entire result set, not over the page. A client that only
+             *     needs rows — or that already holds the footer for the current filter set —
+             *     should send false.
+             */
+            includeTotals?: boolean;
             /** @enum {string} */
             stockState?: "ALL" | "IN_STOCK" | "OUT_OF_STOCK" | "NEGATIVE";
             /** @enum {string} */

@@ -39,6 +39,9 @@ export class DocumentNumberRuleEntity extends BaseEntity {
   @Column({ length: 50, nullable: true, comment: 'Optional fixed string appended after the sequence' })
   suffix?: string;
 
+  @Column({ length: 5, default: '-', comment: 'String joining prefix / date / sequence / suffix; empty means no separator' })
+  separator: string;
+
   @Column({ name: 'include_date', default: true, comment: 'Whether to embed a date segment in the number' })
   includeDate: boolean;
 

@@ -20,6 +20,7 @@ export interface DocumentNumberRuleShape {
   includeDate: boolean;
   dateFormat: string;
   sequenceLength: number;
+  separator: string;
 }
 
 export function computeResetKey(policy: ResetPolicy, now: Date): string {
@@ -45,6 +46,7 @@ export function formatDate(format: string, date: Date): string {
   const day = date.getDate().toString().padStart(2, '0');
 
   const replacements: Record<string, string> = {
+    YYMMDD: `${year.slice(-2)}${month}${day}`,
     YYYYMMDD: `${year}${month}${day}`,
     YYYYMM: `${year}${month}`,
     YYYY: year,
@@ -63,7 +65,7 @@ export function formatDocumentNumber(
 ): string {
   const seq = sequence.toString().padStart(rule.sequenceLength, '0');
   // Continuous rules (no date, no suffix) render as "<prefix><seq>" with no
-  // separator; rules with a date or suffix keep the hyphen-separated layout.
+  // separator; rules with a date or suffix join on the rule's own separator.
   if (!rule.includeDate && !rule.suffix) {
     return `${rule.prefix}${seq}`;
   }
@@ -76,5 +78,5 @@ export function formatDocumentNumber(
   if (rule.suffix) {
     parts.push(rule.suffix);
   }
-  return parts.join('-');
+  return parts.join(rule.separator);
 }

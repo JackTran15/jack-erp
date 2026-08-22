@@ -15,7 +15,7 @@ export class UpdateDocumentNumberRuleDto {
   @IsOptional()
   @IsString()
   @MaxLength(50)
-  @Matches(/^[A-Za-z0-9\-_/]+$/)
+  @Matches(/^[A-Za-z0-9\-_/]*$/)
   prefix?: string;
 
   @IsOptional()
@@ -30,7 +30,7 @@ export class UpdateDocumentNumberRuleDto {
 
   @IsOptional()
   @IsString()
-  @IsEnum(['YYYYMMDD', 'YYYYMM', 'YYYY', 'MMDD', 'MM', 'DD'])
+  @IsEnum(['YYMMDD', 'YYYYMMDD', 'YYYYMM', 'YYYY', 'MMDD', 'MM', 'DD'])
   dateFormat?: string;
 
   @IsOptional()
@@ -42,4 +42,10 @@ export class UpdateDocumentNumberRuleDto {
   @IsOptional()
   @IsEnum(ResetPolicy)
   resetPolicy?: ResetPolicy;
+
+  // See CreateDocumentNumberRuleDto.separator.
+  @IsOptional()
+  @IsString()
+  @MaxLength(5)
+  separator?: string;
 }
