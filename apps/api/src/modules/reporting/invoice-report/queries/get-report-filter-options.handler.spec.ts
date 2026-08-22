@@ -1,18 +1,49 @@
 import { BadRequestException } from '@nestjs/common';
 import { ReportFilterOptionType } from '@erp/shared-interfaces';
+import { EmployeeScope } from '../../../rbac/employee-branch-scope.service';
 import { GetReportFilterOptionsHandler } from './get-report-filter-options.handler';
 
-const actor = { userId: 'u1', organizationId: 'org-1', branchId: 'b1', roles: [] } as any;
+const BRANCH = 'b1';
+const actor = { userId: 'u1', organizationId: 'org-1', branchId: BRANCH, roles: [] } as any;
 
-function makeHandler(overrides: Record<string, any> = {}) {
+/**
+ * QueryBuilder stub that records what it was told, so a raw-SQL predicate can
+ * be asserted on. `rows` feeds getMany, `raw` feeds getRawMany.
+ */
+function qbStub(result: { rows?: any[]; raw?: any[] } = {}) {
+  const qb: any = { andWhereCalls: [] as Array<[string, any]> };
+  for (const m of [
+    'innerJoin', 'leftJoin', 'where', 'select', 'addSelect',
+    'orderBy', 'addOrderBy', 'offset', 'limit', 'skip', 'take',
+  ]) {
+    qb[m] = jest.fn(() => qb);
+  }
+  qb.andWhere = jest.fn((sql: string, params?: any) => {
+    qb.andWhereCalls.push([sql, params]);
+    return qb;
+  });
+  qb.getMany = jest.fn(async () => result.rows ?? []);
+  qb.getRawMany = jest.fn(async () => result.raw ?? []);
+  return qb;
+}
+
+/** The (sql, params) pairs mentioning the branch-assignment table. */
+const scopeCalls = (qb: any) =>
+  (qb.andWhereCalls as Array<[string, any]>).filter(([sql]) =>
+    sql.includes('user_branch_assignments'),
+  );
+
+function makeHandler(
+  overrides: Record<string, any> = {},
+  scope: EmployeeScope = { mode: 'branch', branchId: BRANCH },
+) {
   const branches = {
     find: jest.fn(async () => [{ id: 'b1', name: 'Cần Thơ' }]),
   };
-  const users = {
-    find: jest.fn(async () => [
-      { id: 'usr-1', firstName: 'Thu', lastName: 'Nguyễn', email: 'thu@x.vn' },
-    ]),
-  };
+  const userQb = qbStub({
+    rows: [{ id: 'usr-1', firstName: 'Thu', lastName: 'Nguyễn', email: 'thu@x.vn' }],
+  });
+  const users = { createQueryBuilder: jest.fn(() => userQb) };
   const employees = {
     createQueryBuilder: jest.fn(),
     find: jest.fn(async () => []),
@@ -25,6 +56,7 @@ function makeHandler(overrides: Record<string, any> = {}) {
   };
   const items = { createQueryBuilder: jest.fn() };
   const repos = { branches, users, employees, customers, categories, items, ...overrides };
+  const resolve = jest.fn(async () => scope);
   const handler = new GetReportFilterOptionsHandler(
     repos.branches as any,
     repos.users as any,
@@ -32,8 +64,9 @@ function makeHandler(overrides: Record<string, any> = {}) {
     repos.customers as any,
     repos.categories as any,
     repos.items as any,
+    { resolve } as any,
   );
-  return { handler, repos };
+  return { handler, repos, userQb, resolve };
 }
 
 const run = (handler: GetReportFilterOptionsHandler, dto: any) =>
@@ -50,14 +83,26 @@ describe('GetReportFilterOptionsHandler', () => {
   });
 
   it('cashier: label is "First Last", filtered by org + active', async () => {
-    const { handler, repos } = makeHandler();
+    const { handler, userQb } = makeHandler();
     const out = await run(handler, { type: ReportFilterOptionType.CASHIER });
     expect(out).toEqual([
       { value: 'usr-1', label: 'Thu Nguyễn', metadata: { name: 'Thu Nguyễn' } },
     ]);
-    const where = (repos.users.find as jest.Mock).mock.calls[0][0].where;
-    expect(where.organizationId).toBe('org-1');
-    expect(where.isActive).toBe(true);
+    expect(userQb.where).toHaveBeenCalledWith('u.organizationId = :org', {
+      org: 'org-1',
+    });
+    expect(userQb.andWhereCalls.map(([sql]: [string, any]) => sql)).toContain(
+      'u.isActive = true',
+    );
+  });
+
+  it('cashier: keeps the ordering and paging the find() used', async () => {
+    const { handler, userQb } = makeHandler();
+    await run(handler, { type: ReportFilterOptionType.CASHIER, page: 3, pageSize: 10 });
+    expect(userQb.orderBy).toHaveBeenCalledWith('u.lastName', 'ASC');
+    expect(userQb.addOrderBy).toHaveBeenCalledWith('u.firstName', 'ASC');
+    expect(userQb.skip).toHaveBeenCalledWith(20);
+    expect(userQb.take).toHaveBeenCalledWith(10);
   });
 
   it('cashier: label is "{code} - First Last" when an employee profile is linked', async () => {
@@ -77,27 +122,31 @@ describe('GetReportFilterOptionsHandler', () => {
     ]);
   });
 
+  it('cashier: label is the bare email when the user has no name on file', async () => {
+    const nameless = qbStub({ rows: [{ id: 'usr-9', email: 'thu@x.vn' }] });
+    const { handler } = makeHandler({
+      users: { createQueryBuilder: jest.fn(() => nameless) },
+    });
+    const out = await run(handler, { type: ReportFilterOptionType.CASHIER });
+    expect(out).toEqual([
+      { value: 'usr-9', label: 'thu@x.vn', metadata: { name: 'thu@x.vn' } },
+    ]);
+  });
+
   it('cashier: search builds an OR over first/last name', async () => {
-    const { handler, repos } = makeHandler();
+    const { handler, userQb } = makeHandler();
     await run(handler, { type: ReportFilterOptionType.CASHIER, search: 'thu' });
-    const where = (repos.users.find as jest.Mock).mock.calls[0][0].where;
-    expect(Array.isArray(where)).toBe(true);
-    expect(where).toHaveLength(2);
-    expect(where[0].organizationId).toBe('org-1');
+    expect(userQb.andWhereCalls).toContainEqual([
+      '(u.firstName ILIKE :s OR u.lastName ILIKE :s)',
+      { s: '%thu%' },
+    ]);
   });
 
   it('salesperson: label is "{code} - First Last"', async () => {
     const rows = [
       { id: 'emp-1', code: 'NV000003', firstName: 'An', lastName: 'Trần' },
     ];
-    const qb: any = {};
-    for (const m of [
-      'innerJoin', 'where', 'select', 'addSelect', 'andWhere',
-      'orderBy', 'addOrderBy', 'offset', 'limit',
-    ]) {
-      qb[m] = jest.fn(() => qb);
-    }
-    qb.getRawMany = jest.fn(async () => rows);
+    const qb = qbStub({ raw: rows });
     const { handler } = makeHandler({
       employees: { createQueryBuilder: jest.fn(() => qb), find: jest.fn(async () => []) },
     });
@@ -149,5 +198,86 @@ describe('GetReportFilterOptionsHandler', () => {
     await expect(run(handler, { type: 'bogus' })).rejects.toBeInstanceOf(
       BadRequestException,
     );
+  });
+
+  describe('branch scope (AC-08, AC-09)', () => {
+    it('cashier: binds the active branch into the user query', async () => {
+      const { handler, userQb } = makeHandler();
+      await run(handler, { type: ReportFilterOptionType.CASHIER });
+      expect(scopeCalls(userQb)).toEqual([
+        [expect.stringContaining('uba.user_id = u.id'), { scopeBranchId: BRANCH }],
+      ]);
+    });
+
+    // AC-09 and the trap it guards: user_branch_assignments.user_id points at
+    // users.id. Keyed on e.id the predicate matches nothing and the screen shows
+    // an empty dropdown, which reads as missing data rather than a bug.
+    it('salesperson: keys the predicate on u.id, never on the profile id', async () => {
+      const qb = qbStub({ raw: [] });
+      const { handler } = makeHandler({
+        employees: { createQueryBuilder: jest.fn(() => qb), find: jest.fn(async () => []) },
+      });
+      await run(handler, { type: ReportFilterOptionType.SALESPERSON });
+      const [[sql, params]] = scopeCalls(qb);
+      expect(sql).toContain('uba.user_id = u.id');
+      expect(sql).not.toContain('uba.user_id = e.id');
+      expect(params).toEqual({ scopeBranchId: BRANCH });
+    });
+
+    it('adds no predicate for either type when the scope is all', async () => {
+      const salesQb = qbStub({ raw: [] });
+      const { handler, userQb } = makeHandler(
+        { employees: { createQueryBuilder: jest.fn(() => salesQb), find: jest.fn(async () => []) } },
+        { mode: 'all' },
+      );
+      await run(handler, { type: ReportFilterOptionType.CASHIER });
+      await run(handler, { type: ReportFilterOptionType.SALESPERSON });
+      expect(scopeCalls(userQb)).toEqual([]);
+      expect(scopeCalls(salesQb)).toEqual([]);
+    });
+
+    it('returns nothing without querying when the scope is none', async () => {
+      const salesQb = qbStub({ raw: [{ id: 'emp-1', code: 'NV1' }] });
+      const { handler, repos } = makeHandler(
+        { employees: { createQueryBuilder: jest.fn(() => salesQb), find: jest.fn(async () => []) } },
+        { mode: 'none' },
+      );
+      await expect(run(handler, { type: ReportFilterOptionType.CASHIER })).resolves.toEqual([]);
+      await expect(run(handler, { type: ReportFilterOptionType.SALESPERSON })).resolves.toEqual([]);
+      expect(repos.users.createQueryBuilder).not.toHaveBeenCalled();
+      expect(repos.employees.createQueryBuilder).not.toHaveBeenCalled();
+    });
+
+    // The other filter types must not pay for a permission lookup they never read.
+    it('resolves the scope only for the two employee-listing types', async () => {
+      const { handler, resolve } = makeHandler();
+      await run(handler, { type: ReportFilterOptionType.STORE });
+      await run(handler, { type: ReportFilterOptionType.CUSTOMER });
+      await run(handler, { type: ReportFilterOptionType.INVOICE_STATUS });
+      expect(resolve).not.toHaveBeenCalled();
+
+      await run(handler, { type: ReportFilterOptionType.CASHIER });
+      expect(resolve).toHaveBeenCalledTimes(1);
+    });
+
+    // AC-09 second half — the untouched types keep working exactly as before.
+    it('leaves the non-employee filter types unscoped', async () => {
+      const { handler, repos } = makeHandler();
+      const store = await run(handler, { type: ReportFilterOptionType.STORE });
+      const customer = await run(handler, { type: ReportFilterOptionType.CUSTOMER });
+      const group = await run(handler, { type: ReportFilterOptionType.PRODUCT_GROUP });
+
+      expect(store).toEqual([
+        { value: 'b1', label: 'Cần Thơ', metadata: { branchId: 'b1' } },
+      ]);
+      expect(customer).toEqual([
+        { value: 'cus-1', label: 'Khách lẻ', metadata: { phone: '0900' } },
+      ]);
+      expect(group).toEqual([{ value: 'cat-1', label: 'Đồ uống' }]);
+      for (const repo of [repos.branches, repos.customers, repos.categories]) {
+        const where = (repo.find as jest.Mock).mock.calls[0][0].where;
+        expect(JSON.stringify(where)).not.toContain('branch');
+      }
+    });
   });
 });

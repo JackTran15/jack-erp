@@ -17,6 +17,7 @@ import { PermissionGuard } from './permission.guard';
 import { BranchScopeGuard } from './branch-scope.guard';
 import { PermissionSyncService } from './permission-sync.service';
 import { UsersService } from './users.service';
+import { EmployeeBranchScopeService } from './employee-branch-scope.service';
 import { UsersController } from './users.controller';
 import { RolesService } from './roles.service';
 import { RolesController } from './roles.controller';
@@ -47,8 +48,15 @@ import { PermissionsController } from './permissions.controller';
     BranchScopeGuard,
     PermissionSyncService,
     UsersService,
+    EmployeeBranchScopeService,
     RolesService,
   ],
-  exports: [RbacService, PermissionGuard, BranchScopeGuard, UsersService],
+  exports: [
+    RbacService,
+    PermissionGuard,
+    BranchScopeGuard,
+    UsersService,
+    EmployeeBranchScopeService,
+  ],
 })
 export class RbacModule {}

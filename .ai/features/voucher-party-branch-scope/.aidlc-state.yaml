@@ -1,0 +1,143 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: voucher-party-branch-scope
+slug: voucher-party-branch-scope
+profile: none
+created: 2026-08-22T16:33:53
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-08-22T16:50:55
+    by: akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-08-22T16:50:55
+    by: akenzy
+    evidence: 10 assumptions, none blocking-and-pending; 13 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-22T16:50:55
+    by: akenzy
+    evidence: 5 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-22T16:50:55
+    by: akenzy
+    evidence: graph valid - 5 UoW, 8 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-22T16:58:23
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-22T16:58:23
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-22T17:00:35
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-22T17:03:09
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-22T17:04:21
+    by: akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-22T17:10:27
+    by: akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-22T17:15:55
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-22T17:15:55
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-22T17:15:55
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-22T17:22:35
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-22T17:22:35
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-22T17:22:36
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-22T17:23:31
+    by: akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-22T17:23:31
+    by: akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-22T17:23:31
+    by: akenzy
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-22T17:24:06
+    by: claude
+    ticket: T-04-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-22T17:24:06
+    by: claude
+    ticket: T-05-01
+  - gate: G2
+    action: reopened
+    at: 2026-08-22T17:41:15
+    by: claude
+    reason: ADR-05 khang dinh mode none tra 200 rong tren ca 4 endpoint; e2e chung minh /cash-vouchers/partners tra 403 vi BranchScopeGuard co san chan truoc handler
+  - gate: G2
+    action: passed
+    at: 2026-08-22T17:49:57
+    by: akenzy
+    evidence: 5 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-22T17:49:57
+    by: akenzy
+    evidence: graph valid - 5 UoW, 8 tickets, no cycles
+  - gate: G4
+    action: ticket review
+    at: 2026-08-22T17:50:04
+    by: claude
+    ticket: T-04-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-22T17:50:04
+    by: claude
+    ticket: T-05-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-22T17:50:24
+    by: akenzy
+    ticket: T-04-01

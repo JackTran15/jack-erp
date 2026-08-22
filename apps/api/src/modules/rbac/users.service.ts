@@ -74,6 +74,13 @@ export class UsersService {
    * `iam.user.read.all` an actor sees the employees of their own branches plus
    * the accounts above them (chain managers / admins), which the list renders
    * read-only — see {@link UserListItem.canEdit}.
+   *
+   * This answers "which accounts may I manage", so it spans *every* branch the
+   * actor belongs to. Employee pickers on vouchers and report filters ask a
+   * different question — "which branch does this document belong to" — and use
+   * `EmployeeBranchScopeService.resolve`, which narrows to the single active
+   * branch. Do not collapse the two: this one would widen those pickers back to
+   * the leak they were built to close.
    */
   async visibleUserIds(actor: ActorContext): Promise<string[] | null> {
     const keys = await this.rbacService.getUserPermissions(
