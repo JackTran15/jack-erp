@@ -1,4 +1,4 @@
-import { Entity, Column, Unique } from 'typeorm';
+import { Entity, Column, Index } from 'typeorm';
 import { DocumentType } from '@erp/shared-interfaces';
 import { BaseEntity } from '../../database/entities/base.entity';
 
@@ -11,12 +11,19 @@ export enum ResetPolicy {
 
 /** Defines how document numbers are formatted for a specific document type. Pattern: {prefix}{date?}{sequence}{suffix?}. */
 @Entity('document_number_rules')
-@Unique('UQ_active_rule_scope', [
-  'organizationId',
-  'branchId',
-  'documentType',
-  'isActive',
-])
+// Partial, so NULL is excluded from the key. A plain unique index over
+// (organization_id, branch_id, document_type, is_active) does not constrain the
+// org-wide rules at all — they all carry branch_id NULL, and Postgres treats
+// NULLs as distinct. A branch rule overriding the org default stays legal.
+@Index('UQ_doc_rule_org_default', ['organizationId', 'documentType'], {
+  unique: true,
+  where: '"is_active" AND "branch_id" IS NULL',
+})
+@Index(
+  'UQ_doc_rule_org_branch',
+  ['organizationId', 'branchId', 'documentType'],
+  { unique: true, where: '"is_active" AND "branch_id" IS NOT NULL' },
+)
 export class DocumentNumberRuleEntity extends BaseEntity {
   @Column({
     name: 'document_type',

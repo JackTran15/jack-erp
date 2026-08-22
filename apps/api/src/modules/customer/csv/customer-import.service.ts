@@ -8,7 +8,6 @@ import {
   INVENTORY_IMPORT_PREVIEW_ROWS_LIMIT,
   INVENTORY_IMPORT_ROW_SAVE_BATCH_SIZE,
   INVENTORY_IMPORT_SKU_LOOKUP_BATCH_SIZE,
-  DocumentType,
   PaginatedResponse,
   PaginationQuery,
   WsEventType,
@@ -27,7 +26,7 @@ import { DataSource, EntityManager, Repository } from "typeorm";
 import { v4 as uuidv4 } from "uuid";
 import * as XLSX from "xlsx";
 import { ActorContext } from "../../../common/decorators/actor-context.decorator";
-import { DocumentNumberingService } from "../../document-numbering/document-numbering.service";
+import { CustomerCodeService } from "../services/customer-code.service";
 import {
   cellToString,
   isCsvFile,
@@ -210,7 +209,7 @@ export class CustomerImportService {
     @InjectRepository(EmployeeProfileEntity)
     private readonly employeeProfileRepo: Repository<EmployeeProfileEntity>,
     private readonly dataSource: DataSource,
-    private readonly docNumbering: DocumentNumberingService,
+    private readonly customerCode: CustomerCodeService,
     private readonly workbookService: CustomerImportWorkbookService,
     private readonly wsEmitter: WebSocketEmitterService,
   ) {}
@@ -1090,12 +1089,7 @@ export class CustomerImportService {
     }
 
     const code =
-      normalized.code?.trim() ||
-      (await this.docNumbering.generate(
-        DocumentType.CUSTOMER,
-        actor.branchId,
-        actor,
-      ));
+      normalized.code?.trim() || (await this.customerCode.issue(actor, em));
 
     const customer = await customerRepo.save(
       customerRepo.create({

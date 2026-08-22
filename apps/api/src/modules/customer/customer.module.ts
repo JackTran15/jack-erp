@@ -20,6 +20,7 @@ import { CustomerGroupService } from './customer-group.service';
 import { MembershipCardService } from './services/membership-card.service';
 import { CustomerCreditService } from './services/customer-credit.service';
 import { CustomerSummaryService } from './services/customer-summary.service';
+import { CustomerCodeService } from './services/customer-code.service';
 import {
   MembershipCardTypeService,
   MEMBERSHIP_CARD_TYPE_SERVICE_TOKEN,
@@ -50,6 +51,7 @@ import { LoyaltyPointsReverseConsumer } from './consumers/loyalty-points-reverse
   controllers: [CustomerController],
   providers: [
     CustomerService,
+    CustomerCodeService,
     { provide: CUSTOMER_SERVICE_TOKEN, useExisting: CustomerService },
     CustomerGroupService,
     MembershipCardService,
@@ -65,6 +67,7 @@ import { LoyaltyPointsReverseConsumer } from './consumers/loyalty-points-reverse
   ],
   exports: [
     CustomerService,
+    CustomerCodeService,
     MembershipCardService,
     MembershipCardTypeSeederService,
     LoyaltyPointsPublisher,

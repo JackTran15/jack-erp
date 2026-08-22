@@ -7,6 +7,7 @@ import { EmployeeProfileEntity } from "../../rbac/employee/employee-profile.enti
 import { WebSocketModule } from "../../websocket/websocket.module";
 import { CustomerGroupEntity } from "../customer-group.entity";
 import { CustomerEntity } from "../customer.entity";
+import { CustomerModule } from "../customer.module";
 import { MembershipCardEntity } from "../membership-card.entity";
 import { CustomerExportController } from "./customer-export.controller";
 import { CustomerExportService } from "./customer-export.service";
@@ -31,6 +32,7 @@ import { CustomerImportWorkbookService } from "./customer-import-workbook.servic
     ]),
     DocumentNumberingModule,
     WebSocketModule,
+    CustomerModule,
   ],
   controllers: [CustomerImportController, CustomerExportController],
   providers: [

@@ -1,6 +1,7 @@
 import {
   Entity,
   Column,
+  Index,
   PrimaryGeneratedColumn,
   ManyToOne,
   JoinColumn,
@@ -11,6 +12,9 @@ import { TransferOrderEntity } from './transfer-order.entity';
 import { ItemEntity } from '../location/item.entity';
 
 @Entity('transfer_order_lines')
+// "Is any of this item in transit?" — the stock summary asks it twice per
+// request. Without this the only index was on transfer_order_id.
+@Index('IDX_transfer_order_lines_org_item', ['organizationId', 'itemId'])
 export class TransferOrderLineEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;

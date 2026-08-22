@@ -80,6 +80,10 @@ applyUtcTimestampCodec();
         // parameter instead, which TypeORM merges verbatim into the pg.Pool config.
         // UTC, not the business zone — see the note in `database/data-source.ts`.
         extra: { options: '-c timezone=UTC' },
+        // node-postgres defaults to 10 connections per pool. Postgres runs with
+        // max_connections=100 (3 superuser-reserved), so keep
+        // instances * DB_POOL_SIZE comfortably under ~97.
+        poolSize: Number(config.get<string>('DB_POOL_SIZE', '20')),
         autoLoadEntities: true,
         synchronize: false,
       }),

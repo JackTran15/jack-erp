@@ -60,6 +60,8 @@ export interface CreateTransferDto {
   invoiceId?: string;
   /** Human-readable code of the triggering invoice (denormalized). */
   invoiceNumber?: string;
+  /** Set by system flows (temp warehouse, POS fulfillment) — those documents cannot be edited. */
+  isSystemGenerated?: boolean;
   lines: {
     itemId: string;
     quantity: number;
@@ -90,6 +92,8 @@ export interface BranchScopedTransferInput {
   invoiceId?: string;
   /** Human-readable code of the triggering invoice (denormalized). */
   invoiceNumber?: string;
+  /** Set by system flows (temp warehouse, POS fulfillment) — those documents cannot be edited. */
+  isSystemGenerated?: boolean;
   lines: {
     itemId: string;
     quantity: number;
@@ -191,6 +195,7 @@ export class StockTransferService {
       transferredAt: dto.transferredAt ? new Date(dto.transferredAt) : undefined,
       invoiceId: dto.invoiceId ?? null,
       invoiceNumber: dto.invoiceNumber ?? null,
+      isSystemGenerated: dto.isSystemGenerated ?? false,
       createdBy: actor.userId,
       lines: dto.lines.map((l) => {
         const line = new StockTransferLineEntity();
@@ -393,6 +398,7 @@ export class StockTransferService {
       transferredAt: dto.transferredAt,
       invoiceId: dto.invoiceId,
       invoiceNumber: dto.invoiceNumber,
+      isSystemGenerated: dto.isSystemGenerated,
       notes: dto.notes,
       lines,
     };
@@ -446,6 +452,9 @@ export class StockTransferService {
 
   /**
    * Edit a transfer in place, preserving its id and document number.
+   *  - System-generated (temp warehouse / POS fulfillment / shelf arrangement):
+   *    rejected — the document mirrors stock already moved by another flow and
+   *    editing it would desynchronize that flow's own records.
    *  - CANCELLED: rejected (a voided doc cannot be edited).
    *  - DRAFT: lines/header replaced; no ledger impact yet.
    *  - POSTED: the immutable ledger is corrected by reversing the original
@@ -463,6 +472,11 @@ export class StockTransferService {
     opts: { allowNegative?: boolean } = {},
   ): Promise<StockTransferEntity> {
     const transfer = await this.findOrFail(id, actor.organizationId);
+    if (transfer.isSystemGenerated) {
+      throw new BadRequestException(
+        'Cannot edit a system-generated stock transfer; only transfers created from the stock transfer form can be edited',
+      );
+    }
     if (transfer.status === TransferStatus.CANCELLED) {
       throw new BadRequestException('Cannot edit a cancelled stock transfer');
     }
@@ -817,12 +831,21 @@ export class StockTransferService {
    * returns to the source location and leaves the destination — then the doc is
    * marked CANCELLED (the ledger stays immutable; corrections are reversals, not
    * deletes). Calling again on a CANCELLED doc throws (no double reversal).
+   *
+   * System-generated documents (temp warehouse / POS fulfillment / shelf
+   * arrangement) are rejected for the same reason they cannot be edited: the
+   * stock they record belongs to another flow's records.
    */
   async cancel(
     id: string,
     actor: ActorContext,
   ): Promise<StockTransferEntity> {
     const transfer = await this.findOrFail(id, actor.organizationId);
+    if (transfer.isSystemGenerated) {
+      throw new BadRequestException(
+        'Cannot delete a system-generated stock transfer; only transfers created from the stock transfer form can be deleted',
+      );
+    }
     this.validateTransition(transfer.status, TransferStatus.CANCELLED);
 
     // DRAFT: nothing posted yet — void directly.
@@ -1151,6 +1174,7 @@ export class StockTransferService {
             destinationBranchId: actor.branchId,
             status: TransferStatus.POSTED,
             documentNumber: documentNumber!,
+            isSystemGenerated: true,
             createdBy: actor.userId,
             approvedBy: actor.userId,
             approvedAt: new Date(),

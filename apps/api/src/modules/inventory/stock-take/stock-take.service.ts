@@ -1564,6 +1564,7 @@ export class StockTakeService {
       DocumentType.GOODS_RECEIPT,
       branchId,
       actor,
+      manager,
     );
     const headerLocationId = positives[0].line.locationId;
 
@@ -1619,6 +1620,7 @@ export class StockTakeService {
       DocumentType.GOODS_ISSUE,
       branchId,
       actor,
+      manager,
     );
     const headerLocationId = negatives[0].line.locationId;
 
