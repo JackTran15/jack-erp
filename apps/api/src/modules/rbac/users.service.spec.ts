@@ -702,4 +702,83 @@ describe('UsersService', () => {
       ]);
     });
   });
+  /**
+   * assertCanManageUser exempts self, and that exemption used to reach the role
+   * set — so the last administrator of an org could de-role themselves and lock
+   * everyone out with no way back.
+   */
+  describe('self-demotion', () => {
+    /** Actor currently holds the union of r-admin; r-staff is a strict subset. */
+    function arrangeSelf() {
+      userRepo.exist.mockResolvedValue(true);
+      userRoleRepo.find.mockResolvedValue([]);
+      roleRepo.find.mockImplementation(async ({ where }: any) => {
+        const requested: string[] = where?.id?._value ?? ['r-admin', 'r-staff'];
+        return ['r-admin', 'r-staff']
+          .filter((id) => requested.includes(id))
+          .map((id) => ({ id }));
+      });
+      rbac.getUserPermissions.mockResolvedValue([
+        'iam.user.write',
+        'iam.role.permissions.write',
+      ]);
+      rbac.getRolePermissionKeys.mockImplementation(async (roleIds: string[]) =>
+        new Map(
+          roleIds.map((id) => [
+            id,
+            id === 'r-admin'
+              ? ['iam.user.write', 'iam.role.permissions.write']
+              : ['iam.user.write'],
+          ]),
+        ),
+      );
+    }
+
+    it('refuses to drop a role that carries permissions the actor would lose', async () => {
+      arrangeSelf();
+
+      await expect(
+        service.setRoles(actor.userId, ['r-staff'], actor),
+      ).rejects.toThrow(/Cannot remove your own permissions/);
+      expect(manager.save).not.toHaveBeenCalled();
+    });
+
+    it('refuses to strip the actor of every role', async () => {
+      arrangeSelf();
+
+      await expect(service.setRoles(actor.userId, [], actor)).rejects.toThrow(
+        /Cannot remove your own permissions/,
+      );
+      expect(manager.save).not.toHaveBeenCalled();
+    });
+
+    it('allows a self-edit that keeps every permission the actor holds', async () => {
+      arrangeSelf();
+
+      await expect(
+        service.setRoles(actor.userId, ['r-admin', 'r-staff'], actor),
+      ).resolves.toEqual(['r-admin', 'r-staff']);
+    });
+
+    it('still lets the actor re-role an equal-ranking peer', async () => {
+      arrangeSelf();
+      // The guarantee "an org never loses its last admin" rests on this staying
+      // allowed: the actor is refused on themselves, so the survivor is the actor.
+      // read.all lifts the branch scope so the peer is visible at all.
+      rbac.getUserPermissions.mockResolvedValue([
+        'iam.user.write',
+        'iam.role.permissions.write',
+        'iam.user.read.all',
+      ]);
+      userRepo.findOne.mockResolvedValue({
+        id: 'u-peer',
+        isActive: true,
+        organizationId: 'org-1',
+      });
+
+      await expect(
+        service.setRoles('u-peer', ['r-staff'], actor),
+      ).resolves.toEqual(['r-staff']);
+    });
+  });
 });

@@ -53,18 +53,37 @@ export function RoleUsersTab({
           getRowKey={(row) => row.id}
           renderActions={
             canAssign
-              ? (row) => (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive h-6"
-                    aria-label={`Gỡ ${joinFullName(row.firstName, row.lastName)} khỏi vai trò`}
-                    onClick={() => onRemove(row)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )
+              ? (row) => {
+                  // The server already refuses to re-role an account holding
+                  // permissions the caller lacks, and says so per row via
+                  // `canEdit`. Without this the button opens a confirm dialog
+                  // that can only ever end in a 403 toast.
+                  const manageable = row.canEdit ?? true;
+                  return (
+                    // The title sits on the wrapper, not the button: a disabled
+                    // button takes no pointer events (@erp/ui also sets
+                    // `disabled:pointer-events-none`), so a title on it never shows.
+                    <span
+                      title={
+                        manageable
+                          ? undefined
+                          : "Tài khoản này có quyền cao hơn bạn nên bạn không gỡ vai trò của họ được."
+                      }
+                    >
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive h-6"
+                        aria-label={`Gỡ ${joinFullName(row.firstName, row.lastName)} khỏi vai trò`}
+                        disabled={!manageable}
+                        onClick={() => onRemove(row)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </span>
+                  );
+                }
               : undefined
           }
         />

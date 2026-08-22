@@ -1,7 +1,7 @@
 ---
 feature: employee-role-branch-scope
-stories: 3
-acceptance_criteria: 8
+stories: 4
+acceptance_criteria: 10
 ---
 
 # Requirements — Phân quyền theo permission cho form "Thêm mới Nhân viên"
@@ -43,6 +43,17 @@ hiểu vì sao mã nhân viên đã tồn tại), nhưng mọi đường ghi ph�
 - **AC-08** — Mọi hành động ghi khác xuất phát từ dòng đó cũng phải bị khóa, **kể cả Nhân
   bản**: bản sao mang theo `roleIds` của tài khoản gốc, mà tab Vai trò lại ẩn đúng những vai
   trò đó, nên người dùng không thể bỏ tick thứ khiến server trả 403.
+
+## Story 4 — Màn "Quản lý vai trò" tuân đúng luật đó
+
+Trang này gác bằng `iam.role.read`, mà Quản lý chi nhánh có key đó chỉ để form nhân viên liệt
+kê được vai trò. Họ vào được trang, và nút gỡ người dùng lại chỉ gác bằng `iam.user.roles.write`
+org-wide — không nhìn `canEdit` của từng dòng như trang Nhân viên vẫn làm.
+
+- **AC-09** — Trong "Danh sách người dùng" của một vai trò, nút gỡ bị khóa trên dòng mà người
+  dùng hiện tại không quản lý được (`canEdit === false`), kèm tooltip nói rõ lý do. Ô tick
+  trong hộp "Chọn người dùng" cũng vậy — bỏ tick ở đó đi đúng một đường API với nút gỡ.
+- **AC-10** — Trên dòng ngang hoặc thấp hơn, nút gỡ vẫn bật. Thiếu vế này thì AC-09 vô nghĩa.
 
 ## Not verified here
 
