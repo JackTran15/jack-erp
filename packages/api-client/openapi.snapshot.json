@@ -7609,6 +7609,38 @@
         ]
       }
     },
+    "/inventory/stock/balances/batch": {
+      "post": {
+        "operationId": "StockLedgerController_batchBalances",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchBalanceRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchBalanceResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tồn của nhiều (mặt hàng, vị trí|kho) trong một lượt. POST vì danh sách cặp\ndài hơn nhiều so với giới hạn query string của một phiếu vài trăm dòng —\ncùng lối với `POST /inventory/locations/preferred-shelf/batch`.",
+        "tags": [
+          "StockLedger"
+        ]
+      }
+    },
     "/inventory/stock/balances/tracking": {
       "patch": {
         "operationId": "StockLedgerController_setBalanceTracking",
@@ -18871,6 +18903,104 @@
         ]
       }
     },
+    "/inventory/goods-issues/{id}/lines": {
+      "get": {
+        "operationId": "GoodsIssueController_getLines",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filters",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "GoodsIssue"
+        ]
+      }
+    },
     "/inventory/goods-issues/{id}/print-payload": {
       "get": {
         "operationId": "GoodsIssueController_getPrintPayload",
@@ -19381,6 +19511,104 @@
         ]
       }
     },
+    "/inventory/transfer-orders/{id}/lines": {
+      "get": {
+        "operationId": "TransferOrderController_getLines",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filters",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      }
+    },
     "/inventory/transfer-orders/{id}/print-payload": {
       "get": {
         "operationId": "TransferOrderController_getPrintPayload",
@@ -19736,6 +19964,104 @@
         "responses": {
           "204": {
             "description": ""
+          }
+        },
+        "tags": [
+          "GoodsReceipt"
+        ]
+      }
+    },
+    "/goods-receipts/{id}/lines": {
+      "get": {
+        "operationId": "GoodsReceiptController_getLines",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filters",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -29116,6 +29442,83 @@
           "total",
           "page",
           "pageSize"
+        ]
+      },
+      "BalancePairDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "storageId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "itemId"
+        ]
+      },
+      "BatchBalanceRequestDto": {
+        "type": "object",
+        "properties": {
+          "pairs": {
+            "minItems": 1,
+            "maxItems": 10000,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BalancePairDto"
+            }
+          }
+        },
+        "required": [
+          "pairs"
+        ]
+      },
+      "BatchBalanceRowDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "locationId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "storageId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Tồn hiện có; 0 khi chưa có dòng tồn nào."
+          }
+        },
+        "required": [
+          "itemId",
+          "quantity"
+        ]
+      },
+      "BatchBalanceResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchBalanceRowDto"
+            }
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "BalanceTrackingEntryDto": {
@@ -38996,6 +39399,14 @@
             "nullable": true,
             "description": "Transient (not a column): the resolved \"Đối tượng\" { kind, id, code, name }\ninlined by the v2 search handler / getById so customer and employee\ncounterparties (no provider join) render their name instead of \"—\"."
           },
+          "totalAmount": {
+            "type": "number",
+            "description": "Transient (not a column): per-issue Tổng tiền, inlined by the v2 search\nhandler via a correlated subquery so the list's money column works\nwithout joining `lines` (which the list query no longer does)."
+          },
+          "transferImported": {
+            "type": "boolean",
+            "description": "Transient (not a column): true when this is a transfer-out leg whose\ndestination has already confirmed import. Such a row is frozen — editing it\nwould cascade into a phiếu nhập another branch has posted — so the list\ndisables Sửa/Xóa up front instead of failing on click."
+          },
           "id": {
             "type": "string"
           },
@@ -39931,6 +40342,10 @@
               "id",
               "name"
             ]
+          },
+          "totalAmount": {
+            "type": "number",
+            "description": "Transient (not a column): per-receipt Tổng tiền, inlined by the v2 search\nhandler via a correlated subquery so the list's money column works without\njoining `lines` (which the list query no longer does)."
           },
           "id": {
             "type": "string"

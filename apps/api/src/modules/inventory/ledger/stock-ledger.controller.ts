@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Patch,
+  Post,
   Query,
   ParseUUIDPipe,
   UseInterceptors,
@@ -18,6 +19,10 @@ import { AuditInterceptor } from '../../crud/audit.interceptor';
 import { PaginationQueryDto } from '../../crud/dto';
 import { StockLedgerService } from './stock-ledger.service';
 import { SetBalanceTrackingDto } from './dto/set-balance-tracking.dto';
+import {
+  BatchBalanceRequestDto,
+  BatchBalanceResponseDto,
+} from './dto/batch-balance.dto';
 import { StockMovementType } from '@erp/shared-interfaces';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -237,6 +242,27 @@ export class StockLedgerController {
       // Actor.branchId is resolved from the validated X-Branch-Id/JWT authentication context.
       branchId: actor.branchId,
     });
+  }
+
+  /**
+   * Tồn của nhiều (mặt hàng, vị trí|kho) trong một lượt. POST vì danh sách cặp
+   * dài hơn nhiều so với giới hạn query string của một phiếu vài trăm dòng —
+   * cùng lối với `POST /inventory/locations/preferred-shelf/batch`.
+   */
+  @Post('balances/batch')
+  @RequirePermission('inventory.read')
+  @RequireBranchScope()
+  @ApiOkResponse({ type: BatchBalanceResponseDto })
+  async batchBalances(
+    @Body() dto: BatchBalanceRequestDto,
+    @Actor() actor: ActorContext,
+  ): Promise<BatchBalanceResponseDto> {
+    const data = await this.service.getBalancesForPairs(
+      dto.pairs,
+      actor.organizationId,
+      actor.branchId,
+    );
+    return { data };
   }
 
   // Bulk toggle location-level tracking (stock_balances.is_tracked) for the

@@ -73,9 +73,10 @@ import {
   type TransferOrderDetail,
 } from "../../pages/goods-issue/SelectTransferOrderDialog";
 import {
-  OverstockConfirmDialog,
+  findOverstockRows,
   type OverstockWarningRow,
-} from "../../pages/goods-issue/OverstockConfirmDialog";
+} from "../../api/overstock";
+import { OverstockConfirmDialog } from "./OverstockConfirmDialog";
 import type { IssuableTransferOrderListItem } from "@erp/shared-interfaces";
 import { DocumentLineImportDialog } from "../../pages/inventory/_components/document-import/DocumentLineImportDialog";
 import type { DocumentLineImportJobRow } from "../../pages/inventory/_components/document-import/document-line-import.types";
@@ -848,44 +849,17 @@ export function GoodsIssueFormDialog({
       }));
 
       if (!skipOverstockConfirm) {
-        const requestedByStockKey = new Map<
-          string,
-          { line: (typeof resolvedLines)[number]; quantity: number }
-        >();
-        for (const line of resolvedLines) {
-          const key = `${line.itemId}:${line.locationId}`;
-          const current = requestedByStockKey.get(key);
-          requestedByStockKey.set(key, {
-            line,
-            quantity: (current?.quantity ?? 0) + Number(line.quantity),
-          });
-        }
-
-        const warnings = (
-          await Promise.all(
-            [...requestedByStockKey.values()].map(async ({ line, quantity }) => {
-              const params = new URLSearchParams({
-                page: "1",
-                pageSize: "1",
-                itemId: line.itemId,
-                locationId: line.locationId,
-              });
-              const { data } = await apiClient.get<
-                PaginatedResponse<{ quantity: number | string }>
-              >(`/inventory/stock/balances?${params}`);
-              const availableQuantity = Number(data.data[0]?.quantity ?? 0);
-              if (quantity <= availableQuantity) return null;
-              return {
-                itemId: line.itemId,
-                itemName: line.itemName || line.itemLabel,
-                availableQuantity,
-                unit: line.unit,
-                storageName: line.storageLabel,
-              } satisfies OverstockWarningRow;
-            }),
-          )
-        ).filter((row): row is OverstockWarningRow => row !== null);
-
+        // Mọi dòng đã resolve xong vị trí ở trên, nên đối chiếu theo đúng vị trí.
+        const warnings = await findOverstockRows(
+          resolvedLines.map((line) => ({
+            itemId: line.itemId,
+            itemName: line.itemName || line.itemLabel,
+            unit: line.unit,
+            storageName: line.storageLabel,
+            quantity: Number(line.quantity),
+            locationId: line.locationId,
+          })),
+        );
         if (warnings.length > 0) {
           setOverstockWarnings(warnings);
           return false;

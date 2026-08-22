@@ -452,12 +452,15 @@ export class StockTransferService {
    *    movements (rollback the stock) and posting the new ones in a single
    *    transaction. A pessimistic net-delta check per (item, location) blocks
    *    the edit when it would drive any balance negative (the new source lacks
-   *    stock, or the goods already left the old destination).
+   *    stock, or the goods already left the old destination) — unless
+   *    `opts.allowNegative`, which the UI sets once the user confirms the
+   *    "xuất quá số lượng tồn" warning.
    */
   async update(
     id: string,
     dto: BranchScopedTransferInput,
     actor: ActorContext,
+    opts: { allowNegative?: boolean } = {},
   ): Promise<StockTransferEntity> {
     const transfer = await this.findOrFail(id, actor.organizationId);
     if (transfer.status === TransferStatus.CANCELLED) {
@@ -627,6 +630,7 @@ export class StockTransferService {
 
     const entries = await this.dataSource.transaction(async (manager) => {
       for (const n of netByKey.values()) {
+        if (opts.allowNegative) break;
         if (n.delta >= 0) continue;
         const balance = await manager
           .createQueryBuilder(StockBalanceEntity, 'sb')

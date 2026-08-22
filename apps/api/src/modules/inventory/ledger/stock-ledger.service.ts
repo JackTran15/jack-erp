@@ -69,6 +69,22 @@ export interface LedgerQuery extends PaginationQuery {
   organizationId: string;
 }
 
+/** Một (mặt hàng, phạm vi) cần biết tồn — xem `getBalancesForPairs`. */
+export interface BalancePair {
+  itemId: string;
+  /** Tồn tại đúng vị trí này. Ưu tiên hơn `storageId` khi cả hai cùng có. */
+  locationId?: string;
+  /** Không có `locationId` thì tồn là tổng mọi vị trí trong kho này. */
+  storageId?: string;
+}
+
+export interface BalancePairResult {
+  itemId: string;
+  locationId: string | null;
+  storageId: string | null;
+  quantity: number;
+}
+
 export interface BalanceQuery extends PaginationQuery {
   itemId?: string;
   locationId?: string;
@@ -341,6 +357,73 @@ export class StockLedgerService {
     return this.balanceRepo.findOne({
       where: { itemId, locationId, organizationId },
     });
+  }
+
+  /**
+   * Tồn của nhiều (mặt hàng, phạm vi) trong **một** truy vấn.
+   *
+   * Sinh ra cho vòng kiểm "xuất quá số lượng tồn" của phiếu xuất kho và phiếu
+   * chuyển kho: một phiếu có thể tới hàng trăm dòng, nên hỏi từng dòng một là
+   * hàng trăm round-trip, còn dùng `getBalances` phân trang thì phải tự đoán
+   * cần bao nhiêu trang mới đủ. Ở đây mọi mặt hàng được nạp bằng một câu SQL
+   * rồi gộp trong bộ nhớ, nên số round-trip không phụ thuộc số dòng phiếu.
+   *
+   * `locationId` cho tồn tại đúng vị trí; chỉ có `storageId` thì cộng dồn mọi
+   * vị trí trong kho. Cặp không có dòng tồn nào trả về 0 chứ không bị bỏ khỏi
+   * kết quả — người gọi luôn nhận lại đúng số cặp đã gửi, cùng thứ tự.
+   */
+  async getBalancesForPairs(
+    pairs: BalancePair[],
+    organizationId: string,
+    branchId?: string,
+  ): Promise<BalancePairResult[]> {
+    if (pairs.length === 0) return [];
+
+    const itemIds = Array.from(new Set(pairs.map((p) => p.itemId)));
+    const qb = this.balanceRepo
+      .createQueryBuilder('sb')
+      .innerJoin('locations', 'loc', 'loc.id = sb.location_id')
+      .innerJoin('storages', 'storage', 'storage.id = loc.storage_id')
+      .select('sb.item_id', 'itemId')
+      .addSelect('sb.location_id', 'locationId')
+      .addSelect('loc.storage_id', 'storageId')
+      .addSelect('sb.quantity', 'quantity')
+      .where('sb.organization_id = :organizationId', { organizationId })
+      .andWhere('sb.item_id IN (:...itemIds)', { itemIds });
+
+    if (branchId) {
+      // Same rule as getBalances: the physical storage owns the branch, not the
+      // denormalized stock_balances.branch_id.
+      qb.andWhere('storage.branch_id = :branchId', { branchId });
+    }
+
+    const rows = await qb.getRawMany<{
+      itemId: string;
+      locationId: string;
+      storageId: string;
+      quantity: string;
+    }>();
+
+    const byLocation = new Map<string, number>();
+    const byStorage = new Map<string, number>();
+    for (const row of rows) {
+      const quantity = Number(row.quantity);
+      const locationKey = `${row.itemId}::${row.locationId}`;
+      const storageKey = `${row.itemId}::${row.storageId}`;
+      byLocation.set(locationKey, (byLocation.get(locationKey) ?? 0) + quantity);
+      byStorage.set(storageKey, (byStorage.get(storageKey) ?? 0) + quantity);
+    }
+
+    return pairs.map((pair) => ({
+      itemId: pair.itemId,
+      locationId: pair.locationId ?? null,
+      storageId: pair.storageId ?? null,
+      quantity: pair.locationId
+        ? byLocation.get(`${pair.itemId}::${pair.locationId}`) ?? 0
+        : pair.storageId
+          ? byStorage.get(`${pair.itemId}::${pair.storageId}`) ?? 0
+          : 0,
+    }));
   }
 
   async getBalances(

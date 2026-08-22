@@ -1,12 +1,5 @@
 import { AppModal } from "@erp/ui";
-
-export interface OverstockWarningRow {
-  itemId: string;
-  itemName: string;
-  availableQuantity: number;
-  unit: string;
-  storageName: string;
-}
+import type { OverstockWarningRow } from "../../api/overstock";
 
 interface OverstockConfirmDialogProps {
   rows: OverstockWarningRow[];
