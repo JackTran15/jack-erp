@@ -37,7 +37,12 @@ export function VariantRow({
   onBump,
   onCopyDown,
 }: VariantRowProps) {
-  const oversell = checked && qty > variant.quantityOnHand;
+  // Cơ sở cảnh báo là tồn showroom — đúng tập kho POS trừ hàng — chứ không phải
+  // tổng toàn chi nhánh. Dialog này và dòng giỏ hàng phải nói cùng một con số:
+  // chọn ở đây rồi thấy số khác ở giỏ là cách nhanh nhất để thu ngân mất tin
+  // vào cả hai.
+  const onHand = variant.showroomQuantity;
+  const oversell = checked && qty > onHand;
 
   const warningBadge = oversell ? (
     <Tooltip>
@@ -56,7 +61,7 @@ export function VariantRow({
       >
         <div className="flex flex-col space-y-1">
           <p className="font-semibold">Hàng hóa quá số lượng tồn</p>
-          <p>Tồn: {qtyFormatter.format(variant.quantityOnHand)}</p>
+          <p>Tồn: {qtyFormatter.format(onHand)}</p>
         </div>
       </TooltipContent>
     </Tooltip>
@@ -98,9 +103,7 @@ export function VariantRow({
           className={cn(oversell && "border-[#EF4444]")}
         />
       </td>
-      <td className={cn(cellBase, "text-right text-[#5B5BF0]")}>
-        {variant.quantityOnHand}
-      </td>
+      <td className={cn(cellBase, "text-right text-[#5B5BF0]")}>{onHand}</td>
       <td className={cn(cellBase, "w-10 text-center")}>
         <Tooltip>
           <TooltipTrigger asChild>

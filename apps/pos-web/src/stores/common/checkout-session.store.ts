@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { POINT_REDEMPTION_VALUE_VND } from "@erp/pos/constants/loyalty.constant";
+import { readShowroomOnHand } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
   createPaymentLine,
   type PaymentLine,
@@ -349,10 +350,19 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
               cartChanged = true;
               return { ...l, onHandUnknown: true };
             }
-            // `quantityOnHand` = SUM tồn toàn chi nhánh — con số chuẩn cho cảnh
-            // báo vượt tồn. KHÔNG dùng locations[] (breakdown per-location có
-            // thể chứa cặp +/− bù trừ do BE trừ kho ở vị trí showroom mặc định).
-            const fresh = product.quantityOnHand;
+            // Cơ sở cảnh báo là `showroomQuantity` (tồn ở các kho chính của
+            // chi nhánh) — đúng tập kho POS trừ hàng. KHÔNG phải
+            // `quantityOnHand` (SUM toàn chi nhánh) và KHÔNG dùng locations[]
+            // (breakdown per-location có thể chứa cặp +/− bù trừ, và FE không
+            // biết vị trí nào thuộc showroom).
+            const fresh = readShowroomOnHand(product);
+            if (fresh === null) {
+              // BE cũ / payload thiếu trường: đánh dấu chưa-biết-tồn thay vì
+              // rơi về `quantityOnHand`, thứ sẽ âm thầm dựng lại con số cũ.
+              if (l.onHandUnknown) return l;
+              cartChanged = true;
+              return { ...l, onHandUnknown: true };
+            }
             if (fresh === l.maxQty && !l.onHandUnknown) return l;
             cartChanged = true;
             return { ...l, maxQty: fresh, onHandUnknown: false };

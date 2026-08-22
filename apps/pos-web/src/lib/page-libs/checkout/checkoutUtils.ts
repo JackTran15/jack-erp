@@ -97,6 +97,22 @@ export function formatLineDiscountLabel(line: CartLine): string {
 }
 
 /**
+ * Cơ sở cảnh báo vượt tồn của một dòng bán: **tồn showroom**, đúng tập kho mà
+ * POS trừ hàng (`resolveBranchItemLocations`, `showroomOnly`). Trả `null` khi
+ * BE không gửi trường này — BE cũ, hoặc payload lệch.
+ *
+ * `null` phải được hiểu là "chưa xác định được tồn", KHÔNG được rơi về
+ * `quantityOnHand`: fallback đó dựng lại đúng con số tổng-chi-nhánh mà cảnh báo
+ * này đang bỏ, ở đúng lúc không ai để ý. Và im lặng còn tệ hơn: `qty > undefined`
+ * cho `false`, tức cảnh báo tắt sạch mà không có lỗi nào — trong khi FE là lớp
+ * bảo vệ duy nhất, BE không chặn tồn âm.
+ */
+export function readShowroomOnHand(product: PosCatalogLine): number | null {
+  const value = product.showroomQuantity;
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/**
  * Sale line: qty above on-hand snapshot (`maxQty`) — bán vượt tồn / bán khống.
  * Dòng chưa xác định được tồn (`onHandUnknown`) luôn tính là cần cảnh báo: thà
  * hỏi thừa còn hơn im lặng cho bán khống (BE không chặn tồn âm — xem

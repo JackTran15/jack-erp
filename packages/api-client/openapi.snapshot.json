@@ -34981,6 +34981,10 @@
             "type": "number",
             "description": "Total on-hand quantity of this variant at the branch."
           },
+          "showroomQuantity": {
+            "type": "number",
+            "description": "On-hand at the branch's main (showroom) storages only — the storage set a POS sale deducts from. This, not quantityOnHand, is the oversell-warning basis."
+          },
           "locations": {
             "type": "array",
             "items": {
@@ -34996,6 +35000,7 @@
           "sellingPrice",
           "attributes",
           "quantityOnHand",
+          "showroomQuantity",
           "locations"
         ]
       },

@@ -28,6 +28,7 @@ import { UserEntity } from '../auth/user.entity';
 import { ItemEntity } from '../inventory/location/item.entity';
 import { ItemCategoryEntity } from '../inventory/location/item-category.entity';
 import { ShowroomEntity } from '../inventory/location/showroom.entity';
+import { StorageEntity } from '../inventory/location/storage.entity';
 import { ProductEntity } from '../inventory/product/product.entity';
 import { ProductAttributeDefinitionEntity } from '../inventory/product/product-attribute-definition.entity';
 import { ItemAttributeValueEntity } from '../inventory/product/item-attribute-value.entity';
@@ -85,6 +86,7 @@ import { CheckoutSagaModule } from './checkout-saga/checkout-saga.module';
       ItemEntity,
       ItemCategoryEntity,
       ShowroomEntity,
+      StorageEntity,
       ProductEntity,
       ProductAttributeDefinitionEntity,
       ItemAttributeValueEntity,
