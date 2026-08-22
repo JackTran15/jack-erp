@@ -2,6 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import {
+  EmployeeBranchScopeService,
+  EmployeeScope,
+  employeeBranchScopeSqlPositional,
+} from '../../../rbac/employee-branch-scope.service';
+import {
   PartnerLookupType,
   QueryPartnerLookupDto,
 } from './dto/query-partner-lookup.dto';
@@ -129,7 +134,12 @@ export interface ReceivingAccountItem {
  */
 @Injectable()
 export class PartnerLookupService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    // The service only, never an entity class: raw SQL lives in this file so the
+    // cash-vouchers module stays decoupled from other modules' entities.
+    private readonly employeeScope: EmployeeBranchScopeService,
+  ) {}
 
   private readonly CUSTOMER_SELECT = `
     SELECT 'customer'::text AS type, c.id, c.name, c.code, c.address
@@ -145,7 +155,16 @@ export class PartnerLookupService {
       AND p.is_active = true
       AND ($2::text IS NULL OR p.name ILIKE $2 OR p.code ILIKE $2)`;
 
-  private readonly EMPLOYEE_SELECT = `
+  /**
+   * @param branchPlaceholder rendered placeholder for the active branch, e.g.
+   *   `$3::uuid`, or null to leave the fragment organization-wide. The cast is
+   *   not optional — parameters arrive as text and `branch_id` is uuid.
+   */
+  private employeeSelect(branchPlaceholder: string | null): string {
+    const branchScope = branchPlaceholder
+      ? `\n      AND ${employeeBranchScopeSqlPositional('u.id', branchPlaceholder)}`
+      : '';
+    return `
     SELECT 'employee'::text AS type, u.id,
       btrim(coalesce(u.first_name, '') || ' ' || coalesce(u.last_name, '')) AS name,
       ep.code, NULL::text AS address
@@ -156,7 +175,8 @@ export class PartnerLookupService {
       AND u.is_active = true
       AND ($2::text IS NULL
         OR btrim(coalesce(u.first_name, '') || ' ' || coalesce(u.last_name, '')) ILIKE $2
-        OR ep.code ILIKE $2)`;
+        OR ep.code ILIKE $2)${branchScope}`;
+  }
 
   async lookup(
     query: QueryPartnerLookupDto,
@@ -167,21 +187,28 @@ export class PartnerLookupService {
     const offset = (page - 1) * pageSize;
     const searchPattern = this.buildSearchPattern(query.search);
 
-    const body = this.selectFragments(query.type).join('\n    UNION ALL\n');
+    const scope = await this.employeeScope.resolve(actor);
+    const { body, params } = this.buildLookupQuery(
+      query.type,
+      actor.organizationId,
+      searchPattern,
+      scope,
+    );
+
+    // An employee-only lookup with no branch scope leaves nothing to union.
+    if (!body) return { data: [], total: 0, page, pageSize };
 
     const countSql = `SELECT COUNT(*)::int AS total FROM (${body}) parties`;
-    const countRows = await this.dataSource.query(countSql, [
-      actor.organizationId,
-      searchPattern,
-    ]);
+    const countRows = await this.dataSource.query(countSql, params);
     const total = Number(countRows[0]?.total ?? 0);
 
+    // Placeholders are numbered from the parameter list rather than hardcoded:
+    // a fragment that binds an extra parameter must not silently shift these.
     const pageSql = `SELECT * FROM (${body}) parties
       ORDER BY name ASC, id ASC
-      LIMIT $3 OFFSET $4`;
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     const rows = await this.dataSource.query(pageSql, [
-      actor.organizationId,
-      searchPattern,
+      ...params,
       pageSize,
       offset,
     ]);
@@ -438,21 +465,61 @@ export class PartnerLookupService {
     return rows.map((r: any) => ({ id: r.id, code: r.code, name: r.name }));
   }
 
-  /** SELECT fragments to UNION for a given lookup type. */
-  private selectFragments(type: PartnerLookupType): string[] {
+  /**
+   * The UNION body and its bind parameters, built together.
+   *
+   * Built together on purpose. Postgres rejects a statement carrying more
+   * parameters than it references, so a fragment that binds an extra parameter
+   * breaks every lookup type that omits that fragment — the failure surfaces on
+   * the types nobody touched, which is exactly where nobody looks.
+   *
+   * `$1` is the organization id and `$2` the (escaped) search pattern; both are
+   * referenced by all three fragments, so they are always bound.
+   */
+  private buildLookupQuery(
+    type: PartnerLookupType,
+    organizationId: string,
+    searchPattern: string | null,
+    scope: EmployeeScope,
+  ): { body: string; params: unknown[] } {
+    const params: unknown[] = [organizationId, searchPattern];
+    const fragments: string[] = [];
+
+    for (const kind of this.lookupKinds(type)) {
+      if (kind === PartnerLookupType.CUSTOMER) {
+        fragments.push(this.CUSTOMER_SELECT);
+      } else if (kind === PartnerLookupType.SUPPLIER) {
+        fragments.push(this.SUPPLIER_SELECT);
+      } else if (scope.mode === 'all') {
+        fragments.push(this.employeeSelect(null));
+      } else if (scope.mode === 'branch') {
+        // Push the parameter first so the placeholder is numbered from the list
+        // it was appended to — this pairing is the whole point of ADR-03.
+        params.push(scope.branchId);
+        fragments.push(this.employeeSelect(`$${params.length}::uuid`));
+      }
+      // scope.mode === 'none': the employee fragment is dropped, and with it the
+      // parameter it would have bound.
+    }
+
+    return { body: fragments.join('\n    UNION ALL\n'), params };
+  }
+
+  /** Concrete party kinds a lookup type covers, in UNION order. */
+  private lookupKinds(type: PartnerLookupType): PartnerLookupType[] {
     switch (type) {
       case PartnerLookupType.CUSTOMER:
-        return [this.CUSTOMER_SELECT];
+        return [PartnerLookupType.CUSTOMER];
       case PartnerLookupType.SUPPLIER:
-        return [this.SUPPLIER_SELECT];
+        return [PartnerLookupType.SUPPLIER];
       case PartnerLookupType.EMPLOYEE:
-        return [this.EMPLOYEE_SELECT];
+        return [PartnerLookupType.EMPLOYEE];
       case PartnerLookupType.ALL:
       default:
         return [
-          this.CUSTOMER_SELECT,
-          this.SUPPLIER_SELECT,
-          this.EMPLOYEE_SELECT,
+          PartnerLookupType.CUSTOMER,
+          PartnerLookupType.SUPPLIER,
+          PartnerLookupType.EMPLOYEE,
         ];
     }
   }

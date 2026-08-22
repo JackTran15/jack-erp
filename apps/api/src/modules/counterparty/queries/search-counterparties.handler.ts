@@ -7,6 +7,11 @@ import { CustomerEntity } from '../../customer/customer.entity';
 import { UserEntity } from '../../auth/user.entity';
 import { EmployeeProfileEntity } from '../../rbac/employee/employee-profile.entity';
 import {
+  EmployeeBranchScopeService,
+  EmployeeScope,
+  employeeBranchScopeSqlNamed,
+} from '../../rbac/employee-branch-scope.service';
+import {
   CounterpartyKind,
   CounterpartyOptionDto,
   SearchCounterpartiesDto,
@@ -43,6 +48,7 @@ export class SearchCounterpartiesHandler
     private readonly customerRepo: Repository<CustomerEntity>,
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
+    private readonly employeeScope: EmployeeBranchScopeService,
   ) {}
 
   async execute({
@@ -53,6 +59,9 @@ export class SearchCounterpartiesHandler
     const orgId = actor.organizationId;
     const like = dto.search?.trim() ? `%${dto.search.trim()}%` : null;
     const kinds = resolveKinds(dto);
+    // Resolved once per request, not per kind: the multi-kind path below fans
+    // out with Promise.all and would otherwise repeat the permission lookup.
+    const scope = await this.employeeScope.resolve(actor);
 
     if (kinds.length === 1) {
       const offset = (page - 1) * pageSize;
@@ -62,6 +71,7 @@ export class SearchCounterpartiesHandler
         like,
         pageSize,
         offset,
+        scope,
       );
       return { data: items, total, page, pageSize };
     }
@@ -70,7 +80,7 @@ export class SearchCounterpartiesHandler
     // merge + slice yields the correct globally-sorted page.
     const cap = page * pageSize;
     const results = await Promise.all(
-      kinds.map((kind) => this.searchKind(kind, orgId, like, cap, 0)),
+      kinds.map((kind) => this.searchKind(kind, orgId, like, cap, 0, scope)),
     );
     const merged = results
       .flatMap((r) => r.items)
@@ -89,12 +99,13 @@ export class SearchCounterpartiesHandler
     like: string | null,
     limit: number,
     offset: number,
+    scope: EmployeeScope,
   ): Promise<KindResult> {
     if (kind === CounterpartyKind.SUPPLIER)
       return this.searchSuppliers(orgId, like, limit, offset);
     if (kind === CounterpartyKind.CUSTOMER)
       return this.searchCustomers(orgId, like, limit, offset);
-    return this.searchEmployees(orgId, like, limit, offset);
+    return this.searchEmployees(orgId, like, limit, offset, scope);
   }
 
   private async searchSuppliers(
@@ -161,7 +172,12 @@ export class SearchCounterpartiesHandler
     like: string | null,
     limit: number,
     offset: number,
+    scope: EmployeeScope,
   ): Promise<KindResult> {
+    // Fail closed: an actor with no resolvable branch gets nothing, and gets it
+    // without a query.
+    if (scope.mode === 'none') return { items: [], total: 0 };
+
     const baseWhere = (qb: ReturnType<Repository<UserEntity>['createQueryBuilder']>) => {
       qb.leftJoin(
         EmployeeProfileEntity,
@@ -173,6 +189,13 @@ export class SearchCounterpartiesHandler
       )
         .where('u.organizationId = :orgId', { orgId })
         .andWhere('u.isActive = true');
+      // Inside baseWhere, so the row query and the count query narrow together —
+      // applying it outside is how `total` starts disagreeing with `data` and the
+      // last page comes back empty.
+      if (scope.mode === 'branch')
+        qb.andWhere(employeeBranchScopeSqlNamed('u.id'), {
+          scopeBranchId: scope.branchId,
+        });
       if (like)
         qb.andWhere(
           '(u.firstName ILIKE :like OR u.lastName ILIKE :like OR ep.code ILIKE :like)',

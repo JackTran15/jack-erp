@@ -13,6 +13,11 @@ import { CustomerEntity } from '../../../customer/customer.entity';
 import { ItemEntity } from '../../../inventory/location/item.entity';
 import { ItemCategoryEntity } from '../../../inventory/location/item-category.entity';
 import { EmployeeProfileEntity } from '../../../rbac/employee/employee-profile.entity';
+import {
+  EmployeeBranchScopeService,
+  EmployeeScope,
+  employeeBranchScopeSqlNamed,
+} from '../../../rbac/employee-branch-scope.service';
 import { ReportFilterOptionsQueryDto } from '../dto/report-filter-options-query.dto';
 import { GetReportFilterOptionsQuery } from './get-report-filter-options.query';
 
@@ -40,6 +45,7 @@ export class GetReportFilterOptionsHandler
     private readonly categories: Repository<ItemCategoryEntity>,
     @InjectRepository(ItemEntity)
     private readonly items: Repository<ItemEntity>,
+    private readonly employeeScope: EmployeeBranchScopeService,
   ) {}
 
   async execute({
@@ -50,10 +56,16 @@ export class GetReportFilterOptionsHandler
     switch (dto.type) {
       case ReportFilterOptionType.STORE:
         return this.stores(org, dto);
+      // The scope is resolved inside these two branches only: every other
+      // filter type would otherwise pay for a permission lookup it never reads.
       case ReportFilterOptionType.CASHIER:
-        return this.cashiers(org, dto);
+        return this.cashiers(org, dto, await this.employeeScope.resolve(actor));
       case ReportFilterOptionType.SALESPERSON:
-        return this.salespeople(org, dto);
+        return this.salespeople(
+          org,
+          dto,
+          await this.employeeScope.resolve(actor),
+        );
       case ReportFilterOptionType.CUSTOMER:
         return this.customersOptions(org, dto);
       case ReportFilterOptionType.PRODUCT_GROUP:
@@ -108,23 +120,32 @@ export class GetReportFilterOptionsHandler
   private async cashiers(
     org: string,
     dto: ReportFilterOptionsQueryDto,
+    scope: EmployeeScope,
   ): Promise<IDropdownOption[]> {
-    const base: FindOptionsWhere<UserEntity> = {
-      organizationId: org,
-      isActive: true,
-    };
-    const where = dto.search
-      ? [
-          { ...base, firstName: ILike(`%${dto.search}%`) },
-          { ...base, lastName: ILike(`%${dto.search}%`) },
-        ]
-      : base;
-    const rows = await this.users.find({
-      where,
-      order: { lastName: 'ASC', firstName: 'ASC' },
-      skip: this.skip(dto),
-      take: this.take(dto),
-    });
+    if (scope.mode === 'none') return [];
+
+    // A QueryBuilder rather than find(): FindOptionsWhere cannot carry the raw
+    // EXISTS predicate. Every other clause is a literal transcription of the
+    // find() it replaces — the OR over first/last name, the ordering, the
+    // paging — because a changed label is harder to spot than a changed filter.
+    const qb = this.users
+      .createQueryBuilder('u')
+      .where('u.organizationId = :org', { org })
+      .andWhere('u.isActive = true');
+    if (scope.mode === 'branch')
+      qb.andWhere(employeeBranchScopeSqlNamed('u.id'), {
+        scopeBranchId: scope.branchId,
+      });
+    if (dto.search)
+      qb.andWhere('(u.firstName ILIKE :s OR u.lastName ILIKE :s)', {
+        s: `%${dto.search}%`,
+      });
+    const rows = await qb
+      .orderBy('u.lastName', 'ASC')
+      .addOrderBy('u.firstName', 'ASC')
+      .skip(this.skip(dto))
+      .take(this.take(dto))
+      .getMany();
     const userIds = rows.map((u) => u.id);
     const profiles = userIds.length
       ? await this.employees.find({ where: { userId: In(userIds) } })
@@ -149,7 +170,10 @@ export class GetReportFilterOptionsHandler
   private async salespeople(
     org: string,
     dto: ReportFilterOptionsQueryDto,
+    scope: EmployeeScope,
   ): Promise<IDropdownOption[]> {
+    if (scope.mode === 'none') return [];
+
     const qb = this.employees
       .createQueryBuilder('e')
       .innerJoin(UserEntity, 'u', 'u.id = e.userId AND e.organization_id::uuid = u.organizationId')
@@ -158,6 +182,13 @@ export class GetReportFilterOptionsHandler
       .addSelect('e.code', 'code')
       .addSelect('u.firstName', 'firstName')
       .addSelect('u.lastName', 'lastName');
+    // Keyed on u.id, not e.id: user_branch_assignments.user_id points at
+    // users.id. Keying on the profile id would make the predicate match nothing
+    // and read on screen as "no salespeople", not as a bug.
+    if (scope.mode === 'branch')
+      qb.andWhere(employeeBranchScopeSqlNamed('u.id'), {
+        scopeBranchId: scope.branchId,
+      });
     if (dto.search) {
       qb.andWhere(
         '(u.firstName ILIKE :s OR u.lastName ILIKE :s OR e.code ILIKE :s)',
