@@ -22,17 +22,22 @@ describe('goods-issue purpose permission seeds', () => {
   });
 
   /**
-   * "Nhập khác" / "Xuất khác" move stock with no purchase, sale or transfer
-   * behind them, so no counterparty document can be reconciled against them.
-   * They are reserved for the two org-wide roles; a branch runs on documents
-   * that have a counterparty.
+   * "Nhập khác" / "Xuất khác" / "Hủy hàng" move stock with no purchase, sale or
+   * transfer behind them, so no counterparty document can be reconciled against
+   * them — they write off value on the branch's own say-so. All three are
+   * reserved for the two org-wide roles.
    */
+  const RESERVED_PURPOSE_KEYS = [
+    OTHER_ISSUE_KEY,
+    OTHER_RECEIPT_KEY,
+    DISPOSAL_KEY,
+  ];
+
   it.each([
     ['SYSTEM_ADMIN', SYSTEM_ADMIN_PERMISSION_KEYS],
     ['GENERAL_MANAGER', GENERAL_MANAGER_PERMISSION_KEYS],
-  ])('grants the OTHER purpose keys to %s', (_role, keys) => {
-    expect(keys).toContain(OTHER_ISSUE_KEY);
-    expect(keys).toContain(OTHER_RECEIPT_KEY);
+  ])('grants every reserved purpose key to %s', (_role, keys) => {
+    for (const key of RESERVED_PURPOSE_KEYS) expect(keys).toContain(key);
   });
 
   it.each([
@@ -40,24 +45,18 @@ describe('goods-issue purpose permission seeds', () => {
     ['WAREHOUSE', WAREHOUSE_PERMISSION_KEYS],
     ['SALES', SALES_PERMISSION_KEYS],
     ['CASHIER', CASHIER_PERMISSION_KEYS],
-  ])('withholds the OTHER purpose keys from %s', (_role, keys) => {
-    expect(keys).not.toContain(OTHER_ISSUE_KEY);
-    expect(keys).not.toContain(OTHER_RECEIPT_KEY);
+  ])('withholds every reserved purpose key from %s', (_role, keys) => {
+    for (const key of RESERVED_PURPOSE_KEYS) expect(keys).not.toContain(key);
   });
 
-  // Hủy hàng is unchanged: it still belongs to whoever runs the warehouse.
-  it.each([
-    ['BRANCH_MANAGER', BRANCH_MANAGER_PERMISSION_KEYS],
-    ['WAREHOUSE', WAREHOUSE_PERMISSION_KEYS],
-  ])('still grants the disposal key to %s', (_role, keys) => {
-    expect(keys).toContain(DISPOSAL_KEY);
-  });
-
-  it.each([
-    ['SALES', SALES_PERMISSION_KEYS],
-    ['CASHIER', CASHIER_PERMISSION_KEYS],
-  ])('does not grant the disposal key to %s', (_role, keys) => {
-    expect(keys).not.toContain(DISPOSAL_KEY);
+  /**
+   * Điều chuyển is what is left: the warehouse still moves stock between
+   * branches, and that leg always has the receiving branch's phiếu nhập on the
+   * other side.
+   */
+  it('leaves the transfer keys with WAREHOUSE', () => {
+    expect(WAREHOUSE_PERMISSION_KEYS).toContain('inventory.goods-issue.create');
+    expect(WAREHOUSE_PERMISSION_KEYS).toContain('inventory.transfer.export');
   });
 });
 

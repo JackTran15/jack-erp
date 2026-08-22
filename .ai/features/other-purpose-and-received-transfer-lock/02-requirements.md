@@ -1,7 +1,7 @@
 ---
 feature: other-purpose-and-received-transfer-lock
 stories: 2
-acceptance_criteria: 6
+acceptance_criteria: 7
 ---
 
 # Requirements — Siết "Nhập khác / Xuất khác" và khoá phiếu xuất đã được nhận
@@ -18,7 +18,10 @@ hành trên chứng từ có đối ứng; loại này để cấp tổ chức.
   nhập `purpose=OTHER` đòi `goods_receipt.other-receipt` (key mới).
 - **AC-02** — Chỉ Quản trị hệ thống và Quản lý tổng giữ hai key đó. Quản lý chi nhánh, Nhân
   viên kho, bán hàng, thu ngân đều không.
-- **AC-03** — "Hủy hàng" (`DISPOSAL`) **không đổi**: vẫn thuộc Quản lý chi nhánh và Nhân viên kho.
+- **AC-03** — "Hủy hàng" (`DISPOSAL`) theo cùng luật: cũng chỉ Quản trị hệ thống và Quản lý
+  tổng giữ. Ghi giảm hàng trên lời khai của chính chi nhánh, không có chứng từ đối ứng nào.
+- **AC-07** — Điều chuyển thì giữ nguyên cho Nhân viên kho: chân xuất đó luôn có phiếu nhập của
+  chi nhánh nhận ở phía bên kia.
 - **AC-04** — UI không mời thao tác đó: người thiếu quyền không chọn được mục đích "Khác" trên
   form phiếu nhập, và không thấy "Xuất khác" trong danh sách mục đích của phiếu xuất.
 
