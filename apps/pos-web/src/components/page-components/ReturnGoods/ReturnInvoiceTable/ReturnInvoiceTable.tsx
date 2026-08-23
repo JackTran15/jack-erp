@@ -10,7 +10,12 @@ import {
   FilterOperatorEnum,
   FilterOperatorTypeEnum,
 } from "@erp/pos/constants/checkout.constant";
-import { ReturnInvoiceColumnKey } from "@erp/pos/constants/return-goods.constant";
+import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
+import {
+  RETURN_INVOICE_TYPE_FILTER_OPTIONS,
+  RETURN_INVOICE_TYPE_LABELS,
+  ReturnInvoiceColumnKey,
+} from "@erp/pos/constants/return-goods.constant";
 import type { ReturnInvoiceFilters } from "@erp/pos/dtos/return-goods.dto";
 import type { ReturnInvoiceRow } from "@erp/pos/interfaces/return-goods.interface";
 
@@ -72,6 +77,34 @@ export function ReturnInvoiceTable({
             operatorType={FilterOperatorTypeEnum.NUMBER}
             leadingOperator={FilterOperatorEnum.LESS_THAN_OR_EQUAL}
           />
+        ),
+      },
+      {
+        key: ReturnInvoiceColumnKey.Type,
+        title: "Loại",
+        headerClassName: "w-[100px]",
+        cellClassName: "w-[100px]",
+        render: (row) => RETURN_INVOICE_TYPE_LABELS[row.type],
+        // Enum, không phải chuỗi tự do — nên là một PosSelect dựng thẳng ở đây
+        // thay vì PosDataTableFilterCell (ADR-05). Không có ô chọn toán tử đứng
+        // trước như các cột khác; đó là đánh đổi đã chấp nhận.
+        filterRender: (
+          <div className="relative flex h-7 w-full min-w-0 items-center bg-white">
+            <PosSelect
+              value={
+                RETURN_INVOICE_TYPE_FILTER_OPTIONS.find(
+                  (o) => o.value === filters.type,
+                ) ?? RETURN_INVOICE_TYPE_FILTER_OPTIONS[0]
+              }
+              onChange={(option) => onFilterChange("type", option.value)}
+              items={RETURN_INVOICE_TYPE_FILTER_OPTIONS}
+              itemKey={(option) => option.value}
+              renderItem={(option) => option.label}
+              ariaLabel="Lọc theo loại chứng từ"
+              variant="underline"
+              className="min-w-0 flex-1"
+            />
+          </div>
         ),
       },
       {
@@ -160,7 +193,7 @@ export function ReturnInvoiceTable({
           fillHeight
           summaryRow={
             <tr className="h-11 border-t border-gray-200 text-[14px] font-semibold text-gray-900">
-              <td colSpan={4} className="px-3">
+              <td colSpan={5} className="px-3">
                 Tổng tiền:
               </td>
               <td className="px-3 text-right tabular-nums">

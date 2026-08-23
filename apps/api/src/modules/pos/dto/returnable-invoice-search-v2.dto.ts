@@ -1,15 +1,24 @@
-import { IsInt, IsOptional, Max, Min, ValidateNested } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsOptional,
+  Max,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   CompareFilterDto,
   DateRangeFilterDto,
   StringFilterDto,
 } from '../../../common/filters/filter.dto';
+import { InvoiceType } from '../entities/invoice.entity';
 
 /**
  * Filters for the "quick return" invoice list (POST /v2/invoices/returnable/search).
- * Only fully-paid sales are returnable, so type/status are fixed in the handler and
- * not exposed here.
+ * Status stays fixed in the handler; `type` is a caller-facing filter that narrows
+ * the handler's SALE + EXCHANGE set down to one document kind.
  */
 export class ReturnableInvoiceSearchV2Dto {
   @IsOptional()
@@ -60,4 +69,13 @@ export class ReturnableInvoiceSearchV2Dto {
   @ValidateNested()
   @Type(() => StringFilterDto)
   branchName?: StringFilterDto;
+
+  /**
+   * Document kind. Omit for both returnable kinds (SALE + EXCHANGE). RETURN is
+   * type-valid but yields an empty set — a pure return has no sold lines.
+   */
+  @IsOptional()
+  @IsEnum(InvoiceType)
+  @ApiPropertyOptional({ enum: InvoiceType, example: InvoiceType.EXCHANGE })
+  type?: InvoiceType;
 }

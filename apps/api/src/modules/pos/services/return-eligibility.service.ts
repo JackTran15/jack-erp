@@ -12,7 +12,10 @@ import {
   InvoiceStatus,
   InvoiceType,
 } from '../entities/invoice.entity';
-import { InvoiceItemEntity } from '../entities/invoice-item.entity';
+import {
+  InvoiceItemEntity,
+  ItemDirection,
+} from '../entities/invoice-item.entity';
 import { refundableUnitValues } from './refundable-value.util';
 import {
   InvoiceDebtEntity,
@@ -48,6 +51,17 @@ export interface EligibleLine {
   returnedQuantity: number;
   maxReturnable: number;
 }
+
+/**
+ * Both kinds carry sold (OUT) lines. An EXCHANGE's "bought extra" lines are a
+ * real sale — same stock movement, same cost price, same returned-quantity
+ * accumulator — so a later visit returns against that exchange itself rather
+ * than against the sale two documents back.
+ */
+const RETURNABLE_TYPES: InvoiceType[] = [
+  InvoiceType.SALE,
+  InvoiceType.EXCHANGE,
+];
 
 const RETURNABLE_STATUSES: InvoiceStatus[] = [
   InvoiceStatus.PAID,
@@ -102,7 +116,13 @@ export class ReturnEligibilityService {
     return { remainingDebt: Math.max(0, Number(debt.remainingAmount)) };
   }
 
-  /** Returns per-line returnable amounts for the original SALE invoice. */
+  /**
+   * Returns per-line returnable amounts for the original invoice.
+   *
+   * Only OUT lines come back. On a SALE that is every line; on an EXCHANGE it
+   * drops the goods the customer already handed back, which are not the store's
+   * to refund a second time.
+   */
   async getEligibleLines(
     originalInvoiceId: string,
     actor: ActorContext,
@@ -113,9 +133,9 @@ export class ReturnEligibilityService {
     if (!invoice) {
       throw new NotFoundException(`Invoice ${originalInvoiceId} not found`);
     }
-    if (invoice.type !== InvoiceType.SALE) {
+    if (!RETURNABLE_TYPES.includes(invoice.type)) {
       throw new BadRequestException(
-        `Invoice ${originalInvoiceId} is type ${invoice.type}, only SALE can be returned`,
+        `Invoice ${originalInvoiceId} is type ${invoice.type}, only SALE/EXCHANGE can be returned`,
       );
     }
     if (!RETURNABLE_STATUSES.includes(invoice.status)) {
@@ -129,9 +149,18 @@ export class ReturnEligibilityService {
       order: { sortOrder: 'ASC' },
     });
 
+    // Full item set — the same input `CheckoutReturnService.computeReturnedNet`
+    // reads from the original invoice. The header residual is spread across
+    // every line's net value, so filtering BEFORE this call would move the
+    // divisor and let the preview drift away from the posted charge.
     const refundable = refundableUnitValues(invoice, items);
 
-    return items.map((it) => {
+    // Filter the result, never the input. Unconditional rather than branching
+    // on `invoice.type`: SALE lines are all OUT already, so one predicate covers
+    // both kinds and there is no second path to drift.
+    const returnable = items.filter((it) => it.direction === ItemDirection.OUT);
+
+    return returnable.map((it) => {
       const sold = Number(it.quantity);
       const returned = Number(it.returnedQuantity ?? 0);
       return {
@@ -151,7 +180,15 @@ export class ReturnEligibilityService {
     });
   }
 
-  /** Validate that a regular return line does not exceed its remaining returnable cap. */
+  /**
+   * Validate that a return line may be returned at all, and not beyond its
+   * remaining cap.
+   *
+   * `getEligibleLines` decides what POS OFFERS; this decides what the server
+   * ACCEPTS. An older client — or a direct API call — can still name an inbound
+   * line of an exchange, which would credit and ship goods the customer already
+   * handed back. The write path is where that has to be refused (ADR-03).
+   */
   async assertLineEligible(
     originalInvoiceItemId: string,
     requestedQty: number,
@@ -163,6 +200,13 @@ export class ReturnEligibilityService {
     if (!item) {
       throw new NotFoundException(
         `Original invoice item ${originalInvoiceItemId} not found`,
+      );
+    }
+    // Before the quantity check, so the message names the real cause rather
+    // than reporting an over-return.
+    if (item.direction === ItemDirection.IN) {
+      throw new BadRequestException(
+        `Invoice line ${originalInvoiceItemId} is an inbound (returned) line and cannot be returned again`,
       );
     }
     const max = Number(item.quantity) - Number(item.returnedQuantity ?? 0);

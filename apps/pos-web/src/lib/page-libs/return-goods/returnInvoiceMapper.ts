@@ -28,6 +28,9 @@ export function mapInvoiceToReturnRow(
     id: inv.id,
     invoiceNumber: inv.code,
     createdAt: new Date(issued),
+    // Hóa đơn cũ không mang `type` thì coi như hóa đơn bán — trước tính năng này
+    // lưới chỉ có một loại duy nhất.
+    type: inv.type === "EXCHANGE" ? "EXCHANGE" : "SALE",
     customerId: inv.customerId ?? null,
     customerName: customer?.name ?? "",
     customerPhone: customer?.phone ?? "",

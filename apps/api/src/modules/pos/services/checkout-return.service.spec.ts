@@ -1,7 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { ConflictException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CheckoutReturnService } from './checkout-return.service';
+import { ReturnEligibilityService } from './return-eligibility.service';
 import {
   InvoiceEntity,
   InvoicePaymentMethod,
@@ -1050,6 +1052,170 @@ describe('CheckoutReturnService — debt offset routing', () => {
       await expect(service.checkout('ret-1', cashDto(), actor)).rejects.toThrow(
         /Vượt số lượng có thể trả/,
       );
+    });
+  });
+
+  /**
+   * UOW-01: the original document is itself an EXCHANGE — the customer is
+   * returning goods they bought as the "Mua thêm" half of an earlier exchange.
+   *
+   * The survey concluded this service needs no change (A-16): it accumulates
+   * `returned_quantity` by `originalInvoiceItemId` and offsets debt by
+   * `invoice_debts.invoiceId`, never reading `invoices.type`. A conclusion with
+   * no test behind it is one nobody can check later — so these lock it. If
+   * anyone adds a `type`-dependent branch here, they go red.
+   */
+  describe('original invoice of type EXCHANGE (UOW-01)', () => {
+    /**
+     * Exchange #1 as the DB holds it: one IN line (the shoes the customer gave
+     * back) and two OUT lines (what they bought instead). The 200.000 promotion
+     * on the first OUT line is what makes the refund arithmetic bite — return
+     * one of those two units and 500.000 comes back, not the 600.000 on the
+     * price tag.
+     */
+    const EXCHANGE_ORIGINAL: Partial<InvoiceEntity> = {
+      type: InvoiceType.EXCHANGE,
+      subtotal: 1_500_000,
+      discountAmount: 200_000,
+      amountDue: 1_300_000,
+    };
+
+    const originalLines = (): Array<Partial<InvoiceItemEntity>> => [
+      {
+        direction: ItemDirection.IN,
+        quantity: 1,
+        unitPrice: 750_000,
+        lineTotal: 750_000,
+      },
+      {
+        direction: ItemDirection.OUT,
+        quantity: 2,
+        unitPrice: 600_000,
+        lineTotal: 1_200_000,
+        promotionDiscount: 200_000,
+      },
+      {
+        direction: ItemDirection.OUT,
+        quantity: 1,
+        unitPrice: 300_000,
+        lineTotal: 300_000,
+      },
+    ];
+
+    /** Return one unit of `orig-line-1`, the promoted OUT line. */
+    const returnedLines = (): Array<Partial<InvoiceItemEntity>> => [
+      {
+        quantity: 1,
+        unitPrice: 600_000,
+        lineTotal: 600_000,
+        originalInvoiceItemId: 'orig-line-1',
+      },
+    ];
+
+    const stageExchange = (original: Partial<InvoiceEntity> = {}) =>
+      setupReturn({
+        original: { ...EXCHANGE_ORIGINAL, ...original },
+        originalLines: originalLines(),
+        returnedLines: returnedLines(),
+      });
+
+    const guardCalls = () =>
+      mockManager.query.mock.calls.filter(([sql]: [string]) =>
+        /returned_quantity/.test(sql),
+      );
+
+    it('accumulates on the OUT line it was told to, leaving the IN line alone', async () => {
+      stageExchange();
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(guardCalls()).toHaveLength(1);
+      expect(guardCalls()[0][1]).toEqual([1, 'orig-line-1']);
+      // The inbound line of exchange #1 is goods already back on the shelf;
+      // touching its accumulator would let them be "returned" a second time.
+      expect(guardCalls().flatMap((c: unknown[]) => c[1] as unknown[])).not.toContain(
+        'orig-line-0',
+      );
+    });
+
+    /**
+     * ADR-02 end to end. `getEligibleLines` is what POS quoted the cashier;
+     * `computeReturnedNet` is what the posted document charges. They read the
+     * same original invoice through two different code paths, and the whole
+     * feature is only safe while they agree — a gap between them is the shape
+     * of the phantom-debt class of bug.
+     */
+    it('refunds exactly what getEligibleLines quoted for that line (AC-09)', async () => {
+      stageExchange();
+      const eligibility = new ReturnEligibilityService(
+        invoiceRepo as never,
+        itemRepo as never,
+        debtRepo as never,
+      );
+      const quoted = (await eligibility.getEligibleLines('orig-1', actor)).find(
+        (l) => l.originalInvoiceItemId === 'orig-line-1',
+      )!;
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(refundedAmount()).toBe(quoted.refundableUnitPrice * 1);
+      expect(refundedAmount()).toBe(500_000);
+      // Not the price tag: crediting 600.000 would hand back 100.000 the
+      // customer never paid.
+      expect(refundedAmount()).not.toBe(600_000);
+    });
+
+    it('offers only the two OUT lines back to POS, capped at what is left (AC-10)', async () => {
+      stageExchange();
+      const eligibility = new ReturnEligibilityService(
+        invoiceRepo as never,
+        itemRepo as never,
+        debtRepo as never,
+      );
+
+      const lines = await eligibility.getEligibleLines('orig-1', actor);
+
+      expect(lines.map((l) => l.originalInvoiceItemId)).toEqual([
+        'orig-line-1',
+        'orig-line-2',
+      ]);
+      expect(lines.map((l) => l.maxReturnable)).toEqual([2, 1]);
+    });
+
+    it('rejects an over-return with a conflict (AC-10)', async () => {
+      stageExchange();
+      // `returned_quantity + qty <= quantity` matched no row.
+      mockManager.query.mockResolvedValue([undefined, 0]);
+
+      await expect(service.checkout('ret-1', cashDto(), actor)).rejects.toThrow(
+        ConflictException,
+      );
+    });
+
+    it('settles the exchange own debt first, cash only for the remainder', async () => {
+      stageExchange({ status: InvoiceStatus.DEBT });
+      // The customer still owes 300.000 on exchange #1 itself.
+      withOpenDebt({
+        ...debtRow,
+        originalAmount: 300_000,
+        paidAmount: 0,
+        remainingAmount: 300_000,
+      });
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      // min(refunded 500.000, remaining 300.000) — the debt row is keyed on the
+      // exchange's own id, which is why no type check was ever needed here.
+      expect(savedInvoice().offsetAmount).toBe(300_000);
+      expect(mockManager.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'debt-1',
+          paidAmount: 300_000,
+          remainingAmount: 0,
+          status: DebtStatus.PAID,
+        }),
+      );
+      expect(refundedAmount()).toBe(200_000);
     });
   });
 

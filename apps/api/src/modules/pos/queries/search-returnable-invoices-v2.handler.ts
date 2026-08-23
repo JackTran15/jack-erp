@@ -111,8 +111,13 @@ export class SearchReturnableInvoicesV2Handler
         'branch.id = inv.branch_id::uuid',
       )
       .where('inv.organizationId = :orgId', { orgId: actor.organizationId })
-      .andWhere('inv.type = :type', { type: InvoiceType.SALE })
-      // Paid sales plus outstanding-debt sales (DEBT / PARTIAL_DEBT) are all
+      // Both document kinds that can carry sold (OUT) lines. An EXCHANGE's
+      // "bought extra" lines are a real sale and stay returnable on their own
+      // invoice; RETURN is excluded because it has no OUT line at all.
+      .andWhere('inv.type IN (:...types)', {
+        types: [InvoiceType.SALE, InvoiceType.EXCHANGE],
+      })
+      // Paid invoices plus outstanding-debt ones (DEBT / PARTIAL_DEBT) are all
       // returnable — a debt invoice's return offsets its own customer debt.
       .andWhere('inv.status IN (:...statuses)', {
         statuses: [
@@ -137,6 +142,12 @@ export class SearchReturnableInvoicesV2Handler
 
     if (actor.branchId) {
       qb.andWhere('inv.branchId = :branchId', { branchId: actor.branchId });
+    }
+
+    // Caller-side narrowing on top of the fixed set above: it can only shrink
+    // the two allowed kinds, never re-admit RETURN.
+    if (dto.type) {
+      qb.andWhere('inv.type = :typeFilter', { typeFilter: dto.type });
     }
 
     new FilterBuilder(qb)

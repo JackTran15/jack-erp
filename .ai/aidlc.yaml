@@ -93,6 +93,31 @@ verify:
         # only in HCM, and the first radio is "Chi nhánh kiểm thử" — evidence captured there
         # shows an empty catalogue and silently proves nothing.
         post_login: 'wait input[name="pos-branch"]; click input[name="pos-branch"][value="${LOCAL_POS_BRANCH_ID}"]; click button[type="submit"]; wait [aria-label="Sapo POS"]'
+    # Cùng app pos-web nhưng dựng từ worktree `object-by-branch` ở :3002.
+    # `local-pos` ở :3001 phục vụ checkout GỐC — verify tính năng của worktree trên
+    # cổng đó là chụp ảnh nhầm bản, đúng cái bẫy đã dính một lần.
+    # Chạy: cd apps/pos-web && ./node_modules/.bin/vite --port 3002 --strictPort
+    local-pos-worktree:
+      url: http://localhost:3002
+      required: true
+      auth:
+        # `storage-state`, không phải `form` — và đây là kết luận từ một lần chạy đỏ,
+        # không phải sở thích. Form đăng nhập POS đặt CẢ BA ô (tổ chức, email, mật khẩu)
+        # trên một trang, còn `perform_login` của runner là luồng hai bước kiểu Clerk:
+        # điền email → bấm submit → mới điền mật khẩu → submit lần nữa. Cú submit đầu
+        # tiên bắn đi với mật khẩu rỗng, và `settle()` (networkidle, không phải điều hướng)
+        # trả về trước khi lần submit thứ hai kịp chuyển trang ⇒ runner thấy vẫn đứng ở
+        # /dang-nhap và kết luận "credentials were rejected". Đăng nhập thật ra không sai
+        # gì: cùng tài khoản đó vào được khi có wait_for_url.
+        # Runner cũng không hề điền ô "ID tổ chức" — form recipe chỉ biết email + mật khẩu.
+        #
+        # Phiên được dựng lại bằng: ~/.venvs/aidlc-verify/bin/python scripts/capture.py
+        # (đăng nhập → chọn chi nhánh Hồ Chí Minh → chờ vỏ POS → storage_state).
+        # Tương đương `verify.py --manual-login`, chỉ khác là không cần người ngồi bấm.
+        # localStorage giữ refresh_token + pos-branch nên phiên tự khôi phục.
+        recipe: storage-state
+        landing: /
+        ready_when: { gone: 'text=Đang tải' }
   # Desktop only. Neither app has a mobile layout: no matchMedia/useMediaQuery anywhere, and
   # BackofficeLayout is a fixed ml-60 desktop shell.
   viewports:
