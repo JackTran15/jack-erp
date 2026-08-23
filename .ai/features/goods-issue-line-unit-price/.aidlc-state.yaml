@@ -1,0 +1,198 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: goods-issue-line-unit-price
+slug: goods-issue-line-unit-price
+profile: none
+created: 2026-08-22T21:47:53
+current_gate: G5
+history:
+  - gate: G0
+    action: passed
+    at: 2026-08-22T21:56:43
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-08-22T23:24:01
+    by: Akenzy
+    evidence: 9 assumptions, none blocking-and-pending; 11 acceptance criteria defined
+  - gate: G1
+    action: reopened
+    at: 2026-08-22T23:26:00
+    by: Claude
+    reason: AC-07 khong dat duoc - computeVoucherDelta gop theo (item,location) nen khong the quy chenh lech ve don gia moi cua rieng mot dong khi vua doi gia vua doi so luong
+  - gate: G1
+    action: passed
+    at: 2026-08-22T23:33:46
+    by: Akenzy
+    evidence: 9 assumptions, none blocking-and-pending; 12 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-22T23:33:46
+    by: Akenzy
+    evidence: 5 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-22T23:43:43
+    by: Akenzy
+    evidence: graph valid - 4 UoW, 13 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-22T23:43:50
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-22T23:45:09
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-22T23:45:25
+    by: Claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-22T23:47:05
+    by: Claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-22T23:47:17
+    by: Claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-22T23:48:56
+    by: Claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-22T23:48:57
+    by: Claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-22T23:50:54
+    by: Claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-22T23:50:54
+    by: Claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-22T23:52:51
+    by: Claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-22T23:53:31
+    by: Claude
+    ticket: T-03-01
+  - gate: G3
+    action: reopened
+    at: 2026-08-22T23:55:06
+    by: Claude
+    reason: ADR-05 chi liet ke listImportable; prefill form phieu nhap di qua GET /transfer-orders/ -id (TransferReceiptDetail) doc requestedQty + purchasePrice — surface thu hai chua co ticket, ma AC-09 doi
+  - gate: G3
+    action: passed
+    at: 2026-08-23T12:00:04
+    by: Akenzy
+    evidence: graph valid - 4 UoW, 14 tickets, no cycles
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-23T12:01:10
+    by: Claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-23T12:01:10
+    by: Claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-23T12:02:17
+    by: Claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-23T12:02:17
+    by: Claude
+    ticket: T-03-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-23T12:04:01
+    by: Claude
+    ticket: T-03-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-23T12:04:01
+    by: Claude
+    ticket: T-03-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-23T12:05:49
+    by: Claude
+    ticket: T-03-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-23T12:05:49
+    by: Claude
+    ticket: T-04-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-23T12:09:46
+    by: Claude
+    ticket: T-04-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-23T12:09:46
+    by: Claude
+    ticket: T-02-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-23T12:10:10
+    by: Claude
+    ticket: T-02-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-23T12:10:25
+    by: Claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-23T12:25:39
+    by: Claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-23T12:25:39
+    by: Claude
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-23T12:28:33
+    by: Claude
+    ticket: T-02-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-23T12:28:34
+    by: Claude
+    ticket: T-03-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-23T12:36:22
+    by: Claude
+    ticket: T-03-04
+  - gate: G4
+    action: passed
+    at: 2026-08-23T13:31:59
+    by: Akenzy
+    evidence: all 14 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-08-23T13:31:59
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

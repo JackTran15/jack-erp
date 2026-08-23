@@ -413,8 +413,22 @@ export interface GoodsIssueLine {
   id: string;
   goodsIssueId: string;
   itemId: string;
+  /** Source bin the stock leaves from. Per line — an issue may pull one item from several. */
+  locationId?: string;
   quantity: number;
+  /**
+   * The line's own cost basis. A goods issue may carry the same item on two rows
+   * at two prices, so this belongs to the line and not to the item.
+   */
+  unitPrice?: string | number;
+  lineTotal?: string | number;
   notes?: string;
+  item?: {
+    id: string;
+    code: string;
+    name: string;
+    unit?: string;
+  } | null;
 }
 
 export interface GoodsIssue {

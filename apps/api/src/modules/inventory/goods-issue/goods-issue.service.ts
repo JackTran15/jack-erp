@@ -261,6 +261,40 @@ export class GoodsIssueService {
     }
   }
 
+  /**
+   * Cost basis for each line, in the order they were given.
+   *
+   * A price the caller supplied wins outright — on a goods issue the line's unit
+   * price *is* the cost that reaches the stock ledger (ADR-01), matching what
+   * GoodsReceiptService and StockTransferService already do. Blank (`<= 0`) means
+   * "the caller has no opinion", not "free", so those lines fall back to the
+   * item's instant weighted-average cost at this branch.
+   *
+   * The average is looked up once per item and only for items that actually have
+   * a blank line, so an issue priced end to end touches the ledger not at all.
+   */
+  private async resolveLinePrices(
+    lines: { itemId: string; unitPrice?: string | number | null }[],
+    organizationId: string,
+    branchId: string,
+  ): Promise<number[]> {
+    const averageByItemId = new Map<string, number>();
+    for (const line of lines) {
+      if (Number(line.unitPrice ?? 0) > 0) continue;
+      if (averageByItemId.has(line.itemId)) continue;
+      const average = await this.ledgerService.getInstantAverageCost(
+        line.itemId,
+        organizationId,
+        branchId,
+      );
+      averageByItemId.set(line.itemId, average.unitCost);
+    }
+    return lines.map((line) => {
+      const supplied = Number(line.unitPrice ?? 0);
+      return supplied > 0 ? supplied : (averageByItemId.get(line.itemId) ?? 0);
+    });
+  }
+
   async post(id: string, actor: ActorContext): Promise<GoodsIssueEntity> {
     const gi = await this.findOrFail(id, actor.organizationId, actor.branchId);
     this.validateTransition(gi.status, GoodsIssueStatus.POSTED);
@@ -278,18 +312,17 @@ export class GoodsIssueService {
       throw new BadRequestException('Không xác định được chi nhánh để xuất hàng');
     }
 
-    const costByItemId = new Map<string, number>();
-    for (const itemId of new Set(gi.lines.map((line) => line.itemId))) {
-      const average = await this.ledgerService.getInstantAverageCost(
-        itemId,
-        gi.organizationId,
-        branchId,
-      );
-      costByItemId.set(itemId, average.unitCost);
-    }
+    // A line's own unit price is its cost basis; the average is only consulted for
+    // lines that left the price blank. Resolving per line — rather than per item, as
+    // this used to — is what lets one issue carry the same item at two prices.
+    const priceByLine = await this.resolveLinePrices(
+      gi.lines,
+      gi.organizationId,
+      branchId,
+    );
 
     const entries = await this.dataSource.transaction(async (manager) => {
-      const movements: RecordMovementParams[] = gi.lines.map((line) => ({
+      const movements: RecordMovementParams[] = gi.lines.map((line, index) => ({
         itemId: line.itemId,
         locationId: line.locationId,
         branchId,
@@ -300,11 +333,14 @@ export class GoodsIssueService {
         referenceId: gi.id,
         notes: `Xuất hàng: ${documentNumber}`,
         actorContext: actor,
-        unitCost: costByItemId.get(line.itemId) ?? 0,
+        unitCost: priceByLine[index],
       }));
 
-      for (const line of gi.lines) {
-        const unitCost = costByItemId.get(line.itemId) ?? 0;
+      // Only lines that fell back need writing: a line that carried a price is
+      // already correct from create(), and rewriting it would be a no-op UPDATE.
+      for (const [index, line] of gi.lines.entries()) {
+        if (Number(line.unitPrice) > 0) continue;
+        const unitCost = priceByLine[index];
         await manager.update(
           GoodsIssueLineEntity,
           { id: line.id },
@@ -423,28 +459,38 @@ export class GoodsIssueService {
     if (dto.references !== undefined) gi.references = dto.references;
     if (dto.occurredAt !== undefined) gi.occurredAt = new Date(dto.occurredAt);
 
-    // Cost on a goods issue is never client-supplied — `post()` already
-    // overrides whatever price the client sent with the instant average cost,
-    // and edits keep that contract (T-04-02): unitPrice/lineTotal below are
-    // placeholders, overwritten once the per-pair cost rule is resolved.
+    // A line's submitted price is its cost basis (ADR-01), exactly as on post().
+    // Blank lines are resolved to the moving average *before* the delta is
+    // computed, so computeVoucherDelta compares real money on both sides — feed
+    // it the old placeholder 0 and every value delta comes out wrong.
+    // Without a branch there is no ledger to average over — the lookup would
+    // match zero rows and quietly return the catalog price. A draft in that
+    // state keeps whatever it was sent; post() resolves it once the branch is known.
+    const nextPrices = dto.lines
+      ? branchId
+        ? await this.resolveLinePrices(dto.lines, gi.organizationId, branchId)
+        : dto.lines.map((l) => Number(l.unitPrice ?? 0))
+      : [];
     const nextLines = dto.lines
-      ? dto.lines.map((l) => {
+      ? dto.lines.map((l, index) => {
           const line = new GoodsIssueLineEntity();
           line.itemId = l.itemId;
           line.locationId = l.locationId ?? gi.locationId;
           line.quantity = l.quantity;
-          line.unitPrice = '0.00';
-          line.lineTotal = '0.00';
+          const unitPrice = nextPrices[index];
+          line.unitPrice = unitPrice.toFixed(2);
+          line.lineTotal = (Number(l.quantity) * unitPrice).toFixed(2);
           line.notes = l.notes;
           return line;
         })
       : null;
 
     const nextRevision = (gi.revision ?? 0) + 1;
-    // computeVoucherDelta only pairs quantities here — its valueDelta and
-    // unitCostForDelta are discarded below in favour of the two-directional
-    // cost rule (T-04-02): the "after" unitPrice fed in is a throwaway 0.
-    const rawDeltas =
+    // Both sides carry the voucher's real prices (ADR-01), so the delta's own
+    // valueDelta / unitCostForDelta are the numbers to post — no second cost
+    // rule on top. This is the same shape GoodsReceiptService.update() uses;
+    // only the ledger sign differs, because an issue moves stock the other way.
+    const deltas =
       wasPosted && nextLines
         ? computeVoucherDelta(
             gi.lines.map(toLineSnapshot),
@@ -452,50 +498,7 @@ export class GoodsIssueService {
           )
         : [];
 
-    const beforeByKey = new Map(
-      gi.lines.map((l) => [
-        `${l.itemId}::${l.locationId}`,
-        { quantity: Number(l.quantity), unitPrice: Number(l.unitPrice) },
-      ]),
-    );
-    const averageCostByItem = new Map<string, number>();
-    const resolvedDeltas: {
-      itemId: string;
-      locationId: string;
-      quantityDelta: number;
-      valueDelta: number;
-      unitCostForDelta: number;
-    }[] = [];
-    for (const d of rawDeltas) {
-      let unitCostForDelta: number;
-      if (d.quantityDelta > 0) {
-        // Issuing more than before: cost the extra at today's moving average,
-        // not whatever was on the line originally.
-        if (!averageCostByItem.has(d.itemId)) {
-          const average = await this.ledgerService.getInstantAverageCost(
-            d.itemId,
-            gi.organizationId,
-            branchId!,
-          );
-          averageCostByItem.set(d.itemId, average.unitCost);
-        }
-        unitCostForDelta = averageCostByItem.get(d.itemId)!;
-      } else {
-        // Issuing less (or a line removed outright): reverse at the cost this
-        // issue was actually posted at, not a fresh average.
-        const before = beforeByKey.get(`${d.itemId}::${d.locationId}`);
-        unitCostForDelta = before?.unitPrice ?? 0;
-      }
-      resolvedDeltas.push({
-        itemId: d.itemId,
-        locationId: d.locationId,
-        quantityDelta: d.quantityDelta,
-        valueDelta: Number((d.quantityDelta * unitCostForDelta).toFixed(2)),
-        unitCostForDelta,
-      });
-    }
-
-    const movements: RecordMovementParams[] = resolvedDeltas.map((d) => {
+    const movements: RecordMovementParams[] = deltas.map((d) => {
       // The delta is in the line's own (positive) direction; the ledger for a
       // goods issue stores the opposite sign.
       const ledgerQuantityDelta = -d.quantityDelta;
@@ -521,26 +524,18 @@ export class GoodsIssueService {
       };
     });
 
-    // Re-price each surviving line as the weighted average of everything ever
-    // posted for it: (what was already on the ledger) + (this edit's delta),
-    // divided by the new quantity — so INV-2 holds even when one line now
-    // carries two cost bases (part at the old price, part at today's average).
-    if (nextLines) {
-      const deltaByKey = new Map(
-        resolvedDeltas.map((d) => [`${d.itemId}::${d.locationId}`, d]),
-      );
-      for (const line of nextLines) {
-        const key = `${line.itemId}::${line.locationId}`;
-        const before = beforeByKey.get(key);
-        const beforeTotal = before ? before.quantity * before.unitPrice : 0;
-        const valueDelta = deltaByKey.get(key)?.valueDelta ?? 0;
-        const afterTotal = beforeTotal + valueDelta;
-        const afterQuantity = Number(line.quantity);
-        const unitPrice = afterQuantity !== 0 ? afterTotal / afterQuantity : 0;
-        line.unitPrice = unitPrice.toFixed(2);
-        line.lineTotal = afterTotal.toFixed(2);
-      }
-    }
+    // `nextLines` is saved exactly as submitted — no re-pricing pass.
+    //
+    // There used to be one, because cost was server-assigned and a line could end
+    // up straddling two cost bases, leaving Σ line_value out of step with the
+    // voucher. Both loops that repaired that are gone, and INV-2 now holds by
+    // construction: every ledger row for this voucher is written at the voucher's
+    // own prices, so Σ line_value = Σ (quantity × unit price) at post, and each
+    // revision adds exactly (value after − value before). Nothing left to repair.
+    //
+    // Deleting the re-pricing pass is also what lets one item appear twice at two
+    // prices: it keyed lines by (item, location) and handed every line sharing a
+    // key the same number.
 
     const ledgerEntries = await this.dataSource.transaction(async (manager) => {
       // Lock the voucher row and re-read its state inside the transaction — see
@@ -600,7 +595,7 @@ export class GoodsIssueService {
 
     this.logger.log(
       `Goods issue ${id} updated (${gi.status}) by ${actor.userId}: ` +
-        `${resolvedDeltas.length} ledger adjustment(s), rev ${wasPosted ? nextRevision : gi.revision ?? 0}`,
+        `${deltas.length} ledger adjustment(s), rev ${wasPosted ? nextRevision : gi.revision ?? 0}`,
     );
 
     // This issue is the export leg of a transfer order — apply the same delta
@@ -610,13 +605,13 @@ export class GoodsIssueService {
     if (
       options.cascadeTransferOrder !== false &&
       wasPosted &&
-      resolvedDeltas.length > 0 &&
+      deltas.length > 0 &&
       gi.referenceType === GoodsIssueReferenceType.TRANSFER_ORDER &&
       gi.referenceId
     ) {
       await this.transferOrderService.applyLegRevision(
         gi.referenceId,
-        resolvedDeltas.map((d) => ({ itemId: d.itemId, quantityDelta: d.quantityDelta })),
+        deltas.map((d) => ({ itemId: d.itemId, quantityDelta: d.quantityDelta })),
         actor,
         'export',
       );

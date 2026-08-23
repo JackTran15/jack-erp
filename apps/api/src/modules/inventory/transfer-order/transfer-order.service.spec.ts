@@ -763,6 +763,185 @@ describe('TransferOrderService', () => {
     });
   });
 
+  describe('listImportable — grid rows mirror the export issue (AC-09)', () => {
+    /** DD780 issued twice from one order line, at two prices. */
+    const twoPriceIssue = {
+      id: 'gi-9',
+      documentNumber: 'XK000176',
+      lines: [
+        {
+          id: 'gil-1',
+          itemId: 'item-1',
+          quantity: 30,
+          unitPrice: '350000.00',
+          lineTotal: '10500000.00',
+          item: { code: 'DD780', name: 'Dây thắt lưng DD780', unit: 'Đôi' },
+          location: { code: 'A01.01', name: 'A01.01', storage: { name: 'KHO SG' } },
+        },
+        {
+          id: 'gil-2',
+          itemId: 'item-1',
+          quantity: 60,
+          unitPrice: '340000.00',
+          lineTotal: '20400000.00',
+          item: { code: 'DD780', name: 'Dây thắt lưng DD780', unit: 'Đôi' },
+          location: { code: 'A01.01', name: 'A01.01', storage: { name: 'KHO SG' } },
+        },
+      ],
+    };
+
+    beforeEach(() => {
+      branchRepo.find.mockResolvedValue([{ id: 'branch-A', name: 'Cà Mau' }]);
+    });
+
+    it('returns one row per issue line, keeping both prices (AC-09)', async () => {
+      toRepo.find.mockResolvedValue([
+        baseOrder({
+          status: TransferOrderStatus.IN_PROGRESS,
+          exportGoodsIssueId: 'gi-9',
+        }),
+      ]);
+      giRepo.find.mockResolvedValue([twoPriceIssue]);
+
+      const rows = await service.listImportable({}, actorDest);
+
+      // The order carries ONE line for item-1; the issue carries two. Matching
+      // them back by itemId (the old behaviour) could only surface the first.
+      expect(rows[0].lines).toEqual([
+        expect.objectContaining({ id: 'gil-1', quantity: 30, unitPrice: 350000, lineTotal: 10500000 }),
+        expect.objectContaining({ id: 'gil-2', quantity: 60, unitPrice: 340000, lineTotal: 20400000 }),
+      ]);
+      expect(rows[0].totalAmount).toBe(30900000);
+    });
+
+    it('keys rows on the issue line id, so two rows from one order line stay distinct', async () => {
+      toRepo.find.mockResolvedValue([
+        baseOrder({
+          status: TransferOrderStatus.IN_PROGRESS,
+          exportGoodsIssueId: 'gi-9',
+        }),
+      ]);
+      giRepo.find.mockResolvedValue([twoPriceIssue]);
+
+      const rows = await service.listImportable({}, actorDest);
+
+      // TransferInPage keys its detail grid on `id`; duplicates would collide.
+      const ids = rows[0].lines.map((l) => l.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it('falls back to the order lines when nothing has been issued yet', async () => {
+      toRepo.find.mockResolvedValue([
+        baseOrder({
+          status: TransferOrderStatus.IN_PROGRESS,
+          exportGoodsIssueId: undefined,
+        } as Partial<TransferOrderEntity>),
+      ]);
+      giRepo.find.mockResolvedValue([]);
+
+      const rows = await service.listImportable({}, actorDest);
+
+      // One line, requestedQty 5 at the catalog price 12 — unchanged behaviour.
+      expect(rows[0].lines).toEqual([
+        expect.objectContaining({ itemId: 'item-1', quantity: 5, unitPrice: 12, lineTotal: 60 }),
+      ]);
+    });
+  });
+
+  describe('applyLegRevision — deltas across duplicate SKU lines (AC-10)', () => {
+    const importReceipt = (lines: unknown[]) => ({ id: 'gr-1', lines });
+    const receiptLine = (quantity: string, unitPrice: string) => ({
+      itemId: 'item-1',
+      locationId: 'loc-B01',
+      uomCode: 'pcs',
+      quantity,
+      unitPrice,
+    });
+
+    const savedLines = () =>
+      goodsReceiptService.update.mock.calls[0][1].lines as {
+        quantity: number;
+        unitPrice: number;
+      }[];
+
+    it('pours a decrease through the lines instead of applying it to each (AC-10)', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder({ importGoodsReceiptId: 'gr-1' }));
+      goodsReceiptService.getById.mockResolvedValue(
+        importReceipt([receiptLine('30', '350000'), receiptLine('60', '340000')]),
+      );
+
+      await service.applyLegRevision(
+        'to-1',
+        [{ itemId: 'item-1', quantityDelta: -10 }],
+        actorSource,
+        'export',
+      );
+
+      // Total drops by exactly 10, not 20. The first line absorbs it; prices stay put.
+      const lines = savedLines();
+      expect(lines.reduce((sum, l) => sum + l.quantity, 0)).toBe(80);
+      expect(lines).toEqual([
+        expect.objectContaining({ quantity: 20, unitPrice: 350000 }),
+        expect.objectContaining({ quantity: 60, unitPrice: 340000 }),
+      ]);
+    });
+
+    it('overflows onto the next line and drops the emptied one', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder({ importGoodsReceiptId: 'gr-1' }));
+      goodsReceiptService.getById.mockResolvedValue(
+        importReceipt([receiptLine('30', '350000'), receiptLine('60', '340000')]),
+      );
+
+      await service.applyLegRevision(
+        'to-1',
+        [{ itemId: 'item-1', quantityDelta: -40 }],
+        actorSource,
+        'export',
+      );
+
+      // First line empties (and is filtered out), the remaining 10 hits the second.
+      expect(savedLines()).toEqual([
+        expect.objectContaining({ quantity: 50, unitPrice: 340000 }),
+      ]);
+    });
+
+    it('lands an increase whole on the first line of the item', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder({ importGoodsReceiptId: 'gr-1' }));
+      goodsReceiptService.getById.mockResolvedValue(
+        importReceipt([receiptLine('30', '350000'), receiptLine('60', '340000')]),
+      );
+
+      await service.applyLegRevision(
+        'to-1',
+        [{ itemId: 'item-1', quantityDelta: 5 }],
+        actorSource,
+        'export',
+      );
+
+      expect(savedLines()).toEqual([
+        expect.objectContaining({ quantity: 35, unitPrice: 350000 }),
+        expect.objectContaining({ quantity: 60, unitPrice: 340000 }),
+      ]);
+    });
+
+    it('refuses a decrease the counterpart voucher cannot cover', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder({ importGoodsReceiptId: 'gr-1' }));
+      goodsReceiptService.getById.mockResolvedValue(
+        importReceipt([receiptLine('30', '350000'), receiptLine('60', '340000')]),
+      );
+
+      await expect(
+        service.applyLegRevision(
+          'to-1',
+          [{ itemId: 'item-1', quantityDelta: -100 }],
+          actorSource,
+          'export',
+        ),
+      ).rejects.toThrow('does not carry that much');
+      expect(goodsReceiptService.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('update', () => {
     it('rejects line edits while IN_PROGRESS', async () => {
       toRepo.findOne.mockResolvedValue(

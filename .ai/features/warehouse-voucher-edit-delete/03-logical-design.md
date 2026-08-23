@@ -69,11 +69,27 @@ Quy tắc tính `unitCostForDelta`:
 | Loại phiếu | `quantityDelta > 0` | `quantityDelta < 0` | `quantityDelta = 0`, `valueDelta ≠ 0` |
 |---|---|---|---|
 | Phiếu nhập | đơn giá mới trên dòng phiếu | đơn giá đã ghi sổ của phiếu | ghi dòng `quantity = 0`, `lineValue = valueDelta` |
-| Phiếu xuất | giá bình quân tức thời **tại thời điểm sửa** (A-05) | đơn giá đã ghi sổ của phiếu | như trên |
+| Phiếu xuất | ~~giá bình quân tức thời tại thời điểm sửa (A-05)~~ → **đơn giá mới trên dòng phiếu** | đơn giá đã ghi sổ của phiếu | như trên |
 
-Sau khi ghi chênh lệch, đơn giá lưu trên dòng phiếu xuất được đặt lại thành **bình quân gia
-quyền của toàn bộ giá trị đã ghi sổ cho dòng đó** (`Σ lineValue / Σ quantity`), để INV-2 vẫn
-đúng khi một dòng mang hai mức giá vốn.
+> **Luật của phiếu xuất đã bị thay, 2026-08-22.**
+> Xem `../goods-issue-line-unit-price/03-logical-design.md` → **ADR-03**.
+>
+> Feature này giả định đơn giá dòng phiếu xuất luôn do server gán (bình quân tức thời), nên
+> phần tăng khi sửa cũng phải định giá theo bình quân, và dòng phiếu phải được đặt lại thành
+> bình quân gia quyền `Σ lineValue / Σ quantity` để INV-2 đúng khi một dòng mang hai gốc giá vốn.
+>
+> Feature `goods-issue-line-unit-price` (ADR-01) đổi đơn giá dòng phiếu xuất thành **giá do
+> người dùng nhập**, ngang hàng với phiếu nhập. Hệ quả:
+>
+> - Phần tăng định giá theo **đơn giá mới của chính dòng đó**, không theo bình quân (ADR-03).
+> - Vòng đặt lại đơn giá theo bình quân gia quyền **đã bị xoá** (ADR-02). Một dòng không còn
+>   mang hai gốc giá vốn, nên tình huống nó xử lý không còn tồn tại.
+> - **INV-1, INV-2, INV-3 không đổi** — chúng vẫn là hợp đồng. Chỉ *cách đạt* INV-2 đổi: từ
+>   "tính lại đơn giá dòng cho khớp sổ" sang "sổ luôn ghi theo giá của chính phiếu, nên
+>   `Σ line_value = Σ (số lượng × đơn giá)` là hiển nhiên".
+>
+> Bảng trên giữ nguyên câu chữ gốc (gạch ngang) thay vì xoá, để người đọc thấy được luật nào
+> đã bị thay chứ không chỉ thấy luật hiện hành.
 
 ## Contracts
 

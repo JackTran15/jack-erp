@@ -64,7 +64,10 @@ describe("StockTakeService", () => {
   let receiptRepo: object;
   let issueRepo: object;
   let documentNumbering: { generate: jest.Mock };
-  let stockLedger: { recordBatchMovements: jest.Mock };
+  let stockLedger: {
+    recordBatchMovements: jest.Mock;
+    getInstantAverageCost: jest.Mock;
+  };
   let dataSource: { transaction: jest.Mock };
 
   const buildQb = (rows: unknown[]) => {
@@ -122,7 +125,11 @@ describe("StockTakeService", () => {
     receiptRepo = {};
     issueRepo = {};
     documentNumbering = { generate: jest.fn().mockResolvedValue("KK000001") };
-    stockLedger = { recordBatchMovements: jest.fn() };
+    stockLedger = {
+      recordBatchMovements: jest.fn(),
+      // Present only so the guard below can prove process() never reaches for it.
+      getInstantAverageCost: jest.fn(),
+    };
     dataSource = { transaction: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -464,6 +471,67 @@ describe("StockTakeService", () => {
       expect(managerFind).toHaveBeenCalledWith(ItemEntity, {
         where: { id: expect.anything(), organizationId: "org-1" },
       });
+    });
+  });
+
+  describe("process — generated issue keeps its snapshot cost (AC-11, A-13)", () => {
+    /**
+     * Making a goods issue's `unitPrice` the ledger cost basis (ADR-01) put every
+     * caller that fills that field on the hook. This one is safe for a structural
+     * reason worth pinning: process() builds `GoodsIssueLineEntity` itself and
+     * saves it already POSTED, so `GoodsIssueService.post()` — and the new
+     * per-line resolution inside it — is never reached. The price comes from
+     * ItemCostSnapshotService, not from the moving average.
+     */
+    it("prices the variance issue from snapshotCosts and never consults the moving average", async () => {
+      const lines = [
+        {
+          id: "l-1",
+          itemId: "item-3",
+          locationId: "loc-1",
+          expectedQty: "8",
+          countedQty: "3",
+        },
+      ] as unknown as StockTakeLineEntity[];
+      stRepo.findOne.mockResolvedValue({
+        id: "st-1",
+        organizationId: "org-1",
+        branchId: "branch-1",
+        status: StockTakeStatus.DRAFT,
+        documentNumber: "KK000001",
+        lines,
+      } as unknown as StockTakeEntity);
+
+      const saved: unknown[] = [];
+      const fakeManager = {
+        save: jest.fn((entityOrRows, maybeRows?: unknown) => {
+          saved.push(maybeRows ?? entityOrRows);
+          return Promise.resolve({ id: "fake-id" });
+        }),
+        create: jest.fn((_entity, dto) => ({ id: "fake-id", ...dto })),
+        find: jest.fn().mockResolvedValue([{ id: "item-3", unit: "Hộp" }]),
+        update: jest.fn(),
+      };
+      dataSource.transaction.mockImplementation(
+        async (cb: (m: typeof fakeManager) => unknown) => cb(fakeManager),
+      );
+
+      await service.process("st-1", actor);
+
+      // item-3's snapshot cost is 6: 5 units short → 5 × 6 = 30.
+      const issueLines = saved
+        .flat()
+        .filter(
+          (row): row is { unitPrice: string; lineTotal: string } =>
+            typeof row === "object" &&
+            row !== null &&
+            "unitPrice" in row &&
+            "lineTotal" in row,
+        );
+      expect(issueLines).toEqual([
+        expect.objectContaining({ unitPrice: "6.00", lineTotal: "30.00" }),
+      ]);
+      expect(stockLedger.getInstantAverageCost).not.toHaveBeenCalled();
     });
   });
 

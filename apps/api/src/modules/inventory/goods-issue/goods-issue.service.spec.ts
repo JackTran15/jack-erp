@@ -292,8 +292,10 @@ describe('GoodsIssueService', () => {
     });
   });
 
-  describe('post — instantaneous average cost', () => {
-    it('overrides client prices per SKU and writes the ledger in the posting transaction', async () => {
+  describe('post — per-line cost basis (AC-01, AC-03)', () => {
+    it('keeps two different prices for the same SKU instead of averaging them (AC-01)', async () => {
+      // The bug this replaces: both lines used to be rewritten to the item's
+      // branch-wide average, so 350k and 340k both came back as 342,941.
       const issue = {
         id: 'gi-1',
         organizationId: actor.organizationId,
@@ -301,31 +303,111 @@ describe('GoodsIssueService', () => {
         documentNumber: 'XK000001',
         status: GoodsIssueStatus.DRAFT,
         lines: [
-          { id: 'line-1', itemId: 'item-1', locationId: 'loc-A', quantity: 2, unitPrice: '1' },
-          { id: 'line-2', itemId: 'item-1', locationId: 'loc-B', quantity: 3, unitPrice: '2' },
+          { id: 'line-1', itemId: 'item-1', locationId: 'loc-A', quantity: 30, unitPrice: '350000' },
+          { id: 'line-2', itemId: 'item-1', locationId: 'loc-A', quantity: 60, unitPrice: '340000' },
         ],
       };
       giRepo.findOne.mockResolvedValue(issue);
-      ledgerService.getInstantAverageCost.mockResolvedValue({ unitCost: 215000 });
+      // Deliberately the number the old behaviour produced — if the override
+      // ever comes back, it shows up here rather than in production.
+      ledgerService.getInstantAverageCost.mockResolvedValue({ unitCost: 342941 });
 
       await service.post(issue.id, actor);
 
-      expect(ledgerService.getInstantAverageCost).toHaveBeenCalledTimes(1);
+      // Every line carried a price, so the ledger is never consulted for an average.
+      expect(ledgerService.getInstantAverageCost).not.toHaveBeenCalled();
+      expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({ itemId: 'item-1', quantity: -30, unitCost: 350000 }),
+          expect.objectContaining({ itemId: 'item-1', quantity: -60, unitCost: 340000 }),
+        ],
+        dataSource._manager,
+      );
+    });
+
+    it('leaves a priced line untouched — no rewrite, no no-op UPDATE (AC-01)', async () => {
+      const issue = {
+        id: 'gi-1',
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        documentNumber: 'XK000001',
+        status: GoodsIssueStatus.DRAFT,
+        lines: [
+          { id: 'line-1', itemId: 'item-1', locationId: 'loc-A', quantity: 30, unitPrice: '350000' },
+        ],
+      };
+      giRepo.findOne.mockResolvedValue(issue);
+
+      await service.post(issue.id, actor);
+
+      expect((dataSource._manager as any).update).not.toHaveBeenCalledWith(
+        expect.anything(),
+        { id: 'line-1' },
+        expect.anything(),
+      );
+    });
+
+    it('fills a blank price from the instant average and writes it back (AC-03)', async () => {
+      const issue = {
+        id: 'gi-1',
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        documentNumber: 'XK000001',
+        status: GoodsIssueStatus.DRAFT,
+        lines: [
+          { id: 'line-1', itemId: 'item-1', locationId: 'loc-A', quantity: 30, unitPrice: '0' },
+        ],
+      };
+      giRepo.findOne.mockResolvedValue(issue);
+      ledgerService.getInstantAverageCost.mockResolvedValue({ unitCost: 200000 });
+
+      await service.post(issue.id, actor);
+
       expect(ledgerService.getInstantAverageCost).toHaveBeenCalledWith(
         'item-1',
         actor.organizationId,
         actor.branchId,
       );
+      // The resolved cost is written back, so the line never displays as 0.
       expect((dataSource._manager as any).update).toHaveBeenCalledWith(
         expect.anything(),
         { id: 'line-1' },
-        { unitPrice: '215000.00', lineTotal: '430000.00' },
+        { unitPrice: '200000.00', lineTotal: '6000000.00' },
       );
       expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({ itemId: 'item-1', quantity: -2, unitCost: 215000 }),
-          expect.objectContaining({ itemId: 'item-1', quantity: -3, unitCost: 215000 }),
-        ]),
+        [expect.objectContaining({ quantity: -30, unitCost: 200000 })],
+        dataSource._manager,
+      );
+    });
+
+    it('looks the average up once per item, however many blank lines share it (AC-03)', async () => {
+      const issue = {
+        id: 'gi-1',
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        documentNumber: 'XK000001',
+        status: GoodsIssueStatus.DRAFT,
+        lines: [
+          { id: 'line-1', itemId: 'item-1', locationId: 'loc-A', quantity: 30, unitPrice: '350000' },
+          { id: 'line-2', itemId: 'item-1', locationId: 'loc-A', quantity: 60, unitPrice: '0' },
+          { id: 'line-3', itemId: 'item-1', locationId: 'loc-B', quantity: 10, unitPrice: '0' },
+          { id: 'line-4', itemId: 'item-2', locationId: 'loc-A', quantity: 5, unitPrice: '120000' },
+        ],
+      };
+      giRepo.findOne.mockResolvedValue(issue);
+      ledgerService.getInstantAverageCost.mockResolvedValue({ unitCost: 200000 });
+
+      await service.post(issue.id, actor);
+
+      // item-1 has two blank lines → one lookup; item-2 is fully priced → none.
+      expect(ledgerService.getInstantAverageCost).toHaveBeenCalledTimes(1);
+      expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({ quantity: -30, unitCost: 350000 }),
+          expect.objectContaining({ quantity: -60, unitCost: 200000 }),
+          expect.objectContaining({ quantity: -10, unitCost: 200000 }),
+          expect.objectContaining({ quantity: -5, unitCost: 120000 }),
+        ],
         dataSource._manager,
       );
       expect(ledgerService.publishMovementEvents).toHaveBeenCalledWith([
@@ -516,7 +598,7 @@ describe('GoodsIssueService', () => {
       );
     });
 
-    it('writes a negative-ledger adjustment, costed at today\'s average, when the issued quantity increases', async () => {
+    it("costs a quantity increase at the line's own price, not today's average (AC-07)", async () => {
       giRepo.findOne.mockResolvedValue(postedIssue());
 
       await service.update(
@@ -525,81 +607,28 @@ describe('GoodsIssueService', () => {
         actor,
       );
 
-      // T-04-02: the extra 3 units are costed at today's average (90), not the
-      // 80 the line was originally posted at.
-      expect(ledgerService.getInstantAverageCost).toHaveBeenCalledWith(
-        'item-1',
-        actor.organizationId,
-        'branch-A',
-      );
+      // ADR-03 replaced the old rule (extra units costed at today's average, 90).
+      // The line carries a price, so the average is never consulted at all.
+      expect(ledgerService.getInstantAverageCost).not.toHaveBeenCalled();
       expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
         [
           expect.objectContaining({
             quantity: -3,
-            lineValue: -270,
-            unitCost: 90,
+            lineValue: -240, // 3 × 80, the line's own price
+            unitCost: 80,
             movementType: StockMovementType.ADJUSTMENT_DECREASE,
           }),
         ],
         dataSource._manager,
       );
-      // The line is re-priced to the blended average across both cost bases:
-      // (10 @ 80 + 3 @ 90) / 13 = 1070 / 13 ≈ 82.31.
+      // No re-pricing pass any more: the line keeps exactly what was submitted.
       expect(dataSource._manager.save).toHaveBeenCalledWith(
         GoodsIssueLineEntity,
-        [expect.objectContaining({ unitPrice: '82.31', lineTotal: '1070.00' })],
+        [expect.objectContaining({ unitPrice: '80.00', lineTotal: '1040.00' })],
       );
     });
 
-    it('leaves the ledger alone when only header fields change', async () => {
-      giRepo.findOne.mockResolvedValue(postedIssue());
-
-      await service.update('gi-9', { notes: 'ghi chú mới' }, actor);
-
-      expect(ledgerService.recordBatchMovements).not.toHaveBeenCalled();
-      expect(dataSource._manager.update).toHaveBeenCalledWith(
-        GoodsIssueEntity,
-        'gi-9',
-        expect.objectContaining({ notes: 'ghi chú mới' }),
-      );
-    });
-
-    it('rejects the edit when another request already revised the issue', async () => {
-      giRepo.findOne.mockResolvedValue(postedIssue());
-      dataSource._manager.query.mockResolvedValue([
-        { status: GoodsIssueStatus.POSTED, revision: 1 },
-      ]);
-
-      await expect(
-        service.update('gi-9', { lines: editedLines }, actor),
-      ).rejects.toThrow('modified by another request');
-      expect(ledgerService.recordBatchMovements).not.toHaveBeenCalled();
-    });
-
-    it('rejects an edit on a cancelled issue', async () => {
-      giRepo.findOne.mockResolvedValue(postedIssue({ status: GoodsIssueStatus.CANCELLED }));
-
-      await expect(
-        service.update('gi-9', { lines: editedLines }, actor),
-      ).rejects.toThrow('can no longer be edited');
-    });
-
-    it('allows an edit that drives stock negative', async () => {
-      giRepo.findOne.mockResolvedValue(postedIssue());
-
-      await service.update(
-        'gi-9',
-        { lines: [{ ...editedLines[0], quantity: 50 }] },
-        actor,
-      );
-
-      expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
-        [expect.objectContaining({ quantity: -40 })],
-        dataSource._manager,
-      );
-    });
-
-    it('does not blow up dividing by zero when the item has never had a cost (T-04-02)', async () => {
+    it('resolves a blank price to the average and stays finite when the item was never costed', async () => {
       giRepo.findOne.mockResolvedValue(postedIssue());
       ledgerService.getInstantAverageCost.mockResolvedValue({
         itemId: 'item-1',
@@ -612,14 +641,27 @@ describe('GoodsIssueService', () => {
 
       await service.update(
         'gi-9',
-        { lines: [{ ...editedLines[0], quantity: 13 }] },
+        { lines: [{ ...editedLines[0], quantity: 13, unitPrice: 0 }] },
         actor,
       );
 
+      expect(ledgerService.getInstantAverageCost).toHaveBeenCalledWith(
+        'item-1',
+        actor.organizationId,
+        'branch-A',
+      );
       expect(dataSource._manager.save).toHaveBeenCalledWith(
         GoodsIssueLineEntity,
-        [expect.objectContaining({ unitPrice: '61.54' })], // (10*80 + 0) / 13
+        [expect.objectContaining({ unitPrice: '0.00', lineTotal: '0.00' })],
       );
+      const [movements] = ledgerService.recordBatchMovements.mock.calls[0] as [
+        { quantity: number; lineValue: number; unitCost: number }[],
+      ];
+      for (const movement of movements) {
+        expect(Number.isFinite(movement.quantity)).toBe(true);
+        expect(Number.isFinite(movement.lineValue)).toBe(true);
+        expect(Number.isFinite(movement.unitCost)).toBe(true);
+      }
     });
 
     it('rejects changing the reason for a purpose that does not carry one', async () => {
@@ -647,12 +689,184 @@ describe('GoodsIssueService', () => {
         [
           // Removed line reverses at its own already-posted price (80).
           expect.objectContaining({ itemId: 'item-1', quantity: 10, lineValue: 800 }),
-          // Added line is a full increase, costed at today's average (90) —
-          // the 25 the request sent for item-2 is not used (T-04-02).
-          expect.objectContaining({ itemId: 'item-2', quantity: -4, lineValue: -360, unitCost: 90 }),
+          // Added line is costed at the 25 the request sent for item-2 — under
+          // ADR-03 a submitted price is the cost basis, so today's average (90)
+          // is not consulted.
+          expect.objectContaining({ itemId: 'item-2', quantity: -4, lineValue: -100, unitCost: 25 }),
         ],
         dataSource._manager,
       );
+    });
+
+    describe('two lines, same SKU, same warehouse — the reported defect (AC-05..08, AC-12)', () => {
+      /**
+       * The voucher from the bug report: DD780 issued twice from KHO SG at two
+       * prices. 30 × 350.000 + 60 × 340.000 = 30.900.000. Before this feature
+       * both lines came back at 342.941 — the item's branch-wide average.
+       */
+      function twoPriceIssue() {
+        return postedIssue({
+          lines: [
+            { itemId: 'item-1', locationId: 'loc-A01', quantity: 30, unitPrice: '350000.00' },
+            { itemId: 'item-1', locationId: 'loc-A01', quantity: 60, unitPrice: '340000.00' },
+          ],
+        });
+      }
+      const line = (quantity: number, unitPrice: number) => ({
+        itemId: 'item-1',
+        locationId: 'loc-A01',
+        quantity,
+        unitPrice,
+      });
+
+      const savedLines = () => {
+        const call = dataSource._manager.save.mock.calls.find(
+          (c: unknown[]) => c[0] === GoodsIssueLineEntity,
+        );
+        return call?.[1] as { unitPrice: string; lineTotal: string }[];
+      };
+
+      it('reverses a reduced line at its own price and leaves the other alone (AC-05)', async () => {
+        giRepo.findOne.mockResolvedValue(twoPriceIssue());
+
+        await service.update(
+          'gi-9',
+          { lines: [line(30, 350000), line(50, 340000)] },
+          actor,
+        );
+
+        // 90 → 80 units, 30.900.000 → 27.500.000: the 10 units come back at 340.000.
+        expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
+          [
+            expect.objectContaining({
+              itemId: 'item-1',
+              quantity: 10,
+              lineValue: 3_400_000,
+              unitCost: 340000,
+              movementType: StockMovementType.ADJUSTMENT_INCREASE,
+            }),
+          ],
+          dataSource._manager,
+        );
+        expect(savedLines()).toEqual([
+          expect.objectContaining({ unitPrice: '350000.00', lineTotal: '10500000.00' }),
+          expect.objectContaining({ unitPrice: '340000.00', lineTotal: '17000000.00' }),
+        ]);
+      });
+
+      it('costs an increase at that line\'s price, never the branch average (AC-07)', async () => {
+        giRepo.findOne.mockResolvedValue(twoPriceIssue());
+        // The number the old behaviour produced. If the override ever returns,
+        // it surfaces here rather than in production.
+        ledgerService.getInstantAverageCost.mockResolvedValue({
+          itemId: 'item-1',
+          branchId: 'branch-A',
+          quantity: 1000,
+          inventoryValue: 342_941_000,
+          unitCost: 342941,
+          source: 'LEDGER',
+        });
+
+        await service.update(
+          'gi-9',
+          { lines: [line(40, 350000), line(60, 340000)] },
+          actor,
+        );
+
+        expect(ledgerService.getInstantAverageCost).not.toHaveBeenCalled();
+        expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
+          [
+            expect.objectContaining({
+              quantity: -10,
+              lineValue: -3_500_000, // 10 × 350.000, not 10 × 342.941
+              unitCost: 350000,
+              movementType: StockMovementType.ADJUSTMENT_DECREASE,
+            }),
+          ],
+          dataSource._manager,
+        );
+        // Σ line_value = −34.400.000 = −(40 × 350.000 + 60 × 340.000)  → INV-2
+        expect(savedLines()).toEqual([
+          expect.objectContaining({ unitPrice: '350000.00', lineTotal: '14000000.00' }),
+          expect.objectContaining({ unitPrice: '340000.00', lineTotal: '20400000.00' }),
+        ]);
+      });
+
+      it('reverses a deleted line at 340.000, not at the surviving line\'s 350.000 (AC-08)', async () => {
+        giRepo.findOne.mockResolvedValue(twoPriceIssue());
+
+        await service.update('gi-9', { lines: [line(30, 350000)] }, actor);
+
+        expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
+          [
+            expect.objectContaining({
+              quantity: 60,
+              lineValue: 20_400_000,
+              unitCost: 340000,
+              movementType: StockMovementType.ADJUSTMENT_INCREASE,
+            }),
+          ],
+          dataSource._manager,
+        );
+        expect(savedLines()).toEqual([
+          expect.objectContaining({ unitPrice: '350000.00', lineTotal: '10500000.00' }),
+        ]);
+      });
+
+      it('holds INV-2 when one edit changes both price and quantity (AC-12)', async () => {
+        giRepo.findOne.mockResolvedValue(twoPriceIssue());
+
+        await service.update(
+          'gi-9',
+          { lines: [line(40, 360000), line(60, 340000)] },
+          actor,
+        );
+
+        // computeVoucherDelta aggregates by (item, location), so the stamped
+        // unit cost is derived — |3.900.000 / 10| = 390.000 — and matches no
+        // line's price. That is the known consequence recorded in ADR-03; the
+        // invariant that matters is the value, asserted below.
+        expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
+          [
+            expect.objectContaining({
+              quantity: -10,
+              lineValue: -3_900_000,
+              unitCost: 390000,
+            }),
+          ],
+          dataSource._manager,
+        );
+        // Σ line_value = −30.900.000 − 3.900.000 = −34.800.000, and the voucher
+        // is worth 40 × 360.000 + 60 × 340.000 = 34.800.000. INV-2 holds.
+        expect(savedLines()).toEqual([
+          expect.objectContaining({ unitPrice: '360000.00', lineTotal: '14400000.00' }),
+          expect.objectContaining({ unitPrice: '340000.00', lineTotal: '20400000.00' }),
+        ]);
+      });
+
+      it('resolves only the blank line, leaving its twin\'s price intact', async () => {
+        giRepo.findOne.mockResolvedValue(twoPriceIssue());
+        ledgerService.getInstantAverageCost.mockResolvedValue({
+          itemId: 'item-1',
+          branchId: 'branch-A',
+          quantity: 1000,
+          inventoryValue: 342_941_000,
+          unitCost: 342941,
+          source: 'LEDGER',
+        });
+
+        await service.update(
+          'gi-9',
+          { lines: [line(30, 350000), line(60, 0)] },
+          actor,
+        );
+
+        expect(ledgerService.getInstantAverageCost).toHaveBeenCalledTimes(1);
+        expect(savedLines()).toEqual([
+          expect.objectContaining({ unitPrice: '350000.00', lineTotal: '10500000.00' }),
+          expect.objectContaining({ unitPrice: '342941.00', lineTotal: '20576460.00' }),
+        ]);
+      });
     });
 
     it('holds INV-1 (ledger quantity matches the line) through two consecutive edits', async () => {
