@@ -137,6 +137,10 @@ export async function seedBaseData(
     'inventory.adjustment.post', 'inventory.adjustment.cancel',
     'inventory.goods-issue.read', 'inventory.goods-issue.create',
     'inventory.goods-issue.post', 'inventory.goods-issue.cancel',
+    // Added later than this list and never backfilled here, which left every
+    // suite exercising an OTHER/DISPOSAL issue or an edit failing on a 403.
+    'inventory.goods-issue.update',
+    'inventory.goods-issue.other-issue', 'inventory.goods-issue.disposal',
     'inventory.reports.read',
     'pos.session.manage', 'pos.session.approve_variance',
     'pos.sale.create', 'pos.return.create', 'pos.exchange.create',

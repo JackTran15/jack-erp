@@ -1,4 +1,7 @@
 import { INestApplication } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import * as bcrypt from 'bcryptjs';
+import { DataSource } from 'typeorm';
 import request from 'supertest';
 import {
   createTestApp,
@@ -19,6 +22,7 @@ import {
 describe('Goods receipt from transfer order (E2E)', () => {
   let app: INestApplication;
   let seed: SeedResult;
+  let ds: DataSource;
 
   let itemId: string;
   let srcStorageId: string;
@@ -28,6 +32,7 @@ describe('Goods receipt from transfer order (E2E)', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
+    ds = app.get(DataSource);
     await resetDatabase(app);
     seed = await seedBaseData(app);
 
@@ -173,6 +178,184 @@ describe('Goods receipt from transfer order (E2E)', () => {
     expect(
       (after.body as Array<{ id: string }>).some((r) => r.id === orderId),
     ).toBe(false);
+  });
+
+  describe('both legs balance line by line (AC-09)', () => {
+    /**
+     * Self-contained two-branch harness.
+     *
+     * The three tests above transfer a branch to itself, which a later rule now
+     * rejects ("Cửa hàng đích phải khác cửa hàng hiện tại") — they have been
+     * failing at HEAD since, independently of this feature. Rather than rewrite
+     * their semantics, this block seeds its own destination branch and actor.
+     *
+     * Two logins, not one token with a swapped header: ActorContext resolves
+     * `branchId` from the JWT before the X-Branch-Id header, so a header alone
+     * does not move the actor to another branch.
+     */
+    const SEEDED_ROLE_ID = 'd0000000-0000-4000-8000-000000000001';
+    let destBranchId: string;
+    let destToken: string;
+    let branchBStorageId: string;
+    let branchBLocationId: string;
+
+    const destHeaders = () => ({
+      Authorization: authHeader(destToken),
+      'X-Branch-Id': destBranchId,
+    });
+
+    beforeAll(async () => {
+      destBranchId = randomUUID();
+      await ds.query(
+        `INSERT INTO branches (id, organization_id, name, status, is_main_branch, created_by, created_at, updated_at)
+         VALUES ($1, $2, 'GRT Dest Branch', 'ACTIVE', false, $3, NOW(), NOW())`,
+        [destBranchId, seed.organizationId, seed.userId],
+      );
+
+      const userId = randomUUID();
+      const email = `grt-dest-${userId.slice(0, 8)}@e2e.test`;
+      await ds.query(
+        `INSERT INTO users (id, organization_id, email, password_hash, first_name, last_name, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 'GRT', 'Dest', true, NOW(), NOW())`,
+        [userId, seed.organizationId, email, await bcrypt.hash('password123', 10)],
+      );
+      await ds.query(
+        `INSERT INTO user_roles (id, user_id, role_id, organization_id)
+         VALUES (gen_random_uuid(), $1, $2, $3)`,
+        [userId, SEEDED_ROLE_ID, seed.organizationId],
+      );
+      await ds.query(
+        `INSERT INTO user_branch_assignments (id, user_id, branch_id, organization_id, assigned_by)
+         VALUES (gen_random_uuid(), $1, $2, $3, $1)`,
+        [userId, destBranchId, seed.organizationId],
+      );
+
+      const login = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email, password: 'password123', organizationId: seed.organizationId })
+        .expect(200);
+      destToken = login.body.accessToken;
+
+      const wh = await request(app.getHttpServer())
+        .post('/inventory/storages')
+        .set(destHeaders())
+        .send({ name: 'GRT Dest Branch WH', branchId: destBranchId })
+        .expect(201);
+      branchBStorageId = wh.body.id;
+
+      const locs = await request(app.getHttpServer())
+        .get(
+          `/inventory/locations?page=1&pageSize=1&storageId=${branchBStorageId}&includeUnassigned=true`,
+        )
+        .set(destHeaders())
+        .expect(200);
+      branchBLocationId = locs.body.data[0].id;
+    });
+
+    /** Σ line_value the ledger holds for one voucher. */
+    async function ledgerValue(referenceType: string, referenceId: string) {
+      const [row] = await ds.query(
+        `SELECT COALESCE(SUM(line_value), 0)::float8 AS value
+           FROM stock_ledger_entries
+          WHERE reference_type = $1 AND reference_id = $2`,
+        [referenceType, referenceId],
+      );
+      return (row as { value: number }).value;
+    }
+
+    /** Export the order as two rows of the same item at two prices. */
+    async function createAndExportTwoPrices(): Promise<string> {
+      const created = await request(app.getHttpServer())
+        .post('/inventory/transfer-orders')
+        .set(headers())
+        .send({
+          sourceBranchId: seed.branchId,
+          destinationBranchId: destBranchId,
+          sourceStorageId: srcStorageId,
+          notes: 'GRT two-price e2e',
+          lines: [{ itemId, requestedQty: 9, sourceStorageId: srcStorageId }],
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/inventory/transfer-orders/${created.body.id}/export`)
+        .set(headers())
+        .send({
+          lines: [
+            { itemId, locationId: srcLocationId, quantity: 3, unitPrice: 350 },
+            { itemId, locationId: srcLocationId, quantity: 6, unitPrice: 340 },
+          ],
+        })
+        .expect(201);
+
+      return created.body.id as string;
+    }
+
+    it('shows the destination both issued rows, then receives them at both prices (AC-09)', async () => {
+      const orderId = await createAndExportTwoPrices();
+
+      // The picker mirrors the goods issue, not the single order line: matching
+      // issue lines back by itemId could only ever surface the first of them.
+      const res = await request(app.getHttpServer())
+        .get('/inventory/transfer-orders/importable')
+        .set(destHeaders())
+        .expect(200);
+      const row = (
+        res.body as Array<{
+          id: string;
+          totalAmount: number;
+          lines: Array<{ id: string; quantity: number; unitPrice: number }>;
+        }>
+      ).find((r) => r.id === orderId)!;
+      expect(row.lines).toHaveLength(2);
+      expect(row.lines.map((l) => l.unitPrice).sort((a, b) => a - b)).toEqual([340, 350]);
+      expect(row.lines.map((l) => l.quantity).sort((a, b) => a - b)).toEqual([3, 6]);
+      expect(new Set(row.lines.map((l) => l.id)).size).toBe(2);
+      expect(row.totalAmount).toBe(3 * 350 + 6 * 340); // 3090
+
+      // Receive exactly what was sent — one receipt row per issued row.
+      const imported = await request(app.getHttpServer())
+        .post(`/inventory/transfer-orders/${orderId}/import`)
+        .set(destHeaders())
+        .send({
+          lines: row.lines.map((l) => ({
+            itemId,
+            locationId: branchBLocationId,
+            quantity: l.quantity,
+            unitPrice: l.unitPrice,
+          })),
+        })
+        .expect(201);
+
+      const grId = imported.body.importGoodsReceiptId as string;
+      const giId = imported.body.exportGoodsIssueId as string;
+      expect(grId).toBeTruthy();
+      expect(giId).toBeTruthy();
+
+      // Read the receipt rows from the table rather than GET /goods-receipts/:id:
+      // that endpoint needs a permission this suite's seeded role does not carry,
+      // and the claim under test is about what was stored, not about the reader.
+      const receiptRows = await ds.query(
+        `SELECT quantity, unit_price FROM goods_receipt_lines
+          WHERE goods_receipt_id = $1`,
+        [grId],
+      );
+      const received = (receiptRows as Array<{ quantity: string; unit_price: string }>)
+        .map((l) => [Number(l.quantity), Number(l.unit_price)])
+        .sort((a, b) => a[0] - b[0]);
+      expect(received).toEqual([
+        [3, 350],
+        [6, 340],
+      ]);
+
+      // The two legs must be worth the same, opposite signs: value neither
+      // appears nor evaporates crossing between branches.
+      const issueValue = await ledgerValue('GOODS_ISSUE', giId);
+      const receiptValue = await ledgerValue('GOODS_RECEIPT', grId);
+      expect(issueValue).toBe(-3090);
+      expect(receiptValue).toBe(3090);
+      expect(issueValue + receiptValue).toBe(0);
+    });
   });
 
   it('rejects an import from a non-destination branch context is covered by guards; replays idempotently', async () => {

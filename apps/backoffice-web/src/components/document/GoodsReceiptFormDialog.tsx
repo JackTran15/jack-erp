@@ -638,70 +638,103 @@ export function PurchaseOrderFormDialog({
       // Người giao comes from the source branch's export issue. Đối tượng is
       // deliberately NOT pre-filled — the destination picks it (or leaves it
       // blank, in which case the import endpoint inherits the export issue's).
-      if (exportIssueId) {
-        void (async () => {
-          try {
-            // Org-scoped endpoint — the export issue belongs to the source branch.
-            const { data: issue } = await apiClient.get<GoodsIssue>(
-              `/inventory/transfer-orders/${detail.id}/export-goods-issue`,
-            );
-            if (issue.deliverer) setDeliveryPerson(issue.deliverer);
-          } catch {
-            // best-effort — the fields stay editable and the server still inherits them
-          }
-        })();
-      }
       const targetStorageId = defaultStorage?.id ?? "";
       const targetStorageLabel = defaultStorage?.name ?? "";
       if (targetStorageId) {
         setStorageId(targetStorageId);
         setStorageQuery(targetStorageLabel);
       }
-      const mapped: FormLine[] = detail.lines.map((l) => ({
-        lineId: nextLineId(),
-        itemId: l.itemId,
-        itemLabel: l.item?.code ?? "",
-        itemName: l.item?.name ?? "",
-        unit: l.item?.unit ?? "",
-        storageId: targetStorageId,
-        storageLabel: targetStorageLabel,
-        locationId: "",
-        locationLabel: "",
-        orderedQuantity: Number(l.requestedQty),
-        unitPrice: Number(l.item?.purchasePrice ?? 0),
-        notes: l.note ?? "",
-      }));
-      setLines(mapped);
-      if (targetStorageId) {
-        // Auto-fill Vị trí from the item's preferred shelf. An item with no vị trí
-        // in this kho stays blank — save-time resolution still picks a bin, so the
-        // user is not forced to choose one, but the form must not invent one here.
+      // The order says what was asked for; the export issue says what was actually
+      // sent, line by line, at the price each line went out at. Once an issue
+      // exists it is the one to mirror — an item issued twice at two prices has to
+      // arrive as two rows, and the order only ever carries one row per item.
+      const fromOrderLines = (): FormLine[] =>
+        detail.lines.map((l) => ({
+          lineId: nextLineId(),
+          itemId: l.itemId,
+          itemLabel: l.item?.code ?? "",
+          itemName: l.item?.name ?? "",
+          unit: l.item?.unit ?? "",
+          storageId: targetStorageId,
+          storageLabel: targetStorageLabel,
+          locationId: "",
+          locationLabel: "",
+          orderedQuantity: Number(l.requestedQty),
+          unitPrice: Number(l.item?.purchasePrice ?? 0),
+          notes: l.note ?? "",
+        }));
+      const fromIssueLines = (issue: GoodsIssue): FormLine[] =>
+        issue.lines.map((l) => ({
+          lineId: nextLineId(),
+          itemId: l.itemId,
+          itemLabel: l.item?.code ?? "",
+          itemName: l.item?.name ?? "",
+          unit: l.item?.unit ?? "",
+          storageId: targetStorageId,
+          storageLabel: targetStorageLabel,
+          locationId: "",
+          locationLabel: "",
+          orderedQuantity: Number(l.quantity),
+          unitPrice: Number(l.unitPrice ?? 0),
+          notes: l.notes ?? "",
+        }));
+
+      if (exportIssueId) {
         void (async () => {
-          for (let index = 0; index < mapped.length; index++) {
-            const line = mapped[index];
-            const shelf = await getPreferredShelf(
-              line.itemId,
-              targetStorageId,
-            ).catch(() => null);
-            if (!shelf) continue;
-            setLines((currentLines) =>
-              currentLines.map((current, lineIndex) =>
-                lineIndex === index &&
-                current.itemId === line.itemId &&
-                current.storageId === targetStorageId &&
-                !current.locationId
-                  ? {
-                      ...current,
-                      locationId: shelf.id,
-                      locationLabel: shelf.code,
-                    }
-                  : current,
-              ),
+          let mapped: FormLine[] | null = null;
+          try {
+            // Org-scoped endpoint — the export issue belongs to the source branch.
+            const { data: issue } = await apiClient.get<GoodsIssue>(
+              `/inventory/transfer-orders/${detail.id}/export-goods-issue`,
             );
+            if (issue.deliverer) setDeliveryPerson(issue.deliverer);
+            if (issue.lines?.length) mapped = fromIssueLines(issue);
+          } catch {
+            // best-effort — the fields stay editable and the server still inherits them
           }
+          // A failed lookup falls back to the order's own lines: one row at the
+          // catalog price beats an empty grid.
+          applyPrefilledLines(mapped ?? fromOrderLines());
         })();
+      } else {
+        applyPrefilledLines(fromOrderLines());
       }
-      markDirty();
+
+      function applyPrefilledLines(mapped: FormLine[]) {
+        setLines(mapped);
+        if (targetStorageId) {
+          // Auto-fill Vị trí from the item's preferred shelf. An item with no vị trí
+          // in this kho stays blank — save-time resolution still picks a bin, so the
+          // user is not forced to choose one, but the form must not invent one here.
+          void (async () => {
+            for (let index = 0; index < mapped.length; index++) {
+              const line = mapped[index];
+              const shelf = await getPreferredShelf(
+                line.itemId,
+                targetStorageId,
+              ).catch(() => null);
+              if (!shelf) continue;
+              setLines((currentLines) =>
+                currentLines.map((current, lineIndex) =>
+                  // Index-guarded, so two rows of the same item issued at two
+                  // prices each get their own shelf rather than sharing the first's.
+                  lineIndex === index &&
+                  current.itemId === line.itemId &&
+                  current.storageId === targetStorageId &&
+                  !current.locationId
+                    ? {
+                        ...current,
+                        locationId: shelf.id,
+                        locationLabel: shelf.code,
+                      }
+                    : current,
+                ),
+              );
+            }
+          })();
+        }
+        markDirty();
+      }
     },
     // markDirty/set* are stable closures over component scope.
     // eslint-disable-next-line react-hooks/exhaustive-deps

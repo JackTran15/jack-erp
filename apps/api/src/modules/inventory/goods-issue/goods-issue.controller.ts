@@ -44,7 +44,7 @@ import {
 import { Type } from 'class-transformer';
 import { GoodsIssueService } from './goods-issue.service';
 
-class GoodsIssueLineDto {
+export class GoodsIssueLineDto {
   @IsUUID()
   itemId: string;
 

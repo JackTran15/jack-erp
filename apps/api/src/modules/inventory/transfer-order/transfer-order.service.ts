@@ -625,6 +625,7 @@ export class TransferOrderService {
             0,
           ),
           lines: (gi.lines ?? []).map((line) => ({
+            id: line.id,
             itemId: line.itemId,
             itemCode: line.item?.code ?? "",
             itemName: line.item?.name ?? "",
@@ -665,28 +666,46 @@ export class TransferOrderService {
                 Number(line.item?.purchasePrice ?? 0),
             0,
           ),
-        lines: (o.lines ?? []).map((line) => {
-          const issueLine = gi?.lines.find(
-            (candidate) => candidate.itemId === line.itemId,
-          );
-          const fallbackQuantity = Number(line.requestedQty ?? 0);
-          const fallbackUnitPrice = Number(line.item?.purchasePrice ?? 0);
-          return {
-            id: line.id,
-            itemId: line.itemId,
-            itemCode: issueLine?.itemCode ?? line.item?.code ?? "",
-            itemName: issueLine?.itemName ?? line.item?.name ?? "",
-            unit: issueLine?.unit ?? line.item?.unit ?? "",
-            storageName: issueLine?.storageName ?? null,
-            locationCode: issueLine?.locationCode ?? null,
-            locationName: issueLine?.locationName ?? null,
-            quantity: issueLine?.quantity ?? fallbackQuantity,
-            unitPrice: issueLine?.unitPrice ?? fallbackUnitPrice,
-            lineTotal:
-              issueLine?.lineTotal ?? fallbackQuantity * fallbackUnitPrice,
-            notes: issueLine?.notes ?? line.note ?? null,
-          };
-        }),
+        // Once the source has issued, the goods issue *is* what was sent — one grid
+        // row per issue line, so an item issued twice at two prices stays two rows.
+        // Matching issue lines back onto order lines by itemId (as this did) can
+        // only ever surface the first of them. An order with no issue yet has
+        // nothing to mirror, so it still lists its own lines.
+        lines: gi
+          ? gi.lines.map((issueLine) => ({
+              // The issue line's own id: TransferInPage keys rows on `id`, and two
+              // rows grown from one order line would otherwise collide.
+              id: issueLine.id,
+              itemId: issueLine.itemId,
+              itemCode: issueLine.itemCode,
+              itemName: issueLine.itemName,
+              unit: issueLine.unit,
+              storageName: issueLine.storageName,
+              locationCode: issueLine.locationCode,
+              locationName: issueLine.locationName,
+              quantity: issueLine.quantity,
+              unitPrice: issueLine.unitPrice,
+              lineTotal: issueLine.lineTotal,
+              notes: issueLine.notes,
+            }))
+          : (o.lines ?? []).map((line) => {
+              const fallbackQuantity = Number(line.requestedQty ?? 0);
+              const fallbackUnitPrice = Number(line.item?.purchasePrice ?? 0);
+              return {
+                id: line.id,
+                itemId: line.itemId,
+                itemCode: line.item?.code ?? "",
+                itemName: line.item?.name ?? "",
+                unit: line.item?.unit ?? "",
+                storageName: null,
+                locationCode: null,
+                locationName: null,
+                quantity: fallbackQuantity,
+                unitPrice: fallbackUnitPrice,
+                lineTotal: fallbackQuantity * fallbackUnitPrice,
+                notes: line.note ?? null,
+              };
+            }),
         status: o.status,
       };
     });
@@ -1605,21 +1624,51 @@ export class TransferOrderService {
   ): Promise<void> {
     const counterpartActor = { ...actor, branchId };
     const voucher = await load();
-    const deltaByItem = new Map(deltas.map((d) => [d.itemId, d.quantityDelta]));
+
+    // A delta is stated per item, but the voucher may carry that item on several
+    // lines at several prices. Adding the delta to every one of them would apply
+    // it once per line — a −10 on two lines took 20 off. Instead it is poured
+    // through the lines of that item in order: each takes what it can hold, the
+    // remainder moves on to the next.
+    const remainingByItem = new Map(
+      deltas.map((d) => [d.itemId, d.quantityDelta]),
+    );
     const nextLines = voucher.lines
       .map((line) => {
-        const quantityDelta = deltaByItem.get(line.itemId) ?? 0;
+        const remaining = remainingByItem.get(line.itemId) ?? 0;
+        const quantity = Number(line.quantity);
+        let applied: number;
+        if (remaining >= 0) {
+          // An increase has no natural split across lines, so it lands whole on
+          // the first line of the item and the rest get nothing.
+          applied = remaining;
+        } else {
+          // A decrease is clamped at emptying this line; the overflow carries on.
+          applied = -Math.min(quantity, -remaining);
+        }
+        remainingByItem.set(line.itemId, remaining - applied);
         return {
           itemId: line.itemId,
           locationId: line.locationId,
           binId: line.binId,
           uomCode: line.uomCode,
-          quantity: Number(line.quantity) + quantityDelta,
+          quantity: quantity + applied,
           unitPrice: Number(line.unitPrice ?? 0),
           note: line.note ?? line.notes,
         };
       })
       .filter((line) => line.quantity > 0);
+
+    // Anything still owed means the counterpart voucher never held that much.
+    // Failing loudly beats saving a voucher that silently disagrees with the order.
+    for (const [itemId, remaining] of remainingByItem) {
+      if (remaining < 0) {
+        throw new BadRequestException(
+          `Cannot reduce item ${itemId} by ${-remaining}: the counterpart voucher does not carry that much`,
+        );
+      }
+    }
+
     await save(id, nextLines, counterpartActor);
   }
 
