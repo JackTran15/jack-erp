@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
+import { TempWarehouseStagedStockService } from '../../inventory/temp-warehouse/temp-warehouse-staged-stock.service';
 import { PosCatalogDirection } from '../dto/pos-catalog.query.dto';
 
 export type PosCatalogLineDto = {
@@ -14,16 +15,19 @@ export type PosCatalogLineDto = {
   /** Tổng tồn tại chi nhánh (cộng mọi vị trí lưu). */
   quantityOnHand: number;
   /**
-   * On-hand at the branch's main (showroom) storages only — the same storage
-   * set POS deducts from (`resolveBranchItemLocations`, `showroomOnly: true`).
+   * Projected on-hand at the branch's main (showroom) storages once every open
+   * temp-warehouse line lands: stock already booked there, plus stock staged
+   * into it, minus stock staged out of it. Floored at 0.
    *
-   * This, not `quantityOnHand`, is the oversell-warning basis: a POS sale never
-   * leaves a warehouse, so counting warehouse stock makes the warning fire late
-   * by exactly the amount sitting in the back. `quantityOnHand` stays the
-   * branch-wide total for the callers that legitimately want it (fast stock
-   * transfer).
+   * This, not `quantityOnHand`, is the oversell-warning basis. A POS sale
+   * deducts in two beats — `resolveBranchItemLocations(..., showroomOnly)` off
+   * the showroom, then `fulfillInvoiceFromTempWarehouse` off the staged lines —
+   * so the warning has to sit on the sum of both. Counting warehouse stock as
+   * well would make it fire late by whatever is sitting in the back;
+   * `quantityOnHand` stays the branch-wide total for the callers that
+   * legitimately want it (fast stock transfer).
    */
-  showroomQuantity: number;
+  sellableQuantity: number;
   locations: { locationId: string; name: string; quantity: number }[];
   /** Vị trí ưu tiên trừ khi bán (kho còn nhiều nhất). */
   defaultLocationId: string;
@@ -31,7 +35,10 @@ export type PosCatalogLineDto = {
 
 @Injectable()
 export class PosCatalogService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly stagedStock: TempWarehouseStagedStockService,
+  ) {}
 
   async getCatalog(
     branchId: string,
@@ -111,7 +118,8 @@ export class PosCatalogService {
       params,
     );
 
-    return this.aggregateStockRows(rows, direction);
+    const stagedDelta = await this.stagedStock.getBranchDelta(branchId, orgId);
+    return this.aggregateStockRows(rows, direction, stagedDelta);
   }
 
   /**
@@ -181,7 +189,8 @@ export class PosCatalogService {
       [orgId, branchId, pattern],
     );
 
-    return this.aggregateStockRows(rows, direction);
+    const stagedDelta = await this.stagedStock.getBranchDelta(branchId, orgId);
+    return this.aggregateStockRows(rows, direction, stagedDelta);
   }
 
   private aggregateStockRows(
@@ -198,7 +207,8 @@ export class PosCatalogService {
       unit: string;
       sellingPrice: string;
     }>,
-    direction?: PosCatalogDirection,
+    direction: PosCatalogDirection | undefined,
+    stagedDelta: Map<string, number>,
   ): PosCatalogLineDto[] {
     const filteredRows = direction
       ? rows.filter((r) => {
@@ -220,7 +230,7 @@ export class PosCatalogService {
         unit: string;
         sellingPrice: number;
         quantityOnHand: number;
-        showroomQuantity: number;
+        mainStorageQuantity: number;
         locations: { locationId: string; name: string; quantity: number }[];
         locationIds: Set<string>;
       }
@@ -236,7 +246,7 @@ export class PosCatalogService {
           unit: r.unit,
           sellingPrice: Number(r.sellingPrice) || 0,
           quantityOnHand: 0,
-          showroomQuantity: 0,
+          mainStorageQuantity: 0,
           locations: [],
           locationIds: new Set<string>(),
         });
@@ -252,7 +262,7 @@ export class PosCatalogService {
       // classifies the `direction` parameter (fast stock transfer) and is left
       // alone: two notions of "showroom" live in this file on purpose, and this
       // one has to predict the deduction.
-      if (r.isMainStorage === true) a.showroomQuantity += qty;
+      if (r.isMainStorage === true) a.mainStorageQuantity += qty;
       a.locations.push({
         locationId: r.locationId,
         name: r.locationName ?? '',
@@ -274,7 +284,15 @@ export class PosCatalogService {
         unit: a.unit,
         sellingPrice: a.sellingPrice,
         quantityOnHand: a.quantityOnHand,
-        showroomQuantity: a.showroomQuantity,
+        // Staged temp-warehouse stock has not moved in stock_balances yet, so
+        // the projected showroom on-hand is the booked figure plus the net
+        // effect of the branch's open sessions. Floored at 0: a negative
+        // threshold warns on exactly the same quantities as 0 does, and reads
+        // as a nonsense number in the cashier's tooltip.
+        sellableQuantity: Math.max(
+          0,
+          a.mainStorageQuantity + (stagedDelta.get(a.itemId) ?? 0),
+        ),
         locations: locs,
         defaultLocationId: locs[0]?.locationId ?? '',
       });
@@ -352,6 +370,7 @@ export class PosCatalogService {
       [orgId, branchId, code],
     );
 
-    return this.aggregateStockRows(rows);
+    const stagedDelta = await this.stagedStock.getBranchDelta(branchId, orgId);
+    return this.aggregateStockRows(rows, undefined, stagedDelta);
   }
 }

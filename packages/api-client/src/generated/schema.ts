@@ -9807,6 +9807,7 @@ export interface components {
             notes?: string;
             invoiceId?: string | null;
             invoiceNumber?: string | null;
+            isSystemGenerated: boolean;
             lines: components["schemas"]["StockTransferLineEntity"][];
             transporter?: {
                 id: string;
@@ -11415,8 +11416,8 @@ export interface components {
             attributes: components["schemas"]["PosVariantAttributeDto"][];
             /** @description Total on-hand quantity of this variant at the branch. */
             quantityOnHand: number;
-            /** @description On-hand at the branch's main (showroom) storages only — the storage set a POS sale deducts from. This, not quantityOnHand, is the oversell-warning basis. */
-            showroomQuantity: number;
+            /** @description Projected on-hand at the branch's main (showroom) storages once every open temp-warehouse line lands: booked stock there, plus stock staged into it, minus stock staged out of it, floored at 0. A POS sale deducts from the showroom and then from the staged lines, so this — not quantityOnHand — is the oversell-warning basis. */
+            sellableQuantity: number;
             locations: components["schemas"]["PosVariantLocationDto"][];
         };
         PosProductDetailDto: {

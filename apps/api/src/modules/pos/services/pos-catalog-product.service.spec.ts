@@ -12,6 +12,7 @@ import { ProductAttributeDefinitionEntity } from '../../inventory/product/produc
 import { ItemAttributeValueEntity } from '../../inventory/product/item-attribute-value.entity';
 import { ItemCategoryEntity } from '../../inventory/location/item-category.entity';
 import { CacheService } from '../../redis/cache.service';
+import { TempWarehouseStagedStockService } from '../../inventory/temp-warehouse/temp-warehouse-staged-stock.service';
 import { PosCatalogProductService } from './pos-catalog-product.service';
 
 const actor: ActorContext = {
@@ -110,8 +111,12 @@ describe('PosCatalogProductService', () => {
   let itemAttrValueRepo: RepoMock;
   let categoryRepo: RepoMock;
   let cacheService: { getOrSet: jest.Mock; invalidate: jest.Mock };
+  let getBranchDelta: jest.Mock;
 
   beforeEach(async () => {
+    // Default: nothing staged, so the pre-existing expectations keep meaning
+    // "booked showroom stock".
+    getBranchDelta = jest.fn().mockResolvedValue(new Map<string, number>());
     itemRepo = repoMock();
     productRepo = repoMock();
     balanceRepo = repoMock();
@@ -143,6 +148,10 @@ describe('PosCatalogProductService', () => {
         { provide: getRepositoryToken(ItemAttributeValueEntity), useValue: itemAttrValueRepo },
         { provide: getRepositoryToken(ItemCategoryEntity), useValue: categoryRepo },
         { provide: CacheService, useValue: cacheService },
+        {
+          provide: TempWarehouseStagedStockService,
+          useValue: { getBranchDelta },
+        },
       ],
     }).compile();
 
@@ -314,7 +323,7 @@ describe('PosCatalogProductService', () => {
   // Field reproduced from branch MT46: BX140 sits 8 at a warehouse shelf and 4
   // at the showroom's default shelf. POS deducts from the branch's main
   // (showroom) storages only, so the variant dialog has to warn against 4.
-  describe('showroom-only stock basis', () => {
+  describe('sellable stock basis', () => {
     const bxLocations = [
       { id: 'L-WH', name: '999', storageId: 'S-WH' },
       { id: 'L-SR', name: 'Mặc định', storageId: 'S-MAIN' },
@@ -341,10 +350,45 @@ describe('PosCatalogProductService', () => {
       expect(res.variants[0].quantityOnHand).toBe(12);
     });
 
-    it('exposes showroomQuantity from main-storage locations only', async () => {
+    it('exposes sellableQuantity from main-storage locations only', async () => {
       const res = await service.getProductDetail('branch-1', 'I3', undefined, actor);
 
-      expect(res.variants[0].showroomQuantity).toBe(4);
+      expect(res.variants[0].sellableQuantity).toBe(4);
+    });
+
+    // The variant dialog is the third way an item reaches the cart and it runs
+    // through a different endpoint, so it has to fold in the staged lines too —
+    // otherwise the same SKU shows one number in the dialog and another in the
+    // search bar.
+    it('adds stock staged into the showroom to sellableQuantity', async () => {
+      getBranchDelta.mockResolvedValue(new Map([['I3', 3]]));
+
+      const res = await service.getProductDetail('branch-1', 'I3', undefined, actor);
+
+      expect(res.variants[0].sellableQuantity).toBe(7);
+      expect(res.variants[0].quantityOnHand).toBe(12);
+    });
+
+    it('subtracts stock staged out of the showroom', async () => {
+      getBranchDelta.mockResolvedValue(new Map([['I3', -1]]));
+
+      const res = await service.getProductDetail('branch-1', 'I3', undefined, actor);
+
+      expect(res.variants[0].sellableQuantity).toBe(3);
+    });
+
+    it('floors sellableQuantity at 0 when more is staged out than is on hand', async () => {
+      getBranchDelta.mockResolvedValue(new Map([['I3', -9]]));
+
+      const res = await service.getProductDetail('branch-1', 'I3', undefined, actor);
+
+      expect(res.variants[0].sellableQuantity).toBe(0);
+    });
+
+    it('reads the staged delta scoped to the branch and organization', async () => {
+      await service.getProductDetail('branch-1', 'I3', undefined, actor);
+
+      expect(getBranchDelta).toHaveBeenCalledWith('branch-1', 'org-1');
     });
 
     it('leaves the direction filter on its own showrooms-table classification', async () => {

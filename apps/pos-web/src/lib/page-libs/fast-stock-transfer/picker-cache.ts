@@ -64,7 +64,7 @@ export function catalogLineFromTempWarehouseLine(
     sellingPrice: 0,
     quantityOnHand: 0,
     // Chuyển kho nhanh không dùng cảnh báo vượt tồn của màn bán hàng.
-    showroomQuantity: 0,
+    sellableQuantity: 0,
     locations: locationId
       ? [{ locationId, name: locationName, quantity: 0 }]
       : [],

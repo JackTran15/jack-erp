@@ -1,0 +1,28 @@
+---
+feature: pos-stock-warning-temp-warehouse
+blocking_open: 0
+---
+
+# Assumption register
+
+| ID | Assumption | Confidence | Blocking | Blast radius if wrong | Status | Resolution |
+|----|-----------|-----------|----------|----------------------|--------|-----------|
+| A-01 | Hàng đã quét vào kho tạm chiều w2s là hàng quầy bán được ngay — POS tiêu thụ nó ngay sau khi ghi hoá đơn | high | yes | Cả feature sai tiền đề; ngưỡng cảnh báo cao hơn tồn bán được thật | confirmed | `fulfillInvoiceFromTempWarehouse` (`temp-warehouse.service.ts:1260`) khớp FIFO đúng các dòng `ACTIVE` + `WAREHOUSE_TO_SHOWROOM` của phiên đang mở và sinh phiếu chuyển kho gắn hoá đơn. Đọc code 2026-08-23 |
+| A-02 | Chỉ dòng của phiên `ACTIVE` mới được điều chỉnh; phiên `CLOSED` đã vật chất hoá vào `stock_balances` | high | yes | Đếm hai lần trên mọi phiên đã đóng — ngưỡng phình theo lịch sử | confirmed | `getActiveSession` lọc `status = ACTIVE`; đóng phiên chạy `CREATE_TRANSFERS` (sinh phiếu chuyển kho thật) hoặc `NET_OFFSET` (khử hai chiều, không còn dòng ACTIVE). Cả hai đều thoát khỏi tập tính |
+| A-03 | Chỉ dòng `status = ACTIVE` được tính; `TRANSFERRED` / `DELETED` / `AUTO_BALANCED` bị loại | high | yes | `TRANSFERRED` là dòng đã bị một hoá đơn tiêu thụ và đã sinh phiếu chuyển kho → cộng lại là đếm hai lần | confirmed | Cùng bộ lọc mà `fulfillInvoiceFromTempWarehouse` dùng (`status: TempWarehouseLineStatus.ACTIVE`) |
+| A-04 | Điều chỉnh chỉ áp khi dòng kho tạm **vượt ranh giới main storage**: cộng khi đích ∈ main storages và nguồn ∉, trừ khi nguồn ∈ main storages và đích ∉ | medium | yes | Đếm hai lần khi phiên được ghim `warehouseStorageId` trùng chính storage showroom | confirmed | `openSession` (`temp-warehouse.service.ts:283`) cho client ghim `warehouseStorageId` tuỳ ý, chỉ chặn khi hai vị trí **trùng nhau** — nên nguồn w2s nằm trong main storage là khả dĩ. Hàng chưa chuyển vẫn nằm ở `stock_balances` của vị trí nguồn, nên chỉ dòng vượt ranh giới mới làm `showroomQuantity` sai. Chốt thành ADR-01 |
+| A-05 | Vị trí nguồn của một dòng là `line.source_location_id`, rơi về vị trí nguồn cấp phiên khi null (w2s → `warehouse_location_id`, s2w → `showroom_location_id`) | high | yes | Phân loại ranh giới sai → cộng/trừ nhầm dòng | confirmed | `buildEventPayload` (:1081-1092) chọn nguồn/đích theo `direction`; `lines[].sourceLocationId: l.sourceLocationId ?? undefined` cho thấy per-line ghi đè cấp phiên |
+| A-06 | Mỗi chi nhánh có tối đa **một** phiên ACTIVE cho mỗi chiều | high | no | Nếu sai thì phải gom nhiều phiên; truy vấn theo `branch + status` vẫn đúng, chỉ là gom nhiều hơn | confirmed | Comment entity: "at most one ACTIVE session per direction — enforced by a partial unique index in DB" |
+| A-07 | Phạm vi chi nhánh của dòng kho tạm lấy qua `temp_warehouse_sessions.branch_id`, không qua `temp_warehouse_lines.branch_id` | medium | yes | Rò dòng của chi nhánh khác vào ngưỡng của chi nhánh đang bán | confirmed | `TempWarehouseLineEntity` kế thừa `BaseEntity` nên có `branch_id` nhưng không có chỗ nào trong service dùng nó để lọc; mọi truy vấn dòng đều đi qua `sessionId`. Join qua session là đường duy nhất đã được code tin dùng |
+| A-08 | `showroomQuantity` chỉ có POS checkout tiêu thụ thật; đổi nghĩa trường này không làm hỏng consumer khác | high | yes | Đổi nghĩa âm thầm một trường đang được nơi khác đọc | confirmed | Toàn bộ nơi đọc: `checkoutUtils.readShowroomOnHand`, `VariantRow.tsx`, và hai chỗ hard-code `0` trong Chuyển kho nhanh (`use-fast-stock-transfer-actions.ts:355`, `picker-cache.ts:67`) — hai chỗ này không đọc giá trị BE |
+| A-09 | FE không cần đổi cadence refetch: `use-sync-cart-on-hand.ts` đã gọi `syncPurchaseCartOnHand` mỗi khi dữ liệu catalog đổi | high | no | Ngưỡng cũ đọng lại tới lần refetch sau khi kho tạm đổi | confirmed | `use-sync-cart-on-hand.ts:22` chạy trong `useEffect` theo `data` của catalog query |
+| A-10 | Số dòng ACTIVE trong một phiên đủ nhỏ để gom bằng một truy vấn phụ, không làm chậm đáng kể endpoint catalog | medium | no | Catalog chậm thêm; phải chuyển sang cache hoặc join thẳng | confirmed | Một phiên là một ca làm việc của một chi nhánh; dev có 1–2 dòng/phiên. Gom bằng **một** truy vấn `GROUP BY item_id` cho cả chi nhánh (không N+1) nên chi phí không phụ thuộc số mặt hàng của catalog |
+| A-11 | Hàng ở kho tạm chiều s2w phải **trừ** khỏi ngưỡng, dù `stock_balances` vẫn đếm nó ở showroom | medium | yes | Ngưỡng thấp hơn tồn POS thật sự trừ được → cảnh báo cho giao dịch vẫn xuất được bình thường | confirmed | Quyết định của Akenzy 2026-08-23. Đã nêu đánh đổi trước khi chốt: ngưỡng bám thực tế vật lý (hàng đã rời quầy) thay vì bám sổ sách |
+| A-12 | Hiển thị **một số gộp**, không tách "tồn quầy + kho tạm" | high | yes | Phải thêm trường DTO thứ hai và sửa 4 chỗ hiển thị | confirmed | Quyết định của Akenzy 2026-08-23 — giữ ràng buộc "một nguồn số" của `pos-stock-warning-showroom-only` |
+
+## Rejected assumptions
+
+| ID | What we assumed | What is actually true | Consequence |
+|----|----------------|----------------------|-------------|
+| A-R1 | "Kho tạm" là một storage/location, cộng thêm là cộng thêm một vị trí vào `showroomQuantity` | Kho tạm là **phiên + dòng đã quét** (`temp_warehouse_sessions`, `temp_warehouse_lines`); không có bản ghi `stock_balances` nào. Hàng vẫn nằm ở vị trí nguồn cho tới khi đóng phiên hoặc bị hoá đơn tiêu thụ | Không sửa được bằng cách nới bộ lọc storage — phải cộng từ một bảng khác, và phải tự tay chống đếm hai lần (A-04) |
+| A-R2 | `KQHT` / `KQMM` trong ảnh Slack là hai tổ chức có luật cảnh báo khác nhau → cần cấu hình theo org | Là viết tắt của **Kết Quả Hiện Tại / Kết Quả Mong Muốn** trong báo cáo QA | Không có màn cấu hình, không có cột `settings` nào. Luật áp dụng đồng nhất mọi tổ chức |

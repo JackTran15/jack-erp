@@ -37,11 +37,11 @@ export function VariantRow({
   onBump,
   onCopyDown,
 }: VariantRowProps) {
-  // Cơ sở cảnh báo là tồn showroom — đúng tập kho POS trừ hàng — chứ không phải
-  // tổng toàn chi nhánh. Dialog này và dòng giỏ hàng phải nói cùng một con số:
-  // chọn ở đây rồi thấy số khác ở giỏ là cách nhanh nhất để thu ngân mất tin
-  // vào cả hai.
-  const onHand = variant.showroomQuantity;
+  // Cơ sở cảnh báo là tồn showroom dự phóng (đã gồm hàng đang nằm ở kho tạm) —
+  // đúng tổng hai nhịp POS trừ hàng — chứ không phải tổng toàn chi nhánh. Dialog
+  // này và dòng giỏ hàng phải nói cùng một con số: chọn ở đây rồi thấy số khác ở
+  // giỏ là cách nhanh nhất để thu ngân mất tin vào cả hai.
+  const onHand = variant.sellableQuantity;
   const oversell = checked && qty > onHand;
 
   const warningBadge = oversell ? (

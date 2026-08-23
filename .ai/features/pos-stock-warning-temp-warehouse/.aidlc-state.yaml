@@ -1,0 +1,163 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: pos-stock-warning-temp-warehouse
+slug: pos-stock-warning-temp-warehouse
+profile: none
+created: 2026-08-23T17:19:19
+current_gate: G5
+history:
+  - gate: G0
+    action: passed
+    at: 2026-08-23T17:23:58
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-08-23T17:27:06
+    by: Akenzy
+    evidence: 12 assumptions, none blocking-and-pending; 12 acceptance criteria defined
+  - gate: G1
+    action: reopened
+    at: 2026-08-23T17:30:08
+    by: claude
+    reason: ADR-02 chot doi ten showroomQuantity -> sellableQuantity, nen dong NFR 'chi doi gia tri, khong them/bot truong, api-client khong doi shape' o 02-requirements.md khong con dung; sua truoc khi khoa G2
+  - gate: G1
+    action: passed
+    at: 2026-08-23T17:30:18
+    by: Akenzy
+    evidence: 12 assumptions, none blocking-and-pending; 12 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-23T17:30:34
+    by: Akenzy
+    evidence: 5 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-23T17:37:46
+    by: Akenzy
+    evidence: graph valid - 2 UoW, 6 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-23T17:38:03
+    by: claude
+    ticket: T-01-01
+  - gate: G2
+    action: reopened
+    at: 2026-08-23T17:38:47
+    by: claude
+    reason: ADR-03 ghi 'mot truy van GROUP BY item_id' -> luat ranh gioi ADR-01 nam trong SQL nen 10 muc done-when cua T-01-01 chi kiem duoc bang e2e co DB that. Doi sang - mot truy van tra ve co sourceIsMainStorage/destinationIsMainStorage cho tung dong, dau + tong cong tinh trong JS (khop feedback 'prefer in-memory aggregation' cua Akenzy va kieu spec mock DataSource.query san co). Sua ADR-03 + dong NFR hieu nang o 02-requirements.md
+  - gate: G2
+    action: passed
+    at: 2026-08-23T17:39:14
+    by: Akenzy
+    evidence: 5 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-23T17:39:14
+    by: Akenzy
+    evidence: graph valid - 2 UoW, 6 tickets, no cycles
+  - gate: G4
+    action: ticket review
+    at: 2026-08-23T17:42:11
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-23T17:42:11
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-23T17:42:23
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-23T17:44:36
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-23T17:44:36
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-23T17:44:36
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-23T17:47:13
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-23T17:47:13
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-23T17:47:13
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-23T17:54:52
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-23T17:54:52
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-23T17:54:52
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket review
+    at: 2026-08-23T18:27:03
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-23T18:27:03
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-23T18:27:03
+    by: claude
+    ticket: T-02-02
+  - gate: G3
+    action: reopened
+    at: 2026-08-23T18:48:39
+    by: claude
+    reason: Dieu kien hoan thanh cua ca hai UoW ghi 'npx vitest run trong apps/pos-web xanh'. Thuc te src/lib/common/api-axios.test.ts co 3 test do SAN tren HEAD (feature auth-token-auto-refresh), da xac minh bang git stash - do y het khi khong co diff nay. Sua cau chu de khong tick mot o khong dung, thay vi sua test ngoai pham vi
+  - gate: G3
+    action: passed
+    at: 2026-08-23T18:48:39
+    by: Akenzy
+    evidence: graph valid - 2 UoW, 6 tickets, no cycles
+  - gate: G4
+    action: ticket review
+    at: 2026-08-23T18:48:50
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-23T18:48:50
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: passed
+    at: 2026-08-23T18:57:48
+    by: Akenzy
+    evidence: all 6 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-08-23T18:57:58
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

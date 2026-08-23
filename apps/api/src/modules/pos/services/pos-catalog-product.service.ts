@@ -9,6 +9,7 @@ import { StockBalanceEntity } from '../../inventory/ledger/stock-balance.entity'
 import { LocationEntity } from '../../inventory/location/location.entity';
 import { ShowroomEntity } from '../../inventory/location/showroom.entity';
 import { StorageEntity } from '../../inventory/location/storage.entity';
+import { TempWarehouseStagedStockService } from '../../inventory/temp-warehouse/temp-warehouse-staged-stock.service';
 import { ItemCategoryEntity } from '../../inventory/location/item-category.entity';
 import { ProductAttributeDefinitionEntity } from '../../inventory/product/product-attribute-definition.entity';
 import { ItemAttributeValueEntity } from '../../inventory/product/item-attribute-value.entity';
@@ -34,11 +35,14 @@ import {
 type ItemStock = {
   total: number;
   /**
-   * On-hand at the branch's main (showroom) storages only — the storage set
-   * `resolveBranchItemLocations(..., showroomOnly)` deducts a POS sale from,
-   * and therefore the basis the oversell warning has to compare against.
+   * Projected on-hand at the branch's main (showroom) storages once every open
+   * temp-warehouse line lands — booked stock there, plus stock staged into it,
+   * minus stock staged out of it, floored at 0. A POS sale deducts in two beats
+   * (`resolveBranchItemLocations(..., showroomOnly)`, then
+   * `fulfillInvoiceFromTempWarehouse`), so this is what the oversell warning
+   * has to compare against.
    */
-  showroomTotal: number;
+  sellableTotal: number;
   locations: PosVariantLocationDto[];
 };
 
@@ -95,6 +99,7 @@ export class PosCatalogProductService {
     @InjectRepository(ItemCategoryEntity)
     private readonly categoryRepo: Repository<ItemCategoryEntity>,
     private readonly cacheService: CacheService,
+    private readonly stagedStock: TempWarehouseStagedStockService,
   ) {}
 
   /** List sellable products (parent products + standalone items) with price range and branch stock. */
@@ -444,14 +449,15 @@ export class PosCatalogProductService {
       imageUrl: null,
       attributes,
       quantityOnHand: stock?.total ?? 0,
-      showroomQuantity: stock?.showroomTotal ?? 0,
+      sellableQuantity: stock?.sellableTotal ?? 0,
       locations: stock?.locations ?? [],
     };
   }
 
   /**
    * Sum branch stock per item from stock_balances, optionally restricted to a set of items and to
-   * warehouse/showroom locations (matching PosCatalogService's showroom classification).
+   * warehouse/showroom locations (matching PosCatalogService's showroom classification), and fold
+   * in the branch's open temp-warehouse lines so `sellableTotal` matches what a sale can take.
    */
   private async loadBranchStock(
     orgId: string,
@@ -522,15 +528,24 @@ export class PosCatalogProductService {
       const qty = Number(b.quantity) || 0;
       let agg = map.get(b.itemId);
       if (!agg) {
-        agg = { total: 0, showroomTotal: 0, locations: [] };
+        agg = { total: 0, sellableTotal: 0, locations: [] };
         map.set(b.itemId, agg);
       }
       agg.total += qty;
-      if (mainStorageIds.has(loc.storageId)) agg.showroomTotal += qty;
+      if (mainStorageIds.has(loc.storageId)) agg.sellableTotal += qty;
       agg.locations.push({ locationId: b.locationId, name: loc?.name ?? '', quantity: qty });
     }
 
-    for (const agg of map.values()) {
+    // Staged temp-warehouse stock has not moved in stock_balances yet, so the
+    // booked showroom figure alone understates (or overstates) what the till
+    // can sell. Floored at 0: a negative threshold warns on exactly the same
+    // quantities as 0 does and reads as nonsense in the cashier's tooltip.
+    const stagedDelta = await this.stagedStock.getBranchDelta(branchId, orgId);
+    for (const [itemId, agg] of map.entries()) {
+      agg.sellableTotal = Math.max(
+        0,
+        agg.sellableTotal + (stagedDelta.get(itemId) ?? 0),
+      );
       agg.locations.sort(
         (x, y) => y.quantity - x.quantity || x.locationId.localeCompare(y.locationId),
       );

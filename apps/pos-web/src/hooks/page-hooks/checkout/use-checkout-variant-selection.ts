@@ -39,7 +39,7 @@ function variantToCatalogLine(variant: PosProductVariant): PosCatalogLine {
     quantityOnHand: variant.quantityOnHand,
     // Cơ sở cảnh báo vượt tồn đi cùng biến thể sang giỏ, để dòng giỏ và dialog
     // vừa chọn không cho hai con số khác nhau.
-    showroomQuantity: variant.showroomQuantity,
+    sellableQuantity: variant.sellableQuantity,
     locations: variant.locations,
     // BE trả `locations` đã sort theo quantity desc → [0] là vị trí ưu tiên bán
     // (khớp logic `defaultLocationId` của catalog phẳng).
