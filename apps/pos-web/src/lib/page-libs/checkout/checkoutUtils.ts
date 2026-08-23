@@ -97,9 +97,11 @@ export function formatLineDiscountLabel(line: CartLine): string {
 }
 
 /**
- * Cơ sở cảnh báo vượt tồn của một dòng bán: **tồn showroom**, đúng tập kho mà
- * POS trừ hàng (`resolveBranchItemLocations`, `showroomOnly`). Trả `null` khi
- * BE không gửi trường này — BE cũ, hoặc payload lệch.
+ * Cơ sở cảnh báo vượt tồn của một dòng bán: **tồn showroom dự phóng** — tồn
+ * đang ghi ở showroom, cộng hàng đã quét vào kho tạm để đưa ra quầy, trừ hàng
+ * đã quét để trả về kho. BE tính sẵn; FE không cộng gì thêm.
+ *
+ * Trả `null` khi BE không gửi trường này — BE cũ, hoặc payload lệch.
  *
  * `null` phải được hiểu là "chưa xác định được tồn", KHÔNG được rơi về
  * `quantityOnHand`: fallback đó dựng lại đúng con số tổng-chi-nhánh mà cảnh báo
@@ -107,8 +109,8 @@ export function formatLineDiscountLabel(line: CartLine): string {
  * cho `false`, tức cảnh báo tắt sạch mà không có lỗi nào — trong khi FE là lớp
  * bảo vệ duy nhất, BE không chặn tồn âm.
  */
-export function readShowroomOnHand(product: PosCatalogLine): number | null {
-  const value = product.showroomQuantity;
+export function readSellableOnHand(product: PosCatalogLine): number | null {
+  const value = product.sellableQuantity;
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 

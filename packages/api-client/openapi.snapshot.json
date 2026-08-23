@@ -30313,6 +30313,9 @@
             "type": "string",
             "nullable": true
           },
+          "isSystemGenerated": {
+            "type": "boolean"
+          },
           "lines": {
             "type": "array",
             "items": {
@@ -30372,6 +30375,7 @@
           "destinationBranchId",
           "status",
           "attachmentIds",
+          "isSystemGenerated",
           "lines",
           "id",
           "organizationId",
@@ -35001,9 +35005,9 @@
             "type": "number",
             "description": "Total on-hand quantity of this variant at the branch."
           },
-          "showroomQuantity": {
+          "sellableQuantity": {
             "type": "number",
-            "description": "On-hand at the branch's main (showroom) storages only — the storage set a POS sale deducts from. This, not quantityOnHand, is the oversell-warning basis."
+            "description": "Projected on-hand at the branch's main (showroom) storages once every open temp-warehouse line lands: booked stock there, plus stock staged into it, minus stock staged out of it, floored at 0. A POS sale deducts from the showroom and then from the staged lines, so this — not quantityOnHand — is the oversell-warning basis."
           },
           "locations": {
             "type": "array",
@@ -35020,7 +35024,7 @@
           "sellingPrice",
           "attributes",
           "quantityOnHand",
-          "showroomQuantity",
+          "sellableQuantity",
           "locations"
         ]
       },

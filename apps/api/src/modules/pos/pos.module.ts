@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentNumberingModule } from '../document-numbering/document-numbering.module';
 import { StockLedgerModule } from '../inventory/ledger/stock-ledger.module';
 import { ItemCostSnapshotModule } from '../inventory/location/item-cost-snapshot.module';
+import { TempWarehouseModule } from '../inventory/temp-warehouse/temp-warehouse.module';
 import { AccountingModule } from '../accounting/accounting.module';
 import { EventsModule } from '../events/events.module';
 import { WebSocketModule } from '../websocket/websocket.module';
@@ -95,6 +96,10 @@ import { CheckoutSagaModule } from './checkout-saga/checkout-saga.module';
     DocumentNumberingModule,
     StockLedgerModule,
     ItemCostSnapshotModule,
+    // TempWarehouseStagedStockService: the oversell warning counts stock staged
+    // in an open session, which never reaches stock_balances. No cycle —
+    // TempWarehouseModule does not import PosModule.
+    TempWarehouseModule,
     AccountingModule,
     EventsModule,
     WebSocketModule,

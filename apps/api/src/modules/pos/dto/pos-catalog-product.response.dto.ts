@@ -77,10 +77,12 @@ export class PosProductVariantDto {
   quantityOnHand: number;
   @ApiProperty({
     description:
-      "On-hand at the branch's main (showroom) storages only — the storage set a POS sale " +
-      'deducts from. This, not quantityOnHand, is the oversell-warning basis.',
+      "Projected on-hand at the branch's main (showroom) storages once every open " +
+      'temp-warehouse line lands: booked stock there, plus stock staged into it, minus ' +
+      'stock staged out of it, floored at 0. A POS sale deducts from the showroom and ' +
+      'then from the staged lines, so this — not quantityOnHand — is the oversell-warning basis.',
   })
-  showroomQuantity: number;
+  sellableQuantity: number;
   @ApiProperty({ type: [PosVariantLocationDto] }) locations: PosVariantLocationDto[];
 }
 

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
+import { TempWarehouseStagedStockService } from '../../inventory/temp-warehouse/temp-warehouse-staged-stock.service';
 import { PosCatalogService } from './pos-catalog.service';
 
 const actor: ActorContext = {
@@ -13,13 +14,19 @@ const actor: ActorContext = {
 describe('PosCatalogService.lookupByCode', () => {
   let service: PosCatalogService;
   let query: jest.Mock;
+  let getBranchDelta: jest.Mock;
 
   beforeEach(async () => {
     query = jest.fn();
+    getBranchDelta = jest.fn().mockResolvedValue(new Map<string, number>());
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PosCatalogService,
         { provide: DataSource, useValue: { query } },
+        {
+          provide: TempWarehouseStagedStockService,
+          useValue: { getBranchDelta: getBranchDelta },
+        },
       ],
     }).compile();
 
@@ -213,7 +220,7 @@ describe('PosCatalogService.lookupByCode', () => {
 
     const res = await service.lookupByCode('branch-1', actor, 'BX140');
 
-    expect(res[0].showroomQuantity).toBe(4);
+    expect(res[0].sellableQuantity).toBe(4);
     expect(res[0].quantityOnHand).toBe(12);
   });
 });
@@ -221,13 +228,19 @@ describe('PosCatalogService.lookupByCode', () => {
 describe('PosCatalogService.getCatalog', () => {
   let service: PosCatalogService;
   let query: jest.Mock;
+  let getBranchDelta: jest.Mock;
 
   beforeEach(async () => {
     query = jest.fn();
+    getBranchDelta = jest.fn().mockResolvedValue(new Map<string, number>());
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PosCatalogService,
         { provide: DataSource, useValue: { query } },
+        {
+          provide: TempWarehouseStagedStockService,
+          useValue: { getBranchDelta: getBranchDelta },
+        },
       ],
     }).compile();
 
@@ -322,13 +335,13 @@ describe('PosCatalogService.getCatalog', () => {
     },
   ];
 
-  it('sums showroomQuantity from main-storage locations only', async () => {
+  it('sums sellableQuantity from main-storage locations only', async () => {
     query.mockResolvedValue(bx140Rows);
 
     const res = await service.getCatalog('branch-1', actor);
 
     expect(res).toHaveLength(1);
-    expect(res[0].showroomQuantity).toBe(4);
+    expect(res[0].sellableQuantity).toBe(4);
   });
 
   it('keeps quantityOnHand as the branch-wide total', async () => {
@@ -347,8 +360,8 @@ describe('PosCatalogService.getCatalog', () => {
   // direction=showroom. aggregateStockRows filters *rows* before grouping, so
   // an item stocked only in a warehouse would drop out of the catalogue
   // entirely — unsearchable, unsellable, no oversell to warn about (A-04).
-  // Showing it with showroomQuantity 0 is the point: warn, do not hide.
-  it('keeps warehouse-only items in the result with showroomQuantity 0', async () => {
+  // Showing it with sellableQuantity 0 is the point: warn, do not hide.
+  it('keeps warehouse-only items in the result with sellableQuantity 0', async () => {
     query.mockResolvedValue([
       ...bx140Rows,
       {
@@ -370,7 +383,69 @@ describe('PosCatalogService.getCatalog', () => {
 
     expect(res.map((r) => r.itemId).sort()).toEqual(['BX140', 'I-WH-ONLY']);
     const whOnly = res.find((r) => r.itemId === 'I-WH-ONLY')!;
-    expect(whOnly.showroomQuantity).toBe(0);
+    expect(whOnly.sellableQuantity).toBe(0);
     expect(whOnly.quantityOnHand).toBe(7);
+  });
+
+  // A POS sale deducts in two beats: the showroom first, then the branch's open
+  // temp-warehouse session. The warning threshold has to sit on the sum, or it
+  // fires on transactions the till can complete in full.
+  it('adds stock staged into the showroom to sellableQuantity', async () => {
+    query.mockResolvedValue(bx140Rows);
+    getBranchDelta.mockResolvedValue(new Map([['BX140', 3]]));
+
+    const res = await service.getCatalog('branch-1', actor);
+
+    expect(res[0].sellableQuantity).toBe(7);
+    expect(res[0].quantityOnHand).toBe(12);
+  });
+
+  it('subtracts stock staged out of the showroom', async () => {
+    query.mockResolvedValue(bx140Rows);
+    getBranchDelta.mockResolvedValue(new Map([['BX140', -1]]));
+
+    const res = await service.getCatalog('branch-1', actor);
+
+    expect(res[0].sellableQuantity).toBe(3);
+  });
+
+  it('floors sellableQuantity at 0 when more is staged out than is on hand', async () => {
+    query.mockResolvedValue(bx140Rows);
+    getBranchDelta.mockResolvedValue(new Map([['BX140', -9]]));
+
+    const res = await service.getCatalog('branch-1', actor);
+
+    expect(res[0].sellableQuantity).toBe(0);
+  });
+
+  it('leaves items with no staged line untouched', async () => {
+    query.mockResolvedValue(bx140Rows);
+    getBranchDelta.mockResolvedValue(new Map([['SOMETHING-ELSE', 5]]));
+
+    const res = await service.getCatalog('branch-1', actor);
+
+    expect(res[0].sellableQuantity).toBe(4);
+  });
+
+  it('reads the staged delta once, scoped to the branch and organization', async () => {
+    query.mockResolvedValue(bx140Rows);
+
+    await service.getCatalog('branch-1', actor);
+
+    expect(getBranchDelta).toHaveBeenCalledTimes(1);
+    expect(getBranchDelta).toHaveBeenCalledWith('branch-1', 'org-1');
+  });
+
+  // The three ways an item reaches the cart must agree, or the cashier sees one
+  // number in the grid and a different threshold on the line.
+  it('gives the same sellableQuantity through search and through barcode lookup', async () => {
+    getBranchDelta.mockResolvedValue(new Map([['BX140', 3]]));
+    query.mockResolvedValue(bx140Rows);
+
+    const bySearch = await service.getCatalog('branch-1', actor, 'BX');
+    const byLookup = await service.lookupByCode('branch-1', actor, 'BX140');
+
+    expect(bySearch[0].sellableQuantity).toBe(7);
+    expect(byLookup[0].sellableQuantity).toBe(7);
   });
 });

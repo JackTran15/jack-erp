@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { POINT_REDEMPTION_VALUE_VND } from "@erp/pos/constants/loyalty.constant";
-import { readShowroomOnHand } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
+import { readSellableOnHand } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
   createPaymentLine,
   type PaymentLine,
@@ -350,12 +350,12 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
               cartChanged = true;
               return { ...l, onHandUnknown: true };
             }
-            // Cơ sở cảnh báo là `showroomQuantity` (tồn ở các kho chính của
-            // chi nhánh) — đúng tập kho POS trừ hàng. KHÔNG phải
-            // `quantityOnHand` (SUM toàn chi nhánh) và KHÔNG dùng locations[]
-            // (breakdown per-location có thể chứa cặp +/− bù trừ, và FE không
-            // biết vị trí nào thuộc showroom).
-            const fresh = readShowroomOnHand(product);
+            // Cơ sở cảnh báo là `sellableQuantity` (tồn showroom dự phóng, đã
+            // gồm hàng đang nằm ở kho tạm) — đúng tổng hai nhịp POS trừ hàng.
+            // KHÔNG phải `quantityOnHand` (SUM toàn chi nhánh) và KHÔNG dùng
+            // locations[] (breakdown per-location có thể chứa cặp +/− bù trừ,
+            // và FE không biết vị trí nào thuộc showroom).
+            const fresh = readSellableOnHand(product);
             if (fresh === null) {
               // BE cũ / payload thiếu trường: đánh dấu chưa-biết-tồn thay vì
               // rơi về `quantityOnHand`, thứ sẽ âm thầm dựng lại con số cũ.

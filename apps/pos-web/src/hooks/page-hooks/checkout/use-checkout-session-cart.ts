@@ -15,7 +15,7 @@ import type {
 import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import {
   isCartLineWarning,
-  readShowroomOnHand,
+  readSellableOnHand,
 } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
   clampPosCheckoutQtyNumber,
@@ -169,14 +169,15 @@ export function useCheckoutSessionCart() {
       if (!session) return null;
       // Cho phép bán khống: KHÔNG chặn khi hết tồn. `onHand` chỉ còn dùng làm
       // `maxQty` (snapshot tồn) để đánh dấu cảnh báo vượt tồn + bật dialog xác nhận
-      // bán khống lúc thanh toán. Cơ sở là `showroomQuantity` (tồn tại các kho
-      // chính của chi nhánh) chứ KHÔNG phải `quantityOnHand` (SUM toàn chi
-      // nhánh): POS luôn trừ kho ở showroom, nên đếm cả tồn kho lưu trữ làm cảnh
-      // báo bật muộn đúng bằng lượng hàng nằm trong kho.
+      // bán khống lúc thanh toán. Cơ sở là `sellableQuantity` (tồn showroom dự
+      // phóng, đã gồm hàng đang nằm ở kho tạm) chứ KHÔNG phải `quantityOnHand`
+      // (SUM toàn chi nhánh): POS trừ kho hai nhịp — showroom trước rồi bù từ
+      // kho tạm — nên đếm cả tồn kho lưu trữ làm cảnh báo bật muộn, còn bỏ kho
+      // tạm làm nó bật sớm.
       // Vẫn KHÔNG được tự cộng/lọc `locations[]` để suy ra con số này: FE không
       // biết vị trí nào thuộc showroom, và breakdown per-location có thể chứa
       // cặp +/− bù trừ. Phân loại nằm ở BE.
-      const onHand = readShowroomOnHand(product);
+      const onHand = readSellableOnHand(product);
       const delta = clampPosCheckoutQtyNumber(Number(qtyToAdd) || 0);
 
       // Read the latest cart state from the store so we can compute the

@@ -17,7 +17,7 @@ const bx140 = (over: Partial<PosCatalogLine> = {}): PosCatalogLine => ({
   unit: "CHAI",
   sellingPrice: 140_000,
   quantityOnHand: 12,
-  showroomQuantity: 4,
+  sellableQuantity: 4,
   locations: [
     { locationId: "L-WH", name: "999", quantity: 8 },
     { locationId: "L-SR", name: "Mặc định", quantity: 4 },
@@ -78,13 +78,13 @@ describe("syncPurchaseCartOnHand", () => {
     expect(currentLine().maxQty).toBe(4);
   });
 
-  it("marks the line unknown when the payload carries no showroomQuantity", () => {
+  it("marks the line unknown when the payload carries no sellableQuantity", () => {
     // Simulates an older API that predates the field (ADR-04). Falling back to
     // quantityOnHand here would rebuild the exact number this feature drops,
     // and `qty > undefined` is false — the warning would switch off in silence.
     seedCart(cartLine({ maxQty: 4 }));
     const legacy = bx140();
-    delete (legacy as Partial<PosCatalogLine>).showroomQuantity;
+    delete (legacy as Partial<PosCatalogLine>).sellableQuantity;
 
     usePosCheckoutSessionStore.getState().syncPurchaseCartOnHand([legacy]);
 
