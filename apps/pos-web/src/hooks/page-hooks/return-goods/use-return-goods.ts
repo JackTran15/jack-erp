@@ -111,6 +111,10 @@ export function useReturnGoods(): UseReturnGoodsResult {
   const searchBody = useMemo<SearchReturnableInvoicesBody>(() => {
     const dateFilter = dateRangeToISO(dateRange);
     const hasDate = Boolean(dateFilter.from ?? dateFilter.to);
+    // Không đi qua `toStringFilter`: `type` là enum, không phải chuỗi tự do. So
+    // khớp tường minh để một giá trị lạ không bao giờ tới server (BE dùng
+    // `@IsEnum` nên sẽ trả 400).
+    const typeFilter = debouncedFilters.type;
     return {
       page,
       limit: pageSize,
@@ -120,6 +124,9 @@ export function useReturnGoods(): UseReturnGoodsResult {
       branchName:    toStringFilter(debouncedFilters.branchName),
       totalPaid:     toCompareFilter(debouncedFilters.totalAmount),
       ...(hasDate ? { createdAt: dateFilter } : {}),
+      ...(typeFilter === "SALE" || typeFilter === "EXCHANGE"
+        ? { type: typeFilter }
+        : {}),
     };
   }, [dateRange, debouncedFilters, page, pageSize]);
 

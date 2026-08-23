@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { InvoiceEntity } from '../entities/invoice.entity';
-import { InvoiceItemEntity } from '../entities/invoice-item.entity';
+import { InvoiceEntity, InvoiceStatus, InvoiceType } from '../entities/invoice.entity';
+import { InvoiceItemEntity, ItemDirection } from '../entities/invoice-item.entity';
 import { SearchReturnableInvoicesV2Handler } from './search-returnable-invoices-v2.handler';
 import { SearchReturnableInvoicesV2Query } from './search-returnable-invoices-v2.query';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
@@ -75,6 +75,13 @@ describe('SearchReturnableInvoicesV2Handler', () => {
   const totalsQb = () => builders[1];
   const predicates = (qb: FakeQb) =>
     qb.andWhere.mock.calls.map((c: unknown[]) => c[0] as string);
+  const boundParams = (qb: FakeQb) =>
+    Object.assign(
+      {},
+      ...qb.andWhere.mock.calls.map((c: unknown[]) => c[1] ?? {}),
+    ) as Record<string, unknown>;
+  const existsClause = (qb: FakeQb) =>
+    predicates(qb).find((sql) => sql.includes('EXISTS'));
 
   it('returns the { data, total, page, limit, totals } envelope', async () => {
     await build([{ id: 'inv-1' }], { total: '7', totalAmount: '26117000' });
@@ -102,16 +109,16 @@ describe('SearchReturnableInvoicesV2Handler', () => {
       const totals = predicates(totalsQb());
       expect(totals).toEqual(
         expect.arrayContaining([
-          expect.stringContaining('inv.type = :type'),
+          expect.stringContaining('inv.type IN (:...types)'),
           expect.stringContaining('inv.status IN (:...statuses)'),
           expect.stringContaining('inv.isDraft = false'),
           expect.stringContaining('inv.branchId = :branchId'),
         ]),
       );
-      const existsClause = totals.find((sql) => sql.includes('EXISTS'));
-      expect(existsClause).toContain('invoice_items');
-      expect(existsClause).toContain('ii.quantity > ii.returned_quantity');
-      expect(existsClause).toContain(':outDir');
+      const exists = totals.find((sql) => sql.includes('EXISTS'));
+      expect(exists).toContain('invoice_items');
+      expect(exists).toContain('ii.quantity > ii.returned_quantity');
+      expect(exists).toContain(':outDir');
     });
 
     it('applies exactly the same predicates on both builders', async () => {
@@ -123,6 +130,100 @@ describe('SearchReturnableInvoicesV2Handler', () => {
       const norm = (qb: FakeQb) =>
         predicates(qb).map((sql) => sql.replace(/:p_\w+?_\d+/g, ':param'));
       expect(norm(totalsQb())).toEqual(norm(rowsQb()));
+    });
+  });
+
+  describe('returnable document kinds', () => {
+    /**
+     * The grid used to be pinned to SALE, which is why an exchange's
+     * "bought extra" items could never be returned against their own invoice.
+     * These assertions read the predicates the handler emits, not rows from a
+     * database — what they pin down is the eligibility rule, not the planner.
+     */
+    it('admits EXCHANGE alongside SALE (AC-01)', async () => {
+      await build();
+      await handler.execute(new SearchReturnableInvoicesV2Query({}, actor));
+
+      expect(predicates(rowsQb())).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('inv.type IN (:...types)'),
+        ]),
+      );
+      expect(boundParams(rowsQb()).types).toEqual([
+        InvoiceType.SALE,
+        InvoiceType.EXCHANGE,
+      ]);
+    });
+
+    it('keeps debt exchanges returnable (AC-04)', async () => {
+      await build();
+      await handler.execute(new SearchReturnableInvoicesV2Query({}, actor));
+
+      expect(boundParams(rowsQb()).statuses).toEqual([
+        InvoiceStatus.PAID,
+        InvoiceStatus.DEBT,
+        InvoiceStatus.PARTIAL_DEBT,
+      ]);
+    });
+
+    it('excludes RETURN both by kind and for want of an OUT line (AC-02)', async () => {
+      await build();
+      await handler.execute(new SearchReturnableInvoicesV2Query({}, actor));
+
+      expect(boundParams(rowsQb()).types).not.toContain(InvoiceType.RETURN);
+      // Belt and braces: a pure return is all IN lines, so even if the kind
+      // list ever widened, the EXISTS would still leave it out.
+      expect(existsClause(rowsQb())).toContain('ii.direction = :outDir');
+      expect(boundParams(rowsQb()).outDir).toBe(ItemDirection.OUT);
+    });
+
+    it('drops an exchange whose OUT lines are all returned (AC-03)', async () => {
+      await build();
+      await handler.execute(new SearchReturnableInvoicesV2Query({}, actor));
+
+      expect(existsClause(rowsQb())).toContain(
+        'ii.quantity > ii.returned_quantity',
+      );
+    });
+  });
+
+  describe('caller-supplied type filter', () => {
+    it.each([InvoiceType.SALE, InvoiceType.EXCHANGE])(
+      'narrows the grid and the footer alike to %s (AC-05)',
+      async (type) => {
+        await build();
+        await handler.execute(
+          new SearchReturnableInvoicesV2Query({ type }, actor),
+        );
+
+        expect(predicates(rowsQb())).toEqual(
+          expect.arrayContaining([
+            expect.stringContaining('inv.type = :typeFilter'),
+          ]),
+        );
+        expect(boundParams(rowsQb()).typeFilter).toBe(type);
+        expect(boundParams(totalsQb()).typeFilter).toBe(type);
+      },
+    );
+
+    it('leaves both kinds listed when omitted', async () => {
+      await build();
+      await handler.execute(new SearchReturnableInvoicesV2Query({}, actor));
+
+      expect(
+        predicates(rowsQb()).some((sql) => sql.includes(':typeFilter')),
+      ).toBe(false);
+    });
+
+    it('yields an empty set for RETURN rather than re-admitting it', async () => {
+      await build();
+      await handler.execute(
+        new SearchReturnableInvoicesV2Query({ type: InvoiceType.RETURN }, actor),
+      );
+
+      const params = boundParams(rowsQb());
+      expect(params.types).toEqual([InvoiceType.SALE, InvoiceType.EXCHANGE]);
+      expect(params.typeFilter).toBe(InvoiceType.RETURN);
     });
   });
 

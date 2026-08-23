@@ -238,6 +238,8 @@ export interface SearchInvoicesV2Body {
 export interface SearchReturnableInvoicesBody {
   page?:          number;
   limit?:         number;
+  /** Bỏ trống = cả hoá đơn bán lẫn hoá đơn đổi (server tự giới hạn ở hai loại đó). */
+  type?:          "SALE" | "EXCHANGE";
   code?:          StringFilter;
   createdAt?:     DateRangeFilter;
   customerName?:  StringFilter;

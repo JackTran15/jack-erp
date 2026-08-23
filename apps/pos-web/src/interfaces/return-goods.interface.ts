@@ -12,6 +12,12 @@ export interface ReturnInvoiceRow {
   /** "Ngày tạo" — thời điểm phát hành hóa đơn gốc. */
   createdAt: Date;
   /**
+   * "Loại" — chứng từ gốc là hóa đơn bán hay hóa đơn đổi. Hóa đơn đổi trả được
+   * theo phần "Mua thêm" của nó, nên lưới trộn cả hai; `RETURN` không bao giờ
+   * lọt vào đây (không có dòng bán ra nào để trả).
+   */
+  type: "SALE" | "EXCHANGE";
+  /**
    * Customer id (UUID) của hóa đơn gốc — `null` khi khách lẻ. Dùng để tự điền +
    * khóa khách trên tab `invoice_return` ở checkout.
    */
