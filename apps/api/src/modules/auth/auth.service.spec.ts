@@ -23,6 +23,10 @@ jest.mock('jsonwebtoken');
 jest.mock('bcryptjs');
 jest.mock('uuid', () => ({ v4: () => 'mock-uuid' }));
 
+// TTL assertions need real `iat`/`exp` claims, so these tests swap the mocked
+// jwt.sign for the actual implementation instead of the 'signed-token' stub.
+const actualJwt = jest.requireActual('jsonwebtoken');
+
 const JWT_SECRET = 'test-secret';
 const JWT_REFRESH_SECRET = 'test-refresh-secret';
 
@@ -129,6 +133,35 @@ describe('AuthService', () => {
     sessionStore.createSession.mockResolvedValue(undefined);
   }
 
+  function useRealJwtSign() {
+    (jwt.sign as jest.Mock).mockImplementation(
+      (payload: object, secret: string, options: object) =>
+        actualJwt.sign(payload, secret, options),
+    );
+  }
+
+  async function buildService(
+    getImpl: (key: string, defaultVal?: string) => string,
+  ): Promise<AuthService> {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AuthService,
+        { provide: ConfigService, useValue: { get: jest.fn(getImpl) } },
+        { provide: SessionStore, useValue: sessionStore },
+        { provide: HandoffStore, useValue: handoffStore },
+        { provide: RbacService, useValue: rbacService },
+        { provide: getRepositoryToken(UserEntity), useValue: userRepo },
+        { provide: getRepositoryToken(UserRoleEntity), useValue: userRoleRepo },
+        { provide: getRepositoryToken(RoleEntity), useValue: roleRepo },
+        {
+          provide: getRepositoryToken(UserBranchAssignmentEntity),
+          useValue: userBranchRepo,
+        },
+      ],
+    }).compile();
+    return module.get(AuthService);
+  }
+
   // =========================================================================
   // login
   // =========================================================================
@@ -145,7 +178,7 @@ describe('AuthService', () => {
       expect(result).toEqual({
         accessToken: 'signed-token',
         refreshToken: 'signed-token',
-        expiresIn: 900,
+        expiresIn: 86400,
         session: expect.objectContaining({
           userId: 'user-1',
           organizationId: 'org-1',
@@ -243,7 +276,7 @@ describe('AuthService', () => {
       expect(result).toEqual({
         accessToken: 'new-signed-token',
         refreshToken: 'new-signed-token',
-        expiresIn: 900,
+        expiresIn: 86400,
       });
     });
 
@@ -396,7 +429,7 @@ describe('AuthService', () => {
       expect(result).toEqual({
         accessToken: 'switched-token',
         refreshToken: 'switched-token',
-        expiresIn: 900,
+        expiresIn: 86400,
         session: expect.objectContaining({
           branchIds: ['branch-1', 'branch-2'],
         }),
@@ -512,7 +545,7 @@ describe('AuthService', () => {
       expect(result).toEqual({
         accessToken: 'handoff-token',
         refreshToken: 'handoff-token',
-        expiresIn: 900,
+        expiresIn: 86400,
         session: expect.objectContaining({ userId: 'user-1' }),
       });
     });
@@ -687,6 +720,138 @@ describe('AuthService', () => {
       expect(userRepo.findOne).toHaveBeenCalledWith({
         where: { id: USER, organizationId: ORG },
       });
+    });
+  });
+
+  // =========================================================================
+  // token TTL — proves configurable session TTL (T-01-01) reaches every
+  // token-minting call site, not just login()
+  // =========================================================================
+  describe('token TTL', () => {
+    function decode(token: string): { iat: number; exp: number } {
+      return actualJwt.decode(token) as { iat: number; exp: number };
+    }
+
+    it('login() issues an access token and refresh token carrying the default TTL', async () => {
+      setupValidLogin();
+      useRealJwtSign();
+
+      const result = await service.login('admin@example.com', 'password', 'org-1');
+
+      const access = decode(result.accessToken);
+      const refresh = decode(result.refreshToken);
+      expect(access.exp - access.iat).toBe(86400);
+      expect(refresh.exp - refresh.iat).toBe(2592000);
+    });
+
+    it('login() honors a JWT_ACCESS_TTL override from config', async () => {
+      const overriddenService = await buildService((key, defaultVal) => {
+        if (key === 'JWT_SECRET') return JWT_SECRET;
+        if (key === 'JWT_REFRESH_SECRET') return JWT_REFRESH_SECRET;
+        if (key === 'JWT_ACCESS_TTL') return '1800';
+        return defaultVal as string;
+      });
+      setupValidLogin();
+      useRealJwtSign();
+
+      const result = await overriddenService.login(
+        'admin@example.com',
+        'password',
+        'org-1',
+      );
+
+      const access = decode(result.accessToken);
+      expect(access.exp - access.iat).toBe(1800);
+    });
+
+    it('refresh() rotates tokens carrying the configured TTL', async () => {
+      (jwt.verify as jest.Mock).mockReturnValue({
+        jti: 'old-jti',
+        userId: 'user-1',
+      });
+      sessionStore.getSession.mockResolvedValue({
+        userId: 'user-1',
+        organizationId: 'org-1',
+        branchIds: ['branch-1'],
+        roles: ['admin'],
+        issuedAt: 1000,
+        expiresAt: 999999,
+      });
+      sessionStore.revokeSession.mockResolvedValue(undefined);
+      sessionStore.createSession.mockResolvedValue(undefined);
+      userRoleRepo.find.mockResolvedValue([
+        { id: 'ur-1', userId: 'user-1', roleId: 'role-1', organizationId: 'org-1' } as UserRoleEntity,
+      ]);
+      userBranchRepo.find.mockResolvedValue([
+        { branchId: 'branch-1' } as UserBranchAssignmentEntity,
+      ]);
+      useRealJwtSign();
+
+      const result = await service.refresh('valid-refresh-token');
+
+      const access = decode(result.accessToken);
+      const refresh = decode(result.refreshToken);
+      expect(access.exp - access.iat).toBe(86400);
+      expect(refresh.exp - refresh.iat).toBe(2592000);
+    });
+
+    it('switchBranch() mints tokens carrying the configured TTL', async () => {
+      const current: JwtPayload = {
+        userId: 'user-1',
+        organizationId: 'org-1',
+        roles: ['admin'],
+        branchIds: ['branch-1', 'branch-2'],
+        branchId: 'branch-1',
+        jti: 'old-jti',
+        iat: 1000,
+        exp: 999999,
+      };
+      userRoleRepo.find.mockResolvedValue([
+        { id: 'ur-1', userId: 'user-1', roleId: 'role-1', organizationId: 'org-1' } as UserRoleEntity,
+      ]);
+      userBranchRepo.find.mockResolvedValue([
+        { branchId: 'branch-1' } as UserBranchAssignmentEntity,
+        { branchId: 'branch-2' } as UserBranchAssignmentEntity,
+      ]);
+      sessionStore.revokeSession.mockResolvedValue(undefined);
+      sessionStore.createSession.mockResolvedValue(undefined);
+      useRealJwtSign();
+
+      const result = await service.switchBranch(current, 'branch-2');
+
+      const access = decode(result.accessToken);
+      const refresh = decode(result.refreshToken);
+      expect(access.exp - access.iat).toBe(86400);
+      expect(refresh.exp - refresh.iat).toBe(2592000);
+    });
+
+    it('exchangeHandoffCode() mints tokens carrying the configured TTL', async () => {
+      handoffStore.consume.mockResolvedValue({
+        userId: 'user-1',
+        organizationId: 'org-1',
+        branchId: 'branch-2',
+      });
+      userRepo.findOne.mockResolvedValue({
+        id: 'user-1',
+        organizationId: 'org-1',
+        isActive: true,
+      } as UserEntity);
+      userRoleRepo.find.mockResolvedValue([
+        { id: 'ur-1', userId: 'user-1', roleId: 'role-1', organizationId: 'org-1' } as UserRoleEntity,
+      ]);
+      userBranchRepo.find.mockResolvedValue([
+        { branchId: 'branch-1' } as UserBranchAssignmentEntity,
+        { branchId: 'branch-2' } as UserBranchAssignmentEntity,
+      ]);
+      sessionStore.createSession.mockResolvedValue(undefined);
+      useRealJwtSign();
+
+      const result = await service.exchangeHandoffCode('some-code');
+
+      const access = decode(result.accessToken);
+      const refresh = decode(result.refreshToken);
+      expect(access.exp - access.iat).toBe(86400);
+      expect(refresh.exp - refresh.iat).toBe(2592000);
     });
   });
 });

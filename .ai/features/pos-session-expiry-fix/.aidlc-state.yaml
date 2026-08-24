@@ -56,3 +56,63 @@ history:
     at: 2026-08-24T18:55:29
     by: Akenzy
     ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T18:56:40
+    by: Claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T18:56:42
+    by: Claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T18:57:06
+    by: Claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T18:57:12
+    by: Claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T18:57:22
+    by: Claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T18:58:04
+    by: Claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T18:58:09
+    by: Claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T19:05:24
+    by: Claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T19:08:32
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T19:08:32
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T19:08:32
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T19:08:32
+    by: Akenzy
+    ticket: T-03-01
