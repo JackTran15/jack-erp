@@ -60,6 +60,6 @@ rollback: bỏ trường `storages` khỏi DTO và gỡ `Tooltip` khỏi ô `T�
       trên `erp_dev` vì cần deactivate một storage thật (xem `07-verification.md` § Không kiểm ở
       đây)
 - [x] Có ảnh chụp hover ở `07-verification.md` — Ảnh 3, Ảnh 4
-- [ ] `openapi.snapshot.json` + `schema.ts` đã regenerate và commit — đã regenerate, **chưa
-      commit** (cùng lượt với UOW-01, xem ghi chú ở đó)
+- [x] `openapi.snapshot.json` + `schema.ts` đã regenerate và commit — commit `a4038fd2` trên
+      branch `feat/pos-variant-stock-columns` (cùng lượt với UOW-01, xem ghi chú ở đó)
 - [ ] Demo chạy trước người thật ở gate G4
