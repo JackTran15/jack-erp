@@ -4,7 +4,7 @@ feature: pos-variant-stock-columns
 slug: pos-variant-stock-columns
 profile: none
 created: 2026-08-24T09:21:05
-current_gate: G3
+current_gate: G5
 history:
   - gate: G1
     action: passed
@@ -252,3 +252,13 @@ history:
     at: 2026-08-24T16:22:09
     by: Akenzy
     ticket: T-02-06
+  - gate: G4
+    action: passed
+    at: 2026-08-24T16:36:45
+    by: Akenzy
+    evidence: all 14 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-08-24T16:38:57
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

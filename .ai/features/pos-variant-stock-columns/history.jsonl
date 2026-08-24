@@ -47,3 +47,5 @@
 {"action": "ticket review", "at": "2026-08-24T16:21:04", "by": "claude", "gate": "G4", "id": "91f7983047c0", "ticket": "T-02-05", "ts": "2026-08-24T16:21:04.862270"}
 {"action": "ticket done", "at": "2026-08-24T16:22:09", "by": "Akenzy", "gate": "G4", "id": "b9f1d3f9f304", "ticket": "T-02-05", "ts": "2026-08-24T16:22:09.562697"}
 {"action": "ticket done", "at": "2026-08-24T16:22:09", "by": "Akenzy", "gate": "G4", "id": "6dcd2f9b9c2d", "ticket": "T-02-06", "ts": "2026-08-24T16:22:09.694001"}
+{"action": "passed", "at": "2026-08-24T16:36:45", "by": "Akenzy", "evidence": "all 14 tickets done, all UoW checklists ticked", "gate": "G4", "id": "4ec8b48ea4a1", "ts": "2026-08-24T16:36:45.864482"}
+{"action": "passed", "at": "2026-08-24T16:38:57", "by": "Akenzy", "evidence": "assumptions resolved, ADRs settled, graph valid", "gate": "G5", "id": "884691cce1b7", "ts": "2026-08-24T16:38:57.369626"}

@@ -62,4 +62,5 @@ rollback: bỏ trường `storages` khỏi DTO và gỡ `Tooltip` khỏi ô `T�
 - [x] Có ảnh chụp hover ở `07-verification.md` — Ảnh 3, Ảnh 4
 - [x] `openapi.snapshot.json` + `schema.ts` đã regenerate và commit — commit `a4038fd2` trên
       branch `feat/pos-variant-stock-columns` (cùng lượt với UOW-01, xem ghi chú ở đó)
-- [ ] Demo chạy trước người thật ở gate G4
+- [x] Demo chạy trước người thật ở gate G4 — Akenzy xác nhận trực tiếp trong chat, tick theo yêu
+      cầu tường minh ("tick done close the feature"), không phải Claude tự chứng kiến demo

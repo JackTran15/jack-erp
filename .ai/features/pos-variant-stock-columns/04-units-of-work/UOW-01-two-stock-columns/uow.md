@@ -66,4 +66,5 @@ rollback: revert 2 trường mới khỏi `PosProductVariantDto` và trả `Vari
       chạm. Nợ kỹ thuật cũ, không sửa ở feature này.
 - [x] `openapi.snapshot.json` + `schema.ts` đã regenerate và commit — regenerate ở T-01-07/
       T-02-06, commit `a4038fd2` trên branch `feat/pos-variant-stock-columns`
-- [ ] Demo chạy trước người thật ở gate G4
+- [x] Demo chạy trước người thật ở gate G4 — Akenzy xác nhận trực tiếp trong chat, tick theo yêu
+      cầu tường minh ("tick done close the feature"), không phải Claude tự chứng kiến demo
