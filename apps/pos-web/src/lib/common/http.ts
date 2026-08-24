@@ -4,55 +4,11 @@ import {
 } from "@erp/pos/constants/common.constant";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { resolveApiBaseUrl } from "./api-base";
+import { refreshOnce } from "./token-refresh";
 
 
 function requestId(): string {
   return crypto.randomUUID();
-}
-
-let refreshPromise: Promise<boolean> | null = null;
-
-async function tryRefreshToken(): Promise<boolean> {
-  const refreshToken = localStorage.getItem(POS_REFRESH_TOKEN_KEY);
-  if (!refreshToken) return false;
-
-  try {
-    const res = await fetch(`${resolveApiBaseUrl()}/auth/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
-    });
-
-    if (!res.ok) {
-      localStorage.removeItem(POS_ACCESS_TOKEN_KEY);
-      localStorage.removeItem(POS_REFRESH_TOKEN_KEY);
-      return false;
-    }
-
-    const data = (await res.json()) as {
-      accessToken?: string;
-      refreshToken?: string;
-    };
-
-    if (data.accessToken) {
-      localStorage.setItem(POS_ACCESS_TOKEN_KEY, data.accessToken);
-    }
-    if (data.refreshToken) {
-      localStorage.setItem(POS_REFRESH_TOKEN_KEY, data.refreshToken);
-    }
-    return !!data.accessToken;
-  } catch {
-    return false;
-  }
-}
-
-function refreshOnce(): Promise<boolean> {
-  if (!refreshPromise) {
-    refreshPromise = tryRefreshToken().finally(() => {
-      refreshPromise = null;
-    });
-  }
-  return refreshPromise;
 }
 
 function buildHeaders(init: RequestInit = {}): Headers {
