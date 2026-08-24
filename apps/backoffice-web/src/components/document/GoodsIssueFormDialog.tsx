@@ -859,6 +859,17 @@ export function GoodsIssueFormDialog({
             quantity: Number(line.quantity),
             locationId: line.locationId,
           })),
+          // Sửa phiếu đã ghi sổ chỉ ghi phần chênh lệch (computeVoucherDelta),
+          // nên số lượng bản cũ đang giữ phải được cộng lại — không thì dòng
+          // giữ nguyên số lượng luôn bị cảnh báo vì tồn đã bị chính nó trừ.
+          mode === "edit" && initial?.status === "POSTED"
+            ? initial.lines.map((line) => ({
+                itemId: line.itemId,
+                quantity: Number(line.quantity),
+                locationId: line.locationId || undefined,
+                storageId: line.location?.storageId || undefined,
+              }))
+            : [],
         );
         if (warnings.length > 0) {
           setOverstockWarnings(warnings);

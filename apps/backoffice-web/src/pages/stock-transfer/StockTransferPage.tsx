@@ -1024,6 +1024,17 @@ function TransferFormDialog({
             locationId: l.sourceLocationId || undefined,
             storageId: l.sourceStorageId || undefined,
           })),
+          // Sửa phiếu đã ghi sổ là đảo bút cũ rồi ghi bút mới, nên hàng của bản
+          // cũ quay về kho xuất trước khi trừ số mới — không cộng lại thì dòng
+          // giữ nguyên số lượng luôn bị cảnh báo dù tồn sau khi lưu không đổi.
+          mode === "edit" && initial?.status === "POSTED"
+            ? initial.lines.map((l) => ({
+                itemId: l.itemId,
+                quantity: Number(l.quantity),
+                locationId: l.sourceLocationId || undefined,
+                storageId: l.sourceStorageId || undefined,
+              }))
+            : [],
         );
         if (warnings.length > 0) {
           setOverstockWarnings(warnings);
