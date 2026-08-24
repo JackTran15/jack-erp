@@ -1,0 +1,254 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: pos-variant-stock-columns
+slug: pos-variant-stock-columns
+profile: none
+created: 2026-08-24T09:21:05
+current_gate: G3
+history:
+  - gate: G1
+    action: passed
+    at: 2026-08-24T02:50:30
+    by: Akenzy
+    evidence: 14 assumptions, none blocking-and-pending; 12 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-24T02:50:38
+    by: Akenzy
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-24T02:50:41
+    by: Akenzy
+    evidence: graph valid - 2 UoW, 14 tickets, no cycles
+  - gate: G0
+    action: passed
+    at: 2026-08-24T09:26:00
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T10:38:30
+    by: Claude · implement (Sonnet) (via akenzy)
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T13:37:18
+    by: Claude · implement (Sonnet) (via akenzy)
+    ticket: T-01-01
+  - gate: G4
+    action: ticket todo
+    at: 2026-08-24T13:38:53
+    by: Claude · self-review (Sonnet) (via akenzy)
+    reason: self-caught - spec never updated for new BranchEntity repo dep (all 16 existing tests fail on DI resolution), and the new loadDetailStockExtras done-when items were ticked with zero test coverage of the method
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T13:38:57
+    by: Claude · implement (Sonnet) (via akenzy)
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T13:42:11
+    by: Claude · implement (Sonnet) (via akenzy)
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T14:39:01
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T14:39:51
+    by: Claude (via akenzy)
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T14:39:51
+    by: Claude (via akenzy)
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T14:41:33
+    by: Claude implement (via akenzy)
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T14:42:06
+    by: Claude implement (via akenzy)
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T14:43:15
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T14:43:15
+    by: Akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T14:44:02
+    by: Claude (via akenzy)
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T14:44:02
+    by: Claude (via akenzy)
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T14:44:02
+    by: Claude (via akenzy)
+    ticket: T-01-06
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T14:45:10
+    by: Claude implement (via akenzy)
+    ticket: T-01-06
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T14:45:43
+    by: Akenzy
+    ticket: T-01-06
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T14:46:31
+    by: Claude implement (via akenzy)
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T14:49:23
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T14:50:58
+    by: Claude implement (via akenzy)
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T14:54:09
+    by: Akenzy
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T14:54:40
+    by: Claude (via akenzy)
+    ticket: T-01-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T14:54:40
+    by: Claude (via akenzy)
+    ticket: T-02-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T14:56:27
+    by: Claude implement (via akenzy)
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T14:57:15
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T14:58:24
+    by: Claude implement (via akenzy)
+    ticket: T-01-05
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T14:59:15
+    by: Akenzy
+    ticket: T-01-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T14:59:28
+    by: Claude (via akenzy)
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T14:59:28
+    by: Claude (via akenzy)
+    ticket: T-02-04
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T15:00:35
+    by: Claude implement (via akenzy)
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T15:01:19
+    by: Akenzy
+    ticket: T-02-04
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T15:06:01
+    by: Claude implement (via akenzy)
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T15:07:58
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T15:56:54
+    by: claude
+    ticket: T-01-07
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T15:58:15
+    by: claude
+    ticket: T-01-07
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T15:58:46
+    by: claude
+    ticket: T-01-08
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T16:13:26
+    by: claude
+    ticket: T-01-08
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T16:15:02
+    by: Akenzy
+    ticket: T-01-07
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T16:15:03
+    by: Akenzy
+    ticket: T-01-08
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T16:15:19
+    by: claude
+    ticket: T-02-06
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T16:15:43
+    by: claude
+    ticket: T-02-06
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T16:15:48
+    by: claude
+    ticket: T-02-05
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T16:21:04
+    by: claude
+    ticket: T-02-05
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T16:22:09
+    by: Akenzy
+    ticket: T-02-05
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T16:22:09
+    by: Akenzy
+    ticket: T-02-06

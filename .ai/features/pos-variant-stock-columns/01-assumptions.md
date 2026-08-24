@@ -1,0 +1,33 @@
+---
+feature: pos-variant-stock-columns
+blocking_open: 0
+---
+
+# Assumption register
+
+Mọi dòng `confirmed` dưới đây được user chốt trực tiếp trong phiên lập kế hoạch
+2026-08-24 (hai vòng hỏi, tổng 6 câu). Không dòng nào do agent tự nâng cấp trạng thái.
+
+| ID | Assumption | Confidence | Blocking | Blast radius if wrong | Status | Resolution |
+|----|-----------|-----------|----------|----------------------|--------|-----------|
+| A-01 | `Tồn cửa hàng khác` = tổng tồn ở **tất cả kho** của các chi nhánh `status = ACTIVE` **khác** chi nhánh hiện tại (loại trừ chi nhánh đang bán) | high | yes | Đổi contract DTO + toàn bộ tầng tổng hợp của UOW-01 | confirmed | Akenzy chốt 2026-08-24, phương án "Chi nhánh ACTIVE khác, tất cả kho" |
+| A-02 | `Tồn kho` hiển thị **số dư thô** của kho showroom chi nhánh hiện tại, **cho phép hiện số âm** (không kẹp sàn 0, không cộng kho tạm) | high | yes | Đổi field DTO + ý nghĩa cột; kéo theo AC-05/AC-07 | confirmed | Akenzy chốt 2026-08-24, phương án "Số dư thô kho showroom, cho hiện âm" |
+| A-03 | "Kho showroom hiện tại" = storage đứng sau bản ghi `showrooms.is_main_showroom = true` của chi nhánh, **không phải** tập `storages.is_main_storage` | medium | yes | Nếu hai tập lệch nhau, số hiển thị lệch với tập kho POS thực trừ hàng | confirmed | Akenzy chốt 2026-08-24, phương án "Kho sau showroom chính (is_main_showroom)". Kiểm chứng trên `erp_dev`: cả 3 chi nhánh đều có đúng 1 `is_main_showroom` và storage đó cũng chính là storage duy nhất có `is_main_storage` → hôm nay hai tập trùng nhau |
+| A-04 | Ngưỡng cảnh báo vượt tồn (badge đỏ khi SL > tồn) **giữ nguyên** `sellableQuantity`, không đổi theo số hiển thị mới | high | yes | Nếu sai, phải sửa lại `VariantRow` + đảo quyết định của `pos-stock-warning-temp-warehouse` | confirmed | Akenzy chốt 2026-08-24, phương án "Giữ sellableQuantity (không đổi)" — đã được cảnh báo rõ hệ quả: dòng hiện `-1` vẫn có thể không báo đỏ khi kho tạm đang có hàng |
+| A-05 | Tooltip phân rã **chỉ gắn ở cột `Tồn kho`**, nội dung là các kho của chi nhánh hiện tại. Cột `Tồn cửa hàng khác` **không** có tooltip phân rã theo chi nhánh | high | yes | Nếu sai, cần thêm một mảng phân rã theo chi nhánh vào DTO → UOW-01 phải cắt lại | confirmed | Akenzy chốt 2026-08-24, phương án "Chỉ cột Tồn kho → các kho của CN hiện tại" |
+| A-06 | Phạm vi chỉ `ProductVariantSelectionModal`. Thẻ catalog ngoài lưới và dòng giỏ hàng không đổi | high | yes | Nếu sai, thêm ít nhất 1 UoW cho lưới catalog kèm bài toán perf riêng | confirmed | Akenzy chốt 2026-08-24, phương án "Chỉ dialog chọn biến thể" |
+| A-07 | Tooltip liệt kê **mọi kho đang hoạt động** của chi nhánh hiện tại, kể cả kho có tồn `0` — khớp ảnh tham chiếu (3/4 dòng là `0`) | medium | no | Chỉ đổi bộ lọc lúc render; không đụng contract | pending | — |
+| A-08 | Kho `storages.is_active = false` bị loại khỏi tooltip **và** khỏi mọi phép tổng (cả `Tồn cửa hàng khác`) | medium | no | Số tổng lệch đúng bằng tồn nằm ở kho đã ngừng hoạt động | pending | — |
+| A-09 | Luật lọc dữ liệu hiện có của `loadBranchStock` được áp **y nguyên** cho phần cross-branch: bỏ `stock_balances.is_tracked = false`, bỏ `locations.is_active = false` | high | no | Số tổng lệch so với báo cáo tồn kho backoffice ở đúng các dòng đã ngừng theo dõi | pending | — |
+| A-10 | Thứ tự kho trong tooltip: kho showroom chính đứng đầu, các kho còn lại theo tên tăng dần (`localeCompare` `vi`) | low | no | Chỉ là thứ tự hiển thị; sửa một dòng `sort` | pending | — |
+| A-11 | Số lượng chi nhánh ACTIVE mỗi org ở mức hàng chục và số biến thể mỗi product ≤ 500 (hạn cứng của `VariantGenerationService`), nên một truy vấn `stock_balances WHERE organization_id AND item_id IN (...)` là đủ, không cần cache hay bảng tổng hợp | medium | no | Nếu sai, dialog mở chậm → phải thêm cache hoặc gộp truy vấn; không đổi contract | pending | — |
+| A-12 | Chi nhánh không có bản ghi `is_main_showroom` → `Tồn kho = 0`, tooltip vẫn liệt kê đủ kho của chi nhánh đó | medium | no | Một chi nhánh cấu hình thiếu sẽ hiện `0` thay vì báo lỗi | pending | — |
+| A-13 | Số âm ở cột `Tồn kho` giữ nguyên màu hiện tại (`#5B5BF0`), không tô đỏ riêng | low | no | Thẩm mỹ; một class Tailwind | pending | — |
+| A-14 | Dữ liệu hai cột mới đi kèm trong payload `GET /pos/branches/:branchId/catalog/products/:id` sẵn có — **không** thêm endpoint và không thêm round-trip khi mở dialog | high | no | Nếu tách endpoint riêng, dialog phải xử lý thêm một trạng thái loading | pending | — |
+
+## Rejected assumptions
+
+| ID | What we assumed | What is actually true | Consequence |
+|----|----------------|----------------------|-------------|
+| A-15 | Cột `Tồn cửa hàng khác` đã có dữ liệu và chỉ hiển thị sai | Cột là literal `0` viết cứng tại `VariantRow.tsx:90`; backend chưa từng trả trường nào cho nó | Đây là xây mới cả đường dữ liệu, không phải sửa lỗi hiển thị — UOW-01 gánh phần backend thật sự |
+| A-16 | `PosVariantLocationDto.locations` sẵn có dùng được cho tooltip | `locations` là phân rã theo **vị trí (kệ/ô)**, không phải theo **kho**; ảnh tham chiếu liệt kê tên kho | Cần một mảng phân rã mới ở mức storage; `locations` giữ nguyên cho các consumer khác |

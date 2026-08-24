@@ -34968,6 +34968,32 @@
           "quantity"
         ]
       },
+      "PosVariantStorageDto": {
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Raw on-hand at this storage; may be negative."
+          },
+          "isMainShowroom": {
+            "type": "boolean",
+            "description": "True for the storage backing the branch main showroom."
+          }
+        },
+        "required": [
+          "storageId",
+          "name",
+          "quantity",
+          "isMainShowroom"
+        ]
+      },
       "PosProductVariantDto": {
         "type": "object",
         "properties": {
@@ -35014,6 +35040,21 @@
             "items": {
               "$ref": "#/components/schemas/PosVariantLocationDto"
             }
+          },
+          "mainShowroomQuantity": {
+            "type": "number",
+            "description": "Raw balance at the branch's main showroom storage; may be negative, not floored at 0."
+          },
+          "otherBranchQuantity": {
+            "type": "number",
+            "description": "Total on-hand across every other ACTIVE branch, all active storages."
+          },
+          "storages": {
+            "description": "Per-storage breakdown of this variant's stock at the current branch, every active storage included (even 0 balance), sorted with the main showroom first.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosVariantStorageDto"
+            }
           }
         },
         "required": [
@@ -35025,7 +35066,10 @@
           "attributes",
           "quantityOnHand",
           "sellableQuantity",
-          "locations"
+          "locations",
+          "mainShowroomQuantity",
+          "otherBranchQuantity",
+          "storages"
         ]
       },
       "PosProductDetailDto": {

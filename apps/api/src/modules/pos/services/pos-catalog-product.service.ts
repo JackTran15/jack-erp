@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
-import { PaginatedResponse } from '@erp/shared-interfaces';
+import { BranchStatus, PaginatedResponse } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { ItemEntity } from '../../inventory/location/item.entity';
 import { ProductEntity } from '../../inventory/product/product.entity';
@@ -9,6 +9,7 @@ import { StockBalanceEntity } from '../../inventory/ledger/stock-balance.entity'
 import { LocationEntity } from '../../inventory/location/location.entity';
 import { ShowroomEntity } from '../../inventory/location/showroom.entity';
 import { StorageEntity } from '../../inventory/location/storage.entity';
+import { BranchEntity } from '../../branch/branch.entity';
 import { TempWarehouseStagedStockService } from '../../inventory/temp-warehouse/temp-warehouse-staged-stock.service';
 import { ItemCategoryEntity } from '../../inventory/location/item-category.entity';
 import { ProductAttributeDefinitionEntity } from '../../inventory/product/product-attribute-definition.entity';
@@ -48,6 +49,33 @@ type ItemStock = {
 
 /** A variant's attribute value annotated with its dimension sort order, for display ordering. */
 type VariantAttr = { name: string; value: string; sortOrder: number };
+
+/** Per-storage breakdown of a variant's stock at the current branch. */
+type VariantStorageStock = {
+  storageId: string;
+  name: string;
+  quantity: number;
+  isMainShowroom: boolean;
+};
+
+/**
+ * Per-item stock figures computed independently of `loadBranchStock`/`ItemStock`, used
+ * only on the detail route (T-01-02 wires these into `PosProductVariantDto`). `storages`
+ * — the current branch's per-storage breakdown — is added by T-02-01 on this same type;
+ * wiring it into `PosProductVariantDto` is T-02-02.
+ */
+type VariantStockExtras = {
+  /** Raw balance at the branch's main showroom storage (`showrooms.is_main_showroom`).
+   * Not floored at 0, does not include temp-warehouse staging — see ADR-01/ADR-02. */
+  mainShowroomQuantity: number;
+  /** Total on-hand across every other ACTIVE branch's active storages. */
+  otherBranchQuantity: number;
+  /**
+   * Every active storage of the current branch, including ones with a 0 balance for this
+   * item (A-07). Sorted with the main showroom first, then by name (A-10).
+   */
+  storages: VariantStorageStock[];
+};
 
 /**
  * A catalog card without volatile branch stock — org-scoped and stable, so it can be cached and
@@ -92,6 +120,8 @@ export class PosCatalogProductService {
     private readonly showroomRepo: Repository<ShowroomEntity>,
     @InjectRepository(StorageEntity)
     private readonly storageRepo: Repository<StorageEntity>,
+    @InjectRepository(BranchEntity)
+    private readonly branchRepo: Repository<BranchEntity>,
     @InjectRepository(ProductAttributeDefinitionEntity)
     private readonly attrDefRepo: Repository<ProductAttributeDefinitionEntity>,
     @InjectRepository(ItemAttributeValueEntity)
@@ -381,9 +411,10 @@ export class PosCatalogProductService {
     }
 
     const stockByItem = await this.loadBranchStock(orgId, branchId, undefined, itemIds);
+    const extrasByItem = await this.loadDetailStockExtras(orgId, branchId, itemIds);
 
     const variantDtos = variants.map((v) =>
-      this.toVariantDto(v, attrByItem.get(v.id), stockByItem.get(v.id)),
+      this.toVariantDto(v, attrByItem.get(v.id), stockByItem.get(v.id), extrasByItem.get(v.id)),
     );
 
     const prices = variants.map((v) => Number(v.sellingPrice) || 0);
@@ -413,6 +444,7 @@ export class PosCatalogProductService {
     orgId: string,
   ): Promise<PosProductDetailDto> {
     const stockByItem = await this.loadBranchStock(orgId, branchId, undefined, [item.id]);
+    const extrasByItem = await this.loadDetailStockExtras(orgId, branchId, [item.id]);
     const price = Number(item.sellingPrice) || 0;
     return {
       kind: 'ITEM',
@@ -426,7 +458,9 @@ export class PosCatalogProductService {
       minPrice: price,
       maxPrice: price,
       attributes: [],
-      variants: [this.toVariantDto(item, undefined, stockByItem.get(item.id))],
+      variants: [
+        this.toVariantDto(item, undefined, stockByItem.get(item.id), extrasByItem.get(item.id)),
+      ],
     };
   }
 
@@ -434,6 +468,7 @@ export class PosCatalogProductService {
     item: ItemEntity,
     attrs: VariantAttr[] | undefined,
     stock: ItemStock | undefined,
+    extras: VariantStockExtras | undefined,
   ): PosProductVariantDto {
     const attributes = (attrs ?? [])
       .slice()
@@ -451,6 +486,9 @@ export class PosCatalogProductService {
       quantityOnHand: stock?.total ?? 0,
       sellableQuantity: stock?.sellableTotal ?? 0,
       locations: stock?.locations ?? [],
+      mainShowroomQuantity: extras?.mainShowroomQuantity ?? 0,
+      otherBranchQuantity: extras?.otherBranchQuantity ?? 0,
+      storages: extras?.storages ?? [],
     };
   }
 
@@ -550,6 +588,123 @@ export class PosCatalogProductService {
         (x, y) => y.quantity - x.quantity || x.locationId.localeCompare(y.locationId),
       );
     }
+    return map;
+  }
+
+  /**
+   * Compute `mainShowroomQuantity`, `otherBranchQuantity` and the current branch's
+   * per-storage breakdown (`storages`, T-02-01) per item — independent of `loadBranchStock`
+   * (ADR-01: that method is not touched, so `sellableQuantity` cannot regress). Runs only on
+   * the detail route, never on `listProducts`.
+   *
+   * Applies the same data filters as `loadBranchStock` (`stock_balances.is_tracked = true`,
+   * `locations.is_active = true`, `organizationId` on every query), plus
+   * `storages.is_active = true` and `branches.status = ACTIVE` for the cross-branch half
+   * (A-08, A-09). A branch's row is attributed via `storage.branchId`, not
+   * `stockBalance.branchId`, so the storage-active filter is applied in the same pass.
+   *
+   * `storages` lists every active storage of the current branch regardless of whether it has
+   * any balance for the item (A-07) — built after the balance loop from `storagesById`, not
+   * from the balances themselves, so a 0-quantity storage never disappears.
+   */
+  private async loadDetailStockExtras(
+    orgId: string,
+    branchId: string,
+    itemIds: string[],
+  ): Promise<Map<string, VariantStockExtras>> {
+    const map = new Map<string, VariantStockExtras>();
+    if (itemIds.length === 0) {
+      return map;
+    }
+
+    const balances = await this.balanceRepo.find({
+      where: {
+        organizationId: orgId,
+        itemId: In(itemIds),
+        isTracked: true,
+      },
+    });
+
+    const locationIds = [...new Set(balances.map((b) => b.locationId))];
+    const [activeBranches, storages, mainShowroom, locations] = await Promise.all([
+      this.branchRepo.find({
+        where: { organizationId: orgId, status: BranchStatus.ACTIVE },
+        select: ['id'],
+      }),
+      this.storageRepo.find({
+        where: { organizationId: orgId, isActive: true },
+      }),
+      // A branch without a main-showroom record is not an error (A-12) — mainShowroomStorageId
+      // stays null and every balance simply misses the mainShowroomQuantity bucket below.
+      this.showroomRepo.findOne({
+        where: { organizationId: orgId, branchId, isMainShowroom: true },
+      }),
+      locationIds.length
+        ? this.locationRepo.find({
+            where: { id: In(locationIds), organizationId: orgId, isActive: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const activeBranchIds = new Set(activeBranches.map((b) => b.id));
+    const storagesById = new Map(storages.map((s) => [s.id, s]));
+    const mainShowroomStorageId = mainShowroom?.storageId ?? null;
+    const locById = new Map(locations.map((l) => [l.id, l]));
+    // Only the current branch's storages ever show up in the `storages` breakdown.
+    const currentBranchStorages = storages.filter((s) => s.branchId === branchId);
+
+    const storageTotalsByItem = new Map<string, Map<string, number>>();
+
+    for (const b of balances) {
+      const loc = locById.get(b.locationId);
+      if (!loc) continue;
+      // Missing from storagesById means the storage is deactivated (A-08) — skip the balance
+      // entirely rather than folding it into either bucket.
+      const storage = storagesById.get(loc.storageId);
+      if (!storage) continue;
+
+      const qty = Number(b.quantity) || 0;
+      let extras = map.get(b.itemId);
+      if (!extras) {
+        extras = { mainShowroomQuantity: 0, otherBranchQuantity: 0, storages: [] };
+        map.set(b.itemId, extras);
+      }
+
+      if (storage.branchId === branchId) {
+        if (storage.id === mainShowroomStorageId) {
+          extras.mainShowroomQuantity += qty;
+        }
+        const totals = storageTotalsByItem.get(b.itemId) ?? new Map<string, number>();
+        totals.set(storage.id, (totals.get(storage.id) ?? 0) + qty);
+        storageTotalsByItem.set(b.itemId, totals);
+      } else if (storage.branchId && activeBranchIds.has(storage.branchId)) {
+        extras.otherBranchQuantity += qty;
+      }
+    }
+
+    for (const itemId of itemIds) {
+      const extras = map.get(itemId) ?? {
+        mainShowroomQuantity: 0,
+        otherBranchQuantity: 0,
+        storages: [],
+      };
+      const totals = storageTotalsByItem.get(itemId);
+      extras.storages = currentBranchStorages
+        .map((s) => ({
+          storageId: s.id,
+          name: s.name,
+          quantity: totals?.get(s.id) ?? 0,
+          isMainShowroom: s.id === mainShowroomStorageId,
+        }))
+        .sort((a, b) => {
+          if (a.isMainShowroom !== b.isMainShowroom) {
+            return a.isMainShowroom ? -1 : 1;
+          }
+          return a.name.localeCompare(b.name, 'vi');
+        });
+      map.set(itemId, extras);
+    }
+
     return map;
   }
 }

@@ -57,6 +57,16 @@ export class PosVariantLocationDto {
   @ApiProperty() quantity: number;
 }
 
+/** A branch storage holding stock of a variant, for the storage-breakdown tooltip. */
+export class PosVariantStorageDto {
+  @ApiProperty({ format: 'uuid' }) storageId: string;
+  @ApiProperty() name: string;
+  @ApiProperty({ description: 'Raw on-hand at this storage; may be negative.' })
+  quantity: number;
+  @ApiProperty({ description: 'True for the storage backing the branch main showroom.' })
+  isMainShowroom: boolean;
+}
+
 /** A resolved attribute value of a variant (e.g. { name: "Size", value: "39" }). */
 export class PosVariantAttributeDto {
   @ApiProperty() name: string;
@@ -84,6 +94,22 @@ export class PosProductVariantDto {
   })
   sellableQuantity: number;
   @ApiProperty({ type: [PosVariantLocationDto] }) locations: PosVariantLocationDto[];
+  @ApiProperty({
+    description:
+      "Raw balance at the branch's main showroom storage; may be negative, not floored at 0.",
+  })
+  mainShowroomQuantity: number;
+  @ApiProperty({
+    description: 'Total on-hand across every other ACTIVE branch, all active storages.',
+  })
+  otherBranchQuantity: number;
+  @ApiProperty({
+    type: [PosVariantStorageDto],
+    description:
+      "Per-storage breakdown of this variant's stock at the current branch, every active " +
+      'storage included (even 0 balance), sorted with the main showroom first.',
+  })
+  storages: PosVariantStorageDto[];
 }
 
 /** An attribute dimension of a product and its available option labels. */

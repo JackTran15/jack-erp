@@ -67,6 +67,14 @@ export interface PosVariantAttribute {
   value: string;
 }
 
+/** Một kho của chi nhánh hiện tại kèm số dư của biến thể. */
+export interface PosVariantStorageStock {
+  storageId: string;
+  name: string;
+  quantity: number;
+  isMainShowroom: boolean;
+}
+
 /** Một biến thể (SKU) bán được, kèm tồn tại chi nhánh. */
 export interface PosProductVariant {
   itemId: string;
@@ -81,7 +89,13 @@ export interface PosProductVariant {
   quantityOnHand: number;
   /** Tồn showroom dự phóng (gồm kho tạm) — cơ sở cảnh báo vượt tồn, xem `PosCatalogLine`. */
   sellableQuantity: number;
+  /** Số dư thô kho showroom chính của chi nhánh hiện tại — có thể âm, KHÔNG phải ngưỡng cảnh báo. */
+  mainShowroomQuantity: number;
+  /** Tổng tồn ở các chi nhánh đang hoạt động khác, mọi kho. */
+  otherBranchQuantity: number;
   locations: PosVariantLocation[];
+  /** Phân rã tồn theo từng kho của chi nhánh hiện tại — đã sort sẵn từ backend. */
+  storages: PosVariantStorageStock[];
 }
 
 /** Một chiều thuộc tính của product và các option khả dụng. */
