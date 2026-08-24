@@ -31,6 +31,7 @@ export function FastStockTransferCarrierSearchInput({
     carrierToolbar,
     setCarrierToolbar,
     carrierSearchAdapter,
+    carrierLoadMore,
   } = useFastStockTransferCarriers();
   const { handleToolbarDraftCarrier } = useFastStockTransferActions();
 
@@ -45,6 +46,7 @@ export function FastStockTransferCarrierSearchInput({
       value={carrierToolbar.query}
       onValueChange={(q) => setCarrierToolbar({ query: q })}
       search={carrierSearchAdapter}
+      loadMore={carrierLoadMore}
       onSelect={(c) => {
         handleToolbarDraftCarrier(c);
         setCarrierToolbar({ query: formatCarrierName(c) });
@@ -63,6 +65,9 @@ export function FastStockTransferCarrierSearchInput({
       }}
       itemKey={(c) => c.id}
       renderItem={(c) => formatCarrierName(c)}
+      // Tìm được theo mã nhân viên mà không hiện mã thì dòng khớp trông như kết
+      // quả sai. Chưa có hồ sơ HR thì rơi về email.
+      renderMeta={(c) => c.employeeCode ?? c.email}
       placeholder={placeholder}
       ariaLabel="Người vận chuyển"
       variant="boxed"

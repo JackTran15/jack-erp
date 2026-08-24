@@ -16,7 +16,8 @@ export class ListCarriersQueryDto {
   branchId: string;
 
   @ApiPropertyOptional({
-    description: 'Free-text search on firstName, lastName, email (ILIKE).',
+    description:
+      'Free-text search on firstName, lastName, email and employee code (ILIKE).',
   })
   @IsOptional()
   @IsString()

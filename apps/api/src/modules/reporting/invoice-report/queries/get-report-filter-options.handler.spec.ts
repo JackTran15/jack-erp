@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ReportFilterOptionType } from '@erp/shared-interfaces';
 import { EmployeeScope } from '../../../rbac/employee-branch-scope.service';
 import { GetReportFilterOptionsHandler } from './get-report-filter-options.handler';
@@ -234,6 +234,113 @@ describe('GetReportFilterOptionsHandler', () => {
       await run(handler, { type: ReportFilterOptionType.SALESPERSON });
       expect(scopeCalls(userQb)).toEqual([]);
       expect(scopeCalls(salesQb)).toEqual([]);
+    });
+
+    /**
+     * The explicit-branchId mode (AC-08, AC-09, AC-10, AC-11). Every case here
+     * runs with `mode: 'all'` — an actor holding `iam.user.read.all` — because
+     * that is the actor the whole parameter exists for: everyone else is already
+     * narrowed by EmployeeBranchScopeService and cannot tell the two modes apart.
+     */
+    describe('explicit branchId', () => {
+      const OTHER = 'b2';
+      const chainActor = {
+        userId: 'u1',
+        organizationId: 'org-1',
+        branchId: BRANCH,
+        branchIds: [BRANCH, OTHER],
+        roles: [],
+      } as any;
+      const runAs = (handler: any, dto: any, who = chainActor) =>
+        handler.execute({ dto, actor: who });
+
+      const withSalesQb = () => {
+        const salesQb = qbStub({ raw: [] });
+        const { handler, userQb, repos } = makeHandler(
+          {
+            employees: {
+              createQueryBuilder: jest.fn(() => salesQb),
+              find: jest.fn(async () => []),
+            },
+          },
+          { mode: 'all' },
+        );
+        return { handler, userQb, salesQb, repos };
+      };
+
+      it('cashier: pins to the named branch despite iam.user.read.all', async () => {
+        const { handler, userQb } = withSalesQb();
+        await runAs(handler, {
+          type: ReportFilterOptionType.CASHIER,
+          branchId: OTHER,
+        });
+        expect(scopeCalls(userQb)).toEqual([
+          [
+            expect.stringContaining('uba.user_id = u.id'),
+            { scopeBranchId: OTHER },
+          ],
+        ]);
+      });
+
+      it('salesperson: pins to the named branch despite iam.user.read.all', async () => {
+        const { handler, salesQb } = withSalesQb();
+        await runAs(handler, {
+          type: ReportFilterOptionType.SALESPERSON,
+          branchId: OTHER,
+        });
+        const [[sql, params]] = scopeCalls(salesQb);
+        expect(sql).toContain('uba.user_id = u.id');
+        expect(params).toEqual({ scopeBranchId: OTHER });
+      });
+
+      // AC-10. Without this check the parameter is a way for any actor to read
+      // the staff of a branch they were never assigned to.
+      it('403s for a branch outside the token, for both types', async () => {
+        for (const type of [
+          ReportFilterOptionType.CASHIER,
+          ReportFilterOptionType.SALESPERSON,
+        ]) {
+          const { handler, userQb, salesQb } = withSalesQb();
+          await expect(
+            runAs(handler, { type, branchId: 'b-not-mine' }),
+          ).rejects.toBeInstanceOf(ForbiddenException);
+          expect(scopeCalls(userQb)).toEqual([]);
+          expect(scopeCalls(salesQb)).toEqual([]);
+        }
+      });
+
+      it('403s when the token carries no branchIds at all', async () => {
+        const { handler } = withSalesQb();
+        await expect(
+          runAs(
+            handler,
+            { type: ReportFilterOptionType.CASHIER, branchId: BRANCH },
+            actor, // the shared actor has branchId but no branchIds
+          ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+      });
+
+      // AC-11: the backoffice chain report sends no branchId, and must keep the
+      // consolidated list. This is the case that forbids narrowing the shared
+      // scope service instead of adding the parameter.
+      it('omitting branchId leaves the consolidated scope untouched', async () => {
+        const { handler, userQb, salesQb } = withSalesQb();
+        await runAs(handler, { type: ReportFilterOptionType.CASHIER });
+        await runAs(handler, { type: ReportFilterOptionType.SALESPERSON });
+        expect(scopeCalls(userQb)).toEqual([]);
+        expect(scopeCalls(salesQb)).toEqual([]);
+      });
+
+      it('does not touch the types that list no people', async () => {
+        const { handler, repos } = withSalesQb();
+        await expect(
+          runAs(handler, {
+            type: ReportFilterOptionType.STORE,
+            branchId: 'b-not-mine',
+          }),
+        ).resolves.toHaveLength(1);
+        expect(repos.branches.find).toHaveBeenCalled();
+      });
     });
 
     it('returns nothing without querying when the scope is none', async () => {

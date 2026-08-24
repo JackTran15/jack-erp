@@ -35,6 +35,12 @@ export interface TempWarehousePublicUser {
   firstName: string;
   lastName: string;
   email: string;
+  /**
+   * Code from the linked employee_profiles row. Optional because the carrier
+   * hydrated onto a saved line carries only the account fields, and because an
+   * account may have no HR profile at all — the carrier picker lists it either way.
+   */
+  employeeCode?: string | null;
 }
 
 export interface TempWarehousePublicItem {

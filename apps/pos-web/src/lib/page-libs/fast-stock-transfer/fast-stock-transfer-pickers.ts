@@ -102,15 +102,3 @@ export function lineToToolbarDraft(
 
   return { carrier, product, location };
 }
-
-export function userToCarrierUser(user: {
-  userId: string;
-  displayName: string;
-}): TempWarehousePublicUser {
-  return {
-    id: user.userId,
-    firstName: user.displayName,
-    lastName: "",
-    email: "",
-  };
-}

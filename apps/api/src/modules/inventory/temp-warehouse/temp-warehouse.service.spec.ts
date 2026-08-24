@@ -133,7 +133,6 @@ describe('TempWarehouseService.fulfillInvoiceFromTempWarehouse', () => {
       sessionRepo as any,
       lineRepo as any,
       {} as any, // userRepo
-      {} as any, // userBranchRepo
       {} as any, // itemRepo
       {} as any, // locationRepo
       dataSource as any,
@@ -318,7 +317,6 @@ describe('TempWarehouseService.listLines (includeTransferred)', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
     );
   };
 
@@ -425,7 +423,6 @@ describe('TempWarehouseService.closeBranchSessions', () => {
       sessionRepo as any,
       {} as any, // lineRepo
       {} as any, // userRepo
-      {} as any, // userBranchRepo
       {} as any, // itemRepo
       {} as any, // locationRepo
       dataSource as any,
@@ -622,7 +619,6 @@ describe('TempWarehouseService.addLine (session locations)', () => {
       {} as any, // sessionRepo
       {} as any, // lineRepo
       {} as any, // userRepo
-      {} as any, // userBranchRepo
       {} as any, // itemRepo
       {} as any, // locationRepo
       dataSource as any,
@@ -705,5 +701,219 @@ describe('TempWarehouseService.addLine (session locations)', () => {
       warehouseLocationId: 'wh-b',
       showroomLocationId: 'sr-b',
     });
+  });
+});
+
+describe('TempWarehouseService.listCarriersForBranch', () => {
+  /**
+   * The assertions here are on the SQL the builder is asked to produce, not on
+   * rows: the two things that can silently go wrong — dropping the branch EXISTS,
+   * and dropping the id tiebreaker that keeps page 2 from repeating page 1 — are
+   * both invisible in a mocked result set.
+   */
+  const buildQb = (rows: any[], total: number) => {
+    const where: string[] = [];
+    const params: Record<string, unknown> = {};
+    const order: string[] = [];
+    const selected: string[] = [];
+    let offset: number | undefined;
+    let limit: number | undefined;
+
+    const qb: any = {
+      leftJoin: jest.fn().mockImplementation(() => qb),
+      where: jest.fn().mockImplementation((sql: string, p?: object) => {
+        where.push(sql);
+        Object.assign(params, p ?? {});
+        return qb;
+      }),
+      andWhere: jest.fn().mockImplementation((sql: string, p?: object) => {
+        where.push(sql);
+        Object.assign(params, p ?? {});
+        return qb;
+      }),
+      select: jest.fn().mockImplementation((c: string, a: string) => {
+        selected.push(`${c} as ${a}`);
+        return qb;
+      }),
+      addSelect: jest.fn().mockImplementation((c: string, a: string) => {
+        selected.push(`${c} as ${a}`);
+        return qb;
+      }),
+      orderBy: jest.fn().mockImplementation((c: string) => {
+        order.push(c);
+        return qb;
+      }),
+      addOrderBy: jest.fn().mockImplementation((c: string) => {
+        order.push(c);
+        return qb;
+      }),
+      offset: jest.fn().mockImplementation((n: number) => {
+        offset = n;
+        return qb;
+      }),
+      limit: jest.fn().mockImplementation((n: number) => {
+        limit = n;
+        return qb;
+      }),
+      getCount: jest.fn().mockResolvedValue(total),
+      getRawMany: jest.fn().mockResolvedValue(rows),
+    };
+    return {
+      qb,
+      seen: () => ({ where, params, order, selected, offset, limit }),
+    };
+  };
+
+  const buildServiceWithQb = (rows: any[] = [], total = rows.length) => {
+    const { qb, seen } = buildQb(rows, total);
+    const userRepo = { createQueryBuilder: jest.fn().mockReturnValue(qb) };
+    const service = new TempWarehouseService(
+      {} as any,
+      {} as any,
+      userRepo as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    return { service, seen, qb };
+  };
+
+  const buildService = (rows: any[] = [], total = rows.length) =>
+    buildServiceWithQb(rows, total);
+
+  it('scopes to the branch through user_branch_assignments', async () => {
+    const { service, seen } = buildService();
+
+    await service.listCarriersForBranch({ branchId: 'branch-9' } as any, actor);
+
+    const { where, params } = seen();
+    expect(
+      where.some(
+        (w) =>
+          w.includes('user_branch_assignments') &&
+          w.includes('uba.branch_id = :scopeBranchId'),
+      ),
+    ).toBe(true);
+    expect(params.scopeBranchId).toBe('branch-9');
+    expect(where).toContain('u.organizationId = :org');
+    expect(params.org).toBe(ORG);
+    expect(where).toContain('u.isActive = true');
+  });
+
+  it('searches the employee code alongside name and email', async () => {
+    const { service, seen } = buildService([
+      {
+        id: 'u-1',
+        firstName: 'Lan',
+        lastName: 'Nguyen',
+        email: 'lan@example.com',
+        employeeCode: 'NV000123',
+      },
+    ]);
+
+    const result = await service.listCarriersForBranch(
+      { branchId: BRANCH, search: ' NV000123 ' } as any,
+      actor,
+    );
+
+    const { where, params } = seen();
+    const clause = where.find((w) => w.includes('ILIKE'))!;
+    expect(clause).toContain('u.firstName ILIKE :s');
+    expect(clause).toContain('u.email ILIKE :s');
+    expect(clause).toContain('e.code ILIKE :s');
+    expect(params.s).toBe('%NV000123%');
+    expect(result.data).toEqual([
+      {
+        id: 'u-1',
+        firstName: 'Lan',
+        lastName: 'Nguyen',
+        email: 'lan@example.com',
+        employeeCode: 'NV000123',
+      },
+    ]);
+  });
+
+  it('adds no ILIKE clause when no search term is given', async () => {
+    const { service, seen } = buildService();
+
+    await service.listCarriersForBranch({ branchId: BRANCH } as any, actor);
+
+    expect(seen().where.some((w) => w.includes('ILIKE'))).toBe(false);
+  });
+
+  it('orders by name then id so paged results cannot repeat a row', async () => {
+    const { service, seen } = buildService();
+
+    await service.listCarriersForBranch({ branchId: BRANCH } as any, actor);
+
+    expect(seen().order).toEqual(['u.firstName', 'u.lastName', 'u.id']);
+  });
+
+  it('reports an account with no HR profile rather than filtering it out', async () => {
+    const { service } = buildService([
+      {
+        id: 'u-2',
+        firstName: 'Binh',
+        lastName: 'Tran',
+        email: 'binh@example.com',
+        employeeCode: null,
+      },
+    ]);
+
+    const result = await service.listCarriersForBranch(
+      { branchId: BRANCH } as any,
+      actor,
+    );
+
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0]!.employeeCode).toBeNull();
+  });
+
+  it('pages with the filtered total, not the page length', async () => {
+    const { service, seen } = buildService(
+      [
+        {
+          id: 'u-3',
+          firstName: 'Chi',
+          lastName: 'Le',
+          email: 'chi@example.com',
+          employeeCode: 'NV9',
+        },
+      ],
+      57,
+    );
+
+    const result = await service.listCarriersForBranch(
+      { branchId: BRANCH, page: 3, pageSize: 20 } as any,
+      actor,
+    );
+
+    expect(seen().offset).toBe(40);
+    expect(seen().limit).toBe(20);
+    expect(result).toMatchObject({ total: 57, page: 3, pageSize: 20 });
+  });
+
+  it('counts before the projection is narrowed, not after paging', async () => {
+    // TypeORM clones the builder inside getCount(), so counting first is safe —
+    // but only in that order. Move getCount() below .limit() and `total` quietly
+    // becomes the length of the page, which no assertion on rows would catch.
+    const { service, qb } = buildServiceWithQb();
+
+    await service.listCarriersForBranch(
+      { branchId: BRANCH, page: 2, pageSize: 20 } as any,
+      actor,
+    );
+
+    expect(qb.getCount.mock.invocationCallOrder[0]!).toBeLessThan(
+      qb.limit.mock.invocationCallOrder[0]!,
+    );
+    expect(qb.getCount.mock.invocationCallOrder[0]!).toBeLessThan(
+      qb.select.mock.invocationCallOrder[0]!,
+    );
   });
 });

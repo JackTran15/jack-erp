@@ -45,13 +45,21 @@ export const dailyReportService = {
   ): Promise<ReportDocumentPayload> =>
     http.post<ReportDocumentPayload>("/reports/invoices/print-payload", body),
 
-  /** `GET /reports/invoices/filter-options` — Thu ngân (`cashier`) / NVBH (`salesperson`). */
+  /**
+   * `GET /reports/invoices/filter-options` — Thu ngân (`cashier`) / NVBH (`salesperson`).
+   *
+   * `branchId` ghim danh sách vào chi nhánh đang chọn, kể cả với tài khoản có
+   * `iam.user.read.all`. Chỉ set khi có giá trị thật: `?branchId=` rỗng không
+   * được `@IsOptional()` bỏ qua mà rơi vào `@IsUUID` và trả 400.
+   */
   getFilterOptions: (
     type: string,
     search = "",
+    branchId?: string,
   ): Promise<IDropdownOption[]> => {
     const qs = new URLSearchParams({ type });
     if (search) qs.set("search", search);
+    if (branchId) qs.set("branchId", branchId);
     qs.set("pageSize", "100");
     return http.get<IDropdownOption[]>(
       `/reports/invoices/filter-options?${qs.toString()}`,

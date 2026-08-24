@@ -12267,7 +12267,7 @@
             "name": "search",
             "required": false,
             "in": "query",
-            "description": "Free-text search on firstName, lastName, email (ILIKE).",
+            "description": "Free-text search on firstName, lastName, email and employee code (ILIKE).",
             "schema": {
               "type": "string"
             }
@@ -12296,7 +12296,7 @@
             "description": ""
           }
         },
-        "summary": "List active users assigned to the given branch — used by the FE carrier picker",
+        "summary": "List active users assigned to the given branch, searchable by name, email or employee code — used by the FE carrier picker",
         "tags": [
           "Inventory · Temp Warehouse"
         ]
@@ -17357,6 +17357,16 @@
             "in": "query",
             "description": "Optional case-insensitive partial search (dynamic types only).",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "Pin the people lists (`cashier` / `salesperson`) to this branch, even for an\nactor holding `iam.user.read.all`. POS sends its active branch; the chain\nreports omit it and keep the consolidated view. Ignored by every other type.",
+            "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },

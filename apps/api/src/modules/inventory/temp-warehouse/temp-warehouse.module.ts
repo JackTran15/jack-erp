@@ -8,7 +8,6 @@ import { LocationEntity } from '../location/location.entity';
 import { ItemEntity } from '../location/item.entity';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { UserEntity } from '../../auth/user.entity';
-import { UserBranchAssignmentEntity } from '../../branch/user-branch-assignment.entity';
 import { TempWarehouseService } from './temp-warehouse.service';
 import { TempWarehouseController } from './temp-warehouse.controller';
 import { BranchLocationResolverService } from './branch-location-resolver.service';
@@ -31,7 +30,6 @@ import { EventsModule } from '../../events/events.module';
       ItemEntity,
       StockBalanceEntity,
       UserEntity,
-      UserBranchAssignmentEntity,
     ]),
     StockTransferModule,
     InventoryLocationModule,

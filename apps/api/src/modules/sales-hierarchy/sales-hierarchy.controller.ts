@@ -12,6 +12,13 @@ import { SalesHierarchyService } from './sales-hierarchy.service';
 import { AssignSalesPersonDto, UnassignSalesPersonDto } from './dto';
 
 @Controller('branches')
+// NOTE: no @UseGuards here, so the @RequirePermission / @RequireBranchScope decorators
+// below are Reflector metadata that nothing reads — only AuthGuard is global. Wiring them
+// up was tried and reverted: BranchScopeGuard has no cross-branch bypass, and the
+// backoffice assignment screen exists precisely to administer branches the operator is not
+// assigned to (admin covers 3 of 6 branches in the dev org), so it would 403 that screen.
+// Closing this needs a bypass permission first. Result-set scoping is enforced in the
+// service regardless — see listSalesmen.
 export class SalesHierarchyController {
   constructor(private readonly service: SalesHierarchyService) {}
 
