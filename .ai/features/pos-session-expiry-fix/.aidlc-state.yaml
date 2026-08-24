@@ -161,3 +161,50 @@ history:
     at: 2026-08-24T19:31:46
     by: Akenzy
     evidence: graph valid - 3 UoW, 9 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T19:32:16
+    by: Claude
+    ticket: T-03-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T19:45:21
+    by: Claude
+    ticket: T-03-03
+  - gate: G4
+    action: ticket todo
+    at: 2026-08-24T20:05:07
+    by: Claude
+    reason: Code review BLOCKED - restoreState both written by the effect and in its own dependency array caused the effect to cancel itself before a real /auth/refresh round-trip resolved, permanently freezing the route on a blank screen. Fixed per reviewer's suggested useRef-based in-flight guard; re-verified live twice with no reload.
+    ticket: T-03-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T20:05:17
+    by: Claude
+    ticket: T-03-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T20:05:17
+    by: Claude
+    ticket: T-03-03
+  - gate: G4
+    action: ticket todo
+    at: 2026-08-24T20:19:31
+    by: Claude
+    reason: Second BLOCKED - the useRef fix closed the dependency-array self-cancel bug but left an identical hole under React StrictMode's double-invoke-on-first-mount, since cleanup released 'cancelled' but not inFlightRef. Fixed by releasing inFlightRef in cleanup too; re-verified live via full reload with no tokens (the exact first-mount path) -- clean redirect, no freeze.
+    ticket: T-03-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T20:19:31
+    by: Claude
+    ticket: T-03-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T20:19:31
+    by: Claude
+    ticket: T-03-03
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T20:31:17
+    by: Akenzy
+    ticket: T-03-03
