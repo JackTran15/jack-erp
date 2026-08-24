@@ -47,7 +47,7 @@ rollback: revert auth.service.ts's two ConfigService.get calls back to the hardc
 | 16 call sites reference the two module constants across 4 methods — missing one leaves a mixed-TTL bug | T-01-01's done-when requires every occurrence found by `grep -n "ACCESS_TOKEN_TTL\|REFRESH_TOKEN_TTL"` to be accounted for; T-01-02's tests cover all 4 methods (`login`, `refresh`, `switchBranch`, `exchangeHandoffCode`), not just `login` |
 
 ## Definition of done
-- [ ] AC-01, AC-02, AC-03 all pass
-- [ ] `grep -n "15 \* 60\|7 \* 24 \* 60 \* 60"` in `auth.service.ts` returns nothing (no
-      leftover hardcoded TTL)
+- [x] AC-01, AC-02, AC-03 all pass (T-01-02, 32/32 auth.service.spec.ts)
+- [x] `grep -n "15 \* 60\|7 \* 24 \* 60 \* 60"` in `auth.service.ts` returns nothing (no
+      leftover hardcoded TTL) — verified, zero matches
 - [ ] Demoed and accepted at gate G4
