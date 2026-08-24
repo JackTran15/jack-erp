@@ -1,10 +1,21 @@
 import { usePosFastStockTransferWorkflowStore } from "@erp/pos/stores/page-stores/fast-stock-transfer/fast-stock-transfer-workflow.store";
-import { TempWarehouseTransferProcessingStatus } from "@erp/shared-interfaces";
+import {
+  TempWarehouseLineStatus,
+  TempWarehouseTransferProcessingStatus,
+} from "@erp/shared-interfaces";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { useFastStockTransferActions } from "./use-fast-stock-transfer-actions";
 import { useFastStockTransferData } from "./use-fast-stock-transfer-data";
-import { useTempWarehouseSessionDetail } from "@erp/pos/hooks/react-query/use-query-temp-warehouse";
+import {
+  useTempWarehouseLinesTransferStatus,
+  useTempWarehouseSessionDetail,
+} from "@erp/pos/hooks/react-query/use-query-temp-warehouse";
+
+// Quá thời gian này mà consumer vẫn chưa flip xong thì thôi, không chờ nữa —
+// bỏ mask để dòng hiện lại đúng trạng thái thật trên server thay vì tiếp tục
+// báo "đã xử lý" trong khi nó vẫn ACTIVE.
+const TRANSFER_CONFIRM_TIMEOUT_MS = 20_000;
 
 export function useFastStockTransferMount() {
   const data = useFastStockTransferData();
@@ -15,13 +26,30 @@ export function useFastStockTransferMount() {
   const pruneHiddenLineIds = usePosFastStockTransferWorkflowStore(
     (s) => s.pruneHiddenLineIds,
   );
+  const removeHiddenLineIds = usePosFastStockTransferWorkflowStore(
+    (s) => s.removeHiddenLineIds,
+  );
   const pollSessionId = usePosFastStockTransferWorkflowStore(
     (s) => s.pollSessionId,
+  );
+  const pendingTransferLineIds = usePosFastStockTransferWorkflowStore(
+    (s) => s.pendingTransferLineIds,
+  );
+  const pendingTransferStartedAt = usePosFastStockTransferWorkflowStore(
+    (s) => s.pendingTransferStartedAt,
+  );
+  const setPendingTransferLineIds = usePosFastStockTransferWorkflowStore(
+    (s) => s.setPendingTransferLineIds,
   );
 
   const pollQuery = useTempWarehouseSessionDetail(
     pollSessionId,
     Boolean(pollSessionId),
+  );
+
+  const transferStatusQuery = useTempWarehouseLinesTransferStatus(
+    pendingTransferLineIds,
+    pendingTransferLineIds.length > 0,
   );
 
   useEffect(() => {
@@ -114,5 +142,55 @@ export function useFastStockTransferMount() {
     refetchAll,
     setPageError,
     setPollSessionId,
+  ]);
+
+  // Xác nhận "Xử lý chuyển kho" đã thật sự xong (ACTIVE -> TRANSFERRED) trước
+  // khi báo thành công — xem comment ở use-fast-stock-transfer-actions.ts.
+  useEffect(() => {
+    const result = transferStatusQuery.data;
+    if (
+      !result ||
+      pendingTransferLineIds.length === 0 ||
+      pendingTransferStartedAt === null
+    ) {
+      return;
+    }
+
+    const statusById = new Map(result.map((l) => [l.id, l.status]));
+    const stillActiveIds = pendingTransferLineIds.filter(
+      (id) => statusById.get(id) === TempWarehouseLineStatus.ACTIVE,
+    );
+
+    if (stillActiveIds.length === 0) {
+      // Không còn dòng nào ACTIVE nữa (đã TRANSFERRED, hoặc không còn tồn tại) —
+      // xác nhận xong thật sự, giờ mới báo thành công và refetch để danh sách
+      // ACTIVE phản ánh đúng ngay, không đợi staleTime tự nhiên.
+      setPendingTransferLineIds([]);
+      void refetchAll();
+      toast.success("Đã xử lý chuyển kho thành công.");
+      return;
+    }
+
+    if (Date.now() - pendingTransferStartedAt > TRANSFER_CONFIRM_TIMEOUT_MS) {
+      // Chưa xác nhận được sau timeout: ngừng chờ, bỏ mask để các dòng này
+      // hiện lại đúng trạng thái thật thay vì tiếp tục coi như đã xong.
+      removeHiddenLineIds(stillActiveIds);
+      setPendingTransferLineIds([]);
+      setPageError(
+        "Xử lý chuyển kho đang chậm hơn bình thường, các dòng chưa xác nhận sẽ hiện lại trong danh sách. Vui lòng thử lại sau ít phút.",
+      );
+    }
+  }, [
+    pendingTransferLineIds,
+    pendingTransferStartedAt,
+    refetchAll,
+    removeHiddenLineIds,
+    setPageError,
+    setPendingTransferLineIds,
+    transferStatusQuery.data,
+    // `data` giữ nguyên reference giữa các lần refetch nếu nội dung không đổi
+    // (structural sharing của React Query) — thêm dataUpdatedAt để effect vẫn
+    // chạy lại mỗi lần poll, nếu không nhánh timeout sẽ không bao giờ tới lượt.
+    transferStatusQuery.dataUpdatedAt,
   ]);
 }

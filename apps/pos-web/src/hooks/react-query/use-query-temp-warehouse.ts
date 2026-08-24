@@ -10,11 +10,13 @@ import {
   AddLineResult,
   AddTempWarehouseLineBody,
   CloseBranchSessionsResult,
+  LineTransferStatus,
   ListLinesNettedResult,
   ListLinesRawResult,
   PaginatedResponse,
   TempWarehouseCloseMode,
   TempWarehouseDirection,
+  TempWarehouseLineStatus,
   TempWarehousePublicUser,
   TempWarehouseSession,
   TransferLinesResult,
@@ -84,6 +86,32 @@ export function useTempWarehouseSessionDetail(
       const status = query.state.data?.transferProcessingStatus;
       if (status === "PENDING") return 1500;
       return false;
+    },
+  });
+}
+
+/**
+ * Poll the current status of specific lines until none of them are ACTIVE
+ * anymore. "Xử lý chuyển kho" (`transferLines`) only publishes a Kafka event
+ * and returns 202 — the actual ACTIVE -> TRANSFERRED flip happens later in the
+ * consumer, so the FE needs this to confirm the submission actually landed
+ * instead of trusting the 202 response alone.
+ */
+export function useTempWarehouseLinesTransferStatus(
+  ids: ReadonlyArray<string>,
+  enabled: boolean,
+): UseQueryResult<LineTransferStatus[], Error> {
+  return useQuery({
+    queryKey: TEMP_WAREHOUSE_KEYS.LINES_TRANSFER_STATUS(ids),
+    queryFn: () => tempWarehouseService.getLinesStatus(ids),
+    enabled: enabled && ids.length > 0,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data) return 1500;
+      const stillActive = data.some(
+        (l) => l.status === TempWarehouseLineStatus.ACTIVE,
+      );
+      return stillActive ? 1500 : false;
     },
   });
 }

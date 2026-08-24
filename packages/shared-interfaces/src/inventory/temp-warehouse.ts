@@ -74,6 +74,13 @@ export interface TempWarehouseLine {
   invoiceId?: string | null;
   /** Human-readable code of the consuming invoice (denormalized). */
   invoiceNumber?: string | null;
+  /**
+   * True when this line is already netted out against a matching quantity on
+   * the opposite direction for the same item (branch-wide, FIFO by createdAt)
+   * — "Hiển thị dòng cần kiểm tra" hides these. Computed server-side over the
+   * full working set; only populated by the raw `listLines` endpoint.
+   */
+  isBalanced?: boolean;
   createdAt: string;
   updatedAt: string;
   createdBy: string;
@@ -193,3 +200,14 @@ export interface TransferLinesResult {
 }
 
 export type ListCarriersResult = PaginatedResponse<TempWarehousePublicUser>;
+
+/**
+ * Current status of one line, keyed by id. Polled by the FE after a partial
+ * transfer ("Xử lý chuyển kho") to confirm the async consumer actually flipped
+ * ACTIVE -> TRANSFERRED before treating the submission as done — the POST only
+ * returns 202 (event published, not yet materialized).
+ */
+export interface LineTransferStatus {
+  id: string;
+  status: TempWarehouseLineStatus;
+}

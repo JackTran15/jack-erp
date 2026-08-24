@@ -303,7 +303,12 @@ describe('TempWarehouseService.listLines (includeTransferred)', () => {
       getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
     };
     const sessionRepo = { findOne: jest.fn().mockResolvedValue(session) };
-    const lineRepo = { createQueryBuilder: jest.fn().mockReturnValue(qb) };
+    // `find` backs the isBalanced computation (no branchId/direction on this
+    // fixture → no sibling lookup, just one `find` for the current session).
+    const lineRepo = {
+      createQueryBuilder: jest.fn().mockReturnValue(qb),
+      find: jest.fn().mockResolvedValue([]),
+    };
 
     service = new TempWarehouseService(
       sessionRepo as any,
@@ -354,6 +359,137 @@ describe('TempWarehouseService.listLines (includeTransferred)', () => {
     ).toBe(true);
     // never an unconditional exclusion of TRANSFERRED in this mode.
     expect(clauses.some((c) => c === 'l.status != :transferred')).toBe(false);
+  });
+});
+
+describe('TempWarehouseService.getLinesStatus', () => {
+  // Backs the FE's post-"Xử lý chuyển kho" poll: transferLines only publishes
+  // an event and returns 202, so the FE needs this to confirm the consumer
+  // actually flipped ACTIVE -> TRANSFERRED before treating it as done.
+  it('returns the current status of exactly the requested ids, org-scoped, unfiltered by status', async () => {
+    const lineRepo = {
+      find: jest.fn().mockResolvedValue([
+        line({ id: 'line-a', status: TempWarehouseLineStatus.TRANSFERRED }),
+        line({ id: 'line-b', status: TempWarehouseLineStatus.ACTIVE }),
+      ]),
+    };
+    const service = new TempWarehouseService(
+      {} as any,
+      lineRepo as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+
+    const result = await service.getLinesStatus(['line-a', 'line-b'], actor);
+
+    expect(lineRepo.find).toHaveBeenCalledWith({
+      where: { id: expect.anything(), organizationId: ORG },
+      select: ['id', 'status'],
+    });
+    expect(result).toEqual([
+      { id: 'line-a', status: TempWarehouseLineStatus.TRANSFERRED },
+      { id: 'line-b', status: TempWarehouseLineStatus.ACTIVE },
+    ]);
+  });
+});
+
+describe('TempWarehouseService.computeBalancedLineIdsForSession', () => {
+  // "Hiển thị dòng cần kiểm tra" hides rows already netted out against the
+  // opposite direction — this used to be recomputed client-side from two
+  // independently-paginated (max 500 rows) queries; now the server computes
+  // it once, over the full working set, and the FE just reads the flag.
+  it('nets w2s against s2w across the branch sibling session, FIFO by createdAt', async () => {
+    const w2sSession = {
+      id: 'sess-w2s',
+      branchId: BRANCH,
+      organizationId: ORG,
+      status: TempWarehouseSessionStatus.ACTIVE,
+      direction: TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
+    };
+    const s2wSession = {
+      id: 'sess-s2w',
+      branchId: BRANCH,
+      organizationId: ORG,
+      status: TempWarehouseSessionStatus.ACTIVE,
+      direction: TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE,
+    };
+
+    const sessionRepo = { findOne: jest.fn().mockResolvedValue(s2wSession) };
+    const activeLines = [
+      line({
+        id: 'w2s-early',
+        sessionId: 'sess-w2s',
+        direction: TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
+        quantity: '1.00',
+        createdAt: new Date('2026-08-01T00:00:00Z'),
+      }),
+      line({
+        id: 'w2s-late',
+        sessionId: 'sess-w2s',
+        direction: TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
+        quantity: '1.00',
+        createdAt: new Date('2026-08-02T00:00:00Z'),
+      }),
+      line({
+        id: 's2w-1',
+        sessionId: 'sess-s2w',
+        direction: TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE,
+        quantity: '1.00',
+        createdAt: new Date('2026-08-03T00:00:00Z'),
+      }),
+    ];
+    const lineRepo = { find: jest.fn().mockResolvedValue(activeLines) };
+
+    const service = new TempWarehouseService(
+      sessionRepo as any,
+      lineRepo as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+
+    const balanced = await (service as any).computeBalancedLineIdsForSession(
+      w2sSession,
+      ORG,
+    );
+
+    // totalW2s=2, totalS2w=1 → paired qty 1 → only the earliest w2s line and
+    // the single s2w line are covered; the later w2s line is still outstanding.
+    expect(balanced.has('w2s-early')).toBe(true);
+    expect(balanced.has('w2s-late')).toBe(false);
+    expect(balanced.has('s2w-1')).toBe(true);
+
+    // Sibling lookup queried the branch's ACTIVE opposite-direction session...
+    expect(sessionRepo.findOne).toHaveBeenCalledWith({
+      where: {
+        branchId: BRANCH,
+        organizationId: ORG,
+        status: TempWarehouseSessionStatus.ACTIVE,
+        direction: TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE,
+      },
+    });
+    // ...and the line lookup spans both sessions, not just the current one.
+    expect(lineRepo.find).toHaveBeenCalledWith({
+      where: {
+        sessionId: expect.anything(),
+        organizationId: ORG,
+        status: expect.anything(),
+      },
+      select: ['id', 'itemId', 'direction', 'quantity', 'createdAt'],
+    });
   });
 });
 

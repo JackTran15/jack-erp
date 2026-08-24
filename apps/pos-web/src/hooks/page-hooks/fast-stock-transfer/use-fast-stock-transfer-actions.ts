@@ -18,7 +18,6 @@ import {
   TempWarehouseTransferProcessingStatus,
 } from "@erp/shared-interfaces";
 import { useCallback, useRef } from "react";
-import { toast } from "sonner";
 import { CATALOG_KEYS } from "@erp/pos/constants/react-query-key.constant";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLookupPreferredShelf } from "@erp/pos/hooks/react-query/use-query-inventory";
@@ -123,6 +122,9 @@ export function useFastStockTransferActions() {
   );
   const setPollSessionId = usePosFastStockTransferWorkflowStore(
     (s) => s.setPollSessionId,
+  );
+  const setPendingTransferLineIds = usePosFastStockTransferWorkflowStore(
+    (s) => s.setPendingTransferLineIds,
   );
   const direction = usePosFastStockTransferWorkflowStore((s) => s.direction);
   const filters = usePosFastStockTransferWorkflowStore((s) => s.filters);
@@ -491,11 +493,16 @@ export function useFastStockTransferActions() {
       { sessionId: data.sessionId, body: { lineIds } },
       {
         onSuccess: () => {
+          // 202 chỉ nghĩa là event đã publish, chưa chắc dòng đã đổi trạng thái
+          // thật trên server (consumer xử lý bất đồng bộ). Ẩn ngay để phản hồi
+          // nhanh, nhưng để `pendingTransferLineIds` (poll ở use-fast-stock-transfer-mount)
+          // xác nhận thật rồi mới báo thành công — tránh báo "đã xử lý" trong khi
+          // dòng vẫn ACTIVE, khiến nó "hiện lại" sau F5/Lấy lại dữ liệu.
           addHiddenLineIds(lineIds);
+          setPendingTransferLineIds(lineIds);
           clearTransferSelection();
           clearEditingRow();
           closeProcessDialog();
-          toast.success("Đã xử lý chuyển kho thành công.");
         },
         onError: (err) => setPageError(getErrorMessage(err)),
       },
@@ -507,6 +514,7 @@ export function useFastStockTransferActions() {
     closeProcessDialog,
     data,
     setPageError,
+    setPendingTransferLineIds,
     transferLinesMutation,
   ]);
 

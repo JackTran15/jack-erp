@@ -95,68 +95,6 @@ export function lineMatchesTableFilters(
   return true;
 }
 
-export function buildBalancedLineIds(
-  lines: ReadonlyArray<TempWarehouseLine>,
-): Set<string> {
-  type LineEntry = { id: string; qty: number; createdAt: string };
-
-  const byItem = new Map<string, { w2s: LineEntry[]; s2w: LineEntry[] }>();
-
-  for (const line of lines) {
-    if (
-      line.status !== TempWarehouseLineStatus.ACTIVE &&
-      line.status !== TempWarehouseLineStatus.AUTO_BALANCED
-    ) {
-      continue;
-    }
-    const qty = Number(line.quantity);
-    if (!Number.isFinite(qty) || qty <= 0) continue;
-
-    let bucket = byItem.get(line.itemId);
-    if (!bucket) {
-      bucket = { w2s: [], s2w: [] };
-      byItem.set(line.itemId, bucket);
-    }
-    const entry: LineEntry = {
-      id: line.id,
-      qty,
-      createdAt: line.createdAt,
-    };
-    if (line.direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM) {
-      bucket.w2s.push(entry);
-    } else {
-      bucket.s2w.push(entry);
-    }
-  }
-
-  const balanced = new Set<string>();
-  const byTime = (a: LineEntry, b: LineEntry) =>
-    a.createdAt.localeCompare(b.createdAt);
-
-  const markBalancedSide = (side: LineEntry[], pool: number) => {
-    let remaining = pool;
-    for (const entry of side) {
-      if (remaining <= 0) break;
-      if (entry.qty <= remaining) {
-        balanced.add(entry.id);
-        remaining -= entry.qty;
-      }
-    }
-  };
-
-  for (const bucket of byItem.values()) {
-    const w2s = [...bucket.w2s].sort(byTime);
-    const s2w = [...bucket.s2w].sort(byTime);
-    const totalW2s = w2s.reduce((sum, l) => sum + l.qty, 0);
-    const totalS2w = s2w.reduce((sum, l) => sum + l.qty, 0);
-    const pairedQty = Math.min(totalW2s, totalS2w);
-    markBalancedSide(w2s, pairedQty);
-    markBalancedSide(s2w, pairedQty);
-  }
-
-  return balanced;
-}
-
 export function mapDraftToAddBody(
   draft: FastStockTransferToolbarDraft,
   branchId: string,
