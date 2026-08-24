@@ -48,7 +48,7 @@ rollback: revert http.ts and api-axios.ts to their own local tryRefreshToken/ref
 | `api-axios.ts`'s `AuthErrorCode.TOKEN_EXPIRED` branch must survive the swap verbatim — it's a non-negotiable regression guard from a separate, already-shipped feature | T-02-03's done-when requires the existing `api-axios.test.ts` suite to still pass unmodified in addition to any new tests |
 
 ## Definition of done
-- [ ] AC-07, AC-08 both pass
-- [ ] `grep -n "refreshPromise"` returns exactly one declaration app-wide (in the new shared
-      module), not one per client
+- [x] AC-07, AC-08 both pass (T-02-04, 3/3 token-refresh.test.ts)
+- [x] `grep -n "refreshPromise"` returns exactly one declaration app-wide (in the new shared
+      module), not one per client — verified, only in token-refresh.ts
 - [ ] Demoed and accepted at gate G4
