@@ -41,3 +41,18 @@ history:
     at: 2026-08-24T18:51:25
     by: Claude
     ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T18:52:47
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T18:54:17
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T18:55:29
+    by: Akenzy
+    ticket: T-01-01
