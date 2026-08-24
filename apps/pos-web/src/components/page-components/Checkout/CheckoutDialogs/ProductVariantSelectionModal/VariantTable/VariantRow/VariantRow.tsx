@@ -41,8 +41,8 @@ export function VariantRow({
   // đúng tổng hai nhịp POS trừ hàng — chứ không phải tổng toàn chi nhánh. Dialog
   // này và dòng giỏ hàng phải nói cùng một con số: chọn ở đây rồi thấy số khác ở
   // giỏ là cách nhanh nhất để thu ngân mất tin vào cả hai.
-  const onHand = variant.sellableQuantity;
-  const oversell = checked && qty > onHand;
+  const warningThreshold = variant.sellableQuantity;
+  const oversell = checked && qty > warningThreshold;
 
   const warningBadge = oversell ? (
     <Tooltip>
@@ -61,7 +61,7 @@ export function VariantRow({
       >
         <div className="flex flex-col space-y-1">
           <p className="font-semibold">Hàng hóa quá số lượng tồn</p>
-          <p>Tồn: {qtyFormatter.format(onHand)}</p>
+          <p>Tồn: {qtyFormatter.format(warningThreshold)}</p>
         </div>
       </TooltipContent>
     </Tooltip>
@@ -87,7 +87,9 @@ export function VariantRow({
       <td className={cn(cellBase, "text-right font-medium")}>
         {formatVnd(variant.sellingPrice)}
       </td>
-      <td className={cn(cellBase, "text-right text-[#5B5BF0]")}>0</td>
+      <td className={cn(cellBase, "text-right text-[#5B5BF0]")}>
+        {variant.otherBranchQuantity}
+      </td>
       <td className={cn(cellBase, "w-36")}>
         <PosQuantityInput
           displayValue={qty}
@@ -103,7 +105,32 @@ export function VariantRow({
           className={cn(oversell && "border-[#EF4444]")}
         />
       </td>
-      <td className={cn(cellBase, "text-right text-[#5B5BF0]")}>{onHand}</td>
+      <td className={cn(cellBase, "text-right text-[#5B5BF0]")}>
+        {variant.storages.length > 0 ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>{variant.mainShowroomQuantity}</span>
+            </TooltipTrigger>
+            <TooltipContent
+              side="left"
+              className="max-w-[240px] border border-gray-200 bg-gray-900/80 px-3 py-2 text-left text-[12px] leading-snug text-white shadow-lg"
+            >
+              <div className="flex flex-col space-y-1">
+                {variant.storages.map((storage) => (
+                  <p key={storage.storageId}>
+                    {storage.name} :{" "}
+                    <span className="font-semibold">
+                      {qtyFormatter.format(storage.quantity)}
+                    </span>
+                  </p>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <span>{variant.mainShowroomQuantity}</span>
+        )}
+      </td>
       <td className={cn(cellBase, "w-10 text-center")}>
         <Tooltip>
           <TooltipTrigger asChild>

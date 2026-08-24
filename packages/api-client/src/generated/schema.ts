@@ -11404,6 +11404,15 @@ export interface components {
             name: string;
             quantity: number;
         };
+        PosVariantStorageDto: {
+            /** Format: uuid */
+            storageId: string;
+            name: string;
+            /** @description Raw on-hand at this storage; may be negative. */
+            quantity: number;
+            /** @description True for the storage backing the branch main showroom. */
+            isMainShowroom: boolean;
+        };
         PosProductVariantDto: {
             /** Format: uuid */
             itemId: string;
@@ -11419,6 +11428,12 @@ export interface components {
             /** @description Projected on-hand at the branch's main (showroom) storages once every open temp-warehouse line lands: booked stock there, plus stock staged into it, minus stock staged out of it, floored at 0. A POS sale deducts from the showroom and then from the staged lines, so this — not quantityOnHand — is the oversell-warning basis. */
             sellableQuantity: number;
             locations: components["schemas"]["PosVariantLocationDto"][];
+            /** @description Raw balance at the branch's main showroom storage; may be negative, not floored at 0. */
+            mainShowroomQuantity: number;
+            /** @description Total on-hand across every other ACTIVE branch, all active storages. */
+            otherBranchQuantity: number;
+            /** @description Per-storage breakdown of this variant's stock at the current branch, every active storage included (even 0 balance), sorted with the main showroom first. */
+            storages: components["schemas"]["PosVariantStorageDto"][];
         };
         PosProductDetailDto: {
             /** @enum {string} */
