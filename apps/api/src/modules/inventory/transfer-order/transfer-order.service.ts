@@ -1567,7 +1567,7 @@ export class TransferOrderService {
             `${to.importGoodsReceiptId} at branch ${to.destinationBranchId}`,
         );
       } else {
-        await this.adjustRequestedQty(orderId, deltas);
+        await this.adjustRequestedQty(to, deltas, actor);
       }
     } else {
       if (!to.exportGoodsIssueId) {
@@ -1675,18 +1675,67 @@ export class TransferOrderService {
   /**
    * Destination hasn't imported yet — nothing is posted there to adjust, so
    * the edit only updates how much stock the two-phase import screen expects.
+   *
+   * Upserts rather than blind-updates: an item the order already carries gets
+   * its `requested_qty` adjusted, but an item the export goods issue picked up
+   * *after* the order was created (added/swapped in on a later edit) has no
+   * matching `transfer_order_lines` row yet. A plain `UPDATE ... WHERE
+   * item_id = $3` would match zero rows there and silently drop the delta,
+   * leaving `transfer_order_lines` permanently missing an item the issue
+   * actually carries — which then fails import with "Line item is not part
+   * of the transfer order" once the destination tries to receive it (see
+   * .ai/debug/transfer-order-import-line-mismatch.md). Insert a line instead.
    */
   private async adjustRequestedQty(
-    orderId: string,
+    to: TransferOrderEntity,
     deltas: { itemId: string; quantityDelta: number }[],
+    actor: ActorContext,
   ): Promise<void> {
     for (const d of deltas) {
       if (d.quantityDelta === 0) continue;
-      await this.dataSource.manager.query(
+      const updated = await this.dataSource.manager.query<
+        Array<{ id: string }>
+      >(
         `UPDATE transfer_order_lines
            SET requested_qty = GREATEST(requested_qty + $1, 0)
-         WHERE transfer_order_id = $2 AND item_id = $3`,
-        [d.quantityDelta, orderId, d.itemId],
+         WHERE transfer_order_id = $2 AND item_id = $3
+         RETURNING id`,
+        [d.quantityDelta, to.id, d.itemId],
+      );
+      if (updated.length > 0) continue;
+
+      if (d.quantityDelta <= 0) {
+        // A decrease with no matching line: the order never carried this
+        // item. Nothing to subtract from — logged so a real desync doesn't
+        // vanish silently.
+        this.logger.warn(
+          `Transfer order ${to.id}: skipped a ${d.quantityDelta} delta for ` +
+            `item ${d.itemId} — no matching transfer_order_lines row`,
+        );
+        continue;
+      }
+
+      const sourceLocationId = to.sourceStorageId
+        ? await this.resolveSourceLocation(
+            d.itemId,
+            to.sourceStorageId,
+            to.organizationId,
+          )
+        : null;
+      await this.dataSource.manager.insert(TransferOrderLineEntity, {
+        organizationId: to.organizationId,
+        branchId: to.branchId,
+        transferOrderId: to.id,
+        itemId: d.itemId,
+        requestedQty: String(d.quantityDelta),
+        sourceStorageId: to.sourceStorageId,
+        sourceLocationId,
+        createdBy: actor.userId,
+      });
+      this.logger.log(
+        `Transfer order ${to.id}: inserted a new transfer_order_lines row ` +
+          `for item ${d.itemId} (qty ${d.quantityDelta}) — item was added to ` +
+          `the export issue after the order was created`,
       );
     }
   }

@@ -39,6 +39,7 @@ describe('TransferOrderService', () => {
   let goodsIssueService: Record<string, jest.Mock>;
   let goodsReceiptService: Record<string, jest.Mock>;
   let dataSourceManagerQuery: jest.Mock;
+  let dataSourceManagerInsert: jest.Mock;
 
   const actorSource = {
     userId: 'user-1',
@@ -119,7 +120,11 @@ describe('TransferOrderService', () => {
       getById: jest.fn(),
       update: jest.fn().mockResolvedValue(undefined),
     };
-    dataSourceManagerQuery = jest.fn().mockResolvedValue(undefined);
+    // Default: the UPDATE matches an existing transfer_order_lines row
+    // (RETURNING id yields one row). Tests exercising the "no matching row"
+    // path override this per-call.
+    dataSourceManagerQuery = jest.fn().mockResolvedValue([{ id: 'line-1' }]);
+    dataSourceManagerInsert = jest.fn().mockResolvedValue(undefined);
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -142,7 +147,10 @@ describe('TransferOrderService', () => {
                 save: jest.fn().mockResolvedValue(undefined),
               }),
             ),
-            manager: { query: dataSourceManagerQuery },
+            manager: {
+              query: dataSourceManagerQuery,
+              insert: dataSourceManagerInsert,
+            },
           },
         },
         {
@@ -1060,6 +1068,54 @@ describe('TransferOrderService', () => {
         [-4, 'to-1', 'item-1'],
       );
       expect(goodsReceiptService.update).not.toHaveBeenCalled();
+      expect(dataSourceManagerInsert).not.toHaveBeenCalled();
+    });
+
+    it('inserts a new transfer_order_lines row when the export issue picked up an item the order never carried', async () => {
+      toRepo.findOne.mockResolvedValue(
+        baseOrder({ importGoodsReceiptId: null }),
+      );
+      // No existing transfer_order_lines row for item-2 — the UPDATE matches nothing.
+      dataSourceManagerQuery.mockResolvedValueOnce([]);
+
+      await service.applyLegRevision(
+        'to-1',
+        [{ itemId: 'item-2', quantityDelta: 6 }],
+        actorSource,
+        'export',
+      );
+
+      expect(dataSourceManagerQuery).toHaveBeenCalledWith(
+        expect.stringContaining('requested_qty'),
+        [6, 'to-1', 'item-2'],
+      );
+      expect(dataSourceManagerInsert).toHaveBeenCalledWith(
+        TransferOrderLineEntity,
+        expect.objectContaining({
+          organizationId: 'org-1',
+          transferOrderId: 'to-1',
+          itemId: 'item-2',
+          requestedQty: '6',
+          sourceStorageId: 'storage-A',
+          createdBy: 'user-1',
+        }),
+      );
+    });
+
+    it('skips (and logs) a decrease for an item the order never carried, without inserting', async () => {
+      toRepo.findOne.mockResolvedValue(
+        baseOrder({ importGoodsReceiptId: null }),
+      );
+      dataSourceManagerQuery.mockResolvedValueOnce([]);
+
+      await service.applyLegRevision(
+        'to-1',
+        [{ itemId: 'item-2', quantityDelta: -3 }],
+        actorSource,
+        'export',
+      );
+
+      expect(dataSourceManagerInsert).not.toHaveBeenCalled();
     });
 
     it('applies the delta to the import receipt at the destination branch (AC-17)', async () => {
