@@ -47,6 +47,11 @@ rollback: revert PosSessionHandoff.tsx to its prior version — single-file reve
 | No component-rendering test tooling exists (A-04) — full mount-and-navigate coverage isn't automatable without adding new dependencies | T-03-02 tests the extracted async bootstrap function directly (plain-function test, no DOM); full end-to-end wiring (AC-06 in particular) is verified via the G4 demo script instead of a unit test — stated explicitly, not silently under-covered |
 
 ## Definition of done
-- [ ] AC-04, AC-05, AC-06 all pass
-- [ ] `PosRequireAuth.tsx` has zero diff
+- [ ] AC-04, AC-05, AC-06 all pass — AC-04/AC-05 confirmed by T-03-02 (3/3
+      PosSessionHandoff.test.ts); AC-06 (handoff still takes priority end-to-end) has no
+      automated test by design (A-04 — needs component rendering, unsupported in this repo)
+      and is verified only by the G4 demo script, so this item stays unticked until that
+      demo runs
+- [x] `PosRequireAuth.tsx` has zero diff — verified via git diff across every commit in this
+      feature
 - [ ] Demoed and accepted at gate G4
