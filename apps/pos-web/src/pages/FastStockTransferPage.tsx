@@ -11,7 +11,7 @@ export function FastStockTransferPage() {
   useFastStockTransferMount();
 
   return (
-    <div className="flex h-screen flex-col bg-white">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
       <div className="flex min-h-0 flex-1 flex-col gap-3 px-3 py-3">
         <FastStockTransferToolbar />
         <FastStockTransferTable />

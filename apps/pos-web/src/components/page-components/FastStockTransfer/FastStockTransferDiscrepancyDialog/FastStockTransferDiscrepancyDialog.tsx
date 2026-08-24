@@ -58,7 +58,7 @@ export function FastStockTransferDiscrepancyDialog({
   );
 
   const [closeMode, setCloseMode] = useState<TempWarehouseCloseMode>(
-    TempWarehouseCloseMode.NET_OFFSET,
+    TempWarehouseCloseMode.NONE,
   );
 
   // Keep the selection valid when NET_OFFSET is unavailable.
