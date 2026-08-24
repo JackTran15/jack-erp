@@ -50,14 +50,22 @@ export function useRevenueByItemReportQuery(
   });
 }
 
-/** Thu ngân / NVBH dropdown options (`GET /reports/invoices/filter-options`). */
+/**
+ * Thu ngân / NVBH dropdown options (`GET /reports/invoices/filter-options`).
+ *
+ * `branchId` được **gửi lên**, không chỉ dùng làm cache key: server bỏ qua
+ * bypass `iam.user.read.all` khi có tham số này, nên đây là thứ duy nhất khiến
+ * quản lý cửa hàng thấy nhân sự chi nhánh mình thay vì cả chuỗi. Chưa chọn chi
+ * nhánh thì không gọi — gọi lúc đó là xin đúng danh sách toàn tổ chức.
+ */
 export function useReportFilterOptionsQuery(
   type: string,
 ): UseQueryResult<IDropdownOption[], Error> {
   const branchId = usePosBranchStore((s) => s.branchId) ?? "";
   return useQuery<IDropdownOption[], Error>({
     queryKey: DAILY_REPORT_KEYS.FILTER_OPTIONS(type, branchId),
-    queryFn: () => dailyReportService.getFilterOptions(type),
+    queryFn: () => dailyReportService.getFilterOptions(type, "", branchId),
+    enabled: Boolean(branchId),
     staleTime: 5 * 60_000,
   });
 }

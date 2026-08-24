@@ -12,6 +12,7 @@ import { EventPublisher } from '../events/event-publisher.service';
 import { BranchEntity } from '../branch/branch.entity';
 import { UserEntity } from '../auth/user.entity';
 import { EmployeeProfileEntity } from '../rbac/employee/employee-profile.entity';
+import { employeeBranchScopeSqlNamed } from '../rbac/employee-branch-scope.service';
 import { SalesmanAssignmentEntity } from './salesman-assignment.entity';
 import { SalesManagerAssignmentEntity } from './sales-manager-assignment.entity';
 
@@ -45,13 +46,25 @@ export class SalesHierarchyService {
 
   // ── Salesmen ──────────────────────────────────────────────
 
-  /** Salesmen = all employees in the organization; `branchId` only gates branch-scope access, not the result set. */
+  /**
+   * Salesmen of one branch: employees whose linked user account is assigned to it.
+   *
+   * The branch predicate keys on `u.id`, not `e.id` — `user_branch_assignments.user_id`
+   * points at `users.id`, and keying on the profile id would match nothing and read on
+   * screen as "this branch has no salespeople" rather than as a bug. Same shape as the
+   * salesperson report filter, deliberately: both answer the same question.
+   *
+   * `branchId` used to gate access only, so the picker offered every employee in the
+   * organization and a cashier in one store could book a sale against a colleague in
+   * another. `salesman_assignments` is what assign/unassign writes, but nothing has ever
+   * read it and it is empty in practice — scoping by it would hand back an empty list.
+   */
   async listSalesmen(
     branchId: string,
     actor: ActorContext,
   ): Promise<PublicEmployee[]> {
     await this.validateBranch(branchId, actor);
-    return this.listOrganizationEmployees(actor.organizationId);
+    return this.listBranchEmployees(actor.organizationId, branchId);
   }
 
   async assignSalesman(
@@ -105,13 +118,20 @@ export class SalesHierarchyService {
 
   // ── Sales Managers ────────────────────────────────────────
 
-  /** Sales managers = all employees in the organization; `branchId` only gates branch-scope access, not the result set. */
+  /**
+   * Sales managers of one branch — same scoping as {@link listSalesmen}.
+   *
+   * Not asked for, but not optional either: the two methods shared the org-wide helper,
+   * so scoping one and leaving the other would have left a sibling pair with opposite
+   * meanings behind identical names. Its only caller is the backoffice assignment screen,
+   * whose empty state already reads "tại chi nhánh này".
+   */
   async listSalesManagers(
     branchId: string,
     actor: ActorContext,
   ): Promise<PublicEmployee[]> {
     await this.validateBranch(branchId, actor);
-    return this.listOrganizationEmployees(actor.organizationId);
+    return this.listBranchEmployees(actor.organizationId, branchId);
   }
 
   async assignSalesManager(
@@ -166,18 +186,24 @@ export class SalesHierarchyService {
   // ── Helpers ───────────────────────────────────────────────
 
   /**
-   * All employees in the organization, projected to public-safe fields. The display
-   * name is taken from each employee's linked user account; salary/ID-card fields are
-   * never exposed.
+   * Employees of one branch, projected to public-safe fields. The display name is taken
+   * from each employee's linked user account; salary/ID-card fields are never exposed.
    */
-  private async listOrganizationEmployees(
+  private async listBranchEmployees(
     organizationId: string,
+    branchId: string,
   ): Promise<PublicEmployee[]> {
-    const profiles = await this.employeeRepo.find({
-      where: { organizationId },
-      relations: { jobPosition: true },
-      order: { code: 'ASC' },
-    });
+    // QueryBuilder rather than find(): the branch link lives on a third table and
+    // FindOptionsWhere cannot carry the EXISTS. The join to `users` is what the
+    // predicate keys on; the profile row itself has no usable branch column.
+    const profiles = await this.employeeRepo
+      .createQueryBuilder('e')
+      .leftJoinAndSelect('e.jobPosition', 'jobPosition')
+      .innerJoin(UserEntity, 'u', 'u.id = e.userId')
+      .where('e.organizationId = :organizationId', { organizationId })
+      .andWhere(employeeBranchScopeSqlNamed('u.id'), { scopeBranchId: branchId })
+      .orderBy('e.code', 'ASC')
+      .getMany();
     if (profiles.length === 0) return [];
 
     const userIds = [...new Set(profiles.map((p) => p.userId))];

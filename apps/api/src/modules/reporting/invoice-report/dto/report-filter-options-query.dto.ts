@@ -1,6 +1,14 @@
 import { ReportFilterOptionType } from '@erp/shared-interfaces';
 import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 
 /** Query params for the shared dropdown filter-options endpoint. */
 export class ReportFilterOptionsQueryDto {
@@ -12,6 +20,15 @@ export class ReportFilterOptionsQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  /**
+   * Pin the people lists (`cashier` / `salesperson`) to this branch, even for an
+   * actor holding `iam.user.read.all`. POS sends its active branch; the chain
+   * reports omit it and keep the consolidated view. Ignored by every other type.
+   */
+  @IsOptional()
+  @IsUUID()
+  branchId?: string;
 
   @IsOptional()
   @Type(() => Number)

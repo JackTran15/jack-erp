@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
@@ -7,6 +7,7 @@ import {
   ReportFilterOptionType,
 } from '@erp/shared-interfaces';
 import { FindOptionsWhere, ILike, In, Repository } from 'typeorm';
+import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { UserEntity } from '../../../auth/user.entity';
 import { BranchEntity } from '../../../branch/branch.entity';
 import { CustomerEntity } from '../../../customer/customer.entity';
@@ -59,12 +60,16 @@ export class GetReportFilterOptionsHandler
       // The scope is resolved inside these two branches only: every other
       // filter type would otherwise pay for a permission lookup it never reads.
       case ReportFilterOptionType.CASHIER:
-        return this.cashiers(org, dto, await this.employeeScope.resolve(actor));
+        return this.cashiers(
+          org,
+          dto,
+          this.narrowScope(await this.employeeScope.resolve(actor), dto, actor),
+        );
       case ReportFilterOptionType.SALESPERSON:
         return this.salespeople(
           org,
           dto,
-          await this.employeeScope.resolve(actor),
+          this.narrowScope(await this.employeeScope.resolve(actor), dto, actor),
         );
       case ReportFilterOptionType.CUSTOMER:
         return this.customersOptions(org, dto);
@@ -82,6 +87,35 @@ export class GetReportFilterOptionsHandler
       default:
         throw new BadRequestException(`Unknown filter option type: ${dto.type}`);
     }
+  }
+
+  /**
+   * A branch named by the caller wins over the permission-derived scope.
+   *
+   * POS sends its active branch, so a store manager holding `iam.user.read.all`
+   * gets that store's people rather than the whole chain's. The backoffice chain
+   * reports send nothing and keep `EmployeeBranchScopeService`'s answer, which is
+   * what makes a consolidated cashier filter possible at all — narrowing the
+   * shared service instead would have emptied that screen.
+   *
+   * The membership check is the whole security of the parameter: without it this
+   * is a way for any actor to read the staff of a branch they do not belong to.
+   *
+   * The bound is `branchIds` — the assignment list — not the active branch, so
+   * this is not purely a narrowing: an actor assigned to A and B, working in A,
+   * can name B here without going through `/auth/switch-branch`. Deliberate, and
+   * consistent with `/admin/users`, which already spans every assigned branch.
+   */
+  private narrowScope(
+    scope: EmployeeScope,
+    dto: ReportFilterOptionsQueryDto,
+    actor: ActorContext,
+  ): EmployeeScope {
+    if (!dto.branchId) return scope;
+    if (!actor.branchIds?.includes(dto.branchId)) {
+      throw new ForbiddenException(`Access denied for branch: ${dto.branchId}`);
+    }
+    return { mode: 'branch', branchId: dto.branchId };
   }
 
   private take(dto: ReportFilterOptionsQueryDto): number {

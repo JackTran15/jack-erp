@@ -25,8 +25,6 @@ import {
 
 import { TEMP_WAREHOUSE_KEYS } from "@erp/pos/constants/react-query-key.constant";
 import { tempWarehouseService } from "@erp/pos/services/temp-warehouse.service";
-import { salesHierarchyService } from "@erp/pos/services/sales-hierarchy.service";
-import { userToCarrierUser } from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer-pickers";
 
 export function useTempWarehouseLines(
   branchId: string | null,
@@ -103,14 +101,17 @@ export function useTempWarehouseActiveSession(
   });
 }
 
-export const TEMP_WAREHOUSE_CARRIERS_PAGE_SIZE = 50;
+/**
+ * 20 chứ không phải 50: dropdown chỉ cao 288px, để 50 thì trang 2 gần như không
+ * bao giờ được xin tới và phân trang cuộn thành thứ có mà không chạy.
+ */
+export const TEMP_WAREHOUSE_CARRIERS_PAGE_SIZE = 20;
 
 /**
- * Carrier options for the fast-stock-transfer picker are sourced from the
- * organization's salesmen (`GET /branches/:id/salesmen`), not branch-assigned
- * users. Each row's `id` is the user account id so the line's `carrierUserId`
- * resolves back to the same user when lines are listed. Search/pagination are
- * applied in memory since the salesmen endpoint returns the full list.
+ * Người vận chuyển = user active **được gán chi nhánh** đang chọn
+ * (`GET /inventory/temp-warehouse/carriers`, resolve qua `user_branch_assignments`).
+ * `id` là id tài khoản, nên `carrierUserId` trên line resolve ngược lại đúng
+ * người. Tìm kiếm và phân trang do server làm — theo tên, email và mã nhân viên.
  */
 export async function fetchTempWarehouseCarriers(
   branchId: string,
@@ -118,39 +119,27 @@ export async function fetchTempWarehouseCarriers(
   page = 1,
   pageSize = TEMP_WAREHOUSE_CARRIERS_PAGE_SIZE,
 ): Promise<PaginatedResponse<TempWarehousePublicUser>> {
-  const rows = await salesHierarchyService.listSalesmen(branchId);
-  const carriers = rows.map((r) =>
-    userToCarrierUser({
-      userId: r.userId,
-      displayName: r.fullName || r.code || r.userId,
-    }),
-  );
-  const q = search.trim().toLowerCase();
-  const filtered = q
-    ? carriers.filter((c) => c.firstName.toLowerCase().includes(q))
-    : carriers;
-  const start = (page - 1) * pageSize;
-  return {
-    data: filtered.slice(start, start + pageSize),
-    total: filtered.length,
-    page,
-    pageSize,
-  };
+  return tempWarehouseService.listCarriers({
+    branchId,
+    search,
+    pagination: { page, pageSize },
+  });
 }
 
 export function useSearchTempWarehouseCarriers() {
   const queryClient = useQueryClient();
   return useCallback(
-    (branchId: string, search: string) => {
+    (branchId: string, search: string, page = 1) => {
       const normalizedSearch = search.trim();
       return queryClient.fetchQuery({
         queryKey: TEMP_WAREHOUSE_KEYS.CARRIERS(
           branchId,
           normalizedSearch,
-          1,
+          page,
           TEMP_WAREHOUSE_CARRIERS_PAGE_SIZE,
         ),
-        queryFn: () => fetchTempWarehouseCarriers(branchId, normalizedSearch),
+        queryFn: () =>
+          fetchTempWarehouseCarriers(branchId, normalizedSearch, page),
         staleTime: 30_000,
       });
     },

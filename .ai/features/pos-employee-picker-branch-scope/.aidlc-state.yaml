@@ -1,0 +1,241 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: pos-employee-picker-branch-scope
+slug: pos-employee-picker-branch-scope
+profile: none
+created: 2026-08-24T11:03:21
+current_gate: G5
+history:
+  - gate: G0
+    action: passed
+    at: 2026-08-24T11:05:42
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-08-24T11:07:53
+    by: Akenzy
+    evidence: 7 assumptions, none blocking-and-pending; 13 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-24T11:08:48
+    by: Akenzy
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-24T11:11:44
+    by: Akenzy
+    evidence: graph valid - 2 UoW, 5 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T11:11:55
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T11:11:55
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T11:22:54
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T11:22:54
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket todo
+    at: 2026-08-24T11:28:41
+    by: code-review
+    reason: 3 blockers - finally clears the in-flight flag for a stale seq; no !loading guard so a scroll during the debounce window or during the collapsed 'Dang tim...' body pages the wrong query; loadedCount read from a stale closure after the async gap
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T11:29:32
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T11:32:29
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket todo
+    at: 2026-08-24T11:39:09
+    by: code-review
+    reason: auto-fill effect (W1 fix) pages a stale activeQueryRef into the empty-result state - runSearch catch never writes activeQueryRef nor arms exhausted, so the 'Khong co ket qua' box satisfies scrollHeight<=clientHeight and requests page 1 of the previous query
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T11:39:09
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T11:41:11
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket todo
+    at: 2026-08-24T11:43:58
+    by: code-review
+    reason: PASS with no blockers; reopened only to take the reviewer's suggestion — assert getCount() runs before the projection is narrowed, so a later refactor cannot silently turn total into the page length
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T11:43:59
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket todo
+    at: 2026-08-24T11:44:34
+    by: code-review
+    reason: PASS with no blockers; reopened only to take two suggestions — loadedCount JSDoc no longer matches what the ref counts, and itemKey in loadNextPage deps churns the auto-fill effect on every hover
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T11:44:34
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T11:45:19
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T11:45:20
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T11:45:20
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T11:45:20
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T11:45:32
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T11:45:32
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T11:51:08
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T11:51:08
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket todo
+    at: 2026-08-24T11:58:39
+    by: code-review
+    reason: PASS, no blockers; reopened to take warning 1 — ADR-02 and the governance row describe the param as narrowing, but it is bounded by actor.branchIds not by the active branch, so a multi-branch actor can name a sibling branch without switchBranch
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T11:58:39
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T12:43:25
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T12:43:25
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T12:43:33
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T12:44:39
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T12:51:47
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket todo
+    at: 2026-08-24T12:53:50
+    by: code-review
+    reason: blocker - carrierLoadMore derives the page from Math.floor(loadedCount/pageSize)+1, which only holds while every page is full; the last page is always short, so the division lands back on the page just fetched and re-requests it until loadedCount crosses a pageSize multiple
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T12:53:50
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T12:55:01
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket todo
+    at: 2026-08-24T13:00:21
+    by: code-review
+    reason: blocker - pagingRef is written unconditionally on resolution, so a superseded search response can overwrite cursor.query and make the next carrierLoadMore return [] for a query that is not exhausted, arming the popover's exhaustedRef
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T13:00:22
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T13:00:56
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket todo
+    at: 2026-08-24T13:04:28
+    by: code-review
+    reason: PASS, no blockers; reopened for the comment warning — the comment calls both guard branches unreachable, but fetched >= total is the normal exhaustion path hit on every fully-scrolled query, and a future reader could delete it as dead code
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T13:04:28
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T13:04:32
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T13:04:32
+    by: Akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: passed
+    at: 2026-08-24T15:37:55
+    by: Akenzy
+    evidence: all 5 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-08-24T15:38:06
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

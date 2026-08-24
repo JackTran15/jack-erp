@@ -4,7 +4,6 @@ import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import {
   collectCarriersFromLines,
   collectProductsFromLines,
-  listCarriersSorted,
   mergeCarriersById,
   mergeProductsByItemId,
 } from "@erp/pos/lib/page-libs/fast-stock-transfer/picker-cache";
@@ -46,7 +45,6 @@ interface PosFastStockTransferPickerState {
     users: ReadonlyArray<TempWarehousePublicUser | null | undefined>,
   ) => void;
   getCarrierById: (userId: string) => TempWarehousePublicUser | null;
-  listCarriers: () => TempWarehousePublicUser[];
 
   upsertProducts: (
     products: ReadonlyArray<PosCatalogLine | null | undefined>,
@@ -86,7 +84,6 @@ export const usePosFastStockTransferPickerStore =
 
     getCarrierById: (userId) => get().carriersById[userId] ?? null,
 
-    listCarriers: () => listCarriersSorted(get().carriersById),
 
     upsertProducts: (products) =>
       set((state) => ({

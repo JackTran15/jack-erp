@@ -152,7 +152,7 @@ export class TempWarehouseController {
   @Get('carriers')
   @ApiOperation({
     summary:
-      'List active users assigned to the given branch — used by the FE carrier picker',
+      'List active users assigned to the given branch, searchable by name, email or employee code — used by the FE carrier picker',
   })
   @RequirePermission('inventory.temp-warehouse.read')
   @RequireBranchScope()

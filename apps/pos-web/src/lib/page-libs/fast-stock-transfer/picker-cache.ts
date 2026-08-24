@@ -1,5 +1,4 @@
 import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
-import { formatCarrierName } from "@erp/pos/lib/page-libs/fast-stock-transfer/temp-warehouse-mappers";
 import type { PosCatalogDirection } from "@erp/pos/types/catalog.type";
 import {
   TempWarehouseDirection,
@@ -24,14 +23,6 @@ export function mergeCarriersById(
     if (user) next[user.id] = user;
   }
   return next;
-}
-
-export function listCarriersSorted(
-  byId: Record<string, TempWarehousePublicUser>,
-): TempWarehousePublicUser[] {
-  return Object.values(byId).sort((a, b) =>
-    formatCarrierName(a).localeCompare(formatCarrierName(b), "vi"),
-  );
 }
 
 export function mergeProductsByItemId(

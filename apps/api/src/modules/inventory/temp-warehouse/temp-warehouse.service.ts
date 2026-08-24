@@ -8,7 +8,6 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   DataSource,
-  ILike,
   In,
   Not,
   Repository,
@@ -37,7 +36,8 @@ import { TempWarehouseLineEntity } from './temp-warehouse-line.entity';
 import { ItemEntity } from '../location/item.entity';
 import { LocationEntity } from '../location/location.entity';
 import { UserEntity } from '../../auth/user.entity';
-import { UserBranchAssignmentEntity } from '../../branch/user-branch-assignment.entity';
+import { EmployeeProfileEntity } from '../../rbac/employee/employee-profile.entity';
+import { employeeBranchScopeSqlNamed } from '../../rbac/employee-branch-scope.service';
 import { BranchLocationResolverService } from './branch-location-resolver.service';
 import { StorageDefaultLocationResolverService } from '../location/storage-default-location-resolver.service';
 import { AddTempWarehouseLineDto } from './dto/add-line.dto';
@@ -52,6 +52,8 @@ export interface PublicUser {
   firstName: string;
   lastName: string;
   email: string;
+  /** From the linked employee_profiles row; null for accounts with no HR profile. */
+  employeeCode?: string | null;
 }
 
 export interface PublicItem {
@@ -136,8 +138,6 @@ export class TempWarehouseService {
     private readonly lineRepo: Repository<TempWarehouseLineEntity>,
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
-    @InjectRepository(UserBranchAssignmentEntity)
-    private readonly userBranchRepo: Repository<UserBranchAssignmentEntity>,
     @InjectRepository(ItemEntity)
     private readonly itemRepo: Repository<ItemEntity>,
     @InjectRepository(LocationEntity)
@@ -213,46 +213,69 @@ export class TempWarehouseService {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 50;
 
-    const assignments = await this.userBranchRepo.find({
-      where: {
-        branchId: query.branchId,
-        organizationId: actor.organizationId,
-      },
-      select: ['userId'],
-    });
-
-    const userIds = assignments.map((a) => a.userId);
-    if (userIds.length === 0) {
-      return { data: [], total: 0, page, pageSize };
-    }
-
-    const baseWhere = {
-      id: In(userIds),
-      organizationId: actor.organizationId,
-      isActive: true,
-    } as const;
+    // A QueryBuilder rather than find(): the employee code lives on a joined
+    // table, and FindOptionsWhere can express neither that join nor the branch
+    // EXISTS. One statement also replaces the previous load-all-assignments pass,
+    // which bound a userId list that grew with branch headcount.
+    const qb = this.userRepo
+      .createQueryBuilder('u')
+      // employee_profiles.organization_id is character varying while
+      // users.organization_id is uuid — the cast is not optional. Same idiom as
+      // get-report-filter-options.handler.ts, deliberately, so the two joins over
+      // these tables stay recognisably the same shape.
+      .leftJoin(
+        EmployeeProfileEntity,
+        'e',
+        'e.user_id = u.id AND e.organization_id::uuid = u.organizationId',
+      )
+      .where('u.organizationId = :org', { org: actor.organizationId })
+      .andWhere('u.isActive = true')
+      // The branch link is user_branch_assignments, not any column on the user or
+      // the profile. Shared with the other employee pickers so they cannot drift.
+      .andWhere(employeeBranchScopeSqlNamed('u.id'), {
+        scopeBranchId: query.branchId,
+      });
 
     const search = query.search?.trim();
-    const where = search
-      ? [
-          { ...baseWhere, firstName: ILike(`%${search}%`) },
-          { ...baseWhere, lastName: ILike(`%${search}%`) },
-          { ...baseWhere, email: ILike(`%${search}%`) },
-        ]
-      : baseWhere;
+    if (search) {
+      qb.andWhere(
+        '(u.firstName ILIKE :s OR u.lastName ILIKE :s OR u.email ILIKE :s OR e.code ILIKE :s)',
+        { s: `%${search}%` },
+      );
+    }
 
-    const [users, total] = await this.userRepo.findAndCount({
-      where,
-      order: { firstName: 'ASC', lastName: 'ASC' },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    });
+    // Counted before the projection is narrowed: `total` is the filtered size, not
+    // the length of the page.
+    const total = await qb.getCount();
 
-    const data: PublicUser[] = users.map((u) => ({
-      id: u.id,
-      firstName: u.firstName,
-      lastName: u.lastName,
-      email: u.email,
+    const rows = await qb
+      .select('u.id', 'id')
+      .addSelect('u.firstName', 'firstName')
+      .addSelect('u.lastName', 'lastName')
+      .addSelect('u.email', 'email')
+      .addSelect('e.code', 'employeeCode')
+      .orderBy('u.firstName', 'ASC')
+      .addOrderBy('u.lastName', 'ASC')
+      // The id tiebreaker is load-bearing for the infinite-scroll picker: without a
+      // unique last key, two people sharing a name let page 2 repeat or drop a row,
+      // which reads on screen as a flaky list rather than as a bug.
+      .addOrderBy('u.id', 'ASC')
+      .offset((page - 1) * pageSize)
+      .limit(pageSize)
+      .getRawMany<{
+        id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+        employeeCode: string | null;
+      }>();
+
+    const data: PublicUser[] = rows.map((r) => ({
+      id: r.id,
+      firstName: r.firstName,
+      lastName: r.lastName,
+      email: r.email,
+      employeeCode: r.employeeCode ?? null,
     }));
 
     return { data, total, page, pageSize };

@@ -3982,7 +3982,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List active users assigned to the given branch — used by the FE carrier picker */
+        /** List active users assigned to the given branch, searchable by name, email or employee code — used by the FE carrier picker */
         get: operations["TempWarehouseController_listCarriers"];
         put?: never;
         post?: never;
@@ -21159,7 +21159,7 @@ export interface operations {
             query: {
                 /** @description Branch to scope carriers to. Must be one of the actor branchIds. */
                 branchId: string;
-                /** @description Free-text search on firstName, lastName, email (ILIKE). */
+                /** @description Free-text search on firstName, lastName, email and employee code (ILIKE). */
                 search?: string;
                 page?: number;
                 pageSize?: number;
@@ -24267,6 +24267,12 @@ export interface operations {
                 type: "store" | "cashier" | "salesperson" | "customer" | "productGroup" | "brand" | "unit" | "warehouse" | "customerGroup" | "supplier" | "supplierGroup" | "invoiceStatus" | "statDateType" | "productType" | "statBy";
                 /** @description Optional case-insensitive partial search (dynamic types only). */
                 search?: string;
+                /**
+                 * @description Pin the people lists (`cashier` / `salesperson`) to this branch, even for an
+                 *     actor holding `iam.user.read.all`. POS sends its active branch; the chain
+                 *     reports omit it and keep the consolidated view. Ignored by every other type.
+                 */
+                branchId?: string;
                 page?: number;
                 pageSize?: number;
             };
