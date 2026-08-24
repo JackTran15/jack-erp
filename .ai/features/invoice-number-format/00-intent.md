@@ -3,7 +3,7 @@ feature: invoice-number-format
 slug: invoice-number-format
 owner: Akenzy
 created: 2026-08-22
-status: draft
+status: done
 ---
 
 # Intent — Số hoá đơn in ra phải là số thật, theo định dạng YYMMDDxxxx
@@ -49,8 +49,10 @@ Với mọi hoá đơn tạo mới sau khi triển khai: số in trên phiếu l
   ra giấy và đã nằm trong báo cáo, sổ cái, phiếu thu — viết lại là làm hỏng dữ liệu lịch sử.
 - **Không đụng các loại chứng từ khác** (PT, PC, NK, XK, CK, KH, NV…). Câu hỏi QA #16 chỉ
   nói về số hoá đơn; đổi 28 loại còn lại là một phạm vi khác hẳn.
-- **Không thêm đoạn phân biệt chi nhánh vào mã.** Bộ đếm dùng chung toàn công ty (quyết định
-  của người dùng), nên mã vẫn đúng dạng `YYMMDDxxxx` không hậu tố chi nhánh.
+- **Không thêm đoạn phân biệt chi nhánh vào mã.** Mã vẫn đúng dạng `YYMMDDxxxx` không hậu tố
+  chi nhánh — nhưng **bộ đếm sinh ra mã đó nay tách theo từng chi nhánh**, đảo lại quyết định
+  ban đầu (A-02 → A-10, xem ADR-07): đối chiếu hoá đơn cuối ngày cần thực hiện theo chi nhánh,
+  và bộ đếm dùng chung làm số nhảy cách quãng khi lọc theo một chi nhánh (item #26, ảnh QA).
 - **Không sửa phiếu tạm tính.** "HÓA ĐƠN TẠM TÍNH" in trước khi hoá đơn tồn tại nên chưa thể
   có số thật — xử lý riêng ở UOW-03, không phải bằng cách sinh số giả.
 - **Không chuyển sang Postgres SEQUENCE.** Vấn đề hiệu năng của bộ đếm là giai đoạn 2 của

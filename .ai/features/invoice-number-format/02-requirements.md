@@ -1,7 +1,7 @@
 ---
 feature: invoice-number-format
 stories: 4
-acceptance_criteria: 15
+acceptance_criteria: 17
 ---
 
 # Requirements — invoice-number-format
@@ -60,12 +60,33 @@ Then hai mã là "2608210001" và "2608210001TH"
 And cả hai cùng tồn tại, không có lỗi trùng mã
 ```
 
-**AC-07** — Nhiều chi nhánh dùng chung một bộ đếm
+**AC-07** — Mỗi chi nhánh có bộ đếm riêng, độc lập với chi nhánh khác *(sửa lại theo A-10/ADR-07 —
+đảo ngược bản gốc "nhiều chi nhánh dùng chung một bộ đếm")*
 ```gherkin
-Given chi nhánh MT211 Đà Nẵng và chi nhánh Cần Thơ thuộc cùng một công ty
+Given chi nhánh MT211 Đà Nẵng và chi nhánh Cần Thơ thuộc cùng một công ty, cùng chưa lập hoá đơn
+  bán nào trong ngày 21/08/2026
 When mỗi chi nhánh lập một đơn bán hàng trong cùng ngày 21/08/2026
-Then hai mã là "2608210001" và "2608210002", khác nhau
-And không có lỗi vi phạm uq_invoice_org_code
+Then cả hai mã đều là "2608210001"
+And không có lỗi vi phạm ràng buộc unique — hai hoá đơn khác branch_id được phép trùng chuỗi mã
+```
+
+**AC-16** — Đối chiếu cuối ngày theo chi nhánh không nhảy số
+```gherkin
+Given chi nhánh Cần Thơ đã lập các hoá đơn bán "2608240001".."2608240005" trong ngày, không xen
+  hoá đơn của chi nhánh nào khác
+When kế toán lọc danh sách hoá đơn theo "Ngày tạo: Hôm nay" và chi nhánh Cần Thơ
+Then dải số hiển thị liên tục từ 0001 đến 0005, không có số nào bị thiếu do chi nhánh khác chiếm
+```
+
+**AC-17** — Chi nhánh chưa từng có rule riêng tự động được cấp một bộ đếm khi lập hoá đơn kế tiếp
+```gherkin
+Given chi nhánh Bình Dương mới tạo, chưa từng có rule đánh số INVOICE/RETURN riêng, và bộ đếm
+  dùng chung của công ty hôm nay đang ở giá trị 12
+When thu ngân ở chi nhánh Bình Dương thanh toán đơn bán hàng đầu tiên trong ngày
+Then một rule đánh số theo chi nhánh Bình Dương được tạo, sao chép đúng định dạng của rule dùng
+  chung hiện tại
+And mã hoá đơn được cấp không trùng với bất kỳ mã nào chi nhánh Bình Dương đã từng phát trong
+  ngày hôm đó (bộ đếm mới được fast-forward lên tối thiểu bằng giá trị 12 trước khi cấp số đầu tiên)
 ```
 
 **AC-08** — Các loại chứng từ khác không đổi

@@ -34,7 +34,7 @@ export enum RefundMethod {
 @Index(['organizationId', 'branchId', 'issuedAt'])
 @Index(['organizationId', 'customerId'])
 @Index(['organizationId', 'sessionId', 'isDraft'])
-@Index('uq_invoice_org_code', ['organizationId', 'code'], { unique: true })
+@Index('uq_invoice_org_branch_code', ['organizationId', 'branchId', 'code'], { unique: true })
 @Index('IDX_invoices_org_original', ['organizationId', 'originalInvoiceId'])
 @Index('IDX_invoices_org_branch_status_created', ['organizationId', 'branchId', 'status', 'createdAt'])
 @Index('IDX_invoices_org_customer_type_status', ['organizationId', 'customerId', 'type', 'status'])

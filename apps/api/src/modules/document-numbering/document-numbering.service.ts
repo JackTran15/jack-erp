@@ -257,6 +257,8 @@ export class DocumentNumberingService {
     actor: ActorContext,
     manager?: EntityManager,
   ): Promise<string> {
+    await this.ensureBranchRule(documentType, branchId, actor, manager);
+
     let rule = await this.resolveActiveRule(
       documentType,
       branchId,
@@ -286,6 +288,8 @@ export class DocumentNumberingService {
     branchId: string | undefined,
     actor: ActorContext,
   ): Promise<string> {
+    await this.ensureBranchRule(documentType, branchId, actor);
+
     let rule = await this.resolveActiveRule(
       documentType,
       branchId,
@@ -365,6 +369,149 @@ export class DocumentNumberingService {
       return;
     }
     await this.dataSource.transaction(fastForward);
+  }
+
+  /**
+   * INVOICE/RETURN counters are branch-scoped (ADR-07 in
+   * `03-logical-design.md`): `resolveActiveRule` already prefers a branch rule
+   * over the org-wide one, but nobody ever creates that branch rule. Called
+   * from `generate()`/`preview()` only — the saga's `NextDocumentNumberStep`/
+   * `mintDocumentNumber` must stay unaware of this service (see the comment
+   * there) and only lock/increment a rule this preflight step already made
+   * exist.
+   *
+   * No-op for every document type other than INVOICE/RETURN, for calls
+   * without a `branchId`, and for a branch that already has an active rule —
+   * the cheap existence check below runs outside any transaction so a branch
+   * with its rule already in place never pays for one.
+   */
+  private async ensureBranchRule(
+    documentType: DocumentType,
+    branchId: string | undefined,
+    actor: ActorContext,
+    callerManager?: EntityManager,
+  ): Promise<void> {
+    if (!branchId) return;
+    if (documentType !== DocumentType.INVOICE && documentType !== DocumentType.RETURN) {
+      return;
+    }
+
+    const readRepo = callerManager
+      ? callerManager.getRepository(DocumentNumberRuleEntity)
+      : this.ruleRepo;
+    const existingBranchRule = await readRepo.findOne({
+      where: {
+        organizationId: actor.organizationId,
+        branchId,
+        documentType,
+        isActive: true,
+      },
+    });
+    if (existingBranchRule) return;
+
+    const cloneIntoBranch = async (manager: EntityManager): Promise<void> => {
+      const ruleRepo = manager.getRepository(DocumentNumberRuleEntity);
+
+      // Re-check inside the transaction: a concurrent first request for this
+      // branch today may already have committed the rule between the read
+      // above and this transaction starting.
+      const stillMissing = !(await ruleRepo.findOne({
+        where: {
+          organizationId: actor.organizationId,
+          branchId,
+          documentType,
+          isActive: true,
+        },
+      }));
+      if (!stillMissing) return;
+
+      let orgRule = await ruleRepo.findOne({
+        where: {
+          organizationId: actor.organizationId,
+          branchId: IsNull(),
+          documentType,
+          isActive: true,
+        },
+      });
+      if (!orgRule) {
+        orgRule = await this.ensureDefaultActiveRule(documentType, actor, manager);
+      }
+      if (!orgRule) return;
+
+      const branchRule = ruleRepo.create({
+        organizationId: orgRule.organizationId,
+        branchId,
+        documentType: orgRule.documentType,
+        prefix: orgRule.prefix,
+        suffix: orgRule.suffix,
+        includeDate: orgRule.includeDate,
+        dateFormat: orgRule.dateFormat,
+        sequenceLength: orgRule.sequenceLength,
+        separator: orgRule.separator,
+        resetPolicy: orgRule.resetPolicy,
+        isActive: true,
+        createdBy: actor.userId,
+      });
+
+      try {
+        await ruleRepo.save(branchRule);
+      } catch (error) {
+        // Lost the race to a concurrent first request for this branch today —
+        // the unique index on (branchId, documentType, isActive) rejected
+        // this insert, same pattern as `ensureDefaultActiveRule`. Inside the
+        // caller's own transaction the failed statement has already aborted
+        // it, so there is nothing left to read back here; propagate and let
+        // the caller retry.
+        if (callerManager) throw error;
+        this.logger.warn(
+          `Lost race creating branch numbering rule for ${documentType} in branch ${branchId}, reusing the winner's rule`,
+        );
+        return;
+      }
+
+      // Fast-forward the new branch counter to at least where the org-wide
+      // counter stands today, so a mid-day cutover cannot reissue a number
+      // this same branch already holds under the shared counter.
+      const resetKey = this.computeResetKey(orgRule.resetPolicy, new Date());
+      const counterRepo = manager.getRepository(DocumentNumberCounterEntity);
+      const orgCounter = await counterRepo.findOne({
+        where: { ruleId: orgRule.id, resetKey },
+      });
+      const currentValue = Number(orgCounter?.currentValue ?? 0);
+
+      // `ensureSequenceAtLeast` intentionally no-ops when there is no counter
+      // row yet for (ruleId, resetKey) — for its other caller
+      // (`customer-code.service.ts`) that row always already exists. This
+      // branch rule is brand new, so seed today's counter at 0 first; then
+      // `ensureSequenceAtLeast` has an existing row to raise to `currentValue`
+      // (or leaves it at 0 if the org-wide counter hasn't issued anything
+      // today either).
+      await counterRepo.save(
+        counterRepo.create({
+          ruleId: branchRule.id,
+          organizationId: actor.organizationId,
+          branchId,
+          resetKey,
+          currentValue: 0,
+        }),
+      );
+
+      if (currentValue > 0) {
+        await this.ensureSequenceAtLeast(
+          documentType,
+          branchId,
+          actor,
+          currentValue,
+          manager,
+        );
+      }
+    };
+
+    if (callerManager) {
+      await cloneIntoBranch(callerManager);
+      return;
+    }
+    await this.dataSource.transaction(cloneIntoBranch);
   }
 
   private async resolveActiveRule(

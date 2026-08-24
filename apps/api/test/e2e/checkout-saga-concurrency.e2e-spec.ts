@@ -5,6 +5,7 @@ import {
   countBusinessRows,
   CheckoutSagaFixture,
 } from './setup/checkout-saga-fixture';
+import { authHeader } from './setup/test-app';
 
 /**
  * T-02-09 — the four hardest ACs, each a real bug of the v1 flow: (f) concurrent
@@ -280,6 +281,163 @@ describe('Checkout Saga v2 — concurrency & idempotency (E2E)', () => {
     for (let i = 1; i < sequences.length; i++) {
       expect(sequences[i]).toBe(sequences[i - 1] + 1); // contiguous, no jump
     }
+  });
+
+  // ─── T-04-02 (AC-07/AC-17) — real race on a branch's first INVOICE rule ──
+  /**
+   * Real-Postgres proof of the "lost the race, reuse the winner's rule" catch
+   * in `ensureBranchRule` (`document-numbering.service.ts` ~456-470) — a
+   * mocked unit test can assert the catch block runs, but not that Postgres'
+   * own `UQ_doc_rule_org_branch` partial unique index actually fires and gets
+   * survived under real concurrent transactions.
+   *
+   * Must be a genuinely fresh branch: `fx.seed.branchId` (reused by every
+   * other test above) already has an INVOICE rule by this point in the file
+   * (AC-10/AC-11 forced one into existence), so firing two concurrent
+   * requests at it would prove nothing about the create-path race — the rule
+   * would already exist before either request's `preview()` ever ran.
+   */
+  it('T-04-02: two concurrent checkouts on a branch with no INVOICE rule yet clone exactly one branch rule and issue distinct, sequential numbers (AC-07, AC-17)', async () => {
+    const branchId = randomUUID();
+    await fx.ds.query(
+      `INSERT INTO branches (id, organization_id, name, status, is_main_branch, created_by, created_at, updated_at)
+       VALUES ($1, $2, 'Concurrency Branch', 'ACTIVE', false, $3, NOW(), NOW())`,
+      [branchId, fx.seed.organizationId, fx.seed.userId],
+    );
+    await fx.ds.query(
+      `INSERT INTO user_branch_assignments (id, user_id, branch_id, organization_id, assigned_by)
+       VALUES (gen_random_uuid(), $1, $2, $3, $1)`,
+      [fx.seed.userId, branchId, fx.seed.organizationId],
+    );
+
+    // `ActorContext.branchId` is baked into the JWT at login/switch time and
+    // takes priority over the `X-Branch-Id` header (see actor-context.decorator.ts)
+    // — reusing `fx.headers()`'s token with a different header would not
+    // actually move the actor to the new branch. `/auth/switch-branch` issues
+    // a token scoped to it instead.
+    const switchRes = await request(fx.app.getHttpServer())
+      .post('/auth/switch-branch')
+      .set({ Authorization: authHeader(fx.seed.accessToken) })
+      .send({ branchId })
+      .expect(200);
+    const branchHeaders = () => ({
+      Authorization: authHeader(switchRes.body.accessToken),
+      'X-Branch-Id': branchId,
+    });
+
+    // Prerequisites `resolve-funds.step.ts` checks before it ever reaches
+    // `preview()`/`ensureBranchRule`: a branch cash fund and stock at a
+    // branch-owned location. Items themselves are organization-scoped
+    // (`items` has no `branch_id`), so `fx.itemId` is reused as-is.
+    const cashGl = await fx.ds.query(
+      `SELECT id FROM accounts WHERE organization_id = $1 AND code = '1111' LIMIT 1`,
+      [fx.seed.organizationId],
+    );
+    await request(fx.app.getHttpServer())
+      .post('/cash/accounts')
+      .set(branchHeaders())
+      .send({
+        name: 'Concurrency Branch Fund',
+        type: 'REGISTER',
+        accountId: cashGl[0].id,
+        balance: 0,
+      })
+      .expect(201);
+
+    const storageRes = await request(fx.app.getHttpServer())
+      .post('/inventory/storages')
+      .set(branchHeaders())
+      .send({ name: 'Concurrency WH', branchId })
+      .expect(201);
+    const locRes = await request(fx.app.getHttpServer())
+      .post('/inventory/locations')
+      .set(branchHeaders())
+      .send({
+        code: 'CONC-LOC',
+        type: 'SHELF',
+        name: 'Concurrency Loc',
+        storageId: storageRes.body.id,
+        branchId,
+      })
+      .expect(201);
+    const locationId = locRes.body.id;
+    await fx.ds.query(
+      `INSERT INTO stock_balances (id, organization_id, branch_id, item_id, location_id, quantity, created_by, created_at, updated_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, 100, $5, NOW(), NOW())`,
+      [fx.seed.organizationId, branchId, fx.itemId, locationId, fx.seed.userId],
+    );
+
+    const createBranchDraft = async (): Promise<string> => {
+      const res = await request(fx.app.getHttpServer())
+        .post('/invoices')
+        .set(branchHeaders())
+        .send({
+          sessionId: randomUUID(),
+          items: [
+            {
+              itemId: fx.itemId,
+              locationId,
+              itemCode: 'CKO-ITEM',
+              itemName: 'Item',
+              unit: 'PCS',
+              quantity: 1,
+              unitPrice: 100000,
+            },
+          ],
+        })
+        .expect(201);
+      return res.body.id as string;
+    };
+
+    // Two separate drafts, created sequentially — this is not AC-11's
+    // single-draft lock race, it is two distinct sales landing on the same
+    // brand-new branch counter at the same time (that race happens below, at
+    // checkout). Draft creation itself cannot run concurrently here: its
+    // `tempCode` is `DRAFT-${Date.now()}` (invoice.service.ts), so two drafts
+    // created in the same millisecond collide on `uq_invoice_org_branch_code`
+    // — an unrelated, pre-existing sharp edge, not the race this test exists
+    // to prove.
+    const invoiceIdA = await createBranchDraft();
+    const invoiceIdB = await createBranchDraft();
+
+    const rulesBefore = await fx.ds.query(
+      `SELECT count(*)::int AS c FROM document_number_rules
+       WHERE branch_id = $1 AND document_type = 'INVOICE'`,
+      [branchId],
+    );
+    expect(rulesBefore[0].c).toBe(0);
+
+    const [r1, r2] = await Promise.all([
+      request(fx.app.getHttpServer())
+        .post('/v2/pos/checkout')
+        .set(branchHeaders())
+        .send({ invoiceId: invoiceIdA, payments: [{ paymentMethod: 'cash', amount: 100000 }] }),
+      request(fx.app.getHttpServer())
+        .post('/v2/pos/checkout')
+        .set(branchHeaders())
+        .send({ invoiceId: invoiceIdB, payments: [{ paymentMethod: 'cash', amount: 100000 }] }),
+    ]);
+
+    expect(r1.status).toBe(201);
+    expect(r2.status).toBe(201);
+
+    // Exactly one branch rule — the "lost the race" branch reused the
+    // winner's rule instead of leaving a duplicate or crashing the request.
+    const rulesAfter = await fx.ds.query(
+      `SELECT count(*)::int AS c FROM document_number_rules
+       WHERE branch_id = $1 AND document_type = 'INVOICE'`,
+      [branchId],
+    );
+    expect(rulesAfter[0].c).toBe(1);
+
+    // Distinct, sequential — not both "...0001" (which is what an unhandled
+    // race, or two independent branch rules, would produce).
+    const codes = [r1.body.documentNumber as string, r2.body.documentNumber as string];
+    expect(codes[0]).not.toBe(codes[1]);
+    // DEFAULT_DOC_NUMBER_CONFIG's INVOICE shape: no prefix/separator/suffix,
+    // just YYMMDD + a 4-digit sequence — the trailing 4 digits are the counter.
+    const seqs = codes.map((c) => parseInt(c.slice(-4), 10)).sort((a, b) => a - b);
+    expect(seqs[1]).toBe(seqs[0] + 1);
   });
 
   /**

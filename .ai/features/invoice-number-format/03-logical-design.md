@@ -1,6 +1,6 @@
 ---
 feature: invoice-number-format
-adr_count: 6
+adr_count: 7
 ---
 
 # Logical design — invoice-number-format
@@ -144,7 +144,8 @@ khi có giá trị. Đây cũng chính là cách phiếu tạm tính hết mang 
 | Trùng mã `23505` trên `uq_invoice_org_code` | Transaction thanh toán rollback | Toast lỗi thanh toán |
 | Hai giao dịch cùng mở kỳ đếm mới | `DOC_NUMBER_COUNTER_CONFLICT` (đã có) | Toast "vui lòng thử lại" |
 | Response checkout thiếu `code` | Phiếu in **không có dòng `Số:`** | Không in số sai — đây là điểm mấu chốt của cả feature |
-| Migration gặp rule INVOICE/RETURN theo chi nhánh | `RAISE EXCEPTION`, migration dừng | Người vận hành xử lý rồi chạy lại |
+| Migration gặp rule INVOICE/RETURN theo chi nhánh | *Đã lỗi thời — xem ADR-07: đây giờ là hành vi mong đợi, không còn `RAISE EXCEPTION`* | — |
+| Chi nhánh chưa có rule INVOICE/RETURN riêng | `generate()`/`preview()` tự nhân bản rule org-wide đang active thành rule theo chi nhánh (ADR-07), rồi fast-forward counter mới bằng `ensureSequenceAtLeast` | Trong suốt |
 
 ## Cache & offline
 
@@ -225,4 +226,69 @@ khách đang thanh toán**.
 **Consequences:** một org cấu hình như thế sẽ deploy hỏng và phải xử lý tay. Đó là đánh đổi
 có chủ ý: hỏng lúc deploy nhìn thấy được, hỏng ở quầy thì không. `erp_dev` hiện không có rule
 nào như vậy nên migration chạy suôn.
+**Status:** superseded by ADR-07 — item #26 (ảnh QA cho thấy số nhảy khi lọc theo chi nhánh)
+đảo ngược A-02: bộ đếm giờ **phải** tách theo chi nhánh. Đoạn `RAISE EXCEPTION` trong migration
+`AddDocumentNumberSeparatorAndInvoiceFormat` đã chạy xong và không sửa lại (migration là lịch
+sử, không viết lại — cùng nguyên tắc ADR-02); nó chỉ không còn phản ánh trạng thái mong muốn
+cho các org sắp cấu hình rule theo chi nhánh nữa.
+
+### ADR-07 — Bộ đếm hoá đơn tách theo chi nhánh bằng cách nhân bản rule, không đổi khoá bộ đếm
+
+**Context:** A-10. Đối chiếu hoá đơn cuối ngày phải làm **theo từng chi nhánh** (kế toán), và
+bộ đếm dùng chung làm số nhảy cách quãng khi lọc theo một chi nhánh — không phân biệt được
+"chi nhánh khác chiếm số" với "thiếu hoá đơn thật". `uq_invoice_org_code` là UNIQUE
+`(organization_id, code)`, không có `branch_id`, nên hai bộ đếm độc lập cùng định dạng
+`YYMMDDxxxx` (không hậu tố chi nhánh, A-10 giữ nguyên phần này của A-02) sẽ sớm hay muộn ra
+cùng một chuỗi ở hai chi nhánh khác nhau.
+
+Hai cách đạt bộ đếm độc lập theo chi nhánh, cả hai đều tương thích ngược với `resolveActiveRule`
+(đã ưu tiên rule theo chi nhánh trước rule org-wide — cơ chế **có sẵn**, chỉ chưa ai tạo rule
+theo chi nhánh cho INVOICE/RETURN):
+
+1. **Nhân bản rule theo chi nhánh** — mỗi chi nhánh có một hàng `document_number_rules` riêng
+   (cùng hình dạng, `ruleId` khác), nên `document_number_counters` tự tách theo `ruleId` mà
+   **không cần đổi schema hay khoá `UQ_rule_reset_key` (`ruleId`, `resetKey`)**.
+2. Đổi khoá bộ đếm thành `(ruleId, resetKey, branchId)`, giữ một rule org-wide duy nhất.
+
+**Decision:** (1) — nhân bản rule. `generate()`/`preview()` (không phải bước saga
+`next-document-number.step.ts`, xem dưới) mở rộng thêm một bước riêng cho `INVOICE`/`RETURN`:
+nếu `resolveActiveRule` không tìm thấy rule theo chi nhánh, nhân bản rule org-wide đang active
+(copy `prefix/suffix/includeDate/dateFormat/sequenceLength/separator/resetPolicy`, đổi
+`branchId`) thành một rule mới theo chi nhánh, rồi dùng rule đó. Việc này **luôn chạy trong
+`preview()`** (bước preflight của checkout, gọi trước transaction thanh toán — cùng chỗ A-07
+đã dựa vào để đảm bảo rule tồn tại), **không chạy trong** `NextDocumentNumberStep`/
+`mintDocumentNumber` — bước đó vẫn đúng như comment hiện có: "does NOT call
+`DocumentNumberingService` hay `ensureDefaultActiveRule`", chỉ khoá và tăng counter của rule
+đã được đảm bảo tồn tại từ trước.
+
+Ngay sau khi tạo rule theo chi nhánh, gọi `ensureSequenceAtLeast(documentType, branchId, actor,
+minValue)` với `minValue` = giá trị hiện tại của counter rule org-wide ở `resetKey` hôm nay —
+**fast-forward** counter mới của chi nhánh lên ngang mức đó trước khi phát số đầu tiên.
+
+**Consequences:**
+- Không cần migration backfill tạo trước rule cho từng chi nhánh hiện có — chi nhánh nào chưa
+  có rule riêng thì tự nhân bản ở lần thanh toán kế tiếp; chi nhánh mới tạo sau này cũng tự có
+  rule mà không cần code nào ở luồng tạo chi nhánh biết về việc này.
+- **Rủi ro cutover giữa ngày, đã có mitigation**: nếu không fast-forward, chi nhánh X hôm nay
+  đã có vài hoá đơn số nhỏ (ví dụ `...0005`) từ bộ đếm dùng chung; rule nhân bản mới sẽ đếm lại
+  từ 1 và sớm muộn cũng phát lại đúng `...0005` cho **cùng chi nhánh X** → đâm `uq_invoice_org_code`
+  mới (dù đã thêm `branch_id`, hai hoá đơn này cùng branch nên vẫn trùng) — ngay giữa lúc khách
+  đang thanh toán. `ensureSequenceAtLeast` xoá rủi ro này bằng cách tái dùng cơ chế đã có
+  (`customer-code.service.ts` đã dùng đúng hàm này cho một tình huống lệch số tương tự), đổi
+  lại chi nhánh đó có một ngày duy nhất (ngày cutover) mà dải số theo chi nhánh không bắt đầu
+  từ 1 — chấp nhận được, vì đối chiếu cuối ngày chỉ cần **liên tục kể từ hôm sau**.
+- `ORGANIZATION_SCOPED_DOC_TYPES` và hành vi 26 loại chứng từ còn lại **không đổi** — bước nhân
+  bản chỉ thêm cho `INVOICE`/`RETURN`.
+- **Migration mới** (`WidenInvoiceCodeUniqueToBranch`, tách khỏi migration lịch sử của ADR-01/02):
+  `DROP INDEX uq_invoice_org_code; CREATE UNIQUE INDEX uq_invoice_org_branch_code ON invoices
+  (organization_id, branch_id, code);`. `branch_id` nullable ở tầng entity (`BaseEntity`) nhưng
+  hoá đơn POS luôn có branch thật (checkout bắt buộc chi nhánh hoạt động) — Postgres coi NULL
+  là phân biệt nhau trong UNIQUE nên hàng `branch_id IS NULL` (nếu có) không được bảo vệ trùng
+  mã; ghi nhận là rủi ro còn lại, không chặn, vì hiện chưa thấy hoá đơn nào như vậy trên `erp_dev`.
+  `down()` trả lại `uq_invoice_org_code` — chỉ chạy được nếu không có hai chi nhánh nào đã tạo
+  trùng mã, nên `down()` tự kiểm tra trước khi `DROP`.
+- Đối chiếu cuối ngày (mục đích của cả yêu cầu #26): lọc hoá đơn theo chi nhánh giờ ra một dải
+  `YYMMDDxxxx` liên tục kể từ rule theo chi nhánh có hiệu lực — không còn lẫn số của chi nhánh
+  khác.
+
 **Status:** accepted

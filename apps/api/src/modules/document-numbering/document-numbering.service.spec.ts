@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource, IsNull } from 'typeorm';
+import { DataSource, FindOperator, IsNull } from 'typeorm';
 import { DocumentType } from '@erp/shared-interfaces';
 import {
   DocumentNumberRuleEntity,
@@ -133,7 +133,11 @@ describe('DocumentNumberingService', () => {
         prefix: 'BR-INV',
       });
 
-      ruleRepo.findOne.mockResolvedValueOnce(branchRule);
+      // Both calls resolve the same already-existing branch rule: the T-04-02
+      // existence check in `ensureBranchRule` (which short-circuits without
+      // opening a transaction, since the branch rule already exists) and then
+      // `resolveActiveRule` itself.
+      ruleRepo.findOne.mockResolvedValue(branchRule);
 
       const mockCounterRepo = {
         findOne: jest.fn().mockResolvedValue({
@@ -160,7 +164,10 @@ describe('DocumentNumberingService', () => {
       );
 
       expect(result).toMatch(/^BR-INV-/);
-      expect(ruleRepo.findOne).toHaveBeenCalledTimes(1);
+      expect(ruleRepo.findOne).toHaveBeenCalledTimes(2);
+      // `ensureBranchRule` itself never opens a transaction here — only
+      // `atomicIncrement`'s counter increment does.
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
     });
 
     it('throws NotFoundException when no active rule exists', async () => {
@@ -688,6 +695,216 @@ describe('DocumentNumberingService', () => {
       expect(sale).toBe('2608210001');
       expect(refund).toBe('2608210001TH');
       expect(sale).not.toBe(refund);
+    });
+  });
+
+  // T-04-02 — ADR-07. resolveActiveRule already prefers a branch rule over
+  // the org-wide one; the missing piece was that nobody ever created that
+  // branch rule for INVOICE/RETURN. `ensureBranchRule` clones the org-wide
+  // rule the first time a branch is seen and fast-forwards the new counter to
+  // where the org-wide counter stood, so a mid-day cutover cannot reissue a
+  // number the branch already holds under the shared counter (AC-07, AC-17).
+  describe('branch-scoped INVOICE/RETURN rule cloning (T-04-02)', () => {
+    const AUG_21 = new Date('2026-08-21T09:00:00.000+07:00');
+
+    // Matches the service's own FindOperator usage: only `IsNull()` appears
+    // in the rule queries this file exercises.
+    const matchesWhere = (row: any, where: Record<string, unknown>): boolean =>
+      Object.entries(where).every(([key, value]) =>
+        value instanceof FindOperator
+          ? row[key] === undefined || row[key] === null
+          : row[key] === value,
+      );
+
+    let rules: any[];
+    let counters: any[];
+
+    const orgInvoiceRule = () => ({
+      id: 'rule-org-invoice',
+      organizationId: 'org-1',
+      branchId: undefined,
+      documentType: DocumentType.INVOICE,
+      prefix: '',
+      suffix: undefined,
+      includeDate: true,
+      dateFormat: 'YYMMDD',
+      sequenceLength: 4,
+      separator: '',
+      resetPolicy: ResetPolicy.DAILY,
+      isActive: true,
+      createdBy: 'user-1',
+    });
+
+    // Rebuilds `ruleRepo`/`counterRepo` (the same jest.fn() objects the
+    // service was constructed with — see the outer `beforeEach`) as an
+    // in-memory store shared between the outer service calls and whatever a
+    // transaction's `manager.getRepository(...)` returns, so a rule/counter
+    // created inside a transaction is visible to the next outer call exactly
+    // like a committed row would be.
+    const seedInMemoryStore = (seedRules: any[] = [orgInvoiceRule()]) => {
+      rules = seedRules;
+      counters = [];
+
+      ruleRepo.findOne.mockImplementation(async ({ where }: any) =>
+        rules.find((r) => matchesWhere(r, where)) ?? null,
+      );
+      ruleRepo.create.mockImplementation(
+        (dto: any) => ({ id: `rule-${rules.length + 1}`, ...dto }) as any,
+      );
+      ruleRepo.save.mockImplementation(async (entity: any) => {
+        const idx = rules.findIndex((r) => r.id === entity.id);
+        if (idx >= 0) rules[idx] = entity;
+        else rules.push(entity);
+        return entity;
+      });
+
+      counterRepo.findOne.mockImplementation(async ({ where }: any) =>
+        counters.find((c) => matchesWhere(c, where)) ?? null,
+      );
+      counterRepo.create.mockImplementation(
+        (dto: any) => ({ id: `counter-${counters.length + 1}`, ...dto }) as any,
+      );
+      counterRepo.save.mockImplementation(async (entity: any) => {
+        const idx = counters.findIndex(
+          (c) => c.ruleId === entity.ruleId && c.resetKey === entity.resetKey,
+        );
+        if (idx >= 0) counters[idx] = entity;
+        else counters.push(entity);
+        return entity;
+      });
+
+      const fakeManager = {
+        getRepository: (target: unknown) =>
+          target === DocumentNumberRuleEntity ? ruleRepo : counterRepo,
+      };
+      // Real `dataSource.transaction` takes either `(work)` or
+      // `(isolation, work)` — both call paths in the service are exercised
+      // here (`ensureBranchRule` uses the first, `atomicIncrement` the
+      // second), so accept both.
+      dataSource.transaction.mockImplementation(async (a: any, b?: any) => {
+        const work = typeof a === 'function' ? a : b;
+        return work(fakeManager);
+      });
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(AUG_21);
+      seedInMemoryStore();
+    });
+
+    afterEach(() => jest.useRealTimers());
+
+    // Sequential calls for two DIFFERENT branches — this proves per-branch
+    // counter isolation (AC-07), not concurrency/race safety. The real race on
+    // one branch's *first* rule (two concurrent requests for the *same* new
+    // branch) cannot be proven by a mocked unit test at all — it needs
+    // Postgres' own partial unique index to actually fire, which is what
+    // `checkout-saga-concurrency.e2e-spec.ts`'s T-04-02 test exercises
+    // against a real database (code review feedback on this ticket).
+    it('two DIFFERENT branches previewing INVOICE the same day, called sequentially, each get their own 0001 (per-branch isolation, AC-07)', async () => {
+      const first = await service.preview(DocumentType.INVOICE, 'branch-a', actor);
+      const second = await service.preview(DocumentType.INVOICE, 'branch-b', actor);
+
+      expect(first).toBe('2608210001');
+      expect(second).toBe('2608210001');
+
+      const branchRules = rules.filter((r) => r.documentType === DocumentType.INVOICE && r.branchId);
+      expect(branchRules.map((r) => r.branchId).sort()).toEqual(['branch-a', 'branch-b']);
+    });
+
+    it('generate() fast-forwards a newly cloned branch rule past the org-wide counter, so the first branch number does not collide (AC-17)', async () => {
+      // The shared/org-wide counter already issued 5 numbers today before this
+      // branch ever got its own rule (pre-cutover history).
+      counters.push({
+        ruleId: 'rule-org-invoice',
+        organizationId: 'org-1',
+        branchId: undefined,
+        resetKey: '2026-08-21',
+        currentValue: 5,
+      });
+
+      const result = await service.generate(DocumentType.INVOICE, 'branch-a', actor);
+
+      // Fast-forwarded to 5, then incremented once by this call's own
+      // generate — 6, not 1..5.
+      expect(result).toBe('2608210006');
+
+      const branchCounter = counters.find(
+        (c) => c.ruleId !== 'rule-org-invoice' && c.branchId === 'branch-a',
+      );
+      expect(branchCounter?.currentValue).toBe(6);
+    });
+
+    it('a second generate() the same day reuses the branch rule instead of cloning again', async () => {
+      const first = await service.generate(DocumentType.INVOICE, 'branch-a', actor);
+      const branchRuleCountAfterFirst = rules.filter(
+        (r) => r.documentType === DocumentType.INVOICE && r.branchId === 'branch-a',
+      ).length;
+
+      const second = await service.generate(DocumentType.INVOICE, 'branch-a', actor);
+      const branchRuleCountAfterSecond = rules.filter(
+        (r) => r.documentType === DocumentType.INVOICE && r.branchId === 'branch-a',
+      ).length;
+
+      expect(first).toBe('2608210001');
+      expect(second).toBe('2608210002');
+      expect(branchRuleCountAfterFirst).toBe(1);
+      expect(branchRuleCountAfterSecond).toBe(1);
+    });
+
+    it('a branch keeps a contiguous counter sequence even when another branch\'s invoices are interleaved (AC-16)', async () => {
+      // Mimics the interleaving seen in the QA screenshot: A, B, A — each
+      // branch dials its own already-cloned rule, so B landing in the middle
+      // must not skip or repeat a number on A's side.
+      const a1 = await service.generate(DocumentType.INVOICE, 'branch-a', actor);
+      const b1 = await service.generate(DocumentType.INVOICE, 'branch-b', actor);
+      const a2 = await service.generate(DocumentType.INVOICE, 'branch-a', actor);
+
+      expect(a1).toBe('2608210001');
+      expect(b1).toBe('2608210001');
+      expect(a2).toBe('2608210002');
+
+      const branchARuleId = rules.find(
+        (r) => r.documentType === DocumentType.INVOICE && r.branchId === 'branch-a',
+      )?.id;
+      const branchACounter = counters.find((c) => c.ruleId === branchARuleId);
+      // Branch A's own counter sequence is 1..2, contiguous — untouched by
+      // branch B's call landing in between.
+      expect(branchACounter?.currentValue).toBe(2);
+    });
+
+    it('a document type other than INVOICE/RETURN never clones a branch rule (unchanged behavior)', async () => {
+      rules = [
+        {
+          id: 'rule-org-cash-receipt',
+          organizationId: 'org-1',
+          branchId: undefined,
+          documentType: DocumentType.CASH_RECEIPT,
+          prefix: 'PT',
+          suffix: undefined,
+          includeDate: false,
+          dateFormat: 'YYYYMM',
+          sequenceLength: 6,
+          separator: '-',
+          resetPolicy: ResetPolicy.NEVER,
+          isActive: true,
+          createdBy: 'user-1',
+        },
+      ];
+      seedInMemoryStore(rules);
+
+      const result = await service.generate(
+        DocumentType.CASH_RECEIPT,
+        'branch-a',
+        actor,
+      );
+
+      expect(result).toBe('PT000001');
+      // No branch rule for CASH_RECEIPT was created — the org-wide rule is
+      // still the only row.
+      expect(
+        rules.filter((r) => r.documentType === DocumentType.CASH_RECEIPT),
+      ).toHaveLength(1);
     });
   });
 });
