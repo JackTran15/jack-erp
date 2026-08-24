@@ -4,7 +4,7 @@ feature: pos-session-expiry-fix
 slug: pos-session-expiry-fix
 profile: none
 created: 2026-08-24T18:32:51
-current_gate: G3
+current_gate: G4
 history:
   - gate: G0
     action: passed
@@ -208,3 +208,8 @@ history:
     at: 2026-08-24T20:31:17
     by: Akenzy
     ticket: T-03-03
+  - gate: G4
+    action: passed
+    at: 2026-08-24T20:36:40
+    by: Akenzy
+    evidence: all 9 tickets done, all UoW checklists ticked
