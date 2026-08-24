@@ -50,4 +50,4 @@ rollback: revert auth.service.ts's two ConfigService.get calls back to the hardc
 - [x] AC-01, AC-02, AC-03 all pass (T-01-02, 32/32 auth.service.spec.ts)
 - [x] `grep -n "15 \* 60\|7 \* 24 \* 60 \* 60"` in `auth.service.ts` returns nothing (no
       leftover hardcoded TTL) — verified, zero matches
-- [ ] Demoed and accepted at gate G4
+- [x] Demoed and accepted at gate G4 — accepted by Akenzy

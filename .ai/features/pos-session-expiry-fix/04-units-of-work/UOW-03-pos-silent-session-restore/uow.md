@@ -60,12 +60,11 @@ rollback: revert PosSessionHandoff.tsx and PosRequireAuth.tsx to their prior ver
       cycles) for the navigate-while-open path added by T-03-03: full reload with no tokens
       → clean redirect, not frozen; expired access token + valid refresh token, client-side
       nav with no reload → silent restore, destination page renders, no reload needed
-- [ ] AC-06 (handoff still takes priority end-to-end) — `PosSessionHandoff`'s handoff branch
-      is verbatim unchanged (confirmed by every review pass's diff check across T-03-01/03),
-      and the two paths are mutually exclusive by construction (T-03-03 only runs when no
-      `?handoff=` param is present at all), but the `?handoff=` flow itself was not
-      re-exercised live in this session — no automated test exists for it either (A-04).
-      Low risk given the code path is untouched, but not directly demoed
+- [x] AC-06 (handoff still takes priority end-to-end) — live-verified: minted a real
+      handoff code via `POST /auth/handoff` against this checkout's own API, loaded POS at
+      `/pos/?handoff=<code>`, the exchange completed and landed authenticated on the
+      checkout page with both tokens present and the `?handoff=` param stripped from the
+      URL — unaffected by the new proactive-refresh check
 - [x] `git diff --stat` on `PosRequireAuth.tsx` is non-empty (T-03-03 intentionally changes
       it — this replaces the original "zero diff" requirement, retired by ADR-04)
-- [ ] Demoed and accepted at gate G4
+- [x] Demoed and accepted at gate G4 — accepted by Akenzy

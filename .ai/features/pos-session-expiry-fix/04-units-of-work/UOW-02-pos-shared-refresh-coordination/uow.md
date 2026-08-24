@@ -51,4 +51,4 @@ rollback: revert http.ts and api-axios.ts to their own local tryRefreshToken/ref
 - [x] AC-07, AC-08 both pass (T-02-04, 3/3 token-refresh.test.ts)
 - [x] `grep -n "refreshPromise"` returns exactly one declaration app-wide (in the new shared
       module), not one per client — verified, only in token-refresh.ts
-- [ ] Demoed and accepted at gate G4
+- [x] Demoed and accepted at gate G4 — accepted by Akenzy
