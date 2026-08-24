@@ -58,4 +58,10 @@ rollback: "`pnpm migration:revert` hai lần — rule về `INV`/`RTN` + `YYYYMM
 - [x] Ma trận hồi quy phủ 18 hàng rule trên `erp_dev` (16 hình dạng phân biệt — `CASH_RECEIPT` và `WAREHOUSE` mỗi loại có 2 hàng trùng hình dạng), khẳng định chuỗi đầy đủ
 - [x] `pnpm migration:run` / `migration:revert` chạy sạch cả hai migration trên `erp_dev`
 - [x] Không có `UPDATE invoices SET code` — 66 hoá đơn mã cũ còn nguyên sau khi chạy migration
-- [ ] Demoed và accepted ở gate G4
+- [x] Demoed và accepted ở gate G4 — click-through thật trên `erp2`, `erp_dev` thật, POS `:3001`
+      + Backoffice `:3000`: bán ở Hà Nội ra `2608240001` rồi `2608240003`/`2608240004`/`2608240005`
+      (đúng dạng, không tiền tố/gạch, tăng dần); Đổi trả hàng chọn `2608240001`, trả 1 món →
+      phiếu trả ra `2608240001TH` (dải riêng, bắt đầu lại từ 1); danh sách hoá đơn tìm thấy cả
+      bốn số ở màn Đổi trả. Backoffice → Cấu hình → Đánh số chứng từ: rule `Phiếu thu tiền mặt`
+      vẫn `PT000000`, `Phiếu nhập kho` vẫn `IMP000000`, và 12 loại chứng từ khác không đổi.
+      `INV-202608-00013`/`RTN-202608-00002` (hoá đơn cũ) vẫn nguyên mã. Accepted bởi Akenzy, 2026-08-24

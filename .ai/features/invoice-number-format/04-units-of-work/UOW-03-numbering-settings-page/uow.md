@@ -53,4 +53,11 @@ dạng mà không hiểu vì sao.
 - [x] AC-14 và AC-15 có kiểm ở tầng validator + thuật toán xem trước; xác nhận bằng mắt ở G4
 - [x] `pnpm --filter @erp/api test` xanh — 281 suite, 2886 test
 - [x] `pnpm --filter @erp/backoffice-web build` xanh
-- [ ] Demoed và accepted ở gate G4
+- [x] Demoed và accepted ở gate G4 — click-through thật, Backoffice `:3000` → Cấu hình → Đánh số
+      chứng từ: rule "Hóa đơn" (toàn tổ chức) hiện mẫu số `YYMMDD0000`, rule "Trả hàng" hiện
+      `YYMMDD0000TH`; "Phiếu thu tiền mặt" vẫn `PT000000`, "Phiếu nhập kho" vẫn `IMP000000` —
+      không đổi. Mở sửa rule "Hóa đơn": ô Prefix trống hợp lệ, có ô Định dạng ngày = `YYMMDD`,
+      có ô Dấu phân cách (trống = dính liền) nhận input `-` bình thường — huỷ không lưu để không
+      đụng rule thật. Màn hình còn hiện thêm 3 rule theo chi nhánh do UOW-04 tự nhân bản trong
+      phiên demo — đúng như ADR-07 mô tả: dùng lại đúng màn hình này, không cần UI mới.
+      Accepted bởi Akenzy, 2026-08-24

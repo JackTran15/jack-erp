@@ -4,7 +4,7 @@ feature: invoice-number-format
 slug: invoice-number-format
 profile: none
 created: 2026-08-22T16:35:42
-current_gate: G3
+current_gate: G5
 history:
   - gate: G0
     action: passed
@@ -176,3 +176,110 @@ history:
     at: 2026-08-22T17:17:32
     by: Akenzy
     ticket: T-03-02
+  - gate: G2
+    action: reopened
+    at: 2026-08-24T14:56:52
+    by: Akenzy
+    reason: Item #26 - đảo quyết định A-02/ADR-06 — bộ đếm hoá đơn tách theo chi nhánh thay vì dùng chung, vì kiểm hoá đơn cuối ngày theo từng chi nhánh không thể chấp nhận số bị nhảy do chi nhánh khác chiếm số. Cần sửa ràng buộc uq_invoice_org_code và thay thế guard ADR-06.
+  - gate: G2
+    action: passed
+    at: 2026-08-24T15:03:12
+    by: Akenzy
+    evidence: 7 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-24T15:09:04
+    by: Akenzy
+    evidence: graph valid - 4 UoW, 13 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T15:09:27
+    by: aidlc-implementer
+    ticket: T-04-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T15:09:27
+    by: aidlc-implementer
+    ticket: T-04-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T15:15:25
+    by: aidlc-implementer
+    ticket: T-04-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T15:15:51
+    by: aidlc-implementer
+    ticket: T-04-02
+  - gate: G4
+    action: ticket todo
+    at: 2026-08-24T15:18:22
+    by: Akenzy
+    reason: touches - thiếu apps/api/src/modules/pos/entities/invoice.entity.ts — lỗi khi tôi viết ticket, không phải lỗi implementer. Implementation notes đã yêu cầu đổi @Index decorator nhưng touches không liệt kê nên agent đúng đắn dừng lại. Đã sửa touches + thêm done-when, giao lại để hoàn tất.
+    ticket: T-04-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T15:18:28
+    by: aidlc-implementer
+    ticket: T-04-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T15:22:36
+    by: aidlc-implementer
+    ticket: T-04-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T15:23:32
+    by: Akenzy
+    ticket: T-04-01
+  - gate: G4
+    action: ticket todo
+    at: 2026-08-24T15:29:16
+    by: Akenzy
+    reason: Code review PASS nhưng cảnh báo thật - nhánh catch 'thua race, dùng lại rule của người thắng' (đúng cái ticket này sinh ra để làm) chưa có test nào chạm tới — test 'two branches' hiện tại gọi preview() tuần tự cho hai chi nhánh khác nhau, chứng minh cách ly theo chi nhánh chứ không chứng minh an toàn khi đua nhau thật. Cần thêm một e2e test (Postgres thật) bắn hai generate()/preview() đồng thời cho CÙNG một chi nhánh chưa từng có rule, và đổi tên test cũ cho đúng những gì nó thực sự kiểm.
+    ticket: T-04-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T15:29:28
+    by: aidlc-implementer
+    ticket: T-04-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T16:11:36
+    by: aidlc-implementer
+    ticket: T-04-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T16:18:34
+    by: Akenzy
+    ticket: T-04-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T16:19:16
+    by: aidlc-implementer
+    ticket: T-04-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T16:21:42
+    by: aidlc-implementer
+    ticket: T-04-03
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T16:26:22
+    by: Akenzy
+    ticket: T-04-03
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T16:42:19
+    by: akenzy
+    ticket: T-04-02
+  - gate: G4
+    action: passed
+    at: 2026-08-24T18:34:03
+    by: Akenzy
+    evidence: all 13 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-08-24T18:41:44
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

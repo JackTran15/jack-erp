@@ -1,0 +1,55 @@
+{"action": "passed", "at": "2026-08-22T16:38:14", "by": "Akenzy", "evidence": "architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete", "gate": "G0", "id": "6f1cf6fbfbb6", "ts": "2026-08-22T16:38:14.000000"}
+{"action": "passed", "at": "2026-08-22T16:39:43", "by": "Akenzy", "evidence": "9 assumptions, none blocking-and-pending; 15 acceptance criteria defined", "gate": "G1", "id": "798cc8dc5316", "ts": "2026-08-22T16:39:43.000001"}
+{"action": "passed", "at": "2026-08-22T16:43:59", "by": "Akenzy", "evidence": "6 ADR(s) recorded", "gate": "G2", "id": "5f0288e34b46", "ts": "2026-08-22T16:43:59.000002"}
+{"action": "passed", "at": "2026-08-22T16:53:10", "by": "Akenzy", "evidence": "graph valid - 3 UoW, 10 tickets, no cycles", "gate": "G3", "id": "14c071af06eb", "ts": "2026-08-22T16:53:10.000003"}
+{"action": "ticket in_progress", "at": "2026-08-22T16:53:33", "by": "claude", "gate": "G4", "id": "f700b666b271", "ticket": "T-01-01", "ts": "2026-08-22T16:53:33.000004"}
+{"action": "ticket review", "at": "2026-08-22T16:55:36", "by": "claude", "gate": "G4", "id": "3b4c55299945", "ticket": "T-01-01", "ts": "2026-08-22T16:55:36.000005"}
+{"action": "ticket done", "at": "2026-08-22T16:55:36", "by": "Akenzy", "gate": "G4", "id": "8079df67750f", "ticket": "T-01-01", "ts": "2026-08-22T16:55:36.000006"}
+{"action": "ticket in_progress", "at": "2026-08-22T16:55:37", "by": "claude", "gate": "G4", "id": "ecd5d78e446a", "ticket": "T-01-02", "ts": "2026-08-22T16:55:37.000007"}
+{"action": "ticket review", "at": "2026-08-22T16:58:22", "by": "claude", "gate": "G4", "id": "9b2b66c34539", "ticket": "T-01-02", "ts": "2026-08-22T16:58:22.000008"}
+{"action": "ticket done", "at": "2026-08-22T16:58:22", "by": "Akenzy", "gate": "G4", "id": "847bf9702ba8", "ticket": "T-01-02", "ts": "2026-08-22T16:58:22.000009"}
+{"action": "ticket in_progress", "at": "2026-08-22T16:58:22", "by": "claude", "gate": "G4", "id": "7cc0a4f949bb", "ticket": "T-01-03", "ts": "2026-08-22T16:58:22.000010"}
+{"action": "ticket review", "at": "2026-08-22T17:00:25", "by": "claude", "gate": "G4", "id": "e74495acc875", "ticket": "T-01-03", "ts": "2026-08-22T17:00:25.000011"}
+{"action": "ticket done", "at": "2026-08-22T17:00:25", "by": "Akenzy", "gate": "G4", "id": "3813a22d0074", "ticket": "T-01-03", "ts": "2026-08-22T17:00:25.000012"}
+{"action": "ticket in_progress", "at": "2026-08-22T17:00:25", "by": "claude", "gate": "G4", "id": "db53a63e422c", "ticket": "T-01-04", "ts": "2026-08-22T17:00:25.000013"}
+{"action": "ticket review", "at": "2026-08-22T17:02:13", "by": "claude", "gate": "G4", "id": "5a71a3ce672c", "ticket": "T-01-04", "ts": "2026-08-22T17:02:13.000014"}
+{"action": "ticket done", "at": "2026-08-22T17:02:13", "by": "Akenzy", "gate": "G4", "id": "2f420e5581c0", "ticket": "T-01-04", "ts": "2026-08-22T17:02:13.000015"}
+{"action": "ticket in_progress", "at": "2026-08-22T17:02:13", "by": "claude", "gate": "G4", "id": "eef2fedaf8ce", "ticket": "T-01-05", "ts": "2026-08-22T17:02:13.000016"}
+{"action": "ticket review", "at": "2026-08-22T17:04:29", "by": "claude", "gate": "G4", "id": "ce7885232883", "ticket": "T-01-05", "ts": "2026-08-22T17:04:29.000017"}
+{"action": "ticket done", "at": "2026-08-22T17:04:29", "by": "Akenzy", "gate": "G4", "id": "9ce17004f7c6", "ticket": "T-01-05", "ts": "2026-08-22T17:04:29.000018"}
+{"action": "ticket in_progress", "at": "2026-08-22T17:04:38", "by": "claude", "gate": "G4", "id": "2e60d1ba0a1f", "ticket": "T-02-01", "ts": "2026-08-22T17:04:38.000019"}
+{"action": "ticket review", "at": "2026-08-22T17:06:47", "by": "claude", "gate": "G4", "id": "75e77e907d36", "ticket": "T-02-01", "ts": "2026-08-22T17:06:47.000020"}
+{"action": "ticket done", "at": "2026-08-22T17:06:47", "by": "Akenzy", "gate": "G4", "id": "7574395db65b", "ticket": "T-02-01", "ts": "2026-08-22T17:06:47.000021"}
+{"action": "ticket in_progress", "at": "2026-08-22T17:06:48", "by": "claude", "gate": "G4", "id": "484a26cf592f", "ticket": "T-02-02", "ts": "2026-08-22T17:06:48.000022"}
+{"action": "ticket review", "at": "2026-08-22T17:11:00", "by": "claude", "gate": "G4", "id": "0b13cbf0bf86", "ticket": "T-02-02", "ts": "2026-08-22T17:11:00.000023"}
+{"action": "ticket done", "at": "2026-08-22T17:11:00", "by": "Akenzy", "gate": "G4", "id": "6a4cbd07fa44", "ticket": "T-02-02", "ts": "2026-08-22T17:11:00.000024"}
+{"action": "ticket in_progress", "at": "2026-08-22T17:11:00", "by": "claude", "gate": "G4", "id": "9863c8f10971", "ticket": "T-02-03", "ts": "2026-08-22T17:11:00.000025"}
+{"action": "ticket review", "at": "2026-08-22T17:11:58", "by": "claude", "gate": "G4", "id": "95a053e9a112", "ticket": "T-02-03", "ts": "2026-08-22T17:11:58.000026"}
+{"action": "ticket done", "at": "2026-08-22T17:11:58", "by": "Akenzy", "gate": "G4", "id": "4052142d1391", "ticket": "T-02-03", "ts": "2026-08-22T17:11:58.000027"}
+{"action": "ticket in_progress", "at": "2026-08-22T17:11:58", "by": "claude", "gate": "G4", "id": "2e65bc995b10", "ticket": "T-03-01", "ts": "2026-08-22T17:11:58.000028"}
+{"action": "ticket review", "at": "2026-08-22T17:15:07", "by": "claude", "gate": "G4", "id": "a51401fc59bd", "ticket": "T-03-01", "ts": "2026-08-22T17:15:07.000029"}
+{"action": "ticket done", "at": "2026-08-22T17:15:07", "by": "Akenzy", "gate": "G4", "id": "36a54ee97bdf", "ticket": "T-03-01", "ts": "2026-08-22T17:15:07.000030"}
+{"action": "ticket in_progress", "at": "2026-08-22T17:15:07", "by": "claude", "gate": "G4", "id": "3a7f8cb68af1", "ticket": "T-03-02", "ts": "2026-08-22T17:15:07.000031"}
+{"action": "ticket review", "at": "2026-08-22T17:17:32", "by": "claude", "gate": "G4", "id": "24aaee9a0431", "ticket": "T-03-02", "ts": "2026-08-22T17:17:32.000032"}
+{"action": "ticket done", "at": "2026-08-22T17:17:32", "by": "Akenzy", "gate": "G4", "id": "d2d69a0eb1b0", "ticket": "T-03-02", "ts": "2026-08-22T17:17:32.000033"}
+{"action": "reopened", "at": "2026-08-24T14:56:52", "by": "Akenzy", "gate": "G2", "id": "55b7c789d7d1", "reason": "Item #26 - đảo quyết định A-02/ADR-06 — bộ đếm hoá đơn tách theo chi nhánh thay vì dùng chung, vì kiểm hoá đơn cuối ngày theo từng chi nhánh không thể chấp nhận số bị nhảy do chi nhánh khác chiếm số. Cần sửa ràng buộc uq_invoice_org_code và thay thế guard ADR-06.", "ts": "2026-08-24T14:56:52.837497"}
+{"action": "passed", "at": "2026-08-24T15:03:12", "by": "Akenzy", "evidence": "7 ADR(s) recorded", "gate": "G2", "id": "f796b9c9fc80", "ts": "2026-08-24T15:03:12.872633"}
+{"action": "passed", "at": "2026-08-24T15:09:04", "by": "Akenzy", "evidence": "graph valid - 4 UoW, 13 tickets, no cycles", "gate": "G3", "id": "a60458738b86", "ts": "2026-08-24T15:09:04.104353"}
+{"action": "ticket in_progress", "at": "2026-08-24T15:09:27", "by": "aidlc-implementer", "gate": "G4", "id": "09344fc308ef", "ticket": "T-04-01", "ts": "2026-08-24T15:09:27.535522"}
+{"action": "ticket in_progress", "at": "2026-08-24T15:09:27", "by": "aidlc-implementer", "gate": "G4", "id": "91910affb5d3", "ticket": "T-04-02", "ts": "2026-08-24T15:09:27.606419"}
+{"action": "ticket review", "at": "2026-08-24T15:15:25", "by": "aidlc-implementer", "gate": "G4", "id": "8cc56ab76345", "ticket": "T-04-01", "ts": "2026-08-24T15:15:25.940398"}
+{"action": "ticket review", "at": "2026-08-24T15:15:51", "by": "aidlc-implementer", "gate": "G4", "id": "d4037b82d36c", "ticket": "T-04-02", "ts": "2026-08-24T15:15:51.915366"}
+{"action": "ticket todo", "at": "2026-08-24T15:18:22", "by": "Akenzy", "gate": "G4", "id": "d95baca3af73", "reason": "touches - thiếu apps/api/src/modules/pos/entities/invoice.entity.ts — lỗi khi tôi viết ticket, không phải lỗi implementer. Implementation notes đã yêu cầu đổi @Index decorator nhưng touches không liệt kê nên agent đúng đắn dừng lại. Đã sửa touches + thêm done-when, giao lại để hoàn tất.", "ticket": "T-04-01", "ts": "2026-08-24T15:18:22.949716"}
+{"action": "ticket in_progress", "at": "2026-08-24T15:18:28", "by": "aidlc-implementer", "gate": "G4", "id": "4c4b6f0710e2", "ticket": "T-04-01", "ts": "2026-08-24T15:18:28.980348"}
+{"action": "ticket review", "at": "2026-08-24T15:22:36", "by": "aidlc-implementer", "gate": "G4", "id": "03e7a49fc330", "ticket": "T-04-01", "ts": "2026-08-24T15:22:36.488139"}
+{"action": "ticket done", "at": "2026-08-24T15:23:32", "by": "Akenzy", "gate": "G4", "id": "9d3b3682c16e", "ticket": "T-04-01", "ts": "2026-08-24T15:23:32.822944"}
+{"action": "ticket todo", "at": "2026-08-24T15:29:16", "by": "Akenzy", "gate": "G4", "id": "ebcaf22b9192", "reason": "Code review PASS nhưng cảnh báo thật - nhánh catch 'thua race, dùng lại rule của người thắng' (đúng cái ticket này sinh ra để làm) chưa có test nào chạm tới — test 'two branches' hiện tại gọi preview() tuần tự cho hai chi nhánh khác nhau, chứng minh cách ly theo chi nhánh chứ không chứng minh an toàn khi đua nhau thật. Cần thêm một e2e test (Postgres thật) bắn hai generate()/preview() đồng thời cho CÙNG một chi nhánh chưa từng có rule, và đổi tên test cũ cho đúng những gì nó thực sự kiểm.", "ticket": "T-04-02", "ts": "2026-08-24T15:29:16.138599"}
+{"action": "ticket in_progress", "at": "2026-08-24T15:29:28", "by": "aidlc-implementer", "gate": "G4", "id": "e9c7ee12b6d0", "ticket": "T-04-02", "ts": "2026-08-24T15:29:28.486047"}
+{"action": "ticket review", "at": "2026-08-24T16:11:36", "by": "aidlc-implementer", "gate": "G4", "id": "97177e0ffbfc", "ticket": "T-04-02", "ts": "2026-08-24T16:11:36.102975"}
+{"action": "ticket done", "at": "2026-08-24T16:18:34", "by": "Akenzy", "gate": "G4", "id": "26c83d0706d1", "ticket": "T-04-02", "ts": "2026-08-24T16:18:34.047701"}
+{"action": "ticket in_progress", "at": "2026-08-24T16:19:16", "by": "aidlc-implementer", "gate": "G4", "id": "ebb812a7f01b", "ticket": "T-04-03", "ts": "2026-08-24T16:19:16.564172"}
+{"action": "ticket review", "at": "2026-08-24T16:21:42", "by": "aidlc-implementer", "gate": "G4", "id": "44ba2170aad1", "ticket": "T-04-03", "ts": "2026-08-24T16:21:42.326242"}
+{"action": "ticket done", "at": "2026-08-24T16:26:22", "by": "Akenzy", "gate": "G4", "id": "050e2b8a0860", "ticket": "T-04-03", "ts": "2026-08-24T16:26:22.383165"}
+{"action": "ticket done", "at": "2026-08-24T16:42:19", "by": "akenzy", "gate": "G4", "id": "78616ede236f", "ticket": "T-04-02", "ts": "2026-08-24T16:42:19.357354"}
+{"action": "passed", "at": "2026-08-24T18:34:03", "by": "Akenzy", "evidence": "all 13 tickets done, all UoW checklists ticked", "gate": "G4", "id": "8fb5c9465aab", "ts": "2026-08-24T18:34:03.272865"}
+{"action": "passed", "at": "2026-08-24T18:41:44", "by": "Akenzy", "evidence": "assumptions resolved, ADRs settled, graph valid", "gate": "G5", "id": "d935cb646e09", "ts": "2026-08-24T18:41:44.400295"}

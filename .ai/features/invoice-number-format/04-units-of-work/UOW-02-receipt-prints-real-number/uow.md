@@ -56,4 +56,12 @@ Bước 3 và 5 là toàn bộ lý do feature tồn tại: trước khi sửa, c
 - [x] `grep -rn "Math.random" apps/pos-web/src/lib/page-libs/checkout/` không còn kết quả
 - [x] `npx vitest run` trong `apps/pos-web` xanh — 108 test
 - [x] `pnpm --filter @erp/pos-web build` xanh
-- [ ] Demoed và accepted ở gate G4
+- [x] Demoed và accepted ở gate G4 — click-through thật, `erp2`/`erp_dev`: sau mỗi lần thanh toán
+      thật (bán và trả hàng), số hoá đơn xuất hiện đúng trong Danh sách hoá đơn (bước 3) và tìm
+      ra ngay trong ô tìm hoá đơn ở Đổi trả hàng (bước 5) — với cả `2608240003/4/5` (bán) lẫn
+      `2608240001TH` (trả). Đây chính là bằng chứng cho ADR-03 (số in = `invoice.code` từ response
+      thanh toán, không đoán trước): số đó là số THẬT, tra ra đúng hoá đơn — khác hẳn hành vi cũ
+      bị báo lỗi (số ngẫu nhiên không tồn tại). Không xác nhận trực quan được khay in native (bước
+      2/4 — dialog in của hệ điều hành/trình duyệt không chụp được qua browser automation), nhưng
+      cơ chế sinh dữ liệu cho khay in đã được chứng minh đúng qua toàn bộ chuỗi trên.
+      Accepted bởi Akenzy, 2026-08-24

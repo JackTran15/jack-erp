@@ -242,32 +242,41 @@ describe('NextDocumentNumberStep — the YYMMDD sequence (AC-02, AC-03, AC-07)',
     });
   });
 
-  it('two branches share one org-wide counter, so their numbers differ (AC-07)', async () => {
+  it('each branch mints from its own already-resolved rule, independent of the other branch (AC-07)', async () => {
     at('2026-08-21T10:00:00.000+07:00');
 
-    // Branch A: nothing issued yet today.
-    const a = withManager({ rule: invoiceRule, branchRule: null, existingCounter: null });
+    // A-10/ADR-07: DocumentNumberingService.preview()/generate() has already
+    // cloned a branch-scoped rule for each branch before this step ever runs
+    // (this step / mint-document-number.ts does not create rules — it only
+    // resolves the already-existing branch rule, unchanged by ADR-07). Each
+    // branch therefore resolves a DISTINCT rule id on its very first lookup —
+    // the org-wide fallback is never consulted.
+    const branchARule = { ...invoiceRule, id: 'rule-branch-a' };
+    const branchBRule = { ...invoiceRule, id: 'rule-branch-b' };
+
+    // Branch A: nothing issued yet today on its own rule.
+    const a = withManager({ branchRule: branchARule, existingCounter: null });
     const ca = ctx({ manager: a.manager, invoice: { id: 'inv-a', branchId: 'branch-a' } as any });
     await new NextDocumentNumberStep().execute(ca);
 
-    // Branch B, same organisation: no branch-scoped rule of its own, so it falls
-    // through to the same org-wide rule and therefore the same counter row.
-    const b = withManager({
-      rule: invoiceRule,
-      branchRule: null,
-      existingCounter: { currentValue: 1 },
-    });
+    // Branch B, same organisation: its own rule, its own counter — nothing
+    // issued yet today either, so it also dials from 0001.
+    const b = withManager({ branchRule: branchBRule, existingCounter: null });
     const cb = ctx({ manager: b.manager, invoice: { id: 'inv-b', branchId: 'branch-b' } as any });
     await new NextDocumentNumberStep().execute(cb);
 
     expect(ca.documentNumber).toBe('2608210001');
-    expect(cb.documentNumber).toBe('2608210002');
-    // Same counter, not one per branch — that is what keeps them apart under
-    // uq_invoice_org_code (organization_id, code).
-    for (const qb of [a.qb, b.qb]) {
-      expect(qb.where).toHaveBeenCalledWith('counter.ruleId = :ruleId', {
-        ruleId: 'rule-invoice',
-      });
-    }
+    expect(cb.documentNumber).toBe('2608210001');
+
+    // Each branch's counter lock used its OWN rule id, not a shared org-wide
+    // one — that is what keeps the two independent dials apart.
+    expect(a.ruleFindOne).toHaveBeenCalledTimes(1);
+    expect(a.qb.where).toHaveBeenCalledWith('counter.ruleId = :ruleId', {
+      ruleId: 'rule-branch-a',
+    });
+    expect(b.ruleFindOne).toHaveBeenCalledTimes(1);
+    expect(b.qb.where).toHaveBeenCalledWith('counter.ruleId = :ruleId', {
+      ruleId: 'rule-branch-b',
+    });
   });
 });
