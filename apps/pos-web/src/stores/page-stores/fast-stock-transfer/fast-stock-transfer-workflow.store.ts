@@ -24,6 +24,10 @@ interface PosFastStockTransferWorkflowState {
   editingRowId: string | null;
   editableDraft: FastStockTransferToolbarDraft | null;
   pollSessionId: string | null;
+  /** Lines from the latest "Xử lý chuyển kho" submission still waiting on
+   * server-side confirmation (ACTIVE -> TRANSFERRED); `null` when idle. */
+  pendingTransferLineIds: ReadonlyArray<string>;
+  pendingTransferStartedAt: number | null;
 
   setDirection: (direction: TempWarehouseDirection) => void;
   setFilter: <K extends keyof FastStockTransferFilters>(
@@ -55,9 +59,11 @@ interface PosFastStockTransferWorkflowState {
   remapTransferSelection: (fromId: string, toId: string) => void;
 
   addHiddenLineIds: (ids: ReadonlyArray<string>) => void;
+  removeHiddenLineIds: (ids: ReadonlyArray<string>) => void;
   pruneHiddenLineIds: (activeIds: ReadonlySet<string>) => void;
 
   setPollSessionId: (sessionId: string | null) => void;
+  setPendingTransferLineIds: (ids: ReadonlyArray<string>) => void;
   resetWorkflow: () => void;
   resetWorkflowAll: () => void;
 }
@@ -72,6 +78,8 @@ export const usePosFastStockTransferWorkflowStore =
     editingRowId: null,
     editableDraft: null,
     pollSessionId: null,
+    pendingTransferLineIds: [],
+    pendingTransferStartedAt: null,
 
     setDirection: (direction) =>
       set((state) => ({
@@ -181,6 +189,15 @@ export const usePosFastStockTransferWorkflowStore =
         return { hiddenLineIds: [...setIds] };
       }),
 
+    removeHiddenLineIds: (ids) =>
+      set((state) => {
+        const dropIds = new Set(ids);
+        const next = state.hiddenLineIds.filter((id) => !dropIds.has(id));
+        return next.length === state.hiddenLineIds.length
+          ? state
+          : { hiddenLineIds: next };
+      }),
+
     pruneHiddenLineIds: (activeIds) =>
       set((state) => {
         const next = state.hiddenLineIds.filter((id) => activeIds.has(id));
@@ -191,6 +208,12 @@ export const usePosFastStockTransferWorkflowStore =
 
     setPollSessionId: (pollSessionId) => set({ pollSessionId }),
 
+    setPendingTransferLineIds: (ids) =>
+      set({
+        pendingTransferLineIds: ids,
+        pendingTransferStartedAt: ids.length > 0 ? Date.now() : null,
+      }),
+
     resetWorkflow: () =>
       set({
         transferSelectedByLineId: {},
@@ -198,6 +221,8 @@ export const usePosFastStockTransferWorkflowStore =
         editingRowId: null,
         editableDraft: null,
         toolbarDraft: { ...EMPTY_FAST_STOCK_TRANSFER_TOOLBAR_DRAFT },
+        pendingTransferLineIds: [],
+        pendingTransferStartedAt: null,
       }),
 
     // Khác resetWorkflow (giữ direction/filters/pollSessionId cho flow sau
@@ -212,5 +237,7 @@ export const usePosFastStockTransferWorkflowStore =
         editingRowId: null,
         editableDraft: null,
         pollSessionId: null,
+        pendingTransferLineIds: [],
+        pendingTransferStartedAt: null,
       }),
   }));

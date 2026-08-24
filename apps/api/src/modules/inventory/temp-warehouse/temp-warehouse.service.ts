@@ -540,7 +540,7 @@ export class TempWarehouseService {
   ): Promise<
     | {
         sessionId: string | null;
-        data: LineWithRelations[];
+        data: (LineWithRelations & { isBalanced: boolean })[];
         total: number;
         page: number;
         pageSize: number;
@@ -632,13 +632,143 @@ export class TempWarehouseService {
     const session = await this.sessionRepo.findOne({
       where: { id: sessionId, organizationId: actor.organizationId },
     });
-    const data = await this.attachLineRelations(
+    const relatedLines = await this.attachLineRelations(
       rawLines,
       session,
       actor.organizationId,
     );
 
+    // "Hiển thị dòng cần kiểm tra" hides rows already netted out against the
+    // opposite direction (same item, same branch) — computed here over the
+    // FULL ACTIVE+AUTO_BALANCED working set of both direction sessions, not
+    // just this page, so the FE no longer has to reconcile it itself from two
+    // independently-paginated queries (which silently truncated past 500 rows).
+    const balancedIds = session
+      ? await this.computeBalancedLineIdsForSession(session, actor.organizationId)
+      : new Set<string>();
+    const data = relatedLines.map((l) => ({
+      ...l,
+      isBalanced: balancedIds.has(l.id),
+    }));
+
     return { sessionId, data, total, page, pageSize };
+  }
+
+  /**
+   * Line ids from the branch's ACTIVE working set (this session's direction +
+   * its opposite-direction sibling, if any) that are already netted out —
+   * i.e. covered by a matching quantity on the other side for the same item.
+   * FIFO by createdAt on each side, mirroring the compensating lines built by
+   * buildAutoBalancedLines() on NET_OFFSET close, just without persisting them.
+   */
+  private async computeBalancedLineIdsForSession(
+    session: TempWarehouseSessionEntity,
+    organizationId: string,
+  ): Promise<Set<string>> {
+    const sessionIds = [session.id];
+    if (session.branchId && session.direction) {
+      const opposite =
+        session.direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM
+          ? TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE
+          : TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM;
+      const sibling = await this.sessionRepo.findOne({
+        where: {
+          branchId: session.branchId,
+          organizationId,
+          status: TempWarehouseSessionStatus.ACTIVE,
+          direction: opposite,
+        },
+      });
+      if (sibling) sessionIds.push(sibling.id);
+    }
+
+    const lines = await this.lineRepo.find({
+      where: {
+        sessionId: In(sessionIds),
+        organizationId,
+        status: In([
+          TempWarehouseLineStatus.ACTIVE,
+          TempWarehouseLineStatus.AUTO_BALANCED,
+        ]),
+      },
+      select: ['id', 'itemId', 'direction', 'quantity', 'createdAt'],
+    });
+
+    return this.computeBalancedLineIds(lines);
+  }
+
+  private computeBalancedLineIds(
+    lines: Pick<
+      TempWarehouseLineEntity,
+      'id' | 'itemId' | 'direction' | 'quantity' | 'createdAt'
+    >[],
+  ): Set<string> {
+    interface Entry {
+      id: string;
+      qty: number;
+      createdAt: Date;
+    }
+    const byItem = new Map<string, { w2s: Entry[]; s2w: Entry[] }>();
+
+    for (const line of lines) {
+      const qty = Number(line.quantity);
+      if (!Number.isFinite(qty) || qty <= 0) continue;
+      let bucket = byItem.get(line.itemId);
+      if (!bucket) {
+        bucket = { w2s: [], s2w: [] };
+        byItem.set(line.itemId, bucket);
+      }
+      const entry: Entry = { id: line.id, qty, createdAt: line.createdAt };
+      if (line.direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM) {
+        bucket.w2s.push(entry);
+      } else {
+        bucket.s2w.push(entry);
+      }
+    }
+
+    const balanced = new Set<string>();
+    const byTime = (a: Entry, b: Entry) =>
+      a.createdAt.getTime() - b.createdAt.getTime();
+    const markBalancedSide = (side: Entry[], pool: number) => {
+      let remaining = pool;
+      for (const entry of side) {
+        if (remaining <= 0) break;
+        if (entry.qty <= remaining) {
+          balanced.add(entry.id);
+          remaining -= entry.qty;
+        }
+      }
+    };
+
+    for (const bucket of byItem.values()) {
+      const w2s = [...bucket.w2s].sort(byTime);
+      const s2w = [...bucket.s2w].sort(byTime);
+      const totalW2s = w2s.reduce((sum, l) => sum + l.qty, 0);
+      const totalS2w = s2w.reduce((sum, l) => sum + l.qty, 0);
+      const pairedQty = Math.min(totalW2s, totalS2w);
+      markBalancedSide(w2s, pairedQty);
+      markBalancedSide(s2w, pairedQty);
+    }
+
+    return balanced;
+  }
+
+  /**
+   * Current status of specific lines by id, unfiltered (unlike listLines, this
+   * does not hard-exclude TRANSFERRED). Backs the FE's post-"Xử lý chuyển kho"
+   * poll: transferLines only publishes an event and returns 202, the actual
+   * ACTIVE -> TRANSFERRED flip happens later in the consumer, so the FE needs a
+   * way to confirm it actually happened before treating the submission as done.
+   */
+  async getLinesStatus(
+    ids: string[],
+    actor: ActorContext,
+  ): Promise<{ id: string; status: TempWarehouseLineStatus }[]> {
+    const lines = await this.lineRepo.find({
+      where: { id: In(ids), organizationId: actor.organizationId },
+      select: ['id', 'status'],
+    });
+    return lines.map((l) => ({ id: l.id, status: l.status }));
   }
 
   private async resolveSessionId(

@@ -146,6 +146,8 @@ export const TEMP_WAREHOUSE_KEYS = {
     ["temp-wh", "lines", branchId, direction, includeTransferred] as const,
   LINES_NETTED: (sessionId: string) =>
     ["temp-wh", "lines-netted", sessionId] as const,
+  LINES_TRANSFER_STATUS: (ids: ReadonlyArray<string>) =>
+    ["temp-wh", "lines-transfer-status", ...ids] as const,
   SESSION: (sessionId: string) => ["temp-wh", "session", sessionId] as const,
   CARRIERS: (
     branchId: string,

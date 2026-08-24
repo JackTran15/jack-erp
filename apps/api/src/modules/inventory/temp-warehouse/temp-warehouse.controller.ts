@@ -25,6 +25,7 @@ import { TempWarehouseService } from './temp-warehouse.service';
 import { AddTempWarehouseLineDto } from './dto/add-line.dto';
 import { UpdateTempWarehouseLineDto } from './dto/update-line.dto';
 import { ListTempWarehouseLinesQueryDto } from './dto/list-lines.query';
+import { LinesStatusQueryDto } from './dto/lines-status.query';
 import { CloseBranchSessionsDto } from './dto/close-session.dto';
 import { ListCarriersQueryDto } from './dto/list-carriers.query';
 import { TransferTempWarehouseLinesDto } from './dto/transfer-lines.dto';
@@ -119,6 +120,19 @@ export class TempWarehouseController {
     @Actor() actor: ActorContext,
   ) {
     return this.service.listLines(query, actor);
+  }
+
+  @Get('lines/status')
+  @ApiOperation({
+    summary:
+      'Current status of specific lines by id — used to poll a partial transfer ("Xử lý chuyển kho") until it actually lands (ACTIVE -> TRANSFERRED) instead of trusting the 202 response alone',
+  })
+  @RequirePermission('inventory.temp-warehouse.read')
+  getLinesStatus(
+    @Query() query: LinesStatusQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.getLinesStatus(query.ids, actor);
   }
 
   @Post('sessions/close')

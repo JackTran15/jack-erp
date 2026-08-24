@@ -18,7 +18,6 @@ import {
 import type { InventoryLocationPickerOption } from "@erp/pos/interfaces/inventory-location.interface";
 import {
   attachTransferSelection,
-  buildBalancedLineIds,
   filterImbalancedNettedItems,
   lineMatchesTableFilters,
   lineProductName,
@@ -178,8 +177,17 @@ export function useFastStockTransferData(): FastStockTransferData {
     closeSessionMutation.isPending ||
     transferLinesMutation.isPending;
 
+  // Backend computes isBalanced over the full ACTIVE+AUTO_BALANCED working set
+  // of both direction sessions (see TempWarehouseService.listLines) — FE just
+  // collects the flagged ids instead of re-deriving it from two independently
+  // paginated queries (which silently truncated past 500 rows/direction).
   const balancedLineIds = useMemo(
-    () => buildBalancedLineIds(allLinesForBalance),
+    () =>
+      new Set(
+        allLinesForBalance
+          .filter((line) => line.isBalanced)
+          .map((line) => line.id),
+      ),
     [allLinesForBalance],
   );
 

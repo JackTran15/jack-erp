@@ -3,6 +3,7 @@ import type {
   AddTempWarehouseLineBody,
   CloseBranchSessionsResult,
   CloseTempWarehouseSessionBody,
+  LineTransferStatus,
   ListLinesNettedResult,
   ListLinesRawResult,
   PaginatedResponse,
@@ -170,4 +171,12 @@ export const tempWarehouseService = {
         body,
       ),
     ),
+
+  getLinesStatus: (ids: ReadonlyArray<string>): Promise<LineTransferStatus[]> => {
+    const q = new URLSearchParams();
+    q.set("ids", ids.join(","));
+    return call(() =>
+      http.get<LineTransferStatus[]>(`${BASE}/lines/status?${q.toString()}`),
+    );
+  },
 };
