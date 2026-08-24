@@ -10,6 +10,7 @@ import axios, {
 import { AuthErrorCode } from "@erp/shared-interfaces";
 import { resolveApiBaseUrl } from "./api-base";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
+import { refreshOnce } from "./token-refresh";
 
 
 export const apiClient: AxiosInstance = axios.create({
@@ -43,47 +44,6 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
   return config;
 });
-
-let refreshPromise: Promise<boolean> | null = null;
-
-async function tryRefreshToken(): Promise<boolean> {
-  const refreshToken = localStorage.getItem(POS_REFRESH_TOKEN_KEY);
-  if (!refreshToken) return false;
-
-  try {
-    const res = await axios.post(
-      `${resolveApiBaseUrl()}/auth/refresh`,
-      { refreshToken },
-      { headers: { "Content-Type": "application/json" } },
-    );
-
-    const data = res.data as {
-      accessToken?: string;
-      refreshToken?: string;
-    };
-
-    if (data.accessToken) {
-      localStorage.setItem(POS_ACCESS_TOKEN_KEY, data.accessToken);
-    }
-    if (data.refreshToken) {
-      localStorage.setItem(POS_REFRESH_TOKEN_KEY, data.refreshToken);
-    }
-    return !!data.accessToken;
-  } catch {
-    localStorage.removeItem(POS_ACCESS_TOKEN_KEY);
-    localStorage.removeItem(POS_REFRESH_TOKEN_KEY);
-    return false;
-  }
-}
-
-function refreshOnce(): Promise<boolean> {
-  if (!refreshPromise) {
-    refreshPromise = tryRefreshToken().finally(() => {
-      refreshPromise = null;
-    });
-  }
-  return refreshPromise;
-}
 
 apiClient.interceptors.response.use(
   (response) => response,
