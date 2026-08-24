@@ -100,7 +100,7 @@ export function mapGoodsIssueToVoucherPayload(
   const info = [
     { label: 'Đối tượng', value: issue.counterparty?.name ?? '—' },
     { label: 'Người giao', value: issue.deliverer ?? '—' },
-    { label: 'Diễn giải', value: issue.reason ?? issue.notes ?? '—' },
+    { label: 'Diễn giải', value: issue.notes ?? issue.reason ?? '—' },
   ];
   if (transferDestinationStoreName) {
     info.push({
