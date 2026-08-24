@@ -64,6 +64,6 @@ rollback: revert 2 trường mới khỏi `PosProductVariantDto` và trả `Vari
       service + spec). **Ngoại lệ đã có từ trước, không thuộc diff này**: 2 comment tiếng Việt
       trong `loadBranchStock` (dòng ~513, ~557 hiện tại) — nằm trong hàm bị khoá bởi ADR-01, không
       chạm. Nợ kỹ thuật cũ, không sửa ở feature này.
-- [ ] `openapi.snapshot.json` + `schema.ts` đã regenerate và commit — đã regenerate (T-01-07/
-      T-02-06), **chưa commit**
+- [x] `openapi.snapshot.json` + `schema.ts` đã regenerate và commit — regenerate ở T-01-07/
+      T-02-06, commit `a4038fd2` trên branch `feat/pos-variant-stock-columns`
 - [ ] Demo chạy trước người thật ở gate G4
