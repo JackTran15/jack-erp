@@ -26,3 +26,6 @@
 {"action": "ticket review", "at": "2026-08-24T19:11:16", "by": "Claude", "gate": "G4", "id": "88b9ec643bb9", "ticket": "T-03-02", "ts": "2026-08-24T19:11:16.155297"}
 {"action": "ticket done", "at": "2026-08-24T19:14:27", "by": "Akenzy", "gate": "G4", "id": "ff18a09d0862", "ticket": "T-02-04", "ts": "2026-08-24T19:14:27.372235"}
 {"action": "ticket done", "at": "2026-08-24T19:14:27", "by": "Akenzy", "gate": "G4", "id": "bc20e42a1b0b", "ticket": "T-03-02", "ts": "2026-08-24T19:14:27.491036"}
+{"action": "reopened", "at": "2026-08-24T19:27:42", "by": "Akenzy", "gate": "G2", "id": "e350f5e21120", "reason": "Live G4 demo found the fix only covers app-load, not client-side navigation after the app has been sitting open - the primary real-world scenario from the original complaint. ADR-02's decision to leave PosRequireAuth.tsx untouched is being corrected.", "ts": "2026-08-24T19:27:42.166595"}
+{"action": "passed", "at": "2026-08-24T19:28:32", "by": "Akenzy", "evidence": "4 ADR(s) recorded", "gate": "G2", "id": "b9adc1189053", "ts": "2026-08-24T19:28:32.853068"}
+{"action": "passed", "at": "2026-08-24T19:31:46", "by": "Akenzy", "evidence": "graph valid - 3 UoW, 9 tickets, no cycles", "gate": "G3", "id": "a2f8a66cabd1", "ts": "2026-08-24T19:31:46.399470"}

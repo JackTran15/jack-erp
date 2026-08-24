@@ -146,3 +146,18 @@ history:
     at: 2026-08-24T19:14:27
     by: Akenzy
     ticket: T-03-02
+  - gate: G2
+    action: reopened
+    at: 2026-08-24T19:27:42
+    by: Akenzy
+    reason: Live G4 demo found the fix only covers app-load, not client-side navigation after the app has been sitting open - the primary real-world scenario from the original complaint. ADR-02's decision to leave PosRequireAuth.tsx untouched is being corrected.
+  - gate: G2
+    action: passed
+    at: 2026-08-24T19:28:32
+    by: Akenzy
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-24T19:31:46
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 9 tickets, no cycles
