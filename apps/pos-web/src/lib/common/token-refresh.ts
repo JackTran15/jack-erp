@@ -1,3 +1,4 @@
+import axios from "axios";
 import {
   POS_ACCESS_TOKEN_KEY,
   POS_REFRESH_TOKEN_KEY,
@@ -11,19 +12,16 @@ async function tryRefreshToken(): Promise<boolean> {
   if (!refreshToken) return false;
 
   try {
-    const res = await fetch(`${resolveApiBaseUrl()}/auth/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
-    });
+    // axios.post, not fetch: api-axios.test.ts's existing regression-guard
+    // suite (from auth-token-auto-refresh) spies on axios.post to assert a
+    // refresh fired. A fetch-based call here would be invisible to that spy.
+    const res = await axios.post(
+      `${resolveApiBaseUrl()}/auth/refresh`,
+      { refreshToken },
+      { headers: { "Content-Type": "application/json" } },
+    );
 
-    if (!res.ok) {
-      localStorage.removeItem(POS_ACCESS_TOKEN_KEY);
-      localStorage.removeItem(POS_REFRESH_TOKEN_KEY);
-      return false;
-    }
-
-    const data = (await res.json()) as {
+    const data = res.data as {
       accessToken?: string;
       refreshToken?: string;
     };
