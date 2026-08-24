@@ -69,8 +69,13 @@ verify:
       required: true
       auth:
         recipe: form
-        path: /dang-nhap
-        landing: /
+        # POS được phục vụ dưới base path `/pos/` (vite.config.ts `base: "/pos/"`,
+        # App.tsx `basename={import.meta.env.BASE_URL}`) vì nó dùng chung origin với
+        # backoffice. Đường dẫn phải mang sẵn base: bộ chạy resolve bằng
+        # `new URL(path, env.url)`, nên một path tuyệt đối không có `/pos` sẽ rơi ra
+        # ngoài app và trả 404.
+        path: /pos/dang-nhap
+        landing: /pos/
         ready_when: { gone: 'text=Đang tải' }
         selectors:
           organization: '#pos-login-org-id'
@@ -92,6 +97,12 @@ verify:
   # BackofficeLayout is a fixed ml-60 desktop shell.
   viewports:
     desktop: { width: 1440, height: 900 }
+    # Chiều cao khung nhìn thật của một MacBook 13" sau khi trừ thanh công cụ Chrome.
+    # Không phải "mobile" — cùng layout desktop, chỉ thấp hơn. Có mặt vì popover dài
+    # (vd PosDateRangeFilter, 12 lựa chọn) vừa vặn ở 900 nhưng tràn ở đây, nên bug về
+    # phần tử bị đẩy khỏi khung nhìn chỉ tái hiện được ở chiều cao này.
+    # Feature nào cần thì tự khai trong frontmatter của 07-verification.md.
+    laptop: { width: 1440, height: 720 }
   failure_signals:
     - { selector: '[data-sonner-toast][data-type="error"]', message: 'app hiển thị toast lỗi' }
     - { selector: '.pos-dialog__alert', message: 'POS báo lỗi đăng nhập' }
