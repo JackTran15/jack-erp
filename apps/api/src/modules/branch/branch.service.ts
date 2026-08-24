@@ -227,13 +227,23 @@ export class BranchService {
    * store with no way back.
    */
   async list(
-    query: PaginationQuery & { branchId?: string; includeInactive?: boolean },
+    query: PaginationQuery & {
+      branchId?: string;
+      includeInactive?: boolean;
+      status?: BranchStatus;
+    },
     actor: ActorContext,
   ): Promise<PaginatedResponse<BranchEntity>> {
     const where: Record<string, unknown> = {
       organizationId: actor.organizationId,
     };
-    if (!query.includeInactive) {
+    // Three shapes, in order of specificity:
+    //   status=X          → exactly that status (the management screen's filter)
+    //   includeInactive   → no status filter at all (name lookups, "Tất cả")
+    //   neither           → operating only, which is what every picker wants
+    if (query.status) {
+      where.status = query.status;
+    } else if (!query.includeInactive) {
       where.status = BranchStatus.ACTIVE;
     }
     if (query.branchId) {

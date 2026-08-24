@@ -19,11 +19,6 @@ import { SupplierCreateForm } from "./inventory/SupplierCreateForm";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { TreeSelectInput } from "../forms/TreeSelectInput";
 import { toast } from "sonner";
-import { usePermissionCheck } from "../../hooks/usePermissionCheck";
-import {
-  fetchBranchDeactivationImpact,
-  type BranchDeactivationImpact,
-} from "../../hooks/iam/useBranchDeactivationImpact";
 import type { FieldDefinition } from "@erp/shared-interfaces";
 
 interface Props {
@@ -185,12 +180,6 @@ export function CrudRecordDialog({
   const isSupplier = entityKey === "inventory-providers";
   const isStorage = entityKey === "inventory-storages";
   const isUnit = entityKey === "inventory-item-units";
-  const branchPerms = usePermissionCheck();
-  const isBranch = entityKey === "branches";
-  // The impact endpoint and the status write both require branch.archive, so
-  // showing the checkbox to a branch.write-only actor would offer an action
-  // that can only end in a 403.
-  const canArchiveBranch = branchPerms.has("branch.archive");
   const isSimple = SIMPLE_DIALOG_ENTITIES.has(entityKey);
 
   const { data: config } = useCrudConfig(entityKey);
@@ -225,13 +214,6 @@ export function CrudRecordDialog({
   const [storageInactive, setStorageInactive] = useState(false);
   // Đơn vị tính: "Ngừng theo dõi" = isActive=false (đảo chiều checkbox).
   const [unitInactive, setUnitInactive] = useState(false);
-  // Cửa hàng: "Ngừng hoạt động" = status SUSPENDED (giống MISA eShop).
-  const [branchInactive, setBranchInactive] = useState(false);
-  const [wasBranchInactive, setWasBranchInactive] = useState(false);
-  // Hộp thoại xác nhận + số liệu tồn đọng lấy từ /branches/:id/deactivation-impact.
-  const [branchConfirmOpen, setBranchConfirmOpen] = useState(false);
-  const [branchImpact, setBranchImpact] = useState<BranchDeactivationImpact | null>(null);
-  const [branchImpactLoading, setBranchImpactLoading] = useState(false);
   const wasStorageDefault = isStorage && Boolean(record?.isDefaultReceiving);
   const cannotDeactivate =
     isStorage && (Boolean(record?.isMainStorage) || wasStorageDefault);
@@ -253,11 +235,6 @@ export function CrudRecordDialog({
         setStorageInactive(record.isActive === false);
       }
       if (isUnit) setUnitInactive(record.isActive === false);
-      if (isBranch) {
-        const inactive = record.status === "SUSPENDED";
-        setBranchInactive(inactive);
-        setWasBranchInactive(inactive);
-      }
     } else {
       const defaults: Record<string, unknown> = {};
       editableFields.forEach((f) => { defaults[f.key] = f.type === "boolean" ? false : ""; });
@@ -269,13 +246,9 @@ export function CrudRecordDialog({
         setStorageInactive(false);
       }
       if (isUnit) setUnitInactive(false);
-      if (isBranch) {
-        setBranchInactive(false);
-        setWasBranchInactive(false);
-      }
     }
     setErrors({});
-  }, [open, record, config, editableFields, isEdit, isSupplier, isStorage, isUnit, isBranch]);
+  }, [open, record, config, editableFields, isEdit, isSupplier, isStorage, isUnit]);
 
   const validate = () => {
     const next: Record<string, string> = {};
@@ -305,43 +278,7 @@ export function CrudRecordDialog({
     if (isStorage) payload.isActive = !storageInactive;
     // Đơn vị tính: tạo/nhân bản luôn active; edit theo checkbox "Ngừng theo dõi".
     if (isUnit) payload.isActive = !unitInactive;
-    // `status` là readOnly trong CrudEntityConfig nên không nằm trong editableFields;
-    // phải gửi tường minh — nhưng **chỉ khi ô tích thật sự đổi**.
-    //
-    // Gửi vô điều kiện thì hỏng với cửa hàng đã lưu trữ: `branchInactive` chỉ
-    // dò `SUSPENDED`, nên với `ARCHIVED` nó là false và mỗi lần lưu lại gửi
-    // `ACTIVE` → backend coi là chuyển trạng thái → 400 "không thể mở lại".
-    // Đổi mỗi cái tên của một cửa hàng đã lưu trữ cũng chết, mà trước ticket này
-    // vẫn chạy được.
-    if (isBranch && isEdit && branchInactive !== wasBranchInactive) {
-      payload.status = branchInactive ? "SUSPENDED" : "ACTIVE";
-    }
     return payload;
-  };
-
-  /**
-   * Ticking the box is the only action here with a consequence outside this
-   * screen — POS terminals at that branch stop working — so it gets a
-   * confirmation. Un-ticking (reopening a store) saves straight through.
-   */
-  const requestSave = async (andNew = false) => {
-    if (!validate()) return;
-    if (isBranch && branchInactive && !wasBranchInactive && recordId) {
-      setBranchConfirmOpen(true);
-      setBranchImpactLoading(true);
-      setBranchImpact(null);
-      try {
-        setBranchImpact(await fetchBranchDeactivationImpact(recordId));
-      } catch {
-        // A failed count must not block the decision — the dialog still asks,
-        // just without the numbers.
-        setBranchImpact(null);
-      } finally {
-        setBranchImpactLoading(false);
-      }
-      return;
-    }
-    await save(andNew);
   };
 
   const save = async (andNew = false) => {
@@ -426,7 +363,7 @@ export function CrudRecordDialog({
               <Button
                 type="button"
                 className="!bg-primary-blue !text-primary-blue-foreground hover:!bg-primary-blue-hover"
-                onClick={() => void requestSave(false)}
+                onClick={() => void save(false)}
                 disabled={isSaving}
               >
                 {isSaving ? "Đang lưu…" : "Lưu"}
@@ -435,7 +372,7 @@ export function CrudRecordDialog({
                 <Button
                   variant="outline"
                   type="button"
-                  onClick={() => void requestSave(true)}
+                  onClick={() => void save(true)}
                   disabled={isSaving}
                 >
                   + Lưu và thêm mới
@@ -464,13 +401,13 @@ export function CrudRecordDialog({
         <Button
           type="button"
           className="!bg-primary-blue !text-primary-blue-foreground hover:!bg-primary-blue-hover"
-          onClick={() => void requestSave(false)}
+          onClick={() => void save(false)}
           disabled={isSaving}
         >
           {isSaving ? "Đang lưu…" : "Lưu"}
         </Button>
         {!isEdit && (
-          <Button variant="outline" type="button" onClick={() => void requestSave(true)} disabled={isSaving}>
+          <Button variant="outline" type="button" onClick={() => void save(true)} disabled={isSaving}>
             + Lưu và thêm mới
           </Button>
         )}
@@ -482,7 +419,6 @@ export function CrudRecordDialog({
   );
 
   return (
-    <>
     <AppModal
       open={open}
       onOpenChange={(o) => { if (!o && !isSaving) onClose(); }}
@@ -703,115 +639,27 @@ export function CrudRecordDialog({
                 )}
               </div>
             ) : (
-              <div className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  {editableFields.map((field) => (
-                    <CrudFieldInput
-                      key={field.key}
-                      inputIdPrefix="dialog"
-                      field={field}
-                      value={values[field.key]}
-                      error={errors[field.key]}
-                      entityKey={entityKey}
-                      currentRecordId={recordId ?? undefined}
-                      onChange={(v) => {
-                        setValues((p) => ({ ...p, [field.key]: v }));
-                        setErrors((p) => { const n = { ...p }; delete n[field.key]; return n; });
-                      }}
-                    />
-                  ))}
-                </div>
-                {/* Ngừng hoạt động: chỉ khi SỬA, và không cho với cửa hàng chính
-                    (backend cũng từ chối — đây chỉ là để không mời người dùng bấm) */}
-                {isBranch && isEdit && !Boolean(record?.isMainBranch) && canArchiveBranch && (
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      id="dialog-branch-inactive"
-                      type="checkbox"
-                      className="h-5 w-5 shrink-0 cursor-pointer rounded border-2 border-input accent-primary"
-                      checked={branchInactive}
-                      onChange={(e) => setBranchInactive(e.target.checked)}
-                    />
-                    <span className="cursor-pointer select-none font-medium">
-                      Ngừng hoạt động
-                    </span>
-                  </label>
-                )}
-                {isBranch && isEdit && Boolean(record?.isMainBranch) && (
-                  <p className="text-xs text-muted-foreground">
-                    Đây là cửa hàng chính của tổ chức nên không thể ngừng hoạt động.
-                  </p>
-                )}
+              <div className="grid gap-4 md:grid-cols-2">
+                {editableFields.map((field) => (
+                  <CrudFieldInput
+                    key={field.key}
+                    inputIdPrefix="dialog"
+                    field={field}
+                    value={values[field.key]}
+                    error={errors[field.key]}
+                    entityKey={entityKey}
+                    currentRecordId={recordId ?? undefined}
+                    onChange={(v) => {
+                      setValues((p) => ({ ...p, [field.key]: v }));
+                      setErrors((p) => { const n = { ...p }; delete n[field.key]; return n; });
+                    }}
+                  />
+                ))}
               </div>
             )}
           </>
         )}
       </div>
     </AppModal>
-
-      {/* Xác nhận ngừng hoạt động cửa hàng — chữ theo mẫu MISA eShop, kèm số
-          liệu thật để người bấm biết mình đang bỏ lại cái gì. Chỉ cảnh báo,
-          không chặn (trừ cửa hàng chính, do backend từ chối). */}
-      <Dialog
-        open={branchConfirmOpen}
-        onOpenChange={(o) => { if (!o && !isSaving) setBranchConfirmOpen(false); }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Ngừng hoạt động cửa hàng</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 py-1 text-sm">
-            <p>
-              Nếu ngừng hoạt động cửa hàng{" "}
-              <span className="font-semibold">
-                {String(values.name ?? branchImpact?.branchName ?? "")}
-              </span>{" "}
-              các thiết bị bán hàng sẽ không tiếp tục làm việc được nữa. Bạn có
-              chắc chắn muốn ngừng hoạt động cửa hàng này không?
-            </p>
-            {branchImpactLoading && (
-              <p className="text-muted-foreground">Đang kiểm tra dữ liệu liên quan…</p>
-            )}
-            {branchImpact?.blockers.length ? (
-              <ul className="space-y-1">
-                {branchImpact.blockers.map((b) => (
-                  <li key={b.code} className="text-destructive">{b.message}</li>
-                ))}
-              </ul>
-            ) : null}
-            {branchImpact?.warnings.length ? (
-              <div className="rounded border border-border bg-muted/40 p-3">
-                <p className="mb-1 font-medium">Cửa hàng này vẫn còn:</p>
-                <ul className="list-disc space-y-0.5 pl-5">
-                  {branchImpact.warnings.map((w) => (
-                    <li key={w.code}>
-                      {w.count.toLocaleString("vi-VN")} {w.label}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              className="!bg-primary-blue !text-primary-blue-foreground hover:!bg-primary-blue-hover"
-              disabled={isSaving || Boolean(branchImpact?.blockers.length)}
-              onClick={() => { setBranchConfirmOpen(false); void save(false); }}
-            >
-              {isSaving ? "Đang lưu…" : "Có"}
-            </Button>
-            <Button
-              variant="outline"
-              type="button"
-              disabled={isSaving}
-              onClick={() => setBranchConfirmOpen(false)}
-            >
-              Không
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
   );
 }

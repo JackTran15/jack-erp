@@ -268,3 +268,34 @@ Kèm hai ràng buộc phát sinh, cả hai đều đã bị review bắt:
 2. Ô tích phải canh theo `branch.archive`, vì endpoint impact và đường ghi trạng thái đều đòi
    quyền đó; hiện nó cho ai có `branch.write` cũng thấy thì chỉ dẫn tới 403.
 
+
+
+### ADR-08 — Màn Cửa hàng tách khỏi generic CRUD, tự dựng trên `BaseDataTable`
+
+**Context:** ADR-07 đặt ô tích vào `CrudRecordDialog` và bộ lọc mặc định vào `CrudListPage`.
+Cách đó chạy được — 8/8 bước verify xanh — nhưng nó **trả giá bằng chỗ chung**:
+`CrudRecordDialog` vốn đã có 37 nhánh rẽ theo tên entity trên 817 dòng, `CrudListPage` 23 nhánh
+trên 1112 dòng; tôi thêm vào đó. Phục vụ 13 entity mà phải rẽ nhánh 65 lần theo tên entity thì
+trừu tượng không trả đủ tiền nó tiêu, và mỗi feature mới lại đắt thêm.
+
+Đo thêm: `defaultValue` tôi thêm vào interface dùng chung `FilterDefinition` chỉ phục vụ **một**
+entity — trái quy tắc "không trừu tượng hoá cho code dùng một chỗ" trong CLAUDE.md.
+
+**Decision:** màn Cửa hàng thành trang riêng, tự dựng trên `BaseDataTable` với dialog riêng —
+đúng khuôn `ItemLocationDetailsPage` đã có sẵn trong repo (state lọc cục bộ bằng `useState`,
+query riêng cho endpoint của nó). Trả `CrudRecordDialog`, `CrudListPage` và `FilterDefinition`
+về nguyên trạng.
+
+**Consequences:**
+- Không thêm nhánh special-case nào vào component dùng chung; feature sau không phải gánh.
+- Đổi lại màn Cửa hàng không còn hưởng miễn phí những gì platform làm sẵn (phân trang, chọn
+  dòng, thanh công cụ) — phải tự dựng, nhiều code hơn ở chỗ cục bộ.
+- `branches` **vẫn phải đăng ký** trên platform: `CrudFieldInput.tsx:41` map
+  `payment-accounts.branchId` sang `entityKey: "branches"` cho ô chọn dạng cây, và đường xoá
+  (`BranchCrudService.remove`, có quét phụ thuộc ~35 bảng) chỉ tới được qua
+  `DELETE /admin/entities/branches/records/:id`.
+- Bản vá `serverFilters` bị revert theo. Nó sửa một lỗi thật (bộ lọc cột chưa bao giờ tới
+  server cho entity legacy, nên tổng số và phân trang sai), nhưng sau khi Cửa hàng rời
+  platform thì không còn ai tiêu thụ nó — giữ lại là sửa chỗ không ai nhờ. Tách thành việc riêng.
+
+**Status:** accepted

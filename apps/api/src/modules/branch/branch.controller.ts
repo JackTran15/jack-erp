@@ -12,7 +12,11 @@ import {
   UseGuards,
   forwardRef,
 } from '@nestjs/common';
-import { PaginationQuery, RegistrationStatus } from '@erp/shared-interfaces';
+import {
+  BranchStatus,
+  PaginationQuery,
+  RegistrationStatus,
+} from '@erp/shared-interfaces';
 import { Actor, ActorContext } from '../../common/decorators/actor-context.decorator';
 import { BranchService } from './branch.service';
 import { CreateBranchDto, UpdateBranchDto } from './dto';
@@ -47,7 +51,11 @@ export class BranchController {
   @Get()
   list(
     @Query()
-    query: PaginationQuery & { branchId?: string; includeInactive?: string },
+    query: PaginationQuery & {
+      branchId?: string;
+      includeInactive?: string;
+      status?: BranchStatus;
+    },
     @Actor() actor: ActorContext,
   ) {
     return this.branchService.list(
@@ -58,6 +66,7 @@ export class BranchController {
         sortOrder: query.sortOrder,
         branchId: query.branchId,
         includeInactive: query.includeInactive === 'true',
+        status: query.status,
       },
       actor,
     );

@@ -40,12 +40,6 @@ export interface FilterDefinition {
   label: string;
   type: 'text' | 'select' | 'date-range' | 'number-range' | 'boolean';
   options?: { label: string; value: string }[];
-  /**
-   * Pre-selected when the list first opens. The user can still clear it back to
-   * "all" — this is an opening view, not a restriction. Used where the default
-   * listing should hide retired rows without hiding them for good.
-   */
-  defaultValue?: string;
 }
 
 export interface CrudEntityConfig {

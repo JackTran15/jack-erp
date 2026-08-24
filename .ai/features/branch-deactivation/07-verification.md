@@ -16,75 +16,23 @@ tổ chức nên theo thiết kế **không** ngừng được, và chính đi�
 
 ## Steps
 
-Hai điều học được từ hai vòng chạy đỏ trước, ghi lại để người sau khỏi vấp:
-
-1. Màn Cửa hàng đặt `disableRowClick={true}` — bấm vào dòng chỉ **chọn** dòng, muốn mở form
-   phải bấm **Sửa** trên thanh công cụ.
-2. **Lựa chọn dòng sống sót qua các bước.** Cùng một URL nên component không remount, dòng
-   chọn ở bước trước còn nguyên; chọn thêm dòng thứ hai là **Sửa** bị vô hiệu và mọi thứ sau đó
-   treo. Nên mỗi bước phải tự dọn: bấm ô chọn-tất-cả ở `thead` hai lần (chọn hết → bỏ hết) rồi
-   mới chọn đúng dòng cần.
-
-Selector quét theo `tbody tr:has-text(...)` chứ không dùng `text=`: `text=HCM` khớp cả ô chọn
-chi nhánh trên thanh tiêu đề, còn `text=Chi nhánh …` khớp nhầm giữa các chi nhánh với nhau.
+Màn Cửa hàng nay là **trang riêng** (ADR-08), không còn đi qua `CrudListPage`. Nhờ vậy bộ test
+đơn giản hẳn: chọn dòng là chọn-một (không còn màn "chọn tất cả rồi bỏ tất cả" vốn là chỗ đua
+render mong manh nhất ở các vòng trước), và bộ lọc trạng thái gửi thẳng lên server nên số tổng
+ở chân bảng khớp với số dòng.
 
 | ID | Step | Path | Interaction | Verifies | Assert |
 |---|---|---|---|---|---|
-| S1 | Danh sách Cửa hàng mở ra đã lọc sẵn "Đang hoạt động" | `/admin/branches` | `wait tbody tr:has-text("HCM")` | AC-06 | `count tbody tr:has-text("Đang hoạt động") = 3` |
-| S2 | Form sửa có ô "Ngừng hoạt động" chưa tích | `/admin/branches` | `wait tbody tr:has-text("Chi nhánh kiểm thử"); click thead input[type="checkbox"]; click thead input[type="checkbox"]; click tbody tr:has-text("Chi nhánh kiểm thử") input[type="checkbox"]; wait tbody tr:has-text("Chi nhánh kiểm thử") input[type="checkbox"]:checked; click button:has-text("Sửa"); wait #dialog-branch-inactive` | AC-01 | `count #dialog-branch-inactive = 1` |
-| S3 | Hộp thoại xác nhận nêu hậu quả và số liệu tồn đọng | `/admin/branches` | `wait tbody tr:has-text("Chi nhánh kiểm thử"); click thead input[type="checkbox"]; click thead input[type="checkbox"]; click tbody tr:has-text("Chi nhánh kiểm thử") input[type="checkbox"]; wait tbody tr:has-text("Chi nhánh kiểm thử") input[type="checkbox"]:checked; click button:has-text("Sửa"); wait #dialog-branch-inactive; click #dialog-branch-inactive; click button:has-text("Lưu"); wait text=các thiết bị bán hàng` | AC-02 | `text=nhân viên chỉ thuộc cửa hàng này` |
-| S4 | Bấm Có thì cửa hàng chuyển sang đã ngừng | `/admin/branches` | `select select[aria-label="Lọc Trạng thái"] = ; wait tbody tr:has-text("Chi nhánh kiểm thử"); click thead input[type="checkbox"]; click thead input[type="checkbox"]; click tbody tr:has-text("Chi nhánh kiểm thử") input[type="checkbox"]; wait tbody tr:has-text("Chi nhánh kiểm thử") input[type="checkbox"]:checked; click button:has-text("Sửa"); wait #dialog-branch-inactive; click #dialog-branch-inactive; click button:has-text("Lưu"); wait text=các thiết bị bán hàng; click button:has-text("Có"); wait tbody tr:has-text("Chi nhánh kiểm thử"):has-text("Ngừng hoạt động")` | AC-01, AC-06 | `count tbody tr:has-text("Ngừng hoạt động") = 1` |
-| S5 | Cửa hàng chính không có ô tích, kèm lý do | `/admin/branches` | `wait tbody tr:has-text("TP.HCM"); click thead input[type="checkbox"]; click thead input[type="checkbox"]; click tbody tr:has-text("TP.HCM") input[type="checkbox"]; wait tbody tr:has-text("TP.HCM") input[type="checkbox"]:checked; click button:has-text("Sửa"); wait text=Đây là cửa hàng chính` | AC-05 | `text=Đây là cửa hàng chính của tổ chức nên không thể ngừng hoạt động.` |
-| S6 | Bỏ tích thì cửa hàng hoạt động trở lại | `/admin/branches` | `select select[aria-label="Lọc Trạng thái"] = ; wait tbody tr:has-text("Chi nhánh kiểm thử"); click thead input[type="checkbox"]; click thead input[type="checkbox"]; click tbody tr:has-text("Chi nhánh kiểm thử") input[type="checkbox"]; wait tbody tr:has-text("Chi nhánh kiểm thử") input[type="checkbox"]:checked; click button:has-text("Sửa"); wait #dialog-branch-inactive; click #dialog-branch-inactive; click button:has-text("Lưu"); wait tbody tr:has-text("Chi nhánh kiểm thử"):has-text("Đang hoạt động")` | AC-03 | `count tbody tr:has-text("Ngừng hoạt động") = 0` |
-| S7 | Đang đứng ở Chi nhánh 2, ngừng chính nó → tự chuyển sang chi nhánh khác | `/admin/branches` | `click button[aria-haspopup="menu"]:has-text("HCM"); click [role="menuitemradio"]:has-text("Chi nhánh 2"); wait button:has-text("Chi nhánh 2"); select select[aria-label="Lọc Trạng thái"] = ; wait tbody tr:has-text("Chi nhánh 2"); click thead input[type="checkbox"]; click thead input[type="checkbox"]; click tbody tr:has-text("Chi nhánh 2") input[type="checkbox"]; wait tbody tr:has-text("Chi nhánh 2") input[type="checkbox"]:checked; click button:has-text("Sửa"); wait #dialog-branch-inactive; click #dialog-branch-inactive; click button:has-text("Lưu"); wait text=các thiết bị bán hàng; click button:has-text("Có"); wait button:has-text("HCM")` | AC-12 | `count button:has-text("Chi nhánh 2") = 0` |
-| S8 | Trả Chi nhánh 2 về hoạt động (dọn dữ liệu cho lần chạy sau) | `/admin/branches` | `select select[aria-label="Lọc Trạng thái"] = ; wait tbody tr:has-text("Chi nhánh 2"); click thead input[type="checkbox"]; click thead input[type="checkbox"]; click tbody tr:has-text("Chi nhánh 2") input[type="checkbox"]; wait tbody tr:has-text("Chi nhánh 2") input[type="checkbox"]:checked; click button:has-text("Sửa"); wait #dialog-branch-inactive; click #dialog-branch-inactive; click button:has-text("Lưu"); wait tbody tr:has-text("Chi nhánh 2"):has-text("Đang hoạt động")` | AC-03 | `count tbody tr:has-text("Ngừng hoạt động") = 0` |
+| S1 | Danh sách mở ra đã lọc sẵn "Đang hoạt động" | `/admin/branches` | `wait tbody tr:has-text("HCM")` | AC-06 | `count tbody tr:has-text("Đang hoạt động") = 3` |
+| S2 | Form sửa có ô "Ngừng hoạt động" chưa tích | `/admin/branches` | `wait tbody tr:has-text("Chi nhánh kiểm thử"); click input[aria-label="Chọn Chi nhánh kiểm thử"]; click button:has-text("Sửa"); wait #branch-inactive` | AC-01 | `count #branch-inactive = 1` |
+| S3 | Hộp thoại xác nhận nêu hậu quả và số liệu tồn đọng | `/admin/branches` | `wait tbody tr:has-text("Chi nhánh kiểm thử"); click input[aria-label="Chọn Chi nhánh kiểm thử"]; click button:has-text("Sửa"); wait #branch-inactive; click #branch-inactive; click button:has-text("Lưu"); wait text=các thiết bị bán hàng` | AC-02 | `text=nhân viên chỉ thuộc cửa hàng này` |
+| S4 | Bấm Có thì cửa hàng rời khỏi danh sách đang hoạt động | `/admin/branches` | `wait tbody tr:has-text("Chi nhánh kiểm thử"); click input[aria-label="Chọn Chi nhánh kiểm thử"]; click button:has-text("Sửa"); wait #branch-inactive; click #branch-inactive; click button:has-text("Lưu"); wait text=các thiết bị bán hàng; click button:has-text("Có"); wait text=Đã cập nhật cửa hàng` | AC-01, AC-06 | `no-text=Chi nhánh kiểm thử` |
+| S5 | Lọc "Ngừng hoạt động" thấy đúng cửa hàng vừa ngừng | `/admin/branches` | `select select[aria-label="Lọc Trạng thái"] = SUSPENDED; wait tbody tr:has-text("Chi nhánh kiểm thử")` | AC-06 | `count tbody tr:has-text("Ngừng hoạt động") = 1` |
+| S6 | Cửa hàng chính không có ô tích, kèm lý do | `/admin/branches` | `wait tbody tr:has-text("HCM"); click input[aria-label="Chọn HCM"]; click button:has-text("Sửa"); wait text=Đây là cửa hàng chính` | AC-05 | `text=Đây là cửa hàng chính của tổ chức nên không thể ngừng hoạt động.` |
+| S7 | Bỏ tích thì cửa hàng hoạt động trở lại | `/admin/branches` | `select select[aria-label="Lọc Trạng thái"] = SUSPENDED; wait tbody tr:has-text("Chi nhánh kiểm thử"); click input[aria-label="Chọn Chi nhánh kiểm thử"]; click button:has-text("Sửa"); wait #branch-inactive; click #branch-inactive; click button:has-text("Lưu"); wait text=Đã cập nhật cửa hàng` | AC-03 | `count tbody tr:has-text("Ngừng hoạt động") = 0` |
 
-Bộ lọc mặc định `Đang hoạt động` (yêu cầu #1) **làm hỏng chính kịch bản này**: ngừng xong là
-dòng biến mất khỏi bảng, nên `wait` trên dòng đó không bao giờ đúng và bước sau không còn gì
-để bấm. Mọi bước cần nhìn thấy dòng đã ngừng phải **xoá bộ lọc về "Tất cả"** trước.
-
-> **Cảnh báo cho người chạy lại bộ này trên máy khác.** Verb `select` là thứ tôi thêm vào
-> runner, mà `.claude/skills/ai-dlc-verify/` nằm trong `.gitignore` (dòng 31) — **bản vá đó
-> không đi theo commit này**. Trên máy chưa có nó, S4/S6/S7/S8 sẽ chết ở
-> `unrecognised interaction "select …"`. Cần đồng bộ skill riêng, hoặc đưa nó ra khỏi
-> `.gitignore`. Đây là hạn chế thật của bộ chứng cứ này, không phải chi tiết nhỏ.
-
-Việc đó cần một verb mà runner chưa có: `fill` không lái được `<select>` (Playwright từ chối,
-"not an &lt;input&gt;…"). Đã thêm `select <selector> = <value>` vào
-`.claude/skills/ai-dlc-verify/scripts/runner/actions.mjs` — giá trị rỗng chọn option trống,
-tức là xoá bộ lọc.
-
-Hai cái bẫy nữa, cùng một gốc — **`wait` phải bám vào trạng thái cuối, không bám vào chữ**:
-
-- `wait text=Ngừng hoạt động` khớp ngay *nhãn ô tích* trong hộp thoại đang mở, nên qua tức thì
-  và ảnh chụp trúng lúc nút còn ghi "Đang lưu…".
-- `wait text=Đã cập nhật` (toast) nổ lúc refetch **bắt đầu**, không phải lúc bảng vẽ xong.
-
-Assertion trong runner đánh giá **một lần, không retry** (`run.mjs:257`), nên mọi race đều thành
-đỏ oan. Cả hai bước giờ chờ trên `tbody tr:has-text("<tên>"):has-text("<trạng thái>")` — chỉ
-đúng khi hộp thoại đã đóng và bảng đã có dữ liệu mới.
-
-**Mọi bước chọn dòng đều phải chờ hai lần**: chờ bảng vẽ xong trước khi động vào ô tích, và
-chờ đúng dòng đó *đã được tích* trước khi bấm **Sửa**. Không có hai cái chờ này thì các cú
-click đua với re-render — đã thấy đúng triệu chứng: hai dòng sai bị tích, **Sửa** xám, bước
-sau treo 30 giây. Nó bùng lên ngay khi thêm `serverFilters` (một lần refetch nữa), tức là nó
-vốn mong manh sẵn chứ không phải lỗi mới.
-
-Thêm hai cái bẫy từ vòng chạy 5/7:
-
-- **`text=` khớp trúng `<option>` vô hình.** Assert `text=Đang hoạt động` đỏ dù chữ đó có mặt
-  bốn lần trên màn hình: phần tử **đầu tiên** trong DOM là `<option>` bên trong select lọc, mà
-  option của một select đang đóng thì Playwright coi là không visible — runner dùng
-  `getByText(...).first()` nên nó chờ đúng cái vô hình đó. Đếm theo dòng `tbody` thay vì bắt chữ.
-- **`button[aria-haspopup="menu"]` khớp cả nút avatar**, và avatar đứng trước trong DOM, nên S7
-  mở nhầm menu "Đăng xuất". Phải ghim thêm tên chi nhánh vào selector.
-
-**S8 tồn tại để dọn dữ liệu.** S7 ngừng Chi nhánh 2 và không tự bật lại; thiếu S8 thì mỗi lần
-chạy là để lại một chi nhánh đang ngừng trong DB dev, và lần chạy sau bắt đầu từ trạng thái bẩn
-(đã xảy ra một lần).
-
-Chuỗi thao tác dài hơn mức skill khuyến nghị (~3 verb). Đó là cái giá của việc mỗi bước phải
-tự dọn trạng thái; tách nhỏ hơn cũng không giảm được vì bước nào cũng phải mở lại form từ đầu.
+S4 và S7 đổi dữ liệu thật và S7 trả lại nguyên trạng, nên thứ tự là bắt buộc. Không còn bước
+dọn riêng như S8 cũ: chu trình ngừng → mở lại nằm gọn trong S4..S7 trên cùng một chi nhánh.
 
 ## Not verified here
 

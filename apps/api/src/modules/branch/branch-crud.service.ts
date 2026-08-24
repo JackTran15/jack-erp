@@ -284,44 +284,15 @@ export const BRANCH_ENTITY_CONFIG: CrudEntityConfig = {
     { key: "address", label: "Địa chỉ", type: "string" },
     { key: "phone", label: "Điện thoại", type: "string", hideInList: true },
     { key: "email", label: "Email", type: "string", hideInList: true },
-    {
-      key: "status",
-      label: "Trạng thái",
-      // Must be "enum", not "string": CrudListPage only routes a cell through
-      // formatCrudFieldValue (and therefore through enumLabels) when the field
-      // type is enum — a string field renders the raw value, so the column
-      // would keep showing "ACTIVE".
-      type: "enum",
-      readOnly: true,
-      // The column stays the English enum (CLAUDE.md: enum/ID values stay
-      // English); only the display is Vietnamese. `enumLabels` is the
-      // server-declared wording the backoffice prefers over any local mapping,
-      // so this is the single place the label lives.
-      enumValues: ["ACTIVE", "SUSPENDED", "ARCHIVED"],
-      enumLabels: {
-        ACTIVE: "Đang hoạt động",
-        SUSPENDED: "Ngừng hoạt động",
-        ARCHIVED: "Đã lưu trữ",
-      },
-    },
+    { key: "status", label: "Trạng thái", type: "string", readOnly: true },
   ],
   searchableFields: ["name", "code", "address"],
-  filterDefinitions: [
-    {
-      key: "status",
-      label: "Trạng thái",
-      type: "select",
-      options: [
-        { label: "Đang hoạt động", value: "ACTIVE" },
-        { label: "Ngừng hoạt động", value: "SUSPENDED" },
-        { label: "Đã lưu trữ", value: "ARCHIVED" },
-      ],
-      // Opens on the operating stores. Clearing the filter to "Tất cả" is what
-      // makes a suspended store reachable again, so this must never become a
-      // hard server-side rule.
-      defaultValue: "ACTIVE",
-    },
-  ],
+  // Deliberately empty. The Cửa hàng screen is its own page now (ADR-08), so
+  // nothing renders branches through the generic list — filter definitions and
+  // Vietnamese enum labels here would be config nobody reads. What the platform
+  // still serves for this entity is the delete path (BranchCrudService.remove,
+  // with its dependency scan) and the payment-accounts.branchId relation picker.
+  filterDefinitions: [],
   permissions: {
     create: "branch.write",
     read: "branch.read",
