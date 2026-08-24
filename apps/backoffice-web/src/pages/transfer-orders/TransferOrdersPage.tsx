@@ -242,8 +242,13 @@ export function TransferOrdersPage() {
 
   const loadBranches = useCallback(async () => {
     try {
+      // includeInactive: this feeds the "Điều chuyển đến" name map, not a
+      // picker. Without it a lệnh điều chuyển pointing at a deactivated store
+      // falls through to rendering 8 chars of its UUID (AC-23). The picker in
+      // this same file (searchBranches) stays filtered — ADR-05: hide the
+      // choosing paths, never the lookup ones.
       const { data } = await apiClient.get<PaginatedResponse<BranchOption>>(
-        "/branches?page=1&pageSize=200",
+        "/branches?page=1&pageSize=200&includeInactive=true",
       );
       setBranches(data.data);
     } catch {

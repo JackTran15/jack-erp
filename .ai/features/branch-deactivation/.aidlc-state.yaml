@@ -1,0 +1,108 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: branch-deactivation
+slug: branch-deactivation
+profile: none
+created: 2026-08-24T10:45:31
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-08-24T10:46:44
+    by: akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-08-24T10:49:28
+    by: akenzy
+    evidence: 12 assumptions, none blocking-and-pending; 24 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-24T10:52:19
+    by: akenzy
+    evidence: 7 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-24T11:00:46
+    by: akenzy
+    evidence: graph valid - 5 UoW, 14 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T11:00:57
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T11:05:21
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T14:55:32
+    by: code-review
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T14:55:47
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T14:59:40
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T15:11:06
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T15:24:35
+    by: code-review
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T15:24:35
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T15:27:27
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T15:27:27
+    by: claude-live-verified
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T15:27:27
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T17:47:02
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T17:47:02
+    by: code-review
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-24T17:47:02
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-24T17:47:02
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-24T17:47:02
+    by: code-review
+    ticket: T-02-01

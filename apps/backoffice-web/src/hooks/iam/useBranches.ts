@@ -69,8 +69,14 @@ export function useInvalidateBranches(): () => void {
   const qc = useQueryClient();
   return () => {
     qc.invalidateQueries({ queryKey: BRANCHES_QUERY_KEY });
+    qc.invalidateQueries({ queryKey: ["branches", "me"] });
     qc.invalidateQueries({
       queryKey: ["crud", "inventory-storages", "records"],
     });
+    // Deactivating a branch changes what every branch picker may show, and
+    // these two feed the report filters. Without them a store stays selectable
+    // in reports until the cache goes stale on its own.
+    qc.invalidateQueries({ queryKey: ["filter-options", "branches"] });
+    qc.invalidateQueries({ queryKey: ["report-filter-options"] });
   };
 }

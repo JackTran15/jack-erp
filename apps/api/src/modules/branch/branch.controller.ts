@@ -9,16 +9,30 @@ import {
   Query,
   ParseUUIDPipe,
   Inject,
+  UseGuards,
   forwardRef,
 } from '@nestjs/common';
-import { PaginationQuery, RegistrationStatus } from '@erp/shared-interfaces';
+import {
+  BranchStatus,
+  PaginationQuery,
+  RegistrationStatus,
+} from '@erp/shared-interfaces';
 import { Actor, ActorContext } from '../../common/decorators/actor-context.decorator';
 import { BranchService } from './branch.service';
 import { CreateBranchDto, UpdateBranchDto } from './dto';
 import { RegistrationService } from '../registration/registration.service';
 import { RegistrationType } from '../registration/registration-request.entity';
+import { RequirePermission } from '../auth/decorators';
+import { PermissionGuard } from '../rbac/permission.guard';
 
+/**
+ * `PermissionGuard` is safe to apply to the whole class: it returns true as soon
+ * as a handler declares no `@RequirePermission`, so the routes below that carry
+ * no decorator keep behaving exactly as before. Only the lifecycle routes are
+ * actually gated.
+ */
 @Controller('branches')
+@UseGuards(PermissionGuard)
 export class BranchController {
   constructor(
     private readonly branchService: BranchService,
@@ -36,7 +50,12 @@ export class BranchController {
 
   @Get()
   list(
-    @Query() query: PaginationQuery & { branchId?: string },
+    @Query()
+    query: PaginationQuery & {
+      branchId?: string;
+      includeInactive?: string;
+      status?: BranchStatus;
+    },
     @Actor() actor: ActorContext,
   ) {
     return this.branchService.list(
@@ -46,6 +65,8 @@ export class BranchController {
         sortBy: query.sortBy,
         sortOrder: query.sortOrder,
         branchId: query.branchId,
+        includeInactive: query.includeInactive === 'true',
+        status: query.status,
       },
       actor,
     );
@@ -88,6 +109,16 @@ export class BranchController {
     return this.branchService.listMyBranches(actor);
   }
 
+  /** Must be before @Get(':id') so the suffix is not parsed as part of the id. */
+  @Get(':id/deactivation-impact')
+  @RequirePermission('branch.archive')
+  deactivationImpact(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.branchService.deactivationImpact(id, actor);
+  }
+
   @Get(':id')
   findById(
     @Param('id', ParseUUIDPipe) id: string,
@@ -106,6 +137,7 @@ export class BranchController {
   }
 
   @Post(':id/archive')
+  @RequirePermission('branch.archive')
   archive(
     @Param('id', ParseUUIDPipe) id: string,
     @Actor() actor: ActorContext,
@@ -114,11 +146,21 @@ export class BranchController {
   }
 
   @Post(':id/suspend')
+  @RequirePermission('branch.archive')
   suspend(
     @Param('id', ParseUUIDPipe) id: string,
     @Actor() actor: ActorContext,
   ) {
     return this.branchService.suspend(id, actor);
+  }
+
+  @Post(':id/activate')
+  @RequirePermission('branch.archive')
+  activate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.branchService.activate(id, actor);
   }
 
   @Post(':id/assign-user/:userId')
