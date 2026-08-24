@@ -93,7 +93,15 @@ export function PosDateRangeFilter({
             "shadow-[0_8px_24px_rgba(15,20,36,0.12),0_2px_4px_rgba(15,20,36,0.06)]",
           )}
         >
-          <div className="py-2">
+          {/*
+            Danh sách 12 lựa chọn cao ~530px. Không kẹp chiều cao thì popover
+            tràn khỏi khung nhìn trên máy laptop (~720px) và footer "Áp dụng"
+            bị cắt — mà "Áp dụng" là chỗ DUY NHẤT commit `pending`, nên người
+            dùng chọn preset xong không áp dụng được. Trang cha lại là
+            `overflow-hidden` nên cũng không cuộn tới được.
+            Vùng cuộn chỉ bọc danh sách; footer nằm ngoài để luôn dính đáy.
+          */}
+          <div className="max-h-[50vh] overflow-y-auto py-2">
             {DATE_RANGE_FILTER_CHOICES.map((choice) => {
               const selected = choice.value === pending;
               const showOtherExtra =
