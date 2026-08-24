@@ -360,7 +360,8 @@ describe("StockSummaryService", () => {
       });
 
       const pendingOnlySql = manager.query.mock.calls[1][0] as string;
-      expect(pendingOnlySql).toContain("INNER JOIN items sibling");
+      expect(pendingOnlySql).toContain("FROM items sibling");
+      expect(pendingOnlySql).toContain("sibling.product_id = item.product_id");
       expect(pendingOnlySql).not.toContain(
         "pending_balance.item_id = transfer_line.item_id",
       );

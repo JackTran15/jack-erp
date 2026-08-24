@@ -920,29 +920,50 @@ export class StockSummaryService {
    * Assumes `transfer_order`, `transfer_line` and `item` are in scope.
    */
   private pendingOnlyGuardSql(sku: boolean): string {
-    const balanceItem = sku
-      ? `INNER JOIN items sibling
-             ON sibling.organization_id = transfer_order.organization_id
-            AND sibling.id = pending_balance.item_id
-            AND (
-              CASE WHEN item.product_id IS NULL
-                   THEN sibling.id = item.id
-                   ELSE sibling.product_id = item.product_id
-              END
-            )`
-      : "";
-    return `
+    if (!sku) {
+      return `
                 SELECT 1
                 FROM stock_balances pending_balance
                 INNER JOIN locations pending_location
                   ON pending_location.id = pending_balance.location_id
-                ${balanceItem}
                 WHERE pending_balance.organization_id = transfer_order.organization_id
-                  ${sku ? "" : "AND pending_balance.item_id = transfer_line.item_id"}
+                  AND pending_balance.item_id = transfer_line.item_id
                   AND pending_balance.branch_id = transfer_order.destination_branch_id
                   AND (
                     transfer_order.destination_storage_id IS NULL
                     OR pending_location.storage_id = transfer_order.destination_storage_id
+                  )`;
+    }
+    // SKU mode has no single item_id to key on — any variant of the same
+    // product having a balance in this branch counts. A CASE-wrapped join
+    // condition here (matching sibling.id = item.id OR sibling.product_id =
+    // item.product_id in one predicate) isn't sargable, so Postgres falls back
+    // to scanning every stock_balances row in the branch per transfer line.
+    // Driving the match off `items` (indexed on organization_id, product_id)
+    // first, then probing stock_balances by the resolved sibling ids (indexed
+    // on organization_id, branch_id, item_id), keeps both lookups on an index.
+    return `
+                SELECT 1
+                FROM items sibling
+                WHERE sibling.organization_id = transfer_order.organization_id
+                  AND (
+                    (item.product_id IS NULL AND sibling.id = item.id)
+                    OR (item.product_id IS NOT NULL AND sibling.product_id = item.product_id)
+                  )
+                  AND EXISTS (
+                    SELECT 1
+                    FROM stock_balances pending_balance
+                    WHERE pending_balance.organization_id = transfer_order.organization_id
+                      AND pending_balance.branch_id = transfer_order.destination_branch_id
+                      AND pending_balance.item_id = sibling.id
+                      AND (
+                        transfer_order.destination_storage_id IS NULL
+                        OR EXISTS (
+                          SELECT 1 FROM locations pending_location
+                          WHERE pending_location.id = pending_balance.location_id
+                            AND pending_location.storage_id = transfer_order.destination_storage_id
+                        )
+                      )
                   )`;
   }
 
