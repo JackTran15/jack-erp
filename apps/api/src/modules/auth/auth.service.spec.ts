@@ -15,6 +15,7 @@ import { UserEntity } from './user.entity';
 import { UserRoleEntity } from './user-role.entity';
 import { RoleEntity } from './role.entity';
 import { UserBranchAssignmentEntity } from '../branch/user-branch-assignment.entity';
+import { BranchEntity } from '../branch/branch.entity';
 import { SessionStore } from '../redis/session.store';
 import { HandoffStore } from './handoff.store';
 import { RbacService } from '../rbac/rbac.service';
@@ -46,7 +47,13 @@ describe('AuthService', () => {
   >;
   let userRoleRepo: jest.Mocked<Pick<Repository<UserRoleEntity>, 'find'>>;
   let roleRepo: jest.Mocked<Pick<Repository<RoleEntity>, 'createQueryBuilder'>>;
-  let userBranchRepo: jest.Mocked<Pick<Repository<UserBranchAssignmentEntity>, 'find'>>;
+  let userBranchRepo: jest.Mocked<
+    Pick<Repository<UserBranchAssignmentEntity>, 'find' | 'findOne'>
+  >;
+  let branchRepo: jest.Mocked<Pick<Repository<BranchEntity>, 'find'>>;
+  // Mirrors whatever userBranchRepo.find returned, so "all assigned branches
+  // are active" stays the default without every case restating it.
+  let activeBranchStubs: { id: string }[];
   let sessionStore: jest.Mocked<Pick<SessionStore, 'createSession' | 'getSession' | 'revokeSession'>>;
   let handoffStore: jest.Mocked<Pick<HandoffStore, 'issue' | 'consume'>>;
   let rbacService: jest.Mocked<Pick<RbacService, 'getUserPermissions'>>;
@@ -58,7 +65,10 @@ describe('AuthService', () => {
       save: jest.fn().mockImplementation(async (u) => u),
     };
     userRoleRepo = { find: jest.fn() };
-    userBranchRepo = { find: jest.fn() };
+    userBranchRepo = { find: jest.fn(), findOne: jest.fn().mockResolvedValue(null) };
+    // resolveUserBranches now confirms each assigned branch still operates.
+    // Default: every assigned branch is active, so existing cases are unchanged.
+    branchRepo = { find: jest.fn().mockImplementation(async () => activeBranchStubs) };
     sessionStore = {
       createSession: jest.fn(),
       getSession: jest.fn(),
@@ -106,6 +116,10 @@ describe('AuthService', () => {
           provide: getRepositoryToken(UserBranchAssignmentEntity),
           useValue: userBranchRepo,
         },
+        {
+          provide: getRepositoryToken(BranchEntity),
+          useValue: branchRepo,
+        },
       ],
     }).compile();
 
@@ -124,6 +138,7 @@ describe('AuthService', () => {
     userBranchRepo.find.mockResolvedValue([
       { branchId: 'branch-1' } as UserBranchAssignmentEntity,
     ]);
+    activeBranchStubs = [{ id: 'branch-1' }];
     (jwt.sign as jest.Mock).mockReturnValue('signed-token');
     userRepo.update.mockResolvedValue(undefined as any);
     sessionStore.createSession.mockResolvedValue(undefined);
@@ -133,6 +148,30 @@ describe('AuthService', () => {
   // login
   // =========================================================================
   describe('login', () => {
+    it('still signs in when every assigned branch has been deactivated', async () => {
+      // The assignment rows survive on purpose so reopening the store restores
+      // access. Until then the user has no branch at all, and that must be an
+      // empty list rather than a failed login — the apps show an empty state.
+      setupValidLogin();
+      userBranchRepo.find.mockResolvedValue([
+        { branchId: 'branch-1' } as UserBranchAssignmentEntity,
+      ]);
+      activeBranchStubs = [];
+
+      const result = await service.login('user@erp.local', 'pw', 'org-1');
+
+      expect(result.accessToken).toBeDefined();
+      expect(sessionStore.createSession).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          organizationId: 'org-1',
+          branchIds: [],
+          branchId: undefined,
+        }),
+        expect.any(Number),
+      );
+    });
+
     it('returns tokens on valid credentials', async () => {
       setupValidLogin();
 
@@ -166,6 +205,7 @@ describe('AuthService', () => {
         { branchId: 'branch-1' } as UserBranchAssignmentEntity,
         { branchId: 'branch-2' } as UserBranchAssignmentEntity,
       ]);
+    activeBranchStubs = [{ id: 'branch-1' }, { id: 'branch-2' }];
 
       await service.login('admin@example.com', 'password', 'org-1');
 
@@ -230,6 +270,7 @@ describe('AuthService', () => {
       userBranchRepo.find.mockResolvedValue([
         { branchId: 'branch-1' } as UserBranchAssignmentEntity,
       ]);
+    activeBranchStubs = [{ id: 'branch-1' }];
       (jwt.sign as jest.Mock).mockReturnValue('new-signed-token');
 
       const result = await service.refresh('valid-refresh-token');
@@ -270,6 +311,7 @@ describe('AuthService', () => {
         { branchId: 'branch-1' } as UserBranchAssignmentEntity,
         { branchId: 'branch-2' } as UserBranchAssignmentEntity,
       ]);
+    activeBranchStubs = [{ id: 'branch-1' }, { id: 'branch-2' }];
       (jwt.sign as jest.Mock).mockReturnValue('new-signed-token');
 
       await service.refresh('valid-refresh-token');
@@ -303,6 +345,7 @@ describe('AuthService', () => {
       userBranchRepo.find.mockResolvedValue([
         { branchId: 'branch-1' } as UserBranchAssignmentEntity,
       ]);
+    activeBranchStubs = [{ id: 'branch-1' }];
       (jwt.sign as jest.Mock).mockReturnValue('new-signed-token');
 
       await service.refresh('valid-refresh-token');
@@ -372,7 +415,26 @@ describe('AuthService', () => {
       userBranchRepo.find.mockResolvedValue(
         branchIds.map((branchId) => ({ branchId }) as UserBranchAssignmentEntity),
       );
+      // These helpers mean "the user is assigned to these branches"; keep the
+      // branch table agreeing, or resolveUserBranches filters them all out.
+      activeBranchStubs = branchIds.map((id) => ({ id }));
     }
+
+    it('refuses a branch that is assigned but no longer operating', async () => {
+      // The assignment row stays in the database on purpose, so the user gets
+      // their access back the moment the store reopens — but until then the
+      // branch must not be selectable, and the message must say why.
+      setupAssignedBranches(['branch-1', 'branch-2']);
+      activeBranchStubs = [{ id: 'branch-1' }];
+      userBranchRepo.findOne.mockResolvedValue(
+        { branchId: 'branch-2' } as UserBranchAssignmentEntity,
+      );
+
+      await expect(service.switchBranch(current, 'branch-2')).rejects.toThrow(
+        'Cửa hàng đã ngừng hoạt động.',
+      );
+      expect(sessionStore.revokeSession).not.toHaveBeenCalled();
+    });
 
     it('rotates the session and mints tokens carrying the new active branch', async () => {
       setupAssignedBranches(['branch-1', 'branch-2']);
@@ -434,6 +496,9 @@ describe('AuthService', () => {
       userBranchRepo.find.mockResolvedValue(
         branchIds.map((branchId) => ({ branchId }) as UserBranchAssignmentEntity),
       );
+      // These helpers mean "the user is assigned to these branches"; keep the
+      // branch table agreeing, or resolveUserBranches filters them all out.
+      activeBranchStubs = branchIds.map((id) => ({ id }));
     }
 
     it('issues a single-use code carrying the requested branch', async () => {
@@ -485,6 +550,7 @@ describe('AuthService', () => {
         { branchId: 'branch-1' } as UserBranchAssignmentEntity,
         { branchId: 'branch-2' } as UserBranchAssignmentEntity,
       ]);
+    activeBranchStubs = [{ id: 'branch-1' }, { id: 'branch-2' }];
     }
 
     it('mints a new session without touching the issuing one', async () => {
@@ -578,6 +644,7 @@ describe('AuthService', () => {
       userBranchRepo.find.mockResolvedValue([
         { branchId: 'branch-1' } as UserBranchAssignmentEntity,
       ]);
+    activeBranchStubs = [{ id: 'branch-1' }];
 
       const result = await service.getSession('jti-123');
 

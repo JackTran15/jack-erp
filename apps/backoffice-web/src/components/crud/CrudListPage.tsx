@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -214,9 +215,27 @@ export function CrudListPage({
     [v2, debouncedColumnFilters, page, pageSize],
   );
 
+  // Only `select` filters go to the server, and only their bare value: the
+  // backend's applyFilters does `column = :value` and whitelists by
+  // filterDefinition key, while the text filters carry a mode (contains,
+  // startsWith…) it cannot express — those stay client-side, as before.
+  //
+  // Sending them matters beyond tidiness: filtering only on the client filters
+  // one page, so the footer total counts rows the user cannot see and paging
+  // past page 1 is incoherent.
+  const serverFilters = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const def of config?.filterDefinitions ?? []) {
+      if (def.type !== "select") continue;
+      const value = columnFilters[def.key]?.value?.trim();
+      if (value) out[def.key] = value;
+    }
+    return out;
+  }, [config?.filterDefinitions, columnFilters]);
+
   const recordsQuery = useCrudRecords(
     entityKey ?? "",
-    { page, pageSize, sortBy, sortOrder, search, filters: {} },
+    { page, pageSize, sortBy, sortOrder, search, filters: serverFilters },
     Boolean(config && entityKey) && !v2,
   );
   const v2Query = useCrudV2Search(
@@ -306,6 +325,31 @@ export function CrudListPage({
       return next.size === prev.size ? prev : next;
     });
   }, [records, config?.idField]);
+
+  // Seed the opening filter from the server-declared `defaultValue`, once, when
+  // the config arrives. Guarded on entityKey so switching entities re-seeds, and
+  // it never overwrites a filter the user already set (or one restored from a
+  // return-navigation), which would silently undo their choice.
+  const seededDefaultsFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!config || !entityKey) return;
+    if (seededDefaultsFor.current === entityKey) return;
+    seededDefaultsFor.current = entityKey;
+    const defaults = (config.filterDefinitions ?? []).filter(
+      (f) => f.defaultValue,
+    );
+    if (!defaults.length) return;
+    setColumnFilters((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const f of defaults) {
+        if (next[f.key]) continue;
+        next[f.key] = { mode: "equals", value: f.defaultValue as string };
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [config, entityKey, setColumnFilters]);
 
   const filteredRecords = useMemo(() => {
     // Tree mode renders the collapse-aware flattened rows.
@@ -659,7 +703,8 @@ export function CrudListPage({
         value: prev[fieldKey]?.value ?? "",
       },
     }));
-    if (v2) setPage(1);
+    // Any filter that reaches the server must reset paging, not just v2's.
+      setPage(1);
   };
 
   const handleColumnFilterValueChange = (fieldKey: string, value: string) => {
@@ -671,7 +716,8 @@ export function CrudListPage({
         value,
       },
     }));
-    if (v2) setPage(1);
+    // Any filter that reaches the server must reset paging, not just v2's.
+      setPage(1);
   };
 
   const handleColumnFilterRangeChange = (

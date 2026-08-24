@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
@@ -27,6 +27,9 @@ import type {
   SessionInfo,
   SwitchBranchResponse,
 } from '@erp/shared-interfaces';
+// Value import, not `import type`: it is compared at runtime.
+import { BranchStatus } from '@erp/shared-interfaces';
+import { BranchEntity } from '../branch/branch.entity';
 
 const ACCESS_TOKEN_TTL = 15 * 60;
 const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60;
@@ -54,6 +57,8 @@ export class AuthService {
     private readonly roleRepo: Repository<RoleEntity>,
     @InjectRepository(UserBranchAssignmentEntity)
     private readonly userBranchRepo: Repository<UserBranchAssignmentEntity>,
+    @InjectRepository(BranchEntity)
+    private readonly branchRepo: Repository<BranchEntity>,
   ) {
     this.jwtSecret = this.config.get<string>('JWT_SECRET', 'change-me-secret');
     this.jwtRefreshSecret = this.config.get<string>(
@@ -201,7 +206,11 @@ export class AuthService {
     const { roles, branchIds } = session;
 
     if (!branchIds.includes(branchId)) {
-      throw new ForbiddenException('Branch not assigned to user');
+      throw await this.branchAccessDenied(
+        current.userId,
+        current.organizationId,
+        branchId,
+      );
     }
 
     await this.sessionStore.revokeSession(current.jti);
@@ -267,7 +276,13 @@ export class AuthService {
         current.organizationId,
       );
       if (!branchIds.includes(target)) {
-        throw new ForbiddenException('Branch not assigned to user');
+        // Same condition as switchBranch: a backoffice user standing in a store
+        // that was just retired would otherwise be told it was never theirs.
+        throw await this.branchAccessDenied(
+          current.userId,
+          current.organizationId,
+          target,
+        );
       }
     }
 
@@ -456,6 +471,38 @@ export class AuthService {
     return roles.map((r) => r.name);
   }
 
+  /**
+   * The branch ids baked into the session, and the single chokepoint that makes
+   * a deactivated store disappear.
+   *
+   * Everything downstream reads this list rather than the branches table:
+   * `ActorContext.branchId`, `BranchScopeGuard`, `permittedBranchIds()` and so
+   * the whole of inventory-reports, plus the POS branch picker (which builds
+   * itself from the JWT, not from an endpoint). Filtering here covers all of
+   * them without touching a line of their code.
+   *
+   * An assignment to a non-operating branch is kept in the database on purpose —
+   * reopening the store must restore access without re-assigning anybody.
+   */
+  /**
+   * `branchIds` already excludes non-operating branches, so a store that was
+   * just deactivated fails the same membership test as one the user never had.
+   * The two are very different to the person reading the message, so look up
+   * the assignment and say which it is.
+   */
+  private async branchAccessDenied(
+    userId: string,
+    organizationId: string,
+    branchId: string,
+  ): Promise<ForbiddenException> {
+    const assigned = await this.userBranchRepo.findOne({
+      where: { userId, organizationId, branchId },
+    });
+    return new ForbiddenException(
+      assigned ? 'Cửa hàng đã ngừng hoạt động.' : 'Branch not assigned to user',
+    );
+  }
+
   private async resolveUserBranches(
     userId: string,
     orgId: string,
@@ -463,6 +510,17 @@ export class AuthService {
     const assignments = await this.userBranchRepo.find({
       where: { userId, organizationId: orgId },
     });
-    return assignments.map((a) => a.branchId);
+    if (!assignments.length) return [];
+
+    const operating = await this.branchRepo.find({
+      where: {
+        id: In(assignments.map((a) => a.branchId)),
+        organizationId: orgId,
+        status: BranchStatus.ACTIVE,
+      },
+      select: { id: true },
+    });
+    const live = new Set(operating.map((b) => b.id));
+    return assignments.map((a) => a.branchId).filter((id) => live.has(id));
   }
 }
