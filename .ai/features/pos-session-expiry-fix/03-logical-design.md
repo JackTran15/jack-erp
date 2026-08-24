@@ -1,6 +1,6 @@
 ---
 feature: pos-session-expiry-fix
-adr_count: 3
+adr_count: 4
 ---
 
 # Logical design — pos-session-expiry-fix
@@ -99,6 +99,31 @@ needs updating to describe the broader "session bootstrap" role, and its renderi
 matters: the proactive-refresh check must not run (or must no-op) while a `?handoff=` code
 exchange is in progress, since a handoff always supersedes whatever tokens are already in
 storage (AC-06).
+**Status:** superseded by ADR-04 — see below. `PosSessionHandoff` mounts once for the whole
+app lifetime; it does not re-run on a client-side route change. Live G4 demoing (clear the
+access token, click a nav link without reloading — the exact "idle cashier clicks" scenario
+from `00-intent.md`) proved this ADR's scope was incomplete: it fixes "the POS app loads"
+but not "the user navigates," and AC-04 requires both. The reasoning that motivated leaving
+`PosRequireAuth` untouched (protecting the handoff mechanism's synchronicity) still holds —
+that mechanism only needs the *first* render gated, which `PosSessionHandoff` still does —
+but the conclusion drawn from it (never touch `PosRequireAuth`) was too broad.
+
+### ADR-04 — `PosRequireAuth` also attempts a silent refresh, on every navigation
+**Context:** Per ADR-02's supersession note above: `PosSessionHandoff`'s gate is mount-only,
+so an access token that expires while the SPA tab stays open (the normal case for an
+always-on POS terminal) is invisible to it. `PosRequireAuth` re-evaluates
+`authService.isAuthenticated()` on every navigation via `useLocation()` and, until now, acted
+on it immediately with no chance to refresh first.
+**Decision:** `PosRequireAuth` gains the same check-then-maybe-refresh behavior
+`PosSessionHandoff` already has — reusing the same shared `refreshOnce()` (UOW-02) and the
+same no-op conditions (`restoreSessionIfNeeded`, or an equivalent) — gated by a brief pending
+state, before deciding to render `<Outlet />` or redirect to `/dang-nhap`.
+**Consequences:** `PosRequireAuth.tsx` is no longer untouched by this feature — the "zero
+diff" requirement from UOW-03's original definition-of-done is retired. The handoff mechanism
+is unaffected: it only ever depended on the *first* render being gated by
+`PosSessionHandoff`, not on `PosRequireAuth` staying synchronous forever. A brief pending UI
+now appears on every navigation where the access token has actually expired (not on every
+navigation — the common case, a still-valid token, adds no extra render or async work).
 **Status:** accepted
 
 ### ADR-03 — Unify refresh *coordination* across pos-web's two HTTP clients, not the two transports themselves
