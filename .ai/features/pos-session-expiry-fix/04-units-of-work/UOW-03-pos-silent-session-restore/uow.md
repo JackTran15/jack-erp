@@ -55,11 +55,17 @@ rollback: revert PosSessionHandoff.tsx and PosRequireAuth.tsx to their prior ver
 | No component-rendering test tooling exists (A-04) — full mount-and-navigate coverage isn't automatable without adding new dependencies | T-03-02 tests the extracted async bootstrap function directly (plain-function test, no DOM); full end-to-end wiring (AC-06, and now the navigation case) is verified via the G4 demo script instead of a unit test — stated explicitly, not silently under-covered. This is exactly how the navigation gap itself was found — the demo script is load-bearing, not decorative. |
 
 ## Definition of done
-- [ ] AC-04, AC-05, AC-06 all pass — AC-04/AC-05 confirmed by T-03-02 (3/3
-      PosSessionHandoff.test.ts) for the app-load path; the navigate-while-open path (added
-      by T-03-03) and AC-06 (handoff still takes priority end-to-end) have no automated test
-      by design (A-04) and are verified only by the G4 demo script, so this item stays
-      unticked until that demo runs
-- [ ] `git diff --stat` on `PosRequireAuth.tsx` is non-empty (T-03-03 intentionally changes
+- [x] AC-04, AC-05 pass — confirmed by T-03-02 (3/3 `PosSessionHandoff.test.ts`) for the
+      app-load path, and live in the browser (twice each, across two review-driven fix
+      cycles) for the navigate-while-open path added by T-03-03: full reload with no tokens
+      → clean redirect, not frozen; expired access token + valid refresh token, client-side
+      nav with no reload → silent restore, destination page renders, no reload needed
+- [ ] AC-06 (handoff still takes priority end-to-end) — `PosSessionHandoff`'s handoff branch
+      is verbatim unchanged (confirmed by every review pass's diff check across T-03-01/03),
+      and the two paths are mutually exclusive by construction (T-03-03 only runs when no
+      `?handoff=` param is present at all), but the `?handoff=` flow itself was not
+      re-exercised live in this session — no automated test exists for it either (A-04).
+      Low risk given the code path is untouched, but not directly demoed
+- [x] `git diff --stat` on `PosRequireAuth.tsx` is non-empty (T-03-03 intentionally changes
       it — this replaces the original "zero diff" requirement, retired by ADR-04)
 - [ ] Demoed and accepted at gate G4
