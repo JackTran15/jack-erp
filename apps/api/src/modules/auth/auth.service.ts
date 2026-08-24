@@ -31,8 +31,6 @@ import type {
 import { BranchStatus } from '@erp/shared-interfaces';
 import { BranchEntity } from '../branch/branch.entity';
 
-const ACCESS_TOKEN_TTL = 15 * 60;
-const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60;
 /** Long enough for one tab-open round trip, short enough that a leaked URL is dead. */
 const HANDOFF_CODE_TTL = 60;
 /** Matches UsersService.BCRYPT_COST so both password paths cost the same. */
@@ -43,6 +41,8 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly jwtSecret: string;
   private readonly jwtRefreshSecret: string;
+  private readonly accessTokenTtl: number;
+  private readonly refreshTokenTtl: number;
 
   constructor(
     private readonly config: ConfigService,
@@ -64,6 +64,12 @@ export class AuthService {
     this.jwtRefreshSecret = this.config.get<string>(
       'JWT_REFRESH_SECRET',
       'change-me-refresh-secret',
+    );
+    this.accessTokenTtl = Number(
+      this.config.get<string>('JWT_ACCESS_TTL', '86400'),
+    );
+    this.refreshTokenTtl = Number(
+      this.config.get<string>('JWT_REFRESH_TTL', '2592000'),
     );
   }
 
@@ -99,9 +105,9 @@ export class AuthService {
         branchId,
         roles,
         issuedAt: Math.floor(Date.now() / 1000),
-        expiresAt: Math.floor(Date.now() / 1000) + REFRESH_TOKEN_TTL,
+        expiresAt: Math.floor(Date.now() / 1000) + this.refreshTokenTtl,
       },
-      REFRESH_TOKEN_TTL,
+      this.refreshTokenTtl,
     );
 
     const accessToken = this.signAccessToken({
@@ -122,7 +128,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      expiresIn: ACCESS_TOKEN_TTL,
+      expiresIn: this.accessTokenTtl,
       session,
     };
   }
@@ -167,9 +173,9 @@ export class AuthService {
         branchId,
         roles,
         issuedAt: Math.floor(Date.now() / 1000),
-        expiresAt: Math.floor(Date.now() / 1000) + REFRESH_TOKEN_TTL,
+        expiresAt: Math.floor(Date.now() / 1000) + this.refreshTokenTtl,
       },
-      REFRESH_TOKEN_TTL,
+      this.refreshTokenTtl,
     );
 
     const newAccessToken = this.signAccessToken({
@@ -191,7 +197,7 @@ export class AuthService {
     return {
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
-      expiresIn: ACCESS_TOKEN_TTL,
+      expiresIn: this.accessTokenTtl,
     };
   }
 
@@ -226,9 +232,9 @@ export class AuthService {
         branchId,
         roles,
         issuedAt: now,
-        expiresAt: now + REFRESH_TOKEN_TTL,
+        expiresAt: now + this.refreshTokenTtl,
       },
-      REFRESH_TOKEN_TTL,
+      this.refreshTokenTtl,
     );
 
     const accessToken = this.signAccessToken({
@@ -252,7 +258,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      expiresIn: ACCESS_TOKEN_TTL,
+      expiresIn: this.accessTokenTtl,
       session,
     };
   }
@@ -344,9 +350,9 @@ export class AuthService {
         branchId,
         roles,
         issuedAt: now,
-        expiresAt: now + REFRESH_TOKEN_TTL,
+        expiresAt: now + this.refreshTokenTtl,
       },
-      REFRESH_TOKEN_TTL,
+      this.refreshTokenTtl,
     );
 
     const accessToken = this.signAccessToken({
@@ -365,7 +371,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken: this.signRefreshToken({ jti, userId: user.id }),
-      expiresIn: ACCESS_TOKEN_TTL,
+      expiresIn: this.accessTokenTtl,
       session,
     };
   }
@@ -441,7 +447,7 @@ export class AuthService {
   }
 
   private signAccessToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
-    return jwt.sign(payload, this.jwtSecret, { expiresIn: ACCESS_TOKEN_TTL });
+    return jwt.sign(payload, this.jwtSecret, { expiresIn: this.accessTokenTtl });
   }
 
   private signRefreshToken(payload: {
@@ -449,7 +455,7 @@ export class AuthService {
     userId: string;
   }): string {
     return jwt.sign(payload, this.jwtRefreshSecret, {
-      expiresIn: REFRESH_TOKEN_TTL,
+      expiresIn: this.refreshTokenTtl,
     });
   }
 
