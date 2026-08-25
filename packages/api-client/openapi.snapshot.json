@@ -19838,6 +19838,142 @@
         ]
       }
     },
+    "/inventory/transfer-orders/{id}/export-goods-issue/print-payload": {
+      "get": {
+        "operationId": "TransferOrderController_getExportGoodsIssuePrintPayload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      }
+    },
+    "/inventory/transfer-orders/{id}/export-goods-issue/export": {
+      "get": {
+        "operationId": "TransferOrderController_exportGoodsIssueExcel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      }
+    },
+    "/inventory/transfer-orders/{id}/import-goods-receipt": {
+      "get": {
+        "operationId": "TransferOrderController_getImportGoodsReceipt",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoodsReceiptEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      }
+    },
+    "/inventory/transfer-orders/{id}/import-goods-receipt/print-payload": {
+      "get": {
+        "operationId": "TransferOrderController_getImportGoodsReceiptPrintPayload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      }
+    },
+    "/inventory/transfer-orders/{id}/import-goods-receipt/export": {
+      "get": {
+        "operationId": "TransferOrderController_importGoodsReceiptExcel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      }
+    },
     "/inventory/transfer-orders/{id}/import": {
       "post": {
         "operationId": "TransferOrderController_confirmImport",
@@ -40224,241 +40360,6 @@
           "targetBranchId"
         ]
       },
-      "UpdateTransferOrderDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "ExportTransferOrderDto": {
-        "type": "object",
-        "properties": {
-          "lines": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ExportTransferOrderLineDto"
-            }
-          },
-          "reason": {
-            "type": "string"
-          },
-          "notes": {
-            "type": "string"
-          },
-          "providerId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "counterpartyKind": {
-            "type": "string",
-            "enum": [
-              "supplier",
-              "customer",
-              "employee"
-            ]
-          },
-          "counterpartyId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "deliverer": {
-            "type": "string"
-          },
-          "references": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "occurredAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "ImportTransferOrderDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "GoodsReceiptLineDto": {
-        "type": "object",
-        "properties": {
-          "itemId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "locationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "binId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "uomCode": {
-            "type": "string",
-            "maxLength": 50
-          },
-          "quantity": {
-            "type": "number",
-            "minimum": 0.001
-          },
-          "unitPrice": {
-            "type": "number",
-            "minimum": 0
-          },
-          "note": {
-            "type": "string",
-            "maxLength": 500
-          }
-        },
-        "required": [
-          "itemId",
-          "locationId",
-          "uomCode",
-          "quantity",
-          "unitPrice"
-        ]
-      },
-      "CashSettlementDto": {
-        "type": "object",
-        "properties": {
-          "method": {
-            "type": "object"
-          },
-          "amount": {
-            "type": "number",
-            "minimum": 0.01
-          },
-          "cashAccountId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "description": {
-            "type": "string",
-            "maxLength": 500
-          }
-        },
-        "required": [
-          "method",
-          "amount"
-        ]
-      },
-      "CreateGoodsReceiptDto": {
-        "type": "object",
-        "properties": {
-          "purpose": {
-            "type": "string",
-            "enum": [
-              "PURCHASE",
-              "OTHER",
-              "TRANSFER_IN",
-              "STOCK_TAKE"
-            ]
-          },
-          "providerId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "counterpartyKind": {
-            "type": "string",
-            "description": "Đối tượng kind (supplier | customer | employee). When set, the service\n validates the counterparty and routes supplier→provider_id, customer /\n employee→counterparty cols (provider_id null).",
-            "enum": [
-              "supplier",
-              "customer",
-              "employee"
-            ]
-          },
-          "counterpartyId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "deliveredBy": {
-            "type": "string",
-            "maxLength": 200
-          },
-          "purchasingEmployeeId": {
-            "type": "string",
-            "description": "Nhân viên mua hàng — user (users.id) responsible for the purchase.",
-            "format": "uuid"
-          },
-          "reason": {
-            "type": "string",
-            "maxLength": 500
-          },
-          "description": {
-            "type": "string",
-            "maxLength": 2000
-          },
-          "referenceId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "referenceType": {
-            "type": "string",
-            "enum": [
-              "PURCHASE_ORDER",
-              "STOCK_TRANSFER",
-              "STOCK_TAKE"
-            ]
-          },
-          "sourceBranchId": {
-            "type": "string",
-            "description": "Source branch for transfer-in. Stored separately from referenceId."
-          },
-          "receivedAt": {
-            "type": "string"
-          },
-          "locationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "attachmentIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          "references": {
-            "description": "FE-supplied reference codes shown as Tham chiếu.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "lines": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/GoodsReceiptLineDto"
-            }
-          },
-          "paymentMethod": {
-            "type": "string",
-            "description": "Settlement on post: CASH posts a cash movement + auto Phiếu chi; CREDIT posts a payable JE.",
-            "enum": [
-              "CASH",
-              "CREDIT"
-            ]
-          },
-          "cashAccountId": {
-            "type": "string",
-            "description": "Cash account to pay from; defaults to the branch cash fund when omitted.",
-            "format": "uuid"
-          },
-          "cashPayment": {
-            "$ref": "#/components/schemas/CashSettlementDto"
-          },
-          "cashReceipt": {
-            "$ref": "#/components/schemas/CashSettlementDto"
-          }
-        },
-        "required": [
-          "purpose",
-          "receivedAt",
-          "locationId",
-          "lines"
-        ]
-      },
       "GoodsReceiptEntity": {
         "type": "object",
         "properties": {
@@ -40729,6 +40630,241 @@
           "updatedAt",
           "createdBy",
           "goodsReceipt"
+        ]
+      },
+      "UpdateTransferOrderDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ExportTransferOrderDto": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportTransferOrderLineDto"
+            }
+          },
+          "reason": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "providerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "counterpartyKind": {
+            "type": "string",
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ]
+          },
+          "counterpartyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deliverer": {
+            "type": "string"
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ImportTransferOrderDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "GoodsReceiptLineDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "binId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "uomCode": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0.001
+          },
+          "unitPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "itemId",
+          "locationId",
+          "uomCode",
+          "quantity",
+          "unitPrice"
+        ]
+      },
+      "CashSettlementDto": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "object"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "cashAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "method",
+          "amount"
+        ]
+      },
+      "CreateGoodsReceiptDto": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "PURCHASE",
+              "OTHER",
+              "TRANSFER_IN",
+              "STOCK_TAKE"
+            ]
+          },
+          "providerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "counterpartyKind": {
+            "type": "string",
+            "description": "Đối tượng kind (supplier | customer | employee). When set, the service\n validates the counterparty and routes supplier→provider_id, customer /\n employee→counterparty cols (provider_id null).",
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ]
+          },
+          "counterpartyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deliveredBy": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "purchasingEmployeeId": {
+            "type": "string",
+            "description": "Nhân viên mua hàng — user (users.id) responsible for the purchase.",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "referenceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "referenceType": {
+            "type": "string",
+            "enum": [
+              "PURCHASE_ORDER",
+              "STOCK_TRANSFER",
+              "STOCK_TAKE"
+            ]
+          },
+          "sourceBranchId": {
+            "type": "string",
+            "description": "Source branch for transfer-in. Stored separately from referenceId."
+          },
+          "receivedAt": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "references": {
+            "description": "FE-supplied reference codes shown as Tham chiếu.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoodsReceiptLineDto"
+            }
+          },
+          "paymentMethod": {
+            "type": "string",
+            "description": "Settlement on post: CASH posts a cash movement + auto Phiếu chi; CREDIT posts a payable JE.",
+            "enum": [
+              "CASH",
+              "CREDIT"
+            ]
+          },
+          "cashAccountId": {
+            "type": "string",
+            "description": "Cash account to pay from; defaults to the branch cash fund when omitted.",
+            "format": "uuid"
+          },
+          "cashPayment": {
+            "$ref": "#/components/schemas/CashSettlementDto"
+          },
+          "cashReceipt": {
+            "$ref": "#/components/schemas/CashSettlementDto"
+          }
+        },
+        "required": [
+          "purpose",
+          "receivedAt",
+          "locationId",
+          "lines"
         ]
       },
       "UpdateGoodsReceiptDto": {

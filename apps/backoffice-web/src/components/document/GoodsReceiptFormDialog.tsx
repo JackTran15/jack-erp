@@ -74,8 +74,14 @@ import {
 import { GoodsReceiptImportDialog } from "../../pages/purchase-orders/import/GoodsReceiptImportDialog";
 import type { GoodsReceiptImportJobRow } from "../../pages/purchase-orders/import/import-goods-receipt.types";
 import { VoucherKind } from "@erp/shared-interfaces";
-import { fetchVoucherPrintPayload } from "../../lib/print/voucher-print.api";
-import { downloadVoucherExcel } from "../../lib/print/voucher-export.api";
+import {
+  fetchTransferImportReceiptPrintPayload,
+  fetchVoucherPrintPayload,
+} from "../../lib/print/voucher-print.api";
+import {
+  downloadTransferImportReceiptExcel,
+  downloadVoucherExcel,
+} from "../../lib/print/voucher-export.api";
 import { renderVoucherHtml } from "../../lib/print/render-voucher-html";
 import { printHtmlDocument } from "../../lib/print/print-html-document";
 import {
@@ -93,6 +99,7 @@ import type {
   InventoryItem,
 } from "./goods-receipt-shared";
 import type { GoodsIssue } from "./goods-issue-shared";
+import { GoodsIssueFormDialog } from "./GoodsIssueFormDialog";
 
 // ─── Form dialog (create / edit / view) ──────────────────────────────────────
 
@@ -152,6 +159,7 @@ export function PurchaseOrderFormDialog({
   autoOpenTransferPicker = false,
   autoSelectTransferOrder,
   documentKind = "warehouse-receipt",
+  crossBranchTransferOrderId,
 }: {
   mode: "create" | "edit" | "view";
   initial: PurchaseOrder | null;
@@ -173,6 +181,13 @@ export function PurchaseOrderFormDialog({
     exportGoodsIssueDocumentNumber?: string | null;
   } | null;
   documentKind?: "warehouse-receipt" | "purchase-import";
+  /**
+   * Set when this NK belongs to another branch and was opened through its transfer
+   * order (source branch viewing the destination branch's document): In / Xuất khẩu
+   * must go through the transfer's org-scoped routes, and the document is read-only
+   * from here — the branch-scoped PATCH would 404.
+   */
+  crossBranchTransferOrderId?: string | null;
 }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -184,7 +199,8 @@ export function PurchaseOrderFormDialog({
   const canEdit =
     isView &&
     initial?.status !== "CANCELLED" &&
-    initial?.status !== "REVERSED";
+    initial?.status !== "REVERSED" &&
+    !crossBranchTransferOrderId;
   const isPurchaseImport = documentKind === "purchase-import";
   // Resolve preferred shelves for many lines in a single request, then apply
   // each result back to its row. The (idx, itemId, storageId) guard prevents a
@@ -385,6 +401,35 @@ export function PurchaseOrderFormDialog({
   const [sourceExportGoodsIssueId, setSourceExportGoodsIssueId] = useState<
     string | null
   >(null);
+  // "Tham chiếu" → the source XK, shown read-only on top of this dialog. It belongs
+  // to the source branch, so it is resolved through the transfer order (org-scoped);
+  // the branch-scoped goods-issue GET would 404 from this (destination) branch.
+  const [sourceIssue, setSourceIssue] = useState<GoodsIssue | null>(null);
+  const [sourceIssueStorages, setSourceIssueStorages] = useState<
+    InventoryStorage[]
+  >([]);
+  const openSourceIssue = async () => {
+    if (!sourceTransferOrderId) return;
+    try {
+      const [issueRes, storageRes] = await Promise.all([
+        apiClient.get<GoodsIssue>(
+          `/inventory/transfer-orders/${sourceTransferOrderId}/export-goods-issue`,
+        ),
+        // All org storages (no branchId filter): the XK's lines sit in the source
+        // branch's warehouses, and the dialog resolves the Kho label from this list.
+        // Fetched once per dialog — the warehouse list does not change under it.
+        sourceIssueStorages.length
+          ? null
+          : apiClient.get<PaginatedResponse<InventoryStorage>>(
+              "/inventory/storages?page=1&pageSize=200",
+            ),
+      ]);
+      if (storageRes) setSourceIssueStorages(storageRes.data.data);
+      setSourceIssue(issueRes.data);
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    }
+  };
   const [references, setReferences] = useState<string[]>(
     initial?.references ?? [],
   );
@@ -1221,10 +1266,9 @@ export function PurchaseOrderFormDialog({
     if (!initial?.id || printing) return;
     setPrinting(true);
     try {
-      const payload = await fetchVoucherPrintPayload(
-        VoucherKind.GOODS_RECEIPT,
-        initial.id,
-      );
+      const payload = crossBranchTransferOrderId
+        ? await fetchTransferImportReceiptPrintPayload(crossBranchTransferOrderId)
+        : await fetchVoucherPrintPayload(VoucherKind.GOODS_RECEIPT, initial.id);
       await printHtmlDocument(renderVoucherHtml(payload));
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
@@ -1237,7 +1281,11 @@ export function PurchaseOrderFormDialog({
     if (!initial?.id || exporting) return;
     setExporting(true);
     try {
-      await downloadVoucherExcel(VoucherKind.GOODS_RECEIPT, initial.id);
+      if (crossBranchTransferOrderId) {
+        await downloadTransferImportReceiptExcel(crossBranchTransferOrderId);
+      } else {
+        await downloadVoucherExcel(VoucherKind.GOODS_RECEIPT, initial.id);
+      }
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
     } finally {
@@ -2024,18 +2072,15 @@ export function PurchaseOrderFormDialog({
                         >
                           {r}
                         </button>
-                      ) : sourceExportGoodsIssueId && r === references[0] ? (
+                      ) : sourceExportGoodsIssueId &&
+                        r === references[0] &&
+                        // Mở lồng từ chính phiếu xuất đó: liên kết ngược chỉ mở lại phiếu cha.
+                        !crossBranchTransferOrderId ? (
                         <button
                           key={r}
                           type="button"
                           className="text-sm font-medium text-primary-blue hover:text-primary-blue-hover hover:underline"
-                          onClick={() =>
-                            navigate("/inventory/goods-issues", {
-                              state: {
-                                openDocumentId: sourceExportGoodsIssueId,
-                              },
-                            })
-                          }
+                          onClick={() => void openSourceIssue()}
                         >
                           {r}
                         </button>
@@ -2333,6 +2378,20 @@ export function PurchaseOrderFormDialog({
         onOpenChange={setImportOpen}
         onApplyDraft={handleApplyDraftImport}
       />
+
+      {sourceIssue && (
+        <GoodsIssueFormDialog
+          mode="view"
+          initial={sourceIssue}
+          customers={providers}
+          storages={sourceIssueStorages}
+          actionLoading={false}
+          crossBranchTransferOrderId={sourceTransferOrderId}
+          onClose={() => setSourceIssue(null)}
+          onSaved={() => setSourceIssue(null)}
+          onEdit={() => {}}
+        />
+      )}
     </>
   );
 }

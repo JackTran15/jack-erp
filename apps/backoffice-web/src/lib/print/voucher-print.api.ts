@@ -23,3 +23,27 @@ export async function fetchVoucherPrintPayload(
   const response = await apiClient.get<VoucherPrintPayload>(buildPath(id));
   return response.data;
 }
+
+/**
+ * Print payload for a transfer's export XK, resolved through the transfer order so
+ * the destination branch can print the source branch's phiếu xuất kho — the
+ * branch-scoped goods-issue route 404s there.
+ */
+export async function fetchTransferExportIssuePrintPayload(
+  transferOrderId: string,
+): Promise<VoucherPrintPayload> {
+  const response = await apiClient.get<VoucherPrintPayload>(
+    `/inventory/transfer-orders/${transferOrderId}/export-goods-issue/print-payload`,
+  );
+  return response.data;
+}
+
+/** Mirror of {@link fetchTransferExportIssuePrintPayload} for the import NK. */
+export async function fetchTransferImportReceiptPrintPayload(
+  transferOrderId: string,
+): Promise<VoucherPrintPayload> {
+  const response = await apiClient.get<VoucherPrintPayload>(
+    `/inventory/transfer-orders/${transferOrderId}/import-goods-receipt/print-payload`,
+  );
+  return response.data;
+}

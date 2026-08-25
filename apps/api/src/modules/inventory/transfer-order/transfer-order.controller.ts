@@ -456,6 +456,67 @@ export class TransferOrderController {
     return this.service.getExportGoodsIssue(id, actor);
   }
 
+  @Get(":id/export-goods-issue/print-payload")
+  @RequirePermission("inventory.transfer.read")
+  getExportGoodsIssuePrintPayload(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.getExportGoodsIssuePrintPayload(id, actor);
+  }
+
+  @Get(":id/export-goods-issue/export")
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission("inventory.transfer.read")
+  async exportGoodsIssueExcel(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+    @Res() res: Response,
+  ): Promise<void> {
+    const payload = await this.service.getExportGoodsIssuePrintPayload(id, actor);
+    const doc = voucherToReportDocument(payload);
+    await new ExportPipeline(
+      new StaticRowsFetcher(doc.rows, doc.totals),
+      new VoucherXlsxWriter(payload),
+      new HttpResponseSink(res, payload.title),
+    ).run(doc.header, doc.columns);
+  }
+
+  @Get(":id/import-goods-receipt")
+  @RequirePermission("inventory.transfer.read")
+  getImportGoodsReceipt(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.getImportGoodsReceipt(id, actor);
+  }
+
+  @Get(":id/import-goods-receipt/print-payload")
+  @RequirePermission("inventory.transfer.read")
+  getImportGoodsReceiptPrintPayload(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.getImportGoodsReceiptPrintPayload(id, actor);
+  }
+
+  @Get(":id/import-goods-receipt/export")
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission("inventory.transfer.read")
+  async importGoodsReceiptExcel(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+    @Res() res: Response,
+  ): Promise<void> {
+    const payload = await this.service.getImportGoodsReceiptPrintPayload(id, actor);
+    const doc = voucherToReportDocument(payload);
+    await new ExportPipeline(
+      new StaticRowsFetcher(doc.rows, doc.totals),
+      new VoucherXlsxWriter(payload),
+      new HttpResponseSink(res, payload.title),
+    ).run(doc.header, doc.columns);
+  }
+
   @Patch(":id")
   @RequirePermission("inventory.transfer.create")
   update(

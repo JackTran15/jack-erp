@@ -24,6 +24,7 @@ import { GoodsIssueEntity } from '../goods-issue/goods-issue.entity';
 import { StorageEntity } from '../location/storage.entity';
 import { BranchEntity } from '../../branch/branch.entity';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
+import { GoodsReceiptEntity } from '../goods-receipt/goods-receipt.entity';
 import { GoodsIssueService } from '../goods-issue/goods-issue.service';
 import { GoodsReceiptService } from '../goods-receipt/goods-receipt.service';
 
@@ -34,6 +35,7 @@ describe('TransferOrderService', () => {
   let balanceRepo: Record<string, jest.Mock>;
   let balanceQb: Record<string, jest.Mock>;
   let giRepo: Record<string, jest.Mock>;
+  let grRepo: Record<string, jest.Mock>;
   let branchRepo: Record<string, jest.Mock>;
   let storageRepo: Record<string, jest.Mock>;
   let goodsIssueService: Record<string, jest.Mock>;
@@ -101,6 +103,10 @@ describe('TransferOrderService', () => {
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn().mockResolvedValue(null),
     };
+    grRepo = {
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
+    };
     branchRepo = {
       find: jest.fn().mockResolvedValue([]),
     };
@@ -113,12 +119,14 @@ describe('TransferOrderService', () => {
       cancel: jest.fn().mockResolvedValue({ id: 'gi-1' }),
       getById: jest.fn(),
       update: jest.fn().mockResolvedValue(undefined),
+      buildPrintPayload: jest.fn().mockResolvedValue({ title: 'Phiếu xuất kho' }),
     };
     goodsReceiptService = {
       createAndPost: jest.fn().mockResolvedValue({ id: 'gr-1' }),
       cancel: jest.fn().mockResolvedValue(undefined),
       getById: jest.fn(),
       update: jest.fn().mockResolvedValue(undefined),
+      buildPrintPayload: jest.fn().mockResolvedValue({ title: 'Phiếu nhập kho' }),
     };
     // Default: the UPDATE matches an existing transfer_order_lines row
     // (RETURNING id yields one row). Tests exercising the "no matching row"
@@ -136,6 +144,7 @@ describe('TransferOrderService', () => {
           useValue: balanceRepo,
         },
         { provide: getRepositoryToken(GoodsIssueEntity), useValue: giRepo },
+        { provide: getRepositoryToken(GoodsReceiptEntity), useValue: grRepo },
         { provide: getRepositoryToken(BranchEntity), useValue: branchRepo },
         { provide: getRepositoryToken(StorageEntity), useValue: storageRepo },
         {
@@ -1426,6 +1435,91 @@ describe('TransferOrderService', () => {
 
       await expect(service.getLines('to-1', outsider, 1, 20)).rejects.toThrow(NotFoundException);
       expect(toRepo.manager.findAndCount).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getExportGoodsIssuePrintPayload', () => {
+    const orderWithExport = () =>
+      baseOrder({
+        status: TransferOrderStatus.IN_PROGRESS,
+        exportGoodsIssueId: 'gi-1',
+      } as Partial<TransferOrderEntity>);
+
+    it('resolves the source branch XK for the destination branch (org-scoped)', async () => {
+      toRepo.findOne.mockResolvedValue(orderWithExport());
+      const issue = { id: 'gi-1', branchId: 'branch-A' };
+      giRepo.findOne.mockResolvedValue(issue);
+
+      const payload = await service.getExportGoodsIssuePrintPayload('to-1', actorDest);
+
+      // No branchId in the where clause: the XK belongs to branch-A, the actor is branch-B.
+      expect(giRepo.findOne).toHaveBeenCalledWith({
+        where: { id: 'gi-1', organizationId: 'org-1' },
+      });
+      expect(goodsIssueService.buildPrintPayload).toHaveBeenCalledWith(issue, 'org-1');
+      expect(payload).toEqual({ title: 'Phiếu xuất kho' });
+    });
+
+    it('404s when the actor participates in neither branch', async () => {
+      toRepo.findOne.mockResolvedValue(orderWithExport());
+      const outsider = { ...actorSource, branchId: 'branch-C' };
+
+      await expect(
+        service.getExportGoodsIssuePrintPayload('to-1', outsider),
+      ).rejects.toThrow(NotFoundException);
+      expect(giRepo.findOne).not.toHaveBeenCalled();
+      expect(goodsIssueService.buildPrintPayload).not.toHaveBeenCalled();
+    });
+
+    it('404s when the transfer has no export issue yet', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder());
+
+      await expect(
+        service.getExportGoodsIssuePrintPayload('to-1', actorDest),
+      ).rejects.toThrow(NotFoundException);
+      expect(goodsIssueService.buildPrintPayload).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getImportGoodsReceiptPrintPayload', () => {
+    const orderWithImport = () =>
+      baseOrder({
+        status: TransferOrderStatus.COMPLETED,
+        importGoodsReceiptId: 'gr-1',
+      } as Partial<TransferOrderEntity>);
+
+    it('resolves the destination branch NK for the source branch (org-scoped)', async () => {
+      toRepo.findOne.mockResolvedValue(orderWithImport());
+      const receipt = { id: 'gr-1', branchId: 'branch-B' };
+      grRepo.findOne.mockResolvedValue(receipt);
+
+      const payload = await service.getImportGoodsReceiptPrintPayload('to-1', actorSource);
+
+      // No branchId in the where clause: the NK belongs to branch-B, the actor is branch-A.
+      expect(grRepo.findOne).toHaveBeenCalledWith({
+        where: { id: 'gr-1', organizationId: 'org-1' },
+      });
+      expect(goodsReceiptService.buildPrintPayload).toHaveBeenCalledWith(receipt, 'org-1');
+      expect(payload).toEqual({ title: 'Phiếu nhập kho' });
+    });
+
+    it('404s when the actor participates in neither branch', async () => {
+      toRepo.findOne.mockResolvedValue(orderWithImport());
+      const outsider = { ...actorSource, branchId: 'branch-C' };
+
+      await expect(
+        service.getImportGoodsReceiptPrintPayload('to-1', outsider),
+      ).rejects.toThrow(NotFoundException);
+      expect(grRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('404s while the destination has not confirmed import yet', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder());
+
+      await expect(
+        service.getImportGoodsReceipt('to-1', actorSource),
+      ).rejects.toThrow(NotFoundException);
+      expect(goodsReceiptService.buildPrintPayload).not.toHaveBeenCalled();
     });
   });
 });

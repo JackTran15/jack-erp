@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -37,8 +39,14 @@ import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { VoucherKind } from "@erp/shared-interfaces";
-import { fetchVoucherPrintPayload } from "../../lib/print/voucher-print.api";
-import { downloadVoucherExcel } from "../../lib/print/voucher-export.api";
+import {
+  fetchTransferExportIssuePrintPayload,
+  fetchVoucherPrintPayload,
+} from "../../lib/print/voucher-print.api";
+import {
+  downloadTransferExportIssueExcel,
+  downloadVoucherExcel,
+} from "../../lib/print/voucher-export.api";
 import { renderVoucherHtml } from "../../lib/print/render-voucher-html";
 import { printHtmlDocument } from "../../lib/print/print-html-document";
 import {
@@ -106,6 +114,16 @@ import type {
   PaginatedResponse,
 } from "./goods-issue-shared";
 import { hasPermission } from "../../lib/permissions";
+import type { PurchaseOrder } from "./goods-receipt-shared";
+
+// Lazy, not a static import: GoodsReceiptFormDialog imports this module (for the
+// reverse "Tham chiếu" link), so a static import here would close the cycle and
+// leave one of the two undefined at module init.
+const GoodsReceiptFormDialogLazy = lazy(() =>
+  import("./GoodsReceiptFormDialog").then((m) => ({
+    default: m.GoodsReceiptFormDialog,
+  })),
+);
 
 /**
  * Purposes the current user is allowed to create. "Điều chuyển" (TRANSFER_OUT)
@@ -188,6 +206,7 @@ export function GoodsIssueFormDialog({
   onVoid,
   onRequestDelete,
   onProcessReceive,
+  crossBranchTransferOrderId,
 }: {
   mode: "create" | "edit" | "view";
   initial: GoodsIssue | null;
@@ -202,13 +221,21 @@ export function GoodsIssueFormDialog({
   onRequestDelete?: () => void;
   /** "Xử lý nhập kho" — opens the receive flow for this issue's transfer. */
   onProcessReceive?: () => void;
+  /**
+   * Set when this XK belongs to another branch and was opened through its transfer
+   * order (destination branch viewing the source branch's document): In / Xuất khẩu
+   * must go through the transfer's org-scoped routes, and the document is read-only
+   * from here — the branch-scoped PATCH would 404.
+   */
+  crossBranchTransferOrderId?: string | null;
 }) {
   const navigate = useNavigate();
   const isView = mode === "view";
   const isEdit = mode === "edit";
   // Any non-cancelled row can be edited — BE writes the difference as a
   // stock-ledger adjustment instead of overwriting what was already posted.
-  const canEdit = isView && initial?.status !== "CANCELLED";
+  const canEdit =
+    isView && initial?.status !== "CANCELLED" && !crossBranchTransferOrderId;
   // Resolve preferred shelves for many lines in a single request, then apply
   // each result back to its row. The (idx, itemId, storageId) guard prevents a
   // stale response from overwriting a row the user has since changed.
@@ -493,6 +520,61 @@ export function GoodsIssueFormDialog({
       cancelled = true;
     };
   }, [referenceStockTakeId]);
+
+  // "Tham chiếu" chiều ngược lại: phiếu xuất điều chuyển không lưu số phiếu nhập
+  // (khi lập phiếu xuất thì phiếu nhập chưa tồn tại), nên resolve lúc đọc qua lệnh
+  // điều chuyển. Route org-scoped: phiếu nhập thuộc chi nhánh đích nên GET
+  // /goods-receipts/:id theo phạm vi chi nhánh sẽ 404 từ chi nhánh nguồn.
+  const referenceTransferOrderId =
+    initial?.referenceType === "TRANSFER_ORDER" ? (initial.referenceId ?? null) : null;
+  const [importReceipt, setImportReceipt] = useState<PurchaseOrder | null>(null);
+  const [importReceiptOpen, setImportReceiptOpen] = useState(false);
+  const [importReceiptStorages, setImportReceiptStorages] = useState<
+    InventoryStorage[]
+  >([]);
+  useEffect(() => {
+    // Không hiển thị liên kết ngược khi chính phiếu này đang mở lồng từ phiếu nhập:
+    // nó chỉ mở lại đúng phiếu cha.
+    if (!referenceTransferOrderId || crossBranchTransferOrderId) {
+      setImportReceipt(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data: order } = await apiClient.get<{
+          importGoodsReceiptId?: string | null;
+        }>(`/inventory/transfer-orders/${referenceTransferOrderId}`);
+        if (cancelled || !order.importGoodsReceiptId) return;
+        const { data: receipt } = await apiClient.get<PurchaseOrder>(
+          `/inventory/transfer-orders/${referenceTransferOrderId}/import-goods-receipt`,
+        );
+        if (!cancelled) setImportReceipt(receipt);
+      } catch {
+        // best-effort — chưa nhập kho thì tham chiếu vẫn là "—"
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [crossBranchTransferOrderId, referenceTransferOrderId]);
+
+  const openImportReceipt = async () => {
+    if (!importReceipt) return;
+    try {
+      // Toàn bộ kho của tổ chức: dòng phiếu nhập nằm ở kho của chi nhánh đích.
+      // Chỉ nạp một lần cho mỗi dialog — danh sách kho không đổi trong lúc mở.
+      if (!importReceiptStorages.length) {
+        const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
+          "/inventory/storages?page=1&pageSize=200",
+        );
+        setImportReceiptStorages(data.data);
+      }
+      setImportReceiptOpen(true);
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -1000,10 +1082,9 @@ export function GoodsIssueFormDialog({
     if (!initial?.id || printing) return;
     setPrinting(true);
     try {
-      const payload = await fetchVoucherPrintPayload(
-        VoucherKind.GOODS_ISSUE,
-        initial.id,
-      );
+      const payload = crossBranchTransferOrderId
+        ? await fetchTransferExportIssuePrintPayload(crossBranchTransferOrderId)
+        : await fetchVoucherPrintPayload(VoucherKind.GOODS_ISSUE, initial.id);
       await printHtmlDocument(renderVoucherHtml(payload));
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
@@ -1016,7 +1097,11 @@ export function GoodsIssueFormDialog({
     if (!initial?.id || exporting) return;
     setExporting(true);
     try {
-      await downloadVoucherExcel(VoucherKind.GOODS_ISSUE, initial.id);
+      if (crossBranchTransferOrderId) {
+        await downloadTransferExportIssueExcel(crossBranchTransferOrderId);
+      } else {
+        await downloadVoucherExcel(VoucherKind.GOODS_ISSUE, initial.id);
+      }
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
     } finally {
@@ -1678,20 +1763,33 @@ export function GoodsIssueFormDialog({
               {(() => {
                 // FE-supplied reference list, plus any resolved single-doc
                 // linkage (stock-take / transfer order) not already in it.
+                const importReceiptNumber = importReceipt?.documentNumber ?? null;
                 const refs = [
                   ...references,
                   ...(referenceNumber && !references.includes(referenceNumber)
                     ? [referenceNumber]
                     : []),
+                  ...(importReceiptNumber && !references.includes(importReceiptNumber)
+                    ? [importReceiptNumber]
+                    : []),
                 ];
                 return refs.length ? (
                   <span className="inline-flex flex-wrap items-center gap-1.5">
                     {refs.map((r) =>
-                      r === referenceNumber && referenceStockTakeId ? (
+                      r === importReceiptNumber ? (
                         <button
                           key={r}
                           type="button"
-                          className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm font-medium text-primary-blue hover:text-primary-blue-hover hover:underline"
+                          className="text-sm font-medium text-primary-blue hover:text-primary-blue-hover hover:underline"
+                          onClick={() => void openImportReceipt()}
+                        >
+                          {r}
+                        </button>
+                      ) : r === referenceNumber && referenceStockTakeId ? (
+                        <button
+                          key={r}
+                          type="button"
+                          className="text-sm font-medium text-primary-blue hover:text-primary-blue-hover hover:underline"
                           onClick={() =>
                             navigate("/inventory/stock-takes", {
                               state: { openDocumentId: referenceStockTakeId },
@@ -1703,7 +1801,7 @@ export function GoodsIssueFormDialog({
                       ) : (
                         <span
                           key={r}
-                          className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm font-medium text-foreground"
+                          className="text-sm font-medium text-foreground"
                         >
                           {r}
                         </span>
@@ -2014,6 +2112,22 @@ export function GoodsIssueFormDialog({
             void handleSave(true);
           }}
         />
+      )}
+
+      {importReceiptOpen && importReceipt && referenceTransferOrderId && (
+        <Suspense fallback={null}>
+          <GoodsReceiptFormDialogLazy
+            mode="view"
+            initial={importReceipt}
+            providers={customers}
+            storages={importReceiptStorages}
+            actionLoading={false}
+            crossBranchTransferOrderId={referenceTransferOrderId}
+            onClose={() => setImportReceiptOpen(false)}
+            onSaved={() => setImportReceiptOpen(false)}
+            onEdit={() => {}}
+          />
+        </Suspense>
       )}
     </>
   );

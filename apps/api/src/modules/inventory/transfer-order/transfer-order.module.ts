@@ -7,6 +7,7 @@ import { GoodsReceiptModule } from '../goods-receipt/goods-receipt.module';
 import { LocationEntity } from '../location/location.entity';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { GoodsIssueEntity } from '../goods-issue/goods-issue.entity';
+import { GoodsReceiptEntity } from '../goods-receipt/goods-receipt.entity';
 import { StorageEntity } from '../location/storage.entity';
 import { TransferOrderEntity } from './transfer-order.entity';
 import { TransferOrderLineEntity } from './transfer-order-line.entity';
@@ -21,6 +22,7 @@ import { TransferOrderController } from './transfer-order.controller';
       LocationEntity,
       StockBalanceEntity,
       GoodsIssueEntity,
+      GoodsReceiptEntity,
       BranchEntity,
       StorageEntity,
     ]),

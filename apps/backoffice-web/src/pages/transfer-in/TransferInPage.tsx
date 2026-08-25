@@ -626,6 +626,7 @@ export function TransferInPage() {
           customers={providers}
           storages={storages}
           actionLoading={false}
+          crossBranchTransferOrderId={viewExportRow.id}
           onClose={closeExportView}
           onSaved={async () => {
             closeExportView();

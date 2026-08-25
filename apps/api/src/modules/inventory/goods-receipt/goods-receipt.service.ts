@@ -1135,14 +1135,26 @@ export class GoodsReceiptService {
     id: string,
     actor: ActorContext,
   ): Promise<VoucherPrintPayload> {
-    const receipt = await this.getById(id, actor);
+    return this.buildPrintPayload(await this.getById(id, actor), actor.organizationId);
+  }
+
+  /**
+   * Print/export payload for a receipt the caller already resolved AND scope-checked.
+   * Split out of {@link getPrintPayload} for the cross-branch transfer view: the
+   * exporting (source) branch resolves the destination branch's NK through the
+   * transfer order (org-scoped), so it cannot go through the branch-scoped `getById`.
+   */
+  async buildPrintPayload(
+    receipt: GoodsReceiptEntity,
+    organizationId: string,
+  ): Promise<VoucherPrintPayload> {
     const [branch, transferSourceStoreName] = await Promise.all([
-      loadVoucherBranch(this.receiptRepo.manager, receipt.branchId, actor.organizationId),
+      loadVoucherBranch(this.receiptRepo.manager, receipt.branchId, organizationId),
       loadTransferCounterpartStoreName(
         this.receiptRepo.manager,
         "receipt",
         receipt.id,
-        actor.organizationId,
+        organizationId,
       ),
     ]);
     return mapGoodsReceiptToVoucherPayload(receipt, branch, transferSourceStoreName);

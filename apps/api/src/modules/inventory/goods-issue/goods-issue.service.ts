@@ -806,14 +806,26 @@ export class GoodsIssueService {
     id: string,
     actor: ActorContext,
   ): Promise<VoucherPrintPayload> {
-    const issue = await this.getById(id, actor);
+    return this.buildPrintPayload(await this.getById(id, actor), actor.organizationId);
+  }
+
+  /**
+   * Print/export payload for an issue the caller already resolved AND scope-checked.
+   * Split out of {@link getPrintPayload} for the cross-branch transfer view: the
+   * destination branch resolves the source branch's XK through the transfer order
+   * (org-scoped), so it cannot go through the branch-scoped `getById`.
+   */
+  async buildPrintPayload(
+    issue: GoodsIssueEntity,
+    organizationId: string,
+  ): Promise<VoucherPrintPayload> {
     const [branch, transferDestinationStoreName] = await Promise.all([
-      loadVoucherBranch(this.giRepo.manager, issue.branchId, actor.organizationId),
+      loadVoucherBranch(this.giRepo.manager, issue.branchId, organizationId),
       loadTransferCounterpartStoreName(
         this.giRepo.manager,
         'issue',
         issue.id,
-        actor.organizationId,
+        organizationId,
       ),
     ]);
     return mapGoodsIssueToVoucherPayload(issue, branch, transferDestinationStoreName);
