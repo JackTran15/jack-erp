@@ -13,6 +13,7 @@ import {
   INVOICE_KEYS,
 } from "@erp/pos/constants/react-query-key.constant";
 import { invoiceService } from "@erp/pos/services/invoice.service";
+import { invoiceCreateIdempotencyKey } from "@erp/pos/lib/common/invoiceIdempotency";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { mapInvoiceToReturnRow } from "@erp/pos/lib/page-libs/return-goods/returnInvoiceMapper";
 import { mapInvoiceToListRow } from "@erp/pos/lib/page-libs/invoice-list/invoiceListMapper";
@@ -45,7 +46,8 @@ export function useCreateInvoiceMutation(): UseMutationResult<
 > {
   const qc = useQueryClient();
   return useMutation<InvoiceRow, Error, CreateInvoiceBody>({
-    mutationFn: (body) => invoiceService.create(body),
+    mutationFn: (body) =>
+      invoiceService.create(body, invoiceCreateIdempotencyKey(body)),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: INVOICE_KEYS.DRAFTS_PREFIX });
     },
@@ -304,7 +306,8 @@ export function useCreateReturnInvoiceMutation(): UseMutationResult<
   CreateReturnInvoiceBody
 > {
   return useMutation<InvoiceRow, Error, CreateReturnInvoiceBody>({
-    mutationFn: (body) => invoiceService.createReturn(body),
+    mutationFn: (body) =>
+      invoiceService.createReturn(body, invoiceCreateIdempotencyKey(body)),
   });
 }
 
@@ -314,7 +317,8 @@ export function useCreateExchangeInvoiceMutation(): UseMutationResult<
   CreateExchangeInvoiceBody
 > {
   return useMutation<InvoiceRow, Error, CreateExchangeInvoiceBody>({
-    mutationFn: (body) => invoiceService.createExchange(body),
+    mutationFn: (body) =>
+      invoiceService.createExchange(body, invoiceCreateIdempotencyKey(body)),
   });
 }
 
