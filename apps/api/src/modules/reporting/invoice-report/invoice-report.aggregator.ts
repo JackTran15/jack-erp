@@ -135,9 +135,14 @@ export function cellValue(col: string, agg: DayAggregate): ReportCellValue {
       if (def.source.computed === 'total') {
         return agg.sums.subtotal - agg.sums.discountAmount - agg.sums.pointsDiscountAmount;
       }
-      // promoRate: discount as a percentage of goods
+      // promoRate — (4)+(9) as a percentage of (3), exactly as the column
+      // header's own annotation says: (5)=((4)+(9))/(3).
       return agg.sums.subtotal > 0
-        ? round2((agg.sums.discountAmount / agg.sums.subtotal) * 100)
+        ? round2(
+            ((agg.sums.discountAmount + agg.sums.pointsDiscountAmount) /
+              agg.sums.subtotal) *
+              100,
+          )
         : 0;
   }
 }

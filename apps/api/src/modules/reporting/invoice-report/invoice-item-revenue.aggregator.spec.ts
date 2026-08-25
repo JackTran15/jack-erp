@@ -19,6 +19,7 @@ const row = (over: Partial<InvoiceItemRowInput> = {}): InvoiceItemRowInput => ({
   quantity: 2,
   unitPrice: 1200000,
   lineDiscount: 200000,
+  promoPoints: 0,
   lineTotal: 2200000,
   itemNote: 'ghi chú hàng',
   itemCategory: 'Giày dép',

@@ -22,7 +22,12 @@ export type RevenueByItemDimension =
   | 'locationName';
 
 /** A summed measure off the aggregated group. */
-export type RevenueByItemMeasure = 'quantity' | 'goods' | 'discount' | 'total';
+export type RevenueByItemMeasure =
+  | 'quantity'
+  | 'goods'
+  | 'discount'
+  | 'promoPoints'
+  | 'total';
 
 /** How a column's value is produced (internal — not exposed in the catalog). */
 export type RevenueByItemSource =
@@ -44,8 +49,9 @@ export interface RevenueByItemColumnDef {
  * dimensions (category/brand). `unitPrice` (Đơn giá TB) is a weighted-average
  * unit price of the aggregated group (goods ÷ quantity), so it stays
  * meaningful after lines are summed; its footer total is null (an average has
- * no meaningful sum). `revenue.promoPoints` is a placeholder (0) until a
- * per-line loyalty backing exists. Labels live in
+ * no meaningful sum). `revenue.promoPoints` allocates the invoice header's
+ * redeemed points down to the lines (ADR-04) — an allocation, not a recorded
+ * per-line fact. Labels live in
  * REVENUE_BY_ITEM_COLUMN_LABELS_VI / INVOICE_REPORT_COLUMN_LABELS_VI.
  */
 export const REVENUE_BY_ITEM_COLUMNS: RevenueByItemColumnDef[] = [
@@ -58,7 +64,7 @@ export const REVENUE_BY_ITEM_COLUMNS: RevenueByItemColumnDef[] = [
   { key: 'unitPrice', type: ReportColumnDataType.CURRENCY, group: null, source: { kind: 'computed', computed: 'unitPrice' } },
   { key: 'revenue.goods', type: ReportColumnDataType.CURRENCY, group: 'revenue', source: { kind: 'measure', field: 'goods' } },
   { key: 'revenue.discount', type: ReportColumnDataType.CURRENCY, group: 'revenue', source: { kind: 'measure', field: 'discount' } },
-  { key: 'revenue.promoPoints', type: ReportColumnDataType.CURRENCY, group: 'revenue', source: { kind: 'placeholder', placeholder: 0 } },
+  { key: 'revenue.promoPoints', type: ReportColumnDataType.CURRENCY, group: 'revenue', source: { kind: 'measure', field: 'promoPoints' } },
   { key: 'revenue.promoRate', type: ReportColumnDataType.PERCENT, group: 'revenue', source: { kind: 'computed', computed: 'promoRate' } },
   { key: 'revenue.total', type: ReportColumnDataType.CURRENCY, group: 'revenue', source: { kind: 'measure', field: 'total' } },
   { key: 'itemCategory', type: ReportColumnDataType.STRING, group: null, source: { kind: 'dimension', field: 'itemCategory' } },

@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InvoiceItemRevenueDetailReport } from './invoice-item-revenue-detail.report';
+import { ItemDirection } from '../../../pos/entities/invoice-item.entity';
 
 const ORG = 'org-1';
 const actor = { userId: 'u1', organizationId: ORG, branchId: 'b1', roles: [] } as any;
@@ -31,6 +32,12 @@ const line = (over: Record<string, any> = {}) => ({
   note: 'line note',
   locationId: 'loc1',
   ...over,
+});
+
+/** Every `where` the line repository was queried with, per test. */
+const lineFindWhere: any[] = [];
+beforeEach(() => {
+  lineFindWhere.length = 0;
 });
 
 function makeReport(opts: {
@@ -68,9 +75,19 @@ function makeReport(opts: {
     getRawMany: jest.fn(async () => opts.stockBalanceRaw ?? []),
   };
   const repo = (rows?: any[]) => ({ find: jest.fn(async () => rows ?? []) });
+  // The line repo records its `where` and honours an `itemCode` in it, so a spec
+  // can tell a real SQL narrowing apart from a post-load array filter.
+  const lineRepo = {
+    find: jest.fn(async (findOpts: any) => {
+      lineFindWhere.push(findOpts?.where ?? {});
+      const rows = opts.lines ?? [];
+      const wanted = findOpts?.where?.itemCode;
+      return wanted ? rows.filter((l: any) => l.itemCode === wanted) : rows;
+    }),
+  };
   return new InvoiceItemRevenueDetailReport(
     { createQueryBuilder: jest.fn(() => qb) } as any,
-    repo(opts.lines) as any,
+    lineRepo as any,
     repo(opts.customers) as any,
     repo(opts.customerGroups) as any,
     repo(opts.branches) as any,
@@ -298,5 +315,85 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
     expect(result.total).toBe(1);
     expect(result.rows[0].sku).toBe('SKU001');
     expect(result.totals!['lineRevenue']).toBe(2200000);
+  });
+});
+
+describe('InvoiceItemRevenueDetailReport — filters.sku', () => {
+  const line = (over: Record<string, any> = {}) => ({
+    id: over.id ?? 'l1',
+    invoiceId: 'i1',
+    sortOrder: 0,
+    itemId: over.itemId ?? 'it1',
+    itemCode: over.itemCode ?? 'SKU001',
+    itemName: over.itemName ?? 'Item One',
+    unit: 'đôi',
+    direction: ItemDirection.OUT,
+    quantity: 1,
+    unitPrice: over.unitPrice ?? 1_000_000,
+    lineDiscount: 0,
+    promotionDiscount: 0,
+    lineTotal: over.lineTotal ?? 1_000_000,
+    note: null,
+  });
+
+  const twoSkus = {
+    invoices: [inv()],
+    lines: [
+      line({ id: 'l1', itemCode: 'SKU001', itemId: 'it1' }),
+      line({ id: 'l2', itemCode: 'SKU002', itemId: 'it2', itemName: 'Item Two' }),
+    ],
+  };
+
+  const dto = (over: Record<string, any> = {}) =>
+    ({
+      columns: ['invoiceCode', 'sku', 'lineAmount'],
+      filters: {
+        issuedAt: { from: '2026-06-01', to: '2026-06-30' },
+        ...over,
+      },
+    }) as any;
+
+  it('reaches the line query WHERE, not a filter applied after loading', async () => {
+    const report = makeReport(twoSkus);
+
+    await report.buildData(dto({ sku: 'SKU001' }), actor);
+
+    expect(lineFindWhere.some((w) => w.itemCode === 'SKU001')).toBe(true);
+  });
+
+  it('narrows both the rows and the footer to that SKU', async () => {
+    const report = makeReport(twoSkus);
+
+    const result = await report.buildData(dto({ sku: 'SKU001' }), actor);
+
+    expect(result.rows.map((r) => r.sku)).toEqual(['SKU001']);
+    expect(result.totals!['lineAmount']).toBe(1_000_000);
+  });
+
+  it('composes with categoryId — intersection, not union', async () => {
+    const report = makeReport({
+      ...twoSkus,
+      items: [
+        { id: 'it1', categoryId: 'cat-1' },
+        { id: 'it2', categoryId: 'cat-2' },
+      ],
+    });
+
+    const result = await report.buildData(
+      dto({ sku: 'SKU001', categoryId: 'cat-2' }),
+      actor,
+    );
+
+    // SKU001 is in cat-1, so intersecting with cat-2 leaves nothing.
+    expect(result.rows).toHaveLength(0);
+  });
+
+  it('leaves behaviour identical when no sku is sent', async () => {
+    const report = makeReport(twoSkus);
+
+    const result = await report.buildData(dto(), actor);
+
+    expect(result.rows.map((r) => r.sku)).toEqual(['SKU001', 'SKU002']);
+    expect(lineFindWhere.every((w) => w.itemCode === undefined)).toBe(true);
   });
 });

@@ -65,6 +65,21 @@ describe('invoiceFilterSummary', () => {
     ]);
   });
 
+  it('prints the SKU in full — a catalogue code, not personal data', () => {
+    const [line] = invoiceFilterSummary({ sku: 'SKU001' });
+
+    expect(line).toBe('Mã SKU: SKU001');
+  });
+
+  it('places the SKU after the category line when both are set', () => {
+    const [line] = invoiceFilterSummary({
+      categoryId: '5f1b0d6e-0000-4000-8000-000000000002',
+      sku: 'SKU001',
+    });
+
+    expect(line).toBe('Nhóm hàng hóa: đã lọc; Mã SKU: SKU001');
+  });
+
   it('reports an id filter as active without printing the uuid', () => {
     const [line] = invoiceFilterSummary({
       customerId: '5f1b0d6e-0000-4000-8000-000000000001',

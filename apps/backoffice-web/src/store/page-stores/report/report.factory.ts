@@ -3,7 +3,11 @@ import { REPORT_CATEGORY } from "../../../constants/reports/report-category.cons
 import { REPORT_FILTERS_LINE } from "../../../constants/reports/report-filters.constant";
 import type { ReportBranchConfig } from "../../../constants/reports/report.interface";
 import { STORE_TYPE } from "../../../constants/store.constant";
-import type { ReportFilterValues, ReportInitialState } from "./report.interface";
+import type {
+  ReportDrillDown,
+  ReportFilterValues,
+  ReportInitialState,
+} from "./report.interface";
 
 /** Kỳ báo cáo mở sẵn theo nhóm báo cáo; thiếu key ⇒ "Tháng này". */
 const DEFAULT_PERIOD_PRESET: Partial<Record<REPORT_CATEGORY, PeriodPreset>> = {
@@ -72,6 +76,40 @@ export function buildInitialReportState({
     filters,
     columnFilters: {},
     appliedRequest,
+    reloadNonce: 0,
+  };
+}
+
+/**
+ * State khởi tạo cho báo cáo lồng bên trong một dialog drill-down.
+ *
+ * Khác `buildInitialReportState` ở ba chỗ, và cả ba đều quan trọng:
+ *
+ * - `filters` lấy nguyên từ descriptor, không seed "tháng này" — descriptor đã
+ *   thu hẹp đúng kỳ cần xem (một ngày, hoặc kỳ của báo cáo cha).
+ * - `appliedRequest` luôn khác null, kể cả ở chi nhánh đơn: người dùng vừa click
+ *   một dòng, họ không cần bấm "Lấy dữ liệu" lần nữa.
+ * - `branch` kế thừa từ store cha để query key và đường xuất khẩu trùng nhau.
+ *
+ * `listReport` chỉ chứa đúng report type của dialog: không có ô chọn báo cáo
+ * trong dialog, và một danh sách dài hơn chỉ mời gọi trạng thái không hợp lệ.
+ */
+export function buildDrillDownReportState(
+  parent: Pick<ReportInitialState, "category" | "branch">,
+  drillDown: ReportDrillDown,
+): ReportInitialState {
+  return {
+    category: parent.category,
+    branch: parent.branch,
+    listReport: [drillDown.reportType],
+    reportType: drillDown.reportType,
+    filters: drillDown.filters,
+    columnFilters: {},
+    appliedRequest: {
+      reportType: drillDown.reportType,
+      filters: drillDown.filters,
+      columnFilters: {},
+    },
     reloadNonce: 0,
   };
 }

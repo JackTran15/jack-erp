@@ -66,3 +66,21 @@ describe('enrichHeader', () => {
     expect(h.pinned).toBe('left');
   });
 });
+
+describe('enrichHeader — `date` is not a globally linked column', () => {
+  it('leaves `date` unlinked', () => {
+    // daily-sales-summary sets `link` on its own `date` header (see its
+    // buildColumns). Adding 'date' to LINK_COLUMNS here would look like the same
+    // fix but would also light the column up on invoice-order-listing and
+    // invoice-item-revenue-detail, where clicking it means nothing.
+    const header = enrichHeader({
+      col: 'date',
+      name: 'Ngày',
+      desc: null,
+      type: ReportColumnDataType.DATE,
+      group: null,
+    });
+
+    expect(header.link).toBeFalsy();
+  });
+});

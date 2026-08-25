@@ -25,6 +25,7 @@ const row = (over: Partial<RevenueByItemRowInput> = {}): RevenueByItemRowInput =
   unitPrice: 1000,
   lineDiscount: 100,
   promotionDiscount: 0,
+  promoPoints: 0,
   lineTotal: 1900,
   ...over,
 });

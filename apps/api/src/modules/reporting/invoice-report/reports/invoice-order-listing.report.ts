@@ -18,6 +18,7 @@ import {
   InvoiceEntity,
   InvoicePaymentMethod,
 } from '../../../pos/entities/invoice.entity';
+import { InvoiceItemEntity } from '../../../pos/entities/invoice-item.entity';
 import { InvoicePaymentEntity } from '../../../pos/entities/invoice-payment.entity';
 import { InvoicePromotionEntity, InvoicePromotionType } from '../../../promotion/invoice-promotion.entity';
 import { EmployeeProfileEntity } from '../../../rbac/employee/employee-profile.entity';
@@ -47,6 +48,7 @@ import {
   applyInvoiceStatusFilter,
   CONSOLIDATED_PERMISSION,
   invoiceTypeSign,
+  loadSignedLineDiscounts,
   resolveBranchIds,
   signedGoods,
   statDateColumn,
@@ -87,6 +89,8 @@ export class InvoiceOrderListingReport implements ReportDefinition {
   constructor(
     @InjectRepository(InvoiceEntity)
     private readonly invoices: Repository<InvoiceEntity>,
+    @InjectRepository(InvoiceItemEntity)
+    private readonly lineItems: Repository<InvoiceItemEntity>,
     @InjectRepository(InvoicePaymentEntity)
     private readonly payments: Repository<InvoicePaymentEntity>,
     @InjectRepository(InvoicePromotionEntity)
@@ -257,6 +261,13 @@ export class InvoiceOrderListingReport implements ReportDefinition {
         isDynamicColumnKey(c),
     );
     const needsVoucher = referenced.includes('payment.voucher');
+    // Three columns read `discountAmount`, so any of them pulls the line sums in.
+    const needsLineDiscount = referenced.some(
+      (c) =>
+        c === 'revenue.discount' ||
+        c === 'revenue.promoRate' ||
+        c === 'revenue.total',
+    );
     const needsCustomer =
       referenced.includes('customer') || referenced.includes('customerPhone');
     const needsStore = referenced.includes('storeCode');
@@ -268,6 +279,12 @@ export class InvoiceOrderListingReport implements ReportDefinition {
       : { cash: new Map(), bank: new Map(), byAccount: new Map() };
     const voucherByInvoice = needsVoucher
       ? await this.loadVouchers(invoiceIds)
+      : new Map<string, number>();
+    // "Khuyến mại" comes from the lines, not `invoices.discount_amount`: the
+    // header only records the discount on what was sold, so an EXCHANGE whose
+    // returned line reverses a promotion shows nothing there.
+    const lineDiscounts = needsLineDiscount
+      ? await loadSignedLineDiscounts(this.lineItems, invoiceIds)
       : new Map<string, number>();
     const customerById = needsCustomer
       ? await this.loadCustomers(invoiceRows, actor.organizationId)
@@ -294,7 +311,9 @@ export class InvoiceOrderListingReport implements ReportDefinition {
         code: i.code,
         status: i.status,
         subtotal: signedGoods(i),
-        discountAmount: sign * Number(i.discountAmount ?? 0),
+        // No `sign *` here, unlike every other field: `direction` has already
+        // negated a RETURN's lines, and signing twice flips it back positive.
+        discountAmount: lineDiscounts.get(i.id) ?? 0,
         pointsDiscountAmount: sign * Number(i.pointsDiscountAmount ?? 0),
         totalPaid: sign * Number(i.totalPaid ?? 0),
         amountDue: sign * Number(i.amountDue ?? 0),

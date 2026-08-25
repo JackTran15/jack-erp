@@ -127,9 +127,12 @@ export function listingCellValue(
           ? Math.max(r.amountDue - r.totalPaid, 0)
           : 0;
       }
-      // promoRate — discount as a percentage of goods (mirrors daily-sales).
+      // promoRate — (4)+(9) as a percentage of (3), exactly as the column
+      // header's own annotation says (mirrors daily-sales).
       return r.subtotal > 0
-        ? round2((r.discountAmount / r.subtotal) * 100)
+        ? round2(
+            ((r.discountAmount + r.pointsDiscountAmount) / r.subtotal) * 100,
+          )
         : 0;
   }
 }

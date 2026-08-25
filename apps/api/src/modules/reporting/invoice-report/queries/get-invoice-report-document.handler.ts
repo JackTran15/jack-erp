@@ -77,6 +77,9 @@ export function invoiceFilterSummary(
     filters.brand ? `Thương hiệu: ${filters.brand}` : null,
     filters.allocateComboRevenue ? 'Phân bổ doanh thu combo: Có' : null,
     filters.categoryId ? `Nhóm hàng hóa: ${FILTERED_MARKER}` : null,
+    // Printed in full rather than masked: a SKU is a catalogue code, not
+    // personal data, and a drill-down export is unreadable without it.
+    filters.sku ? `Mã SKU: ${filters.sku}` : null,
     filters.customerId ? `Khách hàng: ${FILTERED_MARKER}` : null,
     filters.cashierId ? `Thu ngân: ${FILTERED_MARKER}` : null,
     filters.salespersonId ? `Nhân viên bán hàng: ${FILTERED_MARKER}` : null,

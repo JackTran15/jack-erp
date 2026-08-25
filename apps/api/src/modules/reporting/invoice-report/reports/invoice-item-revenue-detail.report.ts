@@ -43,9 +43,11 @@ import {
   applyBranchScope,
   applyInvoiceStatusFilter,
   CONSOLIDATED_PERMISSION,
+  invoiceTypeSign,
   resolveBranchIds,
   statDateColumn,
 } from '../../report-core/report-query.util';
+import { allocatePoints } from '../../report-core/allocate-points.util';
 import { ReportDefinition } from '../report-definition';
 import {
   ItemWarehouseLocation,
@@ -173,11 +175,44 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
     const invoiceRows = (await qb.getMany()).filter((i) => i.issuedAt);
     const invoiceById = new Map(invoiceRows.map((i) => [i.id, i]));
 
+    // `sku` narrows in SQL, unlike `categoryId` below — that one needs a
+    // catalogue join, this one is a column on the very table being queried.
+    // Filtering after the load would pull every line in the period on each
+    // drill-down click.
     let lines = invoiceRows.length
       ? await this.lineItems.find({
-          where: { invoiceId: In([...invoiceById.keys()]) },
+          where: {
+            invoiceId: In([...invoiceById.keys()]),
+            ...(dto.filters.sku ? { itemCode: dto.filters.sku } : {}),
+          },
         })
       : [];
+
+    // "Điểm KM" has no per-line backing, so allocate each invoice's redeemed
+    // points down to its lines (ADR-04), pre-signed by invoice type so the four
+    // sales reports agree on Σ. Allocated BEFORE any line filter below: the
+    // shares are a property of the invoice, not of what this request happens to
+    // show, or filtering by category would silently inflate every share.
+    // Keyed by the line object, not its id: nothing downstream needs the id, and
+    // `allocatePoints` already hands back exactly this map.
+    const pointsByLine = new Map<(typeof lines)[number], number>();
+    if (lines.length) {
+      const linesByInvoice = new Map<string, typeof lines>();
+      for (const li of lines) {
+        const bucket = linesByInvoice.get(li.invoiceId);
+        if (bucket) bucket.push(li);
+        else linesByInvoice.set(li.invoiceId, [li]);
+      }
+      for (const [invoiceId, own] of linesByInvoice) {
+        const invoice = invoiceById.get(invoiceId);
+        if (!invoice) continue;
+        const signedPoints =
+          invoiceTypeSign(invoice.type) * Number(invoice.pointsDiscountAmount ?? 0);
+        for (const [line, amount] of allocatePoints(signedPoints, own)) {
+          pointsByLine.set(line, amount);
+        }
+      }
+    }
 
     // Filter lines by item category (Nhóm hàng hóa) when requested.
     if (dto.filters.categoryId && lines.length) {
@@ -267,6 +302,7 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
           // từng dòng, và để footer khớp doanh thu thực.
           lineTotal:
             Number(li.lineTotal ?? 0) - Number(li.promotionDiscount ?? 0),
+          promoPoints: pointsByLine.get(li) ?? 0,
           itemNote: li.note ?? null,
           itemCategory: categoryByItemId.get(li.itemId) ?? null,
           locationCode: location?.code ?? null,

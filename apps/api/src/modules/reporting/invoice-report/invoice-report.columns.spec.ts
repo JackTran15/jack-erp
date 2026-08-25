@@ -54,6 +54,7 @@ describe('invoice-report.columns', () => {
   it('daily-sales-summary.buildColumns still resolves revenue.total to the shared label + formula', async () => {
     const report = new DailySalesSummaryReport(
       { createQueryBuilder: jest.fn() } as any,
+      { createQueryBuilder: jest.fn() } as any,
       { find: jest.fn() } as any,
       { find: jest.fn() } as any,
       { find: jest.fn(async () => []) } as any,

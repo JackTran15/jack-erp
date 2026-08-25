@@ -9,6 +9,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 import {
@@ -91,6 +92,17 @@ export class InvoiceReportFilterDto {
   @IsOptional()
   @IsString()
   brand?: string;
+
+  /**
+   * Per-line reports — narrow to one item by its snapshot code
+   * (`invoice_items.item_code`). Pushed into the line query's WHERE, not applied
+   * after loading, so a drill-down does not pull a month of lines per click.
+   * Bounded because it reaches a query parameter on a hot path.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  sku?: string;
 
   /** revenue-by-item only — product kind filter. */
   @ApiPropertyOptional({ enum: ['product', 'service', 'combo'] })
