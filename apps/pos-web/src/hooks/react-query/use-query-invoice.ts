@@ -12,9 +12,7 @@ import {
   CUSTOMER_KEYS,
   INVOICE_KEYS,
 } from "@erp/pos/constants/react-query-key.constant";
-import { INVOICE_LIST_DEFAULT_PAGE_SIZE } from "@erp/pos/constants/invoice-list.constant";
 import { invoiceService } from "@erp/pos/services/invoice.service";
-import { customerService } from "@erp/pos/services/customer.service";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { mapInvoiceToReturnRow } from "@erp/pos/lib/page-libs/return-goods/returnInvoiceMapper";
 import { mapInvoiceToListRow } from "@erp/pos/lib/page-libs/invoice-list/invoiceListMapper";
@@ -240,7 +238,8 @@ export function useReturnableInvoicesQuery(
 
 /**
  * Danh sách hóa đơn v2 — POST /v2/invoices/search, server-side filter + pagination.
- * Enrich mã/tên/SĐT khách qua `customerService.get` giống hook cũ.
+ * Mã/tên/SĐT khách do BE trả inline (`inv.customer`, chiếu 4 cột) — trước đây chỗ này
+ * gọi `customerService.get` cho từng khách một, tới 100 request cho một trang 100 dòng.
  * `placeholderData: keepPreviousData` giữ dữ liệu cũ trong khi load trang/filter mới.
  */
 export function useInvoiceListV2Query(
@@ -257,32 +256,8 @@ export function useInvoiceListV2Query(
     queryKey: INVOICE_KEYS.SEARCH_V2({ ...body, branchId } as Record<string, unknown>),
     queryFn: async () => {
       const res = await invoiceService.searchV2(body);
-      const ids = Array.from(
-        new Set(
-          res.data
-            .map((inv) => inv.customerId)
-            .filter((id): id is string => Boolean(id)),
-        ),
-      );
-      const entries = await Promise.all(
-        ids.map(async (id) => {
-          try {
-            const customer = await customerService.get(id);
-            return [
-              id,
-              { code: customer.code, name: customer.name, phone: customer.phone },
-            ] as const;
-          } catch {
-            return [id, null] as const;
-          }
-        }),
-      );
-      const byId = new Map(entries);
       const rows = res.data.map((inv) =>
-        mapInvoiceToListRow(
-          inv,
-          inv.customerId ? byId.get(inv.customerId) ?? null : null,
-        ),
+        mapInvoiceToListRow(inv, inv.customer ?? null),
       );
       return {
         rows,
@@ -292,58 +267,6 @@ export function useInvoiceListV2Query(
     },
     staleTime: 30_000,
     placeholderData: keepPreviousData,
-  });
-}
-
-/**
- * Danh sách hóa đơn cho trang `/invoices` — gồm cả bán/trả/đổi (`isDraft=false`,
- * không lọc status). Enrich mã/tên/SĐT khách qua `customerService.get` (endpoint
- * list chỉ trả `customerId`). Lọc theo ngày/cột + phân trang làm client-side ở
- * page-hook (`use-invoice-list`).
- */
-export function useInvoiceListQuery(): UseQueryResult<InvoiceListRow[], Error> {
-  const branchId = usePosBranchStore((s) => s.branchId) ?? "";
-  return useQuery<InvoiceListRow[], Error>({
-    queryKey: INVOICE_KEYS.LIST({ branchId }),
-    queryFn: async () => {
-      const page = await invoiceService.list({
-        isDraft: false,
-        page: 1,
-        limit: INVOICE_LIST_DEFAULT_PAGE_SIZE,
-      });
-      const ids = Array.from(
-        new Set(
-          page.data
-            .map((inv) => inv.customerId)
-            .filter((id): id is string => Boolean(id)),
-        ),
-      );
-      const entries = await Promise.all(
-        ids.map(async (id) => {
-          try {
-            const customer = await customerService.get(id);
-            return [
-              id,
-              {
-                code: customer.code,
-                name: customer.name,
-                phone: customer.phone,
-              },
-            ] as const;
-          } catch {
-            return [id, null] as const;
-          }
-        }),
-      );
-      const byId = new Map(entries);
-      return page.data.map((inv) =>
-        mapInvoiceToListRow(
-          inv,
-          inv.customerId ? byId.get(inv.customerId) ?? null : null,
-        ),
-      );
-    },
-    staleTime: 30_000,
   });
 }
 

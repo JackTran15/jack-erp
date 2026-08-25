@@ -6,6 +6,8 @@ export interface CustomerRow {
   name: string;
   phone?: string | null;
   email?: string | null;
+  /** Mã khách (KH000017). Có ở `customer` inline của các endpoint search v2. */
+  code?: string | null;
 }
 
 /**

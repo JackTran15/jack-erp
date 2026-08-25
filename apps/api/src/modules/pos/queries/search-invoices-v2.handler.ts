@@ -15,6 +15,14 @@ interface TotalsRaw {
   totalAmount: string;
 }
 
+/** The only customer fields the invoice grid renders. See `attachCustomers`. */
+interface InvoiceListCustomer {
+  id: string;
+  code: string;
+  name: string;
+  phone?: string;
+}
+
 @QueryHandler(SearchInvoicesV2Query)
 export class SearchInvoicesV2Handler
   implements IQueryHandler<SearchInvoicesV2Query>
@@ -24,6 +32,8 @@ export class SearchInvoicesV2Handler
     private readonly repo: Repository<InvoiceEntity>,
     @InjectRepository(InvoiceItemEntity)
     private readonly itemRepo: Repository<InvoiceItemEntity>,
+    @InjectRepository(CustomerEntity)
+    private readonly customerRepo: Repository<CustomerEntity>,
   ) {}
 
   async execute({ dto, actor }: SearchInvoicesV2Query) {
@@ -66,6 +76,8 @@ export class SearchInvoicesV2Handler
       }
     }
 
+    await this.attachCustomers(data, actor.organizationId);
+
     return {
       data,
       total: Number(totals?.total ?? 0),
@@ -73,6 +85,55 @@ export class SearchInvoicesV2Handler
       limit,
       totals: { totalAmount: Number(totals?.totalAmount ?? 0) },
     };
+  }
+
+  /**
+   * Resolve each invoice's customer in one page-scoped query and hang it off the
+   * row, so the grid never has to fetch customers one id at a time.
+   *
+   * The columns are projected explicitly rather than joined with
+   * `leftJoinAndMapOne` — that helper selects every column of the alias, and
+   * CustomerEntity carries national id, date of birth, address, tax code and
+   * internal notes. None of those belong in an invoice grid, and this endpoint
+   * is reachable by any authenticated user of the organization.
+   *
+   * The organization scope is repeated here: the customer join in buildQuery
+   * guards the filters, not this read.
+   */
+  private async attachCustomers(
+    data: InvoiceEntity[],
+    organizationId: string,
+  ): Promise<void> {
+    if (data.length === 0) return;
+
+    const customerIds = [
+      ...new Set(
+        data
+          .map((inv) => inv.customerId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+
+    const withCustomer = data as (InvoiceEntity & {
+      customer: InvoiceListCustomer | null;
+    })[];
+
+    if (customerIds.length === 0) {
+      for (const inv of withCustomer) inv.customer = null;
+      return;
+    }
+
+    const customers = await this.customerRepo.find({
+      where: { id: In(customerIds), organizationId },
+      select: ['id', 'code', 'name', 'phone'],
+    });
+    const byId = new Map(customers.map((c) => [c.id, c]));
+
+    for (const inv of withCustomer) {
+      inv.customer = inv.customerId
+        ? (byId.get(inv.customerId) as InvoiceListCustomer | undefined) ?? null
+        : null;
+    }
   }
 
   /**

@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "repositoryLabel": "jack-erp",
+  "slug": "goods-issue-line-unit-price",
+  "capturedAt": "2026-08-23T10:00:04.183Z",
+  "blobs": [
+    {
+      "sha256": "d4c06f7af91cef8f4dc4174a6334d3ac7d4de3110020c3d8b7c5fff31fe21043",
+      "bytes": 52698,
+      "contentType": "image/png",
+      "path": "contact-sheet-local-backoffice.png"
+    },
+    {
+      "sha256": "dcb8c134f9e66f719b1f46513bf5aea87c8adda692c6c363f02061a0513cb92c",
+      "bytes": 133236,
+      "contentType": "image/png",
+      "path": "local-backoffice/desktop/S1.png"
+    },
+    {
+      "sha256": "2502b3ee4e95a8cee4fc632feaabc643d4676f0bbbe211eddf86e1155e277d0d",
+      "bytes": 125492,
+      "contentType": "image/png",
+      "path": "local-backoffice/desktop/S2.png"
+    },
+    {
+      "sha256": "b5689cb821aedebad7d32e92459bd1b7e08cb9f7a978fa56fb93bb2ecc32a78b",
+      "bytes": 133322,
+      "contentType": "image/png",
+      "path": "local-backoffice/desktop/S3.png"
+    },
+    {
+      "sha256": "40f4f5db94f6d2e90b84cf9e085bd9ceef420642b41f6f72dc955fd5e3560e67",
+      "bytes": 465021,
+      "contentType": "application/pdf",
+      "path": "report.pdf"
+    }
+  ]
+}

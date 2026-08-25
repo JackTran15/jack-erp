@@ -49,7 +49,7 @@ export function ReturnGoodsPage() {
   )[0]!;
 
   return (
-    <div className="flex h-screen flex-col bg-white">
+    <div className="flex min-h-0 flex-1 flex-col bg-white">
       <div className="flex flex-1 flex-col overflow-hidden px-4 py-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">

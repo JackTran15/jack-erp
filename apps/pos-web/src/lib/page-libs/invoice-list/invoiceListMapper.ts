@@ -4,7 +4,7 @@ import type {
 } from "@erp/pos/interfaces/invoice.interface";
 import { getInvoiceSignedTotal } from "@erp/pos/lib/common/invoiceAmount";
 
-/** Thông tin khách dùng để enrich mã/tên/SĐT trên bảng (từ `customerService.get`). */
+/** Thông tin khách dùng để hiển thị mã/tên/SĐT trên bảng (từ `inv.customer`). */
 export interface InvoiceListRowCustomer {
   code?: string | null;
   name?: string | null;
@@ -12,8 +12,8 @@ export interface InvoiceListRowCustomer {
 }
 
 /**
- * `InvoiceRow` (`GET /invoices`) → dòng hiển thị bảng "Danh sách hóa đơn".
- * `customer` enrich riêng vì endpoint danh sách chỉ trả `customerId`.
+ * `InvoiceRow` (`POST /v2/invoices/search`) → dòng hiển thị bảng "Danh sách hóa đơn".
+ * `customer` nay do BE trả inline (join, chiếu 4 cột), không còn enrich từng dòng.
  * `amount` có dấu: RETURN/EXCHANGE dùng `netAmount` (âm = hoàn tiền khách), còn lại `amountDue`
  * (xem `getInvoiceSignedTotal`).
  */
