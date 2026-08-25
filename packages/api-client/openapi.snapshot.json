@@ -17545,7 +17545,15 @@
         "parameters": [
           {
             "name": "code",
-            "required": true,
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -17564,7 +17572,7 @@
             }
           }
         },
-        "summary": "Full invoice detail (line items + payments) for the drill-down dialog, by invoice code.",
+        "summary": "Full invoice detail (line items + payments) for the drill-down dialog.\n\n`id` is what the report rows send and the only unambiguous key: invoice\ncodes are unique per branch, not per organisation. `code` stays supported\nfor the treasury drill-downs, which hold a document number and nothing else.",
         "tags": [
           "reports/invoices"
         ]

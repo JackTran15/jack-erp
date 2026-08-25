@@ -105,14 +105,21 @@ export class InvoiceReportController {
     return this.queryBus.execute(new SearchInvoiceReportQuery(dto, actor));
   }
 
-  /** Full invoice detail (line items + payments) for the drill-down dialog, by invoice code. */
+  /**
+   * Full invoice detail (line items + payments) for the drill-down dialog.
+   *
+   * `id` is what the report rows send and the only unambiguous key: invoice
+   * codes are unique per branch, not per organisation. `code` stays supported
+   * for the treasury drill-downs, which hold a document number and nothing else.
+   */
   @Get('detail')
   @RequirePermission(BRANCH_READ)
   getInvoiceDetail(
-    @Query('code') code: string,
     @Actor() actor: ActorContext,
+    @Query('code') code?: string,
+    @Query('id') id?: string,
   ) {
-    return this.queryBus.execute(new GetInvoiceDetailQuery(code, actor));
+    return this.queryBus.execute(new GetInvoiceDetailQuery(code!, actor, id));
   }
 
   @Get('templates')

@@ -18,6 +18,7 @@ import type {
 } from "../../../../constants/reports/report.interface";
 import { DEFAULT_REPORT_COLUMN_WIDTH } from "../../../../lib/table";
 import type {
+  InvoiceDetailTarget,
   ReportColumnFilter,
   ReportFilterValues,
 } from "../../../../store/page-stores/report/report.interface";
@@ -58,11 +59,13 @@ export async function fetchReportData(
 
 // Chi tiết một hóa đơn (line items + thanh toán) cho dialog drill-down, tra theo mã hóa đơn.
 export async function fetchInvoiceDetail(
-  code: string,
+  target: InvoiceDetailTarget,
 ): Promise<InvoiceDetailView> {
   return requireErpData(
+    // Gửi cả `id`: mã hóa đơn chỉ unique theo chi nhánh, tra bằng mã không thôi
+    // có thể ra hóa đơn trùng số của chi nhánh khác.
     await erpApi.GET<InvoiceDetailView>("/reports/invoices/detail", {
-      params: { query: { code } },
+      params: { query: { code: target.code, id: target.id ?? undefined } },
     }),
   );
 }

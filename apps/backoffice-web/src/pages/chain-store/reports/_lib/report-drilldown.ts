@@ -9,16 +9,18 @@
  * click is meaningful on exactly one of each. That is why clickability lives
  * here, keyed by (backendKey, columnKey), instead of on the flag (ADR-02).
  */
+import { REPORT_ROW_INVOICE_ID } from "@erp/shared-interfaces";
 import { REPORT_FILTERS_LINE } from "../../../../constants/reports/report-filters.constant";
 import { REPORT_TYPE_SALES } from "../../../../constants/reports/report-type.constant";
 import type {
+  InvoiceDetailTarget,
   ReportDrillDown,
   ReportFilterValues,
 } from "../../../../store/page-stores/report/report.interface";
 import type { ReportRow } from "../_api/invoice-report.api";
 
 export type DrillDownAction =
-  | { kind: "invoiceDetail"; code: string }
+  | { kind: "invoiceDetail"; target: InvoiceDetailTarget }
   | { kind: "report"; drillDown: ReportDrillDown };
 
 export interface DrillDownContext {
@@ -48,9 +50,13 @@ const formatVnDate = (iso: string): string => {
   return `${d}/${m}/${y}`;
 };
 
-const invoiceDetail: DrillDownResolver = ({ raw }) => {
+const invoiceDetail: DrillDownResolver = ({ raw, row }) => {
   const code = text(raw);
-  return code ? { kind: "invoiceDetail", code } : null;
+  if (!code) return null;
+  return {
+    kind: "invoiceDetail",
+    target: { code, id: text(row[REPORT_ROW_INVOICE_ID]) },
+  };
 };
 
 /**

@@ -10,24 +10,24 @@ import { InvoiceDetailMeta } from "./InvoiceDetailMeta/InvoiceDetailMeta";
 import { InvoiceDetailTotals } from "./InvoiceDetailTotals/InvoiceDetailTotals";
 
 export function InvoiceDetailDialog() {
-  const code = useReportStore((s) => s.detailInvoiceCode);
-  const setDetailInvoiceCode = useReportStore(
-    (s) => s.actions.setDetailInvoiceCode,
-  );
+  const target = useReportStore((s) => s.detailInvoice);
+  const setDetailInvoice = useReportStore((s) => s.actions.setDetailInvoice);
 
   const query = useQuery({
-    queryKey: ["invoice-detail", code],
-    queryFn: () => fetchInvoiceDetail(code as string),
-    enabled: !!code,
+    // `id` nằm trong key: hai chi nhánh có thể cùng mã hóa đơn, cache theo mã
+    // thôi sẽ trả về hóa đơn của chi nhánh mở trước đó.
+    queryKey: ["invoice-detail", target?.id ?? null, target?.code ?? null],
+    queryFn: () => fetchInvoiceDetail(target!),
+    enabled: !!target,
   });
 
   const detail = query.data;
 
   return (
     <AppModal
-      open={!!code}
+      open={!!target}
       onOpenChange={(open) => {
-        if (!open) setDetailInvoiceCode(null);
+        if (!open) setDetailInvoice(null);
       }}
       title="Chi tiết hóa đơn"
       defaultWidth={1040}
@@ -64,7 +64,7 @@ export function InvoiceDetailDialog() {
             <CloudUpload className="mr-1.5 h-4 w-4" />
             Xuất khẩu
           </Button>
-          <Button size="sm" onClick={() => setDetailInvoiceCode(null)}>
+          <Button size="sm" onClick={() => setDetailInvoice(null)}>
             <X className="mr-1.5 h-4 w-4" />
             Đóng
           </Button>

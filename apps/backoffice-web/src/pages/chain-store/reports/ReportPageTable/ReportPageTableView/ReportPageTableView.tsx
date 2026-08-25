@@ -78,9 +78,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
   // Column filter gom chung ở report store (đồng bộ với filter header/popover).
   const columnFilters = useReportStore((s) => s.columnFilters);
   const setColumnFilter = useReportStore((s) => s.actions.setColumnFilter);
-  const setDetailInvoiceCode = useReportStore(
-    (s) => s.actions.setDetailInvoiceCode,
-  );
+  const setDetailInvoice = useReportStore((s) => s.actions.setDetailInvoice);
   const setDrillDown = useReportStore((s) => s.actions.setDrillDown);
   const reportType = useReportStore((s) => s.reportType);
   // Filter đã áp dụng, không phải filter đang gõ dở: dialog phải mở ra trên đúng
@@ -90,10 +88,10 @@ export function ReportPageTableView({ rows, totals }: Props) {
 
   const runDrillDown = useCallback(
     (action: DrillDownAction) => {
-      if (action.kind === "invoiceDetail") setDetailInvoiceCode(action.code);
+      if (action.kind === "invoiceDetail") setDetailInvoice(action.target);
       else setDrillDown(action.drillDown);
     },
-    [setDetailInvoiceCode, setDrillDown],
+    [setDetailInvoice, setDrillDown],
   );
 
   // Tra cứu cấu hình cột theo id để render metadata (label, group, mã, align, link).

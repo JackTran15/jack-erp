@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { ReportColumnDataType } from '@erp/shared-interfaces';
+import { REPORT_ROW_INVOICE_ID, ReportColumnDataType } from '@erp/shared-interfaces';
 import { InvoiceType } from '../../../pos/entities/invoice.entity';
 import { InvoiceOrderListingReport } from './invoice-order-listing.report';
 import {
@@ -226,6 +226,11 @@ describe('InvoiceOrderListingReport.buildData', () => {
       storeCode: 'Chi nhánh 1',
       'payment.bankAccount': null, // placeholder
     });
+
+    // The drill-down key: a code is unique per branch only, so the dialog looks
+    // the invoice up by id.
+    expect(row0[REPORT_ROW_INVOICE_ID]).toBe('i1');
+    expect(result.rows[1][REPORT_ROW_INVOICE_ID]).toBe('i2');
 
     // totals: money columns summed, strings/dates null
     const totals = result.totals!;

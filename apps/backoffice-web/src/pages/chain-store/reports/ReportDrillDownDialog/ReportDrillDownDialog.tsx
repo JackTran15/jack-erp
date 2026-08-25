@@ -36,7 +36,7 @@ interface BodyProps {
  *   — phạm vi của nó do dòng vừa được click quyết định.
  *
  * `InvoiceDetailDialog` được mount lại ở ĐÂY, bên trong provider lồng: cái mount
- * ở `ReportPage` đọc `detailInvoiceCode` của store cha, nên nếu thiếu cái này thì
+ * ở `ReportPage` đọc `detailInvoice` của store cha, nên nếu thiếu cái này thì
  * click mã hoá đơn trong dialog sẽ không làm gì cả.
  */
 function ReportDrillDownBody({ drillDown, onClose }: BodyProps) {

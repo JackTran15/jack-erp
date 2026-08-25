@@ -125,6 +125,16 @@ export type ReportCellValue = string | number | null;
  */
 export type ReportRow = Record<string, ReportCellValue>;
 
+/**
+ * Hidden row key carrying the invoice's id on reports whose rows are invoices.
+ *
+ * Invoice codes restart per branch (`uq_invoice_org_branch_code`), so a
+ * drill-down that passes only the code can resolve to another branch's invoice
+ * with the same number. Rows carry the id so the detail lookup is unambiguous.
+ * Not a catalogue column: the table renders `columns`, so it never shows up.
+ */
+export const REPORT_ROW_INVOICE_ID = '_invoiceId';
+
 /** Response of the search API — only data, no headers (those come from the columns API). */
 export interface InvoiceReportResult {
   rows: ReportRow[];
