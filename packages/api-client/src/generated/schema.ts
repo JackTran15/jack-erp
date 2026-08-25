@@ -6770,6 +6770,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/transfer-orders/{id}/export-goods-issue/print-payload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferOrderController_getExportGoodsIssuePrintPayload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/transfer-orders/{id}/export-goods-issue/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferOrderController_exportGoodsIssueExcel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/transfer-orders/{id}/import-goods-receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferOrderController_getImportGoodsReceipt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/transfer-orders/{id}/import-goods-receipt/print-payload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferOrderController_getImportGoodsReceiptPrintPayload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/transfer-orders/{id}/import-goods-receipt/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferOrderController_importGoodsReceiptExcel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/transfer-orders/{id}/import": {
         parameters: {
             query?: never;
@@ -13346,90 +13426,6 @@ export interface components {
             /** Format: uuid */
             targetBranchId: string;
         };
-        UpdateTransferOrderDto: Record<string, never>;
-        ExportTransferOrderDto: {
-            lines?: components["schemas"]["ExportTransferOrderLineDto"][];
-            reason?: string;
-            notes?: string;
-            /** Format: uuid */
-            providerId?: string;
-            /** @enum {string} */
-            counterpartyKind?: "supplier" | "customer" | "employee";
-            /** Format: uuid */
-            counterpartyId?: string;
-            deliverer?: string;
-            references?: string[];
-            /** Format: date-time */
-            occurredAt?: string;
-        };
-        ImportTransferOrderDto: Record<string, never>;
-        GoodsReceiptLineDto: {
-            /** Format: uuid */
-            itemId: string;
-            /** Format: uuid */
-            locationId: string;
-            /** Format: uuid */
-            binId?: string;
-            uomCode: string;
-            quantity: number;
-            unitPrice: number;
-            note?: string;
-        };
-        CashSettlementDto: {
-            method: Record<string, never>;
-            amount: number;
-            /** Format: uuid */
-            cashAccountId?: string;
-            description?: string;
-        };
-        CreateGoodsReceiptDto: {
-            /** @enum {string} */
-            purpose: "PURCHASE" | "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
-            /** Format: uuid */
-            providerId?: string;
-            /**
-             * @description Đối tượng kind (supplier | customer | employee). When set, the service
-             *      validates the counterparty and routes supplier→provider_id, customer /
-             *      employee→counterparty cols (provider_id null).
-             * @enum {string}
-             */
-            counterpartyKind?: "supplier" | "customer" | "employee";
-            /** Format: uuid */
-            counterpartyId?: string;
-            deliveredBy?: string;
-            /**
-             * Format: uuid
-             * @description Nhân viên mua hàng — user (users.id) responsible for the purchase.
-             */
-            purchasingEmployeeId?: string;
-            reason?: string;
-            description?: string;
-            /** Format: uuid */
-            referenceId?: string;
-            /** @enum {string} */
-            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE";
-            /** @description Source branch for transfer-in. Stored separately from referenceId. */
-            sourceBranchId?: string;
-            receivedAt: string;
-            /** Format: uuid */
-            locationId: string;
-            attachmentIds?: string[];
-            /** @description FE-supplied reference codes shown as Tham chiếu. */
-            references?: string[];
-            lines: components["schemas"]["GoodsReceiptLineDto"][];
-            /**
-             * @description Settlement on post: CASH posts a cash movement + auto Phiếu chi; CREDIT posts a payable JE.
-             * @enum {string}
-             */
-            paymentMethod?: "CASH" | "CREDIT";
-            /**
-             * Format: uuid
-             * @description Cash account to pay from; defaults to the branch cash fund when omitted.
-             */
-            cashAccountId?: string;
-            cashPayment?: components["schemas"]["CashSettlementDto"];
-            cashReceipt?: components["schemas"]["CashSettlementDto"];
-        };
         GoodsReceiptEntity: {
             documentNumber?: string;
             /** @enum {string} */
@@ -13519,6 +13515,90 @@ export interface components {
             goodsReceipt: components["schemas"]["GoodsReceiptEntity"];
             item?: components["schemas"]["ItemEntity"];
             location?: components["schemas"]["LocationEntity"];
+        };
+        UpdateTransferOrderDto: Record<string, never>;
+        ExportTransferOrderDto: {
+            lines?: components["schemas"]["ExportTransferOrderLineDto"][];
+            reason?: string;
+            notes?: string;
+            /** Format: uuid */
+            providerId?: string;
+            /** @enum {string} */
+            counterpartyKind?: "supplier" | "customer" | "employee";
+            /** Format: uuid */
+            counterpartyId?: string;
+            deliverer?: string;
+            references?: string[];
+            /** Format: date-time */
+            occurredAt?: string;
+        };
+        ImportTransferOrderDto: Record<string, never>;
+        GoodsReceiptLineDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            binId?: string;
+            uomCode: string;
+            quantity: number;
+            unitPrice: number;
+            note?: string;
+        };
+        CashSettlementDto: {
+            method: Record<string, never>;
+            amount: number;
+            /** Format: uuid */
+            cashAccountId?: string;
+            description?: string;
+        };
+        CreateGoodsReceiptDto: {
+            /** @enum {string} */
+            purpose: "PURCHASE" | "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
+            /** Format: uuid */
+            providerId?: string;
+            /**
+             * @description Đối tượng kind (supplier | customer | employee). When set, the service
+             *      validates the counterparty and routes supplier→provider_id, customer /
+             *      employee→counterparty cols (provider_id null).
+             * @enum {string}
+             */
+            counterpartyKind?: "supplier" | "customer" | "employee";
+            /** Format: uuid */
+            counterpartyId?: string;
+            deliveredBy?: string;
+            /**
+             * Format: uuid
+             * @description Nhân viên mua hàng — user (users.id) responsible for the purchase.
+             */
+            purchasingEmployeeId?: string;
+            reason?: string;
+            description?: string;
+            /** Format: uuid */
+            referenceId?: string;
+            /** @enum {string} */
+            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE";
+            /** @description Source branch for transfer-in. Stored separately from referenceId. */
+            sourceBranchId?: string;
+            receivedAt: string;
+            /** Format: uuid */
+            locationId: string;
+            attachmentIds?: string[];
+            /** @description FE-supplied reference codes shown as Tham chiếu. */
+            references?: string[];
+            lines: components["schemas"]["GoodsReceiptLineDto"][];
+            /**
+             * @description Settlement on post: CASH posts a cash movement + auto Phiếu chi; CREDIT posts a payable JE.
+             * @enum {string}
+             */
+            paymentMethod?: "CASH" | "CREDIT";
+            /**
+             * Format: uuid
+             * @description Cash account to pay from; defaults to the branch cash fund when omitted.
+             */
+            cashAccountId?: string;
+            cashPayment?: components["schemas"]["CashSettlementDto"];
+            cashReceipt?: components["schemas"]["CashSettlementDto"];
         };
         UpdateGoodsReceiptDto: {
             /** @enum {string} */
@@ -25893,6 +25973,107 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["GoodsIssueEntity"];
                 };
+            };
+        };
+    };
+    TransferOrderController_getExportGoodsIssuePrintPayload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TransferOrderController_exportGoodsIssueExcel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TransferOrderController_getImportGoodsReceipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsReceiptEntity"];
+                };
+            };
+        };
+    };
+    TransferOrderController_getImportGoodsReceiptPrintPayload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TransferOrderController_importGoodsReceiptExcel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

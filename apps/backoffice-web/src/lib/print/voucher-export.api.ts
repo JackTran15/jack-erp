@@ -31,18 +31,44 @@ function filenameFrom(disposition: unknown, fallback: string): string {
   return match?.[1]?.trim() || fallback;
 }
 
+/** GET one .xlsx route and save it, keeping the server-chosen filename. */
+async function downloadXlsx(path: string, fallbackFilename: string): Promise<void> {
+  const response = await apiClient.get<Blob>(path, { responseType: "blob" });
+  triggerBlobDownload(
+    response.data,
+    filenameFrom(response.headers?.["content-disposition"], fallbackFilename),
+  );
+}
+
 /** Download one voucher as .xlsx. One function for all kinds (dispatched by `kind`). */
 export async function downloadVoucherExcel(kind: VoucherKind, id: string): Promise<void> {
   const buildPath = EXPORT_PATH[kind];
   if (!buildPath) {
     throw new Error(`Chứng từ chưa hỗ trợ xuất khẩu: ${kind}`);
   }
-  const response = await apiClient.get<Blob>(buildPath(id), { responseType: "blob" });
-  triggerBlobDownload(
-    response.data,
-    filenameFrom(
-      response.headers?.["content-disposition"],
-      FALLBACK_FILENAME[kind] ?? "chung-tu.xlsx",
-    ),
+  await downloadXlsx(buildPath(id), FALLBACK_FILENAME[kind] ?? "chung-tu.xlsx");
+}
+
+/**
+ * Download a transfer's export XK as .xlsx through the transfer order, so the
+ * destination branch can export the source branch's phiếu xuất kho — the
+ * branch-scoped goods-issue route 404s there.
+ */
+export async function downloadTransferExportIssueExcel(
+  transferOrderId: string,
+): Promise<void> {
+  await downloadXlsx(
+    `/inventory/transfer-orders/${transferOrderId}/export-goods-issue/export`,
+    FALLBACK_FILENAME[VoucherKind.GOODS_ISSUE] ?? "chung-tu.xlsx",
+  );
+}
+
+/** Mirror of {@link downloadTransferExportIssueExcel} for the import NK. */
+export async function downloadTransferImportReceiptExcel(
+  transferOrderId: string,
+): Promise<void> {
+  await downloadXlsx(
+    `/inventory/transfer-orders/${transferOrderId}/import-goods-receipt/export`,
+    FALLBACK_FILENAME[VoucherKind.GOODS_RECEIPT] ?? "chung-tu.xlsx",
   );
 }

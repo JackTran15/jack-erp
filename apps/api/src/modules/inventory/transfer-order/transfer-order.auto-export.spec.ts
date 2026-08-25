@@ -7,6 +7,7 @@ import { TransferOrderEntity } from './transfer-order.entity';
 import { LocationEntity } from '../location/location.entity';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { GoodsIssueEntity } from '../goods-issue/goods-issue.entity';
+import { GoodsReceiptEntity } from '../goods-receipt/goods-receipt.entity';
 import { BranchEntity } from '../../branch/branch.entity';
 import { StorageEntity } from '../location/storage.entity';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
@@ -97,6 +98,10 @@ describe('TransferOrderService — system-generated export leg (AC-11, ADR-04)',
         },
         {
           provide: getRepositoryToken(GoodsIssueEntity),
+          useValue: { find: jest.fn().mockResolvedValue([]), findOne: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(GoodsReceiptEntity),
           useValue: { find: jest.fn().mockResolvedValue([]), findOne: jest.fn() },
         },
         {

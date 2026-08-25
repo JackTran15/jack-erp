@@ -1679,24 +1679,20 @@ export function StockTakeFormDialog({
                   layout="horizontal"
                   labelWidth="7rem"
                 >
-                  <div className="flex min-h-10 flex-wrap items-center gap-y-1 text-sm">
+                  <div className="flex min-h-10 flex-wrap items-center gap-1.5">
                     {referenceLinks.length ? (
-                      referenceLinks.map((reference, index) => (
-                        <span key={reference.key}>
-                          <button
-                            type="button"
-                            className="font-medium text-primary-blue hover:text-primary-blue-hover hover:underline"
-                            onClick={reference.onClick}
-                          >
-                            {reference.label}
-                          </button>
-                          {index < referenceLinks.length - 1 ? (
-                            <span className="mr-1 text-foreground">,</span>
-                          ) : null}
-                        </span>
+                      referenceLinks.map((reference) => (
+                        <button
+                          key={reference.key}
+                          type="button"
+                          className="text-sm font-medium text-primary-blue hover:text-primary-blue-hover hover:underline"
+                          onClick={reference.onClick}
+                        >
+                          {reference.label}
+                        </button>
                       ))
                     ) : (
-                      <span className="text-muted-foreground">—</span>
+                      <span className="text-sm text-muted-foreground">—</span>
                     )}
                   </div>
                 </FormField>

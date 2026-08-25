@@ -50,6 +50,7 @@ import { LocationEntity } from "../location/location.entity";
 import { attachCounterparties } from "../location/services/counterparty-name.util";
 import { StockBalanceEntity } from "../ledger/stock-balance.entity";
 import { GoodsIssueEntity } from "../goods-issue/goods-issue.entity";
+import { GoodsReceiptEntity } from "../goods-receipt/goods-receipt.entity";
 import { StorageEntity } from "../location/storage.entity";
 import { TransferOrderEntity } from "./transfer-order.entity";
 import { TransferOrderLineEntity } from "./transfer-order-line.entity";
@@ -156,6 +157,8 @@ export class TransferOrderService {
     private readonly balanceRepo: Repository<StockBalanceEntity>,
     @InjectRepository(GoodsIssueEntity)
     private readonly giRepo: Repository<GoodsIssueEntity>,
+    @InjectRepository(GoodsReceiptEntity)
+    private readonly grRepo: Repository<GoodsReceiptEntity>,
     @InjectRepository(BranchEntity)
     private readonly branchRepo: Repository<BranchEntity>,
     @InjectRepository(StorageEntity)
@@ -354,6 +357,66 @@ export class TransferOrderService {
       actor.organizationId,
     );
     return gi;
+  }
+
+  /**
+   * Print/export payload for the transfer's export XK, resolved org-scoped for the
+   * same reason as {@link getExportGoodsIssue}: the goods-issue print route is
+   * branch-scoped and would 404 for the importing (destination) branch.
+   */
+  async getExportGoodsIssuePrintPayload(
+    id: string,
+    actor: ActorContext,
+  ): Promise<VoucherPrintPayload> {
+    const gi = await this.getExportGoodsIssue(id, actor);
+    return this.goodsIssueService.buildPrintPayload(gi, actor.organizationId);
+  }
+
+  /**
+   * Import goods-receipt (NK) of a transfer — the mirror of
+   * {@link getExportGoodsIssue}. Resolved org-scoped so the exporting (source)
+   * branch can view the receipt the destination branch posted; the branch-scoped
+   * goods-receipt GET would 404 here.
+   */
+  async getImportGoodsReceipt(
+    id: string,
+    actor: ActorContext,
+  ): Promise<GoodsReceiptEntity> {
+    const to = await this.findOrFail(id, actor.organizationId);
+    this.assertParticipantBranch(to, actor);
+    if (!to.importGoodsReceiptId) {
+      throw new NotFoundException(
+        `Lệnh điều chuyển ${id} chưa có phiếu nhập kho`,
+      );
+    }
+    const gr = await this.grRepo.findOne({
+      where: {
+        id: to.importGoodsReceiptId,
+        organizationId: actor.organizationId,
+      },
+    });
+    if (!gr) {
+      throw new NotFoundException(
+        `Không tìm thấy phiếu nhập kho của lệnh điều chuyển ${id}`,
+      );
+    }
+    // Same reason as the export leg: the raw row only carries
+    // counterparty_kind + counterparty_id, not the Đối tượng name.
+    await attachCounterparties(
+      this.dataSource.manager,
+      [gr],
+      actor.organizationId,
+    );
+    return gr;
+  }
+
+  /** Print/export payload for the transfer's import NK, org-scoped for the source branch. */
+  async getImportGoodsReceiptPrintPayload(
+    id: string,
+    actor: ActorContext,
+  ): Promise<VoucherPrintPayload> {
+    const gr = await this.getImportGoodsReceipt(id, actor);
+    return this.goodsReceiptService.buildPrintPayload(gr, actor.organizationId);
   }
 
   /**
