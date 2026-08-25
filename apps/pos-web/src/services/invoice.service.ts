@@ -56,8 +56,18 @@ export const invoiceService = {
   ): Promise<InvoiceSearchV2Response> =>
     http.post<InvoiceSearchV2Response>("/v2/invoices/drafts/search", body),
 
-  create: (body: CreateInvoiceBody): Promise<InvoiceRow> =>
-    http.post<InvoiceRow>("/invoices", body),
+  /**
+   * `POST /invoices` — tạo draft. `idempotencyKey` bắt buộc và phải bám theo
+   * LẦN LẬP CHỨNG TỪ, không phải theo từng request: bấm "Thanh toán"/"Lưu tạm"
+   * lại với đúng giỏ hàng cũ phải ra lại hóa đơn cũ chứ không tạo thêm draft.
+   * Khoá do tầng hook dựng (`invoiceCreateIdempotencyKey`) vì nó cần nonce nằm
+   * trong session store — service không đọc store.
+   */
+  create: (
+    body: CreateInvoiceBody,
+    idempotencyKey: string,
+  ): Promise<InvoiceRow> =>
+    http.post<InvoiceRow>("/invoices", body, { idempotencyKey }),
 
   getById: (id: string): Promise<InvoiceRow> =>
     http.get<InvoiceRow>(`/invoices/${encodeURIComponent(id)}`),
@@ -91,6 +101,12 @@ export const invoiceService = {
    *
    * `body.selectedProgramIds` chỉ đi vào request khi cờ v2 bật — nhánh v1
    * build payload riêng, không spread `body`, nên field này không lọt qua.
+   *
+   * Khoá idempotency = `invoiceId`: một draft chỉ được tất toán một lần, nên
+   * đó mới là danh tính của thao tác này. Đúng bằng giá trị BE tự suy ra khi
+   * thiếu header (`checkout-saga.controller.ts`), và là thứ cho phép một lần
+   * gửi lại (mất response, refresh token giữa chừng) được replay về đúng kết
+   * quả cũ thay vì đâm vào `INVOICE_NOT_CHECKOUTABLE`.
    */
   checkout: async (id: string, body: CheckoutInvoiceBody): Promise<InvoiceRow> => {
     if (import.meta.env.VITE_CHECKOUT_V2 === "true") {
@@ -107,18 +123,24 @@ export const invoiceService = {
           ? { excludedProgramIds: body.excludedProgramIds }
           : {}),
       };
-      await http.post<CheckoutV2Response>("/v2/pos/checkout", v2Body);
+      await http.post<CheckoutV2Response>("/v2/pos/checkout", v2Body, {
+        idempotencyKey: id,
+      });
       return http.get<InvoiceRow>(`/invoices/${encodeURIComponent(id)}`);
     }
     // Nhánh v1 không khai báo `selectedProgramIds` — build payload tách riêng
     // thay vì spread nguyên `body`, để field mới (nếu caller lỡ truyền) không
     // lọt qua và bị `forbidNonWhitelisted` của ValidationPipe từ chối 400.
-    return http.post<InvoiceRow>(`/invoices/${encodeURIComponent(id)}/checkout`, {
-      payments: body.payments,
-      keptChangeAmount: body.keptChangeAmount,
-      dueDate: body.dueDate,
-      creditDays: body.creditDays,
-    });
+    return http.post<InvoiceRow>(
+      `/invoices/${encodeURIComponent(id)}/checkout`,
+      {
+        payments: body.payments,
+        keptChangeAmount: body.keptChangeAmount,
+        dueDate: body.dueDate,
+        creditDays: body.creditDays,
+      },
+      { idempotencyKey: id },
+    );
   },
 
   delete: (id: string): Promise<void> =>
@@ -151,18 +173,25 @@ export const invoiceService = {
     ),
 
   /** `POST /invoices/returns` — tạo draft RETURN (mode quick|regular). */
-  createReturn: (body: CreateReturnInvoiceBody): Promise<InvoiceRow> =>
-    http.post<InvoiceRow>("/invoices/returns", body),
+  createReturn: (
+    body: CreateReturnInvoiceBody,
+    idempotencyKey: string,
+  ): Promise<InvoiceRow> =>
+    http.post<InvoiceRow>("/invoices/returns", body, { idempotencyKey }),
 
   /** `POST /invoices/exchanges` — tạo draft EXCHANGE. */
-  createExchange: (body: CreateExchangeInvoiceBody): Promise<InvoiceRow> =>
-    http.post<InvoiceRow>("/invoices/exchanges", body),
+  createExchange: (
+    body: CreateExchangeInvoiceBody,
+    idempotencyKey: string,
+  ): Promise<InvoiceRow> =>
+    http.post<InvoiceRow>("/invoices/exchanges", body, { idempotencyKey }),
 
   /** `POST /invoices/:id/checkout-return` — tất toán đơn trả/đổi. */
   checkoutReturn: (id: string, body: CheckoutReturnBody): Promise<InvoiceRow> =>
     http.post<InvoiceRow>(
       `/invoices/${encodeURIComponent(id)}/checkout-return`,
       body,
+      { idempotencyKey: id },
     ),
 
   /**

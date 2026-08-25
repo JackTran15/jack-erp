@@ -71,6 +71,15 @@ export interface InvoiceSession {
    */
   originalInvoiceId?: string;
   /**
+   * Nonce idempotency của chứng từ đang lập trên tab này. Mint một lần rồi giữ
+   * nguyên qua mọi lần bấm lại "Thanh toán"/"Lưu tạm", chỉ xoá khi tab reset
+   * sau khi chứng từ đã lập xong — nhờ đó bấm lại với đúng giỏ hàng cũ được BE
+   * replay về đúng hóa đơn cũ thay vì tạo thêm một hóa đơn nữa.
+   * Ghép với hash payload ở `invoiceCreateIdempotencyKey` để giỏ hàng đã sửa
+   * vẫn ra khoá mới (không dính 409 IDEMPOTENCY_CONFLICT).
+   */
+  checkoutAttemptKey?: string;
+  /**
    * Toàn bộ state soạn thảo per-tab ngoài giỏ hàng (khách, thanh toán, KM, nhãn
    * đã chọn, NV bán/bảng giá, filter catalog). Mỗi tab giữ riêng → chuyển tab
    * không mất; persist nên reload cũng giữ.
@@ -195,6 +204,9 @@ interface PosCheckoutSessionState {
 
   /** After successful payment or draft save — clear lines, back to sale. */
   resetActiveSessionAfterCheckout: () => void;
+
+  /** Nonce idempotency của tab đang active — mint lần đầu, sau đó trả lại đúng nonce đó. */
+  ensureCheckoutAttemptKey: () => string;
 
   /** Open a draft on a new invoice tab; leaves the previously active tab unchanged. */
   openDraftInNewSession: (draft: DraftInvoice) => void;
@@ -499,6 +511,9 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
                   label: s.sourceInvoiceId ? `Hóa đơn ${idx + 1}` : s.label,
                   sourceInvoiceId: undefined,
                   originalInvoiceId: undefined,
+                  // Chứng từ đã lập xong → lần lập kế tiếp phải là khoá mới,
+                  // nếu không hai đơn giỏ giống hệt nhau sẽ bị replay về đơn cũ.
+                  checkoutAttemptKey: undefined,
                   checkoutVariant: CheckoutVariantEnum.SALE,
                   purchaseCart: [],
                   returnCart: [],
@@ -510,6 +525,20 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
               : s,
           ),
         });
+      },
+
+      ensureCheckoutAttemptKey: () => {
+        const id = get().activeSessionId;
+        const existing = get().sessions.find((s) => s.id === id)
+          ?.checkoutAttemptKey;
+        if (existing) return existing;
+        const key = crypto.randomUUID();
+        set({
+          sessions: get().sessions.map((s) =>
+            s.id === id ? { ...s, checkoutAttemptKey: key } : s,
+          ),
+        });
+        return key;
       },
 
       openDraftInNewSession: (draft) => {
@@ -637,6 +666,9 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
                   selectedLineReturnId: raw.selectedLineReturnId ?? null,
                   sourceInvoiceId: raw.sourceInvoiceId,
                   originalInvoiceId: raw.originalInvoiceId,
+                  // Giỏ hàng sống qua reload thì nonce cũng phải sống theo, nếu
+                  // không F5 giữa lúc thanh toán lại đẻ thêm một hóa đơn.
+                  checkoutAttemptKey: raw.checkoutAttemptKey,
                   // v1 → v2: session cũ chưa có `draft` → backfill mặc định.
                   draft: ensureDraftShape(raw.draft),
                 };

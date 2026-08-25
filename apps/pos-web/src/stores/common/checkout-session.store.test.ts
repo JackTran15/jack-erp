@@ -92,3 +92,48 @@ describe("syncPurchaseCartOnHand", () => {
     expect(currentLine().maxQty).not.toBe(12);
   });
 });
+
+describe("ensureCheckoutAttemptKey", () => {
+  beforeEach(() => {
+    usePosCheckoutSessionStore.getState().resetSession();
+  });
+
+  it("returns the same nonce for every retry of one document", () => {
+    // Bấm "Thanh toán" lần 2, lần 3 phải mang đúng nonce của lần 1 — đó là thứ
+    // duy nhất cho BE nhận ra ba request này là một lần lập chứng từ.
+    const first = usePosCheckoutSessionStore
+      .getState()
+      .ensureCheckoutAttemptKey();
+    const second = usePosCheckoutSessionStore
+      .getState()
+      .ensureCheckoutAttemptKey();
+
+    expect(second).toBe(first);
+  });
+
+  it("rotates the nonce once the document is done", () => {
+    // Hai đơn giỏ hàng giống hệt nhau bán liên tiếp trên cùng tab: giữ nguyên
+    // nonce là đơn thứ hai bị replay về hóa đơn của đơn thứ nhất.
+    const first = usePosCheckoutSessionStore
+      .getState()
+      .ensureCheckoutAttemptKey();
+
+    usePosCheckoutSessionStore.getState().resetActiveSessionAfterCheckout();
+
+    expect(
+      usePosCheckoutSessionStore.getState().ensureCheckoutAttemptKey(),
+    ).not.toBe(first);
+  });
+
+  it("keeps each invoice tab on its own nonce", () => {
+    const tabOne = usePosCheckoutSessionStore
+      .getState()
+      .ensureCheckoutAttemptKey();
+
+    usePosCheckoutSessionStore.getState().addSession();
+
+    expect(
+      usePosCheckoutSessionStore.getState().ensureCheckoutAttemptKey(),
+    ).not.toBe(tabOne);
+  });
+});
