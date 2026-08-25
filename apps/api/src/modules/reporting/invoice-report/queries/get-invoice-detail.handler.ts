@@ -46,19 +46,46 @@ export class GetInvoiceDetailHandler
     private readonly users: Repository<UserEntity>,
   ) {}
 
+  /**
+   * The invoice this drill-down is about.
+   *
+   * Invoice codes are unique per (organisation, branch) only — every branch
+   * numbers its own invoices — so looking one up org-wide can return a
+   * different branch's invoice with the same number. Callers that have the id
+   * (the report rows do) send it; a code-only caller gets its own branch's
+   * invoice first, falling back org-wide so a cross-branch document reference
+   * still opens.
+   */
+  private async resolve(
+    id: string | undefined,
+    code: string | undefined,
+    actor: GetInvoiceDetailQuery['actor'],
+  ): Promise<InvoiceEntity | null> {
+    const organizationId = actor.organizationId;
+    if (id) {
+      return this.invoices.findOne({ where: { id, organizationId } });
+    }
+    if (actor.branchId) {
+      const own = await this.invoices.findOne({
+        where: { code, organizationId, branchId: actor.branchId },
+      });
+      if (own) return own;
+    }
+    return this.invoices.findOne({ where: { code, organizationId } });
+  }
+
   async execute({
+    id,
     code,
     actor,
   }: GetInvoiceDetailQuery): Promise<InvoiceDetailView> {
-    if (!code) {
-      throw new BadRequestException('code is required');
+    if (!id && !code) {
+      throw new BadRequestException('id or code is required');
     }
 
-    const invoice = await this.invoices.findOne({
-      where: { code, organizationId: actor.organizationId },
-    });
+    const invoice = await this.resolve(id, code, actor);
     if (!invoice) {
-      throw new NotFoundException(`Invoice not found: ${code}`);
+      throw new NotFoundException(`Invoice not found: ${id ?? code}`);
     }
 
     const [lines, payments, customer, cashier] = await Promise.all([

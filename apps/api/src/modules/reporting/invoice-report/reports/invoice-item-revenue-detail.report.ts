@@ -5,6 +5,7 @@ import {
   INVOICE_REPORT_BAND_LABELS_VI,
   INVOICE_REPORT_COLUMN_LABELS_VI,
   InvoiceReportResult,
+  REPORT_ROW_INVOICE_ID,
   ReportColumnGroup,
   ReportColumnHeader,
 } from '@erp/shared-interfaces';
@@ -342,7 +343,12 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
     const offset = (page - 1) * limit;
     const pageRows = filtered.slice(offset, offset + limit);
 
-    const rows2 = pageRows.map((r) => buildItemRow(dto.columns, r));
+    // See invoice-order-listing: the invoice id rides along so clicking "Mã hóa
+    // đơn" opens the right branch's invoice, not another branch's same number.
+    const rows2 = pageRows.map((r) => ({
+      ...buildItemRow(dto.columns, r),
+      [REPORT_ROW_INVOICE_ID]: r.invoiceId,
+    }));
     const totals = filtered.length ? buildItemTotals(dto.columns, filtered) : null;
 
     return { rows: rows2, totals, total };

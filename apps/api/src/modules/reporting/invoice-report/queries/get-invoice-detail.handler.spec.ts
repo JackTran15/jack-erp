@@ -60,6 +60,59 @@ describe('GetInvoiceDetailHandler', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // Invoice codes restart per branch (uq_invoice_org_branch_code), so the
+  // reported bug: the dialog opened another branch's invoice with the same
+  // number. The id, when the row carries one, is what settles it.
+  describe('which invoice it looks up', () => {
+    const repo = (rows: any[]) => ({
+      findOne: jest.fn(async ({ where }: any) => {
+        const match = rows.find((r) =>
+          Object.entries(where).every(([k, v]) => v === undefined || r[k] === v),
+        );
+        return match ?? null;
+      }),
+    });
+
+    const own = invoice({ id: 'i-b1', code: 'DUP', branchId: 'b1', subtotal: 949000, amountDue: 949000 });
+    const other = invoice({ id: 'i-b2', code: 'DUP', branchId: 'b2', subtotal: 850000, amountDue: 850000 });
+
+    const handlerOver = (invoices: any) =>
+      new GetInvoiceDetailHandler(
+        invoices as any,
+        { find: jest.fn(async () => []) } as any,
+        { find: jest.fn(async () => []) } as any,
+        { findOne: jest.fn(async () => null) } as any,
+        { findOne: jest.fn(async () => null) } as any,
+        { findOne: jest.fn(async () => null) } as any,
+      );
+
+    it('resolves by id, ignoring the code', async () => {
+      // Rows ordered so a code-only lookup would hit the other branch first.
+      const detail = await handlerOver(repo([other, own])).execute({
+        id: 'i-b1',
+        code: 'DUP',
+        actor,
+      } as any);
+      expect(detail.totalAmount).toBe(949000);
+    });
+
+    it('prefers the actor branch when only a code is given', async () => {
+      const detail = await handlerOver(repo([other, own])).execute({
+        code: 'DUP',
+        actor,
+      } as any);
+      expect(detail.totalAmount).toBe(949000);
+    });
+
+    it('falls back org-wide so a cross-branch reference still opens', async () => {
+      const detail = await handlerOver(repo([other])).execute({
+        code: 'DUP',
+        actor,
+      } as any);
+      expect(detail.totalAmount).toBe(850000);
+    });
+  });
+
   it('leaves a plain sale positive', async () => {
     const handler = makeHandler({ invoice: invoice(), lines: [line()] });
     const detail = await handler.execute({ code: 'INV-001', actor } as any);

@@ -5,9 +5,11 @@ import {
   INVOICE_REPORT_BAND_LABELS_VI,
   INVOICE_REPORT_COLUMN_LABELS_VI,
   InvoiceReportResult,
+  REPORT_ROW_INVOICE_ID,
   ReportColumnDataType,
   ReportColumnGroup,
   ReportColumnHeader,
+  ReportRow,
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { FilterBuilder } from '../../../../common/filters/filter.builder';
@@ -80,6 +82,18 @@ const toInstantRange = (
         : period.to,
   };
 };
+
+/**
+ * One report row plus the invoice's id.
+ *
+ * The id rides along so the drill-down dialog can look the invoice up
+ * unambiguously — invoice codes restart per branch, and this report can list
+ * several branches at once. It is not a catalogue column, so neither the table
+ * nor the export (both index rows by column key) ever renders it.
+ */
+function listingRow(columns: string[], r: InvoiceRowInput): ReportRow {
+  return { ...buildInvoiceRow(columns, r), [REPORT_ROW_INVOICE_ID]: r.id };
+}
 
 /** MISA-style invoice & order listing — one row per invoice (status != cancelled). */
 @Injectable()
@@ -198,7 +212,7 @@ export class InvoiceOrderListingReport implements ReportDefinition {
     const offset = (page - 1) * limit;
     const pageRows = filtered.slice(offset, offset + limit);
 
-    const rows2 = pageRows.map((r) => buildInvoiceRow(dto.columns, r));
+    const rows2 = pageRows.map((r) => listingRow(dto.columns, r));
     const totals = filtered.length
       ? buildListingTotals(dto.columns, filtered)
       : null;
@@ -406,7 +420,7 @@ export class InvoiceOrderListingReport implements ReportDefinition {
       const lastEntity = entities[entities.length - 1];
       const lastRaw = raw[raw.length - 1];
       return {
-        rows: kept.map((r) => buildInvoiceRow(dto.columns, r)),
+        rows: kept.map((r) => listingRow(dto.columns, r)),
         nextCursor: lastEntity
           ? { at: lastRaw.cursor_at, id: lastEntity.id }
           : null,

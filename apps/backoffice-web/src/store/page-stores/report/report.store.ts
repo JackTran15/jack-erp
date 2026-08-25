@@ -14,7 +14,7 @@ export function createReportStore(
 ): ReportStoreApi {
   return createStore<ReportState>((set) => ({
     ...initialState,
-    detailInvoiceCode: null,
+    detailInvoice: null,
     drillDown: null,
 
     actions: {
@@ -99,14 +99,14 @@ export function createReportStore(
           appliedRequest: null,
         }),
 
-      setDetailInvoiceCode: (code) => set({ detailInvoiceCode: code }),
+      setDetailInvoice: (target) => set({ detailInvoice: target }),
 
       setDrillDown: (drillDown) => set({ drillDown }),
 
       // Xoá cả drillDown: đổi report type khi dialog đang mở sẽ để lại một
       // dialog mồ côi trỏ vào báo cáo cũ.
       reset: () =>
-        set({ ...initialState, detailInvoiceCode: null, drillDown: null }),
+        set({ ...initialState, detailInvoice: null, drillDown: null }),
     },
   }));
 }

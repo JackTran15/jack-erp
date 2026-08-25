@@ -69,6 +69,16 @@ export interface AppliedReportRequest {
 }
 
 /**
+ * Hoá đơn đang mở chi tiết. `id` là khoá duy nhất — mã hoá đơn chỉ unique theo
+ * từng chi nhánh, nên tra theo mã có thể ra hoá đơn trùng số của chi nhánh khác.
+ * `code` giữ lại cho các dòng/báo cáo chưa kèm `id`.
+ */
+export interface InvoiceDetailTarget {
+  code: string;
+  id: string | null;
+}
+
+/**
  * Một drill-down đã được giải xong: report type đích, tiêu đề hiển thị, và bộ
  * filter đã thu hẹp sẵn. Dialog chỉ việc dựng một report lồng từ đây — nó không
  * biết gì về dòng nào vừa được click.
@@ -111,15 +121,15 @@ export interface ReportActions {
   applyFilters: () => void;
   resetFilters: () => void;
   reset: () => void;
-  // Mã hóa đơn đang xem chi tiết (mở dialog); null = đóng.
-  setDetailInvoiceCode: (code: string | null) => void;
+  // Hóa đơn đang xem chi tiết (mở dialog); null = đóng.
+  setDetailInvoice: (target: InvoiceDetailTarget | null) => void;
   // Drill-down đang mở (dialog báo cáo lồng); null = đóng.
   setDrillDown: (drillDown: ReportDrillDown | null) => void;
 }
 
 export interface ReportState extends ReportInitialState {
   // UI state cho dialog chi tiết hóa đơn (không thuộc initial metadata).
-  detailInvoiceCode: string | null;
+  detailInvoice: InvoiceDetailTarget | null;
   // UI state cho dialog drill-down (báo cáo lồng); song song với cái trên, không thay thế.
   drillDown: ReportDrillDown | null;
   actions: ReportActions;

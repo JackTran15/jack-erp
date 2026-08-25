@@ -6013,7 +6013,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Full invoice detail (line items + payments) for the drill-down dialog, by invoice code. */
+        /**
+         * Full invoice detail (line items + payments) for the drill-down dialog.
+         *
+         *     `id` is what the report rows send and the only unambiguous key: invoice
+         *     codes are unique per branch, not per organisation. `code` stays supported
+         *     for the treasury drill-downs, which hold a document number and nothing else.
+         */
         get: operations["InvoiceReportController_getInvoiceDetail"];
         put?: never;
         post?: never;
@@ -24562,8 +24568,9 @@ export interface operations {
     };
     InvoiceReportController_getInvoiceDetail: {
         parameters: {
-            query: {
-                code: string;
+            query?: {
+                code?: string;
+                id?: string;
             };
             header?: never;
             path?: never;
