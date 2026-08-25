@@ -47,6 +47,7 @@ export interface ReportFilterValues {
   [REPORT_FILTERS_LINE.RECEIVING_STORE]: string;
   [REPORT_FILTERS_LINE.STORE_SINGLE]: string;
   [REPORT_FILTERS_LINE.PRODUCT_TYPE]: string;
+  [REPORT_FILTERS_LINE.SKU]: string;
   [REPORT_FILTERS_LINE.CHECKBOX_ALLOCATE_COMBO]: boolean;
   [REPORT_FILTERS_LINE.CUSTOMER_GROUP]: string;
   [REPORT_FILTERS_LINE.CUSTOMER_SEARCH]: ReportLookupSelection | null;
@@ -65,6 +66,21 @@ export interface AppliedReportRequest {
   reportType: string;
   filters: Partial<ReportFilterValues>;
   columnFilters: Record<string, ReportColumnFilter>;
+}
+
+/**
+ * Một drill-down đã được giải xong: report type đích, tiêu đề hiển thị, và bộ
+ * filter đã thu hẹp sẵn. Dialog chỉ việc dựng một report lồng từ đây — nó không
+ * biết gì về dòng nào vừa được click.
+ *
+ * `filters` là allow-list, KHÔNG phải bản sao filter của báo cáo cha: báo cáo
+ * nguồn và báo cáo đích không cùng bộ filter line (xem `_lib/report-drilldown`).
+ */
+export interface ReportDrillDown {
+  reportType: string;
+  title: string;
+  subtitle: string;
+  filters: Partial<ReportFilterValues>;
 }
 
 // State khởi tạo store (provider nhận, factory dựng từ metadata category + branch).
@@ -97,10 +113,14 @@ export interface ReportActions {
   reset: () => void;
   // Mã hóa đơn đang xem chi tiết (mở dialog); null = đóng.
   setDetailInvoiceCode: (code: string | null) => void;
+  // Drill-down đang mở (dialog báo cáo lồng); null = đóng.
+  setDrillDown: (drillDown: ReportDrillDown | null) => void;
 }
 
 export interface ReportState extends ReportInitialState {
   // UI state cho dialog chi tiết hóa đơn (không thuộc initial metadata).
   detailInvoiceCode: string | null;
+  // UI state cho dialog drill-down (báo cáo lồng); song song với cái trên, không thay thế.
+  drillDown: ReportDrillDown | null;
   actions: ReportActions;
 }

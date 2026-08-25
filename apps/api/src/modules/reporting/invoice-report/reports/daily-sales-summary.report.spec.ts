@@ -3,6 +3,11 @@ import { ReportColumnDataType } from '@erp/shared-interfaces';
 import { InvoiceType, RefundMethod } from '../../../pos/entities/invoice.entity';
 import { PaymentAccountMethod } from '../../../accounting/payment-accounts/enums';
 import { DailySalesSummaryReport } from './daily-sales-summary.report';
+import {
+  fakeLineItemsRepo,
+  type FakeLine,
+} from '../../report-core/fake-line-items-repo';
+import { ItemDirection } from '../../../pos/entities/invoice-item.entity';
 
 const ACC = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const ORG = 'org-1';
@@ -33,6 +38,7 @@ function makeReport(opts: {
   payments?: any[];
   promotions?: any[];
   accounts?: any[];
+  lines?: FakeLine[];
   hasConsolidated?: boolean;
 }) {
   const qb: any = {
@@ -49,8 +55,17 @@ function makeReport(opts: {
   const rbac: any = {
     hasPermission: jest.fn(async () => opts.hasConsolidated ?? false),
   };
+  // Default lines mirror each invoice's header discount on a single OUT line —
+  // the SALE invariant measured in production (Σ OUT lines == Σ discount_amount).
+  // Tests about EXCHANGE/RETURN reversal pass `lines` explicitly instead.
+  const defaultLines: FakeLine[] = (opts.invoices ?? []).map((i: any) => ({
+    invoiceId: i.id,
+    direction: i.type === InvoiceType.RETURN ? ItemDirection.IN : ItemDirection.OUT,
+    promotionDiscount: Number(i.discountAmount ?? 0),
+  }));
   return new DailySalesSummaryReport(
     invoicesRepo,
+    fakeLineItemsRepo(opts.lines ?? defaultLines),
     paymentsRepo,
     promotionsRepo,
     accountsRepo,
@@ -381,5 +396,97 @@ describe('DailySalesSummaryReport.buildData', () => {
     expect(result.total).toBe(1);
     expect(result.rows[0].date).toBe('2026-06-04');
     expect(result.totals!['revenue.goods']).toBe(5000000);
+  });
+});
+
+describe('DailySalesSummaryReport — Khuyến mại comes from the lines', () => {
+  const dto = (columns: string[]) =>
+    ({
+      columns,
+      filters: { issuedAt: { from: '2026-08-01', to: '2026-08-31' } },
+    }) as any;
+
+  it('sees an EXCHANGE whose returned line reverses a promotion the header never recorded', async () => {
+    // The shape of RTN-202608-00022 in erp_dev: header discount 0, new goods
+    // carry no promotion, the returned line reverses 150.000.
+    const report = makeReport({
+      invoices: [
+        inv('x1', '2026-08-19T09:00:00Z', 2400000, 2400000, {
+          type: InvoiceType.EXCHANGE,
+          discountAmount: 0,
+          netAmount: 2400000,
+        }),
+      ],
+      lines: [
+        { invoiceId: 'x1', direction: ItemDirection.OUT, promotionDiscount: 0 },
+        { invoiceId: 'x1', direction: ItemDirection.IN, promotionDiscount: 150000 },
+      ],
+    });
+
+    const result = await report.buildData(dto(['date', 'revenue.discount']), actor);
+
+    expect(result.rows[0]['revenue.discount']).toBe(-150000);
+    expect(result.totals!['revenue.discount']).toBe(-150000);
+  });
+
+  it('negates a RETURN exactly once — direction already carries the sign', async () => {
+    // Signing the line sum again by invoiceTypeSign would flip this back to +80000.
+    const report = makeReport({
+      invoices: [
+        inv('r1', '2026-08-10T09:00:00Z', 500000, 500000, {
+          type: InvoiceType.RETURN,
+          discountAmount: 0,
+        }),
+      ],
+      lines: [
+        { invoiceId: 'r1', direction: ItemDirection.IN, promotionDiscount: 80000 },
+      ],
+    });
+
+    const result = await report.buildData(dto(['date', 'revenue.discount']), actor);
+
+    expect(result.rows[0]['revenue.discount']).toBe(-80000);
+  });
+
+  it('leaves a SALE-only period byte-identical to the header sum', async () => {
+    const report = makeReport({
+      invoices: [
+        inv('s1', '2026-08-13T09:00:00Z', 1000000, 900000, { discountAmount: 100000 }),
+        inv('s2', '2026-08-14T09:00:00Z', 2000000, 1800000, { discountAmount: 200000 }),
+      ],
+      lines: [
+        { invoiceId: 's1', direction: ItemDirection.OUT, lineDiscount: 40000, promotionDiscount: 60000 },
+        { invoiceId: 's2', direction: ItemDirection.OUT, promotionDiscount: 200000 },
+      ],
+    });
+
+    const result = await report.buildData(dto(['date', 'revenue.discount']), actor);
+
+    expect(result.rows.map((r) => r['revenue.discount'])).toEqual([100000, 200000]);
+    expect(result.totals!['revenue.discount']).toBe(300000);
+  });
+
+  it('contributes 0, not NaN, for an invoice with no lines at all', async () => {
+    const report = makeReport({
+      invoices: [
+        inv('n1', '2026-08-15T09:00:00Z', 500000, 500000, { discountAmount: 0 }),
+      ],
+      lines: [],
+    });
+
+    const result = await report.buildData(dto(['date', 'revenue.discount']), actor);
+
+    expect(result.rows[0]['revenue.discount']).toBe(0);
+  });
+});
+
+describe('DailySalesSummaryReport.buildColumns — the date drill-down flag', () => {
+  it('marks `date` as a link and nothing else', async () => {
+    const report = makeReport({});
+
+    const columns = await report.buildColumns(actor);
+    const linked = columns.filter((c) => c.link).map((c) => c.col);
+
+    expect(linked).toEqual(['date']);
   });
 });

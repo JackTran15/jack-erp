@@ -1449,6 +1449,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/branches/{id}/deactivation-impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Must be before @Get(':id') so the suffix is not parsed as part of the id. */
+        get: operations["BranchController_deactivationImpact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/branches/{id}": {
         parameters: {
             query?: never;
@@ -1491,6 +1508,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["BranchController_suspend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/{id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BranchController_activate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3939,6 +3972,23 @@ export interface paths {
         head?: never;
         /** Update a line by soft-deleting it and creating a new one (idempotent) */
         patch: operations["TempWarehouseController_updateLine"];
+        trace?: never;
+    };
+    "/inventory/temp-warehouse/lines/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Current status of specific lines by id — used to poll a partial transfer ("Xử lý chuyển kho") until it actually lands (ACTIVE -> TRANSFERRED) instead of trusting the 202 response alone */
+        get: operations["TempWarehouseController_getLinesStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/inventory/temp-warehouse/sessions/close": {
@@ -8523,6 +8573,27 @@ export interface components {
             assignedAt: string;
             assignedBy: string;
         };
+        BranchDeactivationBlockerDto: {
+            /** @example MAIN_BRANCH */
+            code: string;
+            /** @example Không thể ngừng hoạt động cửa hàng chính của tổ chức. */
+            message: string;
+        };
+        BranchDeactivationWarningDto: {
+            /** @example stock_balances */
+            code: string;
+            /** @example dòng tồn kho */
+            label: string;
+            /** @example 412 */
+            count: number;
+        };
+        BranchDeactivationImpactDto: {
+            branchId: string;
+            branchName: string;
+            isMainBranch: boolean;
+            blockers: components["schemas"]["BranchDeactivationBlockerDto"][];
+            warnings: components["schemas"]["BranchDeactivationWarningDto"][];
+        };
         UpdateBranchDto: {
             name?: string;
             code?: string;
@@ -12063,6 +12134,13 @@ export interface components {
             note?: components["schemas"]["StringFilterDto"];
         };
         ReturnableInvoiceSearchV2Dto: {
+            /**
+             * @description Document kind. Omit for both returnable kinds (SALE + EXCHANGE). RETURN is
+             *     type-valid but yields an empty set — a pure return has no sold lines.
+             * @example EXCHANGE
+             * @enum {string}
+             */
+            type?: "SALE" | "RETURN" | "EXCHANGE";
             /** @default 1 */
             page: number;
             /** @default 20 */
@@ -12680,6 +12758,13 @@ export interface components {
             categoryId?: string;
             /** @description revenue-by-item only — filter by denormalized item brand (Thương hiệu). */
             brand?: string;
+            /**
+             * @description Per-line reports — narrow to one item by its snapshot code
+             *     (`invoice_items.item_code`). Pushed into the line query's WHERE, not applied
+             *     after loading, so a drill-down does not pull a month of lines per click.
+             *     Bounded because it reaches a query parameter on a hot path.
+             */
+            sku?: string;
             /** @description Add a brand-grain split (daily-summary / revenue-by-item). */
             statisticByBrand?: boolean;
             /** @description revenue-by-item only — split combo revenue across components. */
@@ -16627,6 +16712,27 @@ export interface operations {
             };
         };
     };
+    BranchController_deactivationImpact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BranchDeactivationImpactDto"];
+                };
+            };
+        };
+    };
     BranchController_findById: {
         parameters: {
             query?: never;
@@ -16695,6 +16801,27 @@ export interface operations {
         };
     };
     BranchController_suspend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BranchEntity"];
+                };
+            };
+        };
+    };
+    BranchController_activate: {
         parameters: {
             query?: never;
             header?: never;
@@ -21114,6 +21241,29 @@ export interface operations {
                 content: {
                     "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    TempWarehouseController_getLinesStatus: {
+        parameters: {
+            query: {
+                /** @description Line ids to check the current status of — used by the FE to poll a partial transfer ("Xử lý chuyển kho") until it actually lands instead of trusting the 202 response alone. */
+                ids: string[];
+            };
+            header?: {
+                /** @description Idempotency key — same key + same body within 24h replays the original response without creating duplicates */
+                "X-Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

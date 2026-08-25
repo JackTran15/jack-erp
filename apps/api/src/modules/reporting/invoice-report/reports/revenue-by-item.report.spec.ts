@@ -388,3 +388,65 @@ describe('RevenueByItemReport.buildData', () => {
     expect(res.totals).toBeNull();
   });
 });
+
+describe('RevenueByItemReport — Điểm KM allocated from the invoice header', () => {
+  const dto = (columns: string[]) =>
+    ({
+      columns,
+      filters: { issuedAt: { from: '2026-06-01', to: '2026-06-30' } },
+    }) as any;
+
+  it('spreads redeemed points across an invoice\u2019s lines by line size', async () => {
+    const report = makeReport({
+      invoices: [inv({ pointsDiscountAmount: 100000 })],
+      lines: [
+        line({ itemId: 'it1', itemCode: 'SKU001', lineTotal: 300000 }),
+        line({ itemId: 'it2', itemCode: 'SKU002', itemName: 'Item Two', lineTotal: 100000 }),
+      ],
+    });
+
+    const result = await report.buildData(dto(['sku', 'revenue.promoPoints']), actor);
+
+    const bySku = new Map(result.rows.map((r) => [r.sku, r['revenue.promoPoints']]));
+    expect(bySku.get('SKU001')).toBe(75000);
+    expect(bySku.get('SKU002')).toBe(25000);
+    expect(result.totals!['revenue.promoPoints']).toBe(100000);
+  });
+
+  it('no longer reports a hard zero when the invoice redeemed points', async () => {
+    const report = makeReport({
+      invoices: [inv({ pointsDiscountAmount: 650000 })],
+      lines: [line({ lineTotal: 1000000 })],
+    });
+
+    const result = await report.buildData(dto(['sku', 'revenue.promoPoints']), actor);
+
+    expect(result.rows[0]['revenue.promoPoints']).toBe(650000);
+  });
+
+  it('stays zero when no points were redeemed', async () => {
+    const report = makeReport({
+      invoices: [inv({ pointsDiscountAmount: 0 })],
+      lines: [line({ lineTotal: 1000000 })],
+    });
+
+    const result = await report.buildData(dto(['sku', 'revenue.promoPoints']), actor);
+
+    expect(result.rows[0]['revenue.promoPoints']).toBe(0);
+  });
+
+  it('folds Điểm KM into Tỷ lệ KM, matching the column header formula (5)=((4)+(9))/(3)', async () => {
+    const report = makeReport({
+      invoices: [inv({ pointsDiscountAmount: 50000 })],
+      // goods = 1 × 1.000.000; discount = lineDiscount 100.000
+      lines: [
+        line({ quantity: 1, unitPrice: 1000000, lineDiscount: 100000, lineTotal: 900000 }),
+      ],
+    });
+
+    const result = await report.buildData(dto(['sku', 'revenue.promoRate']), actor);
+
+    // (100.000 + 50.000) / 1.000.000 = 15%, not the 10% the old formula gave.
+    expect(result.rows[0]['revenue.promoRate']).toBe(15);
+  });
+});

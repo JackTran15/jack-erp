@@ -24,7 +24,6 @@ describe('invoice-item-revenue.columns', () => {
     ).map((c) => c.key);
     expect(placeholders).toEqual(
       expect.arrayContaining([
-        'revenue.promoPoints',
         'reference',
         'payment.bankAccount',
         'salesChannel',
@@ -32,6 +31,9 @@ describe('invoice-item-revenue.columns', () => {
         'receiverPhone',
       ]),
     );
+    // "Điểm KM" stopped being a placeholder: it now allocates the invoice
+    // header's redeemed points down to the lines (ADR-04).
+    expect(placeholders).not.toContain('revenue.promoPoints');
   });
 
   it('marks the gross line amount as derived and everything else backed/placeholder', () => {

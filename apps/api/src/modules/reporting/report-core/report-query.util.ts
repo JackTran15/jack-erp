@@ -1,8 +1,12 @@
 import { ForbiddenException } from '@nestjs/common';
 import { ReportStoreScope } from '@erp/shared-interfaces';
-import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
+import { ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { InvoiceStatus, InvoiceType } from '../../pos/entities/invoice.entity';
+import {
+  InvoiceItemEntity,
+  ItemDirection,
+} from '../../pos/entities/invoice-item.entity';
 
 /**
  * Structural shape `applyInvoiceStatusFilter` needs from a report's filter DTO.
@@ -139,4 +143,50 @@ export function statDateColumn(
   return filters.statDateType === 'created_date'
     ? `${alias}.createdAt`
     : `${alias}.issuedAt`;
+}
+
+/**
+ * Σ per invoice of each line's promotion contribution, signed by `direction`.
+ *
+ * The header column `invoices.discount_amount` only ever records the discount on
+ * what was *sold*, so an EXCHANGE whose returned line carries a reversed
+ * promotion shows nothing there. Summing the lines sees both legs.
+ *
+ * The sign comes from `direction` ALONE. Do not multiply by `invoiceTypeSign`:
+ * a RETURN's lines are all `IN`, so `direction` has already negated it, and
+ * signing twice flips it back to positive. This is the single easiest way to
+ * get this function wrong.
+ *
+ * Returns aggregated numbers, never entities — `daily-sales-summary`
+ * deliberately never touches `invoice_items`, and loading a month of lines into
+ * memory to add them up would quietly change that report's memory profile.
+ * An invoice with no lines gets no key at all (not a `0`).
+ */
+export async function loadSignedLineDiscounts(
+  repo: Repository<InvoiceItemEntity>,
+  invoiceIds: string[],
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (!invoiceIds.length) return out;
+
+  // Postgres caps bind parameters at 65535; chunk well under it.
+  const CHUNK = 20_000;
+  for (let i = 0; i < invoiceIds.length; i += CHUNK) {
+    const ids = invoiceIds.slice(i, i + CHUNK);
+    const rows = await repo
+      .createQueryBuilder('line')
+      .select('line.invoiceId', 'invoiceId')
+      .addSelect(
+        `SUM(CASE WHEN line.direction = :inDirection THEN -1 ELSE 1 END
+             * (line.lineDiscount + line.promotionDiscount))`,
+        'amount',
+      )
+      .where('line.invoiceId IN (:...ids)', { ids })
+      .setParameter('inDirection', ItemDirection.IN)
+      .groupBy('line.invoiceId')
+      .getRawMany<{ invoiceId: string; amount: string }>();
+
+    for (const r of rows) out.set(r.invoiceId, Number(r.amount ?? 0));
+  }
+  return out;
 }

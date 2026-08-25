@@ -4374,6 +4374,37 @@
         ]
       }
     },
+    "/branches/{id}/deactivation-impact": {
+      "get": {
+        "operationId": "BranchController_deactivationImpact",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchDeactivationImpactDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Must be before @Get(':id') so the suffix is not parsed as part of the id.",
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
     "/branches/{id}": {
       "get": {
         "operationId": "BranchController_findById",
@@ -4475,6 +4506,36 @@
     "/branches/{id}/suspend": {
       "post": {
         "operationId": "BranchController_suspend",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
+    "/branches/{id}/activate": {
+      "post": {
+        "operationId": "BranchController_activate",
         "parameters": [
           {
             "name": "id",
@@ -12151,6 +12212,43 @@
           }
         },
         "summary": "Soft-delete a line (status=DELETED); idempotent",
+        "tags": [
+          "Inventory · Temp Warehouse"
+        ]
+      }
+    },
+    "/inventory/temp-warehouse/lines/status": {
+      "get": {
+        "operationId": "TempWarehouseController_getLinesStatus",
+        "parameters": [
+          {
+            "name": "X-Idempotency-Key",
+            "in": "header",
+            "description": "Idempotency key — same key + same body within 24h replays the original response without creating duplicates",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ids",
+            "required": true,
+            "in": "query",
+            "description": "Line ids to check the current status of — used by the FE to poll a partial transfer (\"Xử lý chuyển kho\") until it actually lands instead of trusting the 202 response alone.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Current status of specific lines by id — used to poll a partial transfer (\"Xử lý chuyển kho\") until it actually lands (ACTIVE -> TRANSFERRED) instead of trusting the 202 response alone",
         "tags": [
           "Inventory · Temp Warehouse"
         ]
@@ -26221,6 +26319,78 @@
           "assignedBy"
         ]
       },
+      "BranchDeactivationBlockerDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "MAIN_BRANCH"
+          },
+          "message": {
+            "type": "string",
+            "example": "Không thể ngừng hoạt động cửa hàng chính của tổ chức."
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ]
+      },
+      "BranchDeactivationWarningDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "stock_balances"
+          },
+          "label": {
+            "type": "string",
+            "example": "dòng tồn kho"
+          },
+          "count": {
+            "type": "number",
+            "example": 412
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "count"
+        ]
+      },
+      "BranchDeactivationImpactDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string"
+          },
+          "branchName": {
+            "type": "string"
+          },
+          "isMainBranch": {
+            "type": "boolean"
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BranchDeactivationBlockerDto"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BranchDeactivationWarningDto"
+            }
+          }
+        },
+        "required": [
+          "branchId",
+          "branchName",
+          "isMainBranch",
+          "blockers",
+          "warnings"
+        ]
+      },
       "UpdateBranchDto": {
         "type": "object",
         "properties": {
@@ -36825,6 +36995,16 @@
       "ReturnableInvoiceSearchV2Dto": {
         "type": "object",
         "properties": {
+          "type": {
+            "description": "Document kind. Omit for both returnable kinds (SALE + EXCHANGE). RETURN is\ntype-valid but yields an empty set — a pure return has no sold lines.",
+            "enum": [
+              "SALE",
+              "RETURN",
+              "EXCHANGE"
+            ],
+            "type": "string",
+            "example": "EXCHANGE"
+          },
           "page": {
             "type": "number",
             "default": 1,
@@ -38348,6 +38528,11 @@
           "brand": {
             "type": "string",
             "description": "revenue-by-item only — filter by denormalized item brand (Thương hiệu)."
+          },
+          "sku": {
+            "type": "string",
+            "description": "Per-line reports — narrow to one item by its snapshot code\n(`invoice_items.item_code`). Pushed into the line query's WHERE, not applied\nafter loading, so a drill-down does not pull a month of lines per click.\nBounded because it reaches a query parameter on a hot path.",
+            "maxLength": 64
           },
           "statisticByBrand": {
             "type": "boolean",

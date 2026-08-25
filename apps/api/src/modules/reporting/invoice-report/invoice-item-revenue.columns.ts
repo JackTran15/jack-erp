@@ -31,6 +31,7 @@ export type ItemRevenueField =
   | 'quantity'
   | 'unitPrice'
   | 'lineDiscount'
+  | 'promoPoints'
   | 'lineTotal'
   | 'itemNote';
 
@@ -85,7 +86,7 @@ export const INVOICE_ITEM_REVENUE_COLUMNS: ItemRevenueColumnDef[] = [
   { key: 'unitPrice', type: ReportColumnDataType.CURRENCY, classification: 'backed', group: null, source: { kind: 'field', field: 'unitPrice' } },
   { key: 'lineAmount', type: ReportColumnDataType.CURRENCY, classification: 'derived', group: 'revenue', source: { kind: 'computed', computed: 'lineAmount' } },
   { key: 'lineDiscount', type: ReportColumnDataType.CURRENCY, classification: 'backed', group: 'revenue', source: { kind: 'field', field: 'lineDiscount' } },
-  { key: 'revenue.promoPoints', type: ReportColumnDataType.CURRENCY, classification: 'placeholder', group: 'revenue', source: { kind: 'placeholder', placeholder: 0 } },
+  { key: 'revenue.promoPoints', type: ReportColumnDataType.CURRENCY, classification: 'backed', group: 'revenue', source: { kind: 'field', field: 'promoPoints' } },
   { key: 'lineRevenue', type: ReportColumnDataType.CURRENCY, classification: 'backed', group: 'revenue', source: { kind: 'field', field: 'lineTotal' } },
   { key: 'reference', type: ReportColumnDataType.STRING, classification: 'placeholder', group: null, source: { kind: 'placeholder', placeholder: null } },
   { key: 'locationCode', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'relation', rel: 'locationCode' } },

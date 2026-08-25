@@ -15,6 +15,7 @@ export function createReportStore(
   return createStore<ReportState>((set) => ({
     ...initialState,
     detailInvoiceCode: null,
+    drillDown: null,
 
     actions: {
       // Đổi report type → columns tự fetch theo type. Chain: tự áp dụng ngay
@@ -100,7 +101,12 @@ export function createReportStore(
 
       setDetailInvoiceCode: (code) => set({ detailInvoiceCode: code }),
 
-      reset: () => set({ ...initialState, detailInvoiceCode: null }),
+      setDrillDown: (drillDown) => set({ drillDown }),
+
+      // Xoá cả drillDown: đổi report type khi dialog đang mở sẽ để lại một
+      // dialog mồ côi trỏ vào báo cáo cũ.
+      reset: () =>
+        set({ ...initialState, detailInvoiceCode: null, drillDown: null }),
     },
   }));
 }

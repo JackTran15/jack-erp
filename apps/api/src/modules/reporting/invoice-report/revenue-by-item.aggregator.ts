@@ -47,6 +47,11 @@ export interface RevenueByItemRowInput {
    * nhưng cả hai cùng vào cột "Khuyến mại".
    */
   promotionDiscount: number;
+  /**
+   * Điểm KM phân bổ cho dòng từ `invoices.points_discount_amount` (ADR-04) —
+   * phân bổ, không phải số ghi nhận theo dòng. Đã mang sẵn dấu theo loại hoá đơn.
+   */
+  promoPoints: number;
   lineTotal: number;
 }
 
@@ -63,6 +68,7 @@ export interface ItemGroupAggregate {
   quantity: number;
   goods: number;
   discount: number;
+  promoPoints: number;
   total: number;
 }
 
@@ -185,6 +191,7 @@ export function aggregateByItem(
         quantity: 0,
         goods: 0,
         discount: 0,
+        promoPoints: 0,
         total: 0,
       };
       byKey.set(d.key, agg);
@@ -197,6 +204,9 @@ export function aggregateByItem(
     // engine phân bổ. Bỏ nguồn thứ hai là bỏ gần như toàn bộ số liệu — CTKM
     // chạy tự động, thu ngân hiếm khi gõ tay.
     agg.discount += sign * (r.lineDiscount + r.promotionDiscount);
+    // `promoPoints` đã mang dấu từ lúc phân bổ (theo loại hoá đơn), nên KHÔNG
+    // nhân `sign` lần nữa — khác với `discount` lấy dấu từ `direction`.
+    agg.promoPoints += r.promoPoints;
     // `lineTotal` chưa trừ khuyến mãi engine (nó được trừ ở cấp hóa đơn), nên
     // phải trừ ở đây để "Doanh thu" đúng là (3)-(4)-(9) như tiêu đề cột.
     agg.total += sign * (r.lineTotal - r.promotionDiscount);
@@ -207,6 +217,7 @@ export function aggregateByItem(
       quantity: round2(a.quantity),
       goods: round2(a.goods),
       discount: round2(a.discount),
+      promoPoints: round2(a.promoPoints),
       total: round2(a.total),
     }))
     .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
@@ -251,8 +262,10 @@ export function itemGroupCellValue(
         // Weighted-average unit price of the aggregated group (goods = Σ sign*qty*unitPrice).
         return agg.quantity !== 0 ? round2(agg.goods / agg.quantity) : 0;
       }
-      // promoRate — discount as a % of goods.
-      return agg.goods > 0 ? round2((agg.discount / agg.goods) * 100) : 0;
+      // promoRate — (4)+(9) as a % of (3), exactly as the column header says.
+      return agg.goods > 0
+        ? round2(((agg.discount + agg.promoPoints) / agg.goods) * 100)
+        : 0;
     case 'placeholder':
       return def.source.placeholder;
   }

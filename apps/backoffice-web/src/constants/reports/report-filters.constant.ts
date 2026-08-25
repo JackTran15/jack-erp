@@ -18,6 +18,11 @@ export enum REPORT_FILTERS_LINE {
     RECEIVING_STORE = 'receiving_store',
     STORE_SINGLE = 'store_single',
     PRODUCT_TYPE = 'product_type',
+    // Không phải một ô nhập liệu: không báo cáo nào khai nó trong registry, nên
+    // getReportFormLines không bao giờ render nó. Nó tồn tại để drill-down theo
+    // mặt hàng đi chung đường buildSearchFilters với mọi filter khác — nhờ đó
+    // xuất khẩu và in trong dialog cũng được thu hẹp đúng SKU.
+    SKU = 'sku',
     CHECKBOX_ALLOCATE_COMBO = 'allocate_combo_revenue',
 
     // === Công nợ ===
@@ -122,6 +127,12 @@ export const REPORT_FILTERS_LINE_METADATA = {
     [REPORT_FILTERS_LINE.PRODUCT_TYPE]: {
         label: 'loại hàng hóa',
         backendField: 'productType',
+    },
+    // Có mặt để bảng metadata phủ hết enum; không báo cáo nào khai line này nên
+    // nhãn không bao giờ hiển thị.
+    [REPORT_FILTERS_LINE.SKU]: {
+        label: 'mã SKU',
+        backendField: 'sku',
     },
     [REPORT_FILTERS_LINE.CHECKBOX_ALLOCATE_COMBO]: {
         backendField: 'allocateComboRevenue',

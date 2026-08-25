@@ -2,6 +2,11 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ReportColumnDataType } from '@erp/shared-interfaces';
 import { InvoiceType } from '../../../pos/entities/invoice.entity';
 import { InvoiceOrderListingReport } from './invoice-order-listing.report';
+import {
+  fakeLineItemsRepo,
+  type FakeLine,
+} from '../../report-core/fake-line-items-repo';
+import { ItemDirection } from '../../../pos/entities/invoice-item.entity';
 
 const ACC = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const ORG = 'org-1';
@@ -33,6 +38,7 @@ function makeReport(opts: {
   customers?: any[];
   branches?: any[];
   employees?: any[];
+  lines?: FakeLine[];
   hasConsolidated?: boolean;
 }) {
   const qb: any = {
@@ -52,8 +58,17 @@ function makeReport(opts: {
   const rbac: any = {
     hasPermission: jest.fn(async () => opts.hasConsolidated ?? false),
   };
+  // Default lines mirror each invoice's header discount on a single OUT line —
+  // the SALE invariant measured in production (Σ OUT lines == Σ discount_amount).
+  // Tests about EXCHANGE/RETURN reversal pass `lines` explicitly instead.
+  const defaultLines: FakeLine[] = (opts.invoices ?? []).map((i: any) => ({
+    invoiceId: i.id,
+    direction: i.type === InvoiceType.RETURN ? ItemDirection.IN : ItemDirection.OUT,
+    promotionDiscount: Number(i.discountAmount ?? 0),
+  }));
   return new InvoiceOrderListingReport(
     invoicesRepo,
+    fakeLineItemsRepo(opts.lines ?? defaultLines),
     paymentsRepo,
     promotionsRepo,
     accountsRepo,
@@ -369,6 +384,7 @@ function makeKeysetReport(invoices: any[]) {
   });
   const report = new InvoiceOrderListingReport(
     invoicesRepo,
+    fakeLineItemsRepo(),
     repo() as any,
     repo() as any,
     { find: jest.fn(async () => [{ accountId: ACC }]) } as any,
@@ -542,5 +558,68 @@ describe('InvoiceOrderListingReport.exportSource', () => {
     expect(page.rows).toHaveLength(0);
     expect(page.hasMore).toBe(true);
     expect(page.nextCursor).not.toBeNull();
+  });
+});
+
+describe('InvoiceOrderListingReport — Khuyến mại comes from the lines', () => {
+  it('shows an EXCHANGE row whose returned line reverses a promotion the header never recorded', async () => {
+    const report = makeReport({
+      invoices: [
+        inv({
+          id: 'x1',
+          code: 'RTN-202608-00022',
+          type: InvoiceType.EXCHANGE,
+          subtotal: 2400000,
+          netAmount: 2400000,
+          discountAmount: 0,
+          totalPaid: 2400000,
+          amountDue: 0,
+        }),
+      ],
+      lines: [
+        { invoiceId: 'x1', direction: ItemDirection.OUT, promotionDiscount: 0 },
+        { invoiceId: 'x1', direction: ItemDirection.IN, promotionDiscount: 150000 },
+      ],
+    });
+
+    const result = await report.buildData(
+      {
+        columns: ['invoiceCode', 'revenue.discount'],
+        filters: { issuedAt: { from: '2026-06-01', to: '2026-06-30' } },
+      } as any,
+      actor,
+    );
+
+    expect(result.rows[0]['revenue.discount']).toBe(-150000);
+    expect(result.totals!['revenue.discount']).toBe(-150000);
+  });
+
+  it('negates a RETURN exactly once — direction already carries the sign', async () => {
+    const report = makeReport({
+      invoices: [
+        inv({
+          id: 'r1',
+          code: 'RTN-000001',
+          type: InvoiceType.RETURN,
+          subtotal: 500000,
+          discountAmount: 0,
+          totalPaid: 500000,
+          amountDue: 0,
+        }),
+      ],
+      lines: [
+        { invoiceId: 'r1', direction: ItemDirection.IN, promotionDiscount: 80000 },
+      ],
+    });
+
+    const result = await report.buildData(
+      {
+        columns: ['invoiceCode', 'revenue.discount'],
+        filters: { issuedAt: { from: '2026-06-01', to: '2026-06-30' } },
+      } as any,
+      actor,
+    );
+
+    expect(result.rows[0]['revenue.discount']).toBe(-80000);
   });
 });

@@ -10,6 +10,7 @@ import { buildInitialTableState } from "../../../store/common/table-store/table.
 import { ReportStoreProvider } from "../../../store/page-stores/report/report.context";
 import { buildInitialReportState } from "../../../store/page-stores/report/report.factory";
 import { InvoiceDetailDialog } from "./InvoiceDetailDialog/InvoiceDetailDialog";
+import { ReportDrillDownMount } from "./ReportDrillDownDialog/ReportDrillDownMount";
 import { ReportPageHeader } from "./ReportPageHeader/ReportPageHeader";
 import { ReportPageTable } from "./ReportPageTable/ReportPageTable";
 import { ReportColumnFilterSync } from "./ReportColumnFilterSync/ReportColumnFilterSync";
@@ -79,6 +80,7 @@ export function ReportPage({ category, reportType }: Props) {
           <ReportPageTable />
         </div>
         <InvoiceDetailDialog />
+        <ReportDrillDownMount />
       </TableStoreProvider>
     </ReportStoreProvider>
   );

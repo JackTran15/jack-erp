@@ -37,6 +37,8 @@ export interface InvoiceItemRowInput {
   quantity: number;
   unitPrice: number;
   lineDiscount: number;
+  /** Điểm KM phân bổ từ header hoá đơn (ADR-04), đã mang sẵn dấu theo loại hoá đơn. */
+  promoPoints: number;
   lineTotal: number;
   itemNote: string | null;
   // Resolved relations (inlined)
@@ -96,6 +98,8 @@ const fieldValue = (
       return r.unitPrice;
     case 'lineDiscount':
       return r.lineDiscount;
+    case 'promoPoints':
+      return r.promoPoints;
     case 'lineTotal':
       return r.lineTotal;
     case 'itemNote':

@@ -127,6 +127,7 @@ export function buildSearchFilters(
   const statBy = filters[REPORT_FILTERS_LINE.STATISTIC_BY];
   const brand = filters[REPORT_FILTERS_LINE.BRAND];
   const productType = filters[REPORT_FILTERS_LINE.PRODUCT_TYPE];
+  const sku = filters[REPORT_FILTERS_LINE.SKU];
   const statisticByBrand = filters[REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND];
   const allocateComboRevenue =
     filters[REPORT_FILTERS_LINE.CHECKBOX_ALLOCATE_COMBO];
@@ -154,6 +155,9 @@ export function buildSearchFilters(
   if (notAll(categoryId)) payload.categoryId = categoryId;
   if (statBy) payload.statBy = statBy as ReportGroupBy;
   if (notAll(brand)) payload.brand = brand;
+  // Chuỗi rỗng phải bị bỏ qua, không gửi lên: @IsString nhận nó và báo cáo
+  // sẽ lọc ra 0 dòng thay vì bỏ qua filter.
+  if (sku) payload.sku = sku;
   if (productType) {
     payload.productType = productType as InvoiceReportFilterPayload["productType"];
   }

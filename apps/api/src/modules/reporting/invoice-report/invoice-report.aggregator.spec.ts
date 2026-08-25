@@ -106,3 +106,30 @@ describe('matchColumnFilter', () => {
     expect(matchColumnFilter(null, { col: 'c', notContains: 'x' })).toBe(true);
   });
 });
+
+describe('cellValue — revenue.promoRate follows its own header formula', () => {
+  const agg = (subtotal: number, discount: number, points: number) => ({
+    day: '2026-08-13',
+    sums: {
+      subtotal,
+      discountAmount: discount,
+      pointsDiscountAmount: points,
+      totalPaid: 0,
+    },
+    cash: 0,
+    voucher: 0,
+    byAccount: {},
+  });
+
+  it('counts Điểm KM in the numerator: (5)=((4)+(9))/(3)', () => {
+    expect(cellValue('revenue.promoRate', agg(1_000_000, 100_000, 50_000))).toBe(15);
+  });
+
+  it('is unchanged when no points were redeemed', () => {
+    expect(cellValue('revenue.promoRate', agg(1_000_000, 100_000, 0))).toBe(10);
+  });
+
+  it('stays 0 rather than NaN when there are no goods', () => {
+    expect(cellValue('revenue.promoRate', agg(0, 100_000, 50_000))).toBe(0);
+  });
+});

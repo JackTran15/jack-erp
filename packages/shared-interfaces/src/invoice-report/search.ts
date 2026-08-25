@@ -67,6 +67,14 @@ export interface InvoiceReportFilterPayload {
   categoryId?: string;
   /** revenue-by-item only — filter by denormalized item brand (Thương hiệu). */
   brand?: string;
+
+  /**
+   * Per-line reports — narrow to one item by its snapshot code
+   * (`invoice_items.item_code`). Backs the "Doanh thu theo mặt hàng" drill-down:
+   * the parent row carries `sku`, and the detail report's `sku` column is the
+   * same field, so the match is exact by construction.
+   */
+  sku?: string;
   /** revenue-by-item only — product kind filter. */
   productType?: ReportProductType;
   /** Add a brand-grain split (daily-summary / revenue-by-item). */

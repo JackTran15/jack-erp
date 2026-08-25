@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   getCoreRowModel,
   useReactTable,
@@ -32,6 +32,11 @@ import {
 } from "../../../../../lib/table";
 import { useTableStore } from "../../../../../store/common/table-store/table.context";
 import { useReportStore } from "../../../../../store/page-stores/report/report.context";
+import { getReportBackendKey } from "../../../../../constants/reports/report-type.constant";
+import {
+  resolveDrillDown,
+  type DrillDownAction,
+} from "../../_lib/report-drilldown";
 import type { ReportRow } from "../../_api/invoice-report.api";
 import { SortableHeaderCell, type DragData } from "./SortableHeaderCell/SortableHeaderCell";
 import { FilterHeaderCell } from "./FilterHeaderCell/FilterHeaderCell";
@@ -75,6 +80,20 @@ export function ReportPageTableView({ rows, totals }: Props) {
   const setColumnFilter = useReportStore((s) => s.actions.setColumnFilter);
   const setDetailInvoiceCode = useReportStore(
     (s) => s.actions.setDetailInvoiceCode,
+  );
+  const setDrillDown = useReportStore((s) => s.actions.setDrillDown);
+  const reportType = useReportStore((s) => s.reportType);
+  // Filter đã áp dụng, không phải filter đang gõ dở: dialog phải mở ra trên đúng
+  // phạm vi mà bảng bên dưới đang hiển thị.
+  const filters = useReportStore((s) => s.appliedRequest?.filters ?? s.filters);
+  const backendKey = getReportBackendKey(reportType);
+
+  const runDrillDown = useCallback(
+    (action: DrillDownAction) => {
+      if (action.kind === "invoiceDetail") setDetailInvoiceCode(action.code);
+      else setDrillDown(action.drillDown);
+    },
+    [setDetailInvoiceCode, setDrillDown],
   );
 
   // Tra cứu cấu hình cột theo id để render metadata (label, group, mã, align, link).
@@ -422,17 +441,22 @@ export function ReportPageTableView({ rows, totals }: Props) {
                     const pinned = cell.column.getIsPinned();
                     const width = cell.column.getSize();
                     const raw = cell.getValue() as number | string | undefined;
-                    const content = col.tableConfig?.link ? (
-                      col.column === "invoiceCode" && raw ? (
-                        <a
-                          className="cursor-pointer text-info hover:underline"
-                          onClick={() => setDetailInvoiceCode(String(raw))}
-                        >
-                          {raw}
-                        </a>
-                      ) : (
-                        raw ?? ""
-                      )
+                    // Cờ `link` của backend chỉ nói "tô xanh"; registry mới là
+                    // thứ quyết định click có làm gì không (ADR-02). Nhờ đó cột
+                    // số có link vẫn đi qua formatReportNumber như cột thường —
+                    // trước đây nó rơi vào nhánh chuỗi thô và mất định dạng.
+                    const action = resolveDrillDown(backendKey, col.column, {
+                      raw,
+                      row: row.original,
+                      filters,
+                    });
+                    const content = action ? (
+                      <a
+                        className="cursor-pointer text-info hover:underline"
+                        onClick={() => runDrillDown(action)}
+                      >
+                        {raw}
+                      </a>
                     ) : isReportNumberColumn(col) ? (
                       formatReportNumber(raw)
                     ) : (

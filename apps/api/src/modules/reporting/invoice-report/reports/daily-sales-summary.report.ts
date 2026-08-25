@@ -16,6 +16,7 @@ import { toBusinessDate } from '../../../../common/utils/business-timezone.util'
 import { PaymentAccountEntity } from '../../../accounting/payment-accounts/payment-account.entity';
 import { PaymentAccountMethod } from '../../../accounting/payment-accounts/enums';
 import { InvoiceEntity, RefundMethod } from '../../../pos/entities/invoice.entity';
+import { InvoiceItemEntity } from '../../../pos/entities/invoice-item.entity';
 import { InvoicePaymentEntity } from '../../../pos/entities/invoice-payment.entity';
 import { InvoicePromotionEntity } from '../../../promotion/invoice-promotion.entity';
 import { RbacService } from '../../../rbac/rbac.service';
@@ -43,6 +44,7 @@ import {
   applyInvoiceStatusFilter,
   CONSOLIDATED_PERMISSION,
   invoiceTypeSign,
+  loadSignedLineDiscounts,
   resolveBranchIds,
   signedGoods,
 } from '../../report-core/report-query.util';
@@ -59,6 +61,8 @@ export class DailySalesSummaryReport implements ReportDefinition {
   constructor(
     @InjectRepository(InvoiceEntity)
     private readonly invoices: Repository<InvoiceEntity>,
+    @InjectRepository(InvoiceItemEntity)
+    private readonly lineItems: Repository<InvoiceItemEntity>,
     @InjectRepository(InvoicePaymentEntity)
     private readonly payments: Repository<InvoicePaymentEntity>,
     @InjectRepository(InvoicePromotionEntity)
@@ -70,14 +74,24 @@ export class DailySalesSummaryReport implements ReportDefinition {
 
   async buildColumns(actor: ActorContext): Promise<ReportColumnHeader[]> {
     const fixed: ReportColumnHeader[] = INVOICE_REPORT_SUMMARY_COLUMNS.map(
-      (c) =>
-        enrichHeader({
+      (c) => {
+        const header = enrichHeader({
           col: c.key,
           name: INVOICE_REPORT_COLUMN_LABELS_VI[c.key] ?? c.key,
           desc: INVOICE_REPORT_COLUMN_DESCS[c.key] ?? null,
           type: c.type,
           group: band(c.group),
-        }),
+        });
+        // `date` is a link on THIS report only — clicking it opens that day's
+        // invoice listing. The shared LINK_COLUMNS set is keyed by column name,
+        // so putting `date` there would light it up on invoice-order-listing and
+        // invoice-item-revenue-detail too, where a click means nothing.
+        //
+        // The flag only says "render it as a link"; whether a click does anything
+        // is the frontend drill-down registry's call (ADR-02).
+        if (header.col === 'date') header.link = true;
+        return header;
+      },
     );
 
     const accounts = await this.activeAccounts(actor);
@@ -160,25 +174,35 @@ export class DailySalesSummaryReport implements ReportDefinition {
     // −subtotal, EXCHANGE newSubtotal−returnSubtotal); the header money fields and
     // payments/promotions are signed by type (RETURN negates). Signing lives here
     // (not the aggregator) so the cash-refund netting in TKT-RPT-03 composes.
+    const dated = invoiceRows.filter((i) => i.issuedAt);
+    // "Khuyến mại" comes from the lines, not `invoices.discount_amount`: the
+    // header only ever records the discount on what was sold, so an EXCHANGE
+    // whose returned line reverses a promotion shows nothing there. Signing is
+    // already inside the helper (by `direction`) — see loadSignedLineDiscounts.
+    const lineDiscounts = await loadSignedLineDiscounts(
+      this.lineItems,
+      dated.map((i) => i.id),
+    );
+
     const signByInvoice = new Map<string, number>();
-    const invoiceInputs: InvoiceAggInput[] = invoiceRows
-      .filter((i) => i.issuedAt)
-      .map((i) => {
-        const sign = invoiceTypeSign(i.type);
-        signByInvoice.set(i.id, sign);
-        // A cash refund is captured on the header (refundedAmount + refundMethod),
-        // never in invoice_payments, so net it out of actual revenue (Σ totalPaid).
-        const cashRefund =
-          i.refundMethod === RefundMethod.CASH ? Number(i.refundedAmount ?? 0) : 0;
-        return {
-          id: i.id,
-          day: toBusinessDate(i.issuedAt!),
-          subtotal: signedGoods(i),
-          discountAmount: sign * Number(i.discountAmount ?? 0),
-          pointsDiscountAmount: sign * Number(i.pointsDiscountAmount ?? 0),
-          totalPaid: sign * Number(i.totalPaid ?? 0) - cashRefund,
-        };
-      });
+    const invoiceInputs: InvoiceAggInput[] = dated.map((i) => {
+      const sign = invoiceTypeSign(i.type);
+      signByInvoice.set(i.id, sign);
+      // A cash refund is captured on the header (refundedAmount + refundMethod),
+      // never in invoice_payments, so net it out of actual revenue (Σ totalPaid).
+      const cashRefund =
+        i.refundMethod === RefundMethod.CASH ? Number(i.refundedAmount ?? 0) : 0;
+      return {
+        id: i.id,
+        day: toBusinessDate(i.issuedAt!),
+        subtotal: signedGoods(i),
+        // No `sign *` here, unlike every other field: `direction` has already
+        // negated a RETURN's lines, and signing twice flips it back positive.
+        discountAmount: lineDiscounts.get(i.id) ?? 0,
+        pointsDiscountAmount: sign * Number(i.pointsDiscountAmount ?? 0),
+        totalPaid: sign * Number(i.totalPaid ?? 0) - cashRefund,
+      };
+    });
 
     const needsPayments = referenced.some(
       (c) => c === 'revenue.cash' || isDynamicColumnKey(c),
