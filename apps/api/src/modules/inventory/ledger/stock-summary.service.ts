@@ -1066,9 +1066,27 @@ export class StockSummaryService {
       });
     }
     if (query.categoryId) {
-      qb.andWhere("item.category_id = :categoryId", {
-        categoryId: query.categoryId,
-      });
+      // Item categories form a tree (`parent_group_id`) and items are attached
+      // to leaves, so an exact match on a parent group returns nothing at all.
+      // Filtering on the whole subtree matches the POS catalog filter
+      // (`resolveDescendantCategoryIds`). `UNION` (not `UNION ALL`) so a
+      // malformed tree with a cycle terminates instead of looping.
+      qb.andWhere(
+        `item.category_id IN (
+          WITH RECURSIVE category_tree AS (
+            SELECT root.id
+            FROM inventory_item_categories root
+            WHERE root.id = :categoryId
+              AND root.organization_id = :organizationId
+            UNION
+            SELECT child.id
+            FROM inventory_item_categories child
+            INNER JOIN category_tree parent ON child.parent_group_id = parent.id
+          )
+          SELECT id FROM category_tree
+        )`,
+        { categoryId: query.categoryId },
+      );
     }
     if (query.search && query.search.trim()) {
       qb.andWhere(`(${group.code} ILIKE :q OR ${group.name} ILIKE :q)`, {

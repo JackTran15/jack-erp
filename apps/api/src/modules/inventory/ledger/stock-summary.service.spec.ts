@@ -61,6 +61,35 @@ describe("StockSummaryService", () => {
     expect(qb.offset).toHaveBeenCalledWith(25);
   });
 
+  it("filters the category subtree, not just the selected category", async () => {
+    const qb = createQueryBuilder([]);
+    const manager = {
+      query: jest.fn().mockResolvedValue([{ total: 0, total_quantity: "0" }]),
+    };
+    const service = new StockSummaryService({
+      createQueryBuilder: jest.fn().mockReturnValue(qb),
+      manager,
+    } as never);
+
+    await service.getSummary({
+      organizationId: "44444444-4444-4444-8444-444444444444",
+      categoryId: "55555555-5555-4555-8555-555555555555",
+    });
+
+    const categoryCall = qb.andWhere.mock.calls.find(([sql]) =>
+      String(sql).includes("item.category_id IN"),
+    );
+    expect(categoryCall).toBeDefined();
+    // Items hang off leaf categories, so a parent group only matches through
+    // its descendants — an `item.category_id = :categoryId` equality is the bug
+    // this guards against.
+    expect(String(categoryCall?.[0])).toContain("WITH RECURSIVE");
+    expect(String(categoryCall?.[0])).toContain("child.parent_group_id");
+    expect(categoryCall?.[1]).toEqual({
+      categoryId: "55555555-5555-4555-8555-555555555555",
+    });
+  });
+
   it("calculates period values from startDate/endDate while preserving movement filters", async () => {
     const row = {
       group_key: "11111111-1111-4111-8111-111111111111",

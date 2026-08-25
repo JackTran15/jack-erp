@@ -73,14 +73,20 @@ async function updateReportTemplate(
 
 /**
  * Template "Hiển thị cột" của report đang mở (v1: template ngầm định đầu tiên
- * theo reportType). Hiện chỉ bật cho báo cáo kho (backendSource inventory) —
- * báo cáo bán hàng adopt sau.
+ * theo reportType).
+ *
+ * Bật cho báo cáo kho + báo cáo bán hàng. Chưa bật cho `debt`/`profit`: bộ cột
+ * của hai nguồn đó đổi theo filter "Thống kê theo", trong khi backend dựng
+ * catalog để kiểm tra template bằng `buildColumns(actor)` không kèm filter —
+ * lưu ở grain khác grain mặc định sẽ bị từ chối "Unknown report columns".
  */
+const TEMPLATE_SOURCES: TemplateSource[] = ["inventory", "invoice"];
+
 export function useReportColumnTemplate() {
   const reportType = useReportStore((s) => s.reportType);
   const source = getReportBackendSource(reportType);
   const backendKey = getReportBackendKey(reportType);
-  const enabled = source === "inventory" && Boolean(backendKey);
+  const enabled = TEMPLATE_SOURCES.includes(source) && Boolean(backendKey);
 
   const query = useQuery({
     queryKey: ["report-templates", source, backendKey],
