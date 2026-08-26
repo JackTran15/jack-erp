@@ -113,6 +113,14 @@ export class BalanceQueryDto extends PaginationQueryDto {
   @IsBoolean()
   isTracked?: boolean;
 
+  @ApiPropertyOptional({
+    description: 'Loại trừ kho showroom (storages.is_main_storage) khỏi kết quả.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => parseBool(value))
+  @IsBoolean()
+  excludeShowroom?: boolean;
+
   // Per-column string filters
   @ApiPropertyOptional()
   @IsOptional()

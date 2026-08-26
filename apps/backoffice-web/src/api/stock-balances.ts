@@ -59,6 +59,8 @@ export interface StockBalancesQuery {
   locationId?: string;
   storageId?: string;
   isTracked?: boolean;
+  /** Loại trừ kho showroom (is_main_storage) khỏi kết quả. */
+  excludeShowroom?: boolean;
   // Per-column symbol filters
   locationCode?: string;
   locationCodeMode?: StringFilterMode;

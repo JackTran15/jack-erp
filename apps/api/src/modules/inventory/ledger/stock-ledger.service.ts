@@ -100,6 +100,8 @@ export interface BalanceQuery extends PaginationQuery {
   isActive?: boolean;
   /** Filter by location-level tracking (stock_balances.is_tracked); omit = tất cả. */
   isTracked?: boolean;
+  /** Loại trừ kho showroom (storages.is_main_storage = true) khỏi kết quả. */
+  excludeShowroom?: boolean;
   organizationId: string;
 
   // Per-column string filters (server-side)
@@ -470,6 +472,9 @@ export class StockLedgerService {
       qb.andWhere('loc.storage_id = :storageId', {
         storageId: query.storageId,
       });
+    }
+    if (query.excludeShowroom) {
+      qb.andWhere('storage.is_main_storage = false');
     }
     if (query.unassigned) {
       qb.andWhere('loc.is_unassigned = true');

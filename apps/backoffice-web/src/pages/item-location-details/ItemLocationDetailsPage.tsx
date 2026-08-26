@@ -39,13 +39,14 @@ import {
   buildItemLocationColumns,
   buildLocationStockItemColumns,
 } from "./ItemLocationDetailsColumns";
-import { buildQuery } from "./ItemLocationDetailsQuery";
+import { buildQuery, EXCLUDE_SHOWROOM_FILTER_VALUE } from "./ItemLocationDetailsQuery";
 import { ArrangeLocationDialog } from "./ArrangeLocationDialog";
 import { TransferLocationDialog } from "./TransferLocationDialog";
 
 interface InventoryStorage {
   id: string;
   name: string;
+  isMainStorage: boolean;
 }
 
 const naturalCollator = new Intl.Collator("vi-VN", {
@@ -84,6 +85,7 @@ export function ItemLocationDetailsPage() {
   const isLocationDetail = Boolean(locationId);
   const [filters, setFilters] = useState<Record<string, ColumnFilter>>({
     isTracked: { mode: "equals", value: "true" },
+    storageId: { mode: "equals", value: EXCLUDE_SHOWROOM_FILTER_VALUE },
   });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -346,10 +348,20 @@ export function ItemLocationDetailsPage() {
     [locationRows, page, pageSize],
   );
 
-  const storageFilterOptions = useMemo(
-    () => (storagesQuery.data ?? []).map((s) => ({ value: s.id, label: s.name })),
-    [storagesQuery.data],
-  );
+  // Option "Trừ {kho showroom}" luôn đứng đầu (ngay dưới "— Tất cả —" do bảng
+  // tự thêm) kể cả khi danh sách kho chưa tải xong, để lựa chọn mặc định hiển
+  // thị đúng ngay lần render đầu; nhãn tự điền tên kho khi danh sách về.
+  const storageFilterOptions = useMemo(() => {
+    const storages = storagesQuery.data ?? [];
+    const showroom = storages.find((s) => s.isMainStorage);
+    return [
+      {
+        value: EXCLUDE_SHOWROOM_FILTER_VALUE,
+        label: showroom ? `Trừ ${showroom.name}` : "Trừ kho showroom",
+      },
+      ...storages.map((s) => ({ value: s.id, label: s.name })),
+    ];
+  }, [storagesQuery.data]);
 
   const stockColumns = useMemo(
     () => buildItemLocationColumns(stockRowIndexMap, storageFilterOptions),
