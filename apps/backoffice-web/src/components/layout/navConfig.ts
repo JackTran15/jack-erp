@@ -3,7 +3,7 @@ import {
   Settings,
   Warehouse,
   BarChart3,
-  ClipboardCheck,
+  // ClipboardCheck,
   ShoppingCart,
   PackageOpen,
   PackageMinus,
@@ -373,38 +373,38 @@ export const navConfig: NavModule[] = [
       // },
     ],
   },
-  {
-    id: "onboarding",
-    label: "Đăng ký & Phê duyệt",
-    icon: ClipboardCheck,
-    defaultPath: "/onboarding/approvals",
-    flyout: { enabled: true },
-    sections: [
-      {
-        id: "onboarding-main",
-        children: [
-          {
-            to: "/onboarding/approvals",
-            label: "Hàng chờ phê duyệt",
-            permission: [
-              "org.registration.approve",
-              "branch.registration.approve",
-            ],
-          },
-          {
-            to: "/onboarding/org-registration",
-            label: "Đăng ký tổ chức",
-            permission: "org.registration.submit",
-          },
-          {
-            to: "/onboarding/branch-registration",
-            label: "Đăng ký chi nhánh",
-            permission: "branch.registration.submit",
-          },
-        ],
-      },
-    ],
-  },
+  // {
+  // id: "onboarding",
+  // label: "Đăng ký & Phê duyệt",
+  // icon: ClipboardCheck,
+  // defaultPath: "/onboarding/approvals",
+  // flyout: { enabled: true },
+  // sections: [
+  // {
+  // id: "onboarding-main",
+  // children: [
+  // {
+  // to: "/onboarding/approvals",
+  // label: "Hàng chờ phê duyệt",
+  // permission: [
+  // "org.registration.approve",
+  // "branch.registration.approve",
+  // ],
+  // },
+  // {
+  // to: "/onboarding/org-registration",
+  // label: "Đăng ký tổ chức",
+  // permission: "org.registration.submit",
+  // },
+  // {
+  // to: "/onboarding/branch-registration",
+  // label: "Đăng ký chi nhánh",
+  // permission: "branch.registration.submit",
+  // },
+  // ],
+  // },
+  // ],
+  // },
   {
     id: "catalog",
     label: "Danh mục",

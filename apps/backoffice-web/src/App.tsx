@@ -14,10 +14,10 @@ import { CrudDetailPage } from "./components/crud/CrudDetailPage";
 import { CrudEditPage } from "./components/crud/CrudEditPage";
 import { BranchManagementPage } from "./pages/branch-management/BranchManagementPage";
 import { SalesHierarchyPage } from "./pages/branch-management/SalesHierarchyPage";
-import { OrgRegistrationPage } from "./pages/onboarding/OrgRegistrationPage";
-import { BranchRegistrationPage } from "./pages/onboarding/BranchRegistrationPage";
-import { ApprovalQueuePage } from "./pages/onboarding/ApprovalQueuePage";
-import { RegistrationDetailPage } from "./pages/onboarding/RegistrationDetailPage";
+// import { OrgRegistrationPage } from "./pages/onboarding/OrgRegistrationPage";
+// import { BranchRegistrationPage } from "./pages/onboarding/BranchRegistrationPage";
+// import { ApprovalQueuePage } from "./pages/onboarding/ApprovalQueuePage";
+// import { RegistrationDetailPage } from "./pages/onboarding/RegistrationDetailPage";
 import { DashboardReportPage } from "./pages/reports/DashboardReportPage";
 import { ReportPage } from "./pages/chain-store/reports/ReportPage";
 import { REPORT_CATEGORY } from "./constants/reports/report-category.constant";
@@ -183,6 +183,7 @@ export function App() {
                   path="/inventory/transfer-orders"
                   element={<TransferOrdersPage />}
                 />
+                {/* Onboarding routes hidden
                 <Route
                   path="/onboarding/org-registration"
                   element={<OrgRegistrationPage />}
@@ -199,6 +200,7 @@ export function App() {
                   path="/onboarding/approvals/:id"
                   element={<RegistrationDetailPage />}
                 />
+                */}
                 <Route path="/reports" element={<DashboardReportPage />} />
                 <Route
                   path="/reports/dashboard"
