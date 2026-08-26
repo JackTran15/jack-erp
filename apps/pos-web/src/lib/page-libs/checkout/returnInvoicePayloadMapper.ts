@@ -13,9 +13,16 @@ import type {
 import type { ReturnInvoiceMode } from "@erp/pos/types/invoice.type";
 import type { ResolveCheckoutPayloadError } from "@erp/pos/types/checkout.type";
 
-/** CartLine (dòng trả) → ReturnInvoiceLineBody. `lineDiscount` chưa wire ⇒ 0. */
+/**
+ * CartLine (dòng trả) → ReturnInvoiceLineBody.
+ *
+ * KM dòng gửi lên dưới dạng **ý định** (`type` + `value` + `reason`) chứ không
+ * phải số tiền đã tính: BE tự suy ra `lineDiscount` và `lineTotal`. Trước đây
+ * chỗ này gửi cứng `lineDiscount: 0`, nên một dòng KM 30% xuống tới chứng từ là
+ * giá gộp — đơn đổi hiện 19.500 trên màn hình lại thành 225.000 phần chênh.
+ */
 function mapReturnLine(line: CartLine): ReturnInvoiceLineBody {
-  return {
+  const body: ReturnInvoiceLineBody = {
     originalInvoiceItemId: line.originalInvoiceItemId,
     itemId: line.itemId,
     itemCode: line.code,
@@ -24,13 +31,18 @@ function mapReturnLine(line: CartLine): ReturnInvoiceLineBody {
     locationId: line.locationId,
     quantity: line.qty,
     unitPrice: line.unitPrice,
-    lineDiscount: 0,
   };
+  if (line.lineDiscount) {
+    body.lineDiscountType = line.lineDiscount.type;
+    body.lineDiscountValue = line.lineDiscount.value;
+    body.lineDiscountReason = line.lineDiscount.reason;
+  }
+  return body;
 }
 
 /** CartLine (hàng mua mới của đơn đổi) → CreateInvoiceItemBody (giống SALE). */
 function mapNewLine(line: CartLine, index: number): CreateInvoiceItemBody {
-  return {
+  const body: CreateInvoiceItemBody = {
     itemId: line.itemId,
     locationId: line.locationId || undefined,
     itemCode: line.code,
@@ -38,9 +50,14 @@ function mapNewLine(line: CartLine, index: number): CreateInvoiceItemBody {
     unit: line.unit,
     quantity: line.qty,
     unitPrice: line.unitPrice,
-    lineDiscount: 0,
     sortOrder: index,
   };
+  if (line.lineDiscount) {
+    body.lineDiscountType = line.lineDiscount.type;
+    body.lineDiscountValue = line.lineDiscount.value;
+    body.lineDiscountReason = line.lineDiscount.reason;
+  }
+  return body;
 }
 
 interface BuildCreateReturnPayloadInput {

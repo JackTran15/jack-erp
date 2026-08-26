@@ -10,7 +10,11 @@ import type {
   InvoicePaymentLineBody,
   UpdateInvoiceBody,
 } from "@erp/pos/dtos/invoice.dto";
-import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
+import type {
+  InvoiceItemRow,
+  InvoiceRow,
+} from "@erp/pos/interfaces/invoice.interface";
+import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import type { ResolveCheckoutPayloadError } from "@erp/pos/types/checkout.type";
 import type {
   CartLine,
@@ -181,7 +185,7 @@ export function mapInvoiceRowToDraftInvoice(
   row: InvoiceRow,
   customer?: CustomerRow | null,
 ): DraftInvoice {
-  const lines: CartLine[] = (row.items ?? []).map((item) => {
+  const mapLine = (item: InvoiceItemRow): CartLine => {
     const line: CartLine = {
       lineId: item.id,
       itemId: item.itemId,
@@ -211,8 +215,22 @@ export function mapInvoiceRowToDraftInvoice(
         reason: item.lineDiscountReason ?? "",
       };
     }
+    if (item.direction === "IN") {
+      // Dòng hàng TRẢ. Bỏ cờ này là mắt xích đã biến một phiếu đổi dở dang thành
+      // đơn bán: hàng khách trả lại nằm im trong giỏ mua và được bán lần nữa.
+      line.isReturnCredit = true;
+      if (item.originalInvoiceItemId) {
+        line.originalInvoiceItemId = item.originalInvoiceItemId;
+      }
+    }
     return line;
-  });
+  };
+
+  const items = row.items ?? [];
+  const lines = items.map(mapLine);
+  // `type` quyết định tab được mở lại là đơn bán hay đơn đổi/trả; `direction`
+  // quyết định mỗi dòng về giỏ nào. Thiếu một trong hai thì restore luôn ra SALE.
+  const isReturnDocument = row.type === "RETURN" || row.type === "EXCHANGE";
 
   return {
     id: row.id,
@@ -223,5 +241,17 @@ export function mapInvoiceRowToDraftInvoice(
     createdAt: new Date(row.createdAt),
     lines,
     total: Number(row.amountDue) || 0,
+    ...(isReturnDocument
+      ? {
+          checkoutVariant: CheckoutVariantEnum.QUICK_EXCHANGE,
+          quickExchangeReturn: items
+            .filter((i) => i.direction === "IN")
+            .map(mapLine),
+          quickExchangePurchase: items
+            .filter((i) => i.direction !== "IN")
+            .map(mapLine),
+          originalInvoiceId: row.originalInvoiceId,
+        }
+      : {}),
   };
 }

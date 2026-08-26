@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { PaymentMethodEnum } from "@erp/pos/constants/checkout.constant";
-import { buildCheckoutInvoiceApiPayload } from "@erp/pos/lib/page-libs/checkout/invoicePayloadMapper";
+import {
+  buildCheckoutInvoiceApiPayload,
+  mapInvoiceRowToDraftInvoice,
+} from "@erp/pos/lib/page-libs/checkout/invoicePayloadMapper";
 import type { PaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 
 function cashLine(
@@ -157,5 +160,119 @@ describe("buildCheckoutInvoiceApiPayload", () => {
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.body.selectedProgramIds).toBeUndefined();
+  });
+});
+
+/**
+ * Khôi phục phiếu nháp đổi/trả: `direction` quyết định dòng về giỏ nào, `type`
+ * quyết định tab mở ra là đơn bán hay đơn đổi trả. Bản cũ bỏ cả hai, nên một
+ * phiếu EXCHANGE dở dang mở lại thành đơn bán với hàng khách trả nằm trong giỏ
+ * mua — thu ngân xoá dòng đó rồi thanh toán là thành hoá đơn EXCHANGE có
+ * `net_amount` mồ côi.
+ */
+describe("mapInvoiceRowToDraftInvoice — phiếu đổi/trả", () => {
+  const inLine = {
+    id: "item-in",
+    itemId: "i-1",
+    itemCode: "TH9864-K-37",
+    itemName: "Giày nữ",
+    unit: "Đôi",
+    quantity: 1,
+    unitPrice: 460_000,
+    lineDiscount: 0,
+    lineTotal: 460_000,
+    direction: "IN" as const,
+    locationId: "loc-1",
+    sortOrder: 0,
+  };
+  const outLine = {
+    id: "item-out",
+    itemId: "i-2",
+    itemCode: "AK29011-XA-36",
+    itemName: "Giày thể thao",
+    unit: "Đôi",
+    quantity: 1,
+    unitPrice: 685_000,
+    lineDiscount: 205_500,
+    lineDiscountType: "percent" as const,
+    lineDiscountValue: 30,
+    lineDiscountReason: "sale30",
+    lineTotal: 479_500,
+    direction: "OUT" as const,
+    locationId: "loc-1",
+    sortOrder: 1,
+  };
+  const row = (over: Record<string, unknown> = {}) =>
+    ({
+      id: "inv-1",
+      code: "DRAFT-abc",
+      status: "draft",
+      isDraft: true,
+      sessionId: "sess-1",
+      staffId: "user-1",
+      subtotal: 479_500,
+      amountDue: 19_500,
+      createdAt: new Date().toISOString(),
+      items: [inLine, outLine],
+      ...over,
+    }) as never;
+
+  it("EXCHANGE: tách dòng IN sang giỏ trả, dòng OUT sang giỏ mua", () => {
+    const draft = mapInvoiceRowToDraftInvoice(row({ type: "EXCHANGE" }));
+
+    expect(draft.checkoutVariant).toBe("quick_exchange");
+    expect(draft.quickExchangeReturn?.map((l) => l.code)).toEqual([
+      "TH9864-K-37",
+    ]);
+    expect(draft.quickExchangePurchase?.map((l) => l.code)).toEqual([
+      "AK29011-XA-36",
+    ]);
+    expect(draft.quickExchangeReturn?.[0].isReturnCredit).toBe(true);
+    expect(draft.quickExchangePurchase?.[0].isReturnCredit).toBeUndefined();
+  });
+
+  it("EXCHANGE: KM theo dòng được dựng lại", () => {
+    const draft = mapInvoiceRowToDraftInvoice(row({ type: "EXCHANGE" }));
+
+    expect(draft.quickExchangePurchase?.[0].lineDiscount).toEqual({
+      type: "percent",
+      value: 30,
+      reason: "sale30",
+    });
+  });
+
+  it("EXCHANGE theo hóa đơn gốc: giữ originalInvoiceId và originalInvoiceItemId", () => {
+    const draft = mapInvoiceRowToDraftInvoice(
+      row({
+        type: "EXCHANGE",
+        originalInvoiceId: "orig-1",
+        items: [{ ...inLine, originalInvoiceItemId: "orig-item-1" }, outLine],
+      }),
+    );
+
+    expect(draft.originalInvoiceId).toBe("orig-1");
+    expect(draft.quickExchangeReturn?.[0].originalInvoiceItemId).toBe(
+      "orig-item-1",
+    );
+  });
+
+  it("RETURN: toàn bộ dòng nằm ở giỏ trả, giỏ mua rỗng", () => {
+    const draft = mapInvoiceRowToDraftInvoice(
+      row({ type: "RETURN", items: [inLine] }),
+    );
+
+    expect(draft.checkoutVariant).toBe("quick_exchange");
+    expect(draft.quickExchangeReturn).toHaveLength(1);
+    expect(draft.quickExchangePurchase).toEqual([]);
+  });
+
+  it("SALE: giữ nguyên hành vi cũ — không tách giỏ, không đặt variant", () => {
+    const draft = mapInvoiceRowToDraftInvoice(
+      row({ type: "SALE", items: [outLine] }),
+    );
+
+    expect(draft.checkoutVariant).toBeUndefined();
+    expect(draft.quickExchangeReturn).toBeUndefined();
+    expect(draft.lines).toHaveLength(1);
   });
 });

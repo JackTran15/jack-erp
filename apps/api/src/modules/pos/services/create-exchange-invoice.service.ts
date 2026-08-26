@@ -18,6 +18,10 @@ import {
 } from '../entities/invoice-item.entity';
 import { ItemEntity } from '../../inventory/location/item.entity';
 import { resolveBranchItemLocations } from './resolve-branch-item-locations';
+import {
+  computeLineDiscount,
+  ResolvedLineDiscount,
+} from './line-discount.util';
 import { CreateExchangeInvoiceDto } from '../dto/create-exchange-invoice.dto';
 import { CreateInvoiceItemDto } from '../dto/create-invoice.dto';
 import { ReturnInvoiceLineDto } from '../dto/create-return-invoice.dto';
@@ -91,14 +95,22 @@ export class CreateExchangeInvoiceService {
       }
     }
 
-    const returnSubtotal = dto.returnLines.reduce(
-      (sum, l) => sum + l.quantity * l.unitPrice - (l.lineDiscount ?? 0),
+    // Both legs resolve their per-line discount once, and every downstream number
+    // — the two subtotals, `netAmount`, and the persisted line rows — reads that
+    // one resolution. Summing gross here is what produced the 225.000 net on an
+    // exchange POS displayed as 19.500: the cashier's 30% line discount lived
+    // only in the browser, so the customer was asked to owe the discount.
+    const resolvedReturnLines = dto.returnLines.map((line) =>
+      computeLineDiscount(line),
+    );
+    const resolvedNewLines = dto.newLines.map((line) =>
+      computeLineDiscount(line),
+    );
+    const returnSubtotal = resolvedReturnLines.reduce(
+      (sum, d) => sum + d.lineTotal,
       0,
     );
-    const newSubtotal = dto.newLines.reduce(
-      (sum, l) => sum + l.quantity * l.unitPrice - (l.lineDiscount ?? 0),
-      0,
-    );
+    const newSubtotal = resolvedNewLines.reduce((sum, d) => sum + d.lineTotal, 0);
     const netAmount = Number((newSubtotal - returnSubtotal).toFixed(2));
     const refundedAmount = Math.max(returnSubtotal - newSubtotal, 0);
 
@@ -136,8 +148,9 @@ export class CreateExchangeInvoiceService {
         { showroomOnly: true },
       );
 
-      const returnItems = dto.returnLines.map((line, index) =>
-        manager.create(InvoiceItemEntity, {
+      const returnItems = dto.returnLines.map((line, index) => {
+        const discount = resolvedReturnLines[index];
+        return manager.create(InvoiceItemEntity, {
           organizationId: actor.organizationId,
           branchId: actor.branchId,
           createdBy: actor.userId,
@@ -154,15 +167,18 @@ export class CreateExchangeInvoiceService {
           costPrice: line.originalInvoiceItemId
             ? costPriceByOriginalItemId.get(line.originalInvoiceItemId) ?? 0
             : costPriceByItemId.get(line.itemId) ?? 0,
-          lineDiscount: line.lineDiscount ?? 0,
-          lineTotal: line.quantity * line.unitPrice - (line.lineDiscount ?? 0),
+          lineDiscount: discount.amount,
+          lineDiscountType: discount.type ?? undefined,
+          lineDiscountValue: discount.value ?? undefined,
+          lineDiscountReason: discount.reason ?? undefined,
+          lineTotal: discount.lineTotal,
           direction: ItemDirection.IN,
           returnedQuantity: 0,
           originalInvoiceItemId: line.originalInvoiceItemId,
           note: line.note,
           sortOrder: index,
-        }),
-      );
+        });
+      });
       await manager.save(returnItems);
 
       // Resolve catalog + product location for new lines.
@@ -170,6 +186,7 @@ export class CreateExchangeInvoiceService {
         manager,
         saved.id,
         dto.newLines,
+        resolvedNewLines,
         actor,
         dto.returnLines.length,
       );
@@ -190,6 +207,7 @@ export class CreateExchangeInvoiceService {
     manager: EntityManager,
     invoiceId: string,
     newLines: CreateInvoiceItemDto[],
+    resolvedLines: ResolvedLineDiscount[],
     actor: ActorContext,
     sortOffset: number,
   ): Promise<InvoiceItemEntity[]> {
@@ -215,6 +233,7 @@ export class CreateExchangeInvoiceService {
 
     return newLines.map((line, index) => {
       const catalog = priceMap.get(line.itemId);
+      const discount = resolvedLines[index];
       // Prefer the resolved showroom location over the FE-supplied shelf so a
       // "Mua thêm" line deducts from the showroom, like every other sale path.
       const resolvedLocationId = itemLocationMap.get(line.itemId) ?? line.locationId;
@@ -232,8 +251,11 @@ export class CreateExchangeInvoiceService {
         unitPrice: line.unitPrice,
         unitPriceDefault: catalog?.sellingPrice ?? 0,
         costPrice: catalog?.purchasePrice ?? 0,
-        lineDiscount: line.lineDiscount ?? 0,
-        lineTotal: line.quantity * line.unitPrice - (line.lineDiscount ?? 0),
+        lineDiscount: discount.amount,
+        lineDiscountType: discount.type ?? undefined,
+        lineDiscountValue: discount.value ?? undefined,
+        lineDiscountReason: discount.reason ?? undefined,
+        lineTotal: discount.lineTotal,
         direction: ItemDirection.OUT,
         returnedQuantity: 0,
         note: line.note,

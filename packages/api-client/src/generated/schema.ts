@@ -12091,7 +12091,17 @@ export interface components {
             locationId: string;
             quantity: number;
             unitPrice: number;
+            /** @description Server-computed discount amount; ignored when lineDiscountType is set. */
             lineDiscount?: number;
+            /**
+             * @description Manual per-line discount type; when set, the server computes lineDiscount from lineDiscountValue.
+             * @enum {string}
+             */
+            lineDiscountType?: "percent" | "amount";
+            /** @description Raw discount value: 10 means 10% when type=percent; a currency amount when type=amount. */
+            lineDiscountValue?: number;
+            /** @description Free-text reason/label for the discount, e.g. "sale30". */
+            lineDiscountReason?: string;
             note?: string;
         };
         CreateReturnInvoiceDto: {

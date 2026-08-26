@@ -9,10 +9,7 @@ import { Repository, DataSource, In, EntityManager } from 'typeorm';
 import { PromotionProgramType } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { InvoiceEntity, InvoiceStatus } from '../entities/invoice.entity';
-import {
-  InvoiceItemEntity,
-  LineDiscountType,
-} from '../entities/invoice-item.entity';
+import { InvoiceItemEntity } from '../entities/invoice-item.entity';
 import { InvoicePaymentEntity } from '../entities/invoice-payment.entity';
 import { InvoiceDebtEntity } from '../entities/invoice-debt.entity';
 import { ItemEntity } from '../../inventory/location/item.entity';
@@ -26,6 +23,11 @@ import { CreateInvoiceDto } from '../dto/create-invoice.dto';
 import { UpdateInvoiceDto } from '../dto/update-invoice.dto';
 import { InvoiceQueryDto } from '../dto/invoice-query.dto';
 import { computeAmountDue } from './invoice-amount.util';
+import {
+  computeLineDiscount,
+  LineDiscountInput,
+  ResolvedLineDiscount,
+} from './line-discount.util';
 
 @Injectable()
 export class InvoiceService {
@@ -76,61 +78,9 @@ export class InvoiceService {
     return profile.id;
   }
 
-  /**
-   * Resolves a line item's manual discount into the persisted breakdown. When a
-   * `lineDiscountType` is supplied the server computes the discount amount from
-   * the raw value (percent of gross, or a flat amount), clamped to the line
-   * gross so the line total never goes negative. With no type it falls back to
-   * the legacy raw `lineDiscount` amount (type/value stay null), preserving the
-   * previous arithmetic. The free-text reason is kept regardless.
-   */
-  private computeLineDiscount(item: {
-    quantity: number;
-    unitPrice: number;
-    lineDiscount?: number;
-    lineDiscountType?: LineDiscountType;
-    lineDiscountValue?: number;
-    lineDiscountReason?: string;
-  }): {
-    amount: number;
-    lineTotal: number;
-    type: LineDiscountType | null;
-    value: number | null;
-    reason: string | null;
-  } {
-    const round2 = (n: number) => Math.round(n * 100) / 100;
-    const gross = item.quantity * item.unitPrice;
-    const reason = item.lineDiscountReason ?? null;
-
-    if (item.lineDiscountType) {
-      const value = item.lineDiscountValue;
-      if (value === undefined || value === null || value < 0) {
-        throw new BadRequestException(
-          'lineDiscountValue is required and must be >= 0 when lineDiscountType is set',
-        );
-      }
-      if (item.lineDiscountType === LineDiscountType.PERCENT && value > 100) {
-        throw new BadRequestException(
-          'lineDiscountValue must be <= 100 for percent discounts',
-        );
-      }
-      const raw =
-        item.lineDiscountType === LineDiscountType.PERCENT
-          ? round2((gross * value) / 100)
-          : round2(value);
-      const amount = Math.min(raw, gross);
-      return {
-        amount,
-        lineTotal: round2(gross - amount),
-        type: item.lineDiscountType,
-        value,
-        reason,
-      };
-    }
-
-    // Legacy path: identical arithmetic to the previous implementation.
-    const amount = item.lineDiscount ?? 0;
-    return { amount, lineTotal: gross - amount, type: null, value: null, reason };
+  /** Thin wrapper over the shared util so existing call sites stay unchanged. */
+  private computeLineDiscount(item: LineDiscountInput): ResolvedLineDiscount {
+    return computeLineDiscount(item);
   }
 
   async create(dto: CreateInvoiceDto, actor: ActorContext): Promise<InvoiceEntity> {

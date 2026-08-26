@@ -36908,7 +36908,26 @@
           },
           "lineDiscount": {
             "type": "number",
+            "description": "Server-computed discount amount; ignored when lineDiscountType is set.",
             "minimum": 0
+          },
+          "lineDiscountType": {
+            "type": "string",
+            "description": "Manual per-line discount type; when set, the server computes lineDiscount from lineDiscountValue.",
+            "enum": [
+              "percent",
+              "amount"
+            ]
+          },
+          "lineDiscountValue": {
+            "type": "number",
+            "description": "Raw discount value: 10 means 10% when type=percent; a currency amount when type=amount.",
+            "minimum": 0
+          },
+          "lineDiscountReason": {
+            "type": "string",
+            "description": "Free-text reason/label for the discount, e.g. \"sale30\".",
+            "maxLength": 255
           },
           "note": {
             "type": "string"

@@ -148,3 +148,75 @@ describe("buildCreateExchangePayload — originalInvoiceId is the mode discrimin
     expect(body.newLines[0]).toMatchObject({ itemId: "item-1", sortOrder: 0 });
   });
 });
+
+/**
+ * KM theo dòng phải đi lên BE dưới dạng ý định (type/value/reason). Gửi cứng
+ * `lineDiscount: 0` như bản cũ khiến chứng từ nhận giá gộp: một đơn đổi POS hiện
+ * "Còn phải thu 19.500" bị BE tính thành 225.000 rồi đòi ghi công nợ.
+ */
+describe("buildCreateExchangePayload — KM theo dòng", () => {
+  const returnLine = cartLine({
+    lineId: "ret-1",
+    unitPrice: 460_000,
+    isReturnCredit: true,
+  });
+  const discountedNewLine = cartLine({
+    lineId: "new-1",
+    unitPrice: 685_000,
+    lineDiscount: { type: "percent", value: 30, reason: "sale30" },
+  });
+
+  it("gửi bộ ba KM của dòng mua thêm, không gửi số tiền đã tính", () => {
+    const body = buildCreateExchangePayload({
+      sessionId: "sess-1",
+      customer: null,
+      reason: "Đổi trả nhanh",
+      returnLines: [returnLine],
+      newLines: [discountedNewLine],
+    });
+
+    expect(body.newLines[0]).toMatchObject({
+      lineDiscountType: "percent",
+      lineDiscountValue: 30,
+      lineDiscountReason: "sale30",
+    });
+    expect(body.newLines[0].lineDiscount).toBeUndefined();
+  });
+
+  it("gửi bộ ba KM của dòng trả", () => {
+    const body = buildCreateExchangePayload({
+      sessionId: "sess-1",
+      customer: null,
+      reason: "Đổi trả nhanh",
+      returnLines: [
+        cartLine({
+          lineId: "ret-2",
+          unitPrice: 500_000,
+          isReturnCredit: true,
+          lineDiscount: { type: "percent", value: 10, reason: "sale10" },
+        }),
+      ],
+      newLines: [discountedNewLine],
+    });
+
+    expect(body.returnLines[0]).toMatchObject({
+      lineDiscountType: "percent",
+      lineDiscountValue: 10,
+      lineDiscountReason: "sale10",
+    });
+    expect(body.returnLines[0].lineDiscount).toBeUndefined();
+  });
+
+  it("dòng không có KM thì không kèm field KM nào", () => {
+    const body = buildCreateExchangePayload({
+      sessionId: "sess-1",
+      customer: null,
+      reason: "Đổi trả nhanh",
+      returnLines: [returnLine],
+      newLines: [cartLine({ lineId: "new-2" })],
+    });
+
+    expect(body.newLines[0].lineDiscountType).toBeUndefined();
+    expect(body.returnLines[0].lineDiscountType).toBeUndefined();
+  });
+});
