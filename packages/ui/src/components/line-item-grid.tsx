@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
 import { Input } from "./input";
 import { Button } from "./button";
 import { cn } from "../lib/utils";
@@ -37,6 +37,12 @@ export interface LineColumn<R> {
   onCellClick?: (row: R, rowIndex: number) => void;
   /** Filter row symbol shown in the column-header filter cell (=, ≤, *, ...). */
   filterSymbol?: string;
+  /**
+   * Turns the column header into a sort toggle. Requires the grid-level
+   * `onSortChange` — sorting is controlled, the caller orders `rows` itself
+   * (see that prop).
+   */
+  sortable?: boolean;
   align?: "left" | "right" | "center";
   className?: string;
   /** Placeholder shown in empty cells (e.g. "Tìm mã hoặc tên" for the SKU column). */
@@ -49,6 +55,12 @@ export interface LineColumn<R> {
    * whole `columns` array on every edit, which defeats row memoization.
    */
   footer?: React.ReactNode;
+}
+
+/** Active sort emitted by a `sortable` column header. */
+export interface LineGridSort {
+  key: string;
+  direction: "asc" | "desc";
 }
 
 export interface LineItemGridProps<R> {
@@ -76,6 +88,17 @@ export interface LineItemGridProps<R> {
    */
   onFilterChange?: (filters: Record<string, string>) => void;
   filters?: Record<string, string>;
+  /**
+   * Active sort, rendered as an arrow on the matching `sortable` column header.
+   *
+   * Sorting is **controlled only**: the grid never reorders `rows`. Clicking a
+   * sortable header cycles asc → desc → cleared and calls `onSortChange`; the
+   * caller re-orders `rows` and passes them back. Row order carries meaning in
+   * a document grid (the trailing input line stays last, running totals follow
+   * the lines), so that decision belongs to the caller.
+   */
+  sort?: LineGridSort | null;
+  onSortChange?: (sort: LineGridSort | null) => void;
   /**
    * Sticky `<tfoot>` cells keyed by column key. Preferred over
    * `LineColumn.footer`: totals change on every edit, so keeping them out of
@@ -370,6 +393,8 @@ function LineItemGridInner<R>({
   onDeleteRow,
   onFilterChange,
   filters,
+  sort,
+  onSortChange,
   footers,
   getRowKey,
   className,
@@ -516,6 +541,41 @@ function LineItemGridInner<R>({
     zIndex: 20,
   });
 
+  /**
+   * Header label, wrapped in a sort toggle when the column opts in and the
+   * caller handles sorting. Cycles asc → desc → cleared.
+   */
+  const renderHeaderLabel = (col: LineColumn<R>) => {
+    if (!col.sortable || !onSortChange) return col.label;
+    const active = sort?.key === col.key ? sort.direction : null;
+    const Icon =
+      active === "asc" ? ArrowUp : active === "desc" ? ArrowDown : ChevronsUpDown;
+    return (
+      <button
+        type="button"
+        className="inline-flex w-full min-w-0 items-center justify-center gap-1 hover:text-primary"
+        onClick={() =>
+          onSortChange(
+            active === "asc"
+              ? { key: col.key, direction: "desc" }
+              : active === "desc"
+                ? null
+                : { key: col.key, direction: "asc" },
+          )
+        }
+        aria-label={`Sắp xếp theo ${col.label}`}
+      >
+        <span className="truncate">{col.label}</span>
+        <Icon
+          className={cn(
+            "h-3.5 w-3.5 shrink-0",
+            active ? "text-primary" : "text-muted-foreground/60",
+          )}
+        />
+      </button>
+    );
+  };
+
   const handleFilter = React.useCallback(
     (key: string, value: string) => {
       if (onFilterChange) {
@@ -586,7 +646,7 @@ function LineItemGridInner<R>({
                         ...sizeStyle(group.columns[0]),
                       }}
                     >
-                      {group.columns[0].label}
+                      {renderHeaderLabel(group.columns[0])}
                     </th>
                   ),
                 )
@@ -602,7 +662,7 @@ function LineItemGridInner<R>({
                       ...sizeStyle(col),
                     }}
                   >
-                    {col.label}
+                    {renderHeaderLabel(col)}
                   </th>
                 ))}
             {showRowActions ? (
@@ -632,7 +692,7 @@ function LineItemGridInner<R>({
                           ...sizeStyle(col),
                         }}
                       >
-                        {col.label}
+                        {renderHeaderLabel(col)}
                       </th>
                     ))
                   : [],

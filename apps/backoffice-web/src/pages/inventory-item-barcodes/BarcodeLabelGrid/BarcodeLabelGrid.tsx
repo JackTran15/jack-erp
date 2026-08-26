@@ -1,4 +1,4 @@
-import { LineItemGrid, type LineColumn } from "@erp/ui";
+import { LineItemGrid, type LineColumn, type LineGridSort } from "@erp/ui";
 import { ArrowDownToLine, Loader2 } from "lucide-react";
 import { useMemo } from "react";
 import { LookupField } from "../../../components/forms/LookupField";
@@ -72,6 +72,9 @@ interface Props {
   onOpenProductPicker: () => void;
   /** Ẩn cột Kho + Vị trí (chuỗi cửa hàng — dữ liệu gắn với 1 chi nhánh). */
   hideLocationColumns: boolean;
+  /** Sắp xếp đang áp dụng (chỉ cột Mã SKU) — `rows` đã được sắp sẵn bởi trang. */
+  sort: LineGridSort | null;
+  onSortChange: (sort: LineGridSort | null) => void;
 }
 
 /** Bảng hàng hoá in tem — cấu hình cột trên LineItemGrid. */
@@ -94,6 +97,8 @@ export function BarcodeLabelGrid({
   onRowFocus,
   onOpenProductPicker,
   hideLocationColumns,
+  sort,
+  onSortChange,
 }: Props) {
   // Nhiều dòng chưa chọn hàng có thể cùng render LookupField — chỉ dòng cuối
   // (dòng nhập liệu) mang id làm target cho phím tắt Ctrl+Insert / Ctrl+F3.
@@ -119,6 +124,7 @@ export function BarcodeLabelGrid({
         label: "Mã SKU",
         width: 200,
         filterSymbol: "*",
+        sortable: true,
         renderEditor: (row, rowIndex) =>
           row.itemId ? (
             <span
@@ -364,6 +370,8 @@ export function BarcodeLabelGrid({
       rows={rows}
       filters={filters}
       onFilterChange={onFiltersChange}
+      sort={sort}
+      onSortChange={onSortChange}
       onDeleteRow={(rowIndex) => {
         const row = rows[rowIndex];
         if (row) onDeleteRow(row.rowId);
