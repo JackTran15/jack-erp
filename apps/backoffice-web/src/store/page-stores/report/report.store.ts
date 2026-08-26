@@ -79,6 +79,27 @@ export function createReportStore(
           };
         }),
 
+      // Bộ cột đổi theo "Thống kê theo" hoặc chế độ xem, và cột biến mất thì ô
+      // lọc của nó cũng biến mất — nhưng giá trị đã gõ thì không. Không dọn ở
+      // đây, nó thành bộ lọc VÔ HÌNH vẫn đang chạy: lưới trả 0 dòng mà người
+      // dùng không thấy chỗ nào để xoá.
+      pruneColumnFilters: (knownColumns) =>
+        set((s) => {
+          const known = new Set(knownColumns);
+          const kept = Object.keys(s.columnFilters).filter((c) => known.has(c));
+          if (kept.length === Object.keys(s.columnFilters).length) return {};
+          const columnFilters = Object.fromEntries(
+            kept.map((c) => [c, s.columnFilters[c]]),
+          );
+          return {
+            columnFilters,
+            appliedRequest: s.appliedRequest
+              ? { ...s.appliedRequest, columnFilters }
+              : s.appliedRequest,
+            reloadNonce: s.reloadNonce + 1,
+          };
+        }),
+
       // Chốt filter hiện tại → appliedRequest (table sẽ fetch data theo snapshot này).
       // reloadNonce tăng để ép refetch ngay cả khi filter không đổi (mỗi click = 1 lần gọi API).
       applyFilters: () =>

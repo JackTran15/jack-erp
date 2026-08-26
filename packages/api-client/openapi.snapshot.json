@@ -7532,6 +7532,15 @@
             }
           },
           {
+            "name": "excludeShowroom",
+            "required": false,
+            "in": "query",
+            "description": "Loại trừ kho showroom (storages.is_main_storage) khỏi kết quả.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "locationCode",
             "required": false,
             "in": "query",
@@ -21879,6 +21888,31 @@
             "required": true,
             "in": "query",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "viewMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "single",
+                "chain"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "statBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "item",
+                "parent",
+                "group"
+              ],
               "type": "string"
             }
           }
@@ -41247,6 +41281,14 @@
               "item",
               "parent",
               "group"
+            ]
+          },
+          "viewMode": {
+            "type": "string",
+            "description": "Which backoffice view is asking (default single).\n\nOnly reports whose row shape differs between the two views read it; the\nrest resolve their scope from `store` alone, as they always have.",
+            "enum": [
+              "single",
+              "chain"
             ]
           },
           "period": {

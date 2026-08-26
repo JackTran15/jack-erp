@@ -13745,6 +13745,14 @@ export interface components {
              * @enum {string}
              */
             statBy?: "item" | "parent" | "group";
+            /**
+             * @description Which backoffice view is asking (default single).
+             *
+             *     Only reports whose row shape differs between the two views read it; the
+             *     rest resolve their scope from `store` alone, as they always have.
+             * @enum {string}
+             */
+            viewMode?: "single" | "chain";
             /** @description Custom period (inclusive ISO dates). Wins over `preset` when set. */
             period?: components["schemas"]["DateRangeFilterDto"];
             /** @description Multi-store scope. Absent or scope="all" ⇒ org-wide (legacy parity). */
@@ -18717,6 +18725,8 @@ export interface operations {
                 isActive?: boolean;
                 /** @description Lọc theo trạng thái theo dõi vị trí (stock_balances.is_tracked). Bỏ trống = tất cả. */
                 isTracked?: boolean;
+                /** @description Loại trừ kho showroom (storages.is_main_storage) khỏi kết quả. */
+                excludeShowroom?: boolean;
                 locationCode?: string;
                 locationCodeMode?: string;
                 locationName?: string;
@@ -26795,6 +26805,8 @@ export interface operations {
         parameters: {
             query: {
                 reportType: string;
+                viewMode?: "single" | "chain";
+                statBy?: "item" | "parent" | "group";
             };
             header?: never;
             path?: never;

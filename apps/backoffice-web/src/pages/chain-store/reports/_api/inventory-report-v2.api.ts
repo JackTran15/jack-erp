@@ -1,5 +1,7 @@
 import type {
   InventoryReportFilterPayload,
+  InventoryReportStatBy,
+  InventoryReportViewMode,
   InventoryReportPreset,
   InventoryReportResult,
   InventoryReportSearchPayload,
@@ -14,6 +16,13 @@ import type { ReportFilterValues } from "../../../../store/page-stores/report/re
  * Báo cáo có dòng "Cửa hàng" ở chain mode — khi SINGLE (không hiện dòng đó)
  * FE tự inject store = chi nhánh đang chọn ở header để số liệu scope đúng.
  */
+/**
+ * Báo cáo đổi HÌNH DẠNG dòng giữa chuỗi và một chi nhánh — chuỗi gộp về một
+ * dòng mỗi hàng hóa, không còn chiều vị trí. BE không tự suy ra được chế độ
+ * (X-Branch-Id vẫn trỏ chi nhánh cũ), nên FE phải nói thẳng.
+ */
+const CHAIN_AWARE_SHAPE_REPORTS = new Set(["inventory-stock-summary"]);
+
 const SINGLE_MODE_HEADER_STORE_REPORTS = new Set([
   "inventory-stock-summary",
   "inventory-document-detail",
@@ -33,10 +42,18 @@ export interface InventorySearchContext {
 
 export async function fetchInventoryReportColumns(
   reportType: string,
+  viewMode?: InventoryReportViewMode,
+  statBy?: InventoryReportStatBy,
 ): Promise<InvoiceReportColumnsResult> {
   return requireErpData(
     await erpApi.GET<InvoiceReportColumnsResult>("/reports/inventory/columns", {
-      params: { query: { reportType } },
+      params: {
+        query: {
+          reportType,
+          ...(viewMode ? { viewMode } : {}),
+          ...(statBy ? { statBy } : {}),
+        },
+      },
     }),
   );
 }
@@ -80,6 +97,10 @@ export function buildInventorySearchFilters(
     SINGLE_MODE_HEADER_STORE_REPORTS.has(ctx.backendKey)
   ) {
     payload.store = { scope: "group", storeIds: [ctx.activeBranchId] };
+  }
+
+  if (ctx && CHAIN_AWARE_SHAPE_REPORTS.has(ctx.backendKey)) {
+    payload.viewMode = ctx.branch === STORE_TYPE.CHAIN ? "chain" : "single";
   }
 
   const range = filters[REPORT_FILTERS_LINE.RANGE_DATE];

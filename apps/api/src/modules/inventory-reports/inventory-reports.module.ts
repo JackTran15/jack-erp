@@ -8,6 +8,8 @@ import { ItemEntity } from '../inventory/location/item.entity';
 import { ItemCategoryEntity } from '../inventory/location/item-category.entity';
 import { LocationEntity } from '../inventory/location/location.entity';
 import { StorageEntity } from '../inventory/location/storage.entity';
+import { ItemStorageLocationEntity } from '../inventory/product/item-storage-location.entity';
+import { StockBalanceEntity } from '../inventory/ledger/stock-balance.entity';
 import { CreateInventoryReportTemplateHandler } from './commands/create-inventory-report-template.handler';
 import { DeleteInventoryReportTemplateHandler } from './commands/delete-inventory-report-template.handler';
 import { UpdateInventoryReportTemplateHandler } from './commands/update-inventory-report-template.handler';
@@ -73,6 +75,8 @@ const REPORT_DEFINITIONS = [
       ItemCategoryEntity,
       LocationEntity,
       StorageEntity,
+      ItemStorageLocationEntity,
+      StockBalanceEntity,
       ReportTemplateEntity,
     ]),
   ],

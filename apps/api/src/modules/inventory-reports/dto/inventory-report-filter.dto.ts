@@ -1,4 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  INVENTORY_REPORT_VIEW_MODES,
+  InventoryReportViewMode,
+} from '@erp/shared-interfaces';
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -54,6 +58,17 @@ export class InventoryReportFilterDto {
   @IsOptional()
   @IsIn(ITEM_GROUP_BY_VALUES as unknown as string[])
   statBy?: ItemGroupBy;
+
+  /**
+   * Which backoffice view is asking (default single).
+   *
+   * Only reports whose row shape differs between the two views read it; the
+   * rest resolve their scope from `store` alone, as they always have.
+   */
+  @ApiPropertyOptional({ enum: INVENTORY_REPORT_VIEW_MODES })
+  @IsOptional()
+  @IsIn(INVENTORY_REPORT_VIEW_MODES as unknown as string[])
+  viewMode?: InventoryReportViewMode;
 
   /** Filter by unit name — applied in-memory on result rows. */
   @IsOptional()
