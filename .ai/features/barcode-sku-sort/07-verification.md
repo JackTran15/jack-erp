@@ -23,8 +23,8 @@ S1/S2/S3 đặt cạnh nhau cho thấy cùng một tập hàng hóa được đ�
 |---|---|---|---|---|---|
 | S0 | Nguồn dữ liệu: chọn tất cả 20 dòng trang đầu của Hàng hóa | `/admin/inventory-items` | `wait text=kết quả; click [aria-label="Chọn tất cả"]` | AC-01 | `text=Hàng hoá` |
 | S1 | Bảng in tem chưa sắp xếp: icon trung tính, thứ tự y hệt trang nguồn | `/admin/inventory-items` | `wait text=kết quả; click [aria-label="Chọn tất cả"]; click text=In tem mã; wait text=Tổng số lượng tem` | AC-01 | `text=Tổng số lượng tem; count [aria-label="Sắp xếp theo Mã SKU"] = 1` |
-| S2 | Bấm header Mã SKU một lần — sắp xếp A-Z, mũi tên lên | `/admin/inventory-items` | `wait text=kết quả; click [aria-label="Chọn tất cả"]; click text=In tem mã; wait text=Tổng số lượng tem; click [aria-label="Sắp xếp theo Mã SKU"]` | AC-01 | `text=Tổng số lượng tem` |
-| S3 | Bấm header Mã SKU lần hai — đảo Z-A, mũi tên xuống | `/admin/inventory-items` | `wait text=kết quả; click [aria-label="Chọn tất cả"]; click text=In tem mã; wait text=Tổng số lượng tem; click [aria-label="Sắp xếp theo Mã SKU"]; click [aria-label="Sắp xếp theo Mã SKU"]` | AC-01 | `text=Tổng số lượng tem` |
+| S2 | Bấm header Mã SKU một lần — A-Z, mũi tên lên, Xem trước là tem đầu A-Z | `/admin/inventory-items` | `wait text=kết quả; click [aria-label="Chọn tất cả"]; click text=In tem mã; wait text=Tổng số lượng tem; click [aria-label="Sắp xếp theo Mã SKU"]` | AC-01 | `text=Tổng số lượng tem` |
+| S3 | Bấm header Mã SKU lần hai — Z-A, mũi tên xuống, Xem trước đổi theo | `/admin/inventory-items` | `wait text=kết quả; click [aria-label="Chọn tất cả"]; click text=In tem mã; wait text=Tổng số lượng tem; click [aria-label="Sắp xếp theo Mã SKU"]; click [aria-label="Sắp xếp theo Mã SKU"]` | AC-01 | `text=Tổng số lượng tem` |
 
 ## Đọc bằng chứng
 
@@ -35,6 +35,12 @@ Thứ tự dòng là thứ DSL assertion không phát biểu được (`text=` c
   header, `AK111` lên trước `AK1109-25` và `AK118066` xuống sau `AK1175131` — đúng như
   `Intl.Collator(numeric: true)` phải cho, và là chỗ phân biệt bản có sắp xếp với bản chỉ đổi icon.
 - **S2 → S3**: cùng tập 20 dòng, thứ tự đảo ngược hoàn toàn, mũi tên đổi từ ↑ sang ↓.
+- **Panel "Xem trước" bên phải**: S2 hiện `ABA2777`, S3 hiện `AK1175131` — luôn là dòng đầu
+  theo thứ tự đang sắp xếp, tức là **tem đầu tiên sẽ in ra**. Đây là chỗ duy nhất trên màn hình
+  phản ánh được thứ tự của lượt in: file PDF mở ở cửa sổ mới nên runner không chụp được nó.
+  Thứ tự tem trong PDF và trong file Xuất khẩu đi thẳng từ cùng một mảng `printableRows`
+  (`renderBarcodeLabelsPdf` chỉ `flatMap` theo thứ tự, backend export ghi chú rõ "giữ nguyên thứ
+  tự dòng trên lưới"), nên tem đầu đúng thì cả lượt đúng.
 
 ## Notes
 

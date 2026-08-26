@@ -67,6 +67,22 @@ function parseFilterNumber(raw: string): number | null {
 /** So sánh mã SKU theo thứ tự A-Z, số trong mã so sánh theo giá trị ("N-9" < "N-38"). */
 const skuCollator = new Intl.Collator("vi", { numeric: true, sensitivity: "base" });
 
+/**
+ * Sắp xếp theo mã SKU, dòng trống luôn ở cuối. Dùng chung cho bảng, In tem và Xuất
+ * khẩu — tem in ra phải theo đúng thứ tự người dùng đang nhìn thấy trên bảng.
+ */
+function sortRowsBySku(
+  list: BarcodeLabelRow[],
+  sort: LineGridSort | null,
+): BarcodeLabelRow[] {
+  if (sort?.key !== "sku") return list;
+  const direction = sort.direction === "asc" ? 1 : -1;
+  const filled = list.filter((r) => !isEmptyRow(r));
+  const empty = list.filter(isEmptyRow);
+  filled.sort((a, b) => direction * skuCollator.compare(a.sku, b.sku));
+  return [...filled, ...empty];
+}
+
 function focusSkuInput() {
   document.getElementById(BARCODE_SKU_INPUT_ID)?.focus();
 }
@@ -522,30 +538,36 @@ export function InventoryItemBarcodesPage() {
 
   // Sắp xếp theo mã SKU (bấm header cột "Mã SKU"). Dòng nhập liệu trống luôn ở cuối
   // bảng — Ctrl+Insert/Ctrl+F3 focus vào ô SKU của dòng cuối cùng.
-  const sortedRows = useMemo(() => {
-    if (sort?.key !== "sku") return visibleRows;
-    const direction = sort.direction === "asc" ? 1 : -1;
-    const filled = visibleRows.filter((r) => !isEmptyRow(r));
-    const empty = visibleRows.filter(isEmptyRow);
-    filled.sort((a, b) => direction * skuCollator.compare(a.sku, b.sku));
-    return [...filled, ...empty];
-  }, [visibleRows, sort]);
+  const sortedRows = useMemo(
+    () => sortRowsBySku(visibleRows, sort),
+    [visibleRows, sort],
+  );
+
+  // Nguồn cho In tem / Xuất khẩu / Xem trước: toàn bộ dòng (bộ lọc header không
+  // loại tem khỏi lượt in), nhưng theo đúng thứ tự đang sắp xếp trên bảng.
+  const orderedRows = useMemo(() => sortRowsBySku(rows, sort), [rows, sort]);
+
+  const printableRows = useMemo(
+    () => orderedRows.filter((r) => r.itemId && r.quantity > 0),
+    [orderedRows],
+  );
 
   const totalQuantity = useMemo(
     () => rows.reduce((sum, r) => sum + (r.itemId ? r.quantity : 0), 0),
     [rows],
   );
 
+  // Tem đầu tiên của lượt in — phải là dòng đầu theo thứ tự đang sắp xếp.
   const previewRow = useMemo(
-    () => rows.find((r) => r.itemId) ?? null,
-    [rows],
+    () => orderedRows.find((r) => r.itemId) ?? null,
+    [orderedRows],
   );
 
   // ─── Export ────────────────────────────────────────────────────────
   // Cùng điều kiện với nút "In tem": chỉ xuất dòng đã chọn hàng hoá và có số
   // lượng in; file .xlsx do backend dựng.
   const handleExport = useCallback(async () => {
-    const exportable = rows.filter((r) => r.itemId && r.quantity > 0);
+    const exportable = printableRows;
     if (!exportable.length) {
       toast.error("Chưa có tem nào để xuất khẩu — thêm hàng hóa và số lượng tem");
       return;
@@ -559,22 +581,21 @@ export function InventoryItemBarcodesPage() {
     } finally {
       setExporting(false);
     }
-  }, [rows]);
+  }, [printableRows]);
 
   // ─── Print ─────────────────────────────────────────────────────────
   // Nút "In tem" mở dialog cảnh báo; việc in thực sự chạy ở doPrint theo lựa chọn.
   const handleOpenPrintConfirm = useCallback(() => {
-    const printable = rows.filter((r) => r.itemId && r.quantity > 0);
-    if (!printable.length) {
+    if (!printableRows.length) {
       toast.error("Chưa có tem nào để in — thêm hàng hóa và số lượng tem");
       return;
     }
     setConfirmOpen(true);
-  }, [rows]);
+  }, [printableRows]);
 
   const doPrint = useCallback(
     (mode: "test" | "bulk") => {
-      const printable = rows.filter((r) => r.itemId && r.quantity > 0);
+      const printable = printableRows;
       if (!printable.length) return;
       // In thử: tối đa 2 tem để người dùng quét kiểm tra trước khi in hàng loạt.
       const toPrint = mode === "test" ? capLabels(printable, 2) : printable;
@@ -594,7 +615,7 @@ export function InventoryItemBarcodesPage() {
       }
       setConfirmOpen(false);
     },
-    [rows, paper, branchCode, isChain],
+    [printableRows, paper, branchCode, isChain],
   );
 
   return (
