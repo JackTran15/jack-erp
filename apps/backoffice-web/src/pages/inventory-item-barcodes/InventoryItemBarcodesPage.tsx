@@ -1,3 +1,4 @@
+import type { LineGridSort } from "@erp/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -63,6 +64,9 @@ function parseFilterNumber(raw: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/** So sánh mã SKU theo thứ tự A-Z, số trong mã so sánh theo giá trị ("N-9" < "N-38"). */
+const skuCollator = new Intl.Collator("vi", { numeric: true, sensitivity: "base" });
+
 function focusSkuInput() {
   document.getElementById(BARCODE_SKU_INPUT_ID)?.focus();
 }
@@ -101,6 +105,7 @@ export function InventoryItemBarcodesPage() {
     makeEmpty: makeEmptyRow,
   });
   const [filters, setFilters] = useState<Record<string, string>>({});
+  const [sort, setSort] = useState<LineGridSort | null>(null);
   const [printing, setPrinting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -515,6 +520,17 @@ export function InventoryItemBarcodesPage() {
     });
   }, [rows, filters]);
 
+  // Sắp xếp theo mã SKU (bấm header cột "Mã SKU"). Dòng nhập liệu trống luôn ở cuối
+  // bảng — Ctrl+Insert/Ctrl+F3 focus vào ô SKU của dòng cuối cùng.
+  const sortedRows = useMemo(() => {
+    if (sort?.key !== "sku") return visibleRows;
+    const direction = sort.direction === "asc" ? 1 : -1;
+    const filled = visibleRows.filter((r) => !isEmptyRow(r));
+    const empty = visibleRows.filter(isEmptyRow);
+    filled.sort((a, b) => direction * skuCollator.compare(a.sku, b.sku));
+    return [...filled, ...empty];
+  }, [visibleRows, sort]);
+
   const totalQuantity = useMemo(
     () => rows.reduce((sum, r) => sum + (r.itemId ? r.quantity : 0), 0),
     [rows],
@@ -605,9 +621,11 @@ export function InventoryItemBarcodesPage() {
         {/* Bảng */}
         <div className="min-h-0 flex-1">
           <BarcodeLabelGrid
-            rows={visibleRows}
+            rows={sortedRows}
             filters={filters}
             onFiltersChange={setFilters}
+            sort={sort}
+            onSortChange={setSort}
             searchItems={searchItems}
             onSkuTextChange={handleSkuTextChange}
             onSelectItem={handleSelectItem}

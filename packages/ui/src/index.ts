@@ -138,6 +138,7 @@ export {
   type LineItemGridProps,
   type LineColumn,
   type LineColumnType,
+  type LineGridSort,
 } from "./components/line-item-grid";
 
 export {
