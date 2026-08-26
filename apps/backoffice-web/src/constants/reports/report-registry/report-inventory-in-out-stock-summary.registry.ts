@@ -119,13 +119,15 @@ const columns: ReportColumnConfig[] = [
     visible: true,
     tableConfig: { width: 140, dataType: "text" },
   },
+  // Vị trí là cột tham chiếu: BE phân giải từ kệ hiện tại của hàng, không nằm
+  // trong câu truy vấn nên không lọc được (khớp filterKind "none" của catalog).
   {
     column: "positionCode",
     backendField: "positionCode",
     label: "Mã vị trí",
     order: 10,
     visible: true,
-    tableConfig: { width: 110, dataType: "text" },
+    tableConfig: { width: 110, dataType: "text", filterKind: "none" },
   },
   {
     column: "positionName",
@@ -133,7 +135,7 @@ const columns: ReportColumnConfig[] = [
     label: "Tên vị trí",
     order: 11,
     visible: true,
-    tableConfig: { width: 110, dataType: "text" },
+    tableConfig: { width: 110, dataType: "text", filterKind: "none" },
   },
   qty("openingQty", GROUP.OPENING, 12),
   value("openingValue", GROUP.OPENING, 13),
@@ -160,10 +162,21 @@ const columns: ReportColumnConfig[] = [
 const tableConfig: ReportTableConfig = { summaryLabel: "Tổng", columns };
 
 export const single_tableRegistryReportInventoryInOutStockSummary = tableConfig;
-export const chain_tableRegistryReportInventoryInOutStockSummary = tableConfig;
+
+// CHAIN (chuỗi): một dòng mỗi hàng hóa, tổng mọi cửa hàng → không có vị trí.
+// Chỉ là fallback khi BE trả catalog rỗng, nhưng phải khớp BE, nếu không hai
+// đường đi cho ra hai bộ cột khác nhau.
+export const chain_tableRegistryReportInventoryInOutStockSummary: ReportTableConfig =
+  {
+    ...tableConfig,
+    columns: columns.filter(
+      (c) => c.column !== "positionCode" && c.column !== "positionName",
+    ),
+  };
 
 // SINGLE (chi nhánh): cửa hàng cố định theo header → không có dòng Cửa hàng;
-// CHAIN (chuỗi): thêm dòng Cửa hàng multi-select ở đầu.
+// CHAIN (chuỗi): thêm dòng Cửa hàng multi-select ở đầu, và bỏ dòng Kho — kho
+// thuộc về một chi nhánh nên không có chỗ đứng trong báo cáo toàn chuỗi.
 const singleFilterLines = [
   REPORT_FILTERS_LINE.WAREHOUSE,
   REPORT_FILTERS_LINE.PRODUCT_GROUP,
@@ -172,7 +185,10 @@ const singleFilterLines = [
   REPORT_FILTERS_LINE.REPORT_PERIOD,
   REPORT_FILTERS_LINE.RANGE_DATE,
 ];
-const chainFilterLines = [REPORT_FILTERS_LINE.STORE, ...singleFilterLines];
+const chainFilterLines = [
+  REPORT_FILTERS_LINE.STORE,
+  ...singleFilterLines.filter((l) => l !== REPORT_FILTERS_LINE.WAREHOUSE),
+];
 
 export const single_filterRegistryReportInventoryInOutStockSummary = singleFilterLines;
 export const chain_filterRegistryReportInventoryInOutStockSummary = chainFilterLines;

@@ -13,11 +13,15 @@ export class GetInventoryReportColumnsHandler
   async execute({
     reportType,
     actor,
+    filters,
   }: GetInventoryReportColumnsQuery): Promise<InvoiceReportColumnsResult> {
     const def = this.registry.get(reportType);
     if (!def) {
       throw new BadRequestException(`Unknown report type: ${reportType}`);
     }
-    return { summaryLabel: 'Tổng', columns: await def.buildColumns(actor) };
+    return {
+      summaryLabel: 'Tổng',
+      columns: await def.buildColumns(actor, filters),
+    };
   }
 }

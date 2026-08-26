@@ -19,6 +19,20 @@ export type InventoryReportPreset =
 /** Row grain of the item dimension ("Thống kê theo"). */
 export type InventoryReportStatBy = 'item' | 'parent' | 'group';
 
+/**
+ * Which of the two backoffice views asked for the report.
+ *
+ * "Chuỗi cửa hàng" is otherwise a frontend-only mode, so the backend cannot
+ * infer it: `X-Branch-Id` still names the last real branch, and a chain user who
+ * picks "Tất cả" resolves to however many branches they happen to be assigned.
+ * Reports whose SHAPE differs between the two views (today: stock-summary, which
+ * drops to one row per item with no location) take this flag explicitly, so the
+ * column catalog and the rows can never disagree about it.
+ */
+export const INVENTORY_REPORT_VIEW_MODES = ['single', 'chain'] as const;
+export type InventoryReportViewMode =
+  (typeof INVENTORY_REPORT_VIEW_MODES)[number];
+
 /** Scope filters applied PRE-aggregate (engine level) for inventory reports. */
 export interface InventoryReportFilterPayload {
   /** Custom period (inclusive ISO dates). Wins over `preset` when set. */
@@ -33,6 +47,8 @@ export interface InventoryReportFilterPayload {
   categoryId?: string;
   /** Item-dimension grain (default item). */
   statBy?: InventoryReportStatBy;
+  /** Which backoffice view is asking (default single). See the type's note. */
+  viewMode?: InventoryReportViewMode;
   /** Filter by unit name (Đơn vị tính) — applied in-memory on rows. */
   unit?: string;
   /** Filter by denormalized item brand — applied in-memory on rows. */

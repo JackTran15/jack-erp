@@ -27,7 +27,16 @@ const EXCLUDE_VOIDED_DOCS_SQL = `
               AND gix.status = 'CANCELLED'
           )`;
 
-export type StockPeriodGroupBy = 'item_location' | 'item_branch';
+export type StockPeriodGroupBy = 'item_location' | 'item_branch' | 'item';
+
+/**
+ * Stand-in group key for the `item` grain, which has no spatial dimension.
+ *
+ * A constant rather than NULL, because `combined` stitches the three ledger CTEs
+ * with `FULL OUTER JOIN ... o.group_key = ip.group_key` and `NULL = NULL` is
+ * false — every item would come back as three half-filled rows.
+ */
+const CHAIN_GROUP_KEY = `''::text`;
 
 /** How the result rows are aggregated along the item dimension. */
 export type ItemGroupBy = 'item' | 'parent' | 'group';
@@ -43,7 +52,10 @@ export interface StockPeriodQuery {
   startDate: Date;
   /** Exclusive upper bound (UTC). */
   endDate: Date;
-  /** Spatial dimension: per-location or per-branch. */
+  /**
+   * Spatial dimension: per-location, per-branch, or none at all (`item` — the
+   * chain view, where one row totals an item across every branch in scope).
+   */
   groupBy: StockPeriodGroupBy;
   /** Item dimension: per-item, per-parent-product, or per-category. Default: 'item'. */
   itemGroupBy?: ItemGroupBy;
@@ -192,10 +204,22 @@ const ITEM_TEXT_JOINS = `
         AND ip.organization_id = i.organization_id
       LEFT JOIN inventory_providers pv ON pv.id = ip.provider_id`;
 
+/**
+ * Location/branch identity as NULLs — for the grains that have no spatial
+ * breakdown to report (`item`, and the parent/group item aggregates).
+ */
+const NULL_SPATIAL_COLS = `
+      NULL::uuid AS location_id,
+      NULL::text AS location_code,
+      NULL::text AS location_name,
+      NULL::uuid AS branch_id,
+      NULL::text AS branch_code,
+      NULL::text AS branch_name,`;
+
 function periodColumnSpecs(
   alias: string,
   withText: boolean,
-  withLocation = false,
+  spatial: StockPeriodGroupBy = 'item_branch',
 ): ReportColumnSpecs {
   const specs: ReportColumnSpecs = {};
   for (const key of NUMERIC_PERIOD_COLUMNS) {
@@ -231,16 +255,19 @@ function periodColumnSpecs(
     specs.incomingQty = { sql: 'COALESCE(pin.qty, 0)', kind: 'number' };
     specs.incomingValue = { sql: 'COALESCE(pin.val, 0)', kind: 'number' };
   }
-  // Only the item_location grain has a location; on item_branch these columns
-  // are absent from the row, so filtering them is refused rather than ignored.
-  if (withText && withLocation) {
+  // Only the item_location grain has a location; on item_branch and item these
+  // columns are absent from the row, so filtering them is refused rather than
+  // ignored.
+  if (withText && spatial === 'item_location') {
     specs.locationCode = { sql: 'loc.code', kind: 'text' };
     specs.locationName = { sql: 'loc.name', kind: 'text' };
   }
   // `branches` has no code column — every query selects `NULL::text AS
   // branch_code` — so `branchCode` deliberately gets no spec and filtering it
   // answers 400 rather than silently matching nothing.
-  if (withText && !withLocation) {
+  // Likewise the branch name: the item grain spans every branch in scope, so
+  // there is no single one to filter on.
+  if (withText && spatial === 'item_branch') {
     specs.branchName = { sql: 'b.name', kind: 'text' };
   }
   return specs;
@@ -266,11 +293,26 @@ function periodColumnSpecs(
  *    branch's default receiving location.
  *
  * "Đang chuyển đi" is unchanged: it always summed every order and never deduped.
+ *
+ * On the `item` grain both sides collapse to one figure per item. A transfer
+ * between two branches of the chain therefore counts in BOTH columns — it is in
+ * transit out of one shop and due into another, and each row keeps the same
+ * formula it has on the per-branch grain.
  */
-function pendingTransferCtes(isLocation: boolean): string {
-  const outKey = isLocation ? 'pb.source_location_id' : 'pb.source_branch_id';
+function pendingTransferCtes(groupBy: StockPeriodGroupBy): string {
+  const isLocation = groupBy === 'item_location';
+  const isChainItem = groupBy === 'item';
+  const outKey = isChainItem
+    ? CHAIN_GROUP_KEY
+    : isLocation
+      ? 'pb.source_location_id'
+      : 'pb.source_branch_id';
   // The destination side has no location of its own, so it borrows one.
-  const inKey = isLocation ? 'dr.location_id' : 'pb.destination_branch_id';
+  const inKey = isChainItem
+    ? CHAIN_GROUP_KEY
+    : isLocation
+      ? 'dr.location_id'
+      : 'pb.destination_branch_id';
   const inJoin = isLocation
     // storages.branch_id is uuid while transfer_orders.destination_branch_id is
     // varchar, so the cast is required — the same direction the rest of this
@@ -333,8 +375,8 @@ function pendingTransferCtes(isLocation: boolean): string {
                SUM(pb.quantity)::numeric AS qty,
                SUM(pb.value)::numeric    AS val
         FROM pending_base pb
-        WHERE ${outKey} IS NOT NULL
-        GROUP BY pb.item_id, ${outKey}
+        ${isChainItem ? '' : `WHERE ${outKey} IS NOT NULL`}
+        GROUP BY pb.item_id${isChainItem ? '' : `, ${outKey}`}
       ),
       pending_in AS (
         SELECT pb.item_id, ${inKey} AS group_key,
@@ -342,8 +384,8 @@ function pendingTransferCtes(isLocation: boolean): string {
                SUM(pb.value)::numeric    AS val
         FROM pending_base pb
         ${inJoin}
-        WHERE ${inKey} IS NOT NULL
-        GROUP BY pb.item_id, ${inKey}
+        ${isChainItem ? '' : `WHERE ${inKey} IS NOT NULL`}
+        GROUP BY pb.item_id${isChainItem ? '' : `, ${inKey}`}
       )`;
 }
 
@@ -414,7 +456,15 @@ export class StockPeriodService {
 
   async aggregate(query: StockPeriodQuery): Promise<StockPeriodResult> {
     const isLocation = query.groupBy === 'item_location';
-    const groupKeyExpr = isLocation ? 'le.location_id' : 'le.branch_id';
+    const groupKeySelect =
+      query.groupBy === 'item'
+        ? CHAIN_GROUP_KEY
+        : isLocation
+          ? 'le.location_id'
+          : 'le.branch_id';
+    // The chain grain groups by item alone; its key is a constant, and a
+    // constant has no business in a GROUP BY.
+    const groupByTail = query.groupBy === 'item' ? '' : `, ${groupKeySelect}`;
     const itemGroupBy: ItemGroupBy = query.itemGroupBy ?? 'item';
 
     const branchIds =
@@ -433,8 +483,8 @@ export class StockPeriodService {
 
     const isItemLevel = itemGroupBy === 'item';
     const combinedCte =
-      this.buildCombinedCte(groupKeyExpr) +
-      (isItemLevel ? `,${pendingTransferCtes(isLocation)}` : '');
+      this.buildCombinedCte(groupKeySelect, groupByTail) +
+      (isItemLevel ? `,${pendingTransferCtes(query.groupBy)}` : '');
 
     const baseParams = [
       query.organizationId, // $1
@@ -451,7 +501,7 @@ export class StockPeriodService {
     // query, so the footer can never describe a different set than the grid.
     const columnFilter = buildReportColumnFilter(
       query.columnFilters,
-      periodColumnSpecs(isItemLevel ? 'c' : 'ia', isItemLevel, isLocation),
+      periodColumnSpecs(isItemLevel ? 'c' : 'ia', isItemLevel, query.groupBy),
       baseParams.length,
     );
     const filterWhere = columnFilter.where ? `AND ${columnFilter.where}` : '';
@@ -459,7 +509,7 @@ export class StockPeriodService {
     const limitIndex = filteredParams.length + 1;
 
     const { dataSql, countSql } = isItemLevel
-      ? this.buildItemSqls(combinedCte, isLocation, filterWhere, limitIndex)
+      ? this.buildItemSqls(combinedCte, query.groupBy, filterWhere, limitIndex)
       : this.buildAggSqls(combinedCte, isLocation, itemGroupBy, filterWhere, limitIndex);
 
     // At the item grain SQL now owns the four transfer columns, so neither the
@@ -487,34 +537,46 @@ export class StockPeriodService {
    */
   private buildItemSqls(
     combinedCte: string,
-    isLocation: boolean,
+    groupBy: StockPeriodGroupBy,
     filterWhere: string,
     limitIndex: number,
   ): { dataSql: string; countSql: string } {
+    const isLocation = groupBy === 'item_location';
+    // On the chain grain `group_key` is the constant sentinel, so there is
+    // nothing to resolve it against — the spatial columns come back NULL, the
+    // same shape the parent/group aggregates already produce.
+    const isChainItem = groupBy === 'item';
     // dataSql walks locations → storages → branches for its columns; the count
     // only needs whichever relation the group key names, and joining the rest
     // would be dead weight on a query that already scans the whole period
     // (ADR-04). Both are many-to-one, so neither changes the row count.
-    const joinLocForFilter = isLocation
-      ? 'LEFT JOIN locations loc ON loc.id = c.group_key'
-      : 'LEFT JOIN branches b ON b.id::text = c.group_key';
-    const locCols = isLocation
-      ? `loc.id AS location_id, loc.code AS location_code, loc.name AS location_name,`
-      : '';
-    const branchCols = isLocation
-      ? `b.id AS branch_id, NULL::text AS branch_code, b.name AS branch_name,`
-      : `b.id AS branch_id, NULL::text AS branch_code, b.name AS branch_name,`;
+    const joinLocForFilter = isChainItem
+      ? ''
+      : isLocation
+        ? 'LEFT JOIN locations loc ON loc.id = c.group_key'
+        : 'LEFT JOIN branches b ON b.id::text = c.group_key';
+    const spatialCols = isChainItem
+      ? NULL_SPATIAL_COLS
+      : `${
+          isLocation
+            ? 'loc.id AS location_id, loc.code AS location_code, loc.name AS location_name,'
+            : ''
+        }
+        b.id AS branch_id, NULL::text AS branch_code, b.name AS branch_name,`;
     const joinLoc = isLocation
       ? `LEFT JOIN locations loc ON loc.id = c.group_key
          LEFT JOIN storages storage ON storage.id = loc.storage_id
          LEFT JOIN branches b ON b.id = storage.branch_id`
       : '';
-    const joinBranch = isLocation
-      ? ''
-      : 'LEFT JOIN branches b ON b.id::text = c.group_key';
-    const orderBy = isLocation
-      ? 'ORDER BY i.code ASC, loc.code ASC NULLS LAST'
-      : 'ORDER BY i.code ASC, b.name ASC NULLS LAST';
+    const joinBranch =
+      isLocation || isChainItem
+        ? ''
+        : 'LEFT JOIN branches b ON b.id::text = c.group_key';
+    const orderBy = isChainItem
+      ? 'ORDER BY i.code ASC'
+      : isLocation
+        ? 'ORDER BY i.code ASC, loc.code ASC NULLS LAST'
+        : 'ORDER BY i.code ASC, b.name ASC NULLS LAST';
 
     const dataSql = `
       WITH ${combinedCte}
@@ -529,8 +591,7 @@ export class StockPeriodService {
         ic.name       AS category_name,
         i.brand       AS brand,
         pv.name       AS supplier,
-        ${locCols}
-        ${branchCols}
+        ${spatialCols}
         c.opening_qty, c.opening_value,
         c.in_qty,      c.in_value,
         c.out_qty,     c.out_value,
@@ -631,14 +692,10 @@ export class StockPeriodService {
       )
     `;
 
-    // Location and branch columns are all NULL — no spatial breakdown at this level.
-    const nullSpatialCols = `
-      NULL::uuid AS location_id,
-      NULL::text AS location_code,
-      NULL::text AS location_name,
-      NULL::uuid AS branch_id,
-      NULL::text AS branch_code,
-      NULL::text AS branch_name,
+    // Location and branch columns are all NULL — no spatial breakdown at this
+    // level — and so are the item-level attributes, which an aggregate row has
+    // no single value for.
+    const nullSpatialCols = `${NULL_SPATIAL_COLS}
       NULL::text AS brand,
       NULL::text AS color,
       NULL::text AS size,`;
@@ -712,15 +769,18 @@ export class StockPeriodService {
 
   /**
    * Builds the `opening`, `in_period`, `out_period`, `combined` CTEs.
-   * `groupKeyExpr` is one of the hard-coded strings `'le.location_id'` or
-   * `'le.branch_id'`; no user input is interpolated.
+   *
+   * `groupKeySelect` is one of the hard-coded strings `'le.location_id'`,
+   * `'le.branch_id'` or the `''::text` chain sentinel, and `groupByTail` is the
+   * matching GROUP BY fragment (empty for the sentinel — grouping by a constant
+   * buys nothing). No user input is interpolated.
    */
-  private buildCombinedCte(groupKeyExpr: string): string {
+  private buildCombinedCte(groupKeySelect: string, groupByTail: string): string {
     return `
       opening AS (
         SELECT
           le.item_id,
-          ${groupKeyExpr} AS group_key,
+          ${groupKeySelect} AS group_key,
           SUM(le.quantity)              AS qty,
           SUM(COALESCE(le.line_value, 0)) AS value
         FROM stock_ledger_entries le
@@ -729,12 +789,12 @@ export class StockPeriodService {
           AND ($4::text[] IS NULL OR le.branch_id   = ANY($4::text[]))
           AND ($5::text[] IS NULL OR le.location_id::text = ANY($5::text[]))
           ${EXCLUDE_VOIDED_DOCS_SQL}
-        GROUP BY le.item_id, ${groupKeyExpr}
+        GROUP BY le.item_id${groupByTail}
       ),
       in_period AS (
         SELECT
           le.item_id,
-          ${groupKeyExpr} AS group_key,
+          ${groupKeySelect} AS group_key,
           SUM(le.quantity) FILTER (WHERE le.quantity > 0)              AS qty,
           SUM(COALESCE(le.line_value, 0)) FILTER (WHERE le.quantity > 0) AS value,
           SUM(CASE WHEN le.movement_type = 'PURCHASE_RECEIPT'    THEN le.quantity ELSE 0 END) AS qty_purchase,
@@ -748,12 +808,12 @@ export class StockPeriodService {
           AND ($4::text[] IS NULL OR le.branch_id   = ANY($4::text[]))
           AND ($5::text[] IS NULL OR le.location_id::text = ANY($5::text[]))
           ${EXCLUDE_VOIDED_DOCS_SQL}
-        GROUP BY le.item_id, ${groupKeyExpr}
+        GROUP BY le.item_id${groupByTail}
       ),
       out_period AS (
         SELECT
           le.item_id,
-          ${groupKeyExpr} AS group_key,
+          ${groupKeySelect} AS group_key,
           SUM(-le.quantity) FILTER (WHERE le.quantity < 0)              AS qty,
           SUM(-COALESCE(le.line_value, 0)) FILTER (WHERE le.quantity < 0) AS value,
           SUM(CASE WHEN le.movement_type = 'SALE_ISSUE'           THEN -le.quantity ELSE 0 END) AS qty_sale,
@@ -766,7 +826,7 @@ export class StockPeriodService {
           AND ($4::text[] IS NULL OR le.branch_id   = ANY($4::text[]))
           AND ($5::text[] IS NULL OR le.location_id::text = ANY($5::text[]))
           ${EXCLUDE_VOIDED_DOCS_SQL}
-        GROUP BY le.item_id, ${groupKeyExpr}
+        GROUP BY le.item_id${groupByTail}
       ),
       combined AS (
         SELECT

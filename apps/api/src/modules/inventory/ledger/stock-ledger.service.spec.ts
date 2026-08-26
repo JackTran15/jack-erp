@@ -590,6 +590,36 @@ describe('StockLedgerService', () => {
           { organizationId: 'org-1' },
         );
       });
+
+      it('test 6: excludeShowroom filters out kho showroom (is_main_storage)', async () => {
+        const qb = createQbSpy();
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        await service.getBalances({
+          organizationId: 'org-1',
+          excludeShowroom: true,
+          page: 1,
+          pageSize: 20,
+        });
+
+        expect(qb.andWhere).toHaveBeenCalledWith('storage.is_main_storage = false');
+      });
+
+      it('test 7: no showroom filter is applied when excludeShowroom is omitted', async () => {
+        const qb = createQbSpy();
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        await service.getBalances({
+          organizationId: 'org-1',
+          page: 1,
+          pageSize: 20,
+        });
+
+        const calls = qb.andWhere.mock.calls.map((args: unknown[]) => String(args[0]));
+        expect(calls.some((sql: string) => sql.includes('is_main_storage'))).toBe(
+          false,
+        );
+      });
     });
   });
 

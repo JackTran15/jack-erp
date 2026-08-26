@@ -402,4 +402,76 @@ describe('StockPeriodService branch-grain filters', () => {
     const countSql = sql.find((t) => t.includes('COUNT(*)'))!;
     expect(countSql).toContain('b.id::text = c.group_key');
   });
+
+  // ── The chain grain: one row per item, no spatial dimension at all ──────────
+
+  describe("groupBy 'item'", () => {
+    it('groups the ledger by item alone', async () => {
+      const { sql, service } = capture();
+
+      await service.aggregate({ ...baseQuery, groupBy: 'item' });
+
+      const [dataSql] = sql;
+      expect(dataSql).toContain('GROUP BY le.item_id\n');
+      expect(dataSql).not.toContain('GROUP BY le.item_id, le.location_id');
+      expect(dataSql).not.toContain('GROUP BY le.item_id, le.branch_id');
+    });
+
+    it("uses a constant group key, because NULL wouldn't join", async () => {
+      // `combined` stitches opening/in/out with FULL OUTER JOIN on group_key.
+      // With NULL on both sides the join never matches and each item comes back
+      // as three half-filled rows instead of one.
+      const { sql, service } = capture();
+
+      await service.aggregate({ ...baseQuery, groupBy: 'item' });
+
+      expect(sql[0]).toContain("''::text AS group_key");
+      expect(sql[0]).toContain(
+        'FULL OUTER JOIN in_period ip\n          ON  o.item_id   = ip.item_id   AND o.group_key  = ip.group_key',
+      );
+    });
+
+    it('reports no location or branch, because a row spans every branch in scope', async () => {
+      const { sql, service } = capture();
+
+      await service.aggregate({ ...baseQuery, groupBy: 'item' });
+
+      const [dataSql] = sql;
+      expect(dataSql).toContain('NULL::text AS location_code');
+      expect(dataSql).toContain('NULL::text AS branch_name');
+      expect(dataSql).not.toContain('LEFT JOIN locations loc');
+      expect(dataSql).not.toContain('LEFT JOIN branches b');
+      expect(dataSql).toContain('ORDER BY i.code ASC\n');
+    });
+
+    it('sums pending transfers per item, both directions', async () => {
+      // A transfer between two shops of the chain is in transit out of one and
+      // due into the other, so it counts in both columns.
+      const { sql, service } = capture();
+
+      await service.aggregate({ ...baseQuery, groupBy: 'item' });
+
+      const [dataSql] = sql;
+      expect(dataSql).toContain('pending_out AS (');
+      expect(dataSql).toContain('pending_in AS (');
+      expect(dataSql).toContain('GROUP BY pb.item_id\n');
+      expect(dataSql).not.toContain('GROUP BY pb.item_id, pb.source_location_id');
+      // Nothing to borrow a destination location for any more.
+      expect(dataSql).not.toContain('JOIN default_receiving dr');
+    });
+
+    it('refuses locationCode and branchName, which the rows do not carry', async () => {
+      const { service } = capture();
+
+      for (const key of ['locationCode', 'branchName']) {
+        await expect(
+          service.aggregate({
+            ...baseQuery,
+            groupBy: 'item',
+            columnFilters: { [key]: { operator: '=', value: 'x' } },
+          }),
+        ).rejects.toThrow(new RegExp(key));
+      }
+    });
+  });
 });

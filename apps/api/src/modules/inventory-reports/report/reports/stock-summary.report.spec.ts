@@ -69,13 +69,53 @@ function build(rows: StockPeriodRow[], total = rows.length) {
     }),
   };
   const branches = { find: jest.fn().mockResolvedValue([]) };
-  const locations = { find: jest.fn().mockResolvedValue([]) };
+  // The shelf the reference location resolves to: a warehouse shelf "A10" that
+  // item-1 is assigned to, plus a showroom that only holds item-2.
+  const locations = {
+    find: jest.fn().mockImplementation(({ where }) => {
+      const ids: string[] = where?.storageId?._value ?? [];
+      const rows = [
+        { id: 'loc-wh', code: 'A10', name: 'A10', storageId: 'wh-1' },
+        { id: 'loc-sr', code: 'DEFAULT', name: 'Mặc định', storageId: 'sr-1' },
+      ];
+      return Promise.resolve(rows.filter((l) => ids.includes(l.storageId)));
+    }),
+  };
+  const storages = {
+    find: jest.fn().mockResolvedValue([
+      { id: 'wh-1', isMainStorage: false },
+      { id: 'sr-1', isMainStorage: true },
+    ]),
+  };
+  const itemStorageLocations = {
+    find: jest.fn().mockImplementation(({ where }) => {
+      const storageIds: string[] = where?.storageId?._value ?? [];
+      return Promise.resolve(
+        storageIds.includes('wh-1')
+          ? [{ itemId: 'item-1', locationId: 'loc-wh', storageId: 'wh-1' }]
+          : [{ itemId: 'item-2', locationId: 'loc-sr', storageId: 'sr-1' }],
+      );
+    }),
+  };
+  const stockBalances = {
+    find: jest.fn().mockResolvedValue([]),
+    createQueryBuilder: jest.fn(() => {
+      const qb: Record<string, unknown> = {};
+      for (const m of ['innerJoin', 'where', 'andWhere', 'orderBy', 'select', 'addSelect'])
+        qb[m] = () => qb;
+      qb.getRawMany = () => Promise.resolve([]);
+      return qb;
+    }),
+  };
   const report = new StockSummaryReport(
     stockPeriod as never,
     branches as never,
     locations as never,
+    storages as never,
+    itemStorageLocations as never,
+    stockBalances as never,
   );
-  return { report, stockPeriod, branches, locations };
+  return { report, stockPeriod, branches, locations, storages };
 }
 
 const baseDto: InventoryReportSearchDto = {
@@ -188,7 +228,6 @@ describe('StockSummaryReport', () => {
           { col: 'name', contains: 'giày' },
           { col: 'endingQty', gte: 25 },
           { col: 'group', equals: 'Nhóm A' },
-          { col: 'positionCode', startsWith: 'A1' },
         ],
       },
       actor,
@@ -200,10 +239,22 @@ describe('StockSummaryReport', () => {
           itemName: { operator: '*', value: 'giày' },
           closingQty: { operator: '>=', value: 25 },
           categoryName: { operator: '=', value: 'Nhóm A' },
-          locationCode: { operator: '+', value: 'A1' },
         },
       }),
     );
+  });
+
+  it('offers no filter on the location columns, because they are not in the query', async () => {
+    // They are resolved per page from the item's current shelf, so a predicate
+    // on them has nothing to attach to — the catalog says so rather than
+    // letting the FE render a box that would 400.
+    const { report } = build([]);
+
+    const cols = await report.buildColumns();
+
+    for (const key of ['positionCode', 'positionName']) {
+      expect(cols.find((c) => c.col === key)!.filterKind).toBe('none');
+    }
   });
 
   it('pushes the unit and brand dropdowns down too (A-11)', async () => {
@@ -363,5 +414,225 @@ describe('StockSummaryReport', () => {
         columnFilters: { supplier: { operator: '*', value: 'Bitis' } },
       }),
     );
+  });
+
+  // ── Thống kê theo: bộ cột đi theo hạt ────────────────────────────────────
+
+  describe('columns per "Thống kê theo" grain', () => {
+    const measures = [
+      'openingQty', 'openingValue', 'inQty', 'inValue', 'outQty', 'outValue',
+      'endingQty', 'endingValue', 'transferOutQty', 'transferOutValue',
+      'incomingQty', 'incomingValue',
+    ];
+
+    it('shows only the category name at the category grain', async () => {
+      // buildAggSqls nulls every other identity column here, so leaving them in
+      // prints eight empty cells — and "Tên hàng hóa" repeating the category
+      // name right beside "Nhóm hàng hóa".
+      const { report } = build([]);
+
+      const cols = (await report.buildColumns(actor, { statBy: 'group' })).map(
+        (c) => c.col,
+      );
+
+      expect(cols).toEqual(['group', ...measures]);
+      expect(cols).not.toContain('name');
+      expect(cols).not.toContain('sku');
+    });
+
+    it('shows the product code and name at the product grain', async () => {
+      const { report } = build([]);
+
+      const cols = (await report.buildColumns(actor, { statBy: 'parent' })).map(
+        (c) => c.col,
+      );
+
+      expect(cols).toEqual(['name', 'sku', ...measures]);
+    });
+
+    it('pins the leading identity column of whatever grain is asked for', async () => {
+      const { report } = build([]);
+
+      const group = await report.buildColumns(actor, { statBy: 'group' });
+      const item = await report.buildColumns(actor);
+
+      expect(group.find((c) => c.col === 'group')!.pinned).toBe('left');
+      expect(item.find((c) => c.col === 'name')!.pinned).toBe('left');
+    });
+
+    it('keeps every column at the item grain', async () => {
+      const { report } = build([]);
+
+      const cols = await report.buildColumns(actor, { statBy: 'item' });
+
+      expect(cols).toHaveLength(24);
+    });
+  });
+
+  // ── Vị trí tham chiếu: kệ hiện tại của hàng, không phải kệ trên bút toán ──
+
+  describe('reference location', () => {
+    it("fills it from the item's current warehouse shelf", async () => {
+      const { report } = build([periodRow({ itemId: 'item-1' })]);
+
+      const result = await report.buildData(
+        { ...baseDto, columns: ['sku', 'positionCode', 'positionName'] },
+        actor,
+      );
+
+      expect(result.rows[0]).toMatchObject({
+        positionCode: 'A10',
+        positionName: 'A10',
+      });
+    });
+
+    it('falls back to the showroom when the item is on no warehouse shelf', async () => {
+      // "ưu tiên khác showroom trước" — a preference, not an exclusion. An item
+      // that only ever sits on the shop floor reports that shelf rather than an
+      // empty cell, which is the opposite of what revenue-by-item wants.
+      const { report } = build([periodRow({ itemId: 'item-2' })]);
+
+      const result = await report.buildData(
+        { ...baseDto, columns: ['sku', 'positionCode', 'positionName'] },
+        actor,
+      );
+
+      expect(result.rows[0]).toMatchObject({
+        positionCode: 'DEFAULT',
+        positionName: 'Mặc định',
+      });
+    });
+
+    it('skips the lookup when the columns were not asked for', async () => {
+      const { report, storages } = build([periodRow({})]);
+
+      await report.buildData({ ...baseDto, columns: ['sku', 'endingQty'] }, actor);
+
+      expect(storages.find).not.toHaveBeenCalled();
+    });
+
+    it('leaves it empty when several stores are in scope', async () => {
+      // A shelf belongs to one branch; two branches have no single answer.
+      const { report, storages, branches } = build([periodRow({})]);
+      branches.find.mockResolvedValue([{ id: 'branch-1' }, { id: 'branch-2' }]);
+
+      const result = await report.buildData(
+        {
+          ...baseDto,
+          columns: ['sku', 'positionCode'],
+          filters: {
+            ...baseDto.filters,
+            store: { scope: 'group', storeIds: ['branch-1', 'branch-2'] } as never,
+          },
+        },
+        { ...actor, branchIds: ['branch-1', 'branch-2'] } as ActorContext,
+      );
+
+      expect(storages.find).not.toHaveBeenCalled();
+      expect(result.rows[0].positionCode).toBeNull();
+    });
+  });
+
+  // ── Chuỗi cửa hàng: một dòng mỗi hàng hóa, không có vị trí ─────────────────
+
+  describe('chain view', () => {
+    it('drops the two location columns from the catalog', async () => {
+      const { report } = build([]);
+
+      const cols = await report.buildColumns(actor, { viewMode: 'chain' });
+
+      expect(cols.map((c) => c.col)).not.toContain('positionCode');
+      expect(cols.map((c) => c.col)).not.toContain('positionName');
+      // Nothing else moves: the chain view is the branch view minus a dimension.
+      expect(cols.map((c) => c.col)).toEqual([
+        'name', 'parentSku', 'parentName', 'color', 'size', 'unit', 'group',
+        'brand', 'sku',
+        'openingQty', 'openingValue', 'inQty', 'inValue', 'outQty', 'outValue',
+        'endingQty', 'endingValue', 'transferOutQty', 'transferOutValue',
+        'incomingQty', 'incomingValue', 'supplier',
+      ]);
+    });
+
+    it('asks the engine for the item grain', async () => {
+      const { report, stockPeriod } = build([periodRow({})]);
+
+      await report.buildData(
+        { ...baseDto, filters: { ...baseDto.filters, viewMode: 'chain' } },
+        actor,
+      );
+
+      expect(stockPeriod.aggregate).toHaveBeenCalledWith(
+        expect.objectContaining({ groupBy: 'item' }),
+      );
+    });
+
+    it('collapses even when the chain is narrowed to one store', async () => {
+      // Driven by the view, not by how many branches `store` resolved to —
+      // otherwise the catalog and the rows disagree the moment a chain user
+      // picks a single shop.
+      const { report, stockPeriod, branches } = build([periodRow({})]);
+      branches.find.mockResolvedValue([{ id: 'branch-1' }]);
+
+      await report.buildData(
+        {
+          ...baseDto,
+          filters: {
+            ...baseDto.filters,
+            viewMode: 'chain',
+            store: { scope: 'group', storeIds: ['branch-1'] } as never,
+          },
+        },
+        actor,
+      );
+
+      expect(stockPeriod.aggregate).toHaveBeenCalledWith(
+        expect.objectContaining({ groupBy: 'item' }),
+      );
+    });
+
+    it('keeps the location columns in the branch view', async () => {
+      const { report, stockPeriod } = build([periodRow({})]);
+
+      await report.buildData(baseDto, actor);
+
+      expect(stockPeriod.aggregate).toHaveBeenCalledWith(
+        expect.objectContaining({ groupBy: 'item' }),
+      );
+      expect((await report.buildColumns()).map((c) => c.col)).toContain(
+        'positionCode',
+      );
+    });
+
+    it('does not even look a shelf up — there is no single branch', async () => {
+      const { report, storages } = build([periodRow({})]);
+
+      await report.buildData(
+        {
+          ...baseDto,
+          columns: ['sku', 'positionCode'],
+          filters: { ...baseDto.filters, viewMode: 'chain' },
+        },
+        actor,
+      );
+
+      expect(storages.find).not.toHaveBeenCalled();
+    });
+
+    it('still accepts a template saved in the branch view', async () => {
+      // `positionCode` stays in CATALOG_KEYS: a saved column set must replay
+      // without a 400 just because the user switched to the chain.
+      const { report } = build([periodRow({})]);
+
+      const result = await report.buildData(
+        {
+          ...baseDto,
+          columns: ['sku', 'positionCode', 'endingQty'],
+          filters: { ...baseDto.filters, viewMode: 'chain' },
+        },
+        actor,
+      );
+
+      expect(result.rows[0]).toHaveProperty('positionCode');
+    });
   });
 });

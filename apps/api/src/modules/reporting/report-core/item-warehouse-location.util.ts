@@ -35,21 +35,70 @@ export interface ItemWarehouseLocationRepos {
  *
  * Callers pass one branch at a time because a shelf belongs to exactly one
  * branch; a row spanning several has no single location.
+ *
+ * `showroomFallback` relaxes the exclusion into a preference: warehouses still
+ * win, but an item that lives only on the showroom floor reports that shelf
+ * instead of an empty cell. The stock reports want this — their location column
+ * is a "where do I go and pick this up" hint, so the showroom is a better answer
+ * than nothing. The revenue and profit reports do not, because there the
+ * showroom shelf is an artefact of how a POS sale is booked, not a fact about
+ * where the goods sit.
  */
 export async function resolveItemWarehouseLocations(
   repos: ItemWarehouseLocationRepos,
   itemIds: string[],
   organizationId: string,
   branchId: string,
+  options: { showroomFallback?: boolean } = {},
 ): Promise<Map<string, ItemWarehouseLocation>> {
   const map = new Map<string, ItemWarehouseLocation>();
   if (!itemIds.length) return map;
 
-  const warehouses = await repos.storages.find({
-    where: { organizationId, branchId, isMainStorage: false, isActive: true },
+  const storages = await repos.storages.find({
+    where: { organizationId, branchId, isActive: true },
   });
-  const warehouseIds = warehouses.map((w) => w.id);
-  if (!warehouseIds.length) return map;
+  const warehouseIds = storages.filter((s) => !s.isMainStorage).map((s) => s.id);
+
+  const found = await resolveWithinStorages(
+    repos,
+    itemIds,
+    organizationId,
+    warehouseIds,
+  );
+
+  if (options.showroomFallback) {
+    const missing = itemIds.filter((id) => !found.has(id));
+    const showroomIds = storages.filter((s) => s.isMainStorage).map((s) => s.id);
+    if (missing.length && showroomIds.length) {
+      const fallback = await resolveWithinStorages(
+        repos,
+        missing,
+        organizationId,
+        showroomIds,
+      );
+      for (const [itemId, location] of fallback) found.set(itemId, location);
+    }
+  }
+
+  for (const itemId of itemIds) {
+    map.set(itemId, found.get(itemId) ?? { code: null, name: null });
+  }
+  return map;
+}
+
+/**
+ * The resolution itself, over one set of storages — run once for the branch's
+ * warehouses and, when a fallback is asked for, again over its showroom.
+ * Only items that actually resolved get an entry.
+ */
+async function resolveWithinStorages(
+  repos: ItemWarehouseLocationRepos,
+  itemIds: string[],
+  organizationId: string,
+  warehouseIds: string[],
+): Promise<Map<string, ItemWarehouseLocation>> {
+  const found = new Map<string, ItemWarehouseLocation>();
+  if (!itemIds.length || !warehouseIds.length) return found;
 
   // Only shelves still in use can be reported — a location switched off
   // ("Ngừng hoạt động") is not where the goods are.
@@ -121,7 +170,7 @@ export async function resolveItemWarehouseLocations(
   for (const itemId of itemIds) {
     const locationId = locationIdByItemId.get(itemId);
     const loc = locationId ? byLocationId.get(locationId) : undefined;
-    map.set(itemId, { code: loc?.code ?? null, name: loc?.name ?? null });
+    if (loc) found.set(itemId, { code: loc.code, name: loc.name });
   }
-  return map;
+  return found;
 }

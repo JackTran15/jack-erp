@@ -12,10 +12,15 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import type { Response } from 'express';
-import { ReportDocumentPayload } from '@erp/shared-interfaces';
+import {
+  INVENTORY_REPORT_VIEW_MODES,
+  InventoryReportStatBy,
+  InventoryReportViewMode,
+  ReportDocumentPayload,
+} from '@erp/shared-interfaces';
 import { ExportPipeline } from '../reporting/report-core/export/export-pipeline';
 import { HttpResponseSink } from '../reporting/report-core/export/http-response.sink';
 import { XlsxStreamWriter } from '../reporting/report-core/export/xlsx-stream.writer';
@@ -29,6 +34,7 @@ import {
 } from '../../common/decorators/actor-context.decorator';
 import { RequirePermission } from '../auth/decorators';
 import { PermissionGuard } from '../rbac/permission.guard';
+import { ITEM_GROUP_BY_VALUES } from './services/stock-period.service';
 import { CreateInventoryReportTemplateCommand } from './commands/create-inventory-report-template.command';
 import { DeleteInventoryReportTemplateCommand } from './commands/delete-inventory-report-template.command';
 import { UpdateInventoryReportTemplateCommand } from './commands/update-inventory-report-template.command';
@@ -67,12 +73,16 @@ export class InventoryReportV2Controller {
   @Get('columns')
   @RequirePermission(REPORTS_READ)
   @ApiOperation({ summary: 'Column catalog of one inventory report type' })
+  @ApiQuery({ name: 'viewMode', enum: INVENTORY_REPORT_VIEW_MODES, required: false })
+  @ApiQuery({ name: 'statBy', enum: ITEM_GROUP_BY_VALUES, required: false })
   getColumns(
     @Query('reportType') reportType: string,
     @Actor() actor: ActorContext,
+    @Query('viewMode') viewMode?: InventoryReportViewMode,
+    @Query('statBy') statBy?: InventoryReportStatBy,
   ) {
     return this.queryBus.execute(
-      new GetInventoryReportColumnsQuery(reportType, actor),
+      new GetInventoryReportColumnsQuery(reportType, actor, { viewMode, statBy }),
     );
   }
 
