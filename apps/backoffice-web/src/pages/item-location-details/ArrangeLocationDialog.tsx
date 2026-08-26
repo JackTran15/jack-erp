@@ -142,7 +142,7 @@ export function ArrangeLocationDialog({
         storageId: initialLocation.storageId,
         storageName: initialLocation.storageName ?? "",
         locationId: initialLocation.id,
-        locationCode: `${initialLocation.code} · ${initialLocation.name}`,
+        locationCode: initialLocation.code,
       },
     ]);
   }, [open, initialLocation, selectedRows.length]);
@@ -284,7 +284,7 @@ export function ArrangeLocationDialog({
           locationId: target.locationId ?? shelf?.id ?? null,
           locationCode:
             target.locationCode ||
-            (shelf ? `${shelf.code} · ${shelf.name}` : ""),
+            (shelf ? shelf.code : ""),
         };
       });
 
@@ -340,7 +340,7 @@ export function ArrangeLocationDialog({
         locationId: context?.locationId ?? shelf?.id ?? null,
         locationCode:
           context?.locationCode ||
-          (shelf ? `${shelf.code} · ${shelf.name}` : ""),
+          (shelf ? shelf.code : ""),
       };
 
       // Replace the first empty row (usually the last one); useTrailingEmptyRow will
@@ -637,7 +637,7 @@ export function ArrangeLocationDialog({
                     onSelect={(loc) =>
                       updateRow(row.uid, {
                         locationId: loc.id,
-                        locationCode: `${loc.code} · ${loc.name}`,
+                        locationCode: loc.code,
                         // If user picked a location without choosing Kho first,
                         // back-fill the Kho from the location.
                         storageId: row.storageId ?? loc.storageId,

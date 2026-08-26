@@ -802,13 +802,13 @@ function TransferFormDialog({
       sourceStorageLabel: l.sourceStorage?.name ?? "",
       sourceLocationId: l.sourceLocationId ?? "",
       sourceLocationLabel: l.sourceLocation
-        ? `${l.sourceLocation.code} · ${l.sourceLocation.name}`
+        ? l.sourceLocation.code
         : "",
       destStorageId: l.destinationStorageId ?? "",
       destStorageLabel: l.destinationStorage?.name ?? "",
       destLocationId: l.destinationLocationId ?? "",
       destLocationLabel: l.destinationLocation
-        ? `${l.destinationLocation.code} · ${l.destinationLocation.name}`
+        ? l.destinationLocation.code
         : "",
       quantity: Number(l.quantity),
       unitPrice: l.unitPrice != null ? String(Number(l.unitPrice)) : "",
@@ -1176,7 +1176,7 @@ function TransferFormDialog({
             return {
               ...line,
               sourceLocationId: shelf.id,
-              sourceLocationLabel: `${shelf.code} · ${shelf.name}`,
+              sourceLocationLabel: shelf.code,
             };
           }),
         );
@@ -1216,7 +1216,7 @@ function TransferFormDialog({
       sourceStorageLabel: resolved?.storage?.name ?? defaultStorage?.name ?? "",
       sourceLocationId: resolved?.shelf?.id ?? "",
       sourceLocationLabel: resolved?.shelf
-        ? `${resolved.shelf.code} · ${resolved.shelf.name}`
+        ? resolved.shelf.code
         : "",
     }),
     [defaultStorage],
@@ -1291,11 +1291,11 @@ function TransferFormDialog({
           ...l,
           sourceLocationId: r.sourceShelf?.id ?? l.sourceLocationId,
           sourceLocationLabel: r.sourceShelf
-            ? `${r.sourceShelf.code} · ${r.sourceShelf.name}`
+            ? r.sourceShelf.code
             : l.sourceLocationLabel,
           destLocationId: r.destShelf?.id ?? l.destLocationId,
           destLocationLabel: r.destShelf
-            ? `${r.destShelf.code} · ${r.destShelf.name}`
+            ? r.destShelf.code
             : l.destLocationLabel,
         };
       }),
@@ -1517,7 +1517,7 @@ function TransferFormDialog({
           onSelect={(loc) =>
             updateLine(idx, {
               sourceLocationId: loc.id,
-              sourceLocationLabel: `${loc.code} · ${loc.name}`,
+              sourceLocationLabel: loc.code,
             })
           }
           search={makeSearchLocations(row.sourceStorageId)}
@@ -1579,7 +1579,7 @@ function TransferFormDialog({
           onSelect={(loc) =>
             updateLine(idx, {
               destLocationId: loc.id,
-              destLocationLabel: `${loc.code} · ${loc.name}`,
+              destLocationLabel: loc.code,
             })
           }
           search={makeSearchLocations(row.destStorageId)}
