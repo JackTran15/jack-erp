@@ -34,6 +34,7 @@ import {
   InvoiceEntity,
   InvoicePaymentMethod,
   InvoiceStatus,
+  InvoiceType,
 } from '../entities/invoice.entity';
 import { InvoiceItemEntity } from '../entities/invoice-item.entity';
 import { InvoicePaymentEntity } from '../entities/invoice-payment.entity';
@@ -120,6 +121,21 @@ export class CheckoutInvoiceService {
       throw new BadRequestException(
         `Invoice ${id} is not a draft and cannot be checked out`,
       );
+    }
+
+    // A RETURN/EXCHANGE draft settles through /checkout-return, which is the only
+    // path that computes `netAmount` and pays out a refund. Letting one through
+    // here issues a document whose `net_amount` still holds the draft's figure
+    // while `amount_due` and `total_paid` hold the sale's — the shape every POS
+    // grid and revenue report then disagrees about.
+    if (invoice.type !== InvoiceType.SALE) {
+      this.logger.warn(
+        `Rejected checkout of invoice ${id}: type=${invoice.type} must settle via /checkout-return`,
+      );
+      throw new BadRequestException({
+        code: 'INVOICE_NOT_CHECKOUTABLE',
+        message: `Invoice ${id} is a ${invoice.type} document and must be settled via /invoices/:id/checkout-return`,
+      });
     }
 
     const items = await this.itemRepo.find({

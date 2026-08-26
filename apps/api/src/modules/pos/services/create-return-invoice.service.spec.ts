@@ -1,5 +1,8 @@
 import { CreateReturnInvoiceService } from './create-return-invoice.service';
-import { InvoiceItemEntity } from '../entities/invoice-item.entity';
+import {
+  InvoiceItemEntity,
+  LineDiscountType,
+} from '../entities/invoice-item.entity';
 import { ReturnInvoiceMode } from '../dto/create-return-invoice.dto';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 
@@ -96,5 +99,73 @@ describe('CreateReturnInvoiceService — costPrice on the returned (IN) line', (
     expect(eligibility.assertLineEligible).not.toHaveBeenCalled();
     const [createdItems] = manager.save.mock.calls.find(([arg]) => Array.isArray(arg))!;
     expect((createdItems as InvoiceItemEntity[])[0].costPrice).toBe(30);
+  });
+});
+
+describe('CreateReturnInvoiceService — per-line discounts', () => {
+  function makeQuickService() {
+    const manager = makeManager();
+    const service = new CreateReturnInvoiceService(
+      {} as never,
+      { transaction: (cb: (m: unknown) => unknown) => cb(manager) } as never,
+      { assertLineEligible: jest.fn() } as never,
+      { snapshotCosts: jest.fn(async () => new Map([['item-1', 30]])) } as never,
+    );
+    return { service, manager };
+  }
+
+  it('subtracts a flat line discount from the refunded value', async () => {
+    const { service, manager } = makeQuickService();
+
+    await service.create(
+      {
+        mode: ReturnInvoiceMode.QUICK,
+        sessionId: 'session-1',
+        reason: 'Đổi ý',
+        lines: [
+          {
+            ...baseLine,
+            quantity: 1,
+            unitPrice: 300000,
+            lineDiscountType: LineDiscountType.AMOUNT,
+            lineDiscountValue: 30000,
+            lineDiscountReason: 'hàng lỗi',
+          },
+        ],
+      },
+      actor,
+    );
+
+    const [createdItems] = manager.save.mock.calls.find(([arg]) => Array.isArray(arg))!;
+    expect((createdItems as InvoiceItemEntity[])[0]).toMatchObject({
+      lineDiscount: 30000,
+      lineDiscountType: LineDiscountType.AMOUNT,
+      lineDiscountValue: 30000,
+      lineDiscountReason: 'hàng lỗi',
+      lineTotal: 270000,
+    });
+
+    const [invoice] = manager.save.mock.calls.find(([arg]) => !Array.isArray(arg))!;
+    expect((invoice as Record<string, unknown>).subtotal).toBe(270000);
+  });
+
+  it('keeps the legacy behaviour when no discount type is supplied', async () => {
+    const { service, manager } = makeQuickService();
+
+    await service.create(
+      {
+        mode: ReturnInvoiceMode.QUICK,
+        sessionId: 'session-1',
+        reason: 'Đổi ý',
+        lines: [baseLine],
+      },
+      actor,
+    );
+
+    const [createdItems] = manager.save.mock.calls.find(([arg]) => Array.isArray(arg))!;
+    expect((createdItems as InvoiceItemEntity[])[0]).toMatchObject({
+      lineDiscount: 0,
+      lineTotal: 200,
+    });
   });
 });

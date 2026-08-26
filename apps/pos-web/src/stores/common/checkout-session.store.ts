@@ -591,6 +591,9 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
             selectedLinePurchaseId: null,
             selectedLineReturnId: null,
             sourceInvoiceId: draft.id,
+            // Phiếu "regular" mở lại phải giữ hóa đơn gốc, nếu không nó được gửi
+            // đi như phiếu trả nhanh và hóa đơn gốc không bị trừ returned_quantity.
+            originalInvoiceId: draft.originalInvoiceId,
             draft: restoredDraft,
           };
         } else {

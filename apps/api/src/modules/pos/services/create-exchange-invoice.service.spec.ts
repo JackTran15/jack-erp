@@ -4,7 +4,12 @@ import { ItemEntity } from '../../inventory/location/item.entity';
 import { StorageEntity } from '../../inventory/location/storage.entity';
 import { LocationEntity } from '../../inventory/location/location.entity';
 import { ItemStorageLocationEntity } from '../../inventory/product/item-storage-location.entity';
-import { InvoiceItemEntity, ItemDirection } from '../entities/invoice-item.entity';
+import {
+  InvoiceItemEntity,
+  ItemDirection,
+  LineDiscountType,
+} from '../entities/invoice-item.entity';
+import { computeLineDiscount } from './line-discount.util';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 
 const ORG = 'org-1';
@@ -143,10 +148,18 @@ describe('CreateExchangeInvoiceService.buildNewLineEntities — showroom locatio
         m: EntityManager,
         invoiceId: string,
         lines: unknown[],
+        resolved: unknown[],
         a: ActorContext,
         offset: number,
       ) => Promise<InvoiceItemEntity[]>;
-    }).buildNewLineEntities(manager, 'inv-1', [newLine], actor, 0)) as InvoiceItemEntity[];
+    }).buildNewLineEntities(
+      manager,
+      'inv-1',
+      [newLine],
+      [computeLineDiscount(newLine)],
+      actor,
+      0,
+    )) as InvoiceItemEntity[];
 
     expect(entity.locationId).toBe(LOC_SHOWROOM_DEFAULT);
     expect(entity.locationId).not.toBe(LOC_WAREHOUSE);
@@ -171,10 +184,18 @@ describe('CreateExchangeInvoiceService.buildNewLineEntities — showroom locatio
         m: EntityManager,
         invoiceId: string,
         lines: unknown[],
+        resolved: unknown[],
         a: ActorContext,
         offset: number,
       ) => Promise<InvoiceItemEntity[]>;
-    }).buildNewLineEntities(manager, 'inv-1', [newLine], actor, 0)) as InvoiceItemEntity[];
+    }).buildNewLineEntities(
+      manager,
+      'inv-1',
+      [newLine],
+      [computeLineDiscount(newLine)],
+      actor,
+      0,
+    )) as InvoiceItemEntity[];
 
     expect(entity.locationId).toBe(LOC_WAREHOUSE);
   });
@@ -315,5 +336,153 @@ describe('CreateExchangeInvoiceService.create — QUICK mode (no originalInvoice
     await expect(
       service.create({ ...quickDto, newLines: [] } as never, actor),
     ).rejects.toThrow(/at least one newLine/);
+  });
+});
+
+describe('CreateExchangeInvoiceService.create — per-line discounts', () => {
+  /** The exact cart from the production report: 685.000 − 30% out, 460.000 in. */
+  const discountedNewLine = {
+    ...newLine,
+    unitPrice: 685000,
+    lineDiscountType: LineDiscountType.PERCENT,
+    lineDiscountValue: 30,
+    lineDiscountReason: 'sale30',
+  };
+  const plainReturnLine = { ...quickReturnLine, unitPrice: 460000 };
+
+  function makeQuick() {
+    const manager = makeSavingManager();
+    const service = new CreateExchangeInvoiceService(
+      {} as never,
+      { transaction: (cb: (m: EntityManager) => unknown) => cb(manager) } as never,
+      { assertLineEligible: jest.fn() } as never,
+      { snapshotCosts: jest.fn(async () => new Map([[ITEM, 60]])) } as never,
+    );
+    return { service, manager };
+  }
+
+  function savedInvoice(manager: EntityManager): Record<string, unknown> {
+    const saveCalls = (manager as unknown as { save: jest.Mock }).save.mock.calls;
+    const [invoice] = saveCalls.find(([arg]: [unknown]) => !Array.isArray(arg))!;
+    return invoice as Record<string, unknown>;
+  }
+
+  function savedNewItems(manager: EntityManager): InvoiceItemEntity[] {
+    const saveCalls = (manager as unknown as { save: jest.Mock }).save.mock.calls;
+    const arrays = saveCalls.filter(([arg]: [unknown]) => Array.isArray(arg));
+    return arrays[1][0] as InvoiceItemEntity[];
+  }
+
+  it('nets the OUT line discount off netAmount instead of charging it to the customer', async () => {
+    const { service, manager } = makeQuick();
+
+    await service.create(
+      {
+        sessionId: 'session-1',
+        reason: 'Đổi trả nhanh',
+        returnLines: [plainReturnLine],
+        newLines: [discountedNewLine],
+      } as never,
+      actor,
+    );
+
+    const invoice = savedInvoice(manager);
+    // 685.000 − 205.500 = 479.500 sold, 460.000 returned → the customer owes 19.500,
+    // which is what POS displayed. Before this fix the draft said 225.000.
+    expect(invoice.subtotal).toBe(479500);
+    expect(invoice.netAmount).toBe(19500);
+    expect(invoice.amountDue).toBe(19500);
+    expect(invoice.refundedAmount).toBe(0);
+  });
+
+  it('persists the discount breakdown on the OUT line', async () => {
+    const { service, manager } = makeQuick();
+
+    await service.create(
+      {
+        sessionId: 'session-1',
+        reason: 'Đổi trả nhanh',
+        returnLines: [plainReturnLine],
+        newLines: [discountedNewLine],
+      } as never,
+      actor,
+    );
+
+    expect(savedNewItems(manager)[0]).toMatchObject({
+      lineDiscount: 205500,
+      lineDiscountType: LineDiscountType.PERCENT,
+      lineDiscountValue: 30,
+      lineDiscountReason: 'sale30',
+      lineTotal: 479500,
+    });
+  });
+
+  it('applies a discount sitting on the returned (IN) line too', async () => {
+    const { service, manager } = makeQuick();
+
+    await service.create(
+      {
+        sessionId: 'session-1',
+        reason: 'Đổi trả nhanh',
+        returnLines: [
+          {
+            ...quickReturnLine,
+            unitPrice: 500000,
+            lineDiscountType: LineDiscountType.PERCENT,
+            lineDiscountValue: 10,
+            lineDiscountReason: 'sale10',
+          },
+        ],
+        newLines: [{ ...newLine, unitPrice: 600000 }],
+      } as never,
+      actor,
+    );
+
+    expect(savedReturnItems(manager)[0]).toMatchObject({
+      lineDiscount: 50000,
+      lineDiscountType: LineDiscountType.PERCENT,
+      lineDiscountValue: 10,
+      lineTotal: 450000,
+    });
+    // 600.000 − 450.000
+    expect(savedInvoice(manager).netAmount).toBe(150000);
+  });
+
+  it('refunds on the discounted values when the returned leg is worth more', async () => {
+    const { service, manager } = makeQuick();
+
+    await service.create(
+      {
+        sessionId: 'session-1',
+        reason: 'Đổi trả nhanh',
+        returnLines: [{ ...quickReturnLine, unitPrice: 600000 }],
+        newLines: [discountedNewLine],
+      } as never,
+      actor,
+    );
+
+    const invoice = savedInvoice(manager);
+    // 479.500 sold − 600.000 returned
+    expect(invoice.netAmount).toBe(-120500);
+    expect(invoice.refundedAmount).toBe(120500);
+    expect(invoice.amountDue).toBe(0);
+  });
+
+  it('ignores a client-supplied lineDiscount amount when a type is present', async () => {
+    const { service, manager } = makeQuick();
+
+    await service.create(
+      {
+        sessionId: 'session-1',
+        reason: 'Đổi trả nhanh',
+        returnLines: [plainReturnLine],
+        // A stale client posting both: the type wins, the amount is discarded.
+        newLines: [{ ...discountedNewLine, lineDiscount: 0 }],
+      } as never,
+      actor,
+    );
+
+    expect(savedNewItems(manager)[0].lineTotal).toBe(479500);
+    expect(savedInvoice(manager).netAmount).toBe(19500);
   });
 });

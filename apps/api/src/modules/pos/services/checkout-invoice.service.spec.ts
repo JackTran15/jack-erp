@@ -4,7 +4,11 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CheckoutInvoiceService } from './checkout-invoice.service';
-import { InvoiceEntity, InvoiceStatus } from '../entities/invoice.entity';
+import {
+  InvoiceEntity,
+  InvoiceStatus,
+  InvoiceType,
+} from '../entities/invoice.entity';
 import { InvoiceItemEntity } from '../entities/invoice-item.entity';
 import { InvoiceDebtService } from './invoice-debt.service';
 import { CheckoutInvoiceDto } from '../dto/checkout-invoice.dto';
@@ -59,6 +63,8 @@ const invoiceStub = (overrides: Partial<InvoiceEntity> = {}): InvoiceEntity =>
     customerId: 'cust-1',
     isDraft: true,
     status: InvoiceStatus.DRAFT,
+    // NOT NULL with a SALE default in the schema — a real draft always carries one.
+    type: InvoiceType.SALE,
     subtotal: 200,
     discountAmount: 0,
     depositAmount: 0,
@@ -216,6 +222,31 @@ describe('CheckoutInvoiceService (event-driven)', () => {
     it('throws when invoice is not a draft', async () => {
       invoiceRepo.findOne.mockResolvedValue(invoiceStub({ isDraft: false }));
       await expect(service.checkout('inv-1', cashPaymentDto(), actor)).rejects.toThrow(BadRequestException);
+    });
+
+    it('AC-09: rejects an EXCHANGE draft with INVOICE_NOT_CHECKOUTABLE and leaves it a draft', async () => {
+      const draft = invoiceStub({ type: InvoiceType.EXCHANGE });
+      invoiceRepo.findOne.mockResolvedValue(draft);
+
+      await expect(
+        service.checkout('inv-1', cashPaymentDto(), actor),
+      ).rejects.toMatchObject({
+        response: { code: 'INVOICE_NOT_CHECKOUTABLE' },
+      });
+      expect(draft.isDraft).toBe(true);
+      expect(draft.status).toBe(InvoiceStatus.DRAFT);
+    });
+
+    it('AC-09: rejects a RETURN draft the same way', async () => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({ type: InvoiceType.RETURN }),
+      );
+
+      await expect(
+        service.checkout('inv-1', cashPaymentDto(), actor),
+      ).rejects.toMatchObject({
+        response: { code: 'INVOICE_NOT_CHECKOUTABLE' },
+      });
     });
 
     it('throws when invoice has no items', async () => {

@@ -18,10 +18,10 @@ import {
 } from '../entities/invoice-item.entity';
 import {
   CreateReturnInvoiceDto,
-  ReturnInvoiceLineDto,
   ReturnInvoiceMode,
 } from '../dto/create-return-invoice.dto';
 import { resolveBranchItemLocations } from './resolve-branch-item-locations';
+import { computeLineDiscount } from './line-discount.util';
 import { ReturnEligibilityService } from './return-eligibility.service';
 import { ItemCostSnapshotService } from '../../inventory/location/item-cost-snapshot.service';
 
@@ -85,10 +85,12 @@ export class CreateReturnInvoiceService {
       );
     }
 
-    const subtotal = dto.lines.reduce(
-      (sum, l) => sum + computeLineTotal(l),
-      0,
-    );
+    // One resolution per line, reused by both the invoice subtotal and the line
+    // rows below: the server derives the discount amount from the type + value
+    // the cashier picked, so a client that posts a stale amount cannot drift the
+    // stored totals away from what POS displayed.
+    const resolvedLines = dto.lines.map((line) => computeLineDiscount(line));
+    const subtotal = resolvedLines.reduce((sum, d) => sum + d.lineTotal, 0);
 
     const invoice = await this.dataSource.transaction(async (manager) => {
       const entity = manager.create(InvoiceEntity, {
@@ -125,8 +127,9 @@ export class CreateReturnInvoiceService {
         { showroomOnly: true },
       );
 
-      const items = dto.lines.map((line, index) =>
-        manager.create(InvoiceItemEntity, {
+      const items = dto.lines.map((line, index) => {
+        const discount = resolvedLines[index];
+        return manager.create(InvoiceItemEntity, {
           organizationId: actor.organizationId,
           branchId: actor.branchId,
           createdBy: actor.userId,
@@ -142,15 +145,18 @@ export class CreateReturnInvoiceService {
           costPrice: line.originalInvoiceItemId
             ? costPriceByOriginalItemId.get(line.originalInvoiceItemId) ?? 0
             : costPriceByItemId.get(line.itemId) ?? 0,
-          lineDiscount: line.lineDiscount ?? 0,
-          lineTotal: computeLineTotal(line),
+          lineDiscount: discount.amount,
+          lineDiscountType: discount.type ?? undefined,
+          lineDiscountValue: discount.value ?? undefined,
+          lineDiscountReason: discount.reason ?? undefined,
+          lineTotal: discount.lineTotal,
           direction: ItemDirection.IN,
           returnedQuantity: 0,
           originalInvoiceItemId: line.originalInvoiceItemId,
           note: line.note,
           sortOrder: index,
-        }),
-      );
+        });
+      });
       await manager.save(items);
       saved.subtotal = subtotal;
       return saved;
@@ -162,8 +168,4 @@ export class CreateReturnInvoiceService {
 
     return invoice;
   }
-}
-
-function computeLineTotal(line: ReturnInvoiceLineDto): number {
-  return line.quantity * line.unitPrice - (line.lineDiscount ?? 0);
 }

@@ -152,7 +152,12 @@ export interface ReturnInvoiceLineBody {
   locationId: string;
   quantity: number;
   unitPrice: number;
+  /** Số tiền KM đã tính — BE bỏ qua khi có `lineDiscountType`. */
   lineDiscount?: number;
+  /** KM thủ công theo dòng: BE tự tính số tiền giảm + `lineTotal` từ bộ ba này. */
+  lineDiscountType?: "percent" | "amount";
+  lineDiscountValue?: number;
+  lineDiscountReason?: string;
   note?: string;
 }
 

@@ -11,6 +11,7 @@ import {
   useCreateExchangeInvoiceMutation,
   useCreateInvoiceMutation,
   useCreateReturnInvoiceMutation,
+  useDeleteInvoiceMutation,
   useRedeemPointsMutation,
   useUpdateInvoiceMutation,
 } from "@erp/pos/hooks/react-query/use-query-invoice";
@@ -23,6 +24,7 @@ import { deriveSettlement } from "@erp/pos/lib/page-libs/checkout/checkoutSettle
 import {
   getOversellSaleLines,
   paymentLabel,
+  payloadLineSubtotal,
 } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { validateCheckout } from "@erp/pos/lib/page-libs/checkout/checkoutValidation";
 import {
@@ -105,6 +107,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
   const createReturnMutation = useCreateReturnInvoiceMutation();
   const createExchangeMutation = useCreateExchangeInvoiceMutation();
   const checkoutReturnMutation = useCheckoutReturnMutation();
+  const deleteInvoiceMutation = useDeleteInvoiceMutation();
   // "NV Thu ngân" trên bản in — user đang đăng nhập.
   const currentUserQuery = useCurrentUserQuery();
   const currentUser = currentUserQuery.data;
@@ -357,12 +360,16 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             return;
           }
 
+          // Phải trừ KM dòng, và phải trừ đúng cách BE trừ: hai số này quyết định
+          // chiều tiền (`net`) mà `buildCheckoutReturnPayload` chọn, nên chúng là
+          // bản sao của `returnSubtotal`/`newSubtotal` mà BE tính lại từ payload.
+          // Cộng gộp ở đây là nửa còn lại của bug KM dòng bị đánh rơi.
           const returnSubtotal = returnLines.reduce(
-            (s, l) => s + l.unitPrice * l.qty,
+            (s, l) => s + payloadLineSubtotal(l),
             0,
           );
           const newSubtotal = newLines.reduce(
-            (s, l) => s + l.unitPrice * l.qty,
+            (s, l) => s + payloadLineSubtotal(l),
             0,
           );
 
@@ -442,6 +449,18 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             receiptPayload.totals.pointsBalanceAfter =
               posted.pointsBalanceAfter ?? undefined;
           }
+          // Tab mở lại từ "HĐ lưu tạm": luồng đổi/trả luôn lập chứng từ MỚI, nên
+          // phiếu nháp nguồn phải được dọn — không dọn thì mỗi lần mở lại đẻ thêm
+          // một phiếu mồ côi. Hoá đơn thật đã phát hành xong rồi, nên xoá hụt chỉ
+          // để lại một dòng thừa trong danh sách chứ không hỏng gì (ADR-03).
+          const staleDraftId = session?.sourceInvoiceId;
+          if (staleDraftId && staleDraftId !== invoiceId) {
+            try {
+              await deleteInvoiceMutation.mutateAsync(staleDraftId);
+            } catch {
+              // Nuốt có chủ đích: không có gì để thu ngân làm với lỗi này.
+            }
+          }
         }
       } catch (err) {
         toast.error(
@@ -491,6 +510,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       createReturnMutation,
       createExchangeMutation,
       checkoutReturnMutation,
+      deleteInvoiceMutation,
       currentUser,
       branches,
       paymentAccounts,
