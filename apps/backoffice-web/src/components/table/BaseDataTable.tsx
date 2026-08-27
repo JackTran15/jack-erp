@@ -96,6 +96,12 @@ interface BaseDataTableProps<T> {
   scrollContainerClassName?: string;
   onRowClick?: (row: T) => void;
   onRowDoubleClick?: (row: T) => void;
+  /**
+   * Class phụ cho từng `<tr>` của tbody. Nối sau class kẻ sọc, và `cn()` chạy
+   * `twMerge` nên một `bg-*` trả về ở đây sẽ ghi đè nền kẻ sọc — cách các trang
+   * danh sách chứng từ tô dòng đang xem.
+   */
+  rowClassName?: (row: T, index: number) => string | undefined;
   leadingColumn?: LeadingColumn<T>;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
@@ -170,6 +176,7 @@ export function BaseDataTable<T>({
   scrollContainerClassName,
   onRowClick,
   onRowDoubleClick,
+  rowClassName,
   leadingColumn,
   sortBy,
   sortOrder = "desc",
@@ -602,6 +609,7 @@ export function BaseDataTable<T>({
                   className={cn(
                     index % 2 === 0 ? "bg-background" : "bg-muted/20",
                     onRowClick || onRowDoubleClick ? "cursor-pointer hover:bg-info-subtle/70" : null,
+                    rowClassName?.(row, index),
                   )}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                   onDoubleClick={onRowDoubleClick ? () => onRowDoubleClick(row) : undefined}

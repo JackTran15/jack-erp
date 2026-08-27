@@ -58,6 +58,11 @@ import {
 import { lookupItemByCode, type ItemLookupResult } from "../../api/item-lookup";
 import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import { useDocumentListSelection } from "../../components/document/useDocumentListSelection";
+import { useRowMultiSelect } from "../../components/document/useRowMultiSelect";
+import {
+  RowSelectCheckbox,
+  SelectAllCheckbox,
+} from "../../components/document/RowSelectCheckbox";
 import {
   buildV2Body,
   type V2SearchConfig,
@@ -309,6 +314,23 @@ export function StockTransferPage() {
     getRowId: getTransferId,
   });
 
+  // Tập phiếu đã tick — tách hẳn khỏi `selectedId`. Trang này vốn không fetch khi
+  // đổi dòng đang xem (DetailPanel đọc `lines` sẵn có trong row), nên thay đổi ở đây
+  // thuần túy là cho phép tick nhiều dòng.
+  const {
+    isChecked,
+    toggle: toggleChecked,
+    toggleAllOnPage,
+    clear: clearChecked,
+    allOnPageChecked,
+    someOnPageChecked,
+  } = useRowMultiSelect({ rows: records?.data ?? [], getRowId: getTransferId });
+
+  // Cố ý chỉ phụ thuộc bộ lọc, KHÔNG phụ thuộc `pagination`: lật trang phải giữ tick.
+  useEffect(() => {
+    clearChecked();
+  }, [columnFilters, period.from, period.to, clearChecked]);
+
   const handleDelete = async (t: Transfer) => {
     setActionLoading(t.id);
     setConfirmDelete(null);
@@ -440,7 +462,15 @@ export function StockTransferPage() {
       onClick: () => selected && setConfirmDelete(selected),
     },
     { id: "sep1", type: "separator" },
-    { id: "reload", label: "Nạp", icon: RefreshCw, onClick: () => void loadRecords() },
+    {
+      id: "reload",
+      label: "Nạp",
+      icon: RefreshCw,
+      onClick: () => {
+        clearChecked();
+        void loadRecords();
+      },
+    },
   ];
 
   const columns: TableColumn<Transfer>[] = [
@@ -542,18 +572,26 @@ export function StockTransferPage() {
           emptyLabel="Chưa có phiếu chuyển kho."
           getRowKey={(row) => row.id}
           onRowClick={(row) => setSelectedId(row.id)}
+          rowClassName={(row) =>
+            // `bg-info-subtle` là token của badge, lightness 98% — trên nền trắng của
+            // bảng nó vô hình. Dòng đang xem cần nhìn thấy được, nên dùng `bg-info`
+            // pha loãng.
+            row.id === selectedId ? "bg-info/15" : undefined
+          }
           leadingColumn={{
             width: 36,
-            header: <span className="sr-only">Chọn</span>,
+            header: (
+              <SelectAllCheckbox
+                checked={allOnPageChecked}
+                indeterminate={someOnPageChecked}
+                disabled={(records?.data.length ?? 0) === 0}
+                onToggle={toggleAllOnPage}
+              />
+            ),
             cell: (row) => (
-              <input
-                type="checkbox"
-                aria-label="Chọn dòng"
-                checked={selectedId === row.id}
-                onChange={() =>
-                  setSelectedId(selectedId === row.id ? null : row.id)
-                }
-                onClick={(e) => e.stopPropagation()}
+              <RowSelectCheckbox
+                checked={isChecked(row.id)}
+                onToggle={() => toggleChecked(row.id)}
               />
             ),
           }}

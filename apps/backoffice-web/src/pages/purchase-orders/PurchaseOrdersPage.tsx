@@ -42,6 +42,12 @@ import {
   type StatusBadgeVariant,
 } from "../../components/status/StatusBadge";
 import { useDocumentListSelection } from "../../components/document/useDocumentListSelection";
+import { useRowMultiSelect } from "../../components/document/useRowMultiSelect";
+import { mergeBarcodePrefillItems } from "../../lib/barcode-prefill-merge";
+import {
+  RowSelectCheckbox,
+  SelectAllCheckbox,
+} from "../../components/document/RowSelectCheckbox";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -354,6 +360,26 @@ export function PurchaseOrdersPage({
     getRowId: getOrderId,
   });
 
+  // Tập phiếu đã tick — tách hẳn khỏi `selectedId`. Ô tick chỉ ghi vào đây, nên
+  // tick không còn kéo theo `GET /goods-receipts/:id` và `/:id/lines` như trước.
+  const {
+    checkedIds,
+    checkedCount,
+    isChecked,
+    toggle: toggleChecked,
+    toggleAllOnPage,
+    clear: clearChecked,
+    allOnPageChecked,
+    someOnPageChecked,
+  } = useRowMultiSelect({ rows: records?.data ?? [], getRowId: getOrderId });
+
+  // Cố ý chỉ phụ thuộc bộ lọc, KHÔNG phụ thuộc `pagination`: lật trang phải giữ tick
+  // để gom phiếu qua nhiều trang rồi in tem một lượt, còn đổi bộ lọc thì tập phiếu
+  // đã tick không còn nghĩa gì.
+  useEffect(() => {
+    clearChecked();
+  }, [columnFilters, period, clearChecked]);
+
   // List rows no longer carry `lines` (v2 search trims them, see
   // search-goods-receipts-v2.handler.ts). The selected document's full detail
   // (header + lines) is fetched separately via the unchanged GET /:id, so the
@@ -370,6 +396,33 @@ export function PurchaseOrdersPage({
     enabled: !!selectedId,
   });
   const selectedOrder = selectedOrderData ?? null;
+
+  // Bật trong lúc gom lines của các phiếu đã tick, để nút "In tem mã" không bấm được
+  // hai lần khi mạng chậm.
+  const [gatheringLabels, setGatheringLabels] = useState(false);
+
+  const toPrefillItems = useCallback(
+    (lines: PurchaseOrderLine[]): BarcodePrefillItem[] =>
+      lines.map((line) => {
+        const storageId = line.location?.storageId ?? "";
+        return {
+          itemId: line.itemId,
+          sku: line.item?.code ?? "",
+          name: line.item?.name ?? "",
+          unit: line.item?.unit ?? line.uomCode ?? "",
+          // Lấy từ quan hệ `item` eager-loaded. Để 0 ở đây là đẩy việc tra giá
+          // sang trang In tem mã, nơi nó tra từng SKU một — với một lượt in
+          // hàng loạt thì thành hàng nghìn request.
+          sellingPrice: Number(line.item?.sellingPrice) || 0,
+          quantity: Number(line.quantity) || 0,
+          storageId,
+          storageName: storageId ? (storageNameById.get(storageId) ?? "") : "",
+          locationId: line.locationId ?? line.location?.id ?? "",
+          locationCode: line.location?.code ?? "",
+        };
+      }),
+    [storageNameById],
+  );
 
   // ─── Row actions ──────────────────────────────────────────────────────────────
 
@@ -478,35 +531,57 @@ export function PurchaseOrdersPage({
       id: "reload",
       label: "Nạp",
       icon: RefreshCw,
-      onClick: () => void loadRecords(),
+      onClick: () => {
+        clearChecked();
+        void loadRecords();
+      },
     },
     {
       id: "barcode",
       label: "In tem mã",
       icon: Barcode,
+      disabled: gatheringLabels,
       onClick: () => {
-        const items: BarcodePrefillItem[] = (selectedOrder?.lines ?? []).map(
-          (line) => {
-            const storageId = line.location?.storageId ?? "";
-            return {
-              itemId: line.itemId,
-              sku: line.item?.code ?? "",
-              name: line.item?.name ?? "",
-              unit: line.item?.unit ?? line.uomCode ?? "",
-              sellingPrice: 0,
-              quantity: Number(line.quantity) || 0,
-              storageId,
-              storageName: storageId ? (storageNameById.get(storageId) ?? "") : "",
-              locationId: line.locationId ?? line.location?.id ?? "",
-              locationCode: line.location?.code ?? "",
-            };
-          },
-        );
-        navigateToBarcodePrint(
-          navigate,
-          "/inventory/purchase-orders",
-          items.length ? items : undefined,
-        );
+        // Không tick phiếu nào → giữ nguyên đường cũ: in theo dòng đang xem.
+        if (checkedCount === 0) {
+          const items = toPrefillItems(selectedOrder?.lines ?? []);
+          navigateToBarcodePrint(
+            navigate,
+            "/inventory/purchase-orders",
+            items.length ? items : undefined,
+          );
+          return;
+        }
+        // Có tick → gom lines của từng phiếu. Dùng `GET /:id` (trả lines đầy đủ)
+        // chứ không phải `/:id/lines`, vốn phân trang cho panel cuộn vô hạn.
+        setGatheringLabels(true);
+        void (async () => {
+          try {
+            const orders = await Promise.all(
+              [...checkedIds].map(async (id) =>
+                requireErpData(
+                  await erpApi.GET<PurchaseOrder>("/goods-receipts/{id}", {
+                    params: { path: { id } },
+                  }),
+                ),
+              ),
+            );
+            const items = mergeBarcodePrefillItems(
+              orders.flatMap((order) => toPrefillItems(order.lines ?? [])),
+            );
+            navigateToBarcodePrint(
+              navigate,
+              "/inventory/purchase-orders",
+              items.length ? items : undefined,
+            );
+          } catch (err) {
+            // Một phiếu hỏng là hỏng cả lượt in: đứng yên tại chỗ, không điều hướng
+            // sang trang In tem mã với dữ liệu thiếu.
+            toast.error(getUserFacingApiErrorMessage(err));
+          } finally {
+            setGatheringLabels(false);
+          }
+        })();
       },
     },
   ];
@@ -752,18 +827,26 @@ export function PurchaseOrdersPage({
           }
           getRowKey={(row) => row.id}
           onRowClick={(row) => setSelectedId(row.id)}
+          rowClassName={(row) =>
+            // `bg-info-subtle` là token của badge, lightness 98% — trên nền trắng của
+            // bảng nó vô hình. Dòng đang xem cần nhìn thấy được, nên dùng `bg-info`
+            // pha loãng.
+            row.id === selectedId ? "bg-info/15" : undefined
+          }
           leadingColumn={{
             width: 36,
-            header: <span className="sr-only">Chọn</span>,
+            header: (
+              <SelectAllCheckbox
+                checked={allOnPageChecked}
+                indeterminate={someOnPageChecked}
+                disabled={(records?.data.length ?? 0) === 0}
+                onToggle={toggleAllOnPage}
+              />
+            ),
             cell: (row) => (
-              <input
-                type="checkbox"
-                aria-label="Chọn dòng"
-                checked={selectedId === row.id}
-                onChange={() =>
-                  setSelectedId(selectedId === row.id ? null : row.id)
-                }
-                onClick={(e) => e.stopPropagation()}
+              <RowSelectCheckbox
+                checked={isChecked(row.id)}
+                onToggle={() => toggleChecked(row.id)}
               />
             ),
           }}

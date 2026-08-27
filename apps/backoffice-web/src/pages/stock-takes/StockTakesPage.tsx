@@ -35,6 +35,11 @@ import {
 } from "../../components/document/inventoryTabs";
 import { StatusBadge } from "../../components/status/StatusBadge";
 import { useDocumentListSelection } from "../../components/document/useDocumentListSelection";
+import { useRowMultiSelect } from "../../components/document/useRowMultiSelect";
+import {
+  RowSelectCheckbox,
+  SelectAllCheckbox,
+} from "../../components/document/RowSelectCheckbox";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -74,7 +79,6 @@ export function StockTakesPage() {
   });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [selectedDetail, setSelectedDetail] = useState<StockTake | null>(null);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   /** New-mode draft from CreateStockTakeDialog. While set, FormDialog opens in "new" mode. */
   const [newDraft, setNewDraft] = useState<StockTakeDraft | null>(null);
@@ -170,12 +174,42 @@ export function StockTakesPage() {
   } = useDocumentListSelection({
     rows: records?.data ?? [],
     getRowId: getStockTakeId,
-    onAutoSelect: (stockTake) => setSelectedIds([stockTake.id]),
   });
-  const selectedRows = useMemo(
+
+  // Chỉ phiếu chưa hủy và chưa gộp mới gộp được, nên ô "Chọn tất cả" phải áp lên đúng
+  // tập đó — truyền chính tập ấy vào hook thay vì toàn bộ dòng đang hiển thị.
+  const mergeEligibleRows = useMemo(
     () =>
-      (records?.data ?? []).filter((record) => selectedIds.includes(record.id)),
-    [records, selectedIds],
+      (records?.data ?? []).filter(
+        (record) => record.status !== "CANCELLED" && !record.mergedIntoId,
+      ),
+    [records],
+  );
+
+  // Tập phiếu đã tick, tách hẳn khỏi `selectedId`. Trước đây ô tick gọi thẳng
+  // `selectStockTake`, nên tick 5 phiếu để gộp là 5 lượt `GET /inventory/stock-takes/:id`
+  // bỏ đi — panel chi tiết chỉ hiển thị được một phiếu.
+  const {
+    checkedIds,
+    isChecked,
+    toggle: toggleChecked,
+    toggleAllOnPage,
+    clear: clearChecked,
+    allOnPageChecked,
+    someOnPageChecked,
+  } = useRowMultiSelect({
+    rows: mergeEligibleRows,
+    getRowId: getStockTakeId,
+  });
+
+  // Cố ý chỉ phụ thuộc bộ lọc, KHÔNG phụ thuộc `pagination` — lật trang giữ tick.
+  useEffect(() => {
+    clearChecked();
+  }, [columnFilters, period, clearChecked]);
+
+  const selectedRows = useMemo(
+    () => (records?.data ?? []).filter((record) => checkedIds.has(record.id)),
+    [records, checkedIds],
   );
   const canMerge =
     selectedRows.length >= 2 &&
@@ -187,18 +221,6 @@ export function StockTakesPage() {
         record.storageId === selectedRows[0]?.storageId &&
         record.countByValue === selectedRows[0]?.countByValue,
     );
-  const mergeEligibleIds = useMemo(
-    () =>
-      (records?.data ?? [])
-        .filter(
-          (record) => record.status !== "CANCELLED" && !record.mergedIntoId,
-        )
-        .map((record) => record.id),
-    [records],
-  );
-  const allEligibleSelected =
-    mergeEligibleIds.length > 0 &&
-    mergeEligibleIds.every((id) => selectedIds.includes(id));
 
   /**
    * Preview the next "Số phiếu KK" based on the highest numeric suffix in the
@@ -341,7 +363,7 @@ export function StockTakesPage() {
     try {
       const { data } = await apiClient.post<StockTakeMergePreview>(
         "/inventory/stock-takes/merge-preview",
-        { sourceIds: selectedIds },
+        { sourceIds: [...checkedIds] },
       );
       setNewDraft({
         storageId: data.storageId ?? "",
@@ -416,7 +438,10 @@ export function StockTakesPage() {
       id: "reload",
       label: "Nạp",
       icon: RefreshCw,
-      onClick: () => void loadRecords(),
+      onClick: () => {
+        clearChecked();
+        void loadRecords();
+      },
     },
   ];
 
@@ -582,6 +607,9 @@ export function StockTakesPage() {
           emptyLabel="Chưa có phiếu kiểm kê trong khoảng thời gian này."
           getRowKey={(r) => r.id}
           onRowClick={(r) => void selectStockTake(r.id)}
+          rowClassName={(r) =>
+            r.id === selectedId ? "bg-info/15" : undefined
+          }
           columnFilterControl={{
             filters: columnFilters,
             onModeChange: setColumnFilterMode,
@@ -590,33 +618,18 @@ export function StockTakesPage() {
           leadingColumn={{
             width: 36,
             header: (
-              <input
-                type="checkbox"
-                aria-label="Chọn tất cả phiếu có thể gộp"
-                checked={allEligibleSelected}
-                onChange={() =>
-                  setSelectedIds((current) =>
-                    allEligibleSelected
-                      ? current.filter((id) => !mergeEligibleIds.includes(id))
-                      : [...new Set([...current, ...mergeEligibleIds])],
-                  )
-                }
+              <SelectAllCheckbox
+                checked={allOnPageChecked}
+                indeterminate={someOnPageChecked}
+                disabled={mergeEligibleRows.length === 0}
+                onToggle={toggleAllOnPage}
+                label="Chọn tất cả phiếu có thể gộp"
               />
             ),
             cell: (r) => (
-              <input
-                type="checkbox"
-                aria-label="Chọn dòng"
-                checked={selectedIds.includes(r.id)}
-                onChange={() => {
-                  void selectStockTake(r.id);
-                  setSelectedIds((current) =>
-                    current.includes(r.id)
-                      ? current.filter((id) => id !== r.id)
-                      : [...current, r.id],
-                  );
-                }}
-                onClick={(e) => e.stopPropagation()}
+              <RowSelectCheckbox
+                checked={isChecked(r.id)}
+                onToggle={() => toggleChecked(r.id)}
               />
             ),
           }}
@@ -643,7 +656,7 @@ export function StockTakesPage() {
             void loadRecords();
           }}
           onSaved={async () => {
-            setSelectedIds([]);
+            clearChecked();
             await loadRecords();
           }}
           onOpenStockTakeReference={(id) => void openStockTakeReference(id)}
