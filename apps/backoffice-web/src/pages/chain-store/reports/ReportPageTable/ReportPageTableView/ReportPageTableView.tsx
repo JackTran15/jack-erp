@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   getCoreRowModel,
   useReactTable,
@@ -29,6 +29,8 @@ import {
   groupPinPosition,
   isReportNumberColumn,
   pinPosition,
+  withStickyBottom,
+  withStickyTop,
 } from "../../../../../lib/table";
 import { useTableStore } from "../../../../../store/common/table-store/table.context";
 import { useReportStore } from "../../../../../store/page-stores/report/report.context";
@@ -253,6 +255,37 @@ export function ReportPageTableView({ rows, totals }: Props) {
   const topItems = segments.map((seg) =>
     seg.kind === "single" ? seg.col.column : `group:${seg.label}`,
   );
+  // Báo cáo không có group thì KHÔNG render tầng 2 và KHÔNG đặt rowSpan: một <tr> rỗng đứng
+  // dưới toàn ô rowSpan={2} khiến trình duyệt chia chiều cao ô spanning cho hai hàng theo cách
+  // không xác định, và phép đo h1 bên dưới sẽ ra một nửa (A-01).
+  const hasGroups = segments.some((seg) => seg.kind === "group");
+
+  // Offset sticky của tầng 2 và hàng filter = tổng chiều cao các hàng phía trên. Phải ĐO chứ
+  // không dùng hằng số kiểu HEADER_ROW_HEIGHT của BaseDataTable: ô header ở đây cao thay đổi
+  // (dòng mã công thức, nhãn xuống dòng khi cột hẹp, cột kéo giãn được).
+  const topRowRef = useRef<HTMLTableRowElement>(null);
+  const subRowRef = useRef<HTMLTableRowElement>(null);
+  const [headerTop, setHeaderTop] = useState({ sub: 0, filter: 0 });
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      // getBoundingClientRect của <tr> an toàn: <tr> không sticky, chỉ ô con sticky (A-02).
+      const h1 = topRowRef.current?.getBoundingClientRect().height ?? 0;
+      const h2 = subRowRef.current?.getBoundingClientRect().height ?? 0;
+      // So sánh trước khi setState: setState vô điều kiện trong callback của ResizeObserver
+      // là vòng lặp vô hạn.
+      setHeaderTop((prev) =>
+        prev.sub === h1 && prev.filter === h1 + h2 ? prev : { sub: h1, filter: h1 + h2 },
+      );
+    };
+    // useLayoutEffect chứ không useEffect: đo sau khi vẽ thì frame đầu hàng filter chồng lên
+    // tiêu đề rồi mới nhảy về đúng chỗ.
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (topRowRef.current) observer.observe(topRowRef.current);
+    if (subRowRef.current) observer.observe(subRowRef.current);
+    return () => observer.disconnect();
+  }, [hasGroups]);
 
   // Nhãn hiển thị trong DragOverlay (bản xem trước nổi của unit đang kéo).
   const overlayLabel = (data: DragData): string => {
@@ -270,15 +303,15 @@ export function ReportPageTableView({ rows, totals }: Props) {
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="min-h-0 flex-1 overflow-auto border border-border bg-background">
+      <div className="isolate min-h-0 flex-1 overflow-auto border border-border bg-background">
         <table
           className="border-separate border-spacing-0 text-sm"
-          style={{ width: "max-content", minWidth: "100%" }}
+          style={{ width: "max-content", minWidth: "100%", height: "100%" }}
         >
           <thead className="bg-muted text-sm font-semibold">
             {/* Tầng 1: group header */}
             <SortableContext items={topItems} strategy={horizontalListSortingStrategy}>
-              <tr>
+              <tr ref={topRowRef}>
                 {segments.map((seg) => {
                   if (seg.kind === "single") {
                     const column = columnById.get(seg.col.column);
@@ -292,11 +325,14 @@ export function ReportPageTableView({ rows, totals }: Props) {
                         id={id}
                         data={{ level: "top", key: id }}
                         validOver={validOverId === id}
-                        rowSpan={2}
-                        style={{ width, minWidth: width, ...pinPosition(column) }}
+                        rowSpan={hasGroups ? 2 : undefined}
+                        style={{
+                          width,
+                          minWidth: width,
+                          ...withStickyTop(pinPosition(column), 0, 25, 35),
+                        }}
                         className={[
                           `relative cursor-grab ${cellBorder} px-2 py-2 align-middle bg-muted`,
-                          pinned ? "z-30" : "",
                           pinned === "right"
                             ? "text-center"
                             : pinned === "left"
@@ -314,8 +350,12 @@ export function ReportPageTableView({ rows, totals }: Props) {
                       </SortableHeaderCell>
                     );
                   }
-                  const groupStyle = groupPinPosition(seg, columnById);
-                  const groupPinned = "position" in groupStyle;
+                  const groupStyle = withStickyTop(
+                    groupPinPosition(seg, columnById),
+                    0,
+                    25,
+                    35,
+                  );
                   const id = `group:${seg.label}`;
                   return (
                     <SortableHeaderCell
@@ -325,10 +365,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
                       validOver={validOverId === id}
                       colSpan={seg.cols.length}
                       style={groupStyle}
-                      className={[
-                        `cursor-grab ${cellBorder} px-2 py-2 text-center align-middle bg-muted`,
-                        groupPinned ? "z-30" : "",
-                      ].join(" ")}
+                      className={`cursor-grab ${cellBorder} px-2 py-2 text-center align-middle bg-muted`}
                     >
                       {seg.label}
                     </SortableHeaderCell>
@@ -336,47 +373,49 @@ export function ReportPageTableView({ rows, totals }: Props) {
                 })}
               </tr>
             </SortableContext>
-            {/* Tầng 2: column header */}
-            <tr>
-              {segments.map((seg) =>
-                seg.kind === "group" ? (
-                  <SortableContext
-                    key={seg.label}
-                    items={seg.cols.map((c) => c.column)}
-                    strategy={horizontalListSortingStrategy}
-                  >
-                    {seg.cols.map((col) => {
-                      const column = columnById.get(col.column);
-                      if (!column) return null;
-                      const pinned = column.getIsPinned();
-                      const width = column.getSize();
-                      const id = col.column;
-                      return (
-                        <SortableHeaderCell
-                          key={id}
-                          id={id}
-                          data={{ level: "child", id, group: seg.label }}
-                          validOver={validOverId === id}
-                          style={{ width, minWidth: width, ...pinPosition(column) }}
-                          className={[
-                            `relative cursor-grab ${cellBorder} px-2 py-2 text-center align-middle bg-muted`,
-                            pinned ? "z-30" : "",
-                          ].join(" ")}
-                          resizeHandle={renderResizeHandle(column)}
-                        >
-                          {col.label}
-                          {getReportColumnCode(col) && (
-                            <div className="text-xs font-normal text-muted-foreground">
-                              {getReportColumnCode(col)}
-                            </div>
-                          )}
-                        </SortableHeaderCell>
-                      );
-                    })}
-                  </SortableContext>
-                ) : null,
-              )}
-            </tr>
+            {/* Tầng 2: column header — chỉ tồn tại khi có group */}
+            {hasGroups ? (
+              <tr ref={subRowRef}>
+                {segments.map((seg) =>
+                  seg.kind === "group" ? (
+                    <SortableContext
+                      key={seg.label}
+                      items={seg.cols.map((c) => c.column)}
+                      strategy={horizontalListSortingStrategy}
+                    >
+                      {seg.cols.map((col) => {
+                        const column = columnById.get(col.column);
+                        if (!column) return null;
+                        const width = column.getSize();
+                        const id = col.column;
+                        return (
+                          <SortableHeaderCell
+                            key={id}
+                            id={id}
+                            data={{ level: "child", id, group: seg.label }}
+                            validOver={validOverId === id}
+                            style={{
+                              width,
+                              minWidth: width,
+                              ...withStickyTop(pinPosition(column), headerTop.sub, 24, 34),
+                            }}
+                            className={`relative cursor-grab ${cellBorder} px-2 py-2 text-center align-middle bg-muted`}
+                            resizeHandle={renderResizeHandle(column)}
+                          >
+                            {col.label}
+                            {getReportColumnCode(col) && (
+                              <div className="text-xs font-normal text-muted-foreground">
+                                {getReportColumnCode(col)}
+                              </div>
+                            )}
+                          </SortableHeaderCell>
+                        );
+                      })}
+                    </SortableContext>
+                  ) : null,
+                )}
+              </tr>
+            ) : null}
             {/* Tầng 3: filter row */}
             <tr>
               {orderedLeaf.map((column) => {
@@ -387,8 +426,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
                   <FilterHeaderCell
                     key={column.id}
                     col={col}
-                    style={pinPosition(column)}
-                    pinned={Boolean(column.getIsPinned())}
+                    style={withStickyTop(pinPosition(column), headerTop.filter, 20, 30)}
                     value={filter?.value ?? ""}
                     operator={filter?.operator ?? ""}
                     onOperatorChange={(op) =>
@@ -486,6 +524,17 @@ export function ReportPageTableView({ rows, totals }: Props) {
                 </tr>
               );
             })}
+            {/* Hàng đệm nuốt phần chiều cao thừa để <tfoot> sticky bottom có chỗ bám: sticky
+                không đẩy được phần tử ra ngoài containing block (<table>), nên bảng ngắn hơn
+                vùng cuộn thì hàng Tổng trôi lên ngay dưới hàng lọc (A-07). Chỉ chèn khi thật
+                sự có <tfoot> — không có hàng Tổng thì đệm chỉ tạo vùng trống thừa.
+                Ô đệm KHÔNG mang cellBorder: bảng dùng border-separate với viền trên từng ô,
+                để nguyên sẽ vẽ một đường kẻ dọc chạy suốt vùng trống. */}
+            {config.summaryLabel ? (
+              <tr aria-hidden="true">
+                <td colSpan={orderedLeaf.length} className="h-full p-0" />
+              </tr>
+            ) : null}
           </tbody>
 
           {/* "Kết quả kinh doanh" không có dòng Tổng ở footer (dòng "IV. Lợi
@@ -498,16 +547,14 @@ export function ReportPageTableView({ rows, totals }: Props) {
                 {orderedLeaf.map((column, idx) => {
                   const col = configById.get(column.id);
                   if (!col) return null;
-                  const pinned = column.getIsPinned();
                   const raw = totals[col.column];
                   return (
                     <td
                       key={column.id}
-                      style={pinPosition(column)}
+                      style={withStickyBottom(pinPosition(column), 15, 18)}
                       className={[
                         `${cellBorder} h-8 px-2 py-0 align-middle bg-muted`,
                         getReportCellAlignClass(col),
-                        pinned ? "z-10" : "",
                       ].join(" ")}
                     >
                       {idx === 0

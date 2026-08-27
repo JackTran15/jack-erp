@@ -15,7 +15,6 @@ import { resolveReportColumnFilterKind } from "../../../../../../lib/table/repor
 interface Props {
   col: ReportColumnConfig;
   style?: CSSProperties;
-  pinned: boolean;
   value: string;
   operator: string;
   onOperatorChange: (op: string) => void;
@@ -30,7 +29,6 @@ const inputClass = "w-full min-w-0 bg-transparent px-2 text-xs outline-none";
 export function FilterHeaderCell({
   col,
   style,
-  pinned,
   value,
   operator,
   onOperatorChange,
@@ -39,7 +37,7 @@ export function FilterHeaderCell({
   const label = col.label ?? col.column;
   const kind = resolveReportColumnFilterKind(col);
 
-  const cellClass = [`${cellBorder} px-1.5 py-0.5 bg-background`, pinned ? "z-20" : ""].join(" ");
+  const cellClass = `${cellBorder} px-1.5 py-0.5 bg-background`;
   const boxClass =
     "flex h-8 items-stretch overflow-hidden rounded-[2px] border border-border bg-background";
 
