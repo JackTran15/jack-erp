@@ -353,28 +353,54 @@ export function InventoryItemBarcodesPage() {
     [],
   );
 
-  // Resolve giá bán thật cho hàng đổ sẵn từ trang nguồn thiếu giá (Nhập/Xuất kho, Chi tiết
-  // vị trí chế độ tổng quan). Chạy một lần lúc mount trên tập row prefill ban đầu.
+  // Resolve giá bán thật cho hàng đổ sẵn từ trang nguồn thiếu giá (Chi tiết vị trí chế độ
+  // tổng quan). Chạy một lần lúc mount trên tập row prefill ban đầu.
+  //
+  // Gộp theo `itemId` và chạy theo lô: bản đầu bắn một request cho MỖI DÒNG, cùng lúc.
+  // Ở một lượt in vài chục dòng thì không ai để ý; từ khi các trang kho cho chọn tất cả
+  // rồi in tem hàng loạt, cùng đoạn code này bắn hàng nghìn request và treo trình duyệt.
+  // Cùng một hàng hóa nằm ở hai vị trí kho là hai dòng tem nhưng chỉ là một lần tra giá.
   useEffect(() => {
-    const missing = rows.filter((r) => r.itemId && r.sellingPrice <= 0);
-    if (!missing.length) return;
+    const byItemId = new Map<string, string>();
+    for (const r of rows) {
+      if (r.itemId && r.sellingPrice <= 0 && !byItemId.has(r.itemId)) {
+        byItemId.set(r.itemId, r.sku);
+      }
+    }
+    if (byItemId.size === 0) return;
     let cancelled = false;
+
+    const pending = [...byItemId.entries()];
+    const resolvePrice = async (itemId: string, sku: string) => {
+      try {
+        const { items } = await searchItems(sku, 1);
+        const match =
+          items.find((i) => i.id === itemId) ?? items.find((i) => i.code === sku);
+        const price = Number(match?.sellingPrice ?? 0);
+        if (cancelled || !match || price <= 0) return;
+        // Một lần setRows cho mọi dòng cùng hàng hóa, thay vì patchRow từng dòng.
+        setRows((prev) =>
+          prev.map((r) => (r.itemId === itemId ? { ...r, sellingPrice: price } : r)),
+        );
+      } catch {
+        /* bỏ qua — giữ giá 0 nếu không resolve được */
+      }
+    };
+
+    // Trần đồng thời: đủ nhanh cho một lượt in bình thường, mà một lượt in lớn cũng
+    // không mở hàng nghìn kết nối một lúc.
+    const CONCURRENCY = 6;
+    const worker = async () => {
+      while (!cancelled) {
+        const next = pending.shift();
+        if (!next) return;
+        await resolvePrice(next[0], next[1]);
+      }
+    };
     void Promise.all(
-      missing.map(async (r) => {
-        try {
-          const { items } = await searchItems(r.sku, 1);
-          const match =
-            items.find((i) => i.id === r.itemId) ??
-            items.find((i) => i.code === r.sku);
-          const price = Number(match?.sellingPrice ?? 0);
-          if (!cancelled && match && price > 0) {
-            patchRow(r.rowId, { sellingPrice: price });
-          }
-        } catch {
-          /* bỏ qua — giữ giá 0 nếu không resolve được */
-        }
-      }),
+      Array.from({ length: Math.min(CONCURRENCY, pending.length) }, worker),
     );
+
     return () => {
       cancelled = true;
     };

@@ -15,8 +15,16 @@ export interface GoodsReceiptLine {
   unitPrice: number | string;
   lineTotal?: number | string;
   note?: string | null;
-  /** Eager-loaded from BE — present on read endpoints. */
-  item?: { id: string; code: string; name: string; unit?: string } | null;
+  /** Eager-loaded from BE — present on read endpoints. TypeORM trả nguyên
+   *  `ItemEntity` (không `select`), nên `sellingPrice` có sẵn ở đây; trang In tem
+   *  mã dùng nó thay vì tự đi tra lại từng SKU. */
+  item?: {
+    id: string;
+    code: string;
+    name: string;
+    unit?: string;
+    sellingPrice?: number | string | null;
+  } | null;
   location?: {
     id: string;
     code: string;

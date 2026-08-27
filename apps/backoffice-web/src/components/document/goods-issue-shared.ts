@@ -24,7 +24,7 @@ export interface GoodsIssueLine {
   unit?: string;
   locationId?: string;
   location?: { id: string; code: string; name: string; storageId?: string } | null;
-  item?: { id: string; code: string; name: string; unit?: string; purchasePrice?: number | string | null } | null;
+  item?: { id: string; code: string; name: string; unit?: string; purchasePrice?: number | string | null; sellingPrice?: number | string | null } | null;
 }
 
 export interface InstantAverageCost {
