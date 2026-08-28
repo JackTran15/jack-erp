@@ -13,14 +13,24 @@ import { StockPeriodService } from './stock-period.service';
  * callers left, so they specified nothing and were replaced rather than kept.
  */
 describe('StockPeriodService pending transfers', () => {
-  function capture(rows: Record<string, unknown>[] = []) {
+  function capture(
+    rows: Record<string, unknown>[] = [],
+    countRow: Record<string, unknown> = {},
+  ) {
     const sql: string[] = [];
     const dataSource = {
       query: jest.fn().mockImplementation((text: string) => {
         sql.push(text);
         return Promise.resolve(
           text.includes('COUNT(*)')
-            ? [{ total: rows.length, transfer_out_qty: '4', incoming_qty: '11' }]
+            ? [
+                {
+                  total: rows.length,
+                  transfer_out_qty: '4',
+                  incoming_qty: '11',
+                  ...countRow,
+                },
+              ]
             : rows,
         );
       }),
@@ -134,6 +144,26 @@ describe('StockPeriodService pending transfers', () => {
     expect(result.totals.incomingQty).toBe(11);
     // Two queries, not four: the pending fetch and the row-key replay are gone.
     expect(sql).toHaveLength(2);
+  });
+
+  it('derives the closing totals instead of leaving them unset', async () => {
+    // The count query has no closing_qty / closing_value column — closing is
+    // arithmetic on the other three bands, both per row and in the footer.
+    // Leaving the keys out made toTotalsRow return null for endingQty /
+    // endingValue, and the "Tồn cuối kỳ" footer rendered 0.
+    const { service } = capture([], {
+      opening_qty: '10',
+      in_qty: '5',
+      out_qty: '3',
+      opening_value: '1000',
+      in_value: '500',
+      out_value: '300',
+    });
+
+    const result = await service.aggregate({ ...baseQuery, groupBy: 'item_branch' });
+
+    expect(result.totals.closingQty).toBe(12);
+    expect(result.totals.closingValue).toBe(1200);
   });
 
   it('filters on a transfer column under SQL', async () => {
