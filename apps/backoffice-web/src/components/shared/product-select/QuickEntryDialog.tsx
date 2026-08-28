@@ -4,10 +4,16 @@ import { useState } from "react";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Apply quantity + unit price to all currently selected items. */
-  onApply: (quantity: number, unitPrice: number) => void;
+  /**
+   * Apply quantity + unit price to all currently selected items. `unitPrice` is
+   * left undefined when the price field is hidden, so each item keeps its own
+   * default rather than being overwritten with 0.
+   */
+  onApply: (quantity: number, unitPrice?: number) => void;
   /** Header title. Defaults to the global "all items" wording. */
   title?: string;
+  /** Show the "Đơn giá" field. Off for callers that only need a quantity. */
+  showUnitPrice?: boolean;
 }
 
 export function QuickEntryDialog({
@@ -15,12 +21,16 @@ export function QuickEntryDialog({
   onOpenChange,
   onApply,
   title = "Nhập nhanh cho tất cả hàng hoá",
+  showUnitPrice = true,
 }: Props) {
   const [quantity, setQuantity] = useState<number | "">(1);
   const [unitPrice, setUnitPrice] = useState<number | "">("");
 
   function handleApply() {
-    onApply(quantity === "" ? 0 : quantity, unitPrice === "" ? 0 : unitPrice);
+    onApply(
+      quantity === "" ? 0 : quantity,
+      showUnitPrice ? (unitPrice === "" ? 0 : unitPrice) : undefined,
+    );
     onOpenChange(false);
   }
 
@@ -52,19 +62,28 @@ export function QuickEntryDialog({
         <MoneyInput
           value={quantity}
           onChange={setQuantity}
+          onKeyDown={
+            showUnitPrice
+              ? undefined
+              : (e) => {
+                  if (e.key === "Enter") handleApply();
+                }
+          }
           className="h-9 flex-1"
           autoFocus
         />
       </label>
-      <label className="flex items-center gap-3 text-sm">
-        <span className="w-20 shrink-0 text-muted-foreground">Đơn giá</span>
-        <MoneyInput
-          value={unitPrice}
-          onChange={setUnitPrice}
-          onKeyDown={(e) => { if (e.key === "Enter") handleApply(); }}
-          className="h-9 flex-1"
-        />
-      </label>
+      {showUnitPrice && (
+        <label className="flex items-center gap-3 text-sm">
+          <span className="w-20 shrink-0 text-muted-foreground">Đơn giá</span>
+          <MoneyInput
+            value={unitPrice}
+            onChange={setUnitPrice}
+            onKeyDown={(e) => { if (e.key === "Enter") handleApply(); }}
+            className="h-9 flex-1"
+          />
+        </label>
+      )}
     </AppModal>
   );
 }
