@@ -126,8 +126,9 @@ export interface StockPeriodResult {
   total: number;
   /**
    * SUM của từng cột số trên toàn bộ kết quả lọc. Khoá trùng tên field của
-   * dòng. Cột dẫn xuất (`closingQty`, `closingValue`) không nằm ở đây — FE tự
-   * suy ra từ opening/in/out để footer khớp đúng công thức của từng dòng.
+   * dòng, kể cả hai cột dẫn xuất `closingQty` / `closingValue` — chúng được
+   * suy ra từ opening/in/out (xem `readPeriodTotals`) để footer khớp đúng
+   * công thức của từng dòng.
    */
   totals: ReportTotals;
 }
@@ -420,7 +421,15 @@ function periodTotalsSelect(alias: string): string {
   ).join(',\n             ');
 }
 
-/** Đọc hàng count+totals thành map khoá theo tên field của dòng. */
+/**
+ * Đọc hàng count+totals thành map khoá theo tên field của dòng.
+ *
+ * `closingQty` / `closingValue` không có cột SQL riêng trong câu count — chúng
+ * được suy ra ở đây bằng đúng phép tính của từng dòng. SUM là tuyến tính nên
+ * SUM(opening + in - out) = SUM(opening) + SUM(in) - SUM(out); không cần thêm
+ * biểu thức vào câu truy vấn. Thiếu hai khoá này thì `toTotalsRow` trả `null`
+ * cho `endingQty`/`endingValue` và footer "Tồn cuối kỳ" in ra 0.
+ */
 function readPeriodTotals(raw: Record<string, unknown> | undefined): ReportTotals {
   const totals: ReportTotals = {};
   for (const key of NUMERIC_PERIOD_COLUMNS) {
@@ -429,6 +438,8 @@ function readPeriodTotals(raw: Record<string, unknown> | undefined): ReportTotal
   for (const [key, column] of Object.entries(TRANSFER_TOTAL_KEYS)) {
     if (raw?.[column] !== undefined) totals[key] = Number(raw[column]);
   }
+  totals.closingQty = totals.openingQty + totals.inQty - totals.outQty;
+  totals.closingValue = totals.openingValue + totals.inValue - totals.outValue;
   return totals;
 }
 
