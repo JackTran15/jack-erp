@@ -13,6 +13,8 @@ export function toTemplateView(
   const { columnFilters, ...scope } = blob;
   return {
     id: e.id,
+    scope: e.branchId ? 'branch' : 'chain',
+    branchId: e.branchId ?? null,
     reportType: e.reportType,
     name: e.name,
     description: e.description ?? null,

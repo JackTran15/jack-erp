@@ -12908,6 +12908,13 @@ export interface components {
             order?: number;
         };
         CreateInvoiceReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
             reportType: string;
             name: string;
             description?: string;
@@ -12917,6 +12924,13 @@ export interface components {
             sortOrder?: number;
         };
         UpdateInvoiceReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
             name?: string;
             description?: string;
             columns?: components["schemas"]["ReportTemplateColumnDto"][];
@@ -13059,6 +13073,13 @@ export interface components {
             limit: number;
         };
         CreateDebtReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
             reportType: string;
             name: string;
             description?: string;
@@ -13068,6 +13089,13 @@ export interface components {
             sortOrder?: number;
         };
         UpdateDebtReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
             name?: string;
             description?: string;
             columns?: components["schemas"]["ReportTemplateColumnDto"][];
@@ -13125,6 +13153,13 @@ export interface components {
             limit: number;
         };
         CreateProfitReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
             reportType: string;
             name: string;
             description?: string;
@@ -13134,6 +13169,13 @@ export interface components {
             sortOrder?: number;
         };
         UpdateProfitReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
             name?: string;
             description?: string;
             columns?: components["schemas"]["ReportTemplateColumnDto"][];
@@ -13815,6 +13857,13 @@ export interface components {
             };
         };
         CreateInventoryReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
             reportType: string;
             name: string;
             description?: string;
@@ -13824,6 +13873,13 @@ export interface components {
             sortOrder?: number;
         };
         UpdateInventoryReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
             name?: string;
             description?: string;
             columns?: components["schemas"]["ReportTemplateColumnDto"][];
@@ -24612,6 +24668,7 @@ export interface operations {
         parameters: {
             query?: {
                 reportType?: string;
+                scope?: string;
             };
             header?: never;
             path?: never;
@@ -24654,7 +24711,9 @@ export interface operations {
     };
     InvoiceReportController_getTemplate: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -24675,7 +24734,9 @@ export interface operations {
     };
     InvoiceReportController_deleteTemplate: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -24905,6 +24966,7 @@ export interface operations {
         parameters: {
             query?: {
                 reportType?: string;
+                scope?: string;
             };
             header?: never;
             path?: never;
@@ -24947,7 +25009,9 @@ export interface operations {
     };
     DebtReportController_getTemplate: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -24968,7 +25032,9 @@ export interface operations {
     };
     DebtReportController_deleteTemplate: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -25131,6 +25197,7 @@ export interface operations {
         parameters: {
             query?: {
                 reportType?: string;
+                scope?: string;
             };
             header?: never;
             path?: never;
@@ -25173,7 +25240,9 @@ export interface operations {
     };
     ProfitReportController_getTemplate: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -25194,7 +25263,9 @@ export interface operations {
     };
     ProfitReportController_deleteTemplate: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -26933,6 +27004,7 @@ export interface operations {
         parameters: {
             query?: {
                 reportType?: string;
+                scope?: string;
             };
             header?: never;
             path?: never;
@@ -26975,7 +27047,9 @@ export interface operations {
     };
     InventoryReportV2Controller_getTemplate: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -26996,7 +27070,9 @@ export interface operations {
     };
     InventoryReportV2Controller_deleteTemplate: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: string;
+            };
             header?: never;
             path: {
                 id: string;

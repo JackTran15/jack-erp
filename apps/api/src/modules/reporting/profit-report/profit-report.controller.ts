@@ -25,7 +25,11 @@ import {
 import { ProfitReportExportDto } from './dto/profit-report-export.dto';
 import { profitReportLabel } from './queries/get-profit-report-document.handler';
 import { GetProfitReportDocumentQuery } from './queries/get-profit-report-document.query';
-import { ReportDocumentPayload, ReportGroupBy } from '@erp/shared-interfaces';
+import {
+  ReportDocumentPayload,
+  ReportGroupBy,
+  TemplateScope,
+} from '@erp/shared-interfaces';
 import {
   Actor,
   ActorContext,
@@ -90,16 +94,23 @@ export class ProfitReportController {
   listTemplates(
     @Actor() actor: ActorContext,
     @Query('reportType') reportType?: string,
+    @Query('scope') scope?: TemplateScope,
   ) {
     return this.queryBus.execute(
-      new ListProfitReportTemplatesQuery(actor, reportType),
+      new ListProfitReportTemplatesQuery(actor, reportType, scope),
     );
   }
 
   @Get('templates/:id')
   @RequirePermission(PROFIT_READ)
-  getTemplate(@Param('id') id: string, @Actor() actor: ActorContext) {
-    return this.queryBus.execute(new GetProfitReportTemplateQuery(id, actor));
+  getTemplate(
+    @Param('id') id: string,
+    @Actor() actor: ActorContext,
+    @Query('scope') scope?: TemplateScope,
+  ) {
+    return this.queryBus.execute(
+      new GetProfitReportTemplateQuery(id, actor, scope),
+    );
   }
 
   @Post('templates')
@@ -127,9 +138,13 @@ export class ProfitReportController {
 
   @Delete('templates/:id')
   @RequirePermission(PROFIT_READ)
-  deleteTemplate(@Param('id') id: string, @Actor() actor: ActorContext) {
+  deleteTemplate(
+    @Param('id') id: string,
+    @Actor() actor: ActorContext,
+    @Query('scope') scope?: TemplateScope,
+  ) {
     return this.commandBus.execute(
-      new DeleteProfitReportTemplateCommand(id, actor),
+      new DeleteProfitReportTemplateCommand(id, actor, scope),
     );
   }
 
