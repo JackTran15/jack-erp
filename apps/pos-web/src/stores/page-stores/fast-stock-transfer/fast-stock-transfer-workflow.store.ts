@@ -41,7 +41,7 @@ interface PosFastStockTransferWorkflowState {
   setToolbarLocation: (
     location: FastStockTransferToolbarDraft["location"],
   ) => void;
-  resetToolbarAfterAdd: (keepCarrier: FastStockTransferToolbarDraft["carrier"]) => void;
+  resetToolbarAfterAdd: () => void;
 
   setEditDraftCarrier: (carrier: FastStockTransferToolbarDraft["carrier"]) => void;
   setEditDraftProduct: (product: FastStockTransferToolbarDraft["product"]) => void;
@@ -123,12 +123,9 @@ export const usePosFastStockTransferWorkflowStore =
         toolbarDraft: { ...state.toolbarDraft, location },
       })),
 
-    resetToolbarAfterAdd: (keepCarrier) =>
+    resetToolbarAfterAdd: () =>
       set({
-        toolbarDraft: {
-          ...EMPTY_FAST_STOCK_TRANSFER_TOOLBAR_DRAFT,
-          carrier: keepCarrier,
-        },
+        toolbarDraft: { ...EMPTY_FAST_STOCK_TRANSFER_TOOLBAR_DRAFT },
       }),
 
     setEditDraftCarrier: (carrier) =>
