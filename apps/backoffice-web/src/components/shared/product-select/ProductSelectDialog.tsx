@@ -58,6 +58,12 @@ interface Props {
   initialSelectedIds?: Set<string>;
   /** Show editable quantity + unit price columns and the "Nhập nhanh" action. */
   showQuantityPrice?: boolean;
+  /**
+   * Show the "Đơn giá" column beside "Số lượng". Only meaningful with
+   * `showQuantityPrice`. Off for callers that only need a count per item —
+   * in tem mã prints the item's own selling price, not a typed-in one.
+   */
+  showUnitPrice?: boolean;
   /** Resolve collapsed full-product selections into rich item lines on confirm. */
   resolveSelectedLines?: boolean;
   defaultUnitPriceSource?: UnitPriceSource;
@@ -119,6 +125,7 @@ export function ProductSelectDialog({
   categoryFilter = true,
   initialSelectedIds,
   showQuantityPrice = false,
+  showUnitPrice = true,
   defaultUnitPriceSource = "none",
   defaultQuantity = 1,
   activeOnly = false,
@@ -399,7 +406,7 @@ export function ProductSelectDialog({
   }, [selectedItemIds, autoSelectIds]);
 
   // "Nhập nhanh" — set quantity + price for every selected item (uniform override)
-  function applyQuickEntry(quantity: number, unitPrice: number) {
+  function applyQuickEntry(quantity: number, unitPrice?: number) {
     setBulkValue({ quantity, unitPrice });
     setLineValues(new Map());
   }
@@ -410,7 +417,7 @@ export function ProductSelectDialog({
   async function applyGroupQuickEntry(
     productId: string,
     quantity: number,
-    unitPrice: number,
+    unitPrice?: number,
   ) {
     let variants = variantCache.current.get(productId) ?? [];
     if (autoSelectIds.has(productId) && variants.length === 0) {
@@ -508,7 +515,7 @@ export function ProductSelectDialog({
     });
   }
 
-  const colCount = showQuantityPrice ? 10 : 8;
+  const colCount = 8 + (showQuantityPrice ? (showUnitPrice ? 2 : 1) : 0);
 
   return (
     <>
@@ -645,9 +652,11 @@ export function ProductSelectDialog({
                       <th className="px-3 py-2 text-right font-medium">
                         Số lượng
                       </th>
-                      <th className="px-3 py-2 text-right font-medium">
-                        Đơn giá
-                      </th>
+                      {showUnitPrice && (
+                        <th className="px-3 py-2 text-right font-medium">
+                          Đơn giá
+                        </th>
+                      )}
                     </>
                   )}
                 </tr>
@@ -689,6 +698,8 @@ export function ProductSelectDialog({
                       variantCache={variantCache}
                       itemDataById={itemDataById}
                       showQuantityPrice={showQuantityPrice}
+                      showUnitPrice={showUnitPrice}
+                      colCount={colCount}
                       getQty={getQty}
                       getPrice={getPrice}
                       setQty={setQty}
@@ -717,6 +728,7 @@ export function ProductSelectDialog({
         <QuickEntryDialog
           open
           onOpenChange={setQuickEntryOpen}
+          showUnitPrice={showUnitPrice}
           onApply={applyQuickEntry}
         />
       )}
@@ -725,6 +737,7 @@ export function ProductSelectDialog({
           open
           title="Nhập nhanh cho hàng đã chọn trong nhóm"
           onOpenChange={() => setQuickEntryGroup(null)}
+          showUnitPrice={showUnitPrice}
           onApply={(q, p) => {
             void applyGroupQuickEntry(quickEntryGroup, q, p);
             setQuickEntryGroup(null);
@@ -743,6 +756,9 @@ interface RowSharedProps {
   activeOnly: boolean;
   includeInactive: boolean;
   showQuantityPrice: boolean;
+  showUnitPrice: boolean;
+  /** Full column count of the table, for full-width rows. */
+  colCount: number;
   getQty: (id: string) => number;
   getPrice: (id: string, data: SelectedProduct) => number;
   setQty: (id: string, quantity: number) => void;
@@ -773,6 +789,7 @@ function QtyPriceCells({
   id,
   data,
   selected,
+  showUnitPrice,
   getQty,
   getPrice,
   setQty,
@@ -781,6 +798,7 @@ function QtyPriceCells({
   id: string;
   data: SelectedProduct;
   selected: boolean;
+  showUnitPrice: boolean;
   getQty: (id: string) => number;
   getPrice: (id: string, data: SelectedProduct) => number;
   setQty: (id: string, quantity: number) => void;
@@ -790,7 +808,7 @@ function QtyPriceCells({
     return (
       <>
         <td className="px-3 py-1.5" />
-        <td className="px-3 py-1.5" />
+        {showUnitPrice && <td className="px-3 py-1.5" />}
       </>
     );
   }
@@ -804,14 +822,16 @@ function QtyPriceCells({
           aria-label={`Số lượng ${data.sku}`}
         />
       </td>
-      <td className="px-2 py-1.5 text-right">
-        <MoneyInput
-          value={getPrice(id, data)}
-          onChange={(v) => setPrice(id, v === "" ? 0 : v)}
-          className="h-7 w-28"
-          aria-label={`Đơn giá ${data.sku}`}
-        />
-      </td>
+      {showUnitPrice && (
+        <td className="px-2 py-1.5 text-right">
+          <MoneyInput
+            value={getPrice(id, data)}
+            onChange={(v) => setPrice(id, v === "" ? 0 : v)}
+            className="h-7 w-28"
+            aria-label={`Đơn giá ${data.sku}`}
+          />
+        </td>
+      )}
     </>
   );
 }
@@ -832,6 +852,8 @@ function ProductOrOrphanRow({
   variantCache,
   itemDataById,
   showQuantityPrice,
+  showUnitPrice,
+  colCount,
   getQty,
   getPrice,
   setQty,
@@ -868,6 +890,7 @@ function ProductOrOrphanRow({
             id={row.id}
             data={orphanToSelected(row)}
             selected={selectedItemIds.has(row.id)}
+            showUnitPrice={showUnitPrice}
             getQty={getQty}
             getPrice={getPrice}
             setQty={setQty}
@@ -930,7 +953,7 @@ function ProductOrOrphanRow({
           {formatMoney(row.sellingPrice)}
         </td>
         {showQuantityPrice && (
-          <td colSpan={2} className="px-3 py-2 text-right">
+          <td colSpan={showUnitPrice ? 2 : 1} className="px-3 py-2 text-right">
             <button
               type="button"
               className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
@@ -955,6 +978,8 @@ function ProductOrOrphanRow({
           variantCache={variantCache}
           itemDataById={itemDataById}
           showQuantityPrice={showQuantityPrice}
+          showUnitPrice={showUnitPrice}
+          colCount={colCount}
           getQty={getQty}
           getPrice={getPrice}
           setQty={setQty}
@@ -989,6 +1014,8 @@ function VariantRowsWithCache({
   variantCache,
   itemDataById,
   showQuantityPrice,
+  showUnitPrice,
+  colCount,
   getQty,
   getPrice,
   setQty,
@@ -1035,7 +1062,7 @@ function VariantRowsWithCache({
     return (
       <tr>
         <td
-          colSpan={showQuantityPrice ? 10 : 8}
+          colSpan={colCount}
           className="py-2 pl-10 text-xs text-muted-foreground"
         >
           Đang tải…
@@ -1085,6 +1112,7 @@ function VariantRowsWithCache({
               id={v.id}
               data={variantToSelected(v)}
               selected={selectedItemIds.has(v.id)}
+              showUnitPrice={showUnitPrice}
               getQty={getQty}
               getPrice={getPrice}
               setQty={setQty}
@@ -1096,7 +1124,7 @@ function VariantRowsWithCache({
 
       {total > VARIANT_PAGE_SIZE && (
         <tr>
-          <td colSpan={showQuantityPrice ? 10 : 8} className="px-10 py-1">
+          <td colSpan={colCount} className="px-10 py-1">
             <PaginationControls
               page={page}
               pageSize={VARIANT_PAGE_SIZE}

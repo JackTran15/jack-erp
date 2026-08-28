@@ -725,6 +725,7 @@ export function InventoryItemBarcodesPage() {
           open
           onOpenChange={setProductPickerOpen}
           showQuantityPrice
+          showUnitPrice={false}
           defaultUnitPriceSource="sellingPrice"
           defaultQuantity={0}
           onConfirm={addRowsFromPicker}
