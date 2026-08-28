@@ -17598,6 +17598,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -17654,6 +17662,14 @@
             "name": "id",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -17720,6 +17736,14 @@
             "name": "id",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -18045,6 +18069,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -18101,6 +18133,14 @@
             "name": "id",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -18167,6 +18207,14 @@
             "name": "id",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -18405,6 +18453,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -18461,6 +18517,14 @@
             "name": "id",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -18527,6 +18591,14 @@
             "name": "id",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -22126,6 +22198,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -22183,6 +22263,14 @@
             "name": "id",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -22249,6 +22337,14 @@
             "name": "id",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -38871,6 +38967,14 @@
       "CreateInvoiceReportTemplateDto": {
         "type": "object",
         "properties": {
+          "scope": {
+            "type": "string",
+            "description": "Which tier to write to. Must be declared by the client: the backoffice sends\n`X-Branch-Id` even in chain view, so the server cannot tell the two apart\n(ADR-02). Omitted ⇒ branch tier when the actor has a branch.",
+            "enum": [
+              "chain",
+              "branch"
+            ]
+          },
           "reportType": {
             "type": "string",
             "minLength": 1,
@@ -38914,6 +39018,14 @@
       "UpdateInvoiceReportTemplateDto": {
         "type": "object",
         "properties": {
+          "scope": {
+            "type": "string",
+            "description": "Which tier to write to. Must be declared by the client: the backoffice sends\n`X-Branch-Id` even in chain view, so the server cannot tell the two apart\n(ADR-02). Omitted ⇒ branch tier when the actor has a branch.",
+            "enum": [
+              "chain",
+              "branch"
+            ]
+          },
           "name": {
             "type": "string",
             "minLength": 1,
@@ -39241,6 +39353,14 @@
       "CreateDebtReportTemplateDto": {
         "type": "object",
         "properties": {
+          "scope": {
+            "type": "string",
+            "description": "Which tier to write to. Must be declared by the client: the backoffice sends\n`X-Branch-Id` even in chain view, so the server cannot tell the two apart\n(ADR-02). Omitted ⇒ branch tier when the actor has a branch.",
+            "enum": [
+              "chain",
+              "branch"
+            ]
+          },
           "reportType": {
             "type": "string",
             "minLength": 1,
@@ -39284,6 +39404,14 @@
       "UpdateDebtReportTemplateDto": {
         "type": "object",
         "properties": {
+          "scope": {
+            "type": "string",
+            "description": "Which tier to write to. Must be declared by the client: the backoffice sends\n`X-Branch-Id` even in chain view, so the server cannot tell the two apart\n(ADR-02). Omitted ⇒ branch tier when the actor has a branch.",
+            "enum": [
+              "chain",
+              "branch"
+            ]
+          },
           "name": {
             "type": "string",
             "minLength": 1,
@@ -39452,6 +39580,14 @@
       "CreateProfitReportTemplateDto": {
         "type": "object",
         "properties": {
+          "scope": {
+            "type": "string",
+            "description": "Which tier to write to. Must be declared by the client: the backoffice sends\n`X-Branch-Id` even in chain view, so the server cannot tell the two apart\n(ADR-02). Omitted ⇒ branch tier when the actor has a branch.",
+            "enum": [
+              "chain",
+              "branch"
+            ]
+          },
           "reportType": {
             "type": "string",
             "minLength": 1,
@@ -39495,6 +39631,14 @@
       "UpdateProfitReportTemplateDto": {
         "type": "object",
         "properties": {
+          "scope": {
+            "type": "string",
+            "description": "Which tier to write to. Must be declared by the client: the backoffice sends\n`X-Branch-Id` even in chain view, so the server cannot tell the two apart\n(ADR-02). Omitted ⇒ branch tier when the actor has a branch.",
+            "enum": [
+              "chain",
+              "branch"
+            ]
+          },
           "name": {
             "type": "string",
             "minLength": 1,
@@ -41453,6 +41597,14 @@
       "CreateInventoryReportTemplateDto": {
         "type": "object",
         "properties": {
+          "scope": {
+            "type": "string",
+            "description": "Which tier to write to. Must be declared by the client: the backoffice sends\n`X-Branch-Id` even in chain view, so the server cannot tell the two apart\n(ADR-02). Omitted ⇒ branch tier when the actor has a branch.",
+            "enum": [
+              "chain",
+              "branch"
+            ]
+          },
           "reportType": {
             "type": "string",
             "minLength": 1,
@@ -41496,6 +41648,14 @@
       "UpdateInventoryReportTemplateDto": {
         "type": "object",
         "properties": {
+          "scope": {
+            "type": "string",
+            "description": "Which tier to write to. Must be declared by the client: the backoffice sends\n`X-Branch-Id` even in chain view, so the server cannot tell the two apart\n(ADR-02). Omitted ⇒ branch tier when the actor has a branch.",
+            "enum": [
+              "chain",
+              "branch"
+            ]
+          },
           "name": {
             "type": "string",
             "minLength": 1,

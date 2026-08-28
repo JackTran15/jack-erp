@@ -20,6 +20,7 @@ import {
   InventoryReportStatBy,
   InventoryReportViewMode,
   ReportDocumentPayload,
+  TemplateScope,
 } from '@erp/shared-interfaces';
 import { ExportPipeline } from '../reporting/report-core/export/export-pipeline';
 import { HttpResponseSink } from '../reporting/report-core/export/http-response.sink';
@@ -148,17 +149,22 @@ export class InventoryReportV2Controller {
   listTemplates(
     @Actor() actor: ActorContext,
     @Query('reportType') reportType?: string,
+    @Query('scope') scope?: TemplateScope,
   ) {
     return this.queryBus.execute(
-      new ListInventoryReportTemplatesQuery(actor, reportType),
+      new ListInventoryReportTemplatesQuery(actor, reportType, scope),
     );
   }
 
   @Get('templates/:id')
   @RequirePermission(REPORTS_READ)
-  getTemplate(@Param('id') id: string, @Actor() actor: ActorContext) {
+  getTemplate(
+    @Param('id') id: string,
+    @Actor() actor: ActorContext,
+    @Query('scope') scope?: TemplateScope,
+  ) {
     return this.queryBus.execute(
-      new GetInventoryReportTemplateQuery(id, actor),
+      new GetInventoryReportTemplateQuery(id, actor, scope),
     );
   }
 
@@ -187,9 +193,13 @@ export class InventoryReportV2Controller {
 
   @Delete('templates/:id')
   @RequirePermission(REPORTS_READ)
-  deleteTemplate(@Param('id') id: string, @Actor() actor: ActorContext) {
+  deleteTemplate(
+    @Param('id') id: string,
+    @Actor() actor: ActorContext,
+    @Query('scope') scope?: TemplateScope,
+  ) {
     return this.commandBus.execute(
-      new DeleteInventoryReportTemplateCommand(id, actor),
+      new DeleteInventoryReportTemplateCommand(id, actor, scope),
     );
   }
 }

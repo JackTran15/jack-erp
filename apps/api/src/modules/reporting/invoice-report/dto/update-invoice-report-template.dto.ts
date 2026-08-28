@@ -1,6 +1,8 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -8,6 +10,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { TemplateScope } from '@erp/shared-interfaces';
 import { ColumnFilterDto } from './column-filter.dto';
 import { InvoiceReportFilterDto } from './invoice-report-filter.dto';
 import { ReportTemplateColumnDto } from './report-template-column.dto';
@@ -43,4 +46,14 @@ export class UpdateInvoiceReportTemplateDto {
   @IsInt()
   @Min(0)
   sortOrder?: number;
+
+  /**
+   * Which tier to write to. Must be declared by the client: the backoffice sends
+   * `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+   * (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+   */
+  @ApiPropertyOptional({ enum: ['chain', 'branch'] })
+  @IsOptional()
+  @IsIn(['chain', 'branch'])
+  scope?: TemplateScope;
 }

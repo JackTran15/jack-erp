@@ -1,6 +1,7 @@
 import type {
   InvoiceReportTemplateView,
   ReportTemplateColumn,
+  TemplateScope,
 } from "@erp/shared-interfaces";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { erpApi, requireErpData } from "../../../../lib/erp-api";
@@ -8,6 +9,8 @@ import {
   getReportBackendKey,
   getReportBackendSource,
 } from "../../../../constants/reports/report-type.constant";
+import { STORE_TYPE } from "../../../../constants/store.constant";
+import { useBranchStore } from "../../../../store/common/branch/branch.store";
 import { useReportStore } from "../../../../store/page-stores/report/report.context";
 
 type TemplateSource = "invoice" | "inventory" | "debt" | "profit";
@@ -31,10 +34,11 @@ const DEFAULT_TEMPLATE_NAME = "Mặc định";
 export async function listReportTemplates(
   source: TemplateSource,
   reportType: string,
+  scope: TemplateScope,
 ): Promise<InvoiceReportTemplateView[]> {
   return requireErpData(
     await erpApi.GET<InvoiceReportTemplateView[]>(TEMPLATES_PATH[source], {
-      params: { query: { reportType } },
+      params: { query: { reportType, scope } },
     }),
   );
 }
@@ -43,6 +47,7 @@ async function createReportTemplate(
   source: TemplateSource,
   reportType: string,
   columns: ReportTemplateColumn[],
+  scope: TemplateScope,
 ): Promise<InvoiceReportTemplateView> {
   return requireErpData(
     await erpApi.POST<InvoiceReportTemplateView>(TEMPLATES_PATH[source], {
@@ -50,6 +55,7 @@ async function createReportTemplate(
         reportType,
         name: DEFAULT_TEMPLATE_NAME,
         columns,
+        scope,
       } as unknown as Record<string, unknown>,
     }),
   );
@@ -59,13 +65,14 @@ async function updateReportTemplate(
   source: TemplateSource,
   id: string,
   columns: ReportTemplateColumn[],
+  scope: TemplateScope,
 ): Promise<InvoiceReportTemplateView> {
   return requireErpData(
     await erpApi.PATCH<InvoiceReportTemplateView>(
       `${TEMPLATES_PATH[source]}/{id}` as never,
       {
         params: { path: { id } },
-        body: { columns } as unknown as Record<string, unknown>,
+        body: { columns, scope } as unknown as Record<string, unknown>,
       } as never,
     ),
   );
@@ -88,9 +95,23 @@ export function useReportColumnTemplate() {
   const backendKey = getReportBackendKey(reportType);
   const enabled = TEMPLATE_SOURCES.includes(source) && Boolean(backendKey);
 
+  // Tầng lưu: bản riêng của chi nhánh, hay bản dùng chung cả chuỗi. Backend
+  // không tự suy ra được — `api-axios` vẫn đính `X-Branch-Id` kể cả khi đang
+  // xem theo chuỗi — nên FE phải khai tường minh.
+  //
+  // Lấy từ report store chứ không gọi `useIsChainSelected()` lần nữa:
+  // `ReportPage` đã suy `branch` TỪ selector đó rồi bơm vào store, nên giá trị
+  // này luôn khớp thứ người dùng đang nhìn — kể cả khi `canViewChain()` hạ
+  // `isChain` thô trong localStorage xuống.
+  const view = useReportStore((s) => s.branch);
+  const scope: TemplateScope = view === STORE_TYPE.CHAIN ? "chain" : "branch";
+  // Đổi chi nhánh có `window.location.reload()` nên cache rụng sạch, nhưng
+  // `setView()` (chuỗi ↔ chi nhánh) thì không — khoá cache phải tự phân biệt.
+  const branchId = useBranchStore((s) => s.branchId);
+
   const query = useQuery({
-    queryKey: ["report-templates", source, backendKey],
-    queryFn: () => listReportTemplates(source, backendKey as string),
+    queryKey: ["report-templates", source, backendKey, scope, branchId],
+    queryFn: () => listReportTemplates(source, backendKey as string, scope),
     enabled,
     staleTime: 60_000,
   });
@@ -101,11 +122,15 @@ export function useReportColumnTemplate() {
   const saveMutation = useMutation({
     mutationFn: async (columns: ReportTemplateColumn[]) =>
       template
-        ? updateReportTemplate(source, template.id, columns)
-        : createReportTemplate(source, backendKey as string, columns),
+        ? updateReportTemplate(source, template.id, columns, scope)
+        : createReportTemplate(source, backendKey as string, columns, scope),
     onSuccess: () => {
+      // Bắt buộc: khi chi nhánh đang kế thừa bản chuỗi, PATCH tách ra một bản
+      // mới và trả về **id khác** id vừa gửi lên. Nạp lại danh sách là cách duy
+      // nhất để `template.id` trỏ đúng bản của chi nhánh ở lần lưu kế tiếp —
+      // thiếu bước này, lần lưu sau lại tách thêm một bản nữa.
       void queryClient.invalidateQueries({
-        queryKey: ["report-templates", source, backendKey],
+        queryKey: ["report-templates", source, backendKey, scope, branchId],
       });
     },
   });

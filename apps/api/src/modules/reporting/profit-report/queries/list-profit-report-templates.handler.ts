@@ -4,6 +4,11 @@ import { Repository } from 'typeorm';
 import { InvoiceReportTemplateView } from '@erp/shared-interfaces';
 import { ReportTemplateEntity } from '../../report-core/report-template.entity';
 import { toTemplateView } from '../../report-core/report-template.view';
+import {
+  pickEffective,
+  readScopeWhere,
+  resolveTemplateScope,
+} from '../../report-core/template-scope';
 import { ListProfitReportTemplatesQuery } from './list-profit-report-templates.query';
 
 @QueryHandler(ListProfitReportTemplatesQuery)
@@ -18,14 +23,18 @@ export class ListProfitReportTemplatesHandler
   async execute({
     actor,
     reportType,
+    scope,
   }: ListProfitReportTemplatesQuery): Promise<InvoiceReportTemplateView[]> {
+    const resolved = resolveTemplateScope(scope, actor);
+    // One element per scope tier, ORed by TypeORM — the report-type filter has
+    // to go inside each one, not around the array.
     const rows = await this.repo.find({
-      where: {
-        organizationId: actor.organizationId,
+      where: readScopeWhere(actor, resolved).map((where) => ({
+        ...where,
         ...(reportType ? { reportType } : {}),
-      },
+      })),
       order: { sortOrder: 'ASC', createdAt: 'DESC' },
     });
-    return rows.map(toTemplateView);
+    return pickEffective(rows, resolved).map(toTemplateView);
   }
 }
