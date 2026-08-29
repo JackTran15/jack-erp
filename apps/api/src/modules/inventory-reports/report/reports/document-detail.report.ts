@@ -29,7 +29,11 @@ import {
   projectRows,
   toTotalsRow,
 } from '../report-data.util';
-import { resolveInventoryBranchIds } from '../report-scope.util';
+import { ItemCategoryEntity } from '../../../inventory/location/item-category.entity';
+import {
+  resolveDescendantCategoryIds,
+  resolveInventoryBranchIds,
+} from '../report-scope.util';
 import { ReportExportSource } from '../../../reporting/report-core/report-definition';
 
 const { STRING, NUMBER } = ReportColumnDataType;
@@ -58,9 +62,11 @@ const COLUMNS: InventoryColumnDef[] = [
   { key: 'outValue', type: NUMBER, band: 'out', width: 130 },
   { key: 'outSalePrice', type: NUMBER, band: 'out', width: 120 },
   { key: 'customer', type: STRING, width: 160 },
-  { key: 'branchCode', type: STRING, width: 130 },
+  // `branches` has no code column: toRow hard-codes null (ADR-05).
+  { key: 'branchCode', type: STRING, filterKind: 'none', width: 130 },
   { key: 'branchName', type: STRING, width: 180 },
-  { key: 'receiverBranchCode', type: STRING, width: 160 },
+  // `branches` has no code column: toRow hard-codes null (ADR-05).
+  { key: 'receiverBranchCode', type: STRING, filterKind: 'none', width: 160 },
   { key: 'receiverBranchName', type: STRING, width: 180 },
 ];
 
@@ -101,6 +107,8 @@ export class DocumentDetailReport implements InventoryReportDefinition {
     private readonly documentDetail: DocumentDetailService,
     @InjectRepository(BranchEntity)
     private readonly branches: Repository<BranchEntity>,
+    @InjectRepository(ItemCategoryEntity)
+    private readonly categories: Repository<ItemCategoryEntity>,
   ) {}
 
   buildColumns(): Promise<ReportColumnHeader[]> {
@@ -151,7 +159,13 @@ export class DocumentDetailReport implements InventoryReportDefinition {
       startDate: period.startDate,
       endDate: period.endDate,
       branchIds,
-      categoryIds: filters.categoryId ? [filters.categoryId] : undefined,
+      // A parent group holds no items of its own — only its leaves do — so the
+      // filter has to carry the whole subtree (ADR-01).
+      categoryIds: await resolveDescendantCategoryIds(
+        this.categories,
+        filters.categoryId,
+        actor.organizationId,
+      ),
       search: filters.search,
       // Shared by the grid and the keyset export, so the file can never cover a
       // different set than the table it was exported from.

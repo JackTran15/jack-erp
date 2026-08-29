@@ -4,6 +4,11 @@ import { InventoryReportSearchDto } from '../../dto/inventory-report-search.dto'
 import { StockPeriodRow } from '../../services/stock-period.service';
 import { StockSummaryReport } from './stock-summary.report';
 
+// An empty category tree: these specs scope by branch and period, never by group,
+// so `resolveDescendantCategoryIds` short-circuits on an absent `categoryId`.
+const categories = { find: jest.fn().mockResolvedValue([]) };
+
+
 const actor: ActorContext = {
   userId: 'user-1',
   organizationId: 'org-1',
@@ -114,6 +119,7 @@ function build(rows: StockPeriodRow[], total = rows.length) {
     storages as never,
     itemStorageLocations as never,
     stockBalances as never,
+    categories as never,
   );
   return { report, stockPeriod, branches, locations, storages };
 }

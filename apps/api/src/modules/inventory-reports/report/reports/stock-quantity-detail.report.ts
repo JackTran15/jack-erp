@@ -17,7 +17,10 @@ import {
   StockPeriodRow,
   StockPeriodService,
 } from '../../services/stock-period.service';
-import { InventoryReportDefinition } from '../inventory-report-definition';
+import {
+  InventoryReportColumnsFilterDto,
+  InventoryReportDefinition,
+} from '../inventory-report-definition';
 import {
   buildInventoryHeaders,
   InventoryColumnDef,
@@ -29,9 +32,11 @@ import {
   projectRows,
   toTotalsRow,
 } from '../report-data.util';
+import { ItemCategoryEntity } from '../../../inventory/location/item-category.entity';
 import {
   resolveInventoryBranchIds,
   resolveWarehouseLocationIds,
+  resolveDescendantCategoryIds,
 } from '../report-scope.util';
 
 const { STRING, NUMBER } = ReportColumnDataType;
@@ -51,17 +56,23 @@ const COLUMNS: InventoryColumnDef[] = [
   { key: 'inPurchase', type: NUMBER, band: 'in', width: 110 },
   { key: 'inTransfer', type: NUMBER, band: 'in', width: 120 },
   { key: 'inReturn', type: NUMBER, band: 'in', width: 120 },
-  { key: 'inWh', type: NUMBER, band: 'in', width: 110 },
+  // No movement subtype backs this column yet: toRow hard-codes null (ADR-05).
+  { key: 'inWh', type: NUMBER, filterKind: 'none', band: 'in', width: 110 },
   { key: 'inAdjust', type: NUMBER, band: 'in', width: 110 },
-  { key: 'inOther', type: NUMBER, band: 'in', width: 100 },
+  // No movement subtype backs this column yet: toRow hard-codes null (ADR-05).
+  { key: 'inOther', type: NUMBER, filterKind: 'none', band: 'in', width: 100 },
   { key: 'outTotal', type: NUMBER, band: 'out', width: 100 },
   { key: 'outSale', type: NUMBER, band: 'out', width: 110 },
   { key: 'outTransfer', type: NUMBER, band: 'out', width: 120 },
-  { key: 'outPurchaseReturn', type: NUMBER, band: 'out', width: 140 },
-  { key: 'outWh', type: NUMBER, band: 'out', width: 110 },
+  // No movement subtype backs this column yet: toRow hard-codes null (ADR-05).
+  { key: 'outPurchaseReturn', type: NUMBER, filterKind: 'none', band: 'out', width: 140 },
+  // No movement subtype backs this column yet: toRow hard-codes null (ADR-05).
+  { key: 'outWh', type: NUMBER, filterKind: 'none', band: 'out', width: 110 },
   { key: 'outAdjust', type: NUMBER, band: 'out', width: 110 },
-  { key: 'outVoid', type: NUMBER, band: 'out', width: 110 },
-  { key: 'outOther', type: NUMBER, band: 'out', width: 100 },
+  // No movement subtype backs this column yet: toRow hard-codes null (ADR-05).
+  { key: 'outVoid', type: NUMBER, filterKind: 'none', band: 'out', width: 110 },
+  // No movement subtype backs this column yet: toRow hard-codes null (ADR-05).
+  { key: 'outOther', type: NUMBER, filterKind: 'none', band: 'out', width: 100 },
   { key: 'endingQty', type: NUMBER, width: 120 },
 ];
 
@@ -92,6 +103,29 @@ const KEY_MAP = {
 } as const;
 
 /** "Chi tiết số lượng nhập xuất tồn kho" — quantities with IN/OUT breakdown. */
+/**
+ * Columns the aggregate grains leave empty, and so cannot filter on (ADR-07).
+ *
+ * The parent and group grains re-aggregate in SQL and select NULL for every
+ * identity column they cannot speak for: a row spanning a whole product model
+ * has no single colour, and one spanning a category has no single SKU. Drawing
+ * a filter box over them answers 400. The lists are measured against real data
+ * — see `evidence/probe-aggregate-grain-columns.txt` — not guessed from the SQL.
+ *
+ * The `item` grain fills everything, so it is absent.
+ */
+const UNFILLED_BY_GRAIN: Record<'parent' | 'group', ReadonlySet<string>> = {
+  parent: new Set(['parentSku', 'parentName', 'color', 'size', 'unit', 'group', 'brand']),
+  group: new Set(['sku', 'parentSku', 'parentName', 'color', 'size', 'unit', 'brand']),
+};
+
+/** The unfilled set for one grain; the item grain fills everything. */
+function unfilledAt(statBy: string | undefined): ReadonlySet<string> {
+  return statBy === 'parent' || statBy === 'group'
+    ? UNFILLED_BY_GRAIN[statBy]
+    : new Set();
+}
+
 @Injectable()
 export class StockQuantityDetailReport implements InventoryReportDefinition {
   readonly key = INVENTORY_REPORT_KEYS.STOCK_QUANTITY_DETAIL;
@@ -102,10 +136,17 @@ export class StockQuantityDetailReport implements InventoryReportDefinition {
     private readonly branches: Repository<BranchEntity>,
     @InjectRepository(LocationEntity)
     private readonly locations: Repository<LocationEntity>,
+    @InjectRepository(ItemCategoryEntity)
+    private readonly categories: Repository<ItemCategoryEntity>,
   ) {}
 
-  buildColumns(): Promise<ReportColumnHeader[]> {
-    return Promise.resolve(buildInventoryHeaders(this.key, COLUMNS, ['sku']));
+  buildColumns(
+    _actor: ActorContext,
+    filters?: InventoryReportColumnsFilterDto,
+  ): Promise<ReportColumnHeader[]> {
+    return Promise.resolve(
+      buildInventoryHeaders(this.key, COLUMNS, ['sku'], unfilledAt(filters?.statBy)),
+    );
   }
 
   async buildData(
@@ -167,7 +208,13 @@ export class StockQuantityDetailReport implements InventoryReportDefinition {
       itemGroupBy: filters.statBy,
       branchIds,
       locationIds,
-      categoryIds: filters.categoryId ? [filters.categoryId] : undefined,
+      // A parent group holds no items of its own — only its leaves do — so the
+      // filter has to carry the whole subtree (ADR-01).
+      categoryIds: await resolveDescendantCategoryIds(
+        this.categories,
+        filters.categoryId,
+        actor.organizationId,
+      ),
       search: filters.search,
       includeBreakdown: true,
       hideZeroRows: filters.hideZeroRows ?? true,

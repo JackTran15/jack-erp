@@ -16,7 +16,10 @@ import {
   StockPeriodRow,
   StockPeriodService,
 } from '../../services/stock-period.service';
-import { InventoryReportDefinition } from '../inventory-report-definition';
+import {
+  InventoryReportColumnsFilterDto,
+  InventoryReportDefinition,
+} from '../inventory-report-definition';
 import {
   buildInventoryHeaders,
   InventoryColumnDef,
@@ -28,7 +31,11 @@ import {
   projectRows,
   toTotalsRow,
 } from '../report-data.util';
-import { resolveInventoryBranchIds } from '../report-scope.util';
+import { ItemCategoryEntity } from '../../../inventory/location/item-category.entity';
+import {
+  resolveDescendantCategoryIds,
+  resolveInventoryBranchIds,
+} from '../report-scope.util';
 
 const { STRING, NUMBER } = ReportColumnDataType;
 
@@ -42,7 +49,8 @@ const COLUMNS: InventoryColumnDef[] = [
   { key: 'unit', type: STRING, width: 110 },
   { key: 'group', type: STRING, width: 140 },
   { key: 'brand', type: STRING, width: 120 },
-  { key: 'branchCode', type: STRING, width: 130 },
+  // `branches` has no code column: every query selects NULL (ADR-05).
+  { key: 'branchCode', type: STRING, filterKind: 'none', width: 130 },
   { key: 'branch', type: STRING, width: 180 },
   { key: 'openingQty', type: NUMBER, band: 'opening', width: 110 },
   { key: 'openingValue', type: NUMBER, band: 'opening', width: 130 },
@@ -72,6 +80,29 @@ const KEY_MAP = {
 } as const;
 
 /** "Tổng hợp nhập xuất tồn kho theo cửa hàng" — one row per item × branch. */
+/**
+ * Columns the aggregate grains leave empty, and so cannot filter on (ADR-07).
+ *
+ * The parent and group grains re-aggregate in SQL and select NULL for every
+ * identity column they cannot speak for: a row spanning a whole product model
+ * has no single colour, and one spanning a category has no single SKU. Drawing
+ * a filter box over them answers 400. The lists are measured against real data
+ * — see `evidence/probe-aggregate-grain-columns.txt` — not guessed from the SQL.
+ *
+ * The `item` grain fills everything, so it is absent.
+ */
+const UNFILLED_BY_GRAIN: Record<'parent' | 'group', ReadonlySet<string>> = {
+  parent: new Set(['parentSku', 'parentName', 'color', 'size', 'unit', 'group', 'brand', 'branch']),
+  group: new Set(['sku', 'parentSku', 'parentName', 'color', 'size', 'unit', 'brand', 'branch']),
+};
+
+/** The unfilled set for one grain; the item grain fills everything. */
+function unfilledAt(statBy: string | undefined): ReadonlySet<string> {
+  return statBy === 'parent' || statBy === 'group'
+    ? UNFILLED_BY_GRAIN[statBy]
+    : new Set();
+}
+
 @Injectable()
 export class StockSummaryByStoreReport implements InventoryReportDefinition {
   readonly key = INVENTORY_REPORT_KEYS.STOCK_SUMMARY_BY_STORE;
@@ -80,10 +111,17 @@ export class StockSummaryByStoreReport implements InventoryReportDefinition {
     private readonly stockPeriod: StockPeriodService,
     @InjectRepository(BranchEntity)
     private readonly branches: Repository<BranchEntity>,
+    @InjectRepository(ItemCategoryEntity)
+    private readonly categories: Repository<ItemCategoryEntity>,
   ) {}
 
-  buildColumns(): Promise<ReportColumnHeader[]> {
-    return Promise.resolve(buildInventoryHeaders(this.key, COLUMNS, ['sku']));
+  buildColumns(
+    _actor: ActorContext,
+    filters?: InventoryReportColumnsFilterDto,
+  ): Promise<ReportColumnHeader[]> {
+    return Promise.resolve(
+      buildInventoryHeaders(this.key, COLUMNS, ['sku'], unfilledAt(filters?.statBy)),
+    );
   }
 
   async buildData(
@@ -141,7 +179,13 @@ export class StockSummaryByStoreReport implements InventoryReportDefinition {
       groupBy: 'item_branch' as const,
       itemGroupBy: filters.statBy,
       branchIds,
-      categoryIds: filters.categoryId ? [filters.categoryId] : undefined,
+      // A parent group holds no items of its own — only its leaves do — so the
+      // filter has to carry the whole subtree (ADR-01).
+      categoryIds: await resolveDescendantCategoryIds(
+        this.categories,
+        filters.categoryId,
+        actor.organizationId,
+      ),
       search: filters.search,
       hideZeroRows: filters.hideZeroRows ?? true,
       columnFilters: toEngineFilters(dto.columnFilters, KEY_MAP, {

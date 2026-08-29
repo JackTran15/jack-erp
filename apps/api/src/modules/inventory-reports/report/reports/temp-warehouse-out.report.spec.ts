@@ -5,6 +5,11 @@ import { TempWarehouseIssueRow } from '../../services/temp-warehouse-report.serv
 import { InventoryReportDefinition } from '../inventory-report-definition';
 import { TempWarehouseOutReport } from './temp-warehouse-out.report';
 
+// An empty category tree: these specs scope by branch and period, never by group,
+// so `resolveDescendantCategoryIds` short-circuits on an absent `categoryId`.
+const categories = { find: jest.fn().mockResolvedValue([]) };
+
+
 const actor = { userId: 'u1', organizationId: 'org-1', roles: [] } as unknown as ActorContext;
 
 const engineRow: TempWarehouseIssueRow = {
@@ -47,7 +52,7 @@ function build(rows: TempWarehouseIssueRow[], total = rows.length) {
     }),
   };
   const branches = { find: jest.fn().mockResolvedValue([]) };
-  const report = new TempWarehouseOutReport(engine as never, branches as never);
+  const report = new TempWarehouseOutReport(engine as never, branches as never, categories as never);
   return Object.assign(report, { engine }) as TempWarehouseOutReport & {
     engine: { list: jest.Mock };
   };

@@ -36,7 +36,7 @@ describe('TransferSummaryByCounterpartReport catalog', () => {
 
   /** The flag is opt-in, so an unrelated inventory report must be untouched. */
   it('does not leak the link flag into other inventory reports', async () => {
-    const report = new DocumentDetailReport(null as never, null as never);
+    const report = new DocumentDetailReport(null as never, null as never, null as never);
     const cols = await report.buildColumns();
 
     expect(cols.filter((h) => h.link)).toHaveLength(0);

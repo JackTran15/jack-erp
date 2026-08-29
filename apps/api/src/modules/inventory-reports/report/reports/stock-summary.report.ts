@@ -10,6 +10,7 @@ import {
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { BranchEntity } from '../../../branch/branch.entity';
+import { ItemCategoryEntity } from '../../../inventory/location/item-category.entity';
 import { LocationEntity } from '../../../inventory/location/location.entity';
 import { StorageEntity } from '../../../inventory/location/storage.entity';
 import { ItemStorageLocationEntity } from '../../../inventory/product/item-storage-location.entity';
@@ -43,6 +44,7 @@ import {
 import {
   resolveInventoryBranchIds,
   resolveWarehouseLocationIds,
+  resolveDescendantCategoryIds,
 } from '../report-scope.util';
 
 const { STRING, NUMBER } = ReportColumnDataType;
@@ -101,6 +103,21 @@ const LOCATION_COLUMN_KEYS = ['positionCode', 'positionName'];
  *
  * `item` is not listed: it fills all of them.
  */
+/**
+ * Measure columns the aggregate grains do not compute (ADR-07).
+ *
+ * `pendingTransferCtes` is only spliced into the item-level query, so at the
+ * parent and group grains these four come back as a structural zero rather than
+ * a number the query stands behind. They stay in the catalog — a saved template
+ * names them — but with no filter box, like `positionCode`.
+ */
+const UNFILLED_MEASURES_AT_AGGREGATE = [
+  'transferOutQty',
+  'transferOutValue',
+  'incomingQty',
+  'incomingValue',
+];
+
 const IDENTITY_KEYS_BY_GRAIN: Record<'parent' | 'group', string[]> = {
   // buildAggSqls puts the product's own code and name into sku / item_name.
   parent: ['name', 'sku'],
@@ -154,6 +171,8 @@ export class StockSummaryReport implements InventoryReportDefinition {
     private readonly itemStorageLocations: Repository<ItemStorageLocationEntity>,
     @InjectRepository(StockBalanceEntity)
     private readonly stockBalances: Repository<StockBalanceEntity>,
+    @InjectRepository(ItemCategoryEntity)
+    private readonly categories: Repository<ItemCategoryEntity>,
   ) {}
 
   private get locationRepos(): ItemWarehouseLocationRepos {
@@ -184,7 +203,12 @@ export class StockSummaryReport implements InventoryReportDefinition {
     });
     // The pin follows whichever identity column leads this grain.
     const pinned = columns.length ? [columns[0].key] : [];
-    return Promise.resolve(buildInventoryHeaders(this.key, columns, pinned));
+    const unfilterable = kept
+      ? new Set(UNFILLED_MEASURES_AT_AGGREGATE)
+      : new Set<string>();
+    return Promise.resolve(
+      buildInventoryHeaders(this.key, columns, pinned, unfilterable),
+    );
   }
 
   async buildData(
@@ -300,7 +324,13 @@ export class StockSummaryReport implements InventoryReportDefinition {
       itemGroupBy: filters.statBy,
       branchIds,
       locationIds,
-      categoryIds: filters.categoryId ? [filters.categoryId] : undefined,
+      // A parent group holds no items of its own — only its leaves do — so the
+      // filter has to carry the whole subtree (ADR-01).
+      categoryIds: await resolveDescendantCategoryIds(
+        this.categories,
+        filters.categoryId,
+        actor.organizationId,
+      ),
       search: filters.search,
       hideZeroRows: filters.hideZeroRows ?? true,
       // The unit/brand dropdowns used to filter the materialised rows in JS.
