@@ -46,6 +46,28 @@ export enum REPORT_FILTERS_LINE {
     PERIOD_COMPARE_CURRENT_RANGE = 'period_compare_current_range',
 }
 
+/**
+ * Filter lines that survive a change of report type even though the new report
+ * does not render them (ADR-04).
+ *
+ * `getReportFormLines` lists only the lines a report DRAWS. Two kinds of value
+ * are meaningful without being drawn, and pruning purely by that list breaks
+ * both: `SKU` carries the scope of a drill-down dialog, and the four
+ * `PERIOD_COMPARE_*` lines are seeded for every report by
+ * `buildInitialReportState` while only "Kết quả kinh doanh" declares them.
+ *
+ * Add a line here when it is read by a payload builder but never rendered.
+ */
+export const ALWAYS_KEPT_FILTER_LINES: ReadonlySet<REPORT_FILTERS_LINE> = new Set([
+    REPORT_FILTERS_LINE.SKU,
+    REPORT_FILTERS_LINE.REPORT_PERIOD,
+    REPORT_FILTERS_LINE.RANGE_DATE,
+    REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS,
+    REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS_RANGE,
+    REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT,
+    REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE,
+]);
+
 export const REPORT_FILTERS_LINE_METADATA = {
     [REPORT_FILTERS_LINE.STORE]: {
         label: 'cửa hàng',

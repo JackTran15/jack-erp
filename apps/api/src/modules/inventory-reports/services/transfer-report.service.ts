@@ -139,7 +139,11 @@ const TRANSFER_SIZE_SQL = `(SELECT pao.value_label FROM item_attribute_values ia
            WHERE iav.item_id = i.id AND LOWER(pad.name) = 'size'
            LIMIT 1)`;
 
-function transferByBranchSpecs(alias: string, withText: boolean): ReportColumnSpecs {
+function transferByBranchSpecs(
+  alias: string,
+  withText: boolean,
+  itemGroupBy: ItemGroupBy = 'item',
+): ReportColumnSpecs {
   const specs: ReportColumnSpecs = {
     outQty: { sql: `${alias}.out_qty`, kind: 'number' },
     outValue: { sql: `${alias}.out_value`, kind: 'number' },
@@ -167,6 +171,27 @@ function transferByBranchSpecs(alias: string, withText: boolean): ReportColumnSp
     specs.color = { sql: TRANSFER_COLOR_SQL, kind: 'text' };
     specs.size = { sql: TRANSFER_SIZE_SQL, kind: 'text' };
     specs.destinationBranchName = { sql: 'b.name', kind: 'text' };
+  }
+  // The aggregate grains drop the item joins, but they still show an identity of
+  // their own — the product's code and name, or the category's name — and the
+  // destination branch, which is a dimension of the row rather than of the item
+  // (ADR-07). The expressions mirror `displayCols` so a filter reads the value
+  // the grid prints.
+  if (!withText) {
+    specs.destinationBranchName = { sql: 'b.name', kind: 'text' };
+    if (itemGroupBy === 'parent') {
+      specs.sku = { sql: `COALESCE(p.code, ${alias}.fallback_sku)`, kind: 'text' };
+      specs.itemName = {
+        sql: `COALESCE(p.name, ${alias}.fallback_name)`,
+        kind: 'text',
+      };
+    }
+    if (itemGroupBy === 'group') {
+      const categoryName = `COALESCE(ic.name, 'Không phân nhóm')`;
+      specs.sku = { sql: categoryName, kind: 'text' };
+      specs.itemName = { sql: categoryName, kind: 'text' };
+      specs.categoryName = { sql: categoryName, kind: 'text' };
+    }
   }
   return specs;
 }
@@ -526,7 +551,7 @@ export class TransferReportService {
     const isItemLevel = itemGroupBy === 'item';
     const columnFilter = buildReportColumnFilter(
       query.columnFilters,
-      transferByBranchSpecs(isItemLevel ? 'c' : 'ia', isItemLevel),
+      transferByBranchSpecs(isItemLevel ? 'c' : 'ia', isItemLevel, itemGroupBy),
       params.length,
     );
     const filterWhere = columnFilter.where ? `AND ${columnFilter.where}` : '';
@@ -654,6 +679,9 @@ export class TransferReportService {
         ORDER BY ${orderByCol} ASC NULLS LAST, b.name ASC
         LIMIT $${limitIndex} OFFSET $${limitIndex + 1}
       `;
+      // Same joins as the rows query: the identity and destination filters
+      // compile to `p.` / `ic.` / `b.` expressions, and a count over a narrower
+      // FROM would both fail to resolve them and count a different set.
       countSql = `
         WITH ${baseCtes},
         ${aggCte}
@@ -662,6 +690,8 @@ export class TransferReportService {
                  ([, col]) => `COALESCE(SUM(ia.${col}), 0)::numeric AS ${col}`,
                ).join(',\n               ')}
         FROM item_agg ia
+        ${joinLookup}
+        JOIN branches b ON b.id = ia.other_branch_id AND b.organization_id = $1
         WHERE TRUE ${filterWhere}
       `;
     }

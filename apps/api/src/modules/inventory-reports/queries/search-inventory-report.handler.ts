@@ -28,7 +28,7 @@ export class SearchInventoryReportHandler
     }
     return this.cache.getOrSet(
       CACHE_NAMESPACE,
-      searchCacheKey(actor.organizationId, dto),
+      searchCacheKey(actor.organizationId, actor.branchIds, dto),
       () => def.buildData(dto, actor),
       CACHE_TTL_SECONDS,
     );

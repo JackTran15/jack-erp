@@ -1,5 +1,8 @@
 import { InventoryReportSearchDto } from '../dto/inventory-report-search.dto';
-import { toTotalsRow } from './report-data.util';
+import {
+  searchCacheKey,
+  toTotalsRow,
+} from './report-data.util';
 
 describe('toTotalsRow', () => {
   const COLUMNS = ['name', 'sku', 'openingQty', 'endingQty'];
@@ -76,6 +79,47 @@ describe('v2 report contract', () => {
     // generated api-client is stale and the web apps need a matching release.
     expect(Object.keys(dto).sort()).toEqual(
       ['columnFilters', 'columns', 'filters', 'limit', 'page', 'reportType'].sort(),
+    );
+  });
+});
+
+describe('searchCacheKey', () => {
+  const ORG = 'org-1';
+  const dto = {
+    reportType: 'inventory-stock-by-store-pivot',
+    columns: ['sku'],
+    filters: { preset: 'this_month' },
+    page: 1,
+    limit: 20,
+  } as unknown as InventoryReportSearchDto;
+
+  it('separates two branch scopes in the same organization', () => {
+    expect(searchCacheKey(ORG, ['b1', 'b2'], dto)).not.toBe(
+      searchCacheKey(ORG, ['b1'], dto),
+    );
+  });
+
+  it('ignores the order the branch ids arrive in', () => {
+    expect(searchCacheKey(ORG, ['b2', 'b1'], dto)).toBe(
+      searchCacheKey(ORG, ['b1', 'b2'], dto),
+    );
+  });
+
+  it('still hits for an identical request from the same scope', () => {
+    expect(searchCacheKey(ORG, ['b1'], dto)).toBe(
+      searchCacheKey(ORG, ['b1'], dto),
+    );
+  });
+
+  it('separates two organizations sharing a branch scope', () => {
+    expect(searchCacheKey(ORG, ['b1'], dto)).not.toBe(
+      searchCacheKey('org-2', ['b1'], dto),
+    );
+  });
+
+  it('treats an absent scope as its own key, not as a crash', () => {
+    expect(searchCacheKey(ORG, undefined, dto)).toBe(
+      searchCacheKey(ORG, [], dto),
     );
   });
 });

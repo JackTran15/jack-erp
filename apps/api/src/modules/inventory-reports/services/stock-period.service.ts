@@ -221,6 +221,7 @@ function periodColumnSpecs(
   alias: string,
   withText: boolean,
   spatial: StockPeriodGroupBy = 'item_branch',
+  itemGroupBy: ItemGroupBy = 'item',
 ): ReportColumnSpecs {
   const specs: ReportColumnSpecs = {};
   for (const key of NUMERIC_PERIOD_COLUMNS) {
@@ -263,6 +264,25 @@ function periodColumnSpecs(
     specs.locationCode = { sql: 'loc.code', kind: 'text' };
     specs.locationName = { sql: 'loc.name', kind: 'text' };
   }
+  // The parent and group grains have no item-level text at all, but they do
+  // carry an identity of their own: the product's code and name, or the
+  // category's name. Those are what the grid shows and what a filter must
+  // compile to — the same expressions `buildAggSqls` selects, so the predicate
+  // reads the value the user can see (ADR-07).
+  if (!withText && itemGroupBy === 'parent') {
+    specs.sku = { sql: `COALESCE(p.code, ${alias}.fallback_sku)`, kind: 'text' };
+    specs.itemName = {
+      sql: `COALESCE(p.name, ${alias}.fallback_name)`,
+      kind: 'text',
+    };
+  }
+  if (!withText && itemGroupBy === 'group') {
+    // At this grain the row IS the category, so both columns show its name.
+    const categoryName = `COALESCE(ic.name, 'Không phân nhóm')`;
+    specs.itemName = { sql: categoryName, kind: 'text' };
+    specs.categoryName = { sql: categoryName, kind: 'text' };
+  }
+
   // `branches` has no code column — every query selects `NULL::text AS
   // branch_code` — so `branchCode` deliberately gets no spec and filtering it
   // answers 400 rather than silently matching nothing.
@@ -512,7 +532,12 @@ export class StockPeriodService {
     // query, so the footer can never describe a different set than the grid.
     const columnFilter = buildReportColumnFilter(
       query.columnFilters,
-      periodColumnSpecs(isItemLevel ? 'c' : 'ia', isItemLevel, query.groupBy),
+      periodColumnSpecs(
+        isItemLevel ? 'c' : 'ia',
+        isItemLevel,
+        query.groupBy,
+        itemGroupBy,
+      ),
       baseParams.length,
     );
     const filterWhere = columnFilter.where ? `AND ${columnFilter.where}` : '';
@@ -763,12 +788,16 @@ export class StockPeriodService {
       LIMIT $${limitIndex} OFFSET $${limitIndex + 1}
     `;
 
+    // The lookup join belongs here too: the identity filters compile to `p.` /
+    // `ic.` expressions, and a count over a narrower FROM would both fail to
+    // resolve them and describe a different set than the rows above it.
     const countSql = `
       WITH ${combinedCte},
       ${itemAggCte}
       SELECT COUNT(*)::int AS total,
              ${periodTotalsSelect('ia')}
       FROM item_agg ia
+      ${joinLookup}
       WHERE ($8::boolean = FALSE OR NOT (ia.opening_qty = 0 AND ia.in_qty = 0 AND ia.out_qty = 0))
         ${filterWhere}
     `;

@@ -20,7 +20,10 @@ import {
   TransferByBranchRow,
   TransferReportService,
 } from '../../services/transfer-report.service';
-import { InventoryReportDefinition } from '../inventory-report-definition';
+import {
+  InventoryReportColumnsFilterDto,
+  InventoryReportDefinition,
+} from '../inventory-report-definition';
 import {
   buildInventoryHeaders,
   InventoryColumnDef,
@@ -33,7 +36,11 @@ import {
   projectRows,
   toTotalsRow,
 } from '../report-data.util';
-import { permittedBranchIds } from '../report-scope.util';
+import { ItemCategoryEntity } from '../../../inventory/location/item-category.entity';
+import {
+  resolveDescendantCategoryIds,
+  permittedBranchIds,
+} from '../report-scope.util';
 
 const { STRING, NUMBER } = ReportColumnDataType;
 
@@ -69,6 +76,29 @@ const NUMERIC = numericKeys(COLUMNS);
 const NON_ADDITIVE = new Set(['outAvgPrice', 'inAvgPrice']);
 
 /** "Tổng hợp hàng hóa đã điều chuyển theo cửa hàng" — item × destination branch. */
+/**
+ * Columns the aggregate grains leave empty, and so cannot filter on (ADR-07).
+ *
+ * The parent and group grains re-aggregate in SQL and select NULL for every
+ * identity column they cannot speak for: a row spanning a whole product model
+ * has no single colour, and one spanning a category has no single SKU. Drawing
+ * a filter box over them answers 400. The lists are measured against real data
+ * — see `evidence/probe-aggregate-grain-columns.txt` — not guessed from the SQL.
+ *
+ * The `item` grain fills everything, so it is absent.
+ */
+const UNFILLED_BY_GRAIN: Record<'parent' | 'group', ReadonlySet<string>> = {
+  parent: new Set(['parentSku', 'parentName', 'color', 'size', 'unit', 'group', 'brand']),
+  group: new Set(['parentSku', 'parentName', 'color', 'size', 'unit', 'brand']),
+};
+
+/** The unfilled set for one grain; the item grain fills everything. */
+function unfilledAt(statBy: string | undefined): ReadonlySet<string> {
+  return statBy === 'parent' || statBy === 'group'
+    ? UNFILLED_BY_GRAIN[statBy]
+    : new Set();
+}
+
 @Injectable()
 export class TransferByStoreReport implements InventoryReportDefinition {
   readonly key = INVENTORY_REPORT_KEYS.TRANSFER_BY_STORE;
@@ -77,10 +107,17 @@ export class TransferByStoreReport implements InventoryReportDefinition {
     private readonly transferReport: TransferReportService,
     @InjectRepository(BranchEntity)
     private readonly branches: Repository<BranchEntity>,
+    @InjectRepository(ItemCategoryEntity)
+    private readonly categories: Repository<ItemCategoryEntity>,
   ) {}
 
-  buildColumns(): Promise<ReportColumnHeader[]> {
-    return Promise.resolve(buildInventoryHeaders(this.key, COLUMNS, ['sku']));
+  buildColumns(
+    _actor: ActorContext,
+    filters?: InventoryReportColumnsFilterDto,
+  ): Promise<ReportColumnHeader[]> {
+    return Promise.resolve(
+      buildInventoryHeaders(this.key, COLUMNS, ['sku'], unfilledAt(filters?.statBy)),
+    );
   }
 
   async buildData(
@@ -91,7 +128,7 @@ export class TransferByStoreReport implements InventoryReportDefinition {
     const scope = await this.resolveScope(dto, actor);
 
     const result = await this.transferReport.byBranch({
-      ...this.engineQuery(dto, actor, scope),
+      ...(await this.engineQuery(dto, actor, scope)),
       page: dto.page ?? 1,
       pageSize: dto.limit ?? 20,
     });
@@ -110,7 +147,7 @@ export class TransferByStoreReport implements InventoryReportDefinition {
   ): Promise<CountedRows> {
     const scope = await this.resolveScope(dto, actor);
     const result = await this.transferReport.byBranch({
-      ...this.engineQuery(dto, actor, scope),
+      ...(await this.engineQuery(dto, actor, scope)),
       page: 1,
       pageSize: 1,
     });
@@ -152,7 +189,7 @@ export class TransferByStoreReport implements InventoryReportDefinition {
   }
 
   /** Everything the engine needs except paging, shared by both callers. */
-  private engineQuery(
+  private async engineQuery(
     dto: InventoryReportSearchDto,
     actor: ActorContext,
     scope: { period: { startDate: Date; endDate: Date }; sourceBranchId: string },
@@ -164,7 +201,13 @@ export class TransferByStoreReport implements InventoryReportDefinition {
       endDate: scope.period.endDate,
       sourceBranchId: scope.sourceBranchId,
       destinationBranchIds: filters.receivingStoreIds,
-      categoryIds: filters.categoryId ? [filters.categoryId] : undefined,
+      // A parent group holds no items of its own — only its leaves do — so the
+      // filter has to carry the whole subtree (ADR-01).
+      categoryIds: await resolveDescendantCategoryIds(
+        this.categories,
+        filters.categoryId,
+        actor.organizationId,
+      ),
       search: filters.search,
       itemGroupBy: filters.statBy,
       columnFilters: toEngineFilters(dto.columnFilters, KEY_MAP, {

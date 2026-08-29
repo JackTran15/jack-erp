@@ -4,6 +4,11 @@ import { InventoryReportSearchDto } from '../../dto/inventory-report-search.dto'
 import { StockBalancePivotRow } from '../../services/stock-balance-pivot.service';
 import { StockByStorePivotReport } from './stock-by-store-pivot.report';
 
+// An empty category tree: these specs scope by branch and period, never by group,
+// so `resolveDescendantCategoryIds` short-circuits on an absent `categoryId`.
+const categories = { find: jest.fn().mockResolvedValue([]) };
+
+
 const actor = {
   userId: 'u1',
   organizationId: 'org-1',
@@ -61,7 +66,7 @@ function build(rows: StockBalancePivotRow[], orgBranches = ORG_BRANCHES, total =
   };
   const branches = { find: jest.fn().mockResolvedValue(orgBranches) };
   return Object.assign(
-    new StockByStorePivotReport(engine as never, branches as never),
+    new StockByStorePivotReport(engine as never, branches as never, categories as never),
     { engine },
   ) as StockByStorePivotReport & { engine: { aggregate: jest.Mock } };
 }
@@ -111,7 +116,7 @@ describe('StockByStorePivotReport', () => {
         .mockResolvedValue({ data: [], branches: [], total: 0, totals: { total: 0 } }),
     };
     const branches = { find: jest.fn().mockResolvedValue([]) };
-    const report = new StockByStorePivotReport(engine as never, branches as never);
+    const report = new StockByStorePivotReport(engine as never, branches as never, categories as never);
 
     await report.buildColumns(actor);
     expect(branches.find).toHaveBeenCalledWith(

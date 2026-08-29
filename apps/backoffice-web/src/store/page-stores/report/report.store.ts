@@ -1,6 +1,10 @@
 import { createStore, type StoreApi } from "zustand";
 import { resolvePeriodRange, type PeriodPreset } from "@erp/ui";
-import { REPORT_FILTERS_LINE } from "../../../constants/reports/report-filters.constant";
+import {
+  ALWAYS_KEPT_FILTER_LINES,
+  REPORT_FILTERS_LINE,
+} from "../../../constants/reports/report-filters.constant";
+import { getReportFormLines } from "../../../constants/reports/report-type.constant";
 import { STORE_TYPE } from "../../../constants/store.constant";
 import type {
   ReportInitialState,
@@ -8,6 +12,24 @@ import type {
 } from "./report.interface";
 
 export type ReportStoreApi = StoreApi<ReportState>;
+
+/**
+ * Bộ lọc còn lại sau khi đổi sang `reportType`: những dòng báo cáo mới khai,
+ * cộng allowlist các line có nghĩa mà không render (ADR-04).
+ */
+function pruneFilters(
+  filters: ReportState["filters"],
+  reportType: string,
+  branch: STORE_TYPE,
+): ReportState["filters"] {
+  const kept = new Set<string>([
+    ...getReportFormLines(reportType, branch),
+    ...ALWAYS_KEPT_FILTER_LINES,
+  ]);
+  const entries = Object.entries(filters).filter(([line]) => kept.has(line));
+  if (entries.length === Object.keys(filters).length) return filters;
+  return Object.fromEntries(entries) as ReportState["filters"];
+}
 
 export function createReportStore(
   initialState: ReportInitialState,
@@ -20,14 +42,24 @@ export function createReportStore(
     actions: {
       // Đổi report type → columns tự fetch theo type. Chain: tự áp dụng ngay
       // (snapshot mới) để fill data không cần bấm nút; single: xóa để chờ áp dụng.
+      //
+      // Bộ lọc cũng bị dọn xuống đúng những dòng báo cáo mới vẽ ra. Không dọn
+      // thì giá trị đặt ở báo cáo trước vẫn đi vào payload — `getReportFormLines`
+      // chỉ quyết định RENDER, còn buildSearchFilters đọc mọi line vô điều kiện —
+      // và thành một bộ lọc VÔ HÌNH thu hẹp lưới mà không có ô nào để xoá. Đây là
+      // bản tương ứng của `pruneColumnFilters` cho bộ lọc đầu trang (ADR-03).
       setReportType: (reportType) =>
-        set((s) => ({
-          reportType,
-          appliedRequest:
-            s.branch === STORE_TYPE.CHAIN
-              ? { reportType, filters: s.filters, columnFilters: s.columnFilters }
-              : null,
-        })),
+        set((s) => {
+          const filters = pruneFilters(s.filters, reportType, s.branch);
+          return {
+            reportType,
+            filters,
+            appliedRequest:
+              s.branch === STORE_TYPE.CHAIN
+                ? { reportType, filters, columnFilters: s.columnFilters }
+                : null,
+          };
+        }),
 
       setFilterValue: (line, value) =>
         set((s) => {

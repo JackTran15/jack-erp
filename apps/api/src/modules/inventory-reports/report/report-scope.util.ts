@@ -3,6 +3,7 @@ import { In, Repository } from 'typeorm';
 import { ReportStoreScope } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { BranchEntity } from '../../branch/branch.entity';
+import { ItemCategoryEntity } from '../../inventory/location/item-category.entity';
 import { LocationEntity } from '../../inventory/location/location.entity';
 
 /**
@@ -75,4 +76,55 @@ export async function resolveWarehouseLocationIds(
   // No locations under the selected storages ⇒ impossible filter, not "no filter".
   if (!rows.length) return ['00000000-0000-0000-0000-000000000000'];
   return rows.map((l) => l.id);
+}
+
+/**
+ * Resolve a product group filter into that group plus every group beneath it.
+ *
+ * Items are only ever tagged to a leaf group, while the picker (`TreeSelectInput`)
+ * offers every node — so matching the selected id alone returns nothing at all for
+ * any parent. Walking the whole subtree is what the POS catalogue filter already
+ * does for the same reason (`PosCatalogProductService.resolveDescendantCategoryIds`).
+ *
+ * Returns undefined when no group filter is set. A group outside the organization
+ * yields the impossible id rather than undefined, so an unknown filter means an
+ * empty result instead of an accidental unfiltered one.
+ */
+export async function resolveDescendantCategoryIds(
+  categories: Repository<ItemCategoryEntity>,
+  categoryId: string | undefined,
+  organizationId: string,
+): Promise<string[] | undefined> {
+  if (!categoryId) return undefined;
+
+  const rows = await categories.find({
+    where: { organizationId },
+    select: { id: true, parentGroupId: true },
+  });
+
+  const childrenByParent = new Map<string, string[]>();
+  const known = new Set<string>();
+  for (const row of rows) {
+    known.add(row.id);
+    if (!row.parentGroupId) continue;
+    const siblings = childrenByParent.get(row.parentGroupId);
+    if (siblings) siblings.push(row.id);
+    else childrenByParent.set(row.parentGroupId, [row.id]);
+  }
+
+  // Unknown group ⇒ impossible filter, matching resolveWarehouseLocationIds.
+  if (!known.has(categoryId)) return ['00000000-0000-0000-0000-000000000000'];
+
+  // `visited` is not belt-and-braces: a malformed tree with a cycle would
+  // otherwise walk forever, and the legacy CTE guards the same case with UNION.
+  const visited = new Set<string>([categoryId]);
+  const queue = [categoryId];
+  while (queue.length) {
+    for (const child of childrenByParent.get(queue.pop()!) ?? []) {
+      if (visited.has(child)) continue;
+      visited.add(child);
+      queue.push(child);
+    }
+  }
+  return [...visited];
 }

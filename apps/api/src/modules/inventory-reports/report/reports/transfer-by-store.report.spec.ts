@@ -4,6 +4,11 @@ import { InventoryReportSearchDto } from '../../dto/inventory-report-search.dto'
 import { TransferByBranchRow } from '../../services/transfer-report.service';
 import { TransferByStoreReport } from './transfer-by-store.report';
 
+// An empty category tree: these specs scope by branch and period, never by group,
+// so `resolveDescendantCategoryIds` short-circuits on an absent `categoryId`.
+const categories = { find: jest.fn().mockResolvedValue([]) };
+
+
 const actorNoBranch = { userId: 'u1', organizationId: 'org-1', roles: [] } as unknown as ActorContext;
 const actorWithBranch = {
   ...actorNoBranch,
@@ -51,7 +56,7 @@ function build(rows: TransferByBranchRow[], ownedBranch = true, total = rows.len
     findOne: jest.fn().mockResolvedValue(ownedBranch ? { id: 'b1' } : null),
   };
   return {
-    report: new TransferByStoreReport(engine as never, branches as never),
+    report: new TransferByStoreReport(engine as never, branches as never, categories as never),
     engine,
   };
 }

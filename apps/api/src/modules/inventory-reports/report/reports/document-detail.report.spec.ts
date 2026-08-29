@@ -3,6 +3,11 @@ import { InventoryReportSearchDto } from '../../dto/inventory-report-search.dto'
 import { DocumentDetailRow } from '../../services/document-detail.service';
 import { DocumentDetailReport } from './document-detail.report';
 
+// An empty category tree: these specs scope by branch and period, never by group,
+// so `resolveDescendantCategoryIds` short-circuits on an absent `categoryId`.
+const categories = { find: jest.fn().mockResolvedValue([]) };
+
+
 const actor = { userId: 'u1', organizationId: 'org-1', roles: [] } as unknown as ActorContext;
 
 function engineRow(overrides: Partial<DocumentDetailRow>): DocumentDetailRow {
@@ -62,7 +67,7 @@ function build(rows: DocumentDetailRow[], total = rows.length) {
   };
   const branches = { find: jest.fn().mockResolvedValue([]) };
   return Object.assign(
-    new DocumentDetailReport(engine as never, branches as never),
+    new DocumentDetailReport(engine as never, branches as never, categories as never),
     { engine },
   ) as DocumentDetailReport & { engine: { list: jest.Mock } };
 }
@@ -158,7 +163,7 @@ function buildKeyset(rows: (DocumentDetailRow & { lineId: string })[]) {
   };
   const branches = { find: jest.fn().mockResolvedValue([]) };
   return {
-    report: new DocumentDetailReport(engine as never, branches as never),
+    report: new DocumentDetailReport(engine as never, branches as never, categories as never),
     calls,
   };
 }

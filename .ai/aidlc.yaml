@@ -53,7 +53,10 @@ verify:
     # Không có post_login: tài khoản này chỉ thuộc một chi nhánh nên không có menu chuyển.
     local-backoffice-bm:
       url: http://localhost:3000
-      required: true
+      # required: false — tài khoản riêng của việc quản lý chi nhánh, credentials chưa từng
+      # được thêm vào .ai/credentials.env. Giữ required:true làm mọi feature khác rơi xuống
+      # rung "skipped" vì một env chúng không dùng. Nâng lại khi có credentials.
+      required: false
       auth:
         recipe: form
         path: /login
@@ -99,7 +102,11 @@ verify:
     # Chạy: cd apps/pos-web && ./node_modules/.bin/vite --port 3002 --strictPort
     local-pos-worktree:
       url: http://localhost:3002
-      required: true
+      # enabled: false — worktree `object-by-branch` không còn dựng ở :3002. Môi trường được
+      # giữ trong config để mô tả cách verify một worktree song song; bật lại khi dựng lại
+      # server đó và mint .ai/.auth/local-pos-worktree.json.
+      enabled: false
+      required: false
       auth:
         # `storage-state`, không phải `form` — và đây là kết luận từ một lần chạy đỏ,
         # không phải sở thích. Form đăng nhập POS đặt CẢ BA ô (tổ chức, email, mật khẩu)

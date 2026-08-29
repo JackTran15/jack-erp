@@ -53,6 +53,32 @@ const PIVOT_COLUMN_SPECS: ReportColumnSpecs = {
 };
 
 /**
+ * Identity specs for the parent and group grains (ADR-07).
+ *
+ * `aggPageSql` chooses the page over `items i` with the product and category
+ * joins already in scope, so these compile against exactly the expressions it
+ * selects as `display_sku` — a filter therefore reads the value the grid prints.
+ *
+ * The measure columns (`total`, `branch.qty.*`) are deliberately absent: at this
+ * grain they are sums over every item behind one agg_key, so a predicate on them
+ * belongs in a HAVING over that group, not in the row-level WHERE this fragment
+ * is spliced into. Filtering one still answers 400 rather than filtering wrongly.
+ */
+function pivotAggregateSpecs(itemGroupBy: 'parent' | 'group'): ReportColumnSpecs {
+  const categoryName = `COALESCE(ic.name, 'Không phân nhóm')`;
+  return itemGroupBy === 'parent'
+    ? {
+        sku: { sql: 'COALESCE(pr.code, i.code)', kind: 'text' },
+        name: { sql: 'COALESCE(pr.name, i.name)', kind: 'text' },
+      }
+    : {
+        sku: { sql: categoryName, kind: 'text' },
+        name: { sql: categoryName, kind: 'text' },
+        group: { sql: categoryName, kind: 'text' },
+      };
+}
+
+/**
  * The row's org-wide quantity, rebuilt at the item-choosing step.
  *
  * The grid's "Tổng" only exists after `foldCells` adds the per-branch cells up
@@ -66,6 +92,60 @@ const PIVOT_TOTAL_SQL = `(
         WHERE sbt.item_id = i.id AND sbt.organization_id = $1
           AND ($2::text[] IS NULL OR sbt.branch_id = ANY($2::text[]))
       )`;
+
+/**
+ * The measure columns at the parent/group grains, as predicates over the GROUP.
+ *
+ * `total` and `branch.qty.<id>` are sums across every item behind one agg_key, so
+ * their predicate belongs in a HAVING, not in the row-level WHERE: filtering rows
+ * first would compare one item's stock and then present the answer as the group's
+ * (ADR-07, T-05-04). The inner expressions are the same per-item subqueries the
+ * item grain filters on — only the SUM() around them is new.
+ */
+function pivotAggregateMeasureSpecs(
+  filters: ReportColumnFilters | undefined,
+  startIndex: number,
+): { specs: ReportColumnSpecs; params: string[] } {
+  const specs: ReportColumnSpecs = {};
+  const params: string[] = [];
+  if (!filters) return { specs, params };
+
+  if (Object.prototype.hasOwnProperty.call(filters, 'total')) {
+    specs.total = { sql: `SUM(${PIVOT_TOTAL_SQL})`, kind: 'number' };
+  }
+  for (const key of Object.keys(filters)) {
+    const branchId = parseBranchQtyColumnKey(key);
+    if (!branchId) continue;
+    if (!UUID_RE.test(branchId)) {
+      throw new BadRequestException(`Cột "${key}" không phải mã chi nhánh hợp lệ`);
+    }
+    params.push(branchId);
+    const index = startIndex + params.length;
+    specs[key] = {
+      sql: `SUM((
+        SELECT COALESCE(SUM(sbb.quantity), 0)
+        FROM stock_balances sbb
+        WHERE sbb.item_id = i.id AND sbb.organization_id = $1
+          AND sbb.branch_id = $${index}
+      ))`,
+      kind: 'number',
+    };
+  }
+  return { specs, params };
+}
+
+/** Split the grid's filters into the ones a WHERE can take and the ones a HAVING must. */
+function partitionPivotFilters(
+  filters: ReportColumnFilters | undefined,
+): { identity: ReportColumnFilters; measure: ReportColumnFilters } {
+  const identity: ReportColumnFilters = {};
+  const measure: ReportColumnFilters = {};
+  for (const [key, value] of Object.entries(filters ?? {})) {
+    const isMeasure = key === 'total' || parseBranchQtyColumnKey(key) !== null;
+    (isMeasure ? measure : identity)[key] = value;
+  }
+  return { identity, measure };
+}
 
 /** A UUID, and nothing that could reach SQL as anything else. */
 const UUID_RE =
@@ -244,19 +324,41 @@ export class StockBalancePivotService {
     // product or a category, not an item, so `color` or `size` have no value to
     // compare against. Filtering one answers 400 rather than being dropped
     // silently, which would leave the grid looking filtered while it is not.
-    const branch = itemGroupBy === 'item'
-      ? pivotBranchSpecs(query.columnFilters, 4)
-      : { specs: {}, params: [] as string[] };
+    if (itemGroupBy !== 'item') {
+      // At the aggregate grains the filters split in two: identity columns are
+      // properties of a row and go in the WHERE, measures are sums over the whole
+      // group and go in a HAVING (ADR-07). Partitioning first is what lets each
+      // half be compiled against the spec table that can actually express it.
+      const split = partitionPivotFilters(query.columnFilters);
+      const identity = buildReportColumnFilter(
+        split.identity,
+        pivotAggregateSpecs(itemGroupBy),
+        4,
+      );
+      const measureStart = 4 + identity.params.length;
+      const measureBranch = pivotAggregateMeasureSpecs(split.measure, measureStart);
+      const measure = buildReportColumnFilter(
+        split.measure,
+        measureBranch.specs,
+        measureStart + measureBranch.params.length,
+      );
+      return this.aggregateByAgg(
+        query.organizationId, branchIds, categoryIds, search, page, pageSize, offset,
+        itemGroupBy,
+        { where: identity.where, params: identity.params },
+        { where: measure.where, params: [...measureBranch.params, ...measure.params] },
+      );
+    }
+
+    const branch = pivotBranchSpecs(query.columnFilters, 4);
 
     const columnFilter = buildReportColumnFilter(
       query.columnFilters,
-      itemGroupBy === 'item'
-        ? {
-            ...PIVOT_COLUMN_SPECS,
-            total: { sql: PIVOT_TOTAL_SQL, kind: 'number' },
-            ...branch.specs,
-          }
-        : {},
+      {
+        ...PIVOT_COLUMN_SPECS,
+        total: { sql: PIVOT_TOTAL_SQL, kind: 'number' },
+        ...branch.specs,
+      },
       4 + branch.params.length,
     );
     // The branch ids sit between the scope parameters and the filter values, so
@@ -266,14 +368,8 @@ export class StockBalancePivotService {
       params: [...branch.params, ...columnFilter.params],
     };
 
-    if (itemGroupBy === 'item') {
-      return this.aggregateByItem(
-        query.organizationId, branchIds, categoryIds, search, page, pageSize, offset,
-        filterFragment,
-      );
-    }
-    return this.aggregateByAgg(
-      query.organizationId, branchIds, categoryIds, search, page, pageSize, offset, itemGroupBy,
+    return this.aggregateByItem(
+      query.organizationId, branchIds, categoryIds, search, page, pageSize, offset,
       filterFragment,
     );
   }
@@ -390,6 +486,7 @@ export class StockBalancePivotService {
     offset: number,
     itemGroupBy: 'parent' | 'group',
     columnFilter: ReportFilterFragment,
+    measureFilter: ReportFilterFragment = { where: '', params: [] },
   ): Promise<StockBalancePivotResult> {
     const isParent = itemGroupBy === 'parent';
 
@@ -406,47 +503,81 @@ export class StockBalancePivotService {
       ? `LEFT JOIN inventory_item_categories ic ON ic.id = i.category_id`
       : `LEFT JOIN inventory_item_categories ic ON ic.id = i.category_id`;
 
-    // Step 1: paginate distinct agg_keys
-    const pageParams = [orgId, branchIds, categoryIds, search];
+    // Step 1: the surviving groups, defined once and reused three times.
+    //
+    // Page, count and footer all read the SAME `groups` CTE. That is what keeps
+    // the footer from describing a different set than the grid above it — the
+    // invariant that mattered once measures became filterable here, because a
+    // HAVING can drop a group that a row-level WHERE would have kept.
+    const filterWhere = columnFilter.where ? `AND ${columnFilter.where}` : '';
+    const havingWhere = measureFilter.where ? `HAVING ${measureFilter.where}` : '';
+    const baseParams = [
+      orgId, branchIds, categoryIds, search,
+      ...columnFilter.params, ...measureFilter.params,
+    ];
+    // LIMIT/OFFSET sit behind every bound filter value, so the placeholders are
+    // computed rather than hard-coded — a filtered page would otherwise read the
+    // wrong parameters.
+    const limitIndex = baseParams.length + 1;
+    const groupsCte = `
+      groups AS (
+        SELECT
+          ${aggKeyExpr} AS agg_key,
+          MIN(${isParent ? `COALESCE(pr.code, i.code)` : `COALESCE(ic.name, 'Không phân nhóm')`}) AS display_sku
+        FROM items i
+        ${joinProduct}
+        ${joinCategory}
+        WHERE i.organization_id = $1
+          AND EXISTS (
+            SELECT 1 FROM stock_balances sb
+            WHERE sb.organization_id = $1 AND sb.item_id = i.id
+              AND ($2::text[] IS NULL OR sb.branch_id = ANY($2::text[]))
+          )
+          AND ($3::uuid[] IS NULL OR i.category_id = ANY($3))
+          AND ($4::text IS NULL OR i.code ILIKE '%' || $4 || '%' OR i.name ILIKE '%' || $4 || '%')
+          ${filterWhere}
+        GROUP BY ${aggKeyExpr}
+        ${havingWhere}
+      )
+    `;
     const aggPageSql = `
-      SELECT DISTINCT
-        ${aggKeyExpr} AS agg_key,
-        ${isParent ? `COALESCE(pr.code, i.code)` : `COALESCE(ic.name, 'Không phân nhóm')`} AS display_sku
-      FROM items i
-      ${joinProduct}
-      ${joinCategory}
-      WHERE i.organization_id = $1
-        AND EXISTS (
-          SELECT 1 FROM stock_balances sb
-          WHERE sb.organization_id = $1 AND sb.item_id = i.id
-            AND ($2::text[] IS NULL OR sb.branch_id = ANY($2::text[]))
-        )
-        AND ($3::uuid[] IS NULL OR i.category_id = ANY($3))
-        AND ($4::text IS NULL OR i.code ILIKE '%' || $4 || '%' OR i.name ILIKE '%' || $4 || '%')
+      WITH ${groupsCte}
+      SELECT agg_key, display_sku
+      FROM groups
       ORDER BY display_sku ASC NULLS LAST
-      LIMIT $5 OFFSET $6
+      LIMIT $${limitIndex} OFFSET $${limitIndex + 1}
     `;
     const aggCountSql = `
-      SELECT COUNT(DISTINCT ${aggKeyExpr})::int AS total
-      FROM items i
+      WITH ${groupsCte}
+      SELECT COUNT(*)::int AS total FROM groups
+    `;
+    // The footer sums only the items behind a surviving group. `loadBranchTotals`
+    // cannot express that — it groups by branch, not by agg_key — so the aggregate
+    // grain gets its own totals query built on the same CTE.
+    const aggTotalsSql = `
+      WITH ${groupsCte}
+      SELECT sb.branch_id AS branch_id, COALESCE(SUM(sb.quantity), 0)::numeric AS qty
+      FROM stock_balances sb
+      JOIN items i ON i.id = sb.item_id AND i.organization_id = $1
       ${joinProduct}
-      WHERE i.organization_id = $1
-        AND EXISTS (
-          SELECT 1 FROM stock_balances sb
-          WHERE sb.organization_id = $1 AND sb.item_id = i.id
-            AND ($2::text[] IS NULL OR sb.branch_id = ANY($2::text[]))
-        )
-        AND ($3::uuid[] IS NULL OR i.category_id = ANY($3))
-        AND ($4::text IS NULL OR i.code ILIKE '%' || $4 || '%' OR i.name ILIKE '%' || $4 || '%')
+      ${joinCategory}
+      WHERE sb.organization_id = $1
+        AND ($2::text[] IS NULL OR sb.branch_id = ANY($2::text[]))
+        AND ${aggKeyExpr} IN (SELECT agg_key FROM groups)
+      GROUP BY sb.branch_id
     `;
 
-    const [aggRows, countRows, totals] = await Promise.all([
-      this.dataSource.query(aggPageSql, [...pageParams, pageSize, offset]),
-      this.dataSource.query(aggCountSql, pageParams),
-      // Cùng tập stock_balances bên dưới, nên tổng ở chế độ gộp phải bằng đúng
-      // tổng ở chế độ theo mã hàng — một bất biến đáng khẳng định bằng test.
-      this.loadBranchTotals(orgId, branchIds, categoryIds, search, columnFilter),
+    const [aggRows, countRows, totalRows] = await Promise.all([
+      this.dataSource.query(aggPageSql, [...baseParams, pageSize, offset]),
+      this.dataSource.query(aggCountSql, baseParams),
+      this.dataSource.query(aggTotalsSql, baseParams),
     ]);
+    const totals: ReportTotals = { total: 0 };
+    for (const row of totalRows as Array<{ branch_id: string | null; qty: string }>) {
+      const qty = Number(row.qty ?? 0);
+      totals.total = Number(totals.total) + qty;
+      if (row.branch_id) totals[`perBranch.${row.branch_id}`] = qty;
+    }
 
     const total = Number(countRows[0]?.total ?? 0);
     const aggKeys = (aggRows as Array<{ agg_key: string }>)
