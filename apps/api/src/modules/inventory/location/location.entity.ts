@@ -1,4 +1,4 @@
-import { Entity, Column, Unique, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, Index, Unique, ManyToOne, JoinColumn } from 'typeorm';
 import { LocationType } from '@erp/shared-interfaces';
 import { BaseEntity } from '../../../database/entities/base.entity';
 import { StorageEntity } from './storage.entity';
@@ -6,6 +6,9 @@ import { StorageEntity } from './storage.entity';
 /** Specific slot within a storage (shelf, rack, bin, zone). Finest granularity for stock tracking. */
 @Entity('locations')
 @Unique(['storageId', 'code'])
+// Every tenant-scoped read filters on these two, but all existing indexes were
+// on storage_id, so those reads scanned the table.
+@Index('IDX_locations_org_branch', ['organizationId', 'branchId'])
 export class LocationEntity extends BaseEntity {
   @Column({ comment: 'Short identifier for the location (e.g. A-01-03)' })
   code: string;

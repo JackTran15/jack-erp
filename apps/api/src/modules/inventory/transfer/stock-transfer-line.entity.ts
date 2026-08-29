@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, JoinColumn, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, Index, ManyToOne, JoinColumn, PrimaryGeneratedColumn } from 'typeorm';
 import { StockTransferEntity } from './stock-transfer.entity';
 import { ItemEntity } from '../location/item.entity';
 import { LocationEntity } from '../location/location.entity';
@@ -6,6 +6,9 @@ import { StorageEntity } from '../location/storage.entity';
 
 /** Single item line within a stock transfer document. */
 @Entity('stock_transfer_lines')
+// Lines are almost always fetched by their parent document; without this the
+// lookup was a full table scan (see AddStockTransferLineAndLocationScopeIndexes).
+@Index('IDX_stock_transfer_lines_transfer', ['transferId'])
 export class StockTransferLineEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
