@@ -242,6 +242,17 @@ Then form hiển thị thông báo lỗi bằng tiếng Việt nêu đúng nguy�
 And phiếu giữ nguyên dữ liệu cũ, sổ kho và sổ quỹ không thay đổi
 ```
 
+**AC-22** — Đổi phiếu chọn khi dialog Sửa còn mở không làm lẫn dữ liệu
+```gherkin
+Given tôi đã bấm Sửa để mở phiếu A trên màn hình Nhập kho (dialog đang mở, chưa Lưu)
+When tôi chọn phiếu B trên lưới rồi bấm Sửa/Xem/Nhân bản lần nữa trong lúc dialog phiếu A còn mở
+Then hệ thống không đổi phiếu đang sửa của dialog đang mở sang B
+And nếu dialog phiếu A có đổi/mất dữ liệu để mở B, form hiển thị đúng và chỉ đúng dữ liệu của
+    phiếu đang được sửa tại mọi thời điểm — không có trường hợp nào PATCH đi kèm id của một
+    phiếu còn nội dung của phiếu khác
+And nút Sửa cũng hoạt động tương tự trên màn hình Xuất kho
+```
+
 ## Non-functional
 
 | Kind | Requirement | Verified by |

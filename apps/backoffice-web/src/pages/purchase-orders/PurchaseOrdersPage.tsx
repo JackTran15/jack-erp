@@ -478,9 +478,13 @@ export function PurchaseOrdersPage({
       id: "duplicate",
       label: "Nhân bản",
       icon: Copy,
-      disabled: !selectedOrder,
+      // Also blocked while a document dialog is already open: the dialog only
+      // re-seeds its form state on mount, so swapping `editingOrder` under an
+      // already-mounted instance would save the old form's data against the
+      // newly-picked record's id. See T-06-05.
+      disabled: !selectedOrder || !!dialogMode,
       onClick: () => {
-        if (!selectedOrder) return;
+        if (!selectedOrder || dialogMode) return;
         setEditingOrder(selectedOrder);
         setDialogMode("create");
       },
@@ -489,9 +493,9 @@ export function PurchaseOrdersPage({
       id: "view",
       label: "Xem",
       icon: Eye,
-      disabled: !selectedOrder,
+      disabled: !selectedOrder || !!dialogMode,
       onClick: () => {
-        if (!selectedOrder) return;
+        if (!selectedOrder || dialogMode) return;
         setEditingOrder(selectedOrder);
         setDialogMode("view");
       },
@@ -506,9 +510,10 @@ export function PurchaseOrdersPage({
       disabled:
         !selectedOrder ||
         selectedOrder.status === "CANCELLED" ||
-        selectedOrder.status === "REVERSED",
+        selectedOrder.status === "REVERSED" ||
+        !!dialogMode,
       onClick: () => {
-        if (!selectedOrder) return;
+        if (!selectedOrder || dialogMode) return;
         setEditingOrder(selectedOrder);
         setDialogMode("edit");
       },
@@ -856,6 +861,11 @@ export function PurchaseOrdersPage({
 
       {dialogMode && (
         <PurchaseOrderFormDialog
+          // Force a remount whenever the target record changes. The dialog
+          // seeds its form state from `initial` only on mount (see T-06-05);
+          // without this, a stale `initial` prop swap on an already-mounted
+          // instance would save one record's edited data under another's id.
+          key={editingOrder?.id ?? "new"}
           mode={dialogMode}
           initial={editingOrder}
           providers={providers}
