@@ -62,8 +62,23 @@ phiếu hiện hành.
 
 ## Not verified here
 
-None of the 21 acceptance criteria are skipped — every one has a step above. Two steps are
-deliberately narrower than their AC's full Given/When/Then, documented in `## Notes`:
+None of the original 21 acceptance criteria are skipped — every one has a step above. Two steps
+are deliberately narrower than their AC's full Given/When/Then, documented in `## Notes`:
+
+- **AC-22** (added 2026-08-30, regression T-06-05: "sửa nhầm phiếu") is not captured as a scripted
+  step here. Its precondition is an interaction with the background page toolbar *while an
+  `AppModal` document dialog is already open on top of it* (`modal={false}`, floating window,
+  `fixed inset-0` overlay) — whether a given screen coordinate reaches the covered toolbar button
+  or the dialog's own content depends on where the button falls relative to the dialog's current
+  bounding box, which is exactly the kind of paint-order/timing sensitivity the 4-verb
+  click/fill/wait/scroll grammar has no primitive for (no "assert disabled", and `click` on an
+  actually-disabled button times out on Playwright's actionability check rather than failing the
+  step's assertion cleanly). Manual click-through against this same `erp_dev` data confirmed the
+  fix instead: on Nhập kho, opening Sửa on `IMP000020`, selecting `IMP000015` in the background
+  list, then clicking the (now-disabled) background Sửa/Xem/Nhân bản left `IMP000020`'s dialog
+  unchanged; closing it and editing `IMP000015` for real produced a PATCH that changed only
+  `IMP000015` (`goods_receipts.revision` 0→1, `IMP000020` untouched) — same result on Xuất kho
+  with `XK000004`/`XK000003`. See T-06-05's Done-when for the full transcript.
 
 - **AC-05** and **AC-11** exercise the *outcome* a UI session can trigger sequentially (an edit
   correctly lands on top of the previous one; a second delete attempt on an already-cancelled

@@ -436,9 +436,13 @@ export function GoodsIssuePage() {
       id: "duplicate",
       label: "Nhân bản",
       icon: Copy,
-      disabled: !selectedIssue,
+      // Also blocked while a document dialog is already open: the dialog only
+      // re-seeds its form state on mount, so swapping `editingIssue` under an
+      // already-mounted instance would save the old form's data against the
+      // newly-picked record's id. See T-06-05.
+      disabled: !selectedIssue || !!dialogMode,
       onClick: () => {
-        if (!selectedIssue) return;
+        if (!selectedIssue || dialogMode) return;
         setEditingIssue(selectedIssue);
         setDialogMode("create");
       },
@@ -447,9 +451,9 @@ export function GoodsIssuePage() {
       id: "view",
       label: "Xem",
       icon: Eye,
-      disabled: !selectedIssue,
+      disabled: !selectedIssue || !!dialogMode,
       onClick: () => {
-        if (!selectedIssue) return;
+        if (!selectedIssue || dialogMode) return;
         setEditingIssue(selectedIssue);
         setDialogMode("view");
       },
@@ -469,9 +473,10 @@ export function GoodsIssuePage() {
       disabled:
         !selectedIssue ||
         selectedIssue.status === "CANCELLED" ||
-        receivedByDestination,
+        receivedByDestination ||
+        !!dialogMode,
       onClick: () => {
-        if (!selectedIssue) return;
+        if (!selectedIssue || dialogMode) return;
         setEditingIssue(selectedIssue);
         setDialogMode("edit");
       },
@@ -803,6 +808,11 @@ export function GoodsIssuePage() {
 
       {dialogMode && (
         <GoodsIssueFormDialog
+          // Force a remount whenever the target record changes. The dialog
+          // seeds its form state from `initial` only on mount (see T-06-05);
+          // without this, a stale `initial` prop swap on an already-mounted
+          // instance would save one record's edited data under another's id.
+          key={editingIssue?.id ?? "new"}
           mode={dialogMode}
           initial={editingIssue}
           customers={customers}
