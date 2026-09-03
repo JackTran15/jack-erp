@@ -1,5 +1,10 @@
 # Inventory Reports — Hướng dẫn tạo dữ liệu & kiểm thử
 
+> **Cập nhật 09/2026 (PQ-02).** Trang legacy `/reports/storage/*` và 8 endpoint
+> `GET /reports/inventory/*` đã bị xoá. Các mục "Route" bên dưới đã đổi sang đường v2
+> `/reports/inventory#<report_type>`; phần mô tả request/response của bản GET chỉ còn
+> giá trị lịch sử — surface thật là `POST /reports/inventory/search`.
+
 Tài liệu này mô tả **luồng nghiệp vụ ERP** cần thực hiện để 7 báo cáo kho có dữ liệu, và các **test case cụ thể** để xác minh từng báo cáo hiển thị đúng.
 
 > Đọc trước: `docs/22-inventory-reports-views.md` (kiến trúc báo cáo).  
@@ -235,7 +240,7 @@ Mỗi test case ghi rõ: điều kiện trước, bộ filter cần set, và k�
 
 ### Báo cáo 1 — Tổng hợp nhập xuất tồn kho
 
-Route: `/reports/storage/stock-summary`
+Route: `/reports/inventory#inventory_in_out_stock_summary`
 
 **TC-01: Tồn đầu kỳ = 0, nhập kỳ → tồn cuối đúng**
 
@@ -368,7 +373,7 @@ Nếu Thời trang hiện 4 rows thay vì 1 → group-by chưa đúng.
 
 ### Báo cáo 2 — Bảng kê chi tiết phiếu nhập xuất
 
-Route: `/reports/storage/stock-document-details`
+Route: `/reports/inventory#warehouse_voucher_detail_list`
 
 **TC-05: Mỗi phiếu POSTED hiện đúng loại chứng từ**
 
@@ -410,7 +415,7 @@ Kỳ vọng: chỉ hiển thị các rows có `item_code = SKU-002` từ cả HN
 
 ### Báo cáo 3 — Chi tiết số lượng nhập xuất tồn
 
-Route: `/reports/storage/stock-quantity-details`
+Route: `/reports/inventory#inventory_in_out_stock_quantity_detail`
 
 **TC-08: Breakdown theo location khớp tổng Report 1**
 
@@ -442,7 +447,7 @@ Kỳ vọng: SKU-001 có **2 dòng** (vị trí A01 và B01), không gộp chung
 
 ### Báo cáo 4 — Tổng hợp NXT theo cửa hàng
 
-Route: `/reports/storage/stock-summary-by-branch`
+Route: `/reports/inventory#store_inventory_in_out_stock_summary`
 
 **TC-10: Mỗi branch có dòng tổng hợp riêng**
 
@@ -482,7 +487,7 @@ Tổng điều chuyển ra HN-01 = tổng điều chuyển vào HCM-01 (phản c
 
 ### Báo cáo 5 — Số lượng tồn theo cửa hàng (Pivot)
 
-Route: `/reports/storage/stock-by-branch`
+Route: `/reports/inventory#stock_quantity_by_store`
 
 > Báo cáo này **không có period** — hiển thị tồn kho hiện tại từ `stock_balances`.
 
@@ -528,7 +533,7 @@ Kỳ vọng: chỉ hiện 1 cột HCM-01. SKU-003 (chỉ có tại HN-01) không
 
 ### Báo cáo 6 — Tổng hợp NX điều chuyển
 
-Route: `/reports/storage/transfer-summary`
+Route: `/reports/inventory#transfer_in_out_summary`
 
 **TC-15: Mỗi cặp (nguồn → đích) có 1 dòng tóm tắt**
 
@@ -567,7 +572,7 @@ Kỳ vọng: mọi row trong Report 6 đều có `qtyDifference = 0`. Nếu khá
 
 ### Báo cáo 7 — Hàng hoá điều chuyển theo cửa hàng
 
-Route: `/reports/storage/transfer-by-branch`
+Route: `/reports/inventory#transferred_goods_summary_by_store`
 
 **TC-17: Filter sourceBranchId = HN-01 chỉ hiện điều chuyển từ HN**
 
@@ -614,7 +619,7 @@ Kỳ vọng: mỗi (item, dest_branch) là 1 row riêng. TRF-001 tạo 2 rows (S
 
 ### Báo cáo 8 — Xuất kho trưng bày tạm thời
 
-Route: `/reports/storage/temporary-issues`
+Route: `/reports/inventory#temporary_warehouse_out_goods`
 
 > ⚠️ **Chưa có dữ liệu thật.** Trang hiện dùng mock data hardcoded — backend chưa implement endpoint thật. Bỏ qua khi test cho đến khi có dữ liệu từ BE.
 

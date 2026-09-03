@@ -1,0 +1,34 @@
+{"action": "passed", "at": "2026-09-03T13:14:02", "by": "Loc Tran", "evidence": "architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete", "gate": "G0", "id": "50381b470369", "ts": "2026-09-03T13:14:02.000000"}
+{"action": "passed", "at": "2026-09-03T13:15:04", "by": "Loc Tran", "evidence": "6 assumptions, none blocking-and-pending; 8 acceptance criteria defined", "gate": "G1", "id": "53b3d8a2de35", "ts": "2026-09-03T13:15:04.000001"}
+{"action": "passed", "at": "2026-09-03T13:16:26", "by": "Loc Tran", "evidence": "3 ADR(s) recorded", "gate": "G2", "id": "b389911f649b", "ts": "2026-09-03T13:16:26.000002"}
+{"action": "passed", "at": "2026-09-03T13:19:54", "by": "Loc Tran", "evidence": "graph valid - 2 UoW, 7 tickets, no cycles", "gate": "G3", "id": "c64bc5b7d7d7", "ts": "2026-09-03T13:19:54.000003"}
+{"action": "ticket in_progress", "at": "2026-09-03T13:20:02", "by": "Claude", "gate": "G4", "id": "423985ec6629", "ticket": "T-01-01", "ts": "2026-09-03T13:20:02.000004"}
+{"action": "ticket review", "at": "2026-09-03T13:20:51", "by": "Claude", "gate": "G4", "id": "7a684dac3dc3", "ticket": "T-01-01", "ts": "2026-09-03T13:20:51.000005"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-03T13:21:04", "by": "Claude", "gate": "G4", "id": "568a146d4210", "ticket": "T-01-01", "ts": "2026-09-03T13:21:04.000006"}
+{"action": "ticket in_progress", "at": "2026-09-03T13:21:12", "by": "Claude", "gate": "G4", "id": "81ea3fa18211", "ticket": "T-01-02", "ts": "2026-09-03T13:21:12.000007"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-03T13:23:09", "by": "Claude", "gate": "G4", "id": "6b697d3b0d30", "ticket": "T-01-02", "ts": "2026-09-03T13:23:09.000008"}
+{"action": "ticket in_progress", "at": "2026-09-03T13:23:09", "by": "Claude", "gate": "G4", "id": "d86ee8a0f62e", "ticket": "T-01-03", "ts": "2026-09-03T13:23:09.000009"}
+{"action": "ticket in_progress", "at": "2026-09-03T13:24:14", "by": "Claude", "gate": "G4", "id": "513feb0a6076", "ticket": "T-02-01", "ts": "2026-09-03T13:24:14.000010"}
+{"action": "ticket in_progress", "at": "2026-09-03T13:24:46", "by": "Claude", "gate": "G4", "id": "5e2cb5714d94", "ticket": "T-01-03", "ts": "2026-09-03T13:24:46.000011"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-03T13:24:47", "by": "Claude", "gate": "G4", "id": "e0ea1fdc5f58", "ticket": "T-01-03", "ts": "2026-09-03T13:24:47.000012"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-03T13:25:25", "by": "Claude", "gate": "G4", "id": "c93b131eca29", "ticket": "T-02-01", "ts": "2026-09-03T13:25:25.000013"}
+{"action": "ticket in_progress", "at": "2026-09-03T13:25:25", "by": "Claude", "gate": "G4", "id": "1f81971b4046", "ticket": "T-02-02", "ts": "2026-09-03T13:25:25.000014"}
+{"action": "ticket in_progress", "at": "2026-09-03T13:27:42", "by": "Claude", "gate": "G4", "id": "3263eb0293c7", "ticket": "T-02-03", "ts": "2026-09-03T13:27:42.000015"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-03T13:43:58", "by": "Claude", "gate": "G4", "id": "1116496ce5f4", "ticket": "T-02-02", "ts": "2026-09-03T13:43:58.000016"}
+{"action": "ticket in_progress", "at": "2026-09-03T13:43:58", "by": "Claude", "gate": "G4", "id": "4bb5b8ea4ddf", "ticket": "T-02-04", "ts": "2026-09-03T13:43:58.000017"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-03T13:46:57", "by": "Claude", "gate": "G4", "id": "40e5f01e4f2f", "ticket": "T-02-04", "ts": "2026-09-03T13:46:57.000018"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-03T14:35:44", "by": "Claude", "gate": "G4", "id": "5026cb1d5e05", "ticket": "T-02-03", "ts": "2026-09-03T14:35:44.000019"}
+{"action": "passed", "at": "2026-09-03T14:35:50", "by": "Loc Tran", "evidence": "all 7 tickets done, all UoW checklists ticked", "gate": "G4", "id": "0936226b22b3", "ts": "2026-09-03T14:35:50.000020"}
+{"action": "passed", "at": "2026-09-03T14:36:20", "by": "Loc Tran", "evidence": "assumptions resolved, ADRs settled, graph valid", "gate": "G5", "id": "5334eaf5641a", "ts": "2026-09-03T14:36:20.000021"}
+{"action": "reopened", "at": "2026-09-03T16:15:45", "by": "Loc Tran", "gate": "G1", "id": "df10fe94400a", "reason": "Chủ dự án chốt - riêng báo cáo Số lượng tồn kho theo cửa hàng được xem TOÀN BỘ chi nhánh của tổ chức. AC-01..05 đảo chiều; ADR-02 bị thay thế.", "ts": "2026-09-03T16:15:45.945786"}
+{"action": "passed", "at": "2026-09-03T16:17:40", "by": "Loc Tran", "evidence": "6 assumptions, none blocking-and-pending; 9 acceptance criteria defined", "gate": "G1", "id": "047a6c59d596", "ts": "2026-09-03T16:17:40.795209"}
+{"action": "passed", "at": "2026-09-03T16:18:07", "by": "Loc Tran", "evidence": "4 ADR(s) recorded", "gate": "G2", "id": "3c980abb9285", "ts": "2026-09-03T16:18:07.674323"}
+{"action": "passed", "at": "2026-09-03T16:19:00", "by": "Loc Tran", "evidence": "graph valid - 2 UoW, 7 tickets, no cycles", "gate": "G3", "id": "d5576b8f5321", "ts": "2026-09-03T16:19:00.705034"}
+{"action": "ticket in_progress", "at": "2026-09-03T16:19:57", "by": "Claude", "gate": "G4", "id": "67d49c15bbc7", "ticket": "T-01-01", "ts": "2026-09-03T16:19:57.245197"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-03T16:20:35", "by": "Claude", "gate": "G4", "id": "155c947bcc0e", "ticket": "T-01-01", "ts": "2026-09-03T16:20:35.099664"}
+{"action": "ticket in_progress", "at": "2026-09-03T16:20:35", "by": "Claude", "gate": "G4", "id": "a1dc12bef09d", "ticket": "T-01-02", "ts": "2026-09-03T16:20:35.268869"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-03T16:21:23", "by": "Claude", "gate": "G4", "id": "0c7438e8f661", "ticket": "T-01-02", "ts": "2026-09-03T16:21:23.633759"}
+{"action": "ticket in_progress", "at": "2026-09-03T16:21:23", "by": "Claude", "gate": "G4", "id": "20ed4ff79a9f", "ticket": "T-01-03", "ts": "2026-09-03T16:21:23.720810"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-03T16:24:34", "by": "Claude", "gate": "G4", "id": "1a06c4eb7d4e", "ticket": "T-01-03", "ts": "2026-09-03T16:24:34.172049"}
+{"action": "passed", "at": "2026-09-03T16:31:25", "by": "Loc Tran", "evidence": "all 7 tickets done, all UoW checklists ticked", "gate": "G4", "id": "75215ffed2eb", "ts": "2026-09-03T16:31:25.306746"}
+{"action": "passed", "at": "2026-09-03T16:31:41", "by": "Loc Tran", "evidence": "assumptions resolved, ADRs settled, graph valid", "gate": "G5", "id": "de7c238650a7", "ts": "2026-09-03T16:31:41.699747"}

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import {
   branchQtyColumnKey,
   INVENTORY_REPORT_KEYS,
@@ -27,10 +27,7 @@ import {
 import { CountedRows } from '../../../reporting/report-core/report-definition';
 import { toEngineFilters } from '../report-column-mapper.util';
 import { projectRows, toTotalsRow } from '../report-data.util';
-import {
-  permittedBranchIds,
-  resolveInventoryBranchIds,
-} from '../report-scope.util';
+import { resolveOrgWideBranchIds } from '../report-scope.util';
 
 const { STRING, NUMBER } = ReportColumnDataType;
 
@@ -104,7 +101,7 @@ export class StockByStorePivotReport implements InventoryReportDefinition {
     this.assertKnownColumns(dto, branchIdSet);
 
     const filters = dto.filters;
-    const branchIds = await resolveInventoryBranchIds(
+    const branchIds = await resolveOrgWideBranchIds(
       this.branches,
       filters.store,
       actor,
@@ -156,7 +153,7 @@ export class StockByStorePivotReport implements InventoryReportDefinition {
     dto: InventoryReportSearchDto,
     actor: ActorContext,
   ): Promise<CountedRows> {
-    const branchIds = await resolveInventoryBranchIds(
+    const branchIds = await resolveOrgWideBranchIds(
       this.branches,
       dto.filters.store,
       actor,
@@ -229,11 +226,13 @@ export class StockByStorePivotReport implements InventoryReportDefinition {
   }
 
   /** Dynamic-column catalog: the branches the actor manages (name ASC). */
+  /**
+   * Every branch of the organization — not just the actor's assignments (ADR-04).
+   * `organizationId` is the only boundary this report enforces on the branch set.
+   */
   private async orgBranches(actor: ActorContext): Promise<BranchEntity[]> {
-    const permitted = permittedBranchIds(actor);
-    if (!permitted.size) return [];
     return this.branches.find({
-      where: { organizationId: actor.organizationId, id: In([...permitted]) },
+      where: { organizationId: actor.organizationId },
       order: { name: 'ASC' },
     });
   }

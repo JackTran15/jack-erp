@@ -61,8 +61,6 @@ import { EmployeesPage } from "./pages/employees/EmployeesPage";
 import { RoleManagementPage } from "./pages/role-management/RoleManagementPage";
 import { CustomerDetailPage } from "./pages/customers/CustomerDetailPage";
 import { CustomersPage } from "./pages/customers/CustomersPage";
-import { DynamicStoreView } from "./pages/dynamic-store-view";
-import { REPORT_TYPE_INVENTORY } from "./constants/reports/report-type.constant";
 import { InventoryReportPage } from "./pages/reports/InventoryReportPage";
 
 const queryClient = new QueryClient({
@@ -292,38 +290,6 @@ export function App() {
                 <Route
                   path="/promotions/vouchers"
                   element={<VouchersPage />}
-                />
-                <Route
-                  path="/reports/storage/stock-summary"
-                  element={<DynamicStoreView type={REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_SUMMARY} />} 
-                />
-                <Route
-                  path="/reports/storage/stock-document-details"
-                  element={<DynamicStoreView type={REPORT_TYPE_INVENTORY.WAREHOUSE_VOUCHER_DETAIL_LIST} />}
-                />
-                <Route
-                  path="/reports/storage/stock-quantity-details"
-                  element={<DynamicStoreView type={REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_QUANTITY_DETAIL} />}
-                />
-                <Route
-                  path="/reports/storage/stock-by-branch"
-                  element={<DynamicStoreView type={REPORT_TYPE_INVENTORY.STOCK_QUANTITY_BY_STORE} />}
-                />
-                <Route
-                  path="/reports/storage/stock-summary-by-branch"
-                  element={<DynamicStoreView type={REPORT_TYPE_INVENTORY.STORE_INVENTORY_IN_OUT_STOCK_SUMMARY} />}
-                />
-                <Route
-                  path="/reports/storage/transfer-summary"
-                  element={<DynamicStoreView type={REPORT_TYPE_INVENTORY.TRANSFER_IN_OUT_SUMMARY} />}
-                />
-                <Route
-                  path="/reports/storage/transfer-by-branch"
-                  element={<DynamicStoreView type={REPORT_TYPE_INVENTORY.TRANSFERRED_GOODS_SUMMARY_BY_STORE} />}
-                />
-                <Route
-                  path="/reports/storage/temporary-issues"
-                  element={<DynamicStoreView type={REPORT_TYPE_INVENTORY.TEMPORARY_WAREHOUSE_OUT_GOODS} />}
                 />
                 <Route
                   path="/settings/document-numbering"

@@ -16,6 +16,7 @@ export function permittedBranchIds(actor: ActorContext): Set<string> {
   return new Set(actor.branchIds ?? []);
 }
 
+
 /**
  * Resolve the branch scope of an inventory report search, always clamped to
  * the branches the actor manages (`actor.branchIds`):
@@ -53,6 +54,40 @@ export async function resolveInventoryBranchIds(
     throw new BadRequestException(
       `Unknown store ids: ${foreign.join(', ')}`,
     );
+  }
+  return ids;
+}
+
+/**
+ * Branch scope for the store-pivot report, which is organization-wide **by design**.
+ *
+ * Read this next to `resolveInventoryBranchIds` above: the two look alike and mean the
+ * opposite. That one clamps to the actor's assignments and turns an empty set into
+ * `NO_ACCESS_BRANCH_IDS` so a missing scope can never become an org-wide read. This one
+ * deliberately returns `undefined` — no branch predicate at all — because
+ * "Số lượng tồn kho theo cửa hàng" exists to compare stock across every store, and the
+ * project owner ruled on 2026-09-03 that every role able to open it sees the whole chain
+ * (ADR-04). `organizationId` remains the hard boundary; assignments are not one here.
+ *
+ * An explicit `storeIds` is therefore checked for tenancy only — belonging to the
+ * organization — and not for membership of `actor.branchIds`.
+ */
+export async function resolveOrgWideBranchIds(
+  branches: Repository<BranchEntity>,
+  store: ReportStoreScope | undefined,
+  actor: ActorContext,
+): Promise<string[] | undefined> {
+  if (!store || store.scope === 'all' || !store.storeIds?.length) return undefined;
+
+  const ids = [...new Set(store.storeIds)];
+  const owned = await branches.find({
+    where: { id: In(ids), organizationId: actor.organizationId },
+    select: { id: true },
+  });
+  if (owned.length !== ids.length) {
+    const ownedIds = new Set(owned.map((b) => b.id));
+    const foreign = ids.filter((id) => !ownedIds.has(id));
+    throw new BadRequestException(`Unknown store ids: ${foreign.join(', ')}`);
   }
   return ids;
 }

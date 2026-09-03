@@ -15,7 +15,7 @@ import {
 } from 'class-validator';
 import { DateRangeFilterDto } from '../../../common/filters/filter.dto';
 import { StoreScopeDto } from '../../reporting/invoice-report/dto/store-scope.dto';
-import { PERIOD_PRESETS, PeriodPresetLiteral } from './inventory-report-query.dto';
+import { PERIOD_PRESETS, PeriodPresetLiteral } from './period-preset';
 import { ITEM_GROUP_BY_VALUES, ItemGroupBy } from '../services/stock-period.service';
 
 /**
