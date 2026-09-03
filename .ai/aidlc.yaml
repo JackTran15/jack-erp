@@ -64,6 +64,24 @@ verify:
           identifier: '#login-email'
           password: '#login-password'
           submit: 'button[type="submit"]'
+    # Nhân viên kho trên backoffice. Đây là vai trò NHÂN VIÊN duy nhất giữ
+    # `inventory.reports.read` (org-role-permissions.ts:210), tức là vai trò nhân viên duy nhất
+    # mở được báo cáo kho — nên nó là mặt còn lại của khiếu nại PQ-02 ("Quản lý chi nhánh và NV").
+    # Cùng URL, cùng selector, cùng 2 chi nhánh với local-backoffice-bm: kịch bản giống hệt, chỉ
+    # khác vai trò, nên chạy chung một 07-verification.md và phải cho cùng kết quả.
+    local-backoffice-wh:
+      url: http://localhost:3000
+      required: true
+      auth:
+        recipe: form
+        path: /login
+        landing: /
+        ready_when: { gone: 'text=Đang khôi phục phiên' }
+        selectors:
+          organization: '#login-org-id'
+          identifier: '#login-email'
+          password: '#login-password'
+          submit: 'button[type="submit"]'
     local-pos:
       url: http://localhost:3001
       required: true

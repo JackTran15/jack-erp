@@ -14,8 +14,6 @@ import { CreateInventoryReportTemplateHandler } from './commands/create-inventor
 import { DeleteInventoryReportTemplateHandler } from './commands/delete-inventory-report-template.handler';
 import { UpdateInventoryReportTemplateHandler } from './commands/update-inventory-report-template.handler';
 import { InventoryReportV2Controller } from './inventory-report-v2.controller';
-import { InventoryReportsController } from './inventory-reports.controller';
-import { InventoryReportsService } from './inventory-reports.service';
 import { GetInventoryReportTemplateHandler } from './queries/get-inventory-report-template.handler';
 import { ListInventoryReportTemplatesHandler } from './queries/list-inventory-report-templates.handler';
 import { GetInventoryFilterOptionsHandler } from './queries/get-inventory-filter-options.handler';
@@ -55,10 +53,11 @@ const REPORT_DEFINITIONS = [
 /**
  * Inventory reports module.
  *
- * Legacy surface: `InventoryReportsController` + facade service (kept as-is,
- * still serving `pages/reports/storage/*`). New surface: the registry-driven
- * v2 contract (`InventoryReportV2Controller` + CQRS handlers), mirroring the
- * invoice report architecture.
+ * One surface only: the registry-driven v2 contract
+ * (`InventoryReportV2Controller` + CQRS handlers), mirroring the invoice report
+ * architecture. The legacy `GET /reports/inventory/*` facade was removed — it
+ * passed `branchIds` straight from the query string into the engine, which reads
+ * an empty list as "no branch predicate" (PQ-02).
  *
  * `RedisModule` is `@Global()` so `CacheService` is injectable without an
  * explicit import. `RbacModule` is `@Global()` so `PermissionGuard` is
@@ -80,9 +79,8 @@ const REPORT_DEFINITIONS = [
       ReportTemplateEntity,
     ]),
   ],
-  controllers: [InventoryReportsController, InventoryReportV2Controller],
+  controllers: [InventoryReportV2Controller],
   providers: [
-    InventoryReportsService,
     StockPeriodService,
     StockBalancePivotService,
     TransferReportService,
