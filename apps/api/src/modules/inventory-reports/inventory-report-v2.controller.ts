@@ -56,10 +56,11 @@ const REPORTS_READ = 'inventory.reports.read';
 
 /**
  * Registry-driven inventory report contract (columns / search /
- * filter-options), mirroring the invoice report surface. The legacy GET
- * report endpoints in `InventoryReportsController` stay untouched.
+ * filter-options), mirroring the invoice report surface. This is now the only
+ * inventory report surface — the legacy GET endpoints were removed.
  * Reads aggregate across branches via `filters.store`, so no
- * `@RequireBranchScope()` (no `X-Branch-Id` header required).
+ * `@RequireBranchScope()` (no `X-Branch-Id` header required); each report
+ * definition clamps to the actor via `report-scope.util.ts`.
  */
 @ApiTags('inventory-reports')
 @Controller('reports/inventory')
