@@ -64,6 +64,83 @@ verify:
           identifier: '#login-email'
           password: '#login-password'
           submit: 'button[type="submit"]'
+    # Nhân viên kho trên backoffice. Đây là vai trò NHÂN VIÊN duy nhất giữ
+    # `inventory.reports.read` (org-role-permissions.ts:210), tức là vai trò nhân viên duy nhất
+    # mở được báo cáo kho — nên nó là mặt còn lại của khiếu nại PQ-02 ("Quản lý chi nhánh và NV").
+    # Cùng URL, cùng selector, cùng 2 chi nhánh với local-backoffice-bm: kịch bản giống hệt, chỉ
+    # khác vai trò, nên chạy chung một 07-verification.md và phải cho cùng kết quả.
+    local-backoffice-wh:
+      url: http://localhost:3000
+      required: true
+      auth:
+        recipe: form
+        path: /login
+        landing: /
+        ready_when: { gone: 'text=Đang khôi phục phiên' }
+        selectors:
+          organization: '#login-org-id'
+          identifier: '#login-email'
+          password: '#login-password'
+          submit: 'button[type="submit"]'
+    # Staging dùng cho đợt rà soát đối chiếu Phụ lục 01 (docs/client/).
+    # `required: false` là cố ý: mọi feature cũ khai `environments: [local-*]` trong
+    # frontmatter của 07-verification.md, và `required` chỉ quyết định việc chặn G4 —
+    # đặt true ở đây sẽ bắt toàn bộ feature cũ phải xanh trên staging mới qua cổng.
+    # Không có post_login: chi nhánh trên staging khác local nên tên/ID chi nhánh của
+    # local không dùng lại được; bước chuyển chi nhánh (nếu cần) khai trong kịch bản.
+    staging-backoffice:
+      url: https://jack-erp-backoffice.ducanhzed.com
+      required: false
+      auth:
+        recipe: form
+        path: /login
+        landing: /
+        ready_when: { gone: 'text=Đang khôi phục phiên' }
+        selectors:
+          organization: '#login-org-id'
+          identifier: '#login-email'
+          password: '#login-password'
+          submit: 'button[type="submit"]'
+        # Tài khoản đáp xuống chi nhánh dùng lần trước; một chi nhánh lẻ không đủ để
+        # đọc báo cáo toàn hệ thống, nên chuyển sang "Chuỗi cửa hàng".
+        # SỬA 2026-09-03: comment cũ ghi "staging không có phiếu lẫn giao dịch nào" —
+        # KHÔNG còn đúng. Local đã được dump từ staging và có 458 goods_issues,
+        # 337 phiếu xuất điều chuyển POSTED, kỳ 09/07/2026–30/08/2026, trên org MT.
+        # Ảnh lưới rỗng của .ai/features/phu-luc-01-audit (01/09) đã lỗi thời.
+        # Trigger là `button.w-52` (BranchSelector.tsx:124) chứ không phải
+        # `button[aria-haspopup="menu"]` như bản local: trên staging selector đó khớp
+        # trước vào menu avatar, và bằng chứng thu được là menu đăng xuất.
+        # Chuyển chi nhánh POST /auth/switch-branch rồi window.location.reload(),
+        # nên phải chờ trigger hiện tên mới thì phiên lưu lại mới đúng.
+        post_login: 'click button.w-52; click [role="menuitemradio"]:has-text("Chuỗi cửa hàng"); wait button.w-52:has-text("Chuỗi cửa hàng")'
+    # Khác local: trên staging POS nằm ở HOST RIÊNG, không dùng chung origin với
+    # backoffice. Host suy ra từ `deriveSiblingOrigin("backoffice","pos")`
+    # (apps/backoffice-web/src/lib/pos-url.ts) — nhãn đầu của hostname đổi
+    # backoffice thành pos. `https://jack-erp-backoffice.../pos/` vẫn trả 200 nhưng
+    # đó là SPA backoffice rơi vào fallback, không phải POS: kiểm bằng <title> chứ
+    # đừng tin mã 200. Vẫn giữ base path `/pos/` nên đường dẫn phải mang tiền tố.
+    staging-pos:
+      url: https://jack-erp-pos.ducanhzed.com
+      required: false
+      auth:
+        recipe: form
+        path: /pos/dang-nhap
+        landing: /pos/
+        ready_when: { gone: 'text=Đang tải' }
+        selectors:
+          organization: '#pos-login-org-id'
+          identifier: '#pos-login-email'
+          password: '#pos-login-password'
+          submit: 'button[type="submit"]'
+        # PosRequireBranch giữ phiên mới ở /chon-chi-nhanh cho tới khi chọn xong chi nhánh.
+        # Bản local ghim theo ${LOCAL_POS_BRANCH_ID} vì fixture khuyến mãi chỉ nằm ở HCM;
+        # ở đây lấy radio đầu tiên — mục đích là chứng minh màn hình tồn tại, không so số liệu.
+        # SỬA 2026-09-03: "trên staging không có fixture nào" không còn chắc đúng sau khi
+        # org MT có dữ liệu thật; ai cần so số liệu trên POS phải ghim chi nhánh cụ thể.
+        # Bước `wait` cuối là bắt buộc, không phải cho đẹp: lựa chọn chi nhánh ghi vào
+        # localStorage, chụp phiên sớm thì branchId còn null và mọi bước sau rơi ngược
+        # về /chon-chi-nhanh. Chờ logo POS: menu nằm trong popover nên nhãn menu chưa hiện.
+        post_login: 'wait input[name="pos-branch"]; click input[name="pos-branch"]; click button:has-text("Tiếp tục"); wait [aria-label="Sapo POS"]'
     local-pos:
       url: http://localhost:3001
       required: true
