@@ -15,10 +15,30 @@ describe('GoodsReceiptService', () => {
     save: jest.fn(),
     findOne: jest.fn(),
     softDelete: jest.fn(),
-    manager: { findOne: jest.fn(), update: jest.fn() },
+    manager: {
+      findOne: jest.fn(),
+      update: jest.fn(),
+      // `buildPrintPayload` resolves branch + transfer counterpart through
+      // `manager.getRepository(...)`; the print tests below stub the results.
+      getRepository: jest.fn(() => ({
+        findOne: jest.fn().mockResolvedValue(null),
+        find: jest.fn().mockResolvedValue([]),
+      })),
+    },
+  };
+  // `getLines` asks for voucher-wide totals alongside the page, so the mock needs a
+  // chainable query builder. Default totals are 0; tests that assert on them override
+  // `getRawOne`.
+  const lineTotalsQb = {
+    select: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    getRawOne: jest.fn().mockResolvedValue({ qty: '0', amount: '0' }),
   };
   const lineRepo = {
     findAndCount: jest.fn(),
+    createQueryBuilder: jest.fn(() => lineTotalsQb),
   };
   // Manager handed to the `dataSource.transaction(...)` callback in `cancel()`
   // — row-lock query + status flip both happen through this, inside the tx.
@@ -1518,61 +1538,196 @@ describe('GoodsReceiptService', () => {
     });
   });
 
-  describe('getLines (T-01-02)', () => {
-    it('returns a paginated page of lines with hasMore=true when more remain', async () => {
-      receiptRepo.findOne.mockResolvedValue({ id: 'receipt-1' });
-      const items = [{ id: 'line-1' }, { id: 'line-2' }];
-      lineRepo.findAndCount.mockResolvedValue([items, 5]);
+  describe('line ordinals (T-04-03, ADR-05)', () => {
+    /** A DTO line; only the fields `makeLine` copies matter here. */
+    const ln = (itemId: string) => ({
+      itemId,
+      locationId: 'loc-A01',
+      uomCode: 'pcs',
+      quantity: 1,
+      unitPrice: 100,
+    });
 
-      const result = await service.getLines('receipt-1', actor, 1, 2);
+    /** `(lineNo, itemId)` pairs in the order the service handed them over. */
+    const ordinals = (lines: { lineNo: number; itemId: string }[]) =>
+      lines.map((l) => [l.lineNo, l.itemId]);
 
-      expect(receiptRepo.findOne).toHaveBeenCalledWith({
-        where: {
-          id: 'receipt-1',
-          organizationId: actor.organizationId,
-          branchId: actor.branchId,
+    beforeEach(() => {
+      receiptRepo.create.mockImplementation((input: unknown) => input);
+      receiptRepo.save.mockImplementation(async (r: unknown) => ({
+        ...(r as object),
+        id: 'receipt-new',
+      }));
+      documentNumberingService.generate.mockResolvedValue('PN0001');
+      // `create` re-reads the saved document through `findOrFail` before
+      // returning; without this the assertion below never runs.
+      receiptRepo.findOne.mockResolvedValue({
+        id: 'receipt-new',
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        status: GoodsReceiptStatus.DRAFT,
+        lines: [],
+      });
+    });
+
+    it('numbers a new receipt 1..n in the order the lines were submitted', async () => {
+      await service.create(
+        {
+          purpose: GoodsReceiptPurpose.OTHER,
+          receivedAt: '2026-06-10T00:00:00.000Z',
+          locationId: 'loc-A01',
+          lines: [ln('item-A'), ln('item-B'), ln('item-C')],
         },
-        loadEagerRelations: false,
-      });
-      expect(lineRepo.findAndCount).toHaveBeenCalledWith({
-        where: { goodsReceiptId: 'receipt-1', organizationId: actor.organizationId },
-        order: { createdAt: 'ASC' },
-        skip: 0,
-        take: 2,
-      });
-      expect(result).toEqual({
-        items,
-        page: 1,
-        pageSize: 2,
-        hasMore: true,
-        total: 5,
+        actor,
+      );
+
+      // The submitted array IS the order the user sees on the grid, so it is
+      // the definition of "the order it was typed".
+      expect(ordinals(receiptRepo.create.mock.calls.at(-1)![0].lines)).toEqual([
+        [1, 'item-A'],
+        [2, 'item-B'],
+        [3, 'item-C'],
+      ]);
+    });
+
+    /**
+     * A draft receipt whose lines the update path replaces wholesale. `update`
+     * deletes every line and re-inserts the set, so these tests assert on what
+     * `txManager.save` was handed.
+     */
+    function draftReceipt() {
+      return {
+        id: 'receipt-ord',
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        status: GoodsReceiptStatus.DRAFT,
+        purpose: GoodsReceiptPurpose.OTHER,
+        documentNumber: 'PN0010',
+        revision: 0,
+        receivedAt: new Date('2026-06-10T00:00:00.000Z'),
+        locationId: 'loc-A01',
+        attachmentIds: [],
+        lines: [ln('item-A'), ln('item-B'), ln('item-C')].map((l, i) => ({
+          ...l,
+          lineNo: i + 1,
+          quantity: '1.000',
+          unitPrice: '100.00',
+        })),
+      };
+    }
+
+    /** Lines the update path re-inserted, in insertion order. */
+    const savedLines = () => {
+      const call = txManager.save.mock.calls.find(
+        (c) => Array.isArray(c[1]) && c[1].length && 'lineNo' in c[1][0],
+      );
+      return call ? (call[1] as { lineNo: number; itemId: string }[]) : [];
+    };
+
+    it('renumbers the whole voucher when a line is inserted in the middle', async () => {
+      receiptRepo.findOne.mockResolvedValue(draftReceipt());
+      txManager.query.mockResolvedValue([
+        { status: GoodsReceiptStatus.DRAFT, revision: 0 },
+      ]);
+
+      await service.update(
+        'receipt-ord',
+        { lines: [ln('item-A'), ln('item-D'), ln('item-B'), ln('item-C')] },
+        actor,
+      );
+
+      // Keeping the old numbers for the old lines and appending would collide on
+      // uq_goods_receipt_lines_doc_line_no the moment someone inserts a line.
+      expect(ordinals(savedLines())).toEqual([
+        [1, 'item-A'],
+        [2, 'item-D'],
+        [3, 'item-B'],
+        [4, 'item-C'],
+      ]);
+    });
+
+    it('leaves no gap when a line is removed from the middle', async () => {
+      receiptRepo.findOne.mockResolvedValue(draftReceipt());
+      txManager.query.mockResolvedValue([
+        { status: GoodsReceiptStatus.DRAFT, revision: 0 },
+      ]);
+
+      await service.update(
+        'receipt-ord',
+        { lines: [ln('item-A'), ln('item-C')] },
+        actor,
+      );
+
+      expect(ordinals(savedLines())).toEqual([
+        [1, 'item-A'],
+        [2, 'item-C'],
+      ]);
+    });
+
+    it('gives every line an ordinal — the column is NOT NULL with no default', async () => {
+      receiptRepo.findOne.mockResolvedValue(draftReceipt());
+      txManager.query.mockResolvedValue([
+        { status: GoodsReceiptStatus.DRAFT, revision: 0 },
+      ]);
+
+      await service.update(
+        'receipt-ord',
+        { lines: [ln('item-A'), ln('item-B')] },
+        actor,
+      );
+
+      // A write path that forgets `lineNo` fails at the insert rather than
+      // silently landing a row, which is the whole point of having no default.
+      for (const line of savedLines()) {
+        expect(typeof line.lineNo).toBe('number');
+      }
+    });
+  });
+
+
+  // T-03-03 — print/export must never inherit the view dialog's pagination (AC-10).
+  //
+  // `getPrintPayload` goes through `getById`, which the view dialog now calls with
+  // `includeLines=false`. Threading that flag down here to "keep it consistent"
+  // would make a 200-line voucher print 50 lines, and the failure would only show
+  // up on paper someone already signed.
+  describe('print/export line completeness (AC-10)', () => {
+    const manyLines = Array.from({ length: 120 }, (_, i) => ({
+      id: `line-${i + 1}`,
+      itemId: `item-${i + 1}`,
+      locationId: 'loc-A01',
+      uomCode: 'cái',
+      quantity: '1',
+      unitPrice: '10.00',
+      lineTotal: '10.00',
+    }));
+
+    beforeEach(() => {
+      receiptRepo.findOne.mockResolvedValue({
+        id: 'receipt-1',
+        organizationId: 'org-1',
+        branchId: 'branch-A',
+        documentNumber: 'PN000001',
+        referenceType: null,
+        receivedAt: new Date('2026-08-31T03:00:00.000Z'),
+        createdAt: new Date('2026-08-31T03:00:00.000Z'),
+        lines: manyLines,
       });
     });
 
-    it('reports hasMore=false on the last page', async () => {
-      receiptRepo.findOne.mockResolvedValue({ id: 'receipt-1' });
-      lineRepo.findAndCount.mockResolvedValue([[{ id: 'line-5' }], 5]);
+    it('loads the document WITH its lines — no header-only shortcut', async () => {
+      await service.getPrintPayload('receipt-1', actor);
 
-      const result = await service.getLines('receipt-1', actor, 3, 2);
-
-      expect(result.hasMore).toBe(false);
-      expect(result.total).toBe(5);
+      const opts = receiptRepo.findOne.mock.calls[0][0];
+      expect(opts.loadEagerRelations).toBeUndefined();
+      expect(opts.relations).toBeUndefined();
     });
 
-    it('returns an empty page for a document with zero lines, not an error', async () => {
-      receiptRepo.findOne.mockResolvedValue({ id: 'receipt-1' });
-      lineRepo.findAndCount.mockResolvedValue([[], 0]);
+    it('carries every line into the payload, not one page of them', async () => {
+      const payload = await service.getPrintPayload('receipt-1', actor);
 
-      const result = await service.getLines('receipt-1', actor, 1, 20);
-
-      expect(result).toEqual({ items: [], page: 1, pageSize: 20, hasMore: false, total: 0 });
-    });
-
-    it('404s for a nonexistent or out-of-scope receipt, without touching lineRepo', async () => {
-      receiptRepo.findOne.mockResolvedValue(null);
-
-      await expect(service.getLines('missing', actor, 1, 20)).rejects.toThrow();
-      expect(lineRepo.findAndCount).not.toHaveBeenCalled();
+      expect(payload.lines).toHaveLength(120);
+      expect(payload.lines.length).toBeGreaterThan(50);
     });
   });
 });

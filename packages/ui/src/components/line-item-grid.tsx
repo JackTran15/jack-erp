@@ -38,6 +38,19 @@ export interface LineColumn<R> {
   /** Filter row symbol shown in the column-header filter cell (=, ≤, *, ...). */
   filterSymbol?: string;
   /**
+   * Set `false` to drop this column's header filter cell entirely — no symbol,
+   * no input, and the column takes no part in the uncontrolled filter pass.
+   *
+   * For columns the caller cannot actually filter on. A grid whose filters run
+   * server-side can only offer the fields the endpoint accepts, and leaving a
+   * typable box over a field the server ignores is worse than offering no box:
+   * the user types, nothing changes, and there is no way to tell that from
+   * "nothing matched".
+   *
+   * Defaults to `true`; every existing column keeps its filter.
+   */
+  filterable?: boolean;
+  /**
    * Turns the column header into a sort toggle. Requires the grid-level
    * `onSortChange` — sorting is controlled, the caller orders `rows` itself
    * (see that prop).
@@ -105,8 +118,16 @@ export interface LineItemGridProps<R> {
    * the column objects lets `columns` stay referentially stable and lets rows
    * bail out of re-rendering. Takes precedence over `LineColumn.footer`.
    *
-   * Totals are document-wide: they come from the caller's own lines, so they
-   * do not follow the header filters.
+   * The grid never computes these, so what they total is whatever the caller
+   * passes. That makes the two filter modes differ, and the difference is
+   * deliberate:
+   *
+   * - Uncontrolled — the grid narrows `rows` itself while the caller still
+   *   holds the whole document, so these stay document-wide and do not follow
+   *   the header filters.
+   * - Controlled — the caller owns the filter and usually re-fetches, so it
+   *   decides. A server-side grid normally passes totals over the matching set,
+   *   which is what the user is asking about once they have filtered.
    */
   footers?: Record<string, React.ReactNode>;
   /**
@@ -441,6 +462,11 @@ function LineItemGridInner<R>({
     const applicable = active.flatMap(([key, value]) => {
       const col = byKey.get(key);
       if (!col) return [];
+      // A column with no filter cell can still carry a stale entry in the map
+      // (the caller seeded `filters`, or the column flipped to unfilterable
+      // while text was in the box). Honouring it would narrow the grid by a
+      // control the user can no longer see or clear.
+      if (col.filterable === false) return [];
       // Columns whose key is synthetic (the value comes from a renderEditor,
       // not from the row) resolve `undefined` for every row — filtering on one
       // would empty the grid. Give them a `getValue` to make them filterable.
@@ -707,17 +733,23 @@ function LineItemGridInner<R>({
                 className="h-8 border-r bg-background p-0"
                 style={{ ...stickyHeaderStyle(filterRowTop), ...sizeStyle(col) }}
               >
-                <div className="flex h-8 min-w-0 items-stretch">
-                  <span className="inline-flex w-7 shrink-0 items-center justify-center border-r bg-muted/30 font-mono text-xs font-semibold text-muted-foreground">
-                    {filterSymbolFor(col as LineColumn<unknown>)}
-                  </span>
-                  <Input
-                    className="h-8 min-w-0 flex-1 rounded-none border-0 bg-background px-2 text-xs font-normal shadow-none focus-visible:ring-inset"
-                    value={activeFilters[col.key] ?? ""}
-                    onChange={(e) => handleFilter(col.key, e.target.value)}
-                    aria-label={`Lọc ${col.label}`}
-                  />
-                </div>
+                {col.filterable === false ? (
+                  // Empty, but still a full-height cell: the filter row has to
+                  // keep its column widths or every header below it shifts.
+                  <div className="h-8 min-w-0 bg-muted/20" />
+                ) : (
+                  <div className="flex h-8 min-w-0 items-stretch">
+                    <span className="inline-flex w-7 shrink-0 items-center justify-center border-r bg-muted/30 font-mono text-xs font-semibold text-muted-foreground">
+                      {filterSymbolFor(col as LineColumn<unknown>)}
+                    </span>
+                    <Input
+                      className="h-8 min-w-0 flex-1 rounded-none border-0 bg-background px-2 text-xs font-normal shadow-none focus-visible:ring-inset"
+                      value={activeFilters[col.key] ?? ""}
+                      onChange={(e) => handleFilter(col.key, e.target.value)}
+                      aria-label={`Lọc ${col.label}`}
+                    />
+                  </div>
+                )}
               </th>
             ))}
             {showRowActions ? (

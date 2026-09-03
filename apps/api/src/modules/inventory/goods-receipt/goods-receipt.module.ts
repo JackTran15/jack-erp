@@ -17,6 +17,7 @@ import { GoodsReceiptController } from './goods-receipt.controller';
 import { GoodsReceiptV2Controller } from './controllers/goods-receipt-v2.controller';
 import { GoodsReceiptCommandV2Controller } from './controllers/goods-receipt-command-v2.controller';
 import { SearchGoodsReceiptsV2Handler } from './queries/search-goods-receipts-v2.handler';
+import { SearchGoodsReceiptLinesV2Handler } from './queries/search-goods-receipt-lines-v2.handler';
 import { CreateGoodsReceiptV2Handler } from './commands/create-goods-receipt-v2.handler';
 import { PostGoodsReceiptV2Handler } from './commands/post-goods-receipt-v2.handler';
 import { GoodsReceiptVoucherLinkConsumer } from './consumers/goods-receipt-voucher-link.consumer';
@@ -46,6 +47,7 @@ import { GoodsReceiptVoucherLinkConsumer } from './consumers/goods-receipt-vouch
   providers: [
     GoodsReceiptService,
     SearchGoodsReceiptsV2Handler,
+    SearchGoodsReceiptLinesV2Handler,
     CreateGoodsReceiptV2Handler,
     PostGoodsReceiptV2Handler,
     GoodsReceiptVoucherLinkConsumer,

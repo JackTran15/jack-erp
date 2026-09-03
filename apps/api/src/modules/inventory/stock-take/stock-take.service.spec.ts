@@ -474,6 +474,67 @@ describe("StockTakeService", () => {
     });
   });
 
+  describe("process — generated receipt numbers its lines (T-04-03, ADR-05)", () => {
+    it("gives every generated receipt line a 1-based ordinal", async () => {
+      const lines = [
+        {
+          id: "l-1",
+          itemId: "item-1",
+          locationId: "loc-1",
+          expectedQty: "10",
+          countedQty: "12",
+        },
+        {
+          id: "l-3",
+          itemId: "item-3",
+          locationId: "loc-1",
+          expectedQty: "3",
+          countedQty: "8",
+        },
+      ] as unknown as StockTakeLineEntity[];
+
+      stRepo.findOne.mockResolvedValue({
+        id: "st-2",
+        organizationId: "org-1",
+        branchId: "branch-1",
+        status: StockTakeStatus.DRAFT,
+        documentNumber: "KK000002",
+        lines,
+      } as unknown as StockTakeEntity);
+
+      const managerSave = jest.fn((e) => Promise.resolve({ id: "fake-id", ...e }));
+      const fakeManager = {
+        save: managerSave,
+        create: jest.fn((_entity, dto) => ({ id: "fake-id", ...dto })),
+        find: jest.fn().mockResolvedValue([
+          { id: "item-1", unit: "Cái" },
+          { id: "item-3", unit: "Hộp" },
+        ]),
+        update: jest.fn(),
+      };
+      dataSource.transaction.mockImplementation(
+        async (cb: (m: typeof fakeManager) => unknown) => cb(fakeManager),
+      );
+
+      await service.process("st-2", actor);
+
+      // This path builds GoodsReceiptLineEntity by hand, so it is its own chance
+      // to forget the ordinal — and `line_no` is NOT NULL with no default, so a
+      // miss here surfaces as a failed stock take, not a display glitch.
+      const receiptLines = managerSave.mock.calls
+        .map((c) => c[0])
+        .find(
+          (arg) =>
+            Array.isArray(arg) &&
+            arg.length > 0 &&
+            "goodsReceiptId" in (arg[0] as object),
+        ) as { lineNo: number }[] | undefined;
+
+      expect(receiptLines).toBeDefined();
+      expect(receiptLines!.map((l) => l.lineNo)).toEqual([1, 2]);
+    });
+  });
+
   describe("process — generated issue keeps its snapshot cost (AC-11, A-13)", () => {
     /**
      * Making a goods issue's `unitPrice` the ledger cost basis (ADR-01) put every

@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
   DocumentFormDialog,
@@ -33,6 +33,9 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PaginationControls } from "../table/PaginationControls";
+import { buildLineSearchBody } from "./line-filter-search";
+import { erpApi, requireErpData } from "../../lib/erp-api";
 import { apiClient } from "../../lib/api-axios";
 import { hasPermission } from "../../lib/permissions";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
@@ -90,6 +93,7 @@ import {
 } from "../../components/shared/product-select/ProductSelectDialog";
 import { BarcodeScanRow } from "../shared/BarcodeScanRow";
 import { getActiveBranchId } from "./goods-receipt-shared";
+import type { GoodsReceiptLine } from "./goods-receipt-shared";
 import type {
   PurchaseOrder,
   PaginatedResponse,
@@ -143,6 +147,59 @@ const getPersistableFormLines = (nextLines: FormLine[]) =>
 
 const normalizeFormLines = (nextLines: FormLine[]) =>
   ensureTrailingBlankLine(nextLines, emptyLine);
+
+/**
+ * `POST /v2/goods-receipts/:id/lines/search`.
+ *
+ * Declared here rather than taken from `@erp/api-client`: the route carries no
+ * response DTO, so its generated schema is a bare `{ type: object }`.
+ *
+ * `total` and `totals` describe the MATCHING lines, not the whole voucher — with
+ * no filter that is the whole voucher, and with one it is what the user filtered
+ * to, which is the number they are asking for once they have filtered (ADR-08).
+ */
+interface GoodsReceiptLinesSearchResponse {
+  data: GoodsReceiptLine[];
+  page: number;
+  limit: number;
+  total: number;
+  totals: { totalQuantity: number; totalAmount: number };
+}
+
+/** Rows per page in the view dialog's line grid. Same as the issue dialog. */
+const VIEW_LINES_PAGE_SIZE = 50;
+
+/**
+ * Header-filter columns the server can filter on, mapped to their DTO field.
+ *
+ * Note `orderedQuantity` → `quantity`: the grid's key and the entity's column do
+ * not agree here, and sending the grid's name would trip `forbidNonWhitelisted`
+ * and come back as a 400 that looks exactly like a network error.
+ */
+const SERVER_FILTERABLE: Record<string, string> = {
+  itemLabel: "itemCode",
+  itemName: "itemName",
+  orderedQuantity: "quantity",
+  unitPrice: "unitPrice",
+  lineTotal: "lineTotal",
+};
+
+/**
+ * Columns whose header filter is switched off in view mode — everything the
+ * server cannot filter on. Longer than the issue dialog's list because this grid
+ * also carries the discount and tax columns (ADR-07).
+ */
+const VIEW_UNFILTERABLE = new Set([
+  "warehouse",
+  "position",
+  "unit",
+  "discountPercent",
+  "discountAmount",
+  "taxRate",
+  "taxAmount",
+  "payableAmount",
+  "notes",
+]);
 
 export function PurchaseOrderFormDialog({
   mode,
@@ -450,7 +507,9 @@ export function PurchaseOrderFormDialog({
   const [lines, setLines] = useState<FormLine[]>(() => {
     if (!initial) return [emptyLine()];
 
-    const initialLines = initial.lines.map((l) => ({
+    // Absent when the caller fetched the header alone (`includeLines=false`).
+    // That is view mode only, where the grid reads `viewLines` below instead.
+    const initialLines = (initial.lines ?? []).map((l) => ({
       lineId: nextLineId(),
       itemId: l.itemId,
       itemLabel: l.item?.code ?? l.itemId.slice(0, 8),
@@ -468,6 +527,103 @@ export function PurchaseOrderFormDialog({
 
     return isView ? initialLines : normalizeFormLines(initialLines);
   });
+
+  // ─── View mode: one page of lines at a time (UOW-03) ──────────────────────
+  //
+  // Mirrors GoodsIssueFormDialog. Create and edit keep the whole voucher in
+  // `lines` state because they must validate and submit every row at once
+  // (ADR-04), so the grid has two row sources picked by `mode`. Deliberate.
+  const [viewLinesPage, setViewLinesPage] = useState(1);
+  const [viewLinesPageSize, setViewLinesPageSize] = useState(VIEW_LINES_PAGE_SIZE);
+  // Header filters, controlled by this dialog rather than by the grid — same
+  // reasoning as the issue dialog: uncontrolled, the grid would filter the one
+  // page it holds and call that "search".
+  const [viewLineFilters, setViewLineFilters] = useState<Record<string, string>>({});
+  const [debouncedLineFilters, setDebouncedLineFilters] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedLineFilters(viewLineFilters), 300);
+    return () => clearTimeout(t);
+  }, [viewLineFilters]);
+
+  const handleViewLineFilterChange = useCallback(
+    (next: Record<string, string>) => {
+      setViewLineFilters(next);
+      setViewLinesPage(1);
+    },
+    [],
+  );
+
+  const viewLinesQuery = useQuery({
+    queryKey: [
+      "goods-receipt-lines",
+      initial?.id,
+      viewLinesPage,
+      viewLinesPageSize,
+      debouncedLineFilters,
+    ],
+    queryFn: async () =>
+      requireErpData(
+        await erpApi.POST<GoodsReceiptLinesSearchResponse>(
+          "/v2/goods-receipts/{id}/lines/search",
+          {
+            params: { path: { id: initial!.id } },
+            body: buildLineSearchBody(
+              debouncedLineFilters,
+              SERVER_FILTERABLE,
+              viewLinesPage,
+              viewLinesPageSize,
+            ),
+          },
+        ),
+      ),
+    enabled: isView && !!initial?.id,
+  });
+
+  const viewLines = useMemo<FormLine[]>(
+    () =>
+      (viewLinesQuery.data?.data ?? []).map((l) => ({
+        lineId: nextLineId(),
+        itemId: l.itemId,
+        itemLabel: l.item?.code ?? l.itemId.slice(0, 8),
+        itemName: l.item?.name ?? "",
+        unit: l.uomCode ?? "",
+        storageId: l.location?.storageId ?? "",
+        storageLabel:
+          storages.find((st) => st.id === l.location?.storageId)?.name ?? "",
+        locationId: l.locationId,
+        locationLabel: l.location?.code ?? l.locationId.slice(0, 8),
+        orderedQuantity: Number(l.quantity),
+        unitPrice: Number(l.unitPrice),
+        notes: l.note ?? "",
+      })),
+    [storages, viewLinesQuery.data],
+  );
+
+  /** Rows the grid renders: a single page in view mode, the whole draft otherwise. */
+  const gridRows = isView ? viewLines : lines;
+
+  /** True while a filter is narrowing the grid — the footer totals follow it. */
+  const viewLineFilterActive = useMemo(
+    () => Object.values(debouncedLineFilters).some((v) => v.trim() !== ""),
+    [debouncedLineFilters],
+  );
+
+  /**
+   * In view mode the header filters run on the server, which only accepts the
+   * five columns in SERVER_FILTERABLE — the rest lose their filter cell rather
+   * than offering a box that does nothing (ADR-07). In create/edit the grid
+   * filters the draft in memory, where every column works.
+   */
+  const applyViewFilterability = useCallback(
+    (cols: LineColumn<FormLine>[]) =>
+      isView
+        ? cols.map((col) =>
+            VIEW_UNFILTERABLE.has(col.key) ? { ...col, filterable: false } : col,
+          )
+        : cols,
+    [isView],
+  );
+
   const [barcodeMode, setBarcodeMode] = useState(false);
 
   const [saving, setSaving] = useState(false);
@@ -708,8 +864,12 @@ export function PurchaseOrderFormDialog({
           unitPrice: Number(l.item?.purchasePrice ?? 0),
           notes: l.note ?? "",
         }));
+      // The source issue is always fetched in full here (transfer import reads it
+      // to seed the receipt), so `lines` is present; the fallback only satisfies
+      // the type, which became optional when the view dialog started fetching
+      // header-only documents.
       const fromIssueLines = (issue: GoodsIssue): FormLine[] =>
-        issue.lines.map((l) => ({
+        (issue.lines ?? []).map((l) => ({
           lineId: nextLineId(),
           itemId: l.itemId,
           itemLabel: l.item?.code ?? "",
@@ -1070,6 +1230,23 @@ export function PurchaseOrderFormDialog({
     return { totalQty: qty, totalAmount: amount };
   }, [lines]);
 
+  // View mode reads the document's own totals off the lines response; the other
+  // modes derive them from the draft in memory. Deriving from `gridRows` would
+  // quietly report one page's totals as the document's.
+  const displayedLineCount = isView
+    ? viewLinesQuery.data?.total ?? 0
+    : lines.length;
+  // Since ADR-08 these are totals over the MATCHING lines: unfiltered that is the
+  // whole voucher exactly as before, filtered it is the subset. It can therefore
+  // disagree with the voucher total in the header, and `viewLineFilterActive` is
+  // what the footer uses to say so instead of looking like a contradiction.
+  const displayedQty = isView
+    ? viewLinesQuery.data?.totals?.totalQuantity ?? 0
+    : totalQty;
+  const displayedAmount = isView
+    ? viewLinesQuery.data?.totals?.totalAmount ?? 0
+    : totalAmount;
+
   const handleSave = useCallback(async (): Promise<boolean> => {
     const receiptPurpose = isPurchaseImport ? "PURCHASE" : purpose;
     if (receiptPurpose === "PURCHASE" && !providerId) {
@@ -1423,7 +1600,7 @@ export function PurchaseOrderFormDialog({
   // renderEditor closure on each render, re-rendering all rows. Everything it
   // closes over must therefore be stable — note the absence of `lines` and of
   // the running totals (those go through `lineFooters`).
-  const lineColumns = useMemo<LineColumn<FormLine>[]>(() => [
+  const lineColumns = useMemo<LineColumn<FormLine>[]>(() => applyViewFilterability([
     {
       key: "itemLabel",
       label: "Mã SKU",
@@ -1680,7 +1857,8 @@ export function PurchaseOrderFormDialog({
         ] satisfies LineColumn<FormLine>[])
       : []),
     { key: "notes", label: "Ghi chú", width: 200, minWidth: 200 },
-  ], [
+  ]), [
+    applyViewFilterability,
     autoFillAssignedLocation,
     fillLineFromItem,
     fillPreferredShelf,
@@ -1699,19 +1877,23 @@ export function PurchaseOrderFormDialog({
   // Totals live here rather than on the columns: a footer embedded in a column
   // object changes the identity of `columns` on every quantity edit, which
   // would re-render every row.
+  // `displayed*`, not `total*`. The latter is derived from `lines`, which view
+  // mode does not populate (the page fetches the header with includeLines=false),
+  // so this row rendered 0 / 0 on every opened voucher — the issue dialog has
+  // always used `displayed*` here and this side was simply missed.
   const lineFooters = useMemo<Record<string, ReactNode>>(
     () => ({
-      orderedQuantity: totalQty.toLocaleString("vi-VN"),
-      lineTotal: formatMoneyInteger(totalAmount),
+      orderedQuantity: displayedQty.toLocaleString("vi-VN"),
+      lineTotal: formatMoneyInteger(displayedAmount),
       ...(isPurchaseImport
         ? {
             discountAmount: "0",
             taxAmount: "0",
-            payableAmount: formatMoneyInteger(totalAmount),
+            payableAmount: formatMoneyInteger(displayedAmount),
           }
         : {}),
     }),
-    [isPurchaseImport, totalAmount, totalQty],
+    [displayedAmount, displayedQty, isPurchaseImport],
   );
 
   const handleChangeCell = useCallback(
@@ -2212,7 +2394,14 @@ export function PurchaseOrderFormDialog({
             )}
             <LineItemGrid
               columns={lineColumns}
-              rows={lines}
+              // Controlled ONLY in view mode. Passing these switches the grid to
+              // controlled filtering, and from then on every `rowIndex` it hands
+              // back indexes the FILTERED array — harmless on a read-only grid,
+              // but in edit mode the user would filter, hit delete, and lose a
+              // different line than the one they clicked.
+              filters={isView ? viewLineFilters : undefined}
+              onFilterChange={isView ? handleViewLineFilterChange : undefined}
+              rows={gridRows}
               footers={lineFooters}
               getRowKey={getLineKey}
               // Omitting onChangeCell makes the built-in cells (Số lượng) read-only.
@@ -2222,18 +2411,38 @@ export function PurchaseOrderFormDialog({
               showAddRow={!linesLocked}
               showRowActions={!linesLocked}
             />
+            {isView && (
+              <PaginationControls
+                page={viewLinesPage}
+                pageSize={viewLinesPageSize}
+                total={viewLinesQuery.data?.total ?? 0}
+                onPageChange={setViewLinesPage}
+                onPageSizeChange={(next) => {
+                  setViewLinesPageSize(next);
+                  setViewLinesPage(1);
+                }}
+                disabled={viewLinesQuery.isFetching}
+              />
+            )}
           </>
         }
         footerSummary={
           isPurchaseImport ? (
             <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-5">
-              <span>
-                Tổng số lượng <strong className="ml-1">{totalQty}</strong>
+              <span className="flex items-center gap-2">
+                Tổng số lượng <strong className="ml-1">{displayedQty}</strong>
+                {/* Both footer layouts can render in view mode — the branch is on
+                    document kind, not on mode — so both need the ADR-08 marker. */}
+                {viewLineFilterActive && (
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                    đang lọc
+                  </span>
+                )}
               </span>
               <span>
                 Tổng thành tiền{" "}
                 <strong className="ml-1">
-                  {formatMoneyInteger(totalAmount)}
+                  {formatMoneyInteger(displayedAmount)}
                 </strong>
               </span>
               <span>
@@ -2245,21 +2454,30 @@ export function PurchaseOrderFormDialog({
               <span>
                 Tổng tiền thanh toán{" "}
                 <strong className="ml-1">
-                  {formatMoneyInteger(totalAmount)}
+                  {formatMoneyInteger(displayedAmount)}
                 </strong>
               </span>
             </div>
           ) : (
             <div className="flex items-center justify-between">
-              <span>Số dòng = {lines.length}</span>
+              <span className="flex items-center gap-2">
+                Số dòng = {displayedLineCount}
+                {/* ADR-08: while a filter is on these numbers describe the
+                    matching lines, not the voucher — say it, or it reads as a bug. */}
+                {viewLineFilterActive && (
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                    đang lọc — số liệu theo dòng khớp
+                  </span>
+                )}
+              </span>
               <div className="flex gap-8">
                 <span>
-                  Số lượng: <strong className="ml-1">{totalQty}</strong>
+                  Số lượng: <strong className="ml-1">{displayedQty}</strong>
                 </span>
                 <span>
                   Thành tiền:{" "}
                   <strong className="ml-1">
-                    {formatMoneyInteger(totalAmount)}
+                    {formatMoneyInteger(displayedAmount)}
                   </strong>
                 </span>
               </div>

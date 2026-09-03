@@ -1587,8 +1587,11 @@ export class StockTakeService {
     });
     const savedReceipt = await manager.save(receipt);
 
-    const lines: GoodsReceiptLineEntity[] = positives.map((p) => {
+    const lines: GoodsReceiptLineEntity[] = positives.map((p, index) => {
       const line = new GoodsReceiptLineEntity();
+      // Generated vouchers need an ordinal too — the column is NOT NULL and has
+      // no default, so an unset one fails at the insert (ADR-05).
+      line.lineNo = index + 1;
       line.organizationId = st.organizationId;
       line.branchId = branchId;
       line.createdBy = actor.userId;
@@ -1641,9 +1644,13 @@ export class StockTakeService {
     });
     const savedIssue = await manager.save(issue);
 
-    const lines: GoodsIssueLineEntity[] = negatives.map((n) => {
+    const lines: GoodsIssueLineEntity[] = negatives.map((n, index) => {
       const line = new GoodsIssueLineEntity();
       line.goodsIssueId = savedIssue.id;
+      // `line_no` is NOT NULL with no DB default (ADR-01), so every write path
+      // has to set it — this auto-generated shrinkage issue included. Order
+      // follows `negatives`, which is the order the count sheet produced.
+      line.lineNo = index + 1;
       line.itemId = n.line.itemId;
       line.locationId = n.line.locationId ?? headerLocationId;
       const cost = costByItemId.get(n.line.itemId) ?? 0;

@@ -36,7 +36,11 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "../../lib/api-axios";
+import { erpApi, requireErpData } from "../../lib/erp-api";
+import { PaginationControls } from "../table/PaginationControls";
+import { buildLineSearchBody } from "./line-filter-search";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { VoucherKind } from "@erp/shared-interfaces";
 import {
@@ -192,6 +196,47 @@ const combineDateTime = (date: string, time: string): string | undefined => {
   const dt = new Date(`${date}T${time || "00:00"}:00`);
   return Number.isNaN(dt.getTime()) ? undefined : dt.toISOString();
 };
+
+/**
+ * `GET /inventory/goods-issues/:id/lines`.
+ *
+ * Hand-written rather than taken from `@erp/api-client`: that route is annotated
+ * with no response DTO, so its generated schema is a bare `{ type: object }` and
+ * carries no fields at all. The list page declares the same shape for the same
+ * reason.
+ *
+ * `total` and `totals` describe the MATCHING lines, not the whole voucher: with no
+ * filter that is the whole voucher, and with one it is what the user filtered to,
+ * which is the number they are asking for once they have filtered (ADR-08).
+ */
+interface GoodsIssueLinesSearchResponse {
+  data: GoodsIssueLine[];
+  page: number;
+  limit: number;
+  total: number;
+  totals: { totalQuantity: number; totalAmount: number };
+}
+
+/** Rows per page in the view dialog's line grid. */
+const VIEW_LINES_PAGE_SIZE = 50;
+
+/**
+ * Header-filter columns the server can actually filter on, mapped to their DTO
+ * field. Every other column gets `filterable: false` in view mode: a typable box
+ * over a field the server ignores is worse than no box, because "nothing
+ * changed" and "nothing matched" look identical (ADR-07).
+ */
+const SERVER_FILTERABLE: Record<string, string> = {
+  itemLabel: "itemCode",
+  itemName: "itemName",
+  quantity: "quantity",
+  unitPrice: "unitPrice",
+  lineTotal: "lineTotal",
+};
+
+/** Columns whose header filter is switched off in view mode. */
+const VIEW_UNFILTERABLE = new Set(["warehouse", "position", "unit"]);
+
 
 export function GoodsIssueFormDialog({
   mode,
@@ -439,7 +484,11 @@ export function GoodsIssueFormDialog({
   const [lines, setLines] = useState<FormLine[]>(() => {
     if (!initial) return [emptyLine()];
 
-    const initialLines = initial.lines.map((l) => ({
+    // `lines` is absent when the caller fetched the header alone
+    // (`includeLines=false`, T-02-01). That only happens in view mode, where the
+    // grid reads `viewLines` below instead of this state — but the fallback has to
+    // be here, because this initializer runs before anything checks the mode.
+    const initialLines = (initial.lines ?? []).map((l) => ({
           lineId: nextLineId(),
           itemId: l.itemId,
           // Prefer the eager-loaded item code; fall back to the legacy
@@ -460,6 +509,91 @@ export function GoodsIssueFormDialog({
 
     return isView ? initialLines : normalizeFormLines(initialLines);
   });
+
+  // ─── View mode: one page of lines at a time (UOW-02) ──────────────────────
+  //
+  // Only the view dialog paginates. Create and edit keep the whole voucher in
+  // `lines` state, because both have to validate and submit every row at once —
+  // paginating them is a different problem and is deliberately out of scope
+  // (ADR-04). So there are two sources of rows below, picked by `mode`. That
+  // split is intentional; it is not leftover code to tidy away.
+  const [viewLinesPage, setViewLinesPage] = useState(1);
+  const [viewLinesPageSize, setViewLinesPageSize] = useState(VIEW_LINES_PAGE_SIZE);
+  // Header filters, controlled by this dialog rather than by the grid. The grid
+  // filters uncontrolled by default, over whatever rows it was handed — which is
+  // one page here, so it would silently mean "search this page". Debounced before
+  // it reaches the query key so a five-letter SKU is one request, not five.
+  const [viewLineFilters, setViewLineFilters] = useState<Record<string, string>>({});
+  const [debouncedLineFilters, setDebouncedLineFilters] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedLineFilters(viewLineFilters), 300);
+    return () => clearTimeout(t);
+  }, [viewLineFilters]);
+
+  const handleViewLineFilterChange = useCallback(
+    (next: Record<string, string>) => {
+      setViewLineFilters(next);
+      // Page 5 of an unfiltered voucher is usually past the end of a filtered
+      // one, and an empty grid reads as "nothing matched".
+      setViewLinesPage(1);
+    },
+    [],
+  );
+
+  const viewLinesQuery = useQuery({
+    queryKey: [
+      "goods-issue-lines",
+      initial?.id,
+      viewLinesPage,
+      viewLinesPageSize,
+      debouncedLineFilters,
+    ],
+    queryFn: async () =>
+      requireErpData(
+        await erpApi.POST<GoodsIssueLinesSearchResponse>(
+          "/v2/inventory/goods-issues/{id}/lines/search",
+          {
+            params: { path: { id: initial!.id } },
+            body: buildLineSearchBody(
+              debouncedLineFilters,
+              SERVER_FILTERABLE,
+              viewLinesPage,
+              viewLinesPageSize,
+            ),
+          },
+        ),
+      ),
+    enabled: isView && !!initial?.id,
+  });
+
+  const viewLines = useMemo<FormLine[]>(
+    () =>
+      (viewLinesQuery.data?.data ?? []).map((l) => ({
+        lineId: nextLineId(),
+        itemId: l.itemId,
+        itemLabel: l.item?.code ?? l.itemCode ?? l.itemId.slice(0, 8),
+        itemName: l.item?.name ?? l.itemName ?? "",
+        unit: l.item?.unit ?? l.unit ?? "",
+        locationId: l.locationId ?? "",
+        locationLabel: l.location?.code ?? "",
+        storageId: l.location?.storageId ?? "",
+        storageLabel:
+          storages.find((st) => st.id === l.location?.storageId)?.name ?? "",
+        quantity: Number(l.quantity),
+        unitPrice: Number(l.unitPrice ?? 0),
+        notes: l.notes ?? "",
+      })),
+    [storages, viewLinesQuery.data],
+  );
+
+  /** Rows the grid renders: a single page in view mode, the whole draft otherwise. */
+  const gridRows = isView ? viewLines : lines;
+
+  /** True while a filter is narrowing the grid — the footer totals follow it. */
+  const viewLineFilterActive = useMemo(
+    () => Object.values(debouncedLineFilters).some((v) => v.trim() !== ""),
+    [debouncedLineFilters],
+  );
 
   const [barcodeMode, setBarcodeMode] = useState(false);
 
@@ -944,8 +1078,11 @@ export function GoodsIssueFormDialog({
           // Sửa phiếu đã ghi sổ chỉ ghi phần chênh lệch (computeVoucherDelta),
           // nên số lượng bản cũ đang giữ phải được cộng lại — không thì dòng
           // giữ nguyên số lượng luôn bị cảnh báo vì tồn đã bị chính nó trừ.
+          // Edit mode always fetches the full document, so `lines` is present here;
+          // the fallback exists only because view mode may hold a header-only
+          // `initial`, and this branch is unreachable in that mode.
           mode === "edit" && initial?.status === "POSTED"
-            ? initial.lines.map((line) => ({
+            ? (initial.lines ?? []).map((line) => ({
                 itemId: line.itemId,
                 quantity: Number(line.quantity),
                 locationId: line.locationId || undefined,
@@ -1372,7 +1509,24 @@ export function GoodsIssueFormDialog({
   // renderEditor closure on each render, re-rendering all rows. Everything it
   // closes over must therefore be stable — note the absence of `lines` and of
   // the running totals (those go through `lineFooters`).
-  const lineColumns = useMemo<LineColumn<FormLine>[]>(() => [
+  /**
+   * In view mode the header filters run on the server, which only accepts the
+   * five columns in SERVER_FILTERABLE — so Kho / Vị trí / Đơn vị tính lose their
+   * filter cell entirely rather than offering a box that does nothing (ADR-07).
+   * In create/edit the grid filters in memory over the draft, where every column
+   * works, so nothing is switched off there.
+   */
+  const applyViewFilterability = useCallback(
+    (cols: LineColumn<FormLine>[]) =>
+      isView
+        ? cols.map((col) =>
+            VIEW_UNFILTERABLE.has(col.key) ? { ...col, filterable: false } : col,
+          )
+        : cols,
+    [isView],
+  );
+
+  const lineColumns = useMemo<LineColumn<FormLine>[]>(() => applyViewFilterability([
     {
       key: "itemLabel",
       label: "Mã SKU",
@@ -1548,7 +1702,8 @@ export function GoodsIssueFormDialog({
       getValue: (r) =>
         r.itemId ? formatMoneyInteger(Number(r.quantity) * Number(r.unitPrice)) : "",
     },
-  ], [
+  ]), [
+    applyViewFilterability,
     detailLocked,
     fillLineFromItem,
     fillPreferredShelf,
@@ -1564,12 +1719,34 @@ export function GoodsIssueFormDialog({
   // Totals live here rather than on the columns: a footer embedded in a column
   // object changes the identity of `columns` on every quantity edit, which
   // would re-render every row.
+  // View mode reads the document's own totals off the lines response; the other
+  // modes still derive them from the draft in memory. Deriving them from
+  // `gridRows` would silently report page totals as document totals.
+  // View mode reads the document's own totals off the lines response; the other
+  // modes still derive them from the draft in memory. Deriving them from
+  // `gridRows` would silently report page totals as document totals.
+  //
+  // Since ADR-08 these are totals over the MATCHING lines: unfiltered that is the
+  // whole voucher exactly as before, filtered it is the subset — which is the sum
+  // the user is asking about once they have filtered. It can therefore disagree
+  // with the voucher total in the header, and `viewLineFilterActive` is what the
+  // footer uses to say so out loud instead of looking like a contradiction.
+  const displayedLineCount = isView
+    ? viewLinesQuery.data?.total ?? 0
+    : lines.length;
+  const displayedQty = isView
+    ? viewLinesQuery.data?.totals?.totalQuantity ?? 0
+    : totalQty;
+  const displayedAmount = isView
+    ? viewLinesQuery.data?.totals?.totalAmount ?? 0
+    : totalAmount;
+
   const lineFooters = useMemo<Record<string, ReactNode>>(
     () => ({
-      quantity: totalQty.toLocaleString("vi-VN"),
-      lineTotal: formatMoneyInteger(totalAmount),
+      quantity: displayedQty.toLocaleString("vi-VN"),
+      lineTotal: formatMoneyInteger(displayedAmount),
     }),
-    [totalAmount, totalQty],
+    [displayedAmount, displayedQty],
   );
 
   const handleChangeCell = useCallback(
@@ -1912,7 +2089,14 @@ export function GoodsIssueFormDialog({
               columns={lineColumns}
               // Omitting onChangeCell makes the built-in cells (Số lượng) read-only.
               onChangeCell={detailLocked ? undefined : handleChangeCell}
-              rows={lines}
+              // Controlled ONLY in view mode. Passing these switches the grid to
+              // controlled filtering, and from then on every `rowIndex` it hands
+              // back indexes the FILTERED array — harmless on a read-only grid,
+              // but in edit mode the user would filter, hit delete, and lose a
+              // different line than the one they clicked.
+              filters={isView ? viewLineFilters : undefined}
+              onFilterChange={isView ? handleViewLineFilterChange : undefined}
+              rows={gridRows}
               footers={lineFooters}
               getRowKey={getLineKey}
               onAddRow={handleAddRow}
@@ -1920,18 +2104,43 @@ export function GoodsIssueFormDialog({
               showAddRow={!detailLocked}
               showRowActions={!detailLocked}
             />
+            {isView && (
+              <PaginationControls
+                page={viewLinesPage}
+                pageSize={viewLinesPageSize}
+                total={viewLinesQuery.data?.total ?? 0}
+                onPageChange={setViewLinesPage}
+                onPageSizeChange={(next) => {
+                  setViewLinesPageSize(next);
+                  setViewLinesPage(1);
+                }}
+                disabled={viewLinesQuery.isFetching}
+              />
+            )}
           </>
         }
         footerSummary={
           <div className="flex items-center justify-between">
-            <span>Số dòng = {lines.length}</span>
+            <span className="flex items-center gap-2">
+              Số dòng = {displayedLineCount}
+              {/* ADR-08: while a filter is on, these three numbers describe the
+                  matching lines, not the voucher — so they can disagree with the
+                  voucher total in the header. Say it, or it reads as a bug. */}
+              {viewLineFilterActive && (
+                <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                  đang lọc — số liệu theo dòng khớp
+                </span>
+              )}
+            </span>
             <div className="flex items-center gap-8">
               <span>
-                Số lượng: <strong className="ml-1">{totalQty}</strong>
+                Số lượng: <strong className="ml-1">{displayedQty}</strong>
               </span>
               <span>
                 Thành tiền:{" "}
-                <strong className="ml-1">{formatMoneyInteger(totalAmount)}</strong>
+                <strong className="ml-1">
+                  {formatMoneyInteger(displayedAmount)}
+                </strong>
               </span>
               {onProcessReceive && (
                 <Button type="button" onClick={onProcessReceive}>

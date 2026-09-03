@@ -119,13 +119,6 @@ export interface GoodsIssueQuery extends PaginationQuery {
   branchId?: string;
 }
 
-export interface GoodsIssueLinesPage {
-  items: GoodsIssueLineEntity[];
-  page: number;
-  pageSize: number;
-  hasMore: boolean;
-  total: number;
-}
 
 const VALID_TRANSITIONS: Record<GoodsIssueStatus, GoodsIssueStatus[]> = {
   [GoodsIssueStatus.DRAFT]: [GoodsIssueStatus.POSTED, GoodsIssueStatus.CANCELLED],
@@ -207,8 +200,11 @@ export class GoodsIssueService {
       references: dto.references ?? [],
       occurredAt: dto.occurredAt ? new Date(dto.occurredAt) : null,
       status: GoodsIssueStatus.DRAFT,
-      lines: dto.lines.map((l) => {
+      lines: dto.lines.map((l, index) => {
         const line = new GoodsIssueLineEntity();
+        // 1-based position in the array the caller sent, which is the order the
+        // user sees on the grid — that is what "the order it was typed" means.
+        line.lineNo = index + 1;
         line.itemId = l.itemId;
         // Honor a per-line source location (used by transfer export where each
         // line can be pulled from a different warehouse); fall back to header.
@@ -474,6 +470,12 @@ export class GoodsIssueService {
     const nextLines = dto.lines
       ? dto.lines.map((l, index) => {
           const line = new GoodsIssueLineEntity();
+          // Renumber the whole voucher from the incoming array rather than
+          // trying to preserve each line's old number. Preserving would collide
+          // with uq_goods_issue_lines_doc_line_no the moment a user inserts a
+          // line in the middle, and the update path replaces every line anyway
+          // (delete-then-insert below).
+          line.lineNo = index + 1;
           line.itemId = l.itemId;
           line.locationId = l.locationId ?? gi.locationId;
           line.quantity = l.quantity;
@@ -733,8 +735,25 @@ export class GoodsIssueService {
     return saved;
   }
 
-  async getById(id: string, actor: ActorContext): Promise<GoodsIssueEntity> {
-    const gi = await this.findOrFail(id, actor.organizationId, actor.branchId);
+  /**
+   * `opts.includeLines: false` returns the header alone (ADR-03). The view dialog
+   * pages its lines through {@link getLines}, so shipping every line here is the
+   * one payload that still scales with voucher size. Default stays `true` — the
+   * barcode-prefill path on the list page depends on this route carrying lines
+   * (`GoodsIssuePage.tsx`, which deliberately uses GET /:id rather than /:id/lines
+   * for exactly that reason), and so does the edit dialog.
+   */
+  async getById(
+    id: string,
+    actor: ActorContext,
+    opts: { includeLines?: boolean } = {},
+  ): Promise<GoodsIssueEntity> {
+    const gi = await this.findOrFail(
+      id,
+      actor.organizationId,
+      actor.branchId,
+      opts.includeLines ?? true,
+    );
     await attachCounterparties(this.giRepo.manager, [gi], actor.organizationId);
     // The detail route is what the list page reads its selected row from (the
     // list row is deliberately treated as stale), so the freeze marker has to
@@ -765,42 +784,7 @@ export class GoodsIssueService {
     );
   }
 
-  /**
-   * Paginated lines for one issue (T-02-02) — the existence/scope check is a
-   * deliberately lean `findOne` with `loadEagerRelations: false`, NOT
-   * `findOrFail`, so it doesn't pull the issue's eager `lines` just to prove
-   * the issue exists and is in scope.
-   *
-   * Ordered by `id ASC`: `GoodsIssueLineEntity` has no `createdAt` column
-   * (unlike its GR/TO counterparts), so `id` is the stable, deterministic
-   * ordering infinite-scroll accumulation needs.
-   */
-  async getLines(
-    id: string,
-    actor: ActorContext,
-    page: number,
-    pageSize: number,
-  ): Promise<GoodsIssueLinesPage> {
-    const exists = await this.giRepo.findOne({
-      where: {
-        id,
-        organizationId: actor.organizationId,
-        ...(actor.branchId ? { branchId: actor.branchId } : {}),
-      },
-      loadEagerRelations: false,
-    });
-    if (!exists) throw new NotFoundException(`Phiếu xuất hàng ${id} không tìm thấy`);
-
-    const [items, total] = await this.giRepo.manager.findAndCount(GoodsIssueLineEntity, {
-      where: { goodsIssueId: id },
-      order: { id: 'ASC' },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    });
-
-    return { items, page, pageSize, hasMore: page * pageSize < total, total };
-  }
-
+  
   /** Print/export payload for one issue (T-03-02, UOW-08) — reuses `getById`'s 404. */
   async getPrintPayload(
     id: string,
@@ -912,9 +896,26 @@ export class GoodsIssueService {
     id: string,
     organizationId: string,
     branchId?: string,
+    includeLines = true,
   ): Promise<GoodsIssueEntity> {
     const gi = await this.giRepo.findOne({
       where: { id, organizationId, ...(branchId ? { branchId } : {}) },
+      // Dropping `lines` means opting out of eager loading entirely and naming
+      // the header relations back, because `loadEagerRelations` is all-or-nothing.
+      // The list must therefore stay in step with the eager relations on
+      // GoodsIssueEntity — a new one added there and not added here would go
+      // silently missing from header-only responses.
+      ...(includeLines
+        ? {}
+        : {
+            loadEagerRelations: false,
+            relations: {
+              location: true,
+              provider: true,
+              reasonRef: true,
+              targetBranch: true,
+            },
+          }),
     });
     if (!gi) throw new NotFoundException(`Phiếu xuất hàng ${id} không tìm thấy`);
     return gi;

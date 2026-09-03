@@ -6486,22 +6486,6 @@ export interface paths {
         patch: operations["GoodsIssueController_update"];
         trace?: never;
     };
-    "/inventory/goods-issues/{id}/lines": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["GoodsIssueController_getLines"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/inventory/goods-issues/{id}/print-payload": {
         parameters: {
             query?: never;
@@ -6576,6 +6560,23 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["GoodsIssueV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory/goods-issues/{id}/lines/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search one goods issue's lines (v2) */
+        post: operations["GoodsIssueV2Controller_searchLines_v2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6904,22 +6905,6 @@ export interface paths {
         patch: operations["GoodsReceiptController_update"];
         trace?: never;
     };
-    "/goods-receipts/{id}/lines": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["GoodsReceiptController_getLines"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/goods-receipts/{id}/print-payload": {
         parameters: {
             query?: never;
@@ -6978,6 +6963,23 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["GoodsReceiptV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/goods-receipts/{id}/lines/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search one goods receipt's lines (v2) */
+        post: operations["GoodsReceiptV2Controller_searchLines_v2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -13318,6 +13320,13 @@ export interface components {
         GoodsIssueLineEntity: {
             id: string;
             goodsIssueId: string;
+            /**
+             * @description 1-based position of this line within its voucher — the order the user typed.
+             *     Explicit rather than derived: this table has no `created_at`, and ordering by
+             *     the uuid primary key gives an arbitrary permutation (ADR-01). Unique per
+             *     `goods_issue_id`, and every write path must set it.
+             */
+            lineNo: number;
             itemId: string;
             locationId: string;
             quantity: number;
@@ -13348,6 +13357,22 @@ export interface components {
             date?: components["schemas"]["DateRangeFilterDto"];
             /** @description Tổng tiền (computed line total: SUM(quantity * unit_price)) */
             totalAmount?: components["schemas"]["CompareFilterDto"];
+        };
+        GoodsIssueLineSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            limit: number;
+            /** @description Mã SKU — matches `items.code`. */
+            itemCode?: components["schemas"]["StringFilterDto"];
+            /** @description Tên hàng hóa — matches `items.name`. */
+            itemName?: components["schemas"]["StringFilterDto"];
+            /** @description Số lượng */
+            quantity?: components["schemas"]["CompareFilterDto"];
+            /** @description Đơn giá */
+            unitPrice?: components["schemas"]["CompareFilterDto"];
+            /** @description Thành tiền — `quantity * unit_price`, see LINE_AMOUNT_EXPRESSION. */
+            lineTotal?: components["schemas"]["CompareFilterDto"];
         };
         GoodsIssueV2LineDto: {
             /** Format: uuid */
@@ -13557,6 +13582,20 @@ export interface components {
             organizationId: string;
             branchId?: string;
             goodsReceiptId: string;
+            /**
+             * @description 1-based position of this line within its voucher — the order the user typed
+             *     it, and the ONLY thing `getLines` orders by (ADR-05).
+             *
+             *     `createdAt` below is still written and still happens to agree, because the
+             *     backfill derived this column from it. Do not order by it again: it agrees by
+             *     history, not by contract, and it cannot express a line inserted into the
+             *     middle of an existing voucher, which renumbering here does.
+             *
+             *     Unique per `goods_receipt_id`, no database default: every write path must
+             *     set it, and one that forgets should fail at the insert rather than collide
+             *     on some later row.
+             */
+            lineNo: number;
             itemId: string;
             locationId: string;
             binId?: string;
@@ -13718,6 +13757,22 @@ export interface components {
             date?: components["schemas"]["DateRangeFilterDto"];
             /** @description Tổng tiền (computed line total: SUM(quantity * unit_price)) */
             totalAmount?: components["schemas"]["CompareFilterDto"];
+        };
+        GoodsReceiptLineSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            limit: number;
+            /** @description Mã SKU — matches `items.code`. */
+            itemCode?: components["schemas"]["StringFilterDto"];
+            /** @description Tên hàng hóa — matches `items.name`. */
+            itemName?: components["schemas"]["StringFilterDto"];
+            /** @description Số lượng */
+            quantity?: components["schemas"]["CompareFilterDto"];
+            /** @description Đơn giá */
+            unitPrice?: components["schemas"]["CompareFilterDto"];
+            /** @description Thành tiền — `quantity * unit_price`, see LINE_AMOUNT_EXPRESSION. */
+            lineTotal?: components["schemas"]["CompareFilterDto"];
         };
         CreateGoodsReceiptV2Dto: {
             /** @enum {string} */
@@ -25541,7 +25596,10 @@ export interface operations {
     };
     GoodsIssueController_getById: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Include the voucher lines. Defaults to true. Pass false when the caller pages the lines separately through GET /:id/lines — on a large voucher the lines are the only part of this payload that scales with size. */
+                includeLines?: boolean;
+            };
             header?: never;
             path: {
                 id: string;
@@ -25581,36 +25639,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GoodsIssueEntity"];
-                };
-            };
-        };
-    };
-    GoodsIssueController_getLines: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                sortBy?: string;
-                sortOrder?: "asc" | "desc";
-                search?: string;
-                filters?: string;
-                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
-                includeInactive?: boolean;
-            };
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
                 };
             };
         };
@@ -25707,6 +25735,31 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["GoodsIssueSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoodsIssueV2Controller_searchLines_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoodsIssueLineSearchV2Dto"];
             };
         };
         responses: {
@@ -26251,7 +26304,10 @@ export interface operations {
     };
     GoodsReceiptController_getById: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Include the voucher lines. Defaults to true. Pass false when the caller pages the lines separately through GET /:id/lines — on a large voucher the lines are the only part of this payload that scales with size. */
+                includeLines?: boolean;
+            };
             header?: never;
             path: {
                 id: string;
@@ -26310,36 +26366,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GoodsReceiptEntity"];
-                };
-            };
-        };
-    };
-    GoodsReceiptController_getLines: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                sortBy?: string;
-                sortOrder?: "asc" | "desc";
-                search?: string;
-                filters?: string;
-                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
-                includeInactive?: boolean;
-            };
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
                 };
             };
         };
@@ -26415,6 +26441,31 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["GoodsReceiptSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoodsReceiptV2Controller_searchLines_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoodsReceiptLineSearchV2Dto"];
             };
         };
         responses: {

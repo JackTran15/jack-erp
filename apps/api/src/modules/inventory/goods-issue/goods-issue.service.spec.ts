@@ -42,7 +42,18 @@ describe('GoodsIssueService', () => {
       save: jest.fn().mockImplementation((d) => Promise.resolve({ ...d, id: 'gi-1' })),
       findOne: jest.fn(),
       delete: jest.fn().mockResolvedValue(undefined),
-      manager: { findAndCount: jest.fn() },
+      manager: {
+        findAndCount: jest.fn(),
+        // `getLines` also asks for voucher-wide totals — the footer of a paginated
+        // grid shows the whole document, not the page. Default 0; overridden where
+        // a test asserts on the numbers.
+        createQueryBuilder: jest.fn(() => ({
+          select: jest.fn().mockReturnThis(),
+          addSelect: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ qty: '0', amount: '0' }),
+        })),
+      },
     };
     branchRepo = {
       findOne: jest.fn().mockResolvedValue({ id: 'branch-B', name: 'Cần Thơ' }),
@@ -1103,55 +1114,194 @@ describe('GoodsIssueService', () => {
     });
   });
 
-  describe('getLines (T-02-02)', () => {
-    it('returns a paginated page of lines with hasMore=true when more remain', async () => {
-      giRepo.findOne.mockResolvedValue({ id: 'gi-1' });
-      const items = [{ id: 'line-1' }, { id: 'line-2' }];
-      giRepo.manager.findAndCount.mockResolvedValue([items, 5]);
 
-      const result = await service.getLines('gi-1', actor, 1, 2);
-
-      expect(giRepo.findOne).toHaveBeenCalledWith({
-        where: {
-          id: 'gi-1',
-          organizationId: actor.organizationId,
-          branchId: actor.branchId,
+  // T-01-02 / T-01-03 — line ordering (AC-01, AC-02, UOW-01).
+  //
+  // Before `line_no` existed, `getLines` ordered by the uuid primary key. That is
+  // deterministic but arbitrary, which is invisible while a voucher renders as one
+  // long list and glaring the moment the grid is paginated. These tests pin both
+  // halves: that every write path stamps an ordinal, and that reads come back in it.
+  describe('line ordering — line_no (AC-01, AC-02)', () => {
+    it('stamps 1-based line_no in the order the lines were sent (AC-01)', async () => {
+      await service.create(
+        {
+          locationId: 'loc-A01',
+          purpose: GoodsIssuePurpose.OTHER,
+          lines: [
+            { itemId: 'item-A', quantity: 1 },
+            { itemId: 'item-B', quantity: 2 },
+            { itemId: 'item-C', quantity: 3 },
+          ],
         },
-        loadEagerRelations: false,
+        actor,
+      );
+
+      const created = giRepo.create.mock.calls[0][0];
+      expect(created.lines.map((l: { itemId: string; lineNo: number }) => [l.itemId, l.lineNo]))
+        .toEqual([
+          ['item-A', 1],
+          ['item-B', 2],
+          ['item-C', 3],
+        ]);
+    });
+
+    it('renumbers the whole voucher on update so an inserted line cannot collide', async () => {
+      // A line dropped into the middle is the case that breaks any scheme trying to
+      // preserve each line's old number: two lines would claim the same ordinal and
+      // uq_goods_issue_lines_doc_line_no would reject the save.
+      const existing = {
+        id: 'gi-1',
+        organizationId: 'org-1',
+        branchId: 'branch-A',
+        status: GoodsIssueStatus.DRAFT,
+        revision: 0,
+        locationId: 'loc-A01',
+        purpose: GoodsIssuePurpose.OTHER,
+        lines: [
+          { id: 'l1', itemId: 'item-A', quantity: '1', unitPrice: '10.00', lineTotal: '10.00', lineNo: 1 },
+          { id: 'l2', itemId: 'item-C', quantity: '3', unitPrice: '30.00', lineTotal: '90.00', lineNo: 2 },
+        ],
+      };
+      giRepo.findOne.mockResolvedValue(existing);
+      dataSource._manager.query.mockResolvedValue([
+        { status: GoodsIssueStatus.DRAFT, revision: 0 },
+      ]);
+
+      await service.update(
+        'gi-1',
+        {
+          lines: [
+            { itemId: 'item-A', quantity: 1, unitPrice: 10 },
+            { itemId: 'item-B', quantity: 2, unitPrice: 20 },
+            { itemId: 'item-C', quantity: 3, unitPrice: 30 },
+          ],
+        },
+        actor,
+      );
+
+      const savedRows = dataSource._manager.save.mock.calls
+        .map((c: unknown[]) => c[1])
+        .find((rows: unknown) => Array.isArray(rows) && (rows as { lineNo?: number }[])[0]?.lineNo);
+      expect(savedRows.map((l: { itemId: string; lineNo: number }) => [l.itemId, l.lineNo]))
+        .toEqual([
+          ['item-A', 1],
+          ['item-B', 2],
+          ['item-C', 3],
+        ]);
+      const ordinals = savedRows.map((l: { lineNo: number }) => l.lineNo);
+      expect(new Set(ordinals).size).toBe(ordinals.length);
+    });
+
+
+  });
+
+  // T-02-01 — includeLines (ADR-03).
+  //
+  // The heavy payload was never /:id/lines; it was GET /:id, which ships every
+  // line of the voucher. The flag lets the view dialog opt out. Default stays
+  // true because the barcode-prefill path on the list page depends on this route
+  // carrying lines — these tests pin the default as hard as they pin the opt-out.
+  describe('getById — includeLines', () => {
+    beforeEach(() => {
+      giRepo.findOne.mockResolvedValue({
+        id: 'gi-1',
+        organizationId: 'org-1',
+        referenceType: null,
+        lines: [],
       });
-      expect(giRepo.manager.findAndCount).toHaveBeenCalledWith(GoodsIssueLineEntity, {
-        where: { goodsIssueId: 'gi-1' },
-        order: { id: 'ASC' },
-        skip: 0,
-        take: 2,
+      giRepo.manager.query = jest.fn().mockResolvedValue([]);
+    });
+
+    it('loads lines when the flag is omitted — the existing callers are untouched', async () => {
+      await service.getById('gi-1', actor);
+
+      const opts = giRepo.findOne.mock.calls[0][0];
+      expect(opts.loadEagerRelations).toBeUndefined();
+      expect(opts.relations).toBeUndefined();
+    });
+
+    it('loads lines when the flag is explicitly true', async () => {
+      await service.getById('gi-1', actor, { includeLines: true });
+
+      const opts = giRepo.findOne.mock.calls[0][0];
+      expect(opts.loadEagerRelations).toBeUndefined();
+    });
+
+    it('skips lines but keeps every header relation when the flag is false', async () => {
+      await service.getById('gi-1', actor, { includeLines: false });
+
+      const opts = giRepo.findOne.mock.calls[0][0];
+      expect(opts.loadEagerRelations).toBe(false);
+      // Turning eager loading off is all-or-nothing, so the header relations have
+      // to be named back explicitly — and `lines` must not be among them.
+      expect(opts.relations).toEqual({
+        location: true,
+        provider: true,
+        reasonRef: true,
+        targetBranch: true,
       });
-      expect(result).toEqual({ items, page: 1, pageSize: 2, hasMore: true, total: 5 });
+      expect(opts.relations).not.toHaveProperty('lines');
     });
 
-    it('reports hasMore=false on the last page', async () => {
-      giRepo.findOne.mockResolvedValue({ id: 'gi-1' });
-      giRepo.manager.findAndCount.mockResolvedValue([[{ id: 'line-5' }], 5]);
+    it('still scopes by organization and branch with lines skipped', async () => {
+      await service.getById('gi-1', actor, { includeLines: false });
 
-      const result = await service.getLines('gi-1', actor, 3, 2);
+      expect(giRepo.findOne.mock.calls[0][0].where).toEqual({
+        id: 'gi-1',
+        organizationId: 'org-1',
+        branchId: 'branch-A',
+      });
+    });
+  });
 
-      expect(result.hasMore).toBe(false);
-      expect(result.total).toBe(5);
+  // T-03-03 — print/export must never inherit the view dialog's pagination (AC-10).
+  //
+  // `getPrintPayload` goes through `getById`, the same route the view dialog now
+  // calls with `includeLines=false`. If anyone ever threads that flag down here to
+  // "keep it consistent", a 200-line voucher silently prints 50 lines — and nobody
+  // notices until a signed document is short. These tests exist to make that edit
+  // fail loudly.
+  describe('print/export line completeness (AC-10)', () => {
+    const manyLines = Array.from({ length: 120 }, (_, i) => ({
+      id: `line-${i + 1}`,
+      lineNo: i + 1,
+      itemId: `item-${i + 1}`,
+      locationId: 'loc-A01',
+      quantity: '1',
+      unitPrice: '10.00',
+      lineTotal: '10.00',
+    }));
+
+    beforeEach(() => {
+      giRepo.findOne.mockResolvedValue({
+        id: 'gi-1',
+        organizationId: 'org-1',
+        branchId: 'branch-A',
+        documentNumber: 'XK000001',
+        referenceType: null,
+        occurredAt: new Date('2026-08-31T03:00:00.000Z'),
+        createdAt: new Date('2026-08-31T03:00:00.000Z'),
+        lines: manyLines,
+      });
+      giRepo.manager.getRepository = jest.fn(() => ({
+        findOne: jest.fn().mockResolvedValue(null),
+      }));
     });
 
-    it('returns an empty page for an issue with zero lines, not an error', async () => {
-      giRepo.findOne.mockResolvedValue({ id: 'gi-1' });
-      giRepo.manager.findAndCount.mockResolvedValue([[], 0]);
+    it('loads the document WITH its lines — no header-only shortcut', async () => {
+      await service.getPrintPayload('gi-1', actor);
 
-      const result = await service.getLines('gi-1', actor, 1, 20);
-
-      expect(result).toEqual({ items: [], page: 1, pageSize: 20, hasMore: false, total: 0 });
+      const opts = giRepo.findOne.mock.calls[0][0];
+      expect(opts.loadEagerRelations).toBeUndefined();
+      expect(opts.relations).toBeUndefined();
     });
 
-    it('404s for a nonexistent or out-of-scope issue, without touching the line query', async () => {
-      giRepo.findOne.mockResolvedValue(null);
+    it('carries every line into the payload, not one page of them', async () => {
+      const payload = await service.getPrintPayload('gi-1', actor);
 
-      await expect(service.getLines('missing', actor, 1, 20)).rejects.toThrow();
-      expect(giRepo.manager.findAndCount).not.toHaveBeenCalled();
+      expect(payload.lines).toHaveLength(120);
+      // Not a page size, and not a truncated tail: first and last both survive.
+      expect(payload.lines.length).toBeGreaterThan(50);
     });
   });
 });
