@@ -240,6 +240,7 @@ export function BarcodeLabelGrid({
         label: "Vị trí",
         width: 130,
         filterSymbol: "*",
+        sortable: true,
         renderEditor: (row) =>
           !row.itemId ? (
             <span />

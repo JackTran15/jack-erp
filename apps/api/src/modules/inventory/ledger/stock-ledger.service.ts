@@ -100,6 +100,8 @@ export interface BalanceQuery extends PaginationQuery {
   isActive?: boolean;
   /** Filter by location-level tracking (stock_balances.is_tracked); omit = tất cả. */
   isTracked?: boolean;
+  /** Filter by location active status (locations.is_active); omit = tất cả. */
+  locationIsActive?: boolean;
   /** Loại trừ kho showroom (storages.is_main_storage = true) khỏi kết quả. */
   excludeShowroom?: boolean;
   organizationId: string;
@@ -148,6 +150,7 @@ export interface StockBalanceSummaryRow {
     name: string;
     storageId: string;
     storageName: string;
+    isActive: boolean;
   };
   threshold: {
     minQty: number | null;
@@ -494,6 +497,11 @@ export class StockLedgerService {
     if (query.isTracked !== undefined) {
       qb.andWhere('sb.is_tracked = :isTracked', { isTracked: query.isTracked });
     }
+    if (query.locationIsActive !== undefined) {
+      qb.andWhere('loc.is_active = :locationIsActive', {
+        locationIsActive: query.locationIsActive,
+      });
+    }
     // Kho đã ngừng hoạt động không hiển thị ở Chi tiết vị trí hàng hóa (giống
     // Tổng hợp tồn kho). Số liệu vẫn còn ở Báo cáo tồn kho (ledger).
     qb.andWhere('storage.is_active = true');
@@ -571,6 +579,7 @@ export class StockLedgerService {
       'loc.name AS "locationName"',
       'loc.storage_id AS "storageId"',
       'storage.name AS "storageName"',
+      'loc.is_active AS "locationIsActive"',
       'th.min_qty AS "minQty"',
       'th.max_qty AS "maxQty"',
     ]);
@@ -627,6 +636,7 @@ export class StockLedgerService {
           name: String(r.locationName),
           storageId: String(r.storageId),
           storageName: String(r.storageName),
+          isActive: Boolean(r.locationIsActive),
         },
         threshold: { minQty, maxQty },
         belowMin: minQty !== null && quantity < minQty,

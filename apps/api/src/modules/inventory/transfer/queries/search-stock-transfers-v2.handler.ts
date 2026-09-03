@@ -31,9 +31,13 @@ interface TotalsRaw {
   totalAmount: string;
 }
 
-/** Người vận chuyển — transporter user's full name (legacy fallback Đối tượng). */
+/** Người vận chuyển — transporter user's full name (legacy fallback Đối tượng).
+ *  `u.organization_id` is uuid (`UserEntity`) while `st.organization_id` is
+ *  varchar (`BaseEntity`, inherited by `StockTransferEntity`); without the
+ *  cast Postgres rejects `uuid = character varying` at plan time (ADR-04,
+ *  same precedent as `search-deposit-recon-v2.handler.ts`). */
 const TRANSPORTER_NAME_SUBQUERY = `(SELECT (u.first_name || ' ' || u.last_name)
-   FROM users u WHERE u.id = st.transporter_user_id AND u.organization_id = st.organization_id)`;
+   FROM users u WHERE u.id = st.transporter_user_id AND u.organization_id::text = st.organization_id)`;
 
 /** Đối tượng (party) — counterparty (supplier/customer/employee), else the
  *  legacy transporter name for transfers created before the counterparty field. */

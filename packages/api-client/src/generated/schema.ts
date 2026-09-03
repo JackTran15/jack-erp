@@ -18657,6 +18657,8 @@ export interface operations {
                 isTracked?: boolean;
                 /** @description Loại trừ kho showroom (storages.is_main_storage) khỏi kết quả. */
                 excludeShowroom?: boolean;
+                /** @description Lọc theo trạng thái hoạt động của vị trí (locations.is_active). Bỏ trống = tất cả. */
+                locationIsActive?: boolean;
                 locationCode?: string;
                 locationCodeMode?: string;
                 locationName?: string;

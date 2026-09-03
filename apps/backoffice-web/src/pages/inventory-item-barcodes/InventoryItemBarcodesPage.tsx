@@ -64,23 +64,35 @@ function parseFilterNumber(raw: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-/** So sánh mã SKU theo thứ tự A-Z, số trong mã so sánh theo giá trị ("N-9" < "N-38"). */
-const skuCollator = new Intl.Collator("vi", { numeric: true, sensitivity: "base" });
+/** So sánh chuỗi theo thứ tự A-Z, số trong chuỗi so sánh theo giá trị ("N-9" < "N-38"). */
+const rowCollator = new Intl.Collator("vi", { numeric: true, sensitivity: "base" });
+
+/** Các cột có thể sắp xếp trên bảng In tem mã. */
+type SortableRowKey = "sku" | "locationCode";
+
+function isSortableRowKey(key: string): key is SortableRowKey {
+  return key === "sku" || key === "locationCode";
+}
 
 /**
- * Sắp xếp theo mã SKU, dòng trống luôn ở cuối. Dùng chung cho bảng, In tem và Xuất
- * khẩu — tem in ra phải theo đúng thứ tự người dùng đang nhìn thấy trên bảng.
+ * Sắp xếp theo khoá đang chọn (Mã SKU hoặc Vị trí). Dòng nhập liệu trống luôn ở
+ * cuối; với khoá "locationCode", dòng có hàng hoá nhưng chưa có vị trí cũng ghim
+ * cuối (A-08) — trước nhóm dòng trống hoàn toàn. Dùng chung cho bảng, In tem và
+ * Xuất khẩu — tem in ra phải theo đúng thứ tự người dùng đang nhìn thấy trên bảng.
  */
-function sortRowsBySku(
+function sortRows(
   list: BarcodeLabelRow[],
   sort: LineGridSort | null,
 ): BarcodeLabelRow[] {
-  if (sort?.key !== "sku") return list;
+  if (!sort || !isSortableRowKey(sort.key)) return list;
+  const key = sort.key;
   const direction = sort.direction === "asc" ? 1 : -1;
-  const filled = list.filter((r) => !isEmptyRow(r));
   const empty = list.filter(isEmptyRow);
-  filled.sort((a, b) => direction * skuCollator.compare(a.sku, b.sku));
-  return [...filled, ...empty];
+  const notEmpty = list.filter((r) => !isEmptyRow(r));
+  const unpositioned = key === "locationCode" ? notEmpty.filter((r) => !r.locationCode) : [];
+  const filled = key === "locationCode" ? notEmpty.filter((r) => r.locationCode) : notEmpty;
+  filled.sort((a, b) => direction * rowCollator.compare(a[key], b[key]));
+  return [...filled, ...unpositioned, ...empty];
 }
 
 function focusSkuInput() {
@@ -134,6 +146,16 @@ export function InventoryItemBarcodesPage() {
   const isChain = useIsChainSelected();
   const queryClient = useQueryClient();
 
+  // A-09: chế độ chuỗi ẩn cột Vị trí (BarcodeLabelGrid lọc bỏ cột), nhưng sort
+  // sống ở state trang nên không tự dọn. Xoá đúng một lần khi cờ isChain
+  // chuyển sang bật và đang sort theo Vị trí — không xoá mỗi lần render (mất
+  // sort ngay khi người dùng vừa bấm), và không đụng sort khi rời chế độ
+  // chuỗi (không đoán ý khôi phục lại).
+  useEffect(() => {
+    if (!isChain) return;
+    setSort((prev) => (prev?.key === "locationCode" ? null : prev));
+  }, [isChain]);
+
   // ─── Reference data ────────────────────────────────────────────────
   const branchId = getActiveBranch();
   const { data: storages } = useQuery({
@@ -181,7 +203,13 @@ export function InventoryItemBarcodesPage() {
   const loadItemBalances = useCallback(
     (itemId: string) =>
       queryClient.fetchQuery({
-        queryKey: ["item-stock-balances", itemId, branchId],
+        queryKey: [
+          "item-stock-balances",
+          itemId,
+          branchId,
+          "isTracked=true",
+          "locationIsActive=true",
+        ],
         queryFn: () => fetchItemStockBalances(itemId, branchId),
         staleTime: 60_000,
       }),
@@ -565,13 +593,13 @@ export function InventoryItemBarcodesPage() {
   // Sắp xếp theo mã SKU (bấm header cột "Mã SKU"). Dòng nhập liệu trống luôn ở cuối
   // bảng — Ctrl+Insert/Ctrl+F3 focus vào ô SKU của dòng cuối cùng.
   const sortedRows = useMemo(
-    () => sortRowsBySku(visibleRows, sort),
+    () => sortRows(visibleRows, sort),
     [visibleRows, sort],
   );
 
   // Nguồn cho In tem / Xuất khẩu / Xem trước: toàn bộ dòng (bộ lọc header không
   // loại tem khỏi lượt in), nhưng theo đúng thứ tự đang sắp xếp trên bảng.
-  const orderedRows = useMemo(() => sortRowsBySku(rows, sort), [rows, sort]);
+  const orderedRows = useMemo(() => sortRows(rows, sort), [rows, sort]);
 
   const printableRows = useMemo(
     () => orderedRows.filter((r) => r.itemId && r.quantity > 0),

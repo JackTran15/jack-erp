@@ -38,7 +38,10 @@ export const counterpartyNameSql = (alias: string): string =>
      WHEN 'customer' THEN (SELECT c.name FROM customers c
        WHERE c.id = ${alias}.counterparty_id AND c.organization_id = ${alias}.organization_id)
      WHEN 'employee' THEN (SELECT (u.first_name || ' ' || u.last_name) FROM users u
-       WHERE u.id = ${alias}.counterparty_id AND u.organization_id = ${alias}.organization_id)
+       -- users.organization_id is uuid, but <alias>.organization_id is varchar
+       -- (every ERP table inherits BaseEntity, which leaves that column
+       -- untyped) — cast so Postgres can plan the comparison at all.
+       WHERE u.id = ${alias}.counterparty_id AND u.organization_id::text = ${alias}.organization_id)
    END`;
 
 /**

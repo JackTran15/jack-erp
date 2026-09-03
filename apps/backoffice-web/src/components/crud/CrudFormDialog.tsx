@@ -85,6 +85,7 @@ const searchLocations = async (query: string) => {
     page: "1",
     pageSize: "8",
     search: query.trim(),
+    activeOnly: "true",
   });
   const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
     `/inventory/locations?${params}`,

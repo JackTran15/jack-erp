@@ -19,6 +19,14 @@ describe('counterpartyNameSql', () => {
     expect(sql).toContain('users');
     expect(sql).toContain('gr.organization_id');
   });
+
+  it('casts users.organization_id to text in the employee branch (uuid vs varchar)', () => {
+    // Not proof by itself — the type mismatch this guards against only
+    // surfaces when Postgres actually plans the query; see the e2e in
+    // apps/api/test/e2e/goods-doc-party-filter.e2e-spec.ts (T-02-01).
+    const sql = counterpartyNameSql('gr');
+    expect(sql).toContain('u.organization_id::text = gr.organization_id');
+  });
 });
 
 describe('attachCounterparties', () => {
