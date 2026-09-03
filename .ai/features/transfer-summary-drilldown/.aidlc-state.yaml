@@ -26,3 +26,28 @@ history:
     at: 2026-09-03T15:25:50
     by: loc
     evidence: graph valid - 4 UoW, 16 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-03T16:16:45
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-03T16:16:45
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-03T16:16:45
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-03T16:16:45
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-03T16:22:00
+    by: claude
+    ticket: T-01-03

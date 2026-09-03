@@ -24,7 +24,7 @@ export interface TransferSummaryQuery {
 
 export interface TransferSummaryRow {
   branchId: string;
-  /** `branches` table has no `code` column today — kept null for forward compat. */
+  /** Mã cửa hàng — `branches.code`, unique per organization. */
   branchCode: string | null;
   branchName: string;
   /** Goods received from other branches (TRANSFER_IN signed positive in ledger). */
@@ -33,10 +33,10 @@ export interface TransferSummaryRow {
   /** Goods shipped out to other branches (TRANSFER_OUT — stored as negative, surfaced as positive magnitude). */
   qtyOut: number;
   valueOut: number;
-  /** Mirror metric: qty other branches actually received from this branch (= sum of TRANSFER_IN at destinations whose paired OUT originated here). */
+  /** Of what this branch shipped out, the qty whose paired GoodsReceipt is posted. Measured on the ISSUE lines, so it is a subset of `qtyOut`. */
   qtyReceived: number;
   valueReceived: number;
-  /** qtyReceived - qtyOut: 0 in a healthy ledger; nonzero hints at in-transit / mismatch. */
+  /** qtyReceived - qtyOut. Always <= 0 by construction; the magnitude is what has shipped but is not yet confirmed received. */
   qtyDifference: number;
   valueDifference: number;
   /** qtyIn - qtyOut at this branch — net inflow/outflow. */
@@ -172,6 +172,41 @@ function transferByBranchSpecs(alias: string, withText: boolean): ReportColumnSp
 }
 
 /**
+ * The paired import leg of a two-phase transfer issue.
+ *
+ * Both legs point at the SAME `transfer_orders.id`:
+ * `goods_issues.reference_type = 'TRANSFER_ORDER'` and
+ * `goods_receipts.reference_type = 'STOCK_TRANSFER'`. That receipt enum member
+ * is misleadingly named — it does NOT hold a `stock_transfers.id`; see
+ * `transfer-order.service.ts:1281` and `:1415`, which write `to.id` into it.
+ *
+ * `transfer_orders.export_goods_issue_id` / `import_goods_receipt_id` pair the
+ * same two documents, but they are nulled when a receipt is deleted or
+ * reversed (`goods-receipt.service.ts:624-640`), so they are lossy for
+ * historical reporting. `gr.reference_id` survives on the receipt row.
+ *
+ * An issue with `reference_id IS NULL` — raised straight from the goods issue
+ * screen rather than from a transfer order — can never match, so it counts as
+ * shipped-but-unconfirmed forever. Deliberate: the report must not assert a
+ * receipt it has no evidence for.
+ *
+ * Deliberately NOT bounded by the period end: "chenh lech" means "still
+ * unconfirmed as of now", so a closed period does move when a late receipt
+ * arrives.
+ */
+export const PAIRED_RECEIPT_EXISTS = (gi: string) => `
+        ${gi}.reference_type = 'TRANSFER_ORDER'
+        AND ${gi}.reference_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM goods_receipts gr_p
+          WHERE gr_p.organization_id = ${gi}.organization_id
+            AND gr_p.status = 'POSTED'
+            AND gr_p.purpose = 'TRANSFER_IN'
+            AND gr_p.reference_type = 'STOCK_TRANSFER'
+            AND gr_p.reference_id = ${gi}.reference_id
+        )`;
+
+/**
  * Báo cáo 6 + 7 — inter-branch transfer activity, from TWO independent
  * document sources (both must be unioned — neither alone is complete):
  *
@@ -192,9 +227,20 @@ function transferByBranchSpecs(alias: string, withText: boolean): ReportColumnSp
  *      yet correctly shows zero incoming, unlike reading `transfer_orders`
  *      by itself would.
  *
+ * "received" is NOT read from the receipt side. It is the quantity of the
+ * ISSUE lines that have a posted paired receipt (`PAIRED_RECEIPT_EXISTS`), so
+ * it is a strict subset of the very rows that produce "out" and therefore
+ * `received - out <= 0` holds by construction rather than by luck. Reading it
+ * off `goods_receipts` — as this report did before — matched the two legs on
+ * branch pair alone, each filtered on its own document's `posted_at`, which
+ * made `received > out` routine: at a period boundary, on a duplicated
+ * receipt, or when a legacy transfer was also receipted by hand.
+ *
  * "value" reflects the cost basis at transfer time — `items.purchase_price`
- * for the legacy flow (no per-line price stored), the line's own
- * `unit_price` for the two-phase flow (real transaction price is captured).
+ * for the legacy flow, the line's own `unit_price` for the two-phase flow
+ * (real transaction price is captured). `stock_transfer_lines.unit_price`
+ * does exist but stays unused, so drill-downs that break these figures down
+ * can reconcile against the cell that opened them.
  *
  * Filter is `status = 'POSTED'` + `posted_at IN [startDate, endDate)` on
  * whichever document represents that leg (the transfer, the GoodsIssue, or
@@ -224,10 +270,11 @@ export class TransferReportService {
     // received", which is a different question from `in_qty` ("how much did
     // THIS branch itself receive from others"). For the legacy flow POSTED
     // is atomic so received always equals out (diff = 0, always healthy).
-    // For the two-phase flow, received is only counted once the destination
-    // has actually posted its GoodsReceipt — a shipment still in transit
-    // (GoodsIssue posted, no GoodsReceipt yet) correctly leaves the source
-    // branch's diff negative (shipped, not yet confirmed received).
+    // For the two-phase flow it rides on the ISSUE line, gated by
+    // `PAIRED_RECEIPT_EXISTS` — a shipment still in transit (GoodsIssue
+    // posted, no GoodsReceipt yet) leaves the source branch's diff negative.
+    // There is deliberately no branch reading `received` off `goods_receipts`:
+    // that is what let `received` exceed `out`.
     const sql = `
       WITH movements AS (
         SELECT
@@ -283,7 +330,11 @@ export class TransferReportService {
           0::numeric AS in_qty, 0::numeric AS in_value,
           gil.quantity::numeric AS out_qty,
           (gil.quantity::numeric * gil.unit_price::numeric) AS out_value,
-          0::numeric AS received_qty, 0::numeric AS received_value
+          CASE WHEN ${PAIRED_RECEIPT_EXISTS('gi')}
+               THEN gil.quantity::numeric ELSE 0 END AS received_qty,
+          CASE WHEN ${PAIRED_RECEIPT_EXISTS('gi')}
+               THEN (gil.quantity::numeric * gil.unit_price::numeric)
+               ELSE 0 END AS received_value
         FROM goods_issues gi
         JOIN goods_issue_lines gil ON gil.goods_issue_id = gi.id
         WHERE gi.organization_id = $1
@@ -309,26 +360,10 @@ export class TransferReportService {
           AND gr.posted_at >= $2 AND gr.posted_at < $3
           AND gr.source_branch_id IS NOT NULL
           AND gr.branch_id <> gr.source_branch_id
-
-        UNION ALL
-
-        SELECT
-          gr.source_branch_id AS branch_id,
-          0::numeric AS in_qty, 0::numeric AS in_value,
-          0::numeric AS out_qty, 0::numeric AS out_value,
-          grl.quantity::numeric AS received_qty,
-          (grl.quantity::numeric * grl.unit_price::numeric) AS received_value
-        FROM goods_receipts gr
-        JOIN goods_receipt_lines grl ON grl.goods_receipt_id = gr.id
-        WHERE gr.organization_id = $1
-          AND gr.status = 'POSTED'
-          AND gr.purpose = 'TRANSFER_IN'
-          AND gr.posted_at >= $2 AND gr.posted_at < $3
-          AND gr.source_branch_id IS NOT NULL
-          AND gr.branch_id <> gr.source_branch_id
       )
       SELECT
         b.id AS branch_id,
+        b.code AS branch_code,
         b.name AS branch_name,
         COALESCE(SUM(m.in_qty), 0) AS in_qty,
         COALESCE(SUM(m.in_value), 0) AS in_value,
@@ -339,7 +374,7 @@ export class TransferReportService {
       FROM movements m
       JOIN branches b ON b.id::text = m.branch_id AND b.organization_id = $1
       WHERE ($4::uuid[] IS NULL OR b.id = ANY($4))
-      GROUP BY b.id, b.name
+      GROUP BY b.id, b.code, b.name
       ORDER BY b.name ASC
     `;
 
@@ -362,7 +397,7 @@ export class TransferReportService {
       const valueReceived = Number(r.received_value ?? 0);
       return {
         branchId: r.branch_id,
-        branchCode: null,
+        branchCode: r.branch_code ?? null,
         branchName: r.branch_name ?? '',
         qtyIn: inQty,
         valueIn: inValue,
@@ -713,6 +748,7 @@ export class TransferReportService {
 
 interface RawTransferSummaryRow {
   branch_id: string;
+  branch_code: string | null;
   branch_name: string | null;
   in_qty: string | number | null;
   in_value: string | number | null;
