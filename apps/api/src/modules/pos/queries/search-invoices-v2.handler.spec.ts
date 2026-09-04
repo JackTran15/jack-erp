@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CompareOperator, StringOperator } from '../../../common/filters/filter.dto';
 import { CustomerEntity } from '../../customer/customer.entity';
-import { InvoiceEntity, InvoiceStatus } from '../entities/invoice.entity';
+import { InvoiceEntity } from '../entities/invoice.entity';
 import { InvoiceItemEntity } from '../entities/invoice-item.entity';
 import { SearchInvoicesV2Handler } from './search-invoices-v2.handler';
 import { SearchInvoicesV2Query } from './search-invoices-v2.query';
@@ -111,69 +111,6 @@ describe('SearchInvoicesV2Handler', () => {
     expect(result.data).toBe(rows);
     expect(result.total).toBe(12);
     expect(result.totals.totalAmount).toBe(26337000);
-  });
-
-  /**
-   * The invoice list screen showed held carts next to real sales, and their
-   * amounts landed in the footer total — four rows, three of which had never
-   * been sold. Drafts have their own picker; this grid is sales only.
-   */
-  describe('draft exclusion', () => {
-    const draftPredicate = (qb: FakeQb) =>
-      qb.andWhere.mock.calls.find(
-        (c: unknown[]) => (c[0] as string) === 'inv.status != :draftStatus',
-      );
-
-    it('excludes drafts from the rows query', async () => {
-      await build();
-      await handler.execute(new SearchInvoicesV2Query({}, actor));
-
-      expect(rowsQb().andWhere).toHaveBeenCalledWith('inv.status != :draftStatus', {
-        draftStatus: InvoiceStatus.DRAFT,
-      });
-    });
-
-    it('excludes drafts from the totals query too, so the footer matches the grid', async () => {
-      await build();
-      await handler.execute(new SearchInvoicesV2Query({}, actor));
-
-      // The count and the SUM come from this second builder. Excluding drafts
-      // on the rows query alone is the bug the user reported, one layer down:
-      // the grid would drop them while the footer total kept adding them in.
-      expect(draftPredicate(totalsQb())).toBeDefined();
-      expect(totalsQb().andWhere).toHaveBeenCalledWith('inv.status != :draftStatus', {
-        draftStatus: InvoiceStatus.DRAFT,
-      });
-    });
-
-    it('keeps excluding drafts when the caller filters by another status', async () => {
-      await build();
-      await handler.execute(
-        new SearchInvoicesV2Query({ status: { value: InvoiceStatus.CANCELLED } }, actor),
-      );
-
-      // Cancelled invoices stay visible — only draft is filtered out — and the
-      // exclusion is not silently dropped by the presence of a status filter.
-      expect(draftPredicate(rowsQb())).toBeDefined();
-      expect(
-        rowsQb().andWhere.mock.calls.some((c: unknown[]) =>
-          (c[0] as string).includes('inv.status'),
-        ),
-      ).toBe(true);
-    });
-
-    it('returns nothing when the caller explicitly asks for drafts', async () => {
-      await build();
-      await handler.execute(
-        new SearchInvoicesV2Query({ status: { value: InvoiceStatus.DRAFT } }, actor),
-      );
-
-      // status = draft AND status != draft. Contradictory by construction, which
-      // is the intended answer: this screen is not where drafts are read.
-      const predicates = rowsQb().andWhere.mock.calls.map((c: unknown[]) => c[0] as string);
-      expect(predicates).toContain('inv.status != :draftStatus');
-      expect(predicates.some((sql) => /inv\.status\s*=/.test(sql))).toBe(true);
-    });
   });
 
   describe('footer grand total', () => {

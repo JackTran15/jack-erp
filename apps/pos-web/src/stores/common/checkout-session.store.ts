@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { POINT_REDEMPTION_VALUE_VND } from "@erp/pos/constants/loyalty.constant";
-import { PaymentMethodEnum } from "@erp/pos/constants/checkout.constant";
 import { readSellableOnHand } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
   createPaymentLine,
@@ -564,23 +563,15 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
               : null,
             customerQuery: draft.customerName?.trim() ?? "",
           },
-          payment: {
-            ...base.payment,
-            // Có snapshot → trả đúng số thu ngân đã gõ, kèm tài khoản nhận tiền.
-            // Không có (phiếu nháp lưu trước khi có cột `draft_payments`) → một
-            // dòng tiền mặt bằng tổng phải thu, tức đúng hành vi cũ; để 0 ở đây
-            // là tái tạo lại chính lỗi đang sửa.
-            paymentLines:
-              draft.payments && draft.payments.length > 0
-                ? draft.payments.map((row) =>
-                    createPaymentLine(
-                      row.method,
-                      row.amount,
-                      row.paymentAccountId ?? null,
-                    ),
-                  )
-                : [createPaymentLine(PaymentMethodEnum.CASH, draft.total)],
-          },
+          payment:
+            draft.payments && draft.payments.length > 0
+              ? {
+                  ...base.payment,
+                  paymentLines: draft.payments.map((row) =>
+                    createPaymentLine(row.method, row.amount),
+                  ),
+                }
+              : base.payment,
         };
 
         let newSession: InvoiceSession;
@@ -876,33 +867,6 @@ export function computeOversellLines(
   state: PosCheckoutSessionState,
 ): CartLine[] {
   return getOversellSaleLines(selectPurchaseCart(state));
-}
-
-/**
- * Số dòng bán đang mang cờ chưa-biết-tồn, tính trên MỌI session (không riêng tab
- * active) vì `syncPurchaseCartOnHand` cũng quét mọi session.
- *
- * Đây là tín hiệu để `useSyncCartOnHand` chạy lại. Dòng thêm vào giỏ SAU lần
- * fetch catalog cuối — điển hình là dòng khôi phục từ hóa đơn lưu tạm — không
- * làm reference `catalogQuery.data` đổi, nên nếu effect chỉ phụ thuộc dữ liệu
- * catalog thì dòng đó kẹt `onHandUnknown` vĩnh viễn và bị báo vượt tồn oan.
- *
- * Trả về SỐ NGUYÊN chứ không phải mảng: subscribe một mảng dựng mới mỗi lần
- * render sẽ làm effect chạy vô hạn.
- *
- * Dòng `isReturnCredit` không đếm — hàng khách trả không cảnh báo vượt tồn, và
- * `syncPurchaseCartOnHand` cũng bỏ qua chúng.
- */
-export function selectUnknownOnHandLineCount(
-  state: PosCheckoutSessionState,
-): number {
-  let count = 0;
-  for (const session of state.sessions) {
-    for (const line of session.purchaseCart) {
-      if (!line.isReturnCredit && line.onHandUnknown) count += 1;
-    }
-  }
-  return count;
 }
 
 // ---------------------------------------------------------------------------

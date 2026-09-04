@@ -4,7 +4,7 @@ import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import type { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { FilterBuilder } from '../../../common/filters/filter.builder';
 import { CustomerEntity } from '../../customer/customer.entity';
-import { InvoiceEntity, InvoiceStatus } from '../entities/invoice.entity';
+import { InvoiceEntity } from '../entities/invoice.entity';
 import { InvoiceItemEntity } from '../entities/invoice-item.entity';
 import { invoiceSignedTotalSql } from '../services/invoice-amount.util';
 import { InvoiceSearchV2Dto } from '../dto/invoice-search-v2.dto';
@@ -161,13 +161,6 @@ export class SearchInvoicesV2Handler
     if (actor.branchId) {
       qb.andWhere('inv.branchId = :branchId', { branchId: actor.branchId });
     }
-
-    // Drafts are held carts, not sales. They are still editable, they carry no
-    // issued number, and counting them makes the grid footer disagree with the
-    // sales it is meant to total. This sits with the scope clauses rather than
-    // in the FilterBuilder block because it is not a user filter: the POS reads
-    // drafts through the dedicated drafts endpoint, never through this grid.
-    qb.andWhere('inv.status != :draftStatus', { draftStatus: InvoiceStatus.DRAFT });
 
     new FilterBuilder(qb)
       .applyString('inv.code',        dto.code)

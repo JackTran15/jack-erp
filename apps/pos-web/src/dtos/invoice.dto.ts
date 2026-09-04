@@ -30,18 +30,6 @@ export interface CreateInvoiceItemBody {
 }
 
 /** Body cho `POST /invoices` — tạo invoice ở trạng thái DRAFT. */
-/**
- * Ảnh chụp dòng thanh toán tại thời điểm "Lưu tạm" (`invoices.draft_payments`).
- * KHÁC `InvoicePaymentLineBody`: cái kia là tiền đã thu thật lúc thanh toán và
- * chảy vào sổ kế toán; cái này chỉ là số thu ngân đang gõ dở trên một phiếu chưa
- * bán, để mở lại tab thì thấy đúng số cũ.
- */
-export interface DraftPaymentBody {
-  method: ApiPaymentMethod;
-  amount: number;
-  paymentAccountId?: string;
-}
-
 export interface CreateInvoiceBody {
   sessionId: string;
   customerId?: string;
@@ -54,8 +42,6 @@ export interface CreateInvoiceBody {
    * `invoices.salesperson_id` (FK → employee_profiles), tách khỏi `staffId` (người tạo đơn).
    */
   salespersonId?: string;
-  /** Dòng thanh toán đang gõ dở, để mở lại phiếu lưu tạm không phải nhập lại tiền. */
-  payments?: DraftPaymentBody[];
 }
 
 /**
@@ -69,11 +55,6 @@ export interface UpdateInvoiceBody {
   items?: CreateInvoiceItemBody[];
   /** Nhân viên bán hàng = employee profile id. Xem `CreateInvoiceBody`. */
   salespersonId?: string;
-  /**
-   * Bỏ trống = giữ nguyên snapshot đang có trên draft; mảng rỗng = xoá. Đừng gửi
-   * `undefined` khi thật sự muốn xoá.
-   */
-  payments?: DraftPaymentBody[];
 }
 
 /**

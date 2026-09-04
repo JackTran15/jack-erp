@@ -43,11 +43,7 @@ export const useCheckoutDraft = (): UseCheckoutDraftResult => {
 
     const purchaseCart = selectPurchaseCart(sessionState);
     const selectedCustomer = selectCustomerDraft(sessionState).selectedCustomer;
-    const paymentDraft = selectPaymentDraft(sessionState);
-    const note = paymentDraft.note || undefined;
-    // Số tiền thu ngân đã gõ đi cùng phiếu. Không gửi kèm thì mở lại tab phải
-    // nhập lại tiền cho từng phiếu treo — đúng khiếu nại đang sửa.
-    const paymentLines = paymentDraft.paymentLines;
+    const note = selectPaymentDraft(sessionState).note || undefined;
     const selectedSalesperson =
       selectMetaDraft(sessionState).selectedSalesperson;
     // Tab mở từ một draft đã lưu → PATCH chính draft đó thay vì tạo bản mới.
@@ -62,7 +58,6 @@ export const useCheckoutDraft = (): UseCheckoutDraftResult => {
               customer: selectedCustomer,
               note,
               salesperson: selectedSalesperson,
-              paymentLines,
             }),
           })
         : await createMutation.mutateAsync(
@@ -72,7 +67,6 @@ export const useCheckoutDraft = (): UseCheckoutDraftResult => {
               customer: selectedCustomer,
               note,
               salesperson: selectedSalesperson,
-              paymentLines,
             }),
           );
       const message = sourceInvoiceId

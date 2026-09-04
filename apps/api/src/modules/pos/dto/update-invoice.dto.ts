@@ -1,7 +1,6 @@
 import { IsOptional, IsString, IsUUID, IsArray, ValidateNested, IsNumber, IsEnum, Min, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 import { LineDiscountType } from '../entities/invoice-item.entity';
-import { DraftPaymentDto } from './draft-payment.dto';
 
 export class UpdateInvoiceItemDto {
   @IsUUID() itemId: string;
@@ -26,10 +25,4 @@ export class UpdateInvoiceDto {
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => UpdateInvoiceItemDto) items?: UpdateInvoiceItemDto[];
   /** Employee (employee_profiles.id) credited with the sale. */
   @IsOptional() @IsUUID() salespersonId?: string;
-
-  /**
-   * Tendered payment lines to snapshot on the draft. Omitting the field leaves an
-   * existing snapshot untouched; an empty array clears it.
-   */
-  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => DraftPaymentDto) payments?: DraftPaymentDto[];
 }
