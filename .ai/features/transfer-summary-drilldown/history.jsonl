@@ -52,3 +52,4 @@
 {"action": "ticket review", "at": "2026-09-03T22:21:24", "by": "claude", "gate": "G4", "id": "877c4aa514c7", "ticket": "T-04-04", "ts": "2026-09-03T22:21:24.110804"}
 {"action": "ticket done", "at": "2026-09-03T22:21:24", "by": "loc", "gate": "G4", "id": "8ee72bfd8aa5", "ticket": "T-04-04", "ts": "2026-09-03T22:21:24.207294"}
 {"action": "passed", "at": "2026-09-03T22:23:41", "by": "loc", "evidence": "all 15 tickets done, all UoW checklists ticked", "gate": "G4", "id": "38999c5b833b", "ts": "2026-09-03T22:23:41.360218"}
+{"action": "reopened", "at": "2026-09-04T11:47:01", "by": "loc", "gate": "G3", "id": "e21356118de1", "reason": "Doi chieu giao dien that voi MISA - ghim cot, ngay gio doc duoc, them Doi tuong/Dien giai, bam so chung tu, ellipsis toan cuc, ten chi nhanh neo. Them UOW-05..07.", "ts": "2026-09-04T11:47:01.336576"}
