@@ -1,0 +1,63 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: transfer-summary-drilldown
+slug: transfer-summary-drilldown
+profile: none
+created: 2026-09-03T14:58:31
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-03T15:25:50
+    by: loc
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-03T15:25:50
+    by: loc
+    evidence: 13 assumptions, none blocking-and-pending; 16 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-03T15:25:50
+    by: loc
+    evidence: 7 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-03T15:25:50
+    by: loc
+    evidence: graph valid - 4 UoW, 16 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-03T16:16:45
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-03T16:16:45
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-03T16:16:45
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-03T16:16:45
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-03T16:22:00
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-03T16:25:17
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-03T16:27:12
+    by: claude
+    ticket: T-02-01

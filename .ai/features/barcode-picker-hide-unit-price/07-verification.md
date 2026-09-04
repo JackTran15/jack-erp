@@ -39,6 +39,7 @@ giới hạn phạm vi ở đây không phải chặt hơn — nó đo nhầm b�
 | S2 | Chọn tất cả rồi mở rộng một nhóm: dòng hàng hoá chỉ có ô nhập số lượng, không ô nhập đơn giá | `/admin/inventory-item-barcodes` | `click button[aria-label="Tìm kiếm"]; wait button:text-is("Chọn"); click input[aria-label="Chọn tất cả trên trang"]; click button[aria-label="Mở rộng"]` | AC-01 | `count input[aria-label^="Đơn giá"] = 0; count table:has(th:text-is("Giá mua TB")) th:text-is("Số lượng") = 1` |
 | S3 | "Nhập nhanh" chỉ còn ô Số lượng | `/admin/inventory-item-barcodes` | `click button[aria-label="Tìm kiếm"]; click input[aria-label="Chọn tất cả trên trang"]; click button:has-text("Nhập nhanh")` | AC-01 | `text=Nhập nhanh cho tất cả hàng hoá; no-text=Đơn giá` |
 | S4 | Xác nhận xong: bảng in tem đổ dòng, cột "Giá bán" có số tiền — giá vẫn lên tem | `/admin/inventory-item-barcodes` | `click button[aria-label="Tìm kiếm"]; wait button:text-is("Chọn"); click input[aria-label="Chọn tất cả ABA2777"]; click button:text-is("Chọn"); wait text=ABA2777-D-38` | AC-02 | `no-text=Giá mua TB; text=Tổng số lượng tem; text=750.000` |
+| S6 | Tab từ ô số lượng nhảy xuống ô số lượng dòng dưới, không dừng ở checkbox | `/admin/inventory-item-barcodes` | `click button[aria-label="Tìm kiếm"]; wait button:text-is("Chọn"); click input[aria-label="Chọn tất cả ABA2777"]; click button[aria-label="Mở rộng"]; press input[aria-label="Số lượng ABA2777-D-38"] = Tab` | AC-04 | `count input[aria-label="Số lượng ABA2777-D-39"]:focus = 1` |
 | S5 | Regression: picker của Xuất kho **vẫn còn** cột Đơn giá | `/inventory/goods-issues` | `click button:has-text("Thêm mới"); wait input[placeholder="Tìm mã hoặc tên"]; click div:has(input[placeholder="Tìm mã hoặc tên"]) > button[aria-label="Tìm kiếm"]` | AC-03 | `count table:has(th:text-is("Giá mua TB")) th:text-is("Đơn giá") = 1` |
 
 ## Đọc bằng chứng
@@ -72,6 +73,12 @@ giới hạn phạm vi ở đây không phải chặt hơn — nó đo nhầm b�
   nhau. Mã biến thể đầu tiên chỉ tồn tại trên bảng in tem (dialog ở bước này không mở rộng nhóm),
   nên chờ nó là chờ đúng thời điểm dữ liệu đã về.
 
+- **S6** là hệ quả trực tiếp của việc bỏ cột Đơn giá, nên phải nằm cùng lượt chạy: trước đây Tab
+  từ ô số lượng rơi vào ô đơn giá cùng dòng; bỏ cột đi thì phần tử tab kế tiếp là **checkbox của
+  dòng dưới**, tức nhập số lượng cho cả bảng phải bấm Tab hai lần mỗi dòng. Assertion neo vào
+  `:focus` của đúng ô số lượng dòng kế (`ABA2777-D-39`) — nếu handler hỏng, focus rơi về checkbox
+  và đếm ra 0. Ghim seed giống S4.
+
 ## Not verified here
 
 Nhập kho (`GoodsReceiptFormDialog`) và Chuyển kho (`StockTransferPage`) cũng truyền
@@ -88,3 +95,4 @@ trong `02-requirements.md`; `verify.py` sẽ cảnh báo — cảnh báo đúng,
 - AC-01: bỏ cột Đơn giá ở bước chọn hàng hoá của luồng in tem, chỉ còn nhập số lượng.
 - AC-02: giá bán vẫn hiển thị trên bảng in tem và vẫn được in lên tem.
 - AC-03: các luồng chứng từ khác giữ nguyên cột Đơn giá.
+- AC-04: Tab từ ô số lượng đi thẳng sang ô số lượng dòng dưới.
