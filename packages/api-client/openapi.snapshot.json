@@ -40313,6 +40313,16 @@
               "chain"
             ]
           },
+          "transferLeg": {
+            "type": "string",
+            "description": "Transfer document detail only — which leg of the pair is primary.\n\nDeclared here because the global ValidationPipe runs with\n`forbidNonWhitelisted`, so an undeclared field makes the whole request 400.",
+            "enum": [
+              "in",
+              "out",
+              "received",
+              "unmatched"
+            ]
+          },
           "period": {
             "description": "Custom period (inclusive ISO dates). Wins over `preset` when set.",
             "allOf": [

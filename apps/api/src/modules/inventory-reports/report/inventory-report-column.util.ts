@@ -25,6 +25,17 @@ export interface InventoryColumnDef {
   filterKind?: ReportColumnHeader['filterKind'];
   filterOptions?: ReportFilterOption[];
   width?: number;
+  /**
+   * Render the cell as a link.
+   *
+   * Opt-in per column, and it has to come from the catalog rather than the
+   * client registry: `ReportTableConfigSync` overwrites the registry config
+   * whenever the columns API returns anything, so a flag set only on the client
+   * makes a cell clickable or not depending on whether a saved column template
+   * exists. The flag is styling and affordance only — whether a click does
+   * anything is decided by the drill-down resolver.
+   */
+  link?: boolean;
 }
 
 /** Build the enriched catalog headers of one inventory report. */
@@ -50,6 +61,7 @@ export function buildInventoryHeaders(
       filterKind: d.filterKind ?? filterKindFor(d.type, d.key),
       align: NUMBER_TYPES.has(d.type) ? 'right' : 'left',
     };
+    if (d.link) header.link = true;
     if (d.filterOptions) header.filterOptions = d.filterOptions;
     if (d.width !== undefined) header.width = d.width;
     if (pinned.has(d.key)) header.pinned = 'left';

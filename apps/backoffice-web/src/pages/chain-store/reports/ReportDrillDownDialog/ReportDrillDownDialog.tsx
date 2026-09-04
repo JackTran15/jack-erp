@@ -11,6 +11,7 @@ import type { ReportDrillDown } from "../../../../store/page-stores/report/repor
 import { InvoiceDetailDialog } from "../InvoiceDetailDialog/InvoiceDetailDialog";
 import { ReportColumnFilterSync } from "../ReportColumnFilterSync/ReportColumnFilterSync";
 import { ReportExportButtons } from "../ReportPageHeader/ReportPageToolbar/ReportExportButtons/ReportExportButtons";
+import { ReportDrillDownMount } from "./ReportDrillDownMount";
 import { ReportPageTable } from "../ReportPageTable/ReportPageTable";
 import { ReportTableConfigSync } from "../ReportTableConfigSync/ReportTableConfigSync";
 
@@ -61,6 +62,14 @@ function ReportDrillDownBody({ drillDown, onClose }: BodyProps) {
         </Button>
       </div>
       <InvoiceDetailDialog />
+      {/*
+        Mount lại chính cái mount của drill-down, bên trong provider lồng: nhờ
+        đó một ô trong dialog này mở được dialog kế tiếp (L1 → L2 → L3).
+        Đệ quy tự dừng — `drillDown` của tầng trong cùng là null nên
+        `ReportDrillDownDialog` render `AppModal` rỗng và không dựng thêm thân
+        nào nữa. z-index đã do `AppModal` xử lý bằng stack ở module scope.
+      */}
+      <ReportDrillDownMount />
     </div>
   );
 }

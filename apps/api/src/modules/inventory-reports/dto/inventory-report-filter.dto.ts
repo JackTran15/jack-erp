@@ -2,6 +2,8 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   INVENTORY_REPORT_VIEW_MODES,
   InventoryReportViewMode,
+  TRANSFER_LEGS,
+  TransferLeg,
 } from '@erp/shared-interfaces';
 import { Type } from 'class-transformer';
 import {
@@ -90,6 +92,17 @@ export class InventoryReportFilterDto {
   @IsArray()
   @IsUUID('4', { each: true })
   receivingStoreIds?: string[];
+
+  /**
+   * Transfer document detail only — which leg of the pair is primary.
+   *
+   * Declared here because the global ValidationPipe runs with
+   * `forbidNonWhitelisted`, so an undeclared field makes the whole request 400.
+   */
+  @ApiPropertyOptional({ enum: TRANSFER_LEGS })
+  @IsOptional()
+  @IsIn(TRANSFER_LEGS as unknown as string[])
+  transferLeg?: TransferLeg;
 
   /** Hide rows with all-zero measures (stock-period reports; default true). */
   @IsOptional()

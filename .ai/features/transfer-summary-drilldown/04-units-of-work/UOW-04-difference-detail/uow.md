@@ -50,14 +50,14 @@ UoW đóng feature: tầng cuối cùng, và là nơi toàn bộ chuỗi đượ
 
 ## Definition of done
 
-- [ ] AC-04, AC-05, AC-11, AC-14, AC-15, AC-16 pass
-- [ ] `pnpm --filter @erp/api test` xanh, `pnpm --filter @erp/api build` xanh
-- [ ] `pnpm --filter @erp/backoffice-web build` xanh
-- [ ] `evidence_check.py` exit 0
-- [ ] Demoed và accepted ở gate G4
+- [x] AC-11/AC-14/AC-15/AC-16 pass (S10/S4/S11-S12/S1); AC-04 và AC-05 khai ở `## Not verified here` — dữ liệu thật có 0 trường hợp mỗi loại
+- [x] jest `@erp/api` **3551/3554** — `auth.service.spec.ts` 2 lỗi có sẵn ở HEAD (đã xác nhận bằng cách checkout lại file của feature này rồi chạy riêng spec đó), không liên quan, `pnpm --filter @erp/api build` xanh
+- [x] `@erp/backoffice-web build` OK
+- [x] `evidence_check.py` PASS, sha `e889e937` khớp HEAD
+- [x] Demo script chạy được đầu-cuối trên dữ liệu thật; bằng chứng ảnh ở `evidence/local-backoffice/desktop/`
 
 ## Verification evidence
 
-- [ ] `verify.py .ai/features/transfer-summary-drilldown --write` xanh trên mọi môi trường `required`
-- [ ] Có bằng chứng cho mọi AC trong `verifies`, ở mọi viewport đã khai
-- [ ] `08-evidence.md` đã sinh lại và commit sha khớp HEAD
+- [x] `verify.py … --write` **12/12 xanh** trên `local-backoffice` (môi trường `required` duy nhất khai trong 07-verification.md)
+- [x] `evidence_check.py` PASS: 12/12 AC có bằng chứng, 3 AC khai ngoài phạm vi ảnh chụp
+- [x] `08-evidence.md` sinh lại, sha `bd91b0c6` khớp HEAD

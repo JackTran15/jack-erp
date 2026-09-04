@@ -23,6 +23,11 @@ export enum REPORT_FILTERS_LINE {
     // mặt hàng đi chung đường buildSearchFilters với mọi filter khác — nhờ đó
     // xuất khẩu và in trong dialog cũng được thu hẹp đúng SKU.
     SKU = 'sku',
+    // Cùng loại với SKU ở trên: không phải ô nhập liệu, không registry nào khai,
+    // nên không bao giờ được render. Nó tồn tại để drill-down chứng từ điều
+    // chuyển đi chung đường buildInventorySearchFilters — nhờ đó xuất khẩu và in
+    // trong dialog cũng thu hẹp đúng chân đang xem.
+    TRANSFER_LEG = 'transfer_leg',
     CHECKBOX_ALLOCATE_COMBO = 'allocate_combo_revenue',
 
     // === Công nợ ===
@@ -133,6 +138,10 @@ export const REPORT_FILTERS_LINE_METADATA = {
     [REPORT_FILTERS_LINE.SKU]: {
         label: 'mã SKU',
         backendField: 'sku',
+    },
+    [REPORT_FILTERS_LINE.TRANSFER_LEG]: {
+        label: 'chân chứng từ',
+        backendField: 'transferLeg',
     },
     [REPORT_FILTERS_LINE.CHECKBOX_ALLOCATE_COMBO]: {
         backendField: 'allocateComboRevenue',

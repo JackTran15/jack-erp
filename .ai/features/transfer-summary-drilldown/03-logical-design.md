@@ -59,7 +59,7 @@ chỉ miễn trừ `transfer-summary.report.ts` khỏi luật cấm `paginateRow
 
 Vì bốn nhánh này là bốn nhánh của báo cáo 6 cộng đúng một vị ngữ, **Σ dòng L1 ≡ dòng cha** trên cả
 sáu chỉ tiêu — AC-07 đúng theo cấu trúc, không phải theo may mắn. Spec ở T-02-02 chạy cả hai truy
-vấn trên cùng seed và so từng chỉ tiêu.
+vấn trên cùng dữ liệu thật của `erp_dev` và so từng chỉ tiêu.
 
 ### Khối 3 — L2/L3: `transfer-detail.service.ts`
 
@@ -112,7 +112,7 @@ theo đúng luật của ADR-01 feature trước. Logic đảo chiều xuất/nh
 | Giữ nguyên công thức, chỉ thêm drill-down để người dùng tự diễn giải | Không giải quyết vấn đề gốc. Người dùng vẫn nhìn thấy "xuất 127 nhập về 173" và vẫn phải hỏi. Đã trình bày và người dùng chọn sửa công thức |
 | Chặn post phiếu nhập vượt số đã xuất, ở `goods-receipt.service` | Chạm luồng nghiệp vụ chứ không chỉ tầng đọc; rủi ro cao hơn hẳn. Không sửa được dữ liệu lịch sử. Đã trình bày, người dùng chọn không làm |
 | Ghép hai chân theo cặp chi nhánh + kỳ, kẹp trần ở số đã xuất | Vẫn ghép sai cặp khi có nhiều chuyến trong kỳ; dialog L3 sẽ trộn hai loại dòng có ý nghĩa khác nhau; và cái trần là một phép chữa cháy không có nghĩa nghiệp vụ. Liên kết thật đã tồn tại — dùng nó |
-| Chặn `EXISTS` ở `gr.posted_at < periodEnd` để kỳ đã chốt tái lập được | Người dùng chọn ngược lại (D3): ưu tiên "đến giờ này vẫn chưa ai nhận" để truy được hàng thất lạc. Fixture TO-4 giữ lại để quyết định này kiểm chứng được, và đảo lại là sửa một dòng |
+| Chặn `EXISTS` ở `gr.posted_at < periodEnd` để kỳ đã chốt tái lập được | Người dùng chọn ngược lại (D3): ưu tiên "đến giờ này vẫn chưa ai nhận" để truy được hàng thất lạc. Đảo lại là sửa một dòng. Lưu ý: dữ liệu thật có **0** phiếu nhận sau cuối kỳ, nên quyết định này chưa được kiểm chứng bằng dữ liệu, chỉ bằng cấu trúc truy vấn |
 | Mở rộng `document-detail.service.ts` (Báo cáo 2) thay vì viết service mới | Xem ADR-04 |
 | Coi phiếu lập tay như tự xác nhận (`received = out`) | Xem ADR-02 |
 | Dùng `transfer_orders.export_goods_issue_id` / `import_goods_receipt_id` để ghép | Hai cột này bị set NULL khi phiếu nhập bị xoá/đảo (`goods-receipt.service.ts:624-640`) nên mất mát với dữ liệu lịch sử. `gr.reference_id` sống sót trên chính dòng phiếu nhập |
@@ -236,8 +236,8 @@ phải thứ phải đi kiểm tra.
 được tính; phiếu nhập trùng hết làm phồng số. Phải ghi vào release note.
 
 Không chặn `gr.posted_at < periodEnd` (D3 của người dùng): "chênh lệch" nghĩa là *"đến giờ này vẫn
-chưa ai nhận"*. Đổi lại, số của kỳ đã chốt sẽ đổi khi phiếu nhập về muộn. Fixture TO-4 tồn tại
-riêng để quyết định này kiểm chứng được, và đảo lại là sửa một dòng.
+chưa ai nhận"*. Đổi lại, số của kỳ đã chốt sẽ đổi khi phiếu nhập về muộn. Đảo lại là sửa một dòng. Dữ liệu thật hiện
+không có phiếu nhận nào rơi sau cuối kỳ, nên khác biệt giữa hai lựa chọn chưa quan sát được.
 
 ### ADR-02 — Phiếu điều chuyển lập tay (`reference_id IS NULL`) tính là chưa xác nhận nhận
 **Status:** accepted
@@ -252,8 +252,8 @@ không biết.
 
 Quyết định của người dùng: `received = 0`. Chúng nằm vĩnh viễn trong L3. Đánh đổi được nêu rõ
 trước khi chốt và người dùng chấp nhận. Rủi ro còn lại là A-02 — nếu vận hành dùng nhiều luồng lập
-tay thì cột chênh lệch thành nhiễu; T-01-04 đếm số phiếu này và báo lại **trước khi** merge UoW-1,
-đủ để mở lại quyết định qua `aidlc reopen G2` nếu cần.
+tay thì cột chênh lệch thành nhiễu; Đã đo trên `erp_dev`: **0/337**, nên rủi ro rỗng ở
+môi trường này. Vẫn phải đo lại trên DB khách trước bàn giao.
 
 ### ADR-03 — Luồng `stock_transfers` cũ giữ nguyên, `received = out`
 **Status:** accepted
@@ -321,3 +321,32 @@ tương đương — `buildInventoryHeaders` chưa bao giờ set `link`.
 Chỉ khai `link: true` ở registry FE thì ô sẽ click được lúc có lúc không, tuỳ template cột đã lưu.
 Vì vậy thêm `link?: boolean` vào `InventoryColumnDef` (opt-in, 8 báo cáo kho còn lại không đổi), và
 vẫn khai ở registry FE cho nhánh fallback. Spec ở T-02-03 assert đúng những cột dự kiến mang cờ.
+
+### ADR-08 — Bằng chứng chạy trên dữ liệu vận hành thật, không seed
+**Status:** accepted
+
+Bản kế hoạch đầu tiên có một ticket dựng seed điều chuyển tất định. Ticket đó đã được viết, chạy,
+và **xoá lại** sau khi đo dữ liệu thật trong `erp_dev` (org MT):
+
+| Ca | Dữ liệu thật |
+|---|---|
+| Cặp phiếu đã ghép (AC-09, AC-10) | 300 |
+| Đang vận chuyển — L3 có dòng (AC-11) | 27 |
+| Chi nhánh có mã (AC-01) | 14/15 |
+| Phiếu lập tay `reference_id` NULL (AC-04) | **0** |
+| `stock_transfers` liên chi nhánh POSTED (AC-05) | **0** |
+| Phiếu nhận sau cuối kỳ (D3) | **0** |
+
+Với mọi AC chụp ảnh được trừ hai cái, dữ liệu thật là bằng chứng **mạnh hơn**: 15 chi nhánh thay
+vì 3, số chứng từ thật của khách, 300 cặp thay vì 4 — và nó chứa đúng ca khách báo (dòng
+"Chi Nhánh cũ không dùng", *xuất 22 nhập về 31*, sau khi sửa là 22 / 22 / 0). Một bộ fixture ba
+chi nhánh không thêm được gì vào đó.
+
+AC-04 và AC-05 thì dữ liệu thật có 0 trường hợp. Cách duy nhất để có ảnh là **tự tạo ra tình huống
+chưa từng xảy ra** rồi chụp nó — thứ trông như bằng chứng nhưng chỉ chứng minh rằng ta biết viết
+INSERT. Chúng chuyển xuống mục `## Not verified here` của `07-verification.md`, kèm ghi chú rằng
+`transfer-report.service.spec.ts` mock `DataSource` nên spec chỉ khẳng định được cấu trúc SQL,
+không khẳng định được hành vi. Đó là giới hạn thật và phải nói ra, không phải che bằng fixture.
+
+Hệ quả: seed và ticket T-01-02 bị xoá; các dòng seed đã chèn vào `erp_dev` đã được dọn, kể cả mã
+chi nhánh `CH-xxxx` mà nó tự điền vào một chi nhánh vốn không có mã.

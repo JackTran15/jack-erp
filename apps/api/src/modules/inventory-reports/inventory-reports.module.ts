@@ -31,11 +31,15 @@ import { StockSummaryReport } from './report/reports/stock-summary.report';
 import { StockSummaryByStoreReport } from './report/reports/stock-summary-by-store.report';
 import { TempWarehouseOutReport } from './report/reports/temp-warehouse-out.report';
 import { TransferByStoreReport } from './report/reports/transfer-by-store.report';
+import { TransferDifferenceDetailReport } from './report/reports/transfer-difference-detail.report';
+import { TransferDocumentDetailReport } from './report/reports/transfer-document-detail.report';
+import { TransferSummaryByCounterpartReport } from './report/reports/transfer-summary-by-counterpart.report';
 import { TransferSummaryReport } from './report/reports/transfer-summary.report';
 import { DocumentDetailService } from './services/document-detail.service';
 import { StockBalancePivotService } from './services/stock-balance-pivot.service';
 import { StockPeriodService } from './services/stock-period.service';
 import { TempWarehouseReportService } from './services/temp-warehouse-report.service';
+import { TransferDetailService } from './services/transfer-detail.service';
 import { TransferReportService } from './services/transfer-report.service';
 
 /** Every registered inventory report definition (order = catalog order). */
@@ -46,6 +50,11 @@ const REPORT_DEFINITIONS = [
   StockSummaryByStoreReport,
   StockByStorePivotReport,
   TransferSummaryReport,
+  // Dialog-only: reached by clicking a branch name on the summary above, and
+  // deliberately not listed in the client's report picker.
+  TransferSummaryByCounterpartReport,
+  TransferDocumentDetailReport,
+  TransferDifferenceDetailReport,
   TransferByStoreReport,
   TempWarehouseOutReport,
 ];
@@ -83,6 +92,7 @@ const REPORT_DEFINITIONS = [
   providers: [
     StockPeriodService,
     StockBalancePivotService,
+    TransferDetailService,
     TransferReportService,
     DocumentDetailService,
     TempWarehouseReportService,

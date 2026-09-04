@@ -486,17 +486,18 @@ export function ReportPageTableView({ rows, totals }: Props) {
                       row: row.original,
                       filters,
                     });
+                    const display = isReportNumberColumn(col)
+                      ? formatReportNumber(raw)
+                      : (raw ?? "");
                     const content = action ? (
                       <a
                         className="cursor-pointer text-info hover:underline"
                         onClick={() => runDrillDown(action)}
                       >
-                        {raw}
+                        {display}
                       </a>
-                    ) : isReportNumberColumn(col) ? (
-                      formatReportNumber(raw)
                     ) : (
-                      raw ?? ""
+                      display
                     );
                     return (
                       <td

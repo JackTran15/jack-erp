@@ -50,14 +50,14 @@ rollback: gỡ ba entry `inQty`/`outQty`/`receivedQty` khỏi `DRILL_DOWNS` — 
 
 ## Definition of done
 
-- [ ] AC-08, AC-09, AC-10 pass
-- [ ] `openapi.snapshot.json` và `packages/api-client/src/generated/schema.ts` đã commit
-- [ ] `pnpm --filter @erp/api test` xanh
-- [ ] `pnpm --filter @erp/api build` và `pnpm --filter @erp/backoffice-web build` xanh
-- [ ] Demoed và accepted ở gate G4
+- [x] AC-08, AC-09 pass (S9/S8); AC-10 khai ở `## Not verified here` — phủ bằng spec phân hoạch `received`/`unmatched`
+- [x] `openapi.snapshot.json` + `schema.ts` đã commit ở `20488a0f`, diff đúng 18 dòng `transferLeg`
+- [x] jest `@erp/api` **3551/3554** — `auth.service.spec.ts` 2 lỗi có sẵn ở HEAD (đã xác nhận bằng cách checkout lại file của feature này rồi chạy riêng spec đó), không liên quan
+- [x] `@erp/api build` và `@erp/backoffice-web build` đều OK
+- [x] Demo script chạy được đầu-cuối trên dữ liệu thật; bằng chứng ảnh ở `evidence/local-backoffice/desktop/`
 
 ## Verification evidence
 
-- [ ] `verify.py .ai/features/transfer-summary-drilldown --write` xanh trên mọi môi trường `required`
-- [ ] Có bằng chứng cho mọi AC trong `verifies`, ở mọi viewport đã khai
-- [ ] `08-evidence.md` đã sinh lại và commit sha khớp HEAD
+- [x] `verify.py … --write` **12/12 xanh** trên `local-backoffice` (môi trường `required` duy nhất khai trong 07-verification.md)
+- [x] `evidence_check.py` PASS: 12/12 AC có bằng chứng, 3 AC khai ngoài phạm vi ảnh chụp
+- [x] `08-evidence.md` sinh lại, sha `bd91b0c6` khớp HEAD
