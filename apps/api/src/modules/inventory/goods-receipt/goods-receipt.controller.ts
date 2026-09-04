@@ -26,6 +26,7 @@ import { PermissionGuard } from '../../rbac/permission.guard';
 import { BranchScopeGuard } from '../../rbac/branch-scope.guard';
 import { AuditInterceptor } from '../../crud/audit.interceptor';
 import { PaginationQueryDto } from '../../crud/dto';
+import { VoucherDetailQueryDto } from '../dto/voucher-detail-query.dto';
 import { ExportPipeline } from '../../reporting/report-core/export/export-pipeline';
 import { HttpResponseSink } from '../../reporting/report-core/export/http-response.sink';
 import { VoucherXlsxWriter } from '../../reporting/report-core/export/voucher-xlsx.writer';
@@ -83,20 +84,12 @@ export class GoodsReceiptController {
   @RequireBranchScope()
   getById(
     @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: VoucherDetailQueryDto,
     @Actor() actor: ActorContext,
   ) {
-    return this.service.getById(id, actor);
-  }
-
-  @Get(':id/lines')
-  @RequirePermission('goods_receipt.read')
-  @RequireBranchScope()
-  getLines(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Query() query: PaginationQueryDto,
-    @Actor() actor: ActorContext,
-  ) {
-    return this.service.getLines(id, actor, query.page, query.pageSize);
+    return this.service.getById(id, actor, {
+      includeLines: query.includeLines,
+    });
   }
 
   @Get(':id/print-payload')

@@ -36,6 +36,39 @@ const line = (itemId: string, locationId: string) => ({
 });
 
 describe('CreateGoodsReceiptV2Handler', () => {
+  it('numbers the lines 1..n in submitted order (T-04-03, ADR-05)', async () => {
+    const { handler, manager } = makeHandler({
+      items: [
+        { id: 'v1', productId: 'p1' },
+        { id: 'v2', productId: 'p1' },
+        { id: 'v3', productId: 'p1' },
+      ],
+    });
+
+    await handler.execute(
+      new CreateGoodsReceiptV2Command(
+        {
+          receivedAt: '2026-06-18T00:00:00.000Z',
+          lines: [line('v1', 'L1'), line('v2', 'L1'), line('v3', 'L1')],
+        } as never,
+        actor,
+      ),
+    );
+
+    // This path builds its lines itself rather than going through
+    // GoodsReceiptService.makeLine, so it is its own chance to forget the
+    // ordinal — and `line_no` is NOT NULL with no default, so forgetting it
+    // fails at the insert.
+    const created = manager.create.mock.calls
+      .map((c) => c[1] as { lineNo?: number; itemId?: string })
+      .filter((o) => 'itemId' in o);
+    expect(created.map((o) => [o.lineNo, o.itemId])).toEqual([
+      [1, 'v1'],
+      [2, 'v2'],
+      [3, 'v3'],
+    ]);
+  });
+
   it('creates a DRAFT, mirrors a supplier counterparty into provider_id', async () => {
     const { handler, manager } = makeHandler({
       items: [

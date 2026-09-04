@@ -73,7 +73,12 @@ export interface GoodsIssue {
   approvedAt?: string;
   postedBy?: string;
   postedAt?: string;
-  lines: GoodsIssueLine[];
+  /**
+   * Optional since T-02-01: `GET /:id?includeLines=false` returns the header
+   * alone, and the view dialog pages the lines separately. Every other caller
+   * still gets them, because the flag defaults to true.
+   */
+  lines?: GoodsIssueLine[];
   createdAt: string;
   /**
    * Per-row Tổng tiền, present on `/v2/inventory/goods-issues/search` list rows

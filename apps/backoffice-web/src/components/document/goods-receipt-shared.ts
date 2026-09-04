@@ -71,7 +71,12 @@ export interface GoodsReceipt {
     storageId?: string;
   } | null;
   attachmentIds?: string[];
-  lines: GoodsReceiptLine[];
+  /**
+   * Optional since T-02-01: `GET /:id?includeLines=false` returns the header
+   * alone, and the view dialog pages the lines separately. Every other caller
+   * still gets them, because the flag defaults to true.
+   */
+  lines?: GoodsReceiptLine[];
   /**
    * Per-row Tổng tiền, present on `/v2/goods-receipts/search` list rows (which
    * no longer carry `lines`) but not on the `GET /:id` shape — that one keeps

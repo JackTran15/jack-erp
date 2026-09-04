@@ -104,13 +104,6 @@ export interface GoodsReceiptQuery extends PaginationQuery {
   branchId?: string;
 }
 
-export interface GoodsReceiptLinesPage {
-  items: GoodsReceiptLineEntity[];
-  page: number;
-  pageSize: number;
-  hasMore: boolean;
-  total: number;
-}
 
 @Injectable()
 export class GoodsReceiptService {
@@ -182,8 +175,14 @@ export class GoodsReceiptService {
       cashAccountId: dto.cashAccountId,
       attachmentIds: dto.attachmentIds ?? [],
       references: dto.references ?? [],
-      lines: dto.lines.map((l) =>
-        this.makeLine(l, actor.organizationId, actor.branchId, actor.userId),
+      lines: dto.lines.map((l, index) =>
+        this.makeLine(
+          l,
+          index + 1,
+          actor.organizationId,
+          actor.branchId,
+          actor.userId,
+        ),
       ),
     });
 
@@ -325,9 +324,19 @@ export class GoodsReceiptService {
       actor.branchId,
     );
 
+    // Renumbered wholesale from the new array rather than preserving the old
+    // ordinals: the update path below deletes every line and re-inserts, and
+    // keeping old numbers would collide on the unique index the moment a line is
+    // inserted into the middle.
     const nextLines = dto.lines
-      ? dto.lines.map((l) =>
-          this.makeLine(l, receipt.organizationId, receipt.branchId, actor.userId),
+      ? dto.lines.map((l, index) =>
+          this.makeLine(
+            l,
+            index + 1,
+            receipt.organizationId,
+            receipt.branchId,
+            actor.userId,
+          ),
         )
       : null;
 
@@ -1078,11 +1087,21 @@ export class GoodsReceiptService {
 
   // ─── Read ─────────────────────────────────────────────────────────────────
 
-  async getById(id: string, actor: ActorContext): Promise<GoodsReceiptEntity> {
+  /**
+   * `opts.includeLines: false` returns the header alone (ADR-03) — the view dialog
+   * pages its lines through {@link getLines}. Default stays `true` so every
+   * existing caller, the edit dialog included, is untouched.
+   */
+  async getById(
+    id: string,
+    actor: ActorContext,
+    opts: { includeLines?: boolean } = {},
+  ): Promise<GoodsReceiptEntity> {
     const receipt = await this.findOrFail(
       id,
       actor.organizationId,
       actor.branchId,
+      opts.includeLines ?? true,
     );
     await attachCounterparties(
       this.receiptRepo.manager,
@@ -1097,39 +1116,7 @@ export class GoodsReceiptService {
     return receipt;
   }
 
-  /**
-   * Paginated lines for one receipt (T-01-02) — the existence/scope check is a
-   * deliberately lean `findOne` with `loadEagerRelations: false`, NOT
-   * `findOrFail`, so it doesn't pull the receipt's eager `lines` just to prove
-   * the receipt exists and is in scope.
-   */
-  async getLines(
-    id: string,
-    actor: ActorContext,
-    page: number,
-    pageSize: number,
-  ): Promise<GoodsReceiptLinesPage> {
-    const exists = await this.receiptRepo.findOne({
-      where: {
-        id,
-        organizationId: actor.organizationId,
-        ...(actor.branchId ? { branchId: actor.branchId } : {}),
-      },
-      loadEagerRelations: false,
-    });
-    if (!exists)
-      throw new NotFoundException(`Phiếu nhập kho ${id} không tìm thấy`);
-
-    const [items, total] = await this.lineRepo.findAndCount({
-      where: { goodsReceiptId: id, organizationId: actor.organizationId },
-      order: { createdAt: "ASC" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    });
-
-    return { items, page, pageSize, hasMore: page * pageSize < total, total };
-  }
-
+  
   /** Print/export payload for one receipt (T-03-02, UOW-08) — reuses `getById`'s 404. */
   async getPrintPayload(
     id: string,
@@ -1213,9 +1200,19 @@ export class GoodsReceiptService {
     id: string,
     organizationId: string,
     branchId?: string,
+    includeLines = true,
   ): Promise<GoodsReceiptEntity> {
     const receipt = await this.receiptRepo.findOne({
       where: { id, organizationId, ...(branchId ? { branchId } : {}) },
+      // `loadEagerRelations` is all-or-nothing, so skipping `lines` means naming
+      // the header relations back. Keep this list in step with the eager
+      // relations on GoodsReceiptEntity.
+      ...(includeLines
+        ? {}
+        : {
+            loadEagerRelations: false,
+            relations: { provider: true, location: true },
+          }),
     });
     if (!receipt)
       throw new NotFoundException(`Phiếu nhập kho ${id} không tìm thấy`);
@@ -1269,13 +1266,20 @@ export class GoodsReceiptService {
     }
   }
 
+  /**
+   * `lineNo` is the 1-based index in the submitted array — that array is the
+   * order the user sees on the grid, which is what "the order it was typed"
+   * means (ADR-05).
+   */
   private makeLine(
     src: GoodsReceiptLineDto,
+    lineNo: number,
     organizationId: string,
     branchId: string | undefined,
     createdBy: string,
   ): GoodsReceiptLineEntity {
     const line = new GoodsReceiptLineEntity();
+    line.lineNo = lineNo;
     line.organizationId = organizationId;
     line.branchId = branchId;
     line.createdBy = createdBy;

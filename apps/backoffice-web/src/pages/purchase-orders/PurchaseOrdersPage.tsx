@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery , useQueryClient} from "@tanstack/react-query";
 import { erpApi, requireErpData } from "../../lib/erp-api";
 import {
   navigateToBarcodePrint,
@@ -147,12 +147,16 @@ function renderStatusBadge(status: PurchaseOrderStatus) {
   return <StatusBadge variant={variant}>{STATUS_LABEL[status]}</StatusBadge>;
 }
 
-/** GET /goods-receipts/:id/lines response shape (paginated). */
+/**
+ * `POST /v2/goods-receipts/:id/lines/search` response.
+ *
+ * Replaced `GET /:id/lines`, which is gone. No `hasMore` any more — the envelope
+ * reports `total`, so "is there another page" is `page * limit < total`.
+ */
 interface GoodsReceiptLinesPage {
-  items: PurchaseOrderLine[];
+  data: PurchaseOrderLine[];
   page: number;
-  pageSize: number;
-  hasMore: boolean;
+  limit: number;
   total: number;
 }
 
@@ -168,6 +172,7 @@ export function PurchaseOrdersPage({
   const isPurchaseMode = mode === "purchase";
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   // `totalAmount` is the server's SUM over every matching row, not only this
   // page — it backs the footer total.
   const [records, setRecords] = useState<
@@ -324,8 +329,9 @@ export function PurchaseOrdersPage({
     if (!openDocumentId) return;
     void (async () => {
       try {
+        // Header only: the view dialog pages its own lines (UOW-03).
         const { data } = await apiClient.get<PurchaseOrder>(
-          `/goods-receipts/${openDocumentId}`,
+          `/goods-receipts/${openDocumentId}?includeLines=false`,
         );
         setSelectedId(data.id);
         setEditingOrder(data);
@@ -617,13 +623,13 @@ export function PurchaseOrdersPage({
           onClick={(e) => {
             e.stopPropagation();
             setSelectedId(row.id);
-            // Row no longer carries `lines` — fetch the full document before
-            // opening the view dialog (mirrors the openDocumentId deep-link
-            // fetch above).
+            // Row carries no `lines`, and the view dialog does not want them —
+            // it pages them itself. Fetch the header alone (mirrors the
+            // openDocumentId deep-link fetch above).
             void (async () => {
               try {
                 const { data } = await apiClient.get<PurchaseOrder>(
-                  `/goods-receipts/${row.id}`,
+                  `/goods-receipts/${row.id}?includeLines=false`,
                 );
                 setEditingOrder(data);
                 setDialogMode("view");
@@ -865,7 +871,10 @@ export function PurchaseOrdersPage({
           // seeds its form state from `initial` only on mount (see T-06-05);
           // without this, a stale `initial` prop swap on an already-mounted
           // instance would save one record's edited data under another's id.
-          key={editingOrder?.id ?? "new"}
+          // Mode is part of the key on purpose: view and edit seed their rows from
+          // different sources (a paginated query vs. `initial.lines`), so switching
+          // must remount and re-seed rather than reuse the previous mode's state.
+          key={`${editingOrder?.id ?? "new"}:${dialogMode}`}
           mode={dialogMode}
           initial={editingOrder}
           providers={providers}
@@ -879,13 +888,38 @@ export function PurchaseOrdersPage({
             setAutoSelectTransferOrder(null);
           }}
           onSaved={async () => {
+            // The view dialog serves its grid from a cached page of
+            // `["goods-receipt-lines", id, ...]`; without this, reopening after
+            // an edit shows the pre-edit page.
+            if (editingOrder) {
+              await queryClient.invalidateQueries({
+                queryKey: ["goods-receipt-lines", editingOrder.id],
+              });
+            }
             setDialogMode(null);
             setEditingOrder(null);
             setAutoOpenTransferPicker(false);
             setAutoSelectTransferOrder(null);
             await loadRecords();
           }}
-          onEdit={() => setDialogMode("edit")}
+          onEdit={() => {
+            // View mode holds a header-only document, so switching straight to
+            // edit would open the form with an empty grid — and saving it would
+            // wipe every line. Re-fetch in full first; the dialog's `key`
+            // includes the mode, so it remounts and re-seeds from this copy.
+            if (!editingOrder) return;
+            void (async () => {
+              try {
+                const { data } = await apiClient.get<PurchaseOrder>(
+                  `/goods-receipts/${editingOrder.id}`,
+                );
+                setEditingOrder(data);
+                setDialogMode("edit");
+              } catch (err) {
+                toast.error(getUserFacingApiErrorMessage(err));
+              }
+            })();
+          }}
           onVoid={editingOrder ? () => setConfirmVoid(editingOrder) : undefined}
           onRequestDelete={
             editingOrder ? () => setConfirmDelete(editingOrder) : undefined
@@ -948,20 +982,24 @@ function DetailPanel({
     queryKey: ["goods-receipt-lines", orderId],
     queryFn: async ({ pageParam }) =>
       requireErpData(
-        await erpApi.GET<GoodsReceiptLinesPage>("/goods-receipts/{id}/lines", {
-          params: {
-            path: { id: orderId! },
-            query: { page: pageParam, pageSize: LINES_PAGE_SIZE },
+        await erpApi.POST<GoodsReceiptLinesPage>(
+          "/v2/goods-receipts/{id}/lines/search",
+          {
+            params: { path: { id: orderId! } },
+            // This panel only paginates; the header filters belong to the view
+            // dialog's grid, not here.
+            body: { page: pageParam, limit: LINES_PAGE_SIZE },
           },
-        }),
+        ),
       ),
     initialPageParam: 1,
-    getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
+    getNextPageParam: (last) =>
+      last.page * last.limit < last.total ? last.page + 1 : undefined,
     enabled: !!orderId,
   });
 
   const lines = useMemo(
-    () => linesQuery.data?.pages.flatMap((p) => p.items) ?? [],
+    () => linesQuery.data?.pages.flatMap((p) => p.data) ?? [],
     [linesQuery.data],
   );
 

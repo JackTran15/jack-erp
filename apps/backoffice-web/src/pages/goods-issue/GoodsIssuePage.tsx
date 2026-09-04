@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { erpApi, requireErpData } from "../../lib/erp-api";
 import {
   navigateToBarcodePrint,
@@ -145,12 +145,16 @@ function renderStatusBadge(status: GoodsIssueStatus) {
   return <StatusBadge variant={variant}>{STATUS_LABELS[status]}</StatusBadge>;
 }
 
-/** GET /inventory/goods-issues/:id/lines response shape (paginated). */
+/**
+ * `POST /v2/inventory/goods-issues/:id/lines/search` response.
+ *
+ * Replaced `GET /:id/lines`, which is gone. No `hasMore` any more — the envelope
+ * reports `total`, so "is there another page" is `page * limit < total`.
+ */
 interface GoodsIssueLinesPage {
-  items: GoodsIssueLine[];
+  data: GoodsIssueLine[];
   page: number;
-  pageSize: number;
-  hasMore: boolean;
+  limit: number;
   total: number;
 }
 
@@ -165,6 +169,7 @@ function isUuidLike(value: string): boolean {
 export function GoodsIssuePage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   // `totalAmount` is the server's SUM over every matching row, not only this
   // page — it backs the footer total.
   const [records, setRecords] = useState<
@@ -281,8 +286,11 @@ export function GoodsIssuePage() {
     if (!openDocumentId) return;
     void (async () => {
       try {
+        // Header only: the view dialog pages its own lines (UOW-02). Shipping
+        // every line here is the one part of this payload that grows with the
+        // voucher.
         const { data } = await apiClient.get<GoodsIssue>(
-          `/inventory/goods-issues/${openDocumentId}`,
+          `/inventory/goods-issues/${openDocumentId}?includeLines=false`,
         );
         setSelectedId(data.id);
         setEditingIssue(data);
@@ -592,13 +600,13 @@ export function GoodsIssuePage() {
           onClick={(e) => {
             e.stopPropagation();
             setSelectedId(row.id);
-            // Row no longer carries `lines` — fetch the full document before
-            // opening the view dialog (mirrors the openDocumentId deep-link
-            // fetch above).
+            // Row carries no `lines`, and the view dialog does not want them —
+            // it pages them itself. Fetch the header alone (mirrors the
+            // openDocumentId deep-link fetch above).
             void (async () => {
               try {
                 const { data } = await apiClient.get<GoodsIssue>(
-                  `/inventory/goods-issues/${row.id}`,
+                  `/inventory/goods-issues/${row.id}?includeLines=false`,
                 );
                 setEditingIssue(data);
                 setDialogMode("view");
@@ -812,7 +820,11 @@ export function GoodsIssuePage() {
           // seeds its form state from `initial` only on mount (see T-06-05);
           // without this, a stale `initial` prop swap on an already-mounted
           // instance would save one record's edited data under another's id.
-          key={editingIssue?.id ?? "new"}
+          // Mode is part of the key on purpose: view and edit now seed their rows
+          // from different sources (a paginated query vs. `initial.lines`), so
+          // switching between them has to remount and re-seed rather than reuse
+          // whatever the previous mode left in state.
+          key={`${editingIssue?.id ?? "new"}:${dialogMode}`}
           mode={dialogMode}
           initial={editingIssue}
           customers={customers}
@@ -824,11 +836,37 @@ export function GoodsIssuePage() {
             setEditingIssue(null);
           }}
           onSaved={async () => {
+            // The view dialog serves its grid from a cached page of
+            // `["goods-issue-lines", id, ...]`. Without this, reopening the
+            // document after an edit shows the pre-edit page.
+            if (editingIssue) {
+              await queryClient.invalidateQueries({
+                queryKey: ["goods-issue-lines", editingIssue.id],
+              });
+            }
             setDialogMode(null);
             setEditingIssue(null);
             await loadRecords();
           }}
-          onEdit={() => setDialogMode("edit")}
+          onEdit={() => {
+            // View mode holds a header-only document, so switching straight to
+            // edit would open the form with an empty grid — and saving it would
+            // wipe every line. Re-fetch in full first, then switch. The dialog's
+            // `key` includes the mode, so it remounts and re-seeds `lines` from
+            // this fresh copy.
+            if (!editingIssue) return;
+            void (async () => {
+              try {
+                const { data } = await apiClient.get<GoodsIssue>(
+                  `/inventory/goods-issues/${editingIssue.id}`,
+                );
+                setEditingIssue(data);
+                setDialogMode("edit");
+              } catch (err) {
+                toast.error(getUserFacingApiErrorMessage(err));
+              }
+            })();
+          }}
           onVoid={editingIssue ? () => setConfirmVoid(editingIssue) : undefined}
           onRequestDelete={
             editingIssue ? () => setConfirmDelete(editingIssue) : undefined
@@ -880,20 +918,24 @@ function DetailPanel({
     queryKey: ["goods-issue-lines", issueId],
     queryFn: async ({ pageParam }) =>
       requireErpData(
-        await erpApi.GET<GoodsIssueLinesPage>("/inventory/goods-issues/{id}/lines", {
-          params: {
-            path: { id: issueId! },
-            query: { page: pageParam, pageSize: LINES_PAGE_SIZE },
+        await erpApi.POST<GoodsIssueLinesPage>(
+          "/v2/inventory/goods-issues/{id}/lines/search",
+          {
+            params: { path: { id: issueId! } },
+            // This panel only paginates; the header filters belong to the view
+            // dialog's grid, not here.
+            body: { page: pageParam, limit: LINES_PAGE_SIZE },
           },
-        }),
+        ),
       ),
     initialPageParam: 1,
-    getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
+    getNextPageParam: (last) =>
+      last.page * last.limit < last.total ? last.page + 1 : undefined,
     enabled: !!issueId,
   });
 
   const lines = useMemo(
-    () => linesQuery.data?.pages.flatMap((p) => p.items) ?? [],
+    () => linesQuery.data?.pages.flatMap((p) => p.data) ?? [],
     [linesQuery.data],
   );
 

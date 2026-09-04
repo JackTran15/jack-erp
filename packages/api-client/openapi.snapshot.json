@@ -19043,6 +19043,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeLines",
+            "required": false,
+            "in": "query",
+            "description": "Include the voucher lines. Defaults to true. Pass false when the caller pages the lines separately through GET /:id/lines — on a large voucher the lines are the only part of this payload that scales with size.",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -19090,104 +19100,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GoodsIssueEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "GoodsIssue"
-        ]
-      }
-    },
-    "/inventory/goods-issues/{id}/lines": {
-      "get": {
-        "operationId": "GoodsIssueController_getLines",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20,
-              "type": "number"
-            }
-          },
-          {
-            "name": "sortBy",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "sortOrder",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "asc",
-              "type": "string",
-              "enum": [
-                "asc",
-                "desc"
-              ]
-            }
-          },
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "filters",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "includeInactive",
-            "required": false,
-            "in": "query",
-            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
-            "schema": {
-              "default": false,
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
                 }
               }
             }
@@ -19337,6 +19249,47 @@
             }
           }
         },
+        "tags": [
+          "GoodsIssueV2"
+        ]
+      }
+    },
+    "/v2/inventory/goods-issues/{id}/lines/search": {
+      "post": {
+        "operationId": "GoodsIssueV2Controller_searchLines_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoodsIssueLineSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Search one goods issue's lines (v2)",
         "tags": [
           "GoodsIssueV2"
         ]
@@ -20226,6 +20179,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeLines",
+            "required": false,
+            "in": "query",
+            "description": "Include the voucher lines. Defaults to true. Pass false when the caller pages the lines separately through GET /:id/lines — on a large voucher the lines are the only part of this payload that scales with size.",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -20297,104 +20260,6 @@
         "responses": {
           "204": {
             "description": ""
-          }
-        },
-        "tags": [
-          "GoodsReceipt"
-        ]
-      }
-    },
-    "/goods-receipts/{id}/lines": {
-      "get": {
-        "operationId": "GoodsReceiptController_getLines",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20,
-              "type": "number"
-            }
-          },
-          {
-            "name": "sortBy",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "sortOrder",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "asc",
-              "type": "string",
-              "enum": [
-                "asc",
-                "desc"
-              ]
-            }
-          },
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "filters",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "includeInactive",
-            "required": false,
-            "in": "query",
-            "description": "Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in.",
-            "schema": {
-              "default": false,
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
           }
         },
         "tags": [
@@ -20511,6 +20376,47 @@
             }
           }
         },
+        "tags": [
+          "GoodsReceiptV2"
+        ]
+      }
+    },
+    "/v2/goods-receipts/{id}/lines/search": {
+      "post": {
+        "operationId": "GoodsReceiptV2Controller_searchLines_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoodsReceiptLineSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Search one goods receipt's lines (v2)",
         "tags": [
           "GoodsReceiptV2"
         ]
@@ -38886,6 +38792,10 @@
           "goodsIssueId": {
             "type": "string"
           },
+          "lineNo": {
+            "type": "number",
+            "description": "1-based position of this line within its voucher — the order the user typed.\nExplicit rather than derived: this table has no `created_at`, and ordering by\nthe uuid primary key gives an arbitrary permutation (ADR-01). Unique per\n`goods_issue_id`, and every write path must set it."
+          },
           "itemId": {
             "type": "string"
           },
@@ -38917,6 +38827,7 @@
         "required": [
           "id",
           "goodsIssueId",
+          "lineNo",
           "itemId",
           "locationId",
           "quantity",
@@ -38992,6 +38903,62 @@
           },
           "totalAmount": {
             "description": "Tổng tiền (computed line total: SUM(quantity * unit_price))",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          }
+        }
+      },
+      "GoodsIssueLineSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 200
+          },
+          "itemCode": {
+            "description": "Mã SKU — matches `items.code`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "itemName": {
+            "description": "Tên hàng hóa — matches `items.name`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "quantity": {
+            "description": "Số lượng",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "unitPrice": {
+            "description": "Đơn giá",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "lineTotal": {
+            "description": "Thành tiền — `quantity * unit_price`, see LINE_AMOUNT_EXPRESSION.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/CompareFilterDto"
@@ -39598,6 +39565,10 @@
           "goodsReceiptId": {
             "type": "string"
           },
+          "lineNo": {
+            "type": "number",
+            "description": "1-based position of this line within its voucher — the order the user typed\nit, and the ONLY thing `getLines` orders by (ADR-05).\n\n`createdAt` below is still written and still happens to agree, because the\nbackfill derived this column from it. Do not order by it again: it agrees by\nhistory, not by contract, and it cannot express a line inserted into the\nmiddle of an existing voucher, which renumbering here does.\n\nUnique per `goods_receipt_id`, no database default: every write path must\nset it, and one that forgets should fail at the insert rather than collide\non some later row."
+          },
           "itemId": {
             "type": "string"
           },
@@ -39647,6 +39618,7 @@
           "id",
           "organizationId",
           "goodsReceiptId",
+          "lineNo",
           "itemId",
           "locationId",
           "uomCode",
@@ -40080,6 +40052,62 @@
           },
           "totalAmount": {
             "description": "Tổng tiền (computed line total: SUM(quantity * unit_price))",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          }
+        }
+      },
+      "GoodsReceiptLineSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 200
+          },
+          "itemCode": {
+            "description": "Mã SKU — matches `items.code`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "itemName": {
+            "description": "Tên hàng hóa — matches `items.name`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "quantity": {
+            "description": "Số lượng",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "unitPrice": {
+            "description": "Đơn giá",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "lineTotal": {
+            "description": "Thành tiền — `quantity * unit_price`, see LINE_AMOUNT_EXPRESSION.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/CompareFilterDto"
