@@ -34590,6 +34590,31 @@
           "unitPrice"
         ]
       },
+      "DraftPaymentDto": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "enum": [
+              "cash",
+              "bank_transfer",
+              "card"
+            ],
+            "type": "string"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "paymentAccountId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "method",
+          "amount"
+        ]
+      },
       "CreateInvoiceDto": {
         "type": "object",
         "properties": {
@@ -34616,6 +34641,13 @@
             "type": "string",
             "description": "Employee (employee_profiles.id) credited with the sale.",
             "format": "uuid"
+          },
+          "payments": {
+            "description": "Tendered payment lines to snapshot on the draft. Omitted = no snapshot; the\nPOS then reopens the draft with a single cash line for the amount due.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DraftPaymentDto"
+            }
           }
         },
         "required": [
@@ -34721,6 +34753,13 @@
           },
           "draftLabel": {
             "type": "string"
+          },
+          "draftPayments": {
+            "description": "Not a payment record: `invoice_payments` owns money that was actually taken,\nand its rows need a resolved GL account. This is the cashier's in-progress\ntender, kept only so reopening a held cart restores what they had typed.\nNULL = draft saved before the column existed; the POS falls back to a single\ncash line for the amount due.",
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
           },
           "customerId": {
             "type": "string"
@@ -35290,6 +35329,13 @@
           "draftLabel": {
             "type": "string"
           },
+          "draftPayments": {
+            "description": "Not a payment record: `invoice_payments` owns money that was actually taken,\nand its rows need a resolved GL account. This is the cashier's in-progress\ntender, kept only so reopening a held cart restores what they had typed.\nNULL = draft saved before the column existed; the POS falls back to a single\ncash line for the amount due.",
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
           "customerId": {
             "type": "string"
           },
@@ -35702,6 +35748,13 @@
             "type": "string",
             "description": "Employee (employee_profiles.id) credited with the sale.",
             "format": "uuid"
+          },
+          "payments": {
+            "description": "Tendered payment lines to snapshot on the draft. Omitting the field leaves an\nexisting snapshot untouched; an empty array clears it.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DraftPaymentDto"
+            }
           }
         }
       },

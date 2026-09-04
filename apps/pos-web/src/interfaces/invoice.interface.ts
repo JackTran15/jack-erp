@@ -54,6 +54,13 @@ export interface InvoiceRow {
   originalInvoiceId?: string;
   isDraft: boolean;
   draftLabel?: string;
+  /**
+   * Ảnh chụp dòng thanh toán lúc lưu tạm (`invoices.draft_payments`, jsonb).
+   * `unknown` là cố ý: cột jsonb không có ràng buộc ở DB, và plugin swagger cũng
+   * chỉ sinh ra `Record<string, never>[]` — nên nơi duy nhất được tin là bộ thu
+   * hẹp trong `mapInvoiceRowToDraftInvoice`, không phải kiểu khai ở đây.
+   */
+  draftPayments?: unknown;
   sessionId: string;
   customerId?: string;
   /** Customer nhúng ở `GET /invoices/drafts`. Các endpoint khác có thể bỏ trống. */

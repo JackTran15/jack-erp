@@ -118,6 +118,9 @@ export class InvoiceService {
         amountDue: subtotal,
         staffId: actor.userId,
         salespersonId: salespersonProfileId,
+        // Snapshot only — never read by checkout or accounting. See ADR-02 and
+        // the column comment on InvoiceEntity.draftPayments.
+        draftPayments: dto.payments,
       });
 
       const savedInvoice = await manager.save(invoiceEntity);
@@ -376,6 +379,10 @@ export class InvoiceService {
       if (dto.customerId !== undefined) invoice.customerId = dto.customerId;
       if (dto.draftLabel !== undefined) invoice.draftLabel = dto.draftLabel;
       if (dto.note !== undefined) invoice.note = dto.note;
+      // Absent field keeps whatever snapshot the draft already had — a PATCH that
+      // only renames the draft must not wipe the cashier's tendered amounts. An
+      // empty array is an explicit clear.
+      if (dto.payments !== undefined) invoice.draftPayments = dto.payments;
       if (dto.salespersonId) {
         invoice.salespersonId = await this.resolveSalespersonProfileId(
           manager,
