@@ -1,4 +1,7 @@
-import { PAYMENT_METHOD_TO_API_METHOD } from "@erp/pos/constants/checkout.constant";
+import {
+  API_METHOD_TO_PAYMENT_METHOD,
+  PAYMENT_METHOD_TO_API_METHOD,
+} from "@erp/pos/constants/checkout.constant";
 import type { PaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
@@ -7,6 +10,7 @@ import type {
   CheckoutInvoiceBody,
   CreateInvoiceBody,
   CreateInvoiceItemBody,
+  DraftPaymentBody,
   InvoicePaymentLineBody,
   UpdateInvoiceBody,
 } from "@erp/pos/dtos/invoice.dto";
@@ -14,13 +18,16 @@ import type {
   InvoiceItemRow,
   InvoiceRow,
 } from "@erp/pos/interfaces/invoice.interface";
+import type { ApiPaymentMethod } from "@erp/pos/types/invoice.type";
 import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import type { ResolveCheckoutPayloadError } from "@erp/pos/types/checkout.type";
 import type {
   CartLine,
   DraftInvoice,
+  DraftInvoicePayment,
   Salesperson,
 } from "@erp/pos/interfaces/checkout.interface";
+import { paymentLabel } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 
 interface BuildCreateInvoicePayloadInput {
   sessionId: string;
@@ -28,6 +35,8 @@ interface BuildCreateInvoicePayloadInput {
   customer: CustomerRow | null;
   note?: string;
   draftLabel?: string;
+  /** Dòng thanh toán đang gõ dở; bỏ trống = không chụp snapshot. */
+  paymentLines?: PaymentLine[];
   salesperson?: Salesperson | null;
 }
 
@@ -59,6 +68,63 @@ function mapCartToInvoiceItems(cart: CartLine[]): CreateInvoiceItemBody[] {
   });
 }
 
+/**
+ * Ảnh chụp dòng thanh toán để gửi kèm khi lưu tạm.
+ *
+ * Dòng `amount: 0` VẪN gửi: nó mang cấu trúc chia tiền (2 dòng tiền mặt + chuyển
+ * khoản) mà thu ngân đã dựng. Lọc bỏ là mở lại phiếu thấy 1 dòng, phải chia lại.
+ */
+function mapPaymentLinesToDraftPayments(
+  lines: PaymentLine[] | undefined,
+): DraftPaymentBody[] | undefined {
+  if (!lines) return undefined;
+  return lines.map((line) => {
+    const row: DraftPaymentBody = {
+      method: PAYMENT_METHOD_TO_API_METHOD[line.method],
+      amount: line.amount,
+    };
+    // Dòng chưa chọn tài khoản (mới thêm, hoặc chi nhánh chưa cấu hình) gửi thiếu
+    // field thay vì gửi null — DTO backend là @IsOptional @IsUUID, null sẽ 400.
+    if (line.paymentAccountId) row.paymentAccountId = line.paymentAccountId;
+    return row;
+  });
+}
+
+/**
+ * Đọc ngược ảnh chụp `invoices.draft_payments` về shape FE.
+ *
+ * Thu hẹp từng phần tử thay vì tin kiểu: cột là jsonb không ràng buộc, phiếu nháp
+ * cũ không có gì ở đây, và một bản ghi méo (sửa tay, nửa chừng của phiên bản cũ)
+ * phải rơi về "không có snapshot" chứ KHÔNG được ném lỗi — mở lại phiếu mà nổ
+ * dialog đỏ còn tệ hơn ô tiền trống.
+ */
+function readDraftPaymentSnapshot(
+  raw: unknown,
+): DraftInvoicePayment[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+
+  const rows: DraftInvoicePayment[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") return undefined;
+    const row = entry as Record<string, unknown>;
+    const method =
+      typeof row.method === "string"
+        ? API_METHOD_TO_PAYMENT_METHOD[row.method as ApiPaymentMethod]
+        : undefined;
+    // `numeric` của Postgres về dạng string, nên Number(...) chứ không ép kiểu.
+    const amount = Number(row.amount);
+    if (!method || !Number.isFinite(amount) || amount < 0) return undefined;
+    rows.push({
+      method,
+      label: paymentLabel(method),
+      amount,
+      paymentAccountId:
+        typeof row.paymentAccountId === "string" ? row.paymentAccountId : null,
+    });
+  }
+  return rows;
+}
+
 export function buildCreateInvoicePayload(
   input: BuildCreateInvoicePayloadInput,
 ): CreateInvoiceBody {
@@ -69,6 +135,7 @@ export function buildCreateInvoicePayload(
     note: input.note,
     items: mapCartToInvoiceItems(input.cart),
     salespersonId: input.salesperson?.id,
+    payments: mapPaymentLinesToDraftPayments(input.paymentLines),
   };
 }
 
@@ -78,6 +145,8 @@ interface BuildUpdateInvoicePayloadInput {
   note?: string;
   draftLabel?: string;
   salesperson?: Salesperson | null;
+  /** Dòng thanh toán đang gõ dở; bỏ trống = giữ nguyên snapshot cũ trên draft. */
+  paymentLines?: PaymentLine[];
 }
 
 /**
@@ -93,6 +162,7 @@ export function buildUpdateInvoicePayload(
     note: input.note,
     items: mapCartToInvoiceItems(input.cart),
     salespersonId: input.salesperson?.id,
+    payments: mapPaymentLinesToDraftPayments(input.paymentLines),
   };
 }
 
@@ -232,6 +302,8 @@ export function mapInvoiceRowToDraftInvoice(
   // quyết định mỗi dòng về giỏ nào. Thiếu một trong hai thì restore luôn ra SALE.
   const isReturnDocument = row.type === "RETURN" || row.type === "EXCHANGE";
 
+  const payments = readDraftPaymentSnapshot(row.draftPayments);
+
   return {
     id: row.id,
     invoiceNumber: row.code,
@@ -241,6 +313,7 @@ export function mapInvoiceRowToDraftInvoice(
     createdAt: new Date(row.createdAt),
     lines,
     total: Number(row.amountDue) || 0,
+    ...(payments ? { payments } : {}),
     ...(isReturnDocument
       ? {
           checkoutVariant: CheckoutVariantEnum.QUICK_EXCHANGE,

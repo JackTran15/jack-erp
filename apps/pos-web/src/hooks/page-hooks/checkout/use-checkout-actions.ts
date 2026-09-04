@@ -500,7 +500,13 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       }
       usePosCheckoutSessionStore.getState().resetActiveSessionAfterCheckout();
       usePosCheckoutUiStore.getState().resetCheckoutUiDraft();
+      // Trả focus về ô quét mã vạch ngay khi giỏ hàng đã reset, trước khi hộp
+      // thoại in (window.print) xuất hiện.
+      usePosCheckoutUiStore.getState().requestProductSearchFocus();
       await printReceiptIfNeeded(receiptPayload);
+      // Hộp thoại in của trình duyệt có thể cướp lại focus — yêu cầu focus lần
+      // nữa sau khi nó đã đóng (in xong, huỷ, hoặc timeout fallback).
+      usePosCheckoutUiStore.getState().requestProductSearchFocus();
     },
     [
       createMutation,
