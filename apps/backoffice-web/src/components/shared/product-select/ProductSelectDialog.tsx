@@ -1,6 +1,13 @@
 import { AppModal, Button, Input, MoneyInput } from "@erp/ui";
 import { ChevronDown, ChevronRight, Search, Zap } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { TreeSelectInput } from "../../forms/TreeSelectInput";
 import { PaginationControls } from "../../table/PaginationControls";
@@ -785,6 +792,32 @@ interface ProductOrOrphanRowProps extends RowSharedProps {
   itemDataById: { current: Map<string, SelectedProduct> };
 }
 
+/** Đánh dấu ô nhập số lượng để Tab tìm được ô kế tiếp. */
+const QTY_INPUT_SELECTOR = 'input[data-qty-input="true"]';
+
+/**
+ * Tab từ ô số lượng nhảy thẳng xuống ô số lượng dòng dưới.
+ *
+ * Chỉ dùng khi cột Đơn giá bị ẩn. Lúc đó phần tử tab tiếp theo trong DOM là
+ * checkbox của dòng kế, nên nhập số lượng cho cả bảng phải bấm Tab hai lần mỗi
+ * dòng. Giới hạn trong `closest("table")` để không nhảy sang lưới nằm sau modal.
+ * Ô cuối bảng không chặn gì, để Tab đi tiếp ra nút ở footer như bình thường.
+ */
+function handleQtyTab(e: KeyboardEvent<HTMLInputElement>) {
+  if (e.key !== "Tab") return;
+  const current = e.currentTarget;
+  const inputs = Array.from(
+    current.closest("table")?.querySelectorAll<HTMLInputElement>(
+      QTY_INPUT_SELECTOR,
+    ) ?? [],
+  );
+  const next = inputs[inputs.indexOf(current) + (e.shiftKey ? -1 : 1)];
+  if (!next) return;
+  e.preventDefault();
+  next.focus();
+  next.select();
+}
+
 function QtyPriceCells({
   id,
   data,
@@ -818,6 +851,8 @@ function QtyPriceCells({
         <MoneyInput
           value={getQty(id)}
           onChange={(v) => setQty(id, v === "" ? 0 : v)}
+          onKeyDown={showUnitPrice ? undefined : handleQtyTab}
+          data-qty-input="true"
           className="h-7 w-20"
           aria-label={`Số lượng ${data.sku}`}
         />
