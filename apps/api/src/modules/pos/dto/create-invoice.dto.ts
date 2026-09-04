@@ -11,6 +11,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { LineDiscountType } from '../entities/invoice-item.entity';
+import { DraftPaymentDto } from './draft-payment.dto';
 
 export class CreateInvoiceItemDto {
   @IsUUID()
@@ -94,4 +95,14 @@ export class CreateInvoiceDto {
   @IsOptional()
   @IsUUID()
   salespersonId?: string;
+
+  /**
+   * Tendered payment lines to snapshot on the draft. Omitted = no snapshot; the
+   * POS then reopens the draft with a single cash line for the amount due.
+   */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DraftPaymentDto)
+  payments?: DraftPaymentDto[];
 }

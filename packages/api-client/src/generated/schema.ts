@@ -11535,6 +11535,13 @@ export interface components {
             note?: string;
             sortOrder?: number;
         };
+        DraftPaymentDto: {
+            /** @enum {string} */
+            method: "cash" | "bank_transfer" | "card";
+            amount: number;
+            /** Format: uuid */
+            paymentAccountId?: string;
+        };
         CreateInvoiceDto: {
             sessionId: string;
             /** Format: uuid */
@@ -11547,6 +11554,11 @@ export interface components {
              * @description Employee (employee_profiles.id) credited with the sale.
              */
             salespersonId?: string;
+            /**
+             * @description Tendered payment lines to snapshot on the draft. Omitted = no snapshot; the
+             *     POS then reopens the draft with a single cash line for the amount due.
+             */
+            payments?: components["schemas"]["DraftPaymentDto"][];
         };
         InvoiceEntity: {
             code: string;
@@ -11584,6 +11596,14 @@ export interface components {
             isDraft: boolean;
             sessionId: string;
             draftLabel?: string;
+            /**
+             * @description Not a payment record: `invoice_payments` owns money that was actually taken,
+             *     and its rows need a resolved GL account. This is the cashier's in-progress
+             *     tender, kept only so reopening a held cart restores what they had typed.
+             *     NULL = draft saved before the column existed; the POS falls back to a single
+             *     cash line for the amount due.
+             */
+            draftPayments?: Record<string, never>[];
             customerId?: string;
             staffId: string;
             salespersonId?: string;
@@ -11756,6 +11776,14 @@ export interface components {
             isDraft: boolean;
             sessionId: string;
             draftLabel?: string;
+            /**
+             * @description Not a payment record: `invoice_payments` owns money that was actually taken,
+             *     and its rows need a resolved GL account. This is the cashier's in-progress
+             *     tender, kept only so reopening a held cart restores what they had typed.
+             *     NULL = draft saved before the column existed; the POS falls back to a single
+             *     cash line for the amount due.
+             */
+            draftPayments?: Record<string, never>[];
             customerId?: string;
             staffId: string;
             salespersonId?: string;
@@ -11892,6 +11920,11 @@ export interface components {
              * @description Employee (employee_profiles.id) credited with the sale.
              */
             salespersonId?: string;
+            /**
+             * @description Tendered payment lines to snapshot on the draft. Omitting the field leaves an
+             *     existing snapshot untouched; an empty array clears it.
+             */
+            payments?: components["schemas"]["DraftPaymentDto"][];
         };
         InvoicePaymentLineDto: {
             /**

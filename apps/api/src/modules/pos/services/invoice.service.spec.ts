@@ -3,7 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { InvoiceService } from './invoice.service';
-import { InvoiceEntity, InvoiceStatus } from '../entities/invoice.entity';
+import { InvoiceEntity, InvoicePaymentMethod, InvoiceStatus } from '../entities/invoice.entity';
 import { InvoiceItemEntity } from '../entities/invoice-item.entity';
 import { InvoicePaymentEntity } from '../entities/invoice-payment.entity';
 import { InvoiceDebtEntity } from '../entities/invoice-debt.entity';
@@ -242,6 +242,80 @@ describe('InvoiceService', () => {
   // ===========================================================================
   // sale deduction location — showroom resolution wins over FE-supplied shelf
   // ===========================================================================
+  /**
+   * Reopening a held cart used to hand the cashier an empty cash line, so they
+   * retyped the tendered amount every time. The snapshot lives on the invoice as
+   * jsonb, deliberately not as `invoice_payments` rows — those need a resolved GL
+   * account and feed journal entries, neither of which applies to money that was
+   * never taken.
+   */
+  describe('draft payment snapshot', () => {
+    const cashLine = {
+      method: InvoicePaymentMethod.CASH,
+      amount: 600_000,
+      paymentAccountId: 'acc-1',
+    };
+
+    it('create: stores the tendered lines on the new draft', async () => {
+      const savedInvoice = invoiceStub();
+      mockManager.save.mockResolvedValueOnce(savedInvoice);
+      invoiceRepo.findOne.mockResolvedValue(savedInvoice);
+      itemRepo.find.mockResolvedValue([]);
+
+      await service.create(
+        { sessionId: 'session-1', payments: [cashLine] },
+        actor,
+      );
+
+      expect(mockManager.create.mock.calls[0][1].draftPayments).toEqual([cashLine]);
+    });
+
+    it('create: leaves the column unset when the client sends no lines', async () => {
+      const savedInvoice = invoiceStub();
+      mockManager.save.mockResolvedValueOnce(savedInvoice);
+      invoiceRepo.findOne.mockResolvedValue(savedInvoice);
+      itemRepo.find.mockResolvedValue([]);
+
+      await service.create({ sessionId: 'session-1' }, actor);
+
+      // undefined, not [] — NULL is what the POS reads as "draft saved before this
+      // column existed" and restores with a single cash line for the amount due.
+      expect(mockManager.create.mock.calls[0][1].draftPayments).toBeUndefined();
+    });
+
+    it('update: replaces the snapshot when lines are supplied', async () => {
+      const stub = invoiceStub({ draftPayments: [cashLine] });
+      invoiceRepo.findOne.mockResolvedValue(stub);
+      itemRepo.find.mockResolvedValue([]);
+
+      const next = { method: InvoicePaymentMethod.CARD, amount: 100, paymentAccountId: 'acc-2' };
+      await service.update('inv-1', { payments: [next] }, actor);
+
+      expect(stub.draftPayments).toEqual([next]);
+    });
+
+    it('update: keeps an existing snapshot when the field is absent', async () => {
+      const stub = invoiceStub({ draftPayments: [cashLine] });
+      invoiceRepo.findOne.mockResolvedValue(stub);
+      itemRepo.find.mockResolvedValue([]);
+
+      // Renaming a draft must not wipe what the cashier had typed.
+      await service.update('inv-1', { draftLabel: 'Table 3' }, actor);
+
+      expect(stub.draftPayments).toEqual([cashLine]);
+    });
+
+    it('update: an empty array clears the snapshot', async () => {
+      const stub = invoiceStub({ draftPayments: [cashLine] });
+      invoiceRepo.findOne.mockResolvedValue(stub);
+      itemRepo.find.mockResolvedValue([]);
+
+      await service.update('inv-1', { payments: [] }, actor);
+
+      expect(stub.draftPayments).toEqual([]);
+    });
+  });
+
   describe('sale deduction location', () => {
     const lineLocationId = (calls: any[][]): string | undefined =>
       calls.find((c) => c[0] === InvoiceItemEntity)?.[1].locationId;
