@@ -24,6 +24,8 @@ export type DrillDownAction =
   | { kind: "report"; drillDown: ReportDrillDown };
 
 export interface DrillDownContext {
+  /** Tên chi nhánh neo của dialog đang mở, nếu có. */
+  anchorName?: string;
   /** Giá trị ô — `undefined` khi dòng không có khoá cột đó. */
   raw: ReportRow[string] | undefined;
   row: ReportRow;
@@ -158,7 +160,7 @@ const itemRevenueDetailForSku: DrillDownResolver = ({ row, filters }) => {
  * dòng nào cả — nó nằm ở phụ đề của chính dialog. Không có nguồn nào khác, nên
  * phụ đề của L2 gọi nó là "cửa hàng đang xem" thay vì bịa một cái tên.
  */
-const ANCHOR_LABEL = "cửa hàng đang xem";
+const ANCHOR_LABEL = "cửa hàng đang xem";   // chỉ dùng khi neo tới đây bằng đường khác
 
 const transferByCounterpart: DrillDownResolver = ({ row, filters }) => {
   const branchId = text(row[REPORT_ROW_BRANCH_ID]);
@@ -175,6 +177,9 @@ const transferByCounterpart: DrillDownResolver = ({ row, filters }) => {
     kind: "report",
     drillDown: {
       reportType: REPORT_TYPE_INVENTORY.TRANSFER_DETAIL_BY_STORE,
+      // Chở tên neo xuống: dòng của dialog này là các chi nhánh đối ứng, nên
+      // tên chi nhánh neo không có trên dòng nào ở tầng dưới.
+      anchorName: branchName || undefined,
       title: "CHI TIẾT NHẬP XUẤT ĐIỀU CHUYỂN THEO CỬA HÀNG",
       subtitle: `Cửa hàng ${branchName}${period}`,
       filters: {
@@ -203,7 +208,7 @@ const transferByCounterpart: DrillDownResolver = ({ row, filters }) => {
  */
 const transferDocs =
   (leg: "in" | "out" | "received"): DrillDownResolver =>
-  ({ raw, row, filters }) => {
+  ({ raw, row, filters, anchorName }) => {
     // Ô bằng 0 thì dialog sẽ rỗng — để nó là chữ thường còn hơn mở ra một bảng
     // trắng khiến người dùng nghi ngờ dữ liệu.
     if (!Number(raw)) return null;
@@ -216,8 +221,9 @@ const transferDocs =
 
     const issuerId = leg === "in" ? counterpartId : anchorId;
     const receiverId = leg === "in" ? anchorId : counterpartId;
-    const issuerName = leg === "in" ? counterpartName : ANCHOR_LABEL;
-    const receiverName = leg === "in" ? ANCHOR_LABEL : counterpartName;
+    const anchor = anchorName ?? ANCHOR_LABEL;
+    const issuerName = leg === "in" ? counterpartName : anchor;
+    const receiverName = leg === "in" ? anchor : counterpartName;
 
     return {
       kind: "report",
@@ -244,7 +250,7 @@ const transferDocs =
  * lệch luôn nói về hàng chi nhánh NEO đã xuất đi mà chưa ai xác nhận nhận, nên
  * neo luôn là nơi xuất.
  */
-const transferDifferenceDetail: DrillDownResolver = ({ raw, row, filters }) => {
+const transferDifferenceDetail: DrillDownResolver = ({ raw, row, filters, anchorName }) => {
   if (!Number(raw)) return null;
 
   const counterpartId = text(row[REPORT_ROW_BRANCH_ID]);
@@ -257,7 +263,7 @@ const transferDifferenceDetail: DrillDownResolver = ({ raw, row, filters }) => {
     drillDown: {
       reportType: REPORT_TYPE_INVENTORY.TRANSFER_DIFFERENCE_DETAIL,
       title: "CHI TIẾT CHÊNH LỆCH ĐIỀU CHUYỂN",
-      subtitle: `Cửa hàng xuất ${ANCHOR_LABEL}  Cửa hàng nhập ${counterpartName}`,
+      subtitle: `Cửa hàng xuất ${anchorName ?? ANCHOR_LABEL}  Cửa hàng nhập ${counterpartName}`,
       filters: {
         [REPORT_FILTERS_LINE.SOURCE_STORE]: anchorId,
         [REPORT_FILTERS_LINE.RECEIVING_STORE]: counterpartId,

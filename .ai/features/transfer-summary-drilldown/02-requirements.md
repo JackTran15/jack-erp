@@ -171,3 +171,50 @@ Then mọi bước xanh trên `local-backoffice` ở viewport desktop
   And không bước nào chụp lưới rỗng
   And `08-evidence.md` có commit sha khớp HEAD
 ```
+
+---
+
+## US-05 — Đối chiếu giao diện với MISA (đợt 2)
+
+**AC-17** — Cột định danh dính khi cuộn ngang
+```gherkin
+Given một dialog chi tiết điều chuyển đang mở trên lưới nhiều cột
+When người dùng cuộn ngang
+Then hai cột đầu vẫn hiện
+  And ở L1 đó là "Mã cửa hàng" và "Tên cửa hàng"
+  And ở L2/L3 đó là "Ngày chứng từ" và "Số chứng từ"
+```
+
+**AC-18** — L1 giữ đủ năm dải
+```gherkin
+Given dialog chi tiết theo cửa hàng đang mở
+When đọc tiêu đề dải
+Then vẫn có "Chênh lệch nhập xuất điều chuyển"
+  And dòng Tổng của dialog đối chiếu được với dòng cha trên cả sáu chỉ tiêu
+```
+> MISA không có dải này. Giữ lại là quyết định D2 của người dùng, đổi lấy bất biến đối chiếu.
+
+**AC-19** — Ngày chứng từ đọc được, có giờ
+```gherkin
+Given dialog chi tiết phiếu đang mở
+When đọc cột "Ngày chứng từ" và "Ngày chứng từ tham chiếu"
+Then giá trị theo dạng dd/MM/yyyy HH:mm, giờ Việt Nam
+  And không phải chuỗi ISO thô
+  And file xuất khẩu hiện đúng giá trị đó
+```
+
+**AC-20** — Hai cột "Đối tượng" và "Diễn giải"
+```gherkin
+Given dialog chi tiết phiếu đang mở
+When đọc hai cột cuối
+Then "Đối tượng" hiện đối tượng của chứng từ, hoặc tên chi nhánh đối ứng khi chứng từ không có
+  And "Diễn giải" hiện ghi chú của chính dòng hàng
+```
+
+**AC-21** — Phụ đề gọi tên chi nhánh neo thật
+```gherkin
+Given dialog L2 hoặc L3 được mở từ một dòng của L1
+When đọc phụ đề
+Then nó gọi tên chi nhánh neo, không phải một nhãn chung chung
+```
+

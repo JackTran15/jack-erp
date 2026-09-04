@@ -48,6 +48,8 @@ export const TRANSFER_DETAIL_COLUMNS: InventoryColumnDef[] = [
   { key: 'parentSku', type: STRING, width: 140 },
   { key: 'parentName', type: STRING, width: 160 },
   { key: 'group', type: STRING, width: 150 },
+  { key: 'counterparty', type: STRING, width: 180 },
+  { key: 'notes', type: STRING, width: 220 },
 ];
 
 /**
@@ -123,6 +125,8 @@ export function toTransferDetailRow(r: TransferDetailRow): ReportRow {
     referenceDate: r.referenceDate,
     reference: r.reference,
     warehouse: r.warehouse,
+    counterparty: r.counterparty,
+    notes: r.notes,
     sku: r.sku,
     name: r.name,
     unit: r.unit,
@@ -159,7 +163,13 @@ export class TransferDocumentDetailReport implements InventoryReportDefinition {
 
   buildColumns(): Promise<ReportColumnHeader[]> {
     return Promise.resolve(
-      buildInventoryHeaders(this.key, TRANSFER_DETAIL_COLUMNS, ['date']),
+      // Ghim hai cột: cuộn ngang trên lưới nhiều cột thì mất luôn danh tính
+      // của dòng. `getStart("left")` của TanStack tự cộng dồn offset nên
+      // danh sách này nhận bao nhiêu khoá cũng được.
+      buildInventoryHeaders(this.key, TRANSFER_DETAIL_COLUMNS, [
+        'date',
+        'documentNumber',
+      ]),
     );
   }
 

@@ -39,8 +39,14 @@ const columns: ReportColumnConfig[] = [
   col("parentSku", "SKU mẫu mã", 140),
   col("parentName", "Tên mẫu mã", 160),
   col("group", "Nhóm hàng", 150),
+  col("counterparty", "Đối tượng", 180),
+  col("notes", "Diễn giải", 220),
 ];
+// Ghim hai cột đầu, khớp catalog backend. Registry này chỉ dùng khi API
+// `columns` trả rỗng, nhưng để lệch với catalog là loại drift chỉ lộ một
+// lần, trong dialog, không kèm lỗi nào.
 columns[0].tableConfig!.pinned = "left";
+columns[1].tableConfig!.pinned = "left";
 
 const tableConfig: ReportTableConfig = { summaryLabel: "Tổng", columns };
 export const single_tableRegistryReportTransferDifferenceDetail = tableConfig;

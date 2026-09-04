@@ -198,6 +198,8 @@ export const INVENTORY_REPORT_COLUMN_LABELS_VI: Record<
     parentSku: 'SKU mẫu mã',
     parentName: 'Tên mẫu mã',
     group: 'Nhóm hàng',
+    counterparty: 'Đối tượng',
+    notes: 'Diễn giải',
   },
   'inventory-transfer-document-detail': {
     date: 'Ngày chứng từ',
@@ -214,6 +216,8 @@ export const INVENTORY_REPORT_COLUMN_LABELS_VI: Record<
     parentSku: 'SKU mẫu mã',
     parentName: 'Tên mẫu mã',
     group: 'Nhóm hàng',
+    counterparty: 'Đối tượng',
+    notes: 'Diễn giải',
   },
   // Same 12 columns and 5 bands as `inventory-transfer-summary`: the dialog is
   // that report re-run for one anchor branch, so its footer has to line up with

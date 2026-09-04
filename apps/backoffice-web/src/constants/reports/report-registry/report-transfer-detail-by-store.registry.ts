@@ -61,7 +61,11 @@ const columns: ReportColumnConfig[] = [
   num("inOutDiffQty", "Số lượng", 110, G_INOUT),
   num("inOutDiffValue", "Giá trị", 130, G_INOUT),
 ];
+// Ghim hai cột đầu, khớp catalog backend. Registry này chỉ dùng khi API
+// `columns` trả rỗng, nhưng để lệch với catalog là loại drift chỉ lộ một
+// lần, trong dialog, không kèm lỗi nào.
 columns[0].tableConfig!.pinned = "left";
+columns[1].tableConfig!.pinned = "left";
 
 const tableConfig: ReportTableConfig = { summaryLabel: "Tổng", columns };
 export const single_tableRegistryReportTransferDetailByStore = tableConfig;

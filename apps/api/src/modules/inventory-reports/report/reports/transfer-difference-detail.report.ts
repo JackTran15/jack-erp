@@ -53,7 +53,12 @@ export class TransferDifferenceDetailReport implements InventoryReportDefinition
   ) {}
 
   buildColumns(): Promise<ReportColumnHeader[]> {
-    return Promise.resolve(buildInventoryHeaders(this.key, COLUMNS, ['date']));
+    return Promise.resolve(
+      // Ghim hai cột: cuộn ngang trên lưới nhiều cột thì mất luôn danh tính
+      // của dòng. `getStart("left")` của TanStack tự cộng dồn offset nên
+      // danh sách này nhận bao nhiêu khoá cũng được.
+      buildInventoryHeaders(this.key, COLUMNS, ['date', 'documentNumber']),
+    );
   }
 
   async buildData(

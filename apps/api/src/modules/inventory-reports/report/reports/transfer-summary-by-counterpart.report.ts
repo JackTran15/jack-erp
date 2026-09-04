@@ -92,7 +92,10 @@ export class TransferSummaryByCounterpartReport
 
   buildColumns(): Promise<ReportColumnHeader[]> {
     return Promise.resolve(
-      buildInventoryHeaders(this.key, COLUMNS, ['branchCode']),
+      // Ghim hai cột: cuộn ngang trên lưới nhiều cột thì mất luôn danh tính
+      // của dòng. `getStart("left")` của TanStack tự cộng dồn offset nên
+      // danh sách này nhận bao nhiêu khoá cũng được.
+      buildInventoryHeaders(this.key, COLUMNS, ['branchCode', 'branchName']),
     );
   }
 

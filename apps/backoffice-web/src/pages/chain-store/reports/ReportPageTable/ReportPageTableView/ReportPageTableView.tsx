@@ -86,6 +86,8 @@ export function ReportPageTableView({ rows, totals }: Props) {
   // Filter đã áp dụng, không phải filter đang gõ dở: dialog phải mở ra trên đúng
   // phạm vi mà bảng bên dưới đang hiển thị.
   const filters = useReportStore((s) => s.appliedRequest?.filters ?? s.filters);
+  // Tên chi nhánh neo do dialog cha truyền xuống; undefined ở trang gốc.
+  const anchorName = useReportStore((state) => state.anchorName);
   const backendKey = getReportBackendKey(reportType);
 
   const runDrillDown = useCallback(
@@ -485,6 +487,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
                       raw,
                       row: row.original,
                       filters,
+                      anchorName,
                     });
                     const display = isReportNumberColumn(col)
                       ? formatReportNumber(raw)

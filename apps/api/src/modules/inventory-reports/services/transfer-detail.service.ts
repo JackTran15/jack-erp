@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { counterpartyNameSql } from '../../inventory/location/services/counterparty-name.util';
 import type { ReportTotals, TransferLeg } from '@erp/shared-interfaces';
 
 // ──────────────────────────────────────────────────────────────────
@@ -33,6 +34,10 @@ export interface TransferDetailRow {
   reference: string | null;
   referenceDate: string | null;
   warehouse: string | null;
+  /** "Đối tượng" — the counterparty, falling back to the branch on the other end. */
+  counterparty: string | null;
+  /** "Diễn giải" — the line's own note, as Báo cáo 2 does. */
+  notes: string | null;
   sku: string;
   name: string;
   unit: string | null;
@@ -77,8 +82,21 @@ export class TransferDetailService {
     const outer = `
       ${legs}
       SELECT
-        l.doc_date, l.doc_number, l.ref_number, l.ref_date,
+        -- Formatted in the OUTER select only. Inside the CTE doc_date stays a
+        -- timestamptz so ORDER BY l.doc_date sorts chronologically instead of
+        -- alphabetically by DD/MM. Formatted here rather than in the browser so
+        -- the Excel export, built from these same rows, says the same thing the
+        -- screen does. Intl with vi-VN emits time-before-date, which is why this
+        -- is to_char and not a JS formatter.
+        to_char(l.doc_date AT TIME ZONE 'Asia/Ho_Chi_Minh',
+                'DD/MM/YYYY HH24:MI') AS doc_date,
+        l.doc_number,
+        l.ref_number,
+        to_char(l.ref_date AT TIME ZONE 'Asia/Ho_Chi_Minh',
+                'DD/MM/YYYY HH24:MI') AS ref_date,
         COALESCE(sg.name, loc.name) AS warehouse,
+        l.counterparty,
+        l.notes,
         i.code AS sku, i.name AS item_name, i.unit,
         l.qty, l.unit_price, l.value,
         pr.code AS parent_sku, pr.name AS parent_name,
@@ -148,6 +166,15 @@ export class TransferDetailService {
           gil.quantity::numeric AS qty,
           gil.unit_price::numeric AS unit_price,
           (gil.quantity::numeric * gil.unit_price::numeric) AS value,
+          -- "Đối tượng": a transfer leg has no external counterparty —
+          -- counterparty_kind is null on essentially every real row — so the
+          -- branch on the other end is the meaningful answer. Same fallback
+          -- the Xuất kho list uses, so report and list page agree.
+          COALESCE(
+            ${counterpartyNameSql('gi')},
+            (SELECT b.name FROM branches b WHERE b.id = gi.target_branch_id)
+          ) AS counterparty,
+          gil.notes AS notes,
           pair.document_number AS ref_number,
           pair.posted_at AS ref_date
         FROM goods_issues gi
@@ -185,6 +212,11 @@ export class TransferDetailService {
           stl.quantity::numeric AS qty,
           COALESCE(i.purchase_price, 0)::numeric AS unit_price,
           (stl.quantity::numeric * COALESCE(i.purchase_price, 0)) AS value,
+          COALESCE(
+            ${counterpartyNameSql('st')},
+            (SELECT b.name FROM branches b WHERE b.id = st.destination_branch_id)
+          ) AS counterparty,
+          stl.notes AS notes,
           NULL::varchar AS ref_number,
           NULL::timestamptz AS ref_date
         FROM stock_transfers st
@@ -211,6 +243,17 @@ export class TransferDetailService {
           grl.quantity::numeric AS qty,
           grl.unit_price::numeric AS unit_price,
           (grl.quantity::numeric * grl.unit_price::numeric) AS value,
+          -- "Đối tượng": a transfer leg has no external counterparty —
+          -- counterparty_kind is null on essentially every real row — so the
+          -- branch on the other end is the meaningful answer. Same fallback
+          -- the Xuất kho list uses, so report and list page agree.
+          -- gr.source_branch_id is varchar while branches.id is uuid, so this
+          -- one needs the cast the issue side does not.
+          COALESCE(
+            ${counterpartyNameSql('gr')},
+            (SELECT b.name FROM branches b WHERE b.id::text = gr.source_branch_id)
+          ) AS counterparty,
+          grl.note AS notes,
           pair.document_number AS ref_number,
           pair.posted_at AS ref_date
         FROM goods_receipts gr
@@ -245,6 +288,11 @@ export class TransferDetailService {
           stl.quantity::numeric AS qty,
           COALESCE(i.purchase_price, 0)::numeric AS unit_price,
           (stl.quantity::numeric * COALESCE(i.purchase_price, 0)) AS value,
+          COALESCE(
+            ${counterpartyNameSql('st')},
+            (SELECT b.name FROM branches b WHERE b.id = st.source_branch_id)
+          ) AS counterparty,
+          stl.notes AS notes,
           NULL::varchar AS ref_number,
           NULL::timestamptz AS ref_date
         FROM stock_transfers st
@@ -261,11 +309,16 @@ export class TransferDetailService {
 
   private toRow(r: RawTransferDetailRow): TransferDetailRow {
     return {
-      date: r.doc_date ? new Date(r.doc_date).toISOString() : '',
+      // Already formatted by to_char in the outer SELECT — passed through, not
+      // re-parsed. `new Date('20/08/2026 13:10')` is Invalid Date and
+      // `.toISOString()` on it throws, which is exactly what this used to do.
+      date: r.doc_date ?? '',
       documentNumber: r.doc_number ?? null,
       reference: r.ref_number ?? null,
-      referenceDate: r.ref_date ? new Date(r.ref_date).toISOString() : null,
+      referenceDate: r.ref_date ?? null,
       warehouse: r.warehouse ?? null,
+      counterparty: r.counterparty ?? null,
+      notes: r.notes ?? null,
       sku: r.sku ?? '',
       name: r.item_name ?? '',
       unit: r.unit ?? null,
@@ -285,6 +338,8 @@ interface RawTransferDetailRow {
   ref_number: string | null;
   ref_date: string | null;
   warehouse: string | null;
+  counterparty: string | null;
+  notes: string | null;
   sku: string | null;
   item_name: string | null;
   unit: string | null;
