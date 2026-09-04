@@ -42,9 +42,9 @@ import { RbacService } from '../../../rbac/rbac.service';
 import {
   applyBranchScope,
   applyInvoiceStatusFilter,
-  CONSOLIDATED_PERMISSION,
+  SALES_CONSOLIDATED,
   invoiceTypeSign,
-  resolveBranchIds,
+  resolveReportBranchIds,
 } from '../../report-core/report-query.util';
 import { GetPosDailySummaryDetailQuery } from './get-pos-daily-summary-detail.query';
 
@@ -164,9 +164,9 @@ export class GetPosDailySummaryDetailHandler
     const hasConsolidated = await this.rbac.hasPermission(
       actor.userId,
       org,
-      CONSOLIDATED_PERMISSION,
+      SALES_CONSOLIDATED,
     );
-    const branchIds = resolveBranchIds(
+    const branchIds = resolveReportBranchIds(
       hasConsolidated,
       undefined,
       dto.branchId ?? actor.branchId,

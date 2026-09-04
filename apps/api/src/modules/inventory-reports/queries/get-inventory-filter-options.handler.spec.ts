@@ -33,59 +33,59 @@ function query(dto: Partial<InventoryFilterOptionsQueryDto>, a = actor) {
   );
 }
 
-describe('GetInventoryFilterOptionsHandler (branch permission clamp)', () => {
-  it('stores: only the branches the actor manages', async () => {
+/**
+ * The pickers are organization-wide, matching the reports they feed (ADR-04,
+ * extended to the whole stock/transfer family on 2026-09-04). Clamping the list
+ * to `actor.branchIds` would leave stores the user is allowed to report on
+ * unreachable. `organizationId` is the only boundary here.
+ */
+describe('GetInventoryFilterOptionsHandler (organization-wide pickers)', () => {
+  it('stores: every branch of the organization, not just the assigned ones', async () => {
     const { handler, branches } = build();
     await handler.execute(query({ type: ReportFilterOptionType.STORE }));
     expect(branches.find).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          organizationId: 'org-1',
-          id: In(['b1', 'b2']),
-        }),
-      }),
+      expect.objectContaining({ where: { organizationId: 'org-1' } }),
     );
   });
 
-  it('stores: empty permission set → empty options, no query', async () => {
+  it('stores: an actor with no branch assignment still gets the full list', async () => {
     const { handler, branches } = build();
-    const noAccess = { ...actor, branchIds: [] } as unknown as ActorContext;
-    const result = await handler.execute(
-      query({ type: ReportFilterOptionType.STORE }, noAccess),
+    const noAssignment = { ...actor, branchIds: [] } as unknown as ActorContext;
+    await handler.execute(
+      query({ type: ReportFilterOptionType.STORE }, noAssignment),
     );
-    expect(result).toEqual([]);
-    expect(branches.find).not.toHaveBeenCalled();
+    expect(branches.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organizationId: 'org-1' } }),
+    );
   });
 
-  it('warehouses: requested branchIds are intersected with permitted', async () => {
+  it('warehouses: requested branchIds are honored as-is', async () => {
     const { handler, storages } = build();
     await handler.execute(
       query({
         type: ReportFilterOptionType.WAREHOUSE,
-        branchIds: ['b2', 'b-foreign'],
+        branchIds: ['b2', 'b3'],
       }),
     );
     expect(storages.find).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           organizationId: 'org-1',
-          branchId: In(['b2']),
+          branchId: In(['b2', 'b3']),
         }),
       }),
     );
   });
 
-  it('warehouses: no branchIds requested → every permitted branch', async () => {
+  it('warehouses: no branchIds requested → no branch predicate at all', async () => {
     const { handler, storages } = build();
     await handler.execute(query({ type: ReportFilterOptionType.WAREHOUSE }));
     expect(storages.find).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ branchId: In(['b1', 'b2']) }),
-      }),
+      expect.objectContaining({ where: { organizationId: 'org-1' } }),
     );
   });
 
-  it('warehouses: requested branches all outside permitted → empty, no query', async () => {
+  it('warehouses: a branch of another organization simply matches nothing', async () => {
     const { handler, storages } = build();
     const result = await handler.execute(
       query({
@@ -93,7 +93,13 @@ describe('GetInventoryFilterOptionsHandler (branch permission clamp)', () => {
         branchIds: ['b-foreign'],
       }),
     );
+    // organizationId is still in the predicate, so a foreign id returns no
+    // rows rather than leaking another tenant's storages.
+    expect(storages.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ organizationId: 'org-1' }),
+      }),
+    );
     expect(result).toEqual([]);
-    expect(storages.find).not.toHaveBeenCalled();
   });
 });

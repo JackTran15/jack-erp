@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { In, Repository } from 'typeorm';
 import { ReportStoreScope } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
@@ -7,70 +7,21 @@ import { ItemCategoryEntity } from '../../inventory/location/item-category.entit
 import { LocationEntity } from '../../inventory/location/location.entity';
 
 /**
- * Impossible branch id — makes an empty permission set an empty result
- * instead of an accidental org-wide query (engines treat [] as "no filter").
- */
-const NO_ACCESS_BRANCH_IDS = ['00000000-0000-0000-0000-000000000000'];
-
-/** Branches the actor manages (`user_branch_assignments` baked into the JWT). */
-export function permittedBranchIds(actor: ActorContext): Set<string> {
-  return new Set(actor.branchIds ?? []);
-}
-
-
-/**
- * Resolve the branch scope of an inventory report search, always clamped to
- * the branches the actor manages (`actor.branchIds`):
- * - `scope: "all"` or absent ⇒ every permitted branch (empty permission set
- *   ⇒ no data, never org-wide).
- * - `scope: "group"` ⇒ the listed storeIds; a store outside the permitted set
- *   is a 403, an id outside the organization is a 400.
- */
-export async function resolveInventoryBranchIds(
-  branches: Repository<BranchEntity>,
-  store: ReportStoreScope | undefined,
-  actor: ActorContext,
-): Promise<string[] | undefined> {
-  const permitted = permittedBranchIds(actor);
-
-  if (!store || store.scope === 'all' || !store.storeIds?.length) {
-    return permitted.size ? [...permitted] : NO_ACCESS_BRANCH_IDS;
-  }
-
-  const ids = [...new Set(store.storeIds)];
-  const denied = ids.filter((id) => !permitted.has(id));
-  if (denied.length) {
-    throw new ForbiddenException(
-      `Access denied for stores: ${denied.join(', ')}`,
-    );
-  }
-  // Defense in depth — permitted ids come from same-org assignments already.
-  const owned = await branches.find({
-    where: { id: In(ids), organizationId: actor.organizationId },
-    select: { id: true },
-  });
-  if (owned.length !== ids.length) {
-    const ownedIds = new Set(owned.map((b) => b.id));
-    const foreign = ids.filter((id) => !ownedIds.has(id));
-    throw new BadRequestException(
-      `Unknown store ids: ${foreign.join(', ')}`,
-    );
-  }
-  return ids;
-}
-
-/**
- * Branch scope for the store-pivot report, which is organization-wide **by design**.
+ * Branch scope for the inventory reports, which are organization-wide **by design**.
  *
- * Read this next to `resolveInventoryBranchIds` above: the two look alike and mean the
- * opposite. That one clamps to the actor's assignments and turns an empty set into
- * `NO_ACCESS_BRANCH_IDS` so a missing scope can never become an org-wide read. This one
- * deliberately returns `undefined` — no branch predicate at all — because
- * "Số lượng tồn kho theo cửa hàng" exists to compare stock across every store, and the
- * project owner ruled on 2026-09-03 that every role able to open it sees the whole chain
- * (ADR-04). `organizationId` remains the hard boundary; assignments are not one here.
+ * Returns `undefined` — no branch predicate at all. "Số lượng tồn kho theo cửa hàng"
+ * exists to compare stock across every store, and the project owner ruled on
+ * 2026-09-03 that every role able to open it sees the whole chain (ADR-04). That
+ * ruling was extended on 2026-09-04 to the whole stock and transfer family: a store
+ * looking up another store's quantities is the point of these reports ("tạo điều kiện
+ * cho các cửa hàng kiểm tra tồn kho trên hệ thống"). What a store must NOT see is
+ * another store's money, and that is enforced on two separate axes — the money
+ * reports clamp to assignments via `resolveReportBranchIds`
+ * (`reporting/report-core/report-query.util.ts`), and the value columns of these
+ * reports are gated by `INVENTORY_VALUE_PERMISSION`.
  *
- * An explicit `storeIds` is therefore checked for tenancy only — belonging to the
+ * `organizationId` remains the hard boundary; assignments are not one here. An
+ * explicit `storeIds` is therefore checked for tenancy only — belonging to the
  * organization — and not for membership of `actor.branchIds`.
  */
 export async function resolveOrgWideBranchIds(

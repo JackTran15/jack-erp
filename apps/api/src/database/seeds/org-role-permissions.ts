@@ -1,3 +1,7 @@
+import {
+  REPORT_PERMISSION_KEYS,
+  reportPermissionsOfDomain,
+} from '@erp/shared-interfaces';
 import { PERMISSION_SEEDS } from '../../modules/rbac/permissions.seed';
 
 /** Seeded role display names (unique per organization). */
@@ -44,6 +48,14 @@ const ROOT_AND_GENERAL_MANAGER_ONLY_KEYS: ReadonlySet<string> = new Set([
   'accounting.bank_payment.delete',
   'accounting.cash_voucher_category.delete',
   'pos.invoice.cancel',
+  // "Toàn chuỗi": seeing every store's revenue, profit and debt in one report.
+  // This is the rule "một cửa hàng không xem được doanh số / kết quả kinh doanh
+  // / lợi nhuận của cửa hàng khác — trừ quản lý hệ thống", so it is listed here
+  // rather than left to the shape of the prefix filter below.
+  'reporting.dashboard.consolidated.read',
+  'reporting.invoice.consolidated.read',
+  'reporting.profit.consolidated.read',
+  'reporting.debts.consolidated.read',
 ]);
 
 /**
@@ -70,10 +82,16 @@ export const BRANCH_MANAGER_PERMISSION_KEYS: string[] = ALL_PERMISSION_KEYS.filt
       key.startsWith('accounting.') ||
       key.startsWith('reporting.dashboard.branch.') ||
       key.startsWith('reporting.invoice.branch.') ||
-      // Branch-pinned by resolveBranchIds() — consolidated needs the key below.
       key === 'reporting.profit.read' ||
-      // Aggregated across branches by design (docs/24-debt-reports-spec.md).
       key === 'reporting.debts.read' ||
+      // Every individual report of all four groups. The data each one returns is
+      // clamped to the manager's own stores by `resolveReportBranchIds` (money)
+      // or is quantity-only and organization-wide by design (kho); the
+      // consolidated keys that would lift the money clamp are excluded above.
+      key.startsWith('reporting.sales.') ||
+      key.startsWith('reporting.profit.') ||
+      key.startsWith('reporting.debts.') ||
+      key.startsWith('reporting.inventory.') ||
       key === 'reporting.invoice-template.manage' ||
       key === 'iam.user.read' ||
       // Staffing the branch: create/edit an employee at /admin/employees, and
@@ -124,6 +142,9 @@ export const SALES_PERMISSION_KEYS: string[] = [
   'accounting.cash.read',
   // POS Báo cáo theo ngày: /reports/pos/daily-summary* + /reports/invoices/*
   'reporting.invoice.branch.read',
+  // …and the one report of that group pos-web actually runs: tab "Doanh thu
+  // theo mặt hàng". The other three sales reports stay in the back office.
+  REPORT_PERMISSION_KEYS['revenue-by-item']!,
   // POS Checkout + Fast stock transfer: GET /branches/:id/salesmen
   'sales-hierarchy.read',
 ];
@@ -158,6 +179,7 @@ export const CASHIER_PERMISSION_KEYS: string[] = [
   'accounting.cash_voucher_partner.read',
   'accounting.cash_voucher_category.read',
   'reporting.invoice.branch.read',
+  REPORT_PERMISSION_KEYS['revenue-by-item']!,
   'sales-hierarchy.read',
 ];
 
@@ -206,9 +228,13 @@ export const WAREHOUSE_PERMISSION_KEYS: string[] = [
   'inventory.purchase-order.read',
   'inventory.purchase-order.create',
   'inventory.purchase-order.receive',
-  // Báo cáo kho (gồm "Hàng hoá xuất kho tạm")
+  // Báo cáo kho (gồm "Hàng hoá xuất kho tạm") — nhóm + toàn bộ 11 báo cáo.
+  // KHÔNG có `reporting.inventory.value.read`: nhân viên kho làm việc trên số
+  // lượng, giá vốn/giá trị tồn là việc của quản lý.
   'inventory.reports.read',
+  ...reportPermissionsOfDomain('inventory'),
   // Báo cáo bán hàng theo mặt hàng
   'reporting.invoice.branch.read',
+  REPORT_PERMISSION_KEYS['revenue-by-item']!,
   'sales-hierarchy.read',
 ];

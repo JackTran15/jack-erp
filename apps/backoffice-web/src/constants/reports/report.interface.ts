@@ -70,8 +70,10 @@ export interface ReportBranchConfig {
 export interface ReportCategoryMetadata {
   label: string;
   url: string;
-  // Permission key gate menu + route của category (xem navConfig/routeAccess).
-  permission?: string;
+  // Permission gate menu + route của category (xem navConfig/routeAccess).
+  // Là mảng "any-of": quyền mở nhóm, cộng quyền của từng báo cáo trong nhóm —
+  // được cấp một báo cáo bất kỳ là thấy menu, và trang tự lọc ô chọn báo cáo.
+  permission?: string | string[];
   configs: Partial<Record<STORE_TYPE, ReportBranchConfig>>;
 }
 

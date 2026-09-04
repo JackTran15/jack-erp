@@ -4,6 +4,7 @@ import {
   REPORT_CATEGORY,
   REPORT_CATEGORY_METADATA,
 } from "../../../constants/reports/report-category.constant";
+import { visibleReportTypes } from "../../../constants/reports/report-permission";
 import { useIsChainSelected } from "../../../store/common/branch/branch.store";
 import { TableStoreProvider } from "../../../store/common/table-store/table.context";
 import { buildInitialTableState } from "../../../store/common/table-store/table.factory";
@@ -27,7 +28,16 @@ interface Props {
 export function ReportPage({ category, reportType }: Props) {
   const isChain = useIsChainSelected();
   const branch = isChain ? STORE_TYPE.CHAIN : STORE_TYPE.SINGLE;
-  const configs = REPORT_CATEGORY_METADATA[category]?.configs?.[branch];
+  const categoryConfigs = REPORT_CATEGORY_METADATA[category]?.configs?.[branch];
+
+  // Mỗi báo cáo một quyền: ô chọn báo cáo chỉ liệt kê những báo cáo user được
+  // cấp. Lọc ở đây (chứ không ở chỗ render dropdown) để mọi thứ phía sau —
+  // report type khởi tạo, URL hash, fallback listReport[0] — đều đi theo.
+  const configs = useMemo(() => {
+    if (!categoryConfigs) return null;
+    const listReport = visibleReportTypes(categoryConfigs.listReport);
+    return listReport.length ? { ...categoryConfigs, listReport } : null;
+  }, [categoryConfigs]);
 
   // Report type khởi tạo: ưu tiên URL hash (giữ trạng thái khi reload / chia sẻ
   // link), kế đến report type theo route, cuối cùng factory fallback listReport[0].
@@ -58,7 +68,9 @@ export function ReportPage({ category, reportType }: Props) {
   if (!configs || !tableInitialState || !reportInitialState) {
     return (
       <div className="p-4 text-sm text-muted-foreground">
-        Báo cáo chưa được cấu hình.
+        {categoryConfigs?.listReport.length
+          ? "Bạn chưa được cấp quyền xem báo cáo nào trong nhóm này."
+          : "Báo cáo chưa được cấu hình."}
       </div>
     );
   }

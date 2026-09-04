@@ -21,6 +21,11 @@ import { ProductEntity } from '../../../inventory/product/product.entity';
 import { SupplierDebtPaymentEntity } from '../../../inventory/supplier-debt/supplier-debt-payment.entity';
 import { SupplierDebtEntity } from '../../../inventory/supplier-debt/supplier-debt.entity';
 import { matchColumnFilter } from '../../report-core/column-filter.util';
+import {
+  DEBTS_CONSOLIDATED,
+  resolveReportBranchIds,
+} from '../../report-core/report-query.util';
+import { RbacService } from '../../../rbac/rbac.service';
 import { debtColumn } from '../debt-report-column.util';
 import { DebtReportFilterDto } from '../dto/debt-report-filter.dto';
 import { DebtReportSearchDto } from '../dto/debt-report-search.dto';
@@ -89,6 +94,10 @@ function paymentMethodLabel(method: GoodsReceiptPaymentMethod): string {
  * giảm trong kỳ" là số LUỸ KẾ (cumulative) từ đầu kỳ đến dòng hiện tại, KHÔNG
  * phải delta/dòng — xem cảnh báo trong docs/24-debt-reports-spec.md #4 (điểm
  * dễ nhầm nhất trong toàn epic).
+ *
+ * Branch scope: clamped to the actor's assigned branches unless they hold
+ * `reporting.debts.consolidated.read`. The opening balance is clamped the same
+ * way so the cumulative columns still start from the right number.
  */
 @Injectable()
 export class SupplierDebtsDetailByDocumentAndProductReport implements ReportDefinition {
@@ -109,6 +118,7 @@ export class SupplierDebtsDetailByDocumentAndProductReport implements ReportDefi
     private readonly itemCategories: Repository<ItemCategoryEntity>,
     @InjectRepository(ProductEntity)
     private readonly products: Repository<ProductEntity>,
+    private readonly rbac: RbacService,
   ) {}
 
   async buildColumns(
@@ -157,11 +167,30 @@ export class SupplierDebtsDetailByDocumentAndProductReport implements ReportDefi
     const orgId = actor.organizationId;
     const groupBy = dto.filters.groupBy ?? 'item';
 
+    const hasConsolidated = await this.rbac.hasPermission(
+      actor.userId,
+      orgId,
+      DEBTS_CONSOLIDATED,
+    );
+    const branchIds = resolveReportBranchIds(
+      hasConsolidated,
+      undefined,
+      dto.filters.branchId,
+      actor,
+    );
+    // null = consolidated ⇒ no branch predicate at all.
+    const branchWhere = branchIds ? { branchId: In(branchIds) } : {};
+
     const [openingDebts, openingPayments] = await Promise.all([
       this.supplierDebts.find({
-        where: { organizationId: orgId, supplierId, issuedAt: LessThan(period.from) },
+        where: {
+          organizationId: orgId,
+          supplierId,
+          issuedAt: LessThan(period.from),
+          ...branchWhere,
+        },
       }),
-      this.paymentsBefore(orgId, supplierId, period.from),
+      this.paymentsBefore(orgId, supplierId, period.from, branchIds),
     ]);
     const openingBalance =
       openingDebts.reduce((s, d) => s + Number(d.originalAmount), 0) -
@@ -173,9 +202,16 @@ export class SupplierDebtsDetailByDocumentAndProductReport implements ReportDefi
           organizationId: orgId,
           supplierId,
           issuedAt: Between(period.from, period.to),
+          ...branchWhere,
         },
       }),
-      this.paymentsInPeriod(orgId, supplierId, period.from, period.to),
+      this.paymentsInPeriod(
+        orgId,
+        supplierId,
+        period.from,
+        period.to,
+        branchIds,
+      ),
     ]);
 
     const receiptById = new Map(
@@ -427,14 +463,20 @@ export class SupplierDebtsDetailByDocumentAndProductReport implements ReportDefi
     orgId: string,
     supplierId: string,
     before: string,
+    branchIds: string[] | null,
   ): Promise<SupplierDebtPaymentEntity[]> {
-    return this.supplierDebtPayments
+    const qb = this.supplierDebtPayments
       .createQueryBuilder('p')
       .innerJoin(SupplierDebtEntity, 'debt', 'debt.id = p.debtId')
       .where('p.organizationId = :orgId', { orgId })
       .andWhere('debt.supplierId = :supplierId', { supplierId })
-      .andWhere('p.paidAt < :before', { before })
-      .getMany();
+      .andWhere('p.paidAt < :before', { before });
+    // Scope by the branch that raised the debt, not wherever the money was
+    // paid, so the opening balance matches the in-period rows.
+    if (branchIds) {
+      qb.andWhere('debt.branchId IN (:...branchIds)', { branchIds });
+    }
+    return qb.getMany();
   }
 
   private async paymentsInPeriod(
@@ -442,13 +484,17 @@ export class SupplierDebtsDetailByDocumentAndProductReport implements ReportDefi
     supplierId: string,
     from: string,
     to: string,
+    branchIds: string[] | null,
   ): Promise<SupplierDebtPaymentEntity[]> {
-    return this.supplierDebtPayments
+    const qb = this.supplierDebtPayments
       .createQueryBuilder('p')
       .innerJoin(SupplierDebtEntity, 'debt', 'debt.id = p.debtId')
       .where('p.organizationId = :orgId', { orgId })
       .andWhere('debt.supplierId = :supplierId', { supplierId })
-      .andWhere('p.paidAt BETWEEN :from AND :to', { from, to })
-      .getMany();
+      .andWhere('p.paidAt BETWEEN :from AND :to', { from, to });
+    if (branchIds) {
+      qb.andWhere('debt.branchId IN (:...branchIds)', { branchIds });
+    }
+    return qb.getMany();
   }
 }

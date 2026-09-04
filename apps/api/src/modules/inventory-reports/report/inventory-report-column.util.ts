@@ -81,6 +81,28 @@ export function buildInventoryHeaders(
   });
 }
 
+/**
+ * Drop a report's money columns for an actor without
+ * `INVENTORY_VALUE_PERMISSION`.
+ *
+ * Inventory reports are organization-wide, so a store can look up another
+ * store's quantities; what it must not see without this grant is what those
+ * goods cost. Applied to the column catalog and — separately — to the requested
+ * column list, so a saved template that still names `outValue` quietly loses
+ * that column instead of failing the whole report with "Unknown report columns".
+ */
+export function withoutValueColumns<T extends { col: string } | string>(
+  columns: T[],
+  valueColumns: readonly string[] | undefined,
+  canSeeValue: boolean,
+): T[] {
+  if (canSeeValue || !valueColumns?.length) return columns;
+  const hidden = new Set(valueColumns);
+  return columns.filter((c) =>
+    typeof c === 'string' ? !hidden.has(c) : !hidden.has(c.col),
+  );
+}
+
 /** Keys of the number-family columns in a column table (totals candidates). */
 export function numericKeys(defs: InventoryColumnDef[]): Set<string> {
   return new Set(defs.filter((d) => NUMBER_TYPES.has(d.type)).map((d) => d.key));

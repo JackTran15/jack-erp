@@ -1,8 +1,12 @@
 import {
   INVENTORY_REPORT_TYPE_LABELS_VI,
+  INVENTORY_VALUE_PERMISSION,
   InventoryReportKey,
 } from '@erp/shared-interfaces';
+import { BadRequestException } from '@nestjs/common';
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { RbacService } from '../../rbac/rbac.service';
+import { withoutValueColumns } from '../report/inventory-report-column.util';
 import {
   dateRangeSubtitle,
   filterSummarySubtitle,
@@ -60,9 +64,10 @@ export class GetInventoryReportDocumentHandler
   constructor(
     private readonly registry: InventoryReportRegistry,
     private readonly exportService: ReportExportService,
+    private readonly rbac: RbacService,
   ) {}
 
-  execute({
+  async execute({
     dto,
     actor,
   }: GetInventoryReportDocumentQuery): Promise<PreparedExport> {
@@ -70,7 +75,23 @@ export class GetInventoryReportDocumentHandler
       INVENTORY_REPORT_TYPE_LABELS_VI[dto.reportType as InventoryReportKey] ??
       dto.reportType;
 
-    return this.exportService.prepareExport(this.registry, dto, actor, {
+    const def = this.registry.get(dto.reportType);
+    if (!def) {
+      throw new BadRequestException(`Unknown report type: ${dto.reportType}`);
+    }
+    const canSeeValue = await this.rbac.hasPermission(
+      actor.userId,
+      actor.organizationId,
+      INVENTORY_VALUE_PERMISSION,
+    );
+    // The gate has to hold on the way out too — an .xlsx or a print payload
+    // reaches the same numbers the screen does.
+    const scoped = {
+      ...dto,
+      columns: withoutValueColumns(dto.columns, def.valueColumns, canSeeValue),
+    };
+
+    return this.exportService.prepareExport(this.registry, scoped, actor, {
       title: label.toUpperCase(),
       subtitleLines: buildSubtitleLines(dto.filters),
     });

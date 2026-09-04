@@ -1,6 +1,11 @@
 import { BadRequestException } from '@nestjs/common';
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { InvoiceReportColumnsResult } from '@erp/shared-interfaces';
+import {
+  INVENTORY_VALUE_PERMISSION,
+  InvoiceReportColumnsResult,
+} from '@erp/shared-interfaces';
+import { RbacService } from '../../rbac/rbac.service';
+import { withoutValueColumns } from '../report/inventory-report-column.util';
 import { InventoryReportRegistry } from '../report/inventory-report-definition';
 import { GetInventoryReportColumnsQuery } from './get-inventory-report-columns.query';
 
@@ -8,7 +13,10 @@ import { GetInventoryReportColumnsQuery } from './get-inventory-report-columns.q
 export class GetInventoryReportColumnsHandler
   implements IQueryHandler<GetInventoryReportColumnsQuery>
 {
-  constructor(private readonly registry: InventoryReportRegistry) {}
+  constructor(
+    private readonly registry: InventoryReportRegistry,
+    private readonly rbac: RbacService,
+  ) {}
 
   async execute({
     reportType,
@@ -19,9 +27,20 @@ export class GetInventoryReportColumnsHandler
     if (!def) {
       throw new BadRequestException(`Unknown report type: ${reportType}`);
     }
+    const [catalog, canSeeValue] = await Promise.all([
+      def.buildColumns(actor, filters),
+      this.rbac.hasPermission(
+        actor.userId,
+        actor.organizationId,
+        INVENTORY_VALUE_PERMISSION,
+      ),
+    ]);
     return {
       summaryLabel: 'Tổng',
-      columns: await def.buildColumns(actor, filters),
+      // Dropped from the catalog, not just hidden on screen: the client builds
+      // its column picker from this, so a column the user may not read must not
+      // be offerable.
+      columns: withoutValueColumns(catalog, def.valueColumns, canSeeValue),
     };
   }
 }

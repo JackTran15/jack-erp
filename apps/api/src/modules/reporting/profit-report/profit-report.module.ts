@@ -36,6 +36,7 @@ import { BusinessResultsReport } from './reports/business-results.report';
 import { GrossProfitByInvoiceReport } from './reports/gross-profit-by-invoice.report';
 import { ProfitByItemReport } from './reports/profit-by-item.report';
 import { ReportExportService } from '../report-core/report-export.service';
+import { ReportPermissionGuard } from '../report-core/report-permission.guard';
 import { GetProfitReportDocumentHandler } from './queries/get-profit-report-document.handler';
 
 @Module({
@@ -69,6 +70,7 @@ import { GetProfitReportDocumentHandler } from './queries/get-profit-report-docu
   providers: [
     GetProfitReportDocumentHandler,
     ReportExportService,
+    ReportPermissionGuard,
     // Report definitions (one per report type — add new ones here + to the registry factory).
     ProfitByItemReport,
     GrossProfitByInvoiceReport,

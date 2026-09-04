@@ -19,6 +19,7 @@ import {
   INVENTORY_REPORT_VIEW_MODES,
   InventoryReportStatBy,
   InventoryReportViewMode,
+  REPORT_DOMAIN_PERMISSIONS,
   ReportDocumentPayload,
   TemplateScope,
 } from '@erp/shared-interfaces';
@@ -35,6 +36,7 @@ import {
 } from '../../common/decorators/actor-context.decorator';
 import { RequirePermission } from '../auth/decorators';
 import { PermissionGuard } from '../rbac/permission.guard';
+import { ReportPermissionGuard } from '../reporting/report-core/report-permission.guard';
 import { ITEM_GROUP_BY_VALUES } from './services/stock-period.service';
 import { CreateInventoryReportTemplateCommand } from './commands/create-inventory-report-template.command';
 import { DeleteInventoryReportTemplateCommand } from './commands/delete-inventory-report-template.command';
@@ -52,19 +54,25 @@ import { GetInventoryReportTemplateQuery } from './queries/get-inventory-report-
 import { ListInventoryReportTemplatesQuery } from './queries/list-inventory-report-templates.query';
 import { SearchInventoryReportQuery } from './queries/search-inventory-report.query';
 
-const REPORTS_READ = 'inventory.reports.read';
+const REPORTS_READ = REPORT_DOMAIN_PERMISSIONS.inventory.floor;
 
 /**
  * Registry-driven inventory report contract (columns / search /
  * filter-options), mirroring the invoice report surface. This is now the only
  * inventory report surface — the legacy GET endpoints were removed.
+ *
+ * Two permission layers. `REPORTS_READ` on each route is the group key: it opens
+ * the screen and the endpoints that carry no `reportType`. `ReportPermissionGuard`
+ * then narrows every reportType-bearing route to that one report's own key.
+ *
  * Reads aggregate across branches via `filters.store`, so no
- * `@RequireBranchScope()` (no `X-Branch-Id` header required); each report
- * definition clamps to the actor via `report-scope.util.ts`.
+ * `@RequireBranchScope()` (no `X-Branch-Id` header required). Stock and transfer
+ * reports are organization-wide by design (ADR-04) — they carry quantities, and
+ * their money columns are gated separately by `INVENTORY_VALUE_PERMISSION`.
  */
 @ApiTags('inventory-reports')
 @Controller('reports/inventory')
-@UseGuards(PermissionGuard)
+@UseGuards(PermissionGuard, ReportPermissionGuard)
 export class InventoryReportV2Controller {
   constructor(
     private readonly queryBus: QueryBus,

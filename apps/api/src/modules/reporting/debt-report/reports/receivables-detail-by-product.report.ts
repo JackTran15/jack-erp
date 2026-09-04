@@ -20,6 +20,11 @@ import { InvoiceItemEntity } from '../../../pos/entities/invoice-item.entity';
 import { ItemCategoryEntity } from '../../../inventory/location/item-category.entity';
 import { ItemEntity } from '../../../inventory/location/item.entity';
 import { matchColumnFilter } from '../../report-core/column-filter.util';
+import {
+  DEBTS_CONSOLIDATED,
+  resolveReportBranchIds,
+} from '../../report-core/report-query.util';
+import { RbacService } from '../../../rbac/rbac.service';
 import { debtColumn } from '../debt-report-column.util';
 import { DebtReportSearchDto } from '../dto/debt-report-search.dto';
 import { ReportDefinition } from '../report-definition';
@@ -83,6 +88,11 @@ function round2(n: number): number {
  * theo từng dòng hàng (KHÔNG theo group) — xem docs/24-debt-reports-spec.md #2
  * cho số liệu mẫu đã verify. Chỉ dùng InvoiceDebtEntity/DebtPaymentEntity (nợ
  * POS) — không gộp sổ kế toán như báo cáo #1 (không có trong đặc tả #2).
+ *
+ * Branch scope: clamped to the actor's assigned branches unless they hold
+ * `reporting.debts.consolidated.read` (previously chain-wide for everyone). The
+ * opening balance is clamped the same way, so the running balance still starts
+ * from the right number.
  */
 @Injectable()
 export class ReceivablesDetailByProductReport implements ReportDefinition {
@@ -105,6 +115,7 @@ export class ReceivablesDetailByProductReport implements ReportDefinition {
     private readonly itemCategories: Repository<ItemCategoryEntity>,
     @InjectRepository(ItemEntity)
     private readonly items: Repository<ItemEntity>,
+    private readonly rbac: RbacService,
   ) {}
 
   async buildColumns(): Promise<ReportColumnHeader[]> {
@@ -143,12 +154,36 @@ export class ReceivablesDetailByProductReport implements ReportDefinition {
     }
     const orgId = actor.organizationId;
 
+    const hasConsolidated = await this.rbac.hasPermission(
+      actor.userId,
+      orgId,
+      DEBTS_CONSOLIDATED,
+    );
+    const branchIds = resolveReportBranchIds(
+      hasConsolidated,
+      undefined,
+      dto.filters.branchId,
+      actor,
+    );
+    // null = consolidated ⇒ no branch predicate at all.
+    const branchWhere = branchIds ? { branchId: In(branchIds) } : {};
+
     // Opening balance: everything strictly before the period start.
     const [openingDebts, openingPayments] = await Promise.all([
       this.invoiceDebts.find({
-        where: { organizationId: orgId, customerId, issuedAt: LessThan(period.from) },
+        where: {
+          organizationId: orgId,
+          customerId,
+          issuedAt: LessThan(period.from),
+          ...branchWhere,
+        },
       }),
-      this.debtPaymentsBeforeForCustomer(orgId, customerId, period.from),
+      this.debtPaymentsBeforeForCustomer(
+        orgId,
+        customerId,
+        period.from,
+        branchIds,
+      ),
     ]);
     const openingBalance =
       openingDebts.reduce((s, d) => s + Number(d.originalAmount), 0) -
@@ -160,9 +195,16 @@ export class ReceivablesDetailByProductReport implements ReportDefinition {
           organizationId: orgId,
           customerId,
           issuedAt: Between(period.from, period.to),
+          ...branchWhere,
         },
       }),
-      this.debtPaymentsInPeriodForCustomer(orgId, customerId, period.from, period.to),
+      this.debtPaymentsInPeriodForCustomer(
+        orgId,
+        customerId,
+        period.from,
+        period.to,
+        branchIds,
+      ),
     ]);
 
     const branches = await this.branches.find({ where: { organizationId: orgId } });
@@ -417,14 +459,20 @@ export class ReceivablesDetailByProductReport implements ReportDefinition {
     orgId: string,
     customerId: string,
     before: string,
+    branchIds: string[] | null,
   ): Promise<DebtPaymentEntity[]> {
-    return this.debtPayments
+    const qb = this.debtPayments
       .createQueryBuilder('p')
       .innerJoin(InvoiceDebtEntity, 'debt', 'debt.id = p.debtId')
       .where('p.organizationId = :orgId', { orgId })
       .andWhere('debt.customerId = :customerId', { customerId })
-      .andWhere('p.paidAt < :before', { before })
-      .getMany();
+      .andWhere('p.paidAt < :before', { before });
+    // Scope by the branch that raised the debt, not wherever the money was
+    // taken, so the opening balance matches the in-period rows.
+    if (branchIds) {
+      qb.andWhere('debt.branchId IN (:...branchIds)', { branchIds });
+    }
+    return qb.getMany();
   }
 
   private async debtPaymentsInPeriodForCustomer(
@@ -432,13 +480,17 @@ export class ReceivablesDetailByProductReport implements ReportDefinition {
     customerId: string,
     from: string,
     to: string,
+    branchIds: string[] | null,
   ): Promise<DebtPaymentEntity[]> {
-    return this.debtPayments
+    const qb = this.debtPayments
       .createQueryBuilder('p')
       .innerJoin(InvoiceDebtEntity, 'debt', 'debt.id = p.debtId')
       .where('p.organizationId = :orgId', { orgId })
       .andWhere('debt.customerId = :customerId', { customerId })
-      .andWhere('p.paidAt BETWEEN :from AND :to', { from, to })
-      .getMany();
+      .andWhere('p.paidAt BETWEEN :from AND :to', { from, to });
+    if (branchIds) {
+      qb.andWhere('debt.branchId IN (:...branchIds)', { branchIds });
+    }
+    return qb.getMany();
   }
 }

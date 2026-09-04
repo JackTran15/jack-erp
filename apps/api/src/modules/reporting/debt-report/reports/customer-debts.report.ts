@@ -20,6 +20,11 @@ import { MembershipCardEntity } from '../../../customer/membership-card.entity';
 import { DebtPaymentEntity } from '../../../pos/entities/debt-payment.entity';
 import { InvoiceDebtEntity } from '../../../pos/entities/invoice-debt.entity';
 import { matchColumnFilter } from '../../report-core/column-filter.util';
+import {
+  DEBTS_CONSOLIDATED,
+  resolveReportBranchIds,
+} from '../../report-core/report-query.util';
+import { RbacService } from '../../../rbac/rbac.service';
 import { debtColumn } from '../debt-report-column.util';
 import { DebtReportSearchDto } from '../dto/debt-report-search.dto';
 import { ReportDefinition } from '../report-definition';
@@ -115,12 +120,18 @@ function buildTotals(columns: string[], buckets: CustomerDebtBucket[]): ReportRo
 
 /**
  * "Công nợ khách hàng" — one row per customer, period ledger
- * (opening/increase/decrease/closing) ALWAYS aggregated across every branch
- * the customer traded with, regardless of the store-selector mode (confirmed
- * business rule — see docs/24-debt-reports-spec.md #1). Merges two ledger
- * sides per the product decision "cả hai": POS credit-invoice debt
- * (InvoiceDebtEntity/DebtPaymentEntity) and the accounting receivables ledger
- * (ReceivableEntity/ReceivableSettlementEntity).
+ * (opening/increase/decrease/closing). Merges two ledger sides per the product
+ * decision "cả hai": POS credit-invoice debt (InvoiceDebtEntity/
+ * DebtPaymentEntity) and the accounting receivables ledger (ReceivableEntity/
+ * ReceivableSettlementEntity).
+ *
+ * Branch scope: clamped to the actor's assigned branches unless they hold
+ * `reporting.debts.consolidated.read`, in which case it aggregates across every
+ * branch the customer traded with. This replaces the previous unconditional
+ * chain-wide aggregation (docs/24-debt-reports-spec.md #1) — a store must not
+ * see another store's figures, so without the consolidated grant the row means
+ * "debt arising from this store's own trade with the customer", not the
+ * customer's chain-wide balance.
  */
 @Injectable()
 export class CustomerDebtsReport implements ReportDefinition {
@@ -142,6 +153,7 @@ export class CustomerDebtsReport implements ReportDefinition {
     private readonly customerGroups: Repository<CustomerGroupEntity>,
     @InjectRepository(MembershipCardEntity)
     private readonly membershipCards: Repository<MembershipCardEntity>,
+    private readonly rbac: RbacService,
   ) {}
 
   async buildColumns(): Promise<ReportColumnHeader[]> {
@@ -170,8 +182,22 @@ export class CustomerDebtsReport implements ReportDefinition {
       throw new BadRequestException('filters.period.from/to is required');
     }
 
+    const hasConsolidated = await this.rbac.hasPermission(
+      actor.userId,
+      actor.organizationId,
+      DEBTS_CONSOLIDATED,
+    );
+    const branchIds = resolveReportBranchIds(
+      hasConsolidated,
+      undefined,
+      dto.filters.branchId,
+      actor,
+    );
+
     const params = {
       organizationId: actor.organizationId,
+      // null = consolidated ⇒ no branch predicate at all.
+      branchIds: branchIds ?? undefined,
       fromDate: period.from,
       toDate: period.to,
     };
@@ -183,12 +209,17 @@ export class CustomerDebtsReport implements ReportDefinition {
           partyIdExpr: 't.customerId',
           amountExpr: 't.originalAmount',
           dateExpr: 't.issuedAt',
+          branchIdExpr: 't.branchId',
         },
         {
           repo: this.debtPayments,
           partyIdExpr: 'debt.customerId',
           amountExpr: 't.amount',
           dateExpr: 't.paidAt',
+          // Scope a payment to the branch that raised the debt, not wherever the
+          // money was taken, so a settlement can never move a balance between
+          // stores' reports.
+          branchIdExpr: 'debt.branchId',
           join: (qb) =>
             qb.innerJoin(InvoiceDebtEntity, 'debt', 'debt.id = t.debtId'),
         },
@@ -200,6 +231,7 @@ export class CustomerDebtsReport implements ReportDefinition {
           partyIdExpr: 't.customerId',
           amountExpr: 't.amount',
           dateExpr: 't.postedAt',
+          branchIdExpr: 't.branchId',
           filter: (qb) =>
             qb.andWhere('t.status IN (:...bookedStatuses)', {
               bookedStatuses: BOOKED_RECEIVABLE_STATUSES,
@@ -210,6 +242,7 @@ export class CustomerDebtsReport implements ReportDefinition {
           partyIdExpr: 'rec.customerId',
           amountExpr: 't.amount',
           dateExpr: 't.settlementDate',
+          branchIdExpr: 'rec.branchId',
           join: (qb) =>
             qb.innerJoin(ReceivableEntity, 'rec', 'rec.id = t.receivableId'),
         },

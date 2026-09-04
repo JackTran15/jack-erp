@@ -12,9 +12,9 @@ import { matchColumnFilter } from '../../report-core/column-filter.util';
 import {
   applyBranchScope,
   applyInvoiceStatusFilter,
-  CONSOLIDATED_PERMISSION,
+  PROFIT_CONSOLIDATED,
   invoiceTypeSign,
-  resolveBranchIds,
+  resolveReportBranchIds,
   signedGoods,
 } from '../../report-core/report-query.util';
 import { ProfitReportSearchDto } from '../dto/profit-report-search.dto';
@@ -89,9 +89,9 @@ export class GrossProfitByInvoiceReport implements ReportDefinition {
     const hasConsolidated = await this.rbac.hasPermission(
       actor.userId,
       actor.organizationId,
-      CONSOLIDATED_PERMISSION,
+      PROFIT_CONSOLIDATED,
     );
-    const branchIds = resolveBranchIds(
+    const branchIds = resolveReportBranchIds(
       hasConsolidated,
       dto.filters.store,
       dto.filters.branchId,

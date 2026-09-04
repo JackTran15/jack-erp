@@ -52,6 +52,9 @@ export function RoleEditModal({
       title={title}
       defaultWidth={1280}
       defaultHeight={780}
+      // The permission editor scrolls its own two panes; without this the body
+      // scrolls instead and takes "Thông tin cơ bản" off screen with it.
+      bodyClassName="overflow-hidden"
       showFooter={true}
       footer={
         <div className="flex w-full justify-end gap-2">
@@ -72,13 +75,19 @@ export function RoleEditModal({
         </div>
       }
     >
-      <div className="flex flex-col gap-6 flex-1">
+      {/*
+        Fixed head, scrolling tail: the role's name and description stay put
+        while the permission matrix scrolls, so you can always see which role
+        you are editing. Everything above the matrix is `shrink-0`; the matrix
+        takes the rest with `flex-1 min-h-0`.
+      */}
+      <div className="flex h-full min-h-0 flex-col gap-6">
         {isSystem && (
-          <Badge variant="secondary">
+          <Badge variant="secondary" className="shrink-0">
             Vai trò hệ thống — không chỉnh sửa hoặc xóa
           </Badge>
         )}
-        <section className="space-y-3">
+        <section className="shrink-0 space-y-3">
           <h3 className="text-xs font-semibold tracking-wide text-muted-foreground">
             THÔNG TIN CƠ BẢN
           </h3>
@@ -102,8 +111,8 @@ export function RoleEditModal({
           </FormField>
         </section>
 
-        <section className="space-y-3">
-          <h3 className="text-xs font-semibold tracking-wide text-muted-foreground">
+        <section className="flex min-h-0 flex-1 flex-col gap-3">
+          <h3 className="shrink-0 text-xs font-semibold tracking-wide text-muted-foreground">
             PHÂN QUYỀN
           </h3>
           <RolePermissionsEditor

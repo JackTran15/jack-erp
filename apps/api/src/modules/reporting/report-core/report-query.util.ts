@@ -1,5 +1,8 @@
 import { ForbiddenException } from '@nestjs/common';
-import { ReportStoreScope } from '@erp/shared-interfaces';
+import {
+  REPORT_DOMAIN_PERMISSIONS,
+  ReportStoreScope,
+} from '@erp/shared-interfaces';
 import { ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { InvoiceStatus, InvoiceType } from '../../pos/entities/invoice.entity';
@@ -19,7 +22,16 @@ export interface InvoiceStatusFilterShape {
   status?: { value?: string | null };
 }
 
-export const CONSOLIDATED_PERMISSION = 'reporting.invoice.consolidated.read';
+/**
+ * Consolidated keys, one per money domain.
+ *
+ * Profit used to borrow the invoice key, which made a profit report's scope
+ * depend on a grant from another domain; each domain now carries its own.
+ */
+export const SALES_CONSOLIDATED = REPORT_DOMAIN_PERMISSIONS.sales.consolidated;
+export const PROFIT_CONSOLIDATED =
+  REPORT_DOMAIN_PERMISSIONS.profit.consolidated;
+export const DEBTS_CONSOLIDATED = REPORT_DOMAIN_PERMISSIONS.debts.consolidated;
 
 /**
  * Sign an invoice's header money contribution by type so returns net instead of
@@ -47,53 +59,69 @@ export function signedGoods(inv: {
 }
 
 /**
- * Resolve the branch ids a report query must filter on.
+ * Resolve the branch ids a money report (sales / profit / debt / POS daily) may
+ * read.
  *
- * Returns `null` to mean "all branches in the org" (consolidated). Org-scoping
- * on every query already prevents cross-tenant leakage; this adds the
- * authorization layer: consolidating across all / multiple stores requires the
- * consolidated permission. A single own-branch request works without it.
+ * The floor is `actor.branchIds` — the stores the user is actually assigned to
+ * in `user_branch_assignments`, not the one branch that happens to be active in
+ * `X-Branch-Id`. Widening past that to the whole chain requires the domain's
+ * consolidated permission, which is the rule "a store does not see another
+ * store's revenue, business results or profit" expressed in one place.
+ *
+ * Returns `null` to mean "no branch predicate" (= every branch in the org),
+ * which only a consolidated actor can reach. Cross-tenant leakage is already
+ * prevented by the `organizationId` filter every report query carries, so an id
+ * from another organization yields no rows rather than needing a lookup here —
+ * that keeps this function pure and unit-testable.
+ *
+ * Contrast `resolveOrgWideBranchIds` in `inventory-reports/report/report-scope.util.ts`:
+ * stock reports are deliberately organization-wide (ADR-04) because they carry
+ * quantities. This one is for the reports that carry money.
  */
-export function resolveBranchIds(
+export function resolveReportBranchIds(
   hasConsolidated: boolean,
   store: ReportStoreScope | undefined,
   requestedBranchId: string | undefined,
   actor: ActorContext,
 ): string[] | null {
+  const assigned = actor.branchIds ?? [];
+  // A consolidated actor never needs assignments; anyone else with none has no
+  // store to report on at all. Refusing here is also what keeps every `return
+  // assigned` below non-empty — an empty array would read as "no filter" to
+  // `applyBranchScope` and quietly widen to the whole organization.
+  if (!hasConsolidated && !assigned.length) {
+    throw new ForbiddenException('No branch access assigned');
+  }
+  const permitted = new Set(assigned);
+
   if (store) {
-    if (store.scope === 'all') {
-      if (hasConsolidated) return null;
-      if (actor.branchId) return [actor.branchId];
-      throw new ForbiddenException('Consolidated access not granted');
+    if (store.scope === 'all' || !store.storeIds?.length) {
+      return hasConsolidated ? null : assigned;
     }
     // scope === 'group'
-    const ids = [...new Set(store.storeIds ?? [])];
-    if (!ids.length) {
-      if (actor.branchId) return [actor.branchId];
-      throw new ForbiddenException('No store selected');
-    }
+    const ids = [...new Set(store.storeIds)];
     if (hasConsolidated) return ids;
-    if (actor.branchId && ids.length === 1 && ids[0] === actor.branchId) return ids;
-    throw new ForbiddenException(
-      'Consolidated access not granted for the selected stores',
-    );
+    const denied = ids.filter((id) => !permitted.has(id));
+    if (denied.length) {
+      throw new ForbiddenException(
+        `Access denied for stores: ${denied.join(', ')}`,
+      );
+    }
+    return ids;
   }
 
-  // Legacy single-branch path (back-compat with the existing search API).
+  // Legacy single-branch path (back-compat with the existing search API), and
+  // the path pos-web always takes — it has no store filter and sends its active
+  // branch explicitly.
   if (requestedBranchId) {
-    if (hasConsolidated) return [requestedBranchId];
-    if (actor.branchId && actor.branchId === requestedBranchId) {
+    if (hasConsolidated || permitted.has(requestedBranchId)) {
       return [requestedBranchId];
     }
-    throw new ForbiddenException(`Access denied for branch: ${requestedBranchId}`);
-  }
-  if (hasConsolidated) return null;
-  if (!actor.branchId) {
     throw new ForbiddenException(
-      'No branch scope available and consolidated access not granted',
+      `Access denied for branch: ${requestedBranchId}`,
     );
   }
-  return [actor.branchId];
+  return hasConsolidated ? null : assigned;
 }
 
 /** Apply the resolved branch scope to a query (no-op when null = all branches). */

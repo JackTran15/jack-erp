@@ -1,5 +1,6 @@
 export * from './document-payload';
 export * from './column-bands';
+export * from './report-permissions';
 
 export interface DashboardSummary {
   organizationId: string;

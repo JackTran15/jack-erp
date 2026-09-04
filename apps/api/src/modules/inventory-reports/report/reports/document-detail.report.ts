@@ -32,7 +32,7 @@ import {
 import { ItemCategoryEntity } from '../../../inventory/location/item-category.entity';
 import {
   resolveDescendantCategoryIds,
-  resolveInventoryBranchIds,
+  resolveOrgWideBranchIds,
 } from '../report-scope.util';
 import { ReportExportSource } from '../../../reporting/report-core/report-definition';
 
@@ -103,6 +103,15 @@ const DATE_FMT = new Intl.DateTimeFormat('vi-VN', {
 export class DocumentDetailReport implements InventoryReportDefinition {
   readonly key = INVENTORY_REPORT_KEYS.DOCUMENT_DETAIL;
 
+  readonly valueColumns = [
+    'inUnitPrice',
+    'inValue',
+    'inSalePrice',
+    'outUnitPrice',
+    'outValue',
+    'outSalePrice',
+  ];
+
   constructor(
     private readonly documentDetail: DocumentDetailService,
     @InjectRepository(BranchEntity)
@@ -149,7 +158,7 @@ export class DocumentDetailReport implements InventoryReportDefinition {
       startDate: filters.period?.from,
       endDate: filters.period?.to,
     });
-    const branchIds = await resolveInventoryBranchIds(
+    const branchIds = await resolveOrgWideBranchIds(
       this.branches,
       filters.store,
       actor,

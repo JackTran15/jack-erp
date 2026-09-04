@@ -106,6 +106,29 @@ const MODULE_PAGES: Record<
       resources: ["inventory.transfer", "inventory.adjustment"],
     },
   ],
+  // Một trang cho mỗi nhóm báo cáo, khớp menu "Báo cáo" của ứng dụng. Không có
+  // khối này thì 25 quyền báo cáo mới đổ hết vào một bức tường card phẳng.
+  reporting: [
+    { id: "reporting-sales", label: "Bán hàng", resources: ["reporting.sales"] },
+    {
+      id: "reporting-inventory",
+      label: "Kho",
+      // `inventory.reports` được alias về `reporting.inventory` trong
+      // permission-vocabulary-vi, nên quyền mở nhóm nằm chung card với 11 báo cáo.
+      resources: ["reporting.inventory"],
+    },
+    { id: "reporting-debts", label: "Công nợ", resources: ["reporting.debts"] },
+    {
+      id: "reporting-profit",
+      label: "Lợi nhuận",
+      resources: ["reporting.profit"],
+    },
+    {
+      id: "reporting-general",
+      label: "Chung",
+      resources: ["reporting.dashboard", "reporting.invoice-template"],
+    },
+  ],
   accounting: [
     {
       id: "accounting-cash",

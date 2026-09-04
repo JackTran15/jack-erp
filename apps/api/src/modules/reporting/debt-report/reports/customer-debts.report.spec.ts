@@ -2,7 +2,16 @@ import { BadRequestException } from '@nestjs/common';
 import { CustomerDebtsReport } from './customer-debts.report';
 
 const ORG = 'org-1';
-const actor = { userId: 'u1', organizationId: ORG, branchId: 'b1', roles: [] } as any;
+const actor = {
+  userId: 'u1',
+  organizationId: ORG,
+  branchId: 'b1',
+  branchIds: ['b1'],
+  roles: [],
+} as any;
+
+/** No consolidated grant — the default, branch-clamped path. */
+const rbac: any = { hasPermission: jest.fn(async () => false) };
 
 function makeReport(opts: {
   posLedger?: any[];
@@ -31,6 +40,7 @@ function makeReport(opts: {
     customersRepo,
     customerGroupsRepo,
     cardsRepo,
+    rbac,
   );
 }
 

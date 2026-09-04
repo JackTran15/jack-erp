@@ -74,9 +74,13 @@ export function RolePermissionsEditor({
   }
 
   return (
+    // `flex-1 min-h-0` rather than a min-height: the two panes below scroll on
+    // their own, which only works if this box is bounded by the dialog instead
+    // of growing to fit its content and pushing the whole dialog into a scroll.
+    // It expects a flex-column parent that has a height of its own.
     <div
       className={cn(
-        "flex min-h-[380px] overflow-hidden rounded-md border",
+        "flex min-h-0 flex-1 overflow-hidden rounded-md border",
         readOnly && "opacity-90",
       )}
     >

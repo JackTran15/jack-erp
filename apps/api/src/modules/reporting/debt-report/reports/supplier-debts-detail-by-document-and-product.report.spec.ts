@@ -4,7 +4,16 @@ import { SupplierDebtsDetailByDocumentAndProductReport } from './supplier-debts-
 
 const ORG = 'org-1';
 const SUPPLIER = 's1';
-const actor = { userId: 'u1', organizationId: ORG, branchId: 'b1', roles: [] } as any;
+const actor = {
+  userId: 'u1',
+  organizationId: ORG,
+  branchId: 'b1',
+  branchIds: ['b1'],
+  roles: [],
+} as any;
+
+/** No consolidated grant — the default, branch-clamped path. */
+const rbac: any = { hasPermission: jest.fn(async () => false) };
 const period = { from: '2026-07-01', to: '2026-07-31' };
 const OPENING = 80360000;
 
@@ -71,6 +80,7 @@ function makeReport(opts: {
     itemsRepo,
     categoriesRepo,
     productsRepo,
+    rbac,
   );
 }
 

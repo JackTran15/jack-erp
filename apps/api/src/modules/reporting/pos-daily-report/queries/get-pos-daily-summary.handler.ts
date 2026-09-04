@@ -35,9 +35,9 @@ import { RbacService } from '../../../rbac/rbac.service';
 import {
   applyBranchScope,
   applyInvoiceStatusFilter,
-  CONSOLIDATED_PERMISSION,
+  SALES_CONSOLIDATED,
   invoiceTypeSign,
-  resolveBranchIds,
+  resolveReportBranchIds,
 } from '../../report-core/report-query.util';
 import { GetPosDailySummaryQuery } from './get-pos-daily-summary.query';
 
@@ -157,15 +157,15 @@ export class GetPosDailySummaryHandler
     const hasConsolidated = await this.rbac.hasPermission(
       actor.userId,
       org,
-      CONSOLIDATED_PERMISSION,
+      SALES_CONSOLIDATED,
     );
     // pos-web has no "Cửa hàng" (store) filter UI — unlike the backoffice reports
-    // that call `resolveBranchIds`, there's no way for the user to express "Tất
+    // that call `resolveReportBranchIds`, there's no way for the user to express "Tất
     // cả chi nhánh". So a consolidated-permission actor must still default to
     // whichever branch is currently active (X-Branch-Id), not every branch in
-    // the org; `resolveBranchIds`'s own "no request = null (all)" default only
+    // the org; `resolveReportBranchIds`'s own "no request = null (all)" default only
     // makes sense where the caller *can* ask for "all" explicitly.
-    const branchIds = resolveBranchIds(
+    const branchIds = resolveReportBranchIds(
       hasConsolidated,
       undefined,
       dto.branchId ?? actor.branchId,

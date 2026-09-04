@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -37,10 +33,7 @@ import {
   toTotalsRow,
 } from '../report-data.util';
 import { ItemCategoryEntity } from '../../../inventory/location/item-category.entity';
-import {
-  resolveDescendantCategoryIds,
-  permittedBranchIds,
-} from '../report-scope.util';
+import { resolveDescendantCategoryIds } from '../report-scope.util';
 
 const { STRING, NUMBER } = ReportColumnDataType;
 
@@ -103,6 +96,13 @@ function unfilledAt(statBy: string | undefined): ReadonlySet<string> {
 export class TransferByStoreReport implements InventoryReportDefinition {
   readonly key = INVENTORY_REPORT_KEYS.TRANSFER_BY_STORE;
 
+  readonly valueColumns = [
+    'outAvgPrice',
+    'outValue',
+    'inAvgPrice',
+    'inValue',
+  ];
+
   constructor(
     private readonly transferReport: TransferReportService,
     @InjectRepository(BranchEntity)
@@ -157,8 +157,10 @@ export class TransferByStoreReport implements InventoryReportDefinition {
   /**
    * Period plus the validated source branch.
    *
-   * The permission checks live here rather than in `buildData` so that
-   * `countRows` — reached from the export path — cannot skip them.
+   * The validation lives here rather than in `buildData` so that `countRows` —
+   * reached from the export path — cannot skip it. The source branch is checked
+   * for tenancy only: this report is organization-wide under ADR-04 like the
+   * rest of the transfer family, so any store may be chosen as the source.
    */
   private async resolveScope(dto: InventoryReportSearchDto, actor: ActorContext) {
     const filters = dto.filters;
@@ -173,9 +175,6 @@ export class TransferByStoreReport implements InventoryReportDefinition {
       throw new BadRequestException(
         'filters.sourceStoreId is required (no active branch on the request)',
       );
-    }
-    if (!permittedBranchIds(actor).has(sourceBranchId)) {
-      throw new ForbiddenException(`Access denied for stores: ${sourceBranchId}`);
     }
     const owned = await this.branches.findOne({
       where: { id: sourceBranchId, organizationId: actor.organizationId },

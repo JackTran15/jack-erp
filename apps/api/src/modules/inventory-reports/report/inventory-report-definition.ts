@@ -34,6 +34,18 @@ export interface InventoryReportDefinition
     actor: ActorContext,
     filters?: InventoryReportColumnsFilterDto,
   ): Promise<ReportColumnHeader[]>;
+
+  /**
+   * The money columns of this report, hidden from actors without
+   * `INVENTORY_VALUE_PERMISSION`.
+   *
+   * Declared per report rather than derived from a `*Value` name so a rename or
+   * an oddly-named column (`unitPrice`, `outAvgPrice`) cannot silently fall out
+   * of the gate. Absent or empty means the report carries no money at all —
+   * true of the pure-quantity ones (`stock-by-store-pivot`,
+   * `stock-quantity-detail`, `temp-warehouse-out`).
+   */
+  readonly valueColumns?: readonly string[];
 }
 
 /** Indexes the registered inventory report definitions by key (DI class token). */

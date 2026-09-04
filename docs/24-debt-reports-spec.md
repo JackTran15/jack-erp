@@ -125,6 +125,17 @@ các báo cáo khác.
   + Cả hai
 - Công nợ tính theo chi nhánh hay theo toàn tổ chức khi ở chế độ "Chuỗi cửa hàng"?
   + Tất cả chi nhánh kể cả chuỗi cửa hàng hay cửa hàng
+  + **Sửa lại 2026-09-04 (quan trọng — con số báo cáo thay đổi):** quyết định "luôn
+    gộp toàn chuỗi" ở trên bị thay thế bởi quy tắc phân quyền báo cáo: một cửa hàng
+    không được xem doanh số / kết quả kinh doanh / lợi nhuận / công nợ của cửa hàng
+    khác. Cả 4 báo cáo công nợ nay kẹp theo `actor.branchIds` qua
+    `resolveReportBranchIds` (`reporting/report-core/report-query.util.ts`); chỉ vai
+    trò giữ `reporting.debts.consolidated.read` (mặc định: Quản trị hệ thống và Quản
+    lý tổng) mới thấy số liệu toàn chuỗi. Không có quyền đó, "Nợ cuối kỳ" của một
+    khách hàng nghĩa là **công nợ phát sinh từ giao dịch của các cửa hàng mình quản
+    lý**, không phải số dư toàn chuỗi của khách hàng đó. Phần "Phạm vi & quyền" của
+    báo cáo #1/#2 bên dưới (và các dòng nói báo cáo "luôn gộp xuyên chi nhánh") phải
+    đọc kèm ghi chú này.
 - Cột Tỉnh thành/Quận huyện/Phường xã: **không có nguồn dữ liệu hiện tại**
   (`CustomerEntity.address` là 1 field text tự do) — cần quyết định có bỏ 3 cột
   này, parse từ address, hay thêm field cấu trúc mới vào `CustomerEntity`.
@@ -250,6 +261,10 @@ tiền của mặt hàng/nhóm hàng nào.
       khớp với hành vi đã ghi nhận ở báo cáo #1 (`summaryLabel: "Tổng"`).
 
 ### Phạm vi & quyền
+> **Cập nhật 2026-09-04:** "gộp xuyên chi nhánh" bên dưới nay chỉ đúng cho vai trò
+> có `reporting.debts.consolidated.read`. Vai trò khác chỉ thấy các cửa hàng mình
+> được gán — xem ghi chú ở "Câu hỏi mở / rủi ro" của báo cáo #1.
+
 - Theo cửa hàng (branch) — hoá đơn luôn gắn `branchId`; ảnh mẫu có cột "Chi nhánh"
   ở cuối bảng (khác báo cáo #1 — ở đây "chi nhánh" là 1 cột dữ liệu trên từng dòng
   chứng từ, không phải chỉ filter cấp trang) → gợi ý báo cáo này gộp dữ liệu nhiều

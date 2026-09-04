@@ -12,6 +12,7 @@ const categories = { find: jest.fn().mockResolvedValue([]) };
 const actor: ActorContext = {
   userId: 'user-1',
   organizationId: 'org-1',
+  branchId: 'branch-1',
   branchIds: ['branch-1'],
   roles: [],
 } as unknown as ActorContext;
@@ -356,8 +357,11 @@ describe('StockSummaryReport', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('rejects store ids outside the actor branch permissions (403)', async () => {
-    const { report } = build([periodRow({})]);
+  it('rejects store ids belonging to another organization (400)', async () => {
+    // Organization-wide under ADR-04: an unassigned store of the same org is
+    // fine, a store of another tenant is not.
+    const { report, branches } = build([periodRow({})]);
+    branches.find.mockResolvedValue([{ id: 'branch-1' }]);
     await expect(
       report.buildData(
         {
@@ -369,14 +373,14 @@ describe('StockSummaryReport', () => {
         },
         actor,
       ),
-    ).rejects.toThrow('Access denied for stores: branch-foreign');
+    ).rejects.toThrow('Unknown store ids: branch-foreign');
   });
 
-  it('clamps an absent/all store scope to the permitted branches', async () => {
+  it('leaves an absent/all store scope unfiltered — every store of the org', async () => {
     const { report, stockPeriod } = build([periodRow({})]);
     await report.buildData(baseDto, actor);
     expect(stockPeriod.aggregate).toHaveBeenCalledWith(
-      expect.objectContaining({ branchIds: ['branch-1'] }),
+      expect.objectContaining({ branchIds: undefined }),
     );
   });
 

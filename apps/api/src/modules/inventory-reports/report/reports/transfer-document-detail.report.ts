@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -30,7 +26,6 @@ import {
 import { CountedRows } from '../../../reporting/report-core/report-definition';
 import { assertKnownColumns, projectRows, toTotalsRow } from '../report-data.util';
 import { toEngineFilters } from '../report-column-mapper.util';
-import { permittedBranchIds } from '../report-scope.util';
 
 const { STRING, NUMBER, DATE, CURRENCY } = ReportColumnDataType;
 
@@ -67,11 +62,18 @@ export const TRANSFER_DETAIL_KEY_MAP: Record<string, string> = {
 };
 
 /**
- * Resolve and authorise the ordered branch pair for a transfer detail query.
+ * Resolve and validate the ordered branch pair for a transfer detail query.
  *
  * Shared by the document-detail and difference-detail reports so the two can
- * never drift on who is allowed to see what. Lives outside `buildData` because
- * `countRows` — reached from the export path — must not be able to skip it.
+ * never drift. Lives outside `buildData` because `countRows` — reached from the
+ * export path — must not be able to skip it.
+ *
+ * Both legs are checked for tenancy only, not against the actor's assignments.
+ * The parent report (`inventory-transfer-summary`) is organization-wide under
+ * ADR-04, so requiring the clicked branch to be assigned would show a row that
+ * 403s the moment you drill into it. These are transfer quantities between
+ * stores, which every holder of the report's permission may see; the money
+ * columns are gated separately by `INVENTORY_VALUE_PERMISSION`.
  */
 export async function resolveTransferPair(
   dto: InventoryReportSearchDto,
@@ -91,15 +93,6 @@ export async function resolveTransferPair(
     throw new BadRequestException(
       'filters.sourceStoreId and filters.receivingStoreIds[0] are both required',
     );
-  }
-
-  // The anchor is the branch whose row was clicked, so that is the one the
-  // actor must be able to see. The counterpart only has to be in the same
-  // organization — a branch manager can legitimately see who they shipped to.
-  const anchor =
-    filters.transferLeg === 'in' ? destinationBranchId : sourceBranchId;
-  if (!permittedBranchIds(actor).has(anchor)) {
-    throw new ForbiddenException(`Access denied for stores: ${anchor}`);
   }
 
   const owned = await branches.find({
@@ -150,6 +143,8 @@ export function toTransferDetailRow(r: TransferDetailRow): ReportRow {
 @Injectable()
 export class TransferDocumentDetailReport implements InventoryReportDefinition {
   readonly key = INVENTORY_REPORT_KEYS.TRANSFER_DOCUMENT_DETAIL;
+
+  readonly valueColumns = ['unitPrice', 'value'];
 
   constructor(
     private readonly transferDetail: TransferDetailService,

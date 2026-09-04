@@ -44,8 +44,8 @@ import { enrichHeader } from '../report-column.util';
 import {
   applyBranchScope,
   applyInvoiceStatusFilter,
-  CONSOLIDATED_PERMISSION,
-  resolveBranchIds,
+  PROFIT_CONSOLIDATED,
+  resolveReportBranchIds,
 } from '../../report-core/report-query.util';
 import { ReportDefinition } from '../report-definition';
 
@@ -146,9 +146,9 @@ export class ProfitByItemReport implements ReportDefinition {
     const hasConsolidated = await this.rbac.hasPermission(
       actor.userId,
       actor.organizationId,
-      CONSOLIDATED_PERMISSION,
+      PROFIT_CONSOLIDATED,
     );
-    const branchIds = resolveBranchIds(
+    const branchIds = resolveReportBranchIds(
       hasConsolidated,
       dto.filters.store,
       dto.filters.branchId,

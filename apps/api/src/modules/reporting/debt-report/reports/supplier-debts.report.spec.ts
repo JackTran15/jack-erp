@@ -1,15 +1,30 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { SupplierDebtsReport } from './supplier-debts.report';
 
 const ORG = 'org-1';
-const actor = { userId: 'u1', organizationId: ORG, branchId: 'b1', roles: [] } as any;
+const actor = {
+  userId: 'u1',
+  organizationId: ORG,
+  branchId: 'b1',
+  branchIds: ['b1', 'br-danang'],
+  roles: [],
+} as any;
+
 const period = { from: '2026-01-01', to: '2026-12-31' };
 
-function makeReport(opts: { ledger?: any[]; providers?: any[] }) {
+function makeReport(
+  opts: { ledger?: any[]; providers?: any[]; consolidated?: boolean } = {},
+) {
   const debtPeriod: any = { getPeriodLedger: jest.fn(async () => opts.ledger ?? []) };
   const providersRepo: any = { find: jest.fn(async () => opts.providers ?? []) };
+  const rbac: any = {
+    hasPermission: jest.fn(async () => opts.consolidated ?? false),
+  };
   const noop: any = {};
-  return { report: new SupplierDebtsReport(debtPeriod, noop, noop, providersRepo), debtPeriod };
+  return {
+    report: new SupplierDebtsReport(debtPeriod, noop, noop, providersRepo, rbac),
+    debtPeriod,
+  };
 }
 
 describe('SupplierDebtsReport.buildData', () => {
@@ -54,7 +69,7 @@ describe('SupplierDebtsReport.buildData', () => {
     });
   });
 
-  it('does not narrow by branch when no branchId filter is given (chain/org-wide default)', async () => {
+  it('clamps to the assigned branches when no branchId filter is given', async () => {
     const { report, debtPeriod } = makeReport({
       ledger: [{ partyId: 's1', opening: 0, increase: 1000, decrease: 0 }],
       providers: [{ id: 's1', code: 'S1', name: 'Supplier 1' }],
@@ -68,8 +83,42 @@ describe('SupplierDebtsReport.buildData', () => {
     expect(debtPeriod.getPeriodLedger).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
+      expect.objectContaining({ branchIds: ['b1', 'br-danang'] }),
+    );
+  });
+
+  it('aggregates chain-wide for an actor holding the consolidated permission', async () => {
+    const { report, debtPeriod } = makeReport({
+      ledger: [{ partyId: 's1', opening: 0, increase: 1000, decrease: 0 }],
+      providers: [{ id: 's1', code: 'S1', name: 'Supplier 1' }],
+      consolidated: true,
+    });
+
+    await report.buildData(
+      { reportType: 'supplier-debts', columns: ['supplierCode'], filters: { period } } as any,
+      actor,
+    );
+
+    expect(debtPeriod.getPeriodLedger).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
       expect.objectContaining({ branchIds: undefined }),
     );
+  });
+
+  it('rejects a branchId outside the actor assignments', async () => {
+    const { report } = makeReport({});
+
+    await expect(
+      report.buildData(
+        {
+          reportType: 'supplier-debts',
+          columns: ['supplierCode'],
+          filters: { period, branchId: 'br-somebody-else' },
+        } as any,
+        actor,
+      ),
+    ).rejects.toThrow(ForbiddenException);
   });
 
   it('returns an empty result when the ledger has no rows', async () => {

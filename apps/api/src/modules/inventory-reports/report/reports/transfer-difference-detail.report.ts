@@ -47,6 +47,8 @@ const NUMERIC = numericKeys(COLUMNS);
 export class TransferDifferenceDetailReport implements InventoryReportDefinition {
   readonly key = INVENTORY_REPORT_KEYS.TRANSFER_DIFFERENCE_DETAIL;
 
+  readonly valueColumns = ['unitPrice', 'value'];
+
   constructor(
     private readonly transferDetail: TransferDetailService,
     @InjectRepository(BranchEntity)
