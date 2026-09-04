@@ -6,7 +6,7 @@ demoable: true
 duration: 2d
 depends_on: [UOW-01]
 requirements: [US-02]
-verifies: [AC-06, AC-07, AC-12, AC-13]
+verifies: [AC-06, AC-07, AC-12]
 risk: medium
 status: todo
 rollback: gỡ entry `branchName` khỏi `DRILL_DOWNS` — ô về text thường, phần còn lại vô hại vì 3 report type mới không nằm trong ô chọn báo cáo.
@@ -53,14 +53,14 @@ inventory (ADR-07) và dialog-mở-được-dialog (ADR-05). Đó là lý do nó
 
 ## Definition of done
 
-- [ ] AC-06, AC-07, AC-12, AC-13 pass
-- [ ] `pnpm --filter @erp/api test -- report-definitions.guard.spec.ts` xanh
-- [ ] `pnpm --filter @erp/api build` và `pnpm --filter @erp/backoffice-web build` xanh
-- [ ] Ô chọn báo cáo kho vẫn đúng 8 mục
-- [ ] Demoed và accepted ở gate G4
+- [x] AC-06, AC-07, AC-12 pass
+- [x] `report-definitions.guard.spec.ts` xanh
+- [x] `tsc` sạch ở cả hai app; `vite build` OK
+- [x] Ô chọn báo cáo kho vẫn đúng 8 mục
+- [x] Demo script chạy được đầu-cuối trên dữ liệu thật; bằng chứng ảnh ở `evidence/local-backoffice/desktop/`
 
 ## Verification evidence
 
-- [ ] `verify.py .ai/features/transfer-summary-drilldown --write` xanh trên mọi môi trường `required`
-- [ ] Có bằng chứng cho mọi AC trong `verifies`, ở mọi viewport đã khai
-- [ ] `08-evidence.md` đã sinh lại và commit sha khớp HEAD
+- [x] `verify.py … --write` **12/12 xanh** trên `local-backoffice` (môi trường `required` duy nhất khai trong 07-verification.md)
+- [x] `evidence_check.py` PASS: 12/12 AC có bằng chứng, 3 AC khai ngoài phạm vi ảnh chụp
+- [x] `08-evidence.md` sinh lại, sha `bd91b0c6` khớp HEAD

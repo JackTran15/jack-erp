@@ -46,56 +46,20 @@ verify:
         # resolves `branchId: fromJwt ?? fromHeader` — a header alone loses.
         # The trailing wait is on the trigger showing the new name, which only
         # happens after the component's window.location.reload() has settled.
-        post_login: 'click button[aria-haspopup="menu"]; click [role="menuitemradio"]:has-text("${LOCAL_BACKOFFICE_BRANCH_NAME}"); wait button:has-text("${LOCAL_BACKOFFICE_BRANCH_NAME}")'
-    # Cùng app backoffice-web nhưng dựng riêng ở :3010 và trỏ vào API :4100
-    # (`VITE_API_BASE_URL`). Lý do y hệt `local-pos-worktree` bên dưới: server dev
-    # `:3000` của người dùng là vite nên nó nóng-nạp mã nguồn mới, NHƯNG API `:4000`
-    # là một bản `dist/` biên dịch sẵn từ trước — `/docs-json` của nó không có
-    # `includeLines`, nên FE mới gửi tham số đó sẽ ăn 400 từ `forbidNonWhitelisted`.
-    # Verify vào `local-backoffice` trong tình trạng đó cho ra ĐỎ GIẢ: lỗi nằm ở
-    # server cũ chứ không ở tính năng.
-    # Dựng:
-    #   cd apps/api && pnpm build && PORT=4100 node dist/main.js
-    #   cd apps/backoffice-web && VITE_API_BASE_URL=http://localhost:4100 \
-    #     ./node_modules/.bin/vite --port 3010 --strictPort
-    local-backoffice-verify:
-      url: http://localhost:3010
-      # Không dùng nữa kể từ 31/8/2026: đã khởi động lại API `:4000` bằng bản build mới,
-      # nên `local-backoffice` chạy đúng và không cần stack riêng. Giữ lại khai báo vì
-      # cái bẫy mà nó mô tả là bẫy lặp lại: `:3000` là vite nên nóng-nạp mã nguồn, còn
-      # `:4000` là `dist/` biên dịch sẵn — hai bên lệch nhau rất dễ cho ra đỏ giả.
-      required: false
-      enabled: false
-      auth:
-        recipe: form
-        # Cùng tài khoản, cùng tổ chức, cùng DB với `local-backoffice` — chỉ khác
-        # cổng. `credentials_prefix` để dùng lại LOCAL_BACKOFFICE_* thay vì nhân
-        # bản mật khẩu sang một bộ biến thứ hai.
-        credentials_prefix: LOCAL_BACKOFFICE
-        path: /login
-        landing: /
-        ready_when: { gone: 'text=Đang khôi phục phiên' }
-        selectors:
-          organization: '#login-org-id'
-          identifier: '#login-email'
-          password: '#login-password'
-          submit: 'button[type="submit"]'
-        post_login: 'click button[aria-haspopup="menu"]; click [role="menuitemradio"]:has-text("${LOCAL_BACKOFFICE_BRANCH_NAME}"); wait button:has-text("${LOCAL_BACKOFFICE_BRANCH_NAME}")'
+        # Trigger là `button.w-52` (BranchSelector.tsx) chứ KHÔNG phải
+        # `button[aria-haspopup="menu"]`: selector đó khớp 15 phần tử trên trang
+        # (mọi dropdown menu), và `.first` rơi vào cái khác — hệ quả là báo cáo
+        # vẫn ở phạm vi một chi nhánh và mọi assert theo chuỗi cửa hàng đều đỏ.
+        # `button.w-52` khớp đúng một. Comment cảnh báo này vốn nằm ở block
+        # staging đã bị #240 xoá; nó đúng cho cả local.
+        post_login: 'click button.w-52; click [role="menuitemradio"]:has-text("${LOCAL_BACKOFFICE_BRANCH_NAME}"); wait button.w-52:has-text("${LOCAL_BACKOFFICE_BRANCH_NAME}")'
     # Quản lý chi nhánh trên backoffice. Cùng URL, cùng selector với local-backoffice —
     # khác duy nhất ở tài khoản, và đó chính là thứ cần chứng minh: một tài khoản toàn quyền
     # nhìn thấy mọi thứ nên không phân biệt được "ẩn đúng" với "chưa lọc gì".
     # Không có post_login: tài khoản này chỉ thuộc một chi nhánh nên không có menu chuyển.
     local-backoffice-bm:
       url: http://localhost:3000
-      # `required: false` đi kèm `enabled: false`: một môi trường không chạy thì
-      # không thể là môi trường bắt buộc — bộ kiểm tra bắt đúng mâu thuẫn này.
-      required: false
-      # Tắt 31/8/2026: tài khoản hạn chế của chi nhánh chưa bao giờ được cấp trên máy
-      # này (thiếu LOCAL_BACKOFFICE_BM_EMAIL / _PASSWORD), nên môi trường này kéo CẢ
-      # dự án xuống rung "skipped" và không feature nào verify được. `enabled: false`
-      # là cách config này mô tả "có khai báo nhưng không chạy". Bật lại bằng cách xoá
-      # dòng dưới, sau khi đã thêm hai biến đó vào .ai/credentials.env.
-      enabled: false
+      required: true
       auth:
         recipe: form
         path: /login
@@ -159,12 +123,9 @@ verify:
     # Chạy: cd apps/pos-web && ./node_modules/.bin/vite --port 3002 --strictPort
     local-pos-worktree:
       url: http://localhost:3002
-      # `required: false` đi kèm `enabled: false`: một môi trường không chạy thì
-      # không thể là môi trường bắt buộc — bộ kiểm tra bắt đúng mâu thuẫn này.
-      required: false
-      # Tắt 31/8/2026, cùng lý do: .ai/.auth/local-pos-worktree.json không còn trên
-      # máy này. Dựng lại phiên bằng scripts/capture.py rồi xoá dòng dưới để bật lại.
-      enabled: false
+      enabled: false   # worktree :3002 đã bị xoá 2026-09-03; một env required không có
+      # phiên lưu sẵn kéo cả rung verify xuống `skipped`, chặn mọi feature.
+      # Bật lại bằng cách dựng lại worktree rồi chạy scripts/capture.py.
       auth:
         # `storage-state`, không phải `form` — và đây là kết luận từ một lần chạy đỏ,
         # không phải sở thích. Form đăng nhập POS đặt CẢ BA ô (tổ chức, email, mật khẩu)
@@ -183,40 +144,6 @@ verify:
         recipe: storage-state
         landing: /
         ready_when: { gone: 'text=Đang tải' }
-    # Thêm cho feature 2026090301-inventory-qa-defects (Claude, 03/09/2026).
-    # KHÔNG sửa `local-backoffice` ở trên vì các feature khác đang dùng nó.
-    #
-    # Vì sao phải có bản này: recipe `form` của runner KHÔNG THỂ đăng nhập vào backoffice.
-    # `perform_login` (runner/run.py:252-273) là luồng hai bước — điền email → submit →
-    # mới điền mật khẩu → submit lần nữa. Form backoffice đặt cả BA ô trên một trang, nên
-    # cú submit đầu bắn đi với mật khẩu rỗng và trang không bao giờ rời /login. Tệ hơn:
-    # runner không hề biết tới ô "ID tổ chức" (`grep organization` trong run.py = 0 kết quả),
-    # mà backoffice bắt buộc phải có org id. Đây là giới hạn cấu trúc, không phải sai config.
-    #
-    # Phiên được dựng bằng script capture: gọi POST /auth/login (trả 200), ghi
-    # refresh_token vào localStorage (`auth-storage.ts:8`), rồi lưu storage_state.
-    local-backoffice-session:
-      url: http://localhost:3000
-      required: true
-      auth:
-        recipe: storage-state
-        landing: /
-        ready_when: { gone: 'text=Đang khôi phục phiên' }
-
-    # Phiên POS cho feature 2026090301 (Claude, 03/09/2026). `required: false` vì
-    # một bảng Steps chạy trên MỌI environment được khai — trộn đường dẫn backoffice
-    # với đường dẫn POS `/pos/...` trong cùng một bảng thì bên nào cũng 404. Phiên này
-    # dùng cho phép kiểm AC-23 chạy riêng, kết quả ghi vào T-04-06.
-    # Cũng phải là storage-state: form POS đặt cả ba ô trên một trang, đúng giới hạn
-    # của `perform_login` đã mô tả ở local-backoffice-session.
-    local-pos-session:
-      url: http://localhost:3001
-      required: false
-      auth:
-        recipe: storage-state
-        landing: /pos/
-        ready_when: { gone: 'text=Đang tải' }
-
   # Desktop only. Neither app has a mobile layout: no matchMedia/useMediaQuery anywhere, and
   # BackofficeLayout is a fixed ml-60 desktop shell.
   viewports:

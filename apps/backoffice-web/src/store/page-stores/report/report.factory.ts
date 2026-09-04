@@ -99,6 +99,7 @@ export function buildDrillDownReportState(
   drillDown: ReportDrillDown,
 ): ReportInitialState {
   return {
+    anchorName: drillDown.anchorName,
     category: parent.category,
     branch: parent.branch,
     listReport: [drillDown.reportType],

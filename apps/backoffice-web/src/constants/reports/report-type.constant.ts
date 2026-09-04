@@ -9,6 +9,9 @@ import { chain_filterRegistryReportWarehouseVoucherDetailList, chain_tableRegist
 import { chain_filterRegistryReportInventoryInOutStockQuantityDetail, chain_tableRegistryReportInventoryInOutStockQuantityDetail, single_filterRegistryReportInventoryInOutStockQuantityDetail, single_tableRegistryReportInventoryInOutStockQuantityDetail } from "./report-registry/report-inventory-in-out-stock-quantity-detail.registry";
 import { chain_filterRegistryReportStoreInventoryInOutStockSummary, chain_tableRegistryReportStoreInventoryInOutStockSummary, single_filterRegistryReportStoreInventoryInOutStockSummary, single_tableRegistryReportStoreInventoryInOutStockSummary } from "./report-registry/report-store-inventory-in-out-stock-summary.registry";
 import { chain_filterRegistryReportStockQuantityByStore, chain_tableRegistryReportStockQuantityByStore, single_filterRegistryReportStockQuantityByStore, single_tableRegistryReportStockQuantityByStore } from "./report-registry/report-stock-quantity-by-store.registry";
+import { chain_filterRegistryReportTransferDifferenceDetail, chain_tableRegistryReportTransferDifferenceDetail, single_filterRegistryReportTransferDifferenceDetail, single_tableRegistryReportTransferDifferenceDetail } from "./report-registry/report-transfer-difference-detail.registry";
+import { chain_filterRegistryReportTransferDetailByDocument, chain_tableRegistryReportTransferDetailByDocument, single_filterRegistryReportTransferDetailByDocument, single_tableRegistryReportTransferDetailByDocument } from "./report-registry/report-transfer-detail-by-document.registry";
+import { chain_filterRegistryReportTransferDetailByStore, chain_tableRegistryReportTransferDetailByStore, single_filterRegistryReportTransferDetailByStore, single_tableRegistryReportTransferDetailByStore } from "./report-registry/report-transfer-detail-by-store.registry";
 import { chain_filterRegistryReportTransferInOutSummary, chain_tableRegistryReportTransferInOutSummary, single_filterRegistryReportTransferInOutSummary, single_tableRegistryReportTransferInOutSummary } from "./report-registry/report-transfer-in-out-summary.registry";
 import { chain_filterRegistryReportTransferredGoodsSummaryByStore, chain_tableRegistryReportTransferredGoodsSummaryByStore, single_filterRegistryReportTransferredGoodsSummaryByStore, single_tableRegistryReportTransferredGoodsSummaryByStore } from "./report-registry/report-transferred-goods-summary-by-store.registry";
 import { chain_filterRegistryReportTemporaryWarehouseOutGoods, chain_tableRegistryReportTemporaryWarehouseOutGoods, single_filterRegistryReportTemporaryWarehouseOutGoods, single_tableRegistryReportTemporaryWarehouseOutGoods } from "./report-registry/report-temporary-warehouse-out-goods.registry";
@@ -133,6 +136,16 @@ export enum REPORT_TYPE_INVENTORY {
   TRANSFER_IN_OUT_SUMMARY = 'transfer_in_out_summary',
   TRANSFERRED_GOODS_SUMMARY_BY_STORE = 'transferred_goods_summary_by_store',
   TEMPORARY_WAREHOUSE_OUT_GOODS = 'temporary_warehouse_out_goods',
+  /**
+   * Dialog-only — mở bằng cách click "Tên cửa hàng" trên báo cáo tổng hợp
+   * điều chuyển. KHÔNG thêm vào `STORAGE_REPORTS`, nếu không nó lọt vào ô
+   * chọn báo cáo.
+   */
+  TRANSFER_DETAIL_BY_STORE = 'transfer_detail_by_store',
+  /** Dialog-only — mở từ ô số lượng của L1. */
+  TRANSFER_DETAIL_BY_DOCUMENT = 'transfer_detail_by_document',
+  /** Dialog-only — mở từ ô "Chênh lệch thực nhận" của L1. */
+  TRANSFER_DIFFERENCE_DETAIL = 'transfer_difference_detail',
   
   
   TEMPORARY_WAREHOUSE_TRANSFER_SUMMARY = 'temporary_warehouse_transfer_summary',
@@ -305,6 +318,45 @@ export const REPORT_TYPE_INVENTORY_METADATA = {
     tableConfig: {
       [STORE_TYPE.SINGLE]: single_tableRegistryReportTransferInOutSummary,
       [STORE_TYPE.CHAIN]: chain_tableRegistryReportTransferInOutSummary,
+    },
+  },
+  [REPORT_TYPE_INVENTORY.TRANSFER_DETAIL_BY_STORE]: {
+    label: 'Chi tiết nhập xuất điều chuyển theo cửa hàng',
+    backendKey: 'inventory-transfer-summary-by-counterpart',
+    backendSource: 'inventory' as const,
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportTransferDetailByStore,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportTransferDetailByStore,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportTransferDetailByStore,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportTransferDetailByStore,
+    },
+  },
+  [REPORT_TYPE_INVENTORY.TRANSFER_DETAIL_BY_DOCUMENT]: {
+    label: 'Chi tiết phiếu nhập xuất điều chuyển theo cửa hàng và chứng từ',
+    backendKey: 'inventory-transfer-document-detail',
+    backendSource: 'inventory' as const,
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportTransferDetailByDocument,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportTransferDetailByDocument,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportTransferDetailByDocument,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportTransferDetailByDocument,
+    },
+  },
+  [REPORT_TYPE_INVENTORY.TRANSFER_DIFFERENCE_DETAIL]: {
+    label: 'Chi tiết chênh lệch điều chuyển',
+    backendKey: 'inventory-transfer-difference-detail',
+    backendSource: 'inventory' as const,
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportTransferDifferenceDetail,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportTransferDifferenceDetail,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportTransferDifferenceDetail,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportTransferDifferenceDetail,
     },
   },
   [REPORT_TYPE_INVENTORY.TRANSFERRED_GOODS_SUMMARY_BY_STORE]: {

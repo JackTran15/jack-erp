@@ -51,7 +51,33 @@ describe('TransferSummaryReport', () => {
       diffValue: -100,
       inOutDiffQty: 2,
       inOutDiffValue: 200,
+      // Hidden key, not a catalog column: the drill-down anchors on the branch
+      // id because `branchCode` is nullable and `branchName` is not unique.
+      _branchId: 'b1',
     });
+  });
+
+  /**
+   * `paginateRows` projects to `dto.columns`, so the id has to be re-attached
+   * after it. Column filters change both the length and the order of the row
+   * list, which is why the re-attach indexes the FILTERED array rather than the
+   * engine's output — get that wrong and rows carry another branch's id, which
+   * a shape assertion on an unfiltered single row would never catch.
+   */
+  it('keeps _branchId aligned with the row after a column filter drops rows', async () => {
+    const rows: TransferSummaryRow[] = [
+      { ...engineRow, branchId: 'b1', branchName: 'CN 1', qtyOut: 0 },
+      { ...engineRow, branchId: 'b2', branchName: 'CN 2', qtyOut: 8 },
+    ];
+
+    const result = await build(rows).buildData(
+      { ...dto, columnFilters: [{ col: 'outQty', gt: 0 }] },
+      actor,
+    );
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]!.branchName).toBe('CN 2');
+    expect(result.rows[0]!._branchId).toBe('b2');
   });
 
   it('exposes the five transfer bands', async () => {
@@ -65,3 +91,34 @@ describe('TransferSummaryReport', () => {
     );
   });
 });
+
+/**
+ * The catalog decides which cells LOOK clickable, and it has to, because
+ * `ReportTableConfigSync` overwrites the client registry whenever the columns
+ * API answers. Setting the flag only on the client makes a cell clickable or
+ * not depending on whether a saved column template happens to exist.
+ */
+describe('TransferSummaryReport link affordances', () => {
+  const headers = async () => {
+    const report = new TransferSummaryReport(null as never, null as never);
+    return report.buildColumns();
+  };
+
+  it('marks only the branch name as a link', async () => {
+    const linked = (await headers()).filter((h) => h.link).map((h) => h.col);
+
+    expect(linked).toEqual(['branchName']);
+  });
+
+  /**
+   * A parent row aggregates every counterpart, so the difference dialog opened
+   * from it could not name a receiving branch. It opens from L1 instead.
+   */
+  it('leaves the difference columns unlinked', async () => {
+    const cols = await headers();
+
+    expect(cols.find((h) => h.col === 'diffQty')?.link).toBeUndefined();
+    expect(cols.find((h) => h.col === 'inOutDiffQty')?.link).toBeUndefined();
+  });
+});
+

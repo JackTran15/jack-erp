@@ -13724,6 +13724,14 @@ export interface components {
              * @enum {string}
              */
             viewMode?: "single" | "chain";
+            /**
+             * @description Transfer document detail only — which leg of the pair is primary.
+             *
+             *     Declared here because the global ValidationPipe runs with
+             *     `forbidNonWhitelisted`, so an undeclared field makes the whole request 400.
+             * @enum {string}
+             */
+            transferLeg?: "in" | "out" | "received" | "unmatched";
             /** @description Custom period (inclusive ISO dates). Wins over `preset` when set. */
             period?: components["schemas"]["DateRangeFilterDto"];
             /** @description Multi-store scope. Absent or scope="all" ⇒ org-wide (legacy parity). */

@@ -57,11 +57,23 @@ export interface InventoryReportFilterPayload {
   sourceStoreId?: string;
   /** transfer-by-store only — destination branches (Cửa hàng nhận). */
   receivingStoreIds?: string[];
+  /**
+   * Transfer document detail only — which leg of the pair is the primary
+   * document. The branch pair is ordered (`sourceStoreId` ships,
+   * `receivingStoreIds[0]` receives), so this decides whether rows are the
+   * issues or the receipts, and whether only matched / only unmatched ones
+   * are listed.
+   */
+  transferLeg?: TransferLeg;
   /** Hide rows with all-zero measures (stock-period reports; default true). */
   hideZeroRows?: boolean;
   /** Free-text search on item code/name. */
   search?: string;
 }
+
+/** Which leg of a transfer pair a document-detail query is reading. */
+export const TRANSFER_LEGS = ['in', 'out', 'received', 'unmatched'] as const;
+export type TransferLeg = (typeof TRANSFER_LEGS)[number];
 
 export interface InventoryReportSearchPayload {
   /** Which report definition to run (see INVENTORY_REPORT_KEYS). */

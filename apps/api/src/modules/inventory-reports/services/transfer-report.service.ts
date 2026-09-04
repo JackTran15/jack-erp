@@ -22,6 +22,17 @@ export interface TransferSummaryQuery {
   branchIds?: string[];
 }
 
+/** L1 of the drill-down: one anchor branch, broken down by the other end. */
+export interface TransferByCounterpartQuery {
+  organizationId: string;
+  startDate: Date;
+  endDate: Date;
+  /** The branch whose row was clicked. Rows come back per counterpart branch. */
+  branchId: string;
+  page?: number;
+  pageSize?: number;
+}
+
 export interface TransferSummaryRow {
   branchId: string;
   /** Mã cửa hàng — `branches.code`, unique per organization. */
@@ -246,6 +257,38 @@ export const PAIRED_RECEIPT_EXISTS = (gi: string) => `
  * whichever document represents that leg (the transfer, the GoodsIssue, or
  * the GoodsReceipt) — not `transfer_orders.created_at`.
  */
+/**
+ * Raw aggregate row → report row. Shared by `summarize()` and
+ * `summarizeByCounterpart()` on purpose: the derived measures (`difference`,
+ * `inOutDifference`) must be computed once, or the drill-down can disagree
+ * with the row that opened it while both queries look correct.
+ */
+function toSummaryRow(r: RawTransferSummaryRow): TransferSummaryRow {
+  const inQty = Number(r.in_qty ?? 0);
+  const inValue = Number(r.in_value ?? 0);
+  const outQty = Number(r.out_qty ?? 0);
+  const outValue = Number(r.out_value ?? 0);
+  // `received` rides on the ISSUE lines, so it is a subset of `out` and the
+  // difference below can never come out positive.
+  const qtyReceived = Number(r.received_qty ?? 0);
+  const valueReceived = Number(r.received_value ?? 0);
+  return {
+    branchId: r.branch_id,
+    branchCode: r.branch_code ?? null,
+    branchName: r.branch_name ?? '',
+    qtyIn: inQty,
+    valueIn: inValue,
+    qtyOut: outQty,
+    valueOut: outValue,
+    qtyReceived,
+    valueReceived,
+    qtyDifference: qtyReceived - outQty,
+    valueDifference: valueReceived - outValue,
+    qtyInOutDifference: inQty - outQty,
+    valueInOutDifference: inValue - outValue,
+  };
+}
+
 @Injectable()
 export class TransferReportService {
   constructor(private readonly dataSource: DataSource) {}
@@ -385,32 +428,7 @@ export class TransferReportService {
       branchIds,
     ])) as RawTransferSummaryRow[];
 
-    const data: TransferSummaryRow[] = rows.map((r) => {
-      const inQty = Number(r.in_qty ?? 0);
-      const inValue = Number(r.in_value ?? 0);
-      const outQty = Number(r.out_qty ?? 0);
-      const outValue = Number(r.out_value ?? 0);
-      // qtyReceived is attributed to THIS branch as shipment source (see SQL
-      // comment) — 0 in a healthy ledger means every unit shipped out has
-      // been confirmed received at its destination.
-      const qtyReceived = Number(r.received_qty ?? 0);
-      const valueReceived = Number(r.received_value ?? 0);
-      return {
-        branchId: r.branch_id,
-        branchCode: r.branch_code ?? null,
-        branchName: r.branch_name ?? '',
-        qtyIn: inQty,
-        valueIn: inValue,
-        qtyOut: outQty,
-        valueOut: outValue,
-        qtyReceived,
-        valueReceived,
-        qtyDifference: qtyReceived - outQty,
-        valueDifference: valueReceived - outValue,
-        qtyInOutDifference: inQty - outQty,
-        valueInOutDifference: inValue - outValue,
-      };
-    });
+    const data: TransferSummaryRow[] = rows.map((r) => toSummaryRow(r));
 
     // Tổng tính trên **toàn bộ** dòng, trước khi cắt trang — chính xác và
     // không tốn thêm truy vấn nào, vì truy vấn này vốn dựng đủ dòng.
@@ -431,6 +449,156 @@ export class TransferReportService {
       total: data.length,
       totals,
     };
+  }
+
+  /**
+   * L1 of the transfer drill-down — the same figures as `summarize()`, but for
+   * ONE anchor branch, broken down by the branch on the other end.
+   *
+   * The four movement branches are the four `summarize()` branches with a
+   * single predicate added (`= $4`, the anchor) and the grouping moved to the
+   * counterpart side. That is deliberate and load-bearing: it makes
+   * `SUM(L1 rows) === the parent row for $4` true by construction, on all six
+   * measures, rather than something to go and verify. Rewrite it any other way
+   * and the dialog will disagree with the cell that opened it.
+   *
+   * Paged in SQL, unlike `summarize()` — `report-definitions.guard.spec.ts`
+   * exempts only `transfer-summary.report.ts` from the no-`paginateRows` rule.
+   */
+  async summarizeByCounterpart(
+    query: TransferByCounterpartQuery,
+  ): Promise<TransferSummaryResult> {
+    const paired = PAIRED_RECEIPT_EXISTS('gi');
+
+    // $1 org, $2 from, $3 to (exclusive), $4 anchor branch.
+    const movements = `
+      WITH movements AS (
+        SELECT
+          st.destination_branch_id::text AS counterpart_id,
+          0::numeric AS in_qty, 0::numeric AS in_value,
+          stl.quantity::numeric AS out_qty,
+          (stl.quantity::numeric * COALESCE(i.purchase_price, 0)) AS out_value,
+          stl.quantity::numeric AS received_qty,
+          (stl.quantity::numeric * COALESCE(i.purchase_price, 0)) AS received_value
+        FROM stock_transfers st
+        JOIN stock_transfer_lines stl ON stl.transfer_id = st.id
+        JOIN items i ON i.id = stl.item_id AND i.organization_id = st.organization_id
+        WHERE st.organization_id = $1
+          AND st.status = 'POSTED'
+          AND st.posted_at >= $2 AND st.posted_at < $3
+          AND st.source_branch_id <> st.destination_branch_id
+          AND st.source_branch_id::text = $4
+
+        UNION ALL
+
+        SELECT
+          st.source_branch_id::text AS counterpart_id,
+          stl.quantity::numeric AS in_qty,
+          (stl.quantity::numeric * COALESCE(i.purchase_price, 0)) AS in_value,
+          0::numeric AS out_qty, 0::numeric AS out_value,
+          0::numeric AS received_qty, 0::numeric AS received_value
+        FROM stock_transfers st
+        JOIN stock_transfer_lines stl ON stl.transfer_id = st.id
+        JOIN items i ON i.id = stl.item_id AND i.organization_id = st.organization_id
+        WHERE st.organization_id = $1
+          AND st.status = 'POSTED'
+          AND st.posted_at >= $2 AND st.posted_at < $3
+          AND st.source_branch_id <> st.destination_branch_id
+          AND st.destination_branch_id::text = $4
+
+        UNION ALL
+
+        SELECT
+          gi.target_branch_id::text AS counterpart_id,
+          0::numeric AS in_qty, 0::numeric AS in_value,
+          gil.quantity::numeric AS out_qty,
+          (gil.quantity::numeric * gil.unit_price::numeric) AS out_value,
+          CASE WHEN ${paired}
+               THEN gil.quantity::numeric ELSE 0 END AS received_qty,
+          CASE WHEN ${paired}
+               THEN (gil.quantity::numeric * gil.unit_price::numeric)
+               ELSE 0 END AS received_value
+        FROM goods_issues gi
+        JOIN goods_issue_lines gil ON gil.goods_issue_id = gi.id
+        WHERE gi.organization_id = $1
+          AND gi.status = 'POSTED'
+          AND gi.purpose = 'TRANSFER_OUT'
+          AND gi.posted_at >= $2 AND gi.posted_at < $3
+          AND gi.target_branch_id IS NOT NULL
+          AND gi.branch_id <> gi.target_branch_id::text
+          AND gi.branch_id = $4
+
+        UNION ALL
+
+        SELECT
+          gr.source_branch_id AS counterpart_id,
+          grl.quantity::numeric AS in_qty,
+          (grl.quantity::numeric * grl.unit_price::numeric) AS in_value,
+          0::numeric AS out_qty, 0::numeric AS out_value,
+          0::numeric AS received_qty, 0::numeric AS received_value
+        FROM goods_receipts gr
+        JOIN goods_receipt_lines grl ON grl.goods_receipt_id = gr.id
+        WHERE gr.organization_id = $1
+          AND gr.status = 'POSTED'
+          AND gr.purpose = 'TRANSFER_IN'
+          AND gr.posted_at >= $2 AND gr.posted_at < $3
+          AND gr.source_branch_id IS NOT NULL
+          AND gr.branch_id <> gr.source_branch_id
+          AND gr.branch_id = $4
+      ),
+      agg AS (
+        SELECT
+          b.id AS branch_id,
+          b.code AS branch_code,
+          b.name AS branch_name,
+          COALESCE(SUM(m.in_qty), 0) AS in_qty,
+          COALESCE(SUM(m.in_value), 0) AS in_value,
+          COALESCE(SUM(m.out_qty), 0) AS out_qty,
+          COALESCE(SUM(m.out_value), 0) AS out_value,
+          COALESCE(SUM(m.received_qty), 0) AS received_qty,
+          COALESCE(SUM(m.received_value), 0) AS received_value
+        FROM movements m
+        JOIN branches b ON b.id::text = m.counterpart_id AND b.organization_id = $1
+        GROUP BY b.id, b.code, b.name
+      )`;
+
+    const page = Math.max(1, query.page ?? 1);
+    const pageSize = Math.max(1, query.pageSize ?? 20);
+    const params = [
+      query.organizationId,
+      query.startDate,
+      query.endDate,
+      query.branchId,
+    ];
+
+    const rows = (await this.dataSource.query(
+      `${movements}
+       SELECT * FROM agg ORDER BY branch_name ASC LIMIT $5 OFFSET $6`,
+      [...params, pageSize, (page - 1) * pageSize],
+    )) as RawTransferSummaryRow[];
+
+    // Totals come from the same CTE so they describe the whole set, not the page.
+    const [totalsRow] = (await this.dataSource.query(
+      `${movements}
+       SELECT COUNT(*)::int AS total,
+              COALESCE(SUM(in_qty), 0) AS in_qty,
+              COALESCE(SUM(in_value), 0) AS in_value,
+              COALESCE(SUM(out_qty), 0) AS out_qty,
+              COALESCE(SUM(out_value), 0) AS out_value,
+              COALESCE(SUM(received_qty), 0) AS received_qty,
+              COALESCE(SUM(received_value), 0) AS received_value
+         FROM agg`,
+      params,
+    )) as (RawTransferSummaryRow & { total: number })[];
+
+    const data = rows.map((r) => toSummaryRow(r));
+    const whole = totalsRow ? toSummaryRow(totalsRow) : null;
+    const totals: ReportTotals = {};
+    for (const field of TRANSFER_SUMMARY_TOTAL_FIELDS) {
+      totals[field] = whole ? whole[field] : 0;
+    }
+
+    return { data, total: Number(totalsRow?.total ?? 0), totals };
   }
 
   // ──────────────────────────────────────────────────────────────────

@@ -9,3 +9,47 @@
 {"action": "ticket review", "at": "2026-09-03T16:22:00", "by": "claude", "gate": "G4", "id": "7c6e7a46c860", "ticket": "T-01-03", "ts": "2026-09-03T16:22:00.669604"}
 {"action": "ticket review", "at": "2026-09-03T16:25:17", "by": "claude", "gate": "G4", "id": "1a9cb7fbf3a3", "ticket": "T-01-01", "ts": "2026-09-03T16:25:17.595366"}
 {"action": "ticket review", "at": "2026-09-03T16:27:12", "by": "claude", "gate": "G4", "id": "eac16afe9d52", "ticket": "T-02-01", "ts": "2026-09-03T16:27:12.743258"}
+{"action": "ticket review", "at": "2026-09-03T18:07:48", "by": "claude", "gate": "G4", "id": "37031d35a3ee", "ticket": "T-01-02", "ts": "2026-09-03T18:07:48.535306"}
+{"action": "reopened", "at": "2026-09-03T18:19:10", "by": "loc", "gate": "G3", "id": "f29f6dfc7b22", "reason": "Do dai - du lieu that co 300 cap da ghep va 27 phieu dang van chuyen, nen seed thua cho 11/13 AC. Xoa T-01-02; AC-04/AC-05 khong con nguon bang chung anh chup.", "ts": "2026-09-03T18:19:10.501646"}
+{"action": "passed", "at": "2026-09-03T18:22:53", "by": "loc", "evidence": "graph valid - 4 UoW, 15 tickets, no cycles", "gate": "G3", "id": "deeecc87ed31", "ts": "2026-09-03T18:22:53.585995"}
+{"action": "ticket done", "at": "2026-09-03T18:35:31", "by": "loc", "gate": "G4", "id": "17e9376d06e3", "ticket": "T-01-01", "ts": "2026-09-03T18:35:31.039608"}
+{"action": "ticket done", "at": "2026-09-03T18:35:31", "by": "loc", "gate": "G4", "id": "d0b149b5f317", "ticket": "T-01-03", "ts": "2026-09-03T18:35:31.138182"}
+{"action": "ticket done", "at": "2026-09-03T18:35:31", "by": "loc", "gate": "G4", "id": "904a497abf6a", "ticket": "T-02-01", "ts": "2026-09-03T18:35:31.237103"}
+{"action": "ticket in_progress", "at": "2026-09-03T18:35:44", "by": "claude", "gate": "G4", "id": "064504446b36", "ticket": "T-01-04", "ts": "2026-09-03T18:35:44.315860"}
+{"action": "ticket review", "at": "2026-09-03T18:38:08", "by": "claude", "gate": "G4", "id": "9a2f7ac17bd7", "ticket": "T-01-04", "ts": "2026-09-03T18:38:08.770159"}
+{"action": "ticket done", "at": "2026-09-03T18:38:08", "by": "loc", "gate": "G4", "id": "ff3ba2692a86", "ticket": "T-01-04", "ts": "2026-09-03T18:38:08.829257"}
+{"action": "ticket in_progress", "at": "2026-09-03T18:38:25", "by": "claude", "gate": "G4", "id": "95858c0de6f9", "ticket": "T-02-02", "ts": "2026-09-03T18:38:25.984281"}
+{"action": "ticket review", "at": "2026-09-03T18:42:21", "by": "claude", "gate": "G4", "id": "9b3334107070", "ticket": "T-02-02", "ts": "2026-09-03T18:42:21.175869"}
+{"action": "ticket done", "at": "2026-09-03T18:42:21", "by": "loc", "gate": "G4", "id": "e4decea3c014", "ticket": "T-02-02", "ts": "2026-09-03T18:42:21.241804"}
+{"action": "ticket in_progress", "at": "2026-09-03T18:42:33", "by": "claude", "gate": "G4", "id": "9b2ca90b5b94", "ticket": "T-02-03", "ts": "2026-09-03T18:42:33.736038"}
+{"action": "ticket review", "at": "2026-09-03T18:46:20", "by": "claude", "gate": "G4", "id": "fb110b73328b", "ticket": "T-02-03", "ts": "2026-09-03T18:46:20.266972"}
+{"action": "ticket done", "at": "2026-09-03T18:46:20", "by": "loc", "gate": "G4", "id": "88354750132d", "ticket": "T-02-03", "ts": "2026-09-03T18:46:20.333689"}
+{"action": "ticket in_progress", "at": "2026-09-03T18:46:35", "by": "claude", "gate": "G4", "id": "ddbe28f79268", "ticket": "T-02-04", "ts": "2026-09-03T18:46:35.375781"}
+{"action": "ticket review", "at": "2026-09-03T18:49:29", "by": "claude", "gate": "G4", "id": "4b34ef27d636", "ticket": "T-02-04", "ts": "2026-09-03T18:49:29.066217"}
+{"action": "ticket done", "at": "2026-09-03T18:49:29", "by": "loc", "gate": "G4", "id": "b8324a3bc2de", "ticket": "T-02-04", "ts": "2026-09-03T18:49:29.129698"}
+{"action": "ticket in_progress", "at": "2026-09-03T19:43:38", "by": "claude", "gate": "G4", "id": "fb95f30cf4cb", "ticket": "T-03-01", "ts": "2026-09-03T19:43:38.005701"}
+{"action": "ticket review", "at": "2026-09-03T19:46:58", "by": "claude", "gate": "G4", "id": "3a79c5d8b276", "ticket": "T-03-01", "ts": "2026-09-03T19:46:58.761118"}
+{"action": "ticket done", "at": "2026-09-03T19:46:58", "by": "loc", "gate": "G4", "id": "e23debbef727", "ticket": "T-03-01", "ts": "2026-09-03T19:46:58.820591"}
+{"action": "ticket in_progress", "at": "2026-09-03T19:47:53", "by": "claude", "gate": "G4", "id": "9da2377226fd", "ticket": "T-03-02", "ts": "2026-09-03T19:47:53.585804"}
+{"action": "ticket review", "at": "2026-09-03T19:49:46", "by": "claude", "gate": "G4", "id": "e06b13c5de1e", "ticket": "T-03-02", "ts": "2026-09-03T19:49:46.591348"}
+{"action": "ticket done", "at": "2026-09-03T19:49:46", "by": "loc", "gate": "G4", "id": "6a1d15479df9", "ticket": "T-03-02", "ts": "2026-09-03T19:49:46.654845"}
+{"action": "ticket in_progress", "at": "2026-09-03T19:50:31", "by": "claude", "gate": "G4", "id": "1f06a19c510f", "ticket": "T-03-03", "ts": "2026-09-03T19:50:31.407540"}
+{"action": "ticket review", "at": "2026-09-03T19:51:47", "by": "claude", "gate": "G4", "id": "a05e3984aba5", "ticket": "T-03-03", "ts": "2026-09-03T19:51:47.601773"}
+{"action": "ticket done", "at": "2026-09-03T19:51:47", "by": "loc", "gate": "G4", "id": "a889b6872d98", "ticket": "T-03-03", "ts": "2026-09-03T19:51:47.669014"}
+{"action": "ticket in_progress", "at": "2026-09-03T19:52:12", "by": "claude", "gate": "G4", "id": "8abbf6136b8f", "ticket": "T-03-04", "ts": "2026-09-03T19:52:12.994321"}
+{"action": "ticket review", "at": "2026-09-03T19:53:39", "by": "claude", "gate": "G4", "id": "31e97cb42204", "ticket": "T-03-04", "ts": "2026-09-03T19:53:39.650270"}
+{"action": "ticket done", "at": "2026-09-03T19:53:39", "by": "loc", "gate": "G4", "id": "2fbf0819f2ec", "ticket": "T-03-04", "ts": "2026-09-03T19:53:39.716539"}
+{"action": "ticket in_progress", "at": "2026-09-03T19:54:12", "by": "claude", "gate": "G4", "id": "011ca3aa7cd0", "ticket": "T-04-01", "ts": "2026-09-03T19:54:12.205794"}
+{"action": "ticket review", "at": "2026-09-03T19:55:05", "by": "claude", "gate": "G4", "id": "8ec02830c28a", "ticket": "T-04-01", "ts": "2026-09-03T19:55:05.878070"}
+{"action": "ticket done", "at": "2026-09-03T19:55:05", "by": "loc", "gate": "G4", "id": "0d66100786d8", "ticket": "T-04-01", "ts": "2026-09-03T19:55:05.946454"}
+{"action": "ticket in_progress", "at": "2026-09-03T19:55:06", "by": "claude", "gate": "G4", "id": "b1ca43a6489f", "ticket": "T-04-02", "ts": "2026-09-03T19:55:06.049428"}
+{"action": "ticket review", "at": "2026-09-03T19:56:35", "by": "claude", "gate": "G4", "id": "593fbb01c030", "ticket": "T-04-02", "ts": "2026-09-03T19:56:35.056877"}
+{"action": "ticket done", "at": "2026-09-03T19:56:35", "by": "loc", "gate": "G4", "id": "06f2d27b6de5", "ticket": "T-04-02", "ts": "2026-09-03T19:56:35.121830"}
+{"action": "ticket in_progress", "at": "2026-09-03T19:57:08", "by": "claude", "gate": "G4", "id": "5e949901999c", "ticket": "T-04-03", "ts": "2026-09-03T19:57:08.524593"}
+{"action": "ticket review", "at": "2026-09-03T19:58:03", "by": "claude", "gate": "G4", "id": "e25649fb5150", "ticket": "T-04-03", "ts": "2026-09-03T19:58:03.067073"}
+{"action": "ticket done", "at": "2026-09-03T19:58:03", "by": "loc", "gate": "G4", "id": "3c775fbfb6ac", "ticket": "T-04-03", "ts": "2026-09-03T19:58:03.133764"}
+{"action": "ticket in_progress", "at": "2026-09-03T22:18:59", "by": "claude", "gate": "G4", "id": "01244e87a3d3", "ticket": "T-04-04", "ts": "2026-09-03T22:18:59.998121"}
+{"action": "ticket review", "at": "2026-09-03T22:21:24", "by": "claude", "gate": "G4", "id": "877c4aa514c7", "ticket": "T-04-04", "ts": "2026-09-03T22:21:24.110804"}
+{"action": "ticket done", "at": "2026-09-03T22:21:24", "by": "loc", "gate": "G4", "id": "8ee72bfd8aa5", "ticket": "T-04-04", "ts": "2026-09-03T22:21:24.207294"}
+{"action": "passed", "at": "2026-09-03T22:23:41", "by": "loc", "evidence": "all 15 tickets done, all UoW checklists ticked", "gate": "G4", "id": "38999c5b833b", "ts": "2026-09-03T22:23:41.360218"}
+{"action": "reopened", "at": "2026-09-04T11:47:01", "by": "loc", "gate": "G3", "id": "e21356118de1", "reason": "Doi chieu giao dien that voi MISA - ghim cot, ngay gio doc duoc, them Doi tuong/Dien giai, bam so chung tu, ellipsis toan cuc, ten chi nhanh neo. Them UOW-05..07.", "ts": "2026-09-04T11:47:01.336576"}

@@ -145,5 +145,12 @@ export function buildInventorySearchFilters(
   const receivingStore = filters[REPORT_FILTERS_LINE.RECEIVING_STORE];
   if (notAll(receivingStore)) payload.receivingStoreIds = [receivingStore];
 
+  // Chân nào của cặp phiếu đang được xem. Chỉ drill-down chứng từ điều chuyển
+  // đặt giá trị này; mọi báo cáo khác bỏ qua.
+  const transferLeg = filters[REPORT_FILTERS_LINE.TRANSFER_LEG];
+  if (transferLeg) {
+    payload.transferLeg = transferLeg as InventoryReportFilterPayload["transferLeg"];
+  }
+
   return payload;
 }
