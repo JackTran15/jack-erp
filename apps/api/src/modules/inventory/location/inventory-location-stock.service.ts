@@ -508,6 +508,12 @@ export class InventoryLocationStockService {
       organizationId,
       locationId,
     };
+    // is_tracked lives on stock_balances, not on items — keep it out of
+    // itemWhere. `typeof` rather than truthiness: false is a valid filter, and
+    // undefined means "all" (the caller owns the default).
+    if (typeof query.isTracked === 'boolean') {
+      base.isTracked = query.isTracked;
+    }
     if (Object.keys(itemWhere).length > 0) {
       base.item = itemWhere;
     }

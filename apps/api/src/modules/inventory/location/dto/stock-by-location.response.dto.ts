@@ -18,6 +18,11 @@ export class StockByLocationItemDto {
   @ApiPropertyOptional({ nullable: true }) variantLabel: string | null;
   @ApiProperty() isPosVisible: boolean;
   @ApiProperty() isActive: boolean;
+  @ApiProperty({
+    description:
+      'Location-level tracking (stock_balances.is_tracked) for this item at this location.',
+  })
+  isTracked: boolean;
   @ApiProperty() sellingPrice: number;
   @ApiProperty() purchasePrice: number;
   @ApiProperty({ type: [String] }) barcodes: string[];
