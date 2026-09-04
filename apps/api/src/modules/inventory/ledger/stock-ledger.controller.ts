@@ -121,6 +121,14 @@ export class BalanceQueryDto extends PaginationQueryDto {
   @IsBoolean()
   excludeShowroom?: boolean;
 
+  @ApiPropertyOptional({
+    description: 'Lọc theo trạng thái hoạt động của vị trí (locations.is_active). Bỏ trống = tất cả.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => parseBool(value))
+  @IsBoolean()
+  locationIsActive?: boolean;
+
   // Per-column string filters
   @ApiPropertyOptional()
   @IsOptional()

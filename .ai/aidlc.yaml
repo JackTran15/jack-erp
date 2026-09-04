@@ -183,6 +183,40 @@ verify:
         recipe: storage-state
         landing: /
         ready_when: { gone: 'text=Đang tải' }
+    # Thêm cho feature 2026090301-inventory-qa-defects (Claude, 03/09/2026).
+    # KHÔNG sửa `local-backoffice` ở trên vì các feature khác đang dùng nó.
+    #
+    # Vì sao phải có bản này: recipe `form` của runner KHÔNG THỂ đăng nhập vào backoffice.
+    # `perform_login` (runner/run.py:252-273) là luồng hai bước — điền email → submit →
+    # mới điền mật khẩu → submit lần nữa. Form backoffice đặt cả BA ô trên một trang, nên
+    # cú submit đầu bắn đi với mật khẩu rỗng và trang không bao giờ rời /login. Tệ hơn:
+    # runner không hề biết tới ô "ID tổ chức" (`grep organization` trong run.py = 0 kết quả),
+    # mà backoffice bắt buộc phải có org id. Đây là giới hạn cấu trúc, không phải sai config.
+    #
+    # Phiên được dựng bằng script capture: gọi POST /auth/login (trả 200), ghi
+    # refresh_token vào localStorage (`auth-storage.ts:8`), rồi lưu storage_state.
+    local-backoffice-session:
+      url: http://localhost:3000
+      required: true
+      auth:
+        recipe: storage-state
+        landing: /
+        ready_when: { gone: 'text=Đang khôi phục phiên' }
+
+    # Phiên POS cho feature 2026090301 (Claude, 03/09/2026). `required: false` vì
+    # một bảng Steps chạy trên MỌI environment được khai — trộn đường dẫn backoffice
+    # với đường dẫn POS `/pos/...` trong cùng một bảng thì bên nào cũng 404. Phiên này
+    # dùng cho phép kiểm AC-23 chạy riêng, kết quả ghi vào T-04-06.
+    # Cũng phải là storage-state: form POS đặt cả ba ô trên một trang, đúng giới hạn
+    # của `perform_login` đã mô tả ở local-backoffice-session.
+    local-pos-session:
+      url: http://localhost:3001
+      required: false
+      auth:
+        recipe: storage-state
+        landing: /pos/
+        ready_when: { gone: 'text=Đang tải' }
+
   # Desktop only. Neither app has a mobile layout: no matchMedia/useMediaQuery anywhere, and
   # BackofficeLayout is a fixed ml-60 desktop shell.
   viewports:

@@ -1540,6 +1540,8 @@ export class StockTakeService {
       .innerJoin("locations", "loc", "loc.id = sb.location_id")
       .where("sb.organization_id = :orgId", { orgId: organizationId })
       .andWhere("sb.item_id = :itemId", { itemId })
+      .andWhere("sb.is_tracked = true")
+      .andWhere("loc.is_active = true")
       .orderBy("sb.quantity", "DESC");
 
     if (locationId) {

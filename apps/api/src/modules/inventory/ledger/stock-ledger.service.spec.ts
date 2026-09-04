@@ -621,6 +621,109 @@ describe('StockLedgerService', () => {
         );
       });
     });
+
+    describe('locationIsActive filter (ADR-02 / A-07)', () => {
+      function createQbSpy() {
+        const qb: any = {
+          innerJoin: jest.fn().mockReturnThis(),
+          leftJoin: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          select: jest.fn().mockReturnThis(),
+          orderBy: jest.fn().mockReturnThis(),
+          offset: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockReturnThis(),
+          getRawMany: jest.fn().mockResolvedValue([]),
+          getCount: jest.fn().mockResolvedValue(0),
+        };
+        return qb;
+      }
+
+      it('applies loc.is_active filter when locationIsActive is passed', async () => {
+        const qb = createQbSpy();
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        await service.getBalances({
+          organizationId: 'org-1',
+          locationIsActive: true,
+          page: 1,
+          pageSize: 20,
+        });
+
+        expect(qb.andWhere).toHaveBeenCalledWith(
+          'loc.is_active = :locationIsActive',
+          { locationIsActive: true },
+        );
+      });
+
+      it('applies loc.is_active = false filter when locationIsActive is false', async () => {
+        const qb = createQbSpy();
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        await service.getBalances({
+          organizationId: 'org-1',
+          locationIsActive: false,
+          page: 1,
+          pageSize: 20,
+        });
+
+        expect(qb.andWhere).toHaveBeenCalledWith(
+          'loc.is_active = :locationIsActive',
+          { locationIsActive: false },
+        );
+      });
+
+      it('does NOT filter loc.is_active when locationIsActive is omitted — behaviour unchanged for existing callers', async () => {
+        const qb = createQbSpy();
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        await service.getBalances({
+          organizationId: 'org-1',
+          page: 1,
+          pageSize: 20,
+        });
+
+        const calls = qb.andWhere.mock.calls.map((args: unknown[]) => String(args[0]));
+        expect(calls.some((sql: string) => sql.includes('loc.is_active'))).toBe(false);
+      });
+
+      it('maps location.isActive into the returned row', async () => {
+        const rawRow = {
+          id: 'b1',
+          organizationId: 'org-1',
+          branchId: 'branch-1',
+          itemId: 'item-1',
+          locationId: 'loc-1',
+          quantity: '50',
+          lastMovementAt: null,
+          itemCode: 'SKU-001',
+          itemName: 'Widget',
+          itemUnit: 'PCS',
+          itemIsActive: true,
+          itemIsPosVisible: true,
+          categoryName: null,
+          locationCode: 'E03.01',
+          locationName: 'E03.01',
+          storageId: 'stor-1',
+          storageName: 'Main WH',
+          locationIsActive: false,
+          minQty: null,
+          maxQty: null,
+        };
+        const qb = createQbSpy();
+        qb.getRawMany = jest.fn().mockResolvedValue([rawRow]);
+        qb.getCount = jest.fn().mockResolvedValue(1);
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        const result = await service.getBalances({
+          organizationId: 'org-1',
+          page: 1,
+          pageSize: 20,
+        });
+
+        expect(result.data[0].location.isActive).toBe(false);
+      });
+    });
   });
 
   describe('getBalancesForPairs', () => {

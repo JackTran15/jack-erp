@@ -7541,6 +7541,15 @@
             }
           },
           {
+            "name": "locationIsActive",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo trạng thái hoạt động của vị trí (locations.is_active). Bỏ trống = tất cả.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "locationCode",
             "required": false,
             "in": "query",

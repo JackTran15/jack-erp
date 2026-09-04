@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { ReportTotals } from "@erp/shared-interfaces";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, SelectQueryBuilder } from "typeorm";
+import { ObjectLiteral, Repository, SelectQueryBuilder } from "typeorm";
 import {
   CompareFilterDto,
   CompareOperator,
@@ -245,20 +245,7 @@ export class StockSummaryService {
     );
 
     const group = this.groupExpressions(query);
-    const pageQb = this.applyHaving(
-      this.buildGroupedQuery(query),
-      query.stockState,
-      query.quantity,
-    )
-      .orderBy(group.aggCode, "ASC")
-      .addOrderBy("storage.name", "ASC")
-      // Tiebreakers: neither the displayed code nor the storage name is unique,
-      // and without a total order OFFSET paging silently repeats/drops rows.
-      .addOrderBy(group.key, "ASC")
-      .addOrderBy("storage.id", "ASC");
-    if (!needsDerivedFilter) {
-      pageQb.limit(pageSize).offset((page - 1) * pageSize);
-    }
+    const wantsPendingOnly = Boolean(query.branchId) && !query.storageId;
 
     const aggQb = this.applyHaving(
       this.buildGroupedQuery(query),
@@ -272,19 +259,24 @@ export class StockSummaryService {
     // the round-trip count unchanged.
     const wantsTotals = query.includeTotals !== false && !needsDerivedFilter;
     const aggregate = wantsTotals
-      ? this.buildTotalsSql(query, aggSql, aggParams)
+      ? this.buildTotalsSql(query, group, aggSql, aggParams)
       : {
           sql: `SELECT COUNT(*)::int AS total, COALESCE(SUM(sub.quantity), 0)::numeric AS total_quantity FROM (${aggSql}) sub`,
           params: aggParams,
         };
 
-    const [rows, aggResult] = await Promise.all([
-      pageQb.getRawMany<RawPageRow>(),
+    // ADR-01: `needsDerivedFilter` already had to materialise every filtered
+    // row instead of a SQL page (it reduces in memory below) — `limit: false`
+    // here reuses exactly that knob, it is not a second way of doing the same
+    // thing.
+    const [{ data: pageData, rows }, aggResult] = await Promise.all([
+      this.fetchPageData(query, group, !needsDerivedFilter, page, pageSize),
       this.balanceRepo.manager.query<RawTotalsRow[]>(
         aggregate.sql,
         aggregate.params,
       ),
     ]);
+    let data = pageData;
 
     let total = Number(aggResult?.[0]?.total ?? 0);
     const totalQuantity = Number(aggResult?.[0]?.total_quantity ?? 0);
@@ -292,7 +284,102 @@ export class StockSummaryService {
       ? this.readTotals(aggResult?.[0], totalQuantity, Boolean(query.startDate || query.endDate))
       : undefined;
 
-    // The follow-up queries below stay keyed on (item, storage) even when the
+    const pendingOnlyQuery = wantsPendingOnly
+      ? this.buildPendingOnlyQuery(query, group)
+      : null;
+    const rawPendingOnlyRows = pendingOnlyQuery
+      ? await this.balanceRepo.manager.query<RawPendingOnlyRow[]>(
+          pendingOnlyQuery.sql,
+          pendingOnlyQuery.params,
+        )
+      : [];
+    // A genuine pending-only row always carries its own `group_key` — the
+    // SELECT list in `buildPendingOnlyQuery` always projects it — so this
+    // also doubles as a guard against a differently-shaped row reaching the
+    // merge below.
+    const pendingOnlyRows = (rawPendingOnlyRows ?? []).filter(
+      (row): row is RawPendingOnlyRow =>
+        Boolean(row) && typeof row.group_key === "string",
+    );
+
+    if (wantsPendingOnly) {
+      const appended = this.mergePendingOnlyRows(data, pendingOnlyRows);
+      // The common case — no incoming transfers survive the filter/dedupe —
+      // never reaches here (`appended === 0`) and keeps the SQL-paginated
+      // `data`/`total` from above untouched, single round trip.
+      if (appended > 0) {
+        if (
+          !needsDerivedFilter &&
+          (page > 1 || rows.length === pageSize)
+        ) {
+          // `data` merged into only a SQL LIMIT/OFFSET slice (or, for
+          // page > 1, none of the earlier pages at all) — neither dedupe nor
+          // pagination can trust it. Refetch the whole filtered set,
+          // unpaginated, exactly like `needsDerivedFilter` already does, and
+          // merge again against the complete picture.
+          const full = await this.fetchPageData(
+            query,
+            group,
+            false,
+            page,
+            pageSize,
+          );
+          data = full.data;
+          this.mergePendingOnlyRows(data, pendingOnlyRows);
+        }
+        // Either `data` was already the full filtered set (page 1 under a
+        // full page, or `needsDerivedFilter`'s own unlimited fetch) or it
+        // just became one above — the SQL `total` never saw the appended
+        // rows, so hand off to the shared in-memory path (ADR-01) instead of
+        // trusting it.
+        return this.paginateInMemory(
+          data,
+          query,
+          page,
+          pageSize,
+          needsDerivedFilter,
+        );
+      }
+    }
+
+    if (needsDerivedFilter) {
+      return this.paginateInMemory(data, query, page, pageSize, true);
+    }
+
+    return { data, total, page, pageSize, totalQuantity, totals };
+  }
+
+  /**
+   * Runs the page query and its per-row enrichment (period figures, pending
+   * transfers, reservations), mapping the result to `StockSummaryRow[]`.
+   * `limit: false` fetches every row matching the filters instead of one
+   * page — the same knob `needsDerivedFilter` already needed, now reused by
+   * the pending-only merge (T-01-03, ADR-01) instead of a second one.
+   */
+  private async fetchPageData(
+    query: StockSummaryQuery,
+    group: ReturnType<StockSummaryService["groupExpressions"]>,
+    limit: boolean,
+    page: number,
+    pageSize: number,
+  ): Promise<{ data: StockSummaryRow[]; rows: RawPageRow[] }> {
+    const pageQb = this.applyHaving(
+      this.buildGroupedQuery(query),
+      query.stockState,
+      query.quantity,
+    )
+      .orderBy(group.aggCode, "ASC")
+      .addOrderBy("storage.name", "ASC")
+      // Tiebreakers: neither the displayed code nor the storage name is unique,
+      // and without a total order OFFSET paging silently repeats/drops rows.
+      .addOrderBy(group.key, "ASC")
+      .addOrderBy("storage.id", "ASC");
+    if (limit) {
+      pageQb.limit(pageSize).offset((page - 1) * pageSize);
+    }
+    const rows = await pageQb.getRawMany<RawPageRow>();
+
+    // These follow-up queries stay keyed on (item, storage) even when the
     // page is grouped by SKU: one row then contributes every variant it folds
     // in, and the per-variant results are summed back per row when mapping.
     const itemIds: string[] = [];
@@ -310,8 +397,6 @@ export class StockSummaryService {
     const pageItemIds = [...new Set(itemIds)];
     const wantsPeriod =
       rows.length > 0 && Boolean(query.startDate || query.endDate);
-    const wantsPendingOnly =
-      Boolean(query.branchId) && !query.storageId && page === 1;
     const periodStart = query.startDate || "1970-01-01";
     const periodEnd = query.endDate ? addOneDay(query.endDate) : "2999-12-31";
 
@@ -399,92 +484,45 @@ export class StockSummaryService {
         GROUP BY pairs.item_id, pairs.storage_id
       `;
 
-    const pendingOnlyQuery = `
-            SELECT
-              ${group.key} AS group_key,
-              MIN(item.product_id::text) AS product_id,
-              ${group.aggCode} AS item_code,
-              ${group.aggName} AS item_name,
-              ${group.sku ? "MIN(item.unit)" : "item.unit"} AS item_unit,
-              ${group.sku ? "MIN(item.brand)" : "item.brand"} AS item_brand,
-              ${group.sku ? "BOOL_OR(item.is_active)" : "item.is_active"} AS item_is_active,
-              ${group.sku ? "MIN(category.name)" : "category.name"} AS category_name,
-              destination_storage.id AS storage_id,
-              destination_storage.name AS storage_name,
-              transfer_order.destination_branch_id AS branch_id,
-              SUM(transfer_line.requested_qty)::numeric AS incoming_qty
-            FROM transfer_orders transfer_order
-            INNER JOIN transfer_order_lines transfer_line
-              ON transfer_line.transfer_order_id = transfer_order.id
-             AND transfer_line.organization_id = transfer_order.organization_id
-            INNER JOIN items item
-              ON item.id = transfer_line.item_id
-             AND item.organization_id = transfer_order.organization_id
-            LEFT JOIN products prod
-              ON prod.id = item.product_id
-            LEFT JOIN inventory_item_categories category
-              ON category.id = item.category_id
-            LEFT JOIN storages destination_storage
-              ON destination_storage.id = transfer_order.destination_storage_id
-             AND destination_storage.organization_id = transfer_order.organization_id
-            WHERE transfer_order.organization_id = $1
-              AND transfer_order.destination_branch_id = $2
-              AND transfer_order.status = 'IN_PROGRESS'
-              AND transfer_order.deleted_at IS NULL
-              AND NOT EXISTS (${this.pendingOnlyGuardSql(group.sku)})
-            GROUP BY ${group.sku
-              ? "prod.code, prod.name"
-              : "item.code, item.name, item.unit, item.brand, item.is_active, category.name"},
-                     ${group.groupBy}, destination_storage.id,
-                     destination_storage.name, transfer_order.destination_branch_id
-          `;
-
-    // None of these four reads depends on another's result, and they were four
-    // serial round trips. Batched, the stage costs the slowest one instead of
-    // their sum.
-    const [periodResult, pendingRows, reservationRows, pendingOnlyRows] =
-      await Promise.all([
-        wantsPeriod
-          ? this.balanceRepo.manager.query<RawPeriodRow[]>(periodQuery, [
-              periodStart,
-              periodEnd,
+    // None of these three reads depends on another's result, and they were
+    // three serial round trips. Batched, the stage costs the slowest one
+    // instead of their sum.
+    const [periodResult, pendingRows, reservationRows] = await Promise.all([
+      wantsPeriod
+        ? this.balanceRepo.manager.query<RawPeriodRow[]>(periodQuery, [
+            periodStart,
+            periodEnd,
+            query.organizationId,
+            itemIds,
+            storageIds,
+            pageItemIds,
+          ])
+        : Promise.resolve([] as RawPeriodRow[]),
+      rows.length > 0
+        ? this.balanceRepo.manager.query<RawPendingTransferRow[]>(
+            pendingTransferQuery,
+            [
+              query.branchId,
               query.organizationId,
               itemIds,
               storageIds,
               pageItemIds,
-            ])
-          : Promise.resolve([] as RawPeriodRow[]),
-        rows.length > 0
-          ? this.balanceRepo.manager.query<RawPendingTransferRow[]>(
-              pendingTransferQuery,
-              [
-                query.branchId,
-                query.organizationId,
-                itemIds,
-                storageIds,
-                pageItemIds,
-              ],
-            )
-          : Promise.resolve([] as RawPendingTransferRow[]),
-        rows.length > 0 && query.branchId
-          ? this.balanceRepo.manager.query<RawReservationRow[]>(
-              reservationQuery,
-              [
-                query.branchId,
-                query.organizationId,
-                itemIds,
-                storageIds,
-                pageItemIds,
-              ],
-            )
-          : Promise.resolve([] as RawReservationRow[]),
-        wantsPendingOnly
-          ? this.balanceRepo.manager.query<RawPendingOnlyRow[]>(
-              pendingOnlyQuery,
-              [query.organizationId, query.branchId],
-            )
-          : Promise.resolve([] as RawPendingOnlyRow[]),
-      ]);
+            ],
+          )
+        : Promise.resolve([] as RawPendingTransferRow[]),
+      rows.length > 0 && query.branchId
+        ? this.balanceRepo.manager.query<RawReservationRow[]>(
+            reservationQuery,
+            [
+              query.branchId,
+              query.organizationId,
+              itemIds,
+              storageIds,
+              pageItemIds,
+            ],
+          )
+        : Promise.resolve([] as RawReservationRow[]),
+    ]);
 
     const periodDataMap = new Map<string, RawPeriodRow>();
     for (const row of periodResult ?? []) {
@@ -501,7 +539,7 @@ export class StockSummaryService {
       reservationMap.set(`${row.item_id}:${row.storage_id}`, row);
     }
 
-    let data: StockSummaryRow[] = rows.map((r) => {
+    const data: StockSummaryRow[] = rows.map((r) => {
       // In SKU mode a row folds several variants, so every follow-up figure is
       // the sum over its members. VARIANT mode has exactly one member, which
       // makes these loops a no-op rename of the old direct lookups.
@@ -572,100 +610,159 @@ export class StockSummaryService {
       };
     });
 
-    if (wantsPendingOnly) {
-      const existingKeys = new Set(
-        data.map((row) => `${row.groupKey}:${row.storageId}`),
-      );
-      let appended = 0;
-      for (const row of pendingOnlyRows ?? []) {
-        const storageId = row.storage_id ?? `pending:${row.branch_id}`;
-        if (existingKeys.has(`${row.group_key}:${storageId}`)) continue;
-        data.push({
-          itemId: row.group_key,
-          storageId,
-          groupKey: row.group_key,
-          productId: row.product_id,
-          item: {
-            id: row.group_key,
-            code: row.item_code,
-            name: row.item_name,
-            unit: row.item_unit,
-            brand: row.item_brand,
-            isActive: row.item_is_active,
-            categoryName: row.category_name,
-          },
-          storage: {
-            id: storageId,
-            name: row.storage_name ?? "Chưa chọn kho nhận",
-            branchId: row.branch_id,
-          },
-          quantity: 0,
-          lastMovementAt: null,
-          openingQty: 0,
-          openingValue: 0,
-          inQty: 0,
-          inValue: 0,
-          outQty: 0,
-          outValue: 0,
-          closingQty: 0,
-          closingValue: 0,
-          transferOutQty: 0,
-          incomingQty: Number(row.incoming_qty ?? 0),
-          reservedQty: 0,
-        });
-        appended += 1;
+    return { data, rows };
+  }
+
+  /**
+   * Appends the pending-only rows (T-01-02) that are not already duplicates
+   * of a row already in `data`, mutating `data` in place. Returns how many
+   * were appended — the caller uses that to decide whether the set it merged
+   * into was trustworthy enough to keep as-is (T-01-03, ADR-01).
+   */
+  private mergePendingOnlyRows(
+    data: StockSummaryRow[],
+    pendingOnlyRows: RawPendingOnlyRow[],
+  ): number {
+    // Keyed by groupKey → the set of storageIds the SKU already has a row
+    // for in `data` (branch-scoped whenever this runs, since it requires
+    // query.branchId).
+    const existingStorageIdsByGroup = new Map<string, Set<string>>();
+    for (const row of data) {
+      let set = existingStorageIdsByGroup.get(row.groupKey);
+      if (!set) {
+        set = new Set();
+        existingStorageIdsByGroup.set(row.groupKey, set);
       }
-      total += appended;
+      set.add(row.storageId);
     }
-
-    if (needsDerivedFilter) {
-      data = data.filter(
-        (row) =>
-          matchesCompare(row.openingQty, query.openingQty) &&
-          matchesCompare(row.inQty, query.inQty) &&
-          matchesCompare(row.outQty, query.outQty) &&
-          matchesCompare(row.transferOutQty, query.transferOutQty) &&
-          matchesCompare(row.incomingQty, query.incomingQty),
+    let appended = 0;
+    for (const row of pendingOnlyRows ?? []) {
+      // `destination_storage_id IS NULL` (rendered "Chưa chọn kho nhận")
+      // cannot be told apart from stock the SKU already has somewhere in
+      // this branch (T-01-01: it is the same physical stock, just a
+      // transfer order that has not picked a destination yet) — so it is a
+      // duplicate whenever *any* row already exists for the SKU here, not
+      // only when a row exists at that exact synthetic key. A row with a
+      // real destination storage is a distinct (SKU × storage) grain and is
+      // only a duplicate of that same storage.
+      const isSyntheticPending = row.storage_id === null;
+      const storageId = row.storage_id ?? `pending:${row.branch_id}`;
+      const existingStorageIds = existingStorageIdsByGroup.get(
+        row.group_key,
       );
-      const filteredTotal = data.length;
-      // Every matching row is in memory here, so the footer totals are a plain
-      // reduce — taken after the derived filter and before the page slice, and
-      // exact by construction. The pending-only rows were appended above, i.e.
-      // before the filter, so they are already counted exactly once.
-      const filteredTotals = data.reduce<StockSummaryTotals>(
-        (sum, row) => ({
-          quantity: sum.quantity + row.quantity,
-          openingQty: sum.openingQty + row.openingQty,
-          inQty: sum.inQty + row.inQty,
-          outQty: sum.outQty + row.outQty,
-          closingQty: sum.closingQty + row.closingQty,
-          transferOutQty: sum.transferOutQty + row.transferOutQty,
-          incomingQty: sum.incomingQty + row.incomingQty,
-          reservedQty: sum.reservedQty + row.reservedQty,
-        }),
-        {
-          quantity: 0,
-          openingQty: 0,
-          inQty: 0,
-          outQty: 0,
-          closingQty: 0,
-          transferOutQty: 0,
-          incomingQty: 0,
-          reservedQty: 0,
+      if (isSyntheticPending) {
+        if (existingStorageIds && existingStorageIds.size > 0) continue;
+      } else if (existingStorageIds?.has(storageId)) {
+        continue;
+      }
+      let set = existingStorageIdsByGroup.get(row.group_key);
+      if (!set) {
+        set = new Set();
+        existingStorageIdsByGroup.set(row.group_key, set);
+      }
+      set.add(storageId);
+      data.push({
+        itemId: row.group_key,
+        storageId,
+        groupKey: row.group_key,
+        productId: row.product_id,
+        item: {
+          id: row.group_key,
+          code: row.item_code,
+          name: row.item_name,
+          unit: row.item_unit,
+          brand: row.item_brand,
+          isActive: row.item_is_active,
+          categoryName: row.category_name,
         },
-      );
-      data = data.slice((page - 1) * pageSize, page * pageSize);
-      return {
-        data,
-        total: filteredTotal,
-        page,
-        pageSize,
-        totalQuantity: filteredTotals.quantity,
-        ...(query.includeTotals === false ? {} : { totals: filteredTotals }),
-      };
+        storage: {
+          id: storageId,
+          name: row.storage_name ?? "Chưa chọn kho nhận",
+          branchId: row.branch_id,
+        },
+        quantity: 0,
+        lastMovementAt: null,
+        openingQty: 0,
+        openingValue: 0,
+        inQty: 0,
+        inValue: 0,
+        outQty: 0,
+        outValue: 0,
+        closingQty: 0,
+        closingValue: 0,
+        transferOutQty: 0,
+        incomingQty: Number(row.incoming_qty ?? 0),
+        reservedQty: 0,
+      });
+      appended += 1;
     }
+    return appended;
+  }
 
-    return { data, total, page, pageSize, totalQuantity, totals };
+  /**
+   * Shared in-memory pagination path (ADR-01): optionally applies the
+   * derived-column filter, sorts deterministically, totals, then slices.
+   * `needsDerivedFilter` used this alone before T-01-03; the pending-only
+   * merge now routes through it too instead of a second, page-blind way of
+   * appending rows and bumping `total`.
+   */
+  private paginateInMemory(
+    data: StockSummaryRow[],
+    query: StockSummaryQuery,
+    page: number,
+    pageSize: number,
+    applyDerivedFilter: boolean,
+  ): StockSummaryResponse {
+    const filteredData = applyDerivedFilter
+      ? data.filter(
+          (row) =>
+            matchesCompare(row.openingQty, query.openingQty) &&
+            matchesCompare(row.inQty, query.inQty) &&
+            matchesCompare(row.outQty, query.outQty) &&
+            matchesCompare(row.transferOutQty, query.transferOutQty) &&
+            matchesCompare(row.incomingQty, query.incomingQty),
+        )
+      : data;
+    // Deterministic order across identical calls: pending-only rows are
+    // appended after the SQL-ordered rows (`mergePendingOnlyRows`), so
+    // without this the merged set has no total order and OFFSET slicing
+    // would tear (T-01-03).
+    const sorted = [...filteredData].sort(sortStockSummaryRows);
+    const filteredTotal = sorted.length;
+    // Every matching row is in memory here, so the footer totals are a plain
+    // reduce — taken after the filter and before the page slice, and exact
+    // by construction.
+    const filteredTotals = sorted.reduce<StockSummaryTotals>(
+      (sum, row) => ({
+        quantity: sum.quantity + row.quantity,
+        openingQty: sum.openingQty + row.openingQty,
+        inQty: sum.inQty + row.inQty,
+        outQty: sum.outQty + row.outQty,
+        closingQty: sum.closingQty + row.closingQty,
+        transferOutQty: sum.transferOutQty + row.transferOutQty,
+        incomingQty: sum.incomingQty + row.incomingQty,
+        reservedQty: sum.reservedQty + row.reservedQty,
+      }),
+      {
+        quantity: 0,
+        openingQty: 0,
+        inQty: 0,
+        outQty: 0,
+        closingQty: 0,
+        transferOutQty: 0,
+        incomingQty: 0,
+        reservedQty: 0,
+      },
+    );
+    const paged = sorted.slice((page - 1) * pageSize, page * pageSize);
+    return {
+      data: paged,
+      total: filteredTotal,
+      page,
+      pageSize,
+      totalQuantity: filteredTotals.quantity,
+      ...(query.includeTotals === false ? {} : { totals: filteredTotals }),
+    };
   }
 
   async getFilterOptions(
@@ -716,6 +813,7 @@ export class StockSummaryService {
    */
   private buildTotalsSql(
     query: StockSummaryQuery,
+    group: ReturnType<StockSummaryService["groupExpressions"]>,
     aggSql: string,
     aggParams: unknown[],
   ): { sql: string; params: unknown[] } {
@@ -819,9 +917,26 @@ export class StockSummaryService {
     // appends these rows only on page 1; the footer must count them on every
     // page or it would shrink when the user pages. The NOT EXISTS guard makes
     // this set disjoint from `pairs`, so nothing is counted twice.
+    //
+    // T-01-04: this CTE must carry the same row filters as `buildPendingOnlyQuery`
+    // (T-01-02) — a filtered-to-zero grid must show a zero "Sắp nhận về" total,
+    // not the whole branch's. Reuses `applyCommonFilters` via the same
+    // `RawSqlWhereCollector` shim instead of a third copy of the predicate set.
     if (query.branchId && !query.storageId) {
       const org = bind(query.organizationId);
       const branch = bind(query.branchId);
+      const collector = new RawSqlWhereCollector(bind, {
+        organizationId: query.organizationId,
+      });
+      this.applyCommonFilters(collector, query, {
+        code: group.code,
+        name: group.name,
+        categoryAlias: "category",
+        storageAlias: "destination_storage",
+      });
+      const extraConditions = collector.conditions
+        .map((condition) => `           AND ${condition}`)
+        .join("\n");
       ctes.push(`pending_only AS (
          SELECT COALESCE(SUM(transfer_line.requested_qty), 0)::numeric AS incoming_qty
          FROM transfer_orders transfer_order
@@ -831,13 +946,21 @@ export class StockSummaryService {
          INNER JOIN items item
            ON item.id = transfer_line.item_id
           AND item.organization_id = transfer_order.organization_id
+         LEFT JOIN products prod
+           ON prod.id = item.product_id
+         LEFT JOIN inventory_item_categories category
+           ON category.id = item.category_id
+         LEFT JOIN storages destination_storage
+           ON destination_storage.id = transfer_order.destination_storage_id
+          AND destination_storage.organization_id = transfer_order.organization_id
          WHERE transfer_order.organization_id = ${org}
            AND transfer_order.destination_branch_id = ${branch}
            AND transfer_order.status = 'IN_PROGRESS'
            AND transfer_order.deleted_at IS NULL
            AND NOT EXISTS (${this.pendingOnlyGuardSql(
              query.groupBy === StockSummaryGroupBy.SKU,
-           )}))`);
+           )})
+${extraConditions})`);
     } else {
       ctes.push(`pending_only AS (SELECT 0::numeric AS incoming_qty)`);
     }
@@ -1065,13 +1188,67 @@ export class StockSummaryService {
         storageId: query.storageId,
       });
     }
+    this.applyCommonFilters(qb, query, {
+      code: group.code,
+      name: group.name,
+      categoryAlias: "cat",
+      storageAlias: "storage",
+    });
+    // Loại phần tồn ở các cặp (item × vị trí) đã ngừng theo dõi ở cấp vị trí
+    // (stock_balances.is_tracked = false). Số liệu vẫn còn ở Báo cáo tồn kho (ledger).
+    qb.andWhere("sb.is_tracked = true");
+    // Không thống kê tồn ở kho đã ngừng hoạt động; số liệu vẫn còn ở Báo cáo tồn kho.
+    qb.andWhere("storage.is_active = true");
+    // Không thống kê tồn ở vị trí đã ngừng hoạt động (location.is_active = false).
+    qb.andWhere("loc.is_active = true");
+    if (query.movementFrom) {
+      qb.andWhere("sb.last_movement_at >= :movementFrom", {
+        movementFrom: query.movementFrom,
+      });
+    }
+    if (query.movementTo) {
+      qb.andWhere("sb.last_movement_at < :movementToPlus1", {
+        movementToPlus1: addOneDay(query.movementTo),
+      });
+    }
+
+    return qb;
+  }
+
+  /**
+   * The filter predicates `buildBaseQuery` and `pendingOnlyQuery` (T-01-02,
+   * ADR-01) must apply identically: `search`, the category subtree,
+   * `item.is_active`, `brand`/`unit`, `isPosVisible`, and the itemCode /
+   * itemName / category / brand / storage column filters. `branchId`,
+   * `storageId`, `sb.is_tracked`, `storage.is_active`, `loc.is_active` and the
+   * movement-date filters stay out of this method: they reference
+   * `stock_balances` / `locations`, which `pendingOnlyQuery` never joins — a
+   * row on the way in has no balance yet, by construction.
+   *
+   * `target` only needs `andWhere(sql, params)`, so `pendingOnlyQuery` can
+   * pass a lightweight collector (`RawSqlWhereCollector`) that turns the same
+   * named-parameter calls into `$n` positional binds instead of a real
+   * TypeORM `SelectQueryBuilder`. That is what keeps this one source instead
+   * of two copies that drift.
+   */
+  private applyCommonFilters(
+    target: WhereTarget,
+    query: StockSummaryQuery,
+    aliases: {
+      code: string;
+      name: string;
+      categoryAlias: string;
+      storageAlias: string;
+    },
+  ): void {
+    const { code, name, categoryAlias, storageAlias } = aliases;
     if (query.categoryId) {
       // Item categories form a tree (`parent_group_id`) and items are attached
       // to leaves, so an exact match on a parent group returns nothing at all.
       // Filtering on the whole subtree matches the POS catalog filter
       // (`resolveDescendantCategoryIds`). `UNION` (not `UNION ALL`) so a
       // malformed tree with a cycle terminates instead of looping.
-      qb.andWhere(
+      target.andWhere(
         `item.category_id IN (
           WITH RECURSIVE category_tree AS (
             SELECT root.id
@@ -1089,60 +1266,146 @@ export class StockSummaryService {
       );
     }
     if (query.search && query.search.trim()) {
-      qb.andWhere(`(${group.code} ILIKE :q OR ${group.name} ILIKE :q)`, {
+      target.andWhere(`(${code} ILIKE :q OR ${name} ILIKE :q)`, {
         q: `%${query.search.trim()}%`,
       });
     }
-    new FilterBuilder(qb)
-      .applyString(group.code, query.itemCode)
-      .applyString(group.name, query.itemName)
+    new FilterBuilder(target as unknown as SelectQueryBuilder<ObjectLiteral>)
+      .applyString(code, query.itemCode)
+      .applyString(name, query.itemName)
       .applyString(
         "item.unit",
         typeof query.unit === "object" ? query.unit : undefined,
       )
-      .applyString("cat.name", query.category)
+      .applyString(`${categoryAlias}.name`, query.category)
       .applyString(
         "item.brand",
         typeof query.brand === "object" ? query.brand : undefined,
       )
-      .applyString("storage.name", query.storage);
+      .applyString(`${storageAlias}.name`, query.storage);
     if (typeof query.brand === "string" && query.brand.trim()) {
-      qb.andWhere("item.brand ILIKE :brandQ", {
+      target.andWhere("item.brand ILIKE :brandQ", {
         brandQ: `%${query.brand.trim()}%`,
       });
     }
     if (typeof query.unit === "string" && query.unit.trim()) {
-      qb.andWhere("item.unit = :unit", { unit: query.unit.trim() });
+      target.andWhere("item.unit = :unit", { unit: query.unit.trim() });
     }
     // Tổng hợp tồn kho mặc định không thống kê hàng đã ngừng theo dõi; vẫn cho xem
     // khi client truyền isActive=false tường minh.
-    qb.andWhere("item.is_active = :isActive", {
+    target.andWhere("item.is_active = :isActive", {
       isActive: query.isActive ?? true,
     });
-    // Loại phần tồn ở các cặp (item × vị trí) đã ngừng theo dõi ở cấp vị trí
-    // (stock_balances.is_tracked = false). Số liệu vẫn còn ở Báo cáo tồn kho (ledger).
-    qb.andWhere("sb.is_tracked = true");
-    // Không thống kê tồn ở kho đã ngừng hoạt động; số liệu vẫn còn ở Báo cáo tồn kho.
-    qb.andWhere("storage.is_active = true");
-    // Không thống kê tồn ở vị trí đã ngừng hoạt động (location.is_active = false).
-    qb.andWhere("loc.is_active = true");
     if (query.isPosVisible !== undefined) {
-      qb.andWhere("item.is_pos_visible = :isPosVisible", {
+      target.andWhere("item.is_pos_visible = :isPosVisible", {
         isPosVisible: query.isPosVisible,
       });
     }
-    if (query.movementFrom) {
-      qb.andWhere("sb.last_movement_at >= :movementFrom", {
-        movementFrom: query.movementFrom,
-      });
-    }
-    if (query.movementTo) {
-      qb.andWhere("sb.last_movement_at < :movementToPlus1", {
-        movementToPlus1: addOneDay(query.movementTo),
-      });
-    }
+  }
 
-    return qb;
+  /**
+   * Builds `pendingOnlyQuery` as dynamic parameterised SQL (T-01-02): the
+   * predicates from `applyCommonFilters` are appended after the transfer-order
+   * WHERE clauses, bound at `$3` onward — `$1`/`$2` stay `organizationId` /
+   * `branchId` exactly as before. Never string-interpolated: every filter
+   * value flows through `bind()`.
+   */
+  private buildPendingOnlyQuery(
+    query: StockSummaryQuery,
+    group: ReturnType<StockSummaryService["groupExpressions"]>,
+  ): { sql: string; params: unknown[] } {
+    const params: unknown[] = [query.organizationId, query.branchId];
+    const bind = (value: unknown): string => {
+      params.push(value);
+      return `$${params.length}`;
+    };
+    const collector = new RawSqlWhereCollector(bind, {
+      organizationId: query.organizationId,
+    });
+    this.applyCommonFilters(collector, query, {
+      code: group.code,
+      name: group.name,
+      categoryAlias: "category",
+      storageAlias: "destination_storage",
+    });
+    const extraConditions = collector.conditions
+      .map((condition) => `              AND ${condition}`)
+      .join("\n");
+
+    const sql = `
+            SELECT
+              ${group.key} AS group_key,
+              MIN(item.product_id::text) AS product_id,
+              ${group.aggCode} AS item_code,
+              ${group.aggName} AS item_name,
+              ${group.sku ? "MIN(item.unit)" : "item.unit"} AS item_unit,
+              ${group.sku ? "MIN(item.brand)" : "item.brand"} AS item_brand,
+              ${group.sku ? "BOOL_OR(item.is_active)" : "item.is_active"} AS item_is_active,
+              ${group.sku ? "MIN(category.name)" : "category.name"} AS category_name,
+              destination_storage.id AS storage_id,
+              destination_storage.name AS storage_name,
+              transfer_order.destination_branch_id AS branch_id,
+              SUM(transfer_line.requested_qty)::numeric AS incoming_qty
+            FROM transfer_orders transfer_order
+            INNER JOIN transfer_order_lines transfer_line
+              ON transfer_line.transfer_order_id = transfer_order.id
+             AND transfer_line.organization_id = transfer_order.organization_id
+            INNER JOIN items item
+              ON item.id = transfer_line.item_id
+             AND item.organization_id = transfer_order.organization_id
+            LEFT JOIN products prod
+              ON prod.id = item.product_id
+            LEFT JOIN inventory_item_categories category
+              ON category.id = item.category_id
+            LEFT JOIN storages destination_storage
+              ON destination_storage.id = transfer_order.destination_storage_id
+             AND destination_storage.organization_id = transfer_order.organization_id
+            WHERE transfer_order.organization_id = $1
+              AND transfer_order.destination_branch_id = $2
+              AND transfer_order.status = 'IN_PROGRESS'
+              AND transfer_order.deleted_at IS NULL
+              AND NOT EXISTS (${this.pendingOnlyGuardSql(group.sku)})
+${extraConditions}
+            GROUP BY ${group.sku
+              ? "prod.code, prod.name"
+              : "item.code, item.name, item.unit, item.brand, item.is_active, category.name"},
+                     ${group.groupBy}, destination_storage.id,
+                     destination_storage.name, transfer_order.destination_branch_id
+          `;
+    return { sql, params };
+  }
+}
+
+/** The slice of `SelectQueryBuilder` that `applyCommonFilters` actually calls. */
+interface WhereTarget {
+  andWhere(sql: string, params?: Record<string, unknown>): unknown;
+}
+
+/**
+ * Lets `applyCommonFilters` — written once against TypeORM's named-parameter
+ * `andWhere(sql, { key: value })` — drive a plain dynamic-SQL string instead
+ * of a real `SelectQueryBuilder`. Every `:name` in `sql` is resolved to a
+ * bound `$n` positional placeholder via `bind`, first from this call's own
+ * `params`, falling back to `knownValues` for names bound elsewhere in the
+ * base query (e.g. `:organizationId`, already `$1` in `pendingOnlyQuery`) —
+ * mirroring how TypeORM merges parameters by name across an entire
+ * `SelectQueryBuilder` regardless of which `andWhere` call introduced them.
+ */
+class RawSqlWhereCollector implements WhereTarget {
+  readonly conditions: string[] = [];
+
+  constructor(
+    private readonly bind: (value: unknown) => string,
+    private readonly knownValues: Record<string, unknown>,
+  ) {}
+
+  andWhere(sql: string, params?: Record<string, unknown>): this {
+    const values = { ...this.knownValues, ...params };
+    const resolved = sql.replace(/:([a-zA-Z0-9_]+)/g, (match, name) =>
+      name in values ? this.bind(values[name]) : match,
+    );
+    this.conditions.push(resolved);
+    return this;
   }
 }
 
@@ -1155,6 +1418,22 @@ function compareSql(operator: CompareOperator): string {
       [CompareOperator.GT]: ">",
       [CompareOperator.GTE]: ">=",
     }[operator] ?? "="
+  );
+}
+
+/**
+ * Same total order as the page query's own `ORDER BY` (`fetchPageData`):
+ * item code, then storage name, then the (groupKey, storageId) tiebreakers.
+ * `paginateInMemory` re-sorts with this after merging in pending-only rows,
+ * which are appended out of that sequence — without it, two identical calls
+ * could slice the merged set into different pages (T-01-03).
+ */
+function sortStockSummaryRows(a: StockSummaryRow, b: StockSummaryRow): number {
+  return (
+    a.item.code.localeCompare(b.item.code) ||
+    a.storage.name.localeCompare(b.storage.name) ||
+    a.groupKey.localeCompare(b.groupKey) ||
+    a.storageId.localeCompare(b.storageId)
   );
 }
 
