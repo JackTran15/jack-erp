@@ -139,6 +139,43 @@ describe('SearchLocationsV2Handler', () => {
     );
   });
 
+  // The query builder is mocked here, so these pin the SQL shape only. The
+  // behaviour they stand for — a shelf whose rows are all untracked reading as
+  // "Chưa xếp" — is proved against real Postgres in
+  // test/e2e/inventory-location-stock.e2e-spec.ts.
+  it('scopes "Đã xếp" to tracked rows in both filter directions', async () => {
+    await build();
+    await handler.execute(new SearchLocationsV2Query({ hasItems: true }, actor));
+    const positive = andWhereSql().find((sql: string) => sql.startsWith('EXISTS ('));
+    expect(positive).toContain('sb.is_tracked = true');
+
+    await build();
+    await handler.execute(new SearchLocationsV2Query({ hasItems: false }, actor));
+    const negative = andWhereSql().find((sql: string) => sql.startsWith('NOT EXISTS ('));
+    // "Chưa xếp" is NOT EXISTS(tracked), not EXISTS(untracked) — the two differ
+    // on a location holding both kinds of row.
+    expect(negative).toContain('sb.is_tracked = true');
+    expect(negative).not.toContain('is_tracked = false');
+  });
+
+  it('projects hasItems from the same tracked-only predicate it filters on', async () => {
+    await build();
+    await handler.execute(new SearchLocationsV2Query({ hasItems: true }, actor));
+
+    const [projection] = qb.addSelect.mock.calls[0] as [string, string];
+    const predicate = andWhereSql().find((sql: string) => sql.startsWith('EXISTS ('));
+    // One constant, so the column and its filter cannot drift apart.
+    expect(projection).toBe(predicate);
+    expect(projection).toContain('sb.is_tracked = true');
+  });
+
+  it('never filters "Đã xếp" by quantity', async () => {
+    await build();
+    await handler.execute(new SearchLocationsV2Query({ hasItems: true }, actor));
+    // A tracked shelf that is temporarily empty is still "Đã xếp" (A-03).
+    expect(andWhereSql().join('\n')).not.toContain('sb.quantity');
+  });
+
   it('paginates and projects hasItems from the raw EXISTS column', async () => {
     const entity = {
       id: 'loc-1',

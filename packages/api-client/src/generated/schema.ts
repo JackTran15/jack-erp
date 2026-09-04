@@ -8756,6 +8756,8 @@ export interface components {
             variantLabel?: string | null;
             isPosVisible: boolean;
             isActive: boolean;
+            /** @description Location-level tracking (stock_balances.is_tracked) for this item at this location. */
+            isTracked: boolean;
             sellingPrice: number;
             purchasePrice: number;
             barcodes: string[];
@@ -9093,8 +9095,11 @@ export interface components {
             storage?: components["schemas"]["StorageEntity"];
             /**
              * @description Transient (not a column): whether any item has been placed at this location
-             *     (has ≥1 stock_balance row). Populated by listLocations to drive the
-             *     "Xếp hàng hóa: Đã xếp / Chưa xếp" column. Undefined on endpoints that don't compute it.
+             *     (has ≥1 stock_balance row that is still tracked — rows left behind by
+             *     "Ngừng theo dõi" do not count). Populated by listLocations and by
+             *     SearchLocationsV2Handler to drive the "Xếp hàng hóa: Đã xếp / Chưa xếp"
+             *     column; both must use the same definition. Undefined on endpoints that
+             *     don't compute it.
              */
             hasItems?: boolean;
             id: string;
@@ -17533,6 +17538,8 @@ export interface operations {
                 providerId?: string;
                 isPosVisible?: boolean;
                 isActive?: boolean;
+                /** @description Filter by location-level tracking (stock_balances.is_tracked). Omit = all. */
+                isTracked?: boolean;
                 stockState?: "all" | "positive" | "zero" | "negative" | "below-min";
             };
             header?: never;

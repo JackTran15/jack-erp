@@ -11,7 +11,12 @@ function displayLocationName(row: StockBalanceRow): string {
   return row.location.name || "—";
 }
 
-const STATUS_FILTER_OPTIONS: ColumnFilterSelectOption[] = [
+/**
+ * Shared by the "Chi tiết vị trí" grid and the location detail dialog on
+ * "Vị trí hàng hóa" — the two screens read the same rows, so they must offer the
+ * same words for them. An empty filter value means "Tất cả".
+ */
+export const STATUS_FILTER_OPTIONS: ColumnFilterSelectOption[] = [
   { value: "true", label: "Đang theo dõi" },
   { value: "false", label: "Ngừng theo dõi" },
 ];
@@ -164,7 +169,8 @@ export function buildLocationStockItemColumns(
       key: "isTracked",
       label: "Trạng thái",
       width: 140,
-      filterKind: "none",
+      filterKind: "select",
+      filterOptions: STATUS_FILTER_OPTIONS,
       render: (r) => (
         <ActiveStatusBadge
           active={r.isTracked}

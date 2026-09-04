@@ -142,6 +142,7 @@ function makeQuery(
   dto.providerId = overrides.providerId;
   dto.isPosVisible = overrides.isPosVisible;
   dto.isActive = overrides.isActive;
+  dto.isTracked = overrides.isTracked;
   dto.stockState = overrides.stockState ?? StockStateFilter.ALL;
   return dto;
 }
@@ -609,6 +610,60 @@ describe('InventoryLocationStockService', () => {
       expect(w.item.isActive).toBe(true);
     });
 
+    it('isTracked=true → stock_balances.isTracked equality, not on item', async () => {
+      setup({ rows: [] });
+      await service.getStockByLocation(
+        'loc-1',
+        makeQuery({ isTracked: true }),
+        actor,
+      );
+      const w = whereArg();
+      expect(w.isTracked).toBe(true);
+      // is_tracked lives on stock_balances, not items.
+      expect(w.item?.isTracked).toBeUndefined();
+    });
+
+    it('isTracked=false → false is a real filter, not treated as absent', async () => {
+      setup({ rows: [] });
+      await service.getStockByLocation(
+        'loc-1',
+        makeQuery({ isTracked: false }),
+        actor,
+      );
+      expect(whereArg().isTracked).toBe(false);
+    });
+
+    it('isTracked omitted → no predicate, so old callers keep seeing everything', async () => {
+      setup({ rows: [] });
+      await service.getStockByLocation('loc-1', makeQuery(), actor);
+      expect('isTracked' in whereArg()).toBe(false);
+    });
+
+    it('isTracked survives the search branch, which returns an array of wheres', async () => {
+      setup({ rows: [] });
+      await service.getStockByLocation(
+        'loc-1',
+        makeQuery({ search: 'nike', isTracked: true }),
+        actor,
+      );
+      const w = whereArg();
+      expect(Array.isArray(w)).toBe(true);
+      expect(w[0].isTracked).toBe(true);
+      expect(w[1].isTracked).toBe(true);
+    });
+
+    it('isTracked applies with barcode, which nests under item', async () => {
+      setup({ rows: [] });
+      await service.getStockByLocation(
+        'loc-1',
+        makeQuery({ barcode: '8934567890123', isTracked: true }),
+        actor,
+      );
+      const w = whereArg();
+      expect(w.isTracked).toBe(true);
+      expect(w.item.barcodes).toEqual({ code: '8934567890123' });
+    });
+
     it('always scopes by organizationId + locationId', async () => {
       setup({ rows: [] });
       await service.getStockByLocation('loc-1', makeQuery(), actor);
@@ -765,6 +820,18 @@ describe('InventoryLocationStockService', () => {
       expect(result.data).toHaveLength(1);
       expect(result.data[0].itemId).toBe('item-1');
       expect(result.meta.total).toBe(1);
+    });
+
+    it('BELOW_MIN inherits isTracked from the shared where', async () => {
+      setup({ rows: [] });
+      await service.getStockByLocation(
+        'loc-1',
+        makeQuery({ stockState: StockStateFilter.BELOW_MIN, isTracked: true }),
+        actor,
+      );
+      // getBelowMinStock is handed the same where buildWhere produced, so the
+      // filter reaches it without a second code path.
+      expect(stockBalanceRepo.find.mock.calls[0][0].where.isTracked).toBe(true);
     });
   });
 

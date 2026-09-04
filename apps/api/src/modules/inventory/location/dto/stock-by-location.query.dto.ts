@@ -150,6 +150,21 @@ export class StockByLocationQueryDto {
   @IsBoolean()
   isActive?: boolean;
 
+  /**
+   * Location-level tracking filter (stock_balances.is_tracked). Omit = all,
+   * matching GET /inventory/stock/balances. The default lives in the callers,
+   * not here: leaving it unset is the only way "Tất cả" stays expressible with
+   * a single boolean.
+   */
+  @ApiPropertyOptional({
+    description:
+      'Filter by location-level tracking (stock_balances.is_tracked). Omit = all.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => parseBool(value))
+  @IsBoolean()
+  isTracked?: boolean;
+
   @ApiPropertyOptional({
     enum: StockStateFilter,
     default: StockStateFilter.ALL,

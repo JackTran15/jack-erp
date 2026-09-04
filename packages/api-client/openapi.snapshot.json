@@ -5633,6 +5633,15 @@
             }
           },
           {
+            "name": "isTracked",
+            "required": false,
+            "in": "query",
+            "description": "Filter by location-level tracking (stock_balances.is_tracked). Omit = all.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "stockState",
             "required": false,
             "in": "query",
@@ -26142,6 +26151,10 @@
           "isActive": {
             "type": "boolean"
           },
+          "isTracked": {
+            "type": "boolean",
+            "description": "Location-level tracking (stock_balances.is_tracked) for this item at this location."
+          },
           "sellingPrice": {
             "type": "number"
           },
@@ -26187,6 +26200,7 @@
           "unit",
           "isPosVisible",
           "isActive",
+          "isTracked",
           "sellingPrice",
           "purchasePrice",
           "barcodes",
@@ -27232,7 +27246,7 @@
           },
           "hasItems": {
             "type": "boolean",
-            "description": "Transient (not a column): whether any item has been placed at this location\n(has ≥1 stock_balance row). Populated by listLocations to drive the\n\"Xếp hàng hóa: Đã xếp / Chưa xếp\" column. Undefined on endpoints that don't compute it."
+            "description": "Transient (not a column): whether any item has been placed at this location\n(has ≥1 stock_balance row that is still tracked — rows left behind by\n\"Ngừng theo dõi\" do not count). Populated by listLocations and by\nSearchLocationsV2Handler to drive the \"Xếp hàng hóa: Đã xếp / Chưa xếp\"\ncolumn; both must use the same definition. Undefined on endpoints that\ndon't compute it."
           },
           "id": {
             "type": "string"

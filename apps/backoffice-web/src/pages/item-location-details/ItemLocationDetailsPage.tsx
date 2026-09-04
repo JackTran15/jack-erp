@@ -124,6 +124,13 @@ export function ItemLocationDetailsPage() {
       params.itemName = itemName;
       params.itemNameMode = filters.itemName?.mode;
     }
+    // Same rule as buildQuery for the general mode: default to tracked-only,
+    // and drop the parameter entirely for "Tất cả". Without this the single
+    // location view keeps listing rows that "Ngừng theo dõi" already retired.
+    const status = filters.isTracked?.value;
+    if (status === "false") params.isTracked = false;
+    else if (status === "true") params.isTracked = true;
+    else if (status === undefined) params.isTracked = true;
     return params;
   }, [page, pageSize, filters]);
 
