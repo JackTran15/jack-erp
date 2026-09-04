@@ -47,10 +47,13 @@ export function ProductSearchInput({
   const focusSeq = usePosCheckoutUiStore((s) => s.productSearchFocusSeq);
 
   useEffect(() => {
-    if (focusSeq === 0) return;
+    // Trên reload trang, catalog chưa load xong nên input còn `disabled` khi
+    // signal focus đầu tiên bắn ra — input disabled không nhận focus được.
+    // Gate theo `disabled` để effect tự retry khi catalog load xong.
+    if (focusSeq === 0 || disabled) return;
     inputRef.current?.focus();
     inputRef.current?.select();
-  }, [focusSeq, inputRef]);
+  }, [focusSeq, disabled, inputRef]);
 
   // Mỗi lần gõ/quét thật mở một phiên nhập mới (nhả guard khử trùng).
   const handleValueChange = useCallback(
