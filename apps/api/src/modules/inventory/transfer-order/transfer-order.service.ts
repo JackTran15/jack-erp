@@ -37,6 +37,7 @@ import {
   VoucherPrintPayload,
 } from "@erp/shared-interfaces";
 import { ActorContext } from "../../../common/decorators/actor-context.decorator";
+import { affectedRowCount } from "../../../common/utils/returning-rows.util";
 import { DocumentNumberingService } from "../../document-numbering/document-numbering.service";
 import {
   loadStorageNames,
@@ -1756,16 +1757,18 @@ export class TransferOrderService {
   ): Promise<void> {
     for (const d of deltas) {
       if (d.quantityDelta === 0) continue;
-      const updated = await this.dataSource.manager.query<
-        Array<{ id: string }>
-      >(
+      const updated = await this.dataSource.manager.query(
         `UPDATE transfer_order_lines
            SET requested_qty = GREATEST(requested_qty + $1, 0)
          WHERE transfer_order_id = $2 AND item_id = $3
          RETURNING id`,
         [d.quantityDelta, to.id, d.itemId],
       );
-      if (updated.length > 0) continue;
+      // `affectedRowCount`, never `updated.length`: TypeORM wraps an UPDATE
+      // result as `[rows, rowCount]`, so the length is 2 whether it matched
+      // every row or none. Reading it directly is what made the insert below
+      // unreachable for ten days — see returning-rows.util.ts and ADR-01.
+      if (affectedRowCount(updated) > 0) continue;
 
       if (d.quantityDelta <= 0) {
         // A decrease with no matching line: the order never carried this

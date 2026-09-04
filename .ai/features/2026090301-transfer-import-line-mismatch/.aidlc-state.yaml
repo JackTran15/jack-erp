@@ -1,0 +1,123 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: transfer-import-line-mismatch
+slug: 2026090301-transfer-import-line-mismatch
+profile: none
+created: 2026-09-03T19:13:39
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-03T19:38:35
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-03T19:38:35
+    by: Akenzy
+    evidence: 8 assumptions, none blocking-and-pending; 11 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-03T19:38:35
+    by: Akenzy
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-03T19:38:35
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 7 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-03T19:38:42
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-03T19:46:30
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-03T19:46:41
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-03T19:50:37
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-03T19:53:26
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-03T19:53:26
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-03T19:53:36
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-03T19:55:50
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-03T19:55:50
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-03T19:59:42
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-03T19:59:42
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done
+    at: 2026-09-03T20:05:38
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-09-03T20:05:38
+    by: Akenzy
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-03T20:05:47
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-03T20:18:06
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-03T20:18:06
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket review
+    at: 2026-09-03T20:20:27
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done
+    at: 2026-09-03T20:36:51
+    by: Akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done
+    at: 2026-09-03T20:36:52
+    by: Akenzy
+    ticket: T-01-04
