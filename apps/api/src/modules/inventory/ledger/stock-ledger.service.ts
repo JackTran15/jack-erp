@@ -15,6 +15,7 @@ import {
 import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { EventPublisher } from '../../events/event-publisher.service';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
+import { affectedRowCount } from '../../../common/utils/returning-rows.util';
 import { StockLedgerEntryEntity } from './stock-ledger-entry.entity';
 import { StockBalanceEntity } from './stock-balance.entity';
 import { ItemStorageLocationService } from '../product/item-storage-location.service';
@@ -700,7 +701,7 @@ export class StockLedgerService {
       }
     }
 
-    const rows = await this.balanceRepo.manager.query<Array<{ id: string }>>(
+    const result = await this.balanceRepo.manager.query(
       `UPDATE stock_balances sb
           SET is_tracked = $4
          FROM unnest($2::uuid[], $3::uuid[]) AS e(item_id, location_id)
@@ -711,7 +712,10 @@ export class StockLedgerService {
       RETURNING sb.id`,
       [actor.organizationId, itemIds, locationIds, isTracked],
     );
-    return { updated: rows.length };
+    // `affectedRowCount`, not `.length`: TypeORM hands back `[rows, rowCount]`
+    // for an UPDATE, so reading the length reported 2 no matter how many
+    // balances were re-flagged — including none. See returning-rows.util.ts.
+    return { updated: affectedRowCount(result) };
   }
 
   async getLedgerEntries(

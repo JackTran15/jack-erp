@@ -128,10 +128,17 @@ describe('TransferOrderService', () => {
       update: jest.fn().mockResolvedValue(undefined),
       buildPrintPayload: jest.fn().mockResolvedValue({ title: 'Phiếu nhập kho' }),
     };
-    // Default: the UPDATE matches an existing transfer_order_lines row
-    // (RETURNING id yields one row). Tests exercising the "no matching row"
-    // path override this per-call.
-    dataSourceManagerQuery = jest.fn().mockResolvedValue([{ id: 'line-1' }]);
+    // Default: the UPDATE matches an existing transfer_order_lines row. The
+    // shape is `[rows, rowCount]`, which is what TypeORM actually returns for
+    // UPDATE/DELETE — NOT a bare row array. Mocking it as `[{...}]` (or `[]` for
+    // the no-match case) is how the 2026-08-24 fix shipped with a green test
+    // over a dead code path for ten days: the mock encoded a misreading of the
+    // driver and then vouched for it. The shape is measured, not assumed — see
+    // `test/e2e/typeorm-returning-shape.e2e-spec.ts`. Tests exercising the
+    // "no matching row" path override this per-call with `[[], 0]`.
+    dataSourceManagerQuery = jest
+      .fn()
+      .mockResolvedValue([[{ id: 'line-1' }], 1]);
     dataSourceManagerInsert = jest.fn().mockResolvedValue(undefined);
 
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -1084,8 +1091,10 @@ describe('TransferOrderService', () => {
       toRepo.findOne.mockResolvedValue(
         baseOrder({ importGoodsReceiptId: null }),
       );
-      // No existing transfer_order_lines row for item-2 — the UPDATE matches nothing.
-      dataSourceManagerQuery.mockResolvedValueOnce([]);
+      // No existing transfer_order_lines row for item-2 — the UPDATE matches
+      // nothing, which the driver reports as `[[], 0]`, NOT as `[]`. The
+      // distinction is the entire bug: `[[], 0].length` is 2.
+      dataSourceManagerQuery.mockResolvedValueOnce([[], 0]);
 
       await service.applyLegRevision(
         'to-1',
@@ -1115,7 +1124,7 @@ describe('TransferOrderService', () => {
       toRepo.findOne.mockResolvedValue(
         baseOrder({ importGoodsReceiptId: null }),
       );
-      dataSourceManagerQuery.mockResolvedValueOnce([]);
+      dataSourceManagerQuery.mockResolvedValueOnce([[], 0]);
 
       await service.applyLegRevision(
         'to-1',

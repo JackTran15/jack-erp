@@ -46,6 +46,8 @@ describe('StockLedgerService', () => {
       findOne: jest.fn(),
       findAndCount: jest.fn(),
       createQueryBuilder: jest.fn(),
+      // setBalanceTracking() runs raw SQL through the repository's manager.
+      manager: { query: jest.fn().mockResolvedValue([[], 0]) } as any,
     };
 
     // Bulk ledger insert: manager.createQueryBuilder().insert().into(...).values(rows).execute()
@@ -698,6 +700,53 @@ describe('StockLedgerService', () => {
       expect(mockQb.select).toHaveBeenCalledWith('COALESCE(SUM(entry.quantity), 0)', 'total');
       expect(mockQb.andWhere).toHaveBeenCalledWith('entry.itemId = :itemId', { itemId: 'item-1' });
       expect(mockQb.andWhere).toHaveBeenCalledWith('entry.locationId = :locationId', { locationId: 'loc-1' });
+    });
+  });
+
+  /**
+   * `updated` is read off an `UPDATE … RETURNING`, which TypeORM hands back as
+   * `[rows, rowCount]` — so the mocks below use that shape, not a bare row
+   * array. Before this was fixed, `rows.length` reported 2 for every call: two
+   * rows updated, none updated, five updated, all "2".
+   *
+   * The shape itself is proven against a live Postgres in
+   * `test/e2e/typeorm-returning-shape.e2e-spec.ts`; these mocks only have
+   * licence to assume it because that test measures it.
+   */
+  describe('setBalanceTracking — reports the real number of rows touched', () => {
+    const entries = [
+      { itemId: 'item-1', locationId: 'loc-1' },
+      { itemId: 'item-2', locationId: 'loc-2' },
+      { itemId: 'item-3', locationId: 'loc-3' },
+    ];
+
+    it('returns the driver rowCount when balances were re-flagged', async () => {
+      (balanceRepo.manager as any).query.mockResolvedValue([
+        [{ id: 'sb-1' }, { id: 'sb-2' }, { id: 'sb-3' }],
+        3,
+      ]);
+
+      const result = await service.setBalanceTracking(entries, true, actor);
+
+      expect(result).toEqual({ updated: 3 });
+    });
+
+    it('returns 0 when every pair was already in the requested state', async () => {
+      // `sb.is_tracked <> $4` matches nothing — the case a raw `.length` calls 2.
+      (balanceRepo.manager as any).query.mockResolvedValue([[], 0]);
+
+      const result = await service.setBalanceTracking(entries, true, actor);
+
+      expect(result).toEqual({ updated: 0 });
+    });
+
+    it('returns 0 for an empty selection without touching the database', async () => {
+      (balanceRepo.manager as any).query.mockClear();
+
+      const result = await service.setBalanceTracking([], true, actor);
+
+      expect(result).toEqual({ updated: 0 });
+      expect((balanceRepo.manager as any).query).not.toHaveBeenCalled();
     });
   });
 });
