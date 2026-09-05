@@ -139,6 +139,8 @@ export interface DraftInvoicePayment {
   /** Human label, e.g. "Tiền mặt". */
   label: string;
   amount: number;
+  /** Tài khoản nhận tiền đã chọn lúc lưu tạm; null = chưa chọn. */
+  paymentAccountId?: string | null;
 }
 
 /**
