@@ -163,6 +163,11 @@ export class TempWarehouseOutReport implements InventoryReportDefinition {
         actor.organizationId,
       ),
       search: filters.search,
+      // Was missing entirely: the value arrived and went nowhere, even though
+      // the engine had the SQL for it. Set here rather than at the two call
+      // sites so the count can never scope differently from the rows
+      // (ADR-02, AC-16).
+      memberScope: { unit: filters.unit, brand: filters.brand },
     };
   }
 

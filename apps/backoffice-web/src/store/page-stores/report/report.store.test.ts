@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import { REPORT_CATEGORY } from "../../../constants/reports/report-category.constant";
 import { REPORT_FILTERS_LINE } from "../../../constants/reports/report-filters.constant";
 import {
+  getReportBackendKey,
+  getReportFormLines,
   REPORT_TYPE_INVENTORY,
   REPORT_TYPE_PROFIT,
 } from "../../../constants/reports/report-type.constant";
 import { STORE_TYPE } from "../../../constants/store.constant";
+import { buildInventorySearchFilters } from "../../../pages/chain-store/reports/_api/inventory-report-v2.api";
 import { buildInitialReportState } from "./report.factory";
 import { createReportStore } from "./report.store";
 
@@ -126,5 +129,77 @@ describe("setReportType prunes the filter bar", () => {
     store.getState().actions.setReportType(WITHOUT_BRAND);
 
     expect(store.getState().appliedRequest).toBeNull();
+  });
+});
+
+// ADR-04: "Số lượng tồn kho theo cửa hàng" reads `stock_balances` — a stock
+// level as of now, with no time axis — so its registry no longer declares the
+// two period lines (T-04-01). The seed in `buildInitialReportState` still puts
+// them in the bag for every report, and `ALWAYS_KEPT_FILTER_LINES` deliberately
+// carries them through the prune. That combination is what these tests pin:
+// dropping the lines from ONE registry must not empty the period of any other
+// report, and must not leave the pivot quietly shipping a period the engine
+// never reads.
+describe("dropping the pivot's period lines (AC-10)", () => {
+  const PIVOT = REPORT_TYPE_INVENTORY.STOCK_QUANTITY_BY_STORE;
+
+  it("leaves the period of another report intact across a round trip", () => {
+    const store = inventoryStore(STORE_TYPE.SINGLE, WITHOUT_BRAND);
+    store
+      .getState()
+      .actions.setFilterValue(REPORT_FILTERS_LINE.REPORT_PERIOD, "this_year");
+    const period = store.getState().filters[REPORT_FILTERS_LINE.REPORT_PERIOD];
+    const range = store.getState().filters[REPORT_FILTERS_LINE.RANGE_DATE];
+
+    store.getState().actions.setReportType(PIVOT);
+    store.getState().actions.setReportType(WITHOUT_BRAND);
+
+    expect(store.getState().filters[REPORT_FILTERS_LINE.REPORT_PERIOD]).toBe(
+      period,
+    );
+    expect(store.getState().filters[REPORT_FILTERS_LINE.RANGE_DATE]).toEqual(
+      range,
+    );
+  });
+
+  it("still renders the period line on the seven other warehouse reports", () => {
+    for (const reportType of INVENTORY_REPORTS.filter((r) => r !== PIVOT)) {
+      const lines = getReportFormLines(reportType, STORE_TYPE.SINGLE);
+      expect(lines).toContain(REPORT_FILTERS_LINE.REPORT_PERIOD);
+      expect(lines).toContain(REPORT_FILTERS_LINE.RANGE_DATE);
+    }
+  });
+
+  it("renders neither period line on the pivot itself (AC-09)", () => {
+    for (const branch of [STORE_TYPE.SINGLE, STORE_TYPE.CHAIN]) {
+      const lines = getReportFormLines(PIVOT, branch);
+      expect(lines).not.toContain(REPORT_FILTERS_LINE.REPORT_PERIOD);
+      expect(lines).not.toContain(REPORT_FILTERS_LINE.RANGE_DATE);
+    }
+  });
+
+  it("sends no period or preset in the pivot's payload", () => {
+    const store = inventoryStore(STORE_TYPE.SINGLE, PIVOT);
+
+    const payload = buildInventorySearchFilters(store.getState().filters, {
+      branch: STORE_TYPE.SINGLE,
+      activeBranchId: "branch-1",
+      backendKey: "inventory-stock-by-store-pivot",
+    });
+
+    expect(payload.period).toBeUndefined();
+    expect(payload.preset).toBeUndefined();
+  });
+
+  it("still sends the period in every other warehouse report's payload", () => {
+    for (const reportType of INVENTORY_REPORTS.filter((r) => r !== PIVOT)) {
+      const store = inventoryStore(STORE_TYPE.SINGLE, reportType);
+      const payload = buildInventorySearchFilters(store.getState().filters, {
+        branch: STORE_TYPE.SINGLE,
+        activeBranchId: "branch-1",
+        backendKey: getReportBackendKey(reportType) as string,
+      });
+      expect(payload.period).toBeDefined();
+    }
   });
 });

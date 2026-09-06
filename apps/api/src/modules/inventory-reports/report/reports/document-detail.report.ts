@@ -170,6 +170,9 @@ export class DocumentDetailReport implements InventoryReportDefinition {
       // Shared by the grid and the keyset export, so the file can never cover a
       // different set than the table it was exported from.
       columnFilters: toEngineFilters(dto.columnFilters, KEY_MAP),
+      // Was missing entirely: the value arrived and went nowhere. Both
+      // engines already had the SQL for it (ADR-02, AC-16).
+      memberScope: { unit: filters.unit, brand: filters.brand },
     };
   }
 

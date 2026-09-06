@@ -183,56 +183,28 @@ describe('toEngineFilters', () => {
     });
   });
 
-  describe('filter-bar scope (ADR-06)', () => {
-    it('folds unit and brand in as exact matches', () => {
-      expect(toEngineFilters([], {}, { unit: 'Đôi', brand: 'Bitis' })).toEqual({
-        unit: { operator: StringOperator.EQUALS, value: 'Đôi' },
-        brand: { operator: StringOperator.EQUALS, value: 'Bitis' },
+  // ADR-02 deliberately reversed what this block used to assert. Until now
+  // `toEngineFilters` folded the filter bar's unit/brand in as extra column
+  // filters; the tests below pinned that folding. It is gone on purpose: those
+  // two values are member scope, not column filters, and travelling through the
+  // column-filter door is what made the parent/group grains answer 400 — the
+  // aggregate row has no unit, so no spec exists to admit the predicate.
+  //
+  // The behaviour did not move to a different shape here, it moved to a
+  // different parameter (`memberScope`), asserted at the reports in
+  // `reports/member-scope-item-grain.spec.ts` and in the engines' own specs.
+  describe('filter-bar scope is no longer folded in (ADR-02)', () => {
+    it('returns only the grid filters, whatever the bar selected', () => {
+      expect(toEngineFilters([{ col: 'unit', contains: 'ô' }])).toEqual({
+        unit: { operator: StringOperator.CONTAINS, value: 'ô' },
       });
     });
 
-    it('ignores an unselected dropdown', () => {
-      expect(toEngineFilters([], {}, { unit: undefined, brand: '' })).toEqual({});
-    });
-
-    it('routes the scope value through the key map too', () => {
-      expect(toEngineFilters([], { unit: 'itemUnit' }, { unit: 'Đôi' })).toEqual({
-        itemUnit: { operator: StringOperator.EQUALS, value: 'Đôi' },
-      });
-    });
-
-    it('keeps both predicates when bar and grid constrain one column', () => {
-      // The in-memory path ran both filters in sequence, so both held. Dropping
-      // either one here would return rows the user did not ask for, while the
-      // UI still shows both filters as active.
-      const result = toEngineFilters(
-        [{ col: 'unit', contains: 'ô' }],
-        {},
-        { unit: 'Đôi' },
-      );
-
-      expect(result).toEqual({
-        unit: [
-          { operator: StringOperator.CONTAINS, value: 'ô' },
-          { operator: StringOperator.EQUALS, value: 'Đôi' },
-        ],
-      });
-    });
-
-    it('AND-s both predicates in the compiled SQL', () => {
-      const SPECS: ReportColumnSpecs = { unit: { sql: 'i.unit', kind: 'text' } };
-      const engineFilters = toEngineFilters(
-        [{ col: 'unit', contains: 'ô' }],
-        {},
-        { unit: 'Đôi' },
-      );
-
-      const fragment = buildReportColumnFilter(engineFilters, SPECS, 0);
-
-      expect(fragment.where).toBe(
-        '(i.unit ILIKE $1) AND (LOWER(i.unit) = LOWER($2))',
-      );
-      expect(fragment.params).toEqual(['%ô%', 'Đôi']);
+    it('leaves the map empty when the grid filtered nothing', () => {
+      // Before ADR-02 an empty grid plus a selected dropdown still produced a
+      // unit/brand entry here. Now an empty grid means an empty map, whatever
+      // the bar holds — the bar has its own way down.
+      expect(toEngineFilters([])).toEqual({});
     });
   });
 });

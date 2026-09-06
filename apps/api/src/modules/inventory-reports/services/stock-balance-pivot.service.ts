@@ -3,6 +3,7 @@ import { parseBranchQtyColumnKey, type ReportTotals } from '@erp/shared-interfac
 import { DataSource } from 'typeorm';
 import {
   buildReportColumnFilter,
+  type MemberScopeFilters,
   type ReportColumnFilters,
   type ReportColumnSpecs,
   type ReportFilterFragment,
@@ -193,6 +194,34 @@ function pivotBranchSpecs(
   return { specs, params };
 }
 
+/**
+ * Member scope for this engine. `$5`/`$6` follow the four scope parameters that
+ * every query here already binds (org, branches, categories, search), so the
+ * column-filter values keep starting right after them — see MEMBER_SCOPE_START.
+ */
+/**
+ * Stand-in key for items with no category, at the `group` grain.
+ *
+ * `i.category_id::text` is NULL for them, and a NULL group key cannot survive
+ * the round trip: `COUNT(*)` over the CTE counts it, but `= ANY($2)` never
+ * matches it and a NULL key is dropped on the way to the cell query. The result
+ * was a report claiming 29 groups and rendering 28, every time — with the
+ * missing one silently absent rather than empty.
+ *
+ * `stock-period` shows these items as "Không phân nhóm"; this makes the pivot
+ * agree instead of hiding them. The value cannot collide with a real key,
+ * which is always a uuid in text form.
+ */
+const UNGROUPED_KEY = '__ungrouped__';
+
+const PIVOT_MEMBER_SCOPE_SQL = `
+  AND ($5::text IS NULL OR i.unit  = $5)
+  AND ($6::text IS NULL OR i.brand = $6)
+`;
+
+/** Count of bound parameters before the first column-filter value. */
+const MEMBER_SCOPE_START = 6;
+
 export interface StockBalancePivotQuery {
   /** Lọc theo cột, áp phía server nên tác dụng trên toàn tập. */
   columnFilters?: ReportColumnFilters;
@@ -201,6 +230,13 @@ export interface StockBalancePivotQuery {
   branchIds?: string[];
   categoryIds?: string[];
   search?: string;
+  /**
+   * Which items take part, from the filter bar's unit/brand dropdowns. Applied
+   * against `items` in the same WHERE as the category and search filters, so at
+   * the aggregate grain it narrows the `groups` CTE before the GROUP BY — the
+   * only place `i.unit` still has a value (ADR-03).
+   */
+  memberScope?: MemberScopeFilters;
   page: number;
   pageSize: number;
 }
@@ -278,6 +314,8 @@ export class StockBalancePivotService {
     branchIds: string[] | null,
     categoryIds: string[] | null,
     search: string | null,
+    unit: string | null,
+    brand: string | null,
     columnFilter: ReportFilterFragment,
   ): Promise<ReportTotals> {
     const filterWhere = columnFilter.where ? `AND ${columnFilter.where}` : '';
@@ -292,10 +330,11 @@ export class StockBalancePivotService {
           AND ($2::text[] IS NULL OR sb.branch_id = ANY($2::text[]))
           AND ($3::uuid[] IS NULL OR i.category_id = ANY($3))
           AND ($4::text IS NULL OR i.code ILIKE '%' || $4 || '%' OR i.name ILIKE '%' || $4 || '%')
+          ${PIVOT_MEMBER_SCOPE_SQL}
           ${filterWhere}
         GROUP BY sb.branch_id
       `,
-        [orgId, branchIds, categoryIds, search, ...columnFilter.params],
+        [orgId, branchIds, categoryIds, search, unit, brand, ...columnFilter.params],
       );
 
     const totals: ReportTotals = { total: 0 };
@@ -312,6 +351,9 @@ export class StockBalancePivotService {
     const branchIds = query.branchIds?.length ? query.branchIds : null;
     const categoryIds = query.categoryIds?.length ? query.categoryIds : null;
     const search = query.search?.trim().length ? query.search.trim() : null;
+    // An empty dropdown means "all", not "match the empty string".
+    const unit = query.memberScope?.unit?.length ? query.memberScope.unit : null;
+    const brand = query.memberScope?.brand?.length ? query.memberScope.brand : null;
 
     const page = Math.max(1, query.page);
     const pageSize = Math.max(1, query.pageSize);
@@ -333,9 +375,9 @@ export class StockBalancePivotService {
       const identity = buildReportColumnFilter(
         split.identity,
         pivotAggregateSpecs(itemGroupBy),
-        4,
+        MEMBER_SCOPE_START,
       );
-      const measureStart = 4 + identity.params.length;
+      const measureStart = MEMBER_SCOPE_START + identity.params.length;
       const measureBranch = pivotAggregateMeasureSpecs(split.measure, measureStart);
       const measure = buildReportColumnFilter(
         split.measure,
@@ -343,14 +385,15 @@ export class StockBalancePivotService {
         measureStart + measureBranch.params.length,
       );
       return this.aggregateByAgg(
-        query.organizationId, branchIds, categoryIds, search, page, pageSize, offset,
+        query.organizationId, branchIds, categoryIds, search, unit, brand,
+        page, pageSize, offset,
         itemGroupBy,
         { where: identity.where, params: identity.params },
         { where: measure.where, params: [...measureBranch.params, ...measure.params] },
       );
     }
 
-    const branch = pivotBranchSpecs(query.columnFilters, 4);
+    const branch = pivotBranchSpecs(query.columnFilters, MEMBER_SCOPE_START);
 
     const columnFilter = buildReportColumnFilter(
       query.columnFilters,
@@ -359,7 +402,7 @@ export class StockBalancePivotService {
         total: { sql: PIVOT_TOTAL_SQL, kind: 'number' },
         ...branch.specs,
       },
-      4 + branch.params.length,
+      MEMBER_SCOPE_START + branch.params.length,
     );
     // The branch ids sit between the scope parameters and the filter values, so
     // both halves keep the indices they were built with.
@@ -369,7 +412,8 @@ export class StockBalancePivotService {
     };
 
     return this.aggregateByItem(
-      query.organizationId, branchIds, categoryIds, search, page, pageSize, offset,
+      query.organizationId, branchIds, categoryIds, search, unit, brand,
+      page, pageSize, offset,
       filterFragment,
     );
   }
@@ -381,13 +425,15 @@ export class StockBalancePivotService {
     branchIds: string[] | null,
     categoryIds: string[] | null,
     search: string | null,
+    unit: string | null,
+    brand: string | null,
     page: number,
     pageSize: number,
     offset: number,
     columnFilter: ReportFilterFragment,
   ): Promise<StockBalancePivotResult> {
     const filterWhere = columnFilter.where ? `AND ${columnFilter.where}` : '';
-    const baseParams = [orgId, branchIds, categoryIds, search, ...columnFilter.params];
+    const baseParams = [orgId, branchIds, categoryIds, search, unit, brand, ...columnFilter.params];
     const limitIndex = baseParams.length + 1;
 
     const itemPageSql = `
@@ -402,6 +448,7 @@ export class StockBalancePivotService {
         )
         AND ($3::uuid[] IS NULL OR i.category_id = ANY($3))
         AND ($4::text IS NULL OR i.code ILIKE '%' || $4 || '%' OR i.name ILIKE '%' || $4 || '%')
+        ${PIVOT_MEMBER_SCOPE_SQL}
         ${filterWhere}
       ORDER BY i.code ASC
       LIMIT $${limitIndex} OFFSET $${limitIndex + 1}
@@ -418,13 +465,14 @@ export class StockBalancePivotService {
         )
         AND ($3::uuid[] IS NULL OR i.category_id = ANY($3))
         AND ($4::text IS NULL OR i.code ILIKE '%' || $4 || '%' OR i.name ILIKE '%' || $4 || '%')
+        ${PIVOT_MEMBER_SCOPE_SQL}
         ${filterWhere}
     `;
 
     const [itemRows, countRows, totals] = await Promise.all([
       this.dataSource.query(itemPageSql, [...baseParams, pageSize, offset]),
       this.dataSource.query(itemCountSql, baseParams),
-      this.loadBranchTotals(orgId, branchIds, categoryIds, search, columnFilter),
+      this.loadBranchTotals(orgId, branchIds, categoryIds, search, unit, brand, columnFilter),
     ]);
 
     const total = Number(countRows[0]?.total ?? 0);
@@ -481,6 +529,8 @@ export class StockBalancePivotService {
     branchIds: string[] | null,
     categoryIds: string[] | null,
     search: string | null,
+    unit: string | null,
+    brand: string | null,
     page: number,
     pageSize: number,
     offset: number,
@@ -492,7 +542,7 @@ export class StockBalancePivotService {
 
     const aggKeyExpr = isParent
       ? `COALESCE(i.product_id::text, i.id::text)`
-      : `i.category_id::text`;
+      : `COALESCE(i.category_id::text, '${UNGROUPED_KEY}')`;
     const displaySkuExpr = isParent
       ? `COALESCE(pr.code, i.code)`
       : `ic.name`;
@@ -512,7 +562,7 @@ export class StockBalancePivotService {
     const filterWhere = columnFilter.where ? `AND ${columnFilter.where}` : '';
     const havingWhere = measureFilter.where ? `HAVING ${measureFilter.where}` : '';
     const baseParams = [
-      orgId, branchIds, categoryIds, search,
+      orgId, branchIds, categoryIds, search, unit, brand,
       ...columnFilter.params, ...measureFilter.params,
     ];
     // LIMIT/OFFSET sit behind every bound filter value, so the placeholders are
@@ -535,6 +585,7 @@ export class StockBalancePivotService {
           )
           AND ($3::uuid[] IS NULL OR i.category_id = ANY($3))
           AND ($4::text IS NULL OR i.code ILIKE '%' || $4 || '%' OR i.name ILIKE '%' || $4 || '%')
+          ${PIVOT_MEMBER_SCOPE_SQL}
           ${filterWhere}
         GROUP BY ${aggKeyExpr}
         ${havingWhere}
@@ -616,7 +667,7 @@ export class StockBalancePivotService {
       `
       : `
         SELECT
-          i.category_id::text                                    AS agg_key,
+          COALESCE(i.category_id::text, '${UNGROUPED_KEY}')      AS agg_key,
           COALESCE(ic.name, 'Không phân nhóm')                   AS sku,
           COALESCE(ic.name, 'Không phân nhóm')                   AS item_name,
           NULL::text                                             AS parent_sku,
@@ -636,7 +687,7 @@ export class StockBalancePivotService {
         LEFT JOIN inventory_item_categories ic ON ic.id = i.category_id
         LEFT JOIN branches b  ON b.id::text = sb.branch_id
         WHERE sb.organization_id = $1
-          AND i.category_id::text = ANY($2)
+          AND COALESCE(i.category_id::text, '${UNGROUPED_KEY}') = ANY($2)
           AND ($3::text[] IS NULL OR sb.branch_id = ANY($3::text[]))
         GROUP BY i.category_id, ic.name, b.id, b.name
         ORDER BY COALESCE(ic.name, 'Không phân nhóm') ASC NULLS LAST, b.name ASC NULLS LAST

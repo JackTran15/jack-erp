@@ -218,10 +218,12 @@ export class StockQuantityDetailReport implements InventoryReportDefinition {
       search: filters.search,
       includeBreakdown: true,
       hideZeroRows: filters.hideZeroRows ?? true,
-      columnFilters: toEngineFilters(dto.columnFilters, KEY_MAP, {
-        unit: filters.unit,
-        brand: filters.brand,
-      }),
+      columnFilters: toEngineFilters(dto.columnFilters, KEY_MAP),
+      // The filter bar's unit/brand travel on their own now: they pick which
+      // items take part, which is not the same job as narrowing the rows the
+      // report produced, and only the item grain could ever pretend it was
+      // (ADR-02).
+      memberScope: { unit: filters.unit, brand: filters.brand },
     };
   }
 

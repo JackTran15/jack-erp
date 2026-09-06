@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import {
+  buildReportColumnFilter,
+  type ReportColumnFilters,
+  type ReportColumnSpecs,
+} from './report-column-filter.util';
 import { counterpartyNameSql } from '../../inventory/location/services/counterparty-name.util';
 import type { ReportTotals, TransferLeg } from '@erp/shared-interfaces';
 
@@ -25,6 +30,14 @@ export interface TransferDetailQuery {
   leg: TransferLeg;
   page: number;
   pageSize: number;
+  /**
+   * Lọc theo cột, áp phía server nên tác dụng trên toàn tập.
+   *
+   * Was validated by the report layer and then dropped on the floor: the dialog
+   * answered 200 with an unfiltered set, which reads as "no rows match that"
+   * only if you happen to know the number you started from (ADR-06).
+   */
+  columnFilters?: ReportColumnFilters;
 }
 
 export interface TransferDetailRow {
@@ -54,6 +67,45 @@ export interface TransferDetailResult {
   total: number;
   totals: ReportTotals;
 }
+
+/**
+ * What each column of the dialog compiles to.
+ *
+ * Every key of `TRANSFER_DETAIL_COLUMNS` appears here, so no column is left
+ * advertising a filter box the engine would refuse. The two date columns match
+ * on the **formatted** string the grid prints rather than the underlying
+ * timestamp — a user filtering "05/09" means the text in front of them, and the
+ * same `to_char` is what produced it.
+ */
+const TRANSFER_DETAIL_COLUMN_SPECS: ReportColumnSpecs = {
+  date: {
+    sql: `to_char(l.doc_date AT TIME ZONE 'Asia/Ho_Chi_Minh', 'DD/MM/YYYY HH24:MI')`,
+    kind: 'text',
+  },
+  documentNumber: { sql: 'l.doc_number', kind: 'text' },
+  reference: { sql: 'l.ref_number', kind: 'text' },
+  referenceDate: {
+    sql: `to_char(l.ref_date AT TIME ZONE 'Asia/Ho_Chi_Minh', 'DD/MM/YYYY HH24:MI')`,
+    kind: 'text',
+  },
+  warehouse: { sql: 'COALESCE(sg.name, loc.name)', kind: 'text' },
+  counterparty: { sql: 'l.counterparty', kind: 'text' },
+  notes: { sql: 'l.notes', kind: 'text' },
+  sku: { sql: 'i.code', kind: 'text' },
+  name: { sql: 'i.name', kind: 'text' },
+  unit: { sql: 'i.unit', kind: 'text' },
+  qty: { sql: 'l.qty', kind: 'number' },
+  unitPrice: { sql: 'l.unit_price', kind: 'number' },
+  value: { sql: 'l.value', kind: 'number' },
+  parentSku: { sql: 'pr.code', kind: 'text' },
+  parentName: { sql: 'pr.name', kind: 'text' },
+  group: { sql: 'ic.name', kind: 'text' },
+};
+
+/** Column keys this engine can filter — the catalog reads it to decide which boxes to draw. */
+export const TRANSFER_DETAIL_FILTERABLE = new Set(
+  Object.keys(TRANSFER_DETAIL_COLUMN_SPECS),
+);
 
 /**
  * A transfer LEG, listed document line by document line.
@@ -116,26 +168,46 @@ export class TransferDetailService {
       query.destinationBranchId,
       query.leg,
     ];
+    // One fragment, spliced into the rows query and the count+totals query, so
+    // the footer cannot describe a different set than the grid.
+    const columnFilter = buildReportColumnFilter(
+      query.columnFilters,
+      TRANSFER_DETAIL_COLUMN_SPECS,
+      params.length,
+    );
+    const filterWhere = columnFilter.where ? `WHERE ${columnFilter.where}` : '';
+    const filteredParams = [...params, ...columnFilter.params];
+    const limitIndex = filteredParams.length + 1;
     const page = Math.max(1, query.page);
     const pageSize = Math.max(1, query.pageSize);
 
     const rows = (await this.dataSource.query(
       `${outer}
+       ${filterWhere}
        ORDER BY l.doc_date ASC, l.doc_number ASC, i.code ASC
-       LIMIT $7 OFFSET $8`,
-      [...params, pageSize, (page - 1) * pageSize],
+       LIMIT $${limitIndex} OFFSET $${limitIndex + 1}`,
+      [...filteredParams, pageSize, (page - 1) * pageSize],
     )) as RawTransferDetailRow[];
 
     // Same CTE and same joins as the rows query. A relation joined in one but
     // not the other is the 42P01 that `document-detail.service.ts` documents.
+    // Same CTE, same joins AND the same filter as the rows query. The joins the
+    // count did not previously need are now load-bearing: a filter on `group`
+    // or `warehouse` compiles to `ic.` / `sg.` and would not resolve without
+    // them.
     const [agg] = (await this.dataSource.query(
       `${legs}
        SELECT COUNT(*)::int AS total,
               COALESCE(SUM(l.qty), 0) AS qty,
               COALESCE(SUM(l.value), 0) AS value
          FROM legs l
-         JOIN items i ON i.id = l.item_id AND i.organization_id = $1`,
-      params,
+         JOIN items i ON i.id = l.item_id AND i.organization_id = $1
+         LEFT JOIN inventory_item_categories ic ON ic.id = i.category_id
+         LEFT JOIN products pr ON pr.id = i.product_id AND pr.organization_id = i.organization_id
+         LEFT JOIN locations loc ON loc.id = l.location_id
+         LEFT JOIN storages sg ON sg.id = loc.storage_id
+       ${filterWhere}`,
+      filteredParams,
     )) as { total: number; qty: string; value: string }[];
 
     return {

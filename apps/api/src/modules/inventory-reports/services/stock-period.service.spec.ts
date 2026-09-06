@@ -505,3 +505,151 @@ describe('StockPeriodService branch-grain filters', () => {
     });
   });
 });
+
+/**
+ * Where a predicate lands, by what kind of predicate it is.
+ *
+ * ADR-03 proposed a three-bin `partitionAggFilters(cols, grain)` returning
+ * `{ cteWhere, outerWhere, having }`. Built against this engine it would carry
+ * two empty bins — see T-03-01 — so the split lives here as an assertion on the
+ * generated SQL instead of as a function with nothing to sort:
+ *
+ * | predicate                        | lands            | why |
+ * |----------------------------------|------------------|-----|
+ * | member scope (`unit`, `brand`)   | inside `item_agg`| reads `i.unit`, which the aggregate replaces with `NULL::text` |
+ * | identity (`sku`, `itemName`, …)  | outer `WHERE`    | a column of the aggregated row |
+ * | measure (`closingQty`, …)        | outer `WHERE`    | `item_agg` already summed it, so no HAVING is needed |
+ *
+ * The first row is the one that bites: a member predicate placed outside the
+ * CTE compiles, runs, and quietly matches nothing at all.
+ */
+describe('StockPeriodService aggregate-grain predicate placement', () => {
+  function capture() {
+    const sql: string[] = [];
+    const dataSource = {
+      query: jest.fn().mockImplementation((text: string) => {
+        sql.push(text);
+        return Promise.resolve(text.includes('COUNT(*)') ? [{ total: 0 }] : []);
+      }),
+    };
+    return { sql, service: new StockPeriodService(dataSource as never) };
+  }
+
+  const aggQuery = {
+    organizationId: 'org-1',
+    startDate: new Date('2026-01-01'),
+    endDate: new Date('2027-01-01'),
+    groupBy: 'item' as const,
+    itemGroupBy: 'group' as const,
+    page: 1,
+    pageSize: 50,
+  };
+
+  /** The slice of a query between `item_agg AS (` and its `GROUP BY`. */
+  function insideAggCte(text: string): string {
+    const start = text.indexOf('item_agg AS (');
+    expect(start).toBeGreaterThan(-1);
+    const groupBy = text.indexOf('GROUP BY', start);
+    return text.slice(start, groupBy);
+  }
+
+  function outsideAggCte(text: string): string {
+    const start = text.indexOf('item_agg AS (');
+    const groupBy = text.indexOf('GROUP BY', start);
+    return text.slice(groupBy);
+  }
+
+  it.each(['parent', 'group'] as const)(
+    'puts the member scope inside item_agg at the %s grain',
+    async (itemGroupBy) => {
+      const { sql, service } = capture();
+
+      await service.aggregate({
+        ...aggQuery,
+        itemGroupBy,
+        memberScope: { unit: 'Đôi', brand: 'Lasta' },
+      });
+
+      for (const text of sql) {
+        expect(insideAggCte(text)).toContain('i.unit  = $9');
+        expect(insideAggCte(text)).toContain('i.brand = $10');
+      }
+    },
+  );
+
+  it('binds the member scope as parameters, never as SQL text', async () => {
+    const { service } = capture();
+    const dataSource = (service as unknown as { dataSource: { query: jest.Mock } })
+      .dataSource;
+
+    await service.aggregate({
+      ...aggQuery,
+      memberScope: { unit: "Đôi'; DROP TABLE items; --", brand: undefined },
+    });
+
+    for (const [text, params] of dataSource.query.mock.calls) {
+      expect(text).not.toContain('DROP TABLE');
+      expect(params).toContain("Đôi'; DROP TABLE items; --");
+    }
+  });
+
+  it('leaves both parameters null when no dropdown is set', async () => {
+    const { service } = capture();
+    const dataSource = (service as unknown as { dataSource: { query: jest.Mock } })
+      .dataSource;
+
+    await service.aggregate({ ...aggQuery, memberScope: { unit: '', brand: undefined } });
+
+    // An empty dropdown means "all". Binding '' would match the empty string
+    // and return nothing — the failure mode a `?? ''` here would produce.
+    const [, params] = dataSource.query.mock.calls[0];
+    expect(params[8]).toBeNull();
+    expect(params[9]).toBeNull();
+  });
+
+  it('puts an identity filter outside the CTE, on the aggregated row', async () => {
+    const { sql, service } = capture();
+
+    await service.aggregate({
+      ...aggQuery,
+      columnFilters: { itemName: { operator: '*', value: 'Giày' } },
+    });
+
+    for (const text of sql) {
+      expect(outsideAggCte(text)).toContain('ic.name');
+      expect(insideAggCte(text)).not.toContain('ILIKE $11');
+    }
+  });
+
+  it('puts a measure filter outside the CTE too — item_agg already summed it', async () => {
+    const { sql, service } = capture();
+
+    await service.aggregate({
+      ...aggQuery,
+      columnFilters: { closingQty: { operator: '>=', value: 1000 } },
+    });
+
+    for (const text of sql) {
+      // A plain WHERE on a column of `item_agg`, not a HAVING: the grouping
+      // happened one level down, so there is no aggregate left to filter.
+      expect(outsideAggCte(text)).toContain('ia.opening_qty + ia.in_qty - ia.out_qty');
+      expect(text).not.toContain('HAVING');
+    }
+  });
+
+  it('applies the same member scope to the rows query and the count', async () => {
+    // The footer describing a different set than the grid is the whole bug
+    // class this UoW is about; one fragment spliced into both is the guard.
+    const { sql, service } = capture();
+
+    await service.aggregate({ ...aggQuery, memberScope: { unit: 'Đôi' } });
+
+    const withCount = sql.filter((t) => t.includes('COUNT(*)'));
+    const withRows = sql.filter((t) => !t.includes('COUNT(*)'));
+    expect(withCount.length).toBeGreaterThan(0);
+    expect(withRows.length).toBeGreaterThan(0);
+    for (const text of [...withCount, ...withRows]) {
+      expect(insideAggCte(text)).toContain('i.unit  = $9');
+    }
+  });
+});

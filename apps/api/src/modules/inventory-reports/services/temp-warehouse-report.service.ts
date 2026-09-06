@@ -3,6 +3,7 @@ import type { ReportTotals } from '@erp/shared-interfaces';
 import { DataSource } from 'typeorm';
 import {
   buildReportColumnFilter,
+  type MemberScopeFilters,
   type ReportColumnFilters,
   type ReportColumnSpecs,
 } from './report-column-filter.util';
@@ -147,6 +148,14 @@ export interface TempWarehouseReportQuery {
   pageSize: number;
   /** Lọc theo cột, áp phía server nên tác dụng trên toàn tập. */
   columnFilters?: ReportColumnFilters;
+  /**
+   * Which items take part, from the filter bar's unit/brand dropdowns.
+   *
+   * `brand` is honoured even though this report shows no brand column: the
+   * dropdown chooses which items are reported, which does not require the grid
+   * to display the value (ADR-02).
+   */
+  memberScope?: MemberScopeFilters;
 }
 
 export interface TempWarehouseReportResult {
@@ -218,6 +227,9 @@ export class TempWarehouseReportService {
       query.search && query.search.trim().length > 0
         ? query.search.trim()
         : null;
+    // An empty dropdown means "all", not "match the empty string".
+    const unit = query.memberScope?.unit?.length ? query.memberScope.unit : null;
+    const brand = query.memberScope?.brand?.length ? query.memberScope.brand : null;
 
     const page = Math.max(1, query.page);
     const pageSize = Math.max(1, query.pageSize);
@@ -435,6 +447,8 @@ export class TempWarehouseReportService {
       branchIds,
       categoryIds,
       search,
+      unit,   // $7
+      brand,  // $8
     ];
 
     // One outer stage shared by the rows, count and totals queries — every
@@ -476,6 +490,8 @@ export class TempWarehouseReportService {
       FROM movements p
       JOIN items i ON i.id = p.item_id AND i.organization_id = $1
       LEFT JOIN users u ON u.id = p.carrier_user_id
+      WHERE ($7::text IS NULL OR i.unit  = $7)
+        AND ($8::text IS NULL OR i.brand = $8)
       )
     `;
 

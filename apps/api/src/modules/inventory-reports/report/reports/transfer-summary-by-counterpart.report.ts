@@ -25,6 +25,7 @@ import {
 } from '../inventory-report-column.util';
 import { CountedRows } from '../../../reporting/report-core/report-definition';
 import { assertKnownColumns, projectRows, toTotalsRow } from '../report-data.util';
+import { toEngineFilters } from '../report-column-mapper.util';
 import { resolveInventoryBranchIds } from '../report-scope.util';
 
 const { STRING, NUMBER } = ReportColumnDataType;
@@ -113,6 +114,9 @@ export class TransferSummaryByCounterpartReport
       branchId: scope.branchId,
       page: dto.page ?? 1,
       pageSize: dto.limit ?? 20,
+      // Validated above by `assertKnownColumns` and, until now, dropped right
+      // here — the dialog answered 200 with an unfiltered grid (ADR-06, AC-16).
+      columnFilters: toEngineFilters(dto.columnFilters),
     });
 
     // `_branchId` is attached AFTER projection on purpose: `projectRows` keeps
@@ -150,6 +154,7 @@ export class TransferSummaryByCounterpartReport
       branchId: scope.branchId,
       page: 1,
       pageSize: 1,
+      columnFilters: toEngineFilters(dto.columnFilters),
     });
     return { total: result.total, subject: 'rows' };
   }

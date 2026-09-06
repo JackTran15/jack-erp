@@ -32,6 +32,19 @@ const SINGLE_MODE_HEADER_STORE_REPORTS = new Set([
   "inventory-temp-warehouse-out",
 ]);
 
+/**
+ * Báo cáo KHÔNG có trục thời gian — engine đọc tồn tại thời điểm hiện tại, nên
+ * `period`/`preset` là trường chết (ADR-04).
+ *
+ * Gỡ hai dòng lọc kỳ khỏi registry (T-04-01) chỉ tắt phần RENDER. Túi `filters`
+ * vẫn được `buildInitialReportState` seed kỳ cho mọi báo cáo, và
+ * `ALWAYS_KEPT_FILTER_LINES` cố ý giữ chúng qua prune để đổi báo cáo qua lại
+ * không làm rỗng kỳ của báo cáo khác. Không chặn ở đây thì payload vẫn mang một
+ * kỳ mà backend không đọc — và vì preset mặc định là "Hôm nay", khoảng ngày đổi
+ * mỗi ngày nên khoá cache đổi theo mà kết quả thì không.
+ */
+const PERIODLESS_REPORTS = new Set(["inventory-stock-by-store-pivot"]);
+
 export interface InventorySearchContext {
   branch: STORE_TYPE;
   activeBranchId?: string | null;
@@ -103,13 +116,15 @@ export function buildInventorySearchFilters(
     payload.viewMode = ctx.branch === STORE_TYPE.CHAIN ? "chain" : "single";
   }
 
-  const range = filters[REPORT_FILTERS_LINE.RANGE_DATE];
+  const range = ctx && PERIODLESS_REPORTS.has(ctx.backendKey)
+    ? undefined
+    : filters[REPORT_FILTERS_LINE.RANGE_DATE];
   if (range?.fromDate || range?.toDate) {
     payload.period = {
       from: range.fromDate || undefined,
       to: range.toDate || undefined,
     };
-  } else {
+  } else if (!ctx || !PERIODLESS_REPORTS.has(ctx.backendKey)) {
     const preset = filters[REPORT_FILTERS_LINE.REPORT_PERIOD];
     if (preset) payload.preset = preset as InventoryReportPreset;
   }

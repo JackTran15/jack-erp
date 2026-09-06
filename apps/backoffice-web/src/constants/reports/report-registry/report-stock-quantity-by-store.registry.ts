@@ -49,13 +49,17 @@ const tableConfig: ReportTableConfig = { summaryLabel: "Tổng", columns };
 export const single_tableRegistryReportStockQuantityByStore = tableConfig;
 export const chain_tableRegistryReportStockQuantityByStore = tableConfig;
 
+// Không có dòng kỳ báo cáo: báo cáo này đọc `stock_balances`, tức là tồn tại
+// THỜI ĐIỂM HIỆN TẠI, và `StockByStorePivotReport` không đọc `period`/`preset` ở
+// bất kỳ đâu. Đo trên erp_dev_3008: cả năm 2026, đúng một ngày, cả năm 2020 và
+// `preset=today` đều trả về cùng 9639 dòng. Hai dòng lọc kỳ từng có ở đây chỉ là
+// ô lọc hiện ra mà không làm gì (ADR-04). Muốn tồn theo thời điểm quá khứ thì
+// phải dựng lại engine trên ledger — là feature riêng, không phải sửa bộ lọc.
 const filterLines = [
   REPORT_FILTERS_LINE.PRODUCT_GROUP,
   REPORT_FILTERS_LINE.BRAND,
   REPORT_FILTERS_LINE.STATISTIC_BY,
   REPORT_FILTERS_LINE.UNIT,
-  REPORT_FILTERS_LINE.REPORT_PERIOD,
-  REPORT_FILTERS_LINE.RANGE_DATE,
 ];
 export const single_filterRegistryReportStockQuantityByStore = filterLines;
 export const chain_filterRegistryReportStockQuantityByStore = filterLines;

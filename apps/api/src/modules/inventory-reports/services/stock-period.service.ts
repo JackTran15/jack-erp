@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { ReportTotals } from '@erp/shared-interfaces';
 import {
   buildReportColumnFilter,
+  type MemberScopeFilters,
   type ReportColumnFilters,
   type ReportColumnSpecs,
 } from './report-column-filter.util';
@@ -75,6 +76,14 @@ export interface StockPeriodQuery {
   pageSize: number;
   /** Lọc theo cột, áp phía server nên tác dụng trên toàn tập. */
   columnFilters?: ReportColumnFilters;
+  /**
+   * Which items take part at all, from the filter bar's unit/brand dropdowns.
+   *
+   * Applied against `items` before anything is summed, so it means the same
+   * thing at every grain: at `item` it drops rows, at `parent`/`group` it drops
+   * members from the sum while the group itself stays visible (A-01).
+   */
+  memberScope?: MemberScopeFilters;
 }
 
 export interface StockPeriodRow {
@@ -216,6 +225,23 @@ const NULL_SPATIAL_COLS = `
       NULL::uuid AS branch_id,
       NULL::text AS branch_code,
       NULL::text AS branch_name,`;
+
+/**
+ * The member-scope predicate, in the one form that works at every grain.
+ *
+ * It reads `i.unit` / `i.brand` — the item's own columns — so it has to sit
+ * wherever `items` is still joined row-by-row. At the item grain that is the
+ * outer WHERE; at the parent/group grains it is inside `item_agg`, BEFORE the
+ * GROUP BY. Put outside the aggregate it would read the `NULL::text AS unit`
+ * that `buildAggSqls` selects and match nothing at all (A-06).
+ *
+ * Both parameters are nullable and a NULL means "no filter", so the same
+ * fragment can be spliced in unconditionally.
+ */
+const MEMBER_SCOPE_SQL = `
+  AND ($9::text  IS NULL OR i.unit  = $9)
+  AND ($10::text IS NULL OR i.brand = $10)
+`;
 
 function periodColumnSpecs(
   alias: string,
@@ -507,6 +533,9 @@ export class StockPeriodService {
     const search =
       query.search?.trim().length ? query.search.trim() : null;
     const hideZeroRows = query.hideZeroRows === true;
+    // Member scope: an empty string from the dropdown means "all", not "blank".
+    const unit = query.memberScope?.unit?.length ? query.memberScope.unit : null;
+    const brand = query.memberScope?.brand?.length ? query.memberScope.brand : null;
 
     const page = Math.max(1, query.page);
     const pageSize = Math.max(1, query.pageSize);
@@ -526,6 +555,8 @@ export class StockPeriodService {
       categoryIds,          // $6
       search,               // $7
       hideZeroRows,         // $8
+      unit,                 // $9
+      brand,                // $10
     ];
 
     // One fragment, spliced into both the rows query and the count+totals
@@ -650,6 +681,7 @@ export class StockPeriodService {
       WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
         AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
         AND ($8::boolean = FALSE OR NOT (c.opening_qty = 0 AND c.in_qty = 0 AND c.out_qty = 0))
+        ${MEMBER_SCOPE_SQL}
         ${filterWhere}
       ${orderBy}
       LIMIT $${limitIndex} OFFSET $${limitIndex + 1}
@@ -669,6 +701,7 @@ export class StockPeriodService {
       WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
         AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
         AND ($8::boolean = FALSE OR NOT (c.opening_qty = 0 AND c.in_qty = 0 AND c.out_qty = 0))
+        ${MEMBER_SCOPE_SQL}
         ${filterWhere}
     `;
 
@@ -724,6 +757,7 @@ export class StockPeriodService {
         JOIN items i ON i.id = c.item_id AND i.organization_id = $1
         WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
           AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
+          ${MEMBER_SCOPE_SQL}
         GROUP BY ${aggKeyExpr}
       )
     `;

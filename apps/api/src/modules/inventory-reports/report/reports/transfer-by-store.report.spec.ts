@@ -142,7 +142,10 @@ describe('TransferByStoreReport', () => {
     );
   });
 
-  it('pushes the unit and brand dropdowns down too', async () => {
+  // ADR-02 moved these two out of `columnFilters` and into `memberScope`, on
+  // purpose: they choose which items are summed, not which produced rows
+  // survive, and only the item grain could pretend those were the same thing.
+  it('pushes the unit and brand dropdowns down as member scope', async () => {
     const { report, engine } = build([engineRow]);
 
     await report.buildData(
@@ -152,10 +155,8 @@ describe('TransferByStoreReport', () => {
 
     expect(engine.byBranch).toHaveBeenCalledWith(
       expect.objectContaining({
-        columnFilters: {
-          unit: { operator: '=', value: 'Đôi' },
-          brand: { operator: '=', value: 'Bitis' },
-        },
+        memberScope: { unit: 'Đôi', brand: 'Bitis' },
+        columnFilters: {},
       }),
     );
   });
@@ -183,5 +184,102 @@ describe('TransferByStoreReport', () => {
         actorWithBranch,
       ),
     ).rejects.toThrow(/Access denied/);
+  });
+});
+
+/**
+ * Footer and paging describe the same set as the grid, at the aggregate grains.
+ *
+ * The SQL half of this is guarded in `transfer-report.service.spec.ts` (N4: the
+ * count and the rows must read the same relations). What is left for the report
+ * layer is the arithmetic on top of the engine's answer — the place where a
+ * correct engine can still be reported wrongly.
+ */
+describe('TransferByStoreReport footer and paging (AC-08, AC-13, AC-14)', () => {
+  const many: TransferByBranchRow[] = Array.from({ length: 7 }, (_, n) => ({
+    ...engineRow,
+    itemId: `item-${n}`,
+    sku: `SKU-${n}`,
+    outQty: n + 1,
+    outValue: (n + 1) * 100,
+    inQty: n + 1,
+    inValue: (n + 1) * 100,
+  }));
+
+  const aggDto = (page: number, limit: number): InventoryReportSearchDto => ({
+    ...dto,
+    columns: ['sku', 'outQty', 'outValue'],
+    filters: { ...dto.filters, statBy: 'group' },
+    page,
+    limit,
+  } as unknown as InventoryReportSearchDto);
+
+  it('reports a total that every row can actually be reached through', async () => {
+    const { report } = build(many);
+    const limit = 3;
+
+    const first = await report.buildData(aggDto(1, limit), actorWithBranch);
+    const pages = Math.ceil(first.total / limit);
+    let walked = 0;
+    let lastPageRows = 0;
+    for (let page = 1; page <= pages; page += 1) {
+      const result = await report.buildData(aggDto(page, limit), actorWithBranch);
+      walked += result.rows.length;
+      lastPageRows = result.rows.length;
+    }
+
+    expect(first.total).toBe(7);
+    expect(walked).toBe(first.total);
+    // AC-14: ceil(7/3) = 3 pages, and the third holds the remaining row.
+    expect(pages).toBe(3);
+    expect(lastPageRows).toBeGreaterThan(0);
+  });
+
+  it('keeps the footer describing the whole set, not the page in view', async () => {
+    // The footer is the engine's whole-set aggregate, so page 3 of 3 must carry
+    // the same totals as page 1. Summing the page instead would understate it
+    // by exactly the rows the user cannot see.
+    const { report } = build(many);
+
+    const firstPage = await report.buildData(aggDto(1, 3), actorWithBranch);
+    const lastPage = await report.buildData(aggDto(3, 3), actorWithBranch);
+
+    expect(firstPage.totals!.outQty).toBe(28); // 1+2+…+7
+    expect(lastPage.totals!.outQty).toBe(28);
+    expect(lastPage.rows).toHaveLength(1);
+  });
+
+  it('passes the member scope to the engine at the aggregate grain (AC-06)', async () => {
+    const { report, engine } = build(many);
+
+    await report.buildData(
+      {
+        ...aggDto(1, 20),
+        filters: { ...dto.filters, statBy: 'group', unit: 'Đôi' },
+      } as unknown as InventoryReportSearchDto,
+      actorWithBranch,
+    );
+
+    expect(engine.byBranch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemGroupBy: 'group',
+        memberScope: { unit: 'Đôi', brand: undefined },
+      }),
+    );
+  });
+
+  it('never sums an average price into the footer', async () => {
+    // `outAvgPrice` is the average of averages — a number with no meaning. The
+    // engine does not aggregate it, and the footer must show null, not 0: zero
+    // is a claim about the data that nobody made.
+    const { report } = build(many);
+
+    const result = await report.buildData(
+      { ...dto, columns: ['sku', 'outAvgPrice', 'outQty'], page: 1, limit: 20 } as unknown as InventoryReportSearchDto,
+      actorWithBranch,
+    );
+
+    expect(result.totals!.outAvgPrice).toBeNull();
+    expect(result.totals!.outQty).toBe(28);
   });
 });

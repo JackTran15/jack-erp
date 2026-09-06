@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { ReportTotals } from '@erp/shared-interfaces';
 import {
   buildReportColumnFilter,
+  type MemberScopeFilters,
   type ReportColumnFilters,
   type ReportColumnSpecs,
 } from './report-column-filter.util';
@@ -31,6 +32,13 @@ export interface TransferByCounterpartQuery {
   branchId: string;
   page?: number;
   pageSize?: number;
+  /**
+   * Lọc theo cột, áp phía server nên tác dụng trên toàn tập.
+   *
+   * Was validated by the report layer and then dropped: the dialog answered 200
+   * with an unfiltered set (ADR-06).
+   */
+  columnFilters?: ReportColumnFilters;
 }
 
 export interface TransferSummaryRow {
@@ -63,6 +71,31 @@ export interface TransferSummaryResult {
 }
 
 /** Cột số của báo cáo 6 — tổng bằng reduce, vì truy vấn vẫn dựng đủ dòng. */
+/**
+ * What each column of the L1 dialog compiles to, against the `agg` CTE.
+ *
+ * The four difference columns are arithmetic over the sums rather than columns
+ * of `agg`, so they repeat the expression rather than name it — the same shape
+ * the row mapper computes, so a filter matches the number on screen.
+ */
+const COUNTERPART_COLUMN_SPECS: ReportColumnSpecs = {
+  branchCode: { sql: 'branch_code', kind: 'text' },
+  branchName: { sql: 'branch_name', kind: 'text' },
+  inQty: { sql: 'in_qty', kind: 'number' },
+  inValue: { sql: 'in_value', kind: 'number' },
+  outQty: { sql: 'out_qty', kind: 'number' },
+  outValue: { sql: 'out_value', kind: 'number' },
+  receivedQty: { sql: 'received_qty', kind: 'number' },
+  receivedValue: { sql: 'received_value', kind: 'number' },
+  diffQty: { sql: '(received_qty - out_qty)', kind: 'number' },
+  diffValue: { sql: '(received_value - out_value)', kind: 'number' },
+  inOutDiffQty: { sql: '(in_qty - out_qty)', kind: 'number' },
+  inOutDiffValue: { sql: '(in_value - out_value)', kind: 'number' },
+};
+
+/** Column keys the L1 dialog can filter. */
+export const COUNTERPART_FILTERABLE = new Set(Object.keys(COUNTERPART_COLUMN_SPECS));
+
 const TRANSFER_SUMMARY_TOTAL_FIELDS = [
   'qtyIn',
   'valueIn',
@@ -92,6 +125,12 @@ export interface TransferByBranchQuery {
   destinationBranchIds?: string[];
   categoryIds?: string[];
   search?: string;
+  /**
+   * Which items take part, from the filter bar's unit/brand dropdowns. Applied
+   * against `items` alongside the category and search filters, so at the
+   * aggregate grains it narrows `item_agg` before the GROUP BY (ADR-03).
+   */
+  memberScope?: MemberScopeFilters;
   itemGroupBy?: ItemGroupBy;
   page: number;
   pageSize: number;
@@ -313,6 +352,21 @@ function toSummaryRow(r: RawTransferSummaryRow): TransferSummaryRow {
     valueInOutDifference: inValue - outValue,
   };
 }
+
+/**
+ * Member scope for the by-branch report. `$8`/`$9` sit right after the seven
+ * scope parameters the query already binds, and `params.length` drives where the
+ * column-filter values start, so appending them shifts nothing by hand.
+ *
+ * At the item grain it goes in the outer WHERE; at parent/group it goes inside
+ * `item_agg`, before the GROUP BY, because that is the last point where
+ * `i.unit` still holds a value rather than the `NULL::text` the aggregate
+ * selects (ADR-03).
+ */
+const TRANSFER_MEMBER_SCOPE_SQL = `
+  AND ($8::text IS NULL OR i.unit  = $8)
+  AND ($9::text IS NULL OR i.brand = $9)
+`;
 
 @Injectable()
 export class TransferReportService {
@@ -595,14 +649,25 @@ export class TransferReportService {
       query.endDate,
       query.branchId,
     ];
+    // One fragment for the rows query and the totals query alike.
+    const columnFilter = buildReportColumnFilter(
+      query.columnFilters,
+      COUNTERPART_COLUMN_SPECS,
+      params.length,
+    );
+    const filterWhere = columnFilter.where ? `WHERE ${columnFilter.where}` : '';
+    const filteredParams = [...params, ...columnFilter.params];
+    const limitIndex = filteredParams.length + 1;
 
     const rows = (await this.dataSource.query(
       `${movements}
-       SELECT * FROM agg ORDER BY branch_name ASC LIMIT $5 OFFSET $6`,
-      [...params, pageSize, (page - 1) * pageSize],
+       SELECT * FROM agg ${filterWhere}
+       ORDER BY branch_name ASC LIMIT $${limitIndex} OFFSET $${limitIndex + 1}`,
+      [...filteredParams, pageSize, (page - 1) * pageSize],
     )) as RawTransferSummaryRow[];
 
-    // Totals come from the same CTE so they describe the whole set, not the page.
+    // Totals come from the same CTE, under the same filter, so they describe the
+    // whole filtered set rather than the page or the unfiltered whole.
     const [totalsRow] = (await this.dataSource.query(
       `${movements}
        SELECT COUNT(*)::int AS total,
@@ -612,8 +677,8 @@ export class TransferReportService {
               COALESCE(SUM(out_value), 0) AS out_value,
               COALESCE(SUM(received_qty), 0) AS received_qty,
               COALESCE(SUM(received_value), 0) AS received_value
-         FROM agg`,
-      params,
+         FROM agg ${filterWhere}`,
+      filteredParams,
     )) as (RawTransferSummaryRow & { total: number })[];
 
     const data = rows.map((r) => toSummaryRow(r));
@@ -634,6 +699,9 @@ export class TransferReportService {
       query.destinationBranchIds?.length ? query.destinationBranchIds : null;
     const categoryIds = query.categoryIds?.length ? query.categoryIds : null;
     const search = query.search?.trim().length ? query.search.trim() : null;
+    // An empty dropdown means "all", not "match the empty string".
+    const unit = query.memberScope?.unit?.length ? query.memberScope.unit : null;
+    const brand = query.memberScope?.brand?.length ? query.memberScope.brand : null;
     const itemGroupBy: ItemGroupBy = query.itemGroupBy ?? 'item';
 
     const page = Math.max(1, query.page);
@@ -749,6 +817,8 @@ export class TransferReportService {
       destinationBranchIds,
       categoryIds,
       search,
+      unit,   // $8
+      brand,  // $9
     ];
     // One fragment for the rows query and the count+totals query alike.
     const isItemLevel = itemGroupBy === 'item';
@@ -798,6 +868,7 @@ export class TransferReportService {
         JOIN  branches b ON b.id = c.other_branch_id AND b.organization_id = $1
         WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
           AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
+          ${TRANSFER_MEMBER_SCOPE_SQL}
           ${filterWhere}
         ORDER BY i.code ASC, b.name ASC
         LIMIT $${limitIndex} OFFSET $${limitIndex + 1}
@@ -815,6 +886,7 @@ export class TransferReportService {
         JOIN branches b ON b.id = c.other_branch_id AND b.organization_id = $1
         WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
           AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
+          ${TRANSFER_MEMBER_SCOPE_SQL}
           ${filterWhere}
       `;
     } else {
@@ -837,6 +909,7 @@ export class TransferReportService {
           JOIN items i ON i.id = c.item_id AND i.organization_id = $1
           WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
             AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
+            ${TRANSFER_MEMBER_SCOPE_SQL}
           GROUP BY ${aggKeyExpr}, c.other_branch_id
         )
       `;

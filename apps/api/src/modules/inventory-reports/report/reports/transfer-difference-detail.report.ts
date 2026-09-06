@@ -17,6 +17,7 @@ import {
 } from '../inventory-report-column.util';
 import { CountedRows } from '../../../reporting/report-core/report-definition';
 import { assertKnownColumns, projectRows, toTotalsRow } from '../report-data.util';
+import { toEngineFilters } from '../report-column-mapper.util';
 import {
   resolveTransferPair,
   toTransferDetailRow,
@@ -74,6 +75,9 @@ export class TransferDifferenceDetailReport implements InventoryReportDefinition
       leg: 'unmatched',
       page: dto.page ?? 1,
       pageSize: dto.limit ?? 20,
+      // Validated above by `assertKnownColumns` and, until now, dropped right
+      // here — the dialog answered 200 with an unfiltered grid (ADR-06, AC-16).
+      columnFilters: toEngineFilters(dto.columnFilters),
     });
 
     return {
@@ -99,6 +103,7 @@ export class TransferDifferenceDetailReport implements InventoryReportDefinition
       leg: 'unmatched',
       page: 1,
       pageSize: 1,
+      columnFilters: toEngineFilters(dto.columnFilters),
     });
     return { total: result.total, subject: 'rows' };
   }

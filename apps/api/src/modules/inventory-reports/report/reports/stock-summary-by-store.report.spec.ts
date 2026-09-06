@@ -119,6 +119,8 @@ describe('StockSummaryByStoreReport', () => {
     );
   });
 
+  // The unit/brand half of this assertion moved to `memberScope` with ADR-02;
+  // paging is untouched.
   it('pushes page, limit and the unit/brand dropdowns down', async () => {
     const { report, engine } = build([engineRow]);
 
@@ -131,7 +133,8 @@ describe('StockSummaryByStoreReport', () => {
       expect.objectContaining({
         page: 3,
         pageSize: 50,
-        columnFilters: { unit: { operator: '=', value: 'Cái' } },
+        memberScope: { unit: 'Cái', brand: undefined },
+        columnFilters: {},
       }),
     );
   });

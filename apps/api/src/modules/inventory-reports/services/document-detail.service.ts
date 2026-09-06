@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { INVENTORY_DOC_KIND_LABELS_VI, type ReportTotals } from '@erp/shared-interfaces';
 import {
   buildReportColumnFilter,
+  type MemberScopeFilters,
   type ReportColumnFilters,
   type ReportColumnSpecs,
 } from './report-column-filter.util';
@@ -100,6 +101,15 @@ export interface DocumentDetailQuery {
   keyset?: boolean;
   /** Lọc theo cột, áp phía server nên tác dụng trên toàn tập. */
   columnFilters?: ReportColumnFilters;
+  /**
+   * Which items take part, from the filter bar's unit/brand dropdowns.
+   *
+   * This report is line-level only, so member scope and column filter would
+   * select the same rows here. It still travels the member door, so all seven
+   * warehouse reports read the same two values the same way and none of them
+   * can quietly stop honouring one (ADR-02).
+   */
+  memberScope?: MemberScopeFilters;
 }
 
 /**
@@ -249,6 +259,9 @@ export class DocumentDetailService {
       query.search && query.search.trim().length > 0
         ? query.search.trim()
         : null;
+    // An empty dropdown means "all", not "match the empty string".
+    const unit = query.memberScope?.unit?.length ? query.memberScope.unit : null;
+    const brand = query.memberScope?.brand?.length ? query.memberScope.brand : null;
 
     const page = Math.max(1, query.page);
     const pageSize = Math.max(1, query.pageSize);
@@ -261,6 +274,8 @@ export class DocumentDetailService {
       branchIds,
       categoryIds,
       search,
+      unit,   // $7
+      brand,  // $8
     ];
     // One fragment, spliced into the rows query and the count+totals query.
     const columnFilter = buildReportColumnFilter(
@@ -426,6 +441,8 @@ export class DocumentDetailService {
       ${OUTER_JOINS}
       WHERE ($5::uuid[] IS NULL OR i.category_id = ANY($5))
         AND ($6::text IS NULL OR i.code ILIKE '%' || $6 || '%' OR i.name ILIKE '%' || $6 || '%')
+        AND ($7::text IS NULL OR i.unit  = $7)
+        AND ($8::text IS NULL OR i.brand = $8)
         ${filterWhere}
       ${keyset ? keysetPredicate : ''}
       ORDER BY ${keyset ? 'l.posted_at DESC, cursor_id DESC' : 'l.posted_at DESC, l.document_number ASC'}
@@ -444,6 +461,8 @@ export class DocumentDetailService {
       ${OUTER_JOINS}
       WHERE ($5::uuid[] IS NULL OR i.category_id = ANY($5))
         AND ($6::text IS NULL OR i.code ILIKE '%' || $6 || '%' OR i.name ILIKE '%' || $6 || '%')
+        AND ($7::text IS NULL OR i.unit  = $7)
+        AND ($8::text IS NULL OR i.brand = $8)
         ${filterWhere}
     `;
 
