@@ -9,3 +9,8 @@ export { UpdateShowroomDto } from './update-showroom.dto';
 export { CreateLocationDto } from './create-location.dto';
 export { UpdateLocationDto } from './update-location.dto';
 export { AssignStorageManagerDto, UnassignStorageManagerDto } from './assign-storage-manager.dto';
+export {
+  SetItemActiveStatusDto,
+  SetItemActiveStatusResponseDto,
+  SetItemActiveStatusSkippedDto,
+} from './set-item-active-status.dto';

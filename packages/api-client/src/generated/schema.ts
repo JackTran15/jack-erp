@@ -1997,6 +1997,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/items/set-active-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InventoryLocationController_setItemActiveStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/items/by-product/{productId}": {
         parameters: {
             query?: never;
@@ -9219,6 +9235,27 @@ export interface components {
             /** @description UUID of the user who created this record. */
             createdBy: string;
         };
+        SetItemActiveStatusDto: {
+            /** @description Grid row ids. A products.id expands to every variant of that product; an items.id targets that item. */
+            ids: string[];
+            /** @description true = Đang kinh doanh, false = Ngừng kinh doanh. */
+            isActive: boolean;
+        };
+        SetItemActiveStatusSkippedDto: {
+            /** @description SKU of the item that was not changed. */
+            code: string;
+            /**
+             * @description IN_SHOWROOM — stock still sits in a main (Showroom) storage and has to be moved out first.
+             * @enum {string}
+             */
+            reason: "IN_SHOWROOM";
+        };
+        SetItemActiveStatusResponseDto: {
+            /** @description Number of item rows actually updated. */
+            updated: number;
+            /** @description Items deliberately left alone. A non-empty list is a normal outcome, not an error. */
+            skipped: components["schemas"]["SetItemActiveStatusSkippedDto"][];
+        };
         ItemLookupResultDto: {
             /** Format: uuid */
             itemId: string;
@@ -9389,6 +9426,17 @@ export interface components {
              * @default false
              */
             includeInactive: boolean;
+            /**
+             * @description Keep only groups whose stock is exhausted in the actor's current branch:
+             *     the signed sum of every variant's on-hand quantity is <= 0.
+             *
+             *     The sum is signed on purpose — a group holding -1 and +1 totals 0 and counts
+             *     as out of stock — and a group with no stock_balances row at all totals 0 too.
+             *     Note this threshold is `<= 0`, deliberately wider than
+             *     StockStateFilter.OUT_OF_STOCK (`= 0`) used by the stock summary screen.
+             * @default false
+             */
+            outOfStock: boolean;
             /** @description Mã SKU */
             code?: components["schemas"]["StringFilterDto"];
             /** @description Mã vạch — matches if any barcode of the group matches */
@@ -17697,6 +17745,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ItemEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_setItemActiveStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetItemActiveStatusDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetItemActiveStatusResponseDto"];
                 };
             };
         };

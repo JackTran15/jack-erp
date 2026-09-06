@@ -43,6 +43,8 @@ import {
   UpdateLocationDto,
   AssignStorageManagerDto,
   UnassignStorageManagerDto,
+  SetItemActiveStatusDto,
+  SetItemActiveStatusResponseDto,
 } from './dto';
 
 @Controller('inventory')
@@ -66,6 +68,17 @@ export class InventoryLocationController {
     @Actor() actor: ActorContext,
   ) {
     return this.service.createItem(dto, actor);
+  }
+
+  // Declared before every `items/:id` route: Nest matches in declaration order,
+  // so a parameterised route above this one would swallow the literal segment.
+  @Post('items/set-active-status')
+  @RequirePermission('inventory.write')
+  setItemActiveStatus(
+    @Body() dto: SetItemActiveStatusDto,
+    @Actor() actor: ActorContext,
+  ): Promise<SetItemActiveStatusResponseDto> {
+    return this.itemCrudService.setActiveStatus(dto.ids, dto.isActive, actor);
   }
 
   @Get('items')

@@ -21,6 +21,12 @@ export interface ToolbarAction {
   tooltip?: string;
   /** "danger" renders the button in destructive color */
   variant?: "default" | "danger";
+  /**
+   * Marks the action as a toggle and says whether it is currently on. Renders a
+   * pressed state and sets `aria-pressed`; leave undefined for plain actions,
+   * which then carry no `aria-pressed` at all.
+   */
+  active?: boolean;
 }
 
 export interface ToolbarActionOption {
@@ -134,6 +140,12 @@ function ToolbarButton({ action, tone }: ToolbarButtonProps) {
       : action.variant === "danger"
         ? "text-destructive hover:bg-destructive/10"
         : "text-foreground hover:bg-accent",
+    // A pressed toggle has to read as pressed without relying on colour alone,
+    // so it also gains a ring and an inset shadow.
+    action.active &&
+      (tone === "primary"
+        ? "bg-white/25 text-white ring-1 ring-inset ring-white/70 shadow-inner"
+        : "bg-accent text-accent-foreground ring-1 ring-inset ring-foreground/30 shadow-inner"),
   );
 
   if (hasOptions) {
@@ -172,6 +184,7 @@ function ToolbarButton({ action, tone }: ToolbarButtonProps) {
       onClick={action.onClick}
       disabled={action.disabled}
       title={action.tooltip}
+      aria-pressed={action.active}
       className={buttonClassName}
     >
       {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}

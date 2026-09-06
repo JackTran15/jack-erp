@@ -11,6 +11,8 @@ export type ListToolbarSpec =
       label?: string;
       variant?: ToolbarAction["variant"];
       options?: ToolbarActionOption[];
+      /** Toggle actions only: whether the toggle is currently on. */
+      active?: boolean;
     };
 
 function isHiddenSpec(spec: ListToolbarSpec): spec is { action: ToolbarActionId; hidden: true } {
@@ -34,6 +36,7 @@ export function buildListToolbar(specs: ListToolbarSpec[]): ToolbarItem[] {
       disabled: spec.disabled,
       variant: spec.variant ?? ("variant" in base ? base.variant : undefined),
       options: spec.options,
+      active: spec.active,
     });
   }
   return items;

@@ -97,6 +97,20 @@ export class InventoryItemSearchV2Dto {
   @IsOptional()
   @IsBoolean()
   includeInactive?: boolean;
+
+  /**
+   * Keep only groups whose stock is exhausted in the actor's current branch:
+   * the signed sum of every variant's on-hand quantity is <= 0.
+   *
+   * The sum is signed on purpose — a group holding -1 and +1 totals 0 and counts
+   * as out of stock — and a group with no stock_balances row at all totals 0 too.
+   * Note this threshold is `<= 0`, deliberately wider than
+   * StockStateFilter.OUT_OF_STOCK (`= 0`) used by the stock summary screen.
+   */
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  outOfStock?: boolean;
 }
 
 /** A single product-grouped row returned by the v2 search. */

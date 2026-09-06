@@ -110,6 +110,12 @@ interface CrudListPageProps {
       context: CrudListInventoryActionContext,
     ) => void;
     renderDialogs?: (context: CrudListInventoryActionContext) => ReactNode;
+    /** Mục menu "Tiện ích"; vắng mặt = ẩn menu. */
+    utilitiesOptions?: Array<{
+      id: string;
+      label: string;
+      onSelect: (context: CrudListInventoryActionContext) => void;
+    }>;
   };
 }
 
@@ -128,6 +134,10 @@ export function CrudListPage({
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(
     new Set(),
   );
+  // "Trạng thái hết hàng" toolbar toggle. Deliberately not persisted across
+  // reloads — the column filters are not either, and a filter that survives a
+  // reload invisibly is how people misread a list.
+  const [outOfStockOnly, setOutOfStockOnly] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editSnapshot, setEditSnapshot] = useState<Record<
     string,
@@ -209,10 +219,14 @@ export function CrudListPage({
   const v2 = entityKey ? CRUD_V2_SEARCH[entityKey] : undefined;
 
   const debouncedColumnFilters = useDebouncedValue(columnFilters, 300);
-  const v2Body = useMemo(
-    () => (v2 ? buildV2Body(v2, debouncedColumnFilters, page, pageSize) : null),
-    [v2, debouncedColumnFilters, page, pageSize],
-  );
+  const v2Body = useMemo(() => {
+    if (!v2) return null;
+    const body = buildV2Body(v2, debouncedColumnFilters, page, pageSize);
+    // Merged rather than folded into columnFilters so it ANDs with the column
+    // filters instead of replacing one. Omitted entirely when off — sending
+    // `false` would be a filter of its own.
+    return outOfStockOnly ? { ...body, outOfStock: true } : body;
+  }, [v2, debouncedColumnFilters, page, pageSize, outOfStockOnly]);
 
   const recordsQuery = useCrudRecords(
     entityKey ?? "",
@@ -539,6 +553,15 @@ export function CrudListPage({
     [idField, entityKey, filteredRecords, selectedRows, refetchRecords],
   );
 
+  const utilitiesOptions = useMemo<ToolbarActionOption[] | undefined>(() => {
+    if (!inventoryConfig?.utilitiesOptions?.length) return undefined;
+    return inventoryConfig.utilitiesOptions.map((option) => ({
+      id: option.id,
+      label: option.label,
+      onClick: () => option.onSelect(inventoryActionContext),
+    }));
+  }, [inventoryConfig?.utilitiesOptions, inventoryActionContext]);
+
   const exportInventoryOptions = useMemo<
     ToolbarActionOption[] | undefined
   >(() => {
@@ -810,6 +833,14 @@ export function CrudListPage({
               )
           : undefined,
         exportInventoryOptions,
+        utilitiesOptions,
+        outOfStockOnly,
+        onToggleOutOfStock: () => {
+          setOutOfStockOnly((prev) => !prev);
+          // The filtered set is much smaller, so staying on page 40 would land
+          // on an empty grid.
+          setPage(1);
+        },
       },
       {
         selectedRecord,
