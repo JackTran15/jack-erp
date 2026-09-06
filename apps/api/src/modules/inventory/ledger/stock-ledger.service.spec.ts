@@ -374,6 +374,72 @@ describe('StockLedgerService', () => {
     });
   });
 
+  // `posted_at` is the ledger's only ordering key, so a compensating flow has to
+  // be able to place its rows before an earlier write at insert time — the log is
+  // append-only and can never be reordered afterwards (ADR-01).
+  describe('caller-supplied postedAt (ADR-01)', () => {
+    const anchored = new Date('2026-08-30T10:00:00.000Z');
+
+    it('honours an explicit postedAt on the single-movement path (AC-02)', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+
+      const result = await service.recordMovement({ ...baseParams, postedAt: anchored });
+
+      expect(result.postedAt).toEqual(anchored);
+    });
+
+    it('honours an explicit postedAt on the batch path (AC-01)', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+
+      const result = await service.recordBatchMovements([
+        { ...baseParams, itemId: 'item-1', postedAt: anchored },
+        { ...baseParams, itemId: 'item-2', postedAt: anchored },
+      ]);
+
+      expect(result.map((r) => r.postedAt)).toEqual([anchored, anchored]);
+    });
+
+    it('falls back to the write instant when no postedAt is given (AC-03)', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+
+      const before = Date.now();
+      const single = await service.recordMovement(baseParams);
+      const after = Date.now();
+
+      expect(single.postedAt.getTime()).toBeGreaterThanOrEqual(before);
+      expect(single.postedAt.getTime()).toBeLessThanOrEqual(after);
+    });
+
+    it('keeps one shared write instant across a batch that supplies no postedAt (AC-03)', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+
+      const before = Date.now();
+      const result = await service.recordBatchMovements([
+        { ...baseParams, itemId: 'item-1' },
+        { ...baseParams, itemId: 'item-2' },
+        { ...baseParams, itemId: 'item-3' },
+      ]);
+      const after = Date.now();
+
+      const stamps = result.map((r) => r.postedAt.getTime());
+      expect(new Set(stamps).size).toBe(1);
+      expect(stamps[0]).toBeGreaterThanOrEqual(before);
+      expect(stamps[0]).toBeLessThanOrEqual(after);
+    });
+
+    it('leaves rows without postedAt on the shared instant when only some rows supply one (AC-03)', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+
+      const result = await service.recordBatchMovements([
+        { ...baseParams, itemId: 'item-1', postedAt: anchored },
+        { ...baseParams, itemId: 'item-2' },
+      ]);
+
+      expect(result[0].postedAt).toEqual(anchored);
+      expect(result[1].postedAt).not.toEqual(anchored);
+    });
+  });
+
   describe('getInstantAverageCost', () => {
     it('calculates the branch-wide instantaneous weighted average from signed ledger values', async () => {
       ledgerRepo.query.mockResolvedValue([

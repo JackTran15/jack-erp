@@ -58,10 +58,10 @@ không có gì để xem.
 
 ## Definition of done
 
-- [ ] AC-01 đến AC-09 đều pass
-- [ ] `pnpm --filter @erp/api test` xanh, không hồi quy ở miền kho
-- [ ] Test e2e luồng bù kho tạm xanh
-- [ ] Không có `UPDATE` nào lên `stock_ledger_entries` trong diff
-- [ ] Không có chuỗi tiếng Việt nào trong mã NestJS được thêm mới
-- [ ] Ảnh chụp thẻ kho trước và sau, đính vào bằng chứng G4
+- [x] AC-01 đến AC-09 đều pass — AC-01/02/03 `stock-ledger.service.spec.ts`, AC-03 `stock-transfer.service.spec.ts`, AC-05/07 `temp-warehouse.service.spec.ts`, AC-04/06/08 `temp-warehouse-fulfill-order.e2e-spec.ts`, AC-09 `enqueue-outbox.step.spec.ts`
+- [x] `pnpm --filter @erp/api test`: 3662 pass / 2 fail. Hai lỗi là `auth.service.spec.ts` (JWT TTL), **đỏ sẵn trên HEAD** — đã xác minh bằng `git stash`. Miền kho không hồi quy
+- [x] `temp-warehouse-fulfill-order.e2e-spec.ts` 3/3 xanh. `temp-warehouse-fulfillment.e2e-spec.ts` 4/5 — case `lines query surfaces TRANSFERRED-by-sale rows` **đỏ sẵn trên HEAD**, đã xác minh bằng `git stash`. Cả hai file kết thúc bằng lỗi teardown outbox-relay, không phải test fail
+- [x] Không có `UPDATE` nào lên `stock_ledger_entries` trong diff
+- [x] Không có chuỗi tiếng Việt trong mã NestJS thêm mới (comment/log/message đều tiếng Anh). Dữ liệu fixture e2e vẫn đặt tên kho tiếng Việt, đúng như file e2e kho tạm sẵn có
+- [ ] Ảnh chụp thẻ kho trước và sau, đính vào bằng chứng G4 — **CHƯA CÓ ẢNH**. `aidlc-verify --doctor` trả rung *skipped* (thiếu credentials của `local-backoffice-bm`/`-wh`, thuộc feature khác) nên không chụp được. Đã thay bằng **kiểm chứng sống trên erp_dev**: hoá đơn `2609060001` (SKU A02-D-39) — TRANSFER_OUT/TRANSFER_IN `07:22:12.824`, SALE_ISSUE `07:22:12.825`, số dư showroom 0 → 1 → 0, không dòng nào âm. Ảnh 'trước' chính là ảnh Akenzy gửi (HĐ 2608290003 / CK003664)
 - [ ] Demoed và được chấp nhận ở gate G4

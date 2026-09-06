@@ -58,6 +58,15 @@ export interface RecordMovementParams {
    * moving-average cost stale. Omit it and the derived formula applies as before.
    */
   lineValue?: number;
+  /**
+   * Ledger position of this movement. `posted_at` is the only ordering key the
+   * stock ledger has — every report filters and sorts by it — so a flow that
+   * compensates an earlier write (temp warehouse fulfilling a POS invoice) has
+   * to place its rows before that write at insert time; the ledger is
+   * append-only, so it can never be reordered afterwards. Omit it and the row
+   * takes the write instant, exactly as before.
+   */
+  postedAt?: Date;
 }
 
 export interface LedgerQuery extends PaginationQuery {
@@ -207,7 +216,7 @@ export class StockLedgerService {
         referenceType: params.referenceType,
         referenceId: params.referenceId,
         notes: params.notes,
-        postedAt: new Date(),
+        postedAt: params.postedAt ?? new Date(),
         createdBy: params.actorContext.userId,
         unitCost,
         lineValue,
@@ -830,7 +839,7 @@ export class StockLedgerService {
         referenceType: params.referenceType,
         referenceId: params.referenceId,
         notes: params.notes,
-        postedAt: now,
+        postedAt: params.postedAt ?? now,
         createdBy: params.actorContext.userId,
         unitCost,
         lineValue,
