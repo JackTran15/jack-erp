@@ -553,10 +553,16 @@ export function PurchaseOrderFormDialog({
     [],
   );
 
+  // Cross-branch view: this NK belongs to the destination branch, so from the
+  // source branch the branch-scoped line search 404s exactly as the
+  // branch-scoped header GET does, leaving a grid that reads as an empty
+  // voucher. Route it through the transfer order, which authorizes the actor's
+  // branch as a participant and then reads org-scoped.
   const viewLinesQuery = useQuery({
     queryKey: [
       "goods-receipt-lines",
       initial?.id,
+      crossBranchTransferOrderId,
       viewLinesPage,
       viewLinesPageSize,
       debouncedLineFilters,
@@ -564,9 +570,13 @@ export function PurchaseOrderFormDialog({
     queryFn: async () =>
       requireErpData(
         await erpApi.POST<GoodsReceiptLinesSearchResponse>(
-          "/v2/goods-receipts/{id}/lines/search",
+          crossBranchTransferOrderId
+            ? "/v2/inventory/transfer-orders/{id}/import-goods-receipt/lines/search"
+            : "/v2/goods-receipts/{id}/lines/search",
           {
-            params: { path: { id: initial!.id } },
+            params: {
+              path: { id: crossBranchTransferOrderId ?? initial!.id },
+            },
             body: buildLineSearchBody(
               debouncedLineFilters,
               SERVER_FILTERABLE,
@@ -576,7 +586,7 @@ export function PurchaseOrderFormDialog({
           },
         ),
       ),
-    enabled: isView && !!initial?.id,
+    enabled: isView && !!(crossBranchTransferOrderId ?? initial?.id),
   });
 
   const viewLines = useMemo<FormLine[]>(

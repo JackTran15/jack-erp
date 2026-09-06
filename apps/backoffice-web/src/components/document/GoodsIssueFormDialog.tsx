@@ -540,10 +540,16 @@ export function GoodsIssueFormDialog({
     [],
   );
 
+  // Cross-branch view (Điều chuyển từ cửa hàng khác): this XK belongs to the
+  // source branch, so the branch-scoped line search 404s here exactly as the
+  // branch-scoped header GET does — and an empty grid reads as "phiếu không có
+  // dòng nào". Both go through the transfer order instead, which authorizes the
+  // actor's branch as a participant and then reads org-scoped.
   const viewLinesQuery = useQuery({
     queryKey: [
       "goods-issue-lines",
       initial?.id,
+      crossBranchTransferOrderId,
       viewLinesPage,
       viewLinesPageSize,
       debouncedLineFilters,
@@ -551,9 +557,13 @@ export function GoodsIssueFormDialog({
     queryFn: async () =>
       requireErpData(
         await erpApi.POST<GoodsIssueLinesSearchResponse>(
-          "/v2/inventory/goods-issues/{id}/lines/search",
+          crossBranchTransferOrderId
+            ? "/v2/inventory/transfer-orders/{id}/export-goods-issue/lines/search"
+            : "/v2/inventory/goods-issues/{id}/lines/search",
           {
-            params: { path: { id: initial!.id } },
+            params: {
+              path: { id: crossBranchTransferOrderId ?? initial!.id },
+            },
             body: buildLineSearchBody(
               debouncedLineFilters,
               SERVER_FILTERABLE,
@@ -563,7 +573,7 @@ export function GoodsIssueFormDialog({
           },
         ),
       ),
-    enabled: isView && !!initial?.id,
+    enabled: isView && !!(crossBranchTransferOrderId ?? initial?.id),
   });
 
   const viewLines = useMemo<FormLine[]>(

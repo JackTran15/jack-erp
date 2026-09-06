@@ -119,6 +119,23 @@ describe('SearchGoodsReceiptLinesV2Handler', () => {
     expect(receiptRepo.findOne.mock.calls[0][0].where).not.toHaveProperty('branchId');
   });
 
+  // The source branch of a transfer reads the destination branch's NK from the
+  // "Tham chiếu" link on the XK. The transfer-order route has already proved the
+  // actor's branch is one end of that transfer, so keeping the branch predicate
+  // here would 404 a voucher the actor is entitled to read — and the grid would
+  // render as an empty voucher rather than as an error.
+  it('drops the branch predicate, but not the organization one, when the caller skips branch scope', async () => {
+    await build();
+    await handler.execute(
+      new SearchGoodsReceiptLinesV2Query(RECEIPT_ID, {}, actor, true),
+    );
+
+    expect(receiptRepo.findOne.mock.calls[0][0].where).toEqual({
+      id: RECEIPT_ID,
+      organizationId: 'org-1',
+    });
+  });
+
   it('keeps the line-level organization filter the replaced getLines had', async () => {
     await build();
     await handler.execute(new SearchGoodsReceiptLinesV2Query(RECEIPT_ID, {}, actor));

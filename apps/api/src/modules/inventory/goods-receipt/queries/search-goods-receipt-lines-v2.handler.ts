@@ -61,15 +61,25 @@ export class SearchGoodsReceiptLinesV2Handler
     private readonly lineRepo: Repository<GoodsReceiptLineEntity>,
   ) {}
 
-  async execute({ goodsReceiptId, dto, actor }: SearchGoodsReceiptLinesV2Query) {
+  async execute({
+    goodsReceiptId,
+    dto,
+    actor,
+    skipBranchScope,
+  }: SearchGoodsReceiptLinesV2Query) {
     const page = dto.page ?? 1;
     const limit = dto.limit ?? 50;
 
+    // `skipBranchScope` leaves the organization predicate in place and only
+    // drops the branch one — the caller that sets it has already proved the
+    // actor's branch is one end of the transfer this receipt belongs to.
     const receipt = await this.receiptRepo.findOne({
       where: {
         id: goodsReceiptId,
         organizationId: actor.organizationId,
-        ...(actor.branchId ? { branchId: actor.branchId } : {}),
+        ...(actor.branchId && !skipBranchScope
+          ? { branchId: actor.branchId }
+          : {}),
       },
       loadEagerRelations: false,
     });
