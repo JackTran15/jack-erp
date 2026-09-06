@@ -4,7 +4,7 @@ feature: temp-warehouse-fulfill-before-invoice
 slug: 2026083001-temp-warehouse-fulfill-before-invoice
 profile: none
 created: 2026-08-30T22:19:49
-current_gate: G3
+current_gate: G5
 history:
   - gate: G0
     action: passed
@@ -116,3 +116,13 @@ history:
     at: 2026-09-06T14:46:27
     by: Akenzy
     ticket: T-01-06
+  - gate: G4
+    action: passed
+    at: 2026-09-06T14:49:49
+    by: Akenzy
+    evidence: all 6 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-09-06T14:52:45
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid
