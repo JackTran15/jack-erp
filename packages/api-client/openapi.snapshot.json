@@ -5940,6 +5940,37 @@
         ]
       }
     },
+    "/inventory/items/set-active-status": {
+      "post": {
+        "operationId": "InventoryLocationController_setItemActiveStatus",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetItemActiveStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetItemActiveStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "InventoryLocation"
+        ]
+      }
+    },
     "/inventory/items/by-product/{productId}": {
       "get": {
         "operationId": "InventoryLocationController_getRepresentativeItemForProduct",
@@ -27705,6 +27736,68 @@
           "createdBy"
         ]
       },
+      "SetItemActiveStatusDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "minItems": 1,
+            "description": "Grid row ids. A products.id expands to every variant of that product; an items.id targets that item.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "true = Đang kinh doanh, false = Ngừng kinh doanh."
+          }
+        },
+        "required": [
+          "ids",
+          "isActive"
+        ]
+      },
+      "SetItemActiveStatusSkippedDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "SKU of the item that was not changed."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "IN_SHOWROOM"
+            ],
+            "description": "IN_SHOWROOM — stock still sits in a main (Showroom) storage and has to be moved out first."
+          }
+        },
+        "required": [
+          "code",
+          "reason"
+        ]
+      },
+      "SetItemActiveStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "number",
+            "description": "Number of item rows actually updated."
+          },
+          "skipped": {
+            "description": "Items deliberately left alone. A non-empty list is a normal outcome, not an error.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SetItemActiveStatusSkippedDto"
+            }
+          }
+        },
+        "required": [
+          "updated",
+          "skipped"
+        ]
+      },
       "ItemLookupResultDto": {
         "type": "object",
         "properties": {
@@ -28267,6 +28360,11 @@
           "includeInactive": {
             "type": "boolean",
             "description": "Include discontinued (isActive=false) items. Defaults to false, so\ndiscontinued items are hidden from search unless the caller opts in\n(e.g. the backoffice management list).",
+            "default": false
+          },
+          "outOfStock": {
+            "type": "boolean",
+            "description": "Keep only groups whose stock is exhausted in the actor's current branch:\nthe signed sum of every variant's on-hand quantity is <= 0.\n\nThe sum is signed on purpose — a group holding -1 and +1 totals 0 and counts\nas out of stock — and a group with no stock_balances row at all totals 0 too.\nNote this threshold is `<= 0`, deliberately wider than\nStockStateFilter.OUT_OF_STOCK (`= 0`) used by the stock summary screen.",
             "default": false
           },
           "code": {

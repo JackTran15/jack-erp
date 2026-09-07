@@ -20,6 +20,12 @@ export interface CrudListToolbarContext {
   onExportInventoryAll?: () => void;
   onExportInventorySelected?: () => void;
   exportInventoryOptions?: ToolbarActionOption[];
+  /** Bộ lọc "Trạng thái hết hàng" đang bật hay không (chỉ lưới hàng hoá). */
+  outOfStockOnly?: boolean;
+  /** Đảo bộ lọc "Trạng thái hết hàng". */
+  onToggleOutOfStock?: () => void;
+  /** Các mục trong menu Tiện ích; vắng mặt = ẩn menu (vd thiếu quyền ghi). */
+  utilitiesOptions?: ToolbarActionOption[];
 }
 
 export interface CrudListToolbarSelection {
@@ -102,14 +108,23 @@ export function buildCrudEntityToolbarSpecs(
             );
           },
         },
-        {
-          action: TOOLBAR_ACTION.utilities,
-          onClick: soon("Tiện ích đang được triển khai."),
-        },
+        ...(ctx.utilitiesOptions?.length
+          ? [
+              {
+                action: TOOLBAR_ACTION.utilities,
+                // Menu thuần: PageToolbar dựng dropdown khi có `options`, nên
+                // onClick chỉ là chỗ giữ chân cho kiểu dữ liệu.
+                onClick: () => {},
+                options: ctx.utilitiesOptions,
+                disabled: sel.selectedCount === 0,
+              } satisfies ListToolbarSpec,
+            ]
+          : []),
         ...importExport(ctx),
         {
           action: TOOLBAR_ACTION.stockoutStatus,
-          onClick: soon("Trạng thái hết hàng đang được triển khai."),
+          onClick: () => ctx.onToggleOutOfStock?.(),
+          active: ctx.outOfStockOnly === true,
         },
       ];
 

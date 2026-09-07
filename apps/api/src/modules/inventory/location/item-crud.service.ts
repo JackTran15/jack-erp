@@ -211,45 +211,120 @@ export class InventoryItemCrudService extends BaseCrudService<
     throw new NotFoundException(`Record ${id} not found`);
   }
 
-  /** Bulk toggle is_active for org-scoped items ("Ngừng theo dõi" / "Sử dụng lại"). */
+  /**
+   * Bulk toggle is_active for org-scoped items ("Ngừng kinh doanh" / "Đang kinh doanh").
+   *
+   * `ids` are grid row ids, which are polymorphic: a grouped row carries a
+   * products.id, an ungrouped ("orphan") row carries an items.id. Both are
+   * expanded here rather than in the caller — see ADR-04. Passing a products.id
+   * straight into `WHERE id IN (...)` would match no row and report success with
+   * updated: 0, which is the silent failure this method exists to prevent.
+   *
+   * Items sitting in a Showroom (main) storage cannot be deactivated — stock has
+   * to be moved out first. Rather than failing the whole batch on one such item,
+   * they are skipped and reported back (ADR-05), so selecting 50 rows still does
+   * the other 47. Reactivating is never blocked.
+   */
   async setActiveStatus(
     ids: string[],
     isActive: boolean,
     actor: ActorContext,
-  ): Promise<{ updated: number }> {
-    if (!ids?.length) return { updated: 0 };
-    // Rule: hàng hóa đang ở kho Showroom không được ngừng theo dõi — phải chuyển
-    // hàng khỏi Showroom trước. Chỉ chặn khi tắt theo dõi (kích hoạt lại luôn cho phép).
-    if (!isActive) {
-      const inShowroom = await this.dataSource.query<Array<{ code: string }>>(
-        `SELECT DISTINCT i.code AS code
-           FROM stock_balances sb
-           JOIN locations loc ON loc.id = sb.location_id
-           JOIN storages s    ON s.id = loc.storage_id
-           JOIN items i       ON i.id = sb.item_id
-          WHERE sb.organization_id = $1
-            AND sb.item_id = ANY($2::uuid[])
-            AND s.is_main_storage = true
-          ORDER BY i.code`,
+  ): Promise<{ updated: number; skipped: Array<{ code: string; reason: string }> }> {
+    if (!ids?.length) return { updated: 0, skipped: [] };
+
+    return this.dataSource.transaction(async (manager) => {
+      // Expand grid row ids to the item rows they stand for. An id that is an
+      // items.id matches the second arm; a products.id matches the first.
+      const targets = await manager.query<Array<{ id: string; code: string }>>(
+        `SELECT id, code FROM items
+          WHERE organization_id = $1
+            AND (product_id = ANY($2::uuid[]) OR id = ANY($2::uuid[]))`,
         [actor.organizationId, ids],
       );
-      if (inShowroom.length) {
-        const codes = inShowroom.slice(0, 5).map((r) => r.code).join(", ");
-        const more = inShowroom.length > 5 ? "…" : "";
-        throw new BadRequestException(
-          `Không thể ngừng theo dõi hàng hóa đang ở Showroom (${codes}${more}).`,
+      if (!targets.length) return { updated: 0, skipped: [] };
+
+      let updatable = targets;
+      const skipped: Array<{ code: string; reason: string }> = [];
+
+      if (!isActive) {
+        // Runs over the EXPANDED set: a variant sitting in a Showroom would slip
+        // through if this were still checked against the raw group ids.
+        const blocked = await manager.query<Array<{ id: string; code: string }>>(
+          `SELECT DISTINCT i.id AS id, i.code AS code
+             FROM stock_balances sb
+             JOIN locations loc ON loc.id = sb.location_id
+             JOIN storages s    ON s.id = loc.storage_id
+             JOIN items i       ON i.id = sb.item_id
+            WHERE sb.organization_id = $1
+              AND sb.item_id = ANY($2::uuid[])
+              AND s.is_main_storage = true
+            ORDER BY i.code`,
+          [actor.organizationId, targets.map((t) => t.id)],
+        );
+        const blockedIds = new Set(blocked.map((b) => b.id));
+        updatable = targets.filter((t) => !blockedIds.has(t.id));
+        skipped.push(
+          ...blocked.map((b) => ({ code: b.code, reason: "IN_SHOWROOM" })),
         );
       }
-    }
-    const result = await this.repository
-      .createQueryBuilder()
-      .update(ItemEntity)
-      .set({ isActive })
-      .where("id IN (:...ids)", { ids })
-      .andWhere("organization_id = :orgId", { orgId: actor.organizationId })
-      .execute();
-    await this.invalidatePosCatalogCache(actor);
-    return { updated: result.affected ?? 0 };
+
+      if (!updatable.length) return { updated: 0, skipped };
+
+      const result = await manager
+        .createQueryBuilder()
+        .update(ItemEntity)
+        .set({ isActive })
+        .where("id IN (:...ids)", { ids: updatable.map((t) => t.id) })
+        .andWhere("organization_id = :orgId", { orgId: actor.organizationId })
+        .execute();
+
+      // Keep products.is_active in step with its items, mirroring the fan-out in
+      // updateProductWithVariants. Ids that are item ids simply match no product.
+      // Only sync when nothing in the group was skipped, so a product is never
+      // marked inactive while one of its variants is still active.
+      const skippedCodes = new Set(skipped.map((s) => s.code));
+      const productIdsToSync = skippedCodes.size
+        ? await this.productIdsWithNoSkippedItem(
+            manager,
+            actor,
+            ids,
+            skippedCodes,
+          )
+        : ids;
+      if (productIdsToSync.length) {
+        await manager.query(
+          `UPDATE products SET is_active = $3, updated_at = now()
+            WHERE organization_id = $1 AND id = ANY($2::uuid[])`,
+          [actor.organizationId, productIdsToSync, isActive],
+        );
+      }
+
+      await this.invalidatePosCatalogCache(actor);
+      return { updated: result.affected ?? 0, skipped };
+    });
+  }
+
+  /**
+   * Of the given row ids, the ones whose every item was actually updated. A
+   * product keeps its old flag while any of its variants was skipped, otherwise
+   * the group would read as discontinued while part of it is still on sale.
+   */
+  private async productIdsWithNoSkippedItem(
+    manager: EntityManager,
+    actor: ActorContext,
+    ids: string[],
+    skippedCodes: Set<string>,
+  ): Promise<string[]> {
+    const rows = await manager.query<Array<{ id: string; code: string }>>(
+      `SELECT COALESCE(product_id, id) AS id, code FROM items
+        WHERE organization_id = $1
+          AND (product_id = ANY($2::uuid[]) OR id = ANY($2::uuid[]))`,
+      [actor.organizationId, ids],
+    );
+    const dirty = new Set(
+      rows.filter((r) => skippedCodes.has(r.code)).map((r) => r.id),
+    );
+    return ids.filter((id) => !dirty.has(id));
   }
 
   /** Block hard-delete once an item has posted movements — MISA parity: use "Ngừng theo dõi" instead. */
