@@ -52,6 +52,9 @@ export function useFastStockTransferActions() {
   const clearProductCache = usePosFastStockTransferPickerStore(
     (s) => s.clearProductCache,
   );
+  const setCarrierToolbar = usePosFastStockTransferPickerStore(
+    (s) => s.setCarrierToolbar,
+  );
   const {
     addLineMutation,
     updateLineMutation,
@@ -312,8 +315,13 @@ export function useFastStockTransferActions() {
         addLineMutation.mutate(body, {
           onSuccess: () => {
             addInFlightRef.current = false;
-            // Giữ người vận chuyển để quét tiếp không phải chọn lại.
-            resetToolbarAfterAdd(carrier);
+            resetToolbarAfterAdd();
+            // Xóa luôn chuỗi trong ô, cùng lượt cập nhật với draft — không đợi
+            // effect đồng bộ của ô tự dọn. Con trỏ quay về ô này ngay sau đây, và
+            // `onFocus` của popover đọc `value` của lần render hiện tại: chậm một
+            // nhịp là nó đi tra lại đúng tên người vận chuyển vừa dùng, rồi mở
+            // danh sách chỉ có mỗi người đó.
+            setCarrierToolbar({ query: "" });
             callbacks?.onAdded?.();
           },
           onError: (err) => {
@@ -327,7 +335,13 @@ export function useFastStockTransferActions() {
         if (!submitted) addInFlightRef.current = false;
       }
     },
-    [addLineMutation, data, resetToolbarAfterAdd, setPageError],
+    [
+      addLineMutation,
+      data,
+      resetToolbarAfterAdd,
+      setCarrierToolbar,
+      setPageError,
+    ],
   );
 
   const handleStartEdit = useCallback(

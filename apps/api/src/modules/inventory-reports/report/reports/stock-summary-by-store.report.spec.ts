@@ -3,6 +3,11 @@ import { InventoryReportSearchDto } from '../../dto/inventory-report-search.dto'
 import { StockPeriodRow } from '../../services/stock-period.service';
 import { StockSummaryByStoreReport } from './stock-summary-by-store.report';
 
+// An empty category tree: these specs scope by branch and period, never by group,
+// so `resolveDescendantCategoryIds` short-circuits on an absent `categoryId`.
+const categories = { find: jest.fn().mockResolvedValue([]) };
+
+
 const actor = { userId: 'u1', organizationId: 'org-1', roles: [] } as unknown as ActorContext;
 
 const engineRow: StockPeriodRow = {
@@ -49,7 +54,7 @@ function build(rows: StockPeriodRow[], total = rows.length) {
   };
   const branches = { find: jest.fn().mockResolvedValue([]) };
   return {
-    report: new StockSummaryByStoreReport(engine as never, branches as never),
+    report: new StockSummaryByStoreReport(engine as never, branches as never, categories as never),
     engine,
   };
 }
@@ -79,7 +84,7 @@ describe('StockSummaryByStoreReport', () => {
 
   it('exposes opening/in/out/ending bands in the catalog', async () => {
     const { report } = build([]);
-    const cols = await report.buildColumns();
+    const cols = await report.buildColumns({} as never);
     expect(cols.find((c) => c.col === 'openingQty')!.group).toEqual({
       id: 'opening',
       name: 'Tồn đầu kỳ',
@@ -114,6 +119,8 @@ describe('StockSummaryByStoreReport', () => {
     );
   });
 
+  // The unit/brand half of this assertion moved to `memberScope` with ADR-02;
+  // paging is untouched.
   it('pushes page, limit and the unit/brand dropdowns down', async () => {
     const { report, engine } = build([engineRow]);
 
@@ -126,7 +133,8 @@ describe('StockSummaryByStoreReport', () => {
       expect.objectContaining({
         page: 3,
         pageSize: 50,
-        columnFilters: { unit: { operator: '=', value: 'Cái' } },
+        memberScope: { unit: 'Cái', brand: undefined },
+        columnFilters: {},
       }),
     );
   });

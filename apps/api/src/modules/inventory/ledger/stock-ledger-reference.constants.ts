@@ -56,6 +56,56 @@ export function resolveReferenceLabel(referenceType: string): string {
 }
 
 /**
+ * `stock_ledger_entries.reference_type` → the source voucher's own
+ * user-entered "Diễn giải" column(s). `stock_ledger_entries.notes` is a
+ * machine-generated string stamped at posting time (e.g. "Phiếu nhập kho
+ * NK000240") — it is NOT the voucher's real description, so the stock card
+ * must look this up separately, the same way it looks up `document_number`.
+ *
+ * `columns` with more than one entry means "first non-empty wins" (COALESCE) —
+ * only STOCK_TAKE needs this, whose form writes to `purpose`/`conclusion`/
+ * `notes` depending on which stage of the count it's in.
+ *
+ * INVOICE / INVOICE_CANCEL / RETURN_INVOICE are intentionally absent: the
+ * `invoices` table has no description/notes column, so those reference types
+ * fall through to the `ELSE NULL` arm of `descriptionSql()`.
+ */
+export const REFERENCE_DESCRIPTION_TABLES: Record<
+  string,
+  { table: string; columns: string[] }
+> = {
+  GOODS_RECEIPT: { table: "goods_receipts", columns: ["description"] },
+  GOODS_ISSUE: { table: "goods_issues", columns: ["notes"] },
+  TRANSFER: { table: "stock_transfers", columns: ["notes"] },
+  TRANSFER_REVERSAL: { table: "stock_transfers", columns: ["notes"] },
+  TRANSFER_EDIT_REVERSAL: { table: "stock_transfers", columns: ["notes"] },
+  LOCATION_CHANGE: { table: "stock_transfers", columns: ["notes"] },
+  ADJUSTMENT: { table: "stock_adjustments", columns: ["reason_description"] },
+  STOCK_TAKE: { table: "stock_takes", columns: ["purpose", "conclusion", "notes"] },
+  PURCHASE: { table: "purchase_orders", columns: ["notes"] },
+  PURCHASE_ORDER: { table: "purchase_orders", columns: ["notes"] },
+};
+
+/**
+ * `CASE reference_type WHEN … THEN (SELECT …) END` over
+ * `REFERENCE_DESCRIPTION_TABLES`, mirroring `documentNumberSql()` above —
+ * same reasoning: one index probe per row instead of joining every source
+ * table.
+ */
+export function descriptionSql(alias = "sle"): string {
+  const arms = Object.entries(REFERENCE_DESCRIPTION_TABLES).map(
+    ([referenceType, { table, columns }]) => {
+      const colExpr =
+        columns.length > 1
+          ? `COALESCE(${columns.map((c) => `d.${c}`).join(", ")})`
+          : `d.${columns[0]}`;
+      return `WHEN '${referenceType}' THEN (SELECT ${colExpr} FROM ${table} d WHERE d.id = ${alias}.reference_id)`;
+    },
+  );
+  return `CASE ${alias}.reference_type ${arms.join(" ")} ELSE NULL END`;
+}
+
+/**
  * `CASE reference_type WHEN … THEN (SELECT …) END` over every mapped table.
  *
  * A `CASE` with correlated PK lookups beats joining all six tables: Postgres

@@ -96,8 +96,10 @@ export class CreateGoodsReceiptV2Handler
       cashAccountId: dto.cashAccountId,
       attachmentIds: dto.attachmentIds ?? [],
       references: dto.references ?? [],
-      lines: dto.lines.map((l) =>
+      lines: dto.lines.map((l, index) =>
         manager.create(GoodsReceiptLineEntity, {
+          // 1-based position in the submitted array — the order the user typed.
+          lineNo: index + 1,
           organizationId: orgId,
           branchId: actor.branchId,
           createdBy: actor.userId,

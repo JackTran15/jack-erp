@@ -11,6 +11,9 @@ export const INVENTORY_REPORT_KEYS = {
   STOCK_SUMMARY_BY_STORE: 'inventory-stock-summary-by-store',
   STOCK_BY_STORE_PIVOT: 'inventory-stock-by-store-pivot',
   TRANSFER_SUMMARY: 'inventory-transfer-summary',
+  TRANSFER_SUMMARY_BY_COUNTERPART: 'inventory-transfer-summary-by-counterpart',
+  TRANSFER_DOCUMENT_DETAIL: 'inventory-transfer-document-detail',
+  TRANSFER_DIFFERENCE_DETAIL: 'inventory-transfer-difference-detail',
   TRANSFER_BY_STORE: 'inventory-transfer-by-store',
   TEMP_WAREHOUSE_OUT: 'inventory-temp-warehouse-out',
 } as const;
@@ -26,6 +29,11 @@ export const INVENTORY_REPORT_TYPE_LABELS_VI: Record<InventoryReportKey, string>
   'inventory-stock-summary-by-store': 'Tổng hợp nhập xuất tồn kho theo cửa hàng',
   'inventory-stock-by-store-pivot': 'Số lượng tồn kho theo cửa hàng',
   'inventory-transfer-summary': 'Tổng hợp nhập xuất điều chuyển',
+  'inventory-transfer-summary-by-counterpart':
+    'Chi tiết nhập xuất điều chuyển theo cửa hàng',
+  'inventory-transfer-document-detail':
+    'Chi tiết phiếu nhập xuất điều chuyển theo cửa hàng và chứng từ',
+  'inventory-transfer-difference-detail': 'Chi tiết chênh lệch điều chuyển',
   'inventory-transfer-by-store': 'Tổng hợp hàng hóa đã điều chuyển theo cửa hàng',
   'inventory-temp-warehouse-out': 'Hàng hóa xuất kho tạm',
 };
@@ -174,6 +182,60 @@ export const INVENTORY_REPORT_COLUMN_LABELS_VI: Record<
     inOutDiffQty: 'Số lượng',
     inOutDiffValue: 'Giá trị',
   },
+  // Cột của L2 trừ `warehouse`: một phiếu chưa ai nhận thì kho đích chưa có
+  // nghĩa, và MISA cũng không hiển thị nó ở dialog này.
+  'inventory-transfer-difference-detail': {
+    date: 'Ngày chứng từ',
+    documentNumber: 'Số chứng từ',
+    referenceDate: 'Ngày chứng từ tham chiếu',
+    reference: 'Tham chiếu',
+    sku: 'Mã SKU',
+    name: 'Tên hàng hóa',
+    unit: 'Đơn vị tính',
+    qty: 'Số lượng',
+    unitPrice: 'Đơn giá',
+    value: 'Giá trị',
+    parentSku: 'SKU mẫu mã',
+    parentName: 'Tên mẫu mã',
+    group: 'Nhóm hàng',
+    counterparty: 'Đối tượng',
+    notes: 'Diễn giải',
+  },
+  'inventory-transfer-document-detail': {
+    date: 'Ngày chứng từ',
+    documentNumber: 'Số chứng từ',
+    referenceDate: 'Ngày chứng từ tham chiếu',
+    reference: 'Tham chiếu',
+    warehouse: 'Kho',
+    sku: 'Mã SKU',
+    name: 'Tên hàng hóa',
+    unit: 'Đơn vị tính',
+    qty: 'Số lượng',
+    unitPrice: 'Đơn giá',
+    value: 'Giá trị',
+    parentSku: 'SKU mẫu mã',
+    parentName: 'Tên mẫu mã',
+    group: 'Nhóm hàng',
+    counterparty: 'Đối tượng',
+    notes: 'Diễn giải',
+  },
+  // Same 12 columns and 5 bands as `inventory-transfer-summary`: the dialog is
+  // that report re-run for one anchor branch, so its footer has to line up with
+  // the row that opened it.
+  'inventory-transfer-summary-by-counterpart': {
+    branchCode: 'Mã cửa hàng',
+    branchName: 'Tên cửa hàng',
+    inQty: 'Số lượng',
+    inValue: 'Giá trị',
+    outQty: 'Số lượng',
+    outValue: 'Giá trị',
+    receivedQty: 'Số lượng',
+    receivedValue: 'Giá trị',
+    diffQty: 'Số lượng',
+    diffValue: 'Giá trị',
+    inOutDiffQty: 'Số lượng',
+    inOutDiffValue: 'Giá trị',
+  },
   'inventory-transfer-by-store': {
     sku: 'Mã SKU',
     name: 'Tên hàng hóa',
@@ -250,6 +312,16 @@ export const INVENTORY_REPORT_BAND_LABELS_VI: Record<
     diff: 'Chênh lệch thực nhận',
     inOutDiff: 'Chênh lệch nhập xuất điều chuyển',
   },
+  // L1 của drill-down dùng đúng 5 dải của báo cáo cha. Thiếu entry này thì
+  // `buildInventoryHeaders` fallback về id thô (`in`, `out`, `received`…) và
+  // dialog hiện tiêu đề bằng tiếng Anh giữa một báo cáo tiếng Việt.
+  'inventory-transfer-summary-by-counterpart': {
+    in: 'Nhập kho điều chuyển',
+    out: 'Xuất kho điều chuyển',
+    received: 'Cửa hàng khác thực nhận về',
+    diff: 'Chênh lệch thực nhận',
+    inOutDiff: 'Chênh lệch nhập xuất điều chuyển',
+  },
 };
 
 /** Vietnamese labels of the stock document kinds (document-detail report). */
@@ -305,3 +377,17 @@ export function parseBranchQtyColumnKey(col: string): string | null {
   const id = col.slice(INVENTORY_BRANCH_QTY_COLUMN_PREFIX.length);
   return id.length > 0 ? id : null;
 }
+
+/**
+ * Hidden row key carrying the branch's id on reports whose rows are branches.
+ *
+ * The transfer drill-downs anchor on a branch, and the rendered row only has
+ * `branchCode` (nullable, and blank on at least one real branch) and
+ * `branchName` (not unique by contract). Neither is a safe key, so rows carry
+ * the id. Mirrors `REPORT_ROW_INVOICE_ID`.
+ *
+ * Not a catalogue column: the table renders `columns`, so it never shows up.
+ * It has to be attached AFTER projection — `projectRows`/`paginateRows` drop
+ * every key the request did not ask for.
+ */
+export const REPORT_ROW_BRANCH_ID = '_branchId';

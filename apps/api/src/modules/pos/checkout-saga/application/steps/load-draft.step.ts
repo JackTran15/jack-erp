@@ -2,7 +2,11 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CheckoutContext, CheckoutStep } from '../checkout-step';
-import { InvoiceEntity, InvoiceStatus } from '../../../entities/invoice.entity';
+import {
+  InvoiceEntity,
+  InvoiceStatus,
+  InvoiceType,
+} from '../../../entities/invoice.entity';
 import { InvoiceItemEntity } from '../../../entities/invoice-item.entity';
 import { CheckoutSagaEntity, CheckoutSagaStatus } from '../../infrastructure/checkout-saga.entity';
 
@@ -61,6 +65,17 @@ export class LoadDraftStep implements CheckoutStep {
           message: `Invoice ${ctx.input.invoiceId} is not a draft and cannot be checked out`,
         });
       }
+    }
+
+    // Parity with checkout-invoice.service: a RETURN/EXCHANGE document settles
+    // through /checkout-return, the only path that computes `netAmount` and pays
+    // a refund. Placed after the replay check so an already-completed sale can
+    // still replay idempotently.
+    if (invoice.type !== InvoiceType.SALE) {
+      throw new BadRequestException({
+        code: 'INVOICE_NOT_CHECKOUTABLE',
+        message: `Invoice ${ctx.input.invoiceId} is a ${invoice.type} document and must be settled via /invoices/:id/checkout-return`,
+      });
     }
 
     const items = await this.itemRepo.find({

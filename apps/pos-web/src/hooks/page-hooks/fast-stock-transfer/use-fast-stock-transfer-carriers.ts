@@ -25,6 +25,12 @@ interface UseFastStockTransferCarriersResult {
   carrierLoadMore: (
     q: string,
   ) => Promise<SearchSuggestion<TempWarehousePublicUser>[]>;
+  /**
+   * Tra ứng viên cho một chuỗi, phục vụ đường Enter tự chọn. Cố tình không chạm
+   * `pagingRef`/`searchSeqRef`: hai ref đó thuộc về danh sách đang hiển thị của
+   * popover, còn đây là một lượt tra rời.
+   */
+  resolveCarrierCandidates: (q: string) => Promise<TempWarehousePublicUser[]>;
   resolveCarrierById: (userId: string) => TempWarehousePublicUser | null;
 }
 
@@ -151,6 +157,14 @@ export function useFastStockTransferCarriers(): UseFastStockTransferCarriersResu
     [fetchPage],
   );
 
+  const resolveCarrierCandidates = useCallback(
+    async (query: string): Promise<TempWarehousePublicUser[]> => {
+      const result = await fetchPage(query, 1);
+      return result?.data ?? [];
+    },
+    [fetchPage],
+  );
+
   const resolveCarrierById = useCallback(
     (userId: string) => getCarrierById(userId),
     [getCarrierById],
@@ -163,6 +177,7 @@ export function useFastStockTransferCarriers(): UseFastStockTransferCarriersResu
       setCarrierToolbar,
       carrierSearchAdapter,
       carrierLoadMore,
+      resolveCarrierCandidates,
       resolveCarrierById,
     }),
     [
@@ -171,6 +186,7 @@ export function useFastStockTransferCarriers(): UseFastStockTransferCarriersResu
       setCarrierToolbar,
       carrierSearchAdapter,
       carrierLoadMore,
+      resolveCarrierCandidates,
       resolveCarrierById,
     ],
   );

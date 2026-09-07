@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import { cn, formatVnd } from "@erp/ui";
 import { PosTextarea } from "@erp/pos/components/common/PosTextarea/PosTextarea";
 import { DebtCheckRow } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/DebtCheckRow/DebtCheckRow";
@@ -56,10 +56,36 @@ export function PaymentSection({
   // nhân viên tự quyết số thu ngay (phần còn lại vào công nợ) nên không ghi đè.
   // Ở luồng hoàn tiền dòng này luôn mang TOÀN BỘ khoản hoàn: phần đi cấn trừ
   // công nợ do BE tự tách và `DebtOffsetRow` hiện rõ bên dưới.
+  //
+  // Nhịp settle ĐẦU TIÊN của mỗi tab thì chỉ ghi nhận, không ghi đè: tab vừa mở
+  // từ hóa đơn lưu tạm đã mang sẵn số tiền của phiếu, và ghi đè ngay lúc mount
+  // sẽ xóa đúng con số vừa khôi phục trước khi thu ngân kịp nhìn. Cùng lý do đó,
+  // chuyển qua lại giữa các tab không còn giẫm lên số của tab kia.
+  //
+  // `debt` nằm trong ref vì bỏ tick "Tính vào công nợ" phải trả số tiền về đủ,
+  // kể cả khi tổng không đổi — nếu chỉ so tổng thì dòng đứng ở 0.
+  //
+  // Giới hạn đã biết: CTKM KHÔNG được lưu trên phiếu nháp, nên mở lại phiếu là
+  // preview chạy lại và tổng đổi thật. Lúc đó số tiền bám theo tổng mới — đúng
+  // luật cũ, và cũng đúng hơn: số cũ được gõ cho một tổng khác.
+  const activeSessionId = usePosCheckoutSessionStore((s) => s.activeSessionId);
+  const lastSettleRef = useRef<{
+    sessionId: string;
+    total: number;
+    debt: boolean;
+  } | null>(null);
   useEffect(() => {
+    const prev = lastSettleRef.current;
+    lastSettleRef.current = {
+      sessionId: activeSessionId,
+      total: settlementAbs,
+      debt,
+    };
     if (debt) return;
+    if (!prev || prev.sessionId !== activeSessionId) return;
+    if (prev.total === settlementAbs && prev.debt === debt) return;
     setFirstLineAmountAuto(settlementAbs);
-  }, [debt, settlementAbs, setFirstLineAmountAuto]);
+  }, [debt, activeSessionId, settlementAbs, setFirstLineAmountAuto]);
 
   // Gán tài khoản mặc định cho dòng thanh toán chưa chọn. Dùng `setPaymentLines`
   // (functional updater → đọc state TƯƠI, KHÔNG chạy manual-edit detection) thay vì

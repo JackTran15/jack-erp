@@ -58,6 +58,11 @@ import {
 import { lookupItemByCode, type ItemLookupResult } from "../../api/item-lookup";
 import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import { useDocumentListSelection } from "../../components/document/useDocumentListSelection";
+import { useRowMultiSelect } from "../../components/document/useRowMultiSelect";
+import {
+  RowSelectCheckbox,
+  SelectAllCheckbox,
+} from "../../components/document/RowSelectCheckbox";
 import {
   buildV2Body,
   type V2SearchConfig,
@@ -309,6 +314,23 @@ export function StockTransferPage() {
     getRowId: getTransferId,
   });
 
+  // Tập phiếu đã tick — tách hẳn khỏi `selectedId`. Trang này vốn không fetch khi
+  // đổi dòng đang xem (DetailPanel đọc `lines` sẵn có trong row), nên thay đổi ở đây
+  // thuần túy là cho phép tick nhiều dòng.
+  const {
+    isChecked,
+    toggle: toggleChecked,
+    toggleAllOnPage,
+    clear: clearChecked,
+    allOnPageChecked,
+    someOnPageChecked,
+  } = useRowMultiSelect({ rows: records?.data ?? [], getRowId: getTransferId });
+
+  // Cố ý chỉ phụ thuộc bộ lọc, KHÔNG phụ thuộc `pagination`: lật trang phải giữ tick.
+  useEffect(() => {
+    clearChecked();
+  }, [columnFilters, period.from, period.to, clearChecked]);
+
   const handleDelete = async (t: Transfer) => {
     setActionLoading(t.id);
     setConfirmDelete(null);
@@ -440,7 +462,15 @@ export function StockTransferPage() {
       onClick: () => selected && setConfirmDelete(selected),
     },
     { id: "sep1", type: "separator" },
-    { id: "reload", label: "Nạp", icon: RefreshCw, onClick: () => void loadRecords() },
+    {
+      id: "reload",
+      label: "Nạp",
+      icon: RefreshCw,
+      onClick: () => {
+        clearChecked();
+        void loadRecords();
+      },
+    },
   ];
 
   const columns: TableColumn<Transfer>[] = [
@@ -542,18 +572,26 @@ export function StockTransferPage() {
           emptyLabel="Chưa có phiếu chuyển kho."
           getRowKey={(row) => row.id}
           onRowClick={(row) => setSelectedId(row.id)}
+          rowClassName={(row) =>
+            // `bg-info-subtle` là token của badge, lightness 98% — trên nền trắng của
+            // bảng nó vô hình. Dòng đang xem cần nhìn thấy được, nên dùng `bg-info`
+            // pha loãng.
+            row.id === selectedId ? "bg-info/15" : undefined
+          }
           leadingColumn={{
             width: 36,
-            header: <span className="sr-only">Chọn</span>,
+            header: (
+              <SelectAllCheckbox
+                checked={allOnPageChecked}
+                indeterminate={someOnPageChecked}
+                disabled={(records?.data.length ?? 0) === 0}
+                onToggle={toggleAllOnPage}
+              />
+            ),
             cell: (row) => (
-              <input
-                type="checkbox"
-                aria-label="Chọn dòng"
-                checked={selectedId === row.id}
-                onChange={() =>
-                  setSelectedId(selectedId === row.id ? null : row.id)
-                }
-                onClick={(e) => e.stopPropagation()}
+              <RowSelectCheckbox
+                checked={isChecked(row.id)}
+                onToggle={() => toggleChecked(row.id)}
               />
             ),
           }}
@@ -802,13 +840,13 @@ function TransferFormDialog({
       sourceStorageLabel: l.sourceStorage?.name ?? "",
       sourceLocationId: l.sourceLocationId ?? "",
       sourceLocationLabel: l.sourceLocation
-        ? `${l.sourceLocation.code} · ${l.sourceLocation.name}`
+        ? l.sourceLocation.code
         : "",
       destStorageId: l.destinationStorageId ?? "",
       destStorageLabel: l.destinationStorage?.name ?? "",
       destLocationId: l.destinationLocationId ?? "",
       destLocationLabel: l.destinationLocation
-        ? `${l.destinationLocation.code} · ${l.destinationLocation.name}`
+        ? l.destinationLocation.code
         : "",
       quantity: Number(l.quantity),
       unitPrice: l.unitPrice != null ? String(Number(l.unitPrice)) : "",
@@ -1176,7 +1214,7 @@ function TransferFormDialog({
             return {
               ...line,
               sourceLocationId: shelf.id,
-              sourceLocationLabel: `${shelf.code} · ${shelf.name}`,
+              sourceLocationLabel: shelf.code,
             };
           }),
         );
@@ -1216,7 +1254,7 @@ function TransferFormDialog({
       sourceStorageLabel: resolved?.storage?.name ?? defaultStorage?.name ?? "",
       sourceLocationId: resolved?.shelf?.id ?? "",
       sourceLocationLabel: resolved?.shelf
-        ? `${resolved.shelf.code} · ${resolved.shelf.name}`
+        ? resolved.shelf.code
         : "",
     }),
     [defaultStorage],
@@ -1291,11 +1329,11 @@ function TransferFormDialog({
           ...l,
           sourceLocationId: r.sourceShelf?.id ?? l.sourceLocationId,
           sourceLocationLabel: r.sourceShelf
-            ? `${r.sourceShelf.code} · ${r.sourceShelf.name}`
+            ? r.sourceShelf.code
             : l.sourceLocationLabel,
           destLocationId: r.destShelf?.id ?? l.destLocationId,
           destLocationLabel: r.destShelf
-            ? `${r.destShelf.code} · ${r.destShelf.name}`
+            ? r.destShelf.code
             : l.destLocationLabel,
         };
       }),
@@ -1517,7 +1555,7 @@ function TransferFormDialog({
           onSelect={(loc) =>
             updateLine(idx, {
               sourceLocationId: loc.id,
-              sourceLocationLabel: `${loc.code} · ${loc.name}`,
+              sourceLocationLabel: loc.code,
             })
           }
           search={makeSearchLocations(row.sourceStorageId)}
@@ -1579,7 +1617,7 @@ function TransferFormDialog({
           onSelect={(loc) =>
             updateLine(idx, {
               destLocationId: loc.id,
-              destLocationLabel: `${loc.code} · ${loc.name}`,
+              destLocationLabel: loc.code,
             })
           }
           search={makeSearchLocations(row.destStorageId)}

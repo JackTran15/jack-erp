@@ -30,7 +30,8 @@
     "audit:voucher-invariants": "ts-node src/database/seeds/voucher-invariant-audit.script.ts",
     "migrate:legacy-items": "ts-node src/scripts/migrate-legacy-items.ts",
     "migrate:legacy-items:rollback": "ts-node src/scripts/migrate-legacy-items.ts --rollback",
-    "fix:double-cancelled-receipts": "ts-node src/scripts/fix-double-cancelled-goods-receipts.ts"
+    "fix:double-cancelled-receipts": "ts-node src/scripts/fix-double-cancelled-goods-receipts.ts",
+    "reconcile:transfer-order-lines": "ts-node src/scripts/reconcile-transfer-order-lines.ts"
   },
   "dependencies": {
     "@erp/shared-interfaces": "workspace:*",

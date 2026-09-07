@@ -23,6 +23,11 @@ export enum REPORT_FILTERS_LINE {
     // mặt hàng đi chung đường buildSearchFilters với mọi filter khác — nhờ đó
     // xuất khẩu và in trong dialog cũng được thu hẹp đúng SKU.
     SKU = 'sku',
+    // Cùng loại với SKU ở trên: không phải ô nhập liệu, không registry nào khai,
+    // nên không bao giờ được render. Nó tồn tại để drill-down chứng từ điều
+    // chuyển đi chung đường buildInventorySearchFilters — nhờ đó xuất khẩu và in
+    // trong dialog cũng thu hẹp đúng chân đang xem.
+    TRANSFER_LEG = 'transfer_leg',
     CHECKBOX_ALLOCATE_COMBO = 'allocate_combo_revenue',
 
     // === Công nợ ===
@@ -45,6 +50,28 @@ export enum REPORT_FILTERS_LINE {
     PERIOD_COMPARE_CURRENT = 'period_compare_current',
     PERIOD_COMPARE_CURRENT_RANGE = 'period_compare_current_range',
 }
+
+/**
+ * Filter lines that survive a change of report type even though the new report
+ * does not render them (ADR-04).
+ *
+ * `getReportFormLines` lists only the lines a report DRAWS. Two kinds of value
+ * are meaningful without being drawn, and pruning purely by that list breaks
+ * both: `SKU` carries the scope of a drill-down dialog, and the four
+ * `PERIOD_COMPARE_*` lines are seeded for every report by
+ * `buildInitialReportState` while only "Kết quả kinh doanh" declares them.
+ *
+ * Add a line here when it is read by a payload builder but never rendered.
+ */
+export const ALWAYS_KEPT_FILTER_LINES: ReadonlySet<REPORT_FILTERS_LINE> = new Set([
+    REPORT_FILTERS_LINE.SKU,
+    REPORT_FILTERS_LINE.REPORT_PERIOD,
+    REPORT_FILTERS_LINE.RANGE_DATE,
+    REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS,
+    REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS_RANGE,
+    REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT,
+    REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE,
+]);
 
 export const REPORT_FILTERS_LINE_METADATA = {
     [REPORT_FILTERS_LINE.STORE]: {
@@ -133,6 +160,10 @@ export const REPORT_FILTERS_LINE_METADATA = {
     [REPORT_FILTERS_LINE.SKU]: {
         label: 'mã SKU',
         backendField: 'sku',
+    },
+    [REPORT_FILTERS_LINE.TRANSFER_LEG]: {
+        label: 'chân chứng từ',
+        backendField: 'transferLeg',
     },
     [REPORT_FILTERS_LINE.CHECKBOX_ALLOCATE_COMBO]: {
         backendField: 'allocateComboRevenue',

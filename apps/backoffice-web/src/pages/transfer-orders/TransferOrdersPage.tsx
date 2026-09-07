@@ -64,6 +64,11 @@ import {
   type StatusBadgeVariant,
 } from "../../components/status/StatusBadge";
 import { useDocumentListSelection } from "../../components/document/useDocumentListSelection";
+import { useRowMultiSelect } from "../../components/document/useRowMultiSelect";
+import {
+  RowSelectCheckbox,
+  SelectAllCheckbox,
+} from "../../components/document/RowSelectCheckbox";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -297,6 +302,24 @@ export function TransferOrdersPage() {
     getRowId: getOrderId,
   });
 
+  // Tập phiếu đã tick — tách hẳn khỏi `selectedId`, nên tick không kéo theo
+  // `GET /inventory/transfer-orders/:id` và `/:id/lines` như trước.
+  const {
+    isChecked,
+    toggle: toggleChecked,
+    toggleAllOnPage,
+    clear: clearChecked,
+    allOnPageChecked,
+    someOnPageChecked,
+  } = useRowMultiSelect({ rows: records?.data ?? [], getRowId: getOrderId });
+
+  // Cố ý chỉ phụ thuộc bộ lọc, KHÔNG phụ thuộc `pagination`: lật trang phải giữ tick.
+  // Trên trang này `loadRecords` chưa gửi bộ lọc lên server (chỉ phân trang), nhưng
+  // vẫn xóa tick khi người dùng sửa bộ lọc để bốn tab kho hành xử giống nhau.
+  useEffect(() => {
+    clearChecked();
+  }, [columnFilters, period, clearChecked]);
+
   // List rows no longer carry `lines` (list() bypasses TransferOrderEntity's
   // eager lines/item, see transfer-order.service.ts `list()`). The selected
   // order's full detail (header + lines) is fetched separately via the
@@ -401,7 +424,10 @@ export function TransferOrdersPage() {
       id: "reload",
       label: "Nạp",
       icon: RefreshCw,
-      onClick: () => void loadRecords(),
+      onClick: () => {
+        clearChecked();
+        void loadRecords();
+      },
     },
   ];
 
@@ -554,18 +580,26 @@ export function TransferOrdersPage() {
           emptyLabel="Chưa có lệnh điều chuyển."
           getRowKey={(row) => row.id}
           onRowClick={(row) => setSelectedId(row.id)}
+          rowClassName={(row) =>
+            // `bg-info-subtle` là token của badge, lightness 98% — trên nền trắng của
+            // bảng nó vô hình. Dòng đang xem cần nhìn thấy được, nên dùng `bg-info`
+            // pha loãng.
+            row.id === selectedId ? "bg-info/15" : undefined
+          }
           leadingColumn={{
             width: 36,
-            header: <span className="sr-only">Chọn</span>,
+            header: (
+              <SelectAllCheckbox
+                checked={allOnPageChecked}
+                indeterminate={someOnPageChecked}
+                disabled={(records?.data.length ?? 0) === 0}
+                onToggle={toggleAllOnPage}
+              />
+            ),
             cell: (row) => (
-              <input
-                type="checkbox"
-                aria-label="Chọn dòng"
-                checked={selectedId === row.id}
-                onChange={() =>
-                  setSelectedId(selectedId === row.id ? null : row.id)
-                }
-                onClick={(e) => e.stopPropagation()}
+              <RowSelectCheckbox
+                checked={isChecked(row.id)}
+                onToggle={() => toggleChecked(row.id)}
               />
             ),
           }}

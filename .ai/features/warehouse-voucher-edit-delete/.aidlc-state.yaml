@@ -276,3 +276,28 @@ history:
     at: 2026-08-17T11:45:01
     by: claude
     ticket: T-06-04
+  - gate: G3
+    action: reopened
+    at: 2026-08-30T13:38:00
+    by: Akenzy
+    reason: QA phát hiện bug sửa nhầm phiếu (điền dữ liệu phiếu A vào phiếu B) - PurchaseOrderFormDialog/GoodsIssueFormDialog seed state 1 lần từ prop initial, không key theo record id; toolbar Sửa/Xem/Nhân bản không guard dialogMode đang mở. Bổ sung ticket khắc phục vào UOW-06.
+  - gate: G3
+    action: passed
+    at: 2026-08-30T13:40:33
+    by: Akenzy
+    evidence: graph valid - 6 UoW, 26 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-30T13:40:43
+    by: Akenzy
+    ticket: T-06-05
+  - gate: G4
+    action: ticket review
+    at: 2026-08-30T13:52:56
+    by: Akenzy
+    ticket: T-06-05
+  - gate: G4
+    action: ticket done
+    at: 2026-08-30T13:54:21
+    by: Akenzy
+    ticket: T-06-05

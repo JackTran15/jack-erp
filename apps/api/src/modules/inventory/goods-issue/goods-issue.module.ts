@@ -13,6 +13,7 @@ import { GoodsIssueController } from './goods-issue.controller';
 import { GoodsIssueV2Controller } from './controllers/goods-issue-v2.controller';
 import { GoodsIssueCommandV2Controller } from './controllers/goods-issue-command-v2.controller';
 import { SearchGoodsIssuesV2Handler } from './queries/search-goods-issues-v2.handler';
+import { SearchGoodsIssueLinesV2Handler } from './queries/search-goods-issue-lines-v2.handler';
 import { CreateGoodsIssueV2Handler } from './commands/create-goods-issue-v2.handler';
 import { PostGoodsIssueV2Handler } from './commands/post-goods-issue-v2.handler';
 
@@ -37,6 +38,7 @@ import { PostGoodsIssueV2Handler } from './commands/post-goods-issue-v2.handler'
   providers: [
     GoodsIssueService,
     SearchGoodsIssuesV2Handler,
+    SearchGoodsIssueLinesV2Handler,
     CreateGoodsIssueV2Handler,
     PostGoodsIssueV2Handler,
   ],

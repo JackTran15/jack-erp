@@ -29,7 +29,11 @@ import {
   projectRows,
   toTotalsRow,
 } from '../report-data.util';
-import { resolveInventoryBranchIds } from '../report-scope.util';
+import { ItemCategoryEntity } from '../../../inventory/location/item-category.entity';
+import {
+  resolveDescendantCategoryIds,
+  resolveInventoryBranchIds,
+} from '../report-scope.util';
 
 const { STRING, NUMBER, DATE } = ReportColumnDataType;
 
@@ -76,6 +80,8 @@ export class TempWarehouseOutReport implements InventoryReportDefinition {
     private readonly tempWarehouse: TempWarehouseReportService,
     @InjectRepository(BranchEntity)
     private readonly branches: Repository<BranchEntity>,
+    @InjectRepository(ItemCategoryEntity)
+    private readonly categories: Repository<ItemCategoryEntity>,
   ) {}
 
   buildColumns(): Promise<ReportColumnHeader[]> {
@@ -149,8 +155,19 @@ export class TempWarehouseOutReport implements InventoryReportDefinition {
       startDate: period.startDate,
       endDate: period.endDate,
       branchIds,
-      categoryIds: filters.categoryId ? [filters.categoryId] : undefined,
+      // A parent group holds no items of its own — only its leaves do — so the
+      // filter has to carry the whole subtree (ADR-01).
+      categoryIds: await resolveDescendantCategoryIds(
+        this.categories,
+        filters.categoryId,
+        actor.organizationId,
+      ),
       search: filters.search,
+      // Was missing entirely: the value arrived and went nowhere, even though
+      // the engine had the SQL for it. Set here rather than at the two call
+      // sites so the count can never scope differently from the rows
+      // (ADR-02, AC-16).
+      memberScope: { unit: filters.unit, brand: filters.brand },
     };
   }
 

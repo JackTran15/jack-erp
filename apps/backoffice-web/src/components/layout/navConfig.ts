@@ -3,7 +3,7 @@ import {
   Settings,
   Warehouse,
   BarChart3,
-  ClipboardCheck,
+  // ClipboardCheck,
   ShoppingCart,
   PackageOpen,
   PackageMinus,
@@ -333,78 +333,40 @@ export const navConfig: NavModule[] = [
       //     { to: "/reports/cash", label: "Tiền mặt" },
       //   ],
       // },
-      // {
-      //   id: "storage-reports",
-      //   label: "Báo cáo kho",
-      //   children: [
-      //     {
-      //       to: "/reports/storage/stock-summary",
-      //       label: "Tổng hợp nhập xuất tồn kho",
-      //     },
-      //     {
-      //       to: "/reports/storage/stock-document-details",
-      //       label: "Bảng kê chi tiết phiếu nhập xuất kho",
-      //     },
-      //     {
-      //       to: "/reports/storage/stock-quantity-details",
-      //       label: "Chi tiết số lượng nhập xuất tồn kho",
-      //     },
-      //     {
-      //       to: "/reports/storage/stock-summary-by-branch",
-      //       label: "Tổng hợp nhập xuất tồn kho theo cửa hàng",
-      //     },
-      //     {
-      //       to: "/reports/storage/stock-by-branch",
-      //       label: "Số lượng tồn kho theo cửa hàng",
-      //     },
-      //     {
-      //       to: "/reports/storage/transfer-summary",
-      //       label: "Tổng hợp nhập xuất điều chuyển",
-      //     },
-      //     {
-      //       to: "/reports/storage/transfer-by-branch",
-      //       label: "Tổng hợp hàng hóa điều chuyển theo cửa hàng",
-      //     },
-      //     {
-      //       to: "/reports/storage/temporary-issues",
-      //       label: "Hàng hoá xuất kho tạm",
-      //     },
-      //   ],
-      // },
     ],
   },
-  {
-    id: "onboarding",
-    label: "Đăng ký & Phê duyệt",
-    icon: ClipboardCheck,
-    defaultPath: "/onboarding/approvals",
-    flyout: { enabled: true },
-    sections: [
-      {
-        id: "onboarding-main",
-        children: [
-          {
-            to: "/onboarding/approvals",
-            label: "Hàng chờ phê duyệt",
-            permission: [
-              "org.registration.approve",
-              "branch.registration.approve",
-            ],
-          },
-          {
-            to: "/onboarding/org-registration",
-            label: "Đăng ký tổ chức",
-            permission: "org.registration.submit",
-          },
-          {
-            to: "/onboarding/branch-registration",
-            label: "Đăng ký chi nhánh",
-            permission: "branch.registration.submit",
-          },
-        ],
-      },
-    ],
-  },
+  // {
+  // id: "onboarding",
+  // label: "Đăng ký & Phê duyệt",
+  // icon: ClipboardCheck,
+  // defaultPath: "/onboarding/approvals",
+  // flyout: { enabled: true },
+  // sections: [
+  // {
+  // id: "onboarding-main",
+  // children: [
+  // {
+  // to: "/onboarding/approvals",
+  // label: "Hàng chờ phê duyệt",
+  // permission: [
+  // "org.registration.approve",
+  // "branch.registration.approve",
+  // ],
+  // },
+  // {
+  // to: "/onboarding/org-registration",
+  // label: "Đăng ký tổ chức",
+  // permission: "org.registration.submit",
+  // },
+  // {
+  // to: "/onboarding/branch-registration",
+  // label: "Đăng ký chi nhánh",
+  // permission: "branch.registration.submit",
+  // },
+  // ],
+  // },
+  // ],
+  // },
   {
     id: "catalog",
     label: "Danh mục",

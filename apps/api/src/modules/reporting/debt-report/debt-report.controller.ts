@@ -25,7 +25,10 @@ import {
 import { DebtReportExportDto } from './dto/debt-report-export.dto';
 import { debtReportLabel } from './queries/get-debt-report-document.handler';
 import { GetDebtReportDocumentQuery } from './queries/get-debt-report-document.query';
-import { ReportDocumentPayload } from '@erp/shared-interfaces';
+import {
+  ReportDocumentPayload,
+  TemplateScope,
+} from '@erp/shared-interfaces';
 import {
   Actor,
   ActorContext,
@@ -90,14 +93,23 @@ export class DebtReportController {
   listTemplates(
     @Actor() actor: ActorContext,
     @Query('reportType') reportType?: string,
+    @Query('scope') scope?: TemplateScope,
   ) {
-    return this.queryBus.execute(new ListDebtReportTemplatesQuery(actor, reportType));
+    return this.queryBus.execute(
+      new ListDebtReportTemplatesQuery(actor, reportType, scope),
+    );
   }
 
   @Get('templates/:id')
   @RequirePermission(DEBTS_READ)
-  getTemplate(@Param('id') id: string, @Actor() actor: ActorContext) {
-    return this.queryBus.execute(new GetDebtReportTemplateQuery(id, actor));
+  getTemplate(
+    @Param('id') id: string,
+    @Actor() actor: ActorContext,
+    @Query('scope') scope?: TemplateScope,
+  ) {
+    return this.queryBus.execute(
+      new GetDebtReportTemplateQuery(id, actor, scope),
+    );
   }
 
   @Post('templates')
@@ -123,8 +135,14 @@ export class DebtReportController {
 
   @Delete('templates/:id')
   @RequirePermission(DEBTS_READ)
-  deleteTemplate(@Param('id') id: string, @Actor() actor: ActorContext) {
-    return this.commandBus.execute(new DeleteDebtReportTemplateCommand(id, actor));
+  deleteTemplate(
+    @Param('id') id: string,
+    @Actor() actor: ActorContext,
+    @Query('scope') scope?: TemplateScope,
+  ) {
+    return this.commandBus.execute(
+      new DeleteDebtReportTemplateCommand(id, actor, scope),
+    );
   }
 
   @Post('export')

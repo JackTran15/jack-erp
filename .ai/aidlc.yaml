@@ -46,12 +46,36 @@ verify:
         # resolves `branchId: fromJwt ?? fromHeader` — a header alone loses.
         # The trailing wait is on the trigger showing the new name, which only
         # happens after the component's window.location.reload() has settled.
-        post_login: 'click button[aria-haspopup="menu"]; click [role="menuitemradio"]:has-text("${LOCAL_BACKOFFICE_BRANCH_NAME}"); wait button:has-text("${LOCAL_BACKOFFICE_BRANCH_NAME}")'
+        # Trigger là `button.w-52` (BranchSelector.tsx) chứ KHÔNG phải
+        # `button[aria-haspopup="menu"]`: selector đó khớp 15 phần tử trên trang
+        # (mọi dropdown menu), và `.first` rơi vào cái khác — hệ quả là báo cáo
+        # vẫn ở phạm vi một chi nhánh và mọi assert theo chuỗi cửa hàng đều đỏ.
+        # `button.w-52` khớp đúng một. Comment cảnh báo này vốn nằm ở block
+        # staging đã bị #240 xoá; nó đúng cho cả local.
+        post_login: 'click button.w-52; click [role="menuitemradio"]:has-text("${LOCAL_BACKOFFICE_BRANCH_NAME}"); wait button.w-52:has-text("${LOCAL_BACKOFFICE_BRANCH_NAME}")'
     # Quản lý chi nhánh trên backoffice. Cùng URL, cùng selector với local-backoffice —
     # khác duy nhất ở tài khoản, và đó chính là thứ cần chứng minh: một tài khoản toàn quyền
     # nhìn thấy mọi thứ nên không phân biệt được "ẩn đúng" với "chưa lọc gì".
     # Không có post_login: tài khoản này chỉ thuộc một chi nhánh nên không có menu chuyển.
     local-backoffice-bm:
+      url: http://localhost:3000
+      required: true
+      auth:
+        recipe: form
+        path: /login
+        landing: /
+        ready_when: { gone: 'text=Đang khôi phục phiên' }
+        selectors:
+          organization: '#login-org-id'
+          identifier: '#login-email'
+          password: '#login-password'
+          submit: 'button[type="submit"]'
+    # Nhân viên kho trên backoffice. Đây là vai trò NHÂN VIÊN duy nhất giữ
+    # `inventory.reports.read` (org-role-permissions.ts:210), tức là vai trò nhân viên duy nhất
+    # mở được báo cáo kho — nên nó là mặt còn lại của khiếu nại PQ-02 ("Quản lý chi nhánh và NV").
+    # Cùng URL, cùng selector, cùng 2 chi nhánh với local-backoffice-bm: kịch bản giống hệt, chỉ
+    # khác vai trò, nên chạy chung một 07-verification.md và phải cho cùng kết quả.
+    local-backoffice-wh:
       url: http://localhost:3000
       required: true
       auth:
@@ -99,7 +123,9 @@ verify:
     # Chạy: cd apps/pos-web && ./node_modules/.bin/vite --port 3002 --strictPort
     local-pos-worktree:
       url: http://localhost:3002
-      required: true
+      enabled: false   # worktree :3002 đã bị xoá 2026-09-03; một env required không có
+      # phiên lưu sẵn kéo cả rung verify xuống `skipped`, chặn mọi feature.
+      # Bật lại bằng cách dựng lại worktree rồi chạy scripts/capture.py.
       auth:
         # `storage-state`, không phải `form` — và đây là kết luận từ một lần chạy đỏ,
         # không phải sở thích. Form đăng nhập POS đặt CẢ BA ô (tổ chức, email, mật khẩu)

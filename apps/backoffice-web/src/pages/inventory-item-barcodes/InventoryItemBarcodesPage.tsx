@@ -1,3 +1,4 @@
+import type { LineGridSort } from "@erp/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -63,6 +64,37 @@ function parseFilterNumber(raw: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/** So sánh chuỗi theo thứ tự A-Z, số trong chuỗi so sánh theo giá trị ("N-9" < "N-38"). */
+const rowCollator = new Intl.Collator("vi", { numeric: true, sensitivity: "base" });
+
+/** Các cột có thể sắp xếp trên bảng In tem mã. */
+type SortableRowKey = "sku" | "locationCode";
+
+function isSortableRowKey(key: string): key is SortableRowKey {
+  return key === "sku" || key === "locationCode";
+}
+
+/**
+ * Sắp xếp theo khoá đang chọn (Mã SKU hoặc Vị trí). Dòng nhập liệu trống luôn ở
+ * cuối; với khoá "locationCode", dòng có hàng hoá nhưng chưa có vị trí cũng ghim
+ * cuối (A-08) — trước nhóm dòng trống hoàn toàn. Dùng chung cho bảng, In tem và
+ * Xuất khẩu — tem in ra phải theo đúng thứ tự người dùng đang nhìn thấy trên bảng.
+ */
+function sortRows(
+  list: BarcodeLabelRow[],
+  sort: LineGridSort | null,
+): BarcodeLabelRow[] {
+  if (!sort || !isSortableRowKey(sort.key)) return list;
+  const key = sort.key;
+  const direction = sort.direction === "asc" ? 1 : -1;
+  const empty = list.filter(isEmptyRow);
+  const notEmpty = list.filter((r) => !isEmptyRow(r));
+  const unpositioned = key === "locationCode" ? notEmpty.filter((r) => !r.locationCode) : [];
+  const filled = key === "locationCode" ? notEmpty.filter((r) => r.locationCode) : notEmpty;
+  filled.sort((a, b) => direction * rowCollator.compare(a[key], b[key]));
+  return [...filled, ...unpositioned, ...empty];
+}
+
 function focusSkuInput() {
   document.getElementById(BARCODE_SKU_INPUT_ID)?.focus();
 }
@@ -101,6 +133,7 @@ export function InventoryItemBarcodesPage() {
     makeEmpty: makeEmptyRow,
   });
   const [filters, setFilters] = useState<Record<string, string>>({});
+  const [sort, setSort] = useState<LineGridSort | null>(null);
   const [printing, setPrinting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -112,6 +145,16 @@ export function InventoryItemBarcodesPage() {
   // các endpoint theo chi nhánh (Kho/Vị trí gắn với 1 chi nhánh cụ thể).
   const isChain = useIsChainSelected();
   const queryClient = useQueryClient();
+
+  // A-09: chế độ chuỗi ẩn cột Vị trí (BarcodeLabelGrid lọc bỏ cột), nhưng sort
+  // sống ở state trang nên không tự dọn. Xoá đúng một lần khi cờ isChain
+  // chuyển sang bật và đang sort theo Vị trí — không xoá mỗi lần render (mất
+  // sort ngay khi người dùng vừa bấm), và không đụng sort khi rời chế độ
+  // chuỗi (không đoán ý khôi phục lại).
+  useEffect(() => {
+    if (!isChain) return;
+    setSort((prev) => (prev?.key === "locationCode" ? null : prev));
+  }, [isChain]);
 
   // ─── Reference data ────────────────────────────────────────────────
   const branchId = getActiveBranch();
@@ -160,7 +203,13 @@ export function InventoryItemBarcodesPage() {
   const loadItemBalances = useCallback(
     (itemId: string) =>
       queryClient.fetchQuery({
-        queryKey: ["item-stock-balances", itemId, branchId],
+        queryKey: [
+          "item-stock-balances",
+          itemId,
+          branchId,
+          "isTracked=true",
+          "locationIsActive=true",
+        ],
         queryFn: () => fetchItemStockBalances(itemId, branchId),
         staleTime: 60_000,
       }),
@@ -332,28 +381,54 @@ export function InventoryItemBarcodesPage() {
     [],
   );
 
-  // Resolve giá bán thật cho hàng đổ sẵn từ trang nguồn thiếu giá (Nhập/Xuất kho, Chi tiết
-  // vị trí chế độ tổng quan). Chạy một lần lúc mount trên tập row prefill ban đầu.
+  // Resolve giá bán thật cho hàng đổ sẵn từ trang nguồn thiếu giá (Chi tiết vị trí chế độ
+  // tổng quan). Chạy một lần lúc mount trên tập row prefill ban đầu.
+  //
+  // Gộp theo `itemId` và chạy theo lô: bản đầu bắn một request cho MỖI DÒNG, cùng lúc.
+  // Ở một lượt in vài chục dòng thì không ai để ý; từ khi các trang kho cho chọn tất cả
+  // rồi in tem hàng loạt, cùng đoạn code này bắn hàng nghìn request và treo trình duyệt.
+  // Cùng một hàng hóa nằm ở hai vị trí kho là hai dòng tem nhưng chỉ là một lần tra giá.
   useEffect(() => {
-    const missing = rows.filter((r) => r.itemId && r.sellingPrice <= 0);
-    if (!missing.length) return;
+    const byItemId = new Map<string, string>();
+    for (const r of rows) {
+      if (r.itemId && r.sellingPrice <= 0 && !byItemId.has(r.itemId)) {
+        byItemId.set(r.itemId, r.sku);
+      }
+    }
+    if (byItemId.size === 0) return;
     let cancelled = false;
+
+    const pending = [...byItemId.entries()];
+    const resolvePrice = async (itemId: string, sku: string) => {
+      try {
+        const { items } = await searchItems(sku, 1);
+        const match =
+          items.find((i) => i.id === itemId) ?? items.find((i) => i.code === sku);
+        const price = Number(match?.sellingPrice ?? 0);
+        if (cancelled || !match || price <= 0) return;
+        // Một lần setRows cho mọi dòng cùng hàng hóa, thay vì patchRow từng dòng.
+        setRows((prev) =>
+          prev.map((r) => (r.itemId === itemId ? { ...r, sellingPrice: price } : r)),
+        );
+      } catch {
+        /* bỏ qua — giữ giá 0 nếu không resolve được */
+      }
+    };
+
+    // Trần đồng thời: đủ nhanh cho một lượt in bình thường, mà một lượt in lớn cũng
+    // không mở hàng nghìn kết nối một lúc.
+    const CONCURRENCY = 6;
+    const worker = async () => {
+      while (!cancelled) {
+        const next = pending.shift();
+        if (!next) return;
+        await resolvePrice(next[0], next[1]);
+      }
+    };
     void Promise.all(
-      missing.map(async (r) => {
-        try {
-          const { items } = await searchItems(r.sku, 1);
-          const match =
-            items.find((i) => i.id === r.itemId) ??
-            items.find((i) => i.code === r.sku);
-          const price = Number(match?.sellingPrice ?? 0);
-          if (!cancelled && match && price > 0) {
-            patchRow(r.rowId, { sellingPrice: price });
-          }
-        } catch {
-          /* bỏ qua — giữ giá 0 nếu không resolve được */
-        }
-      }),
+      Array.from({ length: Math.min(CONCURRENCY, pending.length) }, worker),
     );
+
     return () => {
       cancelled = true;
     };
@@ -515,21 +590,38 @@ export function InventoryItemBarcodesPage() {
     });
   }, [rows, filters]);
 
+  // Sắp xếp theo mã SKU (bấm header cột "Mã SKU"). Dòng nhập liệu trống luôn ở cuối
+  // bảng — Ctrl+Insert/Ctrl+F3 focus vào ô SKU của dòng cuối cùng.
+  const sortedRows = useMemo(
+    () => sortRows(visibleRows, sort),
+    [visibleRows, sort],
+  );
+
+  // Nguồn cho In tem / Xuất khẩu / Xem trước: toàn bộ dòng (bộ lọc header không
+  // loại tem khỏi lượt in), nhưng theo đúng thứ tự đang sắp xếp trên bảng.
+  const orderedRows = useMemo(() => sortRows(rows, sort), [rows, sort]);
+
+  const printableRows = useMemo(
+    () => orderedRows.filter((r) => r.itemId && r.quantity > 0),
+    [orderedRows],
+  );
+
   const totalQuantity = useMemo(
     () => rows.reduce((sum, r) => sum + (r.itemId ? r.quantity : 0), 0),
     [rows],
   );
 
+  // Tem đầu tiên của lượt in — phải là dòng đầu theo thứ tự đang sắp xếp.
   const previewRow = useMemo(
-    () => rows.find((r) => r.itemId) ?? null,
-    [rows],
+    () => orderedRows.find((r) => r.itemId) ?? null,
+    [orderedRows],
   );
 
   // ─── Export ────────────────────────────────────────────────────────
   // Cùng điều kiện với nút "In tem": chỉ xuất dòng đã chọn hàng hoá và có số
   // lượng in; file .xlsx do backend dựng.
   const handleExport = useCallback(async () => {
-    const exportable = rows.filter((r) => r.itemId && r.quantity > 0);
+    const exportable = printableRows;
     if (!exportable.length) {
       toast.error("Chưa có tem nào để xuất khẩu — thêm hàng hóa và số lượng tem");
       return;
@@ -543,22 +635,21 @@ export function InventoryItemBarcodesPage() {
     } finally {
       setExporting(false);
     }
-  }, [rows]);
+  }, [printableRows]);
 
   // ─── Print ─────────────────────────────────────────────────────────
   // Nút "In tem" mở dialog cảnh báo; việc in thực sự chạy ở doPrint theo lựa chọn.
   const handleOpenPrintConfirm = useCallback(() => {
-    const printable = rows.filter((r) => r.itemId && r.quantity > 0);
-    if (!printable.length) {
+    if (!printableRows.length) {
       toast.error("Chưa có tem nào để in — thêm hàng hóa và số lượng tem");
       return;
     }
     setConfirmOpen(true);
-  }, [rows]);
+  }, [printableRows]);
 
   const doPrint = useCallback(
     (mode: "test" | "bulk") => {
-      const printable = rows.filter((r) => r.itemId && r.quantity > 0);
+      const printable = printableRows;
       if (!printable.length) return;
       // In thử: tối đa 2 tem để người dùng quét kiểm tra trước khi in hàng loạt.
       const toPrint = mode === "test" ? capLabels(printable, 2) : printable;
@@ -578,7 +669,7 @@ export function InventoryItemBarcodesPage() {
       }
       setConfirmOpen(false);
     },
-    [rows, paper, branchCode, isChain],
+    [printableRows, paper, branchCode, isChain],
   );
 
   return (
@@ -605,9 +696,11 @@ export function InventoryItemBarcodesPage() {
         {/* Bảng */}
         <div className="min-h-0 flex-1">
           <BarcodeLabelGrid
-            rows={visibleRows}
+            rows={sortedRows}
             filters={filters}
             onFiltersChange={setFilters}
+            sort={sort}
+            onSortChange={setSort}
             searchItems={searchItems}
             onSkuTextChange={handleSkuTextChange}
             onSelectItem={handleSelectItem}
@@ -660,6 +753,7 @@ export function InventoryItemBarcodesPage() {
           open
           onOpenChange={setProductPickerOpen}
           showQuantityPrice
+          showUnitPrice={false}
           defaultUnitPriceSource="sellingPrice"
           defaultQuantity={0}
           onConfirm={addRowsFromPicker}

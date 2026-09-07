@@ -30,6 +30,25 @@ export type ReportColumnSpecs = Record<string, ReportColumnSpec>;
  * one and dropping the other would return rows the user did not ask for while
  * the UI shows both filters as active.
  */
+/**
+ * The filter bar's "Đơn vị tính" / "Thương hiệu" selections.
+ *
+ * These choose **which items take part** in the report, and that is a different
+ * job from the grid's column filters, which narrow the **rows the report already
+ * produced**. At the item grain the two coincide — one row is one item — so
+ * folding them into `columnFilters` worked. At the parent/group grains they come
+ * apart: the aggregate row has no single unit, so `buildAggSqls` selects
+ * `NULL::text AS unit`, no column spec exists, and a member predicate arriving
+ * through the column-filter door was answered with a 400 (ADR-02).
+ *
+ * So they travel on their own, straight to the engine, and land inside the
+ * aggregating CTE where `i.unit` still holds a value (ADR-03).
+ */
+export interface MemberScopeFilters {
+  unit?: string;
+  brand?: string;
+}
+
 export type ReportColumnFilters = Record<
   string,
   ReportColumnFilterDto | ReportColumnFilterDto[]

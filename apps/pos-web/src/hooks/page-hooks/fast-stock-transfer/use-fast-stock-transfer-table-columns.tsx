@@ -5,6 +5,7 @@ import {
 import { PosDataTableFilterCell } from "@erp/pos/components/common/PosDataTable/PosDataTableFilterCell/PosDataTableFilterCell";
 import {
   PosSearchPopover,
+  type PosSearchPopoverHandle,
   type SearchSuggestion,
 } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
 import {
@@ -13,6 +14,7 @@ import {
 } from "@erp/pos/constants/checkout.constant";
 import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
 import { formatOnHand } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
+import { resolveCarrierForQuery } from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer-carrier-resolve";
 import type { FastStockTransferTableRow } from "@erp/pos/types/fast-stock-transfer.type";
 import {
   formatCarrierName,
@@ -24,7 +26,7 @@ import {
   locationLabelForLine,
 } from "@erp/pos/lib/page-libs/fast-stock-transfer/temp-warehouse-mappers";
 import { usePosFastStockTransferWorkflowStore } from "@erp/pos/stores/page-stores/fast-stock-transfer/fast-stock-transfer-workflow.store";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFastStockTransferActions } from "./use-fast-stock-transfer-actions";
 import { useFastStockTransferCarriers } from "./use-fast-stock-transfer-carriers";
 import { useFastStockTransferData } from "./use-fast-stock-transfer-data";
@@ -38,6 +40,7 @@ interface TransporterEditCellProps {
   search: (
     query: string,
   ) => Promise<SearchSuggestion<TempWarehousePublicUser>[]>;
+  resolveCandidates: (query: string) => Promise<TempWarehousePublicUser[]>;
 }
 
 /** Inline carrier picker for the editing row — owns its own input string. */
@@ -45,27 +48,53 @@ function TransporterEditCell({
   value,
   onSelect,
   search,
+  resolveCandidates,
 }: TransporterEditCellProps) {
   const [query, setQuery] = useState(value ? formatCarrierName(value) : "");
+  const popoverRef = useRef<PosSearchPopoverHandle>(null);
+  // Chuỗi mới nhất, đọc được sau `await` — xem chốt cùng tên ở ô Người vận
+  // chuyển trên thanh Thêm dòng.
+  const queryRef = useRef(query);
+  queryRef.current = query;
   useEffect(() => {
     setQuery(value ? formatCarrierName(value) : "");
   }, [value]);
+
+  const selectCarrier = useCallback(
+    (c: TempWarehousePublicUser) => {
+      onSelect(c);
+      setQuery(formatCarrierName(c));
+    },
+    [onSelect],
+  );
+
   return (
     <PosSearchPopover
       value={query}
       onValueChange={setQuery}
       search={search}
-      onSelect={(c) => {
-        onSelect(c);
-        setQuery(formatCarrierName(c));
+      onSelect={selectCarrier}
+      onSubmitQuery={(q) => {
+        if (!q.trim()) return false;
+        void resolveCandidates(q).then((rows) => {
+          if (queryRef.current.trim() !== q) return;
+          const picked = resolveCarrierForQuery(q, rows);
+          if (!picked) return;
+          // Đường này không đi qua `selectItem` của popover nên phải tự đóng.
+          popoverRef.current?.close();
+          selectCarrier(picked);
+        });
+        return true;
       }}
       itemKey={(c) => c.id}
       renderItem={(c) => formatCarrierName(c)}
+      renderMeta={(c) => c.employeeCode ?? c.email}
       placeholder="Chọn"
       ariaLabel="Người vận chuyển"
       variant="underline"
       minChars={0}
       containerClassName="w-full min-w-[140px]"
+      popoverRef={popoverRef}
     />
   );
 }
@@ -108,7 +137,8 @@ function SkuEditCell({ value, onSelect, search }: SkuEditCellProps) {
 export function useFastStockTransferTableColumns() {
   const data = useFastStockTransferData();
   const actions = useFastStockTransferActions();
-  const { carrierSearchAdapter } = useFastStockTransferCarriers();
+  const { carrierSearchAdapter, resolveCarrierCandidates } =
+    useFastStockTransferCarriers();
   const { resolveCandidates } = useFastStockTransferProductPicker();
 
   const filters = usePosFastStockTransferWorkflowStore((s) => s.filters);
@@ -143,6 +173,7 @@ export function useFastStockTransferTableColumns() {
               value={editableDraft.carrier}
               onSelect={actions.handleEditDraftCarrier}
               search={carrierSearchAdapter}
+              resolveCandidates={resolveCarrierCandidates}
             />
           ) : (
             formatCarrierName(row.carrier)
@@ -293,6 +324,7 @@ export function useFastStockTransferTableColumns() {
       filters.sku,
       filters.transporter,
       filters.unit,
+      resolveCarrierCandidates,
     ],
   );
 }

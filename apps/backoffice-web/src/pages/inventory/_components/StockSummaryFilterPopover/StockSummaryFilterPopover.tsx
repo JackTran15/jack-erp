@@ -44,8 +44,7 @@ interface Props {
 
 /**
  * Bộ lọc bổ sung, bung ra ngay dưới nút trigger. Component tự render nút của
- * mình để Radix neo được panel vào đúng vị trí — cùng khuôn với
- * `ReportFilterPopover` ở `pages/reports/storage/_shared/ReportFilterDialog.tsx`.
+ * mình để Radix neo được panel vào đúng vị trí.
  *
  * `draft` chỉ được commit khi bấm "Đồng ý"; đóng bằng click ra ngoài, `Esc`
  * hay "Huỷ bỏ" đều bỏ thay đổi.

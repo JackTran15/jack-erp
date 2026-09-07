@@ -46,6 +46,8 @@ describe('StockLedgerService', () => {
       findOne: jest.fn(),
       findAndCount: jest.fn(),
       createQueryBuilder: jest.fn(),
+      // setBalanceTracking() runs raw SQL through the repository's manager.
+      manager: { query: jest.fn().mockResolvedValue([[], 0]) } as any,
     };
 
     // Bulk ledger insert: manager.createQueryBuilder().insert().into(...).values(rows).execute()
@@ -372,6 +374,72 @@ describe('StockLedgerService', () => {
     });
   });
 
+  // `posted_at` is the ledger's only ordering key, so a compensating flow has to
+  // be able to place its rows before an earlier write at insert time — the log is
+  // append-only and can never be reordered afterwards (ADR-01).
+  describe('caller-supplied postedAt (ADR-01)', () => {
+    const anchored = new Date('2026-08-30T10:00:00.000Z');
+
+    it('honours an explicit postedAt on the single-movement path (AC-02)', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+
+      const result = await service.recordMovement({ ...baseParams, postedAt: anchored });
+
+      expect(result.postedAt).toEqual(anchored);
+    });
+
+    it('honours an explicit postedAt on the batch path (AC-01)', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+
+      const result = await service.recordBatchMovements([
+        { ...baseParams, itemId: 'item-1', postedAt: anchored },
+        { ...baseParams, itemId: 'item-2', postedAt: anchored },
+      ]);
+
+      expect(result.map((r) => r.postedAt)).toEqual([anchored, anchored]);
+    });
+
+    it('falls back to the write instant when no postedAt is given (AC-03)', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+
+      const before = Date.now();
+      const single = await service.recordMovement(baseParams);
+      const after = Date.now();
+
+      expect(single.postedAt.getTime()).toBeGreaterThanOrEqual(before);
+      expect(single.postedAt.getTime()).toBeLessThanOrEqual(after);
+    });
+
+    it('keeps one shared write instant across a batch that supplies no postedAt (AC-03)', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+
+      const before = Date.now();
+      const result = await service.recordBatchMovements([
+        { ...baseParams, itemId: 'item-1' },
+        { ...baseParams, itemId: 'item-2' },
+        { ...baseParams, itemId: 'item-3' },
+      ]);
+      const after = Date.now();
+
+      const stamps = result.map((r) => r.postedAt.getTime());
+      expect(new Set(stamps).size).toBe(1);
+      expect(stamps[0]).toBeGreaterThanOrEqual(before);
+      expect(stamps[0]).toBeLessThanOrEqual(after);
+    });
+
+    it('leaves rows without postedAt on the shared instant when only some rows supply one (AC-03)', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+
+      const result = await service.recordBatchMovements([
+        { ...baseParams, itemId: 'item-1', postedAt: anchored },
+        { ...baseParams, itemId: 'item-2' },
+      ]);
+
+      expect(result[0].postedAt).toEqual(anchored);
+      expect(result[1].postedAt).not.toEqual(anchored);
+    });
+  });
+
   describe('getInstantAverageCost', () => {
     it('calculates the branch-wide instantaneous weighted average from signed ledger values', async () => {
       ledgerRepo.query.mockResolvedValue([
@@ -590,6 +658,139 @@ describe('StockLedgerService', () => {
           { organizationId: 'org-1' },
         );
       });
+
+      it('test 6: excludeShowroom filters out kho showroom (is_main_storage)', async () => {
+        const qb = createQbSpy();
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        await service.getBalances({
+          organizationId: 'org-1',
+          excludeShowroom: true,
+          page: 1,
+          pageSize: 20,
+        });
+
+        expect(qb.andWhere).toHaveBeenCalledWith('storage.is_main_storage = false');
+      });
+
+      it('test 7: no showroom filter is applied when excludeShowroom is omitted', async () => {
+        const qb = createQbSpy();
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        await service.getBalances({
+          organizationId: 'org-1',
+          page: 1,
+          pageSize: 20,
+        });
+
+        const calls = qb.andWhere.mock.calls.map((args: unknown[]) => String(args[0]));
+        expect(calls.some((sql: string) => sql.includes('is_main_storage'))).toBe(
+          false,
+        );
+      });
+    });
+
+    describe('locationIsActive filter (ADR-02 / A-07)', () => {
+      function createQbSpy() {
+        const qb: any = {
+          innerJoin: jest.fn().mockReturnThis(),
+          leftJoin: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          select: jest.fn().mockReturnThis(),
+          orderBy: jest.fn().mockReturnThis(),
+          offset: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockReturnThis(),
+          getRawMany: jest.fn().mockResolvedValue([]),
+          getCount: jest.fn().mockResolvedValue(0),
+        };
+        return qb;
+      }
+
+      it('applies loc.is_active filter when locationIsActive is passed', async () => {
+        const qb = createQbSpy();
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        await service.getBalances({
+          organizationId: 'org-1',
+          locationIsActive: true,
+          page: 1,
+          pageSize: 20,
+        });
+
+        expect(qb.andWhere).toHaveBeenCalledWith(
+          'loc.is_active = :locationIsActive',
+          { locationIsActive: true },
+        );
+      });
+
+      it('applies loc.is_active = false filter when locationIsActive is false', async () => {
+        const qb = createQbSpy();
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        await service.getBalances({
+          organizationId: 'org-1',
+          locationIsActive: false,
+          page: 1,
+          pageSize: 20,
+        });
+
+        expect(qb.andWhere).toHaveBeenCalledWith(
+          'loc.is_active = :locationIsActive',
+          { locationIsActive: false },
+        );
+      });
+
+      it('does NOT filter loc.is_active when locationIsActive is omitted — behaviour unchanged for existing callers', async () => {
+        const qb = createQbSpy();
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        await service.getBalances({
+          organizationId: 'org-1',
+          page: 1,
+          pageSize: 20,
+        });
+
+        const calls = qb.andWhere.mock.calls.map((args: unknown[]) => String(args[0]));
+        expect(calls.some((sql: string) => sql.includes('loc.is_active'))).toBe(false);
+      });
+
+      it('maps location.isActive into the returned row', async () => {
+        const rawRow = {
+          id: 'b1',
+          organizationId: 'org-1',
+          branchId: 'branch-1',
+          itemId: 'item-1',
+          locationId: 'loc-1',
+          quantity: '50',
+          lastMovementAt: null,
+          itemCode: 'SKU-001',
+          itemName: 'Widget',
+          itemUnit: 'PCS',
+          itemIsActive: true,
+          itemIsPosVisible: true,
+          categoryName: null,
+          locationCode: 'E03.01',
+          locationName: 'E03.01',
+          storageId: 'stor-1',
+          storageName: 'Main WH',
+          locationIsActive: false,
+          minQty: null,
+          maxQty: null,
+        };
+        const qb = createQbSpy();
+        qb.getRawMany = jest.fn().mockResolvedValue([rawRow]);
+        qb.getCount = jest.fn().mockResolvedValue(1);
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        const result = await service.getBalances({
+          organizationId: 'org-1',
+          page: 1,
+          pageSize: 20,
+        });
+
+        expect(result.data[0].location.isActive).toBe(false);
+      });
     });
   });
 
@@ -668,6 +869,53 @@ describe('StockLedgerService', () => {
       expect(mockQb.select).toHaveBeenCalledWith('COALESCE(SUM(entry.quantity), 0)', 'total');
       expect(mockQb.andWhere).toHaveBeenCalledWith('entry.itemId = :itemId', { itemId: 'item-1' });
       expect(mockQb.andWhere).toHaveBeenCalledWith('entry.locationId = :locationId', { locationId: 'loc-1' });
+    });
+  });
+
+  /**
+   * `updated` is read off an `UPDATE … RETURNING`, which TypeORM hands back as
+   * `[rows, rowCount]` — so the mocks below use that shape, not a bare row
+   * array. Before this was fixed, `rows.length` reported 2 for every call: two
+   * rows updated, none updated, five updated, all "2".
+   *
+   * The shape itself is proven against a live Postgres in
+   * `test/e2e/typeorm-returning-shape.e2e-spec.ts`; these mocks only have
+   * licence to assume it because that test measures it.
+   */
+  describe('setBalanceTracking — reports the real number of rows touched', () => {
+    const entries = [
+      { itemId: 'item-1', locationId: 'loc-1' },
+      { itemId: 'item-2', locationId: 'loc-2' },
+      { itemId: 'item-3', locationId: 'loc-3' },
+    ];
+
+    it('returns the driver rowCount when balances were re-flagged', async () => {
+      (balanceRepo.manager as any).query.mockResolvedValue([
+        [{ id: 'sb-1' }, { id: 'sb-2' }, { id: 'sb-3' }],
+        3,
+      ]);
+
+      const result = await service.setBalanceTracking(entries, true, actor);
+
+      expect(result).toEqual({ updated: 3 });
+    });
+
+    it('returns 0 when every pair was already in the requested state', async () => {
+      // `sb.is_tracked <> $4` matches nothing — the case a raw `.length` calls 2.
+      (balanceRepo.manager as any).query.mockResolvedValue([[], 0]);
+
+      const result = await service.setBalanceTracking(entries, true, actor);
+
+      expect(result).toEqual({ updated: 0 });
+    });
+
+    it('returns 0 for an empty selection without touching the database', async () => {
+      (balanceRepo.manager as any).query.mockClear();
+
+      const result = await service.setBalanceTracking([], true, actor);
+
+      expect(result).toEqual({ updated: 0 });
+      expect((balanceRepo.manager as any).query).not.toHaveBeenCalled();
     });
   });
 });

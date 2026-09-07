@@ -12,10 +12,16 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import type { Response } from 'express';
-import { ReportDocumentPayload } from '@erp/shared-interfaces';
+import {
+  INVENTORY_REPORT_VIEW_MODES,
+  InventoryReportStatBy,
+  InventoryReportViewMode,
+  ReportDocumentPayload,
+  TemplateScope,
+} from '@erp/shared-interfaces';
 import { ExportPipeline } from '../reporting/report-core/export/export-pipeline';
 import { HttpResponseSink } from '../reporting/report-core/export/http-response.sink';
 import { XlsxStreamWriter } from '../reporting/report-core/export/xlsx-stream.writer';
@@ -29,6 +35,7 @@ import {
 } from '../../common/decorators/actor-context.decorator';
 import { RequirePermission } from '../auth/decorators';
 import { PermissionGuard } from '../rbac/permission.guard';
+import { ITEM_GROUP_BY_VALUES } from './services/stock-period.service';
 import { CreateInventoryReportTemplateCommand } from './commands/create-inventory-report-template.command';
 import { DeleteInventoryReportTemplateCommand } from './commands/delete-inventory-report-template.command';
 import { UpdateInventoryReportTemplateCommand } from './commands/update-inventory-report-template.command';
@@ -49,10 +56,11 @@ const REPORTS_READ = 'inventory.reports.read';
 
 /**
  * Registry-driven inventory report contract (columns / search /
- * filter-options), mirroring the invoice report surface. The legacy GET
- * report endpoints in `InventoryReportsController` stay untouched.
+ * filter-options), mirroring the invoice report surface. This is now the only
+ * inventory report surface — the legacy GET endpoints were removed.
  * Reads aggregate across branches via `filters.store`, so no
- * `@RequireBranchScope()` (no `X-Branch-Id` header required).
+ * `@RequireBranchScope()` (no `X-Branch-Id` header required); each report
+ * definition clamps to the actor via `report-scope.util.ts`.
  */
 @ApiTags('inventory-reports')
 @Controller('reports/inventory')
@@ -67,12 +75,16 @@ export class InventoryReportV2Controller {
   @Get('columns')
   @RequirePermission(REPORTS_READ)
   @ApiOperation({ summary: 'Column catalog of one inventory report type' })
+  @ApiQuery({ name: 'viewMode', enum: INVENTORY_REPORT_VIEW_MODES, required: false })
+  @ApiQuery({ name: 'statBy', enum: ITEM_GROUP_BY_VALUES, required: false })
   getColumns(
     @Query('reportType') reportType: string,
     @Actor() actor: ActorContext,
+    @Query('viewMode') viewMode?: InventoryReportViewMode,
+    @Query('statBy') statBy?: InventoryReportStatBy,
   ) {
     return this.queryBus.execute(
-      new GetInventoryReportColumnsQuery(reportType, actor),
+      new GetInventoryReportColumnsQuery(reportType, actor, { viewMode, statBy }),
     );
   }
 
@@ -138,17 +150,22 @@ export class InventoryReportV2Controller {
   listTemplates(
     @Actor() actor: ActorContext,
     @Query('reportType') reportType?: string,
+    @Query('scope') scope?: TemplateScope,
   ) {
     return this.queryBus.execute(
-      new ListInventoryReportTemplatesQuery(actor, reportType),
+      new ListInventoryReportTemplatesQuery(actor, reportType, scope),
     );
   }
 
   @Get('templates/:id')
   @RequirePermission(REPORTS_READ)
-  getTemplate(@Param('id') id: string, @Actor() actor: ActorContext) {
+  getTemplate(
+    @Param('id') id: string,
+    @Actor() actor: ActorContext,
+    @Query('scope') scope?: TemplateScope,
+  ) {
     return this.queryBus.execute(
-      new GetInventoryReportTemplateQuery(id, actor),
+      new GetInventoryReportTemplateQuery(id, actor, scope),
     );
   }
 
@@ -177,9 +194,13 @@ export class InventoryReportV2Controller {
 
   @Delete('templates/:id')
   @RequirePermission(REPORTS_READ)
-  deleteTemplate(@Param('id') id: string, @Actor() actor: ActorContext) {
+  deleteTemplate(
+    @Param('id') id: string,
+    @Actor() actor: ActorContext,
+    @Query('scope') scope?: TemplateScope,
+  ) {
     return this.commandBus.execute(
-      new DeleteInventoryReportTemplateCommand(id, actor),
+      new DeleteInventoryReportTemplateCommand(id, actor, scope),
     );
   }
 }

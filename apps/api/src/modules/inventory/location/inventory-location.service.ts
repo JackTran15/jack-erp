@@ -810,7 +810,11 @@ export class InventoryLocationService {
       .getManyAndCount();
 
     // Mark which locations already hold items ("Đã xếp" vs "Chưa xếp"): a
-    // location is "đã xếp" when it has at least one stock_balance row.
+    // location is "đã xếp" when it has at least one stock_balance row that is
+    // still tracked. Rows left behind by "Ngừng theo dõi" (is_tracked = false)
+    // are kept on purpose so tracking can be turned back on, so they must not
+    // make an emptied shelf still read as "Đã xếp". Same definition as
+    // HAS_ITEMS_SQL in SearchLocationsV2Handler — keep the two in step.
     if (data.length > 0) {
       const rows = await this.locationRepo.manager
         .createQueryBuilder()
@@ -820,6 +824,7 @@ export class InventoryLocationService {
         .andWhere('sb.location_id IN (:...ids)', {
           ids: data.map((l) => l.id),
         })
+        .andWhere('sb.is_tracked = true')
         .groupBy('sb.location_id')
         .getRawMany<{ locationId: string }>();
       const placed = new Set(rows.map((r) => r.locationId));

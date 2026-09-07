@@ -27,3 +27,25 @@ export function groupPinPosition<T>(
   }
   return {};
 }
+
+// Bọc sticky dọc lên style ghim ngang của một ô. Phải merge vào cùng object style chứ không
+// thêm class `sticky top-0`: pinPosition đặt `position` bằng inline style, mà inline luôn
+// thắng class ở cùng property → class sẽ chết đúng trên các cột ghim (ADR-01).
+// Ô ghim luôn nhận z cao hơn ô thường để khi cuộn ngang nó đè lên phần còn lại của cùng hàng
+// (ADR-02); đây là chỗ duy nhất quyết định z, call site không tự đặt.
+export function withStickyTop(
+  pin: CSSProperties,
+  top: number,
+  z: number,
+  zPinned: number,
+): CSSProperties {
+  return { ...pin, position: "sticky", top, zIndex: pin.position ? zPinned : z };
+}
+
+export function withStickyBottom(
+  pin: CSSProperties,
+  z: number,
+  zPinned: number,
+): CSSProperties {
+  return { ...pin, position: "sticky", bottom: 0, zIndex: pin.position ? zPinned : z };
+}

@@ -209,6 +209,46 @@ describe('EnqueueOutboxStep', () => {
     expect(fulfillCall![2].payload.lines).toHaveLength(2);
   });
 
+  // The whole temp-warehouse ordering fix rests on this boundary staying where it
+  // is: fulfilment is a row this step writes on the payment transaction, handed to
+  // a consumer afterwards — never work the sale waits on. "Make it synchronous to
+  // be safe" reads like an improvement and would put a till-side failure in the
+  // path of every sale (A-02). These two tests exist to argue against that change.
+  describe('the temp-warehouse hand-off is deliberately asynchronous (A-02)', () => {
+    it('hands fulfilment to a consumer via an outbox row on the payment transaction, not inline work', async () => {
+      const { manager, outbox, enqueue } = withManager();
+
+      await new EnqueueOutboxStep(outbox as any).execute(ctx({ manager }));
+
+      const fulfillCall = enqueue.mock.calls.find(
+        (call) => call[1] === 'erp.temp-warehouse.invoice-fulfill',
+      );
+      expect(fulfillCall).toBeDefined();
+      // Written on the caller's manager: the row commits with the invoice, so a
+      // rolled-back sale leaves no fulfilment behind and vice versa.
+      expect(fulfillCall![0]).toBe(manager);
+      // A deterministic id, so a redelivered event dedupes instead of staging twice.
+      expect(fulfillCall![2].eventId).toEqual(expect.any(String));
+      expect(fulfillCall![2].payload.invoiceId).toBe('inv-1');
+    });
+
+    it('depends on the outbox and nothing else, so no temp-warehouse failure has a path into the sale', async () => {
+      // One collaborator only — the outbox. This asserts the *shape* of the
+      // boundary, not the runtime behaviour of a failing consumer: injecting a
+      // temp-warehouse or stock service here is exactly the change it fails on.
+      // Retry/DLQ behaviour on the consumer side is covered by
+      // `events/services/dead-letter.service.spec.ts`.
+      expect(EnqueueOutboxStep.length).toBe(1);
+
+      const { manager, outbox } = withManager();
+      const c = ctx({ manager });
+      await expect(
+        new EnqueueOutboxStep(outbox as any).execute(c),
+      ).resolves.toBeUndefined();
+      expect(c.wsNotification).toBeDefined();
+    });
+  });
+
   it('eventId is deterministic per (topic, invoiceId) — same invoice, same call, same id every time', async () => {
     const { manager: m1, outbox: o1, enqueue: e1 } = withManager();
     const { manager: m2, outbox: o2, enqueue: e2 } = withManager();

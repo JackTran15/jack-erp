@@ -88,7 +88,7 @@ export class ResolveItemLocationsHandler
     const fallbackLoc =
       defaultLoc ??
       (await manager.findOne(LocationEntity, {
-        where: { storageId, organizationId: orgId, isUnassigned: true },
+        where: { storageId, organizationId: orgId, isUnassigned: true, isActive: true },
       })) ??
       null;
 
@@ -98,7 +98,14 @@ export class ResolveItemLocationsHandler
     >();
     for (const [key, itemIds] of groups) {
       // a. Preferred shelf for any sibling in this storage (bỏ qua vị trí đã ngừng
-      //    hoạt động — rơi xuống nhánh sau).
+      //    hoạt động — rơi xuống nhánh sau). The pointer in item_storage_locations
+      //    is never cleared when a shelf is untracked (setBalanceTracking only
+      //    flips stock_balances.is_tracked), so we must also guard against a
+      //    stopped (item, location) pair here. A pair with NO balance row at all
+      //    ("assigned but never received") stays eligible — matching
+      //    isBalanceTracked's `!balance || balance.isTracked` semantics — so this
+      //    is a NOT EXISTS(... is_tracked = false) exclusion, not an inner join
+      //    on is_tracked = true (that would drop the never-received case, AC-19).
       const isl = await manager
         .createQueryBuilder(ItemStorageLocationEntity, 'isl')
         .innerJoin(
@@ -109,6 +116,19 @@ export class ResolveItemLocationsHandler
         .where('isl.item_id IN (:...itemIds)', { itemIds })
         .andWhere('isl.storage_id = :storageId', { storageId })
         .andWhere('isl.organization_id = :orgId', { orgId })
+        .andWhere(
+          `NOT EXISTS (
+             SELECT 1 FROM stock_balances sb
+             WHERE sb.item_id = isl.item_id
+               AND sb.location_id = isl.location_id
+               AND sb.organization_id = isl.organization_id
+               AND sb.is_tracked = false
+           )`,
+        )
+        // Deterministic across sibling variants: order by the shelf's own code
+        // (stable, unique per storage) instead of relying on getOne()'s
+        // undefined row order when several siblings each point at a shelf.
+        .orderBy('loc.code', 'ASC')
         .getOne();
       if (isl) {
         groupLocation.set(key, { locationId: isl.locationId, source: 'preferred' });

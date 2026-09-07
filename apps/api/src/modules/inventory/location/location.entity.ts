@@ -45,8 +45,11 @@ export class LocationEntity extends BaseEntity {
 
   /**
    * Transient (not a column): whether any item has been placed at this location
-   * (has ≥1 stock_balance row). Populated by listLocations to drive the
-   * "Xếp hàng hóa: Đã xếp / Chưa xếp" column. Undefined on endpoints that don't compute it.
+   * (has ≥1 stock_balance row that is still tracked — rows left behind by
+   * "Ngừng theo dõi" do not count). Populated by listLocations and by
+   * SearchLocationsV2Handler to drive the "Xếp hàng hóa: Đã xếp / Chưa xếp"
+   * column; both must use the same definition. Undefined on endpoints that
+   * don't compute it.
    */
   hasItems?: boolean;
 }

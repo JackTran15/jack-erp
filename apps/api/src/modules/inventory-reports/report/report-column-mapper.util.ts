@@ -31,19 +31,6 @@ import type { ReportColumnFilters } from '../services/report-column-filter.util'
  */
 export type ReportKeyMap = Readonly<Record<string, string>>;
 
-/**
- * Filter-bar selections that are really equality predicates on a report column.
- *
- * These used to be applied in JS after pagination, which was harmless only
- * because the whole set was in memory. Once paging moves into SQL, leaving them
- * behind would filter just the page in view — a wrong answer that looks right,
- * which is worse than the 400 this whole feature exists to remove (A-11).
- */
-export interface ScopeColumnFilters {
-  unit?: string;
-  brand?: string;
-}
-
 /** Grid operator field → the engine's text operator. */
 const TEXT_OPERATORS: ReadonlyArray<[keyof ColumnFilter, StringOperator]> = [
   ['contains', StringOperator.CONTAINS],
@@ -130,15 +117,13 @@ function toEngineFilter(col: string, filter: ColumnFilter): ReportColumnFilterDt
  * with no operator would reach `buildReportColumnFilter`, which rejects keys it
  * has no spec for — turning a blank filter box into a 400.
  *
- * `scope` folds the filter bar's unit/brand selections onto the same columns as
- * exact matches (ADR-06). When the bar and the grid both constrain one column
- * the two predicates are kept side by side and AND-ed in SQL, which is what the
- * in-memory path did by running both filters in sequence.
+ * The filter bar's unit/brand selections used to be folded in here as extra
+ * equality predicates. They no longer are: they are member scope, not column
+ * filters, and they now reach the engine as `MemberScopeFilters` (ADR-02).
  */
 export function toEngineFilters(
   filters: ColumnFilter[] | undefined,
   keyMap: ReportKeyMap = {},
-  scope: ScopeColumnFilters = {},
 ): ReportColumnFilters {
   const out: ReportColumnFilters = {};
 
@@ -146,21 +131,6 @@ export function toEngineFilters(
     const engineFilter = toEngineFilter(filter.col, filter);
     if (Object.keys(engineFilter).length === 0) continue;
     out[keyMap[filter.col] ?? filter.col] = engineFilter;
-  }
-
-  for (const [column, value] of Object.entries(scope)) {
-    if (!isSet(value)) continue;
-    const key = keyMap[column] ?? column;
-    const scopeFilter: ReportColumnFilterDto = {
-      operator: StringOperator.EQUALS,
-      value: value as string,
-    };
-    const existing = out[key];
-    if (!existing) {
-      out[key] = scopeFilter;
-      continue;
-    }
-    out[key] = [...(Array.isArray(existing) ? existing : [existing]), scopeFilter];
   }
 
   return out;

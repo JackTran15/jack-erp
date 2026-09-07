@@ -14,8 +14,18 @@ export interface ReportTemplateColumn {
   order: number;
 }
 
+/**
+ * Which tier a saved template lives in. `chain` is the organization-wide default
+ * every branch inherits until it saves its own; `branch` is one branch's override.
+ */
+export type TemplateScope = 'chain' | 'branch';
+
 export interface InvoiceReportTemplateView {
   id: string;
+  /** Tier this template lives in. */
+  scope: TemplateScope;
+  /** Owning branch; null for a chain-tier template. */
+  branchId: string | null;
   /** The report type this template belongs to. */
   reportType: string;
   name: string;

@@ -1,0 +1,218 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: warehouse-list-multiselect
+slug: warehouse-list-multiselect
+profile: none
+created: 2026-08-27T10:06:24
+current_gate: G5
+history:
+  - gate: G0
+    action: passed
+    at: 2026-08-27T10:07:22
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-08-27T10:08:37
+    by: Akenzy
+    evidence: 8 assumptions, none blocking-and-pending; 16 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-27T10:11:01
+    by: Akenzy
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-27T10:15:14
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 9 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-27T10:15:39
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-27T10:15:39
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-27T10:15:39
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-27T10:15:39
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-27T10:17:34
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-27T10:17:34
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-27T10:17:34
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-27T10:17:34
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-27T10:17:44
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-27T10:17:45
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-27T10:17:45
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-27T10:17:45
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-27T10:17:50
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-27T10:18:35
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-27T10:18:36
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-27T10:19:19
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-27T10:19:19
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-27T10:20:20
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-27T10:20:20
+    by: claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-27T10:20:57
+    by: claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-27T10:20:58
+    by: claude
+    ticket: T-03-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-27T10:22:05
+    by: claude
+    ticket: T-03-03
+  - gate: G4
+    action: passed
+    at: 2026-08-27T10:33:31
+    by: Akenzy
+    evidence: all 9 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-08-27T10:33:37
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid
+  - gate: G3
+    action: reopened
+    at: 2026-08-27T10:57:46
+    by: Akenzy
+    reason: In tem hàng loạt bắn một request tra giá cho mỗi dòng — bug lộ ra khi Chọn tất cả, cần thêm UOW-04
+  - gate: G3
+    action: passed
+    at: 2026-08-27T10:59:27
+    by: Akenzy
+    evidence: graph valid - 4 UoW, 11 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-27T10:59:27
+    by: claude
+    ticket: T-04-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-27T10:59:27
+    by: claude
+    ticket: T-04-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-27T10:59:27
+    by: claude
+    ticket: T-04-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-27T10:59:27
+    by: claude
+    ticket: T-04-02
+  - gate: G4
+    action: passed
+    at: 2026-08-27T10:59:34
+    by: Akenzy
+    evidence: all 11 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-08-27T10:59:34
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid
+  - gate: G3
+    action: reopened
+    at: 2026-08-27T11:29:50
+    by: Akenzy
+    reason: Kiểm kê kho cũng tick-là-fetch (selectStockTake trong ô checkbox) — người dùng chốt sửa nốt, thêm UOW-05
+  - gate: G3
+    action: passed
+    at: 2026-08-27T11:29:59
+    by: Akenzy
+    evidence: graph valid - 5 UoW, 12 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-27T11:30:00
+    by: claude
+    ticket: T-05-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-27T11:30:00
+    by: claude
+    ticket: T-05-01
+  - gate: G4
+    action: passed
+    at: 2026-08-27T11:30:00
+    by: Akenzy
+    evidence: all 12 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-08-27T11:30:00
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

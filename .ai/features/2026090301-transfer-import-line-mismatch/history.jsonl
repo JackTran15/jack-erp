@@ -1,0 +1,23 @@
+{"action": "passed", "at": "2026-09-03T19:38:35", "by": "Akenzy", "evidence": "architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete", "gate": "G0", "id": "3cdb97551307", "ts": "2026-09-03T19:38:35.369170"}
+{"action": "passed", "at": "2026-09-03T19:38:35", "by": "Akenzy", "evidence": "8 assumptions, none blocking-and-pending; 11 acceptance criteria defined", "gate": "G1", "id": "803bbad28754", "ts": "2026-09-03T19:38:35.432141"}
+{"action": "passed", "at": "2026-09-03T19:38:35", "by": "Akenzy", "evidence": "4 ADR(s) recorded", "gate": "G2", "id": "d74b618af85c", "ts": "2026-09-03T19:38:35.494523"}
+{"action": "passed", "at": "2026-09-03T19:38:35", "by": "Akenzy", "evidence": "graph valid - 3 UoW, 7 tickets, no cycles", "gate": "G3", "id": "bbea7869233d", "ts": "2026-09-03T19:38:35.607682"}
+{"action": "ticket in_progress", "at": "2026-09-03T19:38:42", "by": "claude", "gate": "G4", "id": "41f813955d5b", "ticket": "T-01-01", "ts": "2026-09-03T19:38:42.191213"}
+{"action": "ticket review", "at": "2026-09-03T19:46:30", "by": "claude", "gate": "G4", "id": "8af9b8e329c6", "ticket": "T-01-01", "ts": "2026-09-03T19:46:30.369543"}
+{"action": "ticket in_progress", "at": "2026-09-03T19:46:41", "by": "claude", "gate": "G4", "id": "64f2373b3440", "ticket": "T-02-01", "ts": "2026-09-03T19:46:41.793339"}
+{"action": "ticket review", "at": "2026-09-03T19:50:37", "by": "claude", "gate": "G4", "id": "743218040462", "ticket": "T-02-01", "ts": "2026-09-03T19:50:37.821470"}
+{"action": "ticket done", "at": "2026-09-03T19:53:26", "by": "Akenzy", "gate": "G4", "id": "574c960ba1f7", "ticket": "T-01-01", "ts": "2026-09-03T19:53:26.845720"}
+{"action": "ticket done", "at": "2026-09-03T19:53:26", "by": "Akenzy", "gate": "G4", "id": "81b1009625e9", "ticket": "T-02-01", "ts": "2026-09-03T19:53:26.956560"}
+{"action": "ticket in_progress", "at": "2026-09-03T19:53:36", "by": "claude", "gate": "G4", "id": "b62a29019564", "ticket": "T-01-02", "ts": "2026-09-03T19:53:36.147661"}
+{"action": "ticket review", "at": "2026-09-03T19:55:50", "by": "claude", "gate": "G4", "id": "ce4d25f9a087", "ticket": "T-01-02", "ts": "2026-09-03T19:55:50.117619"}
+{"action": "ticket in_progress", "at": "2026-09-03T19:55:50", "by": "claude", "gate": "G4", "id": "36068d8f1f5e", "ticket": "T-03-01", "ts": "2026-09-03T19:55:50.184454"}
+{"action": "ticket review", "at": "2026-09-03T19:59:42", "by": "claude", "gate": "G4", "id": "b13d506d9be5", "ticket": "T-03-01", "ts": "2026-09-03T19:59:42.559746"}
+{"action": "ticket in_progress", "at": "2026-09-03T19:59:42", "by": "claude", "gate": "G4", "id": "c231e9d84b92", "ticket": "T-02-02", "ts": "2026-09-03T19:59:42.634532"}
+{"action": "ticket done", "at": "2026-09-03T20:05:38", "by": "Akenzy", "gate": "G4", "id": "4ecb56f02ea4", "ticket": "T-01-02", "ts": "2026-09-03T20:05:38.273123"}
+{"action": "ticket done", "at": "2026-09-03T20:05:38", "by": "Akenzy", "gate": "G4", "id": "28046e9fbfbd", "ticket": "T-03-01", "ts": "2026-09-03T20:05:38.382326"}
+{"action": "ticket in_progress", "at": "2026-09-03T20:05:47", "by": "claude", "gate": "G4", "id": "d08f48d9ffe8", "ticket": "T-01-03", "ts": "2026-09-03T20:05:47.363730"}
+{"action": "ticket review", "at": "2026-09-03T20:18:06", "by": "claude", "gate": "G4", "id": "c3f9376fe3f8", "ticket": "T-01-03", "ts": "2026-09-03T20:18:06.438176"}
+{"action": "ticket in_progress", "at": "2026-09-03T20:18:06", "by": "claude", "gate": "G4", "id": "38651906a9a1", "ticket": "T-01-04", "ts": "2026-09-03T20:18:06.501834"}
+{"action": "ticket review", "at": "2026-09-03T20:20:27", "by": "claude", "gate": "G4", "id": "580942b57f07", "ticket": "T-01-04", "ts": "2026-09-03T20:20:27.996341"}
+{"action": "ticket done", "at": "2026-09-03T20:36:51", "by": "Akenzy", "gate": "G4", "id": "ab682f71f4cb", "ticket": "T-01-03", "ts": "2026-09-03T20:36:51.876159"}
+{"action": "ticket done", "at": "2026-09-03T20:36:52", "by": "Akenzy", "gate": "G4", "id": "c86c7d48989b", "ticket": "T-01-04", "ts": "2026-09-03T20:36:52.000086"}

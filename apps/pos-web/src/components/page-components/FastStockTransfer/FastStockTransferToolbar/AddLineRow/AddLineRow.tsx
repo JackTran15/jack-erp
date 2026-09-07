@@ -32,22 +32,21 @@ export function AddLineRow() {
     el.select();
   }, []);
 
-  // Thêm xong thì con trỏ về ô Hàng hóa, không về ô Người vận chuyển: người vận
-  // chuyển được giữ lại nên thủ kho quét mã kế tiếp mà không phải chạm gì thêm.
+  // Thêm xong thì con trỏ về ô Người vận chuyển: mỗi dòng được xóa sạch draft,
+  // kể cả người vận chuyển, nên đó là ô phải nhập lại đầu tiên.
   //
   // Không focus thẳng trong callback thành công được: lúc đó `isMutating` vẫn còn
   // bật nên ô đang `disabled`, và trình duyệt bỏ focus trên phần tử disabled. Đặt
   // cờ rồi để effect nhặt lại khi ô mở khóa.
-  const [focusProductPending, setFocusProductPending] = useState(false);
+  const [focusCarrierPending, setFocusCarrierPending] = useState(false);
 
   useEffect(() => {
-    if (!focusProductPending) return;
-    const el = productInputRef.current;
+    if (!focusCarrierPending) return;
+    const el = carrierInputRef.current;
     if (!el || el.disabled) return;
-    el.focus();
-    el.select();
-    setFocusProductPending(false);
-  }, [focusProductPending, isMutating]);
+    focusCarrier();
+    setFocusCarrierPending(false);
+  }, [focusCarrier, focusCarrierPending, isMutating]);
 
   useEffect(() => {
     if (focusedForDirectionRef.current === direction) return;
@@ -87,7 +86,7 @@ export function AddLineRow() {
           <FastStockTransferProductSearchInput
             disabled={isSessionClosed || isMutating}
             inputRef={productInputRef}
-            onAdded={() => setFocusProductPending(true)}
+            onAdded={() => setFocusCarrierPending(true)}
             onMissingCarrier={focusCarrier}
           />
         </div>
@@ -112,7 +111,7 @@ export function AddLineRow() {
         type="button"
         onClick={() =>
           void handleAddRow({
-            onAdded: () => setFocusProductPending(true),
+            onAdded: () => setFocusCarrierPending(true),
             onMissingCarrier: focusCarrier,
           })
         }

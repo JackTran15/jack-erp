@@ -21,6 +21,9 @@ describe('counterpartyNameSql', () => {
   });
 
   it('casts users.organization_id — it is uuid while the documents keep varchar', () => {
+    // Not proof by itself — the type mismatch this guards against only
+    // surfaces when Postgres actually plans the query; see the e2e in
+    // apps/api/test/e2e/goods-doc-party-filter.e2e-spec.ts (T-02-01).
     const sql = counterpartyNameSql('gr');
 
     // Without this the employee branch reads `uuid = character varying`, which

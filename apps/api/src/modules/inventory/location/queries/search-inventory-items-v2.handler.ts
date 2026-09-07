@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -15,19 +16,58 @@ import {
 import { SearchInventoryItemsV2Query } from './search-inventory-items-v2.query';
 
 /**
+ * Signed on-hand total for one group, in a single branch.
+ *
+ * Three properties are load-bearing, one per acceptance criterion:
+ *  - COALESCE(..., 0) — a group with no stock_balances row totals 0, so it still
+ *    reads as out of stock instead of dropping out of the result;
+ *  - SUM is NOT clamped — -1 and +1 must cancel to 0. Never wrap this in
+ *    GREATEST(0, ...);
+ *  - the branch is matched on stock_balances.branch_id, which is varchar while
+ *    branches.id is uuid. The parameter is bound as text on purpose: casting it
+ *    to ::uuid makes Postgres infer two conflicting types for one parameter.
+ *    See ADR-02 — storages.branch_id is the documented-authoritative column, but
+ *    this one matches the stock summary screen users cross-check against and hits
+ *    IDX_stock_balances_org_branch_item.
+ */
+const stockTotalColumn = (itemPredicate: string, branchParam: number): string => `
+      COALESCE((
+        SELECT SUM(sb.quantity)
+        FROM stock_balances sb
+        JOIN locations loc ON loc.id = sb.location_id
+        JOIN storages  st  ON st.id  = loc.storage_id
+        WHERE ${itemPredicate}
+          AND sb.organization_id = $1
+          AND sb.branch_id = $${branchParam}
+          AND sb.is_tracked = true
+          AND loc.is_active = true
+          AND st.is_active = true
+      ), 0)                                      AS "stockTotal",`;
+
+/** Row columns of the CTE, minus the internal "stockTotal" helper. */
+const ROW_COLUMNS = `type, id, code, name, barcode, unit, brand,
+      "purchasePrice", "sellingPrice", "isPosVisible", "isActive", "itemCount"`;
+
+/**
  * SHARED SQL — changing a column here changes it for BOTH consumers:
  *
  *   1. `SearchInventoryItemsV2Handler` (this file) -> POST /v2/inventory-items/search (web)
- *   2. `MobileProductService`                      -> GET  /mobile/products          (app)
+ *   2. `MobileProductService` (via `COMBINED_CTE`)  -> GET  /mobile/products          (app)
  *
  * It is exported rather than copied because a second copy of this block would
  * drift silently. Read it as a contract, not as a local helper: an edit made
  * while reasoning only about this file will break the mobile list with nothing
  * to warn you.
  *
- * PARAMETER CONTRACT: `$1` is the organization id, referenced in four places
- * inside. Any statement appended after the CTE must number its own
- * placeholders starting at `$2`.
+ * PARAMETER CONTRACT: `$1` is the organization id, referenced throughout
+ * (including the optional stockTotal subquery). Any statement appended after
+ * the CTE must number its own placeholders starting at `$2`.
+ *
+ * `branchParam` is the placeholder index holding the branch id, set only when the
+ * caller asked for the out-of-stock filter. When it is undefined the emitted SQL
+ * is byte-for-byte what it was before the filter existed — no extra join, no
+ * extra subquery — so the 99% of list loads that do not use the filter pay
+ * nothing for it.
  *
  * The CTE is deliberately unordered — every caller supplies its own
  * `ORDER BY`. This handler pins `code ASC`; the mobile one picks per request.
@@ -39,7 +79,7 @@ import { SearchInventoryItemsV2Query } from './search-inventory-items-v2.query';
  * "anyActive"` column instead of changing `bool_and` — the web filters rely on
  * the current meaning.
  */
-export const COMBINED_CTE = `
+export const buildCombinedCte = (branchParam?: number): string => `
   WITH combined AS (
     SELECT
       'product'                                  AS type,
@@ -58,6 +98,14 @@ export const COMBINED_CTE = `
       AVG(i.selling_price::numeric)::float       AS "sellingPrice",
       bool_and(i.is_pos_visible)                 AS "isPosVisible",
       bool_and(i.is_active)                      AS "isActive",
+${
+  branchParam === undefined
+    ? ''
+    : stockTotalColumn(
+        'sb.item_id IN (SELECT i2.id FROM items i2 WHERE i2.product_id = p.id)',
+        branchParam,
+      )
+}
       COUNT(i.id)::int                           AS "itemCount"
     FROM products p
     INNER JOIN items i ON i.product_id = p.id AND i.organization_id = $1
@@ -82,11 +130,19 @@ export const COMBINED_CTE = `
       i.selling_price::float                     AS "sellingPrice",
       i.is_pos_visible                           AS "isPosVisible",
       i.is_active                                AS "isActive",
+${
+  branchParam === undefined
+    ? ''
+    : stockTotalColumn('sb.item_id = i.id', branchParam)
+}
       0                                          AS "itemCount"
     FROM items i
     WHERE i.organization_id = $1 AND i.product_id IS NULL
   )
 `;
+
+/** The CTE without the stockTotal column — the shape `MobileProductService` consumes. */
+export const COMBINED_CTE = buildCombinedCte();
 
 interface CountRow {
   total: number;
@@ -117,9 +173,24 @@ export class SearchInventoryItemsV2Handler
     const limit = dto.limit ?? 20;
     const offset = (page - 1) * limit;
 
-    // $1 = orgId (referenced throughout the CTE); filter params start at $2.
+    // $1 = orgId (referenced throughout the CTE); filter params start after it.
     const params: unknown[] = [actor.organizationId];
     const where: string[] = [];
+
+    // The out-of-stock filter is scoped to the branch the actor is working in,
+    // so its result set changes when the user switches branch. Without a branch
+    // every group would total 0 and the whole catalogue would read as out of
+    // stock — a silently wrong answer, so refuse instead of guessing.
+    let branchParam: number | undefined;
+    if (dto.outOfStock === true) {
+      if (!actor.branchId) {
+        throw new BadRequestException(
+          'A branch must be selected to filter by out-of-stock status.',
+        );
+      }
+      params.push(actor.branchId);
+      branchParam = params.length;
+    }
 
     this.applyString(where, params, 'code', dto.code);
     this.applyString(where, params, 'barcode', dto.barcode);
@@ -138,17 +209,27 @@ export class SearchInventoryItemsV2Handler
       where.push('"isActive" = true');
     }
 
+    // Sits alongside the column filters so it ANDs with them rather than
+    // replacing them, and needs no parameter of its own.
+    if (branchParam !== undefined) {
+      where.push('"stockTotal" <= 0');
+    }
+
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const cte = buildCombinedCte(branchParam);
+    // "stockTotal" is an internal predicate helper, never part of the response
+    // contract, so project it away when it exists.
+    const selectList = branchParam === undefined ? '*' : ROW_COLUMNS;
 
     const dataSql = `
-      ${COMBINED_CTE}
-      SELECT * FROM combined
+      ${cte}
+      SELECT ${selectList} FROM combined
       ${whereSql}
       ORDER BY code ASC
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}
     `;
     const countSql = `
-      ${COMBINED_CTE}
+      ${cte}
       SELECT COUNT(*)::int AS total FROM combined
       ${whereSql}
     `;

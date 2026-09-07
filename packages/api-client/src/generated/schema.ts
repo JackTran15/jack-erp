@@ -1997,6 +1997,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/items/set-active-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InventoryLocationController_setItemActiveStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/items/by-product/{productId}": {
         parameters: {
             query?: never;
@@ -6486,22 +6502,6 @@ export interface paths {
         patch: operations["GoodsIssueController_update"];
         trace?: never;
     };
-    "/inventory/goods-issues/{id}/lines": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["GoodsIssueController_getLines"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/inventory/goods-issues/{id}/print-payload": {
         parameters: {
             query?: never;
@@ -6576,6 +6576,23 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["GoodsIssueV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory/goods-issues/{id}/lines/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search one goods issue's lines (v2) */
+        post: operations["GoodsIssueV2Controller_searchLines_v2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6872,6 +6889,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/inventory/transfer-orders/{id}/export-goods-issue/lines/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search the lines of a transfer's export goods issue (v2) */
+        post: operations["TransferOrderV2Controller_searchExportGoodsIssueLines_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory/transfer-orders/{id}/import-goods-receipt/lines/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search the lines of a transfer's import goods receipt (v2) */
+        post: operations["TransferOrderV2Controller_searchImportGoodsReceiptLines_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/goods-receipts": {
         parameters: {
             query?: never;
@@ -6902,22 +6953,6 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["GoodsReceiptController_update"];
-        trace?: never;
-    };
-    "/goods-receipts/{id}/lines": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["GoodsReceiptController_getLines"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
     "/goods-receipts/{id}/print-payload": {
@@ -6978,6 +7013,23 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["GoodsReceiptV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/goods-receipts/{id}/lines/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search one goods receipt's lines (v2) */
+        post: operations["GoodsReceiptV2Controller_searchLines_v2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7048,142 +7100,6 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["IssueReasonController_update"];
-        trace?: never;
-    };
-    "/reports/inventory/stock-summary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Tổng hợp nhập xuất tồn kho */
-        get: operations["InventoryReportsController_stockSummary"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/reports/inventory/stock-document-details": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Bảng kê chi tiết phiếu nhập xuất */
-        get: operations["InventoryReportsController_stockDocumentDetails"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/reports/inventory/stock-quantity-details": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Chi tiết số lượng nhập xuất tồn */
-        get: operations["InventoryReportsController_stockQuantityDetails"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/reports/inventory/stock-summary-by-branch": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Tổng hợp nhập xuất tồn theo cửa hàng */
-        get: operations["InventoryReportsController_stockSummaryByBranch"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/reports/inventory/stock-by-branch": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Số lượng tồn theo cửa hàng (pivot) */
-        get: operations["InventoryReportsController_stockByBranch"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/reports/inventory/temporary-warehouse-out-goods": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Hàng hóa xuất kho tạm */
-        get: operations["InventoryReportsController_temporaryWarehouseOutGoods"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/reports/inventory/transfer-summary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Tổng hợp nhập xuất điều chuyển */
-        get: operations["InventoryReportsController_transferSummary"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/reports/inventory/transfer-by-branch": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Hàng hóa điều chuyển theo cửa hàng */
-        get: operations["InventoryReportsController_transferByBranch"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
     "/reports/inventory/columns": {
@@ -8890,6 +8806,8 @@ export interface components {
             variantLabel?: string | null;
             isPosVisible: boolean;
             isActive: boolean;
+            /** @description Location-level tracking (stock_balances.is_tracked) for this item at this location. */
+            isTracked: boolean;
             sellingPrice: number;
             purchasePrice: number;
             barcodes: string[];
@@ -9227,8 +9145,11 @@ export interface components {
             storage?: components["schemas"]["StorageEntity"];
             /**
              * @description Transient (not a column): whether any item has been placed at this location
-             *     (has ≥1 stock_balance row). Populated by listLocations to drive the
-             *     "Xếp hàng hóa: Đã xếp / Chưa xếp" column. Undefined on endpoints that don't compute it.
+             *     (has ≥1 stock_balance row that is still tracked — rows left behind by
+             *     "Ngừng theo dõi" do not count). Populated by listLocations and by
+             *     SearchLocationsV2Handler to drive the "Xếp hàng hóa: Đã xếp / Chưa xếp"
+             *     column; both must use the same definition. Undefined on endpoints that
+             *     don't compute it.
              */
             hasItems?: boolean;
             id: string;
@@ -9347,6 +9268,27 @@ export interface components {
             updatedAt: string;
             /** @description UUID of the user who created this record. */
             createdBy: string;
+        };
+        SetItemActiveStatusDto: {
+            /** @description Grid row ids. A products.id expands to every variant of that product; an items.id targets that item. */
+            ids: string[];
+            /** @description true = Đang kinh doanh, false = Ngừng kinh doanh. */
+            isActive: boolean;
+        };
+        SetItemActiveStatusSkippedDto: {
+            /** @description SKU of the item that was not changed. */
+            code: string;
+            /**
+             * @description IN_SHOWROOM — stock still sits in a main (Showroom) storage and has to be moved out first.
+             * @enum {string}
+             */
+            reason: "IN_SHOWROOM";
+        };
+        SetItemActiveStatusResponseDto: {
+            /** @description Number of item rows actually updated. */
+            updated: number;
+            /** @description Items deliberately left alone. A non-empty list is a normal outcome, not an error. */
+            skipped: components["schemas"]["SetItemActiveStatusSkippedDto"][];
         };
         ItemLookupResultDto: {
             /** Format: uuid */
@@ -9518,6 +9460,17 @@ export interface components {
              * @default false
              */
             includeInactive: boolean;
+            /**
+             * @description Keep only groups whose stock is exhausted in the actor's current branch:
+             *     the signed sum of every variant's on-hand quantity is <= 0.
+             *
+             *     The sum is signed on purpose — a group holding -1 and +1 totals 0 and counts
+             *     as out of stock — and a group with no stock_balances row at all totals 0 too.
+             *     Note this threshold is `<= 0`, deliberately wider than
+             *     StockStateFilter.OUT_OF_STOCK (`= 0`) used by the stock summary screen.
+             * @default false
+             */
+            outOfStock: boolean;
             /** @description Mã SKU */
             code?: components["schemas"]["StringFilterDto"];
             /** @description Mã vạch — matches if any barcode of the group matches */
@@ -11669,6 +11622,13 @@ export interface components {
             note?: string;
             sortOrder?: number;
         };
+        DraftPaymentDto: {
+            /** @enum {string} */
+            method: "cash" | "bank_transfer" | "card";
+            amount: number;
+            /** Format: uuid */
+            paymentAccountId?: string;
+        };
         CreateInvoiceDto: {
             sessionId: string;
             /** Format: uuid */
@@ -11681,6 +11641,11 @@ export interface components {
              * @description Employee (employee_profiles.id) credited with the sale.
              */
             salespersonId?: string;
+            /**
+             * @description Tendered payment lines to snapshot on the draft. Omitted = no snapshot; the
+             *     POS then reopens the draft with a single cash line for the amount due.
+             */
+            payments?: components["schemas"]["DraftPaymentDto"][];
         };
         InvoiceEntity: {
             code: string;
@@ -11718,6 +11683,14 @@ export interface components {
             isDraft: boolean;
             sessionId: string;
             draftLabel?: string;
+            /**
+             * @description Not a payment record: `invoice_payments` owns money that was actually taken,
+             *     and its rows need a resolved GL account. This is the cashier's in-progress
+             *     tender, kept only so reopening a held cart restores what they had typed.
+             *     NULL = draft saved before the column existed; the POS falls back to a single
+             *     cash line for the amount due.
+             */
+            draftPayments?: Record<string, never>[];
             customerId?: string;
             staffId: string;
             salespersonId?: string;
@@ -11890,6 +11863,14 @@ export interface components {
             isDraft: boolean;
             sessionId: string;
             draftLabel?: string;
+            /**
+             * @description Not a payment record: `invoice_payments` owns money that was actually taken,
+             *     and its rows need a resolved GL account. This is the cashier's in-progress
+             *     tender, kept only so reopening a held cart restores what they had typed.
+             *     NULL = draft saved before the column existed; the POS falls back to a single
+             *     cash line for the amount due.
+             */
+            draftPayments?: Record<string, never>[];
             customerId?: string;
             staffId: string;
             salespersonId?: string;
@@ -12026,6 +12007,11 @@ export interface components {
              * @description Employee (employee_profiles.id) credited with the sale.
              */
             salespersonId?: string;
+            /**
+             * @description Tendered payment lines to snapshot on the draft. Omitting the field leaves an
+             *     existing snapshot untouched; an empty array clears it.
+             */
+            payments?: components["schemas"]["DraftPaymentDto"][];
         };
         InvoicePaymentLineDto: {
             /**
@@ -12091,7 +12077,17 @@ export interface components {
             locationId: string;
             quantity: number;
             unitPrice: number;
+            /** @description Server-computed discount amount; ignored when lineDiscountType is set. */
             lineDiscount?: number;
+            /**
+             * @description Manual per-line discount type; when set, the server computes lineDiscount from lineDiscountValue.
+             * @enum {string}
+             */
+            lineDiscountType?: "percent" | "amount";
+            /** @description Raw discount value: 10 means 10% when type=percent; a currency amount when type=amount. */
+            lineDiscountValue?: number;
+            /** @description Free-text reason/label for the discount, e.g. "sale30". */
+            lineDiscountReason?: string;
             note?: string;
         };
         CreateReturnInvoiceDto: {
@@ -12898,6 +12894,13 @@ export interface components {
             order?: number;
         };
         CreateInvoiceReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
             reportType: string;
             name: string;
             description?: string;
@@ -12907,6 +12910,13 @@ export interface components {
             sortOrder?: number;
         };
         UpdateInvoiceReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
             name?: string;
             description?: string;
             columns?: components["schemas"]["ReportTemplateColumnDto"][];
@@ -13049,6 +13059,13 @@ export interface components {
             limit: number;
         };
         CreateDebtReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
             reportType: string;
             name: string;
             description?: string;
@@ -13058,6 +13075,13 @@ export interface components {
             sortOrder?: number;
         };
         UpdateDebtReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
             name?: string;
             description?: string;
             columns?: components["schemas"]["ReportTemplateColumnDto"][];
@@ -13115,6 +13139,13 @@ export interface components {
             limit: number;
         };
         CreateProfitReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
             reportType: string;
             name: string;
             description?: string;
@@ -13124,6 +13155,13 @@ export interface components {
             sortOrder?: number;
         };
         UpdateProfitReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
             name?: string;
             description?: string;
             columns?: components["schemas"]["ReportTemplateColumnDto"][];
@@ -13266,6 +13304,13 @@ export interface components {
         GoodsIssueLineEntity: {
             id: string;
             goodsIssueId: string;
+            /**
+             * @description 1-based position of this line within its voucher — the order the user typed.
+             *     Explicit rather than derived: this table has no `created_at`, and ordering by
+             *     the uuid primary key gives an arbitrary permutation (ADR-01). Unique per
+             *     `goods_issue_id`, and every write path must set it.
+             */
+            lineNo: number;
             itemId: string;
             locationId: string;
             quantity: number;
@@ -13296,6 +13341,22 @@ export interface components {
             date?: components["schemas"]["DateRangeFilterDto"];
             /** @description Tổng tiền (computed line total: SUM(quantity * unit_price)) */
             totalAmount?: components["schemas"]["CompareFilterDto"];
+        };
+        GoodsIssueLineSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            limit: number;
+            /** @description Mã SKU — matches `items.code`. */
+            itemCode?: components["schemas"]["StringFilterDto"];
+            /** @description Tên hàng hóa — matches `items.name`. */
+            itemName?: components["schemas"]["StringFilterDto"];
+            /** @description Số lượng */
+            quantity?: components["schemas"]["CompareFilterDto"];
+            /** @description Đơn giá */
+            unitPrice?: components["schemas"]["CompareFilterDto"];
+            /** @description Thành tiền — `quantity * unit_price`, see LINE_AMOUNT_EXPRESSION. */
+            lineTotal?: components["schemas"]["CompareFilterDto"];
         };
         GoodsIssueV2LineDto: {
             /** Format: uuid */
@@ -13505,6 +13566,20 @@ export interface components {
             organizationId: string;
             branchId?: string;
             goodsReceiptId: string;
+            /**
+             * @description 1-based position of this line within its voucher — the order the user typed
+             *     it, and the ONLY thing `getLines` orders by (ADR-05).
+             *
+             *     `createdAt` below is still written and still happens to agree, because the
+             *     backfill derived this column from it. Do not order by it again: it agrees by
+             *     history, not by contract, and it cannot express a line inserted into the
+             *     middle of an existing voucher, which renumbering here does.
+             *
+             *     Unique per `goods_receipt_id`, no database default: every write path must
+             *     set it, and one that forgets should fail at the insert rather than collide
+             *     on some later row.
+             */
+            lineNo: number;
             itemId: string;
             locationId: string;
             binId?: string;
@@ -13539,6 +13614,22 @@ export interface components {
             occurredAt?: string;
         };
         ImportTransferOrderDto: Record<string, never>;
+        GoodsReceiptLineSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            limit: number;
+            /** @description Mã SKU — matches `items.code`. */
+            itemCode?: components["schemas"]["StringFilterDto"];
+            /** @description Tên hàng hóa — matches `items.name`. */
+            itemName?: components["schemas"]["StringFilterDto"];
+            /** @description Số lượng */
+            quantity?: components["schemas"]["CompareFilterDto"];
+            /** @description Đơn giá */
+            unitPrice?: components["schemas"]["CompareFilterDto"];
+            /** @description Thành tiền — `quantity * unit_price`, see LINE_AMOUNT_EXPRESSION. */
+            lineTotal?: components["schemas"]["CompareFilterDto"];
+        };
         GoodsReceiptLineDto: {
             /** Format: uuid */
             itemId: string;
@@ -13745,6 +13836,22 @@ export interface components {
              * @enum {string}
              */
             statBy?: "item" | "parent" | "group";
+            /**
+             * @description Which backoffice view is asking (default single).
+             *
+             *     Only reports whose row shape differs between the two views read it; the
+             *     rest resolve their scope from `store` alone, as they always have.
+             * @enum {string}
+             */
+            viewMode?: "single" | "chain";
+            /**
+             * @description Transfer document detail only — which leg of the pair is primary.
+             *
+             *     Declared here because the global ValidationPipe runs with
+             *     `forbidNonWhitelisted`, so an undeclared field makes the whole request 400.
+             * @enum {string}
+             */
+            transferLeg?: "in" | "out" | "received" | "unmatched";
             /** @description Custom period (inclusive ISO dates). Wins over `preset` when set. */
             period?: components["schemas"]["DateRangeFilterDto"];
             /** @description Multi-store scope. Absent or scope="all" ⇒ org-wide (legacy parity). */
@@ -13797,6 +13904,13 @@ export interface components {
             };
         };
         CreateInventoryReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
             reportType: string;
             name: string;
             description?: string;
@@ -13806,6 +13920,13 @@ export interface components {
             sortOrder?: number;
         };
         UpdateInventoryReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
             name?: string;
             description?: string;
             columns?: components["schemas"]["ReportTemplateColumnDto"][];
@@ -17499,6 +17620,8 @@ export interface operations {
                 providerId?: string;
                 isPosVisible?: boolean;
                 isActive?: boolean;
+                /** @description Filter by location-level tracking (stock_balances.is_tracked). Omit = all. */
+                isTracked?: boolean;
                 stockState?: "all" | "positive" | "zero" | "negative" | "below-min";
             };
             header?: never;
@@ -17689,6 +17812,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ItemEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_setItemActiveStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetItemActiveStatusDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetItemActiveStatusResponseDto"];
                 };
             };
         };
@@ -18717,6 +18863,10 @@ export interface operations {
                 isActive?: boolean;
                 /** @description Lọc theo trạng thái theo dõi vị trí (stock_balances.is_tracked). Bỏ trống = tất cả. */
                 isTracked?: boolean;
+                /** @description Loại trừ kho showroom (storages.is_main_storage) khỏi kết quả. */
+                excludeShowroom?: boolean;
+                /** @description Lọc theo trạng thái hoạt động của vị trí (locations.is_active). Bỏ trống = tất cả. */
+                locationIsActive?: boolean;
                 locationCode?: string;
                 locationCodeMode?: string;
                 locationName?: string;
@@ -24592,6 +24742,7 @@ export interface operations {
         parameters: {
             query?: {
                 reportType?: string;
+                scope?: string;
             };
             header?: never;
             path?: never;
@@ -24634,7 +24785,9 @@ export interface operations {
     };
     InvoiceReportController_getTemplate: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -24655,7 +24808,9 @@ export interface operations {
     };
     InvoiceReportController_deleteTemplate: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -24885,6 +25040,7 @@ export interface operations {
         parameters: {
             query?: {
                 reportType?: string;
+                scope?: string;
             };
             header?: never;
             path?: never;
@@ -24927,7 +25083,9 @@ export interface operations {
     };
     DebtReportController_getTemplate: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -24948,7 +25106,9 @@ export interface operations {
     };
     DebtReportController_deleteTemplate: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -25111,6 +25271,7 @@ export interface operations {
         parameters: {
             query?: {
                 reportType?: string;
+                scope?: string;
             };
             header?: never;
             path?: never;
@@ -25153,7 +25314,9 @@ export interface operations {
     };
     ProfitReportController_getTemplate: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -25174,7 +25337,9 @@ export interface operations {
     };
     ProfitReportController_deleteTemplate: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -25450,7 +25615,10 @@ export interface operations {
     };
     GoodsIssueController_getById: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Include the voucher lines. Defaults to true. Pass false when the caller pages the lines separately through GET /:id/lines — on a large voucher the lines are the only part of this payload that scales with size. */
+                includeLines?: boolean;
+            };
             header?: never;
             path: {
                 id: string;
@@ -25490,36 +25658,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GoodsIssueEntity"];
-                };
-            };
-        };
-    };
-    GoodsIssueController_getLines: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                sortBy?: string;
-                sortOrder?: "asc" | "desc";
-                search?: string;
-                filters?: string;
-                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
-                includeInactive?: boolean;
-            };
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
                 };
             };
         };
@@ -25616,6 +25754,31 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["GoodsIssueSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoodsIssueV2Controller_searchLines_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoodsIssueLineSearchV2Dto"];
             };
         };
         responses: {
@@ -26109,6 +26272,56 @@ export interface operations {
             };
         };
     };
+    TransferOrderV2Controller_searchExportGoodsIssueLines_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoodsIssueLineSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TransferOrderV2Controller_searchImportGoodsReceiptLines_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoodsReceiptLineSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     GoodsReceiptController_list: {
         parameters: {
             query?: {
@@ -26160,7 +26373,10 @@ export interface operations {
     };
     GoodsReceiptController_getById: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Include the voucher lines. Defaults to true. Pass false when the caller pages the lines separately through GET /:id/lines — on a large voucher the lines are the only part of this payload that scales with size. */
+                includeLines?: boolean;
+            };
             header?: never;
             path: {
                 id: string;
@@ -26219,36 +26435,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GoodsReceiptEntity"];
-                };
-            };
-        };
-    };
-    GoodsReceiptController_getLines: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                sortBy?: string;
-                sortOrder?: "asc" | "desc";
-                search?: string;
-                filters?: string;
-                /** @description Include discontinued (is_active=false) items. Defaults to false, so discontinued items are hidden unless the caller opts in. */
-                includeInactive?: boolean;
-            };
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
                 };
             };
         };
@@ -26324,6 +26510,31 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["GoodsReceiptSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoodsReceiptV2Controller_searchLines_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoodsReceiptLineSearchV2Dto"];
             };
         };
         responses: {
@@ -26493,308 +26704,12 @@ export interface operations {
             };
         };
     };
-    InventoryReportsController_stockSummary: {
-        parameters: {
-            query?: {
-                preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
-                /** @description ISO date (yyyy-MM-dd). Required when preset=custom. */
-                startDate?: string;
-                endDate?: string;
-                /** @description Branch IDs to filter; empty = all visible */
-                branchIds?: string[];
-                /** @description Item category IDs to filter */
-                categoryIds?: string[];
-                /** @description Location/warehouse IDs to filter */
-                locationIds?: string[];
-                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
-                itemGroupBy?: "item" | "parent" | "group";
-                /** @description Full-text search on item code/name */
-                search?: string;
-                page?: number;
-                /** @description Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client. */
-                pageSize?: number;
-                /** @description Lọc theo cột, dạng JSON: {"outQty":{"operator":">=","value":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem. */
-                columnFilters?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InventoryReportsController_stockDocumentDetails: {
-        parameters: {
-            query?: {
-                preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
-                /** @description ISO date (yyyy-MM-dd). Required when preset=custom. */
-                startDate?: string;
-                endDate?: string;
-                /** @description Branch IDs to filter; empty = all visible */
-                branchIds?: string[];
-                /** @description Item category IDs to filter */
-                categoryIds?: string[];
-                /** @description Location/warehouse IDs to filter */
-                locationIds?: string[];
-                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
-                itemGroupBy?: "item" | "parent" | "group";
-                /** @description Full-text search on item code/name */
-                search?: string;
-                page?: number;
-                /** @description Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client. */
-                pageSize?: number;
-                /** @description Lọc theo cột, dạng JSON: {"outQty":{"operator":">=","value":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem. */
-                columnFilters?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InventoryReportsController_stockQuantityDetails: {
-        parameters: {
-            query?: {
-                preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
-                /** @description ISO date (yyyy-MM-dd). Required when preset=custom. */
-                startDate?: string;
-                endDate?: string;
-                /** @description Branch IDs to filter; empty = all visible */
-                branchIds?: string[];
-                /** @description Item category IDs to filter */
-                categoryIds?: string[];
-                /** @description Location/warehouse IDs to filter */
-                locationIds?: string[];
-                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
-                itemGroupBy?: "item" | "parent" | "group";
-                /** @description Full-text search on item code/name */
-                search?: string;
-                page?: number;
-                /** @description Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client. */
-                pageSize?: number;
-                /** @description Lọc theo cột, dạng JSON: {"outQty":{"operator":">=","value":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem. */
-                columnFilters?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InventoryReportsController_stockSummaryByBranch: {
-        parameters: {
-            query?: {
-                preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
-                /** @description ISO date (yyyy-MM-dd). Required when preset=custom. */
-                startDate?: string;
-                endDate?: string;
-                /** @description Branch IDs to filter; empty = all visible */
-                branchIds?: string[];
-                /** @description Item category IDs to filter */
-                categoryIds?: string[];
-                /** @description Location/warehouse IDs to filter */
-                locationIds?: string[];
-                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
-                itemGroupBy?: "item" | "parent" | "group";
-                /** @description Full-text search on item code/name */
-                search?: string;
-                page?: number;
-                /** @description Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client. */
-                pageSize?: number;
-                /** @description Lọc theo cột, dạng JSON: {"outQty":{"operator":">=","value":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem. */
-                columnFilters?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InventoryReportsController_stockByBranch: {
-        parameters: {
-            query?: {
-                preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
-                /** @description ISO date (yyyy-MM-dd). Required when preset=custom. */
-                startDate?: string;
-                endDate?: string;
-                /** @description Branch IDs to filter; empty = all visible */
-                branchIds?: string[];
-                /** @description Item category IDs to filter */
-                categoryIds?: string[];
-                /** @description Location/warehouse IDs to filter */
-                locationIds?: string[];
-                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
-                itemGroupBy?: "item" | "parent" | "group";
-                /** @description Full-text search on item code/name */
-                search?: string;
-                page?: number;
-                /** @description Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client. */
-                pageSize?: number;
-                /** @description Lọc theo cột, dạng JSON: {"outQty":{"operator":">=","value":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem. */
-                columnFilters?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InventoryReportsController_temporaryWarehouseOutGoods: {
-        parameters: {
-            query?: {
-                preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
-                /** @description ISO date (yyyy-MM-dd). Required when preset=custom. */
-                startDate?: string;
-                endDate?: string;
-                /** @description Branch IDs to filter; empty = all visible */
-                branchIds?: string[];
-                /** @description Item category IDs to filter */
-                categoryIds?: string[];
-                /** @description Location/warehouse IDs to filter */
-                locationIds?: string[];
-                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
-                itemGroupBy?: "item" | "parent" | "group";
-                /** @description Full-text search on item code/name */
-                search?: string;
-                page?: number;
-                /** @description Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client. */
-                pageSize?: number;
-                /** @description Lọc theo cột, dạng JSON: {"outQty":{"operator":">=","value":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem. */
-                columnFilters?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InventoryReportsController_transferSummary: {
-        parameters: {
-            query?: {
-                preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
-                /** @description ISO date (yyyy-MM-dd). Required when preset=custom. */
-                startDate?: string;
-                endDate?: string;
-                /** @description Branch IDs to filter; empty = all visible */
-                branchIds?: string[];
-                /** @description Item category IDs to filter */
-                categoryIds?: string[];
-                /** @description Location/warehouse IDs to filter */
-                locationIds?: string[];
-                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
-                itemGroupBy?: "item" | "parent" | "group";
-                /** @description Full-text search on item code/name */
-                search?: string;
-                page?: number;
-                /** @description Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client. */
-                pageSize?: number;
-                /** @description Lọc theo cột, dạng JSON: {"outQty":{"operator":">=","value":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem. */
-                columnFilters?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InventoryReportsController_transferByBranch: {
-        parameters: {
-            query?: {
-                preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
-                /** @description ISO date (yyyy-MM-dd). Required when preset=custom. */
-                startDate?: string;
-                endDate?: string;
-                /** @description Branch IDs to filter; empty = all visible */
-                branchIds?: string[];
-                /** @description Item category IDs to filter */
-                categoryIds?: string[];
-                /** @description Location/warehouse IDs to filter */
-                locationIds?: string[];
-                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
-                itemGroupBy?: "item" | "parent" | "group";
-                /** @description Full-text search on item code/name */
-                search?: string;
-                page?: number;
-                /** @description Trần dùng chung với báo cáo chuỗi (MAX_REPORT_ROWS). Trước đây chặn ở 200 vì lưới tự phân trang phía client. */
-                pageSize?: number;
-                /** @description Lọc theo cột, dạng JSON: {"outQty":{"operator":">=","value":10}}. Khoá là tên field của dòng. Áp ở tầng ngoài cùng của truy vấn nên tác dụng trên toàn tập, không chỉ trang đang xem. */
-                columnFilters?: string;
-                /** @description Cửa hàng xuất (UUID). Bắt buộc gián tiếp — nếu bỏ trống sẽ dùng X-Branch-Id của request. */
-                sourceBranchId?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     InventoryReportV2Controller_getColumns: {
         parameters: {
             query: {
                 reportType: string;
+                viewMode?: "single" | "chain";
+                statBy?: "item" | "parent" | "group";
             };
             header?: never;
             path?: never;
@@ -26911,6 +26826,7 @@ export interface operations {
         parameters: {
             query?: {
                 reportType?: string;
+                scope?: string;
             };
             header?: never;
             path?: never;
@@ -26953,7 +26869,9 @@ export interface operations {
     };
     InventoryReportV2Controller_getTemplate: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -26974,7 +26892,9 @@ export interface operations {
     };
     InventoryReportV2Controller_deleteTemplate: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: string;
+            };
             header?: never;
             path: {
                 id: string;

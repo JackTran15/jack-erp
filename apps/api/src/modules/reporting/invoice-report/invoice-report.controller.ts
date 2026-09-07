@@ -25,7 +25,11 @@ import {
 import { InvoiceReportExportDto } from './dto/invoice-report-export.dto';
 import { invoiceReportLabel } from './queries/get-invoice-report-document.handler';
 import { GetInvoiceReportDocumentQuery } from './queries/get-invoice-report-document.query';
-import { ReportDocumentPayload, ReportGroupBy } from '@erp/shared-interfaces';
+import {
+  ReportDocumentPayload,
+  ReportGroupBy,
+  TemplateScope,
+} from '@erp/shared-interfaces';
 import {
   Actor,
   ActorContext,
@@ -127,16 +131,23 @@ export class InvoiceReportController {
   listTemplates(
     @Actor() actor: ActorContext,
     @Query('reportType') reportType?: string,
+    @Query('scope') scope?: TemplateScope,
   ) {
     return this.queryBus.execute(
-      new ListInvoiceReportTemplatesQuery(actor, reportType),
+      new ListInvoiceReportTemplatesQuery(actor, reportType, scope),
     );
   }
 
   @Get('templates/:id')
   @RequirePermission(BRANCH_READ)
-  getTemplate(@Param('id') id: string, @Actor() actor: ActorContext) {
-    return this.queryBus.execute(new GetInvoiceReportTemplateQuery(id, actor));
+  getTemplate(
+    @Param('id') id: string,
+    @Actor() actor: ActorContext,
+    @Query('scope') scope?: TemplateScope,
+  ) {
+    return this.queryBus.execute(
+      new GetInvoiceReportTemplateQuery(id, actor, scope),
+    );
   }
 
   @Post('templates')
@@ -164,9 +175,13 @@ export class InvoiceReportController {
 
   @Delete('templates/:id')
   // @RequirePermission(TEMPLATE_MANAGE) // NEED CHECK - maybe allow users to delete their own templates without this permission?
-  deleteTemplate(@Param('id') id: string, @Actor() actor: ActorContext) {
+  deleteTemplate(
+    @Param('id') id: string,
+    @Actor() actor: ActorContext,
+    @Query('scope') scope?: TemplateScope,
+  ) {
     return this.commandBus.execute(
-      new DeleteInvoiceReportTemplateCommand(id, actor),
+      new DeleteInvoiceReportTemplateCommand(id, actor, scope),
     );
   }
 

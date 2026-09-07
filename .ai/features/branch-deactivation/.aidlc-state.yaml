@@ -106,3 +106,8 @@ history:
     at: 2026-08-24T17:47:02
     by: code-review
     ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-28T21:46:09
+    by: Claude · implement (Sonnet) (via Akenzy)
+    ticket: T-02-02

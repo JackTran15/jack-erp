@@ -25,6 +25,22 @@ export class GoodsReceiptLineEntity {
   @Column({ name: 'goods_receipt_id', type: 'uuid' })
   goodsReceiptId: string;
 
+  /**
+   * 1-based position of this line within its voucher — the order the user typed
+   * it, and the ONLY thing `getLines` orders by (ADR-05).
+   *
+   * `createdAt` below is still written and still happens to agree, because the
+   * backfill derived this column from it. Do not order by it again: it agrees by
+   * history, not by contract, and it cannot express a line inserted into the
+   * middle of an existing voucher, which renumbering here does.
+   *
+   * Unique per `goods_receipt_id`, no database default: every write path must
+   * set it, and one that forgets should fail at the insert rather than collide
+   * on some later row.
+   */
+  @Column({ name: 'line_no', type: 'int', comment: '1-based position of the line within its voucher' })
+  lineNo: number;
+
   @Column({ name: 'item_id', type: 'uuid' })
   itemId: string;
 

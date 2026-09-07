@@ -17,6 +17,7 @@ import { v5 as uuidv5 } from 'uuid';
 import { createHash } from 'crypto';
 import {
   DomainEventType,
+  StockMovementType,
   TempWarehouseCloseMode,
   TempWarehouseDirection,
   TempWarehouseLineStatus,
@@ -30,6 +31,11 @@ import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { EventPublisher } from '../../events/event-publisher.service';
 import { StockTransferService } from '../transfer/stock-transfer.service';
+import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
+import {
+  businessDayStart,
+  toBusinessDate,
+} from '../../../common/utils/business-timezone.util';
 import { TempWarehouseTransferMaterializerService } from './temp-warehouse-transfer-materializer.service';
 import { TempWarehouseSessionEntity } from './temp-warehouse-session.entity';
 import { TempWarehouseLineEntity } from './temp-warehouse-line.entity';
@@ -46,6 +52,13 @@ import { ListTempWarehouseLinesQueryDto } from './dto/list-lines.query';
 import { CloseBranchSessionsDto } from './dto/close-session.dto';
 import { ListCarriersQueryDto } from './dto/list-carriers.query';
 import { TransferTempWarehouseLinesDto } from './dto/transfer-lines.dto';
+
+/**
+ * `stock_ledger_entries.reference_type` the POS checkout writes its SALE_ISSUE
+ * rows under — see `deduct-stock.step.ts`. Used here to find the sale this
+ * fulfilment compensates.
+ */
+const INVOICE_LEDGER_REFERENCE_TYPE = 'INVOICE';
 
 export interface PublicUser {
   id: string;
@@ -142,6 +155,8 @@ export class TempWarehouseService {
     private readonly itemRepo: Repository<ItemEntity>,
     @InjectRepository(LocationEntity)
     private readonly locationRepo: Repository<LocationEntity>,
+    @InjectRepository(StockLedgerEntryEntity)
+    private readonly ledgerEntryRepo: Repository<StockLedgerEntryEntity>,
     private readonly dataSource: DataSource,
     private readonly locationResolver: BranchLocationResolverService,
     private readonly storageDefaultLocationResolver: StorageDefaultLocationResolverService,
@@ -1512,10 +1527,12 @@ export class TempWarehouseService {
     input.invoiceId = p.invoiceId;
     input.invoiceNumber = p.invoiceNumber;
 
+    const postedAt = await this.resolveFulfillPostedAt(p);
+
     const transfer = await this.stockTransferService.createAndPost(
       input,
       actor,
-      { validateOnHand: false },
+      { validateOnHand: false, postedAt },
     );
 
     // Split + mark consumed lines TRANSFERRED in one transaction. The transfer is
@@ -1563,8 +1580,72 @@ export class TempWarehouseService {
     });
 
     this.logger.log(
-      `Invoice ${p.invoiceId} fulfilled from temp warehouse: transfer ${transfer.id}, ${plan.length} line(s) consumed`,
+      `Invoice ${p.invoiceId} fulfilled from temp warehouse: transfer ${transfer.id}, ` +
+        `${plan.length} line(s) consumed, ledger postedAt ${
+          postedAt ? postedAt.toISOString() : 'write time (unanchored)'
+        }`,
     );
+  }
+
+  /**
+   * Ledger position for the compensating transfer: one millisecond before the
+   * invoice's own ledger rows, clamped to the start of the same business day.
+   *
+   * The stock card orders purely by `posted_at`, and this transfer is written by
+   * a consumer that only runs once the sale has committed — so without this the
+   * running balance dips to -1 on the invoice row even though the goods were
+   * staged in the temp warehouse beforehand. Anchoring on the sale row (immutable
+   * once written) instead of on the consumer's clock is what makes the stamp
+   * identical across replays. The clamp is load-bearing: opening balance is
+   * `SUM(... WHERE posted_at < :from)`, so a stamp that slipped into the previous
+   * day would corrupt the closing balance of one period and the opening balance
+   * of the next. Two conventions have to be respected at once, because the two
+   * report families disagree about where a day starts: the invoice reports cut
+   * on the business day (`businessDayStart`, +07:00), while the inventory period
+   * reports cut on UTC midnight (`date-range-resolver.ts` builds its bounds with
+   * `Date.UTC`, and `stock-period.service.ts` opens with `posted_at < :from`).
+   * Clamping to only one of them leaves the other exposed — notably at 07:00
+   * Asia/Ho_Chi_Minh, which is UTC midnight and a perfectly plausible trading
+   * moment. Taking the later of the two boundaries satisfies both.
+   *
+   * Returns undefined when no sale row can be found: fulfilment is a real stock
+   * correction, and it must not end up in the DLQ merely because the ordering
+   * could not be resolved (ADR-04).
+   */
+  private async resolveFulfillPostedAt(
+    p: TempWarehouseInvoiceFulfillRequestedPayload,
+  ): Promise<Date | undefined> {
+    const anchorRow = await this.ledgerEntryRepo.findOne({
+      where: {
+        organizationId: p.organizationId,
+        referenceType: INVOICE_LEDGER_REFERENCE_TYPE,
+        referenceId: p.invoiceId,
+        // Narrowed to the sale leg on purpose (ADR-02). Nothing else files under
+        // this reference type today, and pinning it keeps that true by force
+        // rather than by luck.
+        movementType: StockMovementType.SALE_ISSUE,
+      },
+      order: { postedAt: 'ASC' },
+      select: { id: true, postedAt: true },
+    });
+
+    if (!anchorRow) {
+      this.logger.warn(
+        `fulfillInvoice ${p.invoiceId}: no ${INVOICE_LEDGER_REFERENCE_TYPE} ledger row to anchor on — ` +
+          'posting the transfer at write time; the stock card may show a negative row',
+      );
+      return undefined;
+    }
+
+    const anchor = new Date(anchorRow.postedAt);
+    const businessDay = new Date(businessDayStart(toBusinessDate(anchor))).getTime();
+    const utcDay = Date.UTC(
+      anchor.getUTCFullYear(),
+      anchor.getUTCMonth(),
+      anchor.getUTCDate(),
+    );
+    const floor = Math.max(businessDay, utcDay);
+    return new Date(Math.max(anchor.getTime() - 1, floor));
   }
 
   // ─── Partial transfer ──────────────────────────────────────────────

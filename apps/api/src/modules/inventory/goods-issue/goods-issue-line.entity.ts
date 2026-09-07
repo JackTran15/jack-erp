@@ -12,6 +12,15 @@ export class GoodsIssueLineEntity {
   @Column({ name: 'goods_issue_id', type: 'uuid', comment: 'Parent goods issue document' })
   goodsIssueId: string;
 
+  /**
+   * 1-based position of this line within its voucher — the order the user typed.
+   * Explicit rather than derived: this table has no `created_at`, and ordering by
+   * the uuid primary key gives an arbitrary permutation (ADR-01). Unique per
+   * `goods_issue_id`, and every write path must set it.
+   */
+  @Column({ name: 'line_no', type: 'int', comment: '1-based position of the line within its voucher' })
+  lineNo: number;
+
   @Column({ name: 'item_id', type: 'uuid', comment: 'Item being issued from stock' })
   itemId: string;
 

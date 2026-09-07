@@ -25,7 +25,10 @@ import {
   UpdateTempWarehouseLineBody,
 } from "@erp/shared-interfaces";
 
-import { TEMP_WAREHOUSE_KEYS } from "@erp/pos/constants/react-query-key.constant";
+import {
+  CATALOG_KEYS,
+  TEMP_WAREHOUSE_KEYS,
+} from "@erp/pos/constants/react-query-key.constant";
 import { tempWarehouseService } from "@erp/pos/services/temp-warehouse.service";
 
 export function useTempWarehouseLines(
@@ -251,6 +254,11 @@ export function useTempWarehouseMutations(
 
   const revalidateTempWarehouse = () => {
     void qc.invalidateQueries({ queryKey: TEMP_WAREHOUSE_KEYS.ALL });
+    // Mỗi dòng kho tạm ACTIVE đổi `sellableQuantity` của catalog (tồn showroom
+    // dự phóng = tồn showroom + hàng đã quét vào kho tạm). Không hạ luôn cache
+    // catalog thì màn bán hàng giữ con số trước lúc quét, và cảnh báo bán khống
+    // lúc thanh toán vẫn bật theo tồn cũ dù hàng đã được đưa ra quầy.
+    void qc.invalidateQueries({ queryKey: CATALOG_KEYS.ALL });
   };
 
   const refetchTempWarehouse = () =>

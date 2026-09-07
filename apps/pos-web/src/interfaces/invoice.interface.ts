@@ -33,6 +33,8 @@ export interface InvoiceItemRow {
    * Chỉ có trên phiếu trả/đổi lập sau khi tính năng này lên; phiếu cũ = 0.
    */
   promotionDiscount?: number;
+  /** Dòng trả lập theo hóa đơn gốc: trỏ về dòng hàng của hóa đơn bán gốc. */
+  originalInvoiceItemId?: string;
   lineTotal: number;
   note?: string;
   sortOrder?: number;
@@ -48,8 +50,17 @@ export interface InvoiceRow {
   status: InvoiceStatus;
   /** SALE | RETURN | EXCHANGE — chỉ SALE mới đổi/trả được (lọc ở trang return-goods). */
   type?: InvoiceType;
+  /** Phiếu trả/đổi lập theo hóa đơn gốc: id hóa đơn bán gốc (trống ở luồng nhanh). */
+  originalInvoiceId?: string;
   isDraft: boolean;
   draftLabel?: string;
+  /**
+   * Ảnh chụp dòng thanh toán lúc lưu tạm (`invoices.draft_payments`, jsonb).
+   * `unknown` là cố ý: cột jsonb không có ràng buộc ở DB, và plugin swagger cũng
+   * chỉ sinh ra `Record<string, never>[]` — nên nơi duy nhất được tin là bộ thu
+   * hẹp trong `mapInvoiceRowToDraftInvoice`, không phải kiểu khai ở đây.
+   */
+  draftPayments?: unknown;
   sessionId: string;
   customerId?: string;
   /** Customer nhúng ở `GET /invoices/drafts`. Các endpoint khác có thể bỏ trống. */

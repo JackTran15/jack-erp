@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
 import { Input } from "./input";
 import { Button } from "./button";
 import { cn } from "../lib/utils";
@@ -37,6 +37,25 @@ export interface LineColumn<R> {
   onCellClick?: (row: R, rowIndex: number) => void;
   /** Filter row symbol shown in the column-header filter cell (=, ≤, *, ...). */
   filterSymbol?: string;
+  /**
+   * Set `false` to drop this column's header filter cell entirely — no symbol,
+   * no input, and the column takes no part in the uncontrolled filter pass.
+   *
+   * For columns the caller cannot actually filter on. A grid whose filters run
+   * server-side can only offer the fields the endpoint accepts, and leaving a
+   * typable box over a field the server ignores is worse than offering no box:
+   * the user types, nothing changes, and there is no way to tell that from
+   * "nothing matched".
+   *
+   * Defaults to `true`; every existing column keeps its filter.
+   */
+  filterable?: boolean;
+  /**
+   * Turns the column header into a sort toggle. Requires the grid-level
+   * `onSortChange` — sorting is controlled, the caller orders `rows` itself
+   * (see that prop).
+   */
+  sortable?: boolean;
   align?: "left" | "right" | "center";
   className?: string;
   /** Placeholder shown in empty cells (e.g. "Tìm mã hoặc tên" for the SKU column). */
@@ -49,6 +68,12 @@ export interface LineColumn<R> {
    * whole `columns` array on every edit, which defeats row memoization.
    */
   footer?: React.ReactNode;
+}
+
+/** Active sort emitted by a `sortable` column header. */
+export interface LineGridSort {
+  key: string;
+  direction: "asc" | "desc";
 }
 
 export interface LineItemGridProps<R> {
@@ -77,13 +102,32 @@ export interface LineItemGridProps<R> {
   onFilterChange?: (filters: Record<string, string>) => void;
   filters?: Record<string, string>;
   /**
+   * Active sort, rendered as an arrow on the matching `sortable` column header.
+   *
+   * Sorting is **controlled only**: the grid never reorders `rows`. Clicking a
+   * sortable header cycles asc → desc → cleared and calls `onSortChange`; the
+   * caller re-orders `rows` and passes them back. Row order carries meaning in
+   * a document grid (the trailing input line stays last, running totals follow
+   * the lines), so that decision belongs to the caller.
+   */
+  sort?: LineGridSort | null;
+  onSortChange?: (sort: LineGridSort | null) => void;
+  /**
    * Sticky `<tfoot>` cells keyed by column key. Preferred over
    * `LineColumn.footer`: totals change on every edit, so keeping them out of
    * the column objects lets `columns` stay referentially stable and lets rows
    * bail out of re-rendering. Takes precedence over `LineColumn.footer`.
    *
-   * Totals are document-wide: they come from the caller's own lines, so they
-   * do not follow the header filters.
+   * The grid never computes these, so what they total is whatever the caller
+   * passes. That makes the two filter modes differ, and the difference is
+   * deliberate:
+   *
+   * - Uncontrolled — the grid narrows `rows` itself while the caller still
+   *   holds the whole document, so these stay document-wide and do not follow
+   *   the header filters.
+   * - Controlled — the caller owns the filter and usually re-fetches, so it
+   *   decides. A server-side grid normally passes totals over the matching set,
+   *   which is what the user is asking about once they have filtered.
    */
   footers?: Record<string, React.ReactNode>;
   /**
@@ -370,6 +414,8 @@ function LineItemGridInner<R>({
   onDeleteRow,
   onFilterChange,
   filters,
+  sort,
+  onSortChange,
   footers,
   getRowKey,
   className,
@@ -416,6 +462,11 @@ function LineItemGridInner<R>({
     const applicable = active.flatMap(([key, value]) => {
       const col = byKey.get(key);
       if (!col) return [];
+      // A column with no filter cell can still carry a stale entry in the map
+      // (the caller seeded `filters`, or the column flipped to unfilterable
+      // while text was in the box). Honouring it would narrow the grid by a
+      // control the user can no longer see or clear.
+      if (col.filterable === false) return [];
       // Columns whose key is synthetic (the value comes from a renderEditor,
       // not from the row) resolve `undefined` for every row — filtering on one
       // would empty the grid. Give them a `getValue` to make them filterable.
@@ -516,6 +567,41 @@ function LineItemGridInner<R>({
     zIndex: 20,
   });
 
+  /**
+   * Header label, wrapped in a sort toggle when the column opts in and the
+   * caller handles sorting. Cycles asc → desc → cleared.
+   */
+  const renderHeaderLabel = (col: LineColumn<R>) => {
+    if (!col.sortable || !onSortChange) return col.label;
+    const active = sort?.key === col.key ? sort.direction : null;
+    const Icon =
+      active === "asc" ? ArrowUp : active === "desc" ? ArrowDown : ChevronsUpDown;
+    return (
+      <button
+        type="button"
+        className="inline-flex w-full min-w-0 items-center justify-center gap-1 hover:text-primary"
+        onClick={() =>
+          onSortChange(
+            active === "asc"
+              ? { key: col.key, direction: "desc" }
+              : active === "desc"
+                ? null
+                : { key: col.key, direction: "asc" },
+          )
+        }
+        aria-label={`Sắp xếp theo ${col.label}`}
+      >
+        <span className="truncate">{col.label}</span>
+        <Icon
+          className={cn(
+            "h-3.5 w-3.5 shrink-0",
+            active ? "text-primary" : "text-muted-foreground/60",
+          )}
+        />
+      </button>
+    );
+  };
+
   const handleFilter = React.useCallback(
     (key: string, value: string) => {
       if (onFilterChange) {
@@ -586,7 +672,7 @@ function LineItemGridInner<R>({
                         ...sizeStyle(group.columns[0]),
                       }}
                     >
-                      {group.columns[0].label}
+                      {renderHeaderLabel(group.columns[0])}
                     </th>
                   ),
                 )
@@ -602,7 +688,7 @@ function LineItemGridInner<R>({
                       ...sizeStyle(col),
                     }}
                   >
-                    {col.label}
+                    {renderHeaderLabel(col)}
                   </th>
                 ))}
             {showRowActions ? (
@@ -632,7 +718,7 @@ function LineItemGridInner<R>({
                           ...sizeStyle(col),
                         }}
                       >
-                        {col.label}
+                        {renderHeaderLabel(col)}
                       </th>
                     ))
                   : [],
@@ -647,17 +733,23 @@ function LineItemGridInner<R>({
                 className="h-8 border-r bg-background p-0"
                 style={{ ...stickyHeaderStyle(filterRowTop), ...sizeStyle(col) }}
               >
-                <div className="flex h-8 min-w-0 items-stretch">
-                  <span className="inline-flex w-7 shrink-0 items-center justify-center border-r bg-muted/30 font-mono text-xs font-semibold text-muted-foreground">
-                    {filterSymbolFor(col as LineColumn<unknown>)}
-                  </span>
-                  <Input
-                    className="h-8 min-w-0 flex-1 rounded-none border-0 bg-background px-2 text-xs font-normal shadow-none focus-visible:ring-inset"
-                    value={activeFilters[col.key] ?? ""}
-                    onChange={(e) => handleFilter(col.key, e.target.value)}
-                    aria-label={`Lọc ${col.label}`}
-                  />
-                </div>
+                {col.filterable === false ? (
+                  // Empty, but still a full-height cell: the filter row has to
+                  // keep its column widths or every header below it shifts.
+                  <div className="h-8 min-w-0 bg-muted/20" />
+                ) : (
+                  <div className="flex h-8 min-w-0 items-stretch">
+                    <span className="inline-flex w-7 shrink-0 items-center justify-center border-r bg-muted/30 font-mono text-xs font-semibold text-muted-foreground">
+                      {filterSymbolFor(col as LineColumn<unknown>)}
+                    </span>
+                    <Input
+                      className="h-8 min-w-0 flex-1 rounded-none border-0 bg-background px-2 text-xs font-normal shadow-none focus-visible:ring-inset"
+                      value={activeFilters[col.key] ?? ""}
+                      onChange={(e) => handleFilter(col.key, e.target.value)}
+                      aria-label={`Lọc ${col.label}`}
+                    />
+                  </div>
+                )}
               </th>
             ))}
             {showRowActions ? (

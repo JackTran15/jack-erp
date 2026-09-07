@@ -85,6 +85,51 @@ describe("StockTakeService", () => {
     return qb;
   };
 
+  // Unlike buildQb (which ignores every where/andWhere clause and just returns
+  // the rows it was given), this fake actually applies the SQL predicates
+  // findItemBalanceInScope builds — needed to prove the is_tracked / is_active
+  // filters really exclude rows, not just that andWhere("...") was called with
+  // the right string.
+  type FakeScopedBalance = {
+    itemId: string;
+    locationId: string;
+    quantity: number;
+    isTracked: boolean;
+    locIsActive: boolean;
+  };
+  const buildBalanceScopeQb = (rows: FakeScopedBalance[]) => {
+    const clauses: Array<{ sql: string; params?: Record<string, unknown> }> =
+      [];
+    const record = (sql: string, params?: Record<string, unknown>) => {
+      clauses.push({ sql, params });
+      return qb;
+    };
+    const qb: Record<string, jest.Mock> = {
+      innerJoin: jest.fn().mockReturnThis(),
+      where: jest.fn(record),
+      andWhere: jest.fn(record),
+      orderBy: jest.fn().mockReturnThis(),
+      getMany: jest.fn(),
+      getOne: jest.fn(async () => {
+        let candidates = rows;
+        for (const { sql, params } of clauses) {
+          if (sql.includes("is_tracked = true")) {
+            candidates = candidates.filter((r) => r.isTracked);
+          } else if (sql.includes("loc.is_active = true")) {
+            candidates = candidates.filter((r) => r.locIsActive);
+          } else if (sql.includes("sb.location_id = :locId")) {
+            candidates = candidates.filter(
+              (r) => r.locationId === params?.locId,
+            );
+          }
+        }
+        const [top] = [...candidates].sort((a, b) => b.quantity - a.quantity);
+        return top ?? null;
+      }),
+    };
+    return qb;
+  };
+
   beforeEach(async () => {
     stRepo = {
       create: jest.fn((dto) => ({ id: "st-new", lines: [], ...dto })),
@@ -311,6 +356,131 @@ describe("StockTakeService", () => {
         service.addLine("st-1", { itemId: "item-1" }, actor),
       ).rejects.toBeInstanceOf(ConflictException);
     });
+
+    // T-04-07 (AC-21, A-13): findItemBalanceInScope must not auto-fill a
+    // stopped-tracking or inactive-location shelf when a line is added to a
+    // saved stock-take without an explicit locationId.
+    describe("stock-take-level location scoping (T-04-07)", () => {
+      it("excludes a stopped (is_tracked=false) shelf and picks the tracked one instead", async () => {
+        stRepo.findOne.mockResolvedValue(draftSt);
+        balanceRepo.createQueryBuilder.mockReturnValue(
+          buildBalanceScopeQb([
+            {
+              itemId: "item-1",
+              locationId: "loc-stopped",
+              quantity: 50,
+              isTracked: false,
+              locIsActive: true,
+            },
+            {
+              itemId: "item-1",
+              locationId: "loc-tracked",
+              quantity: 10,
+              isTracked: true,
+              locIsActive: true,
+            },
+          ]),
+        );
+
+        await service.addLine("st-1", { itemId: "item-1" }, actor);
+
+        expect(lineRepo.save).toHaveBeenCalledWith(
+          expect.objectContaining({
+            locationId: "loc-tracked",
+            expectedQty: "10",
+          }),
+        );
+      });
+
+      it("excludes a balance at an inactive location and picks the active one instead", async () => {
+        stRepo.findOne.mockResolvedValue(draftSt);
+        balanceRepo.createQueryBuilder.mockReturnValue(
+          buildBalanceScopeQb([
+            {
+              itemId: "item-1",
+              locationId: "loc-inactive",
+              quantity: 99,
+              isTracked: true,
+              locIsActive: false,
+            },
+            {
+              itemId: "item-1",
+              locationId: "loc-active",
+              quantity: 3,
+              isTracked: true,
+              locIsActive: true,
+            },
+          ]),
+        );
+
+        await service.addLine("st-1", { itemId: "item-1" }, actor);
+
+        expect(lineRepo.save).toHaveBeenCalledWith(
+          expect.objectContaining({
+            locationId: "loc-active",
+            expectedQty: "3",
+          }),
+        );
+      });
+
+      it("still selects a tracked shelf with zero quantity (A-13) instead of falling back", async () => {
+        stRepo.findOne.mockResolvedValue(draftSt);
+        balanceRepo.createQueryBuilder.mockReturnValue(
+          buildBalanceScopeQb([
+            {
+              itemId: "item-1",
+              locationId: "loc-zero",
+              quantity: 0,
+              isTracked: true,
+              locIsActive: true,
+            },
+          ]),
+        );
+
+        await service.addLine("st-1", { itemId: "item-1" }, actor);
+
+        expect(lineRepo.save).toHaveBeenCalledWith(
+          expect.objectContaining({
+            locationId: "loc-zero",
+            expectedQty: "0",
+          }),
+        );
+        expect(locationRepo.findOne).not.toHaveBeenCalled();
+      });
+
+      it("no longer auto-fills a stopped shelf when addLine has nothing else to pick", async () => {
+        stRepo.findOne.mockResolvedValue(draftSt);
+        balanceRepo.createQueryBuilder.mockReturnValue(
+          buildBalanceScopeQb([
+            {
+              itemId: "item-1",
+              locationId: "loc-stopped",
+              quantity: 50,
+              isTracked: false,
+              locIsActive: true,
+            },
+          ]),
+        );
+        locationRepo.findOne.mockResolvedValue({ id: "loc-fallback" });
+
+        await service.addLine("st-1", { itemId: "item-1" }, actor);
+
+        expect(lineRepo.save).toHaveBeenCalledWith(
+          expect.objectContaining({
+            locationId: "loc-fallback",
+            expectedQty: "0",
+          }),
+        );
+        expect(locationRepo.findOne).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              storageId: "storage-1",
+              isActive: true,
+            }),
+          }),
+        );
+      });
+    });
   });
 
   describe("updateLineCount", () => {
@@ -471,6 +641,67 @@ describe("StockTakeService", () => {
       expect(managerFind).toHaveBeenCalledWith(ItemEntity, {
         where: { id: expect.anything(), organizationId: "org-1" },
       });
+    });
+  });
+
+  describe("process — generated receipt numbers its lines (T-04-03, ADR-05)", () => {
+    it("gives every generated receipt line a 1-based ordinal", async () => {
+      const lines = [
+        {
+          id: "l-1",
+          itemId: "item-1",
+          locationId: "loc-1",
+          expectedQty: "10",
+          countedQty: "12",
+        },
+        {
+          id: "l-3",
+          itemId: "item-3",
+          locationId: "loc-1",
+          expectedQty: "3",
+          countedQty: "8",
+        },
+      ] as unknown as StockTakeLineEntity[];
+
+      stRepo.findOne.mockResolvedValue({
+        id: "st-2",
+        organizationId: "org-1",
+        branchId: "branch-1",
+        status: StockTakeStatus.DRAFT,
+        documentNumber: "KK000002",
+        lines,
+      } as unknown as StockTakeEntity);
+
+      const managerSave = jest.fn((e) => Promise.resolve({ id: "fake-id", ...e }));
+      const fakeManager = {
+        save: managerSave,
+        create: jest.fn((_entity, dto) => ({ id: "fake-id", ...dto })),
+        find: jest.fn().mockResolvedValue([
+          { id: "item-1", unit: "Cái" },
+          { id: "item-3", unit: "Hộp" },
+        ]),
+        update: jest.fn(),
+      };
+      dataSource.transaction.mockImplementation(
+        async (cb: (m: typeof fakeManager) => unknown) => cb(fakeManager),
+      );
+
+      await service.process("st-2", actor);
+
+      // This path builds GoodsReceiptLineEntity by hand, so it is its own chance
+      // to forget the ordinal — and `line_no` is NOT NULL with no default, so a
+      // miss here surfaces as a failed stock take, not a display glitch.
+      const receiptLines = managerSave.mock.calls
+        .map((c) => c[0])
+        .find(
+          (arg) =>
+            Array.isArray(arg) &&
+            arg.length > 0 &&
+            "goodsReceiptId" in (arg[0] as object),
+        ) as { lineNo: number }[] | undefined;
+
+      expect(receiptLines).toBeDefined();
+      expect(receiptLines!.map((l) => l.lineNo)).toEqual([1, 2]);
     });
   });
 

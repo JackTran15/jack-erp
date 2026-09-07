@@ -9,6 +9,8 @@ import type {
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { type TableColumn } from "../../components/table/BaseDataTable";
+import { ActiveStatusBadge } from "../../components/status/StatusBadge";
+import { STATUS_FILTER_OPTIONS } from "../item-location-details/ItemLocationDetailsColumns";
 import { ColumnFilterModeDropdown } from "../../components/table/ColumnFilterModeControl";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import type {
@@ -29,7 +31,8 @@ type FilterKey =
   | "categoryName"
   | "locationCode"
   | "locationName"
-  | "quantityMax";
+  | "quantityMax"
+  | "isTracked";
 
 const TEXT_FILTER_KEYS = [
   "itemCode",
@@ -46,6 +49,10 @@ const INITIAL_FILTERS: Record<FilterKey, ColumnFilter> = {
   locationCode: { mode: "contains", value: "" },
   locationName: { mode: "contains", value: "" },
   quantityMax: { mode: "contains", value: "" },
+  // Rows stopped with "Ngừng theo dõi" are kept in the database on purpose, so
+  // the default has to hide them here rather than the API doing it — the
+  // backend leaves isTracked unset ("all") so "Tất cả" stays expressible.
+  isTracked: { mode: "equals", value: "true" },
 };
 
 function matchesTextFilter(source: string, filter: ColumnFilter): boolean {
@@ -114,6 +121,11 @@ export function LocationStockItemsDialog({
       const quantityMax = committedFilters.quantityMax.value.trim();
       if (quantityMax) {
         params.set("quantityMax", quantityMax);
+      }
+      // Empty value = "Tất cả": send no parameter at all.
+      const isTracked = committedFilters.isTracked.value;
+      if (isTracked === "true" || isTracked === "false") {
+        params.set("isTracked", isTracked);
       }
       const { data: res } = await apiClient.get<StockByLocationResponse>(
         `/inventory/locations/${locationId}/stock-items?${params}`,
@@ -263,6 +275,20 @@ export function LocationStockItemsDialog({
         ),
       },
       {
+        key: "isTracked",
+        label: "Trạng thái",
+        width: 150,
+        className: "whitespace-nowrap",
+        headerClassName: "whitespace-nowrap",
+        render: (r) => (
+          <ActiveStatusBadge
+            active={r.isTracked}
+            activeLabel="Đang theo dõi"
+            inactiveLabel="Ngừng theo dõi"
+          />
+        ),
+      },
+      {
         key: "_actions",
         label: "",
         width: 56,
@@ -345,8 +371,30 @@ export function LocationStockItemsDialog({
                     locationCode: "locationCode",
                     locationName: "locationName",
                     quantity: "quantityMax",
+                    isTracked: "isTracked",
                   };
                   const filterKey = keyByColumn[c.key];
+                  if (c.key === "isTracked") {
+                    return (
+                      <th key={c.key} className="border-b border-r p-0">
+                        <select
+                          className="h-9 w-full min-w-0 border-0 bg-background px-2 text-sm font-normal outline-none focus:ring-1 focus:ring-inset focus:ring-ring"
+                          value={filters.isTracked.value}
+                          onChange={(e) =>
+                            updateFilterValue("isTracked", e.target.value)
+                          }
+                          aria-label={`Lọc ${c.label}`}
+                        >
+                          <option value="">— Tất cả —</option>
+                          {STATUS_FILTER_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </th>
+                    );
+                  }
                   return (
                     <th key={c.key} className="border-b border-r p-0">
                       <div className="flex h-9 items-stretch">

@@ -1,4 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  INVENTORY_REPORT_VIEW_MODES,
+  InventoryReportViewMode,
+  TRANSFER_LEGS,
+  TransferLeg,
+} from '@erp/shared-interfaces';
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -11,7 +17,7 @@ import {
 } from 'class-validator';
 import { DateRangeFilterDto } from '../../../common/filters/filter.dto';
 import { StoreScopeDto } from '../../reporting/invoice-report/dto/store-scope.dto';
-import { PERIOD_PRESETS, PeriodPresetLiteral } from './inventory-report-query.dto';
+import { PERIOD_PRESETS, PeriodPresetLiteral } from './period-preset';
 import { ITEM_GROUP_BY_VALUES, ItemGroupBy } from '../services/stock-period.service';
 
 /**
@@ -55,6 +61,17 @@ export class InventoryReportFilterDto {
   @IsIn(ITEM_GROUP_BY_VALUES as unknown as string[])
   statBy?: ItemGroupBy;
 
+  /**
+   * Which backoffice view is asking (default single).
+   *
+   * Only reports whose row shape differs between the two views read it; the
+   * rest resolve their scope from `store` alone, as they always have.
+   */
+  @ApiPropertyOptional({ enum: INVENTORY_REPORT_VIEW_MODES })
+  @IsOptional()
+  @IsIn(INVENTORY_REPORT_VIEW_MODES as unknown as string[])
+  viewMode?: InventoryReportViewMode;
+
   /** Filter by unit name — applied in-memory on result rows. */
   @IsOptional()
   @IsString()
@@ -75,6 +92,17 @@ export class InventoryReportFilterDto {
   @IsArray()
   @IsUUID('4', { each: true })
   receivingStoreIds?: string[];
+
+  /**
+   * Transfer document detail only — which leg of the pair is primary.
+   *
+   * Declared here because the global ValidationPipe runs with
+   * `forbidNonWhitelisted`, so an undeclared field makes the whole request 400.
+   */
+  @ApiPropertyOptional({ enum: TRANSFER_LEGS })
+  @IsOptional()
+  @IsIn(TRANSFER_LEGS as unknown as string[])
+  transferLeg?: TransferLeg;
 
   /** Hide rows with all-zero measures (stock-period reports; default true). */
   @IsOptional()

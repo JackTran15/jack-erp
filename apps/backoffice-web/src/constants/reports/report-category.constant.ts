@@ -58,7 +58,7 @@ export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCat
   },
   [REPORT_CATEGORY.INVENTORY]: {
     label: "Kho",
-    // Trang ReportPage generic (contract v2); trang legacy /reports/storage/* vẫn truy cập trực tiếp được.
+    // Trang ReportPage generic (contract v2) — surface duy nhất của báo cáo kho.
     url: "/reports/inventory",
     permission: "inventory.reports.read",
     configs: {

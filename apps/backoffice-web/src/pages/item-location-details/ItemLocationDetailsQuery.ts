@@ -11,6 +11,13 @@ export const STRING_FILTER_KEYS = [
 
 export type StringFilterKey = (typeof STRING_FILTER_KEYS)[number];
 
+/**
+ * Giá trị sentinel của option "Trừ {kho showroom}" trong bộ lọc cột Kho. Dùng
+ * sentinel thay vì id kho để mặc định áp được ngay lần render đầu, trước khi
+ * danh sách kho tải xong.
+ */
+export const EXCLUDE_SHOWROOM_FILTER_VALUE = "__exclude_showroom__";
+
 export function buildQuery(
   page: number,
   pageSize: number,
@@ -25,7 +32,8 @@ export function buildQuery(
     extra[`${key as StringFilterKey}Mode`] = f.mode;
   }
   const storageId = filters.storageId?.value?.trim();
-  if (storageId) extra.storageId = storageId;
+  if (storageId === EXCLUDE_SHOWROOM_FILTER_VALUE) extra.excludeShowroom = true;
+  else if (storageId) extra.storageId = storageId;
   // Cột số dùng toán tử ≤ (number-range), giống các cột số khác trong app.
   const q = filters.quantity;
   if (q?.value?.trim()) {

@@ -6,6 +6,10 @@ import { InvoiceReportTemplateView } from '@erp/shared-interfaces';
 import { ReportTemplateEntity } from '../../report-core/report-template.entity';
 import { toTemplateView } from '../../report-core/report-template.view';
 import {
+  resolveTemplateScope,
+  writeScopeWhere,
+} from '../../report-core/template-scope';
+import {
   assertColumnsInCatalog,
   buildColumnCatalog,
   normalizeTemplateColumns,
@@ -27,13 +31,16 @@ export class CreateDebtReportTemplateHandler
     dto,
     actor,
   }: CreateDebtReportTemplateCommand): Promise<InvoiceReportTemplateView> {
+    const resolved = resolveTemplateScope(dto.scope, actor);
     const catalog = await buildColumnCatalog(this.registry, dto.reportType, actor);
     assertColumnsInCatalog((dto.columnFilters ?? []).map((f) => f.col), catalog);
     const columns = normalizeTemplateColumns(dto.columns, catalog);
 
+    // Names are unique per tier, not per organization: two branches may both
+    // call their layout "Mặc định".
     const dup = await this.repo.findOne({
       where: {
-        organizationId: actor.organizationId,
+        ...writeScopeWhere(actor, resolved),
         reportType: dto.reportType,
         name: dto.name,
       },
@@ -45,6 +52,7 @@ export class CreateDebtReportTemplateHandler
     const saved = await this.repo.save(
       this.repo.create({
         organizationId: actor.organizationId,
+        branchId: resolved.branchId ?? undefined,
         createdBy: actor.userId,
         reportType: dto.reportType,
         name: dto.name,

@@ -3,19 +3,24 @@ import { Column, DeleteDateColumn, Entity, Index } from 'typeorm';
 import { BaseEntity } from '../../../database/entities/base.entity';
 
 /**
- * A saved report layout: its own set of columns + filters, shared across the
- * organization (no per-user visibility in v1). ORGANIZATION-scoped,
- * soft-deleted. Generic across report domains — `reportType` holds either an
- * invoice report key (daily-sales-summary, …) or an inventory report key
- * (inventory-stock-summary, …); each domain's handlers validate against
- * their own registry.
+ * A saved report layout: its own set of columns + filters, shared by everyone in
+ * its scope (no per-user visibility in v1). Soft-deleted. Generic across report
+ * domains — `reportType` holds either an invoice report key
+ * (daily-sales-summary, …) or an inventory report key (inventory-stock-summary,
+ * …); each domain's handlers validate against their own registry.
+ *
+ * Scope is two-tiered (ADR-01): `branchId === null` is the chain default that any
+ * branch without its own row inherits; a non-null `branchId` overrides it for
+ * that branch. Resolve scope through `template-scope.ts` rather than filtering by
+ * `organizationId` alone.
+ *
+ * The uniqueness rule — `(organizationId, COALESCE(branchId, ''), reportType,
+ * name)` where not soft-deleted — lives in migration
+ * `AddBranchScopeToReportTemplates1789400000000`. It is not declared here because
+ * the `COALESCE` expression has no TypeORM decorator form, and without it two
+ * NULL branch ids would not collide.
  */
 @Entity('report_templates')
-@Index(
-  'uq_report_templates_org_type_name',
-  ['organizationId', 'reportType', 'name'],
-  { unique: true, where: '"deleted_at" IS NULL' },
-)
 @Index('idx_report_templates_org_sort', ['organizationId', 'sortOrder'])
 export class ReportTemplateEntity extends BaseEntity {
   /** The report type this template belongs to (ReportDefinition.key). */

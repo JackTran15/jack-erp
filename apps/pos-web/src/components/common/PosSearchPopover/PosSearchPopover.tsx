@@ -411,6 +411,10 @@ export function PosSearchPopover<T>({
   }, [open]);
 
   const closePopover = useCallback(() => {
+    // Huỷ luôn lượt tra còn đang chờ debounce: nó chạy sau khi popover đã đóng
+    // thì kết quả rơi vào một danh sách không ai nhìn, và lần mở kế tiếp thừa
+    // hưởng đúng danh sách đó.
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     setOpen(false);
     setSuggestions([]);
     setHighlightIdx(-1);
@@ -559,7 +563,15 @@ export function PosSearchPopover<T>({
               skipFocusSearchRef.current = false;
               return;
             }
-            if (trimmed.length >= minChars && suggestions.length === 0) {
+            // `activeQueryRef`: danh sách đang giữ có thể thuộc về một chuỗi
+            // khác chuỗi đang nằm trong ô — một lượt tra về sau khi popover đã
+            // đóng, hoặc consumer tự thay `value` bằng đường ngoài. Chỉ xét
+            // `suggestions.length === 0` thì lần mở kế tiếp hiện lại đúng danh
+            // sách cũ và không bao giờ tra lại.
+            if (
+              trimmed.length >= minChars &&
+              (suggestions.length === 0 || activeQueryRef.current !== trimmed)
+            ) {
               void runSearch(trimmed);
             }
           }}

@@ -15,6 +15,7 @@ import {
 import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { EventPublisher } from '../../events/event-publisher.service';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
+import { affectedRowCount } from '../../../common/utils/returning-rows.util';
 import { StockLedgerEntryEntity } from './stock-ledger-entry.entity';
 import { StockBalanceEntity } from './stock-balance.entity';
 import { ItemStorageLocationService } from '../product/item-storage-location.service';
@@ -57,6 +58,15 @@ export interface RecordMovementParams {
    * moving-average cost stale. Omit it and the derived formula applies as before.
    */
   lineValue?: number;
+  /**
+   * Ledger position of this movement. `posted_at` is the only ordering key the
+   * stock ledger has — every report filters and sorts by it — so a flow that
+   * compensates an earlier write (temp warehouse fulfilling a POS invoice) has
+   * to place its rows before that write at insert time; the ledger is
+   * append-only, so it can never be reordered afterwards. Omit it and the row
+   * takes the write instant, exactly as before.
+   */
+  postedAt?: Date;
 }
 
 export interface LedgerQuery extends PaginationQuery {
@@ -100,6 +110,10 @@ export interface BalanceQuery extends PaginationQuery {
   isActive?: boolean;
   /** Filter by location-level tracking (stock_balances.is_tracked); omit = tất cả. */
   isTracked?: boolean;
+  /** Filter by location active status (locations.is_active); omit = tất cả. */
+  locationIsActive?: boolean;
+  /** Loại trừ kho showroom (storages.is_main_storage = true) khỏi kết quả. */
+  excludeShowroom?: boolean;
   organizationId: string;
 
   // Per-column string filters (server-side)
@@ -146,6 +160,7 @@ export interface StockBalanceSummaryRow {
     name: string;
     storageId: string;
     storageName: string;
+    isActive: boolean;
   };
   threshold: {
     minQty: number | null;
@@ -201,7 +216,7 @@ export class StockLedgerService {
         referenceType: params.referenceType,
         referenceId: params.referenceId,
         notes: params.notes,
-        postedAt: new Date(),
+        postedAt: params.postedAt ?? new Date(),
         createdBy: params.actorContext.userId,
         unitCost,
         lineValue,
@@ -471,6 +486,9 @@ export class StockLedgerService {
         storageId: query.storageId,
       });
     }
+    if (query.excludeShowroom) {
+      qb.andWhere('storage.is_main_storage = false');
+    }
     if (query.unassigned) {
       qb.andWhere('loc.is_unassigned = true');
     }
@@ -488,6 +506,11 @@ export class StockLedgerService {
     }
     if (query.isTracked !== undefined) {
       qb.andWhere('sb.is_tracked = :isTracked', { isTracked: query.isTracked });
+    }
+    if (query.locationIsActive !== undefined) {
+      qb.andWhere('loc.is_active = :locationIsActive', {
+        locationIsActive: query.locationIsActive,
+      });
     }
     // Kho đã ngừng hoạt động không hiển thị ở Chi tiết vị trí hàng hóa (giống
     // Tổng hợp tồn kho). Số liệu vẫn còn ở Báo cáo tồn kho (ledger).
@@ -566,6 +589,7 @@ export class StockLedgerService {
       'loc.name AS "locationName"',
       'loc.storage_id AS "storageId"',
       'storage.name AS "storageName"',
+      'loc.is_active AS "locationIsActive"',
       'th.min_qty AS "minQty"',
       'th.max_qty AS "maxQty"',
     ]);
@@ -622,6 +646,7 @@ export class StockLedgerService {
           name: String(r.locationName),
           storageId: String(r.storageId),
           storageName: String(r.storageName),
+          isActive: Boolean(r.locationIsActive),
         },
         threshold: { minQty, maxQty },
         belowMin: minQty !== null && quantity < minQty,
@@ -695,7 +720,7 @@ export class StockLedgerService {
       }
     }
 
-    const rows = await this.balanceRepo.manager.query<Array<{ id: string }>>(
+    const result = await this.balanceRepo.manager.query(
       `UPDATE stock_balances sb
           SET is_tracked = $4
          FROM unnest($2::uuid[], $3::uuid[]) AS e(item_id, location_id)
@@ -706,7 +731,10 @@ export class StockLedgerService {
       RETURNING sb.id`,
       [actor.organizationId, itemIds, locationIds, isTracked],
     );
-    return { updated: rows.length };
+    // `affectedRowCount`, not `.length`: TypeORM hands back `[rows, rowCount]`
+    // for an UPDATE, so reading the length reported 2 no matter how many
+    // balances were re-flagged — including none. See returning-rows.util.ts.
+    return { updated: affectedRowCount(result) };
   }
 
   async getLedgerEntries(
@@ -811,7 +839,7 @@ export class StockLedgerService {
         referenceType: params.referenceType,
         referenceId: params.referenceId,
         notes: params.notes,
-        postedAt: now,
+        postedAt: params.postedAt ?? now,
         createdBy: params.actorContext.userId,
         unitCost,
         lineValue,

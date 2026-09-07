@@ -461,11 +461,37 @@ export function StockTakeFormDialog({
         pageSize: "1",
         itemId,
         storageId: effectiveStorageId,
+        isTracked: "true",
+        locationIsActive: "true",
       });
       const { data } = await apiClient.get<PaginatedResponse<BalanceRow>>(
         `/inventory/stock/balances?${params}`,
       );
       return data.data[0] ?? null;
+    },
+    [effectiveStorageId],
+  );
+
+  /**
+   * True when the item has at least one stock-balance row at this storage,
+   * tracked or not. Distinguishes "never received here" (safe to default to
+   * any active location so counting can start) from "every known shelf for
+   * this item is stopped/inactive" (must not silently substitute an
+   * unrelated shelf — see fetchFirstLocation below).
+   */
+  const hasAnyBalanceAtStorage = useCallback(
+    async (itemId: string): Promise<boolean> => {
+      if (!effectiveStorageId) return false;
+      const params = new URLSearchParams({
+        page: "1",
+        pageSize: "1",
+        itemId,
+        storageId: effectiveStorageId,
+      });
+      const { data } = await apiClient.get<PaginatedResponse<BalanceRow>>(
+        `/inventory/stock/balances?${params}`,
+      );
+      return data.total > 0;
     },
     [effectiveStorageId],
   );
@@ -496,7 +522,13 @@ export function StockTakeFormDialog({
     [],
   );
 
-  /** Fallback when item has no balance — use first location of the storage. */
+  /**
+   * Fallback when the item has never had a balance row at this storage —
+   * use the first active location so counting has somewhere to start. Must
+   * only be called when `hasAnyBalanceAtStorage` is false: it does not know
+   * about the item, so if the item does have (stopped) balance history here
+   * it could re-select the exact shelf `fetchFirstBalance` just filtered out.
+   */
   const fetchFirstLocation =
     useCallback(async (): Promise<LocationOption | null> => {
       if (!effectiveStorageId) return null;
@@ -530,15 +562,23 @@ export function StockTakeFormDialog({
       );
 
       if (!locationId) {
-        const fallback = await fetchFirstLocation();
-        if (!fallback) {
-          throw new Error(
-            "Kho được chọn chưa có vị trí nào — tạo vị trí trước khi kiểm kê.",
-          );
+        // Only fall back to "any active location in the storage" when the
+        // item genuinely has no stock-balance history here. If it does have
+        // rows, they were all filtered out (stopped tracking / inactive
+        // location) — defaulting to an unrelated location here could
+        // silently reintroduce the same auto-fill bug, so leave it empty.
+        const everReceivedHere = await hasAnyBalanceAtStorage(item.id);
+        if (!everReceivedHere) {
+          const fallback = await fetchFirstLocation();
+          if (!fallback) {
+            throw new Error(
+              "Kho được chọn chưa có vị trí nào — tạo vị trí trước khi kiểm kê.",
+            );
+          }
+          locationId = fallback.id;
+          locationCode = fallback.code;
+          expectedQty = 0;
         }
-        locationId = fallback.id;
-        locationCode = fallback.code;
-        expectedQty = 0;
       } else if (!locationCode) {
         locationCode = (await fetchLocationById(locationId)).code;
       }
@@ -549,7 +589,12 @@ export function StockTakeFormDialog({
         expectedValue: expectedQty * purchasePrice,
       };
     },
-    [fetchFirstBalance, fetchFirstLocation, fetchLocationById],
+    [
+      fetchFirstBalance,
+      hasAnyBalanceAtStorage,
+      fetchFirstLocation,
+      fetchLocationById,
+    ],
   );
 
   /** Triggered when user picks an item in the row's SKU lookup. */
@@ -604,7 +649,17 @@ export function StockTakeFormDialog({
         return;
       }
 
-      // Edit mode: persist via API so the row gets a server id.
+      // Edit mode: persist via API so the row gets a server id. Unlike the
+      // local-only branch above, we can't leave the location blank here —
+      // POST /lines falls back to its own (unfiltered) location resolution
+      // when locationId is omitted, which could reintroduce a stopped shelf.
+      // Refuse instead of guessing; the user assigns a location manually.
+      if (!defaults.locationId) {
+        toast.error(
+          "Mặt hàng này không còn vị trí đang theo dõi và đang hoạt động — chọn vị trí thủ công.",
+        );
+        return;
+      }
       try {
         const { data } = await apiClient.post<{
           id: string;

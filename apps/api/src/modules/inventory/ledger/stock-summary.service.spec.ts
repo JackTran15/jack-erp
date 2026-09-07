@@ -288,6 +288,438 @@ describe("StockSummaryService", () => {
     );
   });
 
+  describe("pending-only rows bypass the filter (T-01-01, reproduces the reported leak/dup)", () => {
+    // Fixture shape, per the ticket's precondition note:
+    //  - DNGUAB064 has a real balance at storage-A (comes back from the page
+    //    query, which — unlike the pending-only query — genuinely applies
+    //    `search`).
+    //  - DNGUAB064 also has an IN_PROGRESS transfer order into storage-B (a
+    //    *different*, real destination storage): shape (1), legitimate under
+    //    the (SKU × storage) grain and must survive T-01-02.
+    //  - DNGUAB064 also has a second IN_PROGRESS transfer order with
+    //    `destination_storage_id IS NULL`: shape (2), a true duplicate of the
+    //    storage-A row that T-01-02 must collapse away.
+    //  - TXV6079 is an unrelated SKU with its own IN_PROGRESS transfer, used
+    //    to prove the pending-only query ignores `search` entirely.
+    const branchId = "branch-1";
+    const dnguabKey = "item-dnguab064";
+
+    function buildQb() {
+      return createQueryBuilder([
+        {
+          group_key: dnguabKey,
+          product_id: null,
+          item_ids: [dnguabKey],
+          item_code: "DNGUAB064",
+          item_name: "Đế giày ABA064",
+          item_unit: "Đôi",
+          item_brand: null,
+          item_is_active: true,
+          category_name: null,
+          storage_id: "storage-A",
+          storage_name: "Kho A",
+          branch_id: branchId,
+          quantity: "12",
+          last_movement_at: null,
+        },
+      ]);
+    }
+
+    function buildManager() {
+      return {
+        query: jest
+          .fn()
+          // 1) totals aggregate
+          .mockResolvedValueOnce([{ total: 1, total_quantity: "12" }])
+          // 2) pendingTransferQuery (transfer-out / incoming for the page's
+          //    own (item, storage) pairs) — irrelevant here
+          .mockResolvedValueOnce([])
+          // 3) reservationQuery — irrelevant here
+          .mockResolvedValueOnce([])
+          // 4) pendingOnlyQuery — the query with only 4 WHERE clauses and no
+          //    `search`, per the ticket's verified context.
+          .mockResolvedValueOnce([
+            {
+              group_key: dnguabKey,
+              product_id: null,
+              item_code: "DNGUAB064",
+              item_name: "Đế giày ABA064",
+              item_unit: "Đôi",
+              item_brand: null,
+              item_is_active: true,
+              category_name: null,
+              storage_id: "storage-B",
+              storage_name: "Kho B",
+              branch_id: branchId,
+              incoming_qty: "5",
+            },
+            {
+              group_key: dnguabKey,
+              product_id: null,
+              item_code: "DNGUAB064",
+              item_name: "Đế giày ABA064",
+              item_unit: "Đôi",
+              item_brand: null,
+              item_is_active: true,
+              category_name: null,
+              storage_id: null,
+              storage_name: null,
+              branch_id: branchId,
+              incoming_qty: "3",
+            },
+            {
+              group_key: "item-txv6079",
+              product_id: null,
+              item_code: "TXV6079",
+              item_name: "Hàng hóa TXV6079",
+              item_unit: "Cái",
+              item_brand: null,
+              item_is_active: true,
+              category_name: null,
+              storage_id: "storage-C",
+              storage_name: "Kho C",
+              branch_id: branchId,
+              incoming_qty: "8",
+            },
+          ]),
+      };
+    }
+
+    it("pendingOnlyQuery carries the same `search` predicate as buildBaseQuery, so TXV6079-style rows cannot leak", async () => {
+      const qb = buildQb();
+      const manager = buildManager();
+      const service = new StockSummaryService({
+        createQueryBuilder: jest.fn().mockReturnValue(qb),
+        manager,
+      } as never);
+
+      await service.getSummary({
+        organizationId: "org-1",
+        branchId,
+        search: "DNGUAB064",
+        storageId: undefined,
+        page: 1,
+      });
+
+      // Asserting against `result.data` here would only prove that a test
+      // double built by hand happens to omit TXV6079 — it says nothing about
+      // whether the real query does. This asserts on the actual mechanism
+      // instead (T-01-01 originally reproduced the leak by observing that
+      // `pendingOnlyQuery`, :402-440 at the time, had no `search` predicate
+      // at all): the main query's own `search` clause (`applyCommonFilters`,
+      // shared with `pendingOnlyQuery` via `RawSqlWhereCollector`)...
+      const baseSearchCall = qb.andWhere.mock.calls.find(([sql]) =>
+        String(sql).includes("ILIKE :q"),
+      );
+      expect(baseSearchCall).toBeDefined();
+      expect(String(baseSearchCall?.[0])).toBe(
+        "(item.code ILIKE :q OR item.name ILIKE :q)",
+      );
+
+      // ...and pendingOnlyQuery (4th manager.query call — see the "binds
+      // `search`" test below for the call-order breakdown) carries the same
+      // shape, translated to a bound `$n` positional placeholder instead of
+      // TypeORM's `:q`. A row whose code/name does not match this WHERE
+      // clause can never reach the merge step, regardless of what a mock
+      // hands back.
+      const [pendingOnlySql] = manager.query.mock.calls[3];
+      expect(String(pendingOnlySql)).toMatch(
+        /\(item\.code ILIKE \$\d+ OR item\.name ILIKE \$\d+\)/,
+      );
+    });
+
+    it("RED: DNGUAB064 collapses to one duplicate row instead of two legitimate ones", async () => {
+      const qb = buildQb();
+      const manager = buildManager();
+      const service = new StockSummaryService({
+        createQueryBuilder: jest.fn().mockReturnValue(qb),
+        manager,
+      } as never);
+
+      const result = await service.getSummary({
+        organizationId: "org-1",
+        branchId,
+        search: "DNGUAB064",
+        storageId: undefined,
+        page: 1,
+      });
+
+      const dnguabRows = result.data.filter(
+        (row) => row.item.code === "DNGUAB064",
+      );
+      // Actual (buggy) shape observed: 3 rows for DNGUAB064 —
+      //   storageId "storage-A"          (real balance)
+      //   storageId "storage-B"          (shape 1: real destination storage —
+      //                                   legitimate under the SKU × storage
+      //                                   grain, must survive T-01-02)
+      //   storageId "pending:branch-1"   (shape 2: destination_storage_id IS
+      //                                   NULL — a true duplicate of the
+      //                                   storage-A row; T-01-02 must remove
+      //                                   this one, not the storage-B row)
+      // Expected after the fix: exactly the storage-A and storage-B rows.
+      expect(dnguabRows.map((row) => row.storageId).sort()).toEqual(
+        ["storage-A", "storage-B"].sort(),
+      );
+    });
+
+    it("AC-05: pending-only rows still show for every SKU when no filter is applied", async () => {
+      const qb = buildQb();
+      const manager = buildManager();
+      const service = new StockSummaryService({
+        createQueryBuilder: jest.fn().mockReturnValue(qb),
+        manager,
+      } as never);
+
+      const result = await service.getSummary({
+        organizationId: "org-1",
+        branchId,
+        page: 1,
+      });
+
+      // A-03: the pending-only block must never disappear just because no
+      // filter narrowed it — only `search`/column filters (and the dedupe
+      // guard) should ever drop a row from it.
+      const codes = result.data.map((row) => row.item.code);
+      expect(codes).toContain("TXV6079");
+      const dnguabRows = result.data.filter(
+        (row) => row.item.code === "DNGUAB064",
+      );
+      expect(dnguabRows.map((row) => row.storageId).sort()).toEqual(
+        ["storage-A", "storage-B"].sort(),
+      );
+    });
+
+    it("binds `search` into pendingOnlyQuery as a parameter, never string-interpolated", async () => {
+      const qb = buildQb();
+      const manager = buildManager();
+      const service = new StockSummaryService({
+        createQueryBuilder: jest.fn().mockReturnValue(qb),
+        manager,
+      } as never);
+
+      await service.getSummary({
+        organizationId: "org-1",
+        branchId,
+        search: "DNGUAB064",
+        storageId: undefined,
+        page: 1,
+      });
+
+      // pendingOnlyQuery is the 4th manager.query call here: totals, then
+      // pendingTransferQuery / reservationQuery (both fire because the page
+      // query returned a row), then pendingOnlyQuery.
+      const [sql, params] = manager.query.mock.calls[3];
+      expect(String(sql)).toContain("item.code ILIKE $");
+      expect(String(sql)).not.toContain("DNGUAB064");
+      expect(params).toContain("%DNGUAB064%");
+    });
+  });
+
+  describe("pending-only merge happens before pagination, not after (T-01-03, ADR-01)", () => {
+    // These asserts route on the SQL text itself (not call order/count),
+    // per the T-01-02 lesson: a mock told to always return the same value
+    // regardless of which query fired must not be able to fake a pass here.
+    function contentAwareManager(
+      overrides: {
+        pendingOnly?: unknown[];
+        period?: unknown[];
+        pendingTransfer?: unknown[];
+        reservation?: unknown[];
+        aggregate?: Record<string, unknown>;
+      } = {},
+    ) {
+      return {
+        query: jest.fn((sql: string) => {
+          const s = String(sql);
+          if (s.includes("destination_branch_id AS branch_id")) {
+            return Promise.resolve(overrides.pendingOnly ?? []);
+          }
+          if (s.includes("sle.posted_at")) {
+            return Promise.resolve(overrides.period ?? []);
+          }
+          if (s.includes("transfer_out_qty")) {
+            return Promise.resolve(overrides.pendingTransfer ?? []);
+          }
+          if (s.includes("reserved_qty") && s.includes("invoice_item")) {
+            return Promise.resolve(overrides.reservation ?? []);
+          }
+          return Promise.resolve([
+            overrides.aggregate ?? { total: 0, total_quantity: "0" },
+          ]);
+        }),
+      };
+    }
+
+    const branchId = "branch-1";
+
+    function realRow(code: string, storageId: string) {
+      return {
+        group_key: `item-${code}`,
+        product_id: null,
+        item_ids: [`item-${code}`],
+        item_code: code,
+        item_name: `Hàng ${code}`,
+        item_unit: "Cái",
+        item_brand: null,
+        item_is_active: true,
+        category_name: null,
+        storage_id: storageId,
+        storage_name: `Kho ${storageId}`,
+        branch_id: branchId,
+        quantity: "1",
+        last_movement_at: null,
+      };
+    }
+
+    function pendingRow(code: string, incomingQty: string) {
+      return {
+        group_key: `item-${code}`,
+        product_id: null,
+        item_code: code,
+        item_name: `Hàng ${code}`,
+        item_unit: "Cái",
+        item_brand: null,
+        item_is_active: true,
+        category_name: null,
+        storage_id: null,
+        storage_name: null,
+        branch_id: branchId,
+        incoming_qty: incomingQty,
+      };
+    }
+
+    it("page 1 never returns more than pageSize rows, even once a pending row is merged in", async () => {
+      // A full SQL page (2 of 2) plus one new pending row: naively pushing
+      // the pending row on afterwards would leave page 1 with 3 rows.
+      const qb = createQueryBuilder([realRow("AAA", "s1"), realRow("BBB", "s2")]);
+      const manager = contentAwareManager({
+        pendingOnly: [pendingRow("CCC", "5")],
+      });
+      const service = new StockSummaryService({
+        createQueryBuilder: jest.fn().mockReturnValue(qb),
+        manager,
+      } as never);
+
+      const result = await service.getSummary({
+        organizationId: "org-1",
+        branchId,
+        page: 1,
+        pageSize: 2,
+      });
+
+      expect(result.data.length).toBeLessThanOrEqual(2);
+      expect(result.total).toBe(3);
+    });
+
+    it("a pending row appears on its correct page when paging past page 1", async () => {
+      // "AAA" (the pending row) sorts before the real "ZZZ" row, so page 1
+      // (size 1) is the pending AAA and page 2 is the real ZZZ — asserting
+      // page 2 here proves the merge ran before the slice, not after it (the
+      // old code only ever appended pending rows onto page 1).
+      const qb = createQueryBuilder([realRow("ZZZ", "s1")]);
+      const manager = contentAwareManager({
+        pendingOnly: [pendingRow("AAA", "7")],
+      });
+      const service = new StockSummaryService({
+        createQueryBuilder: jest.fn().mockReturnValue(qb),
+        manager,
+      } as never);
+
+      const result = await service.getSummary({
+        organizationId: "org-1",
+        branchId,
+        page: 2,
+        pageSize: 1,
+      });
+
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0]).toEqual(
+        expect.objectContaining({
+          itemId: "item-ZZZ",
+          quantity: 1,
+          incomingQty: 0,
+        }),
+      );
+      expect(result.total).toBe(2);
+    });
+
+    it("total equals the number of rows obtainable across every page", async () => {
+      const qb = createQueryBuilder([realRow("AAA", "s1"), realRow("BBB", "s2")]);
+      const manager = contentAwareManager({
+        pendingOnly: [pendingRow("CCC", "5")],
+      });
+      const service = new StockSummaryService({
+        createQueryBuilder: jest.fn().mockReturnValue(qb),
+        manager,
+      } as never);
+
+      const page1 = await service.getSummary({
+        organizationId: "org-1",
+        branchId,
+        page: 1,
+        pageSize: 2,
+      });
+      const page2 = await service.getSummary({
+        organizationId: "org-1",
+        branchId,
+        page: 2,
+        pageSize: 2,
+      });
+
+      expect(page1.total).toBe(3);
+      expect(page2.total).toBe(3);
+      const seen = [...page1.data, ...page2.data].map((row) => row.itemId);
+      expect(new Set(seen).size).toBe(3);
+      expect(seen).toHaveLength(3);
+    });
+
+    it("keeps the SQL LIMIT/OFFSET path when there is no incoming stock to merge (the common case)", async () => {
+      const qb = createQueryBuilder([realRow("AAA", "s1")]);
+      const manager = contentAwareManager({ pendingOnly: [] });
+      const service = new StockSummaryService({
+        createQueryBuilder: jest.fn().mockReturnValue(qb),
+        manager,
+      } as never);
+
+      await service.getSummary({
+        organizationId: "org-1",
+        branchId,
+        page: 2,
+        pageSize: 20,
+      });
+
+      // Called exactly once: nothing to merge means no second, unpaginated
+      // fetch of the filtered set (ADR-01's performance requirement).
+      expect(qb.limit).toHaveBeenCalledTimes(1);
+      expect(qb.limit).toHaveBeenCalledWith(20);
+      expect(qb.offset).toHaveBeenCalledTimes(1);
+      expect(qb.offset).toHaveBeenCalledWith(20);
+    });
+
+    it("sorts a merged pending row into its alphabetical position, not just appended at the end", async () => {
+      const qb = createQueryBuilder([realRow("ZZZ", "s1")]);
+      const manager = contentAwareManager({
+        pendingOnly: [pendingRow("AAA", "3")],
+      });
+      const service = new StockSummaryService({
+        createQueryBuilder: jest.fn().mockReturnValue(qb),
+        manager,
+      } as never);
+
+      const result = await service.getSummary({
+        organizationId: "org-1",
+        branchId,
+        page: 1,
+        pageSize: 50,
+      });
+
+      expect(result.data.map((row) => row.item.code)).toEqual([
+        "AAA",
+        "ZZZ",
+      ]);
+    });
+  });
+
   describe("groupBy: SKU", () => {
     it("groups on the parent product and sums every variant's period figures", async () => {
       const row = {
@@ -573,6 +1005,66 @@ describe("StockSummaryService", () => {
       // No totals statement is worth running when every row is already loaded.
       const sqlSeen = manager.query.mock.calls.map(([sql]) => String(sql));
       expect(sqlSeen.some((sql) => sql.includes("WITH groups AS"))).toBe(false);
+    });
+
+    it("the totals query's `pending_only` CTE carries the same `search` predicate as pendingOnlyQuery (T-01-04), so the footer's incoming total cannot leak the whole branch", async () => {
+      const qb = createQueryBuilder([]);
+      const manager = {
+        query: jest.fn().mockResolvedValue([{ total: 0, total_quantity: "0" }]),
+      };
+      const service = new StockSummaryService({
+        createQueryBuilder: jest.fn().mockReturnValue(qb),
+        manager,
+      } as never);
+
+      await service.getSummary({
+        organizationId: "org-1",
+        branchId: "branch-1",
+        search: "DNGUAB064",
+      });
+
+      // Same predicate the main query applies (buildBaseQuery, via
+      // applyCommonFilters) — proves both come from one source, not a third
+      // hand-written copy.
+      const baseSearchCall = qb.andWhere.mock.calls.find(([sql]) =>
+        String(sql).includes("ILIKE :q"),
+      );
+      expect(String(baseSearchCall?.[0])).toBe(
+        "(item.code ILIKE :q OR item.name ILIKE :q)",
+      );
+
+      // aggSql itself is mocked to "SELECT 1" here, so any `ILIKE` match in
+      // the totals SQL must come from the `pending_only` CTE's own extra
+      // conditions, appended via the same `RawSqlWhereCollector` shim
+      // `pendingOnlyQuery` (T-01-02) uses.
+      const [totalsSql, totalsParams] = manager.query.mock.calls[0];
+      expect(String(totalsSql)).toContain("pending_only AS (");
+      expect(String(totalsSql)).toMatch(
+        /\(item\.code ILIKE \$\d+ OR item\.name ILIKE \$\d+\)/,
+      );
+      // Parameterised, never interpolated into the SQL text.
+      expect(String(totalsSql)).not.toContain("DNGUAB064");
+      expect(totalsParams).toContain("%DNGUAB064%");
+    });
+
+    it("footer's incoming total is zero when the filter matches zero rows, not the whole branch's total (T-01-04)", async () => {
+      // Simulates what the real `pending_only` CTE returns once its own
+      // filter (above) excludes every row: the aggregate row itself carries
+      // 0, not the unfiltered branch figure — `readTotals` must pass that
+      // through unchanged rather than falling back to some wider total.
+      const { service } = serviceWith({
+        ...TOTALS_ROW,
+        incoming_qty: "0",
+        pending_only_incoming_qty: "0",
+      });
+
+      const result = await service.getSummary({
+        organizationId: "org-1",
+        branchId: "branch-1",
+        search: "no-such-sku-matches",
+      });
+
+      expect(result.totals?.incomingQty).toBe(0);
     });
   });
 });

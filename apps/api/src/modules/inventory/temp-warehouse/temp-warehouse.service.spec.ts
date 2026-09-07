@@ -51,6 +51,9 @@ const line = (
     ...overrides,
   }) as TempWarehouseLineEntity;
 
+/** 2026-08-29 17:00 Asia/Ho_Chi_Minh — the instant the sale hit the ledger. */
+const SALE_POSTED_AT = new Date('2026-08-29T10:00:00.000Z');
+
 const payload = (
   lines: { itemId: string; quantity: number }[],
 ): TempWarehouseInvoiceFulfillRequestedPayload => ({
@@ -67,6 +70,7 @@ describe('TempWarehouseService.fulfillInvoiceFromTempWarehouse', () => {
   let sessionRepo: { findOne: jest.Mock };
   let lineRepo: { findOne: jest.Mock; find: jest.Mock };
   let stockTransferService: { createAndPost: jest.Mock };
+  let ledgerEntryRepo: { findOne: jest.Mock };
   let materializer: { buildBranchScopedTransfer: jest.Mock };
   let manager: {
     findOne: jest.Mock;
@@ -111,6 +115,11 @@ describe('TempWarehouseService.fulfillInvoiceFromTempWarehouse', () => {
     stockTransferService = {
       createAndPost: jest.fn().mockResolvedValue({ id: 'transfer-1' }),
     };
+    // The invoice's own SALE_ISSUE row — what the fulfilment anchors its ledger
+    // position on. 10:00 local, comfortably inside the business day.
+    ledgerEntryRepo = {
+      findOne: jest.fn().mockResolvedValue({ id: 'sle-1', postedAt: SALE_POSTED_AT }),
+    };
     let createCounter = 0;
     manager = {
       findOne: jest.fn().mockImplementation((_e, { where }) => {
@@ -135,6 +144,7 @@ describe('TempWarehouseService.fulfillInvoiceFromTempWarehouse', () => {
       {} as any, // userRepo
       {} as any, // itemRepo
       {} as any, // locationRepo
+      ledgerEntryRepo as any,
       dataSource as any,
       {} as any, // locationResolver
       {} as any, // storageDefaultLocationResolver
@@ -283,6 +293,132 @@ describe('TempWarehouseService.fulfillInvoiceFromTempWarehouse', () => {
       }),
     );
   });
+
+  // The stock card sorts by posted_at alone, and this consumer runs after the
+  // sale has committed — so the compensating transfer has to be stamped before
+  // the sale or the running balance shows -1 on the invoice row.
+  describe('ledger position of the compensating transfer', () => {
+    it('stamps the transfer 1ms before the invoice ledger rows', async () => {
+      build({ 'item-1': [line({ id: 'L1', quantity: '5.00' })] });
+
+      await service.fulfillInvoiceFromTempWarehouse(
+        payload([{ itemId: 'item-1', quantity: 2 }]),
+        actor,
+      );
+
+      expect(ledgerEntryRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: ORG,
+            referenceType: 'INVOICE',
+            referenceId: 'inv-1',
+          }),
+          order: { postedAt: 'ASC' },
+        }),
+      );
+      expect(stockTransferService.createAndPost).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        {
+          validateOnHand: false,
+          postedAt: new Date(SALE_POSTED_AT.getTime() - 1),
+        },
+      );
+    });
+
+    it('clamps to the start of the business day instead of slipping into the previous one (AC-05)', async () => {
+      build({ 'item-1': [line({ id: 'L1', quantity: '5.00' })] });
+      // 00:00:00.000 Asia/Ho_Chi_Minh on 2026-08-29 — backing off 1ms would land
+      // on 2026-08-28 and corrupt both periods' opening/closing balances.
+      const dayStart = new Date('2026-08-28T17:00:00.000Z');
+      ledgerEntryRepo.findOne.mockResolvedValue({ id: 'sle-1', postedAt: dayStart });
+
+      await service.fulfillInvoiceFromTempWarehouse(
+        payload([{ itemId: 'item-1', quantity: 2 }]),
+        actor,
+      );
+
+      const [, , opts] = stockTransferService.createAndPost.mock.calls[0];
+      expect(opts.postedAt).toEqual(dayStart);
+    });
+
+    it('clamps to UTC midnight too, which is where the inventory period reports cut (AC-05)', async () => {
+      build({ 'item-1': [line({ id: 'L1', quantity: '5.00' })] });
+      // 00:00 UTC = 07:00 Asia/Ho_Chi_Minh — a plausible trading moment, and the
+      // boundary `stock-period.service.ts` opens its period on (`posted_at < :from`,
+      // bounds built with `Date.UTC` in `date-range-resolver.ts`). Backing off 1ms
+      // here would file the transfer in the previous period.
+      const utcMidnight = new Date('2026-08-29T00:00:00.000Z');
+      ledgerEntryRepo.findOne.mockResolvedValue({ id: 'sle-1', postedAt: utcMidnight });
+
+      await service.fulfillInvoiceFromTempWarehouse(
+        payload([{ itemId: 'item-1', quantity: 2 }]),
+        actor,
+      );
+
+      const [, , opts] = stockTransferService.createAndPost.mock.calls[0];
+      expect(opts.postedAt).toEqual(utcMidnight);
+    });
+
+    it('returns the same instant every time it is asked, so a redelivery cannot move the row (AC-06)', async () => {
+      build({ 'item-1': [line({ id: 'L1', quantity: '5.00' })] });
+      const p = payload([{ itemId: 'item-1', quantity: 2 }]);
+
+      // Called directly: the public replay guard short-circuits before this runs,
+      // so determinism has to be exercised here rather than through a second sale.
+      const first = await (service as any).resolveFulfillPostedAt(p);
+      const second = await (service as any).resolveFulfillPostedAt(p);
+
+      expect(first).toEqual(second);
+      expect(first).toEqual(new Date(SALE_POSTED_AT.getTime() - 1));
+    });
+
+    it('anchors on the sale leg only, never on some other row filed under the invoice (ADR-02)', async () => {
+      build({ 'item-1': [line({ id: 'L1', quantity: '5.00' })] });
+
+      await service.fulfillInvoiceFromTempWarehouse(
+        payload([{ itemId: 'item-1', quantity: 2 }]),
+        actor,
+      );
+
+      expect(ledgerEntryRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ movementType: 'SALE_ISSUE' }),
+        }),
+      );
+    });
+
+    it('still backdates when the temp warehouse only covers part of the sale (AC-07)', async () => {
+      build({ 'item-1': [line({ id: 'L1', quantity: '1.00' })] });
+
+      await service.fulfillInvoiceFromTempWarehouse(
+        payload([{ itemId: 'item-1', quantity: 3 }]),
+        actor,
+      );
+
+      const [, , opts] = stockTransferService.createAndPost.mock.calls[0];
+      expect(opts.postedAt).toEqual(new Date(SALE_POSTED_AT.getTime() - 1));
+    });
+
+    it('fulfils anyway, with a warning, when there is no ledger row to anchor on (ADR-04)', async () => {
+      build({ 'item-1': [line({ id: 'L1', quantity: '5.00' })] });
+      ledgerEntryRepo.findOne.mockResolvedValue(null);
+      const warn = jest
+        .spyOn((service as any).logger, 'warn')
+        .mockImplementation(() => undefined);
+
+      await service.fulfillInvoiceFromTempWarehouse(
+        payload([{ itemId: 'item-1', quantity: 2 }]),
+        actor,
+      );
+
+      // Adjusting real stock outranks ordering a view: never send this to the DLQ.
+      expect(stockTransferService.createAndPost).toHaveBeenCalledTimes(1);
+      const [, , opts] = stockTransferService.createAndPost.mock.calls[0];
+      expect(opts.postedAt).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('inv-1'));
+    });
+  });
 });
 
 describe('TempWarehouseService.listLines (includeTransferred)', () => {
@@ -316,6 +452,7 @@ describe('TempWarehouseService.listLines (includeTransferred)', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any, // ledgerEntryRepo
       {} as any,
       {} as any,
       {} as any,
@@ -379,6 +516,7 @@ describe('TempWarehouseService.getLinesStatus', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any, // ledgerEntryRepo
       {} as any,
       {} as any,
       {} as any,
@@ -453,6 +591,7 @@ describe('TempWarehouseService.computeBalancedLineIdsForSession', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any, // ledgerEntryRepo
       {} as any,
       {} as any,
       {} as any,
@@ -561,6 +700,7 @@ describe('TempWarehouseService.closeBranchSessions', () => {
       {} as any, // userRepo
       {} as any, // itemRepo
       {} as any, // locationRepo
+      {} as any, // ledgerEntryRepo
       dataSource as any,
       {} as any, // locationResolver
       {} as any, // storageDefaultLocationResolver
@@ -757,6 +897,7 @@ describe('TempWarehouseService.addLine (session locations)', () => {
       {} as any, // userRepo
       {} as any, // itemRepo
       {} as any, // locationRepo
+      {} as any, // ledgerEntryRepo
       dataSource as any,
       locationResolver as any,
       storageDefaultLocationResolver as any,
@@ -909,6 +1050,7 @@ describe('TempWarehouseService.listCarriersForBranch', () => {
       userRepo as any,
       {} as any,
       {} as any,
+      {} as any, // ledgerEntryRepo
       {} as any,
       {} as any,
       {} as any,

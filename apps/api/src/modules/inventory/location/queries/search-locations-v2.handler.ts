@@ -10,15 +10,26 @@ import {
 import { SearchLocationsV2Query } from './search-locations-v2.query';
 
 /**
- * "Đã xếp hàng hóa" — a location holds items when it has ≥1 stock_balance row.
+ * "Đã xếp hàng hóa" — a location holds items when it has ≥1 *tracked*
+ * stock_balance row. Rows left behind by "Ngừng theo dõi" (is_tracked = false)
+ * are kept on purpose so tracking can be turned back on, so they must not make
+ * an emptied shelf still read as "Đã xếp".
+ *
  * Used both as a filter predicate and as the `hasItems` projection, so the list
- * needs a single round-trip (listLocations does it in a second query).
+ * needs a single round-trip (listLocations does it in a second query). Keeping
+ * it one constant is what stops the column and its filter from drifting apart.
+ *
+ * Note the negation: "Chưa xếp" is `NOT EXISTS(... AND is_tracked = true)` —
+ * no tracked row left — which is not the same as `EXISTS(... AND is_tracked =
+ * false)`. The two differ on a location holding both kinds of row.
+ *
  * `:organizationId` is already bound by the base WHERE clause.
  */
 const HAS_ITEMS_SQL = `EXISTS (
   SELECT 1 FROM stock_balances sb
   WHERE sb.location_id = location.id
     AND sb.organization_id = :organizationId
+    AND sb.is_tracked = true
 )`;
 
 interface HasItemsRaw {

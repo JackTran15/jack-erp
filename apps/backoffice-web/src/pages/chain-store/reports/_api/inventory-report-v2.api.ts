@@ -1,5 +1,7 @@
 import type {
   InventoryReportFilterPayload,
+  InventoryReportStatBy,
+  InventoryReportViewMode,
   InventoryReportPreset,
   InventoryReportResult,
   InventoryReportSearchPayload,
@@ -14,6 +16,13 @@ import type { ReportFilterValues } from "../../../../store/page-stores/report/re
  * Báo cáo có dòng "Cửa hàng" ở chain mode — khi SINGLE (không hiện dòng đó)
  * FE tự inject store = chi nhánh đang chọn ở header để số liệu scope đúng.
  */
+/**
+ * Báo cáo đổi HÌNH DẠNG dòng giữa chuỗi và một chi nhánh — chuỗi gộp về một
+ * dòng mỗi hàng hóa, không còn chiều vị trí. BE không tự suy ra được chế độ
+ * (X-Branch-Id vẫn trỏ chi nhánh cũ), nên FE phải nói thẳng.
+ */
+const CHAIN_AWARE_SHAPE_REPORTS = new Set(["inventory-stock-summary"]);
+
 const SINGLE_MODE_HEADER_STORE_REPORTS = new Set([
   "inventory-stock-summary",
   "inventory-document-detail",
@@ -22,6 +31,19 @@ const SINGLE_MODE_HEADER_STORE_REPORTS = new Set([
   "inventory-transfer-summary",
   "inventory-temp-warehouse-out",
 ]);
+
+/**
+ * Báo cáo KHÔNG có trục thời gian — engine đọc tồn tại thời điểm hiện tại, nên
+ * `period`/`preset` là trường chết (ADR-04).
+ *
+ * Gỡ hai dòng lọc kỳ khỏi registry (T-04-01) chỉ tắt phần RENDER. Túi `filters`
+ * vẫn được `buildInitialReportState` seed kỳ cho mọi báo cáo, và
+ * `ALWAYS_KEPT_FILTER_LINES` cố ý giữ chúng qua prune để đổi báo cáo qua lại
+ * không làm rỗng kỳ của báo cáo khác. Không chặn ở đây thì payload vẫn mang một
+ * kỳ mà backend không đọc — và vì preset mặc định là "Hôm nay", khoảng ngày đổi
+ * mỗi ngày nên khoá cache đổi theo mà kết quả thì không.
+ */
+const PERIODLESS_REPORTS = new Set(["inventory-stock-by-store-pivot"]);
 
 export interface InventorySearchContext {
   branch: STORE_TYPE;
@@ -33,10 +55,18 @@ export interface InventorySearchContext {
 
 export async function fetchInventoryReportColumns(
   reportType: string,
+  viewMode?: InventoryReportViewMode,
+  statBy?: InventoryReportStatBy,
 ): Promise<InvoiceReportColumnsResult> {
   return requireErpData(
     await erpApi.GET<InvoiceReportColumnsResult>("/reports/inventory/columns", {
-      params: { query: { reportType } },
+      params: {
+        query: {
+          reportType,
+          ...(viewMode ? { viewMode } : {}),
+          ...(statBy ? { statBy } : {}),
+        },
+      },
     }),
   );
 }
@@ -82,13 +112,19 @@ export function buildInventorySearchFilters(
     payload.store = { scope: "group", storeIds: [ctx.activeBranchId] };
   }
 
-  const range = filters[REPORT_FILTERS_LINE.RANGE_DATE];
+  if (ctx && CHAIN_AWARE_SHAPE_REPORTS.has(ctx.backendKey)) {
+    payload.viewMode = ctx.branch === STORE_TYPE.CHAIN ? "chain" : "single";
+  }
+
+  const range = ctx && PERIODLESS_REPORTS.has(ctx.backendKey)
+    ? undefined
+    : filters[REPORT_FILTERS_LINE.RANGE_DATE];
   if (range?.fromDate || range?.toDate) {
     payload.period = {
       from: range.fromDate || undefined,
       to: range.toDate || undefined,
     };
-  } else {
+  } else if (!ctx || !PERIODLESS_REPORTS.has(ctx.backendKey)) {
     const preset = filters[REPORT_FILTERS_LINE.REPORT_PERIOD];
     if (preset) payload.preset = preset as InventoryReportPreset;
   }
@@ -123,6 +159,13 @@ export function buildInventorySearchFilters(
 
   const receivingStore = filters[REPORT_FILTERS_LINE.RECEIVING_STORE];
   if (notAll(receivingStore)) payload.receivingStoreIds = [receivingStore];
+
+  // Chân nào của cặp phiếu đang được xem. Chỉ drill-down chứng từ điều chuyển
+  // đặt giá trị này; mọi báo cáo khác bỏ qua.
+  const transferLeg = filters[REPORT_FILTERS_LINE.TRANSFER_LEG];
+  if (transferLeg) {
+    payload.transferLeg = transferLeg as InventoryReportFilterPayload["transferLeg"];
+  }
 
   return payload;
 }

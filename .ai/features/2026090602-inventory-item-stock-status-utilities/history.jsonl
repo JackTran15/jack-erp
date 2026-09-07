@@ -1,0 +1,20 @@
+{"action": "passed", "at": "2026-09-06T21:09:19", "by": "Akenzy", "evidence": "architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete", "gate": "G0", "id": "b1f55a871ba1", "ts": "2026-09-06T21:09:19.219534"}
+{"action": "passed", "at": "2026-09-06T21:09:19", "by": "Akenzy", "evidence": "12 assumptions, none blocking-and-pending; 20 acceptance criteria defined", "gate": "G1", "id": "6de1d3f21296", "ts": "2026-09-06T21:09:19.284032"}
+{"action": "passed", "at": "2026-09-06T21:09:19", "by": "Akenzy", "evidence": "5 ADR(s) recorded", "gate": "G2", "id": "cbdc58dcf1d0", "ts": "2026-09-06T21:09:19.349652"}
+{"action": "passed", "at": "2026-09-06T21:09:19", "by": "Akenzy", "evidence": "graph valid - 2 UoW, 7 tickets, no cycles", "gate": "G3", "id": "67aad05f8bf0", "ts": "2026-09-06T21:09:19.464669"}
+{"action": "ticket in_progress", "at": "2026-09-06T21:09:32", "by": "Claude", "gate": "G4", "id": "c82925a16cee", "ticket": "T-01-01", "ts": "2026-09-06T21:09:32.451993"}
+{"action": "ticket review", "at": "2026-09-06T21:13:39", "by": "Claude", "gate": "G4", "id": "ce866274746c", "ticket": "T-01-01", "ts": "2026-09-06T21:13:39.069842"}
+{"action": "ticket done", "at": "2026-09-06T21:13:39", "by": "Akenzy", "gate": "G4", "id": "70ab5558ead0", "ticket": "T-01-01", "ts": "2026-09-06T21:13:39.139534"}
+{"action": "ticket in_progress", "at": "2026-09-06T21:14:18", "by": "Claude", "gate": "G4", "id": "e266390af557", "ticket": "T-02-01", "ts": "2026-09-06T21:14:18.156389"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-06T21:16:53", "by": "Claude", "gate": "G4", "id": "5a29f3c39278", "ticket": "T-02-01", "ts": "2026-09-06T21:16:53.061198"}
+{"action": "ticket in_progress", "at": "2026-09-06T21:16:58", "by": "Claude", "gate": "G4", "id": "dd4555bb0b1b", "ticket": "T-02-02", "ts": "2026-09-06T21:16:58.015583"}
+{"action": "ticket in_progress", "at": "2026-09-06T21:22:37", "by": "Claude", "gate": "G4", "id": "4cd76ca97d4c", "ticket": "T-01-03", "ts": "2026-09-06T21:22:37.701081"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-06T21:26:02", "by": "Claude", "gate": "G4", "id": "1f7171ec866a", "ticket": "T-02-02", "ts": "2026-09-06T21:26:02.218688"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-06T21:32:12", "by": "Claude", "gate": "G4", "id": "73b3cd70f144", "ticket": "T-01-03", "ts": "2026-09-06T21:32:12.282034"}
+{"action": "ticket in_progress", "at": "2026-09-06T21:32:17", "by": "Claude", "gate": "G4", "id": "1276426d7717", "ticket": "T-02-04", "ts": "2026-09-06T21:32:17.131763"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-06T21:38:23", "by": "Claude", "gate": "G4", "id": "4adc8289ee6f", "ticket": "T-02-04", "ts": "2026-09-06T21:38:23.421838"}
+{"action": "ticket in_progress", "at": "2026-09-06T21:38:31", "by": "Claude", "gate": "G4", "id": "9989ee73e662", "ticket": "T-01-02", "ts": "2026-09-06T21:38:31.861532"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-06T22:31:59", "by": "Claude", "gate": "G4", "id": "df07d7e136bf", "ticket": "T-01-02", "ts": "2026-09-06T22:31:59.956954"}
+{"action": "ticket in_progress", "at": "2026-09-06T22:32:00", "by": "Claude", "gate": "G4", "id": "61bd57fbfd80", "ticket": "T-02-03", "ts": "2026-09-06T22:32:00.080970"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-06T22:40:20", "by": "Claude", "gate": "G4", "id": "b027df51a9b5", "ticket": "T-02-03", "ts": "2026-09-06T22:40:20.516019"}
+{"action": "passed", "at": "2026-09-06T22:40:27", "by": "Akenzy", "evidence": "plan authored under ruleset 4 — judged by those rules; this tool implements 5. Plans created from now on carry a verification requirement at G4; all 7 tickets done, all UoW checklists ticked", "gate": "G4", "id": "bffcf40bdf8e", "ts": "2026-09-06T22:40:27.643064"}

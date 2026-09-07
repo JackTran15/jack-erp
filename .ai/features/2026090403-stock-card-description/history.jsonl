@@ -1,0 +1,15 @@
+{"action": "passed", "at": "2026-09-04T19:37:09", "by": "Akenzy", "evidence": "architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete", "gate": "G0", "id": "8e335581badd", "ts": "2026-09-04T19:37:09.399821"}
+{"action": "passed", "at": "2026-09-04T19:37:09", "by": "Akenzy", "evidence": "5 assumptions, none blocking-and-pending; 4 acceptance criteria defined", "gate": "G1", "id": "34fa63b646d6", "ts": "2026-09-04T19:37:09.459158"}
+{"action": "passed", "at": "2026-09-04T19:37:09", "by": "Akenzy", "evidence": "1 ADR(s) recorded", "gate": "G2", "id": "58c931e97f34", "ts": "2026-09-04T19:37:09.522919"}
+{"action": "passed", "at": "2026-09-04T19:37:09", "by": "Akenzy", "evidence": "graph valid - 1 UoW, 3 tickets, no cycles", "gate": "G3", "id": "f0f9b3a6b975", "ts": "2026-09-04T19:37:09.635458"}
+{"action": "ticket in_progress", "at": "2026-09-04T19:42:24", "by": "Akenzy", "gate": "G4", "id": "2c0cfcf518fc", "ticket": "T-01-01", "ts": "2026-09-04T19:42:24.428639"}
+{"action": "ticket review", "at": "2026-09-04T19:44:28", "by": "claude", "gate": "G4", "id": "4de140ab1dae", "ticket": "T-01-01", "ts": "2026-09-04T19:44:28.294730"}
+{"action": "ticket done", "at": "2026-09-04T19:44:28", "by": "Akenzy", "gate": "G4", "id": "b2d9ce81d5f4", "ticket": "T-01-01", "ts": "2026-09-04T19:44:28.363743"}
+{"action": "ticket in_progress", "at": "2026-09-04T19:45:22", "by": "Akenzy", "gate": "G4", "id": "a57f4f117cc9", "ticket": "T-01-02", "ts": "2026-09-04T19:45:22.248082"}
+{"action": "ticket review", "at": "2026-09-04T19:52:52", "by": "claude", "gate": "G4", "id": "c4b317633f91", "ticket": "T-01-02", "ts": "2026-09-04T19:52:52.723686"}
+{"action": "ticket done", "at": "2026-09-04T19:52:52", "by": "Akenzy", "gate": "G4", "id": "a69e66b56726", "ticket": "T-01-02", "ts": "2026-09-04T19:52:52.789708"}
+{"action": "ticket in_progress", "at": "2026-09-04T19:53:37", "by": "Akenzy", "gate": "G4", "id": "150e4329a2cd", "ticket": "T-01-03", "ts": "2026-09-04T19:53:37.547089"}
+{"action": "ticket review", "at": "2026-09-04T19:56:28", "by": "claude", "gate": "G4", "id": "9855cef4ba82", "ticket": "T-01-03", "ts": "2026-09-04T19:56:28.689367"}
+{"action": "ticket done", "at": "2026-09-04T19:56:28", "by": "Akenzy", "gate": "G4", "id": "7baa0a60938f", "ticket": "T-01-03", "ts": "2026-09-04T19:56:28.755011"}
+{"action": "passed", "at": "2026-09-04T20:04:50", "by": "akenzy", "evidence": "all 3 tickets done, all UoW checklists ticked", "gate": "G4", "id": "f7466bc06ef8", "ts": "2026-09-04T20:04:50.557793"}
+{"action": "passed", "at": "2026-09-04T20:08:47", "by": "akenzy", "evidence": "assumptions resolved, ADRs settled, graph valid", "gate": "G5", "id": "85d3d814f288", "ts": "2026-09-04T20:08:47.870501"}

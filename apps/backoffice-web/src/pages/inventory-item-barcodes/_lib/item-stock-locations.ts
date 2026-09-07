@@ -53,6 +53,8 @@ export async function fetchItemStockBalances(
     page: "1",
     pageSize: "100",
     itemId,
+    isTracked: "true",
+    locationIsActive: "true",
   });
   if (branchId) params.set("branchId", branchId);
   const { data } = await apiClient.get<

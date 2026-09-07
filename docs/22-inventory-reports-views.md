@@ -1,6 +1,13 @@
 # Inventory Reports — Handover
 
-Tài liệu này mô tả kiến trúc 7 báo cáo kho hàng (`/reports/storage/*`) sau khi chuyển từ mock data sang real data dùng PostgreSQL **plain views** + Redis cache.
+Tài liệu này mô tả kiến trúc các báo cáo kho hàng sau khi chuyển từ mock data sang real data dùng PostgreSQL **plain views** + Redis cache.
+
+> **Cập nhật 09/2026 (PQ-02).** Surface legacy — 8 endpoint `GET /reports/inventory/*` và 8 trang
+> `/reports/storage/*` — **đã bị xoá**. Chỉ còn contract v2 ở mục 0. Lý do: endpoint legacy truyền
+> `branchIds` thẳng từ query string vào engine, và engine đọc mảng rỗng là "không lọc chi nhánh",
+> nên bất kỳ ai có `inventory.reports.read` cũng đọc được tồn kho toàn công ty. Mọi tham chiếu tới
+> `/reports/storage/*` bên dưới chỉ còn giá trị lịch sử; đường dùng thật là
+> `/reports/inventory#<report_type>`.
 
 > Tác giả: feature `feat/bo-reports` (2026-06). Đối tượng đọc: dev tiếp nhận tính năng để mở rộng / debug / thêm báo cáo mới.
 
@@ -20,11 +27,11 @@ Từ 07/2026, 8 báo cáo kho có **contract 3-API registry-driven** giống bá
 - **Backend**: `apps/api/src/modules/inventory-reports/` — `report/inventory-report-definition.ts` (`InventoryReportRegistry`), `report/reports/*.report.ts` (8 definitions, backendKey `inventory-*`), `inventory-report-v2.controller.ts` + CQRS handlers. Core generic dùng chung với invoice: `apps/api/src/modules/reporting/report-core/`.
 - **Data engines tái dùng nguyên** (mục 4 bên dưới): StockPeriodService, DocumentDetailService, StockBalancePivotService, TransferReportService, TempWarehouseReportService. Cache Redis 45s ở search handler.
 - **VI labels/bands**: `packages/shared-interfaces/src/inventory-report/` (per-report maps — cùng key cột có label khác nhau giữa các báo cáo).
-- **Permission**: tái dùng `inventory.reports.read`. Scope: org-wide khi `filters.store` absent/`all` (parity legacy); `scope:"group"` validate storeIds thuộc org.
+- **Permission**: tái dùng `inventory.reports.read`. Scope: luôn kẹp theo `actor.branchIds` qua `report/report-scope.util.ts` — `filters.store` absent/`all` ⇒ mọi chi nhánh được gán, tập rỗng ⇒ `NO_ACCESS_BRANCH_IDS` (không bao giờ org-wide); `scope:"group"` validate storeIds thuộc phạm vi và thuộc org. Riêng báo cáo #5 (pivot theo cửa hàng), tài khoản KHÔNG có `reporting.dashboard.consolidated.read` chỉ thấy chi nhánh đang làm việc — tập chi nhánh chính là nội dung báo cáo (PQ-02, ADR-02).
 - **Lưu ý số liệu**: báo cáo #6 (NX điều chuyển) v2 sửa bug mapping cũ của FE — `inOutDiffQty/Value` giờ lấy từ `qtyInOutDifference/valueInOutDifference` (trước đây nhầm `qtyDifference`) → số hiển thị thay đổi (đúng).
 - **E2E**: `apps/api/test/e2e/inventory-report-v2.e2e-spec.ts`.
 
-**Surface legacy bên dưới (GET endpoints + trang `/reports/storage/*`) GIỮ NGUYÊN** — sẽ dọn ở epic riêng sau khi contract v2 soak.
+**Surface legacy (GET endpoints + trang `/reports/storage/*`) đã bị xoá 09/2026** — xem hộp cảnh báo đầu tài liệu.
 
 ---
 
@@ -34,13 +41,13 @@ Từ 07/2026, 8 báo cáo kho có **contract 3-API registry-driven** giống bá
 
 | # | Route | Tên báo cáo | Backend endpoint |
 |---|-------|-------------|------------------|
-| 1 | `/reports/storage/stock-summary` | Tổng hợp nhập xuất tồn kho | `GET /reports/inventory/stock-summary` |
-| 2 | `/reports/storage/stock-document-details` | Bảng kê chi tiết phiếu nhập xuất | `GET /reports/inventory/stock-document-details` |
-| 3 | `/reports/storage/stock-quantity-details` | Chi tiết số lượng nhập xuất tồn | `GET /reports/inventory/stock-quantity-details` |
-| 4 | `/reports/storage/stock-summary-by-branch` | Tổng hợp NXT theo cửa hàng | `GET /reports/inventory/stock-summary-by-branch` |
-| 5 | `/reports/storage/stock-by-branch` | Số lượng tồn theo cửa hàng (pivot) | `GET /reports/inventory/stock-by-branch` |
-| 6 | `/reports/storage/transfer-summary` | Tổng hợp NX điều chuyển | `GET /reports/inventory/transfer-summary` |
-| 7 | `/reports/storage/transfer-by-branch` | Hàng hoá điều chuyển theo cửa hàng | `GET /reports/inventory/transfer-by-branch` |
+| 1 | `/reports/inventory#inventory_in_out_stock_summary` | Tổng hợp nhập xuất tồn kho | `POST /reports/inventory/search` (đã xoá bản GET) |
+| 2 | `/reports/inventory#warehouse_voucher_detail_list` | Bảng kê chi tiết phiếu nhập xuất | `POST /reports/inventory/search` (đã xoá bản GET) |
+| 3 | `/reports/inventory#inventory_in_out_stock_quantity_detail` | Chi tiết số lượng nhập xuất tồn | `POST /reports/inventory/search` (đã xoá bản GET) |
+| 4 | `/reports/inventory#store_inventory_in_out_stock_summary` | Tổng hợp NXT theo cửa hàng | `POST /reports/inventory/search` (đã xoá bản GET) |
+| 5 | `/reports/inventory#stock_quantity_by_store` | Số lượng tồn theo cửa hàng (pivot) | `POST /reports/inventory/search` (đã xoá bản GET) |
+| 6 | `/reports/inventory#transfer_in_out_summary` | Tổng hợp NX điều chuyển | `POST /reports/inventory/search` (đã xoá bản GET) |
+| 7 | `/reports/inventory#transferred_goods_summary_by_store` | Hàng hoá điều chuyển theo cửa hàng | `POST /reports/inventory/search` (đã xoá bản GET) |
 
 **Phase 2** (chưa làm): Báo cáo 8 — Xuất kho tạm. Sẽ ráp khi nghiệp vụ rõ.
 
@@ -160,6 +167,8 @@ Permission `inventory.reports.read` đã được seed (`apps/api/src/modules/rb
 ## 5. Frontend
 
 ```
+XOÁ 09/2026 — giữ lại để đọc lịch sử. FE hiện hành: `pages/chain-store/reports/`.
+
 apps/backoffice-web/src/
 ├── api/
 │   └── inventory-reports.ts            # 7 typed wrapper qua erpApi + requireErpData
@@ -216,12 +225,11 @@ Workflow chuẩn:
    - Đăng ký service mới ở `inventory-reports.module.ts`.
 3. **Permission**: tái dùng `inventory.reports.read`, không cần thêm permission mới.
 4. **Cache**: dùng `CacheService.getOrSet("inventory-reports", computeKey(actor, dto), fn, 45)`. Key MUST include `actor.organizationId`.
-5. **DTO**: extend `InventoryReportQueryDto` nếu filter set khớp; tạo DTO mới nếu khác (vd `transfer-by-branch-query.dto.ts`).
-6. **Frontend**:
-   - Thêm wrapper trong `api/inventory-reports.ts`
-   - Thêm hook trong `hooks/use-inventory-reports.ts`
-   - Tạo page component trong `pages/reports/storage/` dùng `StorageReportShell<RowT>`
-   - Thêm route ở `App.tsx` + nav entry ở `navConfig.ts`
+5. **DTO**: `InventoryReportSearchDto` + `inventory-report-filter.dto.ts` (bản GET `InventoryReportQueryDto` đã xoá 09/2026).
+6. **Frontend** (contract v2 — không còn trang riêng cho từng báo cáo):
+   - Thêm `InventoryReportDefinition` ở `report/reports/*.report.ts` và đăng ký trong `REPORT_DEFINITIONS`
+   - Khai `backendKey` + filter/table registry ở `constants/reports/report-type.constant.ts`
+   - Thêm vào `STORAGE_REPORTS` của `constants/reports/report-category.constant.ts` — `ReportPage` tự render, không cần route mới
 
 ---
 
@@ -316,7 +324,6 @@ Mọi query backend phải filter `organization_id = actor.organizationId`. Serv
 
 **Frontend**:
 
-- `apps/backoffice-web/src/api/inventory-reports.ts`
-- `apps/backoffice-web/src/hooks/use-inventory-reports.ts`
+- `apps/backoffice-web/src/pages/chain-store/reports/*` (ReportPage v2)
 - `apps/backoffice-web/src/hooks/use-filter-options.ts`
-- `apps/backoffice-web/src/pages/reports/storage/*`
+- ~~`api/inventory-reports.ts`, `hooks/use-inventory-reports.ts`, `pages/reports/storage/*`~~ — xoá 09/2026

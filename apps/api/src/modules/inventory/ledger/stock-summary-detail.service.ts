@@ -10,6 +10,7 @@ import { StockLedgerCardDto } from "./dto/stock-ledger-card.dto";
 import { StockSkuBreakdownDto } from "./dto/stock-sku-breakdown.dto";
 import {
   REFERENCE_TYPE_OPTIONS,
+  descriptionSql,
   documentNumberSql,
   resolveReferenceLabel,
 } from "./stock-ledger-reference.constants";
@@ -118,7 +119,7 @@ interface RawLedgerRow {
   id: string;
   reference_type: string;
   posted_at: Date;
-  notes: string | null;
+  description: string | null;
   in_qty: string | number;
   out_qty: string | number;
   balance_qty: string | number;
@@ -376,15 +377,19 @@ export class StockSummaryDetailService {
         )}::date`,
       );
     }
-    if (dto.description?.value?.trim()) {
-      conditions.push(stringSql("COALESCE(m.notes, '')", dto.description, bind));
-    }
-    // Filtering on the document number is the one case that forces the CASE
-    // expression into the scanned set instead of the page.
+    // Filtering on the document number or the description is the one case
+    // that forces the corresponding CASE expression into the scanned set
+    // instead of just the page — see the `movements` CTE below.
     const filtersDocumentNumber = Boolean(dto.documentNumber?.value?.trim());
     if (filtersDocumentNumber) {
       conditions.push(
         stringSql("COALESCE(m.document_number, '')", dto.documentNumber!, bind),
+      );
+    }
+    const filtersDescription = Boolean(dto.description?.value?.trim());
+    if (filtersDescription) {
+      conditions.push(
+        stringSql("COALESCE(m.resolved_description, '')", dto.description!, bind),
       );
     }
     for (const [column, filter] of [
@@ -405,6 +410,7 @@ export class StockSummaryDetailService {
     }
 
     const documentNumberExpr = documentNumberSql("sle");
+    const descriptionExpr = descriptionSql("sle");
     const cte = `
       WITH opening AS (
         SELECT COALESCE(SUM(sle.quantity), 0)::numeric AS qty
@@ -423,7 +429,6 @@ export class StockSummaryDetailService {
           sle.id,
           sle.reference_type,
           sle.posted_at,
-          sle.notes,
           GREATEST(sle.quantity, 0)::numeric AS in_qty,
           GREATEST(-sle.quantity, 0)::numeric AS out_qty,
           -- Running balance over the WHOLE period, before paging and before
@@ -434,6 +439,7 @@ export class StockSummaryDetailService {
              ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
            ))::numeric AS balance_qty
           ${filtersDocumentNumber ? `, ${documentNumberExpr} AS document_number` : ""}
+          ${filtersDescription ? `, ${descriptionExpr} AS resolved_description` : ""}
         FROM stock_ledger_entries sle
         INNER JOIN locations loc ON loc.id = sle.location_id
         WHERE sle.organization_id = $1
@@ -454,11 +460,12 @@ export class StockSummaryDetailService {
     const offset = (page - 1) * pageSize;
     const pageParams = [...params, offset, offset + pageSize];
     const pageSql = `${cte}
-      SELECT f.id, f.reference_type, f.posted_at, f.notes,
+      SELECT f.id, f.reference_type, f.posted_at,
              f.in_qty, f.out_qty, f.balance_qty,
-             ${filtersDocumentNumber ? "f.document_number" : `(${documentNumberSql("src")}) AS document_number`}
+             ${filtersDocumentNumber ? "f.document_number" : `(${documentNumberSql("src")}) AS document_number`},
+             ${filtersDescription ? "f.resolved_description AS description" : `(${descriptionSql("src")}) AS description`}
       FROM filtered f
-      ${filtersDocumentNumber ? "" : "INNER JOIN stock_ledger_entries src ON src.id = f.id"}
+      ${filtersDocumentNumber && filtersDescription ? "" : "INNER JOIN stock_ledger_entries src ON src.id = f.id"}
       WHERE f.rn > $${params.length + 1} AND f.rn <= $${params.length + 2}
       ORDER BY f.rn ASC`;
 
@@ -513,7 +520,7 @@ export class StockSummaryDetailService {
         documentTypeLabel: resolveReferenceLabel(r.reference_type),
         documentNumber: r.document_number ?? null,
         postedAt: r.posted_at.toISOString(),
-        description: r.notes ?? null,
+        description: r.description ?? null,
         inQty: Number(r.in_qty),
         outQty: Number(r.out_qty),
         balanceQty: Number(r.balance_qty),

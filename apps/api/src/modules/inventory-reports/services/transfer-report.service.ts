@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { ReportTotals } from '@erp/shared-interfaces';
 import {
   buildReportColumnFilter,
+  type MemberScopeFilters,
   type ReportColumnFilters,
   type ReportColumnSpecs,
 } from './report-column-filter.util';
@@ -22,9 +23,27 @@ export interface TransferSummaryQuery {
   branchIds?: string[];
 }
 
+/** L1 of the drill-down: one anchor branch, broken down by the other end. */
+export interface TransferByCounterpartQuery {
+  organizationId: string;
+  startDate: Date;
+  endDate: Date;
+  /** The branch whose row was clicked. Rows come back per counterpart branch. */
+  branchId: string;
+  page?: number;
+  pageSize?: number;
+  /**
+   * Lọc theo cột, áp phía server nên tác dụng trên toàn tập.
+   *
+   * Was validated by the report layer and then dropped: the dialog answered 200
+   * with an unfiltered set (ADR-06).
+   */
+  columnFilters?: ReportColumnFilters;
+}
+
 export interface TransferSummaryRow {
   branchId: string;
-  /** `branches` table has no `code` column today — kept null for forward compat. */
+  /** Mã cửa hàng — `branches.code`, unique per organization. */
   branchCode: string | null;
   branchName: string;
   /** Goods received from other branches (TRANSFER_IN signed positive in ledger). */
@@ -33,10 +52,10 @@ export interface TransferSummaryRow {
   /** Goods shipped out to other branches (TRANSFER_OUT — stored as negative, surfaced as positive magnitude). */
   qtyOut: number;
   valueOut: number;
-  /** Mirror metric: qty other branches actually received from this branch (= sum of TRANSFER_IN at destinations whose paired OUT originated here). */
+  /** Of what this branch shipped out, the qty whose paired GoodsReceipt is posted. Measured on the ISSUE lines, so it is a subset of `qtyOut`. */
   qtyReceived: number;
   valueReceived: number;
-  /** qtyReceived - qtyOut: 0 in a healthy ledger; nonzero hints at in-transit / mismatch. */
+  /** qtyReceived - qtyOut. Always <= 0 by construction; the magnitude is what has shipped but is not yet confirmed received. */
   qtyDifference: number;
   valueDifference: number;
   /** qtyIn - qtyOut at this branch — net inflow/outflow. */
@@ -52,6 +71,31 @@ export interface TransferSummaryResult {
 }
 
 /** Cột số của báo cáo 6 — tổng bằng reduce, vì truy vấn vẫn dựng đủ dòng. */
+/**
+ * What each column of the L1 dialog compiles to, against the `agg` CTE.
+ *
+ * The four difference columns are arithmetic over the sums rather than columns
+ * of `agg`, so they repeat the expression rather than name it — the same shape
+ * the row mapper computes, so a filter matches the number on screen.
+ */
+const COUNTERPART_COLUMN_SPECS: ReportColumnSpecs = {
+  branchCode: { sql: 'branch_code', kind: 'text' },
+  branchName: { sql: 'branch_name', kind: 'text' },
+  inQty: { sql: 'in_qty', kind: 'number' },
+  inValue: { sql: 'in_value', kind: 'number' },
+  outQty: { sql: 'out_qty', kind: 'number' },
+  outValue: { sql: 'out_value', kind: 'number' },
+  receivedQty: { sql: 'received_qty', kind: 'number' },
+  receivedValue: { sql: 'received_value', kind: 'number' },
+  diffQty: { sql: '(received_qty - out_qty)', kind: 'number' },
+  diffValue: { sql: '(received_value - out_value)', kind: 'number' },
+  inOutDiffQty: { sql: '(in_qty - out_qty)', kind: 'number' },
+  inOutDiffValue: { sql: '(in_value - out_value)', kind: 'number' },
+};
+
+/** Column keys the L1 dialog can filter. */
+export const COUNTERPART_FILTERABLE = new Set(Object.keys(COUNTERPART_COLUMN_SPECS));
+
 const TRANSFER_SUMMARY_TOTAL_FIELDS = [
   'qtyIn',
   'valueIn',
@@ -81,6 +125,12 @@ export interface TransferByBranchQuery {
   destinationBranchIds?: string[];
   categoryIds?: string[];
   search?: string;
+  /**
+   * Which items take part, from the filter bar's unit/brand dropdowns. Applied
+   * against `items` alongside the category and search filters, so at the
+   * aggregate grains it narrows `item_agg` before the GROUP BY (ADR-03).
+   */
+  memberScope?: MemberScopeFilters;
   itemGroupBy?: ItemGroupBy;
   page: number;
   pageSize: number;
@@ -139,7 +189,11 @@ const TRANSFER_SIZE_SQL = `(SELECT pao.value_label FROM item_attribute_values ia
            WHERE iav.item_id = i.id AND LOWER(pad.name) = 'size'
            LIMIT 1)`;
 
-function transferByBranchSpecs(alias: string, withText: boolean): ReportColumnSpecs {
+function transferByBranchSpecs(
+  alias: string,
+  withText: boolean,
+  itemGroupBy: ItemGroupBy = 'item',
+): ReportColumnSpecs {
   const specs: ReportColumnSpecs = {
     outQty: { sql: `${alias}.out_qty`, kind: 'number' },
     outValue: { sql: `${alias}.out_value`, kind: 'number' },
@@ -168,8 +222,64 @@ function transferByBranchSpecs(alias: string, withText: boolean): ReportColumnSp
     specs.size = { sql: TRANSFER_SIZE_SQL, kind: 'text' };
     specs.destinationBranchName = { sql: 'b.name', kind: 'text' };
   }
+  // The aggregate grains drop the item joins, but they still show an identity of
+  // their own — the product's code and name, or the category's name — and the
+  // destination branch, which is a dimension of the row rather than of the item
+  // (ADR-07). The expressions mirror `displayCols` so a filter reads the value
+  // the grid prints.
+  if (!withText) {
+    specs.destinationBranchName = { sql: 'b.name', kind: 'text' };
+    if (itemGroupBy === 'parent') {
+      specs.sku = { sql: `COALESCE(p.code, ${alias}.fallback_sku)`, kind: 'text' };
+      specs.itemName = {
+        sql: `COALESCE(p.name, ${alias}.fallback_name)`,
+        kind: 'text',
+      };
+    }
+    if (itemGroupBy === 'group') {
+      const categoryName = `COALESCE(ic.name, 'Không phân nhóm')`;
+      specs.sku = { sql: categoryName, kind: 'text' };
+      specs.itemName = { sql: categoryName, kind: 'text' };
+      specs.categoryName = { sql: categoryName, kind: 'text' };
+    }
+  }
   return specs;
 }
+
+/**
+ * The paired import leg of a two-phase transfer issue.
+ *
+ * Both legs point at the SAME `transfer_orders.id`:
+ * `goods_issues.reference_type = 'TRANSFER_ORDER'` and
+ * `goods_receipts.reference_type = 'STOCK_TRANSFER'`. That receipt enum member
+ * is misleadingly named — it does NOT hold a `stock_transfers.id`; see
+ * `transfer-order.service.ts:1281` and `:1415`, which write `to.id` into it.
+ *
+ * `transfer_orders.export_goods_issue_id` / `import_goods_receipt_id` pair the
+ * same two documents, but they are nulled when a receipt is deleted or
+ * reversed (`goods-receipt.service.ts:624-640`), so they are lossy for
+ * historical reporting. `gr.reference_id` survives on the receipt row.
+ *
+ * An issue with `reference_id IS NULL` — raised straight from the goods issue
+ * screen rather than from a transfer order — can never match, so it counts as
+ * shipped-but-unconfirmed forever. Deliberate: the report must not assert a
+ * receipt it has no evidence for.
+ *
+ * Deliberately NOT bounded by the period end: "chenh lech" means "still
+ * unconfirmed as of now", so a closed period does move when a late receipt
+ * arrives.
+ */
+export const PAIRED_RECEIPT_EXISTS = (gi: string) => `
+        ${gi}.reference_type = 'TRANSFER_ORDER'
+        AND ${gi}.reference_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM goods_receipts gr_p
+          WHERE gr_p.organization_id = ${gi}.organization_id
+            AND gr_p.status = 'POSTED'
+            AND gr_p.purpose = 'TRANSFER_IN'
+            AND gr_p.reference_type = 'STOCK_TRANSFER'
+            AND gr_p.reference_id = ${gi}.reference_id
+        )`;
 
 /**
  * Báo cáo 6 + 7 — inter-branch transfer activity, from TWO independent
@@ -192,14 +302,72 @@ function transferByBranchSpecs(alias: string, withText: boolean): ReportColumnSp
  *      yet correctly shows zero incoming, unlike reading `transfer_orders`
  *      by itself would.
  *
+ * "received" is NOT read from the receipt side. It is the quantity of the
+ * ISSUE lines that have a posted paired receipt (`PAIRED_RECEIPT_EXISTS`), so
+ * it is a strict subset of the very rows that produce "out" and therefore
+ * `received - out <= 0` holds by construction rather than by luck. Reading it
+ * off `goods_receipts` — as this report did before — matched the two legs on
+ * branch pair alone, each filtered on its own document's `posted_at`, which
+ * made `received > out` routine: at a period boundary, on a duplicated
+ * receipt, or when a legacy transfer was also receipted by hand.
+ *
  * "value" reflects the cost basis at transfer time — `items.purchase_price`
- * for the legacy flow (no per-line price stored), the line's own
- * `unit_price` for the two-phase flow (real transaction price is captured).
+ * for the legacy flow, the line's own `unit_price` for the two-phase flow
+ * (real transaction price is captured). `stock_transfer_lines.unit_price`
+ * does exist but stays unused, so drill-downs that break these figures down
+ * can reconcile against the cell that opened them.
  *
  * Filter is `status = 'POSTED'` + `posted_at IN [startDate, endDate)` on
  * whichever document represents that leg (the transfer, the GoodsIssue, or
  * the GoodsReceipt) — not `transfer_orders.created_at`.
  */
+/**
+ * Raw aggregate row → report row. Shared by `summarize()` and
+ * `summarizeByCounterpart()` on purpose: the derived measures (`difference`,
+ * `inOutDifference`) must be computed once, or the drill-down can disagree
+ * with the row that opened it while both queries look correct.
+ */
+function toSummaryRow(r: RawTransferSummaryRow): TransferSummaryRow {
+  const inQty = Number(r.in_qty ?? 0);
+  const inValue = Number(r.in_value ?? 0);
+  const outQty = Number(r.out_qty ?? 0);
+  const outValue = Number(r.out_value ?? 0);
+  // `received` rides on the ISSUE lines, so it is a subset of `out` and the
+  // difference below can never come out positive.
+  const qtyReceived = Number(r.received_qty ?? 0);
+  const valueReceived = Number(r.received_value ?? 0);
+  return {
+    branchId: r.branch_id,
+    branchCode: r.branch_code ?? null,
+    branchName: r.branch_name ?? '',
+    qtyIn: inQty,
+    valueIn: inValue,
+    qtyOut: outQty,
+    valueOut: outValue,
+    qtyReceived,
+    valueReceived,
+    qtyDifference: qtyReceived - outQty,
+    valueDifference: valueReceived - outValue,
+    qtyInOutDifference: inQty - outQty,
+    valueInOutDifference: inValue - outValue,
+  };
+}
+
+/**
+ * Member scope for the by-branch report. `$8`/`$9` sit right after the seven
+ * scope parameters the query already binds, and `params.length` drives where the
+ * column-filter values start, so appending them shifts nothing by hand.
+ *
+ * At the item grain it goes in the outer WHERE; at parent/group it goes inside
+ * `item_agg`, before the GROUP BY, because that is the last point where
+ * `i.unit` still holds a value rather than the `NULL::text` the aggregate
+ * selects (ADR-03).
+ */
+const TRANSFER_MEMBER_SCOPE_SQL = `
+  AND ($8::text IS NULL OR i.unit  = $8)
+  AND ($9::text IS NULL OR i.brand = $9)
+`;
+
 @Injectable()
 export class TransferReportService {
   constructor(private readonly dataSource: DataSource) {}
@@ -224,10 +392,11 @@ export class TransferReportService {
     // received", which is a different question from `in_qty` ("how much did
     // THIS branch itself receive from others"). For the legacy flow POSTED
     // is atomic so received always equals out (diff = 0, always healthy).
-    // For the two-phase flow, received is only counted once the destination
-    // has actually posted its GoodsReceipt — a shipment still in transit
-    // (GoodsIssue posted, no GoodsReceipt yet) correctly leaves the source
-    // branch's diff negative (shipped, not yet confirmed received).
+    // For the two-phase flow it rides on the ISSUE line, gated by
+    // `PAIRED_RECEIPT_EXISTS` — a shipment still in transit (GoodsIssue
+    // posted, no GoodsReceipt yet) leaves the source branch's diff negative.
+    // There is deliberately no branch reading `received` off `goods_receipts`:
+    // that is what let `received` exceed `out`.
     const sql = `
       WITH movements AS (
         SELECT
@@ -283,7 +452,11 @@ export class TransferReportService {
           0::numeric AS in_qty, 0::numeric AS in_value,
           gil.quantity::numeric AS out_qty,
           (gil.quantity::numeric * gil.unit_price::numeric) AS out_value,
-          0::numeric AS received_qty, 0::numeric AS received_value
+          CASE WHEN ${PAIRED_RECEIPT_EXISTS('gi')}
+               THEN gil.quantity::numeric ELSE 0 END AS received_qty,
+          CASE WHEN ${PAIRED_RECEIPT_EXISTS('gi')}
+               THEN (gil.quantity::numeric * gil.unit_price::numeric)
+               ELSE 0 END AS received_value
         FROM goods_issues gi
         JOIN goods_issue_lines gil ON gil.goods_issue_id = gi.id
         WHERE gi.organization_id = $1
@@ -309,26 +482,10 @@ export class TransferReportService {
           AND gr.posted_at >= $2 AND gr.posted_at < $3
           AND gr.source_branch_id IS NOT NULL
           AND gr.branch_id <> gr.source_branch_id
-
-        UNION ALL
-
-        SELECT
-          gr.source_branch_id AS branch_id,
-          0::numeric AS in_qty, 0::numeric AS in_value,
-          0::numeric AS out_qty, 0::numeric AS out_value,
-          grl.quantity::numeric AS received_qty,
-          (grl.quantity::numeric * grl.unit_price::numeric) AS received_value
-        FROM goods_receipts gr
-        JOIN goods_receipt_lines grl ON grl.goods_receipt_id = gr.id
-        WHERE gr.organization_id = $1
-          AND gr.status = 'POSTED'
-          AND gr.purpose = 'TRANSFER_IN'
-          AND gr.posted_at >= $2 AND gr.posted_at < $3
-          AND gr.source_branch_id IS NOT NULL
-          AND gr.branch_id <> gr.source_branch_id
       )
       SELECT
         b.id AS branch_id,
+        b.code AS branch_code,
         b.name AS branch_name,
         COALESCE(SUM(m.in_qty), 0) AS in_qty,
         COALESCE(SUM(m.in_value), 0) AS in_value,
@@ -339,7 +496,7 @@ export class TransferReportService {
       FROM movements m
       JOIN branches b ON b.id::text = m.branch_id AND b.organization_id = $1
       WHERE ($4::uuid[] IS NULL OR b.id = ANY($4))
-      GROUP BY b.id, b.name
+      GROUP BY b.id, b.code, b.name
       ORDER BY b.name ASC
     `;
 
@@ -350,32 +507,7 @@ export class TransferReportService {
       branchIds,
     ])) as RawTransferSummaryRow[];
 
-    const data: TransferSummaryRow[] = rows.map((r) => {
-      const inQty = Number(r.in_qty ?? 0);
-      const inValue = Number(r.in_value ?? 0);
-      const outQty = Number(r.out_qty ?? 0);
-      const outValue = Number(r.out_value ?? 0);
-      // qtyReceived is attributed to THIS branch as shipment source (see SQL
-      // comment) — 0 in a healthy ledger means every unit shipped out has
-      // been confirmed received at its destination.
-      const qtyReceived = Number(r.received_qty ?? 0);
-      const valueReceived = Number(r.received_value ?? 0);
-      return {
-        branchId: r.branch_id,
-        branchCode: null,
-        branchName: r.branch_name ?? '',
-        qtyIn: inQty,
-        valueIn: inValue,
-        qtyOut: outQty,
-        valueOut: outValue,
-        qtyReceived,
-        valueReceived,
-        qtyDifference: qtyReceived - outQty,
-        valueDifference: valueReceived - outValue,
-        qtyInOutDifference: inQty - outQty,
-        valueInOutDifference: inValue - outValue,
-      };
-    });
+    const data: TransferSummaryRow[] = rows.map((r) => toSummaryRow(r));
 
     // Tổng tính trên **toàn bộ** dòng, trước khi cắt trang — chính xác và
     // không tốn thêm truy vấn nào, vì truy vấn này vốn dựng đủ dòng.
@@ -398,6 +530,167 @@ export class TransferReportService {
     };
   }
 
+  /**
+   * L1 of the transfer drill-down — the same figures as `summarize()`, but for
+   * ONE anchor branch, broken down by the branch on the other end.
+   *
+   * The four movement branches are the four `summarize()` branches with a
+   * single predicate added (`= $4`, the anchor) and the grouping moved to the
+   * counterpart side. That is deliberate and load-bearing: it makes
+   * `SUM(L1 rows) === the parent row for $4` true by construction, on all six
+   * measures, rather than something to go and verify. Rewrite it any other way
+   * and the dialog will disagree with the cell that opened it.
+   *
+   * Paged in SQL, unlike `summarize()` — `report-definitions.guard.spec.ts`
+   * exempts only `transfer-summary.report.ts` from the no-`paginateRows` rule.
+   */
+  async summarizeByCounterpart(
+    query: TransferByCounterpartQuery,
+  ): Promise<TransferSummaryResult> {
+    const paired = PAIRED_RECEIPT_EXISTS('gi');
+
+    // $1 org, $2 from, $3 to (exclusive), $4 anchor branch.
+    const movements = `
+      WITH movements AS (
+        SELECT
+          st.destination_branch_id::text AS counterpart_id,
+          0::numeric AS in_qty, 0::numeric AS in_value,
+          stl.quantity::numeric AS out_qty,
+          (stl.quantity::numeric * COALESCE(i.purchase_price, 0)) AS out_value,
+          stl.quantity::numeric AS received_qty,
+          (stl.quantity::numeric * COALESCE(i.purchase_price, 0)) AS received_value
+        FROM stock_transfers st
+        JOIN stock_transfer_lines stl ON stl.transfer_id = st.id
+        JOIN items i ON i.id = stl.item_id AND i.organization_id = st.organization_id
+        WHERE st.organization_id = $1
+          AND st.status = 'POSTED'
+          AND st.posted_at >= $2 AND st.posted_at < $3
+          AND st.source_branch_id <> st.destination_branch_id
+          AND st.source_branch_id::text = $4
+
+        UNION ALL
+
+        SELECT
+          st.source_branch_id::text AS counterpart_id,
+          stl.quantity::numeric AS in_qty,
+          (stl.quantity::numeric * COALESCE(i.purchase_price, 0)) AS in_value,
+          0::numeric AS out_qty, 0::numeric AS out_value,
+          0::numeric AS received_qty, 0::numeric AS received_value
+        FROM stock_transfers st
+        JOIN stock_transfer_lines stl ON stl.transfer_id = st.id
+        JOIN items i ON i.id = stl.item_id AND i.organization_id = st.organization_id
+        WHERE st.organization_id = $1
+          AND st.status = 'POSTED'
+          AND st.posted_at >= $2 AND st.posted_at < $3
+          AND st.source_branch_id <> st.destination_branch_id
+          AND st.destination_branch_id::text = $4
+
+        UNION ALL
+
+        SELECT
+          gi.target_branch_id::text AS counterpart_id,
+          0::numeric AS in_qty, 0::numeric AS in_value,
+          gil.quantity::numeric AS out_qty,
+          (gil.quantity::numeric * gil.unit_price::numeric) AS out_value,
+          CASE WHEN ${paired}
+               THEN gil.quantity::numeric ELSE 0 END AS received_qty,
+          CASE WHEN ${paired}
+               THEN (gil.quantity::numeric * gil.unit_price::numeric)
+               ELSE 0 END AS received_value
+        FROM goods_issues gi
+        JOIN goods_issue_lines gil ON gil.goods_issue_id = gi.id
+        WHERE gi.organization_id = $1
+          AND gi.status = 'POSTED'
+          AND gi.purpose = 'TRANSFER_OUT'
+          AND gi.posted_at >= $2 AND gi.posted_at < $3
+          AND gi.target_branch_id IS NOT NULL
+          AND gi.branch_id <> gi.target_branch_id::text
+          AND gi.branch_id = $4
+
+        UNION ALL
+
+        SELECT
+          gr.source_branch_id AS counterpart_id,
+          grl.quantity::numeric AS in_qty,
+          (grl.quantity::numeric * grl.unit_price::numeric) AS in_value,
+          0::numeric AS out_qty, 0::numeric AS out_value,
+          0::numeric AS received_qty, 0::numeric AS received_value
+        FROM goods_receipts gr
+        JOIN goods_receipt_lines grl ON grl.goods_receipt_id = gr.id
+        WHERE gr.organization_id = $1
+          AND gr.status = 'POSTED'
+          AND gr.purpose = 'TRANSFER_IN'
+          AND gr.posted_at >= $2 AND gr.posted_at < $3
+          AND gr.source_branch_id IS NOT NULL
+          AND gr.branch_id <> gr.source_branch_id
+          AND gr.branch_id = $4
+      ),
+      agg AS (
+        SELECT
+          b.id AS branch_id,
+          b.code AS branch_code,
+          b.name AS branch_name,
+          COALESCE(SUM(m.in_qty), 0) AS in_qty,
+          COALESCE(SUM(m.in_value), 0) AS in_value,
+          COALESCE(SUM(m.out_qty), 0) AS out_qty,
+          COALESCE(SUM(m.out_value), 0) AS out_value,
+          COALESCE(SUM(m.received_qty), 0) AS received_qty,
+          COALESCE(SUM(m.received_value), 0) AS received_value
+        FROM movements m
+        JOIN branches b ON b.id::text = m.counterpart_id AND b.organization_id = $1
+        GROUP BY b.id, b.code, b.name
+      )`;
+
+    const page = Math.max(1, query.page ?? 1);
+    const pageSize = Math.max(1, query.pageSize ?? 20);
+    const params = [
+      query.organizationId,
+      query.startDate,
+      query.endDate,
+      query.branchId,
+    ];
+    // One fragment for the rows query and the totals query alike.
+    const columnFilter = buildReportColumnFilter(
+      query.columnFilters,
+      COUNTERPART_COLUMN_SPECS,
+      params.length,
+    );
+    const filterWhere = columnFilter.where ? `WHERE ${columnFilter.where}` : '';
+    const filteredParams = [...params, ...columnFilter.params];
+    const limitIndex = filteredParams.length + 1;
+
+    const rows = (await this.dataSource.query(
+      `${movements}
+       SELECT * FROM agg ${filterWhere}
+       ORDER BY branch_name ASC LIMIT $${limitIndex} OFFSET $${limitIndex + 1}`,
+      [...filteredParams, pageSize, (page - 1) * pageSize],
+    )) as RawTransferSummaryRow[];
+
+    // Totals come from the same CTE, under the same filter, so they describe the
+    // whole filtered set rather than the page or the unfiltered whole.
+    const [totalsRow] = (await this.dataSource.query(
+      `${movements}
+       SELECT COUNT(*)::int AS total,
+              COALESCE(SUM(in_qty), 0) AS in_qty,
+              COALESCE(SUM(in_value), 0) AS in_value,
+              COALESCE(SUM(out_qty), 0) AS out_qty,
+              COALESCE(SUM(out_value), 0) AS out_value,
+              COALESCE(SUM(received_qty), 0) AS received_qty,
+              COALESCE(SUM(received_value), 0) AS received_value
+         FROM agg ${filterWhere}`,
+      filteredParams,
+    )) as (RawTransferSummaryRow & { total: number })[];
+
+    const data = rows.map((r) => toSummaryRow(r));
+    const whole = totalsRow ? toSummaryRow(totalsRow) : null;
+    const totals: ReportTotals = {};
+    for (const field of TRANSFER_SUMMARY_TOTAL_FIELDS) {
+      totals[field] = whole ? whole[field] : 0;
+    }
+
+    return { data, total: Number(totalsRow?.total ?? 0), totals };
+  }
+
   // ──────────────────────────────────────────────────────────────────
   // Báo cáo 7
   // ──────────────────────────────────────────────────────────────────
@@ -406,6 +699,9 @@ export class TransferReportService {
       query.destinationBranchIds?.length ? query.destinationBranchIds : null;
     const categoryIds = query.categoryIds?.length ? query.categoryIds : null;
     const search = query.search?.trim().length ? query.search.trim() : null;
+    // An empty dropdown means "all", not "match the empty string".
+    const unit = query.memberScope?.unit?.length ? query.memberScope.unit : null;
+    const brand = query.memberScope?.brand?.length ? query.memberScope.brand : null;
     const itemGroupBy: ItemGroupBy = query.itemGroupBy ?? 'item';
 
     const page = Math.max(1, query.page);
@@ -521,12 +817,14 @@ export class TransferReportService {
       destinationBranchIds,
       categoryIds,
       search,
+      unit,   // $8
+      brand,  // $9
     ];
     // One fragment for the rows query and the count+totals query alike.
     const isItemLevel = itemGroupBy === 'item';
     const columnFilter = buildReportColumnFilter(
       query.columnFilters,
-      transferByBranchSpecs(isItemLevel ? 'c' : 'ia', isItemLevel),
+      transferByBranchSpecs(isItemLevel ? 'c' : 'ia', isItemLevel, itemGroupBy),
       params.length,
     );
     const filterWhere = columnFilter.where ? `AND ${columnFilter.where}` : '';
@@ -570,6 +868,7 @@ export class TransferReportService {
         JOIN  branches b ON b.id = c.other_branch_id AND b.organization_id = $1
         WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
           AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
+          ${TRANSFER_MEMBER_SCOPE_SQL}
           ${filterWhere}
         ORDER BY i.code ASC, b.name ASC
         LIMIT $${limitIndex} OFFSET $${limitIndex + 1}
@@ -587,6 +886,7 @@ export class TransferReportService {
         JOIN branches b ON b.id = c.other_branch_id AND b.organization_id = $1
         WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
           AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
+          ${TRANSFER_MEMBER_SCOPE_SQL}
           ${filterWhere}
       `;
     } else {
@@ -609,6 +909,7 @@ export class TransferReportService {
           JOIN items i ON i.id = c.item_id AND i.organization_id = $1
           WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
             AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
+            ${TRANSFER_MEMBER_SCOPE_SQL}
           GROUP BY ${aggKeyExpr}, c.other_branch_id
         )
       `;
@@ -654,6 +955,9 @@ export class TransferReportService {
         ORDER BY ${orderByCol} ASC NULLS LAST, b.name ASC
         LIMIT $${limitIndex} OFFSET $${limitIndex + 1}
       `;
+      // Same joins as the rows query: the identity and destination filters
+      // compile to `p.` / `ic.` / `b.` expressions, and a count over a narrower
+      // FROM would both fail to resolve them and count a different set.
       countSql = `
         WITH ${baseCtes},
         ${aggCte}
@@ -662,6 +966,8 @@ export class TransferReportService {
                  ([, col]) => `COALESCE(SUM(ia.${col}), 0)::numeric AS ${col}`,
                ).join(',\n               ')}
         FROM item_agg ia
+        ${joinLookup}
+        JOIN branches b ON b.id = ia.other_branch_id AND b.organization_id = $1
         WHERE TRUE ${filterWhere}
       `;
     }
@@ -713,6 +1019,7 @@ export class TransferReportService {
 
 interface RawTransferSummaryRow {
   branch_id: string;
+  branch_code: string | null;
   branch_name: string | null;
   in_qty: string | number | null;
   in_value: string | number | null;

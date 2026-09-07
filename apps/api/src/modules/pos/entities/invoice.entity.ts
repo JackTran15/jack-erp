@@ -16,6 +16,17 @@ export enum InvoicePaymentMethod {
   CARD          = 'card',
 }
 
+/**
+ * One payment line as the cashier had it when the cart was parked (hold-cart).
+ * Persisted whole into `invoices.draft_payments` and read back whole when the POS
+ * reopens the draft; no reader outside that round trip, and never a journal source.
+ */
+export interface DraftPaymentSnapshot {
+  method: InvoicePaymentMethod;
+  amount: number;
+  paymentAccountId?: string;
+}
+
 export enum InvoiceType {
   SALE     = 'SALE',
   RETURN   = 'RETURN',
@@ -120,6 +131,21 @@ export class InvoiceEntity extends BaseEntity {
 
   @Column({ name: 'draft_label', nullable: true, comment: 'User-visible label for in-progress draft (e.g. "Table 3")' })
   draftLabel?: string;
+
+  /**
+   * Not a payment record: `invoice_payments` owns money that was actually taken,
+   * and its rows need a resolved GL account. This is the cashier's in-progress
+   * tender, kept only so reopening a held cart restores what they had typed.
+   * NULL = draft saved before the column existed; the POS falls back to a single
+   * cash line for the amount due.
+   */
+  @Column({
+    name: 'draft_payments',
+    type: 'jsonb',
+    nullable: true,
+    comment: 'Payment lines tendered on the POS at save-draft time; only meaningful while isDraft is true',
+  })
+  draftPayments?: DraftPaymentSnapshot[];
 
   @Column({ name: 'customer_id', type: 'uuid', nullable: true, comment: 'Customer linked to this invoice; null for anonymous sales' })
   customerId?: string;

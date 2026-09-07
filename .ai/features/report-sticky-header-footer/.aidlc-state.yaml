@@ -1,0 +1,108 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: report-sticky-header-footer
+slug: report-sticky-header-footer
+profile: none
+created: 2026-08-27T13:07:37
+current_gate: G5
+history:
+  - gate: G0
+    action: passed
+    at: 2026-08-27T13:08:47
+    by: Loc Tran
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-08-27T13:09:49
+    by: Loc Tran
+    evidence: 5 assumptions, none blocking-and-pending; 6 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-27T13:10:55
+    by: Loc Tran
+    evidence: 2 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-27T14:55:52
+    by: Loc Tran
+    evidence: graph valid - 1 UoW, 3 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-27T14:56:07
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-27T14:56:31
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-27T14:56:38
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-27T15:12:27
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-27T15:12:27
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-27T15:12:27
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: passed
+    at: 2026-08-27T15:12:58
+    by: Loc Tran
+    evidence: all 3 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-08-27T15:13:04
+    by: Loc Tran
+    evidence: assumptions resolved, ADRs settled, graph valid
+  - gate: G1
+    action: reopened
+    at: 2026-08-27T15:27:52
+    by: Loc Tran
+    reason: Bảng rỗng/ít dòng - hàng Tổng không dính đáy vì sticky không đẩy được ra ngoài containing block (<table>). Đo tại 1440x900 - cần 13 dòng mới lấp đầy. Thêm AC-07 cho hành vi lấp đầy chiều cao.
+  - gate: G1
+    action: passed
+    at: 2026-08-27T15:28:15
+    by: Loc Tran
+    evidence: 7 assumptions, none blocking-and-pending; 7 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-27T15:28:15
+    by: Loc Tran
+    evidence: 2 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-27T15:28:58
+    by: Loc Tran
+    evidence: graph valid - 1 UoW, 4 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-27T15:29:14
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-08-27T15:32:11
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: passed
+    at: 2026-08-27T15:32:26
+    by: Loc Tran
+    evidence: all 4 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-08-27T15:32:26
+    by: Loc Tran
+    evidence: assumptions resolved, ADRs settled, graph valid

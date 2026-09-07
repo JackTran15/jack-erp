@@ -15,8 +15,16 @@ export interface GoodsReceiptLine {
   unitPrice: number | string;
   lineTotal?: number | string;
   note?: string | null;
-  /** Eager-loaded from BE — present on read endpoints. */
-  item?: { id: string; code: string; name: string; unit?: string } | null;
+  /** Eager-loaded from BE — present on read endpoints. TypeORM trả nguyên
+   *  `ItemEntity` (không `select`), nên `sellingPrice` có sẵn ở đây; trang In tem
+   *  mã dùng nó thay vì tự đi tra lại từng SKU. */
+  item?: {
+    id: string;
+    code: string;
+    name: string;
+    unit?: string;
+    sellingPrice?: number | string | null;
+  } | null;
   location?: {
     id: string;
     code: string;
@@ -63,7 +71,12 @@ export interface GoodsReceipt {
     storageId?: string;
   } | null;
   attachmentIds?: string[];
-  lines: GoodsReceiptLine[];
+  /**
+   * Optional since T-02-01: `GET /:id?includeLines=false` returns the header
+   * alone, and the view dialog pages the lines separately. Every other caller
+   * still gets them, because the flag defaults to true.
+   */
+  lines?: GoodsReceiptLine[];
   /**
    * Per-row Tổng tiền, present on `/v2/goods-receipts/search` list rows (which
    * no longer carry `lines`) but not on the `GET /:id` shape — that one keeps

@@ -26,10 +26,16 @@ function makeRegistry(cols: string[] = CATALOG): any {
   };
 }
 
+/**
+ * A row the actor's own branch owns. `branchId` matters now: a chain-tier row
+ * (branchId undefined) patched by a branch actor forks instead of updating in
+ * place (ADR-03), which is a different code path — covered separately below.
+ */
 function entity(overrides: Record<string, unknown> = {}): any {
   return {
     id: 't1',
     organizationId: 'org-1',
+    branchId: 'b1',
     reportType: 'daily-sales-summary',
     name: 'T',
     description: null,

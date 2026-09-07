@@ -3,7 +3,11 @@ import { LoadDraftStep } from './load-draft.step';
 import { ResolveAccountsStep } from './resolve-accounts.step';
 import { ResolveFundsStep } from './resolve-funds.step';
 import { ComputeTotalsStep } from './compute-totals.step';
-import { InvoiceStatus, InvoicePaymentMethod } from '../../../entities/invoice.entity';
+import {
+  InvoiceStatus,
+  InvoicePaymentMethod,
+  InvoiceType,
+} from '../../../entities/invoice.entity';
 import { computeAmountDue } from '../../../services/invoice-amount.util';
 import { POINT_EARN_VND_PER_POINT } from '../../../../customer/loyalty.constants';
 import { CheckoutContext } from '../checkout-step';
@@ -45,7 +49,7 @@ describe('LoadDraftStep', () => {
   });
 
   it('AC-04: rejects a non-draft invoice with INVOICE_NOT_CHECKOUTABLE when no completed saga matches this idempotency key', async () => {
-    invoiceRepo.findOne.mockResolvedValue({ isDraft: false, status: InvoiceStatus.PAID });
+    invoiceRepo.findOne.mockResolvedValue({ isDraft: false, status: InvoiceStatus.PAID, type: InvoiceType.SALE });
     sagaRepo.findOne.mockResolvedValue(null);
     await expect(step.execute(ctx())).rejects.toMatchObject({
       response: { code: 'INVOICE_NOT_CHECKOUTABLE' },
@@ -53,7 +57,7 @@ describe('LoadDraftStep', () => {
   });
 
   it('AC-04: rejects a draft with no items', async () => {
-    invoiceRepo.findOne.mockResolvedValue({ isDraft: true, status: InvoiceStatus.DRAFT });
+    invoiceRepo.findOne.mockResolvedValue({ isDraft: true, status: InvoiceStatus.DRAFT, type: InvoiceType.SALE });
     itemRepo.find.mockResolvedValue([]);
     await expect(step.execute(ctx())).rejects.toMatchObject({
       response: { code: 'INVOICE_NOT_CHECKOUTABLE' },
@@ -61,7 +65,7 @@ describe('LoadDraftStep', () => {
   });
 
   it('AC-04: rejects a draft with an item missing locationId', async () => {
-    invoiceRepo.findOne.mockResolvedValue({ isDraft: true, status: InvoiceStatus.DRAFT });
+    invoiceRepo.findOne.mockResolvedValue({ isDraft: true, status: InvoiceStatus.DRAFT, type: InvoiceType.SALE });
     itemRepo.find.mockResolvedValue([{ itemId: 'i1', locationId: null }]);
     await expect(step.execute(ctx())).rejects.toMatchObject({
       response: { code: 'INVOICE_NOT_CHECKOUTABLE' },
@@ -69,7 +73,7 @@ describe('LoadDraftStep', () => {
   });
 
   it('populates ctx.invoice and ctx.items on a valid draft', async () => {
-    const invoice = { id: 'inv-1', isDraft: true, status: InvoiceStatus.DRAFT };
+    const invoice = { id: 'inv-1', isDraft: true, status: InvoiceStatus.DRAFT, type: InvoiceType.SALE };
     const items = [{ itemId: 'i1', locationId: 'loc-1', sortOrder: 0 }];
     invoiceRepo.findOne.mockResolvedValue(invoice);
     itemRepo.find.mockResolvedValue(items);
@@ -84,7 +88,7 @@ describe('LoadDraftStep', () => {
   // A-13 amendment (T-02-09): a resubmitted request against an already-committed
   // invoice must reach open-saga's replay logic, not be rejected here.
   it('AC-10: lets a non-draft invoice through when a COMPLETED saga already matches this idempotency key (replay)', async () => {
-    const invoice = { id: 'inv-1', isDraft: false, status: InvoiceStatus.PAID };
+    const invoice = { id: 'inv-1', isDraft: false, status: InvoiceStatus.PAID, type: InvoiceType.SALE };
     const items = [{ itemId: 'i1', locationId: 'loc-1', sortOrder: 0 }];
     invoiceRepo.findOne.mockResolvedValue(invoice);
     itemRepo.find.mockResolvedValue(items);
@@ -100,8 +104,36 @@ describe('LoadDraftStep', () => {
     expect(c.items).toBe(items);
   });
 
+  it('AC-09: rejects an EXCHANGE draft — it settles through /checkout-return, not here', async () => {
+    invoiceRepo.findOne.mockResolvedValue({
+      id: 'inv-1',
+      isDraft: true,
+      status: InvoiceStatus.DRAFT,
+      type: InvoiceType.EXCHANGE,
+    });
+    const c = ctx();
+    await expect(step.execute(c)).rejects.toMatchObject({
+      response: { code: 'INVOICE_NOT_CHECKOUTABLE' },
+    });
+    // Rejected before the lines are even read — nothing about the draft moves.
+    expect(itemRepo.find).not.toHaveBeenCalled();
+    expect(c.invoice).toBeUndefined();
+  });
+
+  it('AC-09: rejects a RETURN draft the same way', async () => {
+    invoiceRepo.findOne.mockResolvedValue({
+      id: 'inv-1',
+      isDraft: true,
+      status: InvoiceStatus.DRAFT,
+      type: InvoiceType.RETURN,
+    });
+    await expect(step.execute(ctx())).rejects.toMatchObject({
+      response: { code: 'INVOICE_NOT_CHECKOUTABLE' },
+    });
+  });
+
   it('AC-10: a PENDING or FAILED saga for this idempotency key does not bypass the draft guard — only COMPLETED does', async () => {
-    invoiceRepo.findOne.mockResolvedValue({ isDraft: false, status: InvoiceStatus.PAID });
+    invoiceRepo.findOne.mockResolvedValue({ isDraft: false, status: InvoiceStatus.PAID, type: InvoiceType.SALE });
     sagaRepo.findOne.mockResolvedValue(null); // repo query itself filters status: COMPLETED
     await expect(step.execute(ctx())).rejects.toMatchObject({
       response: { code: 'INVOICE_NOT_CHECKOUTABLE' },

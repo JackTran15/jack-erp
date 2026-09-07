@@ -3,6 +3,10 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ReportTemplateEntity } from '../../report-core/report-template.entity';
+import {
+  resolveTemplateScope,
+  writeScopeWhere,
+} from '../../report-core/template-scope';
 import { DeleteInvoiceReportTemplateCommand } from './delete-invoice-report-template.command';
 
 @CommandHandler(DeleteInvoiceReportTemplateCommand)
@@ -17,9 +21,13 @@ export class DeleteInvoiceReportTemplateHandler
   async execute({
     id,
     actor,
+    scope,
   }: DeleteInvoiceReportTemplateCommand): Promise<{ id: string }> {
+    const resolved = resolveTemplateScope(scope, actor);
+    // `writeScopeWhere`, not `readScopeWhere`: reading crosses into the chain
+    // tier so a branch can inherit from it, deleting must not.
     const entity = await this.repo.findOne({
-      where: { id, organizationId: actor.organizationId },
+      where: { ...writeScopeWhere(actor, resolved), id },
     });
     if (!entity) {
       throw new NotFoundException('Invoice report template not found');

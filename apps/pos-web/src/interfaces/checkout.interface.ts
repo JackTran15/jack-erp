@@ -139,6 +139,8 @@ export interface DraftInvoicePayment {
   /** Human label, e.g. "Tiền mặt". */
   label: string;
   amount: number;
+  /** Tài khoản nhận tiền đã chọn lúc lưu tạm; null = chưa chọn. */
+  paymentAccountId?: string | null;
 }
 
 /**
@@ -169,6 +171,12 @@ export interface DraftInvoice {
   checkoutVariant?: CheckoutVariantEnum;
   quickExchangePurchase?: CartLine[];
   quickExchangeReturn?: CartLine[];
+  /**
+   * Phiếu trả/đổi lập theo hóa đơn gốc — tab khôi phục phải mang theo, nếu không
+   * một phiếu "regular" mở lại sẽ được gửi đi như phiếu trả nhanh (BE không trừ
+   * `returned_quantity` của hóa đơn gốc nữa).
+   */
+  originalInvoiceId?: string;
 }
 
 // ============================================================================

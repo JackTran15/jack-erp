@@ -40,6 +40,7 @@ export function ReportTableConfigSync() {
   // buildColumns của revenue-by-item); các báo cáo khác bỏ qua giá trị này.
   const store = useReportStore((s) => s.filters[REPORT_FILTERS_LINE.STORE]);
   const setConfig = useTableStore((s) => s.setConfig);
+  const pruneColumnFilters = useReportStore((s) => s.actions.pruneColumnFilters);
   const columnsActions = useTableStore((s) => s.columnsActions);
 
   const backendKey = getReportBackendKey(reportType);
@@ -47,10 +48,25 @@ export function ReportTableConfigSync() {
   const { template, isLoading: templateLoading } = useReportColumnTemplate();
 
   const { data: columnsResult } = useQuery({
-    queryKey: ["report-columns", backendSource, backendKey, groupBy, statBy, store],
+    queryKey: [
+      "report-columns",
+      backendSource,
+      backendKey,
+      branch,
+      groupBy,
+      statBy,
+      store,
+    ],
     queryFn: () => {
       if (backendSource === "inventory") {
-        return fetchInventoryReportColumns(backendKey as string);
+        // Bộ cột báo cáo kho phụ thuộc chế độ xem VÀ "Thống kê theo": chuỗi bỏ
+        // cột vị trí, hạt mẫu mã/nhóm bỏ các cột định danh mà SQL trả NULL
+        // (xem stock-summary.report.ts). BE trả đúng catalog nên FE không lọc tay.
+        return fetchInventoryReportColumns(
+          backendKey as string,
+          branch === STORE_TYPE.CHAIN ? "chain" : "single",
+          statBy as "item" | "parent" | "group" | undefined,
+        );
       }
       if (backendSource === "debt") {
         return fetchDebtReportColumns(
@@ -88,6 +104,7 @@ export function ReportTableConfigSync() {
         ? { ...columnsResult, columns: columnsResult.columns.filter((h) => h.col !== "location") }
         : columnsResult;
       setConfig(mapHeadersToTableConfig(effectiveColumnsResult));
+      pruneColumnFilters(effectiveColumnsResult.columns.map((h) => h.col));
       if (template?.columns?.length) {
         const merged = mergeTemplateColumnsState(
           template.columns,
@@ -98,7 +115,9 @@ export function ReportTableConfigSync() {
         columnsActions.setPinning(merged.pinning);
       }
     } else {
-      setConfig(getReportTableConfig(reportType, branch));
+      const fallback = getReportTableConfig(reportType, branch);
+      setConfig(fallback);
+      pruneColumnFilters(fallback.columns.map((c) => c.column));
     }
   }, [
     columnsResult,
@@ -108,6 +127,7 @@ export function ReportTableConfigSync() {
     branch,
     setConfig,
     columnsActions,
+    pruneColumnFilters,
   ]);
 
   return null;

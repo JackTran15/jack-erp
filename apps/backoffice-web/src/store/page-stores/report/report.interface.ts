@@ -48,6 +48,7 @@ export interface ReportFilterValues {
   [REPORT_FILTERS_LINE.STORE_SINGLE]: string;
   [REPORT_FILTERS_LINE.PRODUCT_TYPE]: string;
   [REPORT_FILTERS_LINE.SKU]: string;
+  [REPORT_FILTERS_LINE.TRANSFER_LEG]: string;
   [REPORT_FILTERS_LINE.CHECKBOX_ALLOCATE_COMBO]: boolean;
   [REPORT_FILTERS_LINE.CUSTOMER_GROUP]: string;
   [REPORT_FILTERS_LINE.CUSTOMER_SEARCH]: ReportLookupSelection | null;
@@ -87,6 +88,14 @@ export interface InvoiceDetailTarget {
  * nguồn và báo cáo đích không cùng bộ filter line (xem `_lib/report-drilldown`).
  */
 export interface ReportDrillDown {
+  /**
+   * Tên chi nhánh neo, để dialog con gọi đúng tên trong phụ đề.
+   *
+   * Cần thiết vì dòng của dialog cha là các chi nhánh ĐỐI ỨNG — tên của chính
+   * chi nhánh neo không nằm trên dòng nào, chỉ có ở phụ đề của dialog cha. Tuỳ
+   * chọn: bốn drill-down bán hàng không set nó và không đổi hành vi.
+   */
+  anchorName?: string;
   reportType: string;
   title: string;
   subtitle: string;
@@ -95,6 +104,8 @@ export interface ReportDrillDown {
 
 // State khởi tạo store (provider nhận, factory dựng từ metadata category + branch).
 export interface ReportInitialState {
+  /** Tên chi nhánh neo, do dialog cha truyền xuống. Undefined ở trang gốc. */
+  anchorName?: string;
   category: REPORT_CATEGORY;
   branch: STORE_TYPE;
   listReport: string[];
@@ -117,6 +128,8 @@ export interface ReportActions {
   setColumnFilter: (columnId: string, patch: Partial<ReportColumnFilter>) => void;
   // Áp dụng ngay filter cột (dòng đầu bảng) mà không bấm "Lấy dữ liệu".
   commitColumnFilters: () => void;
+  /** Bỏ filter của những cột không còn trong catalog (đổi "Thống kê theo"/chế độ xem). */
+  pruneColumnFilters: (knownColumns: string[]) => void;
   // Chốt filter hiện tại → appliedRequest (kích hoạt fetch data).
   applyFilters: () => void;
   resetFilters: () => void;

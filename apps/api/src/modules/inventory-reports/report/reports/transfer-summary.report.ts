@@ -6,6 +6,7 @@ import {
   InventoryReportResult,
   ReportColumnDataType,
   ReportColumnHeader,
+  REPORT_ROW_BRANCH_ID,
   ReportRow,
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
@@ -34,7 +35,10 @@ const { STRING, NUMBER } = ReportColumnDataType;
 
 const COLUMNS: InventoryColumnDef[] = [
   { key: 'branchCode', type: STRING, width: 130 },
-  { key: 'branchName', type: STRING, width: 220 },
+  // Opens the per-counterpart dialog (L1). `diffQty` deliberately stays
+  // unlinked: a parent row aggregates several counterparts, so the difference
+  // dialog would have no receiving branch to name.
+  { key: 'branchName', type: STRING, link: true, width: 220 },
   { key: 'inQty', type: NUMBER, band: 'in', width: 110 },
   { key: 'inValue', type: NUMBER, band: 'in', width: 130 },
   { key: 'outQty', type: NUMBER, band: 'out', width: 110 },
@@ -91,11 +95,26 @@ export class TransferSummaryReport implements InventoryReportDefinition {
       branchIds,
     });
 
-    let rows = result.data.map((r) => this.toRow(r));
+    // Carry the branch id on the row through filtering and paging, then put it
+    // back after projection: `paginateRows` projects to `dto.columns` and would
+    // otherwise drop it. Indexing must be against the FILTERED array, not
+    // `result.data` — a column filter changes both length and order.
+    let rows: ReportRow[] = result.data.map((r) => ({
+      ...this.toRow(r),
+      [REPORT_ROW_BRANCH_ID]: r.branchId,
+    }));
     rows = applyColumnFilters(rows, dto.columnFilters);
 
+    const limit = dto.limit ?? 20;
+    const offset = ((dto.page ?? 1) - 1) * limit;
+    const page = paginateRows(rows, dto.columns, dto.page ?? 1, limit);
+    page.forEach((row, i) => {
+      const branchId = rows[offset + i]?.[REPORT_ROW_BRANCH_ID];
+      if (branchId !== undefined) row[REPORT_ROW_BRANCH_ID] = branchId;
+    });
+
     return {
-      rows: paginateRows(rows, dto.columns, dto.page ?? 1, dto.limit ?? 20),
+      rows: page,
       totals: buildTotalsRow(dto.columns, rows, NUMERIC),
       total: rows.length,
     };

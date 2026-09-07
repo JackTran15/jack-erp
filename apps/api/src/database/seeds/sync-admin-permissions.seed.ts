@@ -11,6 +11,7 @@
  * Run: pnpm --filter @erp/api seed:sync-admin-permissions
  */
 import { AppDataSource } from '../data-source';
+import { returnedRows } from '../../common/utils/returning-rows.util';
 import { PERMISSION_SEEDS } from '../../modules/rbac/permissions.seed';
 import {
   BRANCH_MANAGER_PERMISSION_KEYS,
@@ -81,16 +82,6 @@ async function assignPermissionsToRole(
     [roleId, permissionKeys],
   );
   return result.length;
-}
-
-/**
- * TypeORM's postgres driver returns `[rows, affectedCount]` for
- * `UPDATE … RETURNING` but a plain row array for `INSERT … RETURNING`.
- */
-function returnedRows<T>(result: unknown): T[] {
-  return Array.isArray(result) && Array.isArray(result[0])
-    ? (result[0] as T[])
-    : ((result ?? []) as T[]);
 }
 
 /**

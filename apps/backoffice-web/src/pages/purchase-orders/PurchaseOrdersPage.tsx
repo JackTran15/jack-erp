@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery , useQueryClient} from "@tanstack/react-query";
 import { erpApi, requireErpData } from "../../lib/erp-api";
 import {
   navigateToBarcodePrint,
@@ -42,6 +42,12 @@ import {
   type StatusBadgeVariant,
 } from "../../components/status/StatusBadge";
 import { useDocumentListSelection } from "../../components/document/useDocumentListSelection";
+import { useRowMultiSelect } from "../../components/document/useRowMultiSelect";
+import { mergeBarcodePrefillItems } from "../../lib/barcode-prefill-merge";
+import {
+  RowSelectCheckbox,
+  SelectAllCheckbox,
+} from "../../components/document/RowSelectCheckbox";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -141,12 +147,16 @@ function renderStatusBadge(status: PurchaseOrderStatus) {
   return <StatusBadge variant={variant}>{STATUS_LABEL[status]}</StatusBadge>;
 }
 
-/** GET /goods-receipts/:id/lines response shape (paginated). */
+/**
+ * `POST /v2/goods-receipts/:id/lines/search` response.
+ *
+ * Replaced `GET /:id/lines`, which is gone. No `hasMore` any more — the envelope
+ * reports `total`, so "is there another page" is `page * limit < total`.
+ */
 interface GoodsReceiptLinesPage {
-  items: PurchaseOrderLine[];
+  data: PurchaseOrderLine[];
   page: number;
-  pageSize: number;
-  hasMore: boolean;
+  limit: number;
   total: number;
 }
 
@@ -162,6 +172,7 @@ export function PurchaseOrdersPage({
   const isPurchaseMode = mode === "purchase";
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   // `totalAmount` is the server's SUM over every matching row, not only this
   // page — it backs the footer total.
   const [records, setRecords] = useState<
@@ -318,8 +329,9 @@ export function PurchaseOrdersPage({
     if (!openDocumentId) return;
     void (async () => {
       try {
+        // Header only: the view dialog pages its own lines (UOW-03).
         const { data } = await apiClient.get<PurchaseOrder>(
-          `/goods-receipts/${openDocumentId}`,
+          `/goods-receipts/${openDocumentId}?includeLines=false`,
         );
         setSelectedId(data.id);
         setEditingOrder(data);
@@ -354,6 +366,26 @@ export function PurchaseOrdersPage({
     getRowId: getOrderId,
   });
 
+  // Tập phiếu đã tick — tách hẳn khỏi `selectedId`. Ô tick chỉ ghi vào đây, nên
+  // tick không còn kéo theo `GET /goods-receipts/:id` và `/:id/lines` như trước.
+  const {
+    checkedIds,
+    checkedCount,
+    isChecked,
+    toggle: toggleChecked,
+    toggleAllOnPage,
+    clear: clearChecked,
+    allOnPageChecked,
+    someOnPageChecked,
+  } = useRowMultiSelect({ rows: records?.data ?? [], getRowId: getOrderId });
+
+  // Cố ý chỉ phụ thuộc bộ lọc, KHÔNG phụ thuộc `pagination`: lật trang phải giữ tick
+  // để gom phiếu qua nhiều trang rồi in tem một lượt, còn đổi bộ lọc thì tập phiếu
+  // đã tick không còn nghĩa gì.
+  useEffect(() => {
+    clearChecked();
+  }, [columnFilters, period, clearChecked]);
+
   // List rows no longer carry `lines` (v2 search trims them, see
   // search-goods-receipts-v2.handler.ts). The selected document's full detail
   // (header + lines) is fetched separately via the unchanged GET /:id, so the
@@ -370,6 +402,33 @@ export function PurchaseOrdersPage({
     enabled: !!selectedId,
   });
   const selectedOrder = selectedOrderData ?? null;
+
+  // Bật trong lúc gom lines của các phiếu đã tick, để nút "In tem mã" không bấm được
+  // hai lần khi mạng chậm.
+  const [gatheringLabels, setGatheringLabels] = useState(false);
+
+  const toPrefillItems = useCallback(
+    (lines: PurchaseOrderLine[]): BarcodePrefillItem[] =>
+      lines.map((line) => {
+        const storageId = line.location?.storageId ?? "";
+        return {
+          itemId: line.itemId,
+          sku: line.item?.code ?? "",
+          name: line.item?.name ?? "",
+          unit: line.item?.unit ?? line.uomCode ?? "",
+          // Lấy từ quan hệ `item` eager-loaded. Để 0 ở đây là đẩy việc tra giá
+          // sang trang In tem mã, nơi nó tra từng SKU một — với một lượt in
+          // hàng loạt thì thành hàng nghìn request.
+          sellingPrice: Number(line.item?.sellingPrice) || 0,
+          quantity: Number(line.quantity) || 0,
+          storageId,
+          storageName: storageId ? (storageNameById.get(storageId) ?? "") : "",
+          locationId: line.locationId ?? line.location?.id ?? "",
+          locationCode: line.location?.code ?? "",
+        };
+      }),
+    [storageNameById],
+  );
 
   // ─── Row actions ──────────────────────────────────────────────────────────────
 
@@ -425,9 +484,13 @@ export function PurchaseOrdersPage({
       id: "duplicate",
       label: "Nhân bản",
       icon: Copy,
-      disabled: !selectedOrder,
+      // Also blocked while a document dialog is already open: the dialog only
+      // re-seeds its form state on mount, so swapping `editingOrder` under an
+      // already-mounted instance would save the old form's data against the
+      // newly-picked record's id. See T-06-05.
+      disabled: !selectedOrder || !!dialogMode,
       onClick: () => {
-        if (!selectedOrder) return;
+        if (!selectedOrder || dialogMode) return;
         setEditingOrder(selectedOrder);
         setDialogMode("create");
       },
@@ -436,9 +499,9 @@ export function PurchaseOrdersPage({
       id: "view",
       label: "Xem",
       icon: Eye,
-      disabled: !selectedOrder,
+      disabled: !selectedOrder || !!dialogMode,
       onClick: () => {
-        if (!selectedOrder) return;
+        if (!selectedOrder || dialogMode) return;
         setEditingOrder(selectedOrder);
         setDialogMode("view");
       },
@@ -453,9 +516,10 @@ export function PurchaseOrdersPage({
       disabled:
         !selectedOrder ||
         selectedOrder.status === "CANCELLED" ||
-        selectedOrder.status === "REVERSED",
+        selectedOrder.status === "REVERSED" ||
+        !!dialogMode,
       onClick: () => {
-        if (!selectedOrder) return;
+        if (!selectedOrder || dialogMode) return;
         setEditingOrder(selectedOrder);
         setDialogMode("edit");
       },
@@ -478,35 +542,57 @@ export function PurchaseOrdersPage({
       id: "reload",
       label: "Nạp",
       icon: RefreshCw,
-      onClick: () => void loadRecords(),
+      onClick: () => {
+        clearChecked();
+        void loadRecords();
+      },
     },
     {
       id: "barcode",
       label: "In tem mã",
       icon: Barcode,
+      disabled: gatheringLabels,
       onClick: () => {
-        const items: BarcodePrefillItem[] = (selectedOrder?.lines ?? []).map(
-          (line) => {
-            const storageId = line.location?.storageId ?? "";
-            return {
-              itemId: line.itemId,
-              sku: line.item?.code ?? "",
-              name: line.item?.name ?? "",
-              unit: line.item?.unit ?? line.uomCode ?? "",
-              sellingPrice: 0,
-              quantity: Number(line.quantity) || 0,
-              storageId,
-              storageName: storageId ? (storageNameById.get(storageId) ?? "") : "",
-              locationId: line.locationId ?? line.location?.id ?? "",
-              locationCode: line.location?.code ?? "",
-            };
-          },
-        );
-        navigateToBarcodePrint(
-          navigate,
-          "/inventory/purchase-orders",
-          items.length ? items : undefined,
-        );
+        // Không tick phiếu nào → giữ nguyên đường cũ: in theo dòng đang xem.
+        if (checkedCount === 0) {
+          const items = toPrefillItems(selectedOrder?.lines ?? []);
+          navigateToBarcodePrint(
+            navigate,
+            "/inventory/purchase-orders",
+            items.length ? items : undefined,
+          );
+          return;
+        }
+        // Có tick → gom lines của từng phiếu. Dùng `GET /:id` (trả lines đầy đủ)
+        // chứ không phải `/:id/lines`, vốn phân trang cho panel cuộn vô hạn.
+        setGatheringLabels(true);
+        void (async () => {
+          try {
+            const orders = await Promise.all(
+              [...checkedIds].map(async (id) =>
+                requireErpData(
+                  await erpApi.GET<PurchaseOrder>("/goods-receipts/{id}", {
+                    params: { path: { id } },
+                  }),
+                ),
+              ),
+            );
+            const items = mergeBarcodePrefillItems(
+              orders.flatMap((order) => toPrefillItems(order.lines ?? [])),
+            );
+            navigateToBarcodePrint(
+              navigate,
+              "/inventory/purchase-orders",
+              items.length ? items : undefined,
+            );
+          } catch (err) {
+            // Một phiếu hỏng là hỏng cả lượt in: đứng yên tại chỗ, không điều hướng
+            // sang trang In tem mã với dữ liệu thiếu.
+            toast.error(getUserFacingApiErrorMessage(err));
+          } finally {
+            setGatheringLabels(false);
+          }
+        })();
       },
     },
   ];
@@ -537,13 +623,13 @@ export function PurchaseOrdersPage({
           onClick={(e) => {
             e.stopPropagation();
             setSelectedId(row.id);
-            // Row no longer carries `lines` — fetch the full document before
-            // opening the view dialog (mirrors the openDocumentId deep-link
-            // fetch above).
+            // Row carries no `lines`, and the view dialog does not want them —
+            // it pages them itself. Fetch the header alone (mirrors the
+            // openDocumentId deep-link fetch above).
             void (async () => {
               try {
                 const { data } = await apiClient.get<PurchaseOrder>(
-                  `/goods-receipts/${row.id}`,
+                  `/goods-receipts/${row.id}?includeLines=false`,
                 );
                 setEditingOrder(data);
                 setDialogMode("view");
@@ -752,18 +838,26 @@ export function PurchaseOrdersPage({
           }
           getRowKey={(row) => row.id}
           onRowClick={(row) => setSelectedId(row.id)}
+          rowClassName={(row) =>
+            // `bg-info-subtle` là token của badge, lightness 98% — trên nền trắng của
+            // bảng nó vô hình. Dòng đang xem cần nhìn thấy được, nên dùng `bg-info`
+            // pha loãng.
+            row.id === selectedId ? "bg-info/15" : undefined
+          }
           leadingColumn={{
             width: 36,
-            header: <span className="sr-only">Chọn</span>,
+            header: (
+              <SelectAllCheckbox
+                checked={allOnPageChecked}
+                indeterminate={someOnPageChecked}
+                disabled={(records?.data.length ?? 0) === 0}
+                onToggle={toggleAllOnPage}
+              />
+            ),
             cell: (row) => (
-              <input
-                type="checkbox"
-                aria-label="Chọn dòng"
-                checked={selectedId === row.id}
-                onChange={() =>
-                  setSelectedId(selectedId === row.id ? null : row.id)
-                }
-                onClick={(e) => e.stopPropagation()}
+              <RowSelectCheckbox
+                checked={isChecked(row.id)}
+                onToggle={() => toggleChecked(row.id)}
               />
             ),
           }}
@@ -773,6 +867,14 @@ export function PurchaseOrdersPage({
 
       {dialogMode && (
         <PurchaseOrderFormDialog
+          // Force a remount whenever the target record changes. The dialog
+          // seeds its form state from `initial` only on mount (see T-06-05);
+          // without this, a stale `initial` prop swap on an already-mounted
+          // instance would save one record's edited data under another's id.
+          // Mode is part of the key on purpose: view and edit seed their rows from
+          // different sources (a paginated query vs. `initial.lines`), so switching
+          // must remount and re-seed rather than reuse the previous mode's state.
+          key={`${editingOrder?.id ?? "new"}:${dialogMode}`}
           mode={dialogMode}
           initial={editingOrder}
           providers={providers}
@@ -786,13 +888,38 @@ export function PurchaseOrdersPage({
             setAutoSelectTransferOrder(null);
           }}
           onSaved={async () => {
+            // The view dialog serves its grid from a cached page of
+            // `["goods-receipt-lines", id, ...]`; without this, reopening after
+            // an edit shows the pre-edit page.
+            if (editingOrder) {
+              await queryClient.invalidateQueries({
+                queryKey: ["goods-receipt-lines", editingOrder.id],
+              });
+            }
             setDialogMode(null);
             setEditingOrder(null);
             setAutoOpenTransferPicker(false);
             setAutoSelectTransferOrder(null);
             await loadRecords();
           }}
-          onEdit={() => setDialogMode("edit")}
+          onEdit={() => {
+            // View mode holds a header-only document, so switching straight to
+            // edit would open the form with an empty grid — and saving it would
+            // wipe every line. Re-fetch in full first; the dialog's `key`
+            // includes the mode, so it remounts and re-seeds from this copy.
+            if (!editingOrder) return;
+            void (async () => {
+              try {
+                const { data } = await apiClient.get<PurchaseOrder>(
+                  `/goods-receipts/${editingOrder.id}`,
+                );
+                setEditingOrder(data);
+                setDialogMode("edit");
+              } catch (err) {
+                toast.error(getUserFacingApiErrorMessage(err));
+              }
+            })();
+          }}
           onVoid={editingOrder ? () => setConfirmVoid(editingOrder) : undefined}
           onRequestDelete={
             editingOrder ? () => setConfirmDelete(editingOrder) : undefined
@@ -855,20 +982,24 @@ function DetailPanel({
     queryKey: ["goods-receipt-lines", orderId],
     queryFn: async ({ pageParam }) =>
       requireErpData(
-        await erpApi.GET<GoodsReceiptLinesPage>("/goods-receipts/{id}/lines", {
-          params: {
-            path: { id: orderId! },
-            query: { page: pageParam, pageSize: LINES_PAGE_SIZE },
+        await erpApi.POST<GoodsReceiptLinesPage>(
+          "/v2/goods-receipts/{id}/lines/search",
+          {
+            params: { path: { id: orderId! } },
+            // This panel only paginates; the header filters belong to the view
+            // dialog's grid, not here.
+            body: { page: pageParam, limit: LINES_PAGE_SIZE },
           },
-        }),
+        ),
       ),
     initialPageParam: 1,
-    getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
+    getNextPageParam: (last) =>
+      last.page * last.limit < last.total ? last.page + 1 : undefined,
     enabled: !!orderId,
   });
 
   const lines = useMemo(
-    () => linesQuery.data?.pages.flatMap((p) => p.items) ?? [],
+    () => linesQuery.data?.pages.flatMap((p) => p.data) ?? [],
     [linesQuery.data],
   );
 

@@ -59,6 +59,8 @@ export interface StockBalancesQuery {
   locationId?: string;
   storageId?: string;
   isTracked?: boolean;
+  /** Loại trừ kho showroom (is_main_storage) khỏi kết quả. */
+  excludeShowroom?: boolean;
   // Per-column symbol filters
   locationCode?: string;
   locationCodeMode?: StringFilterMode;
@@ -104,6 +106,11 @@ export interface LocationStockItemsQuery {
   itemCodeMode?: StringFilterMode;
   itemName?: string;
   itemNameMode?: StringFilterMode;
+  /**
+   * Location-level tracking (stock_balances.is_tracked). Leave undefined for
+   * "Tất cả" — the API treats an absent parameter as no filter.
+   */
+  isTracked?: boolean;
 }
 
 export async function listLocationStockItems(
@@ -124,6 +131,9 @@ export async function listLocationStockItems(
   if (query.itemName?.trim()) {
     params.itemName = query.itemName.trim();
     if (query.itemNameMode) params.itemNameMode = query.itemNameMode;
+  }
+  if (typeof query.isTracked === "boolean") {
+    params.isTracked = String(query.isTracked);
   }
 
   const { data } = await apiClient.get<StockByLocationResponse>(

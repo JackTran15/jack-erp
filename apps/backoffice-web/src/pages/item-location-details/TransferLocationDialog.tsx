@@ -228,7 +228,7 @@ export function TransferLocationDialog({
     setStorageId(first.location.storageId);
     setStorageLabel(first.location.storageName);
     setSourceLocationId(first.location.id);
-    setSourceLocationLabel(`${first.location.code} · ${first.location.name}`);
+    setSourceLocationLabel(first.location.code);
     setSourceLocationCode(first.location.code);
     setDestLocationId("");
     setDestLocationLabel("");
@@ -243,7 +243,7 @@ export function TransferLocationDialog({
           unit: r.item.unit,
           storageName: r.location.storageName,
           sourceLocationId: r.location.id,
-          sourceLocationLabel: `${r.location.code} · ${r.location.name}`,
+          sourceLocationLabel: r.location.code,
           sourceLocationCode: r.location.code,
           destLocationId: "",
           destLocationLabel: "",
@@ -309,7 +309,7 @@ export function TransferLocationDialog({
       if (!bal) return null;
       return {
         sourceLocationId: bal.location.id,
-        sourceLocationLabel: `${bal.location.code} · ${bal.location.name}`,
+        sourceLocationLabel: bal.location.code,
         sourceLocationCode: bal.location.code,
         quantityOnHand: Number(bal.quantity),
       };
@@ -661,7 +661,7 @@ export function TransferLocationDialog({
     (row: TransferRow, loc: InventoryLocation) => {
       patchRow(row.uid, {
         sourceLocationId: loc.id,
-        sourceLocationLabel: `${loc.code} · ${loc.name}`,
+        sourceLocationLabel: loc.code,
         sourceLocationCode: loc.code,
         storageName: loc.storageName ?? row.storageName,
         quantityOnHand: 0,
@@ -681,7 +681,7 @@ export function TransferLocationDialog({
       }
       patchRow(row.uid, {
         destLocationId: loc.id,
-        destLocationLabel: `${loc.code} · ${loc.name}`,
+        destLocationLabel: loc.code,
       });
     },
     [patchRow],
@@ -841,7 +841,7 @@ export function TransferLocationDialog({
             }}
             onSelect={(loc) => {
               setSourceLocationId(loc.id);
-              setSourceLocationLabel(`${loc.code} · ${loc.name}`);
+              setSourceLocationLabel(loc.code);
               setSourceLocationCode(loc.code);
             }}
             search={searchLocationsInStorage(storageId)}
@@ -873,14 +873,14 @@ export function TransferLocationDialog({
                 return;
               }
               setDestLocationId(loc.id);
-              setDestLocationLabel(`${loc.code} · ${loc.name}`);
+              setDestLocationLabel(loc.code);
               setRows((prev) =>
                 prev.map((row) =>
                   row.itemId && row.sourceLocationId !== loc.id
                     ? {
                         ...row,
                         destLocationId: loc.id,
-                        destLocationLabel: `${loc.code} · ${loc.name}`,
+                        destLocationLabel: loc.code,
                       }
                     : row,
                 ),
