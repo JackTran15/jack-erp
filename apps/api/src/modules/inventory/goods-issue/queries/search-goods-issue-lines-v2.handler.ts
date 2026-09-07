@@ -61,18 +61,29 @@ export class SearchGoodsIssueLinesV2Handler
     private readonly lineRepo: Repository<GoodsIssueLineEntity>,
   ) {}
 
-  async execute({ goodsIssueId, dto, actor }: SearchGoodsIssueLinesV2Query) {
+  async execute({
+    goodsIssueId,
+    dto,
+    actor,
+    skipBranchScope,
+  }: SearchGoodsIssueLinesV2Query) {
     const page = dto.page ?? 1;
     const limit = dto.limit ?? 50;
 
     // Existence and scope in one lean read: `loadEagerRelations: false` so
     // proving the voucher is in scope does not drag its whole line collection
     // along, which is the cost this endpoint exists to avoid.
+    //
+    // `skipBranchScope` leaves the organization predicate in place and only
+    // drops the branch one — the caller that sets it has already proved the
+    // actor's branch is one end of the transfer this issue belongs to.
     const issue = await this.issueRepo.findOne({
       where: {
         id: goodsIssueId,
         organizationId: actor.organizationId,
-        ...(actor.branchId ? { branchId: actor.branchId } : {}),
+        ...(actor.branchId && !skipBranchScope
+          ? { branchId: actor.branchId }
+          : {}),
       },
       loadEagerRelations: false,
     });

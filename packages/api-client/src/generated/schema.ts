@@ -6873,6 +6873,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/inventory/transfer-orders/{id}/export-goods-issue/lines/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search the lines of a transfer's export goods issue (v2) */
+        post: operations["TransferOrderV2Controller_searchExportGoodsIssueLines_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory/transfer-orders/{id}/import-goods-receipt/lines/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search the lines of a transfer's import goods receipt (v2) */
+        post: operations["TransferOrderV2Controller_searchImportGoodsReceiptLines_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/goods-receipts": {
         parameters: {
             query?: never;
@@ -13499,6 +13533,22 @@ export interface components {
             occurredAt?: string;
         };
         ImportTransferOrderDto: Record<string, never>;
+        GoodsReceiptLineSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            limit: number;
+            /** @description Mã SKU — matches `items.code`. */
+            itemCode?: components["schemas"]["StringFilterDto"];
+            /** @description Tên hàng hóa — matches `items.name`. */
+            itemName?: components["schemas"]["StringFilterDto"];
+            /** @description Số lượng */
+            quantity?: components["schemas"]["CompareFilterDto"];
+            /** @description Đơn giá */
+            unitPrice?: components["schemas"]["CompareFilterDto"];
+            /** @description Thành tiền — `quantity * unit_price`, see LINE_AMOUNT_EXPRESSION. */
+            lineTotal?: components["schemas"]["CompareFilterDto"];
+        };
         GoodsReceiptLineDto: {
             /** Format: uuid */
             itemId: string;
@@ -13626,22 +13676,6 @@ export interface components {
             date?: components["schemas"]["DateRangeFilterDto"];
             /** @description Tổng tiền (computed line total: SUM(quantity * unit_price)) */
             totalAmount?: components["schemas"]["CompareFilterDto"];
-        };
-        GoodsReceiptLineSearchV2Dto: {
-            /** @default 1 */
-            page: number;
-            /** @default 50 */
-            limit: number;
-            /** @description Mã SKU — matches `items.code`. */
-            itemCode?: components["schemas"]["StringFilterDto"];
-            /** @description Tên hàng hóa — matches `items.name`. */
-            itemName?: components["schemas"]["StringFilterDto"];
-            /** @description Số lượng */
-            quantity?: components["schemas"]["CompareFilterDto"];
-            /** @description Đơn giá */
-            unitPrice?: components["schemas"]["CompareFilterDto"];
-            /** @description Thành tiền — `quantity * unit_price`, see LINE_AMOUNT_EXPRESSION. */
-            lineTotal?: components["schemas"]["CompareFilterDto"];
         };
         CreateGoodsReceiptV2Dto: {
             /** @enum {string} */
@@ -26130,6 +26164,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TransferOrderEntity"];
+                };
+            };
+        };
+    };
+    TransferOrderV2Controller_searchExportGoodsIssueLines_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoodsIssueLineSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TransferOrderV2Controller_searchImportGoodsReceiptLines_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoodsReceiptLineSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
                 };
             };
         };

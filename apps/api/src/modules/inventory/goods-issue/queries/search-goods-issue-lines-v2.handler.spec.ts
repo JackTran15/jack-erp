@@ -119,6 +119,23 @@ describe('SearchGoodsIssueLinesV2Handler', () => {
     expect(issueRepo.findOne.mock.calls[0][0].where).not.toHaveProperty('branchId');
   });
 
+  // The destination branch of a transfer reads the source branch's XK on "Điều
+  // chuyển từ cửa hàng khác". The transfer-order route has already proved the
+  // actor's branch is one end of that transfer, so keeping the branch predicate
+  // here would 404 a voucher the actor is entitled to read — and the grid would
+  // render as an empty voucher rather than as an error.
+  it('drops the branch predicate, but not the organization one, when the caller skips branch scope', async () => {
+    await build();
+    await handler.execute(
+      new SearchGoodsIssueLinesV2Query(ISSUE_ID, {}, actor, true),
+    );
+
+    expect(issueRepo.findOne).toHaveBeenCalledWith({
+      where: { id: ISSUE_ID, organizationId: 'org-1' },
+      loadEagerRelations: false,
+    });
+  });
+
   it('orders by the voucher ordinal and offers no way to change it', async () => {
     await build();
     await handler.execute(new SearchGoodsIssueLinesV2Query(ISSUE_ID, {}, actor));
