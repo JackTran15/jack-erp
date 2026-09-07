@@ -6,7 +6,11 @@ import { defaults, types } from 'pg';
  * `col AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh'`, and every row
  * written by a transaction that also touched a `timestamptz` column lines up
  * to the millisecond with it — e.g. on `stock_ledger_entries`, the naive
- * `created_at` equals `posted_at AT TIME ZONE 'UTC'`.
+ * `created_at` equals `posted_at AT TIME ZONE 'UTC'`. One deliberate exception
+ * exists: the temp-warehouse transfer that compensates a POS sale carries a
+ * caller-supplied `posted_at` placed just before the sale it serves, so its two
+ * columns differ by the consumer lag. Read the alignment as evidence for the
+ * storage convention, not as an invariant to test against.
  *
  * node-postgres does not honour that convention on its own. It converts naive
  * columns in the *process* timezone, in both directions:

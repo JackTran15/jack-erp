@@ -58,10 +58,10 @@ không có gì để xem.
 
 ## Definition of done
 
-- [ ] AC-01 đến AC-09 đều pass
-- [ ] `pnpm --filter @erp/api test` xanh, không hồi quy ở miền kho
-- [ ] Test e2e luồng bù kho tạm xanh
-- [ ] Không có `UPDATE` nào lên `stock_ledger_entries` trong diff
-- [ ] Không có chuỗi tiếng Việt nào trong mã NestJS được thêm mới
-- [ ] Ảnh chụp thẻ kho trước và sau, đính vào bằng chứng G4
-- [ ] Demoed và được chấp nhận ở gate G4
+- [x] AC-01 đến AC-09 đều pass — AC-01/02/03 `stock-ledger.service.spec.ts`, AC-03 `stock-transfer.service.spec.ts`, AC-05/07 `temp-warehouse.service.spec.ts`, AC-04/06/08 `temp-warehouse-fulfill-order.e2e-spec.ts`, AC-09 `enqueue-outbox.step.spec.ts`
+- [x] `pnpm --filter @erp/api test`: 3662 pass / 2 fail. Hai lỗi là `auth.service.spec.ts` (JWT TTL), **đỏ sẵn trên HEAD** — đã xác minh bằng `git stash`. Miền kho không hồi quy
+- [x] `temp-warehouse-fulfill-order.e2e-spec.ts` 3/3 xanh. `temp-warehouse-fulfillment.e2e-spec.ts` 4/5 — case `lines query surfaces TRANSFERRED-by-sale rows` **đỏ sẵn trên HEAD**, đã xác minh bằng `git stash`. Cả hai file kết thúc bằng lỗi teardown outbox-relay, không phải test fail
+- [x] Không có `UPDATE` nào lên `stock_ledger_entries` trong diff
+- [x] Không có chuỗi tiếng Việt trong mã NestJS thêm mới (comment/log/message đều tiếng Anh). Dữ liệu fixture e2e vẫn đặt tên kho tiếng Việt, đúng như file e2e kho tạm sẵn có
+- [x] ~~Ảnh chụp thẻ kho trước và sau~~ — **MIỄN TRỪ bởi Akenzy, 6/9/2026. KHÔNG CÓ ẢNH.** `aidlc-verify --doctor` trả rung *skipped* (thiếu credentials `local-backoffice-bm`/`-wh`, thuộc feature khác) nên không chụp được; chụp tay thất bại vì lưới báo cáo reset filter mỗi lần tương tác. Đứng thay: (a) ảnh 'trước' là ảnh Akenzy gửi kèm phiếu — HĐ 2608290003 / CK003664, dòng hoá đơn −1; (b) 'sau' là kiểm chứng sống tầng dữ liệu trên erp_dev — HĐ `2609060001`, SKU A02-D-39: TRANSFER_OUT/TRANSFER_IN `07:22:12.824`, SALE_ISSUE `07:22:12.825`, số dư showroom 0 → 1 → 0, không dòng nào âm.
+- [x] Demoed và được chấp nhận ở gate G4 — Akenzy ký 6/9/2026 (`aidlc pass G4 --by Akenzy`)

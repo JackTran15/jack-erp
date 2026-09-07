@@ -4,7 +4,7 @@ feature: temp-warehouse-fulfill-before-invoice
 slug: 2026083001-temp-warehouse-fulfill-before-invoice
 profile: none
 created: 2026-08-30T22:19:49
-current_gate: G3
+current_gate: G5
 history:
   - gate: G0
     action: passed
@@ -26,3 +26,103 @@ history:
     at: 2026-08-30T22:45:00
     by: Akenzy
     evidence: graph valid - 1 UoW, 5 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-06T13:18:47
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-06T13:28:13
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-06T13:29:32
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-06T13:29:34
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-06T13:35:59
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-09-06T13:35:59
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-06T13:35:59
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-06T13:47:31
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done
+    at: 2026-09-06T13:47:31
+    by: Akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-06T13:47:36
+    by: claude
+    ticket: T-01-05
+  - gate: G4
+    action: ticket review
+    at: 2026-09-06T13:48:31
+    by: claude
+    ticket: T-01-05
+  - gate: G4
+    action: ticket done
+    at: 2026-09-06T13:48:31
+    by: Akenzy
+    ticket: T-01-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-06T13:48:31
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket review
+    at: 2026-09-06T14:00:10
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done
+    at: 2026-09-06T14:00:11
+    by: Akenzy
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-06T14:46:27
+    by: claude
+    ticket: T-01-06
+  - gate: G4
+    action: ticket review
+    at: 2026-09-06T14:46:27
+    by: claude
+    ticket: T-01-06
+  - gate: G4
+    action: ticket done
+    at: 2026-09-06T14:46:27
+    by: Akenzy
+    ticket: T-01-06
+  - gate: G4
+    action: passed
+    at: 2026-09-06T14:49:49
+    by: Akenzy
+    evidence: all 6 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-09-06T14:52:45
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

@@ -112,6 +112,7 @@ describe('StockTransferService', () => {
 
     dataSource = {
       transaction: jest.fn().mockImplementation((cb) => cb(mockManager)),
+      _mockManager: mockManager as any,
     };
     storageDefaultLocationResolver = {
       resolveStorageTransferLocation: jest.fn(),
@@ -600,6 +601,86 @@ describe('StockTransferService', () => {
         ),
       ).rejects.toThrow(/Transporter user not found/);
       expect(ledgerService.recordBatchMovements).not.toHaveBeenCalled();
+    });
+
+    // The temp-warehouse consumer compensates a sale that is already in the
+    // ledger, so its legs have to land before that sale — see ADR-01/ADR-03.
+    describe('opts.postedAt', () => {
+      const backdated = new Date('2026-08-29T03:15:22.999Z');
+
+      function mockPostReloads() {
+        transferRepo.findOne
+          .mockResolvedValueOnce(draftTransfer) // create() reload
+          .mockResolvedValueOnce(draftTransfer) // post() load
+          .mockResolvedValueOnce({ ...draftTransfer, status: TransferStatus.POSTED });
+      }
+
+      it('stamps both ledger legs with the supplied instant (validateOnHand off — temp warehouse path)', async () => {
+        storageRepo.find.mockResolvedValue([storageA, storageB]);
+        mockDefaultLocations();
+        mockPostReloads();
+
+        await service.createAndPost(khoToKhoDto, actor, {
+          validateOnHand: false,
+          postedAt: backdated,
+        });
+
+        const [movements] = ledgerService.recordBatchMovements.mock.calls[0];
+        expect(movements).toHaveLength(2);
+        // Both legs share one instant, or the transfer itself would create a
+        // moment where the source has shipped and the destination has not received.
+        expect(movements.map((m: { postedAt?: Date }) => m.postedAt)).toEqual([
+          backdated,
+          backdated,
+        ]);
+      });
+
+      it('stamps both ledger legs on the locking path too, so the two branches cannot drift', async () => {
+        storageRepo.find.mockResolvedValue([storageA, storageB]);
+        mockDefaultLocations();
+        mockPostReloads();
+
+        await service.createAndPost(khoToKhoDto, actor, { postedAt: backdated });
+
+        const [movements] = ledgerService.recordBatchMovements.mock.calls[0];
+        expect(movements.map((m: { postedAt?: Date }) => m.postedAt)).toEqual([
+          backdated,
+          backdated,
+        ]);
+      });
+
+      it('leaves postedAt unset when the caller supplies none, so the ledger keeps the write instant (AC-03)', async () => {
+        storageRepo.find.mockResolvedValue([storageA, storageB]);
+        mockDefaultLocations();
+        mockPostReloads();
+
+        await service.createAndPost(khoToKhoDto, actor);
+
+        const [movements] = ledgerService.recordBatchMovements.mock.calls[0];
+        for (const movement of movements) {
+          expect(movement.postedAt).toBeUndefined();
+        }
+      });
+
+      it('keeps the transfer\u2019s own posted_at at real time even when the legs are backdated (ADR-03)', async () => {
+        storageRepo.find.mockResolvedValue([storageA, storageB]);
+        mockDefaultLocations();
+        mockPostReloads();
+
+        const before = Date.now();
+        await service.createAndPost(khoToKhoDto, actor, {
+          validateOnHand: false,
+          postedAt: backdated,
+        });
+        const after = Date.now();
+
+        const statusPatch = (dataSource._mockManager as any).update.mock.calls.find(
+          (call: unknown[]) => call[1] === 'xfer-1',
+        )![2] as { status: TransferStatus; postedAt: Date };
+        expect(statusPatch.status).toBe(TransferStatus.POSTED);
+        expect(statusPatch.postedAt.getTime()).toBeGreaterThanOrEqual(before);
+        expect(statusPatch.postedAt.getTime()).toBeLessThanOrEqual(after);
+      });
     });
   });
 

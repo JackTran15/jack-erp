@@ -7,6 +7,7 @@ import { ShowroomEntity } from '../location/showroom.entity';
 import { LocationEntity } from '../location/location.entity';
 import { ItemEntity } from '../location/item.entity';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
+import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
 import { UserEntity } from '../../auth/user.entity';
 import { TempWarehouseService } from './temp-warehouse.service';
 import { TempWarehouseController } from './temp-warehouse.controller';
@@ -29,6 +30,7 @@ import { EventsModule } from '../../events/events.module';
       LocationEntity,
       ItemEntity,
       StockBalanceEntity,
+      StockLedgerEntryEntity,
       UserEntity,
     ]),
     StockTransferModule,

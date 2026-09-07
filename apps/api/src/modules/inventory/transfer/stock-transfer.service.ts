@@ -420,17 +420,18 @@ export class StockTransferService {
   async createAndPost(
     dto: BranchScopedTransferInput,
     actor: ActorContext,
-    opts: { validateOnHand?: boolean } = {},
+    opts: { validateOnHand?: boolean; postedAt?: Date } = {},
   ): Promise<StockTransferEntity> {
     // HTTP path: each line carries its own Kho xuất/Kho nhập. Resolve them to
     // concrete locations, enforce same-branch, and value each line before the
     // shared create()/post() runs.
-    const { validateOnHand } = opts;
+    const { validateOnHand, postedAt } = opts;
     const resolved = await this.resolveBranchScopedTransfer(dto, actor);
     const draft = await this.create(resolved, actor);
     try {
       return await this.post(draft.id, actor, {
         validateOnHand: validateOnHand ?? true,
+        postedAt,
       });
     } catch (err) {
       // Roll back the just-created DRAFT so no orphan (without ledger) lingers.
@@ -681,10 +682,16 @@ export class StockTransferService {
     return this.findOrFail(id, actor.organizationId);
   }
 
+  /**
+   * `opts.postedAt` sets the ledger position of both legs — used by the
+   * temp-warehouse consumer, which compensates a sale that was already written
+   * and therefore has to land *before* it in the ledger. Omit it and both legs
+   * take the write instant, as before.
+   */
   async post(
     id: string,
     actor: ActorContext,
-    opts: { validateOnHand?: boolean } = {},
+    opts: { validateOnHand?: boolean; postedAt?: Date } = {},
   ): Promise<StockTransferEntity> {
     const transfer = await this.findOrFail(id, actor.organizationId);
     this.validateTransition(transfer.status, TransferStatus.POSTED);
@@ -728,6 +735,7 @@ export class StockTransferService {
           notes: `Transfer out: ${documentNumber}`,
           actorContext: actor,
           unitCost,
+          postedAt: opts.postedAt,
         });
         movements.push({
           itemId: line.itemId,
@@ -741,11 +749,16 @@ export class StockTransferService {
           notes: `Transfer in: ${documentNumber}`,
           actorContext: actor,
           unitCost,
+          postedAt: opts.postedAt,
         });
       }
       return movements;
     };
 
+    // Deliberately real time, even when `opts.postedAt` backdates the ledger
+    // legs (ADR-03): the ledger's `posted_at` is the ordering key of the stock
+    // card, this one is the audit trace of when the post actually ran. They are
+    // allowed to differ by a few hundred ms — do not "fix" them to match.
     const statusPatch = {
       status: TransferStatus.POSTED,
       postedBy: actor.userId,
