@@ -30,6 +30,31 @@ export interface HasCounterparty {
  * matches suppliers, customers and employees alike — not just providers.
  *
  * `alias` is the root entity alias of the query, e.g. 'gr' / 'gi' / 'st'.
+ *
+ * ## Why `users.organization_id` is cast and the other two are not
+ *
+ * `organization_id` is **not one type across the schema**: `users` declares it
+ * `uuid`, while `goods_receipts`, `goods_issues`, `stock_transfers`,
+ * `customers` and `inventory_providers` all declare it `character varying`.
+ *
+ * Without the cast the employee branch reads `uuid = character varying`, and
+ * Postgres has no such operator — so the whole statement fails to plan with
+ * `operator does not exist: uuid = character varying`. It is NOT data
+ * dependent: planning happens before a single row is read, so the query 500s
+ * even for an organisation that has no employee counterparty at all. That is
+ * why this went unnoticed — the fragment is only reached when someone actually
+ * filters by đối tượng.
+ *
+ * Cast direction matters. `uuid::text` is total; the reverse
+ * (`varchar::uuid`) throws on any row whose value is not a well-formed uuid,
+ * which would turn a display filter into a data-quality landmine. The cast
+ * costs nothing here: each subquery is already pinned to one row by
+ * `u.id = <alias>.counterparty_id` (the primary key), so no index on
+ * `organization_id` was going to be used anyway.
+ *
+ * The real fix is to make the column one type schema-wide — that needs a
+ * migration and touches every tenant-scoped query, so it is deliberately not
+ * done here.
  */
 export const counterpartyNameSql = (alias: string): string =>
   `CASE ${alias}.counterparty_kind
@@ -38,7 +63,7 @@ export const counterpartyNameSql = (alias: string): string =>
      WHEN 'customer' THEN (SELECT c.name FROM customers c
        WHERE c.id = ${alias}.counterparty_id AND c.organization_id = ${alias}.organization_id)
      WHEN 'employee' THEN (SELECT (u.first_name || ' ' || u.last_name) FROM users u
-       WHERE u.id = ${alias}.counterparty_id AND u.organization_id = ${alias}.organization_id)
+       WHERE u.id = ${alias}.counterparty_id AND u.organization_id::text = ${alias}.organization_id)
    END`;
 
 /**

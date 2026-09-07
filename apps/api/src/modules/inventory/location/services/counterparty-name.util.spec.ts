@@ -19,6 +19,31 @@ describe('counterpartyNameSql', () => {
     expect(sql).toContain('users');
     expect(sql).toContain('gr.organization_id');
   });
+
+  it('casts users.organization_id — it is uuid while the documents keep varchar', () => {
+    const sql = counterpartyNameSql('gr');
+
+    // Without this the employee branch reads `uuid = character varying`, which
+    // Postgres cannot plan: the whole statement fails with `operator does not
+    // exist`, before reading a single row. So it 500s even for an organisation
+    // with no employee counterparty — which is exactly why it stayed hidden
+    // until the mobile search screen started reaching this fragment.
+    expect(sql).toContain('u.organization_id::text = gr.organization_id');
+
+    // Cast the UUID side, never the varchar side: `varchar::uuid` throws on any
+    // malformed value, turning a display filter into a data-quality landmine.
+    expect(sql).not.toContain('gr.organization_id::uuid');
+  });
+
+  it('does NOT cast the other two branches — they are varchar on both sides', () => {
+    const sql = counterpartyNameSql('gr');
+
+    // `inventory_providers` and `customers` declare `organization_id` varchar,
+    // same as the documents. Casting them too would be cargo-culting the fix
+    // and would drop those index lookups for nothing.
+    expect(sql).toContain('p.organization_id = gr.organization_id');
+    expect(sql).toContain('c.organization_id = gr.organization_id');
+  });
 });
 
 describe('attachCounterparties', () => {

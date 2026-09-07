@@ -61,6 +61,13 @@ export class SearchGoodsIssuesV2Handler
       .leftJoinAndSelect('gi.reasonRef', 'reasonRef')
       .leftJoinAndSelect('gi.location', 'location')
       .orderBy('gi.createdAt', 'DESC')
+      // Tie-breaker, same reason as the goods-receipt handler — and more
+      // likely to bite here: `createdAt` is a CreateDateColumn defaulting to
+      // `now()`, so issues written in one transaction compare exactly equal.
+      // LIMIT/OFFSET over a non-deterministic ORDER BY then lets Postgres
+      // reshuffle them per page, which an infinite-scroll client shows as a
+      // document appearing twice while another vanishes.
+      .addOrderBy('gi.id', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 
@@ -172,7 +179,11 @@ export class SearchGoodsIssuesV2Handler
       .applyString('gi.reason', dto.reason)
       .applyEnum('gi.purpose', dto.purpose?.value)
       .applyDateRange('gi.createdAt', dto.date)
-      .applyCompare(TOTAL_AMOUNT_SUBQUERY, dto.totalAmount);
+      .applyCompare(TOTAL_AMOUNT_SUBQUERY, dto.totalAmount)
+      // Mobile's single search box — see the receipt handler. `PARTY_EXPRESSION`
+      // has one bound more than the receipt side: a transfer has no counterparty
+      // and its "party" is the destination branch.
+      .applyOrString(['gi.documentNumber', PARTY_EXPRESSION], dto.search);
 
     return qb;
   }

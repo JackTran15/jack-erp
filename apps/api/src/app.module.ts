@@ -45,6 +45,7 @@ import { JobPositionModule } from './modules/hr/job-position/job-position.module
 import { InventoryReportsModule } from './modules/inventory-reports/inventory-reports.module';
 import { AdminSearchModule } from './modules/admin-search/admin-search.module';
 import { CounterpartyModule } from './modules/counterparty/counterparty.module';
+import { MobileModule } from './modules/mobile/mobile.module';
 
 // Runs at import time, before Nest evaluates the TypeORM factory below, so no
 // pool is ever created with the driver's process-timezone date handling.
@@ -132,6 +133,7 @@ applyUtcTimestampCodec();
     InventoryReportsModule,
     AdminSearchModule,
     CounterpartyModule,
+    MobileModule,
   ],
 })
 export class AppModule {}
