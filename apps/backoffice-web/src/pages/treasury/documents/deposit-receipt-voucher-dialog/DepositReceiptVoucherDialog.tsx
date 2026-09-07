@@ -47,7 +47,10 @@ import {
   ReceiptVoucherDetailTabEnum,
 } from "../receipt-voucher-dialog/receipt-voucher.constants";
 import type { LedgerCashVoucherDocumentLine } from "../../ledger-cash/ledger-cash.types";
-import { voucherLineTotal } from "../_shared/voucher-dialog.utils";
+import {
+  applyReasonToFirstLine,
+  voucherLineTotal,
+} from "../_shared/voucher-dialog.utils";
 import { DepositAccountSelect } from "../_shared/DepositAccountSelect";
 import {
   QuickCreateCustomerDialog,
@@ -703,6 +706,7 @@ export function DepositReceiptVoucherDialog({
                 setCounterpartyName("");
                 setCounterpartyPhone("");
               }}
+              onPartnerNameChange={(name) => setCounterpartyName(name)}
               onOpenSearchDialog={() => setEntitySearchTarget("partner")}
               onCreateNew={!readOnly && !isDebtCollection ? (kind) => setPartnerCreateKind(kind) : undefined}
             />
@@ -728,6 +732,11 @@ export function DepositReceiptVoucherDialog({
               <Input
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
+                onBlur={(e) =>
+                  setLines((prev) =>
+                    applyReasonToFirstLine(prev, e.target.value),
+                  )
+                }
                 readOnly={readOnly || debtFieldsLocked}
                 disabled={readOnly || debtFieldsLocked}
                 className={fieldClass(readOnly || debtFieldsLocked)}

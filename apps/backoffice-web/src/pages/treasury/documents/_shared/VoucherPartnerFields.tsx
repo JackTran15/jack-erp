@@ -7,6 +7,7 @@ import { READONLY_INPUT_CLASS } from "../../ledger-cash/ledger-cash.constants";
 import {
   PartnerLookupType,
   PARTNER_LOOKUP_LABEL,
+  isFreeTextLookupType,
 } from "./voucher-partner.constants";
 import {
   mergePartnerSearchWithSelection,
@@ -33,6 +34,8 @@ interface Props {
   partnerPhone?: string;
   onPartnerSelect: (selection: VoucherPartnerSelection) => void;
   onPartnerLookupChange: (code: string) => void;
+  /** Called as the user types a hand-entered party name (kind = OTHER only). */
+  onPartnerNameChange?: (name: string) => void;
   onPartnerClear: () => void;
   onOpenSearchDialog: () => void;
   onCreateNew?: (kind: PartnerLookupType) => void;
@@ -74,17 +77,21 @@ export function VoucherPartnerFields({
   partnerPhone,
   onPartnerSelect,
   onPartnerLookupChange,
+  onPartnerNameChange,
   onPartnerClear,
   onOpenSearchDialog,
   onCreateNew,
 }: Props) {
   const searchPartners = usePartnerSearch();
   const kindLabel = partnerKind ? PARTNER_LOOKUP_LABEL[partnerKind] : "";
+  const freeText = !!partnerKind && isFreeTextLookupType(partnerKind);
 
   const createMenuItems = useMemo(
     () =>
       onCreateNew
-        ? PARTNER_LOOKUP_OPTIONS.map((opt) => ({
+        ? PARTNER_LOOKUP_OPTIONS.filter(
+            (opt) => !isFreeTextLookupType(opt.value),
+          ).map((opt) => ({
             label: opt.label,
             onClick: () => onCreateNew(opt.value),
           }))
@@ -153,6 +160,19 @@ export function VoucherPartnerFields({
   );
 
   if (readOnly) {
+    if (freeText) {
+      return (
+        <FormField label={label} layout="horizontal" labelWidth="8rem">
+          <Input
+            value={partnerName}
+            readOnly
+            disabled
+            className={READONLY_INPUT_CLASS}
+            title={kindLabel}
+          />
+        </FormField>
+      );
+    }
     return (
       <FormField label={label} layout="horizontal" labelWidth="8rem">
         <div className="grid grid-cols-[minmax(7rem,1fr)_2fr] gap-2">
@@ -170,6 +190,21 @@ export function VoucherPartnerFields({
             className={READONLY_INPUT_CLASS}
           />
         </div>
+      </FormField>
+    );
+  }
+
+  // A hand-typed party has no code to look up, so the code column would only be
+  // a dead input. The name takes the whole row and is the single source of truth.
+  if (freeText) {
+    return (
+      <FormField label={label} layout="horizontal" labelWidth="8rem">
+        <Input
+          value={partnerName}
+          onChange={(e) => onPartnerNameChange?.(e.target.value)}
+          placeholder="Nhập tên đối tượng"
+          maxLength={255}
+        />
       </FormField>
     );
   }

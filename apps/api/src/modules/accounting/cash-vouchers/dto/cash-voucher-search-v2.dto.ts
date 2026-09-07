@@ -125,6 +125,12 @@ export class CashVoucherRowDto {
   @ApiProperty({ nullable: true })
   referenceType!: string | null;
 
+  @ApiProperty({
+    description:
+      'Bumped by every in-place edit; the grid sends it back as a staleness token.',
+  })
+  revision!: number;
+
   @ApiProperty({ description: 'Payer/payee, falling back to the partner snapshot ("" when none)' })
   counterparty!: string;
 

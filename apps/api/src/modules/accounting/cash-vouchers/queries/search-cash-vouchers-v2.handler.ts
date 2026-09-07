@@ -50,6 +50,8 @@ function buildCte(orgIdx: number, branchIdx?: number, accountIdx?: number): stri
         -- receipts and payments use DIFFERENT reference_type enum types, so both
         -- sides must be text or the UNION cannot match them.
         r.reference_type::text                     AS "referenceType",
+        -- The grid's edit action sends this back as the staleness token.
+        r.revision                                 AS revision,
         r.reason                                   AS reason,
         COALESCE(
           NULLIF(btrim(r.payer_name), ''),
@@ -77,6 +79,7 @@ function buildCte(orgIdx: number, branchIdx?: number, accountIdx?: number): stri
         p.total_amount::float,
         p.cash_account_id,
         p.reference_type::text,
+        p.revision,
         p.reason,
         COALESCE(
           NULLIF(btrim(p.payee_name), ''),

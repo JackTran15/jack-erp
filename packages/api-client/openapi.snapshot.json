@@ -23795,6 +23795,11 @@
             "type": "string",
             "format": "uuid"
           },
+          "partnerName": {
+            "type": "string",
+            "description": "\"Đối tượng\" typed by hand. Only read when `partnerType` is `OTHER`; for a\ncatalogue party the name always comes from the resolver instead.",
+            "maxLength": 255
+          },
           "payerName": {
             "type": "string",
             "description": "\"Người nộp\"",
@@ -23954,6 +23959,10 @@
           "postedBy": {
             "type": "string"
           },
+          "revision": {
+            "type": "number",
+            "description": "Bumped by every in-place edit of a posted voucher. Doubles as the\noptimistic-concurrency token: `update()`/`delete()` refuse when the\ncaller's revision is not the stored one."
+          },
           "deletedAt": {
             "format": "date-time",
             "type": "string"
@@ -23999,6 +24008,7 @@
           "contraAccountId",
           "totalAmount",
           "attachmentIds",
+          "revision",
           "lines",
           "id",
           "organizationId",
@@ -24071,6 +24081,11 @@
       "UpdateCashReceiptDto": {
         "type": "object",
         "properties": {
+          "revision": {
+            "type": "number",
+            "description": "The revision the client last read. Required: editing a posted voucher now\nmoves money, so a blind write must fail loudly rather than silently\noverwrite a concurrent edit.",
+            "minimum": 0
+          },
           "voucherDate": {
             "type": "string"
           },
@@ -24096,6 +24111,11 @@
           "partnerId": {
             "type": "string",
             "format": "uuid"
+          },
+          "partnerName": {
+            "type": "string",
+            "description": "\"Đối tượng\" typed by hand. Only read when `partnerType` is `OTHER`; for a\ncatalogue party the name always comes from the resolver instead.",
+            "maxLength": 255
           },
           "payerName": {
             "type": "string",
@@ -24135,7 +24155,10 @@
               "$ref": "#/components/schemas/CashReceiptLineDto"
             }
           }
-        }
+        },
+        "required": [
+          "revision"
+        ]
       },
       "ReverseCashReceiptDto": {
         "type": "object",
@@ -24218,6 +24241,11 @@
           "partnerId": {
             "type": "string",
             "format": "uuid"
+          },
+          "partnerName": {
+            "type": "string",
+            "description": "\"Đối tượng\" typed by hand. Only read when `partnerType` is `OTHER`; for a\ncatalogue party the name always comes from the resolver instead.",
+            "maxLength": 255
           },
           "payeeName": {
             "type": "string",
@@ -24381,6 +24409,10 @@
           "postedBy": {
             "type": "string"
           },
+          "revision": {
+            "type": "number",
+            "description": "Bumped by every in-place edit of a posted voucher. Doubles as the\noptimistic-concurrency token: `update()`/`delete()` refuse when the\ncaller's revision is not the stored one."
+          },
           "deletedAt": {
             "format": "date-time",
             "type": "string"
@@ -24426,6 +24458,7 @@
           "contraAccountId",
           "totalAmount",
           "attachmentIds",
+          "revision",
           "lines",
           "id",
           "organizationId",
@@ -24498,6 +24531,11 @@
       "UpdateCashPaymentDto": {
         "type": "object",
         "properties": {
+          "revision": {
+            "type": "number",
+            "description": "The revision the client last read. Required: editing a posted voucher now\nmoves money, so a blind write must fail loudly rather than silently\noverwrite a concurrent edit.",
+            "minimum": 0
+          },
           "voucherDate": {
             "type": "string"
           },
@@ -24526,6 +24564,11 @@
           "partnerId": {
             "type": "string",
             "format": "uuid"
+          },
+          "partnerName": {
+            "type": "string",
+            "description": "\"Đối tượng\" typed by hand. Only read when `partnerType` is `OTHER`; for a\ncatalogue party the name always comes from the resolver instead.",
+            "maxLength": 255
           },
           "payeeName": {
             "type": "string",
@@ -24565,7 +24608,10 @@
               "$ref": "#/components/schemas/CashPaymentLineDto"
             }
           }
-        }
+        },
+        "required": [
+          "revision"
+        ]
       },
       "ReverseCashPaymentDto": {
         "type": "object",
@@ -32419,6 +32465,11 @@
             "type": "string",
             "format": "uuid"
           },
+          "partnerName": {
+            "type": "string",
+            "description": "\"Đối tượng\" typed by hand. Only read when `partnerType` is `OTHER`; for a\ncatalogue party the name always comes from the resolver instead.",
+            "maxLength": 255
+          },
           "payerName": {
             "type": "string",
             "description": "\"Người nộp\"",
@@ -32619,6 +32670,10 @@
             "format": "date-time",
             "type": "string"
           },
+          "revision": {
+            "type": "number",
+            "description": "Bumped by every in-place edit of a posted voucher. Doubles as the\noptimistic-concurrency token: `update()`/`delete()` refuse when the\ncaller's revision is not the stored one."
+          },
           "deletedAt": {
             "format": "date-time",
             "type": "string"
@@ -32649,6 +32704,7 @@
           "attachmentIds",
           "createdAt",
           "updatedAt",
+          "revision",
           "createdBy",
           "lines"
         ]
@@ -32715,6 +32771,11 @@
       "UpdateBankReceiptDto": {
         "type": "object",
         "properties": {
+          "revision": {
+            "type": "number",
+            "description": "The revision the client last read. Required: editing a posted voucher now\nmoves money, so a blind write must fail loudly rather than silently\noverwrite a concurrent edit.",
+            "minimum": 0
+          },
           "depositAccountId": {
             "type": "string",
             "format": "uuid"
@@ -32743,6 +32804,11 @@
           "partnerId": {
             "type": "string",
             "format": "uuid"
+          },
+          "partnerName": {
+            "type": "string",
+            "description": "\"Đối tượng\" typed by hand. Only read when `partnerType` is `OTHER`; for a\ncatalogue party the name always comes from the resolver instead.",
+            "maxLength": 255
           },
           "payerName": {
             "type": "string",
@@ -32790,7 +32856,10 @@
               "$ref": "#/components/schemas/BankReceiptLineDto"
             }
           }
-        }
+        },
+        "required": [
+          "revision"
+        ]
       },
       "ReverseBankReceiptDto": {
         "type": "object",
@@ -32878,6 +32947,11 @@
           "partnerId": {
             "type": "string",
             "format": "uuid"
+          },
+          "partnerName": {
+            "type": "string",
+            "description": "\"Đối tượng\" typed by hand. Only read when `partnerType` is `OTHER`; for a\ncatalogue party the name always comes from the resolver instead.",
+            "maxLength": 255
           },
           "payeeName": {
             "type": "string",
@@ -33094,6 +33168,10 @@
             "format": "date-time",
             "type": "string"
           },
+          "revision": {
+            "type": "number",
+            "description": "Bumped by every in-place edit of a posted voucher. Doubles as the\noptimistic-concurrency token: `update()`/`delete()` refuse when the\ncaller's revision is not the stored one."
+          },
           "deletedAt": {
             "format": "date-time",
             "type": "string"
@@ -33124,6 +33202,7 @@
           "attachmentIds",
           "createdAt",
           "updatedAt",
+          "revision",
           "createdBy",
           "lines"
         ]
@@ -33190,6 +33269,11 @@
       "UpdateBankPaymentDto": {
         "type": "object",
         "properties": {
+          "revision": {
+            "type": "number",
+            "description": "The revision the client last read. Required: editing a posted voucher now\nmoves money, so a blind write must fail loudly rather than silently\noverwrite a concurrent edit.",
+            "minimum": 0
+          },
           "depositAccountId": {
             "type": "string",
             "format": "uuid"
@@ -33222,6 +33306,11 @@
           "partnerId": {
             "type": "string",
             "format": "uuid"
+          },
+          "partnerName": {
+            "type": "string",
+            "description": "\"Đối tượng\" typed by hand. Only read when `partnerType` is `OTHER`; for a\ncatalogue party the name always comes from the resolver instead.",
+            "maxLength": 255
           },
           "payeeName": {
             "type": "string",
@@ -33269,7 +33358,10 @@
               "$ref": "#/components/schemas/BankPaymentLineDto"
             }
           }
-        }
+        },
+        "required": [
+          "revision"
+        ]
       },
       "ReverseBankPaymentDto": {
         "type": "object",

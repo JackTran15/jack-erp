@@ -59,7 +59,7 @@ export function useCashReceiptMutations() {
   });
 
   const update = useMutation({
-    mutationFn: async ({ id, body }: { id: string; body: Partial<CreateCashReceiptBody> }) =>
+    mutationFn: async ({ id, body }: { id: string; body: Partial<CreateCashReceiptBody> & { revision: number } }) =>
       requireErpData(
         await erpApi.PATCH<CashReceipt>("/cash-receipts/{id}", {
           params: { path: { id } },

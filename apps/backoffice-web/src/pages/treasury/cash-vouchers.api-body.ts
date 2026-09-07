@@ -8,9 +8,24 @@ import {
   type CreateSupplierDebtPaymentBody,
 } from "./cash-vouchers.types";
 import { toIsoDate } from "./documents/_shared/voucher-dialog.utils";
-import { lookupTypeToPartnerType } from "./documents/_shared/voucher-partner.constants";
+import {
+  isFreeTextLookupType,
+  lookupTypeToPartnerType,
+} from "./documents/_shared/voucher-partner.constants";
 
 function mapPartnerFields(detail: LedgerCashVoucherDetail) {
+  // A hand-typed party is the one shape that carries a type WITHOUT an id, so it
+  // has to be recognised before the `partnerId &&` guard below — that guard is
+  // what used to drop the typed name on the floor, silently.
+  const freeText = !!detail.partnerKind && isFreeTextLookupType(detail.partnerKind);
+  if (freeText) {
+    return {
+      partnerType: lookupTypeToPartnerType(detail.partnerKind!),
+      partnerId: undefined,
+      partnerName: detail.counterpartyName?.trim() || undefined,
+      staffId: detail.staffId,
+    };
+  }
   const partnerType =
     detail.partnerType ??
     (detail.partnerId && detail.partnerKind

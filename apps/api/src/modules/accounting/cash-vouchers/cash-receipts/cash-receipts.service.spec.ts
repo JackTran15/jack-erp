@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CashReceiptsService } from './cash-receipts.service';
 import { CashReceiptEntity } from './cash-receipt.entity';
@@ -53,6 +53,7 @@ function buildManager(opts: {
     save: jest.fn(async (entity: any) => entity),
     update: jest.fn(async () => undefined),
     delete: jest.fn(async () => undefined),
+    softDelete: jest.fn(async () => undefined),
   };
   return manager;
 }
@@ -155,6 +156,91 @@ describe('CashReceiptsService', () => {
       expect(createdVoucher[1].contraAccountId).toBe('contra-resolved');
       expect(createdVoucher[1].journalEntryId).toBe('je-1');
       expect(result.status).toBe(CashVoucherStatus.POSTED);
+    });
+
+    it('stores a hand-typed party name and never looks it up', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'r-new', status: CashVoucherStatus.POSTED },
+      });
+      await setup(manager);
+
+      await service.create(
+        {
+          voucherDate: '2026-06-30',
+          purpose: CashReceiptPurpose.OTHER,
+          cashAccountId: 'cash-1',
+          totalAmount: 100,
+          partnerType: 'OTHER',
+          partnerName: '  Nguyễn Văn A  ',
+          lines: [{ description: 'Thu khác', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      // Nothing to resolve: a free-text party has no catalogue row behind it.
+      expect(partnerResolver.resolve).not.toHaveBeenCalled();
+      const created = manager.create.mock.calls.find(
+        (c: any[]) => c[1]?.status === CashVoucherStatus.POSTED,
+      );
+      expect(created[1].partnerNameSnapshot).toBe('Nguyễn Văn A');
+    });
+
+    it('drops any partnerId sent alongside a hand-typed party', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'r-new', status: CashVoucherStatus.POSTED },
+      });
+      await setup(manager);
+
+      await service.create(
+        {
+          voucherDate: '2026-06-30',
+          purpose: CashReceiptPurpose.OTHER,
+          cashAccountId: 'cash-1',
+          totalAmount: 100,
+          partnerType: 'OTHER',
+          partnerId: '11111111-1111-4111-8111-111111111111',
+          partnerName: 'Nguyễn Văn A',
+          lines: [{ description: 'Thu khác', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      // A free-text party must not leave a partner_id dangling against a row it
+      // never actually referenced.
+      const created = manager.create.mock.calls.find(
+        (c: any[]) => c[1]?.status === CashVoucherStatus.POSTED,
+      );
+      expect(created[1].partnerId).toBeUndefined();
+    });
+
+    it('ignores partnerName when the party is a catalogue row', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'r-new', status: CashVoucherStatus.POSTED },
+      });
+      await setup(manager);
+      partnerResolver.resolve.mockResolvedValue({
+        name: 'Khách hàng thật',
+        address: 'HCM',
+      });
+
+      await service.create(
+        {
+          voucherDate: '2026-06-30',
+          purpose: CashReceiptPurpose.OTHER,
+          cashAccountId: 'cash-1',
+          totalAmount: 100,
+          partnerType: 'CUSTOMER',
+          partnerId: '11111111-1111-4111-8111-111111111111',
+          partnerName: 'Tên giả mạo',
+          lines: [{ description: 'Thu khác', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      const created = manager.create.mock.calls.find(
+        (c: any[]) => c[1]?.status === CashVoucherStatus.POSTED,
+      );
+      expect(created[1].partnerNameSnapshot).toBe('Khách hàng thật');
     });
 
     it('rejects when total_amount does not match the line sum', async () => {
@@ -308,6 +394,340 @@ describe('CashReceiptsService', () => {
       await expect(service.reverse('r-1', 'reason', actor)).rejects.toThrow(
         /Insufficient cash balance/,
       );
+    });
+  });
+
+  describe('update — party snapshot', () => {
+    // A voucher the user created by hand and already posted — the only shape
+    // that update() accepts now (ADR-05).
+    const draft = (over: any = {}) => ({
+      id: 'r-1',
+      status: CashVoucherStatus.POSTED,
+      referenceType: CashReceiptReferenceType.MANUAL,
+      revision: 0,
+      totalAmount: 0,
+      documentNumber: 'PT-26-00001',
+      organizationId: 'org-1',
+      partnerType: 'OTHER',
+      partnerId: undefined,
+      partnerNameSnapshot: 'Nguyễn Văn A',
+      partnerAddressSnapshot: undefined,
+      ...over,
+    });
+
+    it('edits a hand-typed party name in place', async () => {
+      const receipt = draft();
+      const manager = buildManager({ qbResult: receipt, findOneResult: receipt });
+      await setup(manager);
+
+      await service.update('r-1', { revision: 0, partnerName: 'Trần Thị B' } as any, actor);
+
+      expect(receipt.partnerNameSnapshot).toBe('Trần Thị B');
+      expect(partnerResolver.resolve).not.toHaveBeenCalled();
+    });
+
+    it('clears the hand-typed name when switching to a catalogue party', async () => {
+      const receipt = draft();
+      const manager = buildManager({ qbResult: receipt, findOneResult: receipt });
+      await setup(manager);
+      partnerResolver.resolve.mockResolvedValue({
+        name: 'Khách hàng thật',
+        address: 'HCM',
+      });
+
+      await service.update(
+        'r-1',
+        {
+          revision: 0,
+          partnerType: 'CUSTOMER',
+          partnerId: '11111111-1111-4111-8111-111111111111',
+        } as any,
+        actor,
+      );
+
+      // null, not undefined — TypeORM's save() skips undefined, which would
+      // leave "Nguyễn Văn A" showing against a real customer.
+      expect(receipt.partnerNameSnapshot).toBe('Khách hàng thật');
+      expect(receipt.partnerId).toBe('11111111-1111-4111-8111-111111111111');
+    });
+
+    it('clears partnerId when switching from a catalogue party to hand-typed', async () => {
+      const receipt = draft({
+        partnerType: 'CUSTOMER',
+        partnerId: '11111111-1111-4111-8111-111111111111',
+        partnerNameSnapshot: 'Khách hàng thật',
+        partnerAddressSnapshot: 'HCM',
+      });
+      const manager = buildManager({ qbResult: receipt, findOneResult: receipt });
+      await setup(manager);
+
+      await service.update(
+        'r-1',
+        { revision: 0, partnerType: 'OTHER', partnerName: 'Nguyễn Văn A' } as any,
+        actor,
+      );
+
+      expect(receipt.partnerId).toBeNull();
+      expect(receipt.partnerNameSnapshot).toBe('Nguyễn Văn A');
+      expect(receipt.partnerAddressSnapshot).toBeNull();
+    });
+
+    it('leaves the party untouched when the payload does not mention it', async () => {
+      const receipt = draft();
+      const manager = buildManager({ qbResult: receipt, findOneResult: receipt });
+      await setup(manager);
+
+      await service.update('r-1', { revision: 0, reason: 'Đổi lý do' } as any, actor);
+
+      expect(receipt.partnerNameSnapshot).toBe('Nguyễn Văn A');
+      expect(partnerResolver.resolve).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('update — editing a posted voucher (ADR-01)', () => {
+    const posted = (over: any = {}) => ({
+      id: 'r-1',
+      status: CashVoucherStatus.POSTED,
+      referenceType: CashReceiptReferenceType.MANUAL,
+      revision: 0,
+      totalAmount: 5_000_000,
+      documentNumber: 'PT-26-00001',
+      cashAccountId: 'cash-1',
+      contraAccountId: 'contra-1',
+      organizationId: 'org-1',
+      ...over,
+    });
+
+    it('posts ONE compensating WITHDRAWAL when the receipt shrinks', async () => {
+      const receipt = posted();
+      const manager = buildManager({
+        qbResult: receipt,
+        findOneResult: receipt,
+        findResults: [{ amount: 4_000_000 }],
+      });
+      await setup(manager);
+
+      await service.update(
+        'r-1',
+        {
+          revision: 0,
+          totalAmount: 4_000_000,
+          lines: [{ description: 'Thu khác', amount: 4_000_000 }],
+        } as any,
+        actor,
+      );
+
+      expect(cashService.recordMovement).toHaveBeenCalledTimes(1);
+      expect(cashService.recordMovement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cashAccountId: 'cash-1',
+          type: CashMovementType.WITHDRAWAL,
+          amount: 1_000_000,
+          reference: 'PT-26-00001',
+          notes: 'Adjustment for PT-26-00001 rev 1',
+        }),
+        actor,
+        manager,
+      );
+      // The number is the point of the whole feature: same voucher, not a second one.
+      expect(receipt.documentNumber).toBe('PT-26-00001');
+      expect(receipt.revision).toBe(1);
+    });
+
+    it('posts ONE compensating DEPOSIT when the receipt grows', async () => {
+      const receipt = posted();
+      const manager = buildManager({
+        qbResult: receipt,
+        findOneResult: receipt,
+        findResults: [{ amount: 7_500_000 }],
+      });
+      await setup(manager);
+
+      await service.update(
+        'r-1',
+        {
+          revision: 0,
+          totalAmount: 7_500_000,
+          lines: [{ description: 'Thu khác', amount: 7_500_000 }],
+        } as any,
+        actor,
+      );
+
+      expect(cashService.recordMovement).toHaveBeenCalledTimes(1);
+      expect(cashService.recordMovement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: CashMovementType.DEPOSIT,
+          amount: 2_500_000,
+        }),
+        actor,
+        manager,
+      );
+    });
+
+    it('moves nothing when only the wording changed', async () => {
+      const receipt = posted();
+      const manager = buildManager({
+        qbResult: receipt,
+        findOneResult: receipt,
+        findResults: [{ amount: 5_000_000 }],
+      });
+      await setup(manager);
+
+      await service.update(
+        'r-1',
+        { revision: 0, totalAmount: 5_000_000, reason: 'Sửa diễn giải' } as any,
+        actor,
+      );
+
+      expect(cashService.recordMovement).not.toHaveBeenCalled();
+      expect(receipt.revision).toBe(1);
+    });
+
+    it('refuses a voucher produced by a saga', async () => {
+      const receipt = posted({
+        referenceType: CashReceiptReferenceType.INVOICE_DEBT,
+      });
+      const manager = buildManager({ qbResult: receipt, findOneResult: receipt });
+      await setup(manager);
+
+      await expect(
+        service.update('r-1', { revision: 0, totalAmount: 1 } as any, actor),
+      ).rejects.toThrow(BadRequestException);
+      expect(cashService.recordMovement).not.toHaveBeenCalled();
+    });
+
+    it('refuses an already-reversed voucher', async () => {
+      const receipt = posted({ reversedByVoucherId: 'r-2' });
+      const manager = buildManager({ qbResult: receipt, findOneResult: receipt });
+      await setup(manager);
+
+      await expect(
+        service.update('r-1', { revision: 0, totalAmount: 1 } as any, actor),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('refuses a stale revision instead of overwriting a concurrent edit', async () => {
+      const receipt = posted({ revision: 3 });
+      const manager = buildManager({ qbResult: receipt, findOneResult: receipt });
+      await setup(manager);
+
+      await expect(
+        service.update('r-1', { revision: 1, totalAmount: 1 } as any, actor),
+      ).rejects.toThrow(ConflictException);
+      expect(cashService.recordMovement).not.toHaveBeenCalled();
+    });
+
+    it('lets an insufficient-balance refusal from recordMovement through', async () => {
+      const receipt = posted();
+      const manager = buildManager({
+        qbResult: receipt,
+        findOneResult: receipt,
+        findResults: [{ amount: 9_000_000 }],
+      });
+      await setup(manager);
+      cashService.recordMovement.mockRejectedValue(
+        new BadRequestException('Insufficient balance'),
+      );
+
+      await expect(
+        service.update(
+          'r-1',
+          {
+            revision: 0,
+            totalAmount: 9_000_000,
+            lines: [{ description: 'Thu khác', amount: 9_000_000 }],
+          } as any,
+          actor,
+        ),
+      ).rejects.toThrow('Insufficient balance');
+    });
+  });
+
+  describe('delete — edit down to nothing (ADR-02)', () => {
+    const posted = (over: any = {}) => ({
+      id: 'r-1',
+      status: CashVoucherStatus.POSTED,
+      referenceType: CashReceiptReferenceType.MANUAL,
+      revision: 0,
+      totalAmount: 3_000_000,
+      documentNumber: 'PT-26-00001',
+      cashAccountId: 'cash-1',
+      contraAccountId: 'contra-1',
+      organizationId: 'org-1',
+      ...over,
+    });
+
+    it('reverses the whole amount and soft-deletes, keeping status POSTED', async () => {
+      const receipt = posted();
+      const manager = buildManager({ qbResult: receipt, findOneResult: receipt });
+      await setup(manager);
+
+      await service.delete('r-1', actor);
+
+      expect(cashService.recordMovement).toHaveBeenCalledTimes(1);
+      expect(cashService.recordMovement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: CashMovementType.WITHDRAWAL,
+          amount: 3_000_000,
+        }),
+        actor,
+        manager,
+      );
+      expect(manager.softDelete).toHaveBeenCalled();
+      // No CANCELLED enum value exists; deleted_at is the answer to "still here?".
+      expect(receipt.status).toBe(CashVoucherStatus.POSTED);
+    });
+
+    it('refuses to delete a saga-produced voucher', async () => {
+      const receipt = posted({
+        referenceType: CashReceiptReferenceType.INVOICE_DEBT,
+      });
+      const manager = buildManager({ qbResult: receipt, findOneResult: receipt });
+      await setup(manager);
+
+      await expect(service.delete('r-1', actor)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(cashService.recordMovement).not.toHaveBeenCalled();
+      expect(manager.softDelete).not.toHaveBeenCalled();
+    });
+
+    it('refuses to delete an already-deleted voucher', async () => {
+      const receipt = posted({ deletedAt: new Date() });
+      const manager = buildManager({ qbResult: receipt, findOneResult: receipt });
+      await setup(manager);
+
+      await expect(service.delete('r-1', actor)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(cashService.recordMovement).not.toHaveBeenCalled();
+    });
+
+    it('shares the delta engine with update() rather than reversing separately', async () => {
+      // Deleting a 3,000,000 receipt and editing it down to zero must produce
+      // the same single movement — that equivalence is what ADR-02 buys.
+      const forDelete = posted();
+      const md = buildManager({ qbResult: forDelete, findOneResult: forDelete });
+      await setup(md);
+      await service.delete('r-1', actor);
+      const deleteCall = cashService.recordMovement.mock.calls[0][0];
+
+      const forEdit = posted();
+      const me = buildManager({
+        qbResult: forEdit,
+        findOneResult: forEdit,
+        findResults: [],
+      });
+      await setup(me);
+      await service.update(
+        'r-1',
+        { revision: 0, totalAmount: 0, lines: [] } as any,
+        actor,
+      );
+      const editCall = cashService.recordMovement.mock.calls[0][0];
+
+      expect(deleteCall.type).toBe(editCall.type);
+      expect(deleteCall.amount).toBe(editCall.amount);
     });
   });
 

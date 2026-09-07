@@ -4,6 +4,7 @@ import {
   IsArray,
   IsEnum,
   IsISO8601,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -17,6 +18,15 @@ import { CashPaymentLineDto } from './cash-payment-line.dto';
 
 /** Update a DRAFT cash payment. `lines` (when provided) is a full upsert set. */
 export class UpdateCashPaymentDto {
+  /**
+   * The revision the client last read. Required: editing a posted voucher now
+   * moves money, so a blind write must fail loudly rather than silently
+   * overwrite a concurrent edit.
+   */
+  @IsInt()
+  @Min(0)
+  revision: number;
+
   @IsOptional()
   @IsISO8601()
   voucherDate?: string;
@@ -32,6 +42,15 @@ export class UpdateCashPaymentDto {
   @IsOptional()
   @IsUUID()
   partnerId?: string;
+
+  /**
+   * "Đối tượng" typed by hand. Only read when `partnerType` is `OTHER`; for a
+   * catalogue party the name always comes from the resolver instead.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  partnerName?: string;
 
   @IsOptional()
   @IsString()

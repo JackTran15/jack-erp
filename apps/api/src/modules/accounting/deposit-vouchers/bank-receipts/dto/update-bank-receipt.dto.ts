@@ -5,6 +5,7 @@ import {
   IsBoolean,
   IsEnum,
   IsISO8601,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -18,6 +19,15 @@ import { BankReceiptLineDto } from './bank-receipt-line.dto';
 
 /** Update a DRAFT bank receipt. `lines` (when provided) is a full upsert set. */
 export class UpdateBankReceiptDto {
+  /**
+   * The revision the client last read. Required: editing a posted voucher now
+   * moves money, so a blind write must fail loudly rather than silently
+   * overwrite a concurrent edit.
+   */
+  @IsInt()
+  @Min(0)
+  revision: number;
+
   @IsOptional()
   @IsUUID()
   depositAccountId?: string;
@@ -37,6 +47,15 @@ export class UpdateBankReceiptDto {
   @IsOptional()
   @IsUUID()
   partnerId?: string;
+
+  /**
+   * "Đối tượng" typed by hand. Only read when `partnerType` is `OTHER`; for a
+   * catalogue party the name always comes from the resolver instead.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  partnerName?: string;
 
   @IsOptional()
   @IsString()

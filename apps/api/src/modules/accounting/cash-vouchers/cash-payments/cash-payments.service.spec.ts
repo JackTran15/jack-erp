@@ -52,6 +52,7 @@ function buildManager(opts: {
     save: jest.fn(async (entity: any) => entity),
     update: jest.fn(async () => undefined),
     delete: jest.fn(async () => undefined),
+    softDelete: jest.fn(async () => undefined),
   };
   return manager;
 }
@@ -199,6 +200,155 @@ describe('CashPaymentsService', () => {
           actor,
         ),
       ).rejects.toThrow(/Insufficient cash balance/);
+    });
+  });
+
+  describe('free-text party', () => {
+    it('stores a hand-typed payee name without a lookup, and drops partnerId', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'p-new', status: CashVoucherStatus.POSTED },
+      });
+      await setup(manager);
+
+      await service.create(
+        {
+          voucherDate: '2026-06-30',
+          purpose: CashPaymentPurpose.OTHER,
+          cashAccountId: 'cash-1',
+          totalAmount: 100,
+          partnerType: 'OTHER',
+          partnerId: '11111111-1111-4111-8111-111111111111',
+          partnerName: '  Nguyễn Văn A  ',
+          lines: [{ description: 'Chi khác', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      expect(partnerResolver.resolve).not.toHaveBeenCalled();
+      const created = manager.create.mock.calls.find(
+        (c: any[]) => c[1]?.status === CashVoucherStatus.POSTED,
+      );
+      expect(created[1].partnerNameSnapshot).toBe('Nguyễn Văn A');
+      expect(created[1].partnerId).toBeUndefined();
+    });
+
+    it('clears partnerId when an update switches to a hand-typed payee', async () => {
+      const payment = {
+        id: 'p-1',
+        status: CashVoucherStatus.POSTED,
+        referenceType: CashPaymentReferenceType.MANUAL,
+        revision: 0,
+        totalAmount: 0,
+        documentNumber: 'PC-26-00001',
+        organizationId: 'org-1',
+        partnerType: 'SUPPLIER',
+        partnerId: '11111111-1111-4111-8111-111111111111',
+        partnerNameSnapshot: 'NCC thật',
+        partnerAddressSnapshot: 'HCM',
+      };
+      const manager = buildManager({ qbResult: payment, findOneResult: payment });
+      await setup(manager);
+
+      await service.update(
+        'p-1',
+        { revision: 0, partnerType: 'OTHER', partnerName: 'Nguyễn Văn A' } as any,
+        actor,
+      );
+
+      expect(payment.partnerId).toBeNull();
+      expect(payment.partnerNameSnapshot).toBe('Nguyễn Văn A');
+      expect(payment.partnerAddressSnapshot).toBeNull();
+    });
+  });
+
+  describe('update — editing a posted voucher (ADR-01)', () => {
+    const posted = (over: any = {}) => ({
+      id: 'p-1',
+      status: CashVoucherStatus.POSTED,
+      referenceType: CashPaymentReferenceType.MANUAL,
+      revision: 0,
+      totalAmount: 5_000_000,
+      documentNumber: 'PC-26-00001',
+      cashAccountId: 'cash-1',
+      contraAccountId: 'contra-1',
+      organizationId: 'org-1',
+      ...over,
+    });
+
+    it('takes MORE cash out when the payment grows', async () => {
+      const payment = posted();
+      const manager = buildManager({
+        qbResult: payment,
+        findOneResult: payment,
+        findResults: [{ amount: 8_000_000 }],
+      });
+      await setup(manager);
+
+      await service.update(
+        'p-1',
+        {
+          revision: 0,
+          totalAmount: 8_000_000,
+          lines: [{ description: 'Chi khác', amount: 8_000_000 }],
+        } as any,
+        actor,
+      );
+
+      // Opposite direction to a receipt: paying more drains the fund further.
+      expect(cashService.recordMovement).toHaveBeenCalledTimes(1);
+      expect(cashService.recordMovement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: CashMovementType.WITHDRAWAL,
+          amount: 3_000_000,
+          notes: 'Adjustment for PC-26-00001 rev 1',
+        }),
+        actor,
+        manager,
+      );
+      expect(payment.documentNumber).toBe('PC-26-00001');
+      expect(payment.revision).toBe(1);
+    });
+
+    it('puts cash back when the payment shrinks', async () => {
+      const payment = posted();
+      const manager = buildManager({
+        qbResult: payment,
+        findOneResult: payment,
+        findResults: [{ amount: 2_000_000 }],
+      });
+      await setup(manager);
+
+      await service.update(
+        'p-1',
+        {
+          revision: 0,
+          totalAmount: 2_000_000,
+          lines: [{ description: 'Chi khác', amount: 2_000_000 }],
+        } as any,
+        actor,
+      );
+
+      expect(cashService.recordMovement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: CashMovementType.DEPOSIT,
+          amount: 3_000_000,
+        }),
+        actor,
+        manager,
+      );
+    });
+
+    it('refuses a supplier-payment saga voucher', async () => {
+      const payment = posted({
+        referenceType: CashPaymentReferenceType.GOODS_RECEIPT,
+      });
+      const manager = buildManager({ qbResult: payment, findOneResult: payment });
+      await setup(manager);
+
+      await expect(
+        service.update('p-1', { revision: 0, totalAmount: 1 } as any, actor),
+      ).rejects.toThrow(BadRequestException);
+      expect(cashService.recordMovement).not.toHaveBeenCalled();
     });
   });
 

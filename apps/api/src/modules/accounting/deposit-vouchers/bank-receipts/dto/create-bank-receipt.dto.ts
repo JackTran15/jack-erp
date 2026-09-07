@@ -42,6 +42,15 @@ export class CreateBankReceiptDto {
   @IsUUID()
   partnerId?: string;
 
+  /**
+   * "Đối tượng" typed by hand. Only read when `partnerType` is `OTHER`; for a
+   * catalogue party the name always comes from the resolver instead.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  partnerName?: string;
+
   /** "Người nộp" */
   @IsOptional()
   @IsString()

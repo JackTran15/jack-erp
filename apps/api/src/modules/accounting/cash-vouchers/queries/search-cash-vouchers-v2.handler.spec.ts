@@ -53,6 +53,18 @@ describe('SearchCashVouchersV2Handler', () => {
   /** The data query is the first call: [sql, params]. */
   const dataCall = () => query.mock.calls[0] as [string, unknown[]];
 
+  it('falls back to the hand-typed party name for the Đối tượng column', async () => {
+    const [sql] = (await run({}), dataCall());
+
+    // AC-03. A free-text party has no catalogue row, so the only place its name
+    // lives is partner_name_snapshot — if the column list ever drops it, the
+    // grid silently shows blank for exactly the vouchers this feature added.
+    expect(sql).toContain('partner_name_snapshot');
+    // Ordering is load-bearing and deliberate: "Người nộp" still wins when both
+    // are set, so a fixture that fills payer_name proves nothing about this.
+    expect(sql.indexOf('payer_name')).toBeLessThan(sql.indexOf('partner_name_snapshot'));
+  });
+
   it('scopes by organizationId and branchId, paginates, and returns the envelope', async () => {
     const res = await run({ page: 2, limit: 5 });
 

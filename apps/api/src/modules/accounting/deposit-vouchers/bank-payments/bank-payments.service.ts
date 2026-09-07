@@ -42,6 +42,11 @@ import {
   QueryBankPaymentDto,
   BankPaymentSource,
 } from "./dto/query-bank-payment.dto";
+import { isFreeTextParty } from "../../cash-vouchers/shared/voucher-party";
+import {
+  assertEditable,
+  assertRevisionMatches,
+} from "../../cash-vouchers/shared/editable-voucher.util";
 
 export interface BankPaymentCreateAndPostArgs {
   purpose: BankPaymentPurpose;
@@ -171,12 +176,17 @@ export class BankPaymentsService {
         dto.depositAccountId,
         actor.organizationId,
       );
-      const partner = await this.resolvePartner(
-        manager,
-        dto.partnerType,
-        dto.partnerId,
-        actor.organizationId,
-      );
+      // A hand-typed party has nothing to look up: its name IS the record, and
+      // it carries no partner_id to dangle.
+      const freeTextParty = isFreeTextParty(dto.partnerType);
+      const partner = freeTextParty
+        ? null
+        : await this.resolvePartner(
+            manager,
+            dto.partnerType,
+            dto.partnerId,
+            actor.organizationId,
+          );
       const contraAccountId = await this.accountResolver.resolveContraAccount(
         PAYMENT_PURPOSE_TO_ROLE[purpose],
         actor,
@@ -193,8 +203,10 @@ export class BankPaymentsService {
           docDate: dto.docDate,
           referenceType: BankPaymentReferenceType.MANUAL,
           partnerType: dto.partnerType,
-          partnerId: dto.partnerId,
-          partnerName: partner?.name ?? undefined,
+          partnerId: freeTextParty ? undefined : dto.partnerId,
+          partnerName: freeTextParty
+            ? dto.partnerName?.trim() || undefined
+            : (partner?.name ?? undefined),
           // What the cashier typed wins over the partner record's current address —
           // the voucher freezes the address as of the moment it was written.
           partnerAddress: dto.address ?? partner?.address ?? undefined,
@@ -224,24 +236,62 @@ export class BankPaymentsService {
     actor: ActorContext,
   ): Promise<BankPaymentEntity> {
     return this.dataSource.transaction(async (manager) => {
-      const payment = await this.loadForWrite(
+      const payment = await this.lockForWrite(manager, id, actor.organizationId);
+      assertEditable(payment, BankVoucherStatus.POSTED, "Phiếu chi tiền gửi");
+      assertRevisionMatches(payment, dto.revision, "Phiếu chi tiền gửi");
+
+      // BR-LOCK-01, applied to BOTH dates. Checking only the new one would let a
+      // voucher already sitting in a closed month be re-valued: the compensating
+      // movement would land in that closed month and move a figure that has
+      // already been reported.
+      await this.periodGuard.assertNotLocked(
+        payment.branchId,
+        payment.docDate,
         manager,
-        id,
-        actor.organizationId,
       );
-      if (payment.status !== BankVoucherStatus.DRAFT) {
-        throw new BadRequestException(
-          "Only DRAFT bank payments can be updated",
+      if (dto.docDate && dto.docDate !== payment.docDate) {
+        await this.periodGuard.assertNotLocked(
+          payment.branchId,
+          dto.docDate,
+          manager,
         );
       }
+      const amountBefore = Number(payment.totalAmount);
 
-      if (dto.partnerType !== undefined || dto.partnerId !== undefined) {
-        await this.resolvePartner(
-          manager,
-          dto.partnerType ?? payment.partnerType,
-          dto.partnerId ?? payment.partnerId,
-          actor.organizationId,
-        );
+      // Recompute the party snapshot whenever any part of the party changed.
+      // Switching between a hand-typed name and a catalogue row clears the other
+      // shape entirely. The cleared fields are `null`, never `undefined`:
+      // TypeORM's save() skips undefined properties, so undefined would leave the
+      // old value in the column instead of clearing it.
+      const partyTouched =
+        dto.partnerType !== undefined ||
+        dto.partnerId !== undefined ||
+        dto.partnerName !== undefined;
+      const nextPartnerType = dto.partnerType ?? payment.partnerType;
+      if (partyTouched) {
+        if (isFreeTextParty(nextPartnerType)) {
+          Object.assign(payment, {
+            partnerType: nextPartnerType,
+            partnerId: null,
+            partnerNameSnapshot:
+              (dto.partnerName ?? payment.partnerNameSnapshot)?.trim() || null,
+            partnerAddressSnapshot: null,
+          });
+        } else {
+          const nextPartnerId = dto.partnerId ?? payment.partnerId;
+          const partner = await this.resolvePartner(
+            manager,
+            nextPartnerType,
+            nextPartnerId,
+            actor.organizationId,
+          );
+          Object.assign(payment, {
+            partnerType: nextPartnerType ?? null,
+            partnerId: nextPartnerId ?? null,
+            partnerNameSnapshot: partner?.name ?? null,
+            partnerAddressSnapshot: partner?.address ?? null,
+          });
+        }
       }
 
       const purpose = dto.purpose ?? payment.purpose;
@@ -249,8 +299,7 @@ export class BankPaymentsService {
         depositAccountId: dto.depositAccountId ?? payment.depositAccountId,
         docDate: dto.docDate ?? payment.docDate,
         purpose,
-        partnerType: dto.partnerType ?? payment.partnerType,
-        partnerId: dto.partnerId ?? payment.partnerId,
+
         payeeName: dto.payeeName ?? payment.payeeName,
         partnerAddressSnapshot: dto.address ?? payment.partnerAddressSnapshot,
         reason: dto.reason ?? payment.reason,
@@ -281,21 +330,85 @@ export class BankPaymentsService {
       }
       payment.totalAmount = total;
 
+      // ADR-01: the difference is ONE compensating movement on THIS voucher, not
+      // a second document. Opposite direction to a receipt: paying more drains the account further.
+      // An edit that only changed words moves nothing.
+      const delta = Number(total) - amountBefore;
+      await this.postAdjustment(manager, payment, delta, actor);
+
+      payment.revision += 1;
       await manager.save(payment);
+      this.logger.log(
+        `Updated bank payment ${payment.documentNumber} (id=${payment.id}) rev ${payment.revision}, delta=${delta}, by=${actor.userId}`,
+      );
       return this.getByIdInTx(manager, payment.id, actor.organizationId);
     });
   }
 
+  /**
+   * Delete a posted voucher.
+   *
+   * ADR-02: this is `update()` with `after = []` — the same delta engine called
+   * with the whole amount as the difference, so an edit and a deletion cannot
+   * drift apart. The row is soft-deleted and keeps `status = POSTED`; no
+   * `CANCELLED` enum value is introduced.
+   */
   async delete(id: string, actor: ActorContext): Promise<void> {
-    const payment = await this.loadForWrite(
-      this.dataSource.manager,
-      id,
-      actor.organizationId,
+    await this.dataSource.transaction(async (manager) => {
+      const payment = await this.lockForWrite(manager, id, actor.organizationId);
+      assertEditable(payment, BankVoucherStatus.POSTED, "Phiếu chi tiền gửi");
+      await this.periodGuard.assertNotLocked(
+        payment.branchId,
+        payment.docDate,
+        manager,
+      );
+
+      await this.postAdjustment(
+        manager,
+        payment,
+        -Number(payment.totalAmount),
+        actor,
+      );
+
+      payment.revision += 1;
+      await manager.save(payment);
+      await manager.softDelete(BankPaymentEntity, payment.id);
+      this.logger.log(
+        `Deleted bank payment ${payment.documentNumber} (id=${payment.id}) rev ${payment.revision}, reversed ${payment.totalAmount}, by=${actor.userId}`,
+      );
+    });
+  }
+
+  /**
+   * Post the difference as ONE compensating movement on this same voucher
+   * (ADR-01), keyed on the new revision so a retry cannot double-post.
+   * Shared by {@link update} and {@link delete}.
+   */
+  private async postAdjustment(
+    manager: EntityManager,
+    payment: BankPaymentEntity,
+    delta: number,
+    actor: ActorContext,
+  ): Promise<void> {
+    if (Math.abs(delta) <= 0.001) return;
+    await this.depositService.recordMovement(
+      {
+        depositAccountId: payment.depositAccountId,
+        type:
+          delta > 0
+            ? DepositMovementType.WITHDRAWAL
+            : DepositMovementType.DEPOSIT,
+        amount: Math.abs(delta),
+        contraAccountId: payment.contraAccountId,
+        source: DepositMovementSource.MANUAL,
+        docDate: payment.docDate,
+        documentNumber: payment.documentNumber,
+        sourceRefId: payment.id,
+        sourceRefLineId: `REV${payment.revision + 1}`,
+      },
+      actor,
+      manager,
     );
-    if (payment.status !== BankVoucherStatus.DRAFT) {
-      throw new BadRequestException("Only DRAFT bank payments can be deleted");
-    }
-    await this.paymentRepo.softDelete(payment.id);
   }
 
   // ---------------------------------------------------------------------------
@@ -953,6 +1066,28 @@ export class BankPaymentsService {
         status: Not(BankVoucherStatus.REVERSED),
       },
     });
+  }
+
+  /**
+   * Re-read the voucher inside the caller's transaction holding a row lock, so
+   * two concurrent edits serialise instead of both computing a delta from the
+   * same starting amount.
+   */
+  private async lockForWrite(
+    manager: EntityManager,
+    id: string,
+    organizationId: string,
+  ): Promise<BankPaymentEntity> {
+    const found = await manager
+      .createQueryBuilder(BankPaymentEntity, "p")
+      .setLock("pessimistic_write")
+      .where("p.id = :id", { id })
+      .andWhere("p.organizationId = :organizationId", { organizationId })
+      .getOne();
+    if (!found) {
+      throw new NotFoundException(`Bank payment ${id} not found`);
+    }
+    return found;
   }
 
   private async loadForWrite(

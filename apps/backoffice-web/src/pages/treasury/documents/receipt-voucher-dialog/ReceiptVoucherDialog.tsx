@@ -48,6 +48,7 @@ import {
   buildReceiptDetailFromForm,
   toIsoDate,
   voucherLineTotal,
+  applyReasonToFirstLine,
 } from "../_shared/voucher-dialog.utils";
 import {
   QuickCreateCustomerDialog,
@@ -696,6 +697,7 @@ export function ReceiptVoucherDialog({
                 setCounterpartyName("");
                 setCounterpartyPhone("");
               }}
+              onPartnerNameChange={(name) => setCounterpartyName(name)}
               onOpenSearchDialog={() => setEntitySearchTarget("partner")}
               onCreateNew={!readOnly && !isDebtCollection ? (kind) => setPartnerCreateKind(kind) : undefined}
             />
@@ -729,6 +731,11 @@ export function ReceiptVoucherDialog({
               <Input
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
+                onBlur={(e) =>
+                  setLines((prev) =>
+                    applyReasonToFirstLine(prev, e.target.value),
+                  )
+                }
                 readOnly={readOnly || debtFieldsLocked}
                 disabled={readOnly || debtFieldsLocked}
                 className={fieldClass(readOnly || debtFieldsLocked)}

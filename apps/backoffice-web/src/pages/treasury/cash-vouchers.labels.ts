@@ -39,3 +39,25 @@ export function isAutoVoucherReference(
     referenceType !== CashPaymentReferenceType.REVERSAL
   );
 }
+
+/**
+ * Whether a voucher may be edited or deleted in place.
+ *
+ * Mirrors `assertEditable` on the server, deliberately and narrowly: only a
+ * voucher the user created by hand (`referenceType === MANUAL`) and that is
+ * still posted. Everything else — POS sales, debt collection, supplier payments,
+ * fund swaps, transfers, and reversals — stays reversal-only.
+ *
+ * This is NOT `!isAutoVoucherReference(...)`. That helper counts REVERSAL as
+ * "not auto" because a reversal is shown like a normal voucher in the grid, but
+ * a reversal is machine-written and the server refuses to edit it. Reusing it
+ * here would light up a button that can only ever produce a 400.
+ */
+export function isEditableVoucherReference(
+  referenceType?: CashReceiptReferenceType | CashPaymentReferenceType,
+): boolean {
+  return (
+    referenceType === CashReceiptReferenceType.MANUAL ||
+    referenceType === CashPaymentReferenceType.MANUAL
+  );
+}

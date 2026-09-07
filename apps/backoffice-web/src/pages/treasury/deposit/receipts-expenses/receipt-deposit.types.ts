@@ -18,6 +18,7 @@ export interface DepositVoucherRow {
   depositAccountName: string;
   depositAccountNo: string;
   referenceType: string | null;
+  revision: number;
   counterparty: string;
   reason: string | null;
   createdAt: string;
@@ -29,6 +30,8 @@ export interface DepositVoucherRow {
  * is joined, filtered or sorted client-side any more.
  */
 export interface ReceiptDepositListItem {
+  /** Bumped by every in-place edit; sent back on update as a staleness token. */
+  revision: number;
   kind: ReceiptDepositKind;
   id: string;
   docDate: string;

@@ -47,6 +47,7 @@ export function toReceiptPaymentListItem(
     counterparty: row.counterparty,
     reason: row.reason ?? "",
     referenceType: row.referenceType ?? undefined,
+    revision: row.revision ?? 0,
     isGoodsReceiptPayment:
       row.documentKind === CashVoucherDocumentKind.GOODS_RECEIPT_PAYMENT,
     isAutoVoucher: isAutoVoucherReference(row.referenceType ?? undefined),

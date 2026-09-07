@@ -110,6 +110,8 @@ export interface CashReceipt extends BaseRecord {
   documentNumber?: string;
   voucherDate: string;
   status: CashVoucherStatus;
+  /** Bumped by every in-place edit; sent back on update as a staleness token. */
+  revision: number;
   purpose: CashReceiptPurpose;
   partnerType?: CashVoucherPartnerType;
   partnerId?: string;
@@ -134,6 +136,8 @@ export interface CashPayment extends BaseRecord {
   documentNumber?: string;
   voucherDate: string;
   status: CashVoucherStatus;
+  /** Bumped by every in-place edit; sent back on update as a staleness token. */
+  revision: number;
   purpose: CashPaymentPurpose;
   partnerType?: CashVoucherPartnerType;
   partnerId?: string;
@@ -278,6 +282,7 @@ export interface CashVoucherRow {
   totalAmount: number;
   cashAccountId: string;
   referenceType: CashReceiptReferenceType | CashPaymentReferenceType | null;
+  revision: number;
   counterparty: string;
   reason: string | null;
 }
@@ -295,6 +300,8 @@ export interface ReceiptPaymentListItem {
   counterparty: string;
   reason: string;
   referenceType?: CashReceiptReferenceType | CashPaymentReferenceType;
+  /** Staleness token sent back on update. */
+  revision: number;
   isGoodsReceiptPayment: boolean;
   isAutoVoucher: boolean;
   receipt?: CashReceipt;

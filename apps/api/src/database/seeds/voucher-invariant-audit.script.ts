@@ -222,6 +222,10 @@ async function auditCashReceipts(
       SELECT COALESCE(SUM(total_amount), 0) AS total
       FROM cash_payments
       WHERE organization_id = $1 AND status != 'REVERSED'
+        -- Treasury vouchers can now be deleted in place (soft-delete keeps
+        -- status POSTED), so excluding REVERSED alone would count a voucher that
+        -- no longer exists and report a false imbalance.
+        AND deleted_at IS NULL
         AND ((reference_type = 'GOODS_RECEIPT' AND reference_id = $2)
              OR reason LIKE $3)
       `,
@@ -232,6 +236,7 @@ async function auditCashReceipts(
       SELECT COALESCE(SUM(total_amount), 0) AS total
       FROM cash_receipts
       WHERE organization_id = $1 AND status != 'REVERSED'
+        AND deleted_at IS NULL
         AND reason LIKE $2
       `,
       [args.org, adjustmentPrefix],

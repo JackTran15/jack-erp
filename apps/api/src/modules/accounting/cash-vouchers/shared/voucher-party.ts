@@ -30,6 +30,31 @@ export interface VoucherPartySnapshot {
   reference?: string;
 }
 
+/**
+ * The party-type value meaning "typed by hand, not picked from a catalogue".
+ *
+ * Both treasury modules declare their own enum (`CashVoucherPartnerType` and
+ * `BankVoucherPartnerType`) with the same four members, and both Postgres enum
+ * types already carry this value — so free-text parties need no migration, only
+ * a path for the name to travel down.
+ */
+export const FREE_TEXT_PARTNER_TYPE = 'OTHER';
+
+/**
+ * True when the voucher's party is a hand-typed name rather than a reference to
+ * a customer/supplier/employee row.
+ *
+ * Takes a plain string so the one predicate serves both modules' parallel enums.
+ * Two invariants ride on it, and both are enforced by the callers:
+ *   - a free-text party stores its name in `partner_name_snapshot` and has NO
+ *     `partner_id`, so nothing dangles against a row that was never referenced;
+ *   - a catalogue party ignores any client-supplied name outright, so a stale or
+ *     malicious `partnerName` can never shadow the resolved one.
+ */
+export function isFreeTextParty(partnerType?: string): boolean {
+  return partnerType === FREE_TEXT_PARTNER_TYPE;
+}
+
 export interface VoucherPartyInput {
   partnerType?: CashVoucherPartnerType;
   partnerId?: string;

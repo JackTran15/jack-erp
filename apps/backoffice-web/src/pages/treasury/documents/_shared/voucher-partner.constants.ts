@@ -5,13 +5,27 @@ export enum PartnerLookupType {
   CUSTOMER = "customer",
   SUPPLIER = "supplier",
   ALL = "all",
+  /**
+   * A party the user types by hand instead of picking from a catalogue.
+   *
+   * Deliberately absent from the backend's own `PartnerLookupType`: there is
+   * nothing to search for, so `GET /cash-vouchers/partners` is never called with
+   * it. It exists only to drive the form.
+   */
+  OTHER = "other",
 }
 
 export const PARTNER_LOOKUP_OPTIONS = [
   { value: PartnerLookupType.SUPPLIER, label: "Nhà cung cấp" },
   { value: PartnerLookupType.CUSTOMER, label: "Khách hàng" },
   { value: PartnerLookupType.EMPLOYEE, label: "Nhân viên" },
+  { value: PartnerLookupType.OTHER, label: "Khác" },
 ] as const;
+
+/** True for the one lookup type that has no catalogue behind it. */
+export function isFreeTextLookupType(type: PartnerLookupType): boolean {
+  return type === PartnerLookupType.OTHER;
+}
 
 export const PARTNER_LOOKUP_FILTER_OPTIONS: ReadonlyArray<{
   value: PartnerLookupType;
@@ -30,6 +44,7 @@ export const PARTNER_LOOKUP_LABEL: Record<PartnerLookupType, string> = {
   [PartnerLookupType.CUSTOMER]: "Khách hàng",
   [PartnerLookupType.EMPLOYEE]: "Nhân viên",
   [PartnerLookupType.ALL]: "Tất cả loại",
+  [PartnerLookupType.OTHER]: "Khác",
 };
 
 export const DEBT_COLLECTION_PARTNER_OPTIONS = [
@@ -46,7 +61,10 @@ export function lookupTypeToPartnerType(
       return CashVoucherPartnerType.EMPLOYEE;
     case PartnerLookupType.SUPPLIER:
       return CashVoucherPartnerType.SUPPLIER;
+    case PartnerLookupType.OTHER:
+      return CashVoucherPartnerType.OTHER;
     default:
+      // Only ALL reaches here, and it is a filter value, never a saved party.
       return CashVoucherPartnerType.OTHER;
   }
 }
@@ -62,6 +80,8 @@ export function inferLookupType(
       return PartnerLookupType.EMPLOYEE;
     case CashVoucherPartnerType.SUPPLIER:
       return PartnerLookupType.SUPPLIER;
+    case CashVoucherPartnerType.OTHER:
+      return PartnerLookupType.OTHER;
     default:
       return PartnerLookupType.SUPPLIER;
   }

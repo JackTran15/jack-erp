@@ -23,6 +23,7 @@ export function toReceiptDepositListItem(
     docDate: row.docDate,
     documentNumber: row.documentNumber ?? "",
     status: row.status,
+    revision: row.revision ?? 0,
     totalAmount: Number(row.totalAmount) || 0,
     counterparty: row.counterparty ?? "",
     reason: row.reason ?? "",

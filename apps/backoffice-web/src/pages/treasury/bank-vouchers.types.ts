@@ -159,7 +159,10 @@ export interface CreateBankReceiptBody {
   lines: BankVoucherLine[];
 }
 
-export type UpdateBankReceiptBody = Partial<CreateBankReceiptBody>;
+/** `revision` is required: it is the staleness token the server checks. */
+export type UpdateBankReceiptBody = Partial<CreateBankReceiptBody> & {
+  revision: number;
+};
 
 export interface CreateBankPaymentBody {
   documentNumber?: string;
@@ -180,7 +183,10 @@ export interface CreateBankPaymentBody {
   lines: BankVoucherLine[];
 }
 
-export type UpdateBankPaymentBody = Partial<CreateBankPaymentBody>;
+/** `revision` is required: it is the staleness token the server checks. */
+export type UpdateBankPaymentBody = Partial<CreateBankPaymentBody> & {
+  revision: number;
+};
 
 export interface BankReceiptListQuery {
   status?: BankVoucherStatus;

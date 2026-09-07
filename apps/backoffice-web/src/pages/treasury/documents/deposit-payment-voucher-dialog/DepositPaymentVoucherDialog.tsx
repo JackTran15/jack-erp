@@ -58,7 +58,11 @@ import {
 import { TreasuryVoucherDialogModeEnum } from "../_shared/voucher-dialog.types";
 import { VoucherLink } from "../_shared/VoucherLink";
 import { useFundSwapLegs } from "../../../../hooks/treasury/use-fund-swap";
-import { formatDepositAccountLabel, voucherLineTotal } from "../_shared/voucher-dialog.utils";
+import {
+  applyReasonToFirstLine,
+  formatDepositAccountLabel,
+  voucherLineTotal,
+} from "../_shared/voucher-dialog.utils";
 import { DepositAccountSelect } from "../_shared/DepositAccountSelect";
 import {
   QuickCreateCustomerDialog,
@@ -892,6 +896,7 @@ export function DepositPaymentVoucherDialog({
                 setCounterpartyName("");
                 setCounterpartyPhone("");
               }}
+              onPartnerNameChange={(name) => setCounterpartyName(name)}
               onOpenSearchDialog={() => setEntitySearchTarget("partner")}
               onCreateNew={!readOnly && !isSupplierPayment ? (kind) => setPartnerCreateKind(kind) : undefined}
             />
@@ -917,6 +922,11 @@ export function DepositPaymentVoucherDialog({
               <Input
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
+                onBlur={(e) =>
+                  setLines((prev) =>
+                    applyReasonToFirstLine(prev, e.target.value),
+                  )
+                }
                 readOnly={readOnly || debtFieldsLocked}
                 disabled={readOnly || debtFieldsLocked}
                 className={fieldClass(readOnly || debtFieldsLocked)}

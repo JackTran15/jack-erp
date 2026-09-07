@@ -53,6 +53,7 @@ function buildManager(opts: {
     save: jest.fn(async (entity: any) => entity),
     update: jest.fn(async () => undefined),
     delete: jest.fn(async () => undefined),
+    softDelete: jest.fn(async () => undefined),
   };
   return manager;
 }
@@ -214,6 +215,65 @@ describe('BankPaymentsService', () => {
         ),
       ).rejects.toThrow(/BR-LOCK-01/);
       expect(depositService.recordMovement).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('free-text party', () => {
+    it('stores a hand-typed name without a lookup, and drops partnerId', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'p-new', status: BankVoucherStatus.POSTED },
+      });
+      await setup(manager);
+
+      await service.create(
+        {
+          depositAccountId: 'dep-1',
+          docDate: '2026-07-15',
+          purpose: BankPaymentPurpose.OTHER,
+          totalAmount: 100,
+          partnerType: 'OTHER',
+          partnerId: '11111111-1111-4111-8111-111111111111',
+          partnerName: '  Nguyễn Văn A  ',
+          lines: [{ description: 'Chi khác', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      expect(partnerResolver.resolve).not.toHaveBeenCalled();
+      const created = manager.create.mock.calls.find(
+        (c: any[]) => c[1]?.status === BankVoucherStatus.POSTED,
+      );
+      expect(created[1].partnerNameSnapshot).toBe('Nguyễn Văn A');
+      expect(created[1].partnerId).toBeUndefined();
+    });
+
+    it('clears partnerId when an update switches to a hand-typed party', async () => {
+      const payment = {
+        id: 'p-new',
+        status: BankVoucherStatus.POSTED,
+        referenceType: BankPaymentReferenceType.MANUAL,
+        revision: 0,
+        totalAmount: 0,
+        branchId: 'branch-1',
+        docDate: '2026-07-15',
+        documentNumber: 'UNC-26-00001',
+        organizationId: 'org-1',
+        partnerType: 'CUSTOMER',
+        partnerId: '11111111-1111-4111-8111-111111111111',
+        partnerNameSnapshot: 'Khách hàng thật',
+        partnerAddressSnapshot: 'HCM',
+      };
+      const manager = buildManager({ qbResult: payment, findOneResult: payment });
+      await setup(manager);
+
+      await service.update(
+        'p-new',
+        { revision: 0, partnerType: 'OTHER', partnerName: 'Nguyễn Văn A' } as any,
+        actor,
+      );
+
+      expect(payment.partnerId).toBeNull();
+      expect(payment.partnerNameSnapshot).toBe('Nguyễn Văn A');
     });
   });
 

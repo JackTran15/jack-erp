@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { DepositMovementType } from '@erp/shared-interfaces';
 import { BankReceiptsService } from './bank-receipts.service';
@@ -54,6 +54,7 @@ function buildManager(opts: {
     save: jest.fn(async (entity: any) => entity),
     update: jest.fn(async () => undefined),
     delete: jest.fn(async () => undefined),
+    softDelete: jest.fn(async () => undefined),
   };
   return manager;
 }
@@ -201,6 +202,161 @@ describe('BankReceiptsService', () => {
         ),
       ).rejects.toThrow(/BR-LOCK-01/);
       expect(depositService.recordMovement).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('free-text party', () => {
+    it('stores a hand-typed name without a lookup, and drops partnerId', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'r-new', status: BankVoucherStatus.POSTED },
+      });
+      await setup(manager);
+
+      await service.create(
+        {
+          depositAccountId: 'dep-1',
+          docDate: '2026-07-15',
+          purpose: BankReceiptPurpose.OTHER,
+          totalAmount: 100,
+          partnerType: 'OTHER',
+          partnerId: '11111111-1111-4111-8111-111111111111',
+          partnerName: '  Nguyễn Văn A  ',
+          lines: [{ description: 'Thu khác', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      expect(partnerResolver.resolve).not.toHaveBeenCalled();
+      const created = manager.create.mock.calls.find(
+        (c: any[]) => c[1]?.status === BankVoucherStatus.POSTED,
+      );
+      expect(created[1].partnerNameSnapshot).toBe('Nguyễn Văn A');
+      expect(created[1].partnerId).toBeUndefined();
+    });
+
+    it('clears partnerId when an update switches to a hand-typed party', async () => {
+      const receipt = {
+        id: 'r-new',
+        status: BankVoucherStatus.POSTED,
+        referenceType: BankReceiptReferenceType.MANUAL,
+        revision: 0,
+        totalAmount: 0,
+        branchId: 'branch-1',
+        docDate: '2026-07-15',
+        documentNumber: 'NTTK-26-00001',
+        organizationId: 'org-1',
+        partnerType: 'CUSTOMER',
+        partnerId: '11111111-1111-4111-8111-111111111111',
+        partnerNameSnapshot: 'Khách hàng thật',
+        partnerAddressSnapshot: 'HCM',
+      };
+      const manager = buildManager({ qbResult: receipt, findOneResult: receipt });
+      await setup(manager);
+
+      await service.update(
+        'r-new',
+        { revision: 0, partnerType: 'OTHER', partnerName: 'Nguyễn Văn A' } as any,
+        actor,
+      );
+
+      expect(receipt.partnerId).toBeNull();
+      expect(receipt.partnerNameSnapshot).toBe('Nguyễn Văn A');
+    });
+  });
+
+  describe('update — editing a posted voucher (ADR-01)', () => {
+    const posted = (over: any = {}) => ({
+      id: 'r-1',
+      status: BankVoucherStatus.POSTED,
+      referenceType: BankReceiptReferenceType.MANUAL,
+      revision: 0,
+      totalAmount: 5_000_000,
+      documentNumber: 'NTTK-26-00001',
+      depositAccountId: 'dep-1',
+      contraAccountId: 'contra-1',
+      branchId: 'branch-1',
+      docDate: '2026-08-15',
+      organizationId: 'org-1',
+      ...over,
+    });
+
+    it('posts one compensating movement keyed on the new revision', async () => {
+      const receipt = posted();
+      const manager = buildManager({
+        qbResult: receipt,
+        findOneResult: receipt,
+        findResults: [{ amount: 4_000_000 }],
+      });
+      await setup(manager);
+
+      await service.update(
+        'r-1',
+        {
+          revision: 0,
+          totalAmount: 4_000_000,
+          lines: [{ description: 'Thu khác', amount: 4_000_000 }],
+        } as any,
+        actor,
+      );
+
+      expect(depositService.recordMovement).toHaveBeenCalledTimes(1);
+      expect(depositService.recordMovement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          amount: 1_000_000,
+          sourceRefId: 'r-1',
+          sourceRefLineId: 'REV1',
+        }),
+        actor,
+        manager,
+      );
+      expect(receipt.revision).toBe(1);
+    });
+
+    it('refuses when the voucher already sits in a locked period', async () => {
+      const receipt = posted();
+      const manager = buildManager({ qbResult: receipt, findOneResult: receipt });
+      await setup(manager);
+      periodGuard.assertNotLocked.mockRejectedValue(
+        new ConflictException('Period 2026-08 is locked for this branch'),
+      );
+
+      await expect(
+        service.update('r-1', { revision: 0, totalAmount: 1 } as any, actor),
+      ).rejects.toThrow('locked');
+      // Checked on the voucher's OWN date, not just an incoming one.
+      expect(periodGuard.assertNotLocked).toHaveBeenCalledWith(
+        'branch-1',
+        '2026-08-15',
+        manager,
+      );
+      expect(depositService.recordMovement).not.toHaveBeenCalled();
+    });
+
+    it('also checks the incoming date when it differs', async () => {
+      const receipt = posted();
+      const manager = buildManager({
+        qbResult: receipt,
+        findOneResult: receipt,
+        findResults: [{ amount: 5_000_000 }],
+      });
+      await setup(manager);
+
+      await service.update(
+        'r-1',
+        {
+          revision: 0,
+          docDate: '2026-07-20',
+          totalAmount: 5_000_000,
+          lines: [{ description: 'Thu khác', amount: 5_000_000 }],
+        } as any,
+        actor,
+      );
+
+      expect(periodGuard.assertNotLocked).toHaveBeenCalledWith(
+        'branch-1',
+        '2026-07-20',
+        manager,
+      );
     });
   });
 

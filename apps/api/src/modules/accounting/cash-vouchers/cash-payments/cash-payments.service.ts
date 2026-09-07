@@ -24,6 +24,11 @@ import {
   VoucherLinksService,
 } from '../../voucher-links/voucher-links.service';
 import { PartnerResolverService } from '../shared/partner-resolver.service';
+import { isFreeTextParty } from '../shared/voucher-party';
+import {
+  assertEditable,
+  assertRevisionMatches,
+} from '../shared/editable-voucher.util';
 import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
 import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
 import { CashPaymentEntity } from './cash-payment.entity';
@@ -140,12 +145,18 @@ export class CashPaymentsService {
 
     return this.dataSource.transaction(async (manager) => {
       await this.assertCashAccount(manager, dto.cashAccountId, actor.organizationId);
-      const partner = await this.partnerResolver.resolve(
-        manager,
-        dto.partnerType,
-        dto.partnerId,
-        actor.organizationId,
-      );
+      // A hand-typed party has nothing to look up: its name IS the record, and
+      // it carries no partner_id to dangle. Everything else is validated and
+      // snapshotted from the catalogue row.
+      const freeTextParty = isFreeTextParty(dto.partnerType);
+      const partner = freeTextParty
+        ? null
+        : await this.partnerResolver.resolve(
+            manager,
+            dto.partnerType,
+            dto.partnerId,
+            actor.organizationId,
+          );
       const contraAccountId = await this.accountResolver.resolveContraAccount(
         PAYMENT_PURPOSE_TO_ROLE[purpose],
         actor,
@@ -162,9 +173,11 @@ export class CashPaymentsService {
           voucherDate: dto.voucherDate,
           referenceType: CashPaymentReferenceType.MANUAL,
           partnerType: dto.partnerType,
-          partnerId: dto.partnerId,
-          partnerName: partner?.name ?? undefined,
-          partnerAddress: partner?.address ?? undefined,
+          partnerId: freeTextParty ? undefined : dto.partnerId,
+          partnerName: freeTextParty
+            ? dto.partnerName?.trim() || undefined
+            : (partner?.name ?? undefined),
+          partnerAddress: freeTextParty ? undefined : (partner?.address ?? undefined),
           payeeName: dto.payeeName,
           staffId: dto.staffId,
           attachmentIds: dto.attachmentIds ?? [],
@@ -189,27 +202,54 @@ export class CashPaymentsService {
     actor: ActorContext,
   ): Promise<CashPaymentEntity> {
     return this.dataSource.transaction(async (manager) => {
-      const payment = await this.loadForWrite(manager, id, actor.organizationId);
-      if (payment.status !== CashVoucherStatus.DRAFT) {
-        throw new BadRequestException(
-          'Only DRAFT cash payments can be updated',
-        );
-      }
+      const payment = await this.lockForWrite(manager, id, actor.organizationId);
+      assertEditable(payment, CashVoucherStatus.POSTED, 'Phiếu chi');
+      assertRevisionMatches(payment, dto.revision, 'Phiếu chi');
+      const amountBefore = Number(payment.totalAmount);
 
-      if (dto.partnerType !== undefined || dto.partnerId !== undefined) {
-        await this.partnerResolver.resolve(
-          manager,
-          dto.partnerType ?? payment.partnerType,
-          dto.partnerId ?? payment.partnerId,
-          actor.organizationId,
-        );
+      // Recompute the party snapshot whenever any part of the party changed.
+      // Switching between a hand-typed name and a catalogue row has to clear the
+      // other shape completely: leaving a stale partner_name_snapshot behind
+      // would show the old free-text name against a real customer, and leaving a
+      // partner_id behind would point at a row the voucher no longer claims.
+      const partyTouched =
+        dto.partnerType !== undefined ||
+        dto.partnerId !== undefined ||
+        dto.partnerName !== undefined;
+      const nextPartnerType = dto.partnerType ?? payment.partnerType;
+      //
+      // The cleared fields are `null`, never `undefined`: TypeORM's save() skips
+      // undefined properties as "not provided", so undefined would leave the old
+      // value in the column instead of clearing it.
+      if (partyTouched) {
+        if (isFreeTextParty(nextPartnerType)) {
+          Object.assign(payment, {
+            partnerType: nextPartnerType,
+            partnerId: null,
+            partnerNameSnapshot:
+              (dto.partnerName ?? payment.partnerNameSnapshot)?.trim() || null,
+            partnerAddressSnapshot: null,
+          });
+        } else {
+          const nextPartnerId = dto.partnerId ?? payment.partnerId;
+          const partner = await this.partnerResolver.resolve(
+            manager,
+            nextPartnerType,
+            nextPartnerId,
+            actor.organizationId,
+          );
+          Object.assign(payment, {
+            partnerType: nextPartnerType ?? null,
+            partnerId: nextPartnerId ?? null,
+            partnerNameSnapshot: partner?.name ?? null,
+            partnerAddressSnapshot: partner?.address ?? null,
+          });
+        }
       }
 
       Object.assign(payment, {
         voucherDate: dto.voucherDate ?? payment.voucherDate,
         purpose: dto.purpose ?? payment.purpose,
-        partnerType: dto.partnerType ?? payment.partnerType,
-        partnerId: dto.partnerId ?? payment.partnerId,
         payeeName: dto.payeeName ?? payment.payeeName,
         reason: dto.reason ?? payment.reason,
         staffId: dto.staffId ?? payment.staffId,
@@ -234,21 +274,87 @@ export class CashPaymentsService {
       }
       payment.totalAmount = total;
 
+      // ADR-01, mirrored for the paying direction: a payment that grew takes
+      // more cash OUT of the fund (WITHDRAWAL); one that shrank puts some back
+      // (DEPOSIT). Exactly one movement, on this voucher, no second document.
+      //
+      // Growing a payment can exhaust the fund. That check is not re-implemented
+      // here — recordMovement already refuses when the account forbids going
+      // negative, and deferring to it keeps editing and creating a payment under
+      // the same rule.
+      const delta = Number(total) - amountBefore;
+      await this.postAdjustment(manager, payment, delta, actor);
+
+      payment.revision += 1;
       await manager.save(payment);
+      this.logger.log(
+        `Updated cash payment ${payment.documentNumber} (id=${payment.id}) rev ${payment.revision}, delta=${delta}, by=${actor.userId}`,
+      );
       return this.getByIdInTx(manager, payment.id, actor.organizationId);
     });
   }
 
+  /**
+   * Delete a posted voucher.
+   *
+   * ADR-02: this is `update()` with `after = []` — the same delta engine, called
+   * with the whole amount as the difference. Writing a separate reversal path
+   * here is what let the warehouse side ship a `cancel()` that unwound stock but
+   * forgot the accounting; sharing {@link postAdjustment} makes that class of bug
+   * unreachable rather than merely unlikely.
+   *
+   * The row is soft-deleted and keeps `status = POSTED`: no `CANCELLED` enum
+   * value is introduced, and `deleted_at` is what answers "is this still here".
+   */
   async delete(id: string, actor: ActorContext): Promise<void> {
-    const payment = await this.loadForWrite(
-      this.dataSource.manager,
-      id,
-      actor.organizationId,
+    await this.dataSource.transaction(async (manager) => {
+      const payment = await this.lockForWrite(manager, id, actor.organizationId);
+      assertEditable(payment, CashVoucherStatus.POSTED, 'Phiếu chi');
+
+      await this.postAdjustment(
+        manager,
+        payment,
+        -Number(payment.totalAmount),
+        actor,
+      );
+
+      payment.revision += 1;
+      await manager.save(payment);
+      await manager.softDelete(CashPaymentEntity, payment.id);
+      this.logger.log(
+        `Deleted cash payment ${payment.documentNumber} (id=${payment.id}) rev ${payment.revision}, reversed ${payment.totalAmount}, by=${actor.userId}`,
+      );
+    });
+  }
+
+  /**
+   * Post the difference between what the voucher said before and what it says
+   * now, as ONE compensating movement on this same voucher (ADR-01).
+   *
+   * Shared by {@link update} and {@link delete} so an edit and a deletion can never
+   * drift apart. A zero delta writes nothing — editing only the wording must not
+   * touch the ledger.
+   */
+  private async postAdjustment(
+    manager: EntityManager,
+    payment: CashPaymentEntity,
+    delta: number,
+    actor: ActorContext,
+  ): Promise<void> {
+    if (Math.abs(delta) <= 0.001) return;
+    await this.cashService.recordMovement(
+      {
+        cashAccountId: payment.cashAccountId,
+        type:
+          delta > 0 ? CashMovementType.WITHDRAWAL : CashMovementType.DEPOSIT,
+        amount: Math.abs(delta),
+        contraAccountId: payment.contraAccountId,
+        reference: payment.documentNumber,
+        notes: `Adjustment for ${payment.documentNumber} rev ${payment.revision + 1}`,
+      },
+      actor,
+      manager,
     );
-    if (payment.status !== CashVoucherStatus.DRAFT) {
-      throw new BadRequestException('Only DRAFT cash payments can be deleted');
-    }
-    await this.paymentRepo.softDelete(payment.id);
   }
 
   // ---------------------------------------------------------------------------
@@ -790,6 +896,28 @@ export class CashPaymentsService {
         status: Not(CashVoucherStatus.REVERSED),
       },
     });
+  }
+
+  /**
+   * Re-read the voucher inside the caller's transaction holding a row lock, so
+   * two concurrent edits serialise instead of both computing a delta from the
+   * same starting amount and posting two compensating movements.
+   */
+  private async lockForWrite(
+    manager: EntityManager,
+    id: string,
+    organizationId: string,
+  ): Promise<CashPaymentEntity> {
+    const payment = await manager
+      .createQueryBuilder(CashPaymentEntity, 'p')
+      .setLock('pessimistic_write')
+      .where('p.id = :id', { id })
+      .andWhere('p.organizationId = :organizationId', { organizationId })
+      .getOne();
+    if (!payment) {
+      throw new NotFoundException(`Cash payment ${id} not found`);
+    }
+    return payment;
   }
 
   private async loadForWrite(

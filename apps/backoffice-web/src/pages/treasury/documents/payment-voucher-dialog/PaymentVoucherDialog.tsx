@@ -69,6 +69,7 @@ import {
   formatDepositAccountLabel,
   toIsoDate,
   voucherLineTotal,
+  applyReasonToFirstLine,
 } from "../_shared/voucher-dialog.utils";
 import type { VoucherEntitySearchTarget } from "../_shared/voucher-entity-search.store";
 import type { VoucherPartnerOption } from "../_shared/voucher-partner-search";
@@ -867,6 +868,7 @@ export function PaymentVoucherDialog({
                 setCounterpartyName("");
                 setCounterpartyPhone("");
               }}
+              onPartnerNameChange={(name) => setCounterpartyName(name)}
               onOpenSearchDialog={() => setEntitySearchTarget("partner")}
               onCreateNew={!readOnly && !isDebtRepayment ? (kind) => setPartnerCreateKind(kind) : undefined}
             />
@@ -900,6 +902,11 @@ export function PaymentVoucherDialog({
               <Input
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
+                onBlur={(e) =>
+                  setLines((prev) =>
+                    applyReasonToFirstLine(prev, e.target.value),
+                  )
+                }
                 readOnly={readOnly || debtFieldsLocked}
                 disabled={readOnly || debtFieldsLocked}
                 className={fieldClass(readOnly || debtFieldsLocked)}

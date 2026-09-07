@@ -8099,6 +8099,11 @@ export interface components {
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
             partnerId?: string;
+            /**
+             * @description "Đối tượng" typed by hand. Only read when `partnerType` is `OTHER`; for a
+             *     catalogue party the name always comes from the resolver instead.
+             */
+            partnerName?: string;
             /** @description "Người nộp" */
             payerName?: string;
             /** @description "Lý do nộp" */
@@ -8152,6 +8157,12 @@ export interface components {
             /** Format: date-time */
             postedAt?: string;
             postedBy?: string;
+            /**
+             * @description Bumped by every in-place edit of a posted voucher. Doubles as the
+             *     optimistic-concurrency token: `update()`/`delete()` refuse when the
+             *     caller's revision is not the stored one.
+             */
+            revision: number;
             /** Format: date-time */
             deletedAt?: string;
             lines: components["schemas"]["CashReceiptLineEntity"][];
@@ -8189,6 +8200,12 @@ export interface components {
             createdBy: string;
         };
         UpdateCashReceiptDto: {
+            /**
+             * @description The revision the client last read. Required: editing a posted voucher now
+             *     moves money, so a blind write must fail loudly rather than silently
+             *     overwrite a concurrent edit.
+             */
+            revision: number;
             voucherDate?: string;
             /** @enum {string} */
             purpose?: "OTHER" | "DEBT_COLLECTION" | "POS_SALE" | "OTHER_INCOME" | "INTER_BRANCH_IN";
@@ -8196,6 +8213,11 @@ export interface components {
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
             partnerId?: string;
+            /**
+             * @description "Đối tượng" typed by hand. Only read when `partnerType` is `OTHER`; for a
+             *     catalogue party the name always comes from the resolver instead.
+             */
+            partnerName?: string;
             payerName?: string;
             reason?: string;
             /** Format: uuid */
@@ -8235,6 +8257,11 @@ export interface components {
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
             partnerId?: string;
+            /**
+             * @description "Đối tượng" typed by hand. Only read when `partnerType` is `OTHER`; for a
+             *     catalogue party the name always comes from the resolver instead.
+             */
+            partnerName?: string;
             /** @description "Người nhận" */
             payeeName?: string;
             /** @description "Lý do chi" */
@@ -8288,6 +8315,12 @@ export interface components {
             /** Format: date-time */
             postedAt?: string;
             postedBy?: string;
+            /**
+             * @description Bumped by every in-place edit of a posted voucher. Doubles as the
+             *     optimistic-concurrency token: `update()`/`delete()` refuse when the
+             *     caller's revision is not the stored one.
+             */
+            revision: number;
             /** Format: date-time */
             deletedAt?: string;
             lines: components["schemas"]["CashPaymentLineEntity"][];
@@ -8325,6 +8358,12 @@ export interface components {
             createdBy: string;
         };
         UpdateCashPaymentDto: {
+            /**
+             * @description The revision the client last read. Required: editing a posted voucher now
+             *     moves money, so a blind write must fail loudly rather than silently
+             *     overwrite a concurrent edit.
+             */
+            revision: number;
             voucherDate?: string;
             /** @enum {string} */
             purpose?: "OTHER" | "SUPPLIER_PAYMENT" | "PURCHASE" | "EXPENSE" | "SALARY" | "REFUND" | "DEPOSIT_TRANSFER" | "INTER_BRANCH_OUT";
@@ -8332,6 +8371,11 @@ export interface components {
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
             partnerId?: string;
+            /**
+             * @description "Đối tượng" typed by hand. Only read when `partnerType` is `OTHER`; for a
+             *     catalogue party the name always comes from the resolver instead.
+             */
+            partnerName?: string;
             payeeName?: string;
             reason?: string;
             /** Format: uuid */
@@ -10832,6 +10876,11 @@ export interface components {
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
             partnerId?: string;
+            /**
+             * @description "Đối tượng" typed by hand. Only read when `partnerType` is `OTHER`; for a
+             *     catalogue party the name always comes from the resolver instead.
+             */
+            partnerName?: string;
             /** @description "Người nộp" */
             payerName?: string;
             /**
@@ -10908,6 +10957,12 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            /**
+             * @description Bumped by every in-place edit of a posted voucher. Doubles as the
+             *     optimistic-concurrency token: `update()`/`delete()` refuse when the
+             *     caller's revision is not the stored one.
+             */
+            revision: number;
             /** Format: date-time */
             deletedAt?: string;
             createdBy: string;
@@ -10932,6 +10987,12 @@ export interface components {
             createdBy: string;
         };
         UpdateBankReceiptDto: {
+            /**
+             * @description The revision the client last read. Required: editing a posted voucher now
+             *     moves money, so a blind write must fail loudly rather than silently
+             *     overwrite a concurrent edit.
+             */
+            revision: number;
             /** Format: uuid */
             depositAccountId?: string;
             docDate?: string;
@@ -10941,6 +11002,11 @@ export interface components {
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
             partnerId?: string;
+            /**
+             * @description "Đối tượng" typed by hand. Only read when `partnerType` is `OTHER`; for a
+             *     catalogue party the name always comes from the resolver instead.
+             */
+            partnerName?: string;
             payerName?: string;
             /** @description "Địa chỉ" — stored as `partnerAddressSnapshot`. */
             address?: string;
@@ -10987,6 +11053,11 @@ export interface components {
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
             partnerId?: string;
+            /**
+             * @description "Đối tượng" typed by hand. Only read when `partnerType` is `OTHER`; for a
+             *     catalogue party the name always comes from the resolver instead.
+             */
+            partnerName?: string;
             /** @description "Người nhận" */
             payeeName?: string;
             /**
@@ -11071,6 +11142,12 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            /**
+             * @description Bumped by every in-place edit of a posted voucher. Doubles as the
+             *     optimistic-concurrency token: `update()`/`delete()` refuse when the
+             *     caller's revision is not the stored one.
+             */
+            revision: number;
             /** Format: date-time */
             deletedAt?: string;
             createdBy: string;
@@ -11095,6 +11172,12 @@ export interface components {
             createdBy: string;
         };
         UpdateBankPaymentDto: {
+            /**
+             * @description The revision the client last read. Required: editing a posted voucher now
+             *     moves money, so a blind write must fail loudly rather than silently
+             *     overwrite a concurrent edit.
+             */
+            revision: number;
             /** Format: uuid */
             depositAccountId?: string;
             docDate?: string;
@@ -11104,6 +11187,11 @@ export interface components {
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
             partnerId?: string;
+            /**
+             * @description "Đối tượng" typed by hand. Only read when `partnerType` is `OTHER`; for a
+             *     catalogue party the name always comes from the resolver instead.
+             */
+            partnerName?: string;
             payeeName?: string;
             /** @description "Địa chỉ" — stored as `partnerAddressSnapshot`. */
             address?: string;

@@ -238,7 +238,12 @@ export function TreasuryDepositReceiptsPage() {
     toast.success("Đã nạp lại dữ liệu.");
   }, [search, closeVoucherDialogs]);
 
-  const canEditSelected = !!selectedItem && selectedItem.status === BankVoucherStatus.DRAFT;
+  // Mirrors assertEditable on the server: a hand-created voucher that is still
+  // posted. DRAFT is gone — no bank voucher was ever written in that state.
+  const canEditSelected =
+    !!selectedItem &&
+    selectedItem.referenceType === "MANUAL" &&
+    selectedItem.status === BankVoucherStatus.POSTED;
 
   const handlePageEdit = useCallback(() => {
     if (!selectedItem) return;
@@ -277,9 +282,13 @@ export function TreasuryDepositReceiptsPage() {
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !canEditSelected,
+      disabled: !canEditSelected || !!voucherDialog,
       tooltip:
-        selectedItem && selectedItem.status !== BankVoucherStatus.DRAFT ? "Chỉ sửa phiếu nháp" : undefined,
+        selectedItem && selectedItem.referenceType !== "MANUAL"
+          ? "Phiếu tự sinh từ chứng từ khác, chỉ đảo bút được"
+          : selectedItem && selectedItem.status !== BankVoucherStatus.POSTED
+            ? "Chỉ sửa phiếu đã ghi sổ"
+            : undefined,
       onClick: handlePageEdit,
     },
     {
@@ -304,7 +313,7 @@ export function TreasuryDepositReceiptsPage() {
       label: "Xóa",
       icon: Trash2,
       variant: "danger",
-      disabled: !selectedItem || selectedItem.status !== BankVoucherStatus.DRAFT,
+      disabled: !canEditSelected || !!voucherDialog,
       onClick: () => {
         if (selectedItem) setConfirmDeleteItem(selectedItem);
       },
@@ -347,7 +356,10 @@ export function TreasuryDepositReceiptsPage() {
           setSelectedId(created.id);
         } else if (selectedId) {
           const { documentNumber: _doc, ...updateBody } = result.body;
-          await receiptMutations.update.mutateAsync({ id: selectedId, body: updateBody });
+          await receiptMutations.update.mutateAsync({
+            id: selectedId,
+            body: { ...updateBody, revision: selectedItem?.revision ?? 0 },
+          });
         }
         closeVoucherDialogs();
       } catch (e) {
@@ -384,7 +396,10 @@ export function TreasuryDepositReceiptsPage() {
             setSelectedId(created.id);
           } else if (selectedId) {
             const { documentNumber: _doc, ...updateBody } = body;
-            await paymentMutations.update.mutateAsync({ id: selectedId, body: updateBody });
+            await paymentMutations.update.mutateAsync({
+            id: selectedId,
+            body: { ...updateBody, revision: selectedItem?.revision ?? 0 },
+          });
           }
         }
         closeVoucherDialogs();
@@ -563,7 +578,9 @@ export function TreasuryDepositReceiptsPage() {
       {confirmDeleteItem ? (
         <ConfirmActionModal
           title="Xóa chứng từ thu chi"
-          message={`Xác nhận xóa ${confirmDeleteItem.documentNumber || confirmDeleteItem.id}?`}
+          message={`Xóa phiếu ${
+            confirmDeleteItem.documentNumber || confirmDeleteItem.id
+          }? Số dư tài khoản sẽ được điều chỉnh lại bằng một bút toán đảo, và phiếu sẽ không còn trong danh sách.`}
           confirmLabel="Xóa"
           cancelLabel="Quay lại"
           onCancel={() => setConfirmDeleteItem(null)}

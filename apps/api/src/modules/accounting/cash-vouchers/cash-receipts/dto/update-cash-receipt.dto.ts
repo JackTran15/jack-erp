@@ -4,6 +4,7 @@ import {
   IsArray,
   IsEnum,
   IsISO8601,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -15,8 +16,21 @@ import {
 import { CashReceiptPurpose, CashVoucherPartnerType } from '../../enums';
 import { CashReceiptLineDto } from './cash-receipt-line.dto';
 
-/** Update a DRAFT cash receipt. `lines` (when provided) is a full upsert set. */
+/**
+ * Update a posted cash receipt in place. `lines` (when provided) is a full
+ * upsert set, and any change to the total is settled by a compensating cash
+ * movement rather than by rewriting the original entry (ADR-01).
+ */
 export class UpdateCashReceiptDto {
+  /**
+   * The revision the client last read. Required: editing a posted voucher now
+   * moves money, so a blind write must fail loudly rather than silently
+   * overwrite a concurrent edit.
+   */
+  @IsInt()
+  @Min(0)
+  revision: number;
+
   @IsOptional()
   @IsISO8601()
   voucherDate?: string;
@@ -32,6 +46,15 @@ export class UpdateCashReceiptDto {
   @IsOptional()
   @IsUUID()
   partnerId?: string;
+
+  /**
+   * "Đối tượng" typed by hand. Only read when `partnerType` is `OTHER`; for a
+   * catalogue party the name always comes from the resolver instead.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  partnerName?: string;
 
   @IsOptional()
   @IsString()
