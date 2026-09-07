@@ -179,6 +179,99 @@ describe('TransferReportService.byBranch', () => {
  * back 31": `received` computed from the receipt side, matched to `out` on
  * branch pair alone.
  */
+/**
+ * N4: the aggregate grain's count query used to read `FROM item_agg ia` alone
+ * while the rows query read the same CTE through `joinLookup` and an INNER
+ * `JOIN branches`. An INNER join drops rows, so `total` and the four footer
+ * figures described a strictly larger set than the grid — enough to paginate
+ * to a page that renders nothing.
+ *
+ * The cherry-pick in UOW-01 already carried the fix. These tests exist so it
+ * cannot be lost again, because on `erp_dev_3008` the bug is **invisible**:
+ * every `other_branch_id` resolves (0 of 7 unresolvable), so a live row count
+ * agrees whether the join is there or not. Only the SQL shape shows it.
+ */
+describe('TransferReportService.byBranch — count and rows describe one set (N4)', () => {
+  function capture() {
+    const sql: string[] = [];
+    const dataSource = {
+      query: jest.fn().mockImplementation((text: string) => {
+        sql.push(text);
+        return Promise.resolve(text.includes('COUNT(*)') ? [{ total: 0 }] : []);
+      }),
+    };
+    return { sql, service: new TransferReportService(dataSource as never) };
+  }
+
+  const baseQuery = {
+    organizationId: 'org-1',
+    startDate: new Date('2026-01-01'),
+    endDate: new Date('2027-01-01'),
+    sourceBranchId: 'branch-1',
+    page: 1,
+    pageSize: 20,
+  };
+
+  const rowsSql = (sql: string[]) => sql.find((t) => !t.includes('COUNT(*)'))!;
+  const countSql = (sql: string[]) => sql.find((t) => t.includes('COUNT(*)'))!;
+
+  /** Every relation the query reads, in the order it joins them. */
+  function relations(text: string): string[] {
+    return [...text.matchAll(/(?:FROM|JOIN)\s+([a-z_]+)\s/g)]
+      .map((m) => m[1])
+      .filter((r) => r !== 'SELECT');
+  }
+
+  it.each(['parent', 'group'] as const)(
+    'counts over the same relations it pages over, at the %s grain',
+    async (itemGroupBy) => {
+      const { sql, service } = capture();
+
+      await service.byBranch({ ...baseQuery, itemGroupBy });
+
+      // The row-dropping join is the one that matters: `branches` is INNER, so
+      // a count without it counts groups the grid will never show.
+      expect(countSql(sql)).toContain('JOIN branches b ON b.id = ia.other_branch_id');
+      expect(rowsSql(sql)).toContain('JOIN branches b ON b.id = ia.other_branch_id');
+      expect(relations(countSql(sql))).toEqual(relations(rowsSql(sql)));
+    },
+  );
+
+  it.each(['parent', 'group'] as const)(
+    'resolves the identity lookup in both queries at the %s grain',
+    async (itemGroupBy) => {
+      // Not just row parity: the identity filters compile to `p.` / `ic.`
+      // expressions, so a count without the lookup join fails outright with
+      // 42P01 the first time someone filters on a name.
+      const { sql, service } = capture();
+      const lookup = itemGroupBy === 'parent' ? 'JOIN products p' : 'JOIN inventory_item_categories ic';
+
+      await service.byBranch({
+        ...baseQuery,
+        itemGroupBy,
+        columnFilters: { itemName: { operator: '*', value: 'Giày' } },
+      });
+
+      expect(countSql(sql)).toContain(lookup);
+      expect(rowsSql(sql)).toContain(lookup);
+    },
+  );
+
+  it('keeps the member scope in both queries as well', async () => {
+    const { sql, service } = capture();
+
+    await service.byBranch({
+      ...baseQuery,
+      itemGroupBy: 'group',
+      memberScope: { unit: 'Đôi' },
+    });
+
+    for (const text of [rowsSql(sql), countSql(sql)]) {
+      expect(text).toContain('i.unit  = $8');
+    }
+  });
+});
+
 describe('TransferReportService.summarize', () => {
   function capture() {
     const sql: string[] = [];
@@ -374,3 +467,87 @@ describe('TransferReportService.summarizeByCounterpart', () => {
   });
 });
 
+
+/**
+ * L1's column filters — the same "validated then dropped" bug as the L2/L3
+ * dialogs, in the summary that opens them (ADR-06, AC-16).
+ */
+describe('TransferReportService.summarizeByCounterpart column filters', () => {
+  function capture() {
+    const sql: Array<{ text: string; params: unknown[] }> = [];
+    const dataSource = {
+      query: jest.fn().mockImplementation((text: string, params: unknown[]) => {
+        sql.push({ text, params });
+        return Promise.resolve(text.includes('COUNT(*)') ? [{ total: 0 }] : []);
+      }),
+    };
+    return { sql, service: new TransferReportService(dataSource as never) };
+  }
+
+  const base = {
+    organizationId: 'org-1',
+    startDate: new Date('2026-01-01'),
+    endDate: new Date('2027-01-01'),
+    branchId: 'branch-1',
+    page: 1,
+    pageSize: 20,
+  };
+
+  type Captured = { text: string; params: unknown[] };
+  const rows = (sql: Captured[]) => sql.find((q) => !q.text.includes('COUNT(*)'))!;
+  const count = (sql: Captured[]) => sql.find((q) => q.text.includes('COUNT(*)'))!;
+
+  it('filters the rows and the footer by the same predicate', async () => {
+    const { sql, service } = capture();
+
+    await service.summarizeByCounterpart({
+      ...base,
+      columnFilters: { branchName: { operator: '*', value: 'HCM' } },
+    });
+
+    expect(rows(sql).text).toContain('branch_name');
+    expect(count(sql).text).toContain('branch_name');
+    expect(rows(sql).params).toContain('%HCM%');
+    expect(count(sql).params).toContain('%HCM%');
+  });
+
+  it.each([
+    ['diffQty', '(received_qty - out_qty)'],
+    ['diffValue', '(received_value - out_value)'],
+    ['inOutDiffQty', '(in_qty - out_qty)'],
+    ['inOutDiffValue', '(in_value - out_value)'],
+  ])('compiles the derived column %s to the arithmetic the row shows', async (col, expr) => {
+    // These are not columns of `agg`; filtering them has to repeat the same
+    // subtraction the row mapper does, or the filter and the number disagree.
+    const { sql, service } = capture();
+
+    await service.summarizeByCounterpart({
+      ...base,
+      columnFilters: { [col]: { operator: '>=', value: 1 } },
+    });
+
+    expect(rows(sql).text).toContain(expr);
+  });
+
+  it('keeps LIMIT behind the bound filter values', async () => {
+    const { sql, service } = capture();
+
+    await service.summarizeByCounterpart({
+      ...base,
+      columnFilters: { outQty: { operator: '>=', value: 1 } },
+    });
+
+    expect(rows(sql).text).toContain('LIMIT $6 OFFSET $7');
+  });
+
+  it('refuses a column it has no expression for', async () => {
+    const { service } = capture();
+
+    await expect(
+      service.summarizeByCounterpart({
+        ...base,
+        columnFilters: { nonsense: { operator: '=', value: 'x' } },
+      }),
+    ).rejects.toThrow(/nonsense/);
+  });
+});

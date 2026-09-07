@@ -18,7 +18,10 @@ import {
   StockBalancePivotRow,
   StockBalancePivotService,
 } from '../../services/stock-balance-pivot.service';
-import { InventoryReportDefinition } from '../inventory-report-definition';
+import {
+  InventoryReportColumnsFilterDto,
+  InventoryReportDefinition,
+} from '../inventory-report-definition';
 import {
   buildInventoryHeaders,
   InventoryColumnDef,
@@ -27,7 +30,11 @@ import {
 import { CountedRows } from '../../../reporting/report-core/report-definition';
 import { toEngineFilters } from '../report-column-mapper.util';
 import { projectRows, toTotalsRow } from '../report-data.util';
-import { resolveOrgWideBranchIds } from '../report-scope.util';
+import { ItemCategoryEntity } from '../../../inventory/location/item-category.entity';
+import {
+  resolveDescendantCategoryIds,
+  resolveOrgWideBranchIds,
+} from '../report-scope.util';
 
 const { STRING, NUMBER } = ReportColumnDataType;
 
@@ -66,6 +73,29 @@ const FIXED_KEYS = new Set(FIXED_COLUMNS.map((c) => c.key));
  * (`branch.qty.<branchId>`), mirroring the dynamic payment-method columns
  * of the daily sales summary.
  */
+/**
+ * Columns the aggregate grains leave empty, and so cannot filter on (ADR-07).
+ *
+ * The parent and group grains re-aggregate in SQL and select NULL for every
+ * identity column they cannot speak for: a row spanning a whole product model
+ * has no single colour, and one spanning a category has no single SKU. Drawing
+ * a filter box over them answers 400. The lists are measured against real data
+ * — see `evidence/probe-aggregate-grain-columns.txt` — not guessed from the SQL.
+ *
+ * The `item` grain fills everything, so it is absent.
+ */
+const UNFILLED_BY_GRAIN: Record<'parent' | 'group', ReadonlySet<string>> = {
+  parent: new Set(['parentSku', 'parentName', 'color', 'size', 'unit', 'group', 'brand']),
+  group: new Set(['parentSku', 'parentName', 'color', 'size', 'unit', 'brand']),
+};
+
+/** The unfilled set for one grain; the item grain fills everything. */
+function unfilledAt(statBy: string | undefined): ReadonlySet<string> {
+  return statBy === 'parent' || statBy === 'group'
+    ? UNFILLED_BY_GRAIN[statBy]
+    : new Set();
+}
+
 @Injectable()
 export class StockByStorePivotReport implements InventoryReportDefinition {
   readonly key = INVENTORY_REPORT_KEYS.STOCK_BY_STORE_PIVOT;
@@ -74,10 +104,20 @@ export class StockByStorePivotReport implements InventoryReportDefinition {
     private readonly pivot: StockBalancePivotService,
     @InjectRepository(BranchEntity)
     private readonly branches: Repository<BranchEntity>,
+    @InjectRepository(ItemCategoryEntity)
+    private readonly categories: Repository<ItemCategoryEntity>,
   ) {}
 
-  async buildColumns(actor: ActorContext): Promise<ReportColumnHeader[]> {
-    const fixed = buildInventoryHeaders(this.key, FIXED_COLUMNS, ['sku']);
+  async buildColumns(
+    actor: ActorContext,
+    filters?: InventoryReportColumnsFilterDto,
+  ): Promise<ReportColumnHeader[]> {
+    const fixed = buildInventoryHeaders(
+      this.key,
+      FIXED_COLUMNS,
+      ['sku'],
+      unfilledAt(filters?.statBy),
+    );
     const orgBranches = await this.orgBranches(actor);
     const dynamic: ReportColumnHeader[] = orgBranches.map((b) => ({
       col: branchQtyColumnKey(b.id),
@@ -108,7 +148,7 @@ export class StockByStorePivotReport implements InventoryReportDefinition {
     );
 
     const result = await this.pivot.aggregate({
-      ...this.engineQuery(dto, actor, branchIds),
+      ...(await this.engineQuery(dto, actor, branchIds)),
       page: dto.page ?? 1,
       pageSize: dto.limit ?? 20,
     });
@@ -159,7 +199,7 @@ export class StockByStorePivotReport implements InventoryReportDefinition {
       actor,
     );
     const result = await this.pivot.aggregate({
-      ...this.engineQuery(dto, actor, branchIds),
+      ...(await this.engineQuery(dto, actor, branchIds)),
       page: 1,
       pageSize: 1,
     });
@@ -167,7 +207,7 @@ export class StockByStorePivotReport implements InventoryReportDefinition {
   }
 
   /** Everything the engine needs except paging, shared by both callers. */
-  private engineQuery(
+  private async engineQuery(
     dto: InventoryReportSearchDto,
     actor: ActorContext,
     branchIds: string[] | undefined,
@@ -177,12 +217,20 @@ export class StockByStorePivotReport implements InventoryReportDefinition {
       organizationId: actor.organizationId,
       itemGroupBy: filters.statBy,
       branchIds,
-      categoryIds: filters.categoryId ? [filters.categoryId] : undefined,
+      // A parent group holds no items of its own — only its leaves do — so the
+      // filter has to carry the whole subtree (ADR-01).
+      categoryIds: await resolveDescendantCategoryIds(
+        this.categories,
+        filters.categoryId,
+        actor.organizationId,
+      ),
       search: filters.search,
-      columnFilters: toEngineFilters(dto.columnFilters, {}, {
-        unit: filters.unit,
-        brand: filters.brand,
-      }),
+      columnFilters: toEngineFilters(dto.columnFilters, {}),
+      // The filter bar's unit/brand travel on their own now: they pick which
+      // items take part, which is not the same job as narrowing the rows the
+      // report produced, and only the item grain could ever pretend it was
+      // (ADR-02).
+      memberScope: { unit: filters.unit, brand: filters.brand },
     };
   }
 

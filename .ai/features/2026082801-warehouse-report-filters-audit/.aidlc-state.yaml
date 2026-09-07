@@ -1,0 +1,248 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: warehouse-report-filters-audit
+slug: 2026082801-warehouse-report-filters-audit
+profile: none
+created: 2026-08-28T22:12:52
+current_gate: G5
+history:
+  - gate: G0
+    action: passed
+    at: 2026-08-28T22:34:01
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-08-28T22:34:01
+    by: Akenzy
+    evidence: 8 assumptions, none blocking-and-pending; 11 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-28T22:36:53
+    by: Akenzy
+    evidence: 6 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-28T22:40:13
+    by: Akenzy
+    evidence: graph valid - 4 UoW, 8 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-28T22:40:22
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-28T22:41:16
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-28T22:41:16
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-28T22:41:17
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-28T22:46:28
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-28T22:46:28
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-28T22:46:28
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-28T22:55:45
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-28T22:55:45
+    by: Akenzy
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-28T22:55:46
+    by: claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-28T22:55:46
+    by: claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-28T22:55:46
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-28T22:57:07
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-28T22:57:07
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-28T22:57:07
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-28T22:57:07
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-28T22:57:07
+    by: claude
+    ticket: T-04-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-28T22:59:12
+    by: claude
+    ticket: T-04-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-28T22:59:27
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-28T23:00:48
+    by: claude
+    ticket: T-01-03
+  - gate: G3
+    action: reopened
+    at: 2026-08-28T23:05:10
+    by: Akenzy
+    reason: T-03-02 phat hien D5 - o hat Mau ma/Nhom hang hoa, 91 to hop cot x hat tren 5 bao cao van tra 400; catalog quang cao cot loc duoc trong khi engine bo spec o hat gop. Khac D3 vi sku/name o hat Mau ma CO du lieu that, nen ADR-05 khong ap thang duoc. Can ADR-07 + UOW-05.
+  - gate: G2
+    action: reopened
+    at: 2026-08-28T23:05:10
+    by: Akenzy
+    reason: Them ADR-07 chon huong sua D5
+  - gate: G1
+    action: reopened
+    at: 2026-08-28T23:05:10
+    by: Akenzy
+    reason: Them US-05 va AC cho D5
+  - gate: G1
+    action: passed
+    at: 2026-08-28T23:06:39
+    by: Akenzy
+    evidence: 9 assumptions, none blocking-and-pending; 14 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-08-28T23:07:35
+    by: Akenzy
+    evidence: 7 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-08-28T23:07:43
+    by: Akenzy
+    evidence: graph valid - 5 UoW, 11 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-28T23:08:01
+    by: claude
+    ticket: T-05-01
+  - gate: G4
+    action: ticket review
+    at: 2026-08-28T23:10:08
+    by: claude
+    ticket: T-05-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-28T23:10:08
+    by: Akenzy
+    ticket: T-05-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-28T23:10:08
+    by: claude
+    ticket: T-05-02
+  - gate: G4
+    action: ticket review
+    at: 2026-08-28T23:16:47
+    by: claude
+    ticket: T-05-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-29T12:05:44
+    by: Akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done
+    at: 2026-08-29T12:05:44
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-29T12:05:44
+    by: Akenzy
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done
+    at: 2026-08-29T12:05:44
+    by: Akenzy
+    ticket: T-04-01
+  - gate: G4
+    action: ticket done
+    at: 2026-08-29T12:05:44
+    by: Akenzy
+    ticket: T-05-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-29T12:13:47
+    by: claude
+    ticket: T-05-04
+  - gate: G4
+    action: ticket review
+    at: 2026-08-29T12:20:26
+    by: claude
+    ticket: T-05-04
+  - gate: G4
+    action: ticket done
+    at: 2026-08-29T12:20:26
+    by: Akenzy
+    ticket: T-05-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-08-29T12:20:26
+    by: claude
+    ticket: T-05-03
+  - gate: G4
+    action: ticket review
+    at: 2026-08-29T12:20:26
+    by: claude
+    ticket: T-05-03
+  - gate: G4
+    action: ticket done
+    at: 2026-08-29T12:20:26
+    by: Akenzy
+    ticket: T-05-03
+  - gate: G4
+    action: passed
+    at: 2026-08-29T12:27:30
+    by: Akenzy
+    evidence: all 12 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-08-29T12:30:38
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

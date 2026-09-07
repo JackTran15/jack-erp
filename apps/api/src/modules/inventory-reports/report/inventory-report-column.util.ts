@@ -38,11 +38,21 @@ export interface InventoryColumnDef {
   link?: boolean;
 }
 
-/** Build the enriched catalog headers of one inventory report. */
+/**
+ * Build the enriched catalog headers of one inventory report.
+ *
+ * `unfilterable` forces `filterKind: 'none'` on the named columns. It exists
+ * because filterability is not a property of a column alone: the parent and
+ * group grains re-aggregate in SQL and select NULL for the identity columns
+ * they cannot speak for, and a filter box over a column that is always empty
+ * either answers 400 or filters nothing (ADR-07). Which columns those are
+ * depends on the grain, so the caller decides per request.
+ */
 export function buildInventoryHeaders(
   reportKey: InventoryReportKey,
   defs: InventoryColumnDef[],
   pinnedLeft: string[],
+  unfilterable: ReadonlySet<string> = new Set(),
 ): ReportColumnHeader[] {
   const labels = INVENTORY_REPORT_COLUMN_LABELS_VI[reportKey] ?? {};
   const bandLabels = INVENTORY_REPORT_BAND_LABELS_VI[reportKey] ?? {};
@@ -58,7 +68,9 @@ export function buildInventoryHeaders(
       desc: null,
       type: d.type,
       group,
-      filterKind: d.filterKind ?? filterKindFor(d.type, d.key),
+      filterKind: unfilterable.has(d.key)
+        ? 'none'
+        : (d.filterKind ?? filterKindFor(d.type, d.key)),
       align: NUMBER_TYPES.has(d.type) ? 'right' : 'left',
     };
     if (d.link) header.link = true;

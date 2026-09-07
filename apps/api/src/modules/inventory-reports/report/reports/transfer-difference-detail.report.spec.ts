@@ -115,3 +115,129 @@ describe('TransferDifferenceDetailReport', () => {
     );
   });
 });
+
+/**
+ * The hand-off the original bug lived in.
+ *
+ * Both dialogs validated `columnFilters` with `assertKnownColumns` and then
+ * never passed them on. Everything downstream was correct — the service now
+ * compiles and binds them properly — but a report that keeps the filters to
+ * itself still answers 200 with an unfiltered grid, and no service-level test
+ * can see that. These assert the hand-off itself (AC-11, AC-16).
+ */
+describe('drill-down reports hand their column filters to the engine', () => {
+  const dtoWithFilter = {
+    reportType: 'inventory-transfer-difference-detail',
+    columns: ['date', 'documentNumber', 'reference', 'qty'],
+    columnFilters: [{ col: 'sku', contains: 'ABA' }],
+    filters: {
+      period: { from: '2026-07-09', to: '2026-08-30' },
+      sourceStoreId: 'a',
+      receivingStoreIds: ['b'],
+    },
+  } as never;
+  const actorAB = {
+    organizationId: 'org-1',
+    userId: 'u1',
+    roles: [],
+    branchIds: ['a', 'b'],
+    branchId: 'a',
+  } as never;
+
+  function buildDifference() {
+    const engine = {
+      detail: jest
+        .fn()
+        .mockResolvedValue({ data: [], total: 0, totals: { qty: 0, value: 0 } }),
+    };
+    const branches = { find: jest.fn().mockResolvedValue([{ id: 'a' }, { id: 'b' }]) };
+    return {
+      engine,
+      report: new TransferDifferenceDetailReport(engine as never, branches as never),
+    };
+  }
+
+  function buildDocument() {
+    const engine = {
+      detail: jest
+        .fn()
+        .mockResolvedValue({ data: [], total: 0, totals: { qty: 0, value: 0 } }),
+    };
+    const branches = { find: jest.fn().mockResolvedValue([{ id: 'a' }, { id: 'b' }]) };
+    return {
+      engine,
+      report: new TransferDocumentDetailReport(engine as never, branches as never),
+    };
+  }
+
+  it('difference-detail passes them on buildData', async () => {
+    const { report, engine } = buildDifference();
+
+    await report.buildData(dtoWithFilter, actorAB);
+
+    expect(engine.detail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        columnFilters: { sku: { operator: '*', value: 'ABA' } },
+      }),
+    );
+  });
+
+  it('difference-detail passes them on countRows too', async () => {
+    // countRows backs the export cap. A file counted without the filter would
+    // be rejected — or allowed — on the wrong number of rows.
+    const { report, engine } = buildDifference();
+
+    await report.countRows(dtoWithFilter, actorAB);
+
+    expect(engine.detail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        columnFilters: { sku: { operator: '*', value: 'ABA' } },
+      }),
+    );
+  });
+
+  it('document-detail passes them on buildData', async () => {
+    const { report, engine } = buildDocument();
+
+    await report.buildData(
+      { ...(dtoWithFilter as object), reportType: 'inventory-transfer-document-detail' } as never,
+      actorAB,
+    );
+
+    expect(engine.detail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        columnFilters: { sku: { operator: '*', value: 'ABA' } },
+      }),
+    );
+  });
+
+  it('document-detail passes them on countRows too', async () => {
+    const { report, engine } = buildDocument();
+
+    await report.countRows(
+      { ...(dtoWithFilter as object), reportType: 'inventory-transfer-document-detail' } as never,
+      actorAB,
+    );
+
+    expect(engine.detail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        columnFilters: { sku: { operator: '*', value: 'ABA' } },
+      }),
+    );
+  });
+
+  it('sends an empty map when the grid filtered nothing', async () => {
+    // Not `undefined` — the engine treats both the same, but an explicit empty
+    // map is what says "asked and answered" rather than "never wired".
+    const { report, engine } = buildDifference();
+
+    await report.buildData(
+      { ...(dtoWithFilter as object), columnFilters: [] } as never,
+      actorAB,
+    );
+
+    expect(engine.detail).toHaveBeenCalledWith(
+      expect.objectContaining({ columnFilters: {} }),
+    );
+  });
+});

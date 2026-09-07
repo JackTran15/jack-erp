@@ -89,13 +89,25 @@ export function paginateRows(
   return projectRows(rows.slice(offset, offset + limit), columns);
 }
 
-/** Deterministic cache key of one search request (must include the org). */
+/**
+ * Deterministic cache key of one search request.
+ *
+ * The branch scope belongs in the key as much as the organization does: a
+ * request that carries no `store` resolves its scope from `actor.branchIds`
+ * instead, so two users of one organization with different branch assignments
+ * would otherwise share an entry and read each other's numbers (ADR-06).
+ *
+ * The ids are sorted first — their order in the JWT is not guaranteed, and the
+ * same set arriving in two orders must not split the cache for nothing.
+ */
 export function searchCacheKey(
   organizationId: string,
+  branchIds: readonly string[] | undefined,
   dto: InventoryReportSearchDto,
 ): string {
   return createHash('sha256')
     .update(organizationId)
+    .update(JSON.stringify([...(branchIds ?? [])].sort()))
     .update(JSON.stringify(dto))
     .digest('hex');
 }

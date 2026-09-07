@@ -4,6 +4,11 @@ import { InventoryReportSearchDto } from '../../dto/inventory-report-search.dto'
 import { StockPeriodRow } from '../../services/stock-period.service';
 import { StockSummaryReport } from './stock-summary.report';
 
+// An empty category tree: these specs scope by branch and period, never by group,
+// so `resolveDescendantCategoryIds` short-circuits on an absent `categoryId`.
+const categories = { find: jest.fn().mockResolvedValue([]) };
+
+
 const actor: ActorContext = {
   userId: 'user-1',
   organizationId: 'org-1',
@@ -114,6 +119,7 @@ function build(rows: StockPeriodRow[], total = rows.length) {
     storages as never,
     itemStorageLocations as never,
     stockBalances as never,
+    categories as never,
   );
   return { report, stockPeriod, branches, locations, storages };
 }
@@ -257,9 +263,11 @@ describe('StockSummaryReport', () => {
     }
   });
 
-  it('pushes the unit and brand dropdowns down too (A-11)', async () => {
+  it('pushes the unit and brand dropdowns down as member scope (A-11)', async () => {
     // Left in JS these would filter only the page in view — a wrong answer that
-    // looks right, which is worse than the 400 being removed here.
+    // looks right. They still go to SQL; ADR-02 only changed which door: they
+    // are member scope, not column filters, so the aggregate grains can honour
+    // them instead of answering 400.
     const { report, stockPeriod } = build([periodRow({})]);
 
     await report.buildData(
@@ -269,15 +277,15 @@ describe('StockSummaryReport', () => {
 
     expect(stockPeriod.aggregate).toHaveBeenCalledWith(
       expect.objectContaining({
-        columnFilters: {
-          unit: { operator: '=', value: 'Đôi' },
-          brand: { operator: '=', value: 'Lasta' },
-        },
+        memberScope: { unit: 'Đôi', brand: 'Lasta' },
+        columnFilters: {},
       }),
     );
   });
 
-  it('AND-s the unit dropdown with a unit column filter', async () => {
+  it('keeps a unit column filter alongside the unit dropdown', async () => {
+    // Both still constrain the result; they now reach SQL through different
+    // clauses and AND there, rather than as two predicates on one column.
     const { report, stockPeriod } = build([periodRow({})]);
 
     await report.buildData(
@@ -291,12 +299,8 @@ describe('StockSummaryReport', () => {
 
     expect(stockPeriod.aggregate).toHaveBeenCalledWith(
       expect.objectContaining({
-        columnFilters: {
-          unit: [
-            { operator: '*', value: 'ô' },
-            { operator: '=', value: 'Đôi' },
-          ],
-        },
+        columnFilters: { unit: { operator: '*', value: 'ô' } },
+        memberScope: { unit: 'Đôi', brand: undefined },
       }),
     );
   });
@@ -634,5 +638,60 @@ describe('StockSummaryReport', () => {
 
       expect(result.rows[0]).toHaveProperty('positionCode');
     });
+  });
+});
+
+/**
+ * The member scope at the aggregate grains (AC-06).
+ *
+ * The value of these is narrow but specific: they pin that the report keeps
+ * handing the dropdowns down when `statBy` is not `item`. Whether the predicate
+ * then lands in the right half of the SQL is asserted where that decision is
+ * made — `stock-period.service.spec.ts`, "aggregate-grain predicate placement",
+ * whose mutation check showed a misplaced predicate still returns 201 while
+ * matching nothing.
+ */
+describe('StockSummaryReport member scope survives the grain switch', () => {
+  it.each(['item', 'parent', 'group'] as const)(
+    'passes unit and brand down at statBy=%s',
+    async (statBy) => {
+      const { report, stockPeriod } = build([periodRow({})]);
+
+      await report.buildData(
+        {
+          ...baseDto,
+          filters: { ...baseDto.filters, statBy, unit: 'Đôi', brand: 'Lasta' },
+        } as unknown as InventoryReportSearchDto,
+        actor,
+      );
+
+      expect(stockPeriod.aggregate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          itemGroupBy: statBy,
+          memberScope: { unit: 'Đôi', brand: 'Lasta' },
+        }),
+      );
+    },
+  );
+
+  it('sends no column filter for unit at the aggregate grains', async () => {
+    // This is the 400 that started the feature: the aggregate row has no unit,
+    // so no column spec exists, and a `columnFilters.unit` entry was rejected
+    // outright. Nothing may put one back.
+    for (const statBy of ['parent', 'group'] as const) {
+      const { report, stockPeriod } = build([periodRow({})]);
+
+      await report.buildData(
+        {
+          ...baseDto,
+          filters: { ...baseDto.filters, statBy, unit: 'Đôi', brand: 'Lasta' },
+        } as unknown as InventoryReportSearchDto,
+        actor,
+      );
+
+      const [[query]] = stockPeriod.aggregate.mock.calls;
+      expect(query.columnFilters.unit).toBeUndefined();
+      expect(query.columnFilters.brand).toBeUndefined();
+    }
   });
 });

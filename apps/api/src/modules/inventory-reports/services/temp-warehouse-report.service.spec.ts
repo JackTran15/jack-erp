@@ -87,7 +87,8 @@ describe('TempWarehouseReportService', () => {
 
     // Một câu, một vị từ — nên footer không thể mô tả tập khác với các dòng
     // phía trên nó. Đây là tính chất mà bản hai-câu phải giữ bằng kỷ luật.
-    expect(sql).toContain('(sale_qty) >= $7');
+    // $7/$8 are the unit/brand member scope (ADR-02); filter values start at $9.
+    expect(sql).toContain('(sale_qty) >= $9');
     expect(params).toContain(1);
     // LIMIT/OFFSET nối sau tham số của bộ lọc.
     expect(params.slice(-2)).toEqual([20, 0]);
@@ -135,7 +136,7 @@ describe('TempWarehouseReportService', () => {
     const [sql] = query.mock.calls[0] as [string, unknown[]];
     // LIMIT/OFFSET nằm TRONG nguồn của LATERAL, không phải sau nó: `src` là
     // trang đã cắt, và hai LATERAL chạy trên đúng nó.
-    expect(flatten(sql)).toContain('LIMIT $7 OFFSET $8 ) src');
+    expect(flatten(sql)).toContain('LIMIT $9 OFFSET $10 ) src');
     expect(sql).toContain('LEFT JOIN LATERAL');
   });
 
@@ -151,7 +152,7 @@ describe('TempWarehouseReportService', () => {
     });
 
     const [sql] = query.mock.calls[0] as [string, unknown[]];
-    expect(sql).toContain('LOWER(location) = LOWER($7)');
+    expect(sql).toContain('LOWER(location) = LOWER($9)');
     // Kệ giải mã TRƯỚC bộ lọc, tức trước cả LIMIT — ngược với đường thường.
     expect(flatten(sql)).toContain('fallback ON preferred.code IS NULL ) e WHERE');
   });

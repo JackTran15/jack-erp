@@ -174,7 +174,9 @@ describe('StockBalancePivotService column filters', () => {
     });
 
     const page = sql.find((q) => q.text.includes('LIMIT'))!;
-    expect(page.text).toContain('sbb.branch_id = $5');
+    // $5/$6 are the unit/brand member scope (ADR-02); bound filter values start
+    // at $7. The index moved, the guarantee did not.
+    expect(page.text).toContain('sbb.branch_id = $7');
     expect(page.text).not.toContain(BRANCH);
     expect(page.params).toContain(BRANCH);
   });
@@ -182,7 +184,8 @@ describe('StockBalancePivotService column filters', () => {
   it('keeps the branch id and the filter value in the order they were built', async () => {
     // The branch id is bound before the filter values, so both halves keep the
     // indices their SQL was written against. Off-by-one here is a wrong answer,
-    // not an error.
+    // not an error. Params 0-5 are org, branches, categories, search, unit,
+    // brand — the six the engine always binds (MEMBER_SCOPE_START).
     const { sql, service } = capture();
 
     await service.aggregate({
@@ -191,8 +194,8 @@ describe('StockBalancePivotService column filters', () => {
     });
 
     const page = sql.find((q) => q.text.includes('LIMIT'))!;
-    expect(page.params[4]).toBe(BRANCH);
-    expect(page.params[5]).toBe(7);
+    expect(page.params[6]).toBe(BRANCH);
+    expect(page.params[7]).toBe(7);
   });
 
   it('AND-s two branch columns with distinct parameters', async () => {
@@ -208,9 +211,9 @@ describe('StockBalancePivotService column filters', () => {
     });
 
     const page = sql.find((q) => q.text.includes('LIMIT'))!;
-    expect(page.text).toContain('sbb.branch_id = $5');
-    expect(page.text).toContain('sbb.branch_id = $6');
-    expect(page.params.slice(4, 6)).toEqual([BRANCH, other]);
+    expect(page.text).toContain('sbb.branch_id = $7');
+    expect(page.text).toContain('sbb.branch_id = $8');
+    expect(page.params.slice(6, 8)).toEqual([BRANCH, other]);
   });
 
   it('refuses a branch key that is not a uuid', async () => {
@@ -238,5 +241,83 @@ describe('StockBalancePivotService column filters', () => {
         columnFilters: { color: { operator: '=', value: 'Đen' } },
       }),
     ).rejects.toThrow(/color/);
+  });
+});
+
+/**
+ * Items with no category, at the `group` grain.
+ *
+ * The count and the page used to disagree by exactly one row whenever any item
+ * was ungrouped: `COUNT(*)` over the `groups` CTE counted the NULL key, while
+ * the page dropped it before the cell query could ask for it. The grid showed
+ * 28 of 29 groups and gave no hint that one was missing — a phantom last page
+ * in the small, and stock unaccounted for in the large.
+ */
+describe('StockBalancePivotService ungrouped items (group grain)', () => {
+  function capture() {
+    const sql: Array<{ text: string; params: unknown[] }> = [];
+    const dataSource = {
+      query: jest.fn().mockImplementation((text: string, params: unknown[]) => {
+        sql.push({ text, params });
+        if (text.includes('COUNT(*)')) return Promise.resolve([{ total: 2 }]);
+        // The page query: one real category plus the ungrouped bucket.
+        if (text.includes('display_sku')) {
+          return Promise.resolve([
+            { agg_key: 'cat-1', display_sku: 'Giày nam' },
+            { agg_key: '__ungrouped__', display_sku: 'Không phân nhóm' },
+          ]);
+        }
+        return Promise.resolve([]);
+      }),
+    };
+    return { sql, service: new StockBalancePivotService(dataSource as never) };
+  }
+
+  const aggQuery = {
+    organizationId: 'org-1',
+    itemGroupBy: 'group' as const,
+    page: 1,
+    pageSize: 20,
+  };
+
+  it('keys the ungrouped bucket instead of leaving it NULL', async () => {
+    const { sql, service } = capture();
+
+    await service.aggregate(aggQuery);
+
+    const groupsQuery = sql.find((q) => q.text.includes('groups AS ('))!;
+    expect(groupsQuery.text).toContain("COALESCE(i.category_id::text, '__ungrouped__')");
+  });
+
+  it('asks the cell query for the ungrouped bucket too', async () => {
+    // `.filter(Boolean)` used to drop a NULL key here, so the bucket the count
+    // included was never fetched and never rendered.
+    const { sql, service } = capture();
+
+    await service.aggregate(aggQuery);
+
+    const cellQuery = sql.find((q) => q.text.includes('AS branch_name'))!;
+    expect(cellQuery.params[1]).toEqual(['cat-1', '__ungrouped__']);
+  });
+
+  it('matches the bucket in the footer query as well', async () => {
+    // The footer used `IN (SELECT agg_key FROM groups)`, and NULL matches
+    // nothing — so ungrouped stock was missing from the totals as well.
+    const { sql, service } = capture();
+
+    await service.aggregate(aggQuery);
+
+    const totalsQuery = sql.find((q) => q.text.includes('IN (SELECT agg_key FROM groups)'))!;
+    expect(totalsQuery.text).toContain("COALESCE(i.category_id::text, '__ungrouped__')");
+  });
+
+  it('leaves the parent grain alone — its key is never NULL', async () => {
+    const { sql, service } = capture();
+
+    await service.aggregate({ ...aggQuery, itemGroupBy: 'parent' });
+
+    const groupsQuery = sql.find((q) => q.text.includes('groups AS ('))!;
+    expect(groupsQuery.text).toContain('COALESCE(i.product_id::text, i.id::text)');
+    expect(groupsQuery.text).not.toContain('__ungrouped__');
   });
 });
