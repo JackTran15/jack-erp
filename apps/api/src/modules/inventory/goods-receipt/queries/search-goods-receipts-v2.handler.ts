@@ -49,6 +49,12 @@ export class SearchGoodsReceiptsV2Handler implements IQueryHandler<SearchGoodsRe
       .leftJoinAndSelect("gr.provider", "provider")
       .leftJoinAndSelect("gr.location", "location")
       .orderBy("gr.receivedAt", "DESC")
+      // Tie-breaker. `receivedAt` is not unique — two receipts posted in the same minute
+      // compare equal, and LIMIT/OFFSET over a non-deterministic ORDER BY lets Postgres
+      // return them in a different order per page. On an infinite-scroll client that
+      // surfaces as "one document appears twice, another disappears", and it never shows
+      // up on page 1.
+      .addOrderBy("gr.id", "DESC")
       .skip((page - 1) * limit)
       .take(limit);
 
@@ -122,7 +128,15 @@ export class SearchGoodsReceiptsV2Handler implements IQueryHandler<SearchGoodsRe
       .applyString("gr.reason", dto.reason)
       .applyEnum("gr.purpose", dto.purpose?.value)
       .applyDateRange("gr.receivedAt", dto.date)
-      .applyCompare(TOTAL_AMOUNT_SUBQUERY, dto.totalAmount);
+      .applyCompare(TOTAL_AMOUNT_SUBQUERY, dto.totalAmount)
+      // Mobile's single search box. Lives inside `buildQuery` — which runs
+      // twice per request — so the footer total counts the same rows the grid
+      // shows. `documentNumber` is null until a receipt is posted; NULL ILIKE
+      // yields NULL, so drafts simply fall through to the party name.
+      .applyOrString(
+        ["gr.documentNumber", counterpartyNameSql("gr")],
+        dto.search,
+      );
 
     if (dto.purposes?.length) {
       qb.andWhere("gr.purpose IN (:...purposes)", {

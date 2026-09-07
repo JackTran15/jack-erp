@@ -18,6 +18,7 @@ interface FakeQb {
   where: jest.Mock;
   andWhere: jest.Mock;
   orderBy: jest.Mock;
+  addOrderBy: jest.Mock;
   skip: jest.Mock;
   take: jest.Mock;
   select: jest.Mock;
@@ -45,6 +46,7 @@ function makeQb(
     where: jest.fn(self),
     andWhere: jest.fn(self),
     orderBy: jest.fn(self),
+    addOrderBy: jest.fn(self),
     skip: jest.fn(self),
     take: jest.fn(self),
     select: jest.fn(self),
@@ -103,6 +105,10 @@ describe('SearchGoodsReceiptsV2Handler', () => {
     expect(rowsQb().leftJoinAndSelect).not.toHaveBeenCalledWith('lines.item', 'lineItem');
     expect(rowsQb().leftJoinAndSelect).not.toHaveBeenCalledWith('lines.location', 'lineLocation');
     expect(rowsQb().orderBy).toHaveBeenCalledWith('gr.receivedAt', 'DESC');
+    // Tie-breaker: `receivedAt` is not unique, and LIMIT/OFFSET over a
+    // non-deterministic ORDER BY lets rows repeat or vanish between pages —
+    // invisible on page 1, which is why it needs a test rather than a review.
+    expect(rowsQb().addOrderBy).toHaveBeenCalledWith('gr.id', 'DESC');
   });
 
   it('returns the eager rows unchanged in the { data, total, page, limit } envelope, without a lines field', async () => {

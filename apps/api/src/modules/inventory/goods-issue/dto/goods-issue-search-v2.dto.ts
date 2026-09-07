@@ -1,7 +1,9 @@
 import {
   IsInt,
   IsOptional,
+  IsString,
   Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -48,6 +50,16 @@ export class GoodsIssueSearchV2Dto {
   @ValidateNested()
   @Type(() => StringFilterDto)
   party?: StringFilterDto;
+
+  /**
+   * One free-text term matched against document number OR party, for the
+   * mobile search screen. Mirrors `GoodsReceiptSearchV2Dto.search` — see the
+   * note there for why `documentNumber` + `party` cannot express this.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string;
 
   /** Diễn giải (notes) */
   @IsOptional()

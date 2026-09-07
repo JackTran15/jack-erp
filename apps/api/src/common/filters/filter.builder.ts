@@ -11,6 +11,7 @@ import {
   businessDayStart,
   isCalendarDate,
 } from '../utils/business-timezone.util';
+import { escapeLikeTerm } from '../utils/like-escape.util';
 
 let _seq = 0;
 
@@ -46,6 +47,41 @@ export class FilterBuilder<T extends ObjectLiteral> {
     };
 
     this.qb.andWhere(sqlMap[filter.operator], { [key]: valMap[filter.operator] });
+    return this;
+  }
+
+  /**
+   * One free-text term matched against SEVERAL columns with OR.
+   *
+   * Every other method here ANDs its clause, which is right for the web filter
+   * cells: each cell is its own column with its own operator. A mobile search
+   * box is the opposite shape — one term, and a row qualifies if ANY column
+   * matches. Feeding that term through `applyString` twice would AND the two
+   * clauses and return the intersection, which is almost always empty.
+   *
+   * The OR list is wrapped in ONE pair of parens inside ONE `andWhere`. Without
+   * them the OR escapes and disables every tenant/branch predicate already on
+   * the builder — a data leak, not just a wrong result set.
+   *
+   * Unlike `applyString` this escapes `\`, `%` and `_`. The asymmetry is
+   * deliberate: `applyString` is fed by a structured filter cell where the user
+   * picks the operator and a literal `%` is plausibly intended, while this is a
+   * single search box where typing `%` should match a percent sign, not every
+   * row. Postgres' default ESCAPE for ILIKE is the backslash, so no ESCAPE
+   * clause is needed.
+   */
+  applyOrString(cols: string[], value?: string): this {
+    const term = value?.trim();
+    if (!term || cols.length === 0) return this;
+
+    const key = this.key('or_string');
+    const escaped = escapeLikeTerm(term);
+
+    this.qb.andWhere(
+      `(${cols.map((col) => `${col} ILIKE :${key}`).join(' OR ')})`,
+      { [key]: `%${escaped}%` },
+    );
+
     return this;
   }
 

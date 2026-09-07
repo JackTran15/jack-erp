@@ -39,6 +39,7 @@ function makeQb(
     where: jest.fn(() => qb),
     andWhere: jest.fn(() => qb),
     orderBy: jest.fn(() => qb),
+    addOrderBy: jest.fn(() => qb),
     skip: jest.fn(() => qb),
     take: jest.fn(() => qb),
     select: jest.fn(() => qb),
@@ -115,6 +116,10 @@ describe('SearchGoodsIssuesV2Handler', () => {
     expect(qbOf().leftJoinAndSelect).not.toHaveBeenCalledWith('lines.item', 'lineItem');
     expect(qbOf().leftJoinAndSelect).not.toHaveBeenCalledWith('lines.location', 'lineLocation');
     expect(qbOf().orderBy).toHaveBeenCalledWith('gi.createdAt', 'DESC');
+    // Tie-breaker: `createdAt` defaults to `now()`, so issues written in one
+    // transaction compare equal and LIMIT/OFFSET may reshuffle them between
+    // pages — invisible on page 1, which is why it needs a test.
+    expect(qbOf().addOrderBy).toHaveBeenCalledWith('gi.id', 'DESC');
   });
 
   it('returns the eager rows unchanged in the { data, total, page, limit } envelope, without a lines field', async () => {

@@ -16,14 +16,6 @@ import {
 import { SearchInventoryItemsV2Query } from './search-inventory-items-v2.query';
 
 /**
- * Product-grouped inventory item search, fully pushed to SQL (mirrors
- * ItemCrudService.listProductGroups). A CTE builds one row per product
- * (orphans = items without a product) with aggregated columns; the per-column
- * filters, ordering and pagination then run at the DB level — the org's full
- * item set is never loaded into memory. Barcodes are aggregated via a
- * correlated subquery to avoid inflating the AVG/COUNT aggregates.
- */
-/**
  * Signed on-hand total for one group, in a single branch.
  *
  * Three properties are load-bearing, one per acceptance criterion:
@@ -57,13 +49,37 @@ const ROW_COLUMNS = `type, id, code, name, barcode, unit, brand,
       "purchasePrice", "sellingPrice", "isPosVisible", "isActive", "itemCount"`;
 
 /**
+ * SHARED SQL — changing a column here changes it for BOTH consumers:
+ *
+ *   1. `SearchInventoryItemsV2Handler` (this file) -> POST /v2/inventory-items/search (web)
+ *   2. `MobileProductService` (via `COMBINED_CTE`)  -> GET  /mobile/products          (app)
+ *
+ * It is exported rather than copied because a second copy of this block would
+ * drift silently. Read it as a contract, not as a local helper: an edit made
+ * while reasoning only about this file will break the mobile list with nothing
+ * to warn you.
+ *
+ * PARAMETER CONTRACT: `$1` is the organization id, referenced throughout
+ * (including the optional stockTotal subquery). Any statement appended after
+ * the CTE must number its own placeholders starting at `$2`.
+ *
  * `branchParam` is the placeholder index holding the branch id, set only when the
  * caller asked for the out-of-stock filter. When it is undefined the emitted SQL
  * is byte-for-byte what it was before the filter existed — no extra join, no
  * extra subquery — so the 99% of list loads that do not use the filter pay
  * nothing for it.
+ *
+ * The CTE is deliberately unordered — every caller supplies its own
+ * `ORDER BY`. This handler pins `code ASC`; the mobile one picks per request.
+ *
+ * SEMANTIC NOTE: the product branch computes `bool_and(i.is_active)`, so a
+ * product counts as inactive when just ONE of its variants is. Neither consumer
+ * is bitten today because neither filters on `"isActive"` by default; if you
+ * ever need "active if any variant is active", add a `bool_or(...) AS
+ * "anyActive"` column instead of changing `bool_and` — the web filters rely on
+ * the current meaning.
  */
-const buildCombinedCte = (branchParam?: number): string => `
+export const buildCombinedCte = (branchParam?: number): string => `
   WITH combined AS (
     SELECT
       'product'                                  AS type,
@@ -125,10 +141,21 @@ ${
   )
 `;
 
+/** The CTE without the stockTotal column — the shape `MobileProductService` consumes. */
+export const COMBINED_CTE = buildCombinedCte();
+
 interface CountRow {
   total: number;
 }
 
+/**
+ * Product-grouped inventory item search, fully pushed to SQL (mirrors
+ * ItemCrudService.listProductGroups). A CTE builds one row per product
+ * (orphans = items without a product) with aggregated columns; the per-column
+ * filters, ordering and pagination then run at the DB level — the org's full
+ * item set is never loaded into memory. Barcodes are aggregated via a
+ * correlated subquery to avoid inflating the AVG/COUNT aggregates.
+ */
 @QueryHandler(SearchInventoryItemsV2Query)
 export class SearchInventoryItemsV2Handler
   implements IQueryHandler<SearchInventoryItemsV2Query>

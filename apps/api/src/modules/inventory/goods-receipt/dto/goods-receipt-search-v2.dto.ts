@@ -3,7 +3,9 @@ import {
   IsEnum,
   IsInt,
   IsOptional,
+  IsString,
   Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from "class-validator";
@@ -51,6 +53,22 @@ export class GoodsReceiptSearchV2Dto {
   @ValidateNested()
   @Type(() => StringFilterDto)
   party?: StringFilterDto;
+
+  /**
+   * One free-text term matched against document number OR counterparty name,
+   * for the mobile search screen.
+   *
+   * Deliberately NOT expressible with `documentNumber` + `party`: those two are
+   * ANDed by `FilterBuilder`, so passing the same term to both asks for rows
+   * whose number AND party both contain it — an intersection that is almost
+   * always empty. See `FilterBuilder.applyOrString`.
+   *
+   * The web grid never sends this; it has a filter cell per column.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string;
 
   /** Diễn giải (description) */
   @IsOptional()
