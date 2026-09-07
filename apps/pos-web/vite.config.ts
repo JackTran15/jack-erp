@@ -26,6 +26,6 @@ export default defineConfig({
   preview: {
     port: 3001,
     host: true,
-    allowedHosts: ["jack-erp-pos.ducanhzed.com", "erp.giaymt.com.vn"],
+    allowedHosts: ["jack-erp-pos.ducanhzed.com", "erp.giaymt.com.vn", "jack-erp.ducanhzed.com"],
   },
 });
