@@ -14,6 +14,11 @@ import { ProviderEntity } from '../../../inventory/location/provider.entity';
 import { SupplierDebtPaymentEntity } from '../../../inventory/supplier-debt/supplier-debt-payment.entity';
 import { SupplierDebtEntity } from '../../../inventory/supplier-debt/supplier-debt.entity';
 import { matchColumnFilter } from '../../report-core/column-filter.util';
+import {
+  DEBTS_CONSOLIDATED,
+  resolveReportBranchIds,
+} from '../../report-core/report-query.util';
+import { RbacService } from '../../../rbac/rbac.service';
 import { debtColumn } from '../debt-report-column.util';
 import { DebtReportSearchDto } from '../dto/debt-report-search.dto';
 import { ReportDefinition } from '../report-definition';
@@ -69,9 +74,13 @@ function buildTotals(columns: string[], buckets: SupplierDebtBucket[]): ReportRo
 /**
  * "Công nợ nhà cung cấp" — one row per supplier, period ledger
  * (opening/increase/decrease/closing). Only 2 fixed columns (supplierCode,
- * supplierName); mặc định gộp toàn chuỗi/tổ chức, có thể thu hẹp về 1 chi
- * nhánh cụ thể qua `filters.branchId` (khác báo cáo #1/#2 — công nợ khách hàng
- * luôn gộp không có filter phụ, xem docs/24-debt-reports-spec.md #3).
+ * supplierName); `filters.branchId` narrows to one store.
+ *
+ * Branch scope: clamped to the actor's assigned branches unless they hold
+ * `reporting.debts.consolidated.read`. `filters.branchId` used to be applied as
+ * a plain filter with no authorization check at all — it is now resolved
+ * through `resolveReportBranchIds` like every other money report, so asking for
+ * a store outside the actor's assignments is a 403 rather than a free read.
  */
 @Injectable()
 export class SupplierDebtsReport implements ReportDefinition {
@@ -85,6 +94,7 @@ export class SupplierDebtsReport implements ReportDefinition {
     private readonly supplierDebtPayments: Repository<SupplierDebtPaymentEntity>,
     @InjectRepository(ProviderEntity)
     private readonly providers: Repository<ProviderEntity>,
+    private readonly rbac: RbacService,
   ) {}
 
   async buildColumns(): Promise<ReportColumnHeader[]> {
@@ -107,6 +117,18 @@ export class SupplierDebtsReport implements ReportDefinition {
       throw new BadRequestException('filters.period.from/to is required');
     }
 
+    const hasConsolidated = await this.rbac.hasPermission(
+      actor.userId,
+      actor.organizationId,
+      DEBTS_CONSOLIDATED,
+    );
+    const branchIds = resolveReportBranchIds(
+      hasConsolidated,
+      undefined,
+      dto.filters.branchId,
+      actor,
+    );
+
     const ledger = await this.debtPeriod.getPeriodLedger(
       {
         repo: this.supplierDebts,
@@ -125,7 +147,8 @@ export class SupplierDebtsReport implements ReportDefinition {
       },
       {
         organizationId: actor.organizationId,
-        branchIds: dto.filters.branchId ? [dto.filters.branchId] : undefined,
+        // null = consolidated ⇒ no branch predicate at all.
+        branchIds: branchIds ?? undefined,
         fromDate: period.from,
         toDate: period.to,
       },

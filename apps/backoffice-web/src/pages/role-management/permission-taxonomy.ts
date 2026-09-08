@@ -40,6 +40,10 @@ export type PermissionSection = {
 
 /** Left-nav sections: which modules belong to which top-level group. */
 const SECTIONS: { id: string; label: string; modules: string[] }[] = [
+  // Báo cáo đứng đầu: đây là phần được sửa nhiều nhất khi cấu hình một vai trò,
+  // và cũng là phần có nhiều mục nhất (33 quyền) — để nó ở giữa danh sách thì
+  // lần nào cũng phải cuộn mới tới.
+  { id: "reporting", label: "Báo cáo", modules: ["reporting"] },
   { id: "sales", label: "Bán hàng", modules: ["pos", "promotion", "customer"] },
   {
     id: "warehouse",
@@ -47,7 +51,6 @@ const SECTIONS: { id: string; label: string; modules: string[] }[] = [
     modules: ["inventory", "product"],
   },
   { id: "accounting", label: "Kế toán", modules: ["accounting"] },
-  { id: "reporting", label: "Báo cáo", modules: ["reporting"] },
   {
     id: "system",
     label: "Hệ thống",
@@ -104,6 +107,29 @@ const MODULE_PAGES: Record<
       id: "inventory-transfer",
       label: "Điều chuyển & điều chỉnh",
       resources: ["inventory.transfer", "inventory.adjustment"],
+    },
+  ],
+  // Một trang cho mỗi nhóm báo cáo, khớp menu "Báo cáo" của ứng dụng. Không có
+  // khối này thì 25 quyền báo cáo mới đổ hết vào một bức tường card phẳng.
+  reporting: [
+    { id: "reporting-sales", label: "Bán hàng", resources: ["reporting.sales"] },
+    {
+      id: "reporting-inventory",
+      label: "Kho",
+      // `inventory.reports` được alias về `reporting.inventory` trong
+      // permission-vocabulary-vi, nên quyền mở nhóm nằm chung card với 11 báo cáo.
+      resources: ["reporting.inventory"],
+    },
+    { id: "reporting-debts", label: "Công nợ", resources: ["reporting.debts"] },
+    {
+      id: "reporting-profit",
+      label: "Lợi nhuận",
+      resources: ["reporting.profit"],
+    },
+    {
+      id: "reporting-general",
+      label: "Chung",
+      resources: ["reporting.dashboard", "reporting.invoice-template"],
     },
   ],
   accounting: [

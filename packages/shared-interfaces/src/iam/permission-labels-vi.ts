@@ -195,15 +195,75 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
   'accounting.cash_transfer.read': 'Xem chuyển tiền mặt liên chi nhánh',
   'accounting.deposit_dashboard.read': 'Xem báo cáo tiền đang chuyển & dashboard số dư tiền gửi',
 
-  // Báo cáo
+  // Báo cáo — quyền mở màn hình của từng nhóm ("floor").
+  // Từng báo cáo có quyền riêng bên dưới; quyền nhóm chỉ mở màn hình và các
+  // endpoint không mang reportType (danh sách lựa chọn lọc, mẫu đã lưu).
   'reporting.dashboard.branch.read': 'Xem báo cáo theo chi nhánh',
   'reporting.dashboard.consolidated.read': 'Xem báo cáo tổng hợp',
-  'reporting.invoice.branch.read': 'Xem báo cáo hóa đơn (chi nhánh)',
-  'reporting.invoice.consolidated.read': 'Xem báo cáo hóa đơn (toàn chuỗi)',
+  'reporting.invoice.branch.read': 'Mở nhóm báo cáo bán hàng',
+  'reporting.invoice.consolidated.read':
+    'Xem báo cáo bán hàng của toàn chuỗi cửa hàng',
   'reporting.invoice-template.manage': 'Quản lý mẫu báo cáo hóa đơn',
-  'inventory.reports.read': 'Xem báo cáo nhập xuất tồn kho',
-  'reporting.debts.read': 'Xem báo cáo công nợ',
-  'reporting.profit.read': 'Xem báo cáo lợi nhuận',
+  'inventory.reports.read': 'Mở nhóm báo cáo kho',
+  'reporting.debts.read': 'Mở nhóm báo cáo công nợ',
+  'reporting.debts.consolidated.read':
+    'Xem báo cáo công nợ của toàn chuỗi cửa hàng',
+  'reporting.profit.read': 'Mở nhóm báo cáo lợi nhuận',
+  'reporting.profit.consolidated.read':
+    'Xem báo cáo lợi nhuận của toàn chuỗi cửa hàng',
+
+  // Báo cáo bán hàng — mỗi báo cáo một quyền.
+  'reporting.sales.daily-sales-summary.read':
+    'Xem báo cáo Tổng hợp bán hàng theo ngày',
+  'reporting.sales.invoice-order-listing.read':
+    'Xem báo cáo Bảng kê hóa đơn và đơn hàng',
+  'reporting.sales.invoice-item-revenue-detail.read':
+    'Xem báo cáo Chi tiết doanh thu theo hóa đơn và mặt hàng',
+  'reporting.sales.revenue-by-item.read':
+    'Xem báo cáo Doanh thu theo mặt hàng',
+
+  // Báo cáo lợi nhuận
+  'reporting.profit.profit-by-item.read':
+    'Xem báo cáo Lợi nhuận theo mặt hàng',
+  'reporting.profit.gross-profit-by-invoice.read':
+    'Xem báo cáo Lợi nhuận gộp theo hóa đơn',
+  'reporting.profit.business-results.read':
+    'Xem báo cáo Kết quả kinh doanh',
+
+  // Báo cáo công nợ
+  'reporting.debts.customer-debts.read': 'Xem báo cáo Công nợ khách hàng',
+  'reporting.debts.receivables-detail-by-product.read':
+    'Xem báo cáo Chi tiết công nợ phải thu theo mặt hàng',
+  'reporting.debts.supplier-debts.read':
+    'Xem báo cáo Công nợ nhà cung cấp',
+  'reporting.debts.supplier-debts-detail-by-document-and-product.read':
+    'Xem báo cáo Chi tiết công nợ nhà cung cấp theo chứng từ và mặt hàng',
+
+  // Báo cáo kho
+  'reporting.inventory.stock-summary.read':
+    'Xem báo cáo Tổng hợp nhập xuất tồn kho',
+  'reporting.inventory.document-detail.read':
+    'Xem báo cáo Bảng kê chi tiết phiếu nhập xuất kho',
+  'reporting.inventory.stock-quantity-detail.read':
+    'Xem báo cáo Chi tiết số lượng nhập xuất tồn kho',
+  'reporting.inventory.stock-summary-by-store.read':
+    'Xem báo cáo Tổng hợp nhập xuất tồn kho theo cửa hàng',
+  'reporting.inventory.stock-by-store-pivot.read':
+    'Xem báo cáo Số lượng tồn kho theo cửa hàng',
+  'reporting.inventory.transfer-summary.read':
+    'Xem báo cáo Tổng hợp nhập xuất điều chuyển',
+  'reporting.inventory.transfer-summary-by-counterpart.read':
+    'Xem báo cáo Chi tiết nhập xuất điều chuyển theo cửa hàng',
+  'reporting.inventory.transfer-document-detail.read':
+    'Xem báo cáo Chi tiết phiếu nhập xuất điều chuyển theo cửa hàng và chứng từ',
+  'reporting.inventory.transfer-difference-detail.read':
+    'Xem báo cáo Chi tiết chênh lệch điều chuyển',
+  'reporting.inventory.transfer-by-store.read':
+    'Xem báo cáo Tổng hợp hàng hóa đã điều chuyển theo cửa hàng',
+  'reporting.inventory.temp-warehouse-out.read':
+    'Xem báo cáo Hàng hóa xuất kho tạm',
+  'reporting.inventory.value.read':
+    'Xem giá trị nhập/xuất trên báo cáo kho',
 
   // Khuyến mại (CTKM)
   'promotion.read': 'Xem chương trình khuyến mại',

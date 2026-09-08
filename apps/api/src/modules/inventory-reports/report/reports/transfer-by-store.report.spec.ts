@@ -75,14 +75,28 @@ describe('TransferByStoreReport', () => {
     );
   });
 
-  it('403s when the source store is outside the actor branch permissions', async () => {
-    const { report } = build([]);
+  it('lets any store of the organization be the source, assigned or not', async () => {
+    // Organization-wide under ADR-04: quantities may be compared across the
+    // whole chain. `b-other` is a real branch of this org the actor is not
+    // assigned to, and it must resolve rather than 403.
+    const { report, engine } = build([engineRow]);
+    await report.buildData(
+      { ...dto, filters: { ...dto.filters, sourceStoreId: 'b-other' } },
+      actorWithBranch,
+    );
+    expect(engine.byBranch).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceBranchId: 'b-other' }),
+    );
+  });
+
+  it('400s when the source store belongs to another organization', async () => {
+    const { report } = build([], false);
     await expect(
       report.buildData(
         { ...dto, filters: { ...dto.filters, sourceStoreId: 'b-foreign' } },
         actorWithBranch,
       ),
-    ).rejects.toThrow('Access denied for stores: b-foreign');
+    ).rejects.toThrow('Unknown store ids: b-foreign');
   });
 
   it('defaults the source branch to the actor branch and maps group from categoryName', async () => {
@@ -173,17 +187,17 @@ describe('TransferByStoreReport', () => {
     );
   });
 
-  it('enforces the branch permission on the export path as well', async () => {
+  it('validates the source store on the export path as well', async () => {
     // countRows is reached from /export. If the checks only lived in buildData,
-    // an export could read a branch the caller has no access to.
-    const { report } = build([engineRow]);
+    // an export could read a branch of another organization.
+    const { report } = build([engineRow], false);
 
     await expect(
       report.countRows(
         { ...dto, filters: { ...dto.filters, sourceStoreId: 'branch-foreign' } },
         actorWithBranch,
       ),
-    ).rejects.toThrow(/Access denied/);
+    ).rejects.toThrow(/Unknown store ids/);
   });
 });
 

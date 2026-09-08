@@ -3,10 +3,7 @@ import { ActorContext } from '../../../../common/decorators/actor-context.decora
 import { InventoryReportSearchDto } from '../../dto/inventory-report-search.dto';
 import { StockBalancePivotRow } from '../../services/stock-balance-pivot.service';
 import { StockByStorePivotReport } from './stock-by-store-pivot.report';
-import {
-  permittedBranchIds,
-  resolveInventoryBranchIds,
-} from '../report-scope.util';
+import { resolveOrgWideBranchIds } from '../report-scope.util';
 
 // An empty category tree: these specs scope by branch and period, never by group,
 // so `resolveDescendantCategoryIds` short-circuits on an absent `categoryId`.
@@ -338,19 +335,34 @@ describe('StockByStorePivotReport — phạm vi org-wide (ADR-04)', () => {
 });
 
 /**
- * AC-09 — việc nới ở trên KHÔNG được lan sang helper dùng chung: 4 report definition khác
- * vẫn kẹp theo `actor.branchIds`, và tập rỗng vẫn phải thành "không có dữ liệu", không phải
- * "không lọc gì".
+ * Cách đọc lịch sử: AC-09 của ADR-04 từng yêu cầu việc nới org-wide KHÔNG lan sang
+ * helper dùng chung — lúc đó chỉ mình báo cáo pivot này là org-wide. Ngày 2026-09-04
+ * chủ sản phẩm mở rộng quyết định đó cho toàn bộ họ báo cáo tồn kho/điều chuyển
+ * ("tạo điều kiện cho các cửa hàng kiểm tra tồn kho trên hệ thống"), nên
+ * `resolveInventoryBranchIds` không còn caller và đã bị xóa. Ranh giới còn lại là
+ * `organizationId`; phần tiền được chặn riêng bằng `reporting.inventory.value.read`.
  */
-describe('report-scope.util — helper dùng chung không đổi (AC-09)', () => {
-  it('permittedBranchIds vẫn đọc actor.branchIds', () => {
-    expect([...permittedBranchIds({ branchIds: ['x', 'y'] } as never)]).toEqual(['x', 'y']);
-  });
-
-  it('resolveInventoryBranchIds vẫn trả NO_ACCESS khi actor không có chi nhánh nào', async () => {
+describe('report-scope.util — org-wide là mặc định của cả họ báo cáo kho', () => {
+  it('không có store ⇒ không có điều kiện chi nhánh nào, kể cả khi actor không được gán chi nhánh', async () => {
     const branches = { find: jest.fn() };
     await expect(
-      resolveInventoryBranchIds(branches as never, undefined, { branchIds: [] } as never),
-    ).resolves.toEqual(['00000000-0000-0000-0000-000000000000']);
+      resolveOrgWideBranchIds(
+        branches as never,
+        undefined,
+        { organizationId: 'org-1', branchIds: [] } as never,
+      ),
+    ).resolves.toBeUndefined();
+    expect(branches.find).not.toHaveBeenCalled();
+  });
+
+  it('storeIds tường minh vẫn phải thuộc tổ chức', async () => {
+    const branches = { find: jest.fn(async () => [{ id: 'b1' }]) };
+    await expect(
+      resolveOrgWideBranchIds(
+        branches as never,
+        { scope: 'group', storeIds: ['b1', 'b9'] } as never,
+        { organizationId: 'org-1', branchIds: [] } as never,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

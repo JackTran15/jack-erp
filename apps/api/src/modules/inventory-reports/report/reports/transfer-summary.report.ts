@@ -29,7 +29,7 @@ import {
   buildTotalsRow,
   paginateRows,
 } from '../report-data.util';
-import { resolveInventoryBranchIds } from '../report-scope.util';
+import { resolveOrgWideBranchIds } from '../report-scope.util';
 
 const { STRING, NUMBER } = ReportColumnDataType;
 
@@ -59,6 +59,14 @@ const NUMERIC = numericKeys(COLUMNS);
 export class TransferSummaryReport implements InventoryReportDefinition {
   readonly key = INVENTORY_REPORT_KEYS.TRANSFER_SUMMARY;
 
+  readonly valueColumns = [
+    'inValue',
+    'outValue',
+    'receivedValue',
+    'diffValue',
+    'inOutDiffValue',
+  ];
+
   constructor(
     private readonly transferReport: TransferReportService,
     @InjectRepository(BranchEntity)
@@ -82,7 +90,7 @@ export class TransferSummaryReport implements InventoryReportDefinition {
       startDate: filters.period?.from,
       endDate: filters.period?.to,
     });
-    const branchIds = await resolveInventoryBranchIds(
+    const branchIds = await resolveOrgWideBranchIds(
       this.branches,
       filters.store,
       actor,

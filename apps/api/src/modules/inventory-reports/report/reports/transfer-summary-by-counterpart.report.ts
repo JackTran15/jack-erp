@@ -26,7 +26,7 @@ import {
 import { CountedRows } from '../../../reporting/report-core/report-definition';
 import { assertKnownColumns, projectRows, toTotalsRow } from '../report-data.util';
 import { toEngineFilters } from '../report-column-mapper.util';
-import { resolveInventoryBranchIds } from '../report-scope.util';
+import { resolveOrgWideBranchIds } from '../report-scope.util';
 
 const { STRING, NUMBER } = ReportColumnDataType;
 
@@ -76,7 +76,7 @@ const KEY_MAP: Record<string, string> = {
  * name on `inventory-transfer-summary`.
  *
  * The anchor branch arrives as `filters.store` with exactly one id, which buys
- * the existing 403/400 clamping in `resolveInventoryBranchIds` for free rather
+ * the existing tenancy validation in `resolveOrgWideBranchIds` for free rather
  * than re-implementing scope checks here.
  */
 @Injectable()
@@ -84,6 +84,14 @@ export class TransferSummaryByCounterpartReport
   implements InventoryReportDefinition
 {
   readonly key = INVENTORY_REPORT_KEYS.TRANSFER_SUMMARY_BY_COUNTERPART;
+
+  readonly valueColumns = [
+    'inValue',
+    'outValue',
+    'receivedValue',
+    'diffValue',
+    'inOutDiffValue',
+  ];
 
   constructor(
     private readonly transferReport: TransferReportService,
@@ -163,7 +171,7 @@ export class TransferSummaryByCounterpartReport
    * Period plus the anchor branch.
    *
    * Lives here rather than in `buildData` so `countRows` — reached from the
-   * export path — cannot skip the permission check.
+   * export path — cannot skip the validation.
    */
   private async resolveScope(dto: InventoryReportSearchDto, actor: ActorContext) {
     const filters = dto.filters;
@@ -173,9 +181,9 @@ export class TransferSummaryByCounterpartReport
       endDate: filters.period?.to,
     });
 
-    // Throws 403 for a branch outside the actor's scope, 400 for one outside
-    // the organization — the same rules every other inventory report follows.
-    const branchIds = await resolveInventoryBranchIds(
+    // Throws 400 for a branch outside the organization — the same rule every
+    // other inventory report follows.
+    const branchIds = await resolveOrgWideBranchIds(
       this.branches,
       filters.store,
       actor,

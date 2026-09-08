@@ -10,7 +10,13 @@ import { ItemDirection } from '../../../pos/entities/invoice-item.entity';
 
 const ACC = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const ORG = 'org-1';
-const actor = { userId: 'u1', organizationId: ORG, branchId: 'b1', roles: [] } as any;
+const actor = {
+  userId: 'u1',
+  organizationId: ORG,
+  branchId: 'b1',
+  branchIds: ['b1'],
+  roles: [],
+} as any;
 
 const inv = (over: Record<string, any> = {}) => ({
   id: 'i1',

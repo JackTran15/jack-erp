@@ -41,6 +41,7 @@ import { InvoiceOrderListingReport } from './reports/invoice-order-listing.repor
 import { InvoiceItemRevenueDetailReport } from './reports/invoice-item-revenue-detail.report';
 import { RevenueByItemReport } from './reports/revenue-by-item.report';
 import { ReportExportService } from '../report-core/report-export.service';
+import { ReportPermissionGuard } from '../report-core/report-permission.guard';
 import { GetInvoiceReportDocumentHandler } from './queries/get-invoice-report-document.handler';
 import { RevenueByItemParamsBuilder } from './revenue-by-item-params.builder';
 
@@ -77,6 +78,7 @@ import { RevenueByItemParamsBuilder } from './revenue-by-item-params.builder';
     GetInvoiceReportDocumentHandler,
     RevenueByItemParamsBuilder,
     ReportExportService,
+    ReportPermissionGuard,
     // Report definitions (one per report type — add new ones here + to the registry factory).
     DailySalesSummaryReport,
     InvoiceOrderListingReport,

@@ -26,6 +26,7 @@ import { DebtReportExportDto } from './dto/debt-report-export.dto';
 import { debtReportLabel } from './queries/get-debt-report-document.handler';
 import { GetDebtReportDocumentQuery } from './queries/get-debt-report-document.query';
 import {
+  REPORT_DOMAIN_PERMISSIONS,
   ReportDocumentPayload,
   TemplateScope,
 } from '@erp/shared-interfaces';
@@ -35,6 +36,7 @@ import {
 } from '../../../common/decorators/actor-context.decorator';
 import { RequirePermission } from '../../auth/decorators';
 import { PermissionGuard } from '../../rbac/permission.guard';
+import { ReportPermissionGuard } from '../report-core/report-permission.guard';
 import { CreateDebtReportTemplateCommand } from './commands/create-debt-report-template.command';
 import { DeleteDebtReportTemplateCommand } from './commands/delete-debt-report-template.command';
 import { UpdateDebtReportTemplateCommand } from './commands/update-debt-report-template.command';
@@ -48,11 +50,12 @@ import { GetReportFilterOptionsQuery } from './queries/get-report-filter-options
 import { ListDebtReportTemplatesQuery } from './queries/list-debt-report-templates.query';
 import { SearchDebtReportQuery } from './queries/search-debt-report.query';
 
-const DEBTS_READ = 'reporting.debts.read';
+/** Opens the screen; `ReportPermissionGuard` narrows to the requested report. */
+const DEBTS_READ = REPORT_DOMAIN_PERMISSIONS.debts.floor;
 
 @ApiTags('reports/debts')
 @Controller('reports/debts')
-@UseGuards(PermissionGuard)
+@UseGuards(PermissionGuard, ReportPermissionGuard)
 export class DebtReportController {
   constructor(
     private readonly queryBus: QueryBus,

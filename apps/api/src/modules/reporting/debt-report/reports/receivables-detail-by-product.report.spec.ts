@@ -5,7 +5,16 @@ import { ReceivablesDetailByProductReport } from './receivables-detail-by-produc
 
 const ORG = 'org-1';
 const CUSTOMER = 'c1';
-const actor = { userId: 'u1', organizationId: ORG, branchId: 'b1', roles: [] } as any;
+const actor = {
+  userId: 'u1',
+  organizationId: ORG,
+  branchId: 'b1',
+  branchIds: ['b1'],
+  roles: [],
+} as any;
+
+/** No consolidated grant — the default, branch-clamped path. */
+const rbac: any = { hasPermission: jest.fn(async () => false) };
 
 const OPENING = 2531500;
 
@@ -113,6 +122,7 @@ function makeReport(opts: {
     branchesRepo,
     categoriesRepo,
     itemsRepo,
+    rbac,
   );
 }
 

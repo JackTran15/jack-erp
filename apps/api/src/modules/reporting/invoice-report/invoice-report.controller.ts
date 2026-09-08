@@ -26,6 +26,7 @@ import { InvoiceReportExportDto } from './dto/invoice-report-export.dto';
 import { invoiceReportLabel } from './queries/get-invoice-report-document.handler';
 import { GetInvoiceReportDocumentQuery } from './queries/get-invoice-report-document.query';
 import {
+  REPORT_DOMAIN_PERMISSIONS,
   ReportDocumentPayload,
   ReportGroupBy,
   TemplateScope,
@@ -36,6 +37,7 @@ import {
 } from '../../../common/decorators/actor-context.decorator';
 import { RequirePermission } from '../../auth/decorators';
 import { PermissionGuard } from '../../rbac/permission.guard';
+import { ReportPermissionGuard } from '../report-core/report-permission.guard';
 import { CreateInvoiceReportTemplateCommand } from './commands/create-invoice-report-template.command';
 import { DeleteInvoiceReportTemplateCommand } from './commands/delete-invoice-report-template.command';
 import { UpdateInvoiceReportTemplateCommand } from './commands/update-invoice-report-template.command';
@@ -51,12 +53,20 @@ import { ListInvoiceReportTemplatesQuery } from './queries/list-invoice-report-t
 import { ListInvoiceReportTypesQuery } from './queries/list-invoice-report-types.query';
 import { SearchInvoiceReportQuery } from './queries/search-invoice-report.query';
 
-const BRANCH_READ = 'reporting.invoice.branch.read';
-// const TEMPLATE_MANAGE = 'reporting.invoice-template.manage';
+/**
+ * Opens the screen; `ReportPermissionGuard` narrows to the requested report.
+ *
+ * Template CRUD is gated on this same key rather than on
+ * `reporting.invoice-template.manage`, matching what profit/debt/inventory
+ * already do: a template is a personal saved view of a report the user can
+ * already run, so read access is the right bar. (Those three decorators used to
+ * be commented out, which left template CRUD unguarded entirely.)
+ */
+const BRANCH_READ = REPORT_DOMAIN_PERMISSIONS.sales.floor;
 
 @ApiTags('reports/invoices')
 @Controller('reports/invoices')
-@UseGuards(PermissionGuard)
+@UseGuards(PermissionGuard, ReportPermissionGuard)
 export class InvoiceReportController {
   constructor(
     private readonly queryBus: QueryBus,
@@ -151,7 +161,7 @@ export class InvoiceReportController {
   }
 
   @Post('templates')
-  // @RequirePermission(TEMPLATE_MANAGE)
+  @RequirePermission(BRANCH_READ)
   createTemplate(
     @Body() dto: CreateInvoiceReportTemplateDto,
     @Actor() actor: ActorContext,
@@ -162,7 +172,7 @@ export class InvoiceReportController {
   }
 
   @Patch('templates/:id')
-  // @RequirePermission(TEMPLATE_MANAGE)
+  @RequirePermission(BRANCH_READ)
   updateTemplate(
     @Param('id') id: string,
     @Body() dto: UpdateInvoiceReportTemplateDto,
@@ -174,7 +184,7 @@ export class InvoiceReportController {
   }
 
   @Delete('templates/:id')
-  // @RequirePermission(TEMPLATE_MANAGE) // NEED CHECK - maybe allow users to delete their own templates without this permission?
+  @RequirePermission(BRANCH_READ)
   deleteTemplate(
     @Param('id') id: string,
     @Actor() actor: ActorContext,

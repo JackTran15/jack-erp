@@ -32,7 +32,7 @@ import {
 import { ItemCategoryEntity } from '../../../inventory/location/item-category.entity';
 import {
   resolveDescendantCategoryIds,
-  resolveInventoryBranchIds,
+  resolveOrgWideBranchIds,
 } from '../report-scope.util';
 
 const { STRING, NUMBER, DATE } = ReportColumnDataType;
@@ -145,7 +145,7 @@ export class TempWarehouseOutReport implements InventoryReportDefinition {
       startDate: filters.period?.from,
       endDate: filters.period?.to,
     });
-    const branchIds = await resolveInventoryBranchIds(
+    const branchIds = await resolveOrgWideBranchIds(
       this.branches,
       filters.store,
       actor,

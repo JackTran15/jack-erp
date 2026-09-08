@@ -42,7 +42,7 @@ import {
   toTotalsRow,
 } from '../report-data.util';
 import {
-  resolveInventoryBranchIds,
+  resolveOrgWideBranchIds,
   resolveWarehouseLocationIds,
   resolveDescendantCategoryIds,
 } from '../report-scope.util';
@@ -159,6 +159,15 @@ const KEY_MAP = {
 export class StockSummaryReport implements InventoryReportDefinition {
   readonly key = INVENTORY_REPORT_KEYS.STOCK_SUMMARY;
 
+  readonly valueColumns = [
+    'openingValue',
+    'inValue',
+    'outValue',
+    'endingValue',
+    'transferOutValue',
+    'incomingValue',
+  ];
+
   constructor(
     private readonly stockPeriod: StockPeriodService,
     @InjectRepository(BranchEntity)
@@ -258,7 +267,15 @@ export class StockSummaryReport implements InventoryReportDefinition {
     rows: StockPeriodRow[],
   ): Promise<Map<string, ItemWarehouseLocation>> {
     const wanted = dto.columns.some((c) => LOCATION_COLUMN_KEYS.includes(c));
-    const branchId = branchIds?.length === 1 ? branchIds[0] : null;
+    // No store selection means organization-wide (ADR-04), which has no single
+    // branch to read a shelf in — fall back to the request's active branch,
+    // which is the store the user is actually looking at. An explicit
+    // multi-store selection still has no answer.
+    const branchId = branchIds
+      ? branchIds.length === 1
+        ? branchIds[0]
+        : null
+      : (actor.branchId ?? null);
     if (!wanted || !branchId || dto.filters.viewMode === 'chain' || !rows.length) {
       return new Map();
     }
@@ -305,7 +322,7 @@ export class StockSummaryReport implements InventoryReportDefinition {
       endDate: filters.period?.to,
     });
     const [branchIds, locationIds] = await Promise.all([
-      resolveInventoryBranchIds(this.branches, filters.store, actor),
+      resolveOrgWideBranchIds(this.branches, filters.store, actor),
       resolveWarehouseLocationIds(
         this.locations,
         filters.warehouseIds,

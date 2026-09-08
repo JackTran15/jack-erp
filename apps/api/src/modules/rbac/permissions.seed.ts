@@ -1,4 +1,8 @@
-import { PERMISSION_LABELS_VI } from "@erp/shared-interfaces";
+import {
+  INVENTORY_VALUE_PERMISSION,
+  PERMISSION_LABELS_VI,
+  REPORT_PERMISSION_KEYS,
+} from "@erp/shared-interfaces";
 
 export interface PermissionSeed {
   key: string;
@@ -186,7 +190,8 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "accounting.cash_transfer.read", module: "accounting" },
   { key: "accounting.deposit_dashboard.read", module: "accounting" },
 
-  // Reporting
+  // Reporting — group-level keys: open the screen and call the endpoints that
+  // carry no reportType. Per-report keys are spread in below.
   { key: "reporting.dashboard.branch.read", module: "reporting" },
   { key: "reporting.dashboard.consolidated.read", module: "reporting" },
   { key: "inventory.reports.read", module: "reporting" },
@@ -194,7 +199,17 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "reporting.invoice.consolidated.read", module: "reporting" },
   { key: "reporting.invoice-template.manage", module: "reporting" },
   { key: "reporting.debts.read", module: "reporting" },
+  { key: "reporting.debts.consolidated.read", module: "reporting" },
   { key: "reporting.profit.read", module: "reporting" },
+  { key: "reporting.profit.consolidated.read", module: "reporting" },
+  { key: INVENTORY_VALUE_PERMISSION, module: "reporting" },
+
+  // Reporting — one key per report, derived from the catalogue the guard and
+  // the backoffice dropdown read, so the three never drift apart.
+  ...Object.values(REPORT_PERMISSION_KEYS).map((key) => ({
+    key,
+    module: "reporting",
+  })),
 
   // Promotion (CTKM)
   { key: "promotion.read", module: "promotion" },

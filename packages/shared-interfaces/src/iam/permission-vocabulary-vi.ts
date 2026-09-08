@@ -64,13 +64,13 @@ export const PERMISSION_RESOURCE_LABELS_VI: Record<string, string> = {
   "accounting.expenses": "Chi phí",
   "accounting.journal": "Bút toán",
 
-  // Báo cáo
-  "reporting.dashboard": "Báo cáo",
-  "reporting.invoice": "Báo cáo hóa đơn",
+  // Báo cáo — một card cho mỗi nhóm, mỗi báo cáo là một checkbox trong card.
+  "reporting.dashboard": "Báo cáo tổng quan",
+  "reporting.sales": "Báo cáo bán hàng",
   "reporting.invoice-template": "Mẫu báo cáo hóa đơn",
+  "reporting.inventory": "Báo cáo kho",
   "reporting.debts": "Báo cáo công nợ",
   "reporting.profit": "Báo cáo lợi nhuận",
-  "inventory.reports": "Báo cáo nhập xuất tồn",
 
   // Hệ thống
   "iam.user": "Người dùng",
@@ -93,6 +93,12 @@ export const PERMISSION_RESOURCE_LABELS_VI: Record<string, string> = {
 export const PERMISSION_RESOURCE_ALIASES: Record<string, string> = {
   "accounting.payable": "accounting.payables",
   "accounting.receivable": "accounting.receivables",
+  // The inventory-report floor key predates the `reporting.` prefix and cannot
+  // be renamed without invalidating every grant; alias it so it sits in the same
+  // card as the per-report keys instead of a card of its own.
+  "inventory.reports": "reporting.inventory",
+  // Same for the sales floor: the keys say `invoice`, the screen says "Bán hàng".
+  "reporting.invoice": "reporting.sales",
 };
 
 /** Short labels for the action segment of a permission key. */
@@ -177,6 +183,55 @@ export const PERMISSION_SHORT_LABELS_VI: Record<string, string> = {
   "accounting.cash_transfer.create": "Tạo lệnh chuyển",
   "accounting.deposit_transfer.create": "Tạo lệnh chuyển",
   "iam.role.delete": "Xóa (trừ vai trò hệ thống)",
+
+  // Báo cáo — quyền nhóm ("floor") và quyền toàn chuỗi.
+  "reporting.invoice.branch.read": "Mở nhóm báo cáo",
+  "reporting.invoice.consolidated.read": "Xem toàn chuỗi cửa hàng",
+  "reporting.profit.read": "Mở nhóm báo cáo",
+  "reporting.profit.consolidated.read": "Xem toàn chuỗi cửa hàng",
+  "reporting.debts.read": "Mở nhóm báo cáo",
+  "reporting.debts.consolidated.read": "Xem toàn chuỗi cửa hàng",
+  "inventory.reports.read": "Mở nhóm báo cáo",
+  "reporting.inventory.value.read": "Xem giá trị nhập/xuất",
+
+  // Báo cáo — một dòng cho mỗi báo cáo, đúng tên hiển thị trên màn hình.
+  "reporting.sales.daily-sales-summary.read":
+    "Tổng hợp bán hàng theo ngày",
+  "reporting.sales.invoice-order-listing.read":
+    "Bảng kê hóa đơn và đơn hàng",
+  "reporting.sales.invoice-item-revenue-detail.read":
+    "Chi tiết doanh thu theo hóa đơn và mặt hàng",
+  "reporting.sales.revenue-by-item.read": "Doanh thu theo mặt hàng",
+  "reporting.profit.profit-by-item.read": "Lợi nhuận theo mặt hàng",
+  "reporting.profit.gross-profit-by-invoice.read":
+    "Lợi nhuận gộp theo hóa đơn",
+  "reporting.profit.business-results.read": "Kết quả kinh doanh",
+  "reporting.debts.customer-debts.read": "Công nợ khách hàng",
+  "reporting.debts.receivables-detail-by-product.read":
+    "Chi tiết công nợ phải thu theo mặt hàng",
+  "reporting.debts.supplier-debts.read": "Công nợ nhà cung cấp",
+  "reporting.debts.supplier-debts-detail-by-document-and-product.read":
+    "Chi tiết công nợ nhà cung cấp theo chứng từ và mặt hàng",
+  "reporting.inventory.stock-summary.read": "Tổng hợp nhập xuất tồn kho",
+  "reporting.inventory.document-detail.read":
+    "Bảng kê chi tiết phiếu nhập xuất kho",
+  "reporting.inventory.stock-quantity-detail.read":
+    "Chi tiết số lượng nhập xuất tồn kho",
+  "reporting.inventory.stock-summary-by-store.read":
+    "Tổng hợp nhập xuất tồn kho theo cửa hàng",
+  "reporting.inventory.stock-by-store-pivot.read":
+    "Số lượng tồn kho theo cửa hàng",
+  "reporting.inventory.transfer-summary.read":
+    "Tổng hợp nhập xuất điều chuyển",
+  "reporting.inventory.transfer-summary-by-counterpart.read":
+    "Chi tiết nhập xuất điều chuyển theo cửa hàng",
+  "reporting.inventory.transfer-document-detail.read":
+    "Chi tiết phiếu nhập xuất điều chuyển theo cửa hàng và chứng từ",
+  "reporting.inventory.transfer-difference-detail.read":
+    "Chi tiết chênh lệch điều chuyển",
+  "reporting.inventory.transfer-by-store.read":
+    "Tổng hợp hàng hóa đã điều chuyển theo cửa hàng",
+  "reporting.inventory.temp-warehouse-out.read": "Hàng hóa xuất kho tạm",
 };
 
 /**

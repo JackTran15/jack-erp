@@ -41,9 +41,9 @@ import { enrichHeader } from '../report-column.util';
 import {
   applyBranchScope,
   applyInvoiceStatusFilter,
-  CONSOLIDATED_PERMISSION,
+  SALES_CONSOLIDATED,
   invoiceTypeSign,
-  resolveBranchIds,
+  resolveReportBranchIds,
 } from '../../report-core/report-query.util';
 import { allocatePoints } from '../../report-core/allocate-points.util';
 import {
@@ -93,7 +93,7 @@ function resolveGrain(
  *
  * The last case is the common one and used to fall through to "none": a user
  * with consolidated access who never touches the "Cửa hàng" filter sends no
- * store scope, `resolveBranchIds` returns null (= don't restrict invoices),
+ * store scope, `resolveReportBranchIds` returns null (= don't restrict invoices),
  * and both columns came back empty on every row.
  */
 function resolveLocationBranchId(
@@ -183,9 +183,9 @@ export class RevenueByItemReport implements ReportDefinition {
     const hasConsolidated = await this.rbac.hasPermission(
       actor.userId,
       actor.organizationId,
-      CONSOLIDATED_PERMISSION,
+      SALES_CONSOLIDATED,
     );
-    const branchIds = resolveBranchIds(
+    const branchIds = resolveReportBranchIds(
       hasConsolidated,
       dto.filters.store,
       dto.branchId ?? dto.filters.branchId,

@@ -34,7 +34,7 @@ import {
 } from '../report-data.util';
 import { ItemCategoryEntity } from '../../../inventory/location/item-category.entity';
 import {
-  resolveInventoryBranchIds,
+  resolveOrgWideBranchIds,
   resolveWarehouseLocationIds,
   resolveDescendantCategoryIds,
 } from '../report-scope.util';
@@ -192,7 +192,7 @@ export class StockQuantityDetailReport implements InventoryReportDefinition {
       endDate: filters.period?.to,
     });
     const [branchIds, locationIds] = await Promise.all([
-      resolveInventoryBranchIds(this.branches, filters.store, actor),
+      resolveOrgWideBranchIds(this.branches, filters.store, actor),
       resolveWarehouseLocationIds(
         this.locations,
         filters.warehouseIds,

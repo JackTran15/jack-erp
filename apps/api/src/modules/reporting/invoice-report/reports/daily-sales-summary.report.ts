@@ -42,10 +42,10 @@ import { enrichHeader } from '../report-column.util';
 import {
   applyBranchScope,
   applyInvoiceStatusFilter,
-  CONSOLIDATED_PERMISSION,
+  SALES_CONSOLIDATED,
   invoiceTypeSign,
   loadSignedLineDiscounts,
-  resolveBranchIds,
+  resolveReportBranchIds,
   signedGoods,
 } from '../../report-core/report-query.util';
 import { ReportDefinition } from '../report-definition';
@@ -150,9 +150,9 @@ export class DailySalesSummaryReport implements ReportDefinition {
     const hasConsolidated = await this.rbac.hasPermission(
       actor.userId,
       actor.organizationId,
-      CONSOLIDATED_PERMISSION,
+      SALES_CONSOLIDATED,
     );
-    const branchIds = resolveBranchIds(
+    const branchIds = resolveReportBranchIds(
       hasConsolidated,
       dto.filters.store,
       dto.branchId ?? dto.filters.branchId,

@@ -34,8 +34,8 @@ import { InvoiceEntity, InvoiceType } from '../../../pos/entities/invoice.entity
 import { RbacService } from '../../../rbac/rbac.service';
 import {
   applyBranchScope,
-  CONSOLIDATED_PERMISSION,
-  resolveBranchIds,
+  PROFIT_CONSOLIDATED,
+  resolveReportBranchIds,
 } from '../../report-core/report-query.util';
 import {
   BusinessResultsRawValues,
@@ -114,9 +114,9 @@ export class BusinessResultsReport implements ReportDefinition {
     const hasConsolidated = await this.rbac.hasPermission(
       actor.userId,
       actor.organizationId,
-      CONSOLIDATED_PERMISSION,
+      PROFIT_CONSOLIDATED,
     );
-    const branchIds = resolveBranchIds(
+    const branchIds = resolveReportBranchIds(
       hasConsolidated,
       dto.filters.store,
       dto.filters.branchId,

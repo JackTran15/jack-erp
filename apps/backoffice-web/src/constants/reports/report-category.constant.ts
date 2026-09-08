@@ -1,6 +1,26 @@
+import {
+  REPORT_DOMAIN_PERMISSIONS,
+  reportPermissionsOfDomain,
+  type ReportDomain,
+} from "@erp/shared-interfaces";
 import { STORE_TYPE } from "../store.constant";
 import { REPORT_TYPE_DEBTS, REPORT_TYPE_INVENTORY, REPORT_TYPE_PROFIT, REPORT_TYPE_SALES } from "./report-type.constant";
 import type { ReportCategoryMetadata } from "./report.interface";
+
+/**
+ * Menu/route gate của một nhóm báo cáo: quyền mở nhóm HOẶC quyền của bất kỳ báo
+ * cáo nào trong nhóm.
+ *
+ * Chỉ có quyền mở nhóm thôi là chưa đủ để thấy menu (sẽ vào một trang rỗng), và
+ * ngược lại, được cấp đúng một báo cáo thì vẫn phải thấy menu. `satisfiesPermission`
+ * hiểu mảng là "any-of" nên liệt kê cả hai là đúng ngữ nghĩa.
+ */
+function categoryPermissions(domain: ReportDomain): string[] {
+  return [
+    REPORT_DOMAIN_PERMISSIONS[domain].floor,
+    ...reportPermissionsOfDomain(domain),
+  ];
+}
 
 export enum REPORT_CATEGORY {
   SALES = 'sales',
@@ -46,7 +66,7 @@ export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCat
   [REPORT_CATEGORY.SALES]: {
     label: "Bán hàng",
     url: "/reports/sales",
-    permission: "reporting.invoice.branch.read",
+    permission: categoryPermissions("sales"),
     configs: {
       [STORE_TYPE.SINGLE]: {
         listReport: Object.values(REPORT_TYPE_SALES),
@@ -60,7 +80,7 @@ export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCat
     label: "Kho",
     // Trang ReportPage generic (contract v2) — surface duy nhất của báo cáo kho.
     url: "/reports/inventory",
-    permission: "inventory.reports.read",
+    permission: categoryPermissions("inventory"),
     configs: {
       // 8 báo cáo kho đã cấu hình (registry + fetcher).
       [STORE_TYPE.SINGLE]: { listReport: STORAGE_REPORTS },
@@ -82,7 +102,7 @@ export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCat
   [REPORT_CATEGORY.DEBTS]: {
     label: "Công nợ",
     url: "/reports/debts",
-    permission: "reporting.debts.read",
+    permission: categoryPermissions("debts"),
     configs: {
       [STORE_TYPE.SINGLE]: { listReport: DEBT_REPORTS },
       [STORE_TYPE.CHAIN]: { listReport: DEBT_REPORTS },
@@ -95,7 +115,7 @@ export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCat
   [REPORT_CATEGORY.PROFIT]: {
     label: "Lợi nhuận",
     url: "/reports/profit",
-    permission: "reporting.profit.read",
+    permission: categoryPermissions("profit"),
     configs: {
       [STORE_TYPE.SINGLE]: { listReport: PROFIT_REPORTS },
       [STORE_TYPE.CHAIN]: { listReport: PROFIT_REPORTS },

@@ -3,6 +3,7 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BranchEntity } from '../branch/branch.entity';
 import { ReportExportService } from '../reporting/report-core/report-export.service';
+import { ReportPermissionGuard } from '../reporting/report-core/report-permission.guard';
 import { ReportTemplateEntity } from '../reporting/report-core/report-template.entity';
 import { ItemEntity } from '../inventory/location/item.entity';
 import { ItemCategoryEntity } from '../inventory/location/item-category.entity';
@@ -108,6 +109,7 @@ const REPORT_DEFINITIONS = [
     SearchInventoryReportHandler,
     GetInventoryReportDocumentHandler,
     ReportExportService,
+    ReportPermissionGuard,
     CreateInventoryReportTemplateHandler,
     UpdateInventoryReportTemplateHandler,
     DeleteInventoryReportTemplateHandler,

@@ -26,6 +26,7 @@ import { ProfitReportExportDto } from './dto/profit-report-export.dto';
 import { profitReportLabel } from './queries/get-profit-report-document.handler';
 import { GetProfitReportDocumentQuery } from './queries/get-profit-report-document.query';
 import {
+  REPORT_DOMAIN_PERMISSIONS,
   ReportDocumentPayload,
   ReportGroupBy,
   TemplateScope,
@@ -36,6 +37,7 @@ import {
 } from '../../../common/decorators/actor-context.decorator';
 import { RequirePermission } from '../../auth/decorators';
 import { PermissionGuard } from '../../rbac/permission.guard';
+import { ReportPermissionGuard } from '../report-core/report-permission.guard';
 import { CreateProfitReportTemplateCommand } from './commands/create-profit-report-template.command';
 import { DeleteProfitReportTemplateCommand } from './commands/delete-profit-report-template.command';
 import { UpdateProfitReportTemplateCommand } from './commands/update-profit-report-template.command';
@@ -49,11 +51,12 @@ import { GetReportFilterOptionsQuery } from './queries/get-report-filter-options
 import { ListProfitReportTemplatesQuery } from './queries/list-profit-report-templates.query';
 import { SearchProfitReportQuery } from './queries/search-profit-report.query';
 
-const PROFIT_READ = 'reporting.profit.read';
+/** Opens the screen; `ReportPermissionGuard` narrows to the requested report. */
+const PROFIT_READ = REPORT_DOMAIN_PERMISSIONS.profit.floor;
 
 @ApiTags('reports/profit')
 @Controller('reports/profit')
-@UseGuards(PermissionGuard)
+@UseGuards(PermissionGuard, ReportPermissionGuard)
 export class ProfitReportController {
   constructor(
     private readonly queryBus: QueryBus,

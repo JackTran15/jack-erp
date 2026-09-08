@@ -74,6 +74,7 @@ const actor: ActorContext = {
   userId: 'u1',
   organizationId: 'org1',
   branchId: 'b1',
+  branchIds: ['b1'],
   roles: [],
   permissions: [],
 } as unknown as ActorContext;

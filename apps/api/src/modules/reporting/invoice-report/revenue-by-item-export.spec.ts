@@ -11,7 +11,13 @@ import {
 import { XlsxStreamWriter } from '../report-core/export/xlsx-stream.writer';
 
 const ORG = 'org-1';
-const actor = { userId: 'u1', organizationId: ORG, branchId: 'b1', roles: [] } as any;
+const actor = {
+  userId: 'u1',
+  organizationId: ORG,
+  branchId: 'b1',
+  branchIds: ['b1'],
+  roles: [],
+} as any;
 
 const MISA_HEADER_LABELS = [
   'Mã SKU',

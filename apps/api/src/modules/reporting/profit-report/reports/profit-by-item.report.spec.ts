@@ -2,7 +2,13 @@ import { ReportGroupBy } from '@erp/shared-interfaces';
 import { ProfitByItemReport } from './profit-by-item.report';
 
 const ORG = 'org-1';
-const actor = { userId: 'u1', organizationId: ORG, branchId: 'b1', roles: [] } as any;
+const actor = {
+  userId: 'u1',
+  organizationId: ORG,
+  branchId: 'b1',
+  branchIds: ['b1'],
+  roles: [],
+} as any;
 
 const inv = (over: Record<string, any> = {}) => ({
   id: 'i1',

@@ -21,6 +21,7 @@ const actor = {
   userId: 'u1',
   organizationId: ORG,
   branchId: 'b1',
+  branchIds: ['b1'],
   roles: [],
 } as any;
 

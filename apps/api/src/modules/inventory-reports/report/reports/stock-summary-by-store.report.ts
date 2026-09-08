@@ -34,7 +34,7 @@ import {
 import { ItemCategoryEntity } from '../../../inventory/location/item-category.entity';
 import {
   resolveDescendantCategoryIds,
-  resolveInventoryBranchIds,
+  resolveOrgWideBranchIds,
 } from '../report-scope.util';
 
 const { STRING, NUMBER } = ReportColumnDataType;
@@ -107,6 +107,13 @@ function unfilledAt(statBy: string | undefined): ReadonlySet<string> {
 export class StockSummaryByStoreReport implements InventoryReportDefinition {
   readonly key = INVENTORY_REPORT_KEYS.STOCK_SUMMARY_BY_STORE;
 
+  readonly valueColumns = [
+    'openingValue',
+    'inValue',
+    'outValue',
+    'endingValue',
+  ];
+
   constructor(
     private readonly stockPeriod: StockPeriodService,
     @InjectRepository(BranchEntity)
@@ -166,7 +173,7 @@ export class StockSummaryByStoreReport implements InventoryReportDefinition {
       startDate: filters.period?.from,
       endDate: filters.period?.to,
     });
-    const branchIds = await resolveInventoryBranchIds(
+    const branchIds = await resolveOrgWideBranchIds(
       this.branches,
       filters.store,
       actor,

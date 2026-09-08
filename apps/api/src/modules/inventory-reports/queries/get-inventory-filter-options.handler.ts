@@ -13,7 +13,6 @@ import { ItemEntity } from '../../inventory/location/item.entity';
 import { ItemCategoryEntity } from '../../inventory/location/item-category.entity';
 import { StorageEntity } from '../../inventory/location/storage.entity';
 import { InventoryFilterOptionsQueryDto } from '../dto/inventory-filter-options-query.dto';
-import { permittedBranchIds } from '../report/report-scope.util';
 import { GetInventoryFilterOptionsQuery } from './get-inventory-filter-options.query';
 
 /** Dropdown options for the inventory report filters (store, warehouse, …). */
@@ -64,18 +63,20 @@ export class GetInventoryFilterOptionsHandler
     return ((dto.page ?? 1) - 1) * this.take(dto);
   }
 
-  /** Stores — only the branches the actor manages; value = branch id. */
+  /**
+   * Stores — every branch of the organization; value = branch id.
+   *
+   * Inventory reports are organization-wide (ADR-04), so the picker has to
+   * offer every store: a list clamped to the actor's assignments would leave
+   * stores they are allowed to report on unreachable. Money is not exposed
+   * here — the value columns are gated by `INVENTORY_VALUE_PERMISSION`.
+   */
   private async stores(
     org: string,
     dto: InventoryFilterOptionsQueryDto,
-    actor: ActorContext,
+    _actor: ActorContext,
   ): Promise<IDropdownOption[]> {
-    const permitted = permittedBranchIds(actor);
-    if (!permitted.size) return [];
-    const where: FindOptionsWhere<BranchEntity> = {
-      organizationId: org,
-      id: In([...permitted]),
-    };
+    const where: FindOptionsWhere<BranchEntity> = { organizationId: org };
     if (dto.search) where.name = ILike(`%${dto.search}%`);
     const rows = await this.branches.find({
       where,
@@ -91,23 +92,17 @@ export class GetInventoryFilterOptionsHandler
   }
 
   /**
-   * Warehouses — storages of the requested branches ∩ the branches the actor
-   * manages (no branchIds requested ⇒ every permitted branch); value = storage id.
+   * Warehouses — storages of the requested branches, or of every branch when
+   * none is requested; value = storage id. Organization-wide for the same
+   * reason `stores` above is.
    */
   private async warehouses(
     org: string,
     dto: InventoryFilterOptionsQueryDto,
-    actor: ActorContext,
+    _actor: ActorContext,
   ): Promise<IDropdownOption[]> {
-    const permitted = permittedBranchIds(actor);
-    const effective = dto.branchIds?.length
-      ? dto.branchIds.filter((id) => permitted.has(id))
-      : [...permitted];
-    if (!effective.length) return [];
-    const where: FindOptionsWhere<StorageEntity> = {
-      organizationId: org,
-      branchId: In(effective),
-    };
+    const where: FindOptionsWhere<StorageEntity> = { organizationId: org };
+    if (dto.branchIds?.length) where.branchId = In(dto.branchIds);
     if (dto.search) where.name = ILike(`%${dto.search}%`);
     const rows = await this.storages.find({
       where,
