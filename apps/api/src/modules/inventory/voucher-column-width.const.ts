@@ -1,8 +1,8 @@
 /**
  * Column widths for the stock voucher line table, in characters.
  *
- * One table for all three vouchers, because the three column sets overlap
- * almost entirely and three copies of these numbers would be three chances to
+ * One table for all four stock vouchers, because the four column sets overlap
+ * almost entirely and four copies of these numbers would be four chances to
  * drift. Characters is the unit `VoucherXlsxWriter` already reads; the printed
  * page normalises the same numbers into percentages (ADR-13), so a column can
  * never be sized for the file and left wrong on paper.
@@ -42,6 +42,7 @@ export const VOUCHER_COLUMN_WIDTHS: Readonly<Record<string, number>> = {
   sourceWarehouse: 16,
   sourcePosition: 13,
   destWarehouse: 16,
+  destPosition: 13,
   quantity: 11,
   unitPrice: 12,
   lineTotal: 15,

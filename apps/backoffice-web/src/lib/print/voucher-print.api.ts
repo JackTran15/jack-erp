@@ -6,6 +6,7 @@ const PRINT_PAYLOAD_PATH: Partial<Record<VoucherKind, (id: string) => string>> =
   [VoucherKind.GOODS_RECEIPT]: (id) => `/goods-receipts/${id}/print-payload`,
   [VoucherKind.GOODS_ISSUE]: (id) => `/inventory/goods-issues/${id}/print-payload`,
   [VoucherKind.TRANSFER_ORDER]: (id) => `/inventory/transfer-orders/${id}/print-payload`,
+  [VoucherKind.STOCK_TRANSFER]: (id) => `/inventory/stock/transfers/${id}/print-payload`,
 };
 
 /**
