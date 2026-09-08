@@ -16,7 +16,7 @@ import type {
   ReportColumnDataType as FeColumnDataType,
   ReportTableConfig,
 } from "../../../../constants/reports/report.interface";
-import { DEFAULT_REPORT_COLUMN_WIDTH } from "../../../../lib/table";
+import { defaultReportColumnWidth } from "../../../../lib/table";
 import type {
   InvoiceDetailTarget,
   ReportColumnFilter,
@@ -87,30 +87,34 @@ function feDataType(type: ReportColumnDataType): FeColumnDataType {
 }
 
 // columns API → ReportTableConfig. Backend giờ là nguồn sự thật cho filterKind/filterOptions/
-// align/pinned/link; FE chỉ map thẳng, không tự suy ra nữa.
+// align/pinned/link/width; FE chỉ map thẳng, không tự suy ra nữa. Cột không có width
+// → mặc định theo dataType (text rộng hơn số để SKU/tên hàng không xuống dòng).
 export function mapHeadersToTableConfig(
   result: InvoiceReportColumnsResult,
 ): ReportTableConfig {
   return {
     summaryLabel: result.summaryLabel ?? "Tổng",
-    columns: result.columns.map((h: ReportColumnHeader, index) => ({
-      column: h.col,
-      order: index + 1,
-      label: h.name ?? h.col,
-      group: h.group?.name ?? null,
-      visible: true,
-      backendField: h.col,
-      formulaDisplay: h.desc ?? undefined,
-      tableConfig: {
-        dataType: feDataType(h.type),
-        width: DEFAULT_REPORT_COLUMN_WIDTH,
-        align: h.align,
-        pinned: h.pinned ?? undefined,
-        link: h.link ?? false,
-        filterKind: h.filterKind,
-        filterOptions: h.filterOptions,
-      },
-    })),
+    columns: result.columns.map((h: ReportColumnHeader, index) => {
+      const dataType = feDataType(h.type);
+      return {
+        column: h.col,
+        order: index + 1,
+        label: h.name ?? h.col,
+        group: h.group?.name ?? null,
+        visible: true,
+        backendField: h.col,
+        formulaDisplay: h.desc ?? undefined,
+        tableConfig: {
+          dataType,
+          width: h.width ?? defaultReportColumnWidth(dataType),
+          align: h.align,
+          pinned: h.pinned ?? undefined,
+          link: h.link ?? false,
+          filterKind: h.filterKind,
+          filterOptions: h.filterOptions,
+        },
+      };
+    }),
   };
 }
 

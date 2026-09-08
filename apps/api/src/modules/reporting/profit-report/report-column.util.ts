@@ -1,4 +1,5 @@
 import { ReportColumnDataType, ReportColumnFilterKind, ReportColumnHeader } from '@erp/shared-interfaces';
+import { reportColumnWidth } from '../report-core/report-column-widths';
 
 const NUMBER_TYPES = new Set<ReportColumnDataType>([
   ReportColumnDataType.NUMBER,
@@ -23,7 +24,8 @@ export function filterKindFor(
 
 /**
  * Enrich a base {col,name,desc,type,group} header with the FE display + filter
- * metadata the chain-store table config needs (filterKind, alignment, pinned).
+ * metadata the chain-store table config needs (filterKind, alignment, pinned,
+ * width for the shared identity columns).
  * Backend owns this so the FE renders uniformly from one source.
  */
 export function enrichHeader(
@@ -36,5 +38,7 @@ export function enrichHeader(
     align: NUMBER_TYPES.has(base.type) ? 'right' : 'left',
   };
   if (PINNED_LEFT.has(base.col)) header.pinned = 'left';
+  const width = reportColumnWidth(base.col);
+  if (width !== undefined) header.width = width;
   return header;
 }

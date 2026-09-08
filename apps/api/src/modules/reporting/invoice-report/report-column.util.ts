@@ -4,6 +4,7 @@ import {
   ReportColumnFilterKind,
   ReportColumnHeader,
 } from '@erp/shared-interfaces';
+import { reportColumnWidth } from '../report-core/report-column-widths';
 
 const NUMBER_TYPES = new Set<ReportColumnDataType>([
   ReportColumnDataType.NUMBER,
@@ -37,8 +38,8 @@ export function filterKindFor(
 /**
  * Enrich a base {col,name,desc,type,group} header with the FE display + filter
  * metadata the chain-store table config needs (filterKind, filterOptions for
- * select columns, alignment, link, pinned). Backend owns this so the FE renders
- * uniformly from one source.
+ * select columns, alignment, link, pinned, width for the shared identity
+ * columns). Backend owns this so the FE renders uniformly from one source.
  */
 export function enrichHeader(
   base: Pick<ReportColumnHeader, 'col' | 'name' | 'desc' | 'type' | 'group'>,
@@ -52,5 +53,7 @@ export function enrichHeader(
   if (base.col === 'status') header.filterOptions = INVOICE_STATUS_OPTIONS;
   if (LINK_COLUMNS.has(base.col)) header.link = true;
   if (PINNED_LEFT.has(base.col)) header.pinned = 'left';
+  const width = reportColumnWidth(base.col);
+  if (width !== undefined) header.width = width;
   return header;
 }
