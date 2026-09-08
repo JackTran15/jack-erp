@@ -40,6 +40,10 @@ export type PermissionSection = {
 
 /** Left-nav sections: which modules belong to which top-level group. */
 const SECTIONS: { id: string; label: string; modules: string[] }[] = [
+  // Báo cáo đứng đầu: đây là phần được sửa nhiều nhất khi cấu hình một vai trò,
+  // và cũng là phần có nhiều mục nhất (33 quyền) — để nó ở giữa danh sách thì
+  // lần nào cũng phải cuộn mới tới.
+  { id: "reporting", label: "Báo cáo", modules: ["reporting"] },
   { id: "sales", label: "Bán hàng", modules: ["pos", "promotion", "customer"] },
   {
     id: "warehouse",
@@ -47,7 +51,6 @@ const SECTIONS: { id: string; label: string; modules: string[] }[] = [
     modules: ["inventory", "product"],
   },
   { id: "accounting", label: "Kế toán", modules: ["accounting"] },
-  { id: "reporting", label: "Báo cáo", modules: ["reporting"] },
   {
     id: "system",
     label: "Hệ thống",

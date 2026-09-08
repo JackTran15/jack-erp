@@ -258,18 +258,24 @@ function CardBlock({ card, selected, readOnly, onSetKeys }: CardBlockProps) {
             key={item.key}
             title={item.fullLabel}
             className={cn(
-              "flex items-start gap-2 text-sm",
+              // Một dòng cho mỗi quyền: nhóm Báo cáo chỉ đủ chỗ cho một cột card,
+              // nên tên dài như "Chi tiết phiếu nhập xuất điều chuyển theo cửa
+              // hàng và chứng từ" xuống hai dòng và danh sách mất nhịp. `truncate`
+              // cắt bằng ellipsis; tên đầy đủ vẫn đọc được ở tooltip `title` phía
+              // trên. `min-w-0` là bắt buộc — thiếu nó thì flex item không co lại
+              // và ellipsis không bao giờ xuất hiện.
+              "flex min-w-0 items-center gap-2 text-sm",
               readOnly ? "cursor-default" : "cursor-pointer",
             )}
           >
             <input
               type="checkbox"
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input"
+              className="h-4 w-4 shrink-0 rounded border-input"
               checked={selected.has(item.key)}
               disabled={readOnly}
               onChange={(e) => onSetKeys([item.key], e.target.checked)}
             />
-            <span>{item.label}</span>
+            <span className="truncate">{item.label}</span>
           </label>
         ))}
       </div>
