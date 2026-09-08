@@ -150,7 +150,13 @@ export class PosCatalogProductService {
       CATALOG_CACHE_TTL_SECONDS,
     );
 
-    const stockByItem = await this.loadBranchStock(orgId, branchId, query.direction);
+    // Not `loadBranchStock`: that one hydrates every balance row in the branch to build figures
+    // this route has no field for. See loadListStockTotals.
+    const stockByItem = await this.loadListStockTotals(
+      orgId,
+      branchId,
+      query.direction,
+    );
 
     // Selecting a group shows that group AND all descendant groups (items are tagged to leaf
     // categories, so a parent group would otherwise be empty).
@@ -167,7 +173,7 @@ export class PosCatalogProductService {
       .map((c) => ({
         ...c,
         quantityOnHand: c.itemIds.reduce(
-          (sum, id) => sum + (stockByItem.get(id)?.total ?? 0),
+          (sum, id) => sum + (stockByItem.get(id) ?? 0),
           0,
         ),
       }));
@@ -490,6 +496,84 @@ export class PosCatalogProductService {
       otherBranchQuantity: extras?.otherBranchQuantity ?? 0,
       storages: extras?.storages ?? [],
     };
+  }
+
+  /**
+   * Sum branch stock per item for the *list* route: one aggregate query, no entity hydration.
+   *
+   * Deliberately not `loadBranchStock`. That method also produces `sellableTotal`, the
+   * oversell-warning threshold two earlier features spent real effort defining, and ADR-01 of
+   * pos-variant-stock-columns fences it off — a decision this route keeps rather than overturns.
+   * The list route never reads `sellableTotal` or `locations`: `PosProductCardDto` has no field
+   * for either, so the only figure it ever needed was the total, which SQL can sum without
+   * materialising the branch's whole balance table as entities. That hydration is synchronous CPU
+   * on the single Node thread, so loading ~14k rows to serve 30 cards inflated the latency of
+   * every other in-flight request, not just this one.
+   *
+   * The filters mirror `loadBranchStock` case for case — including the two null-storage branches
+   * below, which is where a naive `NOT IN` diverges. Changing a shared filter rule now means
+   * moving three places together: here, `loadBranchStock`, and `loadDetailStockExtras`.
+   */
+  private async loadListStockTotals(
+    orgId: string,
+    branchId: string,
+    direction?: PosCatalogDirection,
+  ): Promise<Map<string, number>> {
+    let showroomStorageIds: string[] | null = null;
+    if (direction) {
+      // The same read loadBranchStock does for this branch. The ids are then bound as a
+      // parameter rather than joined in raw SQL: stock_balances.branch_id is varchar while
+      // showrooms.branch_id is uuid, and making one parameter serve both types is what forced
+      // the casting notes in TempWarehouseStagedStockService.
+      const showrooms = await this.showroomRepo.find({
+        where: { organizationId: orgId, branchId },
+      });
+      showroomStorageIds = showrooms.map((s) => s.storageId);
+      // A branch with no showroom configured is a valid state, not an error: SHOWROOM then
+      // matches nothing at all, exactly as the in-memory filter did.
+      if (
+        direction === PosCatalogDirection.SHOWROOM &&
+        showroomStorageIds.length === 0
+      ) {
+        return new Map();
+      }
+    }
+
+    const qb = this.balanceRepo
+      .createQueryBuilder('sb')
+      // Drops stock at deactivated locations, which is what `if (!loc) continue` did.
+      .innerJoin(
+        LocationEntity,
+        'l',
+        'l.id = sb.locationId AND l.organizationId = :orgId AND l.isActive = true',
+      )
+      .select('sb.itemId', 'itemId')
+      .addSelect('SUM(sb.quantity)', 'total')
+      .where('sb.organizationId = :orgId')
+      .andWhere('sb.branchId = :branchId')
+      .andWhere('sb.isTracked = true')
+      .groupBy('sb.itemId')
+      .setParameters({ orgId, branchId });
+
+    if (showroomStorageIds && showroomStorageIds.length > 0) {
+      if (direction === PosCatalogDirection.SHOWROOM) {
+        qb.andWhere('l.storageId IN (:...showroomStorageIds)', {
+          showroomStorageIds,
+        });
+      } else {
+        // `NOT IN` evaluates to NULL for a null storage_id and would drop the row; the
+        // in-memory filter kept it, because `showroomStorageIds.has(undefined)` is false.
+        qb.andWhere(
+          '(l.storageId IS NULL OR l.storageId NOT IN (:...showroomStorageIds))',
+          { showroomStorageIds },
+        );
+      }
+    }
+
+    // `quantity` is numeric, so SUM comes back as a string; one Number() per item rather than
+    // the previous one per row, which is if anything less float drift, not more.
+    const rows = await qb.getRawMany<{ itemId: string; total: string }>();
+    return new Map(rows.map((r) => [r.itemId, Number(r.total) || 0]));
   }
 
   /**

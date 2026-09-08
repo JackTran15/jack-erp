@@ -15,6 +15,7 @@ import { ItemCategoryEntity } from '../../inventory/location/item-category.entit
 import { BranchEntity } from '../../branch/branch.entity';
 import { CacheService } from '../../redis/cache.service';
 import { TempWarehouseStagedStockService } from '../../inventory/temp-warehouse/temp-warehouse-staged-stock.service';
+import { PosCatalogDirection } from '../dto/pos-catalog.query.dto';
 import { PosCatalogProductService } from './pos-catalog-product.service';
 
 const actor: ActorContext = {
@@ -42,6 +43,63 @@ const queryBuilderMock = (rows: unknown[]) => {
     qb[method] = jest.fn(() => qb);
   }
   qb.getMany = jest.fn().mockResolvedValue(rows);
+  return qb;
+};
+
+/**
+ * Chainable stub for the list route's aggregate stock query. The SQL itself is proved against a
+ * restored production database (see 07-verification.md); what these tests pin is the decision
+ * logic around it — which predicates each `direction` adds, and when the query is skipped
+ * altogether — so `clauses` records every where/andWhere fragment in order.
+ */
+const aggregateQueryBuilderMock = (rows: unknown[]) => {
+  const clauses: string[] = [];
+  const qb: Record<string, jest.Mock> & { clauses: string[] } = { clauses } as never;
+  for (const method of ['innerJoin', 'select', 'addSelect', 'groupBy', 'setParameters']) {
+    qb[method] = jest.fn(() => qb);
+  }
+  for (const method of ['where', 'andWhere']) {
+    qb[method] = jest.fn((clause: string) => {
+      clauses.push(clause);
+      return qb;
+    });
+  }
+  qb.getRawMany = jest.fn().mockResolvedValue(rows);
+  return qb;
+};
+
+/**
+ * The same stub, but resolving from balance/location fixtures instead of a hand-written total: it
+ * evaluates the predicates the builder actually added, so a test that flips `direction` still
+ * exercises the classification rather than asserting its own arithmetic. The SQL those predicates
+ * compile to is proved separately against a restored production database (07-verification.md).
+ */
+const aggregateQueryBuilderFor = (
+  balanceRows: { itemId: string; locationId: string; quantity: number }[],
+  activeLocations: { id: string; storageId?: string | null }[],
+) => {
+  const qb = aggregateQueryBuilderMock([]);
+  qb.getRawMany = jest.fn(async () => {
+    const locById = new Map(activeLocations.map((l) => [l.id, l]));
+    const showroomStorageIds: string[] | undefined = qb.andWhere.mock.calls
+      .map(([, params]) => (params as { showroomStorageIds?: string[] })?.showroomStorageIds)
+      .find((ids) => ids !== undefined);
+    const onlyShowroom = qb.clauses.some((c) => c.startsWith('l.storageId IN'));
+    const exceptShowroom = qb.clauses.some((c) => c.includes('NOT IN'));
+
+    const totals = new Map<string, number>();
+    for (const b of balanceRows) {
+      // A location absent from the fixture is one the INNER JOIN would not match.
+      const loc = locById.get(b.locationId);
+      if (!loc) continue;
+      const inShowroom = (showroomStorageIds ?? []).includes(loc.storageId as string);
+      if (onlyShowroom && !inShowroom) continue;
+      if (exceptShowroom && inShowroom) continue;
+      totals.set(b.itemId, (totals.get(b.itemId) ?? 0) + b.quantity);
+    }
+    // numeric SUM arrives as a string, exactly as node-postgres hands it over.
+    return [...totals].map(([itemId, total]) => ({ itemId, total: String(total) }));
+  });
   return qb;
 };
 
@@ -172,8 +230,11 @@ describe('PosCatalogProductService', () => {
       itemRepo.createQueryBuilder.mockReturnValue(
         queryBuilderMock([variantS, variantM, standalone]),
       );
-      balanceRepo.find.mockResolvedValue(balances);
-      locationRepo.find.mockResolvedValue(locations);
+      // Same fixture balances as before; the list route just reads them summed by the database
+      // instead of hydrating every row, so the numbers below are unchanged.
+      balanceRepo.createQueryBuilder.mockReturnValue(
+        aggregateQueryBuilderFor(balances, locations),
+      );
     });
 
     it('groups variants under a product card and exposes a standalone item as its own card', async () => {
@@ -210,7 +271,9 @@ describe('PosCatalogProductService', () => {
       // First call warms the cache; the pass-through mock still rebuilds, but the
       // stock query is always run live regardless of the cached skeleton.
       await service.listProducts('branch-1', actor, { page: 1, pageSize: 20 } as any);
-      balanceRepo.find.mockResolvedValue([{ itemId: 'I1', locationId: 'L1', quantity: 99 }]);
+      balanceRepo.createQueryBuilder.mockReturnValue(
+        aggregateQueryBuilderFor([{ itemId: 'I1', locationId: 'L1', quantity: 99 }], locations),
+      );
 
       const res = await service.listProducts('branch-1', actor, { page: 1, pageSize: 20 } as any);
       expect(cacheService.getOrSet).toHaveBeenCalled();
@@ -263,6 +326,60 @@ describe('PosCatalogProductService', () => {
 
       expect(res.total).toBe(1);
       expect(res.data[0].id).toBe('P1');
+    });
+
+    it('shows a card with no branch stock at all as 0, not as missing', async () => {
+      // AC-04. An item with no stock_balances row produces no group, so the aggregate simply
+      // has no entry for it — the card still has to appear.
+      balanceRepo.createQueryBuilder.mockReturnValue(aggregateQueryBuilderFor([], locations));
+
+      const res = await service.listProducts('branch-1', actor, { page: 1, pageSize: 20 } as any);
+
+      expect(res.total).toBe(2);
+      expect(res.data.map((c) => c.quantityOnHand)).toEqual([0, 0]);
+    });
+
+    it('sorts by quantityOnHand once the aggregate has been folded into the cards', async () => {
+      // AC-06. Sorting happens after the per-card sum, so the sort key comes from the aggregate:
+      // P1 = I1 + I2 = 2, below the standalone I3 = 10.
+      balanceRepo.createQueryBuilder.mockReturnValue(
+        aggregateQueryBuilderFor(
+          [
+            { itemId: 'I1', locationId: 'L1', quantity: 1 },
+            { itemId: 'I2', locationId: 'L1', quantity: 1 },
+            { itemId: 'I3', locationId: 'L1', quantity: 10 },
+          ],
+          locations,
+        ),
+      );
+
+      const desc = await service.listProducts('branch-1', actor, {
+        page: 1,
+        pageSize: 20,
+        sortBy: 'quantityOnHand',
+        sortOrder: 'desc',
+      } as any);
+      expect(desc.data.map((c) => c.id)).toEqual(['I3', 'P1']);
+
+      const asc = await service.listProducts('branch-1', actor, {
+        page: 1,
+        pageSize: 20,
+        sortBy: 'quantityOnHand',
+        sortOrder: 'asc',
+      } as any);
+      expect(asc.data.map((c) => c.id)).toEqual(['P1', 'I3']);
+    });
+
+    it('never hydrates the branch balance or location tables', async () => {
+      // The whole point of the change: those two reads pulled ~14k + ~1k rows into entities on
+      // every page, which is synchronous CPU and delayed every other in-flight request.
+      await service.listProducts('branch-1', actor, { page: 1, pageSize: 20 } as any);
+
+      expect(balanceRepo.find).not.toHaveBeenCalled();
+      expect(locationRepo.find).not.toHaveBeenCalled();
+      // sellableTotal is a detail-route figure; the list never asked for it.
+      expect(storageRepo.find).not.toHaveBeenCalled();
+      expect(getBranchDelta).not.toHaveBeenCalled();
     });
   });
 
@@ -407,6 +524,9 @@ describe('PosCatalogProductService', () => {
       // which stock it offers.
       showroomRepo.find.mockResolvedValue([{ storageId: 'S-WH' }]);
       itemRepo.createQueryBuilder.mockReturnValue(queryBuilderMock([standalone]));
+      balanceRepo.createQueryBuilder.mockReturnValue(
+        aggregateQueryBuilderFor(bxBalances, bxLocations),
+      );
 
       const res = await service.listProducts('branch-1', actor, {
         page: 1,
@@ -1027,6 +1147,121 @@ describe('PosCatalogProductService', () => {
       // loadDetailStockExtras) — bounded and independent of variant count, not
       // once per variant.
       expect(storageRepo.find.mock.calls.length).toBeLessThanOrEqual(2);
+    });
+  });
+
+  /**
+   * The list route reads stock through its own loader rather than `loadBranchStock`, which is
+   * fenced off by ADR-01 of pos-variant-stock-columns because it owns `sellableQuantity`. These
+   * cases cover the filter and `direction` matrix in isolation; T-01-02 covers the wiring.
+   */
+  describe('loadListStockTotals', () => {
+    /** Invokes the private loader the way `listProducts` does. */
+    const load = (direction?: PosCatalogDirection) =>
+      (service as never as {
+        loadListStockTotals: (
+          orgId: string,
+          branchId: string,
+          direction?: PosCatalogDirection,
+        ) => Promise<Map<string, number>>;
+      }).loadListStockTotals('org-1', 'branch-1', direction);
+
+    it('folds the aggregate rows into itemId -> total, coercing the numeric string', async () => {
+      const qb = aggregateQueryBuilderMock([
+        { itemId: 'I1', total: '8' },
+        { itemId: 'I2', total: '2.50' },
+      ]);
+      balanceRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const totals = await load();
+
+      expect(totals.get('I1')).toBe(8);
+      expect(totals.get('I2')).toBe(2.5);
+      // AC-04: an item with no balance row is absent, and listProducts reads it as `?? 0`.
+      expect(totals.has('I3')).toBe(false);
+    });
+
+    it('sums decimals in the database rather than per row in JS', async () => {
+      // 0.1 + 0.2 across two locations. Postgres adds these as numeric and hands back one
+      // string, so the classic float artefact never reaches the card.
+      const qb = aggregateQueryBuilderMock([{ itemId: 'I1', total: '0.30' }]);
+      balanceRepo.createQueryBuilder.mockReturnValue(qb);
+
+      expect((await load()).get('I1')).toBe(0.3);
+    });
+
+    it('filters out untracked rows and deactivated locations', async () => {
+      const qb = aggregateQueryBuilderMock([]);
+      balanceRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await load();
+
+      // AC-03 — the untracked predicate is on the balance side.
+      expect(qb.clauses).toContain('sb.isTracked = true');
+      // AC-02 — the deactivated-location predicate rides on the join, which is what replaces
+      // the old `if (!loc) continue`.
+      const [, , joinCondition] = qb.innerJoin.mock.calls[0];
+      expect(joinCondition).toContain('l.isActive = true');
+      expect(joinCondition).toContain('l.organizationId = :orgId');
+    });
+
+    it('adds no storage predicate and reads no showrooms when direction is omitted', async () => {
+      const qb = aggregateQueryBuilderMock([]);
+      balanceRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await load();
+
+      expect(showroomRepo.find).not.toHaveBeenCalled();
+      expect(qb.clauses.some((c) => c.includes('storageId'))).toBe(false);
+    });
+
+    it('restricts to showroom storages for direction=SHOWROOM', async () => {
+      showroomRepo.find.mockResolvedValue([{ storageId: 'S1' }, { storageId: 'S2' }]);
+      const qb = aggregateQueryBuilderMock([]);
+      balanceRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await load(PosCatalogDirection.SHOWROOM);
+
+      expect(qb.clauses).toContain('l.storageId IN (:...showroomStorageIds)');
+      expect(qb.andWhere).toHaveBeenCalledWith(expect.stringContaining('IN (:...showroomStorageIds)'), {
+        showroomStorageIds: ['S1', 'S2'],
+      });
+    });
+
+    it('returns nothing for direction=SHOWROOM at a branch with no showroom, without querying', async () => {
+      // Not an error: an unconfigured branch matched nothing under the old in-memory filter
+      // either, because every location failed `showroomStorageIds.has(...)`.
+      showroomRepo.find.mockResolvedValue([]);
+      const qb = aggregateQueryBuilderMock([{ itemId: 'I1', total: '5' }]);
+      balanceRepo.createQueryBuilder.mockReturnValue(qb);
+
+      expect((await load(PosCatalogDirection.SHOWROOM)).size).toBe(0);
+      expect(qb.getRawMany).not.toHaveBeenCalled();
+    });
+
+    it('keeps null-storage locations for direction=WAREHOUSE', async () => {
+      showroomRepo.find.mockResolvedValue([{ storageId: 'S1' }]);
+      const qb = aggregateQueryBuilderMock([]);
+      balanceRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await load(PosCatalogDirection.WAREHOUSE);
+
+      // A bare NOT IN evaluates to NULL for a null storage_id and would drop the row, but the
+      // in-memory filter kept it — `showroomStorageIds.has(undefined)` is false. The IS NULL
+      // arm is what preserves that.
+      expect(qb.clauses).toContain(
+        '(l.storageId IS NULL OR l.storageId NOT IN (:...showroomStorageIds))',
+      );
+    });
+
+    it('adds no storage predicate for direction=WAREHOUSE at a branch with no showroom', async () => {
+      showroomRepo.find.mockResolvedValue([]);
+      const qb = aggregateQueryBuilderMock([{ itemId: 'I1', total: '5' }]);
+      balanceRepo.createQueryBuilder.mockReturnValue(qb);
+
+      // Nothing is a showroom, so everything is warehouse — the whole branch, unfiltered.
+      expect((await load(PosCatalogDirection.WAREHOUSE)).get('I1')).toBe(5);
+      expect(qb.clauses.some((c) => c.includes('storageId'))).toBe(false);
     });
   });
 });
