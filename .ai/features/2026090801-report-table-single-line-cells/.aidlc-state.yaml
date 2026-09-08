@@ -1,0 +1,88 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: report-table-single-line-cells
+slug: 2026090801-report-table-single-line-cells
+profile: none
+created: 2026-09-08T09:39:31
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-08T09:52:08
+    by: loc
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-08T09:52:08
+    by: loc
+    evidence: 6 assumptions, none blocking-and-pending; 7 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-08T09:52:08
+    by: loc
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-08T09:52:08
+    by: loc
+    evidence: graph valid - 1 UoW, 4 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T09:52:29
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-08T09:52:29
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-08T09:52:29
+    by: loc
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T09:52:30
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-08T09:52:30
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-09-08T09:52:30
+    by: loc
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T09:52:30
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket review
+    at: 2026-09-08T09:52:30
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done
+    at: 2026-09-08T09:52:30
+    by: loc
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T09:52:42
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-08T10:01:05
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done
+    at: 2026-09-08T10:01:05
+    by: loc
+    ticket: T-01-03

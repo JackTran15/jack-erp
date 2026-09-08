@@ -6,6 +6,7 @@ import {
   ReportColumnGroup,
   ReportColumnHeader,
 } from '@erp/shared-interfaces';
+import { reportColumnWidth } from '../report-core/report-column-widths';
 
 const NUMBER_TYPES = new Set<ReportColumnDataType>([
   ReportColumnDataType.NUMBER,
@@ -37,7 +38,7 @@ function filterKindFor(type: ReportColumnDataType): ReportColumnFilterKind {
 /**
  * Build one column header from just its key + type (+ optional group). Labels
  * and formula sub-labels come from the shared VI maps so backend source stays
- * English; alignment/pin/link/filterKind are derived the same way as
+ * English; alignment/pin/link/filterKind/width are derived the same way as
  * invoice-report's enrichHeader.
  */
 export function debtColumn(
@@ -45,6 +46,7 @@ export function debtColumn(
   type: ReportColumnDataType,
   group: ReportColumnGroup | null = null,
 ): ReportColumnHeader {
+  const width = reportColumnWidth(col);
   return {
     col,
     name: DEBT_REPORT_COLUMN_LABELS_VI[col] ?? col,
@@ -55,5 +57,6 @@ export function debtColumn(
     align: NUMBER_TYPES.has(type) ? 'right' : 'left',
     ...(LINK_COLUMNS.has(col) ? { link: true } : {}),
     ...(PINNED_LEFT.has(col) ? { pinned: 'left' as const } : {}),
+    ...(width !== undefined ? { width } : {}),
   };
 }

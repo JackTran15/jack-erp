@@ -502,20 +502,30 @@ export function ReportPageTableView({ rows, totals }: Props) {
                     ) : (
                       display
                     );
+                    // Ô dữ liệu luôn 1 dòng: maxWidth khoá cột lại (table width max-content +
+                    // layout auto thì cột vẫn nở theo nội dung, `truncate` vô hiệu); phần dư
+                    // cắt "..." và đưa đủ giá trị vào title để hover đọc (cột text; số đã
+                    // format ngắn, không cần).
                     return (
                       <td
                         key={cell.id}
                         style={{
                           width,
                           minWidth: width,
+                          maxWidth: width,
                           ...pinPosition(cell.column),
                           ...(pinned ? { backgroundColor: pinnedBg } : {}),
                         }}
                         className={[
-                          `${cellBorder} h-8 px-2 py-0 align-middle`,
+                          `${cellBorder} h-8 px-2 py-0 align-middle truncate`,
                           getReportCellAlignClass(col),
                           pinned ? "z-10" : "",
                         ].join(" ")}
+                        title={
+                          !isReportNumberColumn(col) && typeof display === "string" && display
+                            ? display
+                            : undefined
+                        }
                       >
                         {cellIndex === 0 && indentLevel > 0 ? (
                           <span style={{ paddingLeft: indentLevel * 16 }}>{content}</span>
@@ -552,12 +562,16 @@ export function ReportPageTableView({ rows, totals }: Props) {
                   const col = configById.get(column.id);
                   if (!col) return null;
                   const raw = totals[col.column];
+                  const width = column.getSize();
                   return (
                     <td
                       key={column.id}
-                      style={withStickyBottom(pinPosition(column), 15, 18)}
+                      style={{
+                        maxWidth: width,
+                        ...withStickyBottom(pinPosition(column), 15, 18),
+                      }}
                       className={[
-                        `${cellBorder} h-8 px-2 py-0 align-middle bg-muted`,
+                        `${cellBorder} h-8 px-2 py-0 align-middle bg-muted truncate`,
                         getReportCellAlignClass(col),
                       ].join(" ")}
                     >

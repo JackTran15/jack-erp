@@ -1,10 +1,17 @@
 import {
   ReportColumnConfig,
+  ReportColumnDataType,
   ReportColumnFilterKind,
 } from "../../constants/reports/report.interface";
 
 // Bề rộng mặc định khi cột không khai báo `width` trong registry.
 export const DEFAULT_REPORT_COLUMN_WIDTH = 112;
+// Cột text không khai báo width: SKU/tên hàng cần đủ chỗ để không xuống dòng.
+export const DEFAULT_REPORT_TEXT_COLUMN_WIDTH = 160;
+
+export function defaultReportColumnWidth(dataType: ReportColumnDataType | undefined): number {
+  return dataType === "text" ? DEFAULT_REPORT_TEXT_COLUMN_WIDTH : DEFAULT_REPORT_COLUMN_WIDTH;
+}
 
 const numberFormatter = new Intl.NumberFormat("vi-VN");
 
