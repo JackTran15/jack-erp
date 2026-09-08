@@ -1,4 +1,5 @@
 import {
+  INVENTORY_VALUE_PERMISSION,
   REPORT_PERMISSION_KEYS,
   reportPermissionsOfDomain,
 } from '@erp/shared-interfaces';
@@ -228,11 +229,14 @@ export const WAREHOUSE_PERMISSION_KEYS: string[] = [
   'inventory.purchase-order.read',
   'inventory.purchase-order.create',
   'inventory.purchase-order.receive',
-  // Báo cáo kho (gồm "Hàng hoá xuất kho tạm") — nhóm + toàn bộ 11 báo cáo.
-  // KHÔNG có `reporting.inventory.value.read`: nhân viên kho làm việc trên số
-  // lượng, giá vốn/giá trị tồn là việc của quản lý.
+  // Báo cáo kho (gồm "Hàng hoá xuất kho tạm") — nhóm + toàn bộ 11 báo cáo, kèm
+  // cột giá trị. Nhân viên kho đối chiếu giá trị nhập/xuất ngay trên báo cáo nên
+  // giữ `reporting.inventory.value.read` (chủ sản phẩm chốt 2026-09-07). Quyền
+  // này vẫn tồn tại và vẫn được enforce — nó dành cho các vai trò tự tạo cần
+  // xem tồn mà không được xem giá vốn.
   'inventory.reports.read',
   ...reportPermissionsOfDomain('inventory'),
+  INVENTORY_VALUE_PERMISSION,
   // Báo cáo bán hàng theo mặt hàng
   'reporting.invoice.branch.read',
   REPORT_PERMISSION_KEYS['revenue-by-item']!,

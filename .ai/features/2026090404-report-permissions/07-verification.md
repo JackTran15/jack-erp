@@ -12,15 +12,18 @@ thống), `local-backoffice-bm` (Quản lý chi nhánh, được gán 4 cửa h�
 không có nó thì spec chỉ còn giữ được những assertion đúng với **mọi** vai trò,
 mà đó đúng là tập không chứng minh được bất kỳ luật phân quyền nào.
 
-Các cặp step đối nhau (S1/S2, S3/S4, S6/S7) là phần có giá trị nhất: cùng một
-màn hình, hai vai trò, hai kết quả ngược nhau. Một cổng chặn hỏng sẽ làm đúng một
-vế đỏ.
+Các cặp step đối nhau (S3/S4, S6/S7) là phần có giá trị nhất: cùng một màn hình,
+hai vai trò, hai kết quả ngược nhau. Một cổng chặn hỏng sẽ làm đúng một vế đỏ.
+
+S1 **không** còn là cặp đối. Ngày 2026-09-07 chủ sản phẩm chốt nhân viên kho giữ
+cột giá trị, nên cả ba vai trò được seed đều có `reporting.inventory.value.read`
+và không vai trò nào còn đi đường "bị ẩn cột". Xem mục Not verified here.
 
 Thực tế quyền đã đối chiếu với `/auth/session` ngày 2026-09-07:
 
 | Khóa | admin | bm | wh |
 | --- | --- | --- | --- |
-| `reporting.inventory.value.read` | có | có | **không** |
+| `reporting.inventory.value.read` | có | có | có (đổi 2026-09-07) |
 | `reporting.sales.daily-sales-summary.read` | có | có | **không** |
 | `reporting.profit.read` (quyền mở nhóm) | có | có | **không** |
 | `reporting.dashboard.consolidated.read` | có | **không** | **không** |
@@ -29,8 +32,7 @@ Thực tế quyền đã đối chiếu với `/auth/session` ngày 2026-09-07:
 
 | ID | Step | Path | Interaction | Verifies | Assert | Env |
 |---|---|---|---|---|---|---|
-| S1 | Báo cáo kho của vai trò kho, có dữ liệu tháng trước: chỉ có cột Số lượng | `/reports/inventory` | `click button[role=combobox]; click text=Tháng trước; click text=Lấy dữ liệu; wait table tbody tr:nth-child(5)` | AC-12 | `text=Số lượng; no-text=Giá trị; no-text=trên 0 kết quả` | local-backoffice-wh |
-| S2 | Cùng báo cáo và cùng kỳ đó, vai trò có quyền giá trị: có cả hai nhóm cột | `/reports/inventory` | `click button[role=combobox]; click text=Tháng trước; click text=Lấy dữ liệu; wait table tbody tr:nth-child(5)` | AC-12 | `text=Số lượng; text=Giá trị; no-text=trên 0 kết quả` | local-backoffice, local-backoffice-bm |
+| S1 | Báo cáo kho, dữ liệu tháng trước: cả ba vai trò đều thấy Số lượng và Giá trị | `/reports/inventory` | `click button[role=combobox]; click text=Tháng trước; click text=Lấy dữ liệu; wait table tbody tr:nth-child(5)` | AC-12 | `text=Số lượng; text=Giá trị; no-text=trên 0 kết quả` | — |
 | S3 | Ô chọn báo cáo Bán hàng của vai trò kho: mở ra đúng một mục | `/reports/sales` | `click text=Chọn báo cáo; wait text=Kỳ báo cáo; click :nth-match(button[role=combobox], 2)` | AC-01 | `count [data-radix-popper-content-wrapper] .max-h-60 > button = 1` | local-backoffice-wh |
 | S4 | Cùng ô đó, vai trò đủ quyền: mở ra cả bốn mục | `/reports/sales` | `click text=Chọn báo cáo; wait text=Kỳ báo cáo; click :nth-match(button[role=combobox], 2)` | AC-01 | `count [data-radix-popper-content-wrapper] .max-h-60 > button = 4` | local-backoffice, local-backoffice-bm |
 | S5 | Menu Bán hàng mở được và ra số khi chỉ được cấp đúng một báo cáo | `/reports/sales` | `click button[role=combobox]; click text=Tháng trước; click text=Lấy dữ liệu; wait table tbody tr:nth-child(5)` | AC-04 | `text=DOANH THU THEO MẶT HÀNG; no-text=trên 0 kết quả` | local-backoffice-wh |
@@ -55,6 +57,13 @@ Thực tế quyền đã đối chiếu với `/auth/session` ngày 2026-09-07:
 - **AC-15, AC-16, AC-19** — migration và seed, không có bề mặt UI. Phủ bằng
   `report-permissions.contract.spec.ts` (T-05-03) + đối chiếu SQL sau khi chạy
   `pnpm migration:run`.
+- **AC-12, vế bị từ chối** (không có `reporting.inventory.value.read` ⇒ cột giá
+  trị biến mất) — **không còn vai trò seed nào đi đường này**. Trước 2026-09-07
+  nhân viên kho là ca âm và S1 chụp được nó; nay cả ba vai trò đều có khóa, nên
+  S1 chỉ còn chứng minh vế được cấp. Cơ chế vẫn tồn tại và vẫn được enforce ở ba
+  handler; vế âm phủ bằng `inventory-value-columns.spec.ts` (T-04-04), test cả
+  hai chiều. Muốn có lại ảnh cho vế âm thì phải tạo một vai trò mẫu không giữ
+  khóa đó — đây là chỗ bằng chứng yếu đi thật, không phải chỗ nới định nghĩa.
 - **AC-05** — cần một vai trò giữ quyền mở nhóm nhưng không được cấp báo cáo nào
   trong nhóm đó. Không có tài khoản mẫu như vậy, và tạo một tài khoản chỉ để
   chụp ảnh thì bằng chứng nói về tài khoản đó chứ không nói về hệ thống.
@@ -67,13 +76,13 @@ Thực tế quyền đã đối chiếu với `/auth/session` ngày 2026-09-07:
 
 ## Notes
 
-- **S1, S2, S5 lọc về "Tháng trước" trước khi chụp.** Kỳ mặc định của hai nhóm
+- **S1 và S5 lọc về "Tháng trước" trước khi chụp.** Kỳ mặc định của hai nhóm
   Bán hàng và Kho là "Hôm nay" (`DEFAULT_PERIOD_PRESET`), và `erp_dev` không có
   giao dịch hôm nay, nên bản đầu chụp ra bảng rỗng: đúng về cột nhưng không
   thuyết phục — một bảng rỗng thì "không có cột Giá trị" và "không có gì cả"
   trông giống hệt nhau. Lọc về tháng trước cho ~5.055 dòng ở báo cáo kho và
-  ~1.337 dòng ở Doanh thu theo mặt hàng, nên cột giá trị vắng mặt *giữa dữ liệu
-  thật*. Assert `no-text=trên 0 kết quả` khoá luôn điều đó: nếu kỳ lọc lại trượt
+  ~1.337 dòng ở Doanh thu theo mặt hàng, nên các cột được đọc *giữa dữ liệu thật*
+  chứ không phải trên một bảng trắng. Assert `no-text=trên 0 kết quả` khoá luôn điều đó: nếu kỳ lọc lại trượt
   về một khoảng rỗng thì step đỏ chứ không âm thầm xanh trên bảng trắng.
 - Ô chọn kỳ là combobox **duy nhất** khi bảng lọc đang đóng, nên
   `click button[role=combobox]` là đủ và không cần `:nth-match` như S3/S4.

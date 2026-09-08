@@ -142,7 +142,9 @@ mới (không chờ `PermissionSyncService` vì nó chạy sau migration), rồi
 per-report cho mọi role đang giữ key nhóm, cấp bù hai key consolidated mới cho
 role đang giữ key consolidated của hóa đơn, và cấp khóa xem giá trị cho mọi role
 đang giữ `inventory.reports.read`.
-**Consequences:** Ngay sau migration, seed và DB cố tình lệch nhau — ví dụ
-Nhân viên kho vẫn còn khóa xem giá trị. Việc siết xảy ra khi chạy
-`seed:sync-admin-permissions`, là một hành động có chủ đích của người vận hành.
+**Consequences:** Ngay sau migration, seed và DB có thể lệch nhau ở những vai trò
+mà seed cố tình cấp hẹp hơn — hiện chỉ còn SALES/CASHIER (thu về đúng một báo cáo
+bán hàng). Việc siết xảy ra khi chạy `seed:sync-admin-permissions`, là một hành
+động có chủ đích của người vận hành. Với Nhân viên kho thì hai bên trùng nhau:
+chủ sản phẩm chốt ngày 2026-09-07 rằng vai trò này giữ cả khóa xem giá trị.
 **Status:** accepted

@@ -111,15 +111,21 @@ describe('report permission role seeds', () => {
     for (const key of CONSOLIDATED_KEYS) expect(keys).toContain(key);
   });
 
-  it('gives WAREHOUSE every stock report but no value columns', () => {
+  it('gives WAREHOUSE every stock report including the value columns', () => {
+    // Chủ sản phẩm chốt 2026-09-07: nhân viên kho đối chiếu giá trị nhập/xuất
+    // ngay trên báo cáo, nên giữ cột giá trị. Quyền vẫn tồn tại và vẫn enforce —
+    // nó dành cho vai trò tự tạo, không phải để chặn vai trò kho.
     for (const key of reportPermissionsOfDomain('inventory')) {
       expect(WAREHOUSE_PERMISSION_KEYS).toContain(key);
     }
-    expect(WAREHOUSE_PERMISSION_KEYS).not.toContain(INVENTORY_VALUE_PERMISSION);
+    expect(WAREHOUSE_PERMISSION_KEYS).toContain(INVENTORY_VALUE_PERMISSION);
   });
 
-  it('gives BRANCH_MANAGER the value columns it has today', () => {
-    expect(BRANCH_MANAGER_PERMISSION_KEYS).toContain(INVENTORY_VALUE_PERMISSION);
+  it.each([
+    ['BRANCH_MANAGER', BRANCH_MANAGER_PERMISSION_KEYS],
+    ['WAREHOUSE', WAREHOUSE_PERMISSION_KEYS],
+  ])('gives %s the value columns it has today', (_role, keys) => {
+    expect(keys).toContain(INVENTORY_VALUE_PERMISSION);
   });
 
   it.each([

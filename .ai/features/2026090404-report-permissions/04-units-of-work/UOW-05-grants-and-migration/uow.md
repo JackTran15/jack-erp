@@ -20,8 +20,9 @@ rollback: migration có down() — gỡ grant rồi gỡ khóa
 3. Truy vấn lại: mọi vai trò từng giữ `inventory.reports.read` nay có đủ 11 khóa
    báo cáo kho + khóa xem giá trị; vai trò giữ key consolidated của hóa đơn có
    thêm hai key consolidated mới
-4. `pnpm seed:sync-admin-permissions` → Nhân viên kho mất khóa xem giá trị,
-   SALES/CASHIER thu về đúng một báo cáo bán hàng. Đây là bước siết có chủ đích.
+4. `pnpm seed:sync-admin-permissions` → SALES/CASHIER thu về đúng một báo cáo
+   bán hàng. Đây là bước siết có chủ đích. Nhân viên kho **giữ** khóa xem giá trị,
+   nên với vai trò này seed và migration ra cùng một kết quả.
 
 ## In scope
 - Migration tự chứa: chèn khóa, cấp bù theo quyền nhóm đang giữ
