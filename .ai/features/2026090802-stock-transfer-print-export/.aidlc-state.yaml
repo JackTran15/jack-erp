@@ -1,0 +1,108 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: stock-transfer-print-export
+slug: 2026090802-stock-transfer-print-export
+profile: none
+created: 2026-09-08T14:15:49
+current_gate: G5
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-08T14:19:42
+    by: Loc Tran
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-08T14:19:42
+    by: Loc Tran
+    evidence: 9 assumptions, none blocking-and-pending; 8 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-08T14:19:42
+    by: Loc Tran
+    evidence: 2 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-08T14:19:43
+    by: Loc Tran
+    evidence: graph valid - 1 UoW, 5 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T14:19:53
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-08T14:20:28
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T14:20:28
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-08T14:21:41
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-09-08T14:25:35
+    by: code-review
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T14:25:35
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-08T14:27:20
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done
+    at: 2026-09-08T14:29:51
+    by: code-review
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T14:29:51
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T14:29:51
+    by: claude
+    ticket: T-01-05
+  - gate: G4
+    action: ticket review
+    at: 2026-09-08T14:54:33
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done
+    at: 2026-09-08T14:59:53
+    by: code-review
+    ticket: T-01-04
+  - gate: G4
+    action: ticket review
+    at: 2026-09-08T15:15:07
+    by: claude
+    ticket: T-01-05
+  - gate: G4
+    action: ticket done
+    at: 2026-09-08T15:15:07
+    by: code-review
+    ticket: T-01-05
+  - gate: G4
+    action: passed
+    at: 2026-09-08T15:15:07
+    by: Loc Tran
+    evidence: all 5 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-09-08T15:15:07
+    by: Loc Tran
+    evidence: assumptions resolved, ADRs settled, graph valid

@@ -152,6 +152,25 @@ function signatureColumns(count: number, width: number): number[] {
   return Array.from({ length: count }, (_, i) => Math.round(1 + i * step));
 }
 
+/**
+ * The grid columns each signature box covers, as `[start, end]`.
+ *
+ * A box starts at its pitch column and takes the gap up to the next box, so a
+ * label such as "Người nhận hàng" gets two grid columns instead of one. With
+ * the pitch alone the label sits on whatever column the table happens to put
+ * there — on a voucher with many narrow columns that is a six-character
+ * column, and the label breaks mid-word. Merging over the gap keeps every
+ * label on one line without moving any box; when boxes are spread one per
+ * column the gap is zero and nothing is merged.
+ */
+function signatureBoxes(positions: number[]): Array<[number, number]> {
+  return positions.map((start, index) => {
+    const next = positions[index + 1];
+    const reach = start + SIGNATURE_STEP - 1;
+    return [start, next === undefined ? reach : Math.min(reach, next - 1)];
+  });
+}
+
 export class VoucherXlsxWriter implements ExportWriter {
   private workbook?: ExcelJS.stream.xlsx.WorkbookWriter;
   private sheet?: ExcelJS.Worksheet;
@@ -355,11 +374,12 @@ export class VoucherXlsxWriter implements ExportWriter {
 
     const positions = signatureColumns(this.payload.signatures.length, width);
     if (!positions.length) return;
+    const boxes = signatureBoxes(positions);
 
     const labels = sheet.addRow([]);
     labels.height = SIGNATURE_ROW_HEIGHT;
-    positions.forEach((column, index) => {
-      const cell = labels.getCell(column);
+    boxes.forEach(([start, end], index) => {
+      const cell = labels.getCell(start);
       cell.value = this.payload.signatures[index];
       cell.font = bodyFont({ bold: true });
       cell.border = {};
@@ -368,16 +388,18 @@ export class VoucherXlsxWriter implements ExportWriter {
         vertical: 'middle',
         wrapText: true,
       };
+      if (end > start) sheet.mergeCells(labels.number, start, labels.number, end);
     });
     labels.commit();
 
     const hints = sheet.addRow([]);
-    positions.forEach((column) => {
-      const cell = hints.getCell(column);
+    boxes.forEach(([start, end]) => {
+      const cell = hints.getCell(start);
       cell.value = SIGNATURE_HINT;
       cell.font = bodyFont({ italic: true });
       cell.border = {};
       cell.alignment = { horizontal: 'center' };
+      if (end > start) sheet.mergeCells(hints.number, start, hints.number, end);
     });
     hints.commit();
   }

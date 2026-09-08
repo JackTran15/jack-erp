@@ -15,6 +15,7 @@ import {
   DocCounterpartyKind,
   PaginatedResponse,
   PaginationQuery,
+  VoucherPrintPayload,
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { StockLedgerService, RecordMovementParams } from '../ledger/stock-ledger.service';
@@ -29,6 +30,8 @@ import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service'
 import { StorageDefaultLocationResolverService } from '../location/storage-default-location-resolver.service';
 import { resolveDocCounterparty } from '../location/services/resolve-doc-counterparty.util';
 import { attachCounterparties } from '../location/services/counterparty-name.util';
+import { loadVoucherBranch } from '../location/services/voucher-print-context.util';
+import { mapStockTransferToVoucherPayload } from './stock-transfer-print.mapper';
 import { CreateIntraWarehouseTransferDto } from './create-intra-warehouse-transfer.dto';
 
 /** A fully-resolved intra-warehouse move line: source/dest are concrete location ids. */
@@ -945,6 +948,20 @@ export class StockTransferService {
     await this.attachTransporters([transfer], organizationId);
     await attachCounterparties(this.transferRepo.manager, [transfer], organizationId);
     return transfer;
+  }
+
+  /** Print/export payload for one stock transfer — reuses `getById`'s 404 and org scope. */
+  async getPrintPayload(
+    id: string,
+    actor: ActorContext,
+  ): Promise<VoucherPrintPayload> {
+    const transfer = await this.getById(id, actor.organizationId);
+    const sourceBranch = await loadVoucherBranch(
+      this.transferRepo.manager,
+      transfer.sourceBranchId,
+      actor.organizationId,
+    );
+    return mapStockTransferToVoucherPayload(transfer, sourceBranch);
   }
 
   async list(

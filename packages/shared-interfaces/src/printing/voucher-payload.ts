@@ -4,16 +4,17 @@ import { ReportRow } from '../invoice-report/search';
 /**
  * The seam between fetching a voucher's data and rendering it (ADR-05).
  *
- * One shape for all 7 voucher kinds: stock (goods receipt / issue / transfer
- * order) and treasury (cash / bank receipt / payment). The skeleton is
- * identical across all of them — header block, info rows, line table,
- * totals, signatures — so what differs between kinds lives in the data
+ * One shape for all 8 voucher kinds: stock (goods receipt / issue / transfer
+ * order / stock transfer) and treasury (cash / bank receipt / payment). The
+ * skeleton is identical across all of them — header block, info rows, line
+ * table, totals, signatures — so what differs between kinds lives in the data
  * (labels, columns), never in the renderer.
  */
 export enum VoucherKind {
   GOODS_RECEIPT = 'GOODS_RECEIPT',
   GOODS_ISSUE = 'GOODS_ISSUE',
   TRANSFER_ORDER = 'TRANSFER_ORDER',
+  STOCK_TRANSFER = 'STOCK_TRANSFER',
   CASH_RECEIPT = 'CASH_RECEIPT',
   CASH_PAYMENT = 'CASH_PAYMENT',
   BANK_RECEIPT = 'BANK_RECEIPT',

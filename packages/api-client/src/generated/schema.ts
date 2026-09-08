@@ -2926,6 +2926,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/stock/transfers/{id}/print-payload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockTransferController_getPrintPayload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/transfers/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockTransferController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/stock/transfers/{id}/post": {
         parameters: {
             query?: never;
@@ -7331,6 +7363,231 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/mobile/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đăng nhập từ app mobile */
+        post: operations["MobileAuthController_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp lại cặp token từ refresh token */
+        post: operations["MobileAuthController_refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thu hồi phiên hiện tại */
+        post: operations["MobileAuthController_logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Thông tin phiên: user, tổ chức, vai trò, quyền */
+        get: operations["MobileAuthController_getSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cửa hàng mà người dùng được phép làm việc */
+        get: operations["MobileBranchController_listMine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/users/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Người dùng đang đăng nhập (bản rút gọn cho mobile) */
+        get: operations["MobileUserController_getMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách nhà cung cấp, phân trang */
+        get: operations["MobileSupplierController_list"];
+        put?: never;
+        /** Tạo nhà cung cấp */
+        post: operations["MobileSupplierController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/suppliers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một nhà cung cấp theo id */
+        get: operations["MobileSupplierController_findById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Sửa nhà cung cấp theo id */
+        patch: operations["MobileSupplierController_update"];
+        trace?: never;
+    };
+    "/mobile/counterparties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Đối tượng của chứng từ kho: nhà cung cấp và nhân viên */
+        get: operations["MobileCounterpartyController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hàng hoá (biến thể) để thêm vào phiếu, phân trang */
+        get: operations["MobileItemController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách hàng hoá, phân trang */
+        get: operations["MobileProductController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/stock-documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách chứng từ kho theo loại, phân trang */
+        get: operations["MobileStockDocumentController_list"];
+        put?: never;
+        /** Tạo chứng từ kho (lưu và ghi sổ) */
+        post: operations["MobileStockDocumentController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/stock-documents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết một chứng từ kho, kèm dòng hàng */
+        get: operations["MobileStockDocumentController_getById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Sửa chứng từ kho */
+        patch: operations["MobileStockDocumentController_update"];
         trace?: never;
     };
 }
@@ -13331,6 +13588,12 @@ export interface components {
             documentNumber?: components["schemas"]["StringFilterDto"];
             /** @description Đối tượng (counterparty — matches provider.name or targetBranch.name) */
             party?: components["schemas"]["StringFilterDto"];
+            /**
+             * @description One free-text term matched against document number OR party, for the
+             *     mobile search screen. Mirrors `GoodsReceiptSearchV2Dto.search` — see the
+             *     note there for why `documentNumber` + `party` cannot express this.
+             */
+            search?: string;
             /** @description Diễn giải (notes) */
             notes?: components["schemas"]["StringFilterDto"];
             /** @description Lý do (reason) */
@@ -13743,6 +14006,18 @@ export interface components {
             documentNumber?: components["schemas"]["StringFilterDto"];
             /** @description Đối tượng (counterparty — matches provider.name) */
             party?: components["schemas"]["StringFilterDto"];
+            /**
+             * @description One free-text term matched against document number OR counterparty name,
+             *     for the mobile search screen.
+             *
+             *     Deliberately NOT expressible with `documentNumber` + `party`: those two are
+             *     ANDed by `FilterBuilder`, so passing the same term to both asks for rows
+             *     whose number AND party both contain it — an intersection that is almost
+             *     always empty. See `FilterBuilder.applyOrString`.
+             *
+             *     The web grid never sends this; it has a filter cell per column.
+             */
+            search?: string;
             /** @description Diễn giải (description) */
             description?: components["schemas"]["StringFilterDto"];
             /** @description Lý do (reason) */
@@ -14082,6 +14357,339 @@ export interface components {
             total: number;
             page: number;
             pageSize: number;
+        };
+        MobileLoginDto: {
+            /** @description Email đăng nhập */
+            email: string;
+            /** @description Mật khẩu */
+            password: string;
+            /**
+             * Format: uuid
+             * @description Id tổ chức (tenant)
+             */
+            organizationId: string;
+        };
+        MobileRefreshDto: {
+            /** @description Refresh token đã cấp ở lần đăng nhập trước */
+            refreshToken: string;
+        };
+        MobileBranchResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description Tên cửa hàng — thứ DUY NHẤT màn bộ lọc hiển thị */
+            name: string;
+            /** @description Mã cửa hàng. NULL là hợp lệ — backend không bắt buộc trường này. */
+            code: string | null;
+            /** @description Cửa hàng chính của tổ chức. Trường của entity tên là `isMainBranch`; rút gọn ở đây vì trong một danh sách chi nhánh thì chữ "Branch" là thừa. */
+            isMain: boolean;
+        };
+        MobileMeResponseDto: {
+            /** Format: uuid */
+            id: string;
+            email: string;
+            /** @description `firstName` + `lastName` ghép sẵn — app mobile chỉ hiển thị một dòng tên. */
+            fullName: string;
+        };
+        MobileSupplierResponseDto: {
+            /**
+             * Format: uuid
+             * @description Khoá định danh bản ghi. BẤT BIẾN, khác `code` vốn sửa được
+             */
+            id: string;
+            /** @description Mã nhà cung cấp, duy nhất trong tổ chức */
+            code: string;
+            /** @description Tên nhà cung cấp */
+            name: string;
+            /**
+             * @description Còn theo dõi hay đã ngừng
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+            /**
+             * @description Pháp nhân hay cá nhân
+             * @enum {string}
+             */
+            type: "organization" | "individual";
+            /** @description null = chưa từng nhập */
+            address: string | null;
+            /** @description null = chưa từng nhập */
+            phone: string | null;
+            /** @description null = chưa từng nhập */
+            taxCode: string | null;
+            /** @description Mã nhóm NCC; null = chưa xếp nhóm */
+            groupCode: string | null;
+        };
+        MobileSupplierPageDto: {
+            data: components["schemas"]["MobileSupplierResponseDto"][];
+            /** @description Tổng số bản ghi khớp, không phải số bản ghi của trang */
+            total: number;
+            page: number;
+            limit: number;
+        };
+        MobileSupplierCreateDto: {
+            /** @description Mã nhà cung cấp, duy nhất trong tổ chức */
+            code: string;
+            /** @description Tên nhà cung cấp */
+            name: string;
+            /**
+             * @description Vắng = active. Bản ghi mới bao giờ cũng đang theo dõi.
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+            /**
+             * @description Form mobile chưa có ô sửa loại hình nên luôn gửi giá trị của bản ghi (bản
+             *     mới là `organization`). Vẫn nhận ở đây để hợp đồng khép kín: mọi trường
+             *     `MobileSupplierResponseDto` trả ra đều ghi lại được.
+             * @default organization
+             * @enum {string}
+             */
+            type: "organization" | "individual";
+            /**
+             * @description Ba trường dưới nhận cả `null`. `@IsOptional()` của class-validator bỏ qua
+             *     cả `undefined` lẫn `null`, nên `null` đi lọt tới service — và service mới
+             *     là chỗ phân biệt "vắng khoá = giữ nguyên" với "null = xoá trắng".
+             */
+            address?: string | null;
+            phone?: string | null;
+            taxCode?: string | null;
+        };
+        MobileSupplierUpdateDto: {
+            /** @description Mã nhà cung cấp, duy nhất trong tổ chức */
+            code?: string;
+            /** @description Tên nhà cung cấp */
+            name?: string;
+            /**
+             * @description Vắng = active. Bản ghi mới bao giờ cũng đang theo dõi.
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+            /**
+             * @description Form mobile chưa có ô sửa loại hình nên luôn gửi giá trị của bản ghi (bản
+             *     mới là `organization`). Vẫn nhận ở đây để hợp đồng khép kín: mọi trường
+             *     `MobileSupplierResponseDto` trả ra đều ghi lại được.
+             * @default organization
+             * @enum {string}
+             */
+            type: "organization" | "individual";
+            /**
+             * @description Ba trường dưới nhận cả `null`. `@IsOptional()` của class-validator bỏ qua
+             *     cả `undefined` lẫn `null`, nên `null` đi lọt tới service — và service mới
+             *     là chỗ phân biệt "vắng khoá = giữ nguyên" với "null = xoá trắng".
+             */
+            address?: string | null;
+            phone?: string | null;
+            taxCode?: string | null;
+        };
+        MobileCounterpartyResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description Đi thẳng vào `counterpartyKind` của payload lúc lưu phiếu
+             * @enum {string}
+             */
+            kind: "supplier" | "employee";
+            /** @description Mã. NULL là hợp lệ — nhân viên có thể chưa có mã. */
+            code: string | null;
+            name: string;
+        };
+        MobileCounterpartyPageDto: {
+            data: components["schemas"]["MobileCounterpartyResponseDto"][];
+            total: number;
+            page: number;
+            limit: number;
+        };
+        MobileItemResponseDto: {
+            /**
+             * Format: uuid
+             * @description Chính là `lines[].itemId` khi lập phiếu
+             */
+            id: string;
+            /** @description Mã SKU */
+            code: string;
+            /** @description Tên hàng hoá, đã kèm nhãn biến thể — vd `Giày Gelli (39 · Nâu)` */
+            name: string;
+            /** @description Nhãn biến thể tách riêng (`39 · Nâu`). NULL với mặt hàng không có biến thể. Đi kèm [name] chứ không thay nó: màn chọn hiện tên ở dòng đầu và nhãn này ở dòng phụ. */
+            variantLabel: string | null;
+            /** @description Đơn vị tính. Server dùng nó làm `uomCode` của dòng hàng. */
+            unit: string;
+            /** @description Giá nhập mặc định của hàng hoá — điền sẵn vào ô đơn giá khi vừa chọn. Đây là NGOẠI LỆ có cơ sở với luật không-rò-giá-vốn của `/mobile/products`: người lập phiếu nhập buộc phải thấy và sửa được giá nhập. */
+            purchasePrice: number;
+        };
+        MobileItemPageDto: {
+            data: components["schemas"]["MobileItemResponseDto"][];
+            total: number;
+            page: number;
+            limit: number;
+        };
+        MobileProductResponseDto: {
+            /**
+             * Format: uuid
+             * @description Khoá định danh dòng: id của mẫu mã, hoặc id của item nếu nó không thuộc mẫu mã nào
+             */
+            id: string;
+            /** @description Mã hàng hoá (SKU), duy nhất trong tổ chức */
+            code: string;
+            /** @description Tên hàng hoá */
+            name: string;
+            /** @description Giá bán. Với mẫu mã có nhiều biến thể thì là giá trung bình của các biến thể */
+            sellingPrice: number;
+        };
+        MobileProductPageDto: {
+            data: components["schemas"]["MobileProductResponseDto"][];
+            /** @description Tổng số bản ghi khớp, không phải số bản ghi của trang */
+            total: number;
+            page: number;
+            limit: number;
+        };
+        MobileStockDocumentResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description Số phiếu. NULL khi phiếu chưa ghi sổ — backend chỉ sinh mã lúc post, nên app phải có đường hiển thị thay thế chứ đừng ép kiểu. */
+            code: string | null;
+            /** @description Ngày nhận hàng (`receivedAt`), ISO-8601. Đây là ngày người dùng đọc, không phải `createdAt`. */
+            documentDate: string;
+            /** @description Tên đối tượng: nhà cung cấp, khách hàng hoặc nhân viên tuỳ loại phiếu */
+            partyName: string | null;
+            /** @description Mã nhà cung cấp; null với đối tượng không phải NCC */
+            partyCode: string | null;
+            /** @description Thành tiền của phiếu — server cộng từ các dòng hàng, app không phải tự tính */
+            amount: number;
+            /**
+             * @description Backend có BỐN trạng thái nhưng `REVERSED` (đảo bút toán) và `CANCELLED` đều hiển thị là "Đã hủy", nên chúng gộp làm một ở đây — đúng như trang web đang làm.
+             * @enum {string}
+             */
+            status: "draft" | "posted" | "cancelled";
+        };
+        MobileStockDocumentPageDto: {
+            data: components["schemas"]["MobileStockDocumentResponseDto"][];
+            /** @description Tổng số phiếu khớp bộ lọc, không phải số phiếu của trang */
+            total: number;
+            page: number;
+            limit: number;
+            summary: {
+                totalAmount: number;
+            };
+        };
+        MobileStockDocumentPersonDto: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        MobileStockDocumentLineDto: {
+            /**
+             * Format: uuid
+             * @description Định danh hàng hoá. App gửi lại đúng giá trị này khi SỬA phiếu — không có nó thì mọi dòng đọc về đều phải chọn lại tay.
+             */
+            itemId: string;
+            /** @description Tên hàng hoá */
+            name: string;
+            /** @description Mã hàng hoá */
+            sku: string;
+            /** @description Đơn vị tính. Phiếu NHẬP lấy từ `uomCode` của chính dòng hàng — bản chụp tại thời điểm nhập; phiếu XUẤT không có cột đó nên lấy `item.unit`, tức giá trị HIỆN TẠI của hàng hoá. */
+            unit: string;
+            /** @description Số lượng. Cột `numeric(18,3)` nên cho phép phần lẻ (0,5 kg). Driver `pg` trả `numeric` thành chuỗi, DTO này đã ép về số. */
+            quantity: number;
+            unitPrice: number;
+            /** @description Thành tiền do BACKEND tính, không phải `quantity × unitPrice`. Hai số lệch nhau khi có chiết khấu, và trang web cũng ưu tiên trường này. */
+            lineTotal: number;
+        };
+        MobileStockDocumentDetailDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description Số phiếu. NULL khi phiếu chưa ghi sổ — backend chỉ sinh mã lúc post. */
+            code: string | null;
+            /** @description Ngày chứng từ, ISO-8601. Phiếu NHẬP là `receivedAt`; phiếu XUẤT là `occurredAt` (ngày nghiệp vụ người dùng nhập) và lùi về `createdAt` khi nó trống. Lưu ý màn DANH SÁCH của phiếu xuất hiện `createdAt` — lệch có chủ ý, lý do ở `MobileStockDocumentService`. */
+            documentDate: string;
+            /** @description Tên đối tượng: nhà cung cấp, khách hàng hoặc chi nhánh đích */
+            partyName: string | null;
+            /** @description Mã đối tượng. Lấy mã của chính đối tượng (nhà cung cấp HOẶC nhân viên), lùi về mã nhà cung cấp ở đường cũ. */
+            partyCode: string | null;
+            /**
+             * @description Loại đối tượng. Đi CẶP với `counterpartyId` — có cái này mà thiếu cái kia thì app không dựng lại được đối tượng nào.
+             * @enum {string|null}
+             */
+            counterpartyKind: "supplier" | "customer" | "employee" | null;
+            /** Format: uuid */
+            counterpartyId: string | null;
+            /** @description Nhân viên mua hàng — CHỈ phiếu nhập. Trả cả tên chứ không riêng định danh: màn sửa phải hiện được tên, mà app không có đường nào tra ngược một `users.id` thành tên. */
+            purchasingEmployee: components["schemas"]["MobileStockDocumentPersonDto"] | null;
+            /**
+             * @description Phương thức thanh toán — CHỈ phiếu nhập. Phiếu xuất không có khái niệm này nên luôn `null`.
+             * @enum {string|null}
+             */
+            paymentMethod: "CASH" | "CREDIT" | null;
+            /** @description Thành tiền của phiếu — cộng từ `lineTotal` của các dòng. Đường `GET /:id` của backend KHÔNG có `totalAmount` (chỉ danh sách mới có), nên nó được tính ở đây thay vì để app tự cộng. */
+            amount: number;
+            /** @enum {string} */
+            status: "draft" | "posted" | "cancelled";
+            /** @description Người giao hàng. `deliveredBy` ở phiếu nhập, `deliverer` ở phiếu xuất. Chuỗi rỗng khi không có — app hiển thị nó như một dòng trống, không phải thiếu dữ liệu. */
+            deliverer: string;
+            /** @description Diễn giải. `description` ở phiếu nhập, `notes` ở phiếu xuất. */
+            note: string;
+            lines: components["schemas"]["MobileStockDocumentLineDto"][];
+        };
+        MobileStockDocumentLineWriteDto: {
+            /**
+             * Format: uuid
+             * @description Lấy từ `GET /mobile/items` — là `items.id`
+             */
+            itemId: string;
+            /** @description Cho phép phần lẻ: cột `numeric(18,3)` */
+            quantity: number;
+            /** @description 0 là hợp lệ — phiếu điều chuyển nội bộ không có giá */
+            unitPrice: number;
+            note?: string;
+        };
+        MobileStockDocumentCreateDto: {
+            /** @enum {string} */
+            kind: "goods-receipt" | "stock-in" | "stock-out";
+            /**
+             * Format: uuid
+             * @description Cửa hàng lập phiếu — phải nằm trong quyền của người gọi
+             */
+            branchId: string;
+            /** @description Ngày chứng từ, ISO-8601 */
+            documentDate: string;
+            /**
+             * @description Đối tượng. Hai trường đi CÙNG NHAU: gửi `counterpartyKind` mà thiếu
+             *     `counterpartyId` là 400 ở tầng dưới.
+             *
+             *     `customer` sẽ bị từ chối — phiếu kho chỉ nhận nhà cung cấp và nhân viên.
+             * @enum {string}
+             */
+            counterpartyKind?: "supplier" | "customer" | "employee";
+            /** Format: uuid */
+            counterpartyId?: string;
+            /**
+             * Format: uuid
+             * @description Nhân viên mua hàng — `users.id`. Chỉ phiếu NHẬP có trường này.
+             */
+            purchasingEmployeeId?: string;
+            /**
+             * @description Chỉ phiếu NHẬP. Phiếu xuất không có khái niệm thanh toán.
+             * @enum {string}
+             */
+            paymentMethod?: "CASH" | "CREDIT";
+            /** @description Người giao */
+            deliverer?: string;
+            /** @description Diễn giải */
+            note?: string;
+            lines: components["schemas"]["MobileStockDocumentLineWriteDto"][];
+        };
+        MobileStockDocumentUpdateDto: {
+            /** @description Ngày chứng từ, ISO-8601 */
+            documentDate: string;
+            /** @enum {string} */
+            counterpartyKind?: "supplier" | "customer" | "employee";
+            /** Format: uuid */
+            counterpartyId?: string;
+            /** Format: uuid */
+            purchasingEmployeeId?: string;
+            deliverer?: string;
+            note?: string;
+            lines: components["schemas"]["MobileStockDocumentLineWriteDto"][];
         };
     };
     responses: never;
@@ -19630,6 +20238,46 @@ export interface operations {
                 content: {
                     "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    StockTransferController_getPrintPayload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    StockTransferController_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -27096,6 +27744,427 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SearchCounterpartiesResponseDto"];
                 };
+            };
+        };
+    };
+    MobileAuthController_login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileLoginDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    MobileAuthController_refresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileRefreshDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    MobileAuthController_logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileAuthController_getSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    MobileBranchController_listMine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileBranchResponseDto"][];
+                };
+            };
+        };
+    };
+    MobileUserController_getMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileMeResponseDto"];
+                };
+            };
+        };
+    };
+    MobileSupplierController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                sort?: "name" | "code";
+                /** @description Tìm theo mã hoặc tên */
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileSupplierPageDto"];
+                };
+            };
+        };
+    };
+    MobileSupplierController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileSupplierCreateDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileSupplierResponseDto"];
+                };
+            };
+        };
+    };
+    MobileSupplierController_findById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileSupplierResponseDto"];
+                };
+            };
+        };
+    };
+    MobileSupplierController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileSupplierUpdateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileSupplierResponseDto"];
+                };
+            };
+        };
+    };
+    MobileCounterpartyController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                /** @description Tìm theo mã hoặc tên */
+                search?: string;
+                /**
+                 * @description Thu hẹp còn một loại. Bỏ trống thì trả cả hai loại phiếu kho nhận được.
+                 *
+                 *     Màn "Nhân viên mua hàng" truyền `employee`; màn "Đối tượng" không truyền gì
+                 *     — bạn đã chốt nó là MỘT danh sách phẳng, không chia tab.
+                 *
+                 *     Nhận mảng (`?kinds=supplier&kinds=employee`) chứ không một giá trị: hợp
+                 *     đồng bên dưới đã có `types[]`, và một ngày nào đó màn Đối tượng cần đúng
+                 *     hai loại trong ba thì không phải đổi hình dạng tham số.
+                 */
+                kinds?: ("supplier" | "employee")[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileCounterpartyPageDto"];
+                };
+            };
+        };
+    };
+    MobileItemController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                /**
+                 * @description Tìm theo mã, tên, hoặc nhãn biến thể.
+                 *
+                 *     Ba trường chứ không chỉ tên: người lập phiếu gõ mã SKU (`GELLI-39-NAU`)
+                 *     nhiều hơn gõ tên, và nhãn biến thể (`39 · Nâu`) là thứ phân biệt các dòng
+                 *     cùng tên với nhau.
+                 */
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileItemPageDto"];
+                };
+            };
+        };
+    };
+    MobileProductController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                sort?: "name" | "code" | "sellingPrice";
+                /** @description Tìm theo mã hoặc tên */
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileProductPageDto"];
+                };
+            };
+        };
+    };
+    MobileStockDocumentController_list: {
+        parameters: {
+            query: {
+                kind: "goods-receipt" | "stock-in" | "stock-out";
+                /**
+                 * @description Cửa hàng cần xem. Bỏ trống thì lấy cửa hàng mặc định trong token.
+                 *
+                 *     Phải đi qua query chứ không qua header `X-Branch-Id`: `@Actor` giải chi
+                 *     nhánh theo thứ tự `jwt > header`, mà token luôn mang sẵn một `branchId`,
+                 *     nên header bị bỏ qua hoàn toàn. Chi tiết ở `MobileStockDocumentService`.
+                 */
+                branchId?: string;
+                page?: number;
+                limit?: number;
+                /**
+                 * @description Đầu kỳ, tính theo ngày NHẬN HÀNG (`receivedAt`).
+                 *
+                 *     Nhận `YYYY-MM-DD` — và app nên gửi đúng dạng đó chứ đừng kèm giờ: bộ lọc
+                 *     ngày của backend coi một mốc CÓ giờ là mốc chính xác, còn một mốc chỉ có
+                 *     ngày thì tự nở ra trọn ngày. Gửi `2026-09-30T00:00:00` làm `to` sẽ cắt mất
+                 *     mọi phiếu lập trong ngày 30.
+                 */
+                from?: string;
+                /** @description Cuối kỳ, BAO GỒM cả ngày này. Xem ghi chú ở [from]. */
+                to?: string;
+                /** @description Tìm theo số phiếu hoặc tên đối tượng */
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileStockDocumentPageDto"];
+                };
+            };
+        };
+    };
+    MobileStockDocumentController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileStockDocumentCreateDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileStockDocumentController_getById: {
+        parameters: {
+            query: {
+                kind: "goods-receipt" | "stock-in" | "stock-out";
+                /** @description Cửa hàng chứa chứng từ. Xem ghi chú ở DTO danh sách. */
+                branchId?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileStockDocumentDetailDto"];
+                };
+            };
+        };
+    };
+    MobileStockDocumentController_update: {
+        parameters: {
+            query: {
+                kind: "goods-receipt" | "stock-in" | "stock-out";
+                /** @description Cửa hàng chứa chứng từ. Xem ghi chú ở DTO danh sách. */
+                branchId?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileStockDocumentUpdateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

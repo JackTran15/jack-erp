@@ -11,9 +11,10 @@ import {
 } from './setup/test-app';
 
 /**
- * Cross-org / cross-branch isolation for the 3 stock-voucher print-payload
- * routes (T-03-02, AC-13). One table drives all three routes so adding a
- * fourth voucher kind later (UOW-04, treasury) is one row, not a new suite.
+ * Cross-org / cross-branch isolation for the 4 stock-voucher print-payload /
+ * export routes (T-03-02, AC-13; stock transfer added in 2026090802 T-01-05).
+ * One table drives every route so adding a voucher kind is one row, not a new
+ * suite.
  *
  * A tenant boundary here is a security boundary, not a UX detail: the route
  * returns the full document (counterparty name, line items) as JSON, so a
@@ -34,6 +35,7 @@ describe('Voucher print-payload isolation (E2E)', () => {
   let receiptId: string;
   let issueId: string;
   let transferId: string;
+  let stockTransferId: string;
 
   const headers = () => ({
     Authorization: authHeader(seed.accessToken),
@@ -161,8 +163,8 @@ describe('Voucher print-payload isolation (E2E)', () => {
     );
     await ds.query(
       `INSERT INTO goods_receipt_lines
-         (id, organization_id, branch_id, goods_receipt_id, item_id, location_id, uom_code, quantity, unit_price, line_total, created_by, created_at, updated_at)
-       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid, $6::uuid, 'cái', 5, 100, 500, $7::uuid, NOW(), NOW())
+         (id, organization_id, branch_id, goods_receipt_id, item_id, location_id, line_no, uom_code, quantity, unit_price, line_total, created_by, created_at, updated_at)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid, $6::uuid, 1, 'cái', 5, 100, 500, $7::uuid, NOW(), NOW())
        ON CONFLICT (id) DO NOTHING`,
       [lineId, seed.organizationId, seed.branchId, id, itemId, locationId, seed.userId],
     );
@@ -181,10 +183,10 @@ describe('Voucher print-payload isolation (E2E)', () => {
     );
     await ds.query(
       `INSERT INTO goods_issue_lines
-         (id, goods_issue_id, item_id, location_id, quantity, unit_price, line_total, created_by, created_at, updated_at)
-       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 2, 100, 200, $5::uuid, NOW(), NOW())
+         (id, goods_issue_id, item_id, location_id, line_no, quantity, unit_price, line_total)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 2, 100, 200)
        ON CONFLICT (id) DO NOTHING`,
-      [lineId, id, itemId, locationId, seed.userId],
+      [lineId, id, itemId, locationId],
     );
     return id;
   }
@@ -209,6 +211,27 @@ describe('Voucher print-payload isolation (E2E)', () => {
     return id;
   }
 
+  /** A posted stock transfer (phiếu chuyển kho) — the 4th stock voucher (2026090802, T-01-05). */
+  async function seedStockTransfer(): Promise<string> {
+    const id = 'e0000000-0000-4000-8000-000000000040';
+    const lineId = 'e0000000-0000-4000-8000-000000000041';
+    await ds.query(
+      `INSERT INTO stock_transfers
+         (id, organization_id, branch_id, document_number, status, source_branch_id, destination_branch_id, notes, created_by, created_at, updated_at)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, 'CK-TEST-01', 'POSTED', $3::uuid, $3::uuid, 'Voucher print stock transfer', $4::uuid, NOW(), NOW())
+       ON CONFLICT (id) DO NOTHING`,
+      [id, seed.organizationId, seed.branchId, seed.userId],
+    );
+    await ds.query(
+      `INSERT INTO stock_transfer_lines
+         (id, transfer_id, item_id, source_storage_id, destination_storage_id, source_location_id, destination_location_id, quantity, unit_price, line_value)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $4::uuid, $5::uuid, $5::uuid, 2, 100, 200)
+       ON CONFLICT (id) DO NOTHING`,
+      [lineId, id, itemId, storageId, locationId],
+    );
+    return id;
+  }
+
   beforeAll(async () => {
     app = await createTestApp();
     await resetDatabase(app);
@@ -222,7 +245,10 @@ describe('Voucher print-payload isolation (E2E)', () => {
     receiptId = await seedGoodsReceipt();
     issueId = await seedGoodsIssue();
     transferId = await seedTransferOrder();
-  });
+    stockTransferId = await seedStockTransfer();
+    // Boot connects many Kafka consumers and rebuilds the schema; on a busy
+    // machine that exceeds the 180 s default (same allowance as checkout-saga).
+  }, 420_000);
 
   afterAll(async () => {
     await app.close();
@@ -241,6 +267,29 @@ describe('Voucher print-payload isolation (E2E)', () => {
       .get(`/inventory/transfer-orders/${transferId}/print-payload`)
       .set(headers())
       .expect(200);
+    const stockTransfer = await request(app.getHttpServer())
+      .get(`/inventory/stock/transfers/${stockTransferId}/print-payload`)
+      .set(headers())
+      .expect(200);
+    expect(stockTransfer.body.title).toBe('PHIẾU CHUYỂN KHO');
+    expect(stockTransfer.body.docNo).toBe('CK-TEST-01');
+    expect(stockTransfer.body.lines[0].sku).toBe('VP-SKU-01');
+  });
+
+  it('streams the stock transfer as an .xlsx attachment', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/inventory/stock/transfers/${stockTransferId}/export`)
+      .set(headers())
+      .buffer()
+      .parse((response, callback) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk: Buffer) => chunks.push(chunk));
+        response.on('end', () => callback(null, Buffer.concat(chunks)));
+      })
+      .expect(200);
+    expect(res.headers['content-type']).toContain('spreadsheetml');
+    expect(res.headers['content-disposition']).toContain('phieu-chuyen-kho.xlsx');
+    expect((res.body as Buffer).length).toBeGreaterThan(0);
   });
 
   describe.each([
@@ -253,6 +302,14 @@ describe('Voucher print-payload isolation (E2E)', () => {
       label: 'transfer order',
       path: () => `/inventory/transfer-orders/${transferId}/print-payload`,
     },
+    {
+      label: 'stock transfer',
+      path: () => `/inventory/stock/transfers/${stockTransferId}/print-payload`,
+    },
+    {
+      label: 'stock transfer export',
+      path: () => `/inventory/stock/transfers/${stockTransferId}/export`,
+    },
   ])('$label', ({ path }) => {
     it('404s for a token from a different organization, without leaking fields', async () => {
       const res = await request(app.getHttpServer())
@@ -263,6 +320,7 @@ describe('Voucher print-payload isolation (E2E)', () => {
       const body = JSON.stringify(res.body);
       expect(body).not.toContain('TEST-01');
       expect(body).not.toContain('Voucher Print Item');
+      expect(body).not.toContain('VP-SKU-01');
     });
   });
 
@@ -289,6 +347,14 @@ describe('Voucher print-payload isolation (E2E)', () => {
     // so it is exercised by the cross-org case above only.
     await request(app.getHttpServer())
       .get(`/inventory/transfer-orders/${transferId}/print-payload`)
+      .set({ Authorization: authHeader(seed.accessToken), 'X-Branch-Id': otherBranchId })
+      .expect(200);
+  });
+
+  it('stock transfer print-payload is org-scoped only, like the transfer order (ADR-02)', async () => {
+    // A stock transfer may span branches, so the destination branch prints it too.
+    await request(app.getHttpServer())
+      .get(`/inventory/stock/transfers/${stockTransferId}/print-payload`)
       .set({ Authorization: authHeader(seed.accessToken), 'X-Branch-Id': otherBranchId })
       .expect(200);
   });

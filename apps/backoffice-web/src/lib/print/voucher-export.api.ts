@@ -7,6 +7,7 @@ const EXPORT_PATH: Partial<Record<VoucherKind, (id: string) => string>> = {
   [VoucherKind.GOODS_RECEIPT]: (id) => `/goods-receipts/${id}/export`,
   [VoucherKind.GOODS_ISSUE]: (id) => `/inventory/goods-issues/${id}/export`,
   [VoucherKind.TRANSFER_ORDER]: (id) => `/inventory/transfer-orders/${id}/export`,
+  [VoucherKind.STOCK_TRANSFER]: (id) => `/inventory/stock/transfers/${id}/export`,
 };
 
 /**
@@ -22,6 +23,7 @@ const FALLBACK_FILENAME: Partial<Record<VoucherKind, string>> = {
   [VoucherKind.GOODS_RECEIPT]: "phieu-nhap-kho.xlsx",
   [VoucherKind.GOODS_ISSUE]: "phieu-xuat-kho.xlsx",
   [VoucherKind.TRANSFER_ORDER]: "phieu-chuyen-kho.xlsx",
+  [VoucherKind.STOCK_TRANSFER]: "phieu-chuyen-kho.xlsx",
 };
 
 /** Read the server-chosen filename; it names the voucher type. */

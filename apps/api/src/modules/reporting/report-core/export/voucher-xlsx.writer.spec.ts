@@ -310,7 +310,7 @@ describe('VoucherXlsxWriter', () => {
 
       const written: string[] = [];
       labels.eachCell({ includeEmpty: false }, (cell) => {
-        if (cell.value) written.push(String(cell.value));
+        if (cell.value && cell.master === cell) written.push(String(cell.value));
       });
       // 5 boxes will not fit one-per-column in a 4-column table, so the block
       // runs past the table rather than rounding two onto the same cell.
@@ -336,10 +336,40 @@ describe('VoucherXlsxWriter', () => {
 
       const written: number[] = [];
       labels.eachCell({ includeEmpty: false }, (cell, column) => {
-        if (cell.value) written.push(column);
+        if (cell.value && cell.master === cell) written.push(column);
       });
       // B/D/F would need 6 columns; 3 boxes still fit one-per-column in 4.
       expect(written).toEqual([1, 3, 4]);
+    });
+
+    it('merges each box over the gap to the next one so long labels stay on one line', async () => {
+      const sheet = await writeAndRead(payload());
+      const labels = sheet.getRow(sheet.rowCount - 1);
+      const hints = sheet.getRow(sheet.rowCount);
+
+      // B..C, D..E, F..G, H..I, J..K — the label owns its column and the gap.
+      for (const column of [2, 4, 6, 8, 10]) {
+        expect(labels.getCell(column + 1).isMerged).toBe(true);
+        expect(labels.getCell(column + 1).master).toBe(labels.getCell(column));
+        expect(hints.getCell(column + 1).master).toBe(hints.getCell(column));
+      }
+    });
+
+    it('does not merge boxes that sit in adjacent columns', async () => {
+      const sheet = await writeAndRead(
+        payload({
+          lineColumns: PLAIN_COLUMNS,
+          lines: [{ stt: 1, sku: 'X', quantity: 2, lineTotal: 1 }],
+          totals: { stt: null, sku: null, quantity: 2, lineTotal: 1 },
+          signatures: ['Người lập phiếu', 'Thủ kho', 'Giám đốc'],
+        }),
+      );
+      const labels = sheet.getRow(sheet.rowCount - 1);
+
+      // Boxes at A, C, D: A may take B, but C cannot take D.
+      expect(labels.getCell(2).master).toBe(labels.getCell(1));
+      expect(labels.getCell(3).isMerged).toBe(false);
+      expect(labels.getCell(4).value).toBe('Giám đốc');
     });
 
     it('keeps the signature block out of the table border', async () => {

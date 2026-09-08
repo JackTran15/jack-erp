@@ -6,10 +6,14 @@ import {
   Body,
   Param,
   Query,
+  Res,
+  HttpCode,
+  HttpStatus,
   ParseUUIDPipe,
   UseInterceptors,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { Actor, ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { RequirePermission, RequireBranchScope } from '../../auth/decorators';
 import { PermissionGuard } from '../../rbac/permission.guard';
@@ -33,6 +37,11 @@ import {
 import { Type } from 'class-transformer';
 import { StockTransferService } from './stock-transfer.service';
 import { CreateIntraWarehouseTransferDto } from './create-intra-warehouse-transfer.dto';
+import { ExportPipeline } from '../../reporting/report-core/export/export-pipeline';
+import { HttpResponseSink } from '../../reporting/report-core/export/http-response.sink';
+import { VoucherXlsxWriter } from '../../reporting/report-core/export/voucher-xlsx.writer';
+import { StaticRowsFetcher } from '../../reporting/report-core/export/static-rows.fetcher';
+import { voucherToReportDocument } from '../../reporting/report-core/export/voucher-export.adapter';
 
 class TransferLineDto {
   @IsUUID()
@@ -168,6 +177,32 @@ export class StockTransferController {
     @Actor() actor: ActorContext,
   ) {
     return this.service.getById(id, actor.organizationId);
+  }
+
+  @Get(':id/print-payload')
+  @RequirePermission('inventory.transfer.read')
+  getPrintPayload(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.getPrintPayload(id, actor);
+  }
+
+  @Get(':id/export')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission('inventory.transfer.read')
+  async export(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+    @Res() res: Response,
+  ): Promise<void> {
+    const payload = await this.service.getPrintPayload(id, actor);
+    const doc = voucherToReportDocument(payload);
+    await new ExportPipeline(
+      new StaticRowsFetcher(doc.rows, doc.totals),
+      new VoucherXlsxWriter(payload),
+      new HttpResponseSink(res, payload.title),
+    ).run(doc.header, doc.columns);
   }
 
   @Post(':id/post')
