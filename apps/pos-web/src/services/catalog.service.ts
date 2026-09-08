@@ -2,10 +2,23 @@ import { http } from "@erp/pos/lib/common/http";
 import type { GetCatalogProductDetailParams } from "@erp/pos/dtos/catalog.dto";
 import type {
   PosCatalogLine,
+  PosCatalogSearchResult,
   PosProductDetail,
   PosProductListResponse,
 } from "@erp/pos/interfaces/catalog.interface";
 import type { PosCatalogDirection } from "@erp/pos/types/catalog.type";
+
+/** Tham số `GET /pos/branches/:id/catalog/search`. */
+export interface SearchCatalogParams {
+  q: string;
+  /** `exact` bỏ hẳn nhánh gợi ý — đường quét mã vạch và phím Enter. */
+  mode?: "exact" | "full";
+  /** `suggest` cắt `locations[]` và `quantityOnHand` khỏi mỗi dòng gợi ý. */
+  view?: "full" | "suggest";
+  /** Trần số dòng gợi ý. Server kẹp ở 100; bỏ trống là 20. */
+  limit?: number;
+  includeUntracked?: boolean;
+}
 
 export interface ListCatalogProductsParams {
   direction?: PosCatalogDirection;
@@ -29,6 +42,45 @@ export const catalogService = {
     const q = params.toString();
     const path = `/pos/branches/${encodeURIComponent(branchId)}/catalog${q ? `?${q}` : ""}`;
     return http.get<PosCatalogLine[]>(path);
+  },
+
+  /**
+   * Tồn tại chi nhánh của một tập item đã biết —
+   * `POST /pos/branches/:id/catalog/stock`.
+   *
+   * Dùng để làm tươi snapshot tồn của các dòng ĐANG trong giỏ, thay cho việc tải
+   * cả catalog chi nhánh (10 400 item ≈ 3 835 kB trên bản restore prod) để tra ba
+   * món. Trả ít phần tử hơn `itemIds` khi có món đã ngừng bán — caller giữ dòng đó
+   * ở trạng thái chưa biết tồn, tức là cảnh báo vượt tồn vẫn bật.
+   *
+   * `POST` trả **201** (mặc định NestJS cho @Post), không phải 200 — đừng assert 200.
+   */
+  stockForItems: (
+    branchId: string,
+    itemIds: string[],
+  ): Promise<PosCatalogLine[]> =>
+    http.post<PosCatalogLine[]>(
+      `/pos/branches/${encodeURIComponent(branchId)}/catalog/stock`,
+      { itemIds },
+    ),
+
+  /**
+   * Endpoint gộp — `GET /pos/branches/:id/catalog/search`. Một lượt gọi trả cả
+   * `exact` (khớp mã tuyệt đối, để auto-add) lẫn `suggestions` (dropdown), thay
+   * cho `lookupByCode` + `fetch` chạy nối tiếp như trước.
+   */
+  search: (
+    branchId: string,
+    params: SearchCatalogParams,
+  ): Promise<PosCatalogSearchResult> => {
+    const qs = new URLSearchParams({ q: params.q });
+    if (params.mode) qs.set("mode", params.mode);
+    if (params.view) qs.set("view", params.view);
+    if (params.limit !== undefined) qs.set("limit", String(params.limit));
+    if (params.includeUntracked) qs.set("includeUntracked", "true");
+    return http.get<PosCatalogSearchResult>(
+      `/pos/branches/${encodeURIComponent(branchId)}/catalog/search?${qs.toString()}`,
+    );
   },
 
   /**

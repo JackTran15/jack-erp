@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { RbacService } from './rbac.service';
+import { CacheService } from '../redis/cache.service';
 import { UserEntity } from '../auth/user.entity';
 import { RoleEntity } from '../auth/role.entity';
 import { UserRoleEntity } from '../auth/user-role.entity';
@@ -65,6 +66,7 @@ describe('UsersService', () => {
       | 'getGrantableRoleIds'
     >
   >;
+  let cacheService: jest.Mocked<Pick<CacheService, 'invalidate'>>;
   let manager: ReturnType<typeof makeMockManager>;
 
   beforeEach(async () => {
@@ -103,6 +105,9 @@ describe('UsersService', () => {
         },
       ),
     };
+    cacheService = {
+      invalidate: jest.fn().mockResolvedValue(undefined),
+    };
 
     const dataSource = {
       transaction: jest.fn((cb: any) => cb(manager)),
@@ -124,6 +129,7 @@ describe('UsersService', () => {
           useValue: profileRepo,
         },
         { provide: RbacService, useValue: rbac },
+        { provide: CacheService, useValue: cacheService },
         { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
@@ -363,6 +369,58 @@ describe('UsersService', () => {
         'new-id',
         'org-1',
       );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'identity',
+        'identity:new-id:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'my-branches',
+        'new-id:org-1',
+      );
+    });
+  });
+
+  describe('update', () => {
+    it('invalidates the identity cache when isActive flips to false (T-07-03, AC-24)', async () => {
+      const user = {
+        id: 'u-2',
+        isActive: true,
+        lastLoginAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      userRepo.findOne.mockResolvedValue(user);
+
+      await service.update('u-2', { isActive: false }, actor);
+
+      expect(rbac.invalidateUserPermissions).toHaveBeenCalledWith(
+        'u-2',
+        'org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'identity',
+        'identity:u-2:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'my-branches',
+        'u-2:org-1',
+      );
+    });
+
+    it('does not invalidate when isActive is left untouched', async () => {
+      const user = {
+        id: 'u-2',
+        isActive: true,
+        lastLoginAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      userRepo.findOne.mockResolvedValue(user);
+
+      await service.update('u-2', { firstName: 'X' }, actor);
+
+      expect(rbac.invalidateUserPermissions).not.toHaveBeenCalled();
+      expect(cacheService.invalidate).not.toHaveBeenCalled();
     });
   });
 
@@ -411,6 +469,14 @@ describe('UsersService', () => {
         'u-2',
         'org-1',
       );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'identity',
+        'identity:u-2:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'my-branches',
+        'u-2:org-1',
+      );
     });
   });
 
@@ -430,6 +496,14 @@ describe('UsersService', () => {
       expect(rbac.invalidateUserPermissions).toHaveBeenCalledWith(
         'u-1',
         'org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'identity',
+        'identity:u-1:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'my-branches',
+        'u-1:org-1',
       );
     });
 
@@ -700,6 +774,21 @@ describe('UsersService', () => {
       await expect(service.setBranches('u-1', [MINE.id], actor)).resolves.toEqual([
         MINE.id,
       ]);
+    });
+
+    it('setBranches invalidates the identity + my-branches cache — a write not among the six enumerated sites (T-07-03, AC-24)', async () => {
+      arrangeBranches(['iam.user.read.all', 'iam.user.branches.write']);
+
+      await service.setBranches('u-1', [MINE.id], actor);
+
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'identity',
+        'identity:u-1:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'my-branches',
+        'u-1:org-1',
+      );
     });
   });
   /**

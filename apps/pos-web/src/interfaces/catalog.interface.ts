@@ -27,6 +27,31 @@ export interface PosCatalogLine {
 }
 
 /**
+ * Một dòng gợi ý đã cắt gọn — `GET /pos/branches/:id/catalog/search?view=suggest`.
+ *
+ * Bỏ `locations[]` (phần chiếm gần hết payload, và chỉ Chuyển kho nhanh đọc) cùng
+ * `quantityOnHand` (không consumer nào của bán hàng đọc). **Giữ**
+ * `sellableQuantity`: thu ngân thêm thẳng từ dropdown này vào giỏ, và đó là cơ sở
+ * cảnh báo bán vượt tồn.
+ */
+export type PosCatalogSuggestion = Omit<
+  PosCatalogLine,
+  "locations" | "quantityOnHand"
+>;
+
+/** Kết quả `GET /pos/branches/:id/catalog/search` — gộp tra khớp tuyệt đối + gợi ý. */
+export interface PosCatalogSearchResult {
+  /**
+   * Item có mã SKU / mã vạch khớp tuyệt đối — **chỉ khi khớp đúng 1**. Null khi
+   * 0 khớp và null khi nhiều hơn 1: caller gọi để auto-add, mà "cái nào" thì nó
+   * không trả lời được. Luôn giữ shape đầy đủ, kể cả khi `view=suggest`.
+   */
+  exact: PosCatalogLine | null;
+  /** Gợi ý cho dropdown, đã bị `limit` chặn. Luôn rỗng khi `mode=exact`. */
+  suggestions: PosCatalogSuggestion[];
+}
+
+/**
  * Một card catalog ở mức PRODUCT — `GET /pos/branches/:id/catalog/products`.
  * `kind=PRODUCT` gom các biến thể dưới 1 product; `kind=ITEM` là hàng lẻ standalone.
  * `id` là product id (PRODUCT) hoặc item id (ITEM). Mirror `PosProductCardDto` (BE).

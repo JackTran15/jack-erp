@@ -34,6 +34,10 @@ describe("BranchCrudService", () => {
   };
   let service: BranchCrudService;
   let branchStatus: { invalidate: jest.Mock };
+  let branchService: {
+    getBranchAssigneeUserIds: jest.Mock;
+    invalidateMyBranchesForUsers: jest.Mock;
+  };
 
   beforeEach(() => {
     repository = {
@@ -57,10 +61,16 @@ describe("BranchCrudService", () => {
     } as unknown as DataSource;
 
     branchStatus = { invalidate: jest.fn().mockResolvedValue(undefined) };
+    // Defaults to no assignees so the pre-transaction snapshot in `remove`
+    // (T-07-03) resolves without every existing test having to stub it.
+    branchService = {
+      getBranchAssigneeUserIds: jest.fn().mockResolvedValue([]),
+      invalidateMyBranchesForUsers: jest.fn().mockResolvedValue(undefined),
+    };
     service = new BranchCrudService(
       repository as never,
       dataSource,
-      {} as BranchService,
+      branchService as unknown as BranchService,
       branchStatus as never,
     );
   });
@@ -286,6 +296,28 @@ describe("BranchCrudService", () => {
         ([sql]) => typeof sql === "string" && sql.startsWith("DELETE FROM branches"),
       ),
     ).toBe(false);
+  });
+
+  it("snapshots the branch's assignees before the delete transaction and clears their my-branches cache (T-07-03, AC-24)", async () => {
+    repository.findOne.mockResolvedValue(branchStub());
+    branchService.getBranchAssigneeUserIds.mockResolvedValue([
+      "user-2",
+      "user-3",
+    ]);
+
+    await service.remove("branch-1", actor);
+
+    // Snapshotted with the branchId while `user_branch_assignments` still
+    // has the rows — by the time the delete transaction commits, a lookup
+    // by branchId would find nothing.
+    expect(branchService.getBranchAssigneeUserIds).toHaveBeenCalledWith(
+      "branch-1",
+      "org-1",
+    );
+    expect(branchService.invalidateMyBranchesForUsers).toHaveBeenCalledWith(
+      ["user-2", "user-3"],
+      "org-1",
+    );
   });
 
   it("deletes bootstrap rows before deleting a clean branch", async () => {

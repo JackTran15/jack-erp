@@ -9008,6 +9008,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeLines",
+            "required": false,
+            "in": "query",
+            "description": "Include the voucher lines. Defaults to true. Pass false when the caller pages the lines separately through GET /:id/lines — on a large voucher the lines are the only part of this payload that scales with size.",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -9197,6 +9207,47 @@
             }
           }
         },
+        "tags": [
+          "StockTransferV2"
+        ]
+      }
+    },
+    "/v2/inventory/stock/transfers/{id}/lines/search": {
+      "post": {
+        "operationId": "StockTransferV2Controller_searchLines_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockTransferLineSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTransferLineSearchV2ResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Search one stock transfer's lines (v2)",
         "tags": [
           "StockTransferV2"
         ]
@@ -14558,6 +14609,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeLines",
+            "required": false,
+            "in": "query",
+            "description": "Include the voucher lines. Defaults to true. Pass false when the caller pages the lines separately through GET /:id/lines — on a large voucher the lines are the only part of this payload that scales with size.",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -14820,6 +14881,47 @@
         },
         "tags": [
           "StockTake"
+        ]
+      }
+    },
+    "/v2/inventory/stock-takes/{id}/lines/search": {
+      "post": {
+        "operationId": "StockTakeV2Controller_searchLines_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockTakeLineSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTakeLineSearchV2ResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Search one stock take's lines (v2)",
+        "tags": [
+          "StockTakeV2"
         ]
       }
     },
@@ -16185,6 +16287,132 @@
         },
         "tags": [
           "DraftInvoiceV2"
+        ]
+      }
+    },
+    "/pos/branches/{branchId}/catalog/search": {
+      "get": {
+        "operationId": "CatalogSearchV2Controller_search",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "mode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "exact",
+                "full"
+              ]
+            }
+          },
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "full",
+                "suggest"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "No @Max here on purpose — the ceiling is clamped in the handler so an\noversized value succeeds instead of failing validation.",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "includeUntracked",
+            "required": false,
+            "in": "query",
+            "description": "Include stock at stop-tracked (is_tracked=false) details.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosCatalogSearchResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CatalogSearchV2"
+        ]
+      }
+    },
+    "/pos/branches/{branchId}/catalog/stock": {
+      "post": {
+        "operationId": "CatalogSearchV2Controller_stock",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosCatalogStockQueryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PosCatalogLineResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Branch stock for a known set of items — what the POS page needs to refresh\nthe on-hand snapshot of the lines already in the cart.\n\nPOST rather than GET because the payload is a list whose length follows the\ncart, and a dozen UUIDs already crowd a query string. It reads rather than\nwrites; the global idempotency interceptor only engages on an explicit\nX-Idempotency-Key, and replaying the same body would return the same rows\nanyway.\n\nNot routed through the QueryBus: this is a primary-key fetch, not a query\nwith dynamic multi-join filters.",
+        "tags": [
+          "CatalogSearchV2"
         ]
       }
     },
@@ -19644,6 +19872,27 @@
         ]
       }
     },
+    "/inventory/transfer-orders/importable/count": {
+      "get": {
+        "operationId": "TransferOrderController_countImportable",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportableTransferOrderCountResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      }
+    },
     "/inventory/transfer-orders/by-code/{code}": {
       "get": {
         "operationId": "TransferOrderController_getByCode",
@@ -19684,6 +19933,16 @@
             "in": "path",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "includeLines",
+            "required": false,
+            "in": "query",
+            "description": "Include the voucher lines. Defaults to true. Pass false when the caller pages the lines separately through GET /:id/lines — on a large voucher the lines are the only part of this payload that scales with size.",
+            "schema": {
+              "default": true,
+              "type": "boolean"
             }
           }
         ],
@@ -20235,6 +20494,47 @@
           }
         },
         "summary": "Search the lines of a transfer's import goods receipt (v2)",
+        "tags": [
+          "TransferOrderV2"
+        ]
+      }
+    },
+    "/v2/inventory/transfer-orders/{id}/lines/search": {
+      "post": {
+        "operationId": "TransferOrderV2Controller_searchLines_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferOrderLineSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferOrderLineSearchV2ResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Search a transfer order's own lines (v2)",
         "tags": [
           "TransferOrderV2"
         ]
@@ -30571,6 +30871,9 @@
           "transferId": {
             "type": "string"
           },
+          "lineNo": {
+            "type": "number"
+          },
           "itemId": {
             "type": "string"
           },
@@ -30622,6 +30925,7 @@
         "required": [
           "id",
           "transferId",
+          "lineNo",
           "itemId",
           "quantity"
         ]
@@ -30748,6 +31052,219 @@
             ]
           }
         }
+      },
+      "StockTransferLineSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 200
+          }
+        }
+      },
+      "StockTransferLineItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
+      "StockTransferLineStorageDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "StockTransferLineLocationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
+      "StockTransferLineRowDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lineNo": {
+            "type": "number"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "item": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StockTransferLineItemDto"
+              }
+            ]
+          },
+          "sourceStorageId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "sourceStorage": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StockTransferLineStorageDto"
+              }
+            ]
+          },
+          "destinationStorageId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "destinationStorage": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StockTransferLineStorageDto"
+              }
+            ]
+          },
+          "sourceLocationId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "sourceLocation": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StockTransferLineLocationDto"
+              }
+            ]
+          },
+          "destinationLocationId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "destinationLocation": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StockTransferLineLocationDto"
+              }
+            ]
+          },
+          "quantity": {
+            "type": "string",
+            "description": "Quantity to transfer (numeric string)"
+          },
+          "unitPrice": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "lineNo",
+          "itemId",
+          "item",
+          "sourceStorageId",
+          "sourceStorage",
+          "destinationStorageId",
+          "destinationStorage",
+          "sourceLocationId",
+          "sourceLocation",
+          "destinationLocationId",
+          "destinationLocation",
+          "quantity",
+          "unitPrice",
+          "lineValue",
+          "notes"
+        ]
+      },
+      "StockTransferLineSearchV2ResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockTransferLineRowDto"
+            }
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "page",
+          "limit",
+          "total"
+        ]
       },
       "StockTransferV2LineDto": {
         "type": "object",
@@ -34848,6 +35365,10 @@
           "stockTakeId": {
             "type": "string"
           },
+          "lineNo": {
+            "type": "number",
+            "description": "1-based position within the stock-take, stamped by the write path (no DB default)."
+          },
           "itemId": {
             "type": "string"
           },
@@ -34900,6 +35421,7 @@
           "id",
           "organizationId",
           "stockTakeId",
+          "lineNo",
           "itemId",
           "locationId",
           "expectedQty",
@@ -34996,6 +35518,194 @@
         },
         "required": [
           "members"
+        ]
+      },
+      "StockTakeLineSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 200
+          }
+        }
+      },
+      "StockTakeLineItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "unit"
+        ]
+      },
+      "StockTakeLineLocationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
+      "StockTakeLineRowDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lineNo": {
+            "type": "number"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "item": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StockTakeLineItemDto"
+              }
+            ]
+          },
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "location": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StockTakeLineLocationDto"
+              }
+            ]
+          },
+          "expectedQty": {
+            "type": "string",
+            "description": "Expected (system) quantity (numeric string)"
+          },
+          "countedQty": {
+            "type": "string",
+            "nullable": true,
+            "description": "Counted quantity (numeric string)"
+          },
+          "expectedValue": {
+            "type": "string",
+            "description": "Expected (system) value (numeric string)"
+          },
+          "countedValue": {
+            "type": "string",
+            "nullable": true,
+            "description": "Counted value (numeric string)"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Variance reason"
+          }
+        },
+        "required": [
+          "id",
+          "lineNo",
+          "itemId",
+          "item",
+          "locationId",
+          "location",
+          "expectedQty",
+          "countedQty",
+          "expectedValue",
+          "countedValue",
+          "note",
+          "reason"
+        ]
+      },
+      "StockTakeLineTotalsDto": {
+        "type": "object",
+        "properties": {
+          "expectedTotal": {
+            "type": "number"
+          },
+          "countedTotal": {
+            "type": "number"
+          },
+          "varianceTotal": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "expectedTotal",
+          "countedTotal",
+          "varianceTotal"
+        ]
+      },
+      "StockTakeLineSearchV2ResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockTakeLineRowDto"
+            }
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/StockTakeLineTotalsDto"
+          }
+        },
+        "required": [
+          "data",
+          "page",
+          "limit",
+          "total",
+          "totals"
         ]
       },
       "PosProductCardDto": {
@@ -37239,6 +37949,165 @@
             "description": "Optional POS session scope"
           }
         }
+      },
+      "PosCatalogLocationDto": {
+        "type": "object",
+        "properties": {
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "locationId",
+          "name",
+          "quantity"
+        ]
+      },
+      "PosCatalogLineResponseDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "description": "Parent product grouping the variants; null for a standalone item."
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "sellingPrice": {
+            "type": "number"
+          },
+          "quantityOnHand": {
+            "type": "number",
+            "description": "Total on-hand at the branch, across every storage location."
+          },
+          "sellableQuantity": {
+            "type": "number",
+            "description": "Projected showroom on-hand once every open temp-warehouse line lands. This, not quantityOnHand, is the oversell-warning basis."
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosCatalogLocationDto"
+            }
+          },
+          "defaultLocationId": {
+            "type": "string",
+            "description": "Location a POS sale deducts from first; empty when the branch holds no stock."
+          }
+        },
+        "required": [
+          "itemId",
+          "code",
+          "name",
+          "unit",
+          "sellingPrice",
+          "quantityOnHand",
+          "sellableQuantity",
+          "locations",
+          "defaultLocationId"
+        ]
+      },
+      "PosCatalogSuggestionDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "sellingPrice": {
+            "type": "number"
+          },
+          "sellableQuantity": {
+            "type": "number"
+          },
+          "defaultLocationId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemId",
+          "code",
+          "name",
+          "unit",
+          "sellingPrice",
+          "sellableQuantity",
+          "defaultLocationId"
+        ]
+      },
+      "PosCatalogSearchResponseDto": {
+        "type": "object",
+        "properties": {
+          "exact": {
+            "nullable": true,
+            "description": "The item whose SKU or barcode equals the term exactly — only when exactly one matches, so the caller can auto-add without counting. Null for zero or several matches.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PosCatalogLineResponseDto"
+              }
+            ]
+          },
+          "suggestions": {
+            "description": "Fuzzy matches for the dropdown, capped by `limit`. Carries locations[] and quantityOnHand as well when view=full. Always empty when mode=exact.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosCatalogSuggestionDto"
+            }
+          }
+        },
+        "required": [
+          "suggestions"
+        ]
+      },
+      "PosCatalogStockQueryDto": {
+        "type": "object",
+        "properties": {
+          "itemIds": {
+            "minItems": 1,
+            "description": "Items to report branch stock for. Rejected when empty: the caller is expected to skip the request entirely rather than ask about nothing.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "itemIds"
+        ]
       },
       "DiscountCodeEntity": {
         "type": "object",
@@ -40270,6 +41139,9 @@
           "transferOrderId": {
             "type": "string"
           },
+          "lineNo": {
+            "type": "number"
+          },
           "itemId": {
             "type": "string"
           },
@@ -40314,6 +41186,7 @@
           "id",
           "organizationId",
           "transferOrderId",
+          "lineNo",
           "itemId",
           "requestedQty",
           "createdAt",
@@ -40406,6 +41279,17 @@
         "required": [
           "locationId",
           "targetBranchId"
+        ]
+      },
+      "ImportableTransferOrderCountResponseDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "count"
         ]
       },
       "GoodsReceiptEntity": {
@@ -40794,6 +41678,125 @@
             ]
           }
         }
+      },
+      "TransferOrderLineSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 200
+          }
+        }
+      },
+      "TransferOrderLineItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "unit"
+        ]
+      },
+      "TransferOrderLineRowDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lineNo": {
+            "type": "number"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "item": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransferOrderLineItemDto"
+              }
+            ]
+          },
+          "requestedQty": {
+            "type": "string",
+            "description": "Quantity requested for this line (numeric string)"
+          },
+          "sourceStorageId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "sourceLocationId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "lineNo",
+          "itemId",
+          "item",
+          "requestedQty",
+          "sourceStorageId",
+          "sourceLocationId",
+          "note"
+        ]
+      },
+      "TransferOrderLineSearchV2ResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferOrderLineRowDto"
+            }
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "page",
+          "limit",
+          "total"
+        ]
       },
       "GoodsReceiptLineDto": {
         "type": "object",

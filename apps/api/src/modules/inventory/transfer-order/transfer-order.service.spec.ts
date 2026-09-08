@@ -82,6 +82,7 @@ describe('TransferOrderService', () => {
       softDelete: jest.fn().mockResolvedValue(undefined),
       findAndCount: jest.fn().mockResolvedValue([[], 0]),
       find: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
       manager: { findAndCount: jest.fn().mockResolvedValue([[], 0]) },
     };
     locationRepo = {
@@ -501,6 +502,56 @@ describe('TransferOrderService', () => {
         service.getById('to-1', { ...actorSource, branchId: 'branch-C' }),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
+
+    // T-03-04 (AC-09) — `includeLines=false` must suppress the query-level eager
+    // load, not merely drop the field after the fact. `lines` is the only eager
+    // relation on TransferOrderEntity, so `loadEagerRelations: false` alone is
+    // sufficient — there is nothing else that needs re-declaring.
+    it('omits `loadEagerRelations: false` (i.e. joins the lines table) when includeLines is not passed', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder());
+
+      await service.getById('to-1', actorSource);
+
+      const opts = toRepo.findOne.mock.calls[0][0];
+      expect(opts.loadEagerRelations).toBeUndefined();
+    });
+
+    it('omits `loadEagerRelations: false` (i.e. joins the lines table) when includeLines=true is passed explicitly', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder());
+
+      await service.getById('to-1', actorSource, { includeLines: true });
+
+      const opts = toRepo.findOne.mock.calls[0][0];
+      expect(opts.loadEagerRelations).toBeUndefined();
+    });
+
+    it('sets `loadEagerRelations: false` (no join against transfer_order_lines) when includeLines=false', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder({ lines: undefined }));
+
+      await service.getById('to-1', actorSource, { includeLines: false });
+
+      const opts = toRepo.findOne.mock.calls[0][0];
+      expect(opts.loadEagerRelations).toBe(false);
+    });
+
+    it('returns a header with no lines when includeLines=false', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder({ lines: undefined }));
+
+      const to = await service.getById('to-1', actorSource, {
+        includeLines: false,
+      });
+
+      expect(to.lines).toBeUndefined();
+    });
+
+    it('still returns every line when includeLines is omitted', async () => {
+      toRepo.findOne.mockResolvedValue(orderWithBin('loc-A01'));
+      locationRepo.find.mockResolvedValue([{ id: 'loc-A01', code: 'A-01' }]);
+
+      const to = await service.getById('to-1', actorSource);
+
+      expect(to.lines).toHaveLength(1);
+    });
   });
 
   describe('create — source bin', () => {
@@ -869,6 +920,78 @@ describe('TransferOrderService', () => {
       expect(rows[0].lines).toEqual([
         expect.objectContaining({ itemId: 'item-1', quantity: 5, unitPrice: 12, lineTotal: 60 }),
       ]);
+    });
+  });
+
+  describe('countImportable / buildImportableWhere (T-06-01)', () => {
+    /**
+     * Interprets the plain-value + TypeORM FindOperator `where` clause built
+     * by `buildImportableWhere` against an in-memory fixture, so the test
+     * proves `countImportable` and `listImportable` were handed the *same*
+     * predicate rather than asserting two independently-mocked numbers.
+     */
+    function matchesWhere(order: Record<string, unknown>, where: Record<string, unknown>): boolean {
+      return Object.entries(where).every(([key, condition]) => {
+        const value = order[key];
+        if (condition && typeof condition === 'object' && 'type' in condition && 'value' in condition) {
+          const op = condition as { type: string; value: unknown };
+          switch (op.type) {
+            case 'in':
+              return (op.value as unknown[]).includes(value);
+            case 'not':
+              return !matchesWhere({ [key]: value }, { [key]: op.value });
+            case 'isNull':
+              return value === null || value === undefined;
+            case 'between': {
+              const [lo, hi] = op.value as [Date, Date];
+              const d = new Date(value as string);
+              return d >= lo && d <= hi;
+            }
+            case 'moreThanOrEqual':
+              return new Date(value as string) >= (op.value as Date);
+            case 'lessThanOrEqual':
+              return new Date(value as string) <= (op.value as Date);
+            default:
+              return value === op.value;
+          }
+        }
+        return value === condition;
+      });
+    }
+
+    const fixtures = [
+      baseOrder({ id: 'imp-1', status: TransferOrderStatus.IN_PROGRESS, exportGoodsIssueId: 'gi-1', importGoodsReceiptId: undefined, createdAt: new Date('2026-06-05') as unknown as Date }),
+      baseOrder({ id: 'imp-2', status: TransferOrderStatus.COMPLETED, exportGoodsIssueId: 'gi-2', importGoodsReceiptId: undefined, createdAt: new Date('2026-06-10') as unknown as Date }),
+      baseOrder({ id: 'imp-3', status: TransferOrderStatus.COMPLETED, exportGoodsIssueId: 'gi-3', importGoodsReceiptId: 'gr-1', createdAt: new Date('2026-06-15') as unknown as Date }),
+      baseOrder({ id: 'imp-4', status: TransferOrderStatus.DRAFT, exportGoodsIssueId: undefined, importGoodsReceiptId: undefined, createdAt: new Date('2026-06-20') as unknown as Date }),
+      baseOrder({ id: 'imp-5', status: TransferOrderStatus.IN_PROGRESS, exportGoodsIssueId: 'gi-5', importGoodsReceiptId: undefined, createdAt: new Date('2026-07-05') as unknown as Date }),
+    ];
+
+    beforeEach(() => {
+      toRepo.find.mockImplementation(({ where }: { where: Record<string, unknown> }) =>
+        Promise.resolve(fixtures.filter((o) => matchesWhere(o as unknown as Record<string, unknown>, where))),
+      );
+      toRepo.count.mockImplementation(({ where }: { where: Record<string, unknown> }) =>
+        Promise.resolve(fixtures.filter((o) => matchesWhere(o as unknown as Record<string, unknown>, where)).length),
+      );
+      branchRepo.find.mockResolvedValue([]);
+      giRepo.find.mockResolvedValue([]);
+    });
+
+    it.each([
+      { label: 'default (includeCompleted off)', params: {} },
+      { label: 'includeCompleted on', params: { includeCompleted: true } },
+      { label: 'from/to range', params: { from: '2026-06-01', to: '2026-06-30' } },
+    ])('countImportable and listImportable(...).length agree — $label (AC-20)', async ({ params }) => {
+      const rows = await service.listImportable(params, actorDest);
+      const count = await service.countImportable(params, actorDest);
+      expect(count).toBe(rows.length);
+    });
+
+    it('does not query goods-issues or branches (AC-21)', async () => {
+      await service.countImportable({}, actorDest);
+      expect(giRepo.find).not.toHaveBeenCalled();
+      expect(branchRepo.find).not.toHaveBeenCalled();
     });
   });
 

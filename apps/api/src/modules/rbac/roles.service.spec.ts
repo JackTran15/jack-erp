@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { RbacService } from './rbac.service';
+import { CacheService } from '../redis/cache.service';
 import { RoleEntity } from '../auth/role.entity';
 import { PermissionEntity } from '../auth/permission.entity';
 import { RolePermissionEntity } from '../auth/role-permission.entity';
@@ -20,7 +21,9 @@ const actor: ActorContext = {
 function makeMockRepo() {
   return {
     findOne: jest.fn(),
-    find: jest.fn(),
+    // Defaults to empty so `setPermissions`'s identity-cache invalidation
+    // (T-07-03) resolves without every existing test having to stub it.
+    find: jest.fn().mockResolvedValue([]),
     save: jest.fn(),
     create: jest.fn().mockImplementation((data) => ({ ...data })),
     delete: jest.fn(),
@@ -41,6 +44,7 @@ describe('RolesService', () => {
       | 'getGrantableRoleIds'
     >
   >;
+  let cacheService: jest.Mocked<Pick<CacheService, 'invalidate'>>;
 
   beforeEach(async () => {
     roleRepo = makeMockRepo();
@@ -55,6 +59,9 @@ describe('RolesService', () => {
         async (_userId: string, _orgId: string, roleIds: string[]) =>
           new Set(roleIds),
       ),
+    };
+    cacheService = {
+      invalidate: jest.fn().mockResolvedValue(undefined),
     };
 
     const manager = {
@@ -83,6 +90,7 @@ describe('RolesService', () => {
           useValue: userRoleRepo,
         },
         { provide: RbacService, useValue: rbac },
+        { provide: CacheService, useValue: cacheService },
         { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
@@ -178,6 +186,37 @@ describe('RolesService', () => {
       expect(rbac.invalidateUserPermissions).toHaveBeenCalledWith('u-2', 'org-1');
     });
 
+    it('invalidates identity + my-branches cache for every user that held the deleted role (T-07-03, AC-24)', async () => {
+      roleRepo.findOne.mockResolvedValue({
+        id: 'r-1',
+        isSystem: false,
+        organizationId: 'org-1',
+      });
+      userRoleRepo.find.mockResolvedValue([
+        { userId: 'u-1', roleId: 'r-1', organizationId: 'org-1' },
+        { userId: 'u-2', roleId: 'r-1', organizationId: 'org-1' },
+      ]);
+
+      await service.delete('r-1', actor);
+
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'identity',
+        'identity:u-1:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'my-branches',
+        'u-1:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'identity',
+        'identity:u-2:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'my-branches',
+        'u-2:org-1',
+      );
+    });
+
     it('throws when the role is not found', async () => {
       roleRepo.findOne.mockResolvedValue(null);
       await expect(service.delete('missing', actor)).rejects.toBeInstanceOf(
@@ -205,6 +244,36 @@ describe('RolesService', () => {
       await service.setPermissions('r-1', ['pos.sale.create'], actor);
 
       expect(rbac.invalidateOrgPermissions).toHaveBeenCalledWith('org-1');
+    });
+
+    it('invalidates identity + my-branches cache for every user carrying the role (T-07-03, AC-24)', async () => {
+      roleRepo.findOne.mockResolvedValue({
+        id: 'r-1',
+        isSystem: false,
+        organizationId: 'org-1',
+        name: 'Cashier',
+        description: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      permissionRepo.find.mockResolvedValue([
+        { id: 'p-1', key: 'pos.sale.create' },
+      ]);
+      rolePermissionRepo.find.mockResolvedValue([]);
+      userRoleRepo.find.mockResolvedValue([
+        { userId: 'u-3', roleId: 'r-1', organizationId: 'org-1' },
+      ]);
+
+      await service.setPermissions('r-1', ['pos.sale.create'], actor);
+
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'identity',
+        'identity:u-3:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'my-branches',
+        'u-3:org-1',
+      );
     });
 
     it('refuses to change permissions on a system role', async () => {

@@ -1,13 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CacheService } from '../redis/cache.service';
+import { CacheService, CACHE_TTL_SECONDS } from '../redis/cache.service';
 import { UserRoleEntity } from '../auth/user-role.entity';
 import { RolePermissionEntity } from '../auth/role-permission.entity';
 import { PermissionEntity } from '../auth/permission.entity';
 
 const CACHE_NAMESPACE = 'rbac';
-const CACHE_TTL_SECONDS = 300;
 
 @Injectable()
 export class RbacService {

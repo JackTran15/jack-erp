@@ -6,6 +6,7 @@ import { mapInvoiceRowToDraftInvoice } from "@erp/pos/lib/page-libs/checkout/inv
 import {
   computeOversellLines,
   selectActiveSession,
+  selectCartItemIdsKey,
   selectUnknownOnHandLineCount,
   usePosCheckoutSessionStore,
 } from "./checkout-session.store";
@@ -84,6 +85,21 @@ describe("syncPurchaseCartOnHand", () => {
     sync([bx140()]);
 
     expect(currentLine().maxQty).toBe(4);
+  });
+
+  it("marks a line unknown when the payload omits its item entirely", () => {
+    // POST /catalog/stock trả ÍT phần tử hơn itemIds khi một mặt hàng đã ngừng
+    // bán giữa phiên. Dòng đó phải thành chưa-biết-tồn (cảnh báo bật), không
+    // được giữ nguyên con số cũ.
+    seedCart(cartLine({ maxQty: 12 }));
+    const sync = usePosCheckoutSessionStore.getState().syncPurchaseCartOnHand;
+
+    sync([bx140()]);
+    expect(currentLine().onHandUnknown).toBe(false);
+
+    sync([{ ...bx140(), itemId: "SOMETHING-ELSE" }]);
+
+    expect(currentLine().onHandUnknown).toBe(true);
   });
 
   it("marks the line unknown when the payload carries no sellableQuantity", () => {
@@ -436,5 +452,59 @@ describe("openDraftInNewSession — phiếu nháp đổi/trả", () => {
     expect(session?.checkoutVariant).toBe(CheckoutVariantEnum.SALE);
     expect(session?.purchaseCart).toHaveLength(1);
     expect(session?.returnCart).toEqual([]);
+  });
+});
+
+describe("selectCartItemIdsKey", () => {
+  const line = (itemId: string, over: Partial<CartLine> = {}): CartLine =>
+    ({
+      lineId: `L-${itemId}`,
+      itemId,
+      name: itemId,
+      code: itemId,
+      unit: "cái",
+      qty: 1,
+      unitPrice: 100,
+      ...over,
+    }) as CartLine;
+
+  const state = (carts: CartLine[][]) =>
+    ({
+      sessions: carts.map((purchaseCart, i) => ({
+        id: `S${i}`,
+        purchaseCart,
+      })),
+    }) as unknown as Parameters<typeof selectCartItemIdsKey>[0];
+
+  it("gộp itemId từ MỌI session, không riêng tab đang mở", () => {
+    // syncPurchaseCartOnHand quét mọi session. Chỉ gửi itemId của tab active thì
+    // dòng ở tab khác không có trong kết quả → bị đánh onHandUnknown → số dòng
+    // chờ không bao giờ về 0 → vòng lặp request.
+    const key = selectCartItemIdsKey(state([[line("I1")], [line("I2")]]));
+    expect(key).toBe("I1,I2");
+  });
+
+  it("khử trùng itemId xuất hiện ở nhiều dòng / nhiều tab", () => {
+    const key = selectCartItemIdsKey(
+      state([[line("I1"), line("I1")], [line("I1")]]),
+    );
+    expect(key).toBe("I1");
+  });
+
+  it("bỏ qua dòng hàng khách trả, như syncPurchaseCartOnHand", () => {
+    const key = selectCartItemIdsKey(
+      state([[line("I1"), line("I2", { isReturnCredit: true })]]),
+    );
+    expect(key).toBe("I1");
+  });
+
+  it("giá trị ổn định theo nội dung, không theo thứ tự dòng", () => {
+    expect(selectCartItemIdsKey(state([[line("I2"), line("I1")]]))).toBe(
+      selectCartItemIdsKey(state([[line("I1"), line("I2")]])),
+    );
+  });
+
+  it("giỏ rỗng cho chuỗi rỗng", () => {
+    expect(selectCartItemIdsKey(state([[]]))).toBe("");
   });
 });

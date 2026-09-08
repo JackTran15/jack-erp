@@ -13,6 +13,16 @@ export class StockTransferLineEntity {
   @Column({ name: 'transfer_id', type: 'uuid', comment: 'Parent transfer document' })
   transferId: string;
 
+  @Column({
+    name: 'line_no',
+    type: 'integer',
+    comment:
+      'Display order within the transfer (1-based). Frozen from physical row order by ' +
+      'migration 1789810000000; every write path re-stamps it by array index (edits ' +
+      'delete + re-insert all lines).',
+  })
+  lineNo: number;
+
   @Column({ name: 'item_id', type: 'uuid', comment: 'The item being transferred' })
   itemId: string;
 

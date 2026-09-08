@@ -5,6 +5,13 @@ import { MetricsService } from '../metrics/metrics.service';
 const NAMESPACE = 'cache';
 const DEFAULT_TTL_SECONDS = 300;
 
+/**
+ * Shared TTL for every `CacheService.getOrSet` caller that follows the
+ * request-scoped-identity pattern (RBAC permissions, auth identity). Kept in
+ * one place so the caches that must expire together cannot drift apart.
+ */
+export const CACHE_TTL_SECONDS = DEFAULT_TTL_SECONDS;
+
 @Injectable()
 export class CacheService {
   private readonly logger = new Logger(CacheService.name);

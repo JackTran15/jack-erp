@@ -166,6 +166,19 @@ function isUuidLike(value: string): boolean {
   );
 }
 
+/**
+ * `GET /inventory/goods-issues/:id` with no `includeLines` flag — server
+ * default stays `true` (ADR-01). Used by the three toolbar actions that need
+ * the whole line array: Nhân bản, Sửa, and In tem mã (no rows ticked).
+ */
+async function fetchGoodsIssueWithLines(id: string): Promise<GoodsIssue> {
+  return requireErpData(
+    await erpApi.GET<GoodsIssue>("/inventory/goods-issues/{id}", {
+      params: { path: { id } },
+    }),
+  );
+}
+
 export function GoodsIssuePage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -187,6 +200,10 @@ export function GoodsIssuePage() {
   const [columnFilters, setColumnFilters] =
     useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  // Locks the one clicked toolbar action (Nhân bản / Sửa) while its
+  // `fetchGoodsIssueWithLines` round-trip is in flight — not the whole
+  // toolbar (AC-06).
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
 
   const [dialogMode, setDialogMode] = useState<
     "create" | "edit" | "view" | null
@@ -345,16 +362,21 @@ export function GoodsIssuePage() {
   }, [columnFilters, period, clearChecked]);
 
   // List rows no longer carry `lines` (v2 search trims them, see
-  // search-goods-issues-v2.handler.ts). The selected document's full detail
-  // (header + lines) is fetched separately via the unchanged GET /:id, so the
-  // barcode toolbar, the duplicate/view/edit dialog, and DetailPanel all read
-  // from this instead of the stale list row.
+  // search-goods-issues-v2.handler.ts). The selected document's header is
+  // fetched separately via GET /:id?includeLines=false — DetailPanel pages
+  // its own lines through POST /v2/goods-issues/:id/lines/search, so this
+  // query never needs them. Actions that need the full line array (barcode
+  // toolbar, duplicate/view/edit dialog) fetch it on demand instead of
+  // reading it off this header.
   const { data: selectedIssueData } = useQuery({
     queryKey: ["goods-issue", selectedId],
     queryFn: async () =>
       requireErpData(
         await erpApi.GET<GoodsIssue>("/inventory/goods-issues/{id}", {
-          params: { path: { id: selectedId! } },
+          params: {
+            path: { id: selectedId! },
+            query: { includeLines: false },
+          },
         }),
       ),
     enabled: !!selectedId,
@@ -448,17 +470,35 @@ export function GoodsIssuePage() {
       // re-seeds its form state on mount, so swapping `editingIssue` under an
       // already-mounted instance would save the old form's data against the
       // newly-picked record's id. See T-06-05.
-      disabled: !selectedIssue || !!dialogMode,
+      //
+      // The dialog seeds its `lines` state from `initial.lines` in create
+      // mode (duplicate reuses create), and `selectedIssue` no longer carries
+      // lines (T-02-01) — fetch the full document on demand instead (ADR-02).
+      tooltip: pendingAction === "duplicate" ? "Đang tải..." : undefined,
+      disabled: !selectedIssue || !!dialogMode || pendingAction === "duplicate",
       onClick: () => {
         if (!selectedIssue || dialogMode) return;
-        setEditingIssue(selectedIssue);
-        setDialogMode("create");
+        setPendingAction("duplicate");
+        void (async () => {
+          try {
+            const full = await fetchGoodsIssueWithLines(selectedIssue.id);
+            setEditingIssue(full);
+            setDialogMode("create");
+          } catch (err) {
+            toast.error(getUserFacingApiErrorMessage(err));
+          } finally {
+            setPendingAction(null);
+          }
+        })();
       },
     },
     {
       id: "view",
       label: "Xem",
       icon: Eye,
+      // No `fetchGoodsIssueWithLines` here: the view dialog pages its own
+      // lines through `/lines/search` (`gridRows = isView ? viewLines : lines`
+      // in GoodsIssueFormDialog) rather than reading `initial.lines`.
       disabled: !selectedIssue || !!dialogMode,
       onClick: () => {
         if (!selectedIssue || dialogMode) return;
@@ -475,18 +515,35 @@ export function GoodsIssuePage() {
       // overwriting what was already posted — except once the destination
       // branch has received the transfer, when that adjustment would rewrite
       // their posted phiếu nhập and the BE refuses outright.
+      //
+      // `update()` replaces the whole line array server-side, and the edit
+      // dialog seeds `lines` from `initial.lines` — opening it with an empty
+      // array and saving would wipe the voucher's lines. Fetch full first.
       tooltip: receivedByDestination
         ? "Chi nhánh nhận đã nhập phiếu này nên không sửa được nữa."
-        : undefined,
+        : pendingAction === "edit"
+          ? "Đang tải..."
+          : undefined,
       disabled:
         !selectedIssue ||
         selectedIssue.status === "CANCELLED" ||
         receivedByDestination ||
-        !!dialogMode,
+        !!dialogMode ||
+        pendingAction === "edit",
       onClick: () => {
         if (!selectedIssue || dialogMode) return;
-        setEditingIssue(selectedIssue);
-        setDialogMode("edit");
+        setPendingAction("edit");
+        void (async () => {
+          try {
+            const full = await fetchGoodsIssueWithLines(selectedIssue.id);
+            setEditingIssue(full);
+            setDialogMode("edit");
+          } catch (err) {
+            toast.error(getUserFacingApiErrorMessage(err));
+          } finally {
+            setPendingAction(null);
+          }
+        })();
       },
     },
     {
@@ -530,13 +587,31 @@ export function GoodsIssuePage() {
       disabled: gatheringLabels,
       onClick: () => {
         // Không tick phiếu nào → giữ nguyên đường cũ: in theo dòng đang xem.
+        // `selectedIssue` no longer carries `lines` (T-02-01), so fetch the
+        // full document first — same helper, same lock as gathering the
+        // ticked path below (`gatheringLabels` already exists for this;
+        // no second flag).
         if (checkedCount === 0) {
-          const items = toPrefillItems(selectedIssue?.lines ?? []);
-          navigateToBarcodePrint(
-            navigate,
-            "/inventory/goods-issues",
-            items.length ? items : undefined,
-          );
+          if (!selectedIssue) {
+            navigateToBarcodePrint(navigate, "/inventory/goods-issues", undefined);
+            return;
+          }
+          setGatheringLabels(true);
+          void (async () => {
+            try {
+              const full = await fetchGoodsIssueWithLines(selectedIssue.id);
+              const items = toPrefillItems(full.lines ?? []);
+              navigateToBarcodePrint(
+                navigate,
+                "/inventory/goods-issues",
+                items.length ? items : undefined,
+              );
+            } catch (err) {
+              toast.error(getUserFacingApiErrorMessage(err));
+            } finally {
+              setGatheringLabels(false);
+            }
+          })();
           return;
         }
         // Có tick → gom lines của từng phiếu. Dùng `GET /:id` (trả lines đầy đủ)
@@ -545,14 +620,7 @@ export function GoodsIssuePage() {
         void (async () => {
           try {
             const issues = await Promise.all(
-              [...checkedIds].map(async (id) =>
-                requireErpData(
-                  await erpApi.GET<GoodsIssue>(
-                    "/inventory/goods-issues/{id}",
-                    { params: { path: { id } } },
-                  ),
-                ),
-              ),
+              [...checkedIds].map((id) => fetchGoodsIssueWithLines(id)),
             );
             const items = mergeBarcodePrefillItems(
               issues.flatMap((issue) => toPrefillItems(issue.lines ?? [])),
@@ -775,7 +843,7 @@ export function GoodsIssuePage() {
         }
         detailPanel={
           <DetailPanel
-            issue={selectedIssue}
+            issueId={selectedId}
             storageNameById={storageNameById}
           />
         }
@@ -904,16 +972,16 @@ export function GoodsIssuePage() {
 // ─── Detail panel (selected issue's lines) ───────────────────────────────────
 
 function DetailPanel({
-  issue,
+  issueId,
   storageNameById,
 }: {
-  issue: GoodsIssue | null;
+  issueId: string | null;
   storageNameById: Map<string, string>;
 }) {
-  const issueId = issue?.id ?? null;
-
-  // Paginated, independent from the header (`issue`) query's cache key so a
-  // header refetch doesn't discard already-scrolled line pages.
+  // Paginated, independent from the header query's cache key — the raw
+  // selected id is passed straight in (not derived off the header query's
+  // result), so this request leaves in the same render pass as the row
+  // selection instead of waiting on a header round-trip first.
   const linesQuery = useInfiniteQuery({
     queryKey: ["goods-issue-lines", issueId],
     queryFn: async ({ pageParam }) =>
@@ -967,7 +1035,7 @@ function DetailPanel({
       <div className="mb-2 inline-block border-b-2 border-primary px-2 pb-1 text-sm font-semibold">
         Chi tiết
       </div>
-      {!issue ? (
+      {!issueId ? (
         <p className="text-sm text-muted-foreground">
           Chọn một phiếu để xem chi tiết.
         </p>

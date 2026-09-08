@@ -3006,6 +3006,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/inventory/stock/transfers/{id}/lines/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search one stock transfer's lines (v2) */
+        post: operations["StockTransferV2Controller_searchLines_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v2/inventory/stock/transfers": {
         parameters: {
             query?: never;
@@ -5034,6 +5051,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/inventory/stock-takes/{id}/lines/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search one stock take's lines (v2) */
+        post: operations["StockTakeV2Controller_searchLines_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pos/branches/{branchId}/catalog": {
         parameters: {
             query?: never;
@@ -5497,6 +5531,51 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["DraftInvoiceV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pos/branches/{branchId}/catalog/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CatalogSearchV2Controller_search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pos/branches/{branchId}/catalog/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Branch stock for a known set of items — what the POS page needs to refresh
+         *     the on-hand snapshot of the lines already in the cart.
+         *
+         *     POST rather than GET because the payload is a list whose length follows the
+         *     cart, and a dozen UUIDs already crowd a query string. It reads rather than
+         *     writes; the global idempotency interceptor only engages on an explicit
+         *     X-Idempotency-Key, and replaying the same body would return the same rows
+         *     anyway.
+         *
+         *     Not routed through the QueryBus: this is a primary-key fetch, not a query
+         *     with dynamic multi-join filters.
+         */
+        post: operations["CatalogSearchV2Controller_stock"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6729,6 +6808,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/transfer-orders/importable/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferOrderController_countImportable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/transfer-orders/by-code/{code}": {
         parameters: {
             query?: never;
@@ -6949,6 +7044,23 @@ export interface paths {
         put?: never;
         /** Search the lines of a transfer's import goods receipt (v2) */
         post: operations["TransferOrderV2Controller_searchImportGoodsReceiptLines_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory/transfer-orders/{id}/lines/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search a transfer order's own lines (v2) */
+        post: operations["TransferOrderV2Controller_searchLines_v2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -10206,6 +10318,7 @@ export interface components {
         StockTransferLineEntity: {
             id: string;
             transferId: string;
+            lineNo: number;
             itemId: string;
             sourceStorageId?: string;
             destinationStorageId?: string;
@@ -10274,6 +10387,60 @@ export interface components {
             dateRange?: components["schemas"]["DateRangeFilterDto"];
             /** @description Tổng tiền (computed line total: SUM(line_value)) */
             totalAmount?: components["schemas"]["CompareFilterDto"];
+        };
+        StockTransferLineSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            limit: number;
+        };
+        StockTransferLineItemDto: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+        };
+        StockTransferLineStorageDto: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        StockTransferLineLocationDto: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+        };
+        StockTransferLineRowDto: {
+            /** Format: uuid */
+            id: string;
+            lineNo: number;
+            /** Format: uuid */
+            itemId: string;
+            item: components["schemas"]["StockTransferLineItemDto"] | null;
+            /** Format: uuid */
+            sourceStorageId: string | null;
+            sourceStorage: components["schemas"]["StockTransferLineStorageDto"] | null;
+            /** Format: uuid */
+            destinationStorageId: string | null;
+            destinationStorage: components["schemas"]["StockTransferLineStorageDto"] | null;
+            /** Format: uuid */
+            sourceLocationId: string | null;
+            sourceLocation: components["schemas"]["StockTransferLineLocationDto"] | null;
+            /** Format: uuid */
+            destinationLocationId: string | null;
+            destinationLocation: components["schemas"]["StockTransferLineLocationDto"] | null;
+            /** @description Quantity to transfer (numeric string) */
+            quantity: string;
+            unitPrice: string | null;
+            lineValue: string | null;
+            notes: string | null;
+        };
+        StockTransferLineSearchV2ResponseDto: {
+            data: components["schemas"]["StockTransferLineRowDto"][];
+            page: number;
+            limit: number;
+            total: number;
         };
         StockTransferV2LineDto: {
             /** Format: uuid */
@@ -11677,6 +11844,8 @@ export interface components {
             organizationId: string;
             branchId?: string;
             stockTakeId: string;
+            /** @description 1-based position within the stock-take, stamped by the write path (no DB default). */
+            lineNo: number;
             itemId: string;
             locationId: string;
             expectedQty: string;
@@ -11721,6 +11890,59 @@ export interface components {
         };
         ReplaceMembersDto: {
             members: components["schemas"]["StockTakeMemberDto"][];
+        };
+        StockTakeLineSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            limit: number;
+        };
+        StockTakeLineItemDto: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+            unit: string;
+        };
+        StockTakeLineLocationDto: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+        };
+        StockTakeLineRowDto: {
+            /** Format: uuid */
+            id: string;
+            lineNo: number;
+            /** Format: uuid */
+            itemId: string;
+            item: components["schemas"]["StockTakeLineItemDto"] | null;
+            /** Format: uuid */
+            locationId: string;
+            location: components["schemas"]["StockTakeLineLocationDto"] | null;
+            /** @description Expected (system) quantity (numeric string) */
+            expectedQty: string;
+            /** @description Counted quantity (numeric string) */
+            countedQty: string | null;
+            /** @description Expected (system) value (numeric string) */
+            expectedValue: string;
+            /** @description Counted value (numeric string) */
+            countedValue: string | null;
+            note: string | null;
+            /** @description Variance reason */
+            reason: string | null;
+        };
+        StockTakeLineTotalsDto: {
+            expectedTotal: number;
+            countedTotal: number;
+            varianceTotal: number;
+        };
+        StockTakeLineSearchV2ResponseDto: {
+            data: components["schemas"]["StockTakeLineRowDto"][];
+            page: number;
+            limit: number;
+            total: number;
+            totals: components["schemas"]["StockTakeLineTotalsDto"];
         };
         PosProductCardDto: {
             /**
@@ -12536,6 +12758,54 @@ export interface components {
             createdAt?: components["schemas"]["DateRangeFilterDto"];
             /** @description Optional POS session scope */
             sessionId?: string;
+        };
+        PosCatalogLocationDto: {
+            /** Format: uuid */
+            locationId: string;
+            name: string;
+            quantity: number;
+        };
+        PosCatalogLineResponseDto: {
+            /** Format: uuid */
+            itemId: string;
+            /**
+             * Format: uuid
+             * @description Parent product grouping the variants; null for a standalone item.
+             */
+            productId?: string | null;
+            code: string;
+            name: string;
+            unit: string;
+            sellingPrice: number;
+            /** @description Total on-hand at the branch, across every storage location. */
+            quantityOnHand: number;
+            /** @description Projected showroom on-hand once every open temp-warehouse line lands. This, not quantityOnHand, is the oversell-warning basis. */
+            sellableQuantity: number;
+            locations: components["schemas"]["PosCatalogLocationDto"][];
+            /** @description Location a POS sale deducts from first; empty when the branch holds no stock. */
+            defaultLocationId: string;
+        };
+        PosCatalogSuggestionDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            productId?: string | null;
+            code: string;
+            name: string;
+            unit: string;
+            sellingPrice: number;
+            sellableQuantity: number;
+            defaultLocationId: string;
+        };
+        PosCatalogSearchResponseDto: {
+            /** @description The item whose SKU or barcode equals the term exactly — only when exactly one matches, so the caller can auto-add without counting. Null for zero or several matches. */
+            exact?: components["schemas"]["PosCatalogLineResponseDto"] | null;
+            /** @description Fuzzy matches for the dropdown, capped by `limit`. Carries locations[] and quantityOnHand as well when view=full. Always empty when mode=exact. */
+            suggestions: components["schemas"]["PosCatalogSuggestionDto"][];
+        };
+        PosCatalogStockQueryDto: {
+            /** @description Items to report branch stock for. Rejected when empty: the caller is expected to skip the request entirely rather than ask about nothing. */
+            itemIds: string[];
         };
         DiscountCodeEntity: {
             code: string;
@@ -13708,6 +13978,7 @@ export interface components {
             organizationId: string;
             branchId?: string;
             transferOrderId: string;
+            lineNo: number;
             itemId: string;
             requestedQty: string;
             /** @description Source warehouse (storage) to pull this line from at export; null falls back to the header source storage. */
@@ -13755,6 +14026,9 @@ export interface components {
             locationId: string;
             /** Format: uuid */
             targetBranchId: string;
+        };
+        ImportableTransferOrderCountResponseDto: {
+            count: number;
         };
         GoodsReceiptEntity: {
             documentNumber?: string;
@@ -13892,6 +14166,40 @@ export interface components {
             unitPrice?: components["schemas"]["CompareFilterDto"];
             /** @description Thành tiền — `quantity * unit_price`, see LINE_AMOUNT_EXPRESSION. */
             lineTotal?: components["schemas"]["CompareFilterDto"];
+        };
+        TransferOrderLineSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            limit: number;
+        };
+        TransferOrderLineItemDto: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+            unit: string;
+        };
+        TransferOrderLineRowDto: {
+            /** Format: uuid */
+            id: string;
+            lineNo: number;
+            /** Format: uuid */
+            itemId: string;
+            item: components["schemas"]["TransferOrderLineItemDto"] | null;
+            /** @description Quantity requested for this line (numeric string) */
+            requestedQty: string;
+            /** Format: uuid */
+            sourceStorageId: string | null;
+            /** Format: uuid */
+            sourceLocationId: string | null;
+            note: string | null;
+        };
+        TransferOrderLineSearchV2ResponseDto: {
+            data: components["schemas"]["TransferOrderLineRowDto"][];
+            page: number;
+            limit: number;
+            total: number;
         };
         GoodsReceiptLineDto: {
             /** Format: uuid */
@@ -20174,7 +20482,10 @@ export interface operations {
     };
     StockTransferController_getById: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Include the voucher lines. Defaults to true. Pass false when the caller pages the lines separately through GET /:id/lines — on a large voucher the lines are the only part of this payload that scales with size. */
+                includeLines?: boolean;
+            };
             header?: never;
             path: {
                 id: string;
@@ -20342,6 +20653,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    StockTransferV2Controller_searchLines_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockTransferLineSearchV2Dto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTransferLineSearchV2ResponseDto"];
                 };
             };
         };
@@ -23417,7 +23753,10 @@ export interface operations {
     };
     StockTakeController_getById: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Include the voucher lines. Defaults to true. Pass false when the caller pages the lines separately through GET /:id/lines — on a large voucher the lines are the only part of this payload that scales with size. */
+                includeLines?: boolean;
+            };
             header?: never;
             path: {
                 id: string;
@@ -23593,6 +23932,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockTakeEntity"];
+                };
+            };
+        };
+    };
+    StockTakeV2Controller_searchLines_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockTakeLineSearchV2Dto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeLineSearchV2ResponseDto"];
                 };
             };
         };
@@ -24411,6 +24775,63 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CatalogSearchV2Controller_search: {
+        parameters: {
+            query: {
+                q: string;
+                mode?: "exact" | "full";
+                view?: "full" | "suggest";
+                /**
+                 * @description No @Max here on purpose — the ceiling is clamped in the handler so an
+                 *     oversized value succeeds instead of failing validation.
+                 */
+                limit?: number;
+                /** @description Include stock at stop-tracked (is_tracked=false) details. */
+                includeUntracked?: boolean;
+            };
+            header?: never;
+            path: {
+                branchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosCatalogSearchResponseDto"];
+                };
+            };
+        };
+    };
+    CatalogSearchV2Controller_stock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                branchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosCatalogStockQueryDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosCatalogLineResponseDto"][];
                 };
             };
         };
@@ -26592,6 +27013,25 @@ export interface operations {
             };
         };
     };
+    TransferOrderController_countImportable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportableTransferOrderCountResponseDto"];
+                };
+            };
+        };
+    };
     TransferOrderController_getByCode: {
         parameters: {
             query?: never;
@@ -26615,7 +27055,10 @@ export interface operations {
     };
     TransferOrderController_getById: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Include the voucher lines. Defaults to true. Pass false when the caller pages the lines separately through GET /:id/lines — on a large voucher the lines are the only part of this payload that scales with size. */
+                includeLines?: boolean;
+            };
             header?: never;
             path: {
                 id: string;
@@ -26966,6 +27409,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TransferOrderV2Controller_searchLines_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferOrderLineSearchV2Dto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOrderLineSearchV2ResponseDto"];
                 };
             };
         };

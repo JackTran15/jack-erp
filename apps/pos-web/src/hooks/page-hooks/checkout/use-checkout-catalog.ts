@@ -1,12 +1,7 @@
 import { useCallback, useMemo } from "react";
-import type { SearchSuggestion } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
 import type { CatalogProduct } from "@erp/pos/interfaces/checkout.interface";
-import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
-import { matchesCatalogQuery } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
   useCatalogProductsQuery,
-  useCatalogQuery,
-  useSearchCatalog,
 } from "@erp/pos/hooks/react-query/use-query-catalog";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import {
@@ -26,12 +21,10 @@ interface ToolbarState {
 }
 
 interface UseCheckoutCatalogResult {
-  catalog: PosCatalogLine[];
-  catalogLoading: boolean;
   /** Loading riêng cho grid product-level (drive trạng thái Đang tải/Trống của grid). */
   catalogProductsLoading: boolean;
-  catalogError: string;
-  refetchCatalog: () => void;
+  catalogProductsError: string;
+  refetchCatalogProducts: () => void;
   toolbar: ToolbarState;
   setToolbar: (value: Updater<ToolbarState>) => void;
   catalogQuery: string;
@@ -40,17 +33,19 @@ interface UseCheckoutCatalogResult {
   setCatalogGroup: (value: Updater<string | undefined>) => void;
   catalogCollapsed: boolean;
   setCatalogCollapsed: (value: Updater<boolean>) => void;
-  filteredProducts: PosCatalogLine[];
   catalogProducts: CatalogProduct[];
-  productSearchAdapter: (
-    q: string,
-  ) => Promise<SearchSuggestion<PosCatalogLine>[]>;
 }
 
 /**
- * Zero-input adapter. Dữ liệu catalog đến từ React Query (`useCatalogQuery`,
+ * Zero-input adapter cho LƯỚI sản phẩm mức product (`useCatalogProductsQuery`,
  * tự fetch theo `branchId` lấy từ branch store, dedupe across callsites);
- * toolbar / filter / collapse đọc từ catalog store. Phần derived giữ nguyên.
+ * toolbar / filter / collapse đọc từ catalog store.
+ *
+ * KHÔNG còn tải catalog phẳng toàn chi nhánh. Trước đây hook này gọi
+ * `useCatalogQuery` — 10 400 item ≈ 3 835 kB mỗi lần mở trang trên bản restore
+ * prod — để phục vụ đúng hai câu hỏi, và cả hai giờ hỏi thẳng server:
+ * tồn của các dòng trong giỏ (`POST /catalog/stock`) và "chuỗi này khớp mấy mặt
+ * hàng" (`GET /catalog/search`).
  */
 export function useCheckoutCatalog(): UseCheckoutCatalogResult {
   const branchId = usePosBranchStore((s) => s.branchId) ?? "";
@@ -59,24 +54,21 @@ export function useCheckoutCatalog(): UseCheckoutCatalogResult {
     (s) => selectCatalogDraft(s).catalogGroup,
   );
   const categoryId = catalogGroupId ? catalogGroupId : undefined;
-  const catalogQueryResult = useCatalogQuery(branchId);
   const productsQueryResult = useCatalogProductsQuery(branchId, categoryId);
-  const catalog = useMemo(
-    () => catalogQueryResult.data ?? [],
-    [catalogQueryResult.data],
-  );
   const productCards = useMemo(
     () => productsQueryResult.data?.data ?? [],
     [productsQueryResult.data],
   );
-  const catalogLoading = catalogQueryResult.isLoading;
   const catalogProductsLoading = productsQueryResult.isLoading;
-  const catalogError = catalogQueryResult.error
-    ? `Không tải được tồn kho: ${catalogQueryResult.error.message}`
+  // Nguồn lỗi/tải lại chuyển sang query của LƯỚI: sau khi bỏ tải toàn catalog, đó
+  // là thứ duy nhất còn tải được và hỏng được ở màn này. Đổi luôn tên để nó nói
+  // đúng nguồn, thay vì giữ tên cũ trỏ chỗ khác.
+  const catalogProductsError = productsQueryResult.error
+    ? `Không tải được danh sách hàng hoá: ${productsQueryResult.error.message}`
     : "";
-  const refetchCatalog = useCallback(() => {
-    void catalogQueryResult.refetch();
-  }, [catalogQueryResult]);
+  const refetchCatalogProducts = useCallback(() => {
+    void productsQueryResult.refetch();
+  }, [productsQueryResult]);
 
   const { toolbar, catalogQuery, catalogGroup, catalogCollapsed } =
     usePosCheckoutSessionStore(selectCatalogDraft);
@@ -117,10 +109,6 @@ export function useCheckoutCatalog(): UseCheckoutCatalogResult {
     [updateDraftSlice],
   );
 
-  const filteredProducts = useMemo(() => {
-    return catalog.filter((p) => matchesCatalogQuery(p, toolbar.query));
-  }, [catalog, toolbar.query]);
-
   // Grid hiển thị MỖI SẢN PHẨM 1 card (product-level). Lọc client-side theo tên
   // trên danh sách product đã tải (endpoint products không có tham số search).
   const catalogProducts: CatalogProduct[] = useMemo(() => {
@@ -135,25 +123,10 @@ export function useCheckoutCatalog(): UseCheckoutCatalogResult {
       }));
   }, [productCards, catalogQuery]);
 
-  // Gợi ý dropdown lấy server-side: name / SKU / mã vạch khớp ILIKE (client-side
-  // chỉ lọc được name+code trên catalog đã tải, không có mã vạch). Trả tối đa 8.
-  const searchCatalog = useSearchCatalog();
-  const productSearchAdapter = useCallback(
-    async (q: string): Promise<SearchSuggestion<PosCatalogLine>[]> => {
-      const term = q.trim();
-      if (!term || !branchId) return [];
-      const rows = await searchCatalog(branchId, term);
-      return rows.slice(0, 8).map((p) => ({ item: p }));
-    },
-    [searchCatalog, branchId],
-  );
-
   return {
-    catalog,
-    catalogLoading,
     catalogProductsLoading,
-    catalogError,
-    refetchCatalog,
+    catalogProductsError,
+    refetchCatalogProducts,
     toolbar,
     setToolbar,
     catalogQuery,
@@ -162,8 +135,6 @@ export function useCheckoutCatalog(): UseCheckoutCatalogResult {
     setCatalogGroup,
     catalogCollapsed,
     setCatalogCollapsed,
-    filteredProducts,
     catalogProducts,
-    productSearchAdapter,
   };
 }

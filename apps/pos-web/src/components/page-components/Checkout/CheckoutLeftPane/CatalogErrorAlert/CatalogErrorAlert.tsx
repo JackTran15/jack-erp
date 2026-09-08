@@ -2,20 +2,23 @@ import { AlertBar } from "@erp/pos/components/page-components/Checkout/CheckoutL
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
 
 /**
- * Wrapper hiển thị catalog error + nút "Tải lại" — đọc từ catalog adapter
+ * Wrapper hiển thị lỗi tải lưới hàng hoá + nút "Tải lại" — đọc từ catalog adapter
  * (React Query), không cần prop drilling từ Page.
+ *
+ * Nguồn lỗi là `GET /catalog/products` (lưới). Trước đây là `GET /catalog` (catalog
+ * phẳng toàn chi nhánh), thứ trang này không còn tải.
  */
 export function CatalogErrorAlert() {
-  const { catalogError, refetchCatalog } = useCheckoutCatalog();
+  const { catalogProductsError, refetchCatalogProducts } = useCheckoutCatalog();
 
-  if (!catalogError) return null;
+  if (!catalogProductsError) return null;
 
   return (
     <AlertBar
       variant="error"
-      action={{ label: "Tải lại", onClick: refetchCatalog }}
+      action={{ label: "Tải lại", onClick: refetchCatalogProducts }}
     >
-      {catalogError}
+      {catalogProductsError}
     </AlertBar>
   );
 }

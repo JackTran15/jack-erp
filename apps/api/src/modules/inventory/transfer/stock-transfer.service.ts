@@ -200,8 +200,9 @@ export class StockTransferService {
       invoiceNumber: dto.invoiceNumber ?? null,
       isSystemGenerated: dto.isSystemGenerated ?? false,
       createdBy: actor.userId,
-      lines: dto.lines.map((l) => {
+      lines: dto.lines.map((l, idx) => {
         const line = new StockTransferLineEntity();
+        line.lineNo = idx + 1;
         line.itemId = l.itemId;
         line.quantity = l.quantity;
         line.sourceStorageId = l.sourceStorageId;
@@ -505,9 +506,10 @@ export class StockTransferService {
     };
 
     const buildLineEntities = (): StockTransferLineEntity[] =>
-      resolved.lines.map((l) => {
+      resolved.lines.map((l, idx) => {
         const line = new StockTransferLineEntity();
         line.transferId = id;
+        line.lineNo = idx + 1;
         line.itemId = l.itemId;
         line.quantity = l.quantity;
         line.sourceStorageId = l.sourceStorageId;
@@ -940,11 +942,21 @@ export class StockTransferService {
     return this.findOrFail(id, actor.organizationId);
   }
 
+  /**
+   * `opts.includeLines: false` returns the header alone (ADR-01) — the panel
+   * pages its lines through `POST :id/lines/search`. Default stays `true` so
+   * every existing caller, the edit dialog included, is untouched.
+   */
   async getById(
     id: string,
     organizationId: string,
+    opts: { includeLines?: boolean } = {},
   ): Promise<StockTransferEntity> {
-    const transfer = await this.findOrFail(id, organizationId);
+    const transfer = await this.findOrFail(
+      id,
+      organizationId,
+      opts.includeLines ?? true,
+    );
     await this.attachTransporters([transfer], organizationId);
     await attachCounterparties(this.transferRepo.manager, [transfer], organizationId);
     return transfer;
@@ -1210,8 +1222,9 @@ export class StockTransferService {
             approvedAt: new Date(),
             postedBy: actor.userId,
             postedAt: new Date(),
-            lines: lines.map((l) => {
+            lines: lines.map((l, idx) => {
               const line = new StockTransferLineEntity();
+              line.lineNo = idx + 1;
               line.itemId = l.itemId;
               line.quantity = l.quantity;
               line.sourceLocationId = l.sourceLocationId;
@@ -1306,9 +1319,13 @@ export class StockTransferService {
   private async findOrFail(
     id: string,
     organizationId: string,
+    includeLines = true,
   ): Promise<StockTransferEntity> {
     const transfer = await this.transferRepo.findOne({
       where: { id, organizationId },
+      // `loadEagerRelations` is all-or-nothing, but `lines` is the only eager
+      // relation on StockTransferEntity, so there's nothing to re-declare here.
+      ...(includeLines ? {} : { loadEagerRelations: false }),
     });
     if (!transfer) {
       throw new NotFoundException(`Stock transfer ${id} not found`);

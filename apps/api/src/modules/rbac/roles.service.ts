@@ -14,8 +14,19 @@ import { PermissionEntity } from '../auth/permission.entity';
 import { RolePermissionEntity } from '../auth/role-permission.entity';
 import { UserRoleEntity } from '../auth/user-role.entity';
 import { RbacService } from './rbac.service';
+import { CacheService } from '../redis/cache.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
+
+/**
+ * Mirrors `AuthService`'s private `IDENTITY_CACHE_NAMESPACE` /
+ * `BranchService`'s `MY_BRANCHES_CACHE_NAMESPACE` — duplicated here rather
+ * than imported because neither service exposes them and this module has no
+ * other dependency on either one (see the identical copy in
+ * `UsersService`, T-07-03).
+ */
+const IDENTITY_CACHE_NAMESPACE = 'identity';
+const MY_BRANCHES_CACHE_NAMESPACE = 'my-branches';
 
 @Injectable()
 export class RolesService {
@@ -31,8 +42,37 @@ export class RolesService {
     @InjectRepository(UserRoleEntity)
     private readonly userRoleRepo: Repository<UserRoleEntity>,
     private readonly rbacService: RbacService,
+    private readonly cacheService: CacheService,
     private readonly dataSource: DataSource,
   ) {}
+
+  /**
+   * Same helper as `UsersService.invalidateUserIdentity` — clears the
+   * identity report and `/branches/me` caches for one user. Swallows Redis
+   * errors and only logs (T-07-03 / ADR-08).
+   */
+  private async invalidateUserIdentity(
+    userId: string,
+    orgId: string,
+  ): Promise<void> {
+    try {
+      await Promise.all([
+        this.cacheService.invalidate(
+          IDENTITY_CACHE_NAMESPACE,
+          `identity:${userId}:${orgId}`,
+        ),
+        this.cacheService.invalidate(
+          MY_BRANCHES_CACHE_NAMESPACE,
+          `${userId}:${orgId}`,
+        ),
+      ]);
+    } catch (err) {
+      this.logger.error(
+        `Identity cache invalidation failed for user=${userId} org=${orgId} — falling back to the cache TTL`,
+        err instanceof Error ? err.stack : undefined,
+      );
+    }
+  }
 
   async list(actor: ActorContext): Promise<RoleSummary[]> {
     const roles = await this.roleRepo.find({
@@ -184,6 +224,11 @@ export class RolesService {
         ),
       ),
     );
+    await Promise.all(
+      affectedUsers.map((ur) =>
+        this.invalidateUserIdentity(ur.userId, actor.organizationId),
+      ),
+    );
 
     this.logger.log(
       `Deleted role ${id} (org=${actor.organizationId}, affected users=${affectedUsers.length})`,
@@ -226,6 +271,20 @@ export class RolesService {
 
     // All users carrying this role need fresh permissions on next request.
     await this.rbacService.invalidateOrgPermissions(actor.organizationId);
+
+    // Permission keys alone never change a user's `roles` or `branchIds`, so
+    // this identity cache clear is defensive rather than strictly required —
+    // but it is one of the six sites ADR-08 named, and a per-user clear here
+    // is no broader than what the users on this role actually need, unlike
+    // an org-wide `invalidatePattern`.
+    const affectedUsers = await this.userRoleRepo.find({
+      where: { roleId: id, organizationId: actor.organizationId },
+    });
+    await Promise.all(
+      affectedUsers.map((ur) =>
+        this.invalidateUserIdentity(ur.userId, actor.organizationId),
+      ),
+    );
 
     return this.findById(id, actor);
   }

@@ -31,12 +31,23 @@ import { EmployeeAddressEntity } from "./employee/employee-address.entity";
 import { EmployeeEmergencyContactEntity } from "./employee/employee-emergency-contact.entity";
 import { EmployeeAccessScheduleEntity } from "./employee/employee-access-schedule.entity";
 import { RbacService } from "./rbac.service";
+import { CacheService } from "../redis/cache.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { EmployeeProfileDto } from "./dto/employee-profile.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 
 const BCRYPT_COST = 10;
+
+/**
+ * Mirrors `AuthService`'s private `IDENTITY_CACHE_NAMESPACE` /
+ * `BranchService`'s `MY_BRANCHES_CACHE_NAMESPACE` — duplicated here rather
+ * than imported because neither service exposes them and this module has no
+ * other dependency on either one. Same trade `BranchCrudService.invalidateStatusCache`
+ * already made for its own copy of that helper (see T-07-03).
+ */
+const IDENTITY_CACHE_NAMESPACE = "identity";
+const MY_BRANCHES_CACHE_NAMESPACE = "my-branches";
 
 /** Sentinel for "match nothing" — an empty `In([])` would match every row. */
 const NIL_UUID = "00000000-0000-0000-0000-000000000000";
@@ -66,8 +77,42 @@ export class UsersService {
     @InjectRepository(EmployeeProfileEntity)
     private readonly profileRepo: Repository<EmployeeProfileEntity>,
     private readonly rbacService: RbacService,
+    private readonly cacheService: CacheService,
     private readonly dataSource: DataSource,
   ) {}
+
+  /**
+   * Clears both caches a change to one user's roles or branch assignments can
+   * make stale: the identity report (`AuthService.getSession`) and the
+   * `/branches/me` list (`BranchService.listMyBranches`). One call so no
+   * call-site has to remember both — see T-07-03 / ADR-08.
+   *
+   * Swallows Redis errors and only logs, same as the two
+   * `invalidateStatusCache` helpers: a flaky cache must not fail the
+   * mutation that already committed.
+   */
+  private async invalidateUserIdentity(
+    userId: string,
+    orgId: string,
+  ): Promise<void> {
+    try {
+      await Promise.all([
+        this.cacheService.invalidate(
+          IDENTITY_CACHE_NAMESPACE,
+          `identity:${userId}:${orgId}`,
+        ),
+        this.cacheService.invalidate(
+          MY_BRANCHES_CACHE_NAMESPACE,
+          `${userId}:${orgId}`,
+        ),
+      ]);
+    } catch (err) {
+      this.logger.error(
+        `Identity cache invalidation failed for user=${userId} org=${orgId} — falling back to the cache TTL`,
+        err instanceof Error ? err.stack : undefined,
+      );
+    }
+  }
 
   /**
    * User ids the actor may see, or `null` for no restriction. Without
@@ -344,6 +389,7 @@ export class UsersService {
       created.id,
       actor.organizationId,
     );
+    await this.invalidateUserIdentity(created.id, actor.organizationId);
 
     this.logger.log(
       `Created user ${created.id} (email=${normalizedEmail}, org=${actor.organizationId})`,
@@ -382,6 +428,7 @@ export class UsersService {
         id,
         actor.organizationId,
       );
+      await this.invalidateUserIdentity(id, actor.organizationId);
     }
 
     return this.buildUserDetail(id, actor);
@@ -428,6 +475,7 @@ export class UsersService {
     user.isActive = false;
     await this.userRepo.save(user);
     await this.rbacService.invalidateUserPermissions(id, actor.organizationId);
+    await this.invalidateUserIdentity(id, actor.organizationId);
   }
 
   async getRoleIds(id: string, actor: ActorContext): Promise<string[]> {
@@ -469,6 +517,7 @@ export class UsersService {
     });
 
     await this.rbacService.invalidateUserPermissions(id, actor.organizationId);
+    await this.invalidateUserIdentity(id, actor.organizationId);
 
     return roleIds;
   }
@@ -510,6 +559,13 @@ export class UsersService {
         await manager.save(UserBranchAssignmentEntity, rows);
       }
     });
+
+    // Not one of the six sites the plan enumerated (it only tracked
+    // `invalidateUserPermissions` call sites), but this writes
+    // `user_branch_assignments` directly and is exactly the "gán chi nhánh
+    // của tôi bị đổi" case AC-24 names — found while auditing every write to
+    // that table per T-07-03.
+    await this.invalidateUserIdentity(id, actor.organizationId);
 
     return branchIds;
   }

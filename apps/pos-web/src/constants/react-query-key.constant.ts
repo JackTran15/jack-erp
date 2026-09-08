@@ -89,9 +89,50 @@ export const CATALOG_KEYS = {
     ["catalog", "product-detail", branchId, id, kind ?? "auto"] as const,
   LOOKUP: (branchId: string, code: string, includeUntracked = false) =>
     ["catalog", "lookup", branchId, code, includeUntracked] as const,
+  /**
+   * Tồn của một tập item đã biết — `POST /catalog/stock`.
+   *
+   * Key dựng từ **nội dung** mảng (sort + join), không từ reference: giỏ hàng đổi
+   * reference mỗi lần sửa số lượng, và một key mới mỗi render sẽ biến hook đồng bộ
+   * tồn thành vòng lặp request.
+   */
+  STOCK: (branchId: string, itemIds: readonly string[]) =>
+    ["catalog", "stock", branchId, [...itemIds].sort().join(",")] as const,
   /** Tìm kiếm catalog server-side (name/SKU/mã vạch ILIKE) cho dropdown gợi ý. */
   SEARCH: (branchId: string, term: string, includeUntracked = false) =>
     ["catalog", "search", branchId, term, includeUntracked] as const,
+  /**
+   * Endpoint gộp `GET /catalog/search` — tra khớp tuyệt đối + gợi ý trong 1 lượt.
+   *
+   * Key riêng chứ KHÔNG dùng lại `SEARCH`: hai endpoint trả hai shape khác nhau
+   * (`PosCatalogLine[]` vs `PosCatalogSearchResult`), dùng chung một entry cache
+   * là đưa shape này cho consumer của shape kia. `mode`/`view` nằm trong key vì
+   * chúng đổi cả nội dung lẫn hình dạng kết quả.
+   *
+   * `limit` cũng phải nằm trong key, và đây là bài học từ một lần đo thật: ô tìm
+   * gọi `limit=20` (dropdown), `addProductByQuery` gọi `limit=2` (chỉ cần đếm
+   * 0/1/nhiều) — cùng chuỗi, cùng mode, cùng view. Thiếu `limit` thì lời gọi thứ
+   * hai im lặng nhận lại 20 dòng đã cache thay vì hỏi lại, và một caller tương
+   * lai xin `limit=5` sẽ nhận nhầm mà không có dấu hiệu gì.
+   */
+  SEARCH_V2: (
+    branchId: string,
+    term: string,
+    mode: string,
+    view: string,
+    limit: number | undefined,
+    includeUntracked = false,
+  ) =>
+    [
+      "catalog",
+      "search-v2",
+      branchId,
+      term,
+      mode,
+      view,
+      limit ?? "default",
+      includeUntracked,
+    ] as const,
 } as const;
 
 export const ITEM_CATEGORY_KEYS = {

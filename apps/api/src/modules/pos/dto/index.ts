@@ -3,6 +3,23 @@ export { SubmitReconciliationDto } from './reconciliation.dto';
 export { PosCatalogQueryDto } from './pos-catalog.query.dto';
 export { PosCatalogLookupQueryDto } from './pos-catalog-lookup.query.dto';
 export {
+  PosCatalogSearchQueryDto,
+  PosCatalogSearchMode,
+  PosCatalogSearchView,
+  POS_CATALOG_SEARCH_DEFAULT_LIMIT,
+  POS_CATALOG_SEARCH_MAX_LIMIT,
+} from './pos-catalog-search.query.dto';
+export {
+  PosCatalogStockQueryDto,
+  POS_CATALOG_STOCK_MAX_ITEMS,
+} from './pos-catalog-stock.dto';
+export {
+  PosCatalogSearchResponseDto,
+  PosCatalogSuggestionDto,
+  PosCatalogLineResponseDto,
+  PosCatalogLocationDto,
+} from './pos-catalog-search.response.dto';
+export {
   PosCatalogProductsQueryDto,
   PosCatalogProductDetailQueryDto,
 } from './pos-catalog-products.query.dto';

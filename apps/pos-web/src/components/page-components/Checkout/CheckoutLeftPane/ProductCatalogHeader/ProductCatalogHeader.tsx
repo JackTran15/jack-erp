@@ -8,7 +8,7 @@ import { useCheckoutBarcodeAutoAdd } from "@erp/pos/hooks/page-hooks/checkout/us
 import { useCheckoutCartActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cart-actions";
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
 import { useCheckoutMeta } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-meta";
-import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
+import type { PosCatalogSuggestion } from "@erp/pos/interfaces/catalog.interface";
 
 export interface ProductCatalogHeaderProps {
   /** Forwarded to the underlying input — used by the Shift+F3 hotkey. */
@@ -21,26 +21,25 @@ export interface ProductCatalogHeaderProps {
  * đọc state từ catalog store + meta hook.
  */
 export function ProductCatalogHeader({ inputRef }: ProductCatalogHeaderProps) {
-  const { catalogQuery, setCatalogQuery, setCatalogGroup, productSearchAdapter } =
-    useCheckoutCatalog();
+  const { catalogQuery, setCatalogQuery, setCatalogGroup } = useCheckoutCatalog();
   const meta = useCheckoutMeta();
   const { addProductByItem } = useCheckoutCartActions();
-  const { tryAutoAdd, resetGuard } = useCheckoutBarcodeAutoAdd();
+  const { tryAutoAdd, searchWithAutoAdd, resetGuard } =
+    useCheckoutBarcodeAutoAdd();
 
   // Parity với ô F3: ưu tiên khớp mã vạch/SKU 100% → auto-add (đóng dropdown +
   // xóa ô để lưới sản phẩm bên dưới không bị kẹt lọc theo chuỗi mã vạch); chỉ khi
   // không khớp mới rơi về gợi ý tên/SKU/mã vạch (ILIKE) server-side.
   const search = useCallback(
-    async (q: string): Promise<SearchSuggestion<PosCatalogLine>[]> => {
-      const result = await tryAutoAdd(q);
+    async (q: string): Promise<SearchSuggestion<PosCatalogSuggestion>[]> => {
+      const { result, suggestions } = await searchWithAutoAdd(q);
       if (result === "added") {
         setCatalogQuery("");
         return [];
       }
-      if (result === "miss") return productSearchAdapter(q);
-      return [];
+      return suggestions.slice(0, 8).map((item) => ({ item }));
     },
-    [tryAutoAdd, productSearchAdapter, setCatalogQuery],
+    [searchWithAutoAdd, setCatalogQuery],
   );
 
   // Mỗi lần gõ/quét thật mở một phiên nhập mới (nhả guard khử trùng).
@@ -79,7 +78,7 @@ export function ProductCatalogHeader({ inputRef }: ProductCatalogHeaderProps) {
       </span>
 
       <div className="ml-auto w-[280px]">
-        <PosSearchPopover<PosCatalogLine>
+        <PosSearchPopover<PosCatalogSuggestion>
           inputRef={inputRef}
           value={catalogQuery}
           onValueChange={handleValueChange}
@@ -90,7 +89,9 @@ export function ProductCatalogHeader({ inputRef }: ProductCatalogHeaderProps) {
           renderItem={(item) => item.name}
           renderMeta={(item) => `${item.code} · ${item.unit}`}
           placeholder="(Shift + F3) Tìm kiếm"
-          minChars={1}
+          // 3, cùng lý do với ô F3: pg_trgm cần ≥3 ký tự mới tra được index, nên
+          // 1–2 ký tự quét toàn bộ catalog. Đường Enter không bị ngưỡng này chặn.
+          minChars={3}
           debounceMs={150}
           containerClassName="flex h-9 w-full items-stretch overflow-hidden rounded-md border border-gray-200 bg-white focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20"
           inputClassName="min-w-0 flex-1 bg-transparent pr-3 text-[13px] text-gray-900 placeholder:text-gray-400 focus:outline-none"

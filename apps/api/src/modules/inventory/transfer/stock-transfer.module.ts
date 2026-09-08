@@ -15,6 +15,7 @@ import { StockTransferController } from './stock-transfer.controller';
 import { StockTransferV2Controller } from './controllers/stock-transfer-v2.controller';
 import { StockTransferCommandV2Controller } from './controllers/stock-transfer-command-v2.controller';
 import { SearchStockTransfersV2Handler } from './queries/search-stock-transfers-v2.handler';
+import { SearchStockTransferLinesV2Handler } from './queries/search-stock-transfer-lines-v2.handler';
 import { CreateStockTransferV2Handler } from './commands/create-stock-transfer-v2.handler';
 import { StorageDefaultLocationResolverService } from '../location/storage-default-location-resolver.service';
 
@@ -41,6 +42,7 @@ import { StorageDefaultLocationResolverService } from '../location/storage-defau
   providers: [
     StockTransferService,
     SearchStockTransfersV2Handler,
+    SearchStockTransferLinesV2Handler,
     CreateStockTransferV2Handler,
     StorageDefaultLocationResolverService,
   ],

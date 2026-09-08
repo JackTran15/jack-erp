@@ -15,13 +15,12 @@ import { SearchStockTransfersV2Query } from './search-stock-transfers-v2.query';
 
 /**
  * Correlated line total — Tổng tiền = SUM(line_value). Drives the server-side
- * `totalAmount` filter and the footer grand total; the returned rows still
- * carry `lines`, and the handler attaches `totalAmount` per row from those
- * lines.
+ * `totalAmount` filter, the footer grand total, and the per-row `totalAmount`
+ * on the rows query — none of which join `lines`.
  *
- * A correlated subquery rather than a join on purpose: the rows query joins
- * `lines` one-to-many, and summing over that join would count a 5-line
- * transfer five times. The totals query never joins `lines` at all.
+ * A correlated subquery rather than a join on purpose: joining `lines`
+ * one-to-many would count a 5-line transfer five times in any SUM built over
+ * it. Neither the rows query nor the totals query joins `lines` at all.
  */
 const TOTAL_AMOUNT_SUBQUERY = `(SELECT COALESCE(SUM(l.line_value), 0)
    FROM stock_transfer_lines l WHERE l.transfer_id = st.id)`;
@@ -61,15 +60,12 @@ export class SearchStockTransfersV2Handler
     const page = dto.page ?? 1;
     const limit = dto.limit ?? 20;
 
-    // Lines and their item/storage/location relations are joined explicitly so
-    // each row carries the full `lines` the master-detail "Chi tiết" panel reads.
+    // The master-detail "Chi tiết" panel fetches lines separately via
+    // `/lines/search`; this query stays at the voucher level and sources
+    // per-row `totalAmount` from TOTAL_AMOUNT_SUBQUERY instead of joining
+    // `lines` (which would multiply rows for multi-line transfers).
     const rowsQb = this.buildQuery(dto, actor)
-      .leftJoinAndSelect('st.lines', 'lines')
-      .leftJoinAndSelect('lines.item', 'lineItem')
-      .leftJoinAndSelect('lines.sourceStorage', 'lineSrcStorage')
-      .leftJoinAndSelect('lines.destinationStorage', 'lineDstStorage')
-      .leftJoinAndSelect('lines.sourceLocation', 'lineSrcLocation')
-      .leftJoinAndSelect('lines.destinationLocation', 'lineDstLocation')
+      .addSelect(TOTAL_AMOUNT_SUBQUERY, 'totalAmount')
       .orderBy('st.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
@@ -79,8 +75,8 @@ export class SearchStockTransfersV2Handler
       .select('COUNT(*)', 'total')
       .addSelect(`COALESCE(SUM(${TOTAL_AMOUNT_SUBQUERY}), 0)`, 'totalAmount');
 
-    const [data, totals] = await Promise.all([
-      rowsQb.getMany(),
+    const [{ entities: data, raw: rowsRaw }, totals] = await Promise.all([
+      rowsQb.getRawAndEntities<{ totalAmount: string }>(),
       totalsQb.getRawOne<TotalsRaw>(),
     ]);
 
@@ -108,15 +104,12 @@ export class SearchStockTransfersV2Handler
       ]),
     );
 
-    for (const t of data) {
+    data.forEach((t, i) => {
       t.transporter = t.transporterUserId
         ? transporterById.get(t.transporterUserId) ?? null
         : null;
-      t.totalAmount = (t.lines ?? []).reduce(
-        (sum, l) => sum + Number(l.lineValue ?? 0),
-        0,
-      );
-    }
+      t.totalAmount = Number(rowsRaw[i]?.totalAmount ?? 0);
+    });
 
     // Inline the resolved "Đối tượng"; legacy transfers (no counterparty) keep
     // null and fall back to the transporter on the FE.

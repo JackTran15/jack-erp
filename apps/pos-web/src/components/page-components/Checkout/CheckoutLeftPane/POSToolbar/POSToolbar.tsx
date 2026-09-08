@@ -34,7 +34,7 @@ export function POSToolbar({
   salespersonRef,
   priceBookRef,
 }: POSToolbarProps) {
-  const { toolbar, setToolbar, catalogLoading } = useCheckoutCatalog();
+  const { toolbar, setToolbar } = useCheckoutCatalog();
   const meta = useCheckoutMeta();
 
   // PosSearchPopover owns a string value; mirror each picker's selected label.
@@ -56,10 +56,10 @@ export function POSToolbar({
     <div className="flex h-[52px] items-center gap-2 border-b border-gray-200 bg-white px-3">
       <div className="flex grow gap-2">
         <div className="grow">
-          <ProductSearchInput
-            inputRef={productSearchRef}
-            disabled={catalogLoading}
-          />
+          {/* Không còn `disabled`: ô tìm hỏi server, nó không phụ thuộc thứ gì
+              tải trước. Khoá nó từng có nghĩa khi ô lọc trên mảng catalog đã
+              tải — ở chi nhánh 10 400 item, cái chờ đó là vài giây. */}
+          <ProductSearchInput inputRef={productSearchRef} />
         </div>
         <PosQuantityInput
           displayValue={toolbar.qty}
