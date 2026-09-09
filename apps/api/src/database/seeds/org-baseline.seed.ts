@@ -46,6 +46,7 @@ const IDS: OrgBaselineSeedIds = {
   roleSales: 'f1000000-0000-4000-8000-000000000044',
   roleCashier: 'f1000000-0000-4000-8000-000000000045',
   roleWarehouse: 'f1000000-0000-4000-8000-000000000046',
+    rolePartner: 'f1000000-0000-4000-8000-000000000047',
   // Deterministic ids so default-account / payment-account rows dedupe on re-run
   // (branch_id NULL makes a (org, role, branch) unique index treat NULLs as distinct).
   defaultAccount: {

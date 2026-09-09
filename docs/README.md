@@ -42,6 +42,7 @@ This folder contains the enterprise-ready blueprint for building an ERP system w
 - [Realtime WebSocket Service](./20-realtime-websocket-service.md)
 - [Generic CRUD Platform](./21-generic-crud-platform.md)
 - [Debt Reports Spec](./24-debt-reports-spec.md)
+- [Partner Catalog API](./partner-catalog-api.md) — read-only catalogue surface for third-party storefronts
 
 ### Entity Schema Reference
 

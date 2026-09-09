@@ -5,6 +5,7 @@ import {
   VERSION_NEUTRAL,
   VersioningType,
 } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from '../../../src/app.module';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
@@ -32,13 +33,18 @@ export async function createTestApp(): Promise<INestApplication> {
     .useValue({})
     .compile();
 
-  const app = moduleFixture.createNestApplication();
+  const app = moduleFixture.createNestApplication<NestExpressApplication>();
 
   // Mirror main.ts so versioned routes (e.g. @Version('2')) resolve in E2E.
   app.enableVersioning({
     type: VersioningType.URI,
     defaultVersion: VERSION_NEUTRAL,
   });
+
+  // Mirror main.ts's trust-proxy config so specs can exercise IP-whitelist
+  // behaviour (api-key-guard.e2e-spec.ts) via a real X-Forwarded-For header
+  // instead of the raw supertest socket address.
+  app.set('trust proxy', 1);
 
   app.useGlobalPipes(
     new ValidationPipe({

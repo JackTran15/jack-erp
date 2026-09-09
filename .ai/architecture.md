@@ -38,6 +38,7 @@ Ecosystems detected: **node, python**
 | ----------------------------------------- | ----------------------------------- | ----- |
 | `apps/api/src/modules/accounting`         | —                                   | 285   |
 | `apps/api/src/modules/admin-search`       | —                                   | 26    |
+| `apps/api/src/modules/api-key`            | —                                   | 12    |
 | `apps/api/src/modules/auth`               | —                                   | 15    |
 | `apps/api/src/modules/branch`             | —                                   | 11    |
 | `apps/api/src/modules/counterparty`       | —                                   | 6     |
@@ -50,6 +51,7 @@ Ecosystems detected: **node, python**
 | `apps/api/src/modules/inventory`          | —                                   | 312   |
 | `apps/api/src/modules/inventory-reports`  | services                            | 56    |
 | `apps/api/src/modules/metrics`            | —                                   | 6     |
+| `apps/api/src/modules/mobile`             | —                                   | 41    |
 | `apps/api/src/modules/organization`       | —                                   | 9     |
 | `apps/api/src/modules/pos`                | services                            | 80    |
 | `apps/api/src/modules/promotion`          | application, domain, infrastructure | 114   |

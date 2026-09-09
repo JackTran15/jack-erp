@@ -13,7 +13,15 @@ export const SEED_ROLE_NAMES = {
   SALES: 'Nhân viên bán hàng',
   CASHIER: 'Nhân viên thu ngân',
   WAREHOUSE: 'Nhân viên kho',
+  PARTNER: 'Đối tác',
 } as const;
+
+/**
+ * Third-party integration role. Held only by the shadow user behind an API key,
+ * never by a person. Exactly one permission: anything more would let a partner
+ * key reach an internal endpoint that exposes purchase price (ADR-02).
+ */
+export const PARTNER_PERMISSION_KEYS: string[] = ['partner.catalog.read'];
 
 /** Previous single staff role, renamed to SALES — see sync-admin-permissions.seed.ts. */
 export const LEGACY_STAFF_ROLE_NAME = 'Nhân viên';

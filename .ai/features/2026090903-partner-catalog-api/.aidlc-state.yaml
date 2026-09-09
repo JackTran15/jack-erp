@@ -1,0 +1,174 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: partner-catalog-api
+slug: 2026090903-partner-catalog-api
+profile: none
+created: 2026-09-09T12:10:11
+ruleset: 5
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-09T14:15:13
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-09T14:15:41
+    by: Akenzy
+    evidence: 13 assumptions, none blocking-and-pending; 22 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-09T14:15:41
+    by: Akenzy
+    evidence: 6 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-09T14:15:41
+    by: Akenzy
+    evidence: graph valid - 5 UoW, 18 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-09T14:41:24
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-09T14:43:21
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-09T14:43:28
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-09T14:48:04
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-09T15:08:49
+    by: Akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-09T15:12:24
+    by: Akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-09T15:12:25
+    by: Akenzy
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-09T15:27:36
+    by: Akenzy
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-09T15:53:40
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-09T15:55:01
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-09T15:55:01
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-09T15:57:10
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-09T15:57:34
+    by: Akenzy
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-09T15:57:48
+    by: Akenzy
+    ticket: T-02-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-09T15:57:49
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-09T16:00:35
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-09T16:00:35
+    by: Akenzy
+    ticket: T-02-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-09T16:13:39
+    by: Akenzy
+    ticket: T-02-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-09T16:13:49
+    by: Akenzy
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-09T16:16:11
+    by: Akenzy
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-09T16:16:11
+    by: Akenzy
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-09T16:20:19
+    by: Akenzy
+    ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-09T16:20:19
+    by: Akenzy
+    ticket: T-03-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-09T17:04:51
+    by: Akenzy
+    ticket: T-04-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-09T17:05:10
+    by: Akenzy
+    ticket: T-04-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-09T17:05:10
+    by: Akenzy
+    ticket: T-04-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-09T17:06:54
+    by: Akenzy
+    ticket: T-04-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-09T17:06:54
+    by: Akenzy
+    ticket: T-05-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-09T17:08:44
+    by: Akenzy
+    ticket: T-05-01
