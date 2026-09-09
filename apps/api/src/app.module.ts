@@ -51,6 +51,7 @@ import { MobileModule } from './modules/mobile/mobile.module';
 // pool is ever created with the driver's process-timezone date handling.
 applyUtcTimestampCodec();
 import { ApiKeyModule } from './modules/api-key/api-key.module';
+import { PartnerCatalogModule } from './modules/partner-catalog/partner-catalog.module';
 
 @Module({
   imports: [
@@ -136,6 +137,7 @@ import { ApiKeyModule } from './modules/api-key/api-key.module';
     CounterpartyModule,
     MobileModule,
     ApiKeyModule,
+    PartnerCatalogModule,
   ],
 })
 export class AppModule {}

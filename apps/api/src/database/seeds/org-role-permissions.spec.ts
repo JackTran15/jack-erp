@@ -3,7 +3,9 @@ import {
   BRANCH_MANAGER_PERMISSION_KEYS,
   CASHIER_PERMISSION_KEYS,
   GENERAL_MANAGER_PERMISSION_KEYS,
+  PARTNER_PERMISSION_KEYS,
   SALES_PERMISSION_KEYS,
+  SEED_ROLE_NAMES,
   SYSTEM_ADMIN_PERMISSION_KEYS,
   WAREHOUSE_PERMISSION_KEYS,
 } from './org-role-permissions';
@@ -283,5 +285,51 @@ describe('POS staff permission seeds', () => {
   ])('does not grant the back-office promotion keys to %s', (_role, keys) => {
     expect(keys).not.toContain('promotion.read');
     expect(keys).not.toContain('promotion.write');
+  });
+});
+
+const PARTNER_KEY = 'partner.catalog.read';
+
+// The partner surface only closes the purchase-price leak if the partner role
+// is strictly narrower than inventory.read — see ADR-02. These assertions are
+// the machine-checkable half of that argument; the e2e in T-05-02 is the other.
+describe('partner catalog permission seeds', () => {
+  const seededKeys = PERMISSION_SEEDS.map((p) => p.key);
+
+  it('registers the partner permission in the catalogue', () => {
+    expect(seededKeys).toContain(PARTNER_KEY);
+  });
+
+  it('files it under its own module, not under inventory', () => {
+    const seed = PERMISSION_SEEDS.find((p) => p.key === PARTNER_KEY);
+    expect(seed?.module).toBe('partner-catalog');
+  });
+
+  it('names a dedicated partner role', () => {
+    expect(SEED_ROLE_NAMES.PARTNER).toBe('Đối tác');
+  });
+
+  it('gives the partner role exactly one permission', () => {
+    expect(PARTNER_PERMISSION_KEYS).toEqual([PARTNER_KEY]);
+  });
+
+  it('never gives the partner role an internal inventory key', () => {
+    // These two are the endpoints that return purchasePrice.
+    expect(PARTNER_PERMISSION_KEYS).not.toContain('inventory.read');
+    expect(PARTNER_PERMISSION_KEYS.some((k) => k.startsWith('inventory.'))).toBe(
+      false,
+    );
+  });
+
+  it('keeps the partner key away from every staff role', () => {
+    expect(SALES_PERMISSION_KEYS).not.toContain(PARTNER_KEY);
+    expect(CASHIER_PERMISSION_KEYS).not.toContain(PARTNER_KEY);
+    expect(WAREHOUSE_PERMISSION_KEYS).not.toContain(PARTNER_KEY);
+    expect(BRANCH_MANAGER_PERMISSION_KEYS).not.toContain(PARTNER_KEY);
+  });
+
+  it('still reaches the two full-access roles through ALL_PERMISSION_KEYS', () => {
+    expect(SYSTEM_ADMIN_PERMISSION_KEYS).toContain(PARTNER_KEY);
+    expect(GENERAL_MANAGER_PERMISSION_KEYS).toContain(PARTNER_KEY);
   });
 });

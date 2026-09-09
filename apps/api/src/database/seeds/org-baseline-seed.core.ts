@@ -17,6 +17,7 @@ import {
   CASHIER_PERMISSION_KEYS,
   GENERAL_MANAGER_PERMISSION_KEYS,
   SALES_PERMISSION_KEYS,
+  PARTNER_PERMISSION_KEYS,
   SEED_ROLE_NAMES,
   SYSTEM_ADMIN_PERMISSION_KEYS,
   WAREHOUSE_PERMISSION_KEYS,
@@ -33,6 +34,7 @@ export interface OrgBaselineSeedIds {
   roleSales: string;
   roleCashier: string;
   roleWarehouse: string;
+  rolePartner: string;
   defaultAccount: Record<AccountingDefaultAccountRole, string>;
   paymentAccount: Record<string, string>;
 }
@@ -158,7 +160,7 @@ export async function seedOrgBaselineData(params: OrgBaselineSeedParams): Promis
     [IDS.user, IDS.organization, adminEmail, adminPasswordHash],
   );
 
-  // ── RBAC: 6 seed roles + their permission sets ──
+  // ── RBAC: 7 seed roles + their permission sets ──
   await upsertSeedRole(
     IDS.roleSystemAdmin,
     IDS.organization,
@@ -212,6 +214,15 @@ export async function seedOrgBaselineData(params: OrgBaselineSeedParams): Promis
     false,
   );
   await assignPermissionsToRole(IDS.roleWarehouse, WAREHOUSE_PERMISSION_KEYS);
+
+  await upsertSeedRole(
+    IDS.rolePartner,
+    IDS.organization,
+    SEED_ROLE_NAMES.PARTNER,
+    'Đối tác tích hợp — chỉ đọc danh mục hàng hoá qua API key',
+    false,
+  );
+  await assignPermissionsToRole(IDS.rolePartner, PARTNER_PERMISSION_KEYS);
 
   // ── Assign the admin user the System Admin role ──
   await AppDataSource.query(

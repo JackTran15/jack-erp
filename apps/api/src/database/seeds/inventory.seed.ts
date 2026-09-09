@@ -23,6 +23,7 @@ import {
   BRANCH_MANAGER_PERMISSION_KEYS,
   CASHIER_PERMISSION_KEYS,
   GENERAL_MANAGER_PERMISSION_KEYS,
+  PARTNER_PERMISSION_KEYS,
   SALES_PERMISSION_KEYS,
   SEED_ROLE_NAMES,
   SYSTEM_ADMIN_PERMISSION_KEYS,
@@ -44,6 +45,7 @@ const IDS = {
   roleSales: '40000000-0000-4000-8000-000000000005',
   roleCashier: '40000000-0000-4000-8000-000000000006',
   roleWarehouse: '40000000-0000-4000-8000-000000000007',
+  rolePartner: '40000000-0000-4000-8000-000000000008',
   /** Legacy second admin role from earlier seeds — removed after merge. */
   legacyAdminRole: '40000000-0000-4000-8000-000000000002',
   storageMain: '50000000-0000-4000-8000-000000000001',
@@ -449,6 +451,15 @@ async function seedInventoryData() {
       false,
     );
     await assignPermissionsToRole(IDS.roleWarehouse, WAREHOUSE_PERMISSION_KEYS);
+
+    await upsertSeedRole(
+      IDS.rolePartner,
+      IDS.organization,
+      SEED_ROLE_NAMES.PARTNER,
+      'Đối tác tích hợp — chỉ đọc danh mục hàng hoá qua API key',
+      false,
+    );
+    await assignPermissionsToRole(IDS.rolePartner, PARTNER_PERMISSION_KEYS);
 
     await AppDataSource.query(
       `

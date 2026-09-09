@@ -252,6 +252,11 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "api-key.update", module: "api-key" },
   { key: "api-key.delete", module: "api-key" },
 
+  // Partner catalog (read-only storefront surface for third parties).
+  // Deliberately NOT inventory.read: a partner key carrying inventory.read
+  // could call /v2/inventory-items/search, which returns purchasePrice.
+  { key: "partner.catalog.read", module: "partner-catalog" },
+
   // IAM
   { key: "iam.user.read", module: "iam" },
   // Without this, iam.user.read only reaches employees of the actor's own branches.
