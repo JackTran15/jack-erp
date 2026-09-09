@@ -1,16 +1,22 @@
 import type { FieldDefinition } from "@erp/shared-interfaces";
 
 /**
- * Field types whose column is NOT text in Postgres (uuid / date / numeric / enum).
+ * Field types whose column is NOT text in Postgres (uuid / date / numeric / enum / array).
  * An empty string is a valid value for a text column but a cast error for these —
  * and the generic CRUD endpoint takes `Record<string, any>` with no DTO, so the
  * blank would reach the driver and fail with 22P02 (a 500, not a 400).
+ *
+ * `tags` is in this set because an untouched tags field holds `""`, not `[]`
+ * (see `buildDefaults` in CrudCreatePage): sending that for a `text[]` column
+ * 500s. This is what made every API-key create fail while "Giới hạn chi nhánh"
+ * — the field whose own label says empty means all branches — was left empty.
  */
 const NON_TEXT_FIELD_TYPES = new Set<FieldDefinition["type"]>([
   "relation",
   "date",
   "number",
   "enum",
+  "tags",
 ]);
 
 function isBlank(value: unknown): boolean {
