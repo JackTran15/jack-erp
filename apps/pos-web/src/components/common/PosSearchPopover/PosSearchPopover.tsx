@@ -102,6 +102,18 @@ export interface PosSearchPopoverProps<T> {
 
   minChars?: number;
   debounceMs?: number;
+  /**
+   * Hide the suggestion list while still running `search` after the debounce.
+   *
+   * For inputs whose results are rendered somewhere else — the POS product grid
+   * reads the same query string and shows the matches itself — but that still
+   * need the `search` call, because that call is where barcode auto-add lives.
+   * Do not "optimise" it away by skipping `search` when the list is hidden:
+   * that is how scanning silently stops adding to the cart.
+   *
+   * Defaults to false, so every existing call site keeps its dropdown.
+   */
+  suppressSuggestions?: boolean;
   maxSuggestions?: number;
 
   /**
@@ -179,6 +191,7 @@ export function PosSearchPopover<T>({
   shortcut,
   minChars = 2,
   debounceMs = 300,
+  suppressSuggestions = false,
   maxSuggestions = 8,
   loadMore,
   autoHighlightFirst = false,
@@ -490,7 +503,8 @@ export function PosSearchPopover<T>({
   };
 
   const trimmed = value.trim();
-  const showDropdown = open && trimmed.length >= minChars;
+  const showDropdown =
+    !suppressSuggestions && open && trimmed.length >= minChars;
   const hasSuggestions = suggestions.length > 0;
 
   // Preset chrome (variant) vs fully consumer-driven layout (default).

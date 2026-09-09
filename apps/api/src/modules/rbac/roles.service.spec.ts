@@ -208,11 +208,19 @@ describe('RolesService', () => {
         'u-1:org-1',
       );
       expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'users-me',
+        'u-1:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
         'identity',
         'identity:u-2:org-1',
       );
       expect(cacheService.invalidate).toHaveBeenCalledWith(
         'my-branches',
+        'u-2:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'users-me',
         'u-2:org-1',
       );
     });
@@ -272,6 +280,10 @@ describe('RolesService', () => {
       );
       expect(cacheService.invalidate).toHaveBeenCalledWith(
         'my-branches',
+        'u-3:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'users-me',
         'u-3:org-1',
       );
     });

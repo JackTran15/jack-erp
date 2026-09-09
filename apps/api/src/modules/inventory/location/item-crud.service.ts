@@ -28,11 +28,6 @@ import { BaseCrudService } from "../../crud/base-crud.service";
 import { PaginationQueryDto } from "../../crud/dto/pagination-query.dto";
 import type { PaginatedResponse } from "@erp/shared-interfaces";
 import { StockLedgerService } from "../ledger/stock-ledger.service";
-import { CacheService } from "../../redis/cache.service";
-import {
-  CATALOG_CACHE_NAMESPACE,
-  catalogCardsKey,
-} from "../../pos/pos-catalog-cache.constants";
 import { ItemEntity } from "./item.entity";
 import { ItemCategoryEntity } from "./item-category.entity";
 import { BrandEntity } from "./brand.entity";
@@ -101,21 +96,8 @@ export class InventoryItemCrudService extends BaseCrudService<
     private readonly attrValRepo: Repository<ItemAttributeValueEntity>,
     protected readonly dataSource: DataSource,
     private readonly stockLedger: StockLedgerService,
-    private readonly cacheService: CacheService,
   ) {
     super(dataSource);
-  }
-
-  /**
-   * Drop the POS catalog card cache for this org after an item/product write so the
-   * next POS catalog list rebuilds it (name/price/category/visibility feed the cards).
-   * The cache also has a short TTL, so a missed call self-heals within seconds.
-   */
-  private async invalidatePosCatalogCache(actor: ActorContext): Promise<void> {
-    await this.cacheService.invalidate(
-      CATALOG_CACHE_NAMESPACE,
-      catalogCardsKey(actor.organizationId),
-    );
   }
 
   protected override getByIdRelations(): string[] {
@@ -299,7 +281,6 @@ export class InventoryItemCrudService extends BaseCrudService<
         );
       }
 
-      await this.invalidatePosCatalogCache(actor);
       return { updated: result.affected ?? 0, skipped };
     });
   }
@@ -350,7 +331,6 @@ export class InventoryItemCrudService extends BaseCrudService<
     _id: string,
     actor: ActorContext,
   ): Promise<void> {
-    await this.invalidatePosCatalogCache(actor);
   }
 
   /**
@@ -372,7 +352,6 @@ export class InventoryItemCrudService extends BaseCrudService<
     // When colors/sizes arrays are present → create product with variant matrix
     if (Array.isArray(normalized.colors) || Array.isArray(normalized.sizes)) {
       const created = await this.createProductWithVariants(normalized, actor);
-      await this.invalidatePosCatalogCache(actor);
       return created;
     }
 
@@ -417,7 +396,6 @@ export class InventoryItemCrudService extends BaseCrudService<
     );
 
     this.logger.log(`Created inventory-items id=${saved.id}`);
-    await this.invalidatePosCatalogCache(actor);
     return saved;
   }
 
@@ -448,7 +426,6 @@ export class InventoryItemCrudService extends BaseCrudService<
     });
     if (isProductUuid && this.hasProductLevelPatch(normalized)) {
       const updated = await this.updateProductWithVariants(id, normalized, actor);
-      await this.invalidatePosCatalogCache(actor);
       return updated;
     }
 
@@ -496,7 +473,6 @@ export class InventoryItemCrudService extends BaseCrudService<
       });
     }
 
-    await this.invalidatePosCatalogCache(actor);
     return saved;
   }
 

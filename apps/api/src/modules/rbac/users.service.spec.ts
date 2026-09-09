@@ -26,6 +26,15 @@ const actor: ActorContext = {
 };
 
 function makeMockRepo() {
+  // Chainable stub for the one query-builder call in this service (`getMe`'s
+  // role lookup). Every chained method returns the builder; only getMany
+  // resolves.
+  const qb: Record<string, jest.Mock> = {};
+  for (const method of ['innerJoin', 'select', 'where', 'andWhere']) {
+    qb[method] = jest.fn(() => qb);
+  }
+  qb.getMany = jest.fn().mockResolvedValue([]);
+
   return {
     findOne: jest.fn(),
     findAndCount: jest.fn(),
@@ -36,6 +45,8 @@ function makeMockRepo() {
     create: jest.fn().mockImplementation((data) => ({ ...data })),
     delete: jest.fn(),
     exist: jest.fn(),
+    createQueryBuilder: jest.fn(() => qb),
+    qb,
   };
 }
 
@@ -66,7 +77,7 @@ describe('UsersService', () => {
       | 'getGrantableRoleIds'
     >
   >;
-  let cacheService: jest.Mocked<Pick<CacheService, 'invalidate'>>;
+  let cacheService: jest.Mocked<Pick<CacheService, 'invalidate' | 'getOrSet'>>;
   let manager: ReturnType<typeof makeMockManager>;
 
   beforeEach(async () => {
@@ -107,6 +118,9 @@ describe('UsersService', () => {
     };
     cacheService = {
       invalidate: jest.fn().mockResolvedValue(undefined),
+      // Default is a pass-through miss: run the loader, cache nothing. Tests
+      // about caching itself override this.
+      getOrSet: jest.fn(async (_ns, _key, fetchFn) => fetchFn()) as any,
     };
 
     const dataSource = {
@@ -377,6 +391,10 @@ describe('UsersService', () => {
         'my-branches',
         'new-id:org-1',
       );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'users-me',
+        'new-id:org-1',
+      );
     });
   });
 
@@ -405,9 +423,17 @@ describe('UsersService', () => {
         'my-branches',
         'u-2:org-1',
       );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'users-me',
+        'u-2:org-1',
+      );
     });
 
-    it('does not invalidate when isActive is left untouched', async () => {
+    it('leaves the permission cache alone but drops the identity caches on a plain edit', async () => {
+      // Permissions cannot change without isActive changing, so that cache is
+      // still conditional. The identity caches are not: `/admin/users/me`
+      // carries firstName/lastName/code/profile, so a rename that skipped
+      // invalidation served the old name until the 15-minute TTL expired.
       const user = {
         id: 'u-2',
         isActive: true,
@@ -420,7 +446,10 @@ describe('UsersService', () => {
       await service.update('u-2', { firstName: 'X' }, actor);
 
       expect(rbac.invalidateUserPermissions).not.toHaveBeenCalled();
-      expect(cacheService.invalidate).not.toHaveBeenCalled();
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'users-me',
+        'u-2:org-1',
+      );
     });
   });
 
@@ -477,6 +506,30 @@ describe('UsersService', () => {
         'my-branches',
         'u-2:org-1',
       );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'users-me',
+        'u-2:org-1',
+      );
+    });
+
+    it('still completes the write when the cache is unreachable', async () => {
+      // The mutation has already committed by the time invalidation runs, so a
+      // Redis outage must degrade to the TTL rather than fail the request.
+      const user = { id: 'u-2', isActive: true, organizationId: 'org-1' };
+      userRepo.findOne.mockResolvedValue(user);
+      cacheService.invalidate.mockRejectedValue(new Error('redis down'));
+      const logged = jest
+        .spyOn(
+          (service as unknown as { logger: { error: jest.Mock } }).logger,
+          'error',
+        )
+        .mockImplementation(() => undefined);
+
+      await expect(service.deactivate('u-2', actor)).resolves.not.toThrow();
+
+      expect(user.isActive).toBe(false);
+      expect(logged).toHaveBeenCalled();
+      logged.mockRestore();
     });
   });
 
@@ -503,6 +556,10 @@ describe('UsersService', () => {
       );
       expect(cacheService.invalidate).toHaveBeenCalledWith(
         'my-branches',
+        'u-1:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'users-me',
         'u-1:org-1',
       );
     });
@@ -789,6 +846,10 @@ describe('UsersService', () => {
         'my-branches',
         'u-1:org-1',
       );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'users-me',
+        'u-1:org-1',
+      );
     });
   });
   /**
@@ -868,6 +929,84 @@ describe('UsersService', () => {
       await expect(
         service.setRoles('u-peer', ['r-staff'], actor),
       ).resolves.toEqual(['r-staff']);
+    });
+  });
+  describe('getMe', () => {
+    const me: ActorContext = {
+      userId: 'u-me',
+      organizationId: 'org-1',
+      branchId: undefined,
+      roles: [],
+    };
+
+    beforeEach(() => {
+      userRepo.findOne.mockResolvedValue({
+        id: 'u-me',
+        email: 'me@example.com',
+        firstName: 'Me',
+        lastName: 'Myself',
+        isActive: true,
+        lastLoginAt: null,
+        createdAt: new Date('2025-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2025-01-01T00:00:00.000Z'),
+      });
+      rbac.getUserPermissions.mockResolvedValue(['iam.user.read.all']);
+    });
+
+    it('reads through the cache with a key scoped to user and organization', async () => {
+      await service.getMe(me);
+
+      expect(cacheService.getOrSet).toHaveBeenCalledWith(
+        'users-me',
+        'u-me:org-1',
+        expect.any(Function),
+        15 * 60,
+      );
+    });
+
+    it('does not touch the repositories when the cache answers', async () => {
+      (cacheService.getOrSet as jest.Mock).mockResolvedValue({
+        id: 'u-me',
+        roles: [],
+        permissions: [],
+      });
+      userRepo.findOne.mockClear();
+      profileRepo.findOne.mockClear();
+
+      const result = await service.getMe(me);
+
+      expect(result).toMatchObject({ id: 'u-me' });
+      expect(userRepo.findOne).not.toHaveBeenCalled();
+      expect(profileRepo.findOne).not.toHaveBeenCalled();
+      expect(userRoleRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('keys the two organizations of one account apart', async () => {
+      await service.getMe(me);
+      await service.getMe({ ...me, organizationId: 'org-2' });
+
+      const keys = (cacheService.getOrSet as jest.Mock).mock.calls.map(
+        (call) => call[1],
+      );
+      expect(keys).toEqual(['u-me:org-1', 'u-me:org-2']);
+    });
+
+    it('reads through to the database when the cache throws', async () => {
+      // Redis being down must not take the endpoint that gates both SPAs with
+      // it. `getOrSet` does not swallow its own errors.
+      (cacheService.getOrSet as jest.Mock).mockRejectedValue(
+        new Error('redis unreachable'),
+      );
+      const logged = jest
+        .spyOn((service as unknown as { logger: { error: jest.Mock } }).logger, 'error')
+        .mockImplementation(() => undefined);
+
+      const result = await service.getMe(me);
+
+      expect(result).toMatchObject({ id: 'u-me', permissions: ['iam.user.read.all'] });
+      expect(userRepo.findOne).toHaveBeenCalled();
+      expect(logged).toHaveBeenCalled();
+      logged.mockRestore();
     });
   });
 });

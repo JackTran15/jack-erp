@@ -83,8 +83,18 @@ export const SALES_HIERARCHY_KEYS = {
 export const CATALOG_KEYS = {
   ALL: ["catalog"] as const,
   LIST: (branchId: string) => ["catalog", branchId] as const,
-  PRODUCTS: (branchId: string, categoryId?: string) =>
-    ["catalog", "products", branchId, categoryId ?? "all"] as const,
+  // `search` là một phần khoá, không phải tham số phụ: thiếu nó thì TanStack Query
+  // trả cache của từ khoá trước và lưới đứng im — trông y hệt "server không lọc".
+  // Chuỗi rỗng và `undefined` phải cho cùng một khoá, để xoá ô tìm là quay về đúng
+  // cache của lần chưa tìm.
+  PRODUCTS: (branchId: string, categoryId?: string, search?: string) =>
+    [
+      "catalog",
+      "products",
+      branchId,
+      categoryId ?? "all",
+      search?.trim() || "none",
+    ] as const,
   PRODUCT_DETAIL: (branchId: string, id: string, kind?: PosProductKind) =>
     ["catalog", "product-detail", branchId, id, kind ?? "auto"] as const,
   LOOKUP: (branchId: string, code: string, includeUntracked = false) =>

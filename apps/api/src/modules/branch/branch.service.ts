@@ -31,6 +31,13 @@ import { LocationType } from "@erp/shared-interfaces";
 import { CacheService, CACHE_TTL_SECONDS } from "../redis/cache.service";
 
 const MY_BRANCHES_CACHE_NAMESPACE = "my-branches";
+
+/**
+ * `/admin/users/me`. Same duplication trade as the two namespaces above.
+ * Invalidated here rather than left to its 15-minute TTL — ADR-04 of
+ * 2026090805-pos-initial-load-latency.
+ */
+const USERS_ME_CACHE_NAMESPACE = "users-me";
 /**
  * Mirrors `AuthService`'s private `IDENTITY_CACHE_NAMESPACE` — duplicated
  * here rather than imported because `AuthService` does not expose it and
@@ -61,9 +68,10 @@ export class BranchService {
   ) {}
 
   /**
-   * Clears both caches one user's own role/branch-assignment change can make
-   * stale: the identity report (`AuthService.getSession`) and the
-   * `/branches/me` list (this service's `listMyBranches`). Mirrors
+   * Clears the three caches one user's own role/branch-assignment change can
+   * make stale: the identity report (`AuthService.getSession`), the
+   * `/branches/me` list (this service's `listMyBranches`), and `/admin/users/me`
+   * (`UsersService.getMe`). Mirrors
    * `UsersService.invalidateUserIdentity` / `RolesService.invalidateUserIdentity`
    * — see T-07-03 / ADR-08. Swallows Redis errors and only logs, same as
    * `invalidateStatusCache` below.
@@ -80,6 +88,10 @@ export class BranchService {
         ),
         this.cacheService.invalidate(
           MY_BRANCHES_CACHE_NAMESPACE,
+          `${userId}:${organizationId}`,
+        ),
+        this.cacheService.invalidate(
+          USERS_ME_CACHE_NAMESPACE,
           `${userId}:${organizationId}`,
         ),
       ]);

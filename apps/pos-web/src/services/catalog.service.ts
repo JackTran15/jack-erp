@@ -26,6 +26,12 @@ export interface ListCatalogProductsParams {
   pageSize?: number;
   /** Lọc theo danh mục (inventory-item-categories). */
   categoryId?: string;
+  /**
+   * Từ khoá tìm kiếm. Server khớp trên mã, tên, nhãn biến thể của MỌI biến thể
+   * của card, cộng tên sản phẩm và tên nhóm hàng — nên nó tìm được cả những thứ
+   * lọc theo `name` trên client không bao giờ thấy.
+   */
+  search?: string;
 }
 
 export const catalogService = {
@@ -112,6 +118,7 @@ export const catalogService = {
     if (params.page !== undefined) qs.set("page", String(params.page));
     if (params.pageSize !== undefined) qs.set("pageSize", String(params.pageSize));
     if (params.categoryId) qs.set("categoryId", params.categoryId);
+    if (params.search?.trim()) qs.set("search", params.search.trim());
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return http.get<PosProductListResponse>(
       `/pos/branches/${encodeURIComponent(branchId)}/catalog/products${suffix}`,

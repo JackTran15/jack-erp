@@ -77,9 +77,12 @@ export function useCheckoutCustomer() {
   );
 
   const { search } = useCustomerSearch();
-  // Prefetch một trang khách (50) ngay khi CustomerSection mount → click vào ô
-  // khách là hiện danh sách + lọc local tức thì, không cần gọi API mỗi lần gõ.
-  const customerListQuery = useCustomerListQuery({ pageSize: 50 });
+  // Prefetch một trang khách ngay khi CustomerSection mount → click vào ô khách là
+  // hiện danh sách + lọc local tức thì, không cần gọi API mỗi lần gõ.
+  // 20 chứ không phải 50: con số này là corpus lọc local (UI chỉ hiện 8), nên nó đánh
+  // đổi payload lúc mở trang lấy số lần phải rơi xuống `search(q)` bên dưới. Xuống 10
+  // thì gần như mọi lượt gõ đều gọi API.
+  const customerListQuery = useCustomerListQuery({ pageSize: 20 });
   const prefetched = customerListQuery.data?.data;
 
   const customerSearchAdapter = useCallback(

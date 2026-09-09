@@ -239,6 +239,10 @@ describe('BranchService', () => {
         'my-branches',
         'user-1:org-1',
       );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'users-me',
+        'user-1:org-1',
+      );
     });
 
     it('auto-creates the branch showroom backed by a main storage', async () => {
@@ -889,6 +893,10 @@ describe('BranchService', () => {
         'my-branches',
         'user-2:org-1',
       );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'users-me',
+        'user-2:org-1',
+      );
     });
 
     it('throws ConflictException when user is already assigned', async () => {
@@ -928,6 +936,10 @@ describe('BranchService', () => {
       );
       expect(cacheService.invalidate).toHaveBeenCalledWith(
         'my-branches',
+        'user-2:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'users-me',
         'user-2:org-1',
       );
     });

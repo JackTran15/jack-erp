@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { In } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { ItemEntity } from '../../inventory/location/item.entity';
 import { ProductEntity } from '../../inventory/product/product.entity';
@@ -13,7 +13,6 @@ import { ProductAttributeDefinitionEntity } from '../../inventory/product/produc
 import { ItemAttributeValueEntity } from '../../inventory/product/item-attribute-value.entity';
 import { ItemCategoryEntity } from '../../inventory/location/item-category.entity';
 import { BranchEntity } from '../../branch/branch.entity';
-import { CacheService } from '../../redis/cache.service';
 import { TempWarehouseStagedStockService } from '../../inventory/temp-warehouse/temp-warehouse-staged-stock.service';
 import { PosCatalogDirection } from '../dto/pos-catalog.query.dto';
 import { PosCatalogProductService } from './pos-catalog-product.service';
@@ -35,16 +34,6 @@ const repoMock = (): RepoMock => ({
   findOne: jest.fn(),
   createQueryBuilder: jest.fn(),
 });
-
-/** Chainable query-builder stub whose getMany() resolves to the given rows. */
-const queryBuilderMock = (rows: unknown[]) => {
-  const qb: Record<string, jest.Mock> = {};
-  for (const method of ['leftJoin', 'select', 'where', 'andWhere']) {
-    qb[method] = jest.fn(() => qb);
-  }
-  qb.getMany = jest.fn().mockResolvedValue(rows);
-  return qb;
-};
 
 /**
  * Chainable stub for the list route's aggregate stock query. The SQL itself is proved against a
@@ -171,8 +160,8 @@ describe('PosCatalogProductService', () => {
   let attrDefRepo: RepoMock;
   let itemAttrValueRepo: RepoMock;
   let categoryRepo: RepoMock;
-  let cacheService: { getOrSet: jest.Mock; invalidate: jest.Mock };
   let getBranchDelta: jest.Mock;
+  let dataSource: { query: jest.Mock };
 
   beforeEach(async () => {
     // Default: nothing staged, so the pre-existing expectations keep meaning
@@ -194,11 +183,11 @@ describe('PosCatalogProductService', () => {
     attrDefRepo = repoMock();
     itemAttrValueRepo = repoMock();
     categoryRepo = repoMock();
-    // Pass-through cache: always rebuild via the fetch fn so buildOrgCards runs.
-    cacheService = {
-      getOrSet: jest.fn((_ns, _key, fetchFn) => fetchFn()),
-      invalidate: jest.fn(),
-    };
+
+    // The card-key CTE is raw SQL. Its results are proved against a restored
+    // production database (see T-01-02's measurements); what these tests pin is
+    // what the service asks for — which predicates and which ORDER BY.
+    dataSource = { query: jest.fn().mockResolvedValue([]) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -213,11 +202,11 @@ describe('PosCatalogProductService', () => {
         { provide: getRepositoryToken(ProductAttributeDefinitionEntity), useValue: attrDefRepo },
         { provide: getRepositoryToken(ItemAttributeValueEntity), useValue: itemAttrValueRepo },
         { provide: getRepositoryToken(ItemCategoryEntity), useValue: categoryRepo },
-        { provide: CacheService, useValue: cacheService },
         {
           provide: TempWarehouseStagedStockService,
           useValue: { getBranchDelta },
         },
+        { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
 
@@ -225,23 +214,84 @@ describe('PosCatalogProductService', () => {
   });
 
   describe('listProducts', () => {
+    // The route no longer walks an in-memory catalogue: it asks the database for
+    // one page of card ids, then for those cards' columns. These fixtures answer
+    // as the database would, routed by which query is being run so the tests do
+    // not depend on call order.
+    const CARD_ROWS = [
+      { card_id: 'P1', is_product: true },
+      { card_id: 'I3', is_product: false },
+    ];
+    const DETAIL_ROWS = [
+      {
+        card_id: 'P1',
+        is_product: true,
+        name: 'Áo',
+        description: 'Áo thun cotton',
+        category_id: 'C1',
+        category_name: 'Áo',
+        unit: 'cái',
+        min_price: '100',
+        max_price: '150',
+        variant_count: 2,
+        item_ids: ['I1', 'I2'],
+      },
+      {
+        card_id: 'I3',
+        is_product: false,
+        name: 'Bút',
+        description: null,
+        category_id: null,
+        category_name: null,
+        unit: 'cây',
+        min_price: '50',
+        max_price: '50',
+        variant_count: 1,
+        item_ids: ['I3'],
+      },
+    ];
+
+    /** Routes each raw query to its fixture by what the SQL selects. */
+    const answerWith = (over: {
+      cards?: unknown[];
+      details?: unknown[];
+      count?: string;
+      ranked?: unknown[];
+    } = {}) => {
+      dataSource.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('count(*)')) return [{ count: over.count ?? '2' }];
+        if (sql.includes('array_agg(i.id::text) AS item_ids')) {
+          return (
+            over.ranked ?? [
+              { card_id: 'P1', item_ids: ['I1', 'I2'] },
+              { card_id: 'I3', item_ids: ['I3'] },
+            ]
+          );
+        }
+        if (sql.includes('variant_count')) return over.details ?? DETAIL_ROWS;
+        return over.cards ?? CARD_ROWS;
+      });
+    };
+
+    const sqlMatching = (fragment: string): string | undefined =>
+      (dataSource.query.mock.calls as [string, unknown[]][])
+        .map(([sql]) => sql.replace(/\s+/g, ' '))
+        .find((sql) => sql.includes(fragment));
+
     beforeEach(() => {
-      // buildOrgCards loads the whole org via the query builder (no category filter).
-      itemRepo.createQueryBuilder.mockReturnValue(
-        queryBuilderMock([variantS, variantM, standalone]),
-      );
-      // Same fixture balances as before; the list route just reads them summed by the database
-      // instead of hydrating every row, so the numbers below are unchanged.
+      answerWith();
       balanceRepo.createQueryBuilder.mockReturnValue(
         aggregateQueryBuilderFor(balances, locations),
       );
     });
 
     it('groups variants under a product card and exposes a standalone item as its own card', async () => {
-      const res = await service.listProducts('branch-1', actor, { page: 1, pageSize: 20 } as any);
+      const res = await service.listProducts('branch-1', actor, {
+        page: 1,
+        pageSize: 20,
+      } as any);
 
       expect(res.total).toBe(2);
-      // Sorted by name (vi): "Áo" before "Bút".
       const [productCard, itemCard] = res.data;
 
       expect(productCard).toMatchObject({
@@ -253,133 +303,188 @@ describe('PosCatalogProductService', () => {
         variantCount: 2,
         quantityOnHand: 10, // 5 + 3 (I1) + 2 (I2)
         categoryId: 'C1',
+        categoryName: 'Áo',
         imageUrl: null,
       });
-
       expect(itemCard).toMatchObject({
         kind: 'ITEM',
         id: 'I3',
         name: 'Bút',
-        minPrice: 50,
-        maxPrice: 50,
         variantCount: 1,
         quantityOnHand: 10,
       });
     });
 
-    it('serves the cached skeleton but merges live branch stock', async () => {
-      // First call warms the cache; the pass-through mock still rebuilds, but the
-      // stock query is always run live regardless of the cached skeleton.
-      await service.listProducts('branch-1', actor, { page: 1, pageSize: 20 } as any);
-      balanceRepo.createQueryBuilder.mockReturnValue(
-        aggregateQueryBuilderFor([{ itemId: 'I1', locationId: 'L1', quantity: 99 }], locations),
-      );
+    it('holds nothing back between calls', async () => {
+      // The org card blob, its 60-second rebuild and the invalidation call site
+      // in item-crud are all gone: the service no longer takes a CacheService at
+      // all, so a price edit is visible on the very next request. ADR-01. Two
+      // identical calls must therefore both reach the database.
+      const query = { page: 1, pageSize: 20 } as any;
 
-      const res = await service.listProducts('branch-1', actor, { page: 1, pageSize: 20 } as any);
-      expect(cacheService.getOrSet).toHaveBeenCalled();
-      expect(res.data.find((c) => c.id === 'P1')?.quantityOnHand).toBe(99);
+      await service.listProducts('branch-1', actor, query);
+      const first = dataSource.query.mock.calls.length;
+      await service.listProducts('branch-1', actor, query);
+
+      expect(dataSource.query.mock.calls.length).toBe(first * 2);
+      expect(balanceRepo.createQueryBuilder).toHaveBeenCalledTimes(2);
     });
 
-    it('paginates the grouped cards in memory', async () => {
-      const res = await service.listProducts('branch-1', actor, { page: 1, pageSize: 1 } as any);
-      expect(res.total).toBe(2);
-      expect(res.data).toHaveLength(1);
-      expect(res.data[0].id).toBe('P1');
-    });
+    it('asks the database for stock only for the items on the page', async () => {
+      const qb = aggregateQueryBuilderFor(balances, locations);
+      balanceRepo.createQueryBuilder.mockReturnValue(qb);
 
-    it('filters by search across product name and variant codes', async () => {
-      const res = await service.listProducts('branch-1', actor, {
+      await service.listProducts('branch-1', actor, {
         page: 1,
         pageSize: 20,
-        search: 'but-01',
       } as any);
-      expect(res.total).toBe(1);
-      expect(res.data[0].id).toBe('I3');
+
+      // The whole point of the change: not the ~14,000 balance rows of the branch.
+      expect(qb.clauses).toContain('sb.itemId IN (:...itemIds)');
+      const narrowing = qb.andWhere.mock.calls
+        .map(([, params]) => (params as { itemIds?: string[] })?.itemIds)
+        .find((ids) => ids !== undefined);
+      expect(narrowing).toEqual(['I1', 'I2', 'I3']);
     });
 
-    it('filters by category (exact leaf) in memory over the cached skeleton', async () => {
-      categoryRepo.find.mockResolvedValue([{ id: 'C1', parentGroupId: null }]);
-
-      const res = await service.listProducts('branch-1', actor, {
-        page: 1,
+    it('delegates paging to the database instead of slicing in memory', async () => {
+      await service.listProducts('branch-1', actor, {
+        page: 3,
         pageSize: 20,
-        categoryId: 'C1',
       } as any);
 
-      // Standalone "Bút" (no category) is excluded; only the C1 product remains.
-      expect(res.total).toBe(1);
-      expect(res.data[0].id).toBe('P1');
+      const sql = sqlMatching('LIMIT');
+      expect(sql).toContain('LIMIT $2 OFFSET $3');
+      const params = (dataSource.query.mock.calls as [string, unknown[]][]).find(
+        ([s]) => s.includes('LIMIT'),
+      )![1];
+      expect(params).toEqual(['org-1', 20, 40]);
+    });
+
+    it('pushes the search term into the card query', async () => {
+      await service.listProducts('branch-1', actor, {
+        page: 1,
+        pageSize: 20,
+        search: 'áo',
+      } as any);
+
+      expect(sqlMatching('bool_or(')).toBeDefined();
+      const params = (dataSource.query.mock.calls as [string, unknown[]][]).find(
+        ([s]) => s.includes('bool_or('),
+      )![1];
+      expect(params).toContain('%áo%');
     });
 
     it('includes descendant categories when a parent group is selected', async () => {
-      // Parent C0 → child C1 (the variants live under C1).
       categoryRepo.find.mockResolvedValue([
-        { id: 'C0', parentGroupId: null },
         { id: 'C1', parentGroupId: 'C0' },
+        { id: 'C2', parentGroupId: 'C1' },
+        { id: 'C9', parentGroupId: null },
       ]);
 
-      const res = await service.listProducts('branch-1', actor, {
+      await service.listProducts('branch-1', actor, {
         page: 1,
         pageSize: 20,
         categoryId: 'C0',
       } as any);
 
-      expect(res.total).toBe(1);
-      expect(res.data[0].id).toBe('P1');
+      const params = (dataSource.query.mock.calls as [string, unknown[]][]).find(
+        ([s]) => s.includes('= ANY($2::uuid[])'),
+      )![1];
+      // C0 itself plus every descendant, and nothing outside the subtree.
+      expect(params[1]).toEqual(expect.arrayContaining(['C0', 'C1', 'C2']));
+      expect(params[1]).not.toContain('C9');
+    });
+
+    it('returns an empty page rather than throwing when the filter matches nothing', async () => {
+      categoryRepo.find.mockResolvedValue([]);
+      answerWith({ cards: [], details: [], count: '0' });
+
+      const res = await service.listProducts('branch-1', actor, {
+        page: 1,
+        pageSize: 20,
+        categoryId: 'C-missing',
+      } as any);
+
+      expect(res).toMatchObject({ data: [], total: 0, page: 1, pageSize: 20 });
     });
 
     it('shows a card with no branch stock at all as 0, not as missing', async () => {
-      // AC-04. An item with no stock_balances row produces no group, so the aggregate simply
-      // has no entry for it — the card still has to appear.
-      balanceRepo.createQueryBuilder.mockReturnValue(aggregateQueryBuilderFor([], locations));
-
-      const res = await service.listProducts('branch-1', actor, { page: 1, pageSize: 20 } as any);
-
-      expect(res.total).toBe(2);
-      expect(res.data.map((c) => c.quantityOnHand)).toEqual([0, 0]);
-    });
-
-    it('sorts by quantityOnHand once the aggregate has been folded into the cards', async () => {
-      // AC-06. Sorting happens after the per-card sum, so the sort key comes from the aggregate:
-      // P1 = I1 + I2 = 2, below the standalone I3 = 10.
       balanceRepo.createQueryBuilder.mockReturnValue(
-        aggregateQueryBuilderFor(
-          [
-            { itemId: 'I1', locationId: 'L1', quantity: 1 },
-            { itemId: 'I2', locationId: 'L1', quantity: 1 },
-            { itemId: 'I3', locationId: 'L1', quantity: 10 },
-          ],
-          locations,
-        ),
+        aggregateQueryBuilderFor([], locations),
       );
 
-      const desc = await service.listProducts('branch-1', actor, {
+      const res = await service.listProducts('branch-1', actor, {
         page: 1,
         pageSize: 20,
-        sortBy: 'quantityOnHand',
-        sortOrder: 'desc',
       } as any);
-      expect(desc.data.map((c) => c.id)).toEqual(['I3', 'P1']);
 
-      const asc = await service.listProducts('branch-1', actor, {
-        page: 1,
-        pageSize: 20,
-        sortBy: 'quantityOnHand',
-        sortOrder: 'asc',
-      } as any);
-      expect(asc.data.map((c) => c.id)).toEqual(['P1', 'I3']);
+      expect(res.data).toHaveLength(2);
+      expect(res.data.every((c) => c.quantityOnHand === 0)).toBe(true);
+    });
+
+    describe('sortBy=quantityOnHand', () => {
+      it('ranks on the branch-wide aggregate, not on one page of it', async () => {
+        const qb = aggregateQueryBuilderFor(balances, locations);
+        balanceRepo.createQueryBuilder.mockReturnValue(qb);
+
+        const res = await service.listProducts('branch-1', actor, {
+          page: 1,
+          pageSize: 20,
+          sortBy: 'quantityOnHand',
+          sortOrder: 'desc',
+        } as any);
+
+        // Cannot narrow to a page it has not chosen yet — ADR-03. And having
+        // paid for the branch-wide total once, it must not ask a second time
+        // for a subset of what it already holds.
+        expect(qb.clauses).not.toContain('sb.itemId IN (:...itemIds)');
+        expect(balanceRepo.createQueryBuilder).toHaveBeenCalledTimes(1);
+        // P1 = 10, I3 = 10; both present, and total is the full card count.
+        expect(res.total).toBe(2);
+        expect(res.data.map((c) => c.id).sort()).toEqual(['I3', 'P1']);
+      });
+
+      it('orders ascending by stock when asked', async () => {
+        balanceRepo.createQueryBuilder.mockReturnValue(
+          aggregateQueryBuilderFor(
+            [
+              { itemId: 'I1', locationId: 'L1', quantity: 1 },
+              { itemId: 'I3', locationId: 'L1', quantity: 7 },
+            ],
+            locations,
+          ),
+        );
+
+        const res = await service.listProducts('branch-1', actor, {
+          page: 1,
+          pageSize: 20,
+          sortBy: 'quantityOnHand',
+          sortOrder: 'asc',
+        } as any);
+
+        expect(res.data.map((c) => c.id)).toEqual(['P1', 'I3']);
+      });
+
+      it('does not ask the database to order by name', async () => {
+        await service.listProducts('branch-1', actor, {
+          page: 1,
+          pageSize: 20,
+          sortBy: 'quantityOnHand',
+        } as any);
+
+        expect(sqlMatching('vi-VN-x-icu')).toBeUndefined();
+      });
     });
 
     it('never hydrates the branch balance or location tables', async () => {
-      // The whole point of the change: those two reads pulled ~14k + ~1k rows into entities on
-      // every page, which is synchronous CPU and delayed every other in-flight request.
-      await service.listProducts('branch-1', actor, { page: 1, pageSize: 20 } as any);
+      await service.listProducts('branch-1', actor, {
+        page: 1,
+        pageSize: 20,
+      } as any);
 
       expect(balanceRepo.find).not.toHaveBeenCalled();
       expect(locationRepo.find).not.toHaveBeenCalled();
-      // sellableTotal is a detail-route figure; the list never asked for it.
-      expect(storageRepo.find).not.toHaveBeenCalled();
-      expect(getBranchDelta).not.toHaveBeenCalled();
     });
   });
 
@@ -523,7 +628,27 @@ describe('PosCatalogProductService', () => {
       // back 4 instead of 8, and fast stock transfer would silently change
       // which stock it offers.
       showroomRepo.find.mockResolvedValue([{ storageId: 'S-WH' }]);
-      itemRepo.createQueryBuilder.mockReturnValue(queryBuilderMock([standalone]));
+      dataSource.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('count(*)')) return [{ count: '1' }];
+        if (sql.includes('variant_count')) {
+          return [
+            {
+              card_id: 'I3',
+              is_product: false,
+              name: 'Bút',
+              description: null,
+              category_id: null,
+              category_name: null,
+              unit: 'cây',
+              min_price: '50',
+              max_price: '50',
+              variant_count: 1,
+              item_ids: ['I3'],
+            },
+          ];
+        }
+        return [{ card_id: 'I3', is_product: false }];
+      });
       balanceRepo.createQueryBuilder.mockReturnValue(
         aggregateQueryBuilderFor(bxBalances, bxLocations),
       );
@@ -1262,6 +1387,291 @@ describe('PosCatalogProductService', () => {
       // Nothing is a showroom, so everything is warehouse — the whole branch, unfiltered.
       expect((await load(PosCatalogDirection.WAREHOUSE)).get('I1')).toBe(5);
       expect(qb.clauses.some((c) => c.includes('storageId'))).toBe(false);
+    });
+  });
+  describe('card-key query', () => {
+    // The two private methods are exercised through listProducts in T-01-04.
+    // Until then they are reached directly: this ticket is about the SQL the
+    // service asks for, and routing through the old in-memory path would only
+    // obscure it.
+    const callPage = (query: Record<string, unknown>) =>
+      (
+        service as unknown as {
+          loadCardKeysPage: (
+            orgId: string,
+            query: unknown,
+            categoryIds: string[] | null,
+          ) => Promise<unknown>;
+        }
+      ).loadCardKeysPage('org-1', { page: 1, pageSize: 20, ...query }, null);
+
+    const sqlOf = (call: number): string =>
+      (dataSource.query.mock.calls[call][0] as string).replace(/\s+/g, ' ');
+
+    const paramsOf = (call: number): unknown[] =>
+      dataSource.query.mock.calls[call][1] as unknown[];
+
+    it('orders by name under the Vietnamese ICU collation by default', async () => {
+      await callPage({});
+
+      // The database is en_US.utf8; without this collation the order disagrees
+      // with the JS localeCompare(name, 'vi') it replaced. See ADR-02.
+      expect(sqlOf(0)).toContain('ORDER BY name COLLATE "vi-VN-x-icu" ASC');
+    });
+
+    it('orders by price columns without the collation', async () => {
+      await callPage({ sortBy: 'minPrice', sortOrder: 'desc' });
+
+      expect(sqlOf(0)).toContain('ORDER BY min_price DESC');
+      expect(sqlOf(0)).not.toContain('vi-VN-x-icu');
+    });
+
+    it('falls back to the name ordering for an unknown sortBy', async () => {
+      await callPage({ sortBy: 'somethingElse' });
+
+      expect(sqlOf(0)).toContain('ORDER BY name COLLATE "vi-VN-x-icu" ASC');
+    });
+
+    it('binds the page size and offset rather than interpolating them', async () => {
+      await callPage({ page: 3, pageSize: 20 });
+
+      expect(sqlOf(0)).toContain('LIMIT $2 OFFSET $3');
+      expect(paramsOf(0)).toEqual(['org-1', 20, 40]);
+    });
+
+    it('adds no category or search predicate when neither is asked for', async () => {
+      await callPage({});
+
+      expect(sqlOf(0)).not.toContain('HAVING');
+      expect(sqlOf(0)).not.toContain('LIKE');
+      expect(paramsOf(0)).toEqual(['org-1', 20, 0]);
+    });
+
+    it('filters a product card on its representative category, and a standalone item on its own', async () => {
+      await (
+        service as unknown as {
+          loadCardKeysPage: (
+            o: string,
+            q: unknown,
+            c: string[] | null,
+          ) => Promise<unknown>;
+        }
+      ).loadCardKeysPage('org-1', { page: 1, pageSize: 20 }, ['cat-1', 'cat-2']);
+
+      const sql = sqlOf(0);
+      // Product arm: the representative variant's category, chosen by item id so
+      // the rule is deterministic.
+      expect(sql).toContain(
+        "HAVING (array_agg(i.category_id ORDER BY i.id) FILTER (WHERE i.category_id IS NOT NULL))[1] = ANY($2::uuid[])",
+      );
+      // Standalone arm: the item's own category.
+      expect(sql).toContain('AND i.category_id = ANY($2::uuid[])');
+      expect(paramsOf(0)[1]).toEqual(['cat-1', 'cat-2']);
+    });
+
+    it('matches search across product, category, code, name and variant label', async () => {
+      // Mixed case and padding on purpose: the column side is lowercased, so a
+      // term bound as typed matches nothing. An already-lowercase fixture here
+      // let exactly that bug through to the E2E run.
+      await callPage({ search: '  Đầm Dạ  ' });
+
+      const sql = sqlOf(0);
+      // bool_or, not WHERE: a non-matching variant must still count towards the
+      // card's MIN/MAX price, exactly as the in-memory filter did.
+      expect(sql).toContain('HAVING bool_or(');
+      for (const column of [
+        'lower(p.name) LIKE $2',
+        "lower(coalesce(c.name, '')) LIKE $2",
+        'lower(i.code) LIKE $2',
+        'lower(i.name) LIKE $2',
+        "lower(coalesce(i.variant_label, '')) LIKE $2",
+      ]) {
+        expect(sql).toContain(column);
+      }
+      expect(paramsOf(0)[1]).toBe('%đầm dạ%');
+    });
+
+    it('counts the same card set the page is drawn from', async () => {
+      dataSource.query.mockResolvedValue([{ count: '2539' }]);
+
+      const total = await (
+        service as unknown as {
+          countCardKeys: (
+            o: string,
+            q: unknown,
+            c: string[] | null,
+          ) => Promise<number>;
+        }
+      ).countCardKeys('org-1', { page: 1, pageSize: 20, search: 'giay' }, [
+        'cat-1',
+      ]);
+
+      expect(total).toBe(2539);
+      const sql = sqlOf(0);
+      expect(sql).toContain('SELECT count(*)::text AS count FROM card_keys');
+      expect(sql).not.toContain('LIMIT');
+      // Same filters as the page query, so total and data cannot disagree.
+      expect(sql).toContain('= ANY($2::uuid[])');
+      expect(sql).toContain('bool_or(');
+    });
+
+    it('reports zero rather than NaN when the count comes back empty', async () => {
+      dataSource.query.mockResolvedValue([]);
+
+      const total = await (
+        service as unknown as {
+          countCardKeys: (
+            o: string,
+            q: unknown,
+            c: string[] | null,
+          ) => Promise<number>;
+        }
+      ).countCardKeys('org-1', { page: 1, pageSize: 20 }, null);
+
+      expect(total).toBe(0);
+    });
+  });
+  describe('card details and page-scoped stock', () => {
+    const details = (cardIds: string[]) =>
+      (
+        service as unknown as {
+          loadCardDetails: (o: string, ids: string[]) => Promise<Map<string, unknown>>;
+        }
+      ).loadCardDetails('org-1', cardIds);
+
+    const stockTotals = (itemIds?: string[]) =>
+      (
+        service as unknown as {
+          loadListStockTotals: (
+            o: string,
+            b: string,
+            d?: PosCatalogDirection,
+            ids?: string[],
+          ) => Promise<Map<string, number>>;
+        }
+      ).loadListStockTotals('org-1', 'branch-1', undefined, itemIds);
+
+    it('asks for nothing when the page is empty', async () => {
+      const result = await details([]);
+
+      expect(result.size).toBe(0);
+      expect(dataSource.query).not.toHaveBeenCalled();
+    });
+
+    it('maps a product card, coercing the numeric columns the driver returns as strings', async () => {
+      dataSource.query.mockResolvedValue([
+        {
+          card_id: 'p-1',
+          is_product: true,
+          name: 'Áo thun',
+          description: null,
+          category_id: 'cat-1',
+          category_name: 'Áo',
+          unit: 'Cái',
+          min_price: '150000.00',
+          max_price: '250000.00',
+          variant_count: 3,
+          item_ids: ['i-1', 'i-2', 'i-3'],
+        },
+      ]);
+
+      const result = await details(['p-1']);
+
+      expect(result.get('p-1')).toEqual({
+        kind: 'PRODUCT',
+        name: 'Áo thun',
+        description: null,
+        categoryId: 'cat-1',
+        categoryName: 'Áo',
+        unit: 'Cái',
+        minPrice: 150000,
+        maxPrice: 250000,
+        variantCount: 3,
+        itemIds: ['i-1', 'i-2', 'i-3'],
+      });
+    });
+
+    it('marks a row with no product as a standalone item card', async () => {
+      dataSource.query.mockResolvedValue([
+        {
+          card_id: 'i-9',
+          is_product: false,
+          name: 'Bình giữ nhiệt',
+          description: 'x',
+          category_id: null,
+          category_name: null,
+          unit: 'Cái',
+          min_price: '99000',
+          max_price: '99000',
+          variant_count: 1,
+          item_ids: ['i-9'],
+        },
+      ]);
+
+      const result = await details(['i-9']);
+
+      expect(result.get('i-9')).toMatchObject({
+        kind: 'ITEM',
+        categoryId: null,
+        categoryName: null,
+        variantCount: 1,
+      });
+    });
+
+    it('picks the category of the lowest-id variant, not whichever row came back first', async () => {
+      await details(['p-1']);
+
+      // Deterministic where buildOrgCards was not: it took "the first variant
+      // with a category" in unspecified row order.
+      const sql = (dataSource.query.mock.calls[0][0] as string).replace(/\s+/g, ' ');
+      expect(sql).toContain(
+        '(array_agg(i.category_id ORDER BY i.id) FILTER (WHERE i.category_id IS NOT NULL))[1]',
+      );
+      expect(sql).toContain(
+        '(array_agg(c.name ORDER BY i.id) FILTER (WHERE c.name IS NOT NULL))[1]',
+      );
+    });
+
+    it('never falls back to a variant name or description for a product card', async () => {
+      const sql = (await details(['p-1']), dataSource.query.mock.calls[0][0] as string);
+
+      // COALESCE(p.name, i.name) would silently invent a name for a product
+      // whose own name is blank; buildOrgCards did not do that.
+      expect(sql).toContain(
+        'CASE WHEN i.product_id IS NOT NULL THEN p.name ELSE i.name END',
+      );
+      expect(sql).toContain(
+        'CASE WHEN i.product_id IS NOT NULL THEN p.description ELSE i.description END',
+      );
+    });
+
+    it('narrows the stock aggregate to the page when item ids are given', async () => {
+      const qb = aggregateQueryBuilderMock([{ itemId: 'i-1', total: '5' }]);
+      balanceRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await stockTotals(['i-1', 'i-2']);
+
+      expect(qb.clauses).toContain('sb.itemId IN (:...itemIds)');
+      expect(result.get('i-1')).toBe(5);
+    });
+
+    it('leaves the aggregate branch-wide when no item ids are given', async () => {
+      const qb = aggregateQueryBuilderMock([]);
+      balanceRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await stockTotals(undefined);
+
+      // The sortBy=quantityOnHand path relies on this staying branch-wide.
+      expect(qb.clauses).not.toContain('sb.itemId IN (:...itemIds)');
+    });
+
+    it('runs no query at all for an empty page', async () => {
+      balanceRepo.createQueryBuilder.mockClear();
+
+      const result = await stockTotals([]);
+
+      expect(result.size).toBe(0);
+      expect(balanceRepo.createQueryBuilder).not.toHaveBeenCalled();
     });
   });
 });
