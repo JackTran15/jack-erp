@@ -1,0 +1,9 @@
+{"action": "passed", "at": "2026-09-09T11:07:22", "by": "Akenzy", "evidence": "architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete", "gate": "G0", "id": "f850e7e43031", "ts": "2026-09-09T11:07:22.323061"}
+{"action": "passed", "at": "2026-09-09T11:07:22", "by": "Akenzy", "evidence": "5 assumptions, none blocking-and-pending; 6 acceptance criteria defined", "gate": "G1", "id": "f3faea0aff49", "ts": "2026-09-09T11:07:22.392003"}
+{"action": "passed", "at": "2026-09-09T11:07:22", "by": "Akenzy", "evidence": "3 ADR(s) recorded", "gate": "G2", "id": "08e540b81eb8", "ts": "2026-09-09T11:07:22.460355"}
+{"action": "passed", "at": "2026-09-09T11:07:22", "by": "Akenzy", "evidence": "graph valid - 1 UoW, 2 tickets, no cycles", "gate": "G3", "id": "3d83d6217200", "ts": "2026-09-09T11:07:22.578135"}
+{"action": "ticket in_progress", "at": "2026-09-09T11:07:22", "by": "claude", "gate": "G4", "id": "6d8922d8de1d", "ticket": "T-01-01", "ts": "2026-09-09T11:07:22.646185"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-09T11:08:42", "by": "claude", "gate": "G4", "id": "87b68db9f733", "ticket": "T-01-01", "ts": "2026-09-09T11:08:42.658884"}
+{"action": "ticket in_progress", "at": "2026-09-09T11:08:42", "by": "claude", "gate": "G4", "id": "ffdc5d07a0ff", "ticket": "T-01-02", "ts": "2026-09-09T11:08:42.770820"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-09T11:14:22", "by": "claude", "gate": "G4", "id": "7b5a096dd879", "ticket": "T-01-02", "ts": "2026-09-09T11:14:22.832494"}
+{"action": "passed", "at": "2026-09-09T11:26:00", "by": "Akenzy", "evidence": "no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 2 tickets done, all UoW checklists ticked", "gate": "G4", "id": "eadf249b23b7", "ts": "2026-09-09T11:26:00.230376"}

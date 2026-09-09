@@ -77,6 +77,7 @@ const LEDGER_FILTER_KEYS = [
   "amountIn",
   "amountOut",
   "counterparty",
+  "personName",
   "staff",
 ] as const;
 
@@ -92,6 +93,7 @@ const LEDGER_SEARCH: V2SearchConfig = {
     amountIn: "compare",
     amountOut: "compare",
     counterparty: "string",
+    personName: "string",
     staff: "string",
   },
 };
@@ -123,6 +125,7 @@ interface DepositLedgerDisplayRow {
   amountOut: number;
   runningBalance: number;
   counterparty: string;
+  personName: string;
   staff: string;
 }
 
@@ -147,6 +150,7 @@ function toDisplayRow(row: DepositLedgerRow): DepositLedgerDisplayRow {
     amountOut: toNumber(row.amountOut),
     runningBalance: toNumber(row.runningBalance),
     counterparty: row.counterpartyName ?? "",
+    personName: row.personName ?? "",
     staff: row.staffName ?? "",
   };
 }
@@ -173,6 +177,7 @@ function buildOpeningRow(
     amountOut: 0,
     runningBalance: toNumber(openingBalance),
     counterparty: "",
+    personName: "",
     staff: "",
   };
 }
@@ -371,6 +376,12 @@ export function LedgerDepositPage() {
         label: "Đối tượng",
         width: 150,
         render: (r) => r.counterparty,
+      },
+      {
+        key: "personName",
+        label: "Người nộp/nhận",
+        width: 150,
+        render: (r) => r.personName,
       },
       {
         key: "staff",

@@ -58,11 +58,17 @@ export class CashLedgerSearchV2Dto {
   @Type(() => StringFilterDto)
   description?: StringFilterDto;
 
-  /** Counterparty column, resolved from the source voucher. */
+  /** Party column — the source voucher's partner name snapshot alone. */
   @IsOptional()
   @ValidateNested()
   @Type(() => StringFilterDto)
   counterparty?: StringFilterDto;
+
+  /** Person column — the source voucher's payer_name / payee_name alone. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => StringFilterDto)
+  personName?: StringFilterDto;
 
   /** Staff column, resolved from the source voucher's staff user. */
   @IsOptional()

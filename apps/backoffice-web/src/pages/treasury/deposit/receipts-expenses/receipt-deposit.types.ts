@@ -18,7 +18,11 @@ export interface DepositVoucherRow {
   depositAccountName: string;
   depositAccountNo: string;
   referenceType: string | null;
+  revision: number;
+  /** Partner name snapshot only — "" when the voucher has no party. */
   counterparty: string;
+  /** Payer/payee name only — "" when nobody was named. Never the party. */
+  personName: string;
   reason: string | null;
   createdAt: string;
 }
@@ -29,6 +33,8 @@ export interface DepositVoucherRow {
  * is joined, filtered or sorted client-side any more.
  */
 export interface ReceiptDepositListItem {
+  /** Bumped by every in-place edit; sent back on update as a staleness token. */
+  revision: number;
   kind: ReceiptDepositKind;
   id: string;
   docDate: string;
@@ -36,6 +42,7 @@ export interface ReceiptDepositListItem {
   status: BankVoucherStatus;
   totalAmount: number;
   counterparty: string;
+  personName: string;
   reason: string;
   depositAccountId: string;
   depositAccountName: string;

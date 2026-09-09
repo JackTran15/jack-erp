@@ -42,6 +42,17 @@ export class CreateBankPaymentDto {
   @IsUUID()
   partnerId?: string;
 
+  /**
+   * "Đối tượng" typed by hand. Frozen onto the voucher as
+   * `partner_name_snapshot` regardless of `partnerType` — for a catalogue
+   * party it overrides the catalogue name but leaves `partnerId` untouched
+   * (ADR-02).
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  partnerName?: string;
+
   /** "Người nhận" */
   @IsOptional()
   @IsString()

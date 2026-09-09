@@ -8,17 +8,15 @@ import {
   type CreateSupplierDebtPaymentBody,
 } from "./cash-vouchers.types";
 import { toIsoDate } from "./documents/_shared/voucher-dialog.utils";
-import { lookupTypeToPartnerType } from "./documents/_shared/voucher-partner.constants";
+import { resolvePartyFields } from "./documents/_shared/voucher-partner.constants";
 
 function mapPartnerFields(detail: LedgerCashVoucherDetail) {
-  const partnerType =
-    detail.partnerType ??
-    (detail.partnerId && detail.partnerKind
-      ? lookupTypeToPartnerType(detail.partnerKind)
-      : undefined);
   return {
-    partnerType,
-    partnerId: detail.partnerId,
+    ...resolvePartyFields({
+      partnerId: detail.partnerId,
+      partnerKind: detail.partnerKind,
+      partnerName: detail.counterpartyName,
+    }),
     staffId: detail.staffId,
   };
 }
@@ -43,6 +41,7 @@ export function ledgerDetailToCreateReceiptBody(
     payerName: detail.payerName ?? detail.counterpartyName,
     reason: detail.reason,
     ...mapPartnerFields(detail),
+    address: detail.address?.trim() || undefined,
     cashAccountId,
     // contraAccountId omitted — resolved server-side from the purpose.
     totalAmount,
@@ -92,6 +91,7 @@ export function ledgerDetailToCreatePaymentBody(
     payeeName: detail.payerName ?? detail.counterpartyName,
     reason: detail.reason,
     ...mapPartnerFields(detail),
+    address: detail.address?.trim() || undefined,
     cashAccountId,
     // contraAccountId omitted — resolved server-side from the purpose. NOTE:
     // transfer sub-options (cash→bank, branch transfer) currently resolve by

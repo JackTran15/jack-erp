@@ -14,10 +14,14 @@ import {
   type SingleSelectOption,
   type ToolbarItem,
 } from "@erp/ui";
-import { DocumentType } from "@erp/shared-interfaces";
-import { Pencil, Save, X } from "lucide-react";
+import { DocumentType, VoucherKind } from "@erp/shared-interfaces";
+import { CloudUpload, Pencil, Printer, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { useGenerateDocumentNumber } from "../../../../hooks/document-numbering/useGenerateDocumentNumber";
+import { fetchVoucherPrintPayload } from "../../../../lib/print/voucher-print.api";
+import { renderVoucherHtml } from "../../../../lib/print/render-voucher-html";
+import { printHtmlDocument } from "../../../../lib/print/print-html-document";
+import { downloadVoucherExcel } from "../../../../lib/print/voucher-export.api";
 import { useBranches } from "../../../../hooks/iam/useBranches";
 import { useBranchStore } from "../../../../store/common/branch/branch.store";
 import { useDepositDashboard } from "../../../../hooks/treasury/use-deposit-dashboard";
@@ -58,7 +62,11 @@ import {
 import { TreasuryVoucherDialogModeEnum } from "../_shared/voucher-dialog.types";
 import { VoucherLink } from "../_shared/VoucherLink";
 import { useFundSwapLegs } from "../../../../hooks/treasury/use-fund-swap";
-import { formatDepositAccountLabel, voucherLineTotal } from "../_shared/voucher-dialog.utils";
+import {
+  applyReasonToFirstLine,
+  formatDepositAccountLabel,
+  voucherLineTotal,
+} from "../_shared/voucher-dialog.utils";
 import { DepositAccountSelect } from "../_shared/DepositAccountSelect";
 import {
   QuickCreateCustomerDialog,
@@ -74,6 +82,7 @@ import type { VoucherPartnerOption } from "../_shared/voucher-partner-search";
 import {
   PartnerLookupType,
   inferLookupType,
+  resolvePartyFields,
 } from "../_shared/voucher-partner.constants";
 import { usePartnerLookup } from "../_shared/voucher-partner-search";
 
@@ -194,6 +203,8 @@ export function DepositPaymentVoucherDialog({
   const [staffCreateOpen, setStaffCreateOpen] = useState(false);
   const [debtPickOpen, setDebtPickOpen] = useState(false);
   const [detailTab, setDetailTab] = useState(ReceiptVoucherDetailTabEnum.LINES);
+  const [printing, setPrinting] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const { data: paymentCategories = [] } = useCashVoucherCategories(
     CashVoucherCategoryDirection.OUT,
@@ -720,8 +731,7 @@ export function DepositPaymentVoucherDialog({
         depositAccountId,
         docDate,
         purpose,
-        partnerType: partnerId ? lookupTypeToPartnerType(partnerKind) : undefined,
-        partnerId: partnerId || undefined,
+        ...resolvePartyFields({ partnerId, partnerKind, partnerName: counterpartyName }),
         payeeName: payeeName || undefined,
         address: address || undefined,
         reason: reason || undefined,
@@ -747,6 +757,7 @@ export function DepositPaymentVoucherDialog({
     isSupplierPayment,
     partnerId,
     partnerKind,
+    counterpartyName,
     documentLines,
     payeeName,
     reason,
@@ -791,6 +802,36 @@ export function DepositPaymentVoucherDialog({
     isReversal,
   );
 
+  const canPrint = Boolean(initial?.id);
+
+  const handlePrint = useCallback(async () => {
+    if (!initial?.id || printing) return;
+    setPrinting(true);
+    try {
+      const payload = await fetchVoucherPrintPayload(
+        VoucherKind.BANK_PAYMENT,
+        initial.id,
+      );
+      await printHtmlDocument(renderVoucherHtml(payload));
+    } catch {
+      toast.error("Không in được phiếu.");
+    } finally {
+      setPrinting(false);
+    }
+  }, [initial?.id, printing]);
+
+  const handleExport = useCallback(async () => {
+    if (!initial?.id || exporting) return;
+    setExporting(true);
+    try {
+      await downloadVoucherExcel(VoucherKind.BANK_PAYMENT, initial.id);
+    } catch {
+      toast.error("Xuất khẩu thất bại.");
+    } finally {
+      setExporting(false);
+    }
+  }, [initial?.id, exporting]);
+
   const toolbarItems: ToolbarItem[] = useMemo(() => {
     const items: ToolbarItem[] = [];
     if (readOnly && onRequestEdit) {
@@ -799,9 +840,36 @@ export function DepositPaymentVoucherDialog({
     if (!readOnly && onSave) {
       items.push({ id: "save", label: "Lưu", icon: Save, onClick: handleSave });
     }
+    if (canPrint) {
+      items.push({
+        id: "print",
+        label: "In",
+        icon: Printer,
+        disabled: printing,
+        onClick: () => void handlePrint(),
+      });
+      items.push({
+        id: "export",
+        label: "Xuất khẩu",
+        icon: CloudUpload,
+        disabled: exporting,
+        onClick: () => void handleExport(),
+      });
+    }
     items.push({ id: "close", label: "Đóng", icon: X, onClick: handleClose });
     return items;
-  }, [readOnly, onRequestEdit, handleSave, handleClose, onSave]);
+  }, [
+    readOnly,
+    onRequestEdit,
+    handleSave,
+    handleClose,
+    onSave,
+    canPrint,
+    printing,
+    handlePrint,
+    exporting,
+    handleExport,
+  ]);
 
   const title =
     mode === TreasuryVoucherDialogModeEnum.CREATE
@@ -892,6 +960,7 @@ export function DepositPaymentVoucherDialog({
                 setCounterpartyName("");
                 setCounterpartyPhone("");
               }}
+              onPartnerNameChange={(name) => setCounterpartyName(name)}
               onOpenSearchDialog={() => setEntitySearchTarget("partner")}
               onCreateNew={!readOnly && !isSupplierPayment ? (kind) => setPartnerCreateKind(kind) : undefined}
             />
@@ -917,6 +986,11 @@ export function DepositPaymentVoucherDialog({
               <Input
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
+                onBlur={(e) =>
+                  setLines((prev) =>
+                    applyReasonToFirstLine(prev, e.target.value),
+                  )
+                }
                 readOnly={readOnly || debtFieldsLocked}
                 disabled={readOnly || debtFieldsLocked}
                 className={fieldClass(readOnly || debtFieldsLocked)}

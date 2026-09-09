@@ -7,15 +7,17 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, DataSource, EntityManager, Not, Repository } from 'typeorm';
+import { Brackets, DataSource, EntityManager, In, Not, Repository } from 'typeorm';
 import {
   DepositMovementSource,
   DepositMovementType,
   DepositTransferStatus,
   DocumentType,
+  VoucherPrintPayload,
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { DocumentNumberingService } from '../../../document-numbering/document-numbering.service';
+import { loadVoucherBranch } from '../../../inventory/location/services/voucher-print-context.util';
 import { DepositService } from '../../deposit/deposit.service';
 import { DepositAccountEntity } from '../../deposit/deposit-account.entity';
 import { DepositPeriodGuardService } from '../../deposit-period-lock/deposit-period-guard.service';
@@ -29,14 +31,21 @@ import {
 } from '../enums';
 import { PartnerResolverService } from '../../cash-vouchers/shared/partner-resolver.service';
 import { CashVoucherPartnerType } from '../../cash-vouchers/enums';
+import { CashVoucherCategoryEntity } from '../../cash-vouchers/cash-voucher-categories/cash-voucher-category.entity';
 import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
 import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
+import { mapBankReceiptToVoucherPayload } from './bank-receipt-print.mapper';
 import { BankReceiptEntity } from './bank-receipt.entity';
 import { BankReceiptLineEntity } from './bank-receipt-line.entity';
 import { CreateBankReceiptDto } from './dto/create-bank-receipt.dto';
 import { UpdateBankReceiptDto } from './dto/update-bank-receipt.dto';
 import { BankReceiptLineDto } from './dto/bank-receipt-line.dto';
 import { QueryBankReceiptDto, BankReceiptSource } from './dto/query-bank-receipt.dto';
+import { isFreeTextParty } from '../../cash-vouchers/shared/voucher-party';
+import {
+  assertEditable,
+  assertRevisionMatches,
+} from '../../cash-vouchers/shared/editable-voucher.util';
 
 /** Internal args for movement+JE+voucher atomic creation (GĐ4 / reuse). */
 export interface BankReceiptCreateAndPostArgs {
@@ -158,12 +167,17 @@ export class BankReceiptsService {
         actor.organizationId,
       );
       // Validate the polymorphic partner exists and snapshot its name/address.
-      const partner = await this.resolvePartner(
-        manager,
-        dto.partnerType,
-        dto.partnerId,
-        actor.organizationId,
-      );
+      // A hand-typed party has nothing to look up: its name IS the record, and
+      // it carries no partner_id to dangle.
+      const freeTextParty = isFreeTextParty(dto.partnerType);
+      const partner = freeTextParty
+        ? null
+        : await this.resolvePartner(
+            manager,
+            dto.partnerType,
+            dto.partnerId,
+            actor.organizationId,
+          );
       const contraAccountId = await this.accountResolver.resolveContraAccount(
         RECEIPT_PURPOSE_TO_ROLE[purpose],
         actor,
@@ -180,8 +194,10 @@ export class BankReceiptsService {
           docDate: dto.docDate,
           referenceType: BankReceiptReferenceType.MANUAL,
           partnerType: dto.partnerType,
-          partnerId: dto.partnerId,
-          partnerName: partner?.name ?? undefined,
+          partnerId: freeTextParty ? undefined : dto.partnerId,
+          partnerName: freeTextParty
+            ? dto.partnerName?.trim() || undefined
+            : (dto.partnerName?.trim() || partner?.name) ?? undefined,
           // What the cashier typed wins over the partner record's current address —
           // the voucher freezes the address as of the moment it was written.
           partnerAddress: dto.address ?? partner?.address ?? undefined,
@@ -211,26 +227,70 @@ export class BankReceiptsService {
     actor: ActorContext,
   ): Promise<BankReceiptEntity> {
     return this.dataSource.transaction(async (manager) => {
-      const receipt = await this.loadForWrite(manager, id, actor.organizationId);
-      if (receipt.status !== BankVoucherStatus.DRAFT) {
-        throw new BadRequestException('Only DRAFT bank receipts can be updated');
-      }
+      const receipt = await this.lockForWrite(manager, id, actor.organizationId);
+      assertEditable(receipt, BankVoucherStatus.POSTED, 'Phiếu thu tiền gửi');
+      assertRevisionMatches(receipt, dto.revision, 'Phiếu thu tiền gửi');
 
-      if (dto.partnerType !== undefined || dto.partnerId !== undefined) {
-        await this.resolvePartner(
+      // BR-LOCK-01, applied to BOTH dates. Checking only the new one would let a
+      // voucher already sitting in a closed month be re-valued: the compensating
+      // movement would land in that closed month and move a figure that has
+      // already been reported.
+      await this.periodGuard.assertNotLocked(receipt.branchId, receipt.docDate, manager);
+      if (dto.docDate && dto.docDate !== receipt.docDate) {
+        await this.periodGuard.assertNotLocked(
+          receipt.branchId,
+          dto.docDate,
           manager,
-          dto.partnerType ?? receipt.partnerType,
-          dto.partnerId ?? receipt.partnerId,
-          actor.organizationId,
         );
+      }
+      const amountBefore = Number(receipt.totalAmount);
+
+      // Recompute the party snapshot whenever any part of the party changed.
+      // Switching between a hand-typed name and a catalogue row clears the other
+      // shape entirely. The cleared fields are `null`, never `undefined`:
+      // TypeORM's save() skips undefined properties, so undefined would leave the
+      // old value in the column instead of clearing it.
+      const partyTouched =
+        dto.partnerType !== undefined ||
+        dto.partnerId !== undefined ||
+        dto.partnerName !== undefined;
+      const nextPartnerType = dto.partnerType ?? receipt.partnerType;
+      if (partyTouched) {
+        if (isFreeTextParty(nextPartnerType)) {
+          Object.assign(receipt, {
+            partnerType: nextPartnerType,
+            partnerId: null,
+            partnerNameSnapshot:
+              (dto.partnerName ?? receipt.partnerNameSnapshot)?.trim() || null,
+            partnerAddressSnapshot: null,
+          });
+        } else {
+          const nextPartnerId = dto.partnerId ?? receipt.partnerId;
+          const partner = await this.resolvePartner(
+            manager,
+            nextPartnerType,
+            nextPartnerId,
+            actor.organizationId,
+          );
+          Object.assign(receipt, {
+            partnerType: nextPartnerType ?? null,
+            partnerId: nextPartnerId ?? null,
+            // A typed name wins over the catalogue name (ADR-02) but partner_id
+            // stays put; `dto.partnerName` is checked against `undefined`, not
+            // falsiness, so an explicit '' clears the snapshot to null instead
+            // of silently falling back to the catalogue name.
+            partnerNameSnapshot:
+              (dto.partnerName ?? partner?.name)?.trim() || null,
+            partnerAddressSnapshot: partner?.address ?? null,
+          });
+        }
       }
 
       Object.assign(receipt, {
         depositAccountId: dto.depositAccountId ?? receipt.depositAccountId,
         docDate: dto.docDate ?? receipt.docDate,
         purpose: dto.purpose ?? receipt.purpose,
-        partnerType: dto.partnerType ?? receipt.partnerType,
-        partnerId: dto.partnerId ?? receipt.partnerId,
+
         payerName: dto.payerName ?? receipt.payerName,
         partnerAddressSnapshot: dto.address ?? receipt.partnerAddressSnapshot,
         reason: dto.reason ?? receipt.reason,
@@ -257,21 +317,85 @@ export class BankReceiptsService {
       }
       receipt.totalAmount = total;
 
+      // ADR-01: the difference is ONE compensating movement on THIS voucher, not
+      // a second document. A receipt that grew takes in more money; one that shrank gives it back.
+      // An edit that only changed words moves nothing.
+      const delta = Number(total) - amountBefore;
+      await this.postAdjustment(manager, receipt, delta, actor);
+
+      receipt.revision += 1;
       await manager.save(receipt);
+      this.logger.log(
+        `Updated bank receipt ${receipt.documentNumber} (id=${receipt.id}) rev ${receipt.revision}, delta=${delta}, by=${actor.userId}`,
+      );
       return this.getByIdInTx(manager, receipt.id, actor.organizationId);
     });
   }
 
+  /**
+   * Delete a posted voucher.
+   *
+   * ADR-02: this is `update()` with `after = []` — the same delta engine called
+   * with the whole amount as the difference, so an edit and a deletion cannot
+   * drift apart. The row is soft-deleted and keeps `status = POSTED`; no
+   * `CANCELLED` enum value is introduced.
+   */
   async delete(id: string, actor: ActorContext): Promise<void> {
-    const receipt = await this.loadForWrite(
-      this.dataSource.manager,
-      id,
-      actor.organizationId,
+    await this.dataSource.transaction(async (manager) => {
+      const receipt = await this.lockForWrite(manager, id, actor.organizationId);
+      assertEditable(receipt, BankVoucherStatus.POSTED, 'Phiếu thu tiền gửi');
+      await this.periodGuard.assertNotLocked(
+        receipt.branchId,
+        receipt.docDate,
+        manager,
+      );
+
+      await this.postAdjustment(
+        manager,
+        receipt,
+        -Number(receipt.totalAmount),
+        actor,
+      );
+
+      receipt.revision += 1;
+      await manager.save(receipt);
+      await manager.softDelete(BankReceiptEntity, receipt.id);
+      this.logger.log(
+        `Deleted bank receipt ${receipt.documentNumber} (id=${receipt.id}) rev ${receipt.revision}, reversed ${receipt.totalAmount}, by=${actor.userId}`,
+      );
+    });
+  }
+
+  /**
+   * Post the difference as ONE compensating movement on this same voucher
+   * (ADR-01), keyed on the new revision so a retry cannot double-post.
+   * Shared by {@link update} and {@link delete}.
+   */
+  private async postAdjustment(
+    manager: EntityManager,
+    receipt: BankReceiptEntity,
+    delta: number,
+    actor: ActorContext,
+  ): Promise<void> {
+    if (Math.abs(delta) <= 0.001) return;
+    await this.depositService.recordMovement(
+      {
+        depositAccountId: receipt.depositAccountId,
+        type:
+          delta > 0
+            ? DepositMovementType.DEPOSIT
+            : DepositMovementType.WITHDRAWAL,
+        amount: Math.abs(delta),
+        contraAccountId: receipt.contraAccountId,
+        source: DepositMovementSource.MANUAL,
+        docDate: receipt.docDate,
+        documentNumber: receipt.documentNumber,
+        sourceRefId: receipt.id,
+        sourceRefLineId: `REV${receipt.revision + 1}`,
+      },
+      actor,
+      manager,
     );
-    if (receipt.status !== BankVoucherStatus.DRAFT) {
-      throw new BadRequestException('Only DRAFT bank receipts can be deleted');
-    }
-    await this.receiptRepo.softDelete(receipt.id);
   }
 
   // ---------------------------------------------------------------------------
@@ -772,6 +896,55 @@ export class BankReceiptsService {
     }
   }
 
+  /**
+   * Print/export payload for one receipt (T-03-03, ADR-05). Goes through
+   * `getById` for the same 404 / org-scoping the sibling `GET :id` route
+   * uses — a second query here would let the printed voucher drift from the
+   * one the user is looking at. The mapper is pure, so the display names it
+   * cannot resolve itself — `depositAccountId` and each line's `categoryId`
+   * are plain FK columns, not loaded relations — are resolved here.
+   */
+  async getPrintPayload(
+    id: string,
+    actor: ActorContext,
+  ): Promise<VoucherPrintPayload> {
+    const receipt = await this.getById(id, actor);
+    const manager = this.dataSource.manager;
+    const [branch, bankAccountName, categoryNames] = await Promise.all([
+      loadVoucherBranch(manager, receipt.branchId, actor.organizationId),
+      this.resolveBankAccountName(manager, receipt.depositAccountId, actor.organizationId),
+      this.resolveCategoryNames(manager, receipt.lines, actor.organizationId),
+    ]);
+    return mapBankReceiptToVoucherPayload(receipt, branch, bankAccountName, categoryNames);
+  }
+
+  private async resolveBankAccountName(
+    manager: EntityManager,
+    depositAccountId: string,
+    organizationId: string,
+  ): Promise<string> {
+    const account = await manager.findOne(DepositAccountEntity, {
+      where: { id: depositAccountId, organizationId },
+    });
+    return account?.name ?? '';
+  }
+
+  /** Batch-resolves category names for a receipt's lines, keyed by category id. */
+  private async resolveCategoryNames(
+    manager: EntityManager,
+    lines: BankReceiptLineEntity[],
+    organizationId: string,
+  ): Promise<Map<string, string>> {
+    const ids = [
+      ...new Set(lines.map((l) => l.categoryId).filter((id): id is string => Boolean(id))),
+    ];
+    if (!ids.length) return new Map();
+    const categories = await manager.find(CashVoucherCategoryEntity, {
+      where: { id: In(ids), organizationId },
+    });
+    return new Map(categories.map((c) => [c.id, c.name]));
+  }
+
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
@@ -851,6 +1024,28 @@ export class BankReceiptsService {
         status: Not(BankVoucherStatus.REVERSED),
       },
     });
+  }
+
+  /**
+   * Re-read the voucher inside the caller's transaction holding a row lock, so
+   * two concurrent edits serialise instead of both computing a delta from the
+   * same starting amount.
+   */
+  private async lockForWrite(
+    manager: EntityManager,
+    id: string,
+    organizationId: string,
+  ): Promise<BankReceiptEntity> {
+    const found = await manager
+      .createQueryBuilder(BankReceiptEntity, 'r')
+      .setLock('pessimistic_write')
+      .where('r.id = :id', { id })
+      .andWhere('r.organizationId = :organizationId', { organizationId })
+      .getOne();
+    if (!found) {
+      throw new NotFoundException(`Bank receipt ${id} not found`);
+    }
+    return found;
   }
 
   private async loadForWrite(

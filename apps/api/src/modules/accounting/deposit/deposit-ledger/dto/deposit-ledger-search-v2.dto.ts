@@ -74,6 +74,12 @@ export class DepositLedgerSearchV2Dto {
   @Type(() => StringFilterDto)
   counterparty?: StringFilterDto;
 
+  /** Person column — the source voucher's payer_name / payee_name alone. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => StringFilterDto)
+  personName?: StringFilterDto;
+
   /** Staff column, resolved from the source voucher's cashier user. */
   @IsOptional()
   @ValidateNested()

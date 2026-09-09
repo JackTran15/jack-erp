@@ -76,11 +76,17 @@ export class DepositVoucherSearchV2Dto {
   @Type(() => StringFilterDto)
   accountLabel?: StringFilterDto;
 
-  /** Payer/payee column, falling back to the partner name snapshot. */
+  /** Party column — the partner name snapshot alone. */
   @IsOptional()
   @ValidateNested()
   @Type(() => StringFilterDto)
   counterparty?: StringFilterDto;
+
+  /** Person column — payer_name / payee_name alone. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => StringFilterDto)
+  personName?: StringFilterDto;
 
   /** Reason column. */
   @IsOptional()
@@ -121,8 +127,23 @@ export class DepositVoucherRowDto {
   @ApiProperty({ nullable: true })
   referenceType!: string | null;
 
-  @ApiProperty({ description: 'Payer/payee, falling back to the partner snapshot ("" when none)' })
+  @ApiProperty({
+    description:
+      'Bumped by every in-place edit; the grid sends it back as a staleness token.',
+  })
+  revision!: number;
+
+  @ApiProperty({
+    description:
+      'Partner name snapshot only ("" when the voucher has no catalogue or free-text party)',
+  })
   counterparty!: string;
+
+  @ApiProperty({
+    description:
+      'Payer/payee name only ("" when nobody was named on the voucher). Never falls back to the party.',
+  })
+  personName!: string;
 
   @ApiProperty({ nullable: true })
   reason!: string | null;

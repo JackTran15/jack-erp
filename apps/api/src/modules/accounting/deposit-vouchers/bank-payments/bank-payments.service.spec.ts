@@ -1,12 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { DepositMovementType, ReconStatus } from '@erp/shared-interfaces';
 import { BankPaymentsService } from './bank-payments.service';
 import { BankPaymentEntity } from './bank-payment.entity';
 import { BankPaymentLineEntity } from './bank-payment-line.entity';
 import { DepositService } from '../../deposit/deposit.service';
+import { DepositAccountEntity } from '../../deposit/deposit-account.entity';
 import { DocumentNumberingService } from '../../../document-numbering/document-numbering.service';
 import { PartnerResolverService } from '../../cash-vouchers/shared/partner-resolver.service';
 import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
@@ -20,6 +21,8 @@ import {
   BankVoucherStatus,
 } from '../enums';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
+import { BranchEntity } from '../../../branch/branch.entity';
+import { CashVoucherCategoryEntity } from '../../cash-vouchers/cash-voucher-categories/cash-voucher-category.entity';
 
 const actor: ActorContext = {
   userId: 'user-1',
@@ -53,6 +56,7 @@ function buildManager(opts: {
     save: jest.fn(async (entity: any) => entity),
     update: jest.fn(async () => undefined),
     delete: jest.fn(async () => undefined),
+    softDelete: jest.fn(async () => undefined),
   };
   return manager;
 }
@@ -215,6 +219,199 @@ describe('BankPaymentsService', () => {
       ).rejects.toThrow(/BR-LOCK-01/);
       expect(depositService.recordMovement).not.toHaveBeenCalled();
     });
+
+    it('overrides the catalogue name with a hand-typed partnerName, keeping partnerId (ADR-02)', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'p-new', status: BankVoucherStatus.POSTED },
+      });
+      await setup(manager);
+      partnerResolver.resolve.mockResolvedValue({
+        name: 'NCC thật',
+        address: 'HCM',
+      });
+
+      await service.create(
+        {
+          depositAccountId: 'dep-1',
+          docDate: '2026-07-15',
+          purpose: BankPaymentPurpose.SUPPLIER_PAYMENT,
+          totalAmount: 100,
+          partnerType: 'SUPPLIER',
+          partnerId: '11111111-1111-4111-8111-111111111111',
+          partnerName: 'NCC thật — CN Bình Tân',
+          lines: [{ description: 'Trả NCC', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      const created = manager.create.mock.calls.find(
+        (c: any[]) => c[1]?.status === BankVoucherStatus.POSTED,
+      );
+      expect(created[1].partnerNameSnapshot).toBe('NCC thật — CN Bình Tân');
+      expect(created[1].partnerId).toBe('11111111-1111-4111-8111-111111111111');
+    });
+
+    it('falls back to the catalogue name when partnerName is not sent (auto-create paths unaffected)', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'p-new', status: BankVoucherStatus.POSTED },
+      });
+      await setup(manager);
+      partnerResolver.resolve.mockResolvedValue({
+        name: 'NCC thật',
+        address: 'HCM',
+      });
+
+      await service.create(
+        {
+          depositAccountId: 'dep-1',
+          docDate: '2026-07-15',
+          purpose: BankPaymentPurpose.SUPPLIER_PAYMENT,
+          totalAmount: 100,
+          partnerType: 'SUPPLIER',
+          partnerId: '11111111-1111-4111-8111-111111111111',
+          lines: [{ description: 'Trả NCC', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      const created = manager.create.mock.calls.find(
+        (c: any[]) => c[1]?.status === BankVoucherStatus.POSTED,
+      );
+      expect(created[1].partnerNameSnapshot).toBe('NCC thật');
+    });
+  });
+
+  describe('free-text party', () => {
+    it('stores a hand-typed name without a lookup, and drops partnerId', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'p-new', status: BankVoucherStatus.POSTED },
+      });
+      await setup(manager);
+
+      await service.create(
+        {
+          depositAccountId: 'dep-1',
+          docDate: '2026-07-15',
+          purpose: BankPaymentPurpose.OTHER,
+          totalAmount: 100,
+          partnerType: 'OTHER',
+          partnerId: '11111111-1111-4111-8111-111111111111',
+          partnerName: '  Nguyễn Văn A  ',
+          lines: [{ description: 'Chi khác', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      expect(partnerResolver.resolve).not.toHaveBeenCalled();
+      const created = manager.create.mock.calls.find(
+        (c: any[]) => c[1]?.status === BankVoucherStatus.POSTED,
+      );
+      expect(created[1].partnerNameSnapshot).toBe('Nguyễn Văn A');
+      expect(created[1].partnerId).toBeUndefined();
+    });
+
+    it('clears partnerId when an update switches to a hand-typed party', async () => {
+      const payment = {
+        id: 'p-new',
+        status: BankVoucherStatus.POSTED,
+        referenceType: BankPaymentReferenceType.MANUAL,
+        revision: 0,
+        totalAmount: 0,
+        branchId: 'branch-1',
+        docDate: '2026-07-15',
+        documentNumber: 'UNC-26-00001',
+        organizationId: 'org-1',
+        partnerType: 'CUSTOMER',
+        partnerId: '11111111-1111-4111-8111-111111111111',
+        partnerNameSnapshot: 'Khách hàng thật',
+        partnerAddressSnapshot: 'HCM',
+      };
+      const manager = buildManager({ qbResult: payment, findOneResult: payment });
+      await setup(manager);
+
+      await service.update(
+        'p-new',
+        { revision: 0, partnerType: 'OTHER', partnerName: 'Nguyễn Văn A' } as any,
+        actor,
+      );
+
+      expect(payment.partnerId).toBeNull();
+      expect(payment.partnerNameSnapshot).toBe('Nguyễn Văn A');
+    });
+  });
+
+  describe('update — party snapshot (ADR-02)', () => {
+    it('overrides the catalogue name with a hand-typed partnerName, keeping the catalogue link', async () => {
+      const payment = {
+        id: 'p-1',
+        status: BankVoucherStatus.POSTED,
+        referenceType: BankPaymentReferenceType.MANUAL,
+        revision: 0,
+        totalAmount: 0,
+        branchId: 'branch-1',
+        docDate: '2026-07-15',
+        documentNumber: 'UNC-26-00001',
+        organizationId: 'org-1',
+        partnerType: 'SUPPLIER',
+        partnerId: '11111111-1111-4111-8111-111111111111',
+        partnerNameSnapshot: 'NCC thật',
+        partnerAddressSnapshot: 'HCM',
+      };
+      const manager = buildManager({ qbResult: payment, findOneResult: payment });
+      await setup(manager);
+      partnerResolver.resolve.mockResolvedValue({
+        name: 'NCC thật',
+        address: 'HCM',
+      });
+
+      await service.update(
+        'p-1',
+        {
+          revision: 0,
+          partnerType: 'SUPPLIER',
+          partnerId: '11111111-1111-4111-8111-111111111111',
+          partnerName: 'NCC thật — CN Bình Tân',
+        } as any,
+        actor,
+      );
+
+      expect(payment.partnerNameSnapshot).toBe('NCC thật — CN Bình Tân');
+      expect(payment.partnerId).toBe('11111111-1111-4111-8111-111111111111');
+    });
+
+    it('clears the snapshot to null (not the old value) when partnerName is sent as an empty string', async () => {
+      const payment = {
+        id: 'p-1',
+        status: BankVoucherStatus.POSTED,
+        referenceType: BankPaymentReferenceType.MANUAL,
+        revision: 0,
+        totalAmount: 0,
+        branchId: 'branch-1',
+        docDate: '2026-07-15',
+        documentNumber: 'UNC-26-00001',
+        organizationId: 'org-1',
+        partnerType: 'SUPPLIER',
+        partnerId: '11111111-1111-4111-8111-111111111111',
+        partnerNameSnapshot: 'NCC thật',
+        partnerAddressSnapshot: 'HCM',
+      };
+      const manager = buildManager({ qbResult: payment, findOneResult: payment });
+      await setup(manager);
+      partnerResolver.resolve.mockResolvedValue({
+        name: 'NCC thật',
+        address: 'HCM',
+      });
+
+      // TypeORM's save() skips `undefined` as "not provided" — an explicit ''
+      // is what proves the snapshot was actually cleared, not just left alone.
+      await service.update(
+        'p-1',
+        { revision: 0, partnerName: '' } as any,
+        actor,
+      );
+
+      expect(payment.partnerNameSnapshot).toBeNull();
+    });
   });
 
   describe('post', () => {
@@ -368,6 +565,126 @@ describe('BankPaymentsService', () => {
       );
       expect(depositService.recordMovement).not.toHaveBeenCalled();
       expect(supplierDepositPaymentSaga.compensate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getPrintPayload (T-03-03, AC-11)', () => {
+    const basePayment = {
+      id: 'p-1',
+      organizationId: 'org-1',
+      branchId: 'branch-1',
+      documentNumber: 'UNC-26-00001',
+      docDate: '2026-09-08',
+      status: BankVoucherStatus.POSTED,
+      purpose: BankPaymentPurpose.OTHER,
+      partnerNameSnapshot: 'Công ty A',
+      partnerAddressSnapshot: '123 Lê Lợi',
+      payeeName: 'Công ty A',
+      reason: 'Chi tiền mua vật tư',
+      reference: 'UNC000456',
+      depositAccountId: 'dep-acc-1',
+      contraAccountId: 'contra-1',
+      totalAmount: 500000,
+      referenceType: BankPaymentReferenceType.MANUAL,
+      revision: 0,
+      lines: [
+        { id: 'line-1', description: 'Mua vật tư', categoryId: 'cat-1', amount: 500000 },
+      ],
+    };
+
+    /**
+     * Entity-aware `EntityManager` mock: `getPrintPayload` fans out to
+     * `getById` (via `manager.findOne`), `loadVoucherBranch` (via
+     * `manager.getRepository(BranchEntity).findOne`), and the service's own
+     * `manager.findOne`/`manager.find` for the deposit account and categories.
+     * The `BankPaymentEntity` branch mirrors the real query's WHERE clause so
+     * an org/id mismatch reproduces the same 404 `getById` would give.
+     */
+    function buildPrintPayloadManager(
+      opts: {
+        payment?: typeof basePayment;
+        branch?: any;
+        depositAccount?: any;
+        categories?: any[];
+      } = {},
+    ) {
+      const manager: any = {
+        findOne: jest.fn(async (entity: any, options: any) => {
+          if (entity === BankPaymentEntity) {
+            const payment = opts.payment;
+            if (!payment) return null;
+            if (options.where.organizationId !== payment.organizationId) return null;
+            if (options.where.id !== payment.id) return null;
+            return payment;
+          }
+          if (entity === DepositAccountEntity) return opts.depositAccount ?? null;
+          return null;
+        }),
+        find: jest.fn(async (entity: any) =>
+          entity === CashVoucherCategoryEntity ? opts.categories ?? [] : [],
+        ),
+        getRepository: jest.fn((entity: any) => ({
+          findOne: jest.fn(async () =>
+            entity === BranchEntity ? opts.branch ?? null : null,
+          ),
+        })),
+      };
+      return manager;
+    }
+
+    it('resolves branch, bank account name and category names into a BANK_PAYMENT payload', async () => {
+      const manager = buildPrintPayloadManager({
+        payment: basePayment,
+        branch: {
+          id: 'branch-1',
+          name: 'Chi nhánh Q1',
+          address: '1 Đường ABC',
+          phone: '0900000000',
+        },
+        depositAccount: { id: 'dep-acc-1', name: 'Vietcombank CN Q1' },
+        categories: [{ id: 'cat-1', name: 'Mua vật tư' }],
+      });
+      await setup(manager);
+
+      const payload = await service.getPrintPayload('p-1', actor);
+
+      expect(payload.kind).toBe('BANK_PAYMENT');
+      expect(payload.paper).toBe('A5');
+      expect(payload.title).toBe('PHIẾU CHI (tiền gửi)');
+      expect(payload.docNo).toBe('UNC-26-00001');
+      expect(payload.branch).toEqual({
+        name: 'Chi nhánh Q1',
+        address: '1 Đường ABC',
+        phone: '0900000000',
+      });
+      expect(payload.info).toContainEqual({
+        label: 'Tài khoản ngân hàng',
+        value: 'Vietcombank CN Q1',
+      });
+      expect(payload.lines[0]).toMatchObject({
+        categoryName: 'Mua vật tư',
+        amount: 500000,
+      });
+    });
+
+    it('id not found ⇒ 404 (not 403)', async () => {
+      const manager = buildPrintPayloadManager({ payment: undefined });
+      await setup(manager);
+
+      await expect(service.getPrintPayload('missing-id', actor)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('voucher of another organization ⇒ 404, same as sibling GET :id', async () => {
+      const manager = buildPrintPayloadManager({
+        payment: { ...basePayment, organizationId: 'org-2' },
+      });
+      await setup(manager);
+
+      await expect(service.getPrintPayload('p-1', actor)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
     });
   });
 });

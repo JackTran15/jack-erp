@@ -1,0 +1,294 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: treasury-voucher-party-address-print-export
+slug: 2026090804-treasury-voucher-party-address-print-export
+profile: none
+created: 2026-09-08T15:42:14
+ruleset: 5
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-08T16:15:19
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-08T16:15:19
+    by: Akenzy
+    evidence: 11 assumptions, none blocking-and-pending; 18 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-08T16:15:19
+    by: Akenzy
+    evidence: 7 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-08T16:15:19
+    by: Akenzy
+    evidence: graph valid - 5 UoW, 21 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T16:15:25
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-08T16:17:29
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T16:18:39
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T16:18:39
+    by: claude
+    ticket: T-01-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T16:18:39
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T16:18:39
+    by: claude
+    ticket: T-05-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-08T16:23:31
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T16:24:33
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-08T16:26:36
+    by: claude-code
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-08T16:28:19
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T16:28:42
+    by: claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-08T16:29:06
+    by: Claude Opus 5 (1M context)
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done
+    at: 2026-09-08T16:29:45
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-08T16:30:43
+    by: claude
+    ticket: T-01-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-08T16:31:05
+    by: claude
+    ticket: T-05-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T16:32:12
+    by: claude
+    ticket: T-01-06
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T16:32:12
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T16:32:12
+    by: claude
+    ticket: T-05-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-08T16:32:19
+    by: Claude Opus 5 (1M context)
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done
+    at: 2026-09-08T16:32:56
+    by: claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T16:33:22
+    by: claude
+    ticket: T-03-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-08T16:34:42
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T16:35:06
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-08T16:35:53
+    by: Claude Opus 5 (1M context)
+    ticket: T-01-04
+  - gate: G4
+    action: ticket review
+    at: 2026-09-08T16:36:25
+    by: claude-code
+    ticket: T-03-05
+  - gate: G4
+    action: ticket done
+    at: 2026-09-08T16:36:29
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-08T16:36:46
+    by: claude
+    ticket: T-05-02
+  - gate: G4
+    action: ticket done
+    at: 2026-09-08T16:37:00
+    by: claude
+    ticket: T-03-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T16:37:25
+    by: claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-08T16:41:03
+    by: Claude (Sonnet 5)
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-08T16:41:52
+    by: claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-08T16:42:25
+    by: claude-code
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done
+    at: 2026-09-08T16:43:39
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T16:44:19
+    by: claude
+    ticket: T-03-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-08T16:47:18
+    by: Claude Opus 5 (1M context)
+    ticket: T-01-06
+  - gate: G4
+    action: ticket done
+    at: 2026-09-08T16:47:53
+    by: claude
+    ticket: T-01-06
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T16:48:26
+    by: claude
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-08T16:56:17
+    by: claude
+    ticket: T-02-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T16:56:45
+    by: claude
+    ticket: T-05-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-08T17:42:08
+    by: claude
+    ticket: T-03-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T17:42:56
+    by: claude
+    ticket: T-03-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T17:42:56
+    by: claude
+    ticket: T-04-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-08T17:48:59
+    by: claude-sonnet-5
+    ticket: T-05-03
+  - gate: G4
+    action: ticket done
+    at: 2026-09-08T17:49:54
+    by: claude
+    ticket: T-05-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-08T17:51:13
+    by: claude
+    ticket: T-04-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T17:51:46
+    by: claude
+    ticket: T-04-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-08T17:59:17
+    by: claude
+    ticket: T-03-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T17:59:45
+    by: claude
+    ticket: T-04-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T18:04:25
+    by: claude
+    ticket: T-04-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-08T18:07:34
+    by: claude
+    ticket: T-04-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-08T18:07:53
+    by: Claude Opus 5 (1M context)
+    ticket: T-04-04
+  - gate: G4
+    action: ticket done
+    at: 2026-09-08T18:08:35
+    by: claude
+    ticket: T-04-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-08T18:14:55
+    by: claude
+    ticket: T-04-03

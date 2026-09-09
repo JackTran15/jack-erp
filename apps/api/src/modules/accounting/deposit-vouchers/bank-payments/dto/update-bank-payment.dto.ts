@@ -5,6 +5,7 @@ import {
   IsBoolean,
   IsEnum,
   IsISO8601,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -18,6 +19,15 @@ import { BankPaymentLineDto } from './bank-payment-line.dto';
 
 /** Update a DRAFT bank payment. `lines` (when provided) is a full upsert set. */
 export class UpdateBankPaymentDto {
+  /**
+   * The revision the client last read. Required: editing a posted voucher now
+   * moves money, so a blind write must fail loudly rather than silently
+   * overwrite a concurrent edit.
+   */
+  @IsInt()
+  @Min(0)
+  revision: number;
+
   @IsOptional()
   @IsUUID()
   depositAccountId?: string;
@@ -37,6 +47,17 @@ export class UpdateBankPaymentDto {
   @IsOptional()
   @IsUUID()
   partnerId?: string;
+
+  /**
+   * "Đối tượng" typed by hand. Frozen onto the voucher as
+   * `partner_name_snapshot` regardless of `partnerType` — for a catalogue
+   * party it overrides the catalogue name but leaves `partnerId` untouched
+   * (ADR-02).
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  partnerName?: string;
 
   @IsOptional()
   @IsString()

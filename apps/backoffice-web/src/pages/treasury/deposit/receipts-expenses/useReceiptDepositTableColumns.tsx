@@ -111,6 +111,12 @@ export function useReceiptDepositTableColumns(
         render: (r) => r.counterparty,
       },
       {
+        key: "personName",
+        label: "Người nộp/nhận",
+        width: 160,
+        render: (r) => r.personName,
+      },
+      {
         key: "reason",
         label: "Lý do",
         width: 240,

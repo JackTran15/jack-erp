@@ -118,6 +118,14 @@ export class CashPaymentEntity extends BaseEntity {
   @Column({ name: 'posted_by', type: 'uuid', nullable: true })
   postedBy?: string;
 
+  /**
+   * Bumped by every in-place edit of a posted voucher. Doubles as the
+   * optimistic-concurrency token: `update()`/`delete()` refuse when the
+   * caller's revision is not the stored one.
+   */
+  @Column({ name: 'revision', type: 'int', default: 0 })
+  revision: number;
+
   @DeleteDateColumn({ name: 'deleted_at', nullable: true })
   deletedAt?: Date;
 

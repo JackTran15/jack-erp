@@ -17,6 +17,34 @@ export function voucherLineTotal(lines: { amount: number }[]): number {
   return lines.reduce((s, l) => s + (Number(l.amount) || 0), 0);
 }
 
+/**
+ * Copies "Lý do thu"/"Lý do chi" down into the first detail line's "Diễn giải",
+ * but only while that cell is still empty — a line the user has typed into is
+ * never overwritten.
+ *
+ * Called from the reason field's own handler, never from an effect watching
+ * `reason`. An effect would also fire while a dialog hydrates an existing
+ * voucher in EDIT mode and would quietly rewrite a saved description; it would
+ * also need a per-line dirty flag to know what "still empty" meant after the
+ * first keystroke. The same reasoning is spelled out on `handleSubOptionChange`
+ * in PaymentVoucherDialog, which is the existing precedent for copying a header
+ * value into a line.
+ *
+ * Returns a new array when it changes something and the original array when it
+ * does not, so callers can pass the result straight to `setLines` without
+ * forcing a re-render for a no-op.
+ */
+export function applyReasonToFirstLine(
+  lines: VoucherFormLine[],
+  reason: string,
+): VoucherFormLine[] {
+  const text = reason.trim();
+  if (!text) return lines;
+  const first = lines[0];
+  if (!first || first.description.trim()) return lines;
+  return [{ ...first, description: text }, ...lines.slice(1)];
+}
+
 /** "BANK - Name - STK" — distinguishes deposit accounts sharing the same bank in a picker. */
 export function formatDepositAccountLabel(account: {
   bankName: string;
@@ -26,9 +54,8 @@ export function formatDepositAccountLabel(account: {
   return `${account.bankName} - ${account.name} - ${account.accountNo}`;
 }
 
-import type { CashVoucherPartnerType } from "../../cash-vouchers.types";
 import {
-  lookupTypeToPartnerType,
+  resolvePartyFields,
   type PartnerLookupType,
 } from "./voucher-partner.constants";
 
@@ -50,9 +77,15 @@ export function buildReceiptDetailFromForm(state: {
   lines: VoucherFormLine[];
   documentLines?: LedgerCashVoucherDetail["documentLines"];
 }): LedgerCashVoucherDetail {
-  const partnerType: CashVoucherPartnerType | undefined = state.partnerId
-    ? lookupTypeToPartnerType(state.partnerKind)
-    : undefined;
+  // Delegate to `resolvePartyFields` instead of re-deriving the rule here: it
+  // is the one place (ADR-04) both cash and bank voucher dialogs decide
+  // `partnerType`, so a hand-typed name always resolves to `OTHER` even when
+  // `partnerKind` still carries a stale catalogue value.
+  const { partnerType } = resolvePartyFields({
+    partnerId: state.partnerId,
+    partnerKind: state.partnerKind,
+    partnerName: state.counterpartyName,
+  });
   return {
     kind: LedgerCashVoucherKindEnum.RECEIPT,
     purpose: state.purpose,
@@ -102,9 +135,15 @@ export function buildPaymentDetailFromForm(state: {
   documentLines?: LedgerCashVoucherDocumentLine[];
   transferAccountId?: string;
 }): LedgerCashVoucherDetail {
-  const partnerType: CashVoucherPartnerType | undefined = state.partnerId
-    ? lookupTypeToPartnerType(state.partnerKind)
-    : undefined;
+  // Delegate to `resolvePartyFields` instead of re-deriving the rule here: it
+  // is the one place (ADR-04) both cash and bank voucher dialogs decide
+  // `partnerType`, so a hand-typed name always resolves to `OTHER` even when
+  // `partnerKind` still carries a stale catalogue value.
+  const { partnerType } = resolvePartyFields({
+    partnerId: state.partnerId,
+    partnerKind: state.partnerKind,
+    partnerName: state.counterpartyName,
+  });
   return {
     kind: LedgerCashVoucherKindEnum.PAYMENT,
     purpose: state.purpose,

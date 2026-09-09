@@ -45,8 +45,10 @@ export function toReceiptPaymentListItem(
     status: row.status,
     totalAmount: num(row.totalAmount),
     counterparty: row.counterparty,
+    personName: row.personName,
     reason: row.reason ?? "",
     referenceType: row.referenceType ?? undefined,
+    revision: row.revision ?? 0,
     isGoodsReceiptPayment:
       row.documentKind === CashVoucherDocumentKind.GOODS_RECEIPT_PAYMENT,
     isAutoVoucher: isAutoVoucherReference(row.referenceType ?? undefined),
@@ -73,6 +75,7 @@ export function cashReceiptToVoucherDetail(
   categoryNames: Map<string, string> = new Map(),
 ): LedgerCashVoucherDetail {
   return {
+    id: r.id,
     kind: LedgerCashVoucherKindEnum.RECEIPT,
     purpose:
       r.purpose === "DEBT_COLLECTION"
@@ -102,6 +105,7 @@ export function cashPaymentToVoucherDetail(
 ): LedgerCashVoucherDetail {
   const isGr = p.referenceType === CashPaymentReferenceType.GOODS_RECEIPT;
   return {
+    id: p.id,
     kind: LedgerCashVoucherKindEnum.PAYMENT,
     purpose: LedgerCashVoucherPurposeEnum.OTHER,
     paymentPurpose: p.purpose,
@@ -155,6 +159,7 @@ export function receiptPaymentToLedgerRow(
     amountOut: isReceipt ? 0 : item.totalAmount,
     balance,
     counterparty: item.counterparty,
+    personName: item.personName,
     employee: "",
     documentType: isReceipt
       ? ("cash_receipt" as LedgerCashRow["documentType"])
@@ -174,6 +179,7 @@ export function buildOpeningLedgerRow(balance: number): LedgerCashRow {
     amountOut: 0,
     balance,
     counterparty: "",
+    personName: "",
     employee: "",
     documentType: "opening_balance" as LedgerCashRow["documentType"],
     detail: {
@@ -213,6 +219,7 @@ export function cashLedgerRowToUiRow(row: CashLedgerRow): LedgerCashRow {
     amountOut: num(row.credit),
     balance: num(row.balance),
     counterparty: row.partnerName ?? "",
+    personName: row.personName ?? "",
     employee: row.staffName ?? "",
     documentType: isPt
       ? ("cash_receipt" as LedgerCashRow["documentType"])

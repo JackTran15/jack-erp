@@ -152,6 +152,77 @@ describe('SearchDepositVouchersV2Handler', () => {
     expect(params).toContain('%199118899%');
   });
 
+  it('reads party and person from separate columns in both union halves', async () => {
+    await run({});
+    const [sql] = dataCall();
+
+    // AC-06/AC-07 (ADR-02). Neither expression may name the other's source.
+    expect(sql).toContain(
+      "COALESCE(NULLIF(btrim(r.partner_name_snapshot), ''), '')\n                                                   AS counterparty",
+    );
+    expect(sql).toContain(
+      "COALESCE(NULLIF(btrim(r.payer_name), ''), '')\n                                                   AS \"personName\"",
+    );
+    // The old shape nested both sources in one COALESCE; it must be gone, not
+    // merely reordered.
+    expect(sql).not.toContain("NULLIF(btrim(r.payer_name), ''),\n          NULLIF");
+
+    // The payment half is positional — swapping its two lines yields a query
+    // Postgres accepts and a grid showing each value under the other's heading.
+    const paymentHalf = sql.slice(sql.indexOf('FROM bank_receipts r'));
+    expect(paymentHalf.indexOf('p.partner_name_snapshot')).toBeLessThan(
+      paymentHalf.indexOf('p.payee_name'),
+    );
+  });
+
+  it('projects every field DepositVoucherRowDto declares (AC-06)', async () => {
+    await run({});
+    const [sql] = dataCall();
+    const select = sql.slice(sql.lastIndexOf('SELECT', sql.indexOf('FROM rows')),
+                             sql.indexOf('FROM rows'));
+
+    // The whole list, not just the field of the day — see the twin spec in
+    // search-cash-vouchers-v2.handler.spec.ts for why one field is not enough.
+    for (const field of [
+      'kind', 'id', 'docDate', 'documentNumber', 'status', 'totalAmount',
+      'depositAccountId', 'depositAccountName', 'depositAccountNo',
+      'referenceType', 'revision', 'counterparty', 'personName', 'reason',
+      'createdAt',
+    ]) {
+      expect(select).toContain(field);
+    }
+  });
+
+  it('keeps revision out of the totals query', async () => {
+    await run({});
+    const [totalsSql] = query.mock.calls[1] as [string, unknown[]];
+    const totalsSelect = totalsSql.slice(totalsSql.lastIndexOf('SELECT COUNT'));
+    expect(totalsSelect).not.toContain('revision');
+  });
+
+  it('projects personName through the outer select so the row reaches the grid', async () => {
+    await run({});
+    const [sql] = dataCall();
+    // A column present in the CTE but missing from the outer SELECT is invisible
+    // with no error at all — the grid just renders an empty cell forever.
+    expect(sql).toContain('counterparty, "personName", reason, "createdAt"');
+  });
+
+  it('filters personName independently of counterparty', async () => {
+    // AC-08. Two filters, two predicates, two params: if they ever collapsed
+    // onto one column, filtering by a name held only in the other field would
+    // still return the row.
+    await run({
+      counterparty: { operator: StringOperator.CONTAINS, value: 'kkkk' },
+      personName: { operator: StringOperator.CONTAINS, value: '123123' },
+    });
+    const [sql, params] = dataCall();
+    expect(sql).toContain("COALESCE(counterparty, '') ILIKE $3");
+    expect(sql).toContain('COALESCE("personName", \'\') ILIKE $4');
+    expect(params).toContain('%kkkk%');
+    expect(params).toContain('%123123%');
+  });
+
   it('builds a numeric comparison clause for the total amount filter', async () => {
     await run({ totalAmount: { operator: CompareOperator.GTE, value: 100000 } });
     const [sql, params] = dataCall();

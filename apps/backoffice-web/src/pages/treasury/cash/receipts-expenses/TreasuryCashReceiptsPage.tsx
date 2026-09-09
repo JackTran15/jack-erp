@@ -15,6 +15,7 @@ import {
 } from "@erp/ui";
 import {
   ChevronDown,
+  CloudUpload,
   Copy,
   Eye,
   Pencil,
@@ -50,12 +51,14 @@ import {
   useCashReceiptMutations,
 } from "../../../../hooks/treasury/use-cash-receipts";
 import { useCategoryNameMap } from "../../../../hooks/treasury/use-cash-voucher-categories";
+import { downloadCashVoucherListExport } from "../../../../hooks/treasury/use-cash-voucher-export";
 import { useCashVoucherSearch } from "../../../../hooks/treasury/use-cash-vouchers";
 import {
   cashPaymentToVoucherDetail,
   cashReceiptToVoucherDetail,
   toReceiptPaymentListItem,
 } from "../../cash-vouchers.adapters";
+import { isEditableVoucherReference } from "../../cash-vouchers.labels";
 import {
   ledgerDetailToCreatePaymentBody,
   ledgerDetailToCreateReceiptBody,
@@ -137,6 +140,7 @@ export function TreasuryCashReceiptsPage() {
     useState<ReceiptPaymentListItem | null>(null);
   const [reverseReason, setReverseReason] = useState("");
   const [reverseLoading, setReverseLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const categoryInMap = useCategoryNameMap(CashVoucherCategoryDirection.IN);
   const categoryOutMap = useCategoryNameMap(CashVoucherCategoryDirection.OUT);
@@ -289,10 +293,28 @@ export function TreasuryCashReceiptsPage() {
     toast.success("Đã nạp lại dữ liệu.");
   }, [refetch, closeVoucherDialogs]);
 
+  // `searchBody` is the exact object the grid posts to `/search` — reusing it
+  // here instead of rebuilding a second filter is what keeps the exported
+  // file matching what the grid shows (ADR-06).
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    try {
+      await downloadCashVoucherListExport(searchBody);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Xuất khẩu thất bại.");
+    } finally {
+      setExporting(false);
+    }
+  }, [searchBody]);
+
+  // Mirrors assertEditable on the server: a hand-created voucher that is still
+  // posted. Editing now writes a compensating movement rather than requiring a
+  // draft, so DRAFT — a state no voucher has ever actually been in — is gone.
   const canEditSelected =
     !!selectedItem &&
     !selectedItem.isGoodsReceiptPayment &&
-    selectedItem.status === CashVoucherStatus.DRAFT;
+    isEditableVoucherReference(selectedItem.referenceType) &&
+    selectedItem.status === CashVoucherStatus.POSTED;
 
   const handlePageEdit = useCallback(() => {
     if (!selectedItem || selectedItem.isGoodsReceiptPayment) return;
@@ -313,7 +335,7 @@ export function TreasuryCashReceiptsPage() {
       id: "clone",
       label: "Nhân bản",
       icon: Copy,
-      disabled: !selectedItem || selectedItem.isGoodsReceiptPayment,
+      disabled: !!voucherDialog || !selectedItem || selectedItem.isGoodsReceiptPayment,
       tooltip: selectedItem?.isGoodsReceiptPayment
         ? "Không nhân bản phiếu nhập hàng"
         : undefined,
@@ -345,7 +367,7 @@ export function TreasuryCashReceiptsPage() {
       id: "view",
       label: "Xem",
       icon: Eye,
-      disabled: !selectedItem,
+      disabled: !!voucherDialog || !selectedItem,
       onClick: () => {
         if (selectedItem) openViewVoucher(selectedItem);
       },
@@ -354,12 +376,14 @@ export function TreasuryCashReceiptsPage() {
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !canEditSelected,
+      disabled: !canEditSelected || !!voucherDialog,
       tooltip: selectedItem?.isGoodsReceiptPayment
         ? "Phiếu nhập hàng chỉ xem"
-        : selectedItem?.status !== CashVoucherStatus.DRAFT
-          ? "Chỉ sửa phiếu nháp"
-          : undefined,
+        : !isEditableVoucherReference(selectedItem?.referenceType)
+          ? "Phiếu tự sinh từ chứng từ khác, chỉ đảo bút được"
+          : selectedItem?.status !== CashVoucherStatus.POSTED
+            ? "Chỉ sửa phiếu đã ghi sổ"
+            : undefined,
       onClick: handlePageEdit,
     },
     {
@@ -385,8 +409,13 @@ export function TreasuryCashReceiptsPage() {
       label: "Xóa",
       icon: Trash2,
       variant: "danger",
-      disabled:
-        !selectedItem || selectedItem.status !== CashVoucherStatus.DRAFT,
+      // Same rule as Sửa: deleting is editing down to nothing (ADR-02), so
+      // anything editable is deletable and nothing else is.
+      disabled: !canEditSelected || !!voucherDialog,
+      tooltip:
+        selectedItem && !isEditableVoucherReference(selectedItem.referenceType)
+          ? "Phiếu tự sinh từ chứng từ khác, chỉ đảo bút được"
+          : undefined,
       onClick: () => {
         if (selectedItem) setConfirmDeleteItem(selectedItem);
       },
@@ -445,10 +474,15 @@ export function TreasuryCashReceiptsPage() {
               const created = await receiptMutations.create.mutateAsync(body);
               setSelectedId(created.id);
             } else if (selectedId) {
+              // documentNumber is immutable once posted; revision is the
+              // staleness token the server compares against the locked row.
               const { documentNumber: _, ...updateBody } = body;
               await receiptMutations.update.mutateAsync({
                 id: selectedId,
-                body: updateBody,
+                body: {
+                  ...updateBody,
+                  revision: selectedItem?.revision ?? 0,
+                },
               });
             }
           }
@@ -473,16 +507,25 @@ export function TreasuryCashReceiptsPage() {
               const created = await paymentMutations.create.mutateAsync(body);
               setSelectedId(created.id);
             } else if (selectedId) {
+              // documentNumber is immutable once posted; revision is the
+              // staleness token the server compares against the locked row.
               const { documentNumber: _, ...updateBody } = body;
               await paymentMutations.update.mutateAsync({
                 id: selectedId,
-                body: updateBody,
+                body: {
+                  ...updateBody,
+                  revision: selectedItem?.revision ?? 0,
+                },
               });
             }
           }
         }
         closeVoucherDialogs();
-        toast.success("Đã ghi sổ chứng từ.");
+        toast.success(
+            voucherDialog?.mode === TreasuryVoucherDialogModeEnum.CREATE
+              ? "Đã ghi sổ chứng từ."
+              : "Đã cập nhật chứng từ và ghi bút toán chênh lệch.",
+          );
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Lưu thất bại.");
       }
@@ -491,6 +534,9 @@ export function TreasuryCashReceiptsPage() {
       voucherDialog,
       cashAccountId,
       selectedId,
+      // Read for its `revision` when building the update payload; omitting it
+      // would send a stale token and get the save rejected as a conflict.
+      selectedItem,
       receiptMutations,
       paymentMutations,
       closeVoucherDialogs,
@@ -516,7 +562,11 @@ export function TreasuryCashReceiptsPage() {
           setSelectedId(created.fromPaymentId);
         }
         closeVoucherDialogs();
-        toast.success("Đã ghi sổ chứng từ.");
+        toast.success(
+            voucherDialog?.mode === TreasuryVoucherDialogModeEnum.CREATE
+              ? "Đã ghi sổ chứng từ."
+              : "Đã cập nhật chứng từ và ghi bút toán chênh lệch.",
+          );
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Lưu thất bại.");
       }
@@ -611,12 +661,22 @@ export function TreasuryCashReceiptsPage() {
           </div>
         }
         filters={
-          <div className="flex flex-wrap items-end gap-4">
-            <PeriodFilter
-              value={period}
-              onChange={setPeriod}
-              onApply={handleApply}
-            />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-end gap-4">
+              <PeriodFilter
+                value={period}
+                onChange={setPeriod}
+                onApply={handleApply}
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+              disabled={exporting}
+            >
+              <CloudUpload className="mr-1 h-4 w-4" /> Xuất khẩu
+            </Button>
           </div>
         }
         summary={
@@ -669,6 +729,7 @@ export function TreasuryCashReceiptsPage() {
       </DocumentListShell>
 
       <ReceiptVoucherDialog
+        key={selectedId ?? "new"}
         open={
           !!voucherDialog &&
           voucherDialog.kind === ReceiptCashVoucherDialogKindEnum.RECEIPT
@@ -688,6 +749,7 @@ export function TreasuryCashReceiptsPage() {
       />
 
       <PaymentVoucherDialog
+        key={selectedId ?? "new"}
         open={
           (!!voucherDialog &&
             voucherDialog.kind === ReceiptCashVoucherDialogKindEnum.PAYMENT) ||
@@ -726,7 +788,9 @@ export function TreasuryCashReceiptsPage() {
       {confirmDeleteItem ? (
         <ConfirmActionModal
           title="Xóa chứng từ thu chi"
-          message={`Xác nhận xóa ${confirmDeleteItem.documentNumber || confirmDeleteItem.id}?`}
+          message={`Xóa phiếu ${
+            confirmDeleteItem.documentNumber || confirmDeleteItem.id
+          }? Số dư quỹ sẽ được điều chỉnh lại bằng một bút toán đảo, và phiếu sẽ không còn trong danh sách.`}
           confirmLabel="Xóa"
           cancelLabel="Quay lại"
           onCancel={() => setConfirmDeleteItem(null)}

@@ -5,13 +5,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, DataSource, EntityManager, Not, Repository } from 'typeorm';
-import { DocumentType } from '@erp/shared-interfaces';
+import { Brackets, DataSource, EntityManager, In, Not, Repository } from 'typeorm';
+import { DocumentType, VoucherPrintPayload } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { DocumentNumberingService } from '../../../document-numbering/document-numbering.service';
+import { loadVoucherBranch } from '../../../inventory/location/services/voucher-print-context.util';
 import { CashService } from '../../cash/cash.service';
 import { CashMovementType } from '../../cash/cash-movement.entity';
 import { CashAccountEntity } from '../../cash/cash-account.entity';
+import { CashVoucherCategoryEntity } from '../cash-voucher-categories/cash-voucher-category.entity';
 import {
   CashPaymentPurpose,
   CashPaymentReferenceType,
@@ -24,8 +26,14 @@ import {
   VoucherLinksService,
 } from '../../voucher-links/voucher-links.service';
 import { PartnerResolverService } from '../shared/partner-resolver.service';
+import { isFreeTextParty } from '../shared/voucher-party';
+import {
+  assertEditable,
+  assertRevisionMatches,
+} from '../shared/editable-voucher.util';
 import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
 import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
+import { mapCashPaymentToVoucherPayload } from './cash-payment-print.mapper';
 import { CashPaymentEntity } from './cash-payment.entity';
 import { CashPaymentLineEntity } from './cash-payment-line.entity';
 import { CreateCashPaymentDto } from './dto/create-cash-payment.dto';
@@ -140,12 +148,18 @@ export class CashPaymentsService {
 
     return this.dataSource.transaction(async (manager) => {
       await this.assertCashAccount(manager, dto.cashAccountId, actor.organizationId);
-      const partner = await this.partnerResolver.resolve(
-        manager,
-        dto.partnerType,
-        dto.partnerId,
-        actor.organizationId,
-      );
+      // A hand-typed party has nothing to look up: its name IS the record, and
+      // it carries no partner_id to dangle. Everything else is validated and
+      // snapshotted from the catalogue row.
+      const freeTextParty = isFreeTextParty(dto.partnerType);
+      const partner = freeTextParty
+        ? null
+        : await this.partnerResolver.resolve(
+            manager,
+            dto.partnerType,
+            dto.partnerId,
+            actor.organizationId,
+          );
       const contraAccountId = await this.accountResolver.resolveContraAccount(
         PAYMENT_PURPOSE_TO_ROLE[purpose],
         actor,
@@ -162,9 +176,16 @@ export class CashPaymentsService {
           voucherDate: dto.voucherDate,
           referenceType: CashPaymentReferenceType.MANUAL,
           partnerType: dto.partnerType,
-          partnerId: dto.partnerId,
-          partnerName: partner?.name ?? undefined,
-          partnerAddress: partner?.address ?? undefined,
+          partnerId: freeTextParty ? undefined : dto.partnerId,
+          partnerName: freeTextParty
+            ? dto.partnerName?.trim() || undefined
+            : (dto.partnerName?.trim() || partner?.name) ?? undefined,
+          // What the cashier typed wins over the catalogue's current address —
+          // the voucher freezes the address as of the moment it was written
+          // (ADR-03, same rule as bank-receipts.service.ts).
+          partnerAddress: freeTextParty
+            ? dto.address?.trim() || undefined
+            : dto.address?.trim() ?? partner?.address ?? undefined,
           payeeName: dto.payeeName,
           staffId: dto.staffId,
           attachmentIds: dto.attachmentIds ?? [],
@@ -189,28 +210,73 @@ export class CashPaymentsService {
     actor: ActorContext,
   ): Promise<CashPaymentEntity> {
     return this.dataSource.transaction(async (manager) => {
-      const payment = await this.loadForWrite(manager, id, actor.organizationId);
-      if (payment.status !== CashVoucherStatus.DRAFT) {
-        throw new BadRequestException(
-          'Only DRAFT cash payments can be updated',
-        );
-      }
+      const payment = await this.lockForWrite(manager, id, actor.organizationId);
+      assertEditable(payment, CashVoucherStatus.POSTED, 'Phiếu chi');
+      assertRevisionMatches(payment, dto.revision, 'Phiếu chi');
+      const amountBefore = Number(payment.totalAmount);
 
-      if (dto.partnerType !== undefined || dto.partnerId !== undefined) {
-        await this.partnerResolver.resolve(
-          manager,
-          dto.partnerType ?? payment.partnerType,
-          dto.partnerId ?? payment.partnerId,
-          actor.organizationId,
-        );
+      // Recompute the party snapshot whenever any part of the party changed.
+      // Switching between a hand-typed name and a catalogue row has to clear the
+      // other shape completely: leaving a stale partner_name_snapshot behind
+      // would show the old free-text name against a real customer, and leaving a
+      // partner_id behind would point at a row the voucher no longer claims.
+      const partyTouched =
+        dto.partnerType !== undefined ||
+        dto.partnerId !== undefined ||
+        dto.partnerName !== undefined;
+      const nextPartnerType = dto.partnerType ?? payment.partnerType;
+      //
+      // The cleared fields are `null`, never `undefined`: TypeORM's save() skips
+      // undefined properties as "not provided", so undefined would leave the old
+      // value in the column instead of clearing it.
+      if (partyTouched) {
+        if (isFreeTextParty(nextPartnerType)) {
+          Object.assign(payment, {
+            partnerType: nextPartnerType,
+            partnerId: null,
+            partnerNameSnapshot:
+              (dto.partnerName ?? payment.partnerNameSnapshot)?.trim() || null,
+            partnerAddressSnapshot: null,
+          });
+        } else {
+          const nextPartnerId = dto.partnerId ?? payment.partnerId;
+          const partner = await this.partnerResolver.resolve(
+            manager,
+            nextPartnerType,
+            nextPartnerId,
+            actor.organizationId,
+          );
+          Object.assign(payment, {
+            partnerType: nextPartnerType ?? null,
+            partnerId: nextPartnerId ?? null,
+            // A typed name wins over the catalogue name (ADR-02) but partner_id
+            // stays put; `dto.partnerName` is checked against `undefined`, not
+            // falsiness, so an explicit '' clears the snapshot to null instead
+            // of silently falling back to the catalogue name.
+            partnerNameSnapshot:
+              (dto.partnerName ?? partner?.name)?.trim() || null,
+            partnerAddressSnapshot: partner?.address ?? null,
+          });
+        }
       }
 
       Object.assign(payment, {
         voucherDate: dto.voucherDate ?? payment.voucherDate,
         purpose: dto.purpose ?? payment.purpose,
-        partnerType: dto.partnerType ?? payment.partnerType,
-        partnerId: dto.partnerId ?? payment.partnerId,
         payeeName: dto.payeeName ?? payment.payeeName,
+        // ADR-03: unlike partnerName, address does not participate in
+        // `partyTouched`, so this assignment sits here — outside
+        // `if (partyTouched)` — and always runs. Editing only the address
+        // must save (AC-09) even when the party is never mentioned. When the
+        // party WAS touched, `payment.partnerAddressSnapshot` was already
+        // reset above to the new party's address (or `null`), so `dto.address
+        // ?? payment.partnerAddressSnapshot` still lets an explicit address
+        // sent alongside a party change win. The trailing `.trim() || null`
+        // mirrors partnerNameSnapshot's handling: an explicit '' must clear
+        // the column to `null`, not leave it as `''` or fall back silently —
+        // TypeORM's save() skips `undefined`, not `null` or `''`.
+        partnerAddressSnapshot:
+          (dto.address ?? payment.partnerAddressSnapshot)?.trim() || null,
         reason: dto.reason ?? payment.reason,
         staffId: dto.staffId ?? payment.staffId,
         cashAccountId: dto.cashAccountId ?? payment.cashAccountId,
@@ -234,21 +300,87 @@ export class CashPaymentsService {
       }
       payment.totalAmount = total;
 
+      // ADR-01, mirrored for the paying direction: a payment that grew takes
+      // more cash OUT of the fund (WITHDRAWAL); one that shrank puts some back
+      // (DEPOSIT). Exactly one movement, on this voucher, no second document.
+      //
+      // Growing a payment can exhaust the fund. That check is not re-implemented
+      // here — recordMovement already refuses when the account forbids going
+      // negative, and deferring to it keeps editing and creating a payment under
+      // the same rule.
+      const delta = Number(total) - amountBefore;
+      await this.postAdjustment(manager, payment, delta, actor);
+
+      payment.revision += 1;
       await manager.save(payment);
+      this.logger.log(
+        `Updated cash payment ${payment.documentNumber} (id=${payment.id}) rev ${payment.revision}, delta=${delta}, by=${actor.userId}`,
+      );
       return this.getByIdInTx(manager, payment.id, actor.organizationId);
     });
   }
 
+  /**
+   * Delete a posted voucher.
+   *
+   * ADR-02: this is `update()` with `after = []` — the same delta engine, called
+   * with the whole amount as the difference. Writing a separate reversal path
+   * here is what let the warehouse side ship a `cancel()` that unwound stock but
+   * forgot the accounting; sharing {@link postAdjustment} makes that class of bug
+   * unreachable rather than merely unlikely.
+   *
+   * The row is soft-deleted and keeps `status = POSTED`: no `CANCELLED` enum
+   * value is introduced, and `deleted_at` is what answers "is this still here".
+   */
   async delete(id: string, actor: ActorContext): Promise<void> {
-    const payment = await this.loadForWrite(
-      this.dataSource.manager,
-      id,
-      actor.organizationId,
+    await this.dataSource.transaction(async (manager) => {
+      const payment = await this.lockForWrite(manager, id, actor.organizationId);
+      assertEditable(payment, CashVoucherStatus.POSTED, 'Phiếu chi');
+
+      await this.postAdjustment(
+        manager,
+        payment,
+        -Number(payment.totalAmount),
+        actor,
+      );
+
+      payment.revision += 1;
+      await manager.save(payment);
+      await manager.softDelete(CashPaymentEntity, payment.id);
+      this.logger.log(
+        `Deleted cash payment ${payment.documentNumber} (id=${payment.id}) rev ${payment.revision}, reversed ${payment.totalAmount}, by=${actor.userId}`,
+      );
+    });
+  }
+
+  /**
+   * Post the difference between what the voucher said before and what it says
+   * now, as ONE compensating movement on this same voucher (ADR-01).
+   *
+   * Shared by {@link update} and {@link delete} so an edit and a deletion can never
+   * drift apart. A zero delta writes nothing — editing only the wording must not
+   * touch the ledger.
+   */
+  private async postAdjustment(
+    manager: EntityManager,
+    payment: CashPaymentEntity,
+    delta: number,
+    actor: ActorContext,
+  ): Promise<void> {
+    if (Math.abs(delta) <= 0.001) return;
+    await this.cashService.recordMovement(
+      {
+        cashAccountId: payment.cashAccountId,
+        type:
+          delta > 0 ? CashMovementType.WITHDRAWAL : CashMovementType.DEPOSIT,
+        amount: Math.abs(delta),
+        contraAccountId: payment.contraAccountId,
+        reference: payment.documentNumber,
+        notes: `Adjustment for ${payment.documentNumber} rev ${payment.revision + 1}`,
+      },
+      actor,
+      manager,
     );
-    if (payment.status !== CashVoucherStatus.DRAFT) {
-      throw new BadRequestException('Only DRAFT cash payments can be deleted');
-    }
-    await this.paymentRepo.softDelete(payment.id);
   }
 
   // ---------------------------------------------------------------------------
@@ -703,6 +835,55 @@ export class CashPaymentsService {
     return Object.assign(payment, { sourceLink, linkedVoucher });
   }
 
+  /**
+   * Print/export payload for one payment (T-03-03, ADR-05). Goes through
+   * `getById` for the same 404 / org-scoping the sibling `GET :id` route
+   * uses — a second query here would let the printed voucher drift from the
+   * one the user is looking at. The mapper is pure, so the display names it
+   * cannot resolve itself — `cashAccountId` and each line's `categoryId` are
+   * plain FK columns, not loaded relations — are resolved here.
+   */
+  async getPrintPayload(
+    id: string,
+    actor: ActorContext,
+  ): Promise<VoucherPrintPayload> {
+    const payment = await this.getById(id, actor);
+    const manager = this.dataSource.manager;
+    const [branch, cashAccountName, categoryNames] = await Promise.all([
+      loadVoucherBranch(manager, payment.branchId, actor.organizationId),
+      this.resolveCashAccountName(manager, payment.cashAccountId, actor.organizationId),
+      this.resolveCategoryNames(manager, payment.lines, actor.organizationId),
+    ]);
+    return mapCashPaymentToVoucherPayload(payment, branch, cashAccountName, categoryNames);
+  }
+
+  private async resolveCashAccountName(
+    manager: EntityManager,
+    cashAccountId: string,
+    organizationId: string,
+  ): Promise<string> {
+    const account = await manager.findOne(CashAccountEntity, {
+      where: { id: cashAccountId, organizationId },
+    });
+    return account?.name ?? '';
+  }
+
+  /** Batch-resolves category names for a payment's lines, keyed by category id. */
+  private async resolveCategoryNames(
+    manager: EntityManager,
+    lines: CashPaymentLineEntity[],
+    organizationId: string,
+  ): Promise<Map<string, string>> {
+    const ids = [
+      ...new Set(lines.map((l) => l.categoryId).filter((id): id is string => Boolean(id))),
+    ];
+    if (!ids.length) return new Map();
+    const categories = await manager.find(CashVoucherCategoryEntity, {
+      where: { id: In(ids), organizationId },
+    });
+    return new Map(categories.map((c) => [c.id, c.name]));
+  }
+
   private async buildSourceLink(
     payment: CashPaymentEntity,
     organizationId: string,
@@ -790,6 +971,28 @@ export class CashPaymentsService {
         status: Not(CashVoucherStatus.REVERSED),
       },
     });
+  }
+
+  /**
+   * Re-read the voucher inside the caller's transaction holding a row lock, so
+   * two concurrent edits serialise instead of both computing a delta from the
+   * same starting amount and posting two compensating movements.
+   */
+  private async lockForWrite(
+    manager: EntityManager,
+    id: string,
+    organizationId: string,
+  ): Promise<CashPaymentEntity> {
+    const payment = await manager
+      .createQueryBuilder(CashPaymentEntity, 'p')
+      .setLock('pessimistic_write')
+      .where('p.id = :id', { id })
+      .andWhere('p.organizationId = :organizationId', { organizationId })
+      .getOne();
+    if (!payment) {
+      throw new NotFoundException(`Cash payment ${id} not found`);
+    }
+    return payment;
   }
 
   private async loadForWrite(

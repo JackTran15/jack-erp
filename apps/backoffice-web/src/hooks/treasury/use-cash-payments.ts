@@ -56,7 +56,7 @@ export function useCashPaymentMutations() {
   });
 
   const update = useMutation({
-    mutationFn: async ({ id, body }: { id: string; body: Partial<CreateCashPaymentBody> }) =>
+    mutationFn: async ({ id, body }: { id: string; body: Partial<CreateCashPaymentBody> & { revision: number } }) =>
       requireErpData(
         await erpApi.PATCH<CashPayment>("/cash-payments/{id}", {
           params: { path: { id } },

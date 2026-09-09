@@ -622,6 +622,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/cash-vouchers/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export the merged cash voucher list as .xlsx */
+        post: operations["CashVoucherV2Controller_export_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v2/cash-ledger/search": {
         parameters: {
             query?: never;
@@ -669,6 +686,38 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["CashReceiptsController_update"];
+        trace?: never;
+    };
+    "/cash-receipts/{id}/print-payload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashReceiptsController_getPrintPayload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-receipts/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashReceiptsController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/cash-receipts/{id}/post": {
@@ -733,6 +782,38 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["CashPaymentsController_update"];
+        trace?: never;
+    };
+    "/cash-payments/{id}/print-payload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashPaymentsController_getPrintPayload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-payments/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashPaymentsController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/cash-payments/{id}/post": {
@@ -3431,6 +3512,38 @@ export interface paths {
         patch: operations["BankReceiptsController_update"];
         trace?: never;
     };
+    "/bank-receipts/{id}/print-payload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BankReceiptsController_getPrintPayload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bank-receipts/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BankReceiptsController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/bank-receipts/{id}/post": {
         parameters: {
             query?: never;
@@ -3493,6 +3606,38 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["BankPaymentsController_update"];
+        trace?: never;
+    };
+    "/bank-payments/{id}/print-payload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BankPaymentsController_getPrintPayload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bank-payments/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BankPaymentsController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/bank-payments/{id}/post": {
@@ -8011,8 +8156,10 @@ export interface components {
             documentNumber?: components["schemas"]["StringFilterDto"];
             /** @description Total amount column. */
             totalAmount?: components["schemas"]["CompareFilterDto"];
-            /** @description Payer/payee column, falling back to the partner name snapshot. */
+            /** @description Party column — the partner name snapshot alone. */
             counterparty?: components["schemas"]["StringFilterDto"];
+            /** @description Person column — payer_name / payee_name alone. */
+            personName?: components["schemas"]["StringFilterDto"];
             /** @description Reason column. */
             reason?: components["schemas"]["StringFilterDto"];
         };
@@ -8035,8 +8182,12 @@ export interface components {
             totalAmount: number;
             cashAccountId: string;
             referenceType: string | null;
-            /** @description Payer/payee, falling back to the partner snapshot ("" when none) */
+            /** @description Bumped by every in-place edit; the grid sends it back as a staleness token. */
+            revision: number;
+            /** @description Partner name snapshot only ("" when the voucher has no catalogue or free-text party) */
             counterparty: string;
+            /** @description Payer/payee name only ("" when nobody was named on the voucher). Never falls back to the party. */
+            personName: string;
             reason: string | null;
         };
         CashVoucherSearchV2ResponseDto: {
@@ -8067,8 +8218,10 @@ export interface components {
             documentNumber?: components["schemas"]["StringFilterDto"];
             /** @description Description column, resolved from the source voucher's reason. */
             description?: components["schemas"]["StringFilterDto"];
-            /** @description Counterparty column, resolved from the source voucher. */
+            /** @description Party column — the source voucher's partner name snapshot alone. */
             counterparty?: components["schemas"]["StringFilterDto"];
+            /** @description Person column — the source voucher's payer_name / payee_name alone. */
+            personName?: components["schemas"]["StringFilterDto"];
             /** @description Staff column, resolved from the source voucher's staff user. */
             staff?: components["schemas"]["StringFilterDto"];
             /** @description Money-in column; also constrains the row to inbound movements. */
@@ -8099,6 +8252,19 @@ export interface components {
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
             partnerId?: string;
+            /**
+             * @description "Đối tượng" typed by hand. Frozen onto the voucher as
+             *     `partner_name_snapshot` regardless of `partnerType` — for a catalogue
+             *     party it overrides the catalogue name but leaves `partnerId` untouched
+             *     (ADR-02).
+             */
+            partnerName?: string;
+            /**
+             * @description "Địa chỉ" — the payer's address as typed on the voucher. Stored as
+             *     `partnerAddressSnapshot`; when omitted, posting falls back to the
+             *     partner record's current address (ADR-03).
+             */
+            address?: string;
             /** @description "Người nộp" */
             payerName?: string;
             /** @description "Lý do nộp" */
@@ -8152,6 +8318,12 @@ export interface components {
             /** Format: date-time */
             postedAt?: string;
             postedBy?: string;
+            /**
+             * @description Bumped by every in-place edit of a posted voucher. Doubles as the
+             *     optimistic-concurrency token: `update()`/`delete()` refuse when the
+             *     caller's revision is not the stored one.
+             */
+            revision: number;
             /** Format: date-time */
             deletedAt?: string;
             lines: components["schemas"]["CashReceiptLineEntity"][];
@@ -8189,6 +8361,12 @@ export interface components {
             createdBy: string;
         };
         UpdateCashReceiptDto: {
+            /**
+             * @description The revision the client last read. Required: editing a posted voucher now
+             *     moves money, so a blind write must fail loudly rather than silently
+             *     overwrite a concurrent edit.
+             */
+            revision: number;
             voucherDate?: string;
             /** @enum {string} */
             purpose?: "OTHER" | "DEBT_COLLECTION" | "POS_SALE" | "OTHER_INCOME" | "INTER_BRANCH_IN";
@@ -8196,6 +8374,19 @@ export interface components {
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
             partnerId?: string;
+            /**
+             * @description "Đối tượng" typed by hand. Frozen onto the voucher as
+             *     `partner_name_snapshot` regardless of `partnerType` — for a catalogue
+             *     party it overrides the catalogue name but leaves `partnerId` untouched
+             *     (ADR-02).
+             */
+            partnerName?: string;
+            /**
+             * @description "Địa chỉ" — the payer's address as typed on the voucher. Stored as
+             *     `partnerAddressSnapshot`; when omitted, posting falls back to the
+             *     partner record's current address (ADR-03).
+             */
+            address?: string;
             payerName?: string;
             reason?: string;
             /** Format: uuid */
@@ -8235,6 +8426,19 @@ export interface components {
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
             partnerId?: string;
+            /**
+             * @description "Đối tượng" typed by hand. Frozen onto the voucher as
+             *     `partner_name_snapshot` regardless of `partnerType` — for a catalogue
+             *     party it overrides the catalogue name but leaves `partnerId` untouched
+             *     (ADR-02).
+             */
+            partnerName?: string;
+            /**
+             * @description "Địa chỉ" — the payee's address as typed on the voucher. Stored as
+             *     `partnerAddressSnapshot`; when omitted, posting falls back to the
+             *     partner record's current address (ADR-03).
+             */
+            address?: string;
             /** @description "Người nhận" */
             payeeName?: string;
             /** @description "Lý do chi" */
@@ -8288,6 +8492,12 @@ export interface components {
             /** Format: date-time */
             postedAt?: string;
             postedBy?: string;
+            /**
+             * @description Bumped by every in-place edit of a posted voucher. Doubles as the
+             *     optimistic-concurrency token: `update()`/`delete()` refuse when the
+             *     caller's revision is not the stored one.
+             */
+            revision: number;
             /** Format: date-time */
             deletedAt?: string;
             lines: components["schemas"]["CashPaymentLineEntity"][];
@@ -8325,6 +8535,12 @@ export interface components {
             createdBy: string;
         };
         UpdateCashPaymentDto: {
+            /**
+             * @description The revision the client last read. Required: editing a posted voucher now
+             *     moves money, so a blind write must fail loudly rather than silently
+             *     overwrite a concurrent edit.
+             */
+            revision: number;
             voucherDate?: string;
             /** @enum {string} */
             purpose?: "OTHER" | "SUPPLIER_PAYMENT" | "PURCHASE" | "EXPENSE" | "SALARY" | "REFUND" | "DEPOSIT_TRANSFER" | "INTER_BRANCH_OUT";
@@ -8332,6 +8548,19 @@ export interface components {
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
             partnerId?: string;
+            /**
+             * @description "Đối tượng" typed by hand. Frozen onto the voucher as
+             *     `partner_name_snapshot` regardless of `partnerType` — for a catalogue
+             *     party it overrides the catalogue name but leaves `partnerId` untouched
+             *     (ADR-02).
+             */
+            partnerName?: string;
+            /**
+             * @description "Địa chỉ" — the payee's address as typed on the voucher. Stored as
+             *     `partnerAddressSnapshot`; when omitted, posting falls back to the
+             *     partner record's current address (ADR-03).
+             */
+            address?: string;
             payeeName?: string;
             reason?: string;
             /** Format: uuid */
@@ -10675,6 +10904,8 @@ export interface components {
             description?: components["schemas"]["StringFilterDto"];
             /** @description Counterparty column, resolved from the source voucher. */
             counterparty?: components["schemas"]["StringFilterDto"];
+            /** @description Person column — the source voucher's payer_name / payee_name alone. */
+            personName?: components["schemas"]["StringFilterDto"];
             /** @description Staff column, resolved from the source voucher's cashier user. */
             staff?: components["schemas"]["StringFilterDto"];
             /** @description Money-in column; also constrains the row to inbound movements. */
@@ -10710,8 +10941,10 @@ export interface components {
             totalAmount?: components["schemas"]["CompareFilterDto"];
             /** @description Account column — matches the rendered "name (accountNo)" label. */
             accountLabel?: components["schemas"]["StringFilterDto"];
-            /** @description Payer/payee column, falling back to the partner name snapshot. */
+            /** @description Party column — the partner name snapshot alone. */
             counterparty?: components["schemas"]["StringFilterDto"];
+            /** @description Person column — payer_name / payee_name alone. */
+            personName?: components["schemas"]["StringFilterDto"];
             /** @description Reason column. */
             reason?: components["schemas"]["StringFilterDto"];
         };
@@ -10732,8 +10965,12 @@ export interface components {
             /** @description Inlined from deposit_accounts ("" when unresolved) */
             depositAccountNo: string;
             referenceType: string | null;
-            /** @description Payer/payee, falling back to the partner snapshot ("" when none) */
+            /** @description Bumped by every in-place edit; the grid sends it back as a staleness token. */
+            revision: number;
+            /** @description Partner name snapshot only ("" when the voucher has no catalogue or free-text party) */
             counterparty: string;
+            /** @description Payer/payee name only ("" when nobody was named on the voucher). Never falls back to the party. */
+            personName: string;
             reason: string | null;
             createdAt: string;
         };
@@ -10832,6 +11069,13 @@ export interface components {
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
             partnerId?: string;
+            /**
+             * @description "Đối tượng" typed by hand. Frozen onto the voucher as
+             *     `partner_name_snapshot` regardless of `partnerType` — for a catalogue
+             *     party it overrides the catalogue name but leaves `partnerId` untouched
+             *     (ADR-02).
+             */
+            partnerName?: string;
             /** @description "Người nộp" */
             payerName?: string;
             /**
@@ -10908,6 +11152,12 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            /**
+             * @description Bumped by every in-place edit of a posted voucher. Doubles as the
+             *     optimistic-concurrency token: `update()`/`delete()` refuse when the
+             *     caller's revision is not the stored one.
+             */
+            revision: number;
             /** Format: date-time */
             deletedAt?: string;
             createdBy: string;
@@ -10932,6 +11182,12 @@ export interface components {
             createdBy: string;
         };
         UpdateBankReceiptDto: {
+            /**
+             * @description The revision the client last read. Required: editing a posted voucher now
+             *     moves money, so a blind write must fail loudly rather than silently
+             *     overwrite a concurrent edit.
+             */
+            revision: number;
             /** Format: uuid */
             depositAccountId?: string;
             docDate?: string;
@@ -10941,6 +11197,13 @@ export interface components {
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
             partnerId?: string;
+            /**
+             * @description "Đối tượng" typed by hand. Frozen onto the voucher as
+             *     `partner_name_snapshot` regardless of `partnerType` — for a catalogue
+             *     party it overrides the catalogue name but leaves `partnerId` untouched
+             *     (ADR-02).
+             */
+            partnerName?: string;
             payerName?: string;
             /** @description "Địa chỉ" — stored as `partnerAddressSnapshot`. */
             address?: string;
@@ -10987,6 +11250,13 @@ export interface components {
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
             partnerId?: string;
+            /**
+             * @description "Đối tượng" typed by hand. Frozen onto the voucher as
+             *     `partner_name_snapshot` regardless of `partnerType` — for a catalogue
+             *     party it overrides the catalogue name but leaves `partnerId` untouched
+             *     (ADR-02).
+             */
+            partnerName?: string;
             /** @description "Người nhận" */
             payeeName?: string;
             /**
@@ -11071,6 +11341,12 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            /**
+             * @description Bumped by every in-place edit of a posted voucher. Doubles as the
+             *     optimistic-concurrency token: `update()`/`delete()` refuse when the
+             *     caller's revision is not the stored one.
+             */
+            revision: number;
             /** Format: date-time */
             deletedAt?: string;
             createdBy: string;
@@ -11095,6 +11371,12 @@ export interface components {
             createdBy: string;
         };
         UpdateBankPaymentDto: {
+            /**
+             * @description The revision the client last read. Required: editing a posted voucher now
+             *     moves money, so a blind write must fail loudly rather than silently
+             *     overwrite a concurrent edit.
+             */
+            revision: number;
             /** Format: uuid */
             depositAccountId?: string;
             docDate?: string;
@@ -11104,6 +11386,13 @@ export interface components {
             partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
             /** Format: uuid */
             partnerId?: string;
+            /**
+             * @description "Đối tượng" typed by hand. Frozen onto the voucher as
+             *     `partner_name_snapshot` regardless of `partnerType` — for a catalogue
+             *     party it overrides the catalogue name but leaves `partnerId` untouched
+             *     (ADR-02).
+             */
+            partnerName?: string;
             payeeName?: string;
             /** @description "Địa chỉ" — stored as `partnerAddressSnapshot`. */
             address?: string;
@@ -16222,6 +16511,27 @@ export interface operations {
             };
         };
     };
+    CashVoucherV2Controller_export_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashVoucherSearchV2Dto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     CashLedgerV2Controller_search_v2: {
         parameters: {
             query?: never;
@@ -16360,6 +16670,46 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CashReceiptEntity"];
                 };
+            };
+        };
+    };
+    CashReceiptsController_getPrintPayload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashReceiptsController_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -16524,6 +16874,46 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CashPaymentEntity"];
                 };
+            };
+        };
+    };
+    CashPaymentsController_getPrintPayload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashPaymentsController_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -21395,6 +21785,46 @@ export interface operations {
             };
         };
     };
+    BankReceiptsController_getPrintPayload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    BankReceiptsController_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     BankReceiptsController_post: {
         parameters: {
             query?: never;
@@ -21556,6 +21986,46 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["BankPaymentEntity"];
                 };
+            };
+        };
+    };
+    BankPaymentsController_getPrintPayload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    BankPaymentsController_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

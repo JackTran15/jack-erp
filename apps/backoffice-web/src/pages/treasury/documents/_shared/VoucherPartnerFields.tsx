@@ -33,6 +33,8 @@ interface Props {
   partnerPhone?: string;
   onPartnerSelect: (selection: VoucherPartnerSelection) => void;
   onPartnerLookupChange: (code: string) => void;
+  /** Called as the user types a hand-entered party name (kind = OTHER only). */
+  onPartnerNameChange?: (name: string) => void;
   onPartnerClear: () => void;
   onOpenSearchDialog: () => void;
   onCreateNew?: (kind: PartnerLookupType) => void;
@@ -74,6 +76,7 @@ export function VoucherPartnerFields({
   partnerPhone,
   onPartnerSelect,
   onPartnerLookupChange,
+  onPartnerNameChange,
   onPartnerClear,
   onOpenSearchDialog,
   onCreateNew,
@@ -153,6 +156,22 @@ export function VoucherPartnerFields({
   );
 
   if (readOnly) {
+    // A hand-typed party carries no code, so the code box would only ever be an
+    // empty input that reads as a rendering fault. The distinction is `partnerId`,
+    // not `partnerKind` — the kind is no longer something the user picks.
+    if (!partnerId) {
+      return (
+        <FormField label={label} layout="horizontal" labelWidth="8rem">
+          <Input
+            value={partnerName}
+            readOnly
+            disabled
+            className={READONLY_INPUT_CLASS}
+            title={kindLabel}
+          />
+        </FormField>
+      );
+    }
     return (
       <FormField label={label} layout="horizontal" labelWidth="8rem">
         <div className="grid grid-cols-[minmax(7rem,1fr)_2fr] gap-2">
@@ -196,13 +215,15 @@ export function VoucherPartnerFields({
           onSearchButtonClick={onOpenSearchDialog}
           createMenuItems={createMenuItems}
         />
+        {/* Always typeable (ADR-01). Leaving the code box empty and typing here
+            is what marks the party as hand-entered; the type is derived at the
+            outgoing boundary, never picked by the user. */}
         <Input
           value={partnerName}
-          readOnly
-          disabled
-          placeholder="Tên"
-          className={READONLY_INPUT_CLASS}
-          title={partnerId ? kindLabel : "Chọn từ danh sách"}
+          onChange={(e) => onPartnerNameChange?.(e.target.value)}
+          placeholder="Nhập tên hoặc chọn từ mã"
+          maxLength={255}
+          title={partnerId ? kindLabel : undefined}
         />
       </div>
     </FormField>

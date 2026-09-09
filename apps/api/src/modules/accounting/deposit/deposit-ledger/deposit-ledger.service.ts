@@ -46,6 +46,7 @@ interface RawRow {
   account_no: string;
   description: string | null;
   counterparty: string;
+  personName: string;
   staff: string;
 }
 
@@ -72,6 +73,7 @@ export interface LedgerFilters {
   accountNo?: StringFilterDto;
   description?: StringFilterDto;
   counterparty?: StringFilterDto;
+  personName?: StringFilterDto;
   staff?: StringFilterDto;
   amountIn?: CompareFilterDto;
   amountOut?: CompareFilterDto;
@@ -116,13 +118,20 @@ const DERIVED_COLUMNS = `
         bp.id AS payment_id,
         COALESCE(a.account_no, '') AS account_no,
         COALESCE(br.reason, bp.reason) AS description,
+        -- Party and person are two identities on the same voucher, so they are
+        -- two columns and neither falls back to the other (ADR-02). What is left
+        -- inside each COALESCE picks the *voucher branch* — a ledger row has
+        -- either a receipt or a payment, never both.
         COALESCE(
-          NULLIF(btrim(br.payer_name), ''),
-          NULLIF(btrim(bp.payee_name), ''),
-          NULLIF(btrim(br.partner_name_snapshot), ''),
           NULLIF(btrim(bp.partner_name_snapshot), ''),
+          NULLIF(btrim(br.partner_name_snapshot), ''),
           ''
         ) AS counterparty,
+        COALESCE(
+          NULLIF(btrim(bp.payee_name), ''),
+          NULLIF(btrim(br.payer_name), ''),
+          ''
+        ) AS "personName",
         btrim(COALESCE(su.first_name, '') || ' ' || COALESCE(su.last_name, '')) AS staff`;
 
 /**
@@ -272,6 +281,7 @@ export class DepositLedgerService {
     this.applyString(outer, params, 'account_no', filters.accountNo);
     this.applyString(outer, params, 'description', filters.description);
     this.applyString(outer, params, 'counterparty', filters.counterparty);
+    this.applyString(outer, params, '"personName"', filters.personName);
     this.applyString(outer, params, 'staff', filters.staff);
     // amountIn/amountOut are the two signs of `signed`, so each filter also
     // constrains the direction.
@@ -393,6 +403,7 @@ export class DepositLedgerService {
       accountNo: dto.accountNo,
       description: dto.description,
       counterparty: dto.counterparty,
+      personName: dto.personName,
       staff: dto.staff,
       amountIn: dto.amountIn,
       amountOut: dto.amountOut,
@@ -460,6 +471,7 @@ export class DepositLedgerService {
         amountOut: String(amountOut),
         runningBalance: String(runningAt),
         counterpartyName: r.counterparty || null,
+        personName: r.personName || null,
         staffName: r.staff || null,
         reconStatus: r.recon_status as ReconStatus,
         valueDate: r.value_date,
@@ -635,7 +647,7 @@ export class DepositLedgerService {
     const offsetIdx = params.length;
     const fullSql = `SELECT id, ledger_account_id, type, amount, doc_date, document_number,
         recon_status, value_date, signed, source, receipt_id, payment_id, account_no,
-        description, counterparty, staff
+        description, counterparty, "personName", staff
       FROM (${sql}) legs
       ${ROW_ORDER}
       LIMIT $${limitIdx} OFFSET $${offsetIdx}`;

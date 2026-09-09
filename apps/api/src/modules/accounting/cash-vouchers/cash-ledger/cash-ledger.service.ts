@@ -28,7 +28,10 @@ export interface CashLedgerRow {
   voucherNumber: string | null;
   kind: 'PT' | 'PC' | 'Khác';
   description: string | null;
+  /** Partner name snapshot only — null when the voucher has no party. */
   partnerName: string | null;
+  /** Payer/payee name only — null when nobody was named. Never the party. */
+  personName: string | null;
   staffName: string | null;
   debit: number;
   credit: number;
@@ -61,6 +64,7 @@ interface RawRow {
   voucher_number: string | null;
   description: string | null;
   counterparty: string | null;
+  personName: string | null;
   staff: string | null;
 }
 
@@ -81,6 +85,7 @@ export interface LedgerFilters {
   documentNumber?: StringFilterDto;
   description?: StringFilterDto;
   counterparty?: StringFilterDto;
+  personName?: StringFilterDto;
   staff?: StringFilterDto;
   amountIn?: CompareFilterDto;
   amountOut?: CompareFilterDto;
@@ -129,12 +134,13 @@ const DERIVED_COLUMNS = `
         cp.id                                            AS payment_id,
         COALESCE(cp.document_number, cr.document_number) AS voucher_number,
         COALESCE(cp.reason, cr.reason, m.notes)          AS description,
-        COALESCE(
-          cp.partner_name_snapshot,
-          cp.payee_name,
-          cr.partner_name_snapshot,
-          cr.payer_name
-        )                                                AS counterparty,
+        -- Party and person are two identities on the same voucher, so they are
+        -- two columns and neither falls back to the other (ADR-02). What is left
+        -- inside each COALESCE picks the *voucher branch* — a ledger row has
+        -- either a receipt or a payment, never both.
+        COALESCE(cp.partner_name_snapshot, cr.partner_name_snapshot)
+                                                         AS counterparty,
+        COALESCE(cp.payee_name, cr.payer_name)           AS "personName",
         btrim(COALESCE(su.first_name, '') || ' ' || COALESCE(su.last_name, '')) AS staff`;
 
 /**
@@ -222,6 +228,7 @@ export class CashLedgerService {
     this.applyString(outer, params, 'voucher_number', filters.documentNumber);
     this.applyString(outer, params, 'description', filters.description);
     this.applyString(outer, params, 'counterparty', filters.counterparty);
+    this.applyString(outer, params, '"personName"', filters.personName);
     this.applyString(outer, params, 'staff', filters.staff);
     // amountIn/amountOut are the two signs of `signed`, so each filter also
     // constrains the direction.
@@ -377,6 +384,7 @@ export class CashLedgerService {
       documentNumber: dto.documentNumber,
       description: dto.description,
       counterparty: dto.counterparty,
+      personName: dto.personName,
       staff: dto.staff,
       amountIn: dto.amountIn,
       amountOut: dto.amountOut,
@@ -440,6 +448,7 @@ export class CashLedgerService {
         kind: r.payment_id ? 'PC' : r.receipt_id ? 'PT' : 'Khác',
         description: r.description ?? null,
         partnerName: r.counterparty ?? null,
+        personName: r.personName ?? null,
         staffName: r.staff || null,
         debit,
         credit,
@@ -556,7 +565,7 @@ export class CashLedgerService {
     params.push(offset);
     const offsetIdx = params.length;
     const fullSql = `SELECT id, cash_account_id, to_account_id, type, amount, created_at,
-        signed, receipt_id, payment_id, voucher_number, description, counterparty, staff
+        signed, receipt_id, payment_id, voucher_number, description, counterparty, "personName", staff
       FROM (${sql}) legs
       ${ROW_ORDER}
       LIMIT $${limitIdx} OFFSET $${offsetIdx}`;
