@@ -132,6 +132,7 @@ describe('DepositLedgerService.getLedger — single account (BR-LEDG-03 regressi
           payment_id: null,
           description: 'Thu tien khach le',
           counterparty: 'A CHINH',
+          personName: 'Trần Văn B',
           staff: 'Kenzy Nguyen',
         },
         {
@@ -184,6 +185,7 @@ describe('DepositLedgerService.getLedger — single account (BR-LEDG-03 regressi
           signed: '200',
           description: 'Thu tien khach le',
           counterparty: 'A CHINH',
+          personName: 'Trần Văn B',
           staff: 'Kenzy Nguyen',
         },
         {
@@ -199,6 +201,7 @@ describe('DepositLedgerService.getLedger — single account (BR-LEDG-03 regressi
           // COALESCE(..., '') in SQL means "no voucher" arrives as an empty
           // string, which must surface as null rather than a blank cell value.
           counterparty: '',
+          personName: '',
           staff: '',
         },
       ],
@@ -206,14 +209,17 @@ describe('DepositLedgerService.getLedger — single account (BR-LEDG-03 regressi
 
     const res = await service.getLedger(q, actor);
 
+    // AC-12: party, person and staff are three sources and stay three values.
     expect(res.rows[0]).toMatchObject({
       description: 'Thu tien khach le',
       counterpartyName: 'A CHINH',
+      personName: 'Trần Văn B',
       staffName: 'Kenzy Nguyen',
     });
     expect(res.rows[1]).toMatchObject({
       description: null,
       counterpartyName: null,
+      personName: null,
       staffName: null,
     });
   });
@@ -456,6 +462,35 @@ describe('DepositLedgerService.search — v2 per-column filters', () => {
       )!,
     };
   };
+
+  it('keeps party and person on separate columns, per voucher branch (AC-13)', async () => {
+    // The old expression coalesced four values across BOTH axes at once —
+    // receipt-vs-payment and party-vs-person — so a receipt naming only a person
+    // filled the party column. Each COALESCE may now pick a branch only.
+    const { service, query } = buildService(ZERO_SUMS);
+    await service.search(q, actor);
+
+    const [sql] = calls(query).page;
+    expect(sql).toContain("NULLIF(btrim(bp.partner_name_snapshot), ''),\n          NULLIF(btrim(br.partner_name_snapshot), '')");
+    expect(sql).toContain("NULLIF(btrim(bp.payee_name), ''),\n          NULLIF(btrim(br.payer_name), '')");
+    // A column in the derived list but missing from the outer SELECT is
+    // invisible with no error at all.
+    expect(sql).toContain('description, counterparty, "personName", staff');
+  });
+
+  it('filters personName independently of counterparty', async () => {
+    const { service, query } = buildService(ZERO_SUMS);
+    await service.search(
+      { ...q, personName: { operator: StringOperator.CONTAINS, value: 'Trần' } },
+      actor,
+    );
+
+    const c = calls(query);
+    for (const [sql, params] of [c.page, c.count, c.inOut]) {
+      expect(sql).toContain('COALESCE("personName", \'\') ILIKE');
+      expect(params).toContain('%Trần%');
+    }
+  });
 
   it('orders by doc_date then created_at so same-day rows follow entry order', async () => {
     const { service, query } = buildService(ZERO_SUMS);

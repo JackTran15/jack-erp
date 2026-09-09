@@ -43,8 +43,10 @@ export class CreateBankPaymentDto {
   partnerId?: string;
 
   /**
-   * "Đối tượng" typed by hand. Only read when `partnerType` is `OTHER`; for a
-   * catalogue party the name always comes from the resolver instead.
+   * "Đối tượng" typed by hand. Frozen onto the voucher as
+   * `partner_name_snapshot` regardless of `partnerType` — for a catalogue
+   * party it overrides the catalogue name but leaves `partnerId` untouched
+   * (ADR-02).
    */
   @IsOptional()
   @IsString()

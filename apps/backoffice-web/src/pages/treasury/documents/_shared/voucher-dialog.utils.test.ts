@@ -1,12 +1,130 @@
 import { describe, expect, it } from "vitest";
-import { applyReasonToFirstLine } from "./voucher-dialog.utils";
+import {
+  CashPaymentPurpose,
+  CashVoucherPartnerType,
+} from "../../cash-vouchers.types";
+import {
+  LedgerCashVoucherPurposeEnum,
+} from "../../ledger-cash/ledger-cash.types";
+import {
+  applyReasonToFirstLine,
+  buildPaymentDetailFromForm,
+  buildReceiptDetailFromForm,
+} from "./voucher-dialog.utils";
 import type { VoucherFormLine } from "./voucher-dialog.constants";
+import {
+  PartnerLookupType,
+  resolvePartyFields,
+} from "./voucher-partner.constants";
 
 const line = (description: string, amount = 0): VoucherFormLine => ({
   description,
   amount,
   category: "",
   categoryId: undefined,
+});
+
+const baseReceiptState = (
+  overrides: Partial<Parameters<typeof buildReceiptDetailFromForm>[0]> = {},
+): Parameters<typeof buildReceiptDetailFromForm>[0] => ({
+  purpose: LedgerCashVoucherPurposeEnum.OTHER,
+  partnerKind: PartnerLookupType.CUSTOMER,
+  partnerId: "",
+  counterpartyCode: "",
+  counterpartyName: "",
+  payerName: "",
+  address: "",
+  reason: "",
+  staffId: "",
+  employeeCode: "",
+  employeeName: "",
+  reference: "",
+  voucherNo: "",
+  voucherDate: "2026-09-08",
+  lines: [],
+  ...overrides,
+});
+
+const basePaymentState = (
+  overrides: Partial<Parameters<typeof buildPaymentDetailFromForm>[0]> = {},
+): Parameters<typeof buildPaymentDetailFromForm>[0] => ({
+  ...baseReceiptState(),
+  paymentPurpose: CashPaymentPurpose.OTHER,
+  ...overrides,
+});
+
+// AC-04 / T-01-04: after ADR-04 removed the modal's free-text branch,
+// `buildReceiptDetailFromForm` and `buildPaymentDetailFromForm` must derive
+// `partnerType` by calling `resolvePartyFields` — the same rule the deposit
+// dialogs and `cash-vouchers.api-body.ts` already follow — so there is no
+// second derivation left to drift out of sync.
+describe("buildReceiptDetailFromForm — partnerType derivation (ADR-04)", () => {
+  it("resolves a hand-typed name with no partnerId to OTHER, matching resolvePartyFields", () => {
+    const state = baseReceiptState({
+      // A stale catalogue kind left over from a previous selection — the
+      // trap the ticket calls out: `lookupTypeToPartnerType` alone would
+      // read this as CUSTOMER, not OTHER.
+      partnerKind: PartnerLookupType.CUSTOMER,
+      partnerId: "",
+      counterpartyName: "Nguyễn Văn Ba",
+    });
+    const detail = buildReceiptDetailFromForm(state);
+    expect(detail.partnerType).toBe(CashVoucherPartnerType.OTHER);
+    expect(detail.partnerType).toBe(
+      resolvePartyFields({
+        partnerId: state.partnerId,
+        partnerKind: state.partnerKind,
+        partnerName: state.counterpartyName,
+      }).partnerType,
+    );
+  });
+
+  it("resolves a catalogue party (has partnerId) to its lookup kind", () => {
+    const state = baseReceiptState({
+      partnerKind: PartnerLookupType.SUPPLIER,
+      partnerId: "supplier-1",
+      counterpartyName: "Công ty ABC",
+    });
+    expect(buildReceiptDetailFromForm(state).partnerType).toBe(
+      CashVoucherPartnerType.SUPPLIER,
+    );
+  });
+
+  it("leaves partnerType undefined with neither an id nor a typed name", () => {
+    expect(
+      buildReceiptDetailFromForm(baseReceiptState()).partnerType,
+    ).toBeUndefined();
+  });
+});
+
+describe("buildPaymentDetailFromForm — partnerType derivation (ADR-04)", () => {
+  it("resolves a hand-typed name with no partnerId to OTHER, matching resolvePartyFields", () => {
+    const state = basePaymentState({
+      partnerKind: PartnerLookupType.CUSTOMER,
+      partnerId: "",
+      counterpartyName: "Nguyễn Văn Ba",
+    });
+    const detail = buildPaymentDetailFromForm(state);
+    expect(detail.partnerType).toBe(CashVoucherPartnerType.OTHER);
+    expect(detail.partnerType).toBe(
+      resolvePartyFields({
+        partnerId: state.partnerId,
+        partnerKind: state.partnerKind,
+        partnerName: state.counterpartyName,
+      }).partnerType,
+    );
+  });
+
+  it("resolves a catalogue party (has partnerId) to its lookup kind", () => {
+    const state = basePaymentState({
+      partnerKind: PartnerLookupType.EMPLOYEE,
+      partnerId: "emp-1",
+      counterpartyName: "Trần Thị C",
+    });
+    expect(buildPaymentDetailFromForm(state).partnerType).toBe(
+      CashVoucherPartnerType.EMPLOYEE,
+    );
+  });
 });
 
 describe("applyReasonToFirstLine", () => {

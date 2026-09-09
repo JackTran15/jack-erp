@@ -1,12 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CashReceiptsService } from './cash-receipts.service';
 import { CashReceiptEntity } from './cash-receipt.entity';
 import { CashReceiptLineEntity } from './cash-receipt-line.entity';
 import { CashService } from '../../cash/cash.service';
 import { CashMovementType } from '../../cash/cash-movement.entity';
+import { CashAccountEntity } from '../../cash/cash-account.entity';
 import { DocumentNumberingService } from '../../../document-numbering/document-numbering.service';
 import { PartnerResolverService } from '../shared/partner-resolver.service';
 import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
@@ -19,6 +24,8 @@ import {
   CashVoucherStatus,
 } from '../enums';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
+import { BranchEntity } from '../../../branch/branch.entity';
+import { CashVoucherCategoryEntity } from '../cash-voucher-categories/cash-voucher-category.entity';
 
 const actor: ActorContext = {
   userId: 'user-1',
@@ -213,7 +220,7 @@ describe('CashReceiptsService', () => {
       expect(created[1].partnerId).toBeUndefined();
     });
 
-    it('ignores partnerName when the party is a catalogue row', async () => {
+    it('overrides the catalogue name with a hand-typed partnerName, keeping partnerId (ADR-02)', async () => {
       const manager = buildManager({
         findOneResult: { id: 'r-new', status: CashVoucherStatus.POSTED },
       });
@@ -231,7 +238,37 @@ describe('CashReceiptsService', () => {
           totalAmount: 100,
           partnerType: 'CUSTOMER',
           partnerId: '11111111-1111-4111-8111-111111111111',
-          partnerName: 'Tên giả mạo',
+          partnerName: 'Công ty A — CN Bình Tân',
+          lines: [{ description: 'Thu khác', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      const created = manager.create.mock.calls.find(
+        (c: any[]) => c[1]?.status === CashVoucherStatus.POSTED,
+      );
+      expect(created[1].partnerNameSnapshot).toBe('Công ty A — CN Bình Tân');
+      expect(created[1].partnerId).toBe('11111111-1111-4111-8111-111111111111');
+    });
+
+    it('falls back to the catalogue name when partnerName is not sent (auto-create paths unaffected)', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'r-new', status: CashVoucherStatus.POSTED },
+      });
+      await setup(manager);
+      partnerResolver.resolve.mockResolvedValue({
+        name: 'Khách hàng thật',
+        address: 'HCM',
+      });
+
+      await service.create(
+        {
+          voucherDate: '2026-06-30',
+          purpose: CashReceiptPurpose.OTHER,
+          cashAccountId: 'cash-1',
+          totalAmount: 100,
+          partnerType: 'CUSTOMER',
+          partnerId: '11111111-1111-4111-8111-111111111111',
           lines: [{ description: 'Thu khác', amount: 100 }],
         } as any,
         actor,
@@ -259,6 +296,91 @@ describe('CashReceiptsService', () => {
         ),
       ).rejects.toThrow(/must equal sum/);
       expect(cashService.recordMovement).not.toHaveBeenCalled();
+    });
+
+    it('stores the hand-typed address for a free-text party (ADR-03)', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'r-new', status: CashVoucherStatus.POSTED },
+      });
+      await setup(manager);
+
+      await service.create(
+        {
+          voucherDate: '2026-06-30',
+          purpose: CashReceiptPurpose.OTHER,
+          cashAccountId: 'cash-1',
+          totalAmount: 100,
+          partnerType: 'OTHER',
+          partnerName: 'Nguyễn Văn A',
+          address: '123 Lê Lợi, Q1',
+          lines: [{ description: 'Thu khác', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      const created = manager.create.mock.calls.find(
+        (c: any[]) => c[1]?.status === CashVoucherStatus.POSTED,
+      );
+      expect(created[1].partnerAddressSnapshot).toBe('123 Lê Lợi, Q1');
+    });
+
+    it('lets a hand-typed address win over the catalogue address', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'r-new', status: CashVoucherStatus.POSTED },
+      });
+      await setup(manager);
+      partnerResolver.resolve.mockResolvedValue({
+        name: 'Khách hàng thật',
+        address: 'HCM',
+      });
+
+      await service.create(
+        {
+          voucherDate: '2026-06-30',
+          purpose: CashReceiptPurpose.OTHER,
+          cashAccountId: 'cash-1',
+          totalAmount: 100,
+          partnerType: 'CUSTOMER',
+          partnerId: '11111111-1111-4111-8111-111111111111',
+          address: '123 Lê Lợi, Q1',
+          lines: [{ description: 'Thu khác', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      const created = manager.create.mock.calls.find(
+        (c: any[]) => c[1]?.status === CashVoucherStatus.POSTED,
+      );
+      expect(created[1].partnerAddressSnapshot).toBe('123 Lê Lợi, Q1');
+    });
+
+    it('falls back to the catalogue address when address is not sent', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'r-new', status: CashVoucherStatus.POSTED },
+      });
+      await setup(manager);
+      partnerResolver.resolve.mockResolvedValue({
+        name: 'Khách hàng thật',
+        address: 'HCM',
+      });
+
+      await service.create(
+        {
+          voucherDate: '2026-06-30',
+          purpose: CashReceiptPurpose.OTHER,
+          cashAccountId: 'cash-1',
+          totalAmount: 100,
+          partnerType: 'CUSTOMER',
+          partnerId: '11111111-1111-4111-8111-111111111111',
+          lines: [{ description: 'Thu khác', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      const created = manager.create.mock.calls.find(
+        (c: any[]) => c[1]?.status === CashVoucherStatus.POSTED,
+      );
+      expect(created[1].partnerAddressSnapshot).toBe('HCM');
     });
   });
 
@@ -481,6 +603,158 @@ describe('CashReceiptsService', () => {
 
       expect(receipt.partnerNameSnapshot).toBe('Nguyễn Văn A');
       expect(partnerResolver.resolve).not.toHaveBeenCalled();
+    });
+
+    it('overrides the catalogue name with a hand-typed partnerName, keeping the catalogue link (AC-03)', async () => {
+      const receipt = draft({
+        partnerType: 'CUSTOMER',
+        partnerId: '11111111-1111-4111-8111-111111111111',
+        partnerNameSnapshot: 'Công ty A',
+        partnerAddressSnapshot: 'HCM',
+      });
+      const manager = buildManager({ qbResult: receipt, findOneResult: receipt });
+      await setup(manager);
+      partnerResolver.resolve.mockResolvedValue({
+        name: 'Công ty A',
+        address: 'HCM',
+      });
+
+      await service.update(
+        'r-1',
+        {
+          revision: 0,
+          partnerType: 'CUSTOMER',
+          partnerId: '11111111-1111-4111-8111-111111111111',
+          partnerName: 'Công ty A — CN Bình Tân',
+        } as any,
+        actor,
+      );
+
+      expect(receipt.partnerNameSnapshot).toBe('Công ty A — CN Bình Tân');
+      expect(receipt.partnerId).toBe('11111111-1111-4111-8111-111111111111');
+    });
+
+    it('clears the snapshot to null (not the old value) when partnerName is sent as an empty string', async () => {
+      const receipt = draft({
+        partnerType: 'CUSTOMER',
+        partnerId: '11111111-1111-4111-8111-111111111111',
+        partnerNameSnapshot: 'Công ty A',
+        partnerAddressSnapshot: 'HCM',
+      });
+      const manager = buildManager({ qbResult: receipt, findOneResult: receipt });
+      await setup(manager);
+      partnerResolver.resolve.mockResolvedValue({
+        name: 'Công ty A',
+        address: 'HCM',
+      });
+
+      // TypeORM's save() skips `undefined` as "not provided" — an explicit ''
+      // is what proves the snapshot was actually cleared, not just left alone.
+      await service.update(
+        'r-1',
+        { revision: 0, partnerName: '' } as any,
+        actor,
+      );
+
+      expect(receipt.partnerNameSnapshot).toBeNull();
+    });
+  });
+
+  describe('update — address snapshot (ADR-03)', () => {
+    const draft = (over: any = {}) => ({
+      id: 'r-1',
+      status: CashVoucherStatus.POSTED,
+      referenceType: CashReceiptReferenceType.MANUAL,
+      revision: 0,
+      totalAmount: 100,
+      documentNumber: 'PT-26-00001',
+      cashAccountId: 'cash-1',
+      contraAccountId: 'contra-1',
+      organizationId: 'org-1',
+      partnerType: 'OTHER',
+      partnerId: undefined,
+      partnerNameSnapshot: 'Nguyễn Văn A',
+      partnerAddressSnapshot: 'Địa chỉ cũ',
+      ...over,
+    });
+
+    it('saves an address-only edit, bumps revision, and never calls recordMovement', async () => {
+      const receipt = draft();
+      const manager = buildManager({
+        qbResult: receipt,
+        findOneResult: receipt,
+        findResults: [{ amount: 100 }],
+      });
+      await setup(manager);
+
+      await service.update(
+        'r-1',
+        { revision: 0, address: '123 Lê Lợi, Q1, lầu 3' } as any,
+        actor,
+      );
+
+      expect(receipt.partnerAddressSnapshot).toBe('123 Lê Lợi, Q1, lầu 3');
+      expect(receipt.revision).toBe(1);
+      // The amount did not change, so no compensating movement may be posted.
+      expect(cashService.recordMovement).not.toHaveBeenCalled();
+    });
+
+    it('clears the address to null when sent as an empty string', async () => {
+      const receipt = draft();
+      const manager = buildManager({
+        qbResult: receipt,
+        findOneResult: receipt,
+        findResults: [{ amount: 100 }],
+      });
+      await setup(manager);
+
+      await service.update('r-1', { revision: 0, address: '' } as any, actor);
+
+      expect(receipt.partnerAddressSnapshot).toBeNull();
+    });
+
+    it('keeps the existing address when the payload does not mention it', async () => {
+      const receipt = draft();
+      const manager = buildManager({
+        qbResult: receipt,
+        findOneResult: receipt,
+        findResults: [{ amount: 100 }],
+      });
+      await setup(manager);
+
+      await service.update(
+        'r-1',
+        { revision: 0, reason: 'Đổi lý do' } as any,
+        actor,
+      );
+
+      expect(receipt.partnerAddressSnapshot).toBe('Địa chỉ cũ');
+    });
+
+    it('takes the new party address when switching catalogue party without sending address', async () => {
+      const receipt = draft();
+      const manager = buildManager({
+        qbResult: receipt,
+        findOneResult: receipt,
+        findResults: [{ amount: 100 }],
+      });
+      await setup(manager);
+      partnerResolver.resolve.mockResolvedValue({
+        name: 'Khách hàng thật',
+        address: 'HCM',
+      });
+
+      await service.update(
+        'r-1',
+        {
+          revision: 0,
+          partnerType: 'CUSTOMER',
+          partnerId: '11111111-1111-4111-8111-111111111111',
+        } as any,
+        actor,
+      );
+
+      expect(receipt.partnerAddressSnapshot).toBe('HCM');
     });
   });
 
@@ -759,6 +1033,125 @@ describe('CashReceiptsService', () => {
       expect(createdVoucher[1].journalEntryId).toBe('je-existing');
       expect(createdVoucher[1].status).toBe(CashVoucherStatus.POSTED);
       expect(result.voucherNumber).toBe('PT-26-00001');
+    });
+  });
+
+  describe('getPrintPayload (T-03-03, AC-10)', () => {
+    const baseReceipt = {
+      id: 'r-1',
+      organizationId: 'org-1',
+      branchId: 'branch-1',
+      documentNumber: 'PT-26-00001',
+      voucherDate: '2026-09-08',
+      status: CashVoucherStatus.POSTED,
+      purpose: CashReceiptPurpose.OTHER,
+      partnerNameSnapshot: 'Nguyễn Văn A',
+      partnerAddressSnapshot: '123 Lê Lợi',
+      payerName: 'Nguyễn Văn A',
+      reason: 'Thu tiền bán hàng',
+      cashAccountId: 'cash-acc-1',
+      contraAccountId: 'contra-1',
+      totalAmount: 500000,
+      referenceType: CashReceiptReferenceType.MANUAL,
+      revision: 0,
+      lines: [
+        { id: 'line-1', description: 'Bán hàng', categoryId: 'cat-1', amount: 500000 },
+      ],
+    };
+
+    /**
+     * Entity-aware `EntityManager` mock: `getPrintPayload` fans out to
+     * `getById` (via `manager.findOne`), `loadVoucherBranch` (via
+     * `manager.getRepository(BranchEntity).findOne`), and the service's own
+     * `manager.findOne`/`manager.find` for the cash account and categories.
+     * The `CashReceiptEntity` branch mirrors the real query's WHERE clause so
+     * an org/id mismatch reproduces the same 404 `getById` would give.
+     */
+    function buildPrintPayloadManager(
+      opts: {
+        receipt?: typeof baseReceipt;
+        branch?: any;
+        cashAccount?: any;
+        categories?: any[];
+      } = {},
+    ) {
+      const manager: any = {
+        findOne: jest.fn(async (entity: any, options: any) => {
+          if (entity === CashReceiptEntity) {
+            const receipt = opts.receipt;
+            if (!receipt) return null;
+            if (options.where.organizationId !== receipt.organizationId) return null;
+            if (options.where.id !== receipt.id) return null;
+            return receipt;
+          }
+          if (entity === CashAccountEntity) return opts.cashAccount ?? null;
+          return null;
+        }),
+        find: jest.fn(async (entity: any) =>
+          entity === CashVoucherCategoryEntity ? opts.categories ?? [] : [],
+        ),
+        getRepository: jest.fn((entity: any) => ({
+          findOne: jest.fn(async () =>
+            entity === BranchEntity ? opts.branch ?? null : null,
+          ),
+        })),
+      };
+      return manager;
+    }
+
+    it('resolves branch, cash account name and category names into a CASH_RECEIPT payload', async () => {
+      const manager = buildPrintPayloadManager({
+        receipt: baseReceipt,
+        branch: {
+          id: 'branch-1',
+          name: 'Chi nhánh Q1',
+          address: '1 Đường ABC',
+          phone: '0900000000',
+        },
+        cashAccount: { id: 'cash-acc-1', name: 'Quỹ tiền mặt chính' },
+        categories: [{ id: 'cat-1', name: 'Bán hàng' }],
+      });
+      await setup(manager);
+
+      const payload = await service.getPrintPayload('r-1', actor);
+
+      expect(payload.kind).toBe('CASH_RECEIPT');
+      expect(payload.paper).toBe('A5');
+      expect(payload.title).toBe('PHIẾU THU');
+      expect(payload.docNo).toBe('PT-26-00001');
+      expect(payload.branch).toEqual({
+        name: 'Chi nhánh Q1',
+        address: '1 Đường ABC',
+        phone: '0900000000',
+      });
+      expect(payload.info).toContainEqual({
+        label: 'Quỹ tiền mặt',
+        value: 'Quỹ tiền mặt chính',
+      });
+      expect(payload.lines[0]).toMatchObject({
+        categoryName: 'Bán hàng',
+        amount: 500000,
+      });
+    });
+
+    it('id not found ⇒ 404 (not 403)', async () => {
+      const manager = buildPrintPayloadManager({ receipt: undefined });
+      await setup(manager);
+
+      await expect(service.getPrintPayload('missing-id', actor)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('voucher of another organization ⇒ 404, same as sibling GET :id', async () => {
+      const manager = buildPrintPayloadManager({
+        receipt: { ...baseReceipt, organizationId: 'org-2' },
+      });
+      await setup(manager);
+
+      await expect(service.getPrintPayload('r-1', actor)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
     });
   });
 });

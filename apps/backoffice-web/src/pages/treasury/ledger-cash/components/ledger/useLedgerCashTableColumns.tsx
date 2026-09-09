@@ -103,6 +103,12 @@ export function useLedgerCashTableColumns(
         render: (r) => r.counterparty,
       },
       {
+        key: "personName",
+        label: "Người nộp/nhận",
+        width: 140,
+        render: (r) => r.personName,
+      },
+      {
         key: "staff",
         label: "Đối tượng thu/chi",
         width: 140,

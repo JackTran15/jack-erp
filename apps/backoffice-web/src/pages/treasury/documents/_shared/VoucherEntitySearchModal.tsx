@@ -14,8 +14,6 @@ import {
   DEBT_COLLECTION_PARTNER_OPTIONS,
   PARTNER_LOOKUP_DEFAULT,
   PARTNER_LOOKUP_DIALOG_OPTIONS,
-  PARTNER_LOOKUP_LABEL,
-  isFreeTextLookupType,
   PartnerLookupType,
 } from "./voucher-partner.constants";
 import {
@@ -301,23 +299,6 @@ export function VoucherEntitySearchModal({
       disabled={Boolean(lockedKind)}
       onChange={(e) => {
         const next = e.target.value as PartnerLookupType;
-        // "Khác" is not something to search for — there is no catalogue behind
-        // it, and the backend's own lookup enum has no such value, so issuing a
-        // request here would 400. Instead hand an empty selection of that kind
-        // straight back to the form, which switches its Đối tượng field to
-        // free-text entry, and close.
-        if (isFreeTextLookupType(next)) {
-          onSelectPartner?.({
-            lookupKey: `${PartnerLookupType.OTHER}:`,
-            id: "",
-            code: "",
-            name: "",
-            kind: PartnerLookupType.OTHER,
-            kindLabel: PARTNER_LOOKUP_LABEL[PartnerLookupType.OTHER],
-          });
-          onOpenChange(false);
-          return;
-        }
         setKindFilter(next);
         clearPageCacheForTarget(target);
         persistSession({ kindFilter: next, page: 1, selectedKey: null });

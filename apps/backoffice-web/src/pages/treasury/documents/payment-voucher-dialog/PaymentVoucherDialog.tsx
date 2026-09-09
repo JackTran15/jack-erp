@@ -1,4 +1,4 @@
-import { DocumentType } from "@erp/shared-interfaces";
+import { DocumentType, VoucherKind } from "@erp/shared-interfaces";
 import {
   Button,
   DateTimeField,
@@ -14,11 +14,15 @@ import {
   type SingleSelectOption,
   type ToolbarItem,
 } from "@erp/ui";
-import { Pencil, Save, X } from "lucide-react";
+import { CloudUpload, Pencil, Printer, Save, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { RadioGroup } from "../../../../components/forms/RadioGroup";
 import { useGenerateDocumentNumber } from "../../../../hooks/document-numbering/useGenerateDocumentNumber";
+import { fetchVoucherPrintPayload } from "../../../../lib/print/voucher-print.api";
+import { renderVoucherHtml } from "../../../../lib/print/render-voucher-html";
+import { printHtmlDocument } from "../../../../lib/print/print-html-document";
+import { downloadVoucherExcel } from "../../../../lib/print/voucher-export.api";
 import { useCashVoucherCategories } from "../../../../hooks/treasury/use-cash-voucher-categories";
 import {
   CashPaymentPurpose,
@@ -172,6 +176,8 @@ export function PaymentVoucherDialog({
   const [partnerCreateKind, setPartnerCreateKind] = useState<PartnerLookupType | null>(null);
   const [staffCreateOpen, setStaffCreateOpen] = useState(false);
   const [debtPickOpen, setDebtPickOpen] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [paymentSubOption, setPaymentSubOption] = useState(
     PaymentOtherSubOption.OTHER,
   );
@@ -704,6 +710,36 @@ export function PaymentVoucherDialog({
     handleClose,
   ]);
 
+  const canPrint = Boolean(initial?.id);
+
+  const handlePrint = useCallback(async () => {
+    if (!initial?.id || printing) return;
+    setPrinting(true);
+    try {
+      const payload = await fetchVoucherPrintPayload(
+        VoucherKind.CASH_PAYMENT,
+        initial.id,
+      );
+      await printHtmlDocument(renderVoucherHtml(payload));
+    } catch {
+      toast.error("Không in được phiếu.");
+    } finally {
+      setPrinting(false);
+    }
+  }, [initial?.id, printing]);
+
+  const handleExport = useCallback(async () => {
+    if (!initial?.id || exporting) return;
+    setExporting(true);
+    try {
+      await downloadVoucherExcel(VoucherKind.CASH_PAYMENT, initial.id);
+    } catch {
+      toast.error("Xuất khẩu thất bại.");
+    } finally {
+      setExporting(false);
+    }
+  }, [initial?.id, exporting]);
+
   const toolbarItems: ToolbarItem[] = useMemo(() => {
     const items: ToolbarItem[] = [];
     if (readOnly && onRequestEdit) {
@@ -722,6 +758,22 @@ export function PaymentVoucherDialog({
         onClick: handleSave,
       });
     }
+    if (canPrint) {
+      items.push({
+        id: "print",
+        label: "In",
+        icon: Printer,
+        disabled: printing,
+        onClick: () => void handlePrint(),
+      });
+      items.push({
+        id: "export",
+        label: "Xuất khẩu",
+        icon: CloudUpload,
+        disabled: exporting,
+        onClick: () => void handleExport(),
+      });
+    }
     items.push({
       id: "close",
       label: "Đóng",
@@ -729,7 +781,18 @@ export function PaymentVoucherDialog({
       onClick: handleClose,
     });
     return items;
-  }, [readOnly, onRequestEdit, handleSave, handleClose, onSave]);
+  }, [
+    readOnly,
+    onRequestEdit,
+    handleSave,
+    handleClose,
+    onSave,
+    canPrint,
+    printing,
+    handlePrint,
+    exporting,
+    handleExport,
+  ]);
 
   const title =
     mode === TreasuryVoucherDialogModeEnum.CREATE

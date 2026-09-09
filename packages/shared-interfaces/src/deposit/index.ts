@@ -122,7 +122,10 @@ export interface DepositLedgerRow {
   amountIn: string;
   amountOut: string;
   runningBalance: string;
+  /** Partner name snapshot only — null when the voucher has no party. */
   counterpartyName?: string | null;
+  /** Payer/payee name only — null when nobody was named. Never the party. */
+  personName?: string | null;
   staffName?: string | null;
   reconStatus: ReconStatus;
   /** Settlement date (R2); null = cleared immediately (settlement_days=0). */

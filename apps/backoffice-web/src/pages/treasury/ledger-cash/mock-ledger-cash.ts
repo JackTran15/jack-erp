@@ -26,6 +26,7 @@ export const MOCK_LEDGER_CASH_ROWS: LedgerCashRow[] = [
     amountOut: 0,
     balance: 1_080_000,
     counterparty: "",
+    personName: "",
     employee: "",
     documentType: LedgerCashDocumentTypeEnum.OPENING_BALANCE,
     detail: {
@@ -53,6 +54,7 @@ export const MOCK_LEDGER_CASH_ROWS: LedgerCashRow[] = [
     amountOut: 0,
     balance: 1_620_000,
     counterparty: "Anh Hà",
+    personName: "",
     employee: EMPLOYEE,
     documentType: LedgerCashDocumentTypeEnum.INVOICE_SALE,
     detail: {
@@ -94,6 +96,7 @@ export const MOCK_LEDGER_CASH_ROWS: LedgerCashRow[] = [
     amountOut: 0,
     balance: 3_270_000,
     counterparty: "Anh Hà",
+    personName: "",
     employee: EMPLOYEE,
     documentType: LedgerCashDocumentTypeEnum.INVOICE_SALE,
     detail: {
@@ -133,6 +136,7 @@ export const MOCK_LEDGER_CASH_ROWS: LedgerCashRow[] = [
     amountOut: 0,
     balance: 4_120_000,
     counterparty: "Anh Hà",
+    personName: "",
     employee: EMPLOYEE,
     documentType: LedgerCashDocumentTypeEnum.INVOICE_SALE,
     detail: {
@@ -172,6 +176,7 @@ export const MOCK_LEDGER_CASH_ROWS: LedgerCashRow[] = [
     amountOut: 0,
     balance: 8_290_000,
     counterparty: "Anh Hà",
+    personName: "",
     employee: EMPLOYEE,
     documentType: LedgerCashDocumentTypeEnum.INVOICE_SALE,
     detail: {
@@ -221,6 +226,7 @@ export const MOCK_LEDGER_CASH_ROWS: LedgerCashRow[] = [
     amountOut: 2_500_000,
     balance: 5_790_000,
     counterparty: "duc anh",
+    personName: "",
     employee: EMPLOYEE,
     documentType: LedgerCashDocumentTypeEnum.INVOICE_RETURN,
     detail: {
@@ -273,6 +279,7 @@ export const MOCK_LEDGER_CASH_ROWS: LedgerCashRow[] = [
     amountOut: 0,
     balance: 7_440_000,
     counterparty: "duc anh",
+    personName: "",
     employee: EMPLOYEE,
     documentType: LedgerCashDocumentTypeEnum.CASH_RECEIPT,
     detail: {
@@ -318,6 +325,7 @@ export const MOCK_LEDGER_CASH_ROWS: LedgerCashRow[] = [
     amountOut: 1_397_500,
     balance: 6_042_500,
     counterparty: "Test NCC",
+    personName: "",
     employee: EMPLOYEE,
     documentType: LedgerCashDocumentTypeEnum.GOODS_RECEIPT_PAYMENT,
     detail: {
@@ -405,6 +413,7 @@ export const MOCK_LEDGER_CASH_ROWS: LedgerCashRow[] = [
     amountOut: 0,
     balance: 7_615_000,
     counterparty: "duc anh",
+    personName: "",
     employee: EMPLOYEE,
     documentType: LedgerCashDocumentTypeEnum.CASH_RECEIPT,
     detail: {
@@ -451,6 +460,7 @@ export const MOCK_LEDGER_CASH_ROWS: LedgerCashRow[] = [
     amountOut: 0,
     balance: 7_790_000,
     counterparty: "duc anh",
+    personName: "",
     employee: EMPLOYEE,
     documentType: LedgerCashDocumentTypeEnum.CASH_RECEIPT,
     detail: {
@@ -486,6 +496,7 @@ export const MOCK_LEDGER_CASH_ROWS: LedgerCashRow[] = [
     amountOut: 0,
     balance: 6_042_500,
     counterparty: "",
+    personName: "",
     employee: EMPLOYEE,
     documentType: LedgerCashDocumentTypeEnum.CASH_PAYMENT,
     detail: {

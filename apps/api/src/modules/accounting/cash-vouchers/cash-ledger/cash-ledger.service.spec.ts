@@ -33,6 +33,7 @@ function row(over: Record<string, unknown> = {}) {
     voucher_number: null,
     description: null,
     counterparty: null,
+    personName: null,
     staff: null,
     ...over,
   };
@@ -205,6 +206,7 @@ describe('CashLedgerService', () => {
           voucher_number: 'PT-26-00001',
           description: 'Thu bán hàng',
           counterparty: 'Khách A',
+          personName: 'Trần Văn B',
           staff: 'Nguyen An',
         }),
       ],
@@ -212,14 +214,47 @@ describe('CashLedgerService', () => {
 
     const res = await service.getLedger({ cashAccountId: ACC }, actor);
 
+    // AC-09: party, person and staff are three sources and stay three values.
     expect(res.rows[0]).toMatchObject({
       voucherId: 'r-1',
       voucherNumber: 'PT-26-00001',
       kind: 'PT',
       description: 'Thu bán hàng',
       partnerName: 'Khách A',
+      personName: 'Trần Văn B',
       staffName: 'Nguyen An',
     });
+  });
+
+  it('leaves the party null when only a person was named on the voucher', async () => {
+    // AC-10. The old COALESCE let partner_name_snapshot stand in for a missing
+    // payer_name and vice versa; with the split, a voucher that names only a
+    // person must show an empty party cell rather than borrow one.
+    stub(
+      [[{ sum: 0 }], [{ sum: 200 }], [{ debit: 200, credit: 0 }], [{ total: 1 }]],
+      [row({ receipt_id: 'r-1', counterparty: null, personName: 'Trần Văn B' })],
+    );
+
+    const res = await service.getLedger({ cashAccountId: ACC }, actor);
+
+    expect(res.rows[0].partnerName).toBeNull();
+    expect(res.rows[0].personName).toBe('Trần Văn B');
+  });
+
+  it('derives party and person from separate voucher columns', async () => {
+    stub([[{ sum: 0 }], [{ sum: 0 }], [{ debit: 0, credit: 0 }], [{ total: 0 }]]);
+    await service.getLedger({ cashAccountId: ACC }, actor);
+
+    const [sql] = pageRowsCall();
+    // Each COALESCE now picks a voucher *branch* (receipt vs payment), never a
+    // field type — that is the invariant that keeps the two columns apart.
+    expect(sql).toContain(
+      'COALESCE(cp.partner_name_snapshot, cr.partner_name_snapshot)',
+    );
+    expect(sql).toContain('COALESCE(cp.payee_name, cr.payer_name)');
+    // A column in the derived list but missing from the outer SELECT is
+    // invisible with no error at all.
+    expect(sql).toContain('description, counterparty, "personName", staff');
   });
 
   it('marks a row PC when the movement resolves to a payment', async () => {
@@ -267,6 +302,7 @@ describe('CashLedgerService', () => {
         description: { operator: StringOperator.CONTAINS, value: 'thu' },
         counterparty: { operator: StringOperator.EQUALS, value: 'Khách A' },
         documentNumber: { operator: StringOperator.STARTS_WITH, value: 'PT' },
+        personName: { operator: StringOperator.CONTAINS, value: 'Trần' },
         staff: { operator: StringOperator.CONTAINS, value: 'An' },
       },
       actor,
@@ -276,6 +312,9 @@ describe('CashLedgerService', () => {
     expect(sql).toContain('FROM (SELECT m.id');
     expect(sql).toContain("COALESCE(description, '') ILIKE");
     expect(sql).toContain("lower(COALESCE(counterparty, '')) = lower(");
+    // AC-11: an independent predicate on its own column.
+    expect(sql).toContain('COALESCE("personName", \'\') ILIKE');
+    expect(params).toContain('%Trần%');
     expect(sql).toContain("COALESCE(voucher_number, '') ILIKE");
     expect(sql).toContain("COALESCE(staff, '') ILIKE");
     expect(params).toContain('%thu%');

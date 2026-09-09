@@ -26,6 +26,7 @@ export function toReceiptDepositListItem(
     revision: row.revision ?? 0,
     totalAmount: Number(row.totalAmount) || 0,
     counterparty: row.counterparty ?? "",
+    personName: row.personName ?? "",
     reason: row.reason ?? "",
     depositAccountId: row.depositAccountId,
     depositAccountName: row.depositAccountName ?? "",

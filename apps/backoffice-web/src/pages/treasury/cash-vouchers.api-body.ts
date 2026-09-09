@@ -8,32 +8,15 @@ import {
   type CreateSupplierDebtPaymentBody,
 } from "./cash-vouchers.types";
 import { toIsoDate } from "./documents/_shared/voucher-dialog.utils";
-import {
-  isFreeTextLookupType,
-  lookupTypeToPartnerType,
-} from "./documents/_shared/voucher-partner.constants";
+import { resolvePartyFields } from "./documents/_shared/voucher-partner.constants";
 
 function mapPartnerFields(detail: LedgerCashVoucherDetail) {
-  // A hand-typed party is the one shape that carries a type WITHOUT an id, so it
-  // has to be recognised before the `partnerId &&` guard below — that guard is
-  // what used to drop the typed name on the floor, silently.
-  const freeText = !!detail.partnerKind && isFreeTextLookupType(detail.partnerKind);
-  if (freeText) {
-    return {
-      partnerType: lookupTypeToPartnerType(detail.partnerKind!),
-      partnerId: undefined,
-      partnerName: detail.counterpartyName?.trim() || undefined,
-      staffId: detail.staffId,
-    };
-  }
-  const partnerType =
-    detail.partnerType ??
-    (detail.partnerId && detail.partnerKind
-      ? lookupTypeToPartnerType(detail.partnerKind)
-      : undefined);
   return {
-    partnerType,
-    partnerId: detail.partnerId,
+    ...resolvePartyFields({
+      partnerId: detail.partnerId,
+      partnerKind: detail.partnerKind,
+      partnerName: detail.counterpartyName,
+    }),
     staffId: detail.staffId,
   };
 }
@@ -58,6 +41,7 @@ export function ledgerDetailToCreateReceiptBody(
     payerName: detail.payerName ?? detail.counterpartyName,
     reason: detail.reason,
     ...mapPartnerFields(detail),
+    address: detail.address?.trim() || undefined,
     cashAccountId,
     // contraAccountId omitted — resolved server-side from the purpose.
     totalAmount,
@@ -107,6 +91,7 @@ export function ledgerDetailToCreatePaymentBody(
     payeeName: detail.payerName ?? detail.counterpartyName,
     reason: detail.reason,
     ...mapPartnerFields(detail),
+    address: detail.address?.trim() || undefined,
     cashAccountId,
     // contraAccountId omitted — resolved server-side from the purpose. NOTE:
     // transfer sub-options (cash→bank, branch transfer) currently resolve by

@@ -133,6 +133,8 @@ export interface LedgerCashGoodsReceiptInfo {
 }
 
 export interface LedgerCashVoucherDetail {
+  /** Backend cash-receipt/cash-payment id — needed to print the voucher. */
+  id?: string;
   kind: LedgerCashVoucherKindEnum;
   purpose: LedgerCashVoucherPurposeEnum;
   paymentPurpose?: CashPaymentPurpose;
@@ -196,6 +198,7 @@ export interface LedgerCashRow {
   amountOut: number;
   balance: number;
   counterparty: string;
+  personName: string;
   employee: string;
   documentType: LedgerCashDocumentTypeEnum;
   detail: LedgerCashDetailPayload;

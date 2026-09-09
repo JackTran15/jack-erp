@@ -7,15 +7,17 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, DataSource, EntityManager, Not, Repository } from 'typeorm';
+import { Brackets, DataSource, EntityManager, In, Not, Repository } from 'typeorm';
 import {
   DepositMovementSource,
   DepositMovementType,
   DepositTransferStatus,
   DocumentType,
+  VoucherPrintPayload,
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { DocumentNumberingService } from '../../../document-numbering/document-numbering.service';
+import { loadVoucherBranch } from '../../../inventory/location/services/voucher-print-context.util';
 import { DepositService } from '../../deposit/deposit.service';
 import { DepositAccountEntity } from '../../deposit/deposit-account.entity';
 import { DepositPeriodGuardService } from '../../deposit-period-lock/deposit-period-guard.service';
@@ -29,8 +31,10 @@ import {
 } from '../enums';
 import { PartnerResolverService } from '../../cash-vouchers/shared/partner-resolver.service';
 import { CashVoucherPartnerType } from '../../cash-vouchers/enums';
+import { CashVoucherCategoryEntity } from '../../cash-vouchers/cash-voucher-categories/cash-voucher-category.entity';
 import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
 import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
+import { mapBankReceiptToVoucherPayload } from './bank-receipt-print.mapper';
 import { BankReceiptEntity } from './bank-receipt.entity';
 import { BankReceiptLineEntity } from './bank-receipt-line.entity';
 import { CreateBankReceiptDto } from './dto/create-bank-receipt.dto';
@@ -193,7 +197,7 @@ export class BankReceiptsService {
           partnerId: freeTextParty ? undefined : dto.partnerId,
           partnerName: freeTextParty
             ? dto.partnerName?.trim() || undefined
-            : (partner?.name ?? undefined),
+            : (dto.partnerName?.trim() || partner?.name) ?? undefined,
           // What the cashier typed wins over the partner record's current address —
           // the voucher freezes the address as of the moment it was written.
           partnerAddress: dto.address ?? partner?.address ?? undefined,
@@ -271,7 +275,12 @@ export class BankReceiptsService {
           Object.assign(receipt, {
             partnerType: nextPartnerType ?? null,
             partnerId: nextPartnerId ?? null,
-            partnerNameSnapshot: partner?.name ?? null,
+            // A typed name wins over the catalogue name (ADR-02) but partner_id
+            // stays put; `dto.partnerName` is checked against `undefined`, not
+            // falsiness, so an explicit '' clears the snapshot to null instead
+            // of silently falling back to the catalogue name.
+            partnerNameSnapshot:
+              (dto.partnerName ?? partner?.name)?.trim() || null,
             partnerAddressSnapshot: partner?.address ?? null,
           });
         }
@@ -885,6 +894,55 @@ export class BankReceiptsService {
       receipt.collectedByCode = staff?.code ?? null;
       receipt.collectedByName = staff?.name ?? null;
     }
+  }
+
+  /**
+   * Print/export payload for one receipt (T-03-03, ADR-05). Goes through
+   * `getById` for the same 404 / org-scoping the sibling `GET :id` route
+   * uses — a second query here would let the printed voucher drift from the
+   * one the user is looking at. The mapper is pure, so the display names it
+   * cannot resolve itself — `depositAccountId` and each line's `categoryId`
+   * are plain FK columns, not loaded relations — are resolved here.
+   */
+  async getPrintPayload(
+    id: string,
+    actor: ActorContext,
+  ): Promise<VoucherPrintPayload> {
+    const receipt = await this.getById(id, actor);
+    const manager = this.dataSource.manager;
+    const [branch, bankAccountName, categoryNames] = await Promise.all([
+      loadVoucherBranch(manager, receipt.branchId, actor.organizationId),
+      this.resolveBankAccountName(manager, receipt.depositAccountId, actor.organizationId),
+      this.resolveCategoryNames(manager, receipt.lines, actor.organizationId),
+    ]);
+    return mapBankReceiptToVoucherPayload(receipt, branch, bankAccountName, categoryNames);
+  }
+
+  private async resolveBankAccountName(
+    manager: EntityManager,
+    depositAccountId: string,
+    organizationId: string,
+  ): Promise<string> {
+    const account = await manager.findOne(DepositAccountEntity, {
+      where: { id: depositAccountId, organizationId },
+    });
+    return account?.name ?? '';
+  }
+
+  /** Batch-resolves category names for a receipt's lines, keyed by category id. */
+  private async resolveCategoryNames(
+    manager: EntityManager,
+    lines: BankReceiptLineEntity[],
+    organizationId: string,
+  ): Promise<Map<string, string>> {
+    const ids = [
+      ...new Set(lines.map((l) => l.categoryId).filter((id): id is string => Boolean(id))),
+    ];
+    if (!ids.length) return new Map();
+    const categories = await manager.find(CashVoucherCategoryEntity, {
+      where: { id: In(ids), organizationId },
+    });
+    return new Map(categories.map((c) => [c.id, c.name]));
   }
 
   // ---------------------------------------------------------------------------

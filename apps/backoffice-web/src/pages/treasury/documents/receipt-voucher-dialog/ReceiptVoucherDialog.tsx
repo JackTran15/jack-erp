@@ -12,10 +12,14 @@ import {
   type LineColumn,
   type ToolbarItem,
 } from "@erp/ui";
-import { DocumentType } from "@erp/shared-interfaces";
-import { Pencil, Save, X } from "lucide-react";
+import { DocumentType, VoucherKind } from "@erp/shared-interfaces";
+import { CloudUpload, Pencil, Printer, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { useGenerateDocumentNumber } from "../../../../hooks/document-numbering/useGenerateDocumentNumber";
+import { fetchVoucherPrintPayload } from "../../../../lib/print/voucher-print.api";
+import { renderVoucherHtml } from "../../../../lib/print/render-voucher-html";
+import { printHtmlDocument } from "../../../../lib/print/print-html-document";
+import { downloadVoucherExcel } from "../../../../lib/print/voucher-export.api";
 import { RadioGroup } from "../../../../components/forms/RadioGroup";
 import { BaseDataTable } from "../../../../components/table/BaseDataTable";
 import { Tabs } from "../../../../components/tabs";
@@ -145,6 +149,8 @@ export function ReceiptVoucherDialog({
   );
   const [countAsRevenue, setCountAsRevenue] = useState(false);
   const [debtPickOpen, setDebtPickOpen] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const { data: receiptCategories = [] } = useCashVoucherCategories(
     CashVoucherCategoryDirection.IN,
@@ -588,6 +594,37 @@ export function ReceiptVoucherDialog({
     documentLines,
   ]);
 
+  const voucherId = initial?.id;
+  const canPrint = Boolean(voucherId);
+
+  const handlePrint = useCallback(async () => {
+    if (!voucherId || printing) return;
+    setPrinting(true);
+    try {
+      const payload = await fetchVoucherPrintPayload(
+        VoucherKind.CASH_RECEIPT,
+        voucherId,
+      );
+      await printHtmlDocument(renderVoucherHtml(payload));
+    } catch {
+      toast.error("Không in được phiếu.");
+    } finally {
+      setPrinting(false);
+    }
+  }, [voucherId, printing]);
+
+  const handleExport = useCallback(async () => {
+    if (!voucherId || exporting) return;
+    setExporting(true);
+    try {
+      await downloadVoucherExcel(VoucherKind.CASH_RECEIPT, voucherId);
+    } catch {
+      toast.error("Xuất khẩu thất bại.");
+    } finally {
+      setExporting(false);
+    }
+  }, [voucherId, exporting]);
+
   const toolbarItems: ToolbarItem[] = useMemo(() => {
     const items: ToolbarItem[] = [];
     if (readOnly && onRequestEdit) {
@@ -606,6 +643,22 @@ export function ReceiptVoucherDialog({
         onClick: handleSave,
       });
     }
+    if (canPrint) {
+      items.push({
+        id: "print",
+        label: "In",
+        icon: Printer,
+        disabled: printing,
+        onClick: () => void handlePrint(),
+      });
+      items.push({
+        id: "export",
+        label: "Xuất khẩu",
+        icon: CloudUpload,
+        disabled: exporting,
+        onClick: () => void handleExport(),
+      });
+    }
     items.push({
       id: "close",
       label: "Đóng",
@@ -613,7 +666,18 @@ export function ReceiptVoucherDialog({
       onClick: handleClose,
     });
     return items;
-  }, [readOnly, onRequestEdit, handleSave, handleClose, onSave]);
+  }, [
+    readOnly,
+    onRequestEdit,
+    handleSave,
+    handleClose,
+    onSave,
+    canPrint,
+    printing,
+    handlePrint,
+    exporting,
+    handleExport,
+  ]);
 
   const title =
     mode === TreasuryVoucherDialogModeEnum.CREATE

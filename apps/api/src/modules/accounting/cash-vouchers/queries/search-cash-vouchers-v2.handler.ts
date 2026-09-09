@@ -53,11 +53,12 @@ function buildCte(orgIdx: number, branchIdx?: number, accountIdx?: number): stri
         -- The grid's edit action sends this back as the staleness token.
         r.revision                                 AS revision,
         r.reason                                   AS reason,
-        COALESCE(
-          NULLIF(btrim(r.payer_name), ''),
-          NULLIF(btrim(r.partner_name_snapshot), ''),
-          ''
-        )                                          AS counterparty
+        -- Party and person are two different identities on the same voucher, so
+        -- they are two columns and neither falls back to the other (ADR-02).
+        COALESCE(NULLIF(btrim(r.partner_name_snapshot), ''), '')
+                                                   AS counterparty,
+        COALESCE(NULLIF(btrim(r.payer_name), ''), '')
+                                                   AS "personName"
       FROM cash_receipts r
       WHERE ${scope('r')}
 
@@ -81,11 +82,10 @@ function buildCte(orgIdx: number, branchIdx?: number, accountIdx?: number): stri
         p.reference_type::text,
         p.revision,
         p.reason,
-        COALESCE(
-          NULLIF(btrim(p.payee_name), ''),
-          NULLIF(btrim(p.partner_name_snapshot), ''),
-          ''
-        )
+        -- Positional, not by name: the second half of a UNION ALL matches the
+        -- first by column order, and both of these are text.
+        COALESCE(NULLIF(btrim(p.partner_name_snapshot), ''), ''),
+        COALESCE(NULLIF(btrim(p.payee_name), ''), '')
       FROM cash_payments p
       WHERE ${scope('p')}
     )
@@ -139,6 +139,7 @@ export class SearchCashVouchersV2Handler
     this.applyEnum(where, params, 'status', dto.status?.value);
     this.applyCompare(where, params, '"totalAmount"', dto.totalAmount);
     this.applyString(where, params, 'counterparty', dto.counterparty);
+    this.applyString(where, params, '"personName"', dto.personName);
     this.applyString(where, params, 'reason', dto.reason);
 
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
@@ -146,7 +147,8 @@ export class SearchCashVouchersV2Handler
     const dataSql = `
       ${cte}
       SELECT "documentKind", kind, id, "createdAt", "voucherDate", "documentNumber",
-             status, "totalAmount", "cashAccountId", "referenceType", counterparty, reason
+             status, "totalAmount", "cashAccountId", "referenceType", revision,
+             counterparty, "personName", reason
       FROM combined
       ${whereSql}
       ORDER BY "createdAt" DESC, id DESC

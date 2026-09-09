@@ -1708,6 +1708,31 @@
         ]
       }
     },
+    "/v2/cash-vouchers/export": {
+      "post": {
+        "operationId": "CashVoucherV2Controller_export_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CashVoucherSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Export the merged cash voucher list as .xlsx",
+        "tags": [
+          "CashVoucherV2"
+        ]
+      }
+    },
     "/v2/cash-ledger/search": {
       "post": {
         "operationId": "CashLedgerV2Controller_search_v2",
@@ -1957,6 +1982,59 @@
       },
       "delete": {
         "operationId": "CashReceiptsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CashReceipts"
+        ]
+      }
+    },
+    "/cash-receipts/{id}/print-payload": {
+      "get": {
+        "operationId": "CashReceiptsController_getPrintPayload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashReceipts"
+        ]
+      }
+    },
+    "/cash-receipts/{id}/export": {
+      "get": {
+        "operationId": "CashReceiptsController_export",
         "parameters": [
           {
             "name": "id",
@@ -2267,6 +2345,59 @@
       },
       "delete": {
         "operationId": "CashPaymentsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CashPayments"
+        ]
+      }
+    },
+    "/cash-payments/{id}/print-payload": {
+      "get": {
+        "operationId": "CashPaymentsController_getPrintPayload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashPayments"
+        ]
+      }
+    },
+    "/cash-payments/{id}/export": {
+      "get": {
+        "operationId": "CashPaymentsController_export",
         "parameters": [
           {
             "name": "id",
@@ -10537,6 +10668,59 @@
         ]
       }
     },
+    "/bank-receipts/{id}/print-payload": {
+      "get": {
+        "operationId": "BankReceiptsController_getPrintPayload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "BankReceipts"
+        ]
+      }
+    },
+    "/bank-receipts/{id}/export": {
+      "get": {
+        "operationId": "BankReceiptsController_export",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "BankReceipts"
+        ]
+      }
+    },
     "/bank-receipts/{id}/post": {
       "post": {
         "operationId": "BankReceiptsController_post",
@@ -10829,6 +11013,59 @@
       },
       "delete": {
         "operationId": "BankPaymentsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "BankPayments"
+        ]
+      }
+    },
+    "/bank-payments/{id}/print-payload": {
+      "get": {
+        "operationId": "BankPaymentsController_getPrintPayload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "BankPayments"
+        ]
+      }
+    },
+    "/bank-payments/{id}/export": {
+      "get": {
+        "operationId": "BankPaymentsController_export",
         "parameters": [
           {
             "name": "id",
@@ -23529,7 +23766,15 @@
             ]
           },
           "counterparty": {
-            "description": "Payer/payee column, falling back to the partner name snapshot.",
+            "description": "Party column — the partner name snapshot alone.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "personName": {
+            "description": "Person column — payer_name / payee_name alone.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/StringFilterDto"
@@ -23598,9 +23843,17 @@
             "type": "string",
             "nullable": true
           },
+          "revision": {
+            "type": "number",
+            "description": "Bumped by every in-place edit; the grid sends it back as a staleness token."
+          },
           "counterparty": {
             "type": "string",
-            "description": "Payer/payee, falling back to the partner snapshot (\"\" when none)"
+            "description": "Partner name snapshot only (\"\" when the voucher has no catalogue or free-text party)"
+          },
+          "personName": {
+            "type": "string",
+            "description": "Payer/payee name only (\"\" when nobody was named on the voucher). Never falls back to the party."
           },
           "reason": {
             "type": "string",
@@ -23618,7 +23871,9 @@
           "totalAmount",
           "cashAccountId",
           "referenceType",
+          "revision",
           "counterparty",
+          "personName",
           "reason"
         ]
       },
@@ -23697,7 +23952,15 @@
             ]
           },
           "counterparty": {
-            "description": "Counterparty column, resolved from the source voucher.",
+            "description": "Party column — the source voucher's partner name snapshot alone.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "personName": {
+            "description": "Person column — the source voucher's payer_name / payee_name alone.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/StringFilterDto"
@@ -23797,8 +24060,13 @@
           },
           "partnerName": {
             "type": "string",
-            "description": "\"Đối tượng\" typed by hand. Only read when `partnerType` is `OTHER`; for a\ncatalogue party the name always comes from the resolver instead.",
+            "description": "\"Đối tượng\" typed by hand. Frozen onto the voucher as\n`partner_name_snapshot` regardless of `partnerType` — for a catalogue\nparty it overrides the catalogue name but leaves `partnerId` untouched\n(ADR-02).",
             "maxLength": 255
+          },
+          "address": {
+            "type": "string",
+            "description": "\"Địa chỉ\" — the payer's address as typed on the voucher. Stored as\n`partnerAddressSnapshot`; when omitted, posting falls back to the\npartner record's current address (ADR-03).",
+            "maxLength": 500
           },
           "payerName": {
             "type": "string",
@@ -24114,8 +24382,13 @@
           },
           "partnerName": {
             "type": "string",
-            "description": "\"Đối tượng\" typed by hand. Only read when `partnerType` is `OTHER`; for a\ncatalogue party the name always comes from the resolver instead.",
+            "description": "\"Đối tượng\" typed by hand. Frozen onto the voucher as\n`partner_name_snapshot` regardless of `partnerType` — for a catalogue\nparty it overrides the catalogue name but leaves `partnerId` untouched\n(ADR-02).",
             "maxLength": 255
+          },
+          "address": {
+            "type": "string",
+            "description": "\"Địa chỉ\" — the payer's address as typed on the voucher. Stored as\n`partnerAddressSnapshot`; when omitted, posting falls back to the\npartner record's current address (ADR-03).",
+            "maxLength": 500
           },
           "payerName": {
             "type": "string",
@@ -24244,8 +24517,13 @@
           },
           "partnerName": {
             "type": "string",
-            "description": "\"Đối tượng\" typed by hand. Only read when `partnerType` is `OTHER`; for a\ncatalogue party the name always comes from the resolver instead.",
+            "description": "\"Đối tượng\" typed by hand. Frozen onto the voucher as\n`partner_name_snapshot` regardless of `partnerType` — for a catalogue\nparty it overrides the catalogue name but leaves `partnerId` untouched\n(ADR-02).",
             "maxLength": 255
+          },
+          "address": {
+            "type": "string",
+            "description": "\"Địa chỉ\" — the payee's address as typed on the voucher. Stored as\n`partnerAddressSnapshot`; when omitted, posting falls back to the\npartner record's current address (ADR-03).",
+            "maxLength": 500
           },
           "payeeName": {
             "type": "string",
@@ -24567,8 +24845,13 @@
           },
           "partnerName": {
             "type": "string",
-            "description": "\"Đối tượng\" typed by hand. Only read when `partnerType` is `OTHER`; for a\ncatalogue party the name always comes from the resolver instead.",
+            "description": "\"Đối tượng\" typed by hand. Frozen onto the voucher as\n`partner_name_snapshot` regardless of `partnerType` — for a catalogue\nparty it overrides the catalogue name but leaves `partnerId` untouched\n(ADR-02).",
             "maxLength": 255
+          },
+          "address": {
+            "type": "string",
+            "description": "\"Địa chỉ\" — the payee's address as typed on the voucher. Stored as\n`partnerAddressSnapshot`; when omitted, posting falls back to the\npartner record's current address (ADR-03).",
+            "maxLength": 500
           },
           "payeeName": {
             "type": "string",
@@ -32011,6 +32294,14 @@
               }
             ]
           },
+          "personName": {
+            "description": "Person column — the source voucher's payer_name / payee_name alone.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
           "staff": {
             "description": "Staff column, resolved from the source voucher's cashier user.",
             "allOf": [
@@ -32107,7 +32398,15 @@
             ]
           },
           "counterparty": {
-            "description": "Payer/payee column, falling back to the partner name snapshot.",
+            "description": "Party column — the partner name snapshot alone.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "personName": {
+            "description": "Person column — payer_name / payee_name alone.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/StringFilterDto"
@@ -32173,9 +32472,17 @@
             "type": "string",
             "nullable": true
           },
+          "revision": {
+            "type": "number",
+            "description": "Bumped by every in-place edit; the grid sends it back as a staleness token."
+          },
           "counterparty": {
             "type": "string",
-            "description": "Payer/payee, falling back to the partner snapshot (\"\" when none)"
+            "description": "Partner name snapshot only (\"\" when the voucher has no catalogue or free-text party)"
+          },
+          "personName": {
+            "type": "string",
+            "description": "Payer/payee name only (\"\" when nobody was named on the voucher). Never falls back to the party."
           },
           "reason": {
             "type": "string",
@@ -32196,7 +32503,9 @@
           "depositAccountName",
           "depositAccountNo",
           "referenceType",
+          "revision",
           "counterparty",
+          "personName",
           "reason",
           "createdAt"
         ]
@@ -32467,7 +32776,7 @@
           },
           "partnerName": {
             "type": "string",
-            "description": "\"Đối tượng\" typed by hand. Only read when `partnerType` is `OTHER`; for a\ncatalogue party the name always comes from the resolver instead.",
+            "description": "\"Đối tượng\" typed by hand. Frozen onto the voucher as\n`partner_name_snapshot` regardless of `partnerType` — for a catalogue\nparty it overrides the catalogue name but leaves `partnerId` untouched\n(ADR-02).",
             "maxLength": 255
           },
           "payerName": {
@@ -32807,7 +33116,7 @@
           },
           "partnerName": {
             "type": "string",
-            "description": "\"Đối tượng\" typed by hand. Only read when `partnerType` is `OTHER`; for a\ncatalogue party the name always comes from the resolver instead.",
+            "description": "\"Đối tượng\" typed by hand. Frozen onto the voucher as\n`partner_name_snapshot` regardless of `partnerType` — for a catalogue\nparty it overrides the catalogue name but leaves `partnerId` untouched\n(ADR-02).",
             "maxLength": 255
           },
           "payerName": {
@@ -32950,7 +33259,7 @@
           },
           "partnerName": {
             "type": "string",
-            "description": "\"Đối tượng\" typed by hand. Only read when `partnerType` is `OTHER`; for a\ncatalogue party the name always comes from the resolver instead.",
+            "description": "\"Đối tượng\" typed by hand. Frozen onto the voucher as\n`partner_name_snapshot` regardless of `partnerType` — for a catalogue\nparty it overrides the catalogue name but leaves `partnerId` untouched\n(ADR-02).",
             "maxLength": 255
           },
           "payeeName": {
@@ -33309,7 +33618,7 @@
           },
           "partnerName": {
             "type": "string",
-            "description": "\"Đối tượng\" typed by hand. Only read when `partnerType` is `OTHER`; for a\ncatalogue party the name always comes from the resolver instead.",
+            "description": "\"Đối tượng\" typed by hand. Frozen onto the voucher as\n`partner_name_snapshot` regardless of `partnerType` — for a catalogue\nparty it overrides the catalogue name but leaves `partnerId` untouched\n(ADR-02).",
             "maxLength": 255
           },
           "payeeName": {

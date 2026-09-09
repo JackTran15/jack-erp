@@ -245,11 +245,19 @@ export class VoucherXlsxWriter implements ExportWriter {
     return out as ExcelJS.Column[];
   }
 
-  /** One data-shaped row: value at each slot's start, merged across its span. */
+  /**
+   * One data-shaped row: value at each slot's start, merged across its span.
+   *
+   * `mergeFirst`, when given, additionally merges columns `1..mergeFirst` —
+   * only `writeTotalsRow` needs this, for its label span. It must happen
+   * here, before `row.commit()`, for the same reason as the per-slot merges
+   * above: WorkbookWriter drops the row afterwards (ADR-08).
+   */
   private writeGridRow(
     sheet: ExcelJS.Worksheet,
     valueOf: (slot: GridSlot) => unknown,
     decorate?: (cell: ExcelJS.Cell, slot: GridSlot) => void,
+    mergeFirst?: number,
   ): ExcelJS.Row {
     const row = sheet.addRow([]);
     for (const slot of this.grid.slots) {
@@ -261,6 +269,9 @@ export class VoucherXlsxWriter implements ExportWriter {
       if (slot.end > slot.start) {
         sheet.mergeCells(row.number, slot.start, row.number, slot.end);
       }
+    }
+    if (mergeFirst && mergeFirst > 1) {
+      sheet.mergeCells(row.number, 1, row.number, mergeFirst);
     }
     row.commit();
     return row;
@@ -328,7 +339,7 @@ export class VoucherXlsxWriter implements ExportWriter {
     const span = labelSpan(this.grid);
     const label = this.payload.totalsLabel ?? DEFAULT_TOTALS_LABEL;
 
-    const row = this.writeGridRow(
+    this.writeGridRow(
       sheet,
       (slot) => {
         if (slot.start === 1) return label;
@@ -344,9 +355,8 @@ export class VoucherXlsxWriter implements ExportWriter {
           cell.alignment = { horizontal: 'left', vertical: 'middle' };
         }
       },
+      span,
     );
-
-    if (span > 1) sheet.mergeCells(row.number, 1, row.number, span);
   }
 
   private writeAmountInWords(sheet: ExcelJS.Worksheet): void {

@@ -147,6 +147,7 @@ export interface CreateBankReceiptBody {
   purpose?: BankReceiptPurpose;
   partnerType?: CashVoucherPartnerType;
   partnerId?: string;
+  partnerName?: string;
   payerName?: string;
   address?: string;
   reason?: string;
@@ -171,6 +172,7 @@ export interface CreateBankPaymentBody {
   purpose?: BankPaymentPurpose;
   partnerType?: CashVoucherPartnerType;
   partnerId?: string;
+  partnerName?: string;
   payeeName?: string;
   address?: string;
   reason?: string;

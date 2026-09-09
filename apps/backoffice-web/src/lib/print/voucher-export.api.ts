@@ -8,6 +8,10 @@ const EXPORT_PATH: Partial<Record<VoucherKind, (id: string) => string>> = {
   [VoucherKind.GOODS_ISSUE]: (id) => `/inventory/goods-issues/${id}/export`,
   [VoucherKind.TRANSFER_ORDER]: (id) => `/inventory/transfer-orders/${id}/export`,
   [VoucherKind.STOCK_TRANSFER]: (id) => `/inventory/stock/transfers/${id}/export`,
+  [VoucherKind.CASH_RECEIPT]: (id) => `/cash-receipts/${id}/export`,
+  [VoucherKind.CASH_PAYMENT]: (id) => `/cash-payments/${id}/export`,
+  [VoucherKind.BANK_RECEIPT]: (id) => `/bank-receipts/${id}/export`,
+  [VoucherKind.BANK_PAYMENT]: (id) => `/bank-payments/${id}/export`,
 };
 
 /**
@@ -24,6 +28,10 @@ const FALLBACK_FILENAME: Partial<Record<VoucherKind, string>> = {
   [VoucherKind.GOODS_ISSUE]: "phieu-xuat-kho.xlsx",
   [VoucherKind.TRANSFER_ORDER]: "phieu-chuyen-kho.xlsx",
   [VoucherKind.STOCK_TRANSFER]: "phieu-chuyen-kho.xlsx",
+  [VoucherKind.CASH_RECEIPT]: "phieu-thu-tien-mat.xlsx",
+  [VoucherKind.CASH_PAYMENT]: "phieu-chi-tien-mat.xlsx",
+  [VoucherKind.BANK_RECEIPT]: "phieu-thu-tien-gui.xlsx",
+  [VoucherKind.BANK_PAYMENT]: "phieu-chi-tien-gui.xlsx",
 };
 
 /** Read the server-chosen filename; it names the voucher type. */

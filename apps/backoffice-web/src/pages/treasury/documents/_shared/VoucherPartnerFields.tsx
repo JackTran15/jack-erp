@@ -7,7 +7,6 @@ import { READONLY_INPUT_CLASS } from "../../ledger-cash/ledger-cash.constants";
 import {
   PartnerLookupType,
   PARTNER_LOOKUP_LABEL,
-  isFreeTextLookupType,
 } from "./voucher-partner.constants";
 import {
   mergePartnerSearchWithSelection,
@@ -84,14 +83,11 @@ export function VoucherPartnerFields({
 }: Props) {
   const searchPartners = usePartnerSearch();
   const kindLabel = partnerKind ? PARTNER_LOOKUP_LABEL[partnerKind] : "";
-  const freeText = !!partnerKind && isFreeTextLookupType(partnerKind);
 
   const createMenuItems = useMemo(
     () =>
       onCreateNew
-        ? PARTNER_LOOKUP_OPTIONS.filter(
-            (opt) => !isFreeTextLookupType(opt.value),
-          ).map((opt) => ({
+        ? PARTNER_LOOKUP_OPTIONS.map((opt) => ({
             label: opt.label,
             onClick: () => onCreateNew(opt.value),
           }))
@@ -160,7 +156,10 @@ export function VoucherPartnerFields({
   );
 
   if (readOnly) {
-    if (freeText) {
+    // A hand-typed party carries no code, so the code box would only ever be an
+    // empty input that reads as a rendering fault. The distinction is `partnerId`,
+    // not `partnerKind` — the kind is no longer something the user picks.
+    if (!partnerId) {
       return (
         <FormField label={label} layout="horizontal" labelWidth="8rem">
           <Input
@@ -194,21 +193,6 @@ export function VoucherPartnerFields({
     );
   }
 
-  // A hand-typed party has no code to look up, so the code column would only be
-  // a dead input. The name takes the whole row and is the single source of truth.
-  if (freeText) {
-    return (
-      <FormField label={label} layout="horizontal" labelWidth="8rem">
-        <Input
-          value={partnerName}
-          onChange={(e) => onPartnerNameChange?.(e.target.value)}
-          placeholder="Nhập tên đối tượng"
-          maxLength={255}
-        />
-      </FormField>
-    );
-  }
-
   return (
     <FormField label={label} layout="horizontal" labelWidth="8rem">
       <div className="grid grid-cols-[minmax(7rem,1fr)_2fr] gap-2">
@@ -231,13 +215,15 @@ export function VoucherPartnerFields({
           onSearchButtonClick={onOpenSearchDialog}
           createMenuItems={createMenuItems}
         />
+        {/* Always typeable (ADR-01). Leaving the code box empty and typing here
+            is what marks the party as hand-entered; the type is derived at the
+            outgoing boundary, never picked by the user. */}
         <Input
           value={partnerName}
-          readOnly
-          disabled
-          placeholder="Tên"
-          className={READONLY_INPUT_CLASS}
-          title={partnerId ? kindLabel : "Chọn từ danh sách"}
+          onChange={(e) => onPartnerNameChange?.(e.target.value)}
+          placeholder="Nhập tên hoặc chọn từ mã"
+          maxLength={255}
+          title={partnerId ? kindLabel : undefined}
         />
       </div>
     </FormField>

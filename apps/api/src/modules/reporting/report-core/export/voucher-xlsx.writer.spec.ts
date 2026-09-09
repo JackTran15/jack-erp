@@ -42,6 +42,18 @@ const PLAIN_COLUMNS: DocumentColumn[] = [
   { col: 'lineTotal', label: 'Thành tiền', type: ReportColumnDataType.CURRENCY },
 ];
 
+/**
+ * The treasury-voucher grid: two leading STRING columns before the first
+ * number, unlike every stock-voucher fixture above which leads with a
+ * numeric `stt`. This is what makes `labelSpan` return more than 1 and
+ * exercises the totals-row label merge.
+ */
+const TREASURY_COLUMNS: DocumentColumn[] = [
+  { col: 'description', label: 'Diễn giải', type: ReportColumnDataType.STRING },
+  { col: 'categoryName', label: 'Loại thu chi', type: ReportColumnDataType.STRING },
+  { col: 'amount', label: 'Số tiền', type: ReportColumnDataType.CURRENCY },
+];
+
 /** Row map for `payload()` — named so assertions read as layout, not arithmetic. */
 const ROW_HEADER = 10;
 const ROW_DATA = 11;
@@ -226,6 +238,22 @@ describe('VoucherXlsxWriter', () => {
       expect(sheet.getCell(`J${ROW_TOTALS}`).value).toBe(500000);
       expect(sheet.getCell(`L${ROW_TOTALS}`).value).toBe(800000);
       expect(sheet.getCell(`J${ROW_TOTALS}`).font?.bold).toBe(true);
+    });
+
+    it('merges the totals label across two leading string columns (treasury grid)', async () => {
+      const sheet = await writeAndRead(
+        payload({
+          lineColumns: TREASURY_COLUMNS,
+          lines: [
+            { description: 'Thu tiền bán hàng', categoryName: 'Doanh thu', amount: 500000 },
+          ],
+          totals: { description: null, categoryName: null, amount: 500000 },
+        }),
+      );
+
+      expect(sheet.getCell(`A${ROW_TOTALS}`).value).toBe('Tổng');
+      expect(sheet.getCell(`B${ROW_TOTALS}`).master.address).toBe(`A${ROW_TOTALS}`);
+      expect(sheet.getCell(`C${ROW_TOTALS}`).value).toBe(500000);
     });
 
     it('lays out a table with no span or hidden exactly as before', async () => {

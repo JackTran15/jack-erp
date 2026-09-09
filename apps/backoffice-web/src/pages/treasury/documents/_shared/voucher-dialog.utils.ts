@@ -54,10 +54,8 @@ export function formatDepositAccountLabel(account: {
   return `${account.bankName} - ${account.name} - ${account.accountNo}`;
 }
 
-import type { CashVoucherPartnerType } from "../../cash-vouchers.types";
 import {
-  isFreeTextLookupType,
-  lookupTypeToPartnerType,
+  resolvePartyFields,
   type PartnerLookupType,
 } from "./voucher-partner.constants";
 
@@ -79,12 +77,15 @@ export function buildReceiptDetailFromForm(state: {
   lines: VoucherFormLine[];
   documentLines?: LedgerCashVoucherDetail["documentLines"];
 }): LedgerCashVoucherDetail {
-  // A hand-typed party has no id, so `partnerId ? ... : undefined` would erase
-  // its type and take the typed name down with it.
-  const partnerType: CashVoucherPartnerType | undefined =
-    state.partnerId || isFreeTextLookupType(state.partnerKind)
-      ? lookupTypeToPartnerType(state.partnerKind)
-      : undefined;
+  // Delegate to `resolvePartyFields` instead of re-deriving the rule here: it
+  // is the one place (ADR-04) both cash and bank voucher dialogs decide
+  // `partnerType`, so a hand-typed name always resolves to `OTHER` even when
+  // `partnerKind` still carries a stale catalogue value.
+  const { partnerType } = resolvePartyFields({
+    partnerId: state.partnerId,
+    partnerKind: state.partnerKind,
+    partnerName: state.counterpartyName,
+  });
   return {
     kind: LedgerCashVoucherKindEnum.RECEIPT,
     purpose: state.purpose,
@@ -134,12 +135,15 @@ export function buildPaymentDetailFromForm(state: {
   documentLines?: LedgerCashVoucherDocumentLine[];
   transferAccountId?: string;
 }): LedgerCashVoucherDetail {
-  // A hand-typed party has no id, so `partnerId ? ... : undefined` would erase
-  // its type and take the typed name down with it.
-  const partnerType: CashVoucherPartnerType | undefined =
-    state.partnerId || isFreeTextLookupType(state.partnerKind)
-      ? lookupTypeToPartnerType(state.partnerKind)
-      : undefined;
+  // Delegate to `resolvePartyFields` instead of re-deriving the rule here: it
+  // is the one place (ADR-04) both cash and bank voucher dialogs decide
+  // `partnerType`, so a hand-typed name always resolves to `OTHER` even when
+  // `partnerKind` still carries a stale catalogue value.
+  const { partnerType } = resolvePartyFields({
+    partnerId: state.partnerId,
+    partnerKind: state.partnerKind,
+    partnerName: state.counterpartyName,
+  });
   return {
     kind: LedgerCashVoucherKindEnum.PAYMENT,
     purpose: state.purpose,

@@ -15,6 +15,7 @@ import {
 } from "@erp/ui";
 import {
   ChevronDown,
+  CloudUpload,
   Copy,
   Eye,
   Pencil,
@@ -50,6 +51,7 @@ import {
   useCashReceiptMutations,
 } from "../../../../hooks/treasury/use-cash-receipts";
 import { useCategoryNameMap } from "../../../../hooks/treasury/use-cash-voucher-categories";
+import { downloadCashVoucherListExport } from "../../../../hooks/treasury/use-cash-voucher-export";
 import { useCashVoucherSearch } from "../../../../hooks/treasury/use-cash-vouchers";
 import {
   cashPaymentToVoucherDetail,
@@ -138,6 +140,7 @@ export function TreasuryCashReceiptsPage() {
     useState<ReceiptPaymentListItem | null>(null);
   const [reverseReason, setReverseReason] = useState("");
   const [reverseLoading, setReverseLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const categoryInMap = useCategoryNameMap(CashVoucherCategoryDirection.IN);
   const categoryOutMap = useCategoryNameMap(CashVoucherCategoryDirection.OUT);
@@ -289,6 +292,20 @@ export function TreasuryCashReceiptsPage() {
     setPagination((p) => ({ ...p, page: 1 }));
     toast.success("Đã nạp lại dữ liệu.");
   }, [refetch, closeVoucherDialogs]);
+
+  // `searchBody` is the exact object the grid posts to `/search` — reusing it
+  // here instead of rebuilding a second filter is what keeps the exported
+  // file matching what the grid shows (ADR-06).
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    try {
+      await downloadCashVoucherListExport(searchBody);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Xuất khẩu thất bại.");
+    } finally {
+      setExporting(false);
+    }
+  }, [searchBody]);
 
   // Mirrors assertEditable on the server: a hand-created voucher that is still
   // posted. Editing now writes a compensating movement rather than requiring a
@@ -644,12 +661,22 @@ export function TreasuryCashReceiptsPage() {
           </div>
         }
         filters={
-          <div className="flex flex-wrap items-end gap-4">
-            <PeriodFilter
-              value={period}
-              onChange={setPeriod}
-              onApply={handleApply}
-            />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-end gap-4">
+              <PeriodFilter
+                value={period}
+                onChange={setPeriod}
+                onApply={handleApply}
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+              disabled={exporting}
+            >
+              <CloudUpload className="mr-1 h-4 w-4" /> Xuất khẩu
+            </Button>
           </div>
         }
         summary={

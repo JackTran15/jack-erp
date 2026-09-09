@@ -12,10 +12,14 @@ import {
   type LineColumn,
   type ToolbarItem,
 } from "@erp/ui";
-import { DocumentType } from "@erp/shared-interfaces";
-import { Pencil, Save, X } from "lucide-react";
+import { DocumentType, VoucherKind } from "@erp/shared-interfaces";
+import { CloudUpload, Pencil, Printer, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { useGenerateDocumentNumber } from "../../../../hooks/document-numbering/useGenerateDocumentNumber";
+import { fetchVoucherPrintPayload } from "../../../../lib/print/voucher-print.api";
+import { renderVoucherHtml } from "../../../../lib/print/render-voucher-html";
+import { printHtmlDocument } from "../../../../lib/print/print-html-document";
+import { downloadVoucherExcel } from "../../../../lib/print/voucher-export.api";
 import { RadioGroup } from "../../../../components/forms/RadioGroup";
 import { Tabs } from "../../../../components/tabs";
 import { BaseDataTable, type TableColumn } from "../../../../components/table/BaseDataTable";
@@ -67,6 +71,7 @@ import {
   PARTNER_LOOKUP_LABEL,
   PartnerLookupType,
   inferLookupType,
+  resolvePartyFields,
 } from "../_shared/voucher-partner.constants";
 import { usePartnerLookup } from "../_shared/voucher-partner-search";
 import { CashVoucherPartnerType } from "../../cash-vouchers.types";
@@ -182,6 +187,8 @@ export function DepositReceiptVoucherDialog({
   const [partnerCreateKind, setPartnerCreateKind] = useState<PartnerLookupType | null>(null);
   const [staffCreateOpen, setStaffCreateOpen] = useState(false);
   const [debtPickOpen, setDebtPickOpen] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const { data: receiptCategories = [] } = useCashVoucherCategories(
     CashVoucherCategoryDirection.IN,
@@ -558,8 +565,7 @@ export function DepositReceiptVoucherDialog({
       depositAccountId,
       docDate,
       purpose,
-      partnerType: partnerId ? lookupTypeToPartnerType(partnerKind) : undefined,
-      partnerId: partnerId || undefined,
+      ...resolvePartyFields({ partnerId, partnerKind, partnerName: counterpartyName }),
       payerName: payerName || undefined,
       address: address || undefined,
       reason: reason || undefined,
@@ -587,6 +593,7 @@ export function DepositReceiptVoucherDialog({
     purpose,
     partnerId,
     partnerKind,
+    counterpartyName,
     payerName,
     address,
     reason,
@@ -628,6 +635,36 @@ export function DepositReceiptVoucherDialog({
     isReversal,
   );
 
+  const canPrint = Boolean(initial?.id);
+
+  const handlePrint = useCallback(async () => {
+    if (!initial?.id || printing) return;
+    setPrinting(true);
+    try {
+      const payload = await fetchVoucherPrintPayload(
+        VoucherKind.BANK_RECEIPT,
+        initial.id,
+      );
+      await printHtmlDocument(renderVoucherHtml(payload));
+    } catch {
+      toast.error("Không in được phiếu.");
+    } finally {
+      setPrinting(false);
+    }
+  }, [initial?.id, printing]);
+
+  const handleExport = useCallback(async () => {
+    if (!initial?.id || exporting) return;
+    setExporting(true);
+    try {
+      await downloadVoucherExcel(VoucherKind.BANK_RECEIPT, initial.id);
+    } catch {
+      toast.error("Xuất khẩu thất bại.");
+    } finally {
+      setExporting(false);
+    }
+  }, [initial?.id, exporting]);
+
   const toolbarItems: ToolbarItem[] = useMemo(() => {
     const items: ToolbarItem[] = [];
     if (readOnly && onRequestEdit) {
@@ -636,9 +673,36 @@ export function DepositReceiptVoucherDialog({
     if (!readOnly && onSave) {
       items.push({ id: "save", label: "Lưu", icon: Save, onClick: handleSave });
     }
+    if (canPrint) {
+      items.push({
+        id: "print",
+        label: "In",
+        icon: Printer,
+        disabled: printing,
+        onClick: () => void handlePrint(),
+      });
+      items.push({
+        id: "export",
+        label: "Xuất khẩu",
+        icon: CloudUpload,
+        disabled: exporting,
+        onClick: () => void handleExport(),
+      });
+    }
     items.push({ id: "close", label: "Đóng", icon: X, onClick: handleClose });
     return items;
-  }, [readOnly, onRequestEdit, handleSave, handleClose, onSave]);
+  }, [
+    readOnly,
+    onRequestEdit,
+    handleSave,
+    handleClose,
+    onSave,
+    canPrint,
+    printing,
+    handlePrint,
+    exporting,
+    handleExport,
+  ]);
 
   const title =
     mode === TreasuryVoucherDialogModeEnum.CREATE

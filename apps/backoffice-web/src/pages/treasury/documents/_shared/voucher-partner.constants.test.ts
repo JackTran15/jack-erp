@@ -5,17 +5,15 @@ import {
   PARTNER_LOOKUP_DIALOG_OPTIONS,
   PartnerLookupType,
   inferLookupType,
-  isFreeTextLookupType,
   lookupTypeToPartnerType,
 } from "./voucher-partner.constants";
 
 describe("partner lookup kinds", () => {
-  it("offers Khác alongside the three catalogue kinds on the Đối tượng dialog", () => {
+  it("offers only the three catalogue kinds on the Đối tượng dialog (ADR-04: Khác removed)", () => {
     expect(PARTNER_LOOKUP_DIALOG_OPTIONS.map((o) => o.value)).toEqual([
       PartnerLookupType.SUPPLIER,
       PartnerLookupType.CUSTOMER,
       PartnerLookupType.EMPLOYEE,
-      PartnerLookupType.OTHER,
     ]);
   });
 
@@ -44,18 +42,6 @@ describe("partner lookup kinds", () => {
     ] as const) {
       expect(lookupTypeToPartnerType(lookup)).toBe(partner);
       expect(inferLookupType(partner)).toBe(lookup);
-    }
-  });
-
-  it("treats only OTHER as free text", () => {
-    expect(isFreeTextLookupType(PartnerLookupType.OTHER)).toBe(true);
-    for (const k of [
-      PartnerLookupType.CUSTOMER,
-      PartnerLookupType.SUPPLIER,
-      PartnerLookupType.EMPLOYEE,
-      PartnerLookupType.ALL,
-    ]) {
-      expect(isFreeTextLookupType(k)).toBe(false);
     }
   });
 

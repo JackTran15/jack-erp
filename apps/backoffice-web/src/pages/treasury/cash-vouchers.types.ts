@@ -234,7 +234,10 @@ export interface CashLedgerRow {
   voucherNumber: string | null;
   kind: "PT" | "PC" | "Khác";
   description: string | null;
+  /** Partner name snapshot only — null when the voucher has no party. */
   partnerName: string | null;
+  /** Payer/payee name only — null when nobody was named. Never the party. */
+  personName: string | null;
   staffName: string | null;
   debit: number;
   credit: number;
@@ -283,7 +286,10 @@ export interface CashVoucherRow {
   cashAccountId: string;
   referenceType: CashReceiptReferenceType | CashPaymentReferenceType | null;
   revision: number;
+  /** Partner name snapshot only — "" when the voucher has no party. */
   counterparty: string;
+  /** Payer/payee name only — "" when nobody was named. Never the party. */
+  personName: string;
   reason: string | null;
 }
 
@@ -298,6 +304,7 @@ export interface ReceiptPaymentListItem {
   status: CashVoucherStatus;
   totalAmount: number;
   counterparty: string;
+  personName: string;
   reason: string;
   referenceType?: CashReceiptReferenceType | CashPaymentReferenceType;
   /** Staleness token sent back on update. */
@@ -314,6 +321,8 @@ export interface CreateCashReceiptBody {
   purpose?: CashReceiptPurpose;
   partnerType?: CashVoucherPartnerType;
   partnerId?: string;
+  partnerName?: string;
+  address?: string;
   payerName?: string;
   reason?: string;
   staffId?: string;
@@ -367,6 +376,8 @@ export interface CreateCashPaymentBody {
   purpose?: CashPaymentPurpose;
   partnerType?: CashVoucherPartnerType;
   partnerId?: string;
+  partnerName?: string;
+  address?: string;
   payeeName?: string;
   reason?: string;
   staffId?: string;

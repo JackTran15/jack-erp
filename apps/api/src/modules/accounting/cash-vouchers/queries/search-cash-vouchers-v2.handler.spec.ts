@@ -53,16 +53,73 @@ describe('SearchCashVouchersV2Handler', () => {
   /** The data query is the first call: [sql, params]. */
   const dataCall = () => query.mock.calls[0] as [string, unknown[]];
 
-  it('falls back to the hand-typed party name for the Đối tượng column', async () => {
+  it('reads the party column from partner_name_snapshot alone', async () => {
     const [sql] = (await run({}), dataCall());
 
-    // AC-03. A free-text party has no catalogue row, so the only place its name
-    // lives is partner_name_snapshot — if the column list ever drops it, the
-    // grid silently shows blank for exactly the vouchers this feature added.
-    expect(sql).toContain('partner_name_snapshot');
-    // Ordering is load-bearing and deliberate: "Người nộp" still wins when both
-    // are set, so a fixture that fills payer_name proves nothing about this.
-    expect(sql.indexOf('payer_name')).toBeLessThan(sql.indexOf('partner_name_snapshot'));
+    // AC-02/AC-03. The two identities are two columns now (ADR-02): neither
+    // expression may name the other's source, or one of them goes back to
+    // hiding the other. Asserted per branch because a UNION ALL has two.
+    expect(sql).toContain(
+      "COALESCE(NULLIF(btrim(r.partner_name_snapshot), ''), '')\n                                                   AS counterparty",
+    );
+    expect(sql).toContain("COALESCE(NULLIF(btrim(p.partner_name_snapshot), ''), '')");
+    // The old shape nested both sources in one COALESCE; it must be gone, not
+    // merely reordered.
+    expect(sql).not.toContain("NULLIF(btrim(r.payer_name), ''),\n          NULLIF");
+  });
+
+  it('reads the person column from payer_name / payee_name alone', async () => {
+    const [sql] = (await run({}), dataCall());
+
+    // AC-01. The receipt half names the column; the payment half is positional,
+    // so the only thing that keeps them aligned is that both sides list party
+    // before person. Assert that order on the payment half explicitly — swapping
+    // the two lines there produces a query Postgres accepts and a grid that
+    // shows each value under the other's heading.
+    expect(sql).toContain(
+      "COALESCE(NULLIF(btrim(r.payer_name), ''), '')\n                                                   AS \"personName\"",
+    );
+    const paymentHalf = sql.slice(sql.indexOf('FROM cash_receipts r'));
+    expect(paymentHalf.indexOf('p.partner_name_snapshot')).toBeLessThan(
+      paymentHalf.indexOf('p.payee_name'),
+    );
+  });
+
+  it('projects personName in the outer select so the row reaches the grid', async () => {
+    const [sql] = (await run({}), dataCall());
+    // A column that exists in the CTE but not in the outer SELECT is invisible
+    // with no error at all — the grid just renders an empty cell forever.
+    const select = sql.slice(sql.lastIndexOf('SELECT', sql.indexOf('FROM combined')),
+                             sql.indexOf('FROM combined'));
+    expect(select).toContain('"personName"');
+  });
+
+  it('projects every field CashVoucherRowDto declares (AC-06)', async () => {
+    const [sql] = (await run({}), dataCall());
+    const projection = sql.slice(sql.indexOf('FROM combined'));
+    const select = sql.slice(sql.lastIndexOf('SELECT', sql.indexOf('FROM combined')),
+                             sql.indexOf('FROM combined'));
+
+    // The whole list, not just the field of the day. `manager.query<RowDto[]>` is
+    // a cast rather than a check, so a column the DTO promises and the SELECT
+    // omits reaches the grid as `undefined` with tsc green and Postgres silent —
+    // which is exactly how `revision` shipped broken.
+    for (const field of [
+      'documentKind', 'kind', 'id', 'createdAt', 'voucherDate', 'documentNumber',
+      'status', 'totalAmount', 'cashAccountId', 'referenceType', 'revision',
+      'counterparty', 'personName', 'reason',
+    ]) {
+      expect(select).toContain(field);
+    }
+    expect(projection).toBeTruthy();
+  });
+
+  it('keeps revision out of the totals query', async () => {
+    await run({});
+    const [totalsSql] = query.mock.calls[1] as [string, unknown[]];
+    // totalsSql is a bare COUNT/SUM; a stray column there is a different bug.
+    const totalsSelect = totalsSql.slice(totalsSql.lastIndexOf('SELECT COUNT'));
+    expect(totalsSelect).not.toContain('revision');
   });
 
   it('scopes by organizationId and branchId, paginates, and returns the envelope', async () => {
@@ -165,6 +222,20 @@ describe('SearchCashVouchersV2Handler', () => {
     const [sql, params] = dataCall();
     expect(sql).toContain("lower(COALESCE(counterparty, '')) = lower($3)");
     expect(params).toContain('A CHINH');
+  });
+
+  it('filters the personName column independently of counterparty', async () => {
+    // AC-04/AC-05. Two filters, two predicates, two params — if they ever
+    // collapsed onto one column, filtering by a name that exists only in the
+    // other field would still return the row.
+    await run({
+      counterparty: { operator: StringOperator.CONTAINS, value: 'kkkk' },
+      personName: { operator: StringOperator.CONTAINS, value: '123123' },
+    });
+    const [sql, params] = dataCall();
+    expect(sql).toContain("COALESCE(counterparty, '') ILIKE $3");
+    expect(sql).toContain('COALESCE("personName", \'\') ILIKE $4');
+    expect(params).toEqual(['org-1', 'branch-1', '%kkkk%', '%123123%', 20, 0]);
   });
 
   it('builds a numeric comparison clause for the total amount filter', async () => {

@@ -5,13 +5,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, DataSource, EntityManager, Not, Repository } from 'typeorm';
-import { DocumentType } from '@erp/shared-interfaces';
+import { Brackets, DataSource, EntityManager, In, Not, Repository } from 'typeorm';
+import { DocumentType, VoucherPrintPayload } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { DocumentNumberingService } from '../../../document-numbering/document-numbering.service';
+import { loadVoucherBranch } from '../../../inventory/location/services/voucher-print-context.util';
 import { CashService } from '../../cash/cash.service';
 import { CashMovementType } from '../../cash/cash-movement.entity';
 import { CashAccountEntity } from '../../cash/cash-account.entity';
+import { CashVoucherCategoryEntity } from '../cash-voucher-categories/cash-voucher-category.entity';
 import {
   CashPaymentPurpose,
   CashPaymentReferenceType,
@@ -31,6 +33,7 @@ import {
 } from '../shared/editable-voucher.util';
 import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
 import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
+import { mapCashPaymentToVoucherPayload } from './cash-payment-print.mapper';
 import { CashPaymentEntity } from './cash-payment.entity';
 import { CashPaymentLineEntity } from './cash-payment-line.entity';
 import { CreateCashPaymentDto } from './dto/create-cash-payment.dto';
@@ -176,8 +179,13 @@ export class CashPaymentsService {
           partnerId: freeTextParty ? undefined : dto.partnerId,
           partnerName: freeTextParty
             ? dto.partnerName?.trim() || undefined
-            : (partner?.name ?? undefined),
-          partnerAddress: freeTextParty ? undefined : (partner?.address ?? undefined),
+            : (dto.partnerName?.trim() || partner?.name) ?? undefined,
+          // What the cashier typed wins over the catalogue's current address —
+          // the voucher freezes the address as of the moment it was written
+          // (ADR-03, same rule as bank-receipts.service.ts).
+          partnerAddress: freeTextParty
+            ? dto.address?.trim() || undefined
+            : dto.address?.trim() ?? partner?.address ?? undefined,
           payeeName: dto.payeeName,
           staffId: dto.staffId,
           attachmentIds: dto.attachmentIds ?? [],
@@ -241,7 +249,12 @@ export class CashPaymentsService {
           Object.assign(payment, {
             partnerType: nextPartnerType ?? null,
             partnerId: nextPartnerId ?? null,
-            partnerNameSnapshot: partner?.name ?? null,
+            // A typed name wins over the catalogue name (ADR-02) but partner_id
+            // stays put; `dto.partnerName` is checked against `undefined`, not
+            // falsiness, so an explicit '' clears the snapshot to null instead
+            // of silently falling back to the catalogue name.
+            partnerNameSnapshot:
+              (dto.partnerName ?? partner?.name)?.trim() || null,
             partnerAddressSnapshot: partner?.address ?? null,
           });
         }
@@ -251,6 +264,19 @@ export class CashPaymentsService {
         voucherDate: dto.voucherDate ?? payment.voucherDate,
         purpose: dto.purpose ?? payment.purpose,
         payeeName: dto.payeeName ?? payment.payeeName,
+        // ADR-03: unlike partnerName, address does not participate in
+        // `partyTouched`, so this assignment sits here — outside
+        // `if (partyTouched)` — and always runs. Editing only the address
+        // must save (AC-09) even when the party is never mentioned. When the
+        // party WAS touched, `payment.partnerAddressSnapshot` was already
+        // reset above to the new party's address (or `null`), so `dto.address
+        // ?? payment.partnerAddressSnapshot` still lets an explicit address
+        // sent alongside a party change win. The trailing `.trim() || null`
+        // mirrors partnerNameSnapshot's handling: an explicit '' must clear
+        // the column to `null`, not leave it as `''` or fall back silently —
+        // TypeORM's save() skips `undefined`, not `null` or `''`.
+        partnerAddressSnapshot:
+          (dto.address ?? payment.partnerAddressSnapshot)?.trim() || null,
         reason: dto.reason ?? payment.reason,
         staffId: dto.staffId ?? payment.staffId,
         cashAccountId: dto.cashAccountId ?? payment.cashAccountId,
@@ -807,6 +833,55 @@ export class CashPaymentsService {
       actor.organizationId,
     );
     return Object.assign(payment, { sourceLink, linkedVoucher });
+  }
+
+  /**
+   * Print/export payload for one payment (T-03-03, ADR-05). Goes through
+   * `getById` for the same 404 / org-scoping the sibling `GET :id` route
+   * uses — a second query here would let the printed voucher drift from the
+   * one the user is looking at. The mapper is pure, so the display names it
+   * cannot resolve itself — `cashAccountId` and each line's `categoryId` are
+   * plain FK columns, not loaded relations — are resolved here.
+   */
+  async getPrintPayload(
+    id: string,
+    actor: ActorContext,
+  ): Promise<VoucherPrintPayload> {
+    const payment = await this.getById(id, actor);
+    const manager = this.dataSource.manager;
+    const [branch, cashAccountName, categoryNames] = await Promise.all([
+      loadVoucherBranch(manager, payment.branchId, actor.organizationId),
+      this.resolveCashAccountName(manager, payment.cashAccountId, actor.organizationId),
+      this.resolveCategoryNames(manager, payment.lines, actor.organizationId),
+    ]);
+    return mapCashPaymentToVoucherPayload(payment, branch, cashAccountName, categoryNames);
+  }
+
+  private async resolveCashAccountName(
+    manager: EntityManager,
+    cashAccountId: string,
+    organizationId: string,
+  ): Promise<string> {
+    const account = await manager.findOne(CashAccountEntity, {
+      where: { id: cashAccountId, organizationId },
+    });
+    return account?.name ?? '';
+  }
+
+  /** Batch-resolves category names for a payment's lines, keyed by category id. */
+  private async resolveCategoryNames(
+    manager: EntityManager,
+    lines: CashPaymentLineEntity[],
+    organizationId: string,
+  ): Promise<Map<string, string>> {
+    const ids = [
+      ...new Set(lines.map((l) => l.categoryId).filter((id): id is string => Boolean(id))),
+    ];
+    if (!ids.length) return new Map();
+    const categories = await manager.find(CashVoucherCategoryEntity, {
+      where: { id: In(ids), organizationId },
+    });
+    return new Map(categories.map((c) => [c.id, c.name]));
   }
 
   private async buildSourceLink(
