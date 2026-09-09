@@ -17,6 +17,7 @@ import { RoleEntity } from './role.entity';
 import { UserBranchAssignmentEntity } from '../branch/user-branch-assignment.entity';
 import { BranchEntity } from '../branch/branch.entity';
 import { SessionStore } from '../redis/session.store';
+import { CacheService } from '../redis/cache.service';
 import { HandoffStore } from './handoff.store';
 import { RbacService } from '../rbac/rbac.service';
 
@@ -61,6 +62,10 @@ describe('AuthService', () => {
   let sessionStore: jest.Mocked<Pick<SessionStore, 'createSession' | 'getSession' | 'revokeSession'>>;
   let handoffStore: jest.Mocked<Pick<HandoffStore, 'issue' | 'consume'>>;
   let rbacService: jest.Mocked<Pick<RbacService, 'getUserPermissions'>>;
+  // Backs `cacheService.getOrSet` with a real in-memory store so the identity
+  // cache tests below exercise actual hit/miss behavior, not just a pass-through.
+  let cacheStore: Map<string, unknown>;
+  let cacheService: jest.Mocked<Pick<CacheService, 'getOrSet'>>;
 
   beforeEach(async () => {
     userRepo = {
@@ -88,6 +93,22 @@ describe('AuthService', () => {
         'iam.user.read',
       ]),
     };
+    cacheStore = new Map();
+    cacheService = {
+      getOrSet: jest.fn(
+        async <T>(
+          namespace: string,
+          key: string,
+          fetchFn: () => Promise<T>,
+        ): Promise<T> => {
+          const cacheKey = `${namespace}:${key}`;
+          if (cacheStore.has(cacheKey)) return cacheStore.get(cacheKey) as T;
+          const value = await fetchFn();
+          cacheStore.set(cacheKey, value);
+          return value;
+        },
+      ) as jest.Mocked<Pick<CacheService, 'getOrSet'>>['getOrSet'],
+    };
 
     const mockQb = {
       where: jest.fn().mockReturnThis(),
@@ -111,6 +132,7 @@ describe('AuthService', () => {
           },
         },
         { provide: SessionStore, useValue: sessionStore },
+        { provide: CacheService, useValue: cacheService },
         { provide: HandoffStore, useValue: handoffStore },
         { provide: RbacService, useValue: rbacService },
         { provide: getRepositoryToken(UserEntity), useValue: userRepo },
@@ -163,6 +185,7 @@ describe('AuthService', () => {
         AuthService,
         { provide: ConfigService, useValue: { get: jest.fn(getImpl) } },
         { provide: SessionStore, useValue: sessionStore },
+        { provide: CacheService, useValue: cacheService },
         { provide: HandoffStore, useValue: handoffStore },
         { provide: RbacService, useValue: rbacService },
         { provide: getRepositoryToken(UserEntity), useValue: userRepo },
@@ -919,6 +942,234 @@ describe('AuthService', () => {
       const refresh = decode(result.refreshToken);
       expect(access.exp - access.iat).toBe(86400);
       expect(refresh.exp - refresh.iat).toBe(2592000);
+    });
+  });
+
+  // =========================================================================
+  // identity cache (T-07-01 / ADR-07) — read path is cached, token-minting
+  // paths and revocation checks must never see a stale answer.
+  // =========================================================================
+  describe('identity cache', () => {
+    function arrangeIdentity() {
+      userRoleRepo.find.mockResolvedValue([
+        { id: 'ur-1', userId: 'user-1', roleId: 'role-1', organizationId: 'org-1' } as UserRoleEntity,
+      ]);
+      userBranchRepo.find.mockResolvedValue([
+        { branchId: 'branch-1' } as UserBranchAssignmentEntity,
+      ]);
+      activeBranchStubs = [{ id: 'branch-1' }];
+    }
+
+    it('calling buildSessionInfo twice (via getSession) runs the resolvers exactly once', async () => {
+      arrangeIdentity();
+      sessionStore.getSession.mockResolvedValue({
+        userId: 'user-1',
+        organizationId: 'org-1',
+        branchIds: ['branch-1'],
+        roles: ['admin'],
+        issuedAt: 1000,
+        expiresAt: 999999,
+      });
+
+      await service.getSession('jti-1');
+      await service.getSession('jti-1');
+
+      expect(userRoleRepo.find).toHaveBeenCalledTimes(1);
+      expect(userBranchRepo.find).toHaveBeenCalledTimes(1);
+      expect(cacheService.getOrSet).toHaveBeenCalledTimes(2);
+    });
+
+    it('login() runs the resolvers every time, even with a hot identity cache', async () => {
+      setupValidLogin();
+      sessionStore.getSession.mockResolvedValue({
+        userId: 'user-1',
+        organizationId: 'org-1',
+        branchIds: ['branch-1'],
+        roles: ['admin'],
+        issuedAt: 1000,
+        expiresAt: 999999,
+      });
+
+      // Warm the identity cache for user-1/org-1.
+      await service.getSession('jti-warm');
+      expect(userRoleRepo.find).toHaveBeenCalledTimes(1);
+      expect(userBranchRepo.find).toHaveBeenCalledTimes(1);
+
+      await service.login('admin@example.com', 'password', 'org-1');
+
+      // login() must not read from the cache warmed above.
+      expect(userRoleRepo.find).toHaveBeenCalledTimes(2);
+      expect(userBranchRepo.find).toHaveBeenCalledTimes(2);
+    });
+
+    it('switchBranch() runs the resolvers every time, and rejects a branch removed from user_branch_assignments immediately even with a hot identity cache', async () => {
+      // This is the regression T-07-01 exists to close: version 1 cached the
+      // read inside buildSessionInfo, so switchBranch's authorization gate
+      // (`branchIds.includes(branchId)`) could stay stale for up to
+      // CACHE_TTL_SECONDS after a branch was revoked.
+      const current: JwtPayload = {
+        userId: 'user-1',
+        organizationId: 'org-1',
+        roles: ['admin'],
+        branchIds: ['branch-1', 'branch-2'],
+        branchId: 'branch-1',
+        jti: 'old-jti',
+        iat: 1000,
+        exp: 999999,
+      };
+      arrangeIdentity();
+      userBranchRepo.find.mockResolvedValue([
+        { branchId: 'branch-1' } as UserBranchAssignmentEntity,
+        { branchId: 'branch-2' } as UserBranchAssignmentEntity,
+      ]);
+      activeBranchStubs = [{ id: 'branch-1' }, { id: 'branch-2' }];
+      sessionStore.getSession.mockResolvedValue({
+        userId: 'user-1',
+        organizationId: 'org-1',
+        branchIds: ['branch-1', 'branch-2'],
+        roles: ['admin'],
+        issuedAt: 1000,
+        expiresAt: 999999,
+      });
+
+      // Warm the identity cache while branch-2 is still assigned.
+      await service.getSession('jti-warm');
+      expect(userBranchRepo.find).toHaveBeenCalledTimes(1);
+
+      // The assignment row for branch-2 is now gone from user_branch_assignments.
+      userBranchRepo.find.mockResolvedValue([
+        { branchId: 'branch-1' } as UserBranchAssignmentEntity,
+      ]);
+      userBranchRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.switchBranch(current, 'branch-2')).rejects.toThrow(
+        ForbiddenException,
+      );
+      // switchBranch must not have answered from the cache warmed above.
+      expect(userBranchRepo.find).toHaveBeenCalledTimes(2);
+      expect(sessionStore.revokeSession).not.toHaveBeenCalled();
+      expect(sessionStore.createSession).not.toHaveBeenCalled();
+    });
+
+    it('exchangeHandoffCode() runs the resolvers every time, even with a hot identity cache', async () => {
+      arrangeIdentity();
+      handoffStore.consume.mockResolvedValue({
+        userId: 'user-1',
+        organizationId: 'org-1',
+        branchId: 'branch-1',
+      });
+      userRepo.findOne.mockResolvedValue({
+        id: 'user-1',
+        organizationId: 'org-1',
+        isActive: true,
+      } as UserEntity);
+      sessionStore.createSession.mockResolvedValue(undefined);
+      sessionStore.getSession.mockResolvedValue({
+        userId: 'user-1',
+        organizationId: 'org-1',
+        branchIds: ['branch-1'],
+        roles: ['admin'],
+        issuedAt: 1000,
+        expiresAt: 999999,
+      });
+      (jwt.sign as jest.Mock).mockReturnValue('handoff-token');
+
+      // Warm the identity cache the way getSession would.
+      await service.getSession('jti-warm');
+      expect(userRoleRepo.find).toHaveBeenCalledTimes(1);
+      expect(userBranchRepo.find).toHaveBeenCalledTimes(1);
+
+      await service.exchangeHandoffCode('some-code');
+
+      // exchangeHandoffCode() must not read from the cache warmed above.
+      expect(userRoleRepo.find).toHaveBeenCalledTimes(2);
+      expect(userBranchRepo.find).toHaveBeenCalledTimes(2);
+    });
+
+    it('refresh() runs the resolvers every time, even with a hot identity cache', async () => {
+      arrangeIdentity();
+      sessionStore.getSession.mockResolvedValue({
+        userId: 'user-1',
+        organizationId: 'org-1',
+        branchIds: ['branch-1'],
+        roles: ['admin'],
+        issuedAt: 1000,
+        expiresAt: 999999,
+      });
+      sessionStore.revokeSession.mockResolvedValue(undefined);
+      sessionStore.createSession.mockResolvedValue(undefined);
+      (jwt.verify as jest.Mock).mockReturnValue({
+        jti: 'old-jti',
+        userId: 'user-1',
+      });
+      (jwt.sign as jest.Mock).mockReturnValue('new-signed-token');
+
+      // Warm the identity cache the way buildSessionInfo would.
+      await service.getSession('jti-warm');
+      expect(userRoleRepo.find).toHaveBeenCalledTimes(1);
+
+      await service.refresh('valid-refresh-token');
+
+      // refresh() must not read from the cache warmed above.
+      expect(userRoleRepo.find).toHaveBeenCalledTimes(2);
+      expect(userBranchRepo.find).toHaveBeenCalledTimes(2);
+    });
+
+    it('the branch-switch / handoff membership check runs the resolver every time, even with a hot identity cache', async () => {
+      // ADR-07's "chuyển chi nhánh / handoff" call site is the resolveUserBranches
+      // call inside createHandoffCode (auth.service.ts:280-292), which decides
+      // whether the caller may still stand in the requested branch. It must
+      // never read from the identity cache.
+      arrangeIdentity();
+      const current: JwtPayload = {
+        userId: 'user-1',
+        organizationId: 'org-1',
+        roles: ['admin'],
+        branchIds: ['branch-1'],
+        branchId: 'branch-1',
+        jti: 'old-jti',
+        iat: 1000,
+        exp: 999999,
+      };
+      sessionStore.getSession.mockResolvedValue({
+        userId: 'user-1',
+        organizationId: 'org-1',
+        branchIds: ['branch-1'],
+        roles: ['admin'],
+        issuedAt: 1000,
+        expiresAt: 999999,
+      });
+
+      // Warm the identity cache the way buildSessionInfo would.
+      await service.getSession('jti-warm');
+      expect(userBranchRepo.find).toHaveBeenCalledTimes(1);
+
+      await service.createHandoffCode(current, 'branch-1');
+
+      expect(userBranchRepo.find).toHaveBeenCalledTimes(2);
+    });
+
+    it('getSession returns null for a revoked jti even when the identity cache is warm', async () => {
+      arrangeIdentity();
+      sessionStore.getSession.mockResolvedValueOnce({
+        userId: 'user-1',
+        organizationId: 'org-1',
+        branchIds: ['branch-1'],
+        roles: ['admin'],
+        issuedAt: 1000,
+        expiresAt: 999999,
+      });
+
+      // Warm the identity cache for user-1/org-1.
+      await service.getSession('jti-live');
+
+      // The session for the same user is now revoked.
+      sessionStore.getSession.mockResolvedValueOnce(null);
+      const result = await service.getSession('jti-live');
+
+      expect(result).toBeNull();
+      // getSession must consult sessionStore itself, not any cache, to decide this.
+      expect(sessionStore.getSession).toHaveBeenCalledTimes(2);
     });
   });
 });

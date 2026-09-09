@@ -1,5 +1,7 @@
 import { useCallback, useMemo } from "react";
-import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
+import type {
+  PosCatalogSuggestion,
+} from "@erp/pos/interfaces/catalog.interface";
 import {
   CheckoutPane,
   selectActiveSession,
@@ -10,7 +12,6 @@ import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/chec
 import type {
   CartLine,
   CartLineDiscount,
-  CatalogProduct,
 } from "@erp/pos/interfaces/checkout.interface";
 import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import {
@@ -165,7 +166,7 @@ export function useCheckoutSessionCart() {
   );
 
   const addProduct = useCallback(
-    (product: PosCatalogLine, qtyToAdd = 1): string | null => {
+    (product: PosCatalogSuggestion, qtyToAdd = 1): string | null => {
       if (!session) return null;
       // Cho phép bán khống: KHÔNG chặn khi hết tồn. `onHand` chỉ còn dùng làm
       // `maxQty` (snapshot tồn) để đánh dấu cảnh báo vượt tồn + bật dialog xác nhận
@@ -254,15 +255,6 @@ export function useCheckoutSessionCart() {
       setSelectedLinePurchaseId,
       setSelectedLineReturnId,
     ],
-  );
-
-  const handleCatalogSelect = useCallback(
-    (product: CatalogProduct, catalog: PosCatalogLine[]): string | null => {
-      const found = catalog.find((p) => p.itemId === product.id);
-      if (!found) return null;
-      return addProduct(found);
-    },
-    [addProduct],
   );
 
   const updateUnitPrice = useCallback(
@@ -466,7 +458,6 @@ export function useCheckoutSessionCart() {
     setCartError,
     grandTotal,
     addProduct,
-    handleCatalogSelect,
     updateUnitPrice,
     updateQty,
     bumpQty,

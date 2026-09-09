@@ -481,6 +481,30 @@ describe("StockTakeService", () => {
         );
       });
     });
+
+    // T-05-01 (AC-18) regression: removeLine() deletes a row without
+    // renumbering, so a gap-filling lineNo must be computed from the current
+    // max, not from st.lines.length — otherwise a subsequent add collides
+    // with uq_stock_take_lines_doc_line_no.
+    it("numbers the next line from the current max lineNo, not the line count, after a middle line was removed", async () => {
+      stRepo.findOne.mockResolvedValue({
+        ...draftSt,
+        // line_no = 2 was removed via removeLine(); two lines remain but the
+        // max is 3, not 2.
+        lines: [
+          { id: "line-1", lineNo: 1 },
+          { id: "line-3", lineNo: 3 },
+        ],
+      });
+      balanceRepo.createQueryBuilder.mockReturnValue(buildQb([]));
+      locationRepo.findOne.mockResolvedValue({ id: "loc-X" });
+
+      await service.addLine("st-1", { itemId: "item-1" }, actor);
+
+      expect(lineRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ lineNo: 4 }),
+      );
+    });
   });
 
   describe("updateLineCount", () => {

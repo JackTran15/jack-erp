@@ -129,16 +129,47 @@ interface TransferOrder {
   createdAt: string;
 }
 
-/** GET /inventory/transfer-orders/:id/lines response shape (paginated). */
+/** `POST /v2/inventory/transfer-orders/:id/lines/search` response shape. */
 interface TransferOrderLinesPage {
-  items: TransferOrderLine[];
+  data: TransferOrderLine[];
   page: number;
-  pageSize: number;
-  hasMore: boolean;
+  limit: number;
   total: number;
 }
 
 const LINES_PAGE_SIZE = 50;
+
+// Extracted so the request shape for AC-09 (`includeLines=false` on the
+// select-row header fetch) can be asserted without rendering the page.
+export function buildSelectedTransferOrderHeaderRequest(id: string) {
+  return {
+    params: {
+      path: { id },
+      query: { includeLines: false as const },
+    },
+  } as const;
+}
+
+// Extracted so the "keep paging until the server says stop" rule behind
+// AC-10 can be asserted without rendering the page or a real network call.
+export function getNextTransferOrderLinesPageParam(last: TransferOrderLinesPage) {
+  return last.page * last.limit < last.total ? last.page + 1 : undefined;
+}
+
+/**
+ * `GET /inventory/transfer-orders/:id` with no `includeLines` flag — server
+ * default stays `true`. Used by the three toolbar actions that need the whole
+ * line array to seed the dialog: Nhân bản, Xem, Sửa (the dialog's `lines`
+ * state is seeded from `initial.lines` in every mode — see
+ * `TransferOrderFormDialog`).
+ */
+async function fetchTransferOrderWithLines(id: string): Promise<TransferOrder> {
+  return requireErpData(
+    await erpApi.GET<TransferOrder>("/inventory/transfer-orders/{id}", {
+      params: { path: { id } },
+    }),
+  );
+}
 
 interface PaginatedResponse<T> {
   data: T[];
@@ -212,6 +243,10 @@ export function TransferOrdersPage() {
   const [columnFilters, setColumnFilters] =
     useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  // Locks the one clicked toolbar action (Nhân bản / Xem / Sửa) while its
+  // `fetchTransferOrderWithLines` round-trip is in flight — not the whole
+  // toolbar.
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
 
   const [dialogMode, setDialogMode] = useState<
     "create" | "edit" | "view" | null
@@ -322,16 +357,19 @@ export function TransferOrdersPage() {
 
   // List rows no longer carry `lines` (list() bypasses TransferOrderEntity's
   // eager lines/item, see transfer-order.service.ts `list()`). The selected
-  // order's full detail (header + lines) is fetched separately via the
-  // unchanged GET /:id, so the duplicate/view/edit dialog and DetailPanel
-  // both read from this instead of the stale list row.
+  // order's header is fetched separately via GET /:id?includeLines=false —
+  // DetailPanel pages its own lines through POST
+  // /v2/inventory/transfer-orders/:id/lines/search, so this query never needs
+  // them. Actions that need the full line array (duplicate/view/edit dialog)
+  // fetch it on demand instead of reading it off this header.
   const { data: selectedOrderData } = useQuery({
     queryKey: ["transfer-order", selectedId],
     queryFn: async () =>
       requireErpData(
-        await erpApi.GET<TransferOrder>("/inventory/transfer-orders/{id}", {
-          params: { path: { id: selectedId! } },
-        }),
+        await erpApi.GET<TransferOrder>(
+          "/inventory/transfer-orders/{id}",
+          buildSelectedTransferOrderHeaderRequest(selectedId!),
+        ),
       ),
     enabled: !!selectedId,
   });
@@ -378,37 +416,73 @@ export function TransferOrdersPage() {
       id: "duplicate",
       label: "Nhân bản",
       icon: Copy,
-      disabled: !selectedOrder,
+      // `selectedOrder` no longer carries `lines` (includeLines=false above),
+      // and the dialog seeds its `lines` state from `initial.lines` in every
+      // mode — fetch the full document on demand instead (ADR-02).
+      tooltip: pendingAction === "duplicate" ? "Đang tải..." : undefined,
+      disabled: !selectedOrder || pendingAction === "duplicate",
       onClick: () => {
         if (!selectedOrder) return;
-        setEditingOrder(selectedOrder);
-        setDialogMode("create");
+        setPendingAction("duplicate");
+        void (async () => {
+          try {
+            const full = await fetchTransferOrderWithLines(selectedOrder.id);
+            setEditingOrder(full);
+            setDialogMode("create");
+          } catch (err) {
+            toast.error(getUserFacingApiErrorMessage(err));
+          } finally {
+            setPendingAction(null);
+          }
+        })();
       },
     },
     {
       id: "view",
       label: "Xem",
       icon: Eye,
-      disabled: !selectedOrder,
+      tooltip: pendingAction === "view" ? "Đang tải..." : undefined,
+      disabled: !selectedOrder || pendingAction === "view",
       onClick: () => {
         if (!selectedOrder) return;
-        setEditingOrder(selectedOrder);
-        setDialogMode("view");
+        setPendingAction("view");
+        void (async () => {
+          try {
+            const full = await fetchTransferOrderWithLines(selectedOrder.id);
+            setEditingOrder(full);
+            setDialogMode("view");
+          } catch (err) {
+            toast.error(getUserFacingApiErrorMessage(err));
+          } finally {
+            setPendingAction(null);
+          }
+        })();
       },
     },
     {
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !selectedOrder || !editable,
+      tooltip: pendingAction === "edit" ? "Đang tải..." : undefined,
+      disabled: !selectedOrder || !editable || pendingAction === "edit",
       onClick: () => {
         if (!editable) {
           toast.info("Phiếu đã hoàn thành hoặc đã hủy không thể sửa.");
           return;
         }
         if (!selectedOrder) return;
-        setEditingOrder(selectedOrder);
-        setDialogMode("edit");
+        setPendingAction("edit");
+        void (async () => {
+          try {
+            const full = await fetchTransferOrderWithLines(selectedOrder.id);
+            setEditingOrder(full);
+            setDialogMode("edit");
+          } catch (err) {
+            toast.error(getUserFacingApiErrorMessage(err));
+          } finally {
+            setPendingAction(null);
+          }
+        })();
       },
     },
     {
@@ -568,6 +642,7 @@ export function TransferOrdersPage() {
         }
         detailPanel={
           <DetailPanel
+            orderId={selectedId}
             order={selectedOrder}
             storageNameById={storageNameById}
           />
@@ -661,34 +736,39 @@ export function TransferOrdersPage() {
 // ─── Detail panel (selected order's lines) ────────────────────────────────────
 
 function DetailPanel({
+  orderId,
   order,
   storageNameById,
 }: {
+  // Raw selected id, independent of the header (`order`) query's result —
+  // gating this query on `order?.id` instead would make it wait for the
+  // header round-trip to resolve, turning one parallel pair of requests into
+  // two sequential ones (the exact regression `2026083002` shipped).
+  orderId: string | null;
   order: TransferOrder | null;
   storageNameById: Map<string, string>;
 }) {
-  const orderId = order?.id ?? null;
-
   // Paginated, independent from the header (`order`) query's cache key so a
   // header refetch doesn't discard already-scrolled line pages.
   const linesQuery = useInfiniteQuery({
     queryKey: ["transfer-order-lines", orderId],
     queryFn: async ({ pageParam }) =>
       requireErpData(
-        await erpApi.GET<TransferOrderLinesPage>("/inventory/transfer-orders/{id}/lines", {
-          params: {
-            path: { id: orderId! },
-            query: { page: pageParam, pageSize: LINES_PAGE_SIZE },
+        await erpApi.POST<TransferOrderLinesPage>(
+          "/v2/inventory/transfer-orders/{id}/lines/search",
+          {
+            params: { path: { id: orderId! } },
+            body: { page: pageParam, limit: LINES_PAGE_SIZE },
           },
-        }),
+        ),
       ),
     initialPageParam: 1,
-    getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
+    getNextPageParam: getNextTransferOrderLinesPageParam,
     enabled: !!orderId,
   });
 
   const lines = useMemo(
-    () => linesQuery.data?.pages.flatMap((p) => p.items) ?? [],
+    () => linesQuery.data?.pages.flatMap((p) => p.data) ?? [],
     [linesQuery.data],
   );
 
@@ -729,7 +809,7 @@ function DetailPanel({
           </strong>
         </p>
       )}
-      {!order ? (
+      {!orderId ? (
         <p className="text-sm text-muted-foreground">
           Chọn một lệnh để xem chi tiết.
         </p>
@@ -766,7 +846,7 @@ function DetailPanel({
               const code = line.item?.code ?? line.itemId.slice(0, 8);
               const name = line.item?.name ?? "—";
               const unit = line.item?.unit ?? "—";
-              const srcId = line.sourceStorageId ?? order.sourceStorageId;
+              const srcId = line.sourceStorageId ?? order?.sourceStorageId;
               const srcName = srcId ? (storageNameById.get(srcId) ?? "—") : "—";
               return (
                 <tr key={line.id} className="border-b">

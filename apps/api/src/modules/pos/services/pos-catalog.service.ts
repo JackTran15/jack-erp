@@ -3,6 +3,11 @@ import { DataSource } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { TempWarehouseStagedStockService } from '../../inventory/temp-warehouse/temp-warehouse-staged-stock.service';
 import { PosCatalogDirection } from '../dto/pos-catalog.query.dto';
+import {
+  buildExactMatchCte,
+  buildItemIdsCte,
+  buildSuggestCte,
+} from './pos-catalog-sql';
 
 export type PosCatalogLineDto = {
   itemId: string;
@@ -31,6 +36,36 @@ export type PosCatalogLineDto = {
   locations: { locationId: string; name: string; quantity: number }[];
   /** Vị trí ưu tiên trừ khi bán (kho còn nhiều nhất). */
   defaultLocationId: string;
+};
+
+/**
+ * One raw row of the catalogue queries: an item joined to one of its branch
+ * stock locations, or to none at all (`locationId` null) when the item matches
+ * but the branch holds no balance for it.
+ */
+type CatalogStockRow = {
+  itemId: string;
+  productId: string | null;
+  locationId: string | null;
+  locationName: string | null;
+  quantity: string | null;
+  isShowroom?: boolean | null;
+  isMainStorage?: boolean | null;
+  code: string;
+  name: string;
+  unit: string;
+  sellingPrice: string;
+};
+
+/** Both arms of the merged POS catalogue search. */
+export type PosCatalogSearchResult = {
+  /**
+   * The single item whose SKU or barcode equals the term exactly. Null for zero
+   * matches and null for several: the caller auto-adds on a unique hit, so
+   * "which one" is not a question it can answer.
+   */
+  exact: PosCatalogLineDto | null;
+  suggestions: PosCatalogLineDto[];
 };
 
 @Injectable()
@@ -123,8 +158,20 @@ export class PosCatalogService {
   }
 
   /**
-   * ILIKE search from items — LEFT JOIN stock_balances so hàng khớp tên/SKU/mã vạch
-   * vẫn trả về dù chưa có tồn tại chi nhánh (giống lookupByCode).
+   * ILIKE search over item name/SKU, attached barcodes and the parent product's
+   * code/name. Stock is LEFT JOINed on afterwards, so an item that matches but
+   * carries no balance in the branch still comes back (same contract as
+   * `lookupByCode`).
+   *
+   * `limit` caps the matched items before the stock join. It is optional and
+   * `getCatalog` does not pass it: `GET /pos/branches/:id/catalog` keeps its
+   * historical unbounded response, which fast stock transfer relies on.
+   *
+   * When both are supplied, `direction` filters *after* the cap, so it can
+   * shrink the result below `limit`. The two are never combined today —
+   * `direction` comes only from fast stock transfer and `limit` only from the
+   * CQRS search handler — and reconciling them would mean pushing the showroom
+   * classification into the capped subquery for no present caller.
    */
   private async searchCatalogByTerm(
     branchId: string,
@@ -132,10 +179,36 @@ export class PosCatalogService {
     pattern: string,
     direction?: PosCatalogDirection,
     includeUntracked = false,
+    limit?: number,
   ): Promise<PosCatalogLineDto[]> {
+    const rows = await this.querySuggestRows(
+      branchId,
+      orgId,
+      pattern,
+      includeUntracked,
+      limit,
+    );
+    const stagedDelta = await this.stagedStock.getBranchDelta(branchId, orgId);
+    return this.aggregateStockRows(rows, direction, stagedDelta);
+  }
+
+  /** Raw stock rows for the fuzzy arm; aggregation and the staged delta are the caller's. */
+  private async querySuggestRows(
+    branchId: string,
+    orgId: string,
+    pattern: string,
+    includeUntracked = false,
+    limit?: number,
+  ): Promise<CatalogStockRow[]> {
     const trackedFilter = includeUntracked ? '' : 'AND sb.is_tracked = true';
     const rows = await this.dataSource.query(
-      `SELECT i.id                  AS "itemId",
+      // The match runs as a UNION of index-driven arms and is capped there, so
+      // the stock join reads balances for the surviving items only. See
+      // buildSuggestCte for why this is not an OR across a LEFT JOIN.
+      `WITH matched AS (
+         ${buildSuggestCte({ org: '$1', pattern: '$3', limit })}
+       )
+       SELECT i.id                  AS "itemId",
               i.product_id          AS "productId",
               i.code,
               i.name,
@@ -153,9 +226,9 @@ export class PosCatalogService {
                 )
               END AS "isShowroom",
               COALESCE(st.is_main_storage, false) AS "isMainStorage"
-       FROM items i
-       LEFT JOIN item_barcodes b
-         ON b.item_id = i.id AND b.organization_id = i.organization_id
+       FROM matched m
+       INNER JOIN items i
+         ON i.id = m.id
        LEFT JOIN stock_balances sb
          ON sb.item_id = i.id
         AND sb.organization_id = i.organization_id
@@ -167,46 +240,23 @@ export class PosCatalogService {
         )
        LEFT JOIN locations l
          ON l.id = sb.location_id
+       -- storages.branch_id is uuid while stock_balances.branch_id is varchar, so
+       -- the branch parameter is compared as text on both sides: casting $2 to
+       -- uuid here would make Postgres deduce two conflicting types for the same
+       -- parameter and reject the statement.
        LEFT JOIN storages st
          ON st.id = l.storage_id
         AND st.organization_id = $1
         AND st.branch_id::text = $2
-       WHERE i.organization_id = $1
-         AND i.is_active = true
-         AND i.is_pos_visible = true
-         AND (
-           i.name ILIKE $3
-           OR i.code ILIKE $3
-           OR b.code ILIKE $3
-           OR EXISTS (
-             SELECT 1 FROM products p
-             WHERE p.id = i.product_id
-               AND p.organization_id = i.organization_id
-               AND (p.code ILIKE $3 OR p.name ILIKE $3)
-           )
-         )
        ORDER BY i.name ASC, sb.location_id ASC`,
       [orgId, branchId, pattern],
     );
 
-    const stagedDelta = await this.stagedStock.getBranchDelta(branchId, orgId);
-    return this.aggregateStockRows(rows, direction, stagedDelta);
+    return rows;
   }
 
   private aggregateStockRows(
-    rows: Array<{
-      itemId: string;
-      productId: string | null;
-      locationId: string | null;
-      locationName: string | null;
-      quantity: string | null;
-      isShowroom?: boolean | null;
-      isMainStorage?: boolean | null;
-      code: string;
-      name: string;
-      unit: string;
-      sellingPrice: string;
-    }>,
+    rows: CatalogStockRow[],
     direction: PosCatalogDirection | undefined,
     stagedDelta: Map<string, number>,
   ): PosCatalogLineDto[] {
@@ -320,21 +370,88 @@ export class PosCatalogService {
     includeUntracked = false,
   ): Promise<PosCatalogLineDto[]> {
     const orgId = actor.organizationId;
+    const rows = await this.queryExactRows(
+      branchId,
+      orgId,
+      code,
+      includeUntracked,
+    );
+    const stagedDelta = await this.stagedStock.getBranchDelta(branchId, orgId);
+    return this.aggregateStockRows(rows, undefined, stagedDelta);
+  }
+
+  /**
+   * Both arms of the POS search bar in one round trip: the exact SKU/barcode
+   * match that drives auto-add, and the fuzzy suggestions that fill the
+   * dropdown.
+   *
+   * They are issued together because the caller needs both to decide what to
+   * do with a keystroke, and because the staged temp-warehouse delta — which
+   * `sellableQuantity` depends on and which is a query of its own — is then
+   * read once for the request rather than once per arm.
+   *
+   * `mode: 'exact'` skips the fuzzy arm entirely. That is what the Enter key
+   * and a barcode scan want, and it also keeps them clear of the one case no
+   * index can help: pg_trgm needs three characters, so a one- or two-character
+   * term makes the fuzzy arm scan.
+   */
+  async searchCatalog(
+    branchId: string,
+    actor: ActorContext,
+    params: {
+      term: string;
+      exactOnly?: boolean;
+      limit?: number;
+      includeUntracked?: boolean;
+    },
+  ): Promise<PosCatalogSearchResult> {
+    const orgId = actor.organizationId;
+    const includeUntracked = params.includeUntracked ?? false;
+    const term = params.term.trim();
+    const pattern = `%${term.replace(/[%_\\]/g, '')}%`;
+
+    const [exactRows, suggestRows, stagedDelta] = await Promise.all([
+      this.queryExactRows(branchId, orgId, term, includeUntracked),
+      params.exactOnly
+        ? Promise.resolve<CatalogStockRow[]>([])
+        : this.querySuggestRows(
+            branchId,
+            orgId,
+            pattern,
+            includeUntracked,
+            params.limit,
+          ),
+      this.stagedStock.getBranchDelta(branchId, orgId),
+    ]);
+
+    const exactLines = this.aggregateStockRows(exactRows, undefined, stagedDelta);
+
+    return {
+      // Deliberately null when several items share the code: the caller's whole
+      // reason for asking is to auto-add without a choice to make.
+      exact: exactLines.length === 1 ? exactLines[0]! : null,
+      suggestions: this.aggregateStockRows(suggestRows, undefined, stagedDelta),
+    };
+  }
+
+  /** Raw stock rows for the exact arm; aggregation and the staged delta are the caller's. */
+  private async queryExactRows(
+    branchId: string,
+    orgId: string,
+    code: string,
+    includeUntracked = false,
+  ): Promise<CatalogStockRow[]> {
     const trackedFilter = includeUntracked ? '' : 'AND sb.is_tracked = true';
 
-    const rows: Array<{
-      itemId: string;
-      productId: string | null;
-      code: string;
-      name: string;
-      unit: string;
-      sellingPrice: string;
-      locationId: string | null;
-      locationName: string | null;
-      quantity: string | null;
-      isMainStorage: boolean | null;
-    }> = await this.dataSource.query(
-      `SELECT i.id                  AS "itemId",
+    const rows: CatalogStockRow[] = await this.dataSource.query(
+      // The match itself is a UNION of two index-driven arms (see
+      // buildExactMatchCte); only the stock projection is joined on afterwards,
+      // so the branch's balances are read for the handful of matched items
+      // rather than for every POS-visible item in the organization.
+      `WITH matched AS (
+         ${buildExactMatchCte({ org: '$1', code: '$3' })}
+       )
+       SELECT i.id                  AS "itemId",
               i.product_id          AS "productId",
               i.code,
               i.name,
@@ -344,9 +461,9 @@ export class PosCatalogService {
               l.name                AS "locationName",
               sb.quantity::text     AS "quantity",
               COALESCE(st.is_main_storage, false) AS "isMainStorage"
-       FROM items i
-       LEFT JOIN item_barcodes b
-         ON b.item_id = i.id AND b.organization_id = i.organization_id
+       FROM matched m
+       INNER JOIN items i
+         ON i.id = m.id
        LEFT JOIN stock_balances sb
          ON sb.item_id = i.id
         AND sb.organization_id = i.organization_id
@@ -358,19 +475,105 @@ export class PosCatalogService {
         )
        LEFT JOIN locations l
          ON l.id = sb.location_id
+       -- storages.branch_id is uuid while stock_balances.branch_id is varchar, so
+       -- the branch parameter is compared as text on both sides: casting $2 to
+       -- uuid here would make Postgres deduce two conflicting types for the same
+       -- parameter and reject the statement.
        LEFT JOIN storages st
          ON st.id = l.storage_id
         AND st.organization_id = $1
         AND st.branch_id::text = $2
-       WHERE i.organization_id = $1
-         AND i.is_active = true
-         AND i.is_pos_visible = true
-         AND (i.code = $3 OR b.code = $3)
        ORDER BY i.name ASC, sb.location_id ASC`,
       [orgId, branchId, code],
     );
 
+    return rows;
+  }
+
+  /**
+   * Branch stock for a known set of items, in the same shape and from the same
+   * aggregation as every other catalogue read.
+   *
+   * This exists so the POS page can refresh the on-hand snapshot of the lines
+   * already in the cart without pulling the branch catalogue: on a production
+   * restore that catalogue is 10,400 items and ~3.8 MB, to answer a question
+   * about three of them.
+   *
+   * Items that are no longer active or POS-visible simply do not come back, so
+   * the result can be shorter than `itemIds`. That is deliberate — the caller
+   * leaves such a line with an unknown on-hand, which keeps the oversell
+   * warning on rather than quoting a figure that is no longer true.
+   */
+  async getStockForItems(
+    branchId: string,
+    actor: ActorContext,
+    itemIds: string[],
+    includeUntracked = false,
+  ): Promise<PosCatalogLineDto[]> {
+    const orgId = actor.organizationId;
+    const rows = await this.queryItemIdRows(
+      branchId,
+      orgId,
+      itemIds,
+      includeUntracked,
+    );
     const stagedDelta = await this.stagedStock.getBranchDelta(branchId, orgId);
     return this.aggregateStockRows(rows, undefined, stagedDelta);
+  }
+
+  /** Raw stock rows for a known item set; aggregation and the staged delta are the caller's. */
+  private async queryItemIdRows(
+    branchId: string,
+    orgId: string,
+    itemIds: string[],
+    includeUntracked = false,
+  ): Promise<CatalogStockRow[]> {
+    const trackedFilter = includeUntracked ? '' : 'AND sb.is_tracked = true';
+
+    const rows: CatalogStockRow[] = await this.dataSource.query(
+      // Same shape as queryExactRows: the item set is resolved first and the
+      // stock projection hangs off it, so stock_balances is probed on
+      // (organization, branch, item) for the handful of ids asked about.
+      `WITH matched AS (
+         ${buildItemIdsCte({ org: '$1', itemIds: '$3' })}
+       )
+       SELECT i.id                  AS "itemId",
+              i.product_id          AS "productId",
+              i.code,
+              i.name,
+              i.unit,
+              i.selling_price::text AS "sellingPrice",
+              sb.location_id        AS "locationId",
+              l.name                AS "locationName",
+              sb.quantity::text     AS "quantity",
+              COALESCE(st.is_main_storage, false) AS "isMainStorage"
+       FROM matched m
+       INNER JOIN items i
+         ON i.id = m.id
+       LEFT JOIN stock_balances sb
+         ON sb.item_id = i.id
+        AND sb.organization_id = i.organization_id
+        AND sb.branch_id = $2
+        ${trackedFilter}
+        AND EXISTS (
+          SELECT 1 FROM locations lact
+          WHERE lact.id = sb.location_id AND lact.is_active = true
+        )
+       LEFT JOIN locations l
+         ON l.id = sb.location_id
+       -- storages.branch_id is uuid while stock_balances.branch_id is varchar, so
+       -- the branch parameter is compared as text on both sides: casting $2 to
+       -- uuid here would make Postgres deduce two conflicting types for the same
+       -- parameter and reject the statement.
+       LEFT JOIN storages st
+         ON st.id = l.storage_id
+        AND st.organization_id = $1
+        AND st.branch_id::text = $2
+       ORDER BY i.name ASC, sb.location_id ASC`,
+      // The id list is bound as one array parameter, never interpolated.
+      [orgId, branchId, itemIds],
+    );
+
+    return rows;
   }
 }

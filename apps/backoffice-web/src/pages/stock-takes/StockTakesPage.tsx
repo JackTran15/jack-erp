@@ -61,6 +61,20 @@ import {
   type StorageOption,
 } from "./stock-takes.types";
 
+/**
+ * Fetch a stock-take with its full line array. Used exclusively by write
+ * paths (view/edit dialog) right before they need it (ADR-02) — never reuse
+ * `selectedDetail`, which is populated with `includeLines=false` and can
+ * hold only a page of lines for a large voucher. Passing that into a save
+ * would silently truncate the counted stock take (AC-19).
+ */
+async function fetchStockTakeWithLines(id: string): Promise<StockTake> {
+  const { data } = await apiClient.get<StockTake>(
+    `/inventory/stock-takes/${id}`,
+  );
+  return data;
+}
+
 export function StockTakesPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -79,6 +93,8 @@ export function StockTakesPage() {
   });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [selectedDetail, setSelectedDetail] = useState<StockTake | null>(null);
+  /** Locks Xem/Sửa while `fetchStockTakeWithLines` is in flight (A-02). */
+  const [openingId, setOpeningId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   /** New-mode draft from CreateStockTakeDialog. While set, FormDialog opens in "new" mode. */
   const [newDraft, setNewDraft] = useState<StockTakeDraft | null>(null);
@@ -242,14 +258,19 @@ export function StockTakesPage() {
 
   const detailRequestId = useRef(0);
 
-  /** Fetch a full stock-take so the bottom panel always has lines and members. */
+  /**
+   * Fetch the stock-take header for row selection — `includeLines=false`
+   * (ADR-09): the bottom panel pages its own lines separately, so the header
+   * only needs to carry status/members. `detailRequestId` still guards
+   * against clicking through rows faster than the header round-trip.
+   */
   const selectStockTake = useCallback(
     async (id: string) => {
       setSelectedId(id);
       const requestId = ++detailRequestId.current;
       try {
         const { data } = await apiClient.get<StockTake>(
-          `/inventory/stock-takes/${id}`,
+          `/inventory/stock-takes/${id}?includeLines=false`,
         );
         if (requestId !== detailRequestId.current) return null;
         setSelectedDetail(data);
@@ -269,15 +290,26 @@ export function StockTakesPage() {
     void selectStockTake(selected.id);
   }, [selectStockTake, selected, selectedDetail?.id]);
 
-  /** Fetch a single stock-take (with full lines) when opening for view/edit. */
+  /**
+   * Open a stock-take for view/edit. This is a write path (the form dialog
+   * saves the whole line array back), so it always fetches the full document
+   * on demand (ADR-02) instead of reusing `selectedDetail` — see
+   * `fetchStockTakeWithLines`.
+   */
   const openForEdit = useCallback(
     async (id: string) => {
-      const data = await selectStockTake(id);
-      if (data) {
+      setSelectedId(id);
+      setOpeningId(id);
+      try {
+        const data = await fetchStockTakeWithLines(id);
         setEditing(data);
+      } catch (err) {
+        toast.error(getUserFacingApiErrorMessage(err));
+      } finally {
+        setOpeningId(null);
       }
     },
-    [selectStockTake],
+    [setSelectedId],
   );
 
   useEffect(() => {
@@ -398,15 +430,20 @@ export function StockTakesPage() {
       id: "view",
       label: "Xem",
       icon: Eye,
-      disabled: !selected,
+      tooltip: openingId ? "Đang tải..." : undefined,
+      disabled: !selected || !!openingId,
       onClick: () => selected && void openForEdit(selected.id),
     },
     {
       id: "edit",
       label: "Sửa",
       icon: Pencil,
+      tooltip: openingId ? "Đang tải..." : undefined,
       disabled:
-        !selected || selected.status !== "DRAFT" || !!selected.mergedIntoId,
+        !selected ||
+        selected.status !== "DRAFT" ||
+        !!selected.mergedIntoId ||
+        !!openingId,
       onClick: () => selected && void openForEdit(selected.id),
     },
     {
@@ -461,7 +498,8 @@ export function StockTakesPage() {
       render: (r) => (
         <button
           type="button"
-          className="font-medium text-primary-blue transition-colors hover:text-primary-blue-hover hover:underline"
+          disabled={!!openingId}
+          className="font-medium text-primary-blue transition-colors hover:text-primary-blue-hover hover:underline disabled:cursor-not-allowed disabled:opacity-60"
           onClick={(e) => {
             e.stopPropagation();
             void openForEdit(r.id);
@@ -598,7 +636,16 @@ export function StockTakesPage() {
             onRefresh={() => void loadRecords()}
           />
         }
-        detailPanel={<StockTakeDetailPanel stockTake={panelStockTake} />}
+        detailPanel={
+          // `voucherId` comes straight from `selectedId` — NOT from
+          // `panelStockTake`/`selectedDetail` (the header fetch). Deriving it
+          // from the header result would gate the lines request behind that
+          // round-trip; measured on a sibling page, that lag was 44ms.
+          <StockTakeDetailPanel
+            stockTake={panelStockTake}
+            voucherId={selectedId}
+          />
+        }
       >
         <BaseDataTable
           columns={columns}

@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import {
   AppModal,
   Button,
@@ -176,7 +177,12 @@ interface Transfer {
   totalAmount?: number;
   /** Phiếu tự sinh (kho tạm / bán hàng / xếp kệ) — chỉ xem, không sửa được. */
   isSystemGenerated?: boolean;
-  lines: TransferLine[];
+  /**
+   * List rows from `/v2/inventory/stock/transfers/search` never carry this
+   * (ADR-05 dropped the `lines` join) — it's only present after a full fetch
+   * (`fetchTransferWithLines`), which is what the dialog seeds from.
+   */
+  lines?: TransferLine[];
   createdAt: string;
   approvedAt?: string;
   postedAt?: string;
@@ -185,7 +191,31 @@ interface Transfer {
 /** Tổng tiền for a row — prefer the BE-computed value, else sum line values. */
 function transferTotal(t: Transfer): number {
   if (t.totalAmount != null) return Number(t.totalAmount);
-  return t.lines.reduce((s, l) => s + Number(l.lineValue ?? 0), 0);
+  return (t.lines ?? []).reduce((s, l) => s + Number(l.lineValue ?? 0), 0);
+}
+
+/** One page of a stock transfer's lines — `POST /v2/inventory/stock/transfers/:id/lines/search`. */
+interface StockTransferLinesPage {
+  data: TransferLine[];
+  page: number;
+  limit: number;
+  total: number;
+}
+
+const LINES_PAGE_SIZE = 50;
+
+/**
+ * `GET /inventory/stock/transfers/:id` with no `includeLines` flag — server
+ * default stays `true`, so the response carries every line. Used by the
+ * toolbar actions that need the full line array (Nhân bản, Sửa, Xem) so the
+ * dialog never seeds from a list row missing `lines` (ADR-02) — opening Sửa
+ * with an empty array and saving would silently wipe the phiếu's lines.
+ */
+async function fetchTransferWithLines(id: string): Promise<Transfer> {
+  const { data } = await apiClient.get<Transfer>(
+    `/inventory/stock/transfers/${id}`,
+  );
+  return data;
 }
 
 interface PaginatedResponse<T> {
@@ -236,6 +266,9 @@ export function StockTransferPage() {
     useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [storages, setStorages] = useState<InventoryStorage[]>([]);
+  // Locks the one clicked action (Nhân bản / Xem / Sửa) while its
+  // `fetchTransferWithLines` round-trip is in flight — not the whole toolbar.
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
 
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | "view" | null>(null);
   const [editing, setEditing] = useState<Transfer | null>(null);
@@ -352,6 +385,28 @@ export function StockTransferPage() {
     }
   };
 
+  /**
+   * Nhân bản / Xem / Sửa all need the full line array (ADR-02) — the list row
+   * only carries the header. `actionKey` locks just the button that triggered
+   * it; a failed fetch toasts and never opens the dialog (AC-04-style: no
+   * empty-lines dialog a user could save over the real data).
+   */
+  const openTransferDialog = useCallback(
+    async (id: string, mode: "create" | "view" | "edit", actionKey: string) => {
+      setPendingAction(actionKey);
+      try {
+        const full = await fetchTransferWithLines(id);
+        setEditing(mode === "create" ? { ...full, documentNumber: undefined } : full);
+        setDialogMode(mode);
+      } catch (err) {
+        toast.error(getUserFacingApiErrorMessage(err));
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [],
+  );
+
   // Any filter edit resets to page 1 so the server result starts from the top.
   const resetPage = useCallback(
     () => setPagination((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 })),
@@ -409,24 +464,25 @@ export function StockTransferPage() {
       id: "duplicate",
       label: "Nhân bản",
       icon: Copy,
-      disabled: !selected,
-      // Open the create form prefilled from the selected phiếu (a fresh doc:
-      // drop the document number so the new one is generated on save).
+      // `selected` no longer carries `lines` (v2 search trims them), and the
+      // dialog seeds its `lines` state from `initial.lines` in every mode —
+      // fetch the full document on demand instead (ADR-02).
+      disabled: !selected || pendingAction === "duplicate",
+      tooltip: pendingAction === "duplicate" ? "Đang tải..." : undefined,
       onClick: () => {
         if (!selected) return;
-        setEditing({ ...selected, documentNumber: undefined });
-        setDialogMode("create");
+        void openTransferDialog(selected.id, "create", "duplicate");
       },
     },
     {
       id: "view",
       label: "Xem",
       icon: Eye,
-      disabled: !selected,
+      disabled: !selected || pendingAction === "view",
+      tooltip: pendingAction === "view" ? "Đang tải..." : undefined,
       onClick: () => {
         if (!selected) return;
-        setEditing(selected);
-        setDialogMode("view");
+        void openTransferDialog(selected.id, "view", "view");
       },
     },
     {
@@ -439,14 +495,16 @@ export function StockTransferPage() {
       disabled:
         !selected ||
         selected.status === "CANCELLED" ||
-        Boolean(selected.isSystemGenerated),
+        Boolean(selected.isSystemGenerated) ||
+        pendingAction === "edit",
       tooltip: selected?.isSystemGenerated
         ? "Phiếu tự sinh (kho tạm / bán hàng) không sửa được. Chỉ sửa phiếu tạo bằng Thêm mới."
-        : undefined,
+        : pendingAction === "edit"
+          ? "Đang tải..."
+          : undefined,
       onClick: () => {
         if (!selected) return;
-        setEditing(selected);
-        setDialogMode("edit");
+        void openTransferDialog(selected.id, "edit", "edit");
       },
     },
     {
@@ -498,8 +556,8 @@ export function StockTransferPage() {
           onClick={(e) => {
             e.stopPropagation();
             setSelectedId(row.id);
-            setEditing(row);
-            setDialogMode("view");
+            if (pendingAction) return;
+            void openTransferDialog(row.id, "view", "view");
           }}
           title={row.documentNumber ?? row.id}
         >
@@ -568,7 +626,7 @@ export function StockTransferPage() {
             onRefresh={() => void loadRecords()}
           />
         }
-        detailPanel={<DetailPanel transfer={selected} />}
+        detailPanel={<DetailPanel transferId={selectedId} />}
       >
         <BaseDataTable
           columns={columns}
@@ -639,15 +697,76 @@ export function StockTransferPage() {
 
 // ─── Detail panel (selected transfer's lines) ────────────────────────────────
 
-function DetailPanel({ transfer }: { transfer: Transfer | null }) {
+/**
+ * "Is there another page" is `page * limit < total` — the envelope has no
+ * `hasMore` flag. Exported so the pagination boundary (last page vs. one
+ * short of it) is tested without spinning up the query client (AC-15).
+ */
+export function getNextStockTransferLinesPageParam(last: {
+  page: number;
+  limit: number;
+  total: number;
+}): number | undefined {
+  return last.page * last.limit < last.total ? last.page + 1 : undefined;
+}
+
+function DetailPanel({ transferId }: { transferId: string | null }) {
+  // Paginated, independent from any header re-fetch — the raw selected id is
+  // passed straight in (not derived off a header query's result), so this
+  // request leaves in the same render pass as the row selection instead of
+  // waiting on a round-trip first (the regression `2026083002` shipped).
+  const linesQuery = useInfiniteQuery({
+    queryKey: ["stock-transfer-lines", transferId],
+    queryFn: async ({ pageParam }) => {
+      const { data } = await apiClient.post<StockTransferLinesPage>(
+        `/v2/inventory/stock/transfers/${transferId}/lines/search`,
+        { page: pageParam, limit: LINES_PAGE_SIZE },
+      );
+      return data;
+    },
+    initialPageParam: 1,
+    getNextPageParam: getNextStockTransferLinesPageParam,
+    enabled: !!transferId,
+  });
+
+  const lines = useMemo(
+    () => linesQuery.data?.pages.flatMap((p) => p.data) ?? [],
+    [linesQuery.data],
+  );
+
+  const hasNextPage = linesQuery.hasNextPage;
+  const isFetchingNextPage = linesQuery.isFetchingNextPage;
+  const fetchNextPage = linesQuery.fetchNextPage;
+
+  // Sentinel row, observed instead of a scroll listener: the actual scroll
+  // container (DocumentListShell's resizable detail-panel wrapper) lives
+  // outside this component, so we can't attach onScroll to it directly.
+  const sentinelRef = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !isFetchingNextPage) {
+          void fetchNextPage();
+        }
+      },
+      { threshold: 0.1 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, lines.length]);
+
   return (
     <div className="px-4 py-3">
       <div className="mb-2 inline-block border-b-2 border-primary px-2 pb-1 text-sm font-semibold">
         Chi tiết
       </div>
-      {!transfer ? (
+      {!transferId ? (
         <p className="text-sm text-muted-foreground">Chọn một phiếu để xem chi tiết.</p>
-      ) : transfer.lines.length === 0 ? (
+      ) : linesQuery.isLoading ? (
+        <p className="text-sm text-muted-foreground">Đang tải...</p>
+      ) : lines.length === 0 ? (
         <p className="text-sm text-muted-foreground">Phiếu này chưa có dòng hàng.</p>
       ) : (
         <table className="w-full border-collapse text-sm">
@@ -667,7 +786,7 @@ function DetailPanel({ transfer }: { transfer: Transfer | null }) {
             </tr>
           </thead>
           <tbody>
-            {transfer.lines.map((line) => {
+            {lines.map((line) => {
               const amount =
                 line.lineValue != null
                   ? Number(line.lineValue)
@@ -700,6 +819,13 @@ function DetailPanel({ transfer }: { transfer: Transfer | null }) {
                 </tr>
               );
             })}
+            {hasNextPage && (
+              <tr ref={sentinelRef}>
+                <td colSpan={11} className="py-2 text-center text-xs text-muted-foreground">
+                  {isFetchingNextPage ? "Đang tải thêm..." : ""}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       )}
@@ -750,6 +876,35 @@ const emptyLine = (): FormLine => ({
   unitPrice: "",
   notes: "",
 });
+
+/**
+ * Server line → grid row, minus the client-only `lineId` (assigned by the
+ * caller via `nextLineId()`). Pulled out so the dialog seeding — the thing
+ * AC-16 guards ("mở Sửa với đủ dòng, lưu lại không mất dòng nào") — is
+ * testable without mounting the dialog: every field on every one of
+ * `initial.lines` must survive the round trip into `FormLine`.
+ */
+export function mapTransferLineToFormLine(
+  l: TransferLine,
+): Omit<FormLine, "lineId"> {
+  return {
+    itemId: l.itemId,
+    itemLabel: l.item?.code ?? l.itemId.slice(0, 8),
+    itemName: l.item?.name ?? "",
+    unit: l.item?.unit ?? "",
+    sourceStorageId: l.sourceStorageId ?? "",
+    sourceStorageLabel: l.sourceStorage?.name ?? "",
+    sourceLocationId: l.sourceLocationId ?? "",
+    sourceLocationLabel: l.sourceLocation ? l.sourceLocation.code : "",
+    destStorageId: l.destinationStorageId ?? "",
+    destStorageLabel: l.destinationStorage?.name ?? "",
+    destLocationId: l.destinationLocationId ?? "",
+    destLocationLabel: l.destinationLocation ? l.destinationLocation.code : "",
+    quantity: Number(l.quantity),
+    unitPrice: l.unitPrice != null ? String(Number(l.unitPrice)) : "",
+    notes: l.notes ?? "",
+  };
+}
 
 const getPersistableFormLines = (nextLines: FormLine[]) =>
   getPersistableLines(nextLines);
@@ -833,29 +988,16 @@ function TransferFormDialog({
   });
   const [lines, setLines] = useState<FormLine[]>(() => {
     if (!initial) return [makeEmptyLine()];
-    if (initial.lines.length === 0) return isView ? [] : [makeEmptyLine()];
+    // `initial` is always the full-fetched transfer by the time this dialog
+    // opens (ADR-02: openTransferDialog awaits fetchTransferWithLines before
+    // setDialogMode), so `.lines` is populated here — the `?? []` only guards
+    // the type (list rows omit it), not a real runtime gap.
+    const initialSourceLines = initial.lines ?? [];
+    if (initialSourceLines.length === 0) return isView ? [] : [makeEmptyLine()];
 
-    const initialLines: FormLine[] = initial.lines.map((l) => ({
+    const initialLines: FormLine[] = initialSourceLines.map((l) => ({
       lineId: nextLineId(),
-      itemId: l.itemId,
-      itemLabel: l.item?.code ?? l.itemId.slice(0, 8),
-      itemName: l.item?.name ?? "",
-      unit: l.item?.unit ?? "",
-      sourceStorageId: l.sourceStorageId ?? "",
-      sourceStorageLabel: l.sourceStorage?.name ?? "",
-      sourceLocationId: l.sourceLocationId ?? "",
-      sourceLocationLabel: l.sourceLocation
-        ? l.sourceLocation.code
-        : "",
-      destStorageId: l.destinationStorageId ?? "",
-      destStorageLabel: l.destinationStorage?.name ?? "",
-      destLocationId: l.destinationLocationId ?? "",
-      destLocationLabel: l.destinationLocation
-        ? l.destinationLocation.code
-        : "",
-      quantity: Number(l.quantity),
-      unitPrice: l.unitPrice != null ? String(Number(l.unitPrice)) : "",
-      notes: l.notes ?? "",
+      ...mapTransferLineToFormLine(l),
     }));
 
     return isView ? initialLines : normalizeLines(initialLines);
@@ -1073,7 +1215,7 @@ function TransferFormDialog({
           // cũ quay về kho xuất trước khi trừ số mới — không cộng lại thì dòng
           // giữ nguyên số lượng luôn bị cảnh báo dù tồn sau khi lưu không đổi.
           mode === "edit" && initial?.status === "POSTED"
-            ? initial.lines.map((l) => ({
+            ? (initial.lines ?? []).map((l) => ({
                 itemId: l.itemId,
                 quantity: Number(l.quantity),
                 locationId: l.sourceLocationId || undefined,

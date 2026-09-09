@@ -8,7 +8,7 @@ import {
   Version,
 } from "@nestjs/common";
 import { QueryBus } from "@nestjs/cqrs";
-import { ApiOperation } from "@nestjs/swagger";
+import { ApiOkResponse, ApiOperation, ApiProperty } from "@nestjs/swagger";
 import {
   Actor,
   ActorContext,
@@ -19,7 +19,66 @@ import { GoodsIssueLineSearchV2Dto } from "../../goods-issue/dto/goods-issue-lin
 import { SearchGoodsIssueLinesV2Query } from "../../goods-issue/queries/search-goods-issue-lines-v2.query";
 import { GoodsReceiptLineSearchV2Dto } from "../../goods-receipt/dto/goods-receipt-line-search-v2.dto";
 import { SearchGoodsReceiptLinesV2Query } from "../../goods-receipt/queries/search-goods-receipt-lines-v2.query";
+import { TransferOrderLineSearchV2Dto } from "../dto/transfer-order-line-search-v2.dto";
+import { SearchTransferOrderLinesV2Query } from "../queries/search-transfer-order-lines-v2.query";
 import { TransferOrderService } from "../transfer-order.service";
+
+/** Item summary carried on a transfer order line row (ADR-04: pagination-only, no column filters). */
+class TransferOrderLineItemDto {
+  @ApiProperty({ format: "uuid" })
+  id!: string;
+
+  @ApiProperty()
+  code!: string;
+
+  @ApiProperty()
+  name!: string;
+
+  @ApiProperty()
+  unit!: string;
+}
+
+/** One row of a transfer order's line grid. */
+class TransferOrderLineRowDto {
+  @ApiProperty({ format: "uuid" })
+  id!: string;
+
+  @ApiProperty()
+  lineNo!: number;
+
+  @ApiProperty({ format: "uuid" })
+  itemId!: string;
+
+  @ApiProperty({ type: TransferOrderLineItemDto, nullable: true })
+  item!: TransferOrderLineItemDto | null;
+
+  @ApiProperty({ description: "Quantity requested for this line (numeric string)" })
+  requestedQty!: string;
+
+  @ApiProperty({ type: String, format: "uuid", nullable: true })
+  sourceStorageId!: string | null;
+
+  @ApiProperty({ type: String, format: "uuid", nullable: true })
+  sourceLocationId!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  note!: string | null;
+}
+
+/** Paginated envelope returned by `POST :id/lines/search` (ADR-04). */
+class TransferOrderLineSearchV2ResponseDto {
+  @ApiProperty({ type: [TransferOrderLineRowDto] })
+  data!: TransferOrderLineRowDto[];
+
+  @ApiProperty()
+  page!: number;
+
+  @ApiProperty()
+  limit!: number;
+
+  @ApiProperty()
+  total!: number;
+}
 
 /**
  * Line grids for the two documents of a transfer, addressed by the transfer
@@ -77,6 +136,28 @@ export class TransferOrderV2Controller {
     const receipt = await this.service.getImportGoodsReceipt(id, actor);
     return this.queryBus.execute(
       new SearchGoodsReceiptLinesV2Query(receipt.id, dto, actor, true),
+    );
+  }
+
+  /**
+   * Paginated lines of the transfer order itself (ADR-04), as opposed to
+   * either of its child documents' line grids above. The handler resolves
+   * and authorizes the transfer order directly (org + participant-branch
+   * scope), so unlike the two routes above there is no upstream `service`
+   * call here.
+   */
+  @Post(":id/lines/search")
+  @Version("2")
+  @RequirePermission("inventory.transfer.read")
+  @ApiOperation({ summary: "Search a transfer order's own lines (v2)" })
+  @ApiOkResponse({ type: TransferOrderLineSearchV2ResponseDto })
+  searchLines(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: TransferOrderLineSearchV2Dto,
+    @Actor() actor: ActorContext,
+  ): Promise<TransferOrderLineSearchV2ResponseDto> {
+    return this.queryBus.execute(
+      new SearchTransferOrderLinesV2Query(id, dto, actor),
     );
   }
 }

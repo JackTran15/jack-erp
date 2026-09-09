@@ -1,12 +1,8 @@
 import { useCallback, useMemo } from "react";
-import type { SearchSuggestion } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
+import { useDebounce } from "@erp/pos/hooks/common/use-debounce";
 import type { CatalogProduct } from "@erp/pos/interfaces/checkout.interface";
-import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
-import { matchesCatalogQuery } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
   useCatalogProductsQuery,
-  useCatalogQuery,
-  useSearchCatalog,
 } from "@erp/pos/hooks/react-query/use-query-catalog";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import {
@@ -26,12 +22,10 @@ interface ToolbarState {
 }
 
 interface UseCheckoutCatalogResult {
-  catalog: PosCatalogLine[];
-  catalogLoading: boolean;
   /** Loading riêng cho grid product-level (drive trạng thái Đang tải/Trống của grid). */
   catalogProductsLoading: boolean;
-  catalogError: string;
-  refetchCatalog: () => void;
+  catalogProductsError: string;
+  refetchCatalogProducts: () => void;
   toolbar: ToolbarState;
   setToolbar: (value: Updater<ToolbarState>) => void;
   catalogQuery: string;
@@ -40,17 +34,30 @@ interface UseCheckoutCatalogResult {
   setCatalogGroup: (value: Updater<string | undefined>) => void;
   catalogCollapsed: boolean;
   setCatalogCollapsed: (value: Updater<boolean>) => void;
-  filteredProducts: PosCatalogLine[];
   catalogProducts: CatalogProduct[];
-  productSearchAdapter: (
-    q: string,
-  ) => Promise<SearchSuggestion<PosCatalogLine>[]>;
+  /**
+   * Tổng số card khớp bộ lọc hiện tại — của TOÀN BỘ kết quả, không phải số card
+   * trên trang. Luật "khớp đúng một món thì mở dialog" phải đọc con số này;
+   * `catalogProducts.length` chỉ là kích thước trang.
+   */
+  catalogTotal: number;
+  /** Từ khoá đã debounce, đúng thứ đã gửi lên server. "" khi không lọc. */
+  catalogSearch: string;
 }
 
 /**
- * Zero-input adapter. Dữ liệu catalog đến từ React Query (`useCatalogQuery`,
+ * Zero-input adapter cho LƯỚI sản phẩm mức product (`useCatalogProductsQuery`,
  * tự fetch theo `branchId` lấy từ branch store, dedupe across callsites);
- * toolbar / filter / collapse đọc từ catalog store. Phần derived giữ nguyên.
+ * toolbar / filter / collapse đọc từ catalog store.
+ *
+ * Tìm kiếm chạy TRÊN SERVER: `catalogQuery` được debounce 150 ms rồi đi vào
+ * `useCatalogProductsQuery` như tham số `search`.
+ *
+ * KHÔNG còn tải catalog phẳng toàn chi nhánh. Trước đây hook này gọi
+ * `useCatalogQuery` — 10 400 item ≈ 3 835 kB mỗi lần mở trang trên bản restore
+ * prod — để phục vụ đúng hai câu hỏi, và cả hai giờ hỏi thẳng server:
+ * tồn của các dòng trong giỏ (`POST /catalog/stock`) và "chuỗi này khớp mấy mặt
+ * hàng" (`GET /catalog/search`).
  */
 export function useCheckoutCatalog(): UseCheckoutCatalogResult {
   const branchId = usePosBranchStore((s) => s.branchId) ?? "";
@@ -59,30 +66,40 @@ export function useCheckoutCatalog(): UseCheckoutCatalogResult {
     (s) => selectCatalogDraft(s).catalogGroup,
   );
   const categoryId = catalogGroupId ? catalogGroupId : undefined;
-  const catalogQueryResult = useCatalogQuery(branchId);
-  const productsQueryResult = useCatalogProductsQuery(branchId, categoryId);
-  const catalog = useMemo(
-    () => catalogQueryResult.data ?? [],
-    [catalogQueryResult.data],
+
+  const { toolbar, catalogQuery, catalogGroup, catalogCollapsed } =
+    usePosCheckoutSessionStore(selectCatalogDraft);
+
+  // 150 ms để khớp `debounceMs` của PosSearchPopover ngay phía trên ô tìm; hai con
+  // số lệch nhau thì ô tìm và lưới cập nhật so le và trông như lag.
+  // Không có ngưỡng số ký tự: truy vấn của lưới không dùng trigram nên chi phí phẳng
+  // theo độ dài từ khoá, và kết quả vẫn phân trang 20 (ADR-02).
+  const debouncedQuery = useDebounce(catalogQuery, 150);
+  const catalogSearch = debouncedQuery.trim();
+  const productsQueryResult = useCatalogProductsQuery(
+    branchId,
+    categoryId,
+    catalogSearch || undefined,
   );
+  const updateDraftSlice = usePosCheckoutSessionStore(
+    (s) => s.updateActiveDraftSlice,
+  );
+
+  // Nguồn lỗi/tải lại chuyển sang query của LƯỚI: sau khi bỏ tải toàn catalog, đó
+  // là thứ duy nhất còn tải được và hỏng được ở màn này. Đổi luôn tên để nó nói
+  // đúng nguồn, thay vì giữ tên cũ trỏ chỗ khác.
+  const catalogProductsError = productsQueryResult.error
+    ? `Không tải được danh sách hàng hoá: ${productsQueryResult.error.message}`
+    : "";
+  const refetchCatalogProducts = useCallback(() => {
+    void productsQueryResult.refetch();
+  }, [productsQueryResult]);
+
   const productCards = useMemo(
     () => productsQueryResult.data?.data ?? [],
     [productsQueryResult.data],
   );
-  const catalogLoading = catalogQueryResult.isLoading;
   const catalogProductsLoading = productsQueryResult.isLoading;
-  const catalogError = catalogQueryResult.error
-    ? `Không tải được tồn kho: ${catalogQueryResult.error.message}`
-    : "";
-  const refetchCatalog = useCallback(() => {
-    void catalogQueryResult.refetch();
-  }, [catalogQueryResult]);
-
-  const { toolbar, catalogQuery, catalogGroup, catalogCollapsed } =
-    usePosCheckoutSessionStore(selectCatalogDraft);
-  const updateDraftSlice = usePosCheckoutSessionStore(
-    (s) => s.updateActiveDraftSlice,
-  );
 
   const setToolbar = useCallback(
     (value: Updater<ToolbarState>) =>
@@ -117,43 +134,25 @@ export function useCheckoutCatalog(): UseCheckoutCatalogResult {
     [updateDraftSlice],
   );
 
-  const filteredProducts = useMemo(() => {
-    return catalog.filter((p) => matchesCatalogQuery(p, toolbar.query));
-  }, [catalog, toolbar.query]);
-
-  // Grid hiển thị MỖI SẢN PHẨM 1 card (product-level). Lọc client-side theo tên
-  // trên danh sách product đã tải (endpoint products không có tham số search).
-  const catalogProducts: CatalogProduct[] = useMemo(() => {
-    const q = catalogQuery.trim().toLowerCase();
-    return productCards
-      .filter((c) => !q || c.name.toLowerCase().includes(q))
-      .map((c) => ({
+  // Grid hiển thị MỖI SẢN PHẨM 1 card (product-level). KHÔNG lọc ở đây nữa:
+  // trước đây chỗ này lọc `productCards` theo `name` trên 20 card đã tải, nên gõ
+  // một tiền tố MÃ ("AK59") không khớp card nào và lưới báo "Chưa có hàng phù hợp"
+  // trong khi thực tế có hàng. Server khớp cả mã, tên, nhãn biến thể và tên nhóm.
+  const catalogProducts: CatalogProduct[] = useMemo(
+    () =>
+      productCards.map((c) => ({
         id: c.id,
         name: c.name,
         price: c.minPrice ?? 0,
         kind: c.kind,
-      }));
-  }, [productCards, catalogQuery]);
-
-  // Gợi ý dropdown lấy server-side: name / SKU / mã vạch khớp ILIKE (client-side
-  // chỉ lọc được name+code trên catalog đã tải, không có mã vạch). Trả tối đa 8.
-  const searchCatalog = useSearchCatalog();
-  const productSearchAdapter = useCallback(
-    async (q: string): Promise<SearchSuggestion<PosCatalogLine>[]> => {
-      const term = q.trim();
-      if (!term || !branchId) return [];
-      const rows = await searchCatalog(branchId, term);
-      return rows.slice(0, 8).map((p) => ({ item: p }));
-    },
-    [searchCatalog, branchId],
+      })),
+    [productCards],
   );
 
   return {
-    catalog,
-    catalogLoading,
     catalogProductsLoading,
-    catalogError,
-    refetchCatalog,
+    catalogProductsError,
+    refetchCatalogProducts,
     toolbar,
     setToolbar,
     catalogQuery,
@@ -162,8 +161,8 @@ export function useCheckoutCatalog(): UseCheckoutCatalogResult {
     setCatalogGroup,
     catalogCollapsed,
     setCatalogCollapsed,
-    filteredProducts,
     catalogProducts,
-    productSearchAdapter,
+    catalogTotal: productsQueryResult.data?.total ?? 0,
+    catalogSearch,
   };
 }

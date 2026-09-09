@@ -42,6 +42,7 @@ import { HttpResponseSink } from '../../reporting/report-core/export/http-respon
 import { VoucherXlsxWriter } from '../../reporting/report-core/export/voucher-xlsx.writer';
 import { StaticRowsFetcher } from '../../reporting/report-core/export/static-rows.fetcher';
 import { voucherToReportDocument } from '../../reporting/report-core/export/voucher-export.adapter';
+import { VoucherDetailQueryDto } from '../dto/voucher-detail-query.dto';
 
 class TransferLineDto {
   @IsUUID()
@@ -174,9 +175,12 @@ export class StockTransferController {
   @RequirePermission('inventory.transfer.read')
   getById(
     @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: VoucherDetailQueryDto,
     @Actor() actor: ActorContext,
   ) {
-    return this.service.getById(id, actor.organizationId);
+    return this.service.getById(id, actor.organizationId, {
+      includeLines: query.includeLines,
+    });
   }
 
   @Get(':id/print-payload')

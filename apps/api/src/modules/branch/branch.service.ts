@@ -28,6 +28,23 @@ import { StorageEntity } from "../inventory/location/storage.entity";
 import { ShowroomEntity } from "../inventory/location/showroom.entity";
 import { LocationEntity } from "../inventory/location/location.entity";
 import { LocationType } from "@erp/shared-interfaces";
+import { CacheService, CACHE_TTL_SECONDS } from "../redis/cache.service";
+
+const MY_BRANCHES_CACHE_NAMESPACE = "my-branches";
+
+/**
+ * `/admin/users/me`. Same duplication trade as the two namespaces above.
+ * Invalidated here rather than left to its 15-minute TTL — ADR-04 of
+ * 2026090805-pos-initial-load-latency.
+ */
+const USERS_ME_CACHE_NAMESPACE = "users-me";
+/**
+ * Mirrors `AuthService`'s private `IDENTITY_CACHE_NAMESPACE` — duplicated
+ * here rather than imported because `AuthService` does not expose it and
+ * this module has no other dependency on it (same copy also lives in
+ * `UsersService` / `RolesService`, see T-07-03).
+ */
+const IDENTITY_CACHE_NAMESPACE = "identity";
 
 /** Reserved for User Root / General Manager — see database/seeds/org-role-permissions.ts. */
 const BRANCH_LIFECYCLE_PERMISSION = "branch.archive";
@@ -47,7 +64,107 @@ export class BranchService {
     private readonly branchStatus: BranchStatusService,
     private readonly rbac: RbacService,
     private readonly dataSource: DataSource,
+    private readonly cacheService: CacheService,
   ) {}
+
+  /**
+   * Clears the three caches one user's own role/branch-assignment change can
+   * make stale: the identity report (`AuthService.getSession`), the
+   * `/branches/me` list (this service's `listMyBranches`), and `/admin/users/me`
+   * (`UsersService.getMe`). Mirrors
+   * `UsersService.invalidateUserIdentity` / `RolesService.invalidateUserIdentity`
+   * — see T-07-03 / ADR-08. Swallows Redis errors and only logs, same as
+   * `invalidateStatusCache` below.
+   */
+  private async invalidateUserIdentity(
+    userId: string,
+    organizationId: string,
+  ): Promise<void> {
+    try {
+      await Promise.all([
+        this.cacheService.invalidate(
+          IDENTITY_CACHE_NAMESPACE,
+          `identity:${userId}:${organizationId}`,
+        ),
+        this.cacheService.invalidate(
+          MY_BRANCHES_CACHE_NAMESPACE,
+          `${userId}:${organizationId}`,
+        ),
+        this.cacheService.invalidate(
+          USERS_ME_CACHE_NAMESPACE,
+          `${userId}:${organizationId}`,
+        ),
+      ]);
+    } catch (err) {
+      this.logger.error(
+        `Identity cache invalidation failed for user=${userId} org=${organizationId} — falling back to the cache TTL`,
+        err instanceof Error ? err.stack : undefined,
+      );
+    }
+  }
+
+  /**
+   * Every userId currently assigned to a branch. Exposed (rather than kept
+   * private) so `BranchCrudService.remove` can snapshot the assignee list
+   * *before* its transaction deletes the `user_branch_assignments` rows —
+   * by the time that transaction commits, a lookup by `branchId` would find
+   * nothing left to invalidate.
+   */
+  async getBranchAssigneeUserIds(
+    branchId: string,
+    organizationId: string,
+  ): Promise<string[]> {
+    const assignments = await this.assignmentRepo.find({
+      where: { branchId, organizationId },
+      select: ["userId"],
+    });
+    return assignments.map((a) => a.userId);
+  }
+
+  /**
+   * Clears the `my-branches` entry for each given user. Only `my-branches`,
+   * not the identity cache too: ADR-08 scopes a branch status change to
+   * `/branches/me` specifically. Per-user rather than a single
+   * `invalidatePattern` scoped to the org, so a status flip on one branch
+   * cannot clear another branch's unrelated cache entries (ADR-08). Swallows
+   * Redis errors and only logs, same as `invalidateStatusCache`.
+   */
+  async invalidateMyBranchesForUsers(
+    userIds: string[],
+    organizationId: string,
+  ): Promise<void> {
+    try {
+      await Promise.all(
+        userIds.map((userId) =>
+          this.cacheService.invalidate(
+            MY_BRANCHES_CACHE_NAMESPACE,
+            `${userId}:${organizationId}`,
+          ),
+        ),
+      );
+    } catch (err) {
+      this.logger.error(
+        `my-branches cache invalidation failed for org=${organizationId} — falling back to the cache TTL`,
+        err instanceof Error ? err.stack : undefined,
+      );
+    }
+  }
+
+  /**
+   * Convenience wrapper for the four status-change sites in this file, where
+   * the `user_branch_assignments` rows for the branch still exist at call
+   * time (unlike `BranchCrudService.remove`, which must snapshot first).
+   */
+  private async invalidateMyBranchesForBranch(
+    branchId: string,
+    organizationId: string,
+  ): Promise<void> {
+    const userIds = await this.getBranchAssigneeUserIds(
+      branchId,
+      organizationId,
+    );
+    await this.invalidateMyBranchesForUsers(userIds, organizationId);
+  }
 
   async create(dto: CreateBranchDto, actor: ActorContext): Promise<BranchEntity> {
     const existing = await this.branchRepo.findOne({
@@ -168,6 +285,13 @@ export class BranchService {
 
       return branch;
     });
+
+    // The transaction above self-assigns the creator to the new branch — a
+    // `user_branch_assignments` write not among the six sites the plan
+    // enumerated (it only tracked pre-existing `invalidateStatusCache` /
+    // `invalidateUserPermissions` callers). Found while auditing every write
+    // to that table per T-07-03.
+    await this.invalidateUserIdentity(actor.userId, actor.organizationId);
 
     if (isMainBranch) {
       await this.orgService.setMainBranch(actor.organizationId, saved.id);
@@ -297,6 +421,7 @@ export class BranchService {
 
     if (movesStatus) {
       await this.invalidateStatusCache(actor.organizationId);
+      await this.invalidateMyBranchesForBranch(id, actor.organizationId);
       this.logger.log(
         `Branch status changed via update: ${id} org=${actor.organizationId} actor=${actor.userId} ${previousStatus} -> ${saved.status}`,
       );
@@ -546,6 +671,7 @@ export class BranchService {
     branch.status = BranchStatus.ARCHIVED;
     const saved = await this.branchRepo.save(branch);
     await this.invalidateStatusCache(actor.organizationId);
+    await this.invalidateMyBranchesForBranch(id, actor.organizationId);
     return saved;
   }
 
@@ -557,6 +683,7 @@ export class BranchService {
     branch.status = BranchStatus.SUSPENDED;
     const saved = await this.branchRepo.save(branch);
     await this.invalidateStatusCache(actor.organizationId);
+    await this.invalidateMyBranchesForBranch(id, actor.organizationId);
     this.logger.log(
       `Branch suspended: ${id} org=${actor.organizationId} actor=${actor.userId} ACTIVE -> SUSPENDED`,
     );
@@ -571,6 +698,7 @@ export class BranchService {
     branch.status = BranchStatus.ACTIVE;
     const saved = await this.branchRepo.save(branch);
     await this.invalidateStatusCache(actor.organizationId);
+    await this.invalidateMyBranchesForBranch(id, actor.organizationId);
     this.logger.log(
       `Branch activated: ${id} org=${actor.organizationId} actor=${actor.userId} SUSPENDED -> ACTIVE`,
     );
@@ -600,7 +728,13 @@ export class BranchService {
       assignedBy: actor.userId,
     });
 
-    return this.assignmentRepo.save(assignment);
+    const saved = await this.assignmentRepo.save(assignment);
+    // Not one of the six sites the plan enumerated (it only tracked
+    // pre-existing `invalidateStatusCache` / `invalidateUserPermissions`
+    // callers) — found while auditing every `user_branch_assignments` write
+    // per T-07-03.
+    await this.invalidateUserIdentity(userId, actor.organizationId);
+    return saved;
   }
 
   async unassignUser(
@@ -620,6 +754,9 @@ export class BranchService {
     }
 
     await this.assignmentRepo.remove(assignment);
+    // Same reasoning as `assignUser` above — found while auditing every
+    // `user_branch_assignments` write per T-07-03.
+    await this.invalidateUserIdentity(userId, actor.organizationId);
   }
 
   async getUserBranches(
@@ -631,24 +768,44 @@ export class BranchService {
     });
   }
 
+  /**
+   * Feeds the backoffice header selector and the POS branch list only —
+   * `/branches/me` is a read path, not an authorization gate. The real
+   * branch-access check happens uncached in `AuthService.switchBranch`, so
+   * the worst case here is the UI briefly offering a branch the server then
+   * refuses (ADR-07 v2, `03-logical-design.md`) — correct behaviour, not a
+   * hole.
+   *
+   * The cached result depends on two independently mutable things, and both
+   * need explicit invalidation (T-07-03), not just this TTL:
+   *   1. the user's `user_branch_assignments` rows (assign/unassign);
+   *   2. each assigned branch's `status` (activate/deactivate).
+   */
   async listMyBranches(actor: ActorContext): Promise<BranchEntity[]> {
-    const assignments = await this.assignmentRepo.find({
-      where: { userId: actor.userId, organizationId: actor.organizationId },
-      select: ['branchId'],
-    });
+    return this.cacheService.getOrSet(
+      MY_BRANCHES_CACHE_NAMESPACE,
+      `${actor.userId}:${actor.organizationId}`,
+      async () => {
+        const assignments = await this.assignmentRepo.find({
+          where: { userId: actor.userId, organizationId: actor.organizationId },
+          select: ['branchId'],
+        });
 
-    if (!assignments.length) return [];
+        if (!assignments.length) return [];
 
-    // Feeds the backoffice header selector and the POS branch list, so a
-    // retired store must not appear — the JWT already excludes it, and this
-    // endpoint has to agree or the two disagree on screen.
-    return this.branchRepo.find({
-      where: assignments.map((a) => ({
-        id: a.branchId,
-        organizationId: actor.organizationId,
-        status: BranchStatus.ACTIVE,
-      })),
-      order: { createdAt: 'ASC' },
-    });
+        // Feeds the backoffice header selector and the POS branch list, so a
+        // retired store must not appear — the JWT already excludes it, and this
+        // endpoint has to agree or the two disagree on screen.
+        return this.branchRepo.find({
+          where: assignments.map((a) => ({
+            id: a.branchId,
+            organizationId: actor.organizationId,
+            status: BranchStatus.ACTIVE,
+          })),
+          order: { createdAt: 'ASC' },
+        });
+      },
+      CACHE_TTL_SECONDS,
+    );
   }
 }

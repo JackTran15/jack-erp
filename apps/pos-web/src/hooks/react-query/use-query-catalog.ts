@@ -6,10 +6,14 @@ import {
 } from "@erp/pos/constants/react-query-key.constant";
 import type {
   PosCatalogLine,
+  PosCatalogSearchResult,
   PosProductDetail,
   PosProductListResponse,
 } from "@erp/pos/interfaces/catalog.interface";
-import { catalogService } from "@erp/pos/services/catalog.service";
+import {
+  catalogService,
+  type SearchCatalogParams,
+} from "@erp/pos/services/catalog.service";
 import type { PosProductKind } from "@erp/pos/types/catalog.type";
 import { useQueryClient } from "@tanstack/react-query";
 import type { PosCatalogDirection } from "@erp/pos/types/catalog.type";
@@ -33,25 +37,33 @@ export function useCatalogQuery(
   });
 }
 
-/** Số product tải tối đa cho grid (1 trang, không phân trang thêm). */
-export const POS_CATALOG_PRODUCTS_PAGE_SIZE = 30;
+/**
+ * Số product tải tối đa cho grid (1 trang, không phân trang thêm).
+ * Bằng đúng mặc định của `PaginationQueryDto.pageSize` phía server — trước đây
+ * frontend ghi đè thành 30 mà không có lý do ghi lại.
+ */
+export const POS_CATALOG_PRODUCTS_PAGE_SIZE = 20;
 
 /**
  * Danh sách catalog mức PRODUCT cho grid — `GET /pos/branches/:id/catalog/products`.
- * Tải 1 trang (pageSize=100); ô tìm header lọc client-side trên kết quả này.
- * Dedupe theo `CATALOG_KEYS.PRODUCTS(branchId)`. Tắt khi chưa có branch.
+ * Tải 1 trang (`POS_CATALOG_PRODUCTS_PAGE_SIZE`). Lọc và tìm kiếm chạy TRÊN SERVER:
+ * `categoryId` và `search` đều đi vào request lẫn `queryKey`. Tắt khi chưa có branch.
  */
 export function useCatalogProductsQuery(
   branchId: string,
   categoryId?: string,
+  search?: string,
 ): UseQueryResult<PosProductListResponse, Error> {
+  // Chuẩn hoá một lần ở đây để khoá và request không thể lệch nhau.
+  const term = search?.trim() || undefined;
   return useQuery<PosProductListResponse, Error>({
-    queryKey: CATALOG_KEYS.PRODUCTS(branchId, categoryId),
+    queryKey: CATALOG_KEYS.PRODUCTS(branchId, categoryId, term),
     queryFn: () =>
       catalogService.listProducts(branchId, {
         page: 1,
         pageSize: POS_CATALOG_PRODUCTS_PAGE_SIZE,
         categoryId,
+        search: term,
       }),
     enabled: Boolean(branchId),
     staleTime: 30_000,
@@ -167,4 +179,66 @@ export function useSearchCatalog() {
       }),
     [queryClient],
   );
+}
+
+/** Số dòng gợi ý xin về mỗi lượt gõ. Server kẹp trần ở 100. */
+export const POS_CATALOG_SEARCH_LIMIT = 20;
+
+/**
+ * Endpoint gộp — `GET /pos/branches/:id/catalog/search`. Một lượt gọi thay cho
+ * `useLookupCatalogByCode` + `useSearchCatalog` chạy nối tiếp.
+ *
+ * Trả callback imperative vì ô tìm hàng gọi theo sự kiện (debounce / Enter),
+ * không theo vòng đời component. Cache theo `CATALOG_KEYS.SEARCH_V2` nên gõ lại
+ * cùng chuỗi trong `staleTime` không phát request thừa.
+ */
+export function useSearchPosCatalog() {
+  const queryClient = useQueryClient();
+  return useCallback(
+    (
+      branchId: string,
+      params: SearchCatalogParams,
+    ): Promise<PosCatalogSearchResult> => {
+      const mode = params.mode ?? "full";
+      const view = params.view ?? "full";
+      return queryClient.fetchQuery({
+        queryKey: CATALOG_KEYS.SEARCH_V2(
+          branchId,
+          params.q,
+          mode,
+          view,
+          params.limit,
+          params.includeUntracked ?? false,
+        ),
+        queryFn: () =>
+          catalogService.search(branchId, { ...params, mode, view }),
+        staleTime: 30_000,
+      });
+    },
+    [queryClient],
+  );
+}
+
+/**
+ * Tồn tại chi nhánh của các item đang nằm trong giỏ —
+ * `POST /pos/branches/:id/catalog/stock`.
+ *
+ * Dùng `useQuery` chứ không phải `fetchQuery` imperative như đường tìm kiếm: đây là
+ * dữ liệu phái sinh từ state giỏ, cần theo dõi liên tục, không theo sự kiện gõ.
+ *
+ * Giỏ rỗng thì **không gọi gì** (`enabled`). Đó là ca hay gặp nhất — mở trang với giỏ
+ * trống — và thay một request 3 835 kB bằng một request 0 phần tử vẫn là một
+ * round-trip cho hư không. Server cũng từ chối `itemIds: []` bằng 400, nên hai lớp
+ * cùng nói một điều.
+ */
+export function useCatalogStockQuery(
+  branchId: string,
+  itemIds: readonly string[],
+): UseQueryResult<PosCatalogLine[], Error> {
+  return useQuery<PosCatalogLine[], Error>({
+    queryKey: CATALOG_KEYS.STOCK(branchId, itemIds),
+    queryFn: () => catalogService.stockForItems(branchId, [...itemIds]),
+    enabled: Boolean(branchId) && itemIds.length > 0,
+    staleTime: 30_000,
+  });
 }

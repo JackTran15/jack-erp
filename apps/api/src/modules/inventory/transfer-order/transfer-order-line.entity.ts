@@ -28,6 +28,16 @@ export class TransferOrderLineEntity {
   @Column({ name: 'transfer_order_id', type: 'uuid' })
   transferOrderId: string;
 
+  @Column({
+    name: 'line_no',
+    type: 'integer',
+    comment:
+      'Display order within the transfer order (1-based). Backfilled by migration ' +
+      '1789800000000 from created_at/ctid, which recovers the original typing order ' +
+      '(see ADR-03); every write path re-stamps it by array index.',
+  })
+  lineNo: number;
+
   @Column({ name: 'item_id', type: 'uuid' })
   itemId: string;
 

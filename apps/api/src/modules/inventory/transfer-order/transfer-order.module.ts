@@ -15,6 +15,7 @@ import { TransferOrderLineEntity } from './transfer-order-line.entity';
 import { TransferOrderService } from './transfer-order.service';
 import { TransferOrderController } from './transfer-order.controller';
 import { TransferOrderV2Controller } from './controllers/transfer-order-v2.controller';
+import { SearchTransferOrderLinesV2Handler } from './queries/search-transfer-order-lines-v2.handler';
 
 @Module({
   imports: [
@@ -34,7 +35,7 @@ import { TransferOrderV2Controller } from './controllers/transfer-order-v2.contr
     forwardRef(() => GoodsReceiptModule),
   ],
   controllers: [TransferOrderController, TransferOrderV2Controller],
-  providers: [TransferOrderService],
+  providers: [TransferOrderService, SearchTransferOrderLinesV2Handler],
   exports: [TransferOrderService],
 })
 export class TransferOrderModule {}

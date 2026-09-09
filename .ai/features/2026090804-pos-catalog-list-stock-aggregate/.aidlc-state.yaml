@@ -1,0 +1,64 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: pos-catalog-list-stock-aggregate
+slug: 2026090804-pos-catalog-list-stock-aggregate
+profile: none
+created: 2026-09-08T18:13:47
+ruleset: 5
+current_gate: G4
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-08T18:16:42
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-08T18:18:50
+    by: Akenzy
+    evidence: 4 assumptions, none blocking-and-pending; 8 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-08T18:19:26
+    by: Akenzy
+    evidence: 3 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-08T18:20:39
+    by: Akenzy
+    evidence: graph valid - 1 UoW, 3 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T18:20:44
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-08T18:24:20
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T18:24:26
+    by: Claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-08T18:28:09
+    by: Claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-08T18:28:09
+    by: Claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-08T18:29:25
+    by: Claude
+    ticket: T-01-03
+  - gate: G4
+    action: passed
+    at: 2026-09-08T18:29:43
+    by: Akenzy
+    evidence: no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 3 tickets done, all UoW checklists ticked

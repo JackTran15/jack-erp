@@ -41,6 +41,7 @@ import { AuditInterceptor } from "../../crud/audit.interceptor";
 import { PermissionGuard } from "../../rbac/permission.guard";
 import { BranchScopeGuard } from "../../rbac/branch-scope.guard";
 import { PaginationQueryDto } from "../../crud/dto";
+import { VoucherDetailQueryDto } from "../dto/voucher-detail-query.dto";
 import { StockTakeService } from "./stock-take.service";
 
 class CreateStockTakeLineDto {
@@ -369,9 +370,12 @@ export class StockTakeController {
   @RequireBranchScope()
   getById(
     @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: VoucherDetailQueryDto,
     @Actor() actor: ActorContext,
   ) {
-    return this.service.getById(id, actor);
+    return this.service.getById(id, actor, {
+      includeLines: query.includeLines,
+    });
   }
 
   @Patch(":id")

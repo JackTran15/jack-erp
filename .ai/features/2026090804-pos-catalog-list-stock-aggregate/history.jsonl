@@ -1,0 +1,11 @@
+{"action": "passed", "at": "2026-09-08T18:16:42", "by": "Akenzy", "evidence": "architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete", "gate": "G0", "id": "785aed5eba9c", "ts": "2026-09-08T18:16:42.267600"}
+{"action": "passed", "at": "2026-09-08T18:18:50", "by": "Akenzy", "evidence": "4 assumptions, none blocking-and-pending; 8 acceptance criteria defined", "gate": "G1", "id": "f207e96937af", "ts": "2026-09-08T18:18:50.935023"}
+{"action": "passed", "at": "2026-09-08T18:19:26", "by": "Akenzy", "evidence": "3 ADR(s) recorded", "gate": "G2", "id": "0978c3b6e393", "ts": "2026-09-08T18:19:26.303920"}
+{"action": "passed", "at": "2026-09-08T18:20:39", "by": "Akenzy", "evidence": "graph valid - 1 UoW, 3 tickets, no cycles", "gate": "G3", "id": "99f3c524486f", "ts": "2026-09-08T18:20:39.944583"}
+{"action": "ticket in_progress", "at": "2026-09-08T18:20:44", "by": "Claude", "gate": "G4", "id": "747fe75d253e", "ticket": "T-01-01", "ts": "2026-09-08T18:20:44.049294"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-08T18:24:20", "by": "Claude", "gate": "G4", "id": "4fceea44a65d", "ticket": "T-01-01", "ts": "2026-09-08T18:24:20.293757"}
+{"action": "ticket in_progress", "at": "2026-09-08T18:24:26", "by": "Claude", "gate": "G4", "id": "73a1eb16709d", "ticket": "T-01-02", "ts": "2026-09-08T18:24:26.845058"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-08T18:28:09", "by": "Claude", "gate": "G4", "id": "41fe921cbd10", "ticket": "T-01-02", "ts": "2026-09-08T18:28:09.069871"}
+{"action": "ticket in_progress", "at": "2026-09-08T18:28:09", "by": "Claude", "gate": "G4", "id": "2f8d4852129b", "ticket": "T-01-03", "ts": "2026-09-08T18:28:09.184238"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-08T18:29:25", "by": "Claude", "gate": "G4", "id": "bde57c01ee93", "ticket": "T-01-03", "ts": "2026-09-08T18:29:25.237756"}
+{"action": "passed", "at": "2026-09-08T18:29:43", "by": "Akenzy", "evidence": "no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 3 tickets done, all UoW checklists ticked", "gate": "G4", "id": "e1ba355cf906", "ts": "2026-09-08T18:29:43.974027"}

@@ -13,6 +13,7 @@ import { UserBranchAssignmentEntity } from './user-branch-assignment.entity';
 import { BranchService } from './branch.service';
 import { BranchStatusService } from './branch-status.service';
 import { RbacService } from '../rbac/rbac.service';
+import { CacheService } from '../redis/cache.service';
 import { OrganizationService } from '../organization/organization.service';
 import { DocumentNumberingService } from '../document-numbering/document-numbering.service';
 import { BranchCashProvisioningService } from '../accounting/cash/branch-cash-provisioning.service';
@@ -69,6 +70,8 @@ describe('BranchService', () => {
   let dataSource: { transaction: jest.Mock; query: jest.Mock };
   let branchStatus: { invalidate: jest.Mock };
   let rbac: { hasPermission: jest.Mock };
+  let cacheStore: Map<string, unknown>;
+  let cacheService: jest.Mocked<Pick<CacheService, 'getOrSet' | 'invalidate'>>;
 
   beforeEach(async () => {
     branchRepo = {
@@ -81,7 +84,10 @@ describe('BranchService', () => {
     };
     assignmentRepo = {
       findOne: jest.fn(),
-      find: jest.fn(),
+      // Defaults to empty so the status-change sites' `my-branches`
+      // invalidation (T-07-03) resolves without every existing test having
+      // to stub it.
+      find: jest.fn().mockResolvedValue([]),
       create: jest.fn((dto) => ({ id: 'asgn-1', ...dto })),
       save: jest.fn((entity) => Promise.resolve(entity)),
       remove: jest.fn(),
@@ -132,6 +138,28 @@ describe('BranchService', () => {
     branchStatus = { invalidate: jest.fn().mockResolvedValue(undefined) };
     // Privileged by default; the permission cases override it.
     rbac = { hasPermission: jest.fn().mockResolvedValue(true) };
+    // Real hit/miss behavior via an in-memory Map, mirroring
+    // auth.service.spec.ts's CacheService mock — not a pass-through, so the
+    // "second call doesn't hit the DB" assertions actually mean something.
+    cacheStore = new Map();
+    cacheService = {
+      getOrSet: jest.fn(
+        async <T>(
+          namespace: string,
+          key: string,
+          fetchFn: () => Promise<T>,
+        ): Promise<T> => {
+          const cacheKey = `${namespace}:${key}`;
+          if (cacheStore.has(cacheKey)) return cacheStore.get(cacheKey) as T;
+          const value = await fetchFn();
+          cacheStore.set(cacheKey, value);
+          return value;
+        },
+      ) as jest.Mocked<Pick<CacheService, 'getOrSet'>>['getOrSet'],
+      invalidate: jest.fn(async (namespace: string, key: string) => {
+        cacheStore.delete(`${namespace}:${key}`);
+      }),
+    };
     dataSource = {
       query: jest.fn().mockResolvedValue([{ count: 0 }]),
       transaction: jest.fn((cb: (m: typeof manager) => unknown) => cb(manager)),
@@ -154,6 +182,7 @@ describe('BranchService', () => {
         { provide: BranchStatusService, useValue: branchStatus },
         { provide: RbacService, useValue: rbac },
         { provide: DataSource, useValue: dataSource },
+        { provide: CacheService, useValue: cacheService },
       ],
     }).compile();
 
@@ -194,6 +223,26 @@ describe('BranchService', () => {
       await expect(
         service.create({ name: 'Main HQ' }, actor),
       ).rejects.toThrow(ConflictException);
+    });
+
+    it('drops the creator identity + my-branches cache after self-assigning to the new branch — a write not among the six enumerated sites (T-07-03, AC-24)', async () => {
+      branchRepo.findOne.mockResolvedValue(null);
+      branchRepo.count.mockResolvedValue(1);
+
+      await service.create({ name: 'HQ' }, actor);
+
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'identity',
+        'identity:user-1:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'my-branches',
+        'user-1:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'users-me',
+        'user-1:org-1',
+      );
     });
 
     it('auto-creates the branch showroom backed by a main storage', async () => {
@@ -292,6 +341,21 @@ describe('BranchService', () => {
       expect(result.status).toBe(BranchStatus.ARCHIVED);
       expect(branchRepo.save).toHaveBeenCalled();
     });
+
+    it('drops the my-branches cache for every assignee of the archived branch (T-07-03, AC-24)', async () => {
+      branchRepo.findOne.mockResolvedValue(
+        branchStub({ status: BranchStatus.SUSPENDED }),
+      );
+      branchRepo.count.mockResolvedValue(0);
+      assignmentRepo.find.mockResolvedValue([{ userId: 'user-5' }]);
+
+      await service.archive('branch-1', actor);
+
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'my-branches',
+        'user-5:org-1',
+      );
+    });
   });
 
   // =========================================================================
@@ -338,6 +402,31 @@ describe('BranchService', () => {
 
       expect(branchStatus.invalidate).toHaveBeenCalledWith('org-1');
     });
+
+    it('drops the my-branches cache for every assignee of the suspended branch (T-07-03, AC-24)', async () => {
+      branchRepo.findOne.mockResolvedValue(
+        branchStub({ status: BranchStatus.ACTIVE, isMainBranch: false }),
+      );
+      assignmentRepo.find.mockResolvedValue([
+        { userId: 'user-2' },
+        { userId: 'user-3' },
+      ]);
+
+      await service.suspend('branch-1', actor);
+
+      expect(assignmentRepo.find).toHaveBeenCalledWith({
+        where: { branchId: 'branch-1', organizationId: 'org-1' },
+        select: ['userId'],
+      });
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'my-branches',
+        'user-2:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'my-branches',
+        'user-3:org-1',
+      );
+    });
   });
 
   // =========================================================================
@@ -353,6 +442,20 @@ describe('BranchService', () => {
 
       expect(result.status).toBe(BranchStatus.ACTIVE);
       expect(branchStatus.invalidate).toHaveBeenCalledWith('org-1');
+    });
+
+    it('drops the my-branches cache for every assignee of the reactivated branch (T-07-03, AC-24)', async () => {
+      branchRepo.findOne.mockResolvedValue(
+        branchStub({ status: BranchStatus.SUSPENDED, isMainBranch: false }),
+      );
+      assignmentRepo.find.mockResolvedValue([{ userId: 'user-4' }]);
+
+      await service.activate('branch-1', actor);
+
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'my-branches',
+        'user-4:org-1',
+      );
     });
 
     it('refuses an ARCHIVED branch', async () => {
@@ -393,6 +496,24 @@ describe('BranchService', () => {
 
       expect(result.status).toBe(BranchStatus.SUSPENDED);
       expect(branchStatus.invalidate).toHaveBeenCalledWith('org-1');
+    });
+
+    it('drops the my-branches cache for every assignee when PATCH moves status (T-07-03, AC-24)', async () => {
+      branchRepo.findOne.mockResolvedValue(
+        branchStub({ status: BranchStatus.ACTIVE, isMainBranch: false }),
+      );
+      assignmentRepo.find.mockResolvedValue([{ userId: 'user-6' }]);
+
+      await service.update(
+        'branch-1',
+        { status: BranchStatus.SUSPENDED },
+        actor,
+      );
+
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'my-branches',
+        'user-6:org-1',
+      );
     });
 
     it('routes a status change through activate()', async () => {
@@ -646,6 +767,45 @@ describe('BranchService', () => {
         });
       }
     });
+
+    it('on a cache miss returns the same result the uncached path produced', async () => {
+      assignmentRepo.find.mockResolvedValue([{ branchId: 'branch-1' }]);
+      const branches = [branchStub()];
+      branchRepo.find.mockResolvedValue(branches);
+
+      const result = await service.listMyBranches(actor);
+
+      expect(result).toBe(branches);
+    });
+
+    it('serves the second call from cache: both underlying queries run once', async () => {
+      assignmentRepo.find.mockResolvedValue([{ branchId: 'branch-1' }]);
+      branchRepo.find.mockResolvedValue([branchStub()]);
+
+      const first = await service.listMyBranches(actor);
+      const second = await service.listMyBranches(actor);
+
+      expect(assignmentRepo.find).toHaveBeenCalledTimes(1);
+      expect(branchRepo.find).toHaveBeenCalledTimes(1);
+      expect(second).toEqual(first);
+    });
+
+    it('falls through to the DB when the cache is unavailable, without throwing', async () => {
+      assignmentRepo.find.mockResolvedValue([{ branchId: 'branch-1' }]);
+      const branches = [branchStub()];
+      branchRepo.find.mockResolvedValue(branches);
+      // Simulate CacheService.getOrSet's own Redis-down fallback: it still
+      // calls fetchFn and returns its result, it just never gets the cache
+      // hit shortcut. Re-implementing that fallback here would test our own
+      // stub instead of the contract this ticket relies on.
+      cacheService.getOrSet.mockImplementationOnce(
+        async (_namespace, _key, fetchFn) => fetchFn(),
+      );
+
+      const result = await service.listMyBranches(actor);
+
+      expect(result).toEqual(branches);
+    });
   });
 
   // =========================================================================
@@ -719,6 +879,26 @@ describe('BranchService', () => {
       expect(result.userId).toBe('user-2');
     });
 
+    it('drops the assigned user identity + my-branches cache — a write not among the six enumerated sites (T-07-03, AC-24)', async () => {
+      branchRepo.findOne.mockResolvedValue(branchStub());
+      assignmentRepo.findOne.mockResolvedValue(null);
+
+      await service.assignUser('branch-1', 'user-2', actor);
+
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'identity',
+        'identity:user-2:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'my-branches',
+        'user-2:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'users-me',
+        'user-2:org-1',
+      );
+    });
+
     it('throws ConflictException when user is already assigned', async () => {
       branchRepo.findOne.mockResolvedValue(branchStub());
       assignmentRepo.findOne.mockResolvedValue({ id: 'existing' });
@@ -738,6 +918,30 @@ describe('BranchService', () => {
       await service.unassignUser('branch-1', 'user-2', actor);
 
       expect(assignmentRepo.remove).toHaveBeenCalledWith(assignment);
+    });
+
+    it('drops the unassigned user identity + my-branches cache (T-07-03, AC-24)', async () => {
+      branchRepo.findOne.mockResolvedValue(branchStub());
+      assignmentRepo.findOne.mockResolvedValue({
+        id: 'asgn-1',
+        userId: 'user-2',
+        branchId: 'branch-1',
+      });
+
+      await service.unassignUser('branch-1', 'user-2', actor);
+
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'identity',
+        'identity:user-2:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'my-branches',
+        'user-2:org-1',
+      );
+      expect(cacheService.invalidate).toHaveBeenCalledWith(
+        'users-me',
+        'user-2:org-1',
+      );
     });
 
     it('throws NotFoundException when assignment does not exist', async () => {

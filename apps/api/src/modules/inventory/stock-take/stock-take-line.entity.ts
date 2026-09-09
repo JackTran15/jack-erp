@@ -25,6 +25,10 @@ export class StockTakeLineEntity {
   @Column({ name: "stock_take_id", type: "uuid" })
   stockTakeId: string;
 
+  /** 1-based position within the stock-take, stamped by the write path (no DB default). */
+  @Column({ name: "line_no", type: "integer" })
+  lineNo: number;
+
   @Column({ name: "item_id", type: "uuid" })
   itemId: string;
 

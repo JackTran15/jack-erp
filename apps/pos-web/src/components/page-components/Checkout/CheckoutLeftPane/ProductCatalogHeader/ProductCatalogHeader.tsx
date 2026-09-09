@@ -8,7 +8,7 @@ import { useCheckoutBarcodeAutoAdd } from "@erp/pos/hooks/page-hooks/checkout/us
 import { useCheckoutCartActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cart-actions";
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
 import { useCheckoutMeta } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-meta";
-import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
+import type { PosCatalogSuggestion } from "@erp/pos/interfaces/catalog.interface";
 
 export interface ProductCatalogHeaderProps {
   /** Forwarded to the underlying input — used by the Shift+F3 hotkey. */
@@ -16,31 +16,34 @@ export interface ProductCatalogHeaderProps {
 }
 
 /**
- * Section header for the product catalog: uppercase label + product search
- * popover + group-filter combobox. Concrete cho PosCatalogLine/ProductGroup —
- * đọc state từ catalog store + meta hook.
+ * Section header for the product catalog: uppercase label + product search input
+ * + group-filter combobox. Concrete cho PosCatalogLine/ProductGroup — đọc state từ
+ * catalog store + meta hook.
+ *
+ * Ô tìm sản phẩm không có dropdown gợi ý: lưới bên dưới đọc cùng `catalogQuery` và
+ * hiển thị kết quả. Ô lọc nhóm hàng ngay cạnh thì VẪN có dropdown.
  */
 export function ProductCatalogHeader({ inputRef }: ProductCatalogHeaderProps) {
-  const { catalogQuery, setCatalogQuery, setCatalogGroup, productSearchAdapter } =
-    useCheckoutCatalog();
+  const { catalogQuery, setCatalogQuery, setCatalogGroup } = useCheckoutCatalog();
   const meta = useCheckoutMeta();
   const { addProductByItem } = useCheckoutCartActions();
-  const { tryAutoAdd, resetGuard } = useCheckoutBarcodeAutoAdd();
+  const { tryAutoAdd, searchWithAutoAdd, resetGuard } =
+    useCheckoutBarcodeAutoAdd();
 
-  // Parity với ô F3: ưu tiên khớp mã vạch/SKU 100% → auto-add (đóng dropdown +
-  // xóa ô để lưới sản phẩm bên dưới không bị kẹt lọc theo chuỗi mã vạch); chỉ khi
-  // không khớp mới rơi về gợi ý tên/SKU/mã vạch (ILIKE) server-side.
+  // Ô này KHÔNG còn hiện dropdown gợi ý (`suppressSuggestions`) — lưới sản phẩm bên
+  // dưới là nơi trả lời. Nhưng lượt gọi này vẫn phải chạy: đây là chỗ auto-add mã
+  // vạch sống. Khớp mã vạch/SKU 100% → thêm thẳng vào giỏ rồi xoá ô, để lưới không
+  // bị kẹt lọc theo chuỗi mã vạch (và để dialog "khớp đúng một card" không mở nhầm
+  // sau một lần quét).
+  //
+  // Luôn trả mảng rỗng: không ai đọc gợi ý ở call-site này nữa.
   const search = useCallback(
-    async (q: string): Promise<SearchSuggestion<PosCatalogLine>[]> => {
-      const result = await tryAutoAdd(q);
-      if (result === "added") {
-        setCatalogQuery("");
-        return [];
-      }
-      if (result === "miss") return productSearchAdapter(q);
+    async (q: string): Promise<SearchSuggestion<PosCatalogSuggestion>[]> => {
+      const { result } = await searchWithAutoAdd(q);
+      if (result === "added") setCatalogQuery("");
       return [];
     },
-    [tryAutoAdd, productSearchAdapter, setCatalogQuery],
+    [searchWithAutoAdd, setCatalogQuery],
   );
 
   // Mỗi lần gõ/quét thật mở một phiên nhập mới (nhả guard khử trùng).
@@ -79,18 +82,26 @@ export function ProductCatalogHeader({ inputRef }: ProductCatalogHeaderProps) {
       </span>
 
       <div className="ml-auto w-[280px]">
-        <PosSearchPopover<PosCatalogLine>
+        <PosSearchPopover<PosCatalogSuggestion>
           inputRef={inputRef}
           value={catalogQuery}
           onValueChange={handleValueChange}
           search={search}
-          onSelect={(item) => addProductByItem(item)}
           onSubmitQuery={handleSubmitQuery}
-          itemKey={(item) => item.itemId}
+          // Lưới sản phẩm bên dưới hiển thị kết quả; dropdown ở đây chỉ là câu trả
+          // lời thứ hai cho cùng câu hỏi, và trước đây hai câu trả lời hay lệch nhau.
+          suppressSuggestions
+          // `onSelect` / `renderItem` / `itemKey` là prop bắt buộc của
+          // PosSearchPopover và không bao giờ chạy khi danh sách bị ẩn. Giữ lại thay
+          // vì nới type của component dùng chung cho đúng một call-site — và giữ
+          // đúng hành vi cũ phòng khi ai đó tắt `suppressSuggestions` để soi lỗi.
+          onSelect={(item) => addProductByItem(item)}
           renderItem={(item) => item.name}
-          renderMeta={(item) => `${item.code} · ${item.unit}`}
+          itemKey={(item) => item.itemId}
           placeholder="(Shift + F3) Tìm kiếm"
-          minChars={1}
+          // 3, cùng lý do với ô F3: pg_trgm cần ≥3 ký tự mới tra được index, nên
+          // 1–2 ký tự quét toàn bộ catalog. Đường Enter không bị ngưỡng này chặn.
+          minChars={3}
           debounceMs={150}
           containerClassName="flex h-9 w-full items-stretch overflow-hidden rounded-md border border-gray-200 bg-white focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20"
           inputClassName="min-w-0 flex-1 bg-transparent pr-3 text-[13px] text-gray-900 placeholder:text-gray-400 focus:outline-none"

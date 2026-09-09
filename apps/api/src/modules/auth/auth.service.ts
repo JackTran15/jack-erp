@@ -12,6 +12,7 @@ import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { SessionStore } from '../redis/session.store';
+import { CacheService, CACHE_TTL_SECONDS } from '../redis/cache.service';
 import { HandoffStore } from './handoff.store';
 import { RbacService } from '../rbac/rbac.service';
 import { UserEntity } from './user.entity';
@@ -35,6 +36,8 @@ import { BranchEntity } from '../branch/branch.entity';
 const HANDOFF_CODE_TTL = 60;
 /** Matches UsersService.BCRYPT_COST so both password paths cost the same. */
 const BCRYPT_ROUNDS = 10;
+/** Namespace for the cached `{ roles, branchIds }` pair — see `getCachedIdentity`. */
+const IDENTITY_CACHE_NAMESPACE = 'identity';
 
 @Injectable()
 export class AuthService {
@@ -47,6 +50,7 @@ export class AuthService {
   constructor(
     private readonly config: ConfigService,
     private readonly sessionStore: SessionStore,
+    private readonly cacheService: CacheService,
     private readonly handoffStore: HandoffStore,
     private readonly rbacService: RbacService,
     @InjectRepository(UserEntity)
@@ -423,7 +427,12 @@ export class AuthService {
   async getSession(jti: string): Promise<SessionInfo | null> {
     const session = await this.sessionStore.getSession(jti);
     if (!session) return null;
-    return this.buildSessionInfo(session.userId, session.organizationId);
+    const { userId, organizationId } = session;
+    const [{ roles, branchIds }, permissions] = await Promise.all([
+      this.getCachedIdentity(userId, organizationId),
+      this.rbacService.getUserPermissions(userId, organizationId),
+    ]);
+    return { userId, organizationId, roles, branchIds, permissions };
   }
 
   private async buildSessionInfo(
@@ -436,6 +445,42 @@ export class AuthService {
       this.rbacService.getUserPermissions(userId, organizationId),
     ]);
     return { userId, organizationId, roles, branchIds, permissions };
+  }
+
+  /**
+   * Cached `{ roles, branchIds }` pair, mirroring the pattern
+   * `RbacService.getUserPermissions` already uses. Read-path only — call this
+   * from `getSession` exclusively, and only after the session's revocation
+   * has already been checked via `sessionStore.getSession`.
+   *
+   * Do NOT call this from a token-minting path (`login`, `refresh`,
+   * `switchBranch`, `exchangeHandoffCode`) or from an authorization gate.
+   * `login`, `switchBranch` and `exchangeHandoffCode` reach the resolvers via
+   * the uncached `buildSessionInfo`; `refresh` and `createHandoffCode` call
+   * `resolveUserRoles` / `resolveUserBranches` directly. All of them must keep
+   * doing so: minting a JWT with cached roles hands out stale permissions for the
+   * life of the token, and the branch-switch check exists specifically to
+   * block standing in a branch that was just revoked — a cache in front of
+   * it would honor that revoked assignment for up to `CACHE_TTL_SECONDS`
+   * (ADR-07 v2). Cache serves identity reporting only; it must never enter a
+   * token payload or gate an authorization decision.
+   */
+  private async getCachedIdentity(
+    userId: string,
+    orgId: string,
+  ): Promise<{ roles: string[]; branchIds: string[] }> {
+    return this.cacheService.getOrSet(
+      IDENTITY_CACHE_NAMESPACE,
+      `identity:${userId}:${orgId}`,
+      async () => {
+        const [roles, branchIds] = await Promise.all([
+          this.resolveUserRoles(userId, orgId),
+          this.resolveUserBranches(userId, orgId),
+        ]);
+        return { roles, branchIds };
+      },
+      CACHE_TTL_SECONDS,
+    );
   }
 
   verifyAccessToken(token: string): JwtPayload {

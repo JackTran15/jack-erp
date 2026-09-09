@@ -11,7 +11,7 @@ import {
 import { useCheckoutBarcodeAutoAdd } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-barcode-auto-add";
 import { useCheckoutCartActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cart-actions";
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
-import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
+import type { PosCatalogSuggestion } from "@erp/pos/interfaces/catalog.interface";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface ProductSearchInputProps {
@@ -20,7 +20,13 @@ export interface ProductSearchInputProps {
   disabled?: boolean;
   /** Placeholder mặc định có hint phím tắt F3. */
   placeholder?: string;
-  /** Min ký tự để mở popover suggest. */
+  /**
+   * Min ký tự để mở popover suggest. Mặc định 3 — đây là điều kiện kỹ thuật,
+   * không phải tinh chỉnh UX: `pg_trgm` cần ≥3 ký tự mới tra được index, nên
+   * chuỗi 1–2 ký tự quét toàn bộ catalog (đo 54,7 ms cho `%2%` kể cả đã LIMIT).
+   * Quét mã vạch KHÔNG bị ảnh hưởng: đường Enter (`onSubmitQuery`) không đi qua
+   * ngưỡng này.
+   */
   minChars?: number;
   /** Debounce ms cho input. */
   debounceMs?: number;
@@ -38,12 +44,13 @@ export function ProductSearchInput({
   inputRef,
   disabled,
   placeholder = "(F3) Nhập tên hàng hóa, mã vạch, mã SKU",
-  minChars = 1,
+  minChars = 3,
   debounceMs = 150,
 }: ProductSearchInputProps) {
-  const { toolbar, setToolbar, productSearchAdapter } = useCheckoutCatalog();
+  const { toolbar, setToolbar } = useCheckoutCatalog();
   const { addProductByItem, addProductByQuery } = useCheckoutCartActions();
-  const { tryAutoAdd, resetGuard } = useCheckoutBarcodeAutoAdd();
+  const { tryAutoAdd, searchWithAutoAdd, resetGuard } =
+    useCheckoutBarcodeAutoAdd();
   const focusSeq = usePosCheckoutUiStore((s) => s.productSearchFocusSeq);
 
   useEffect(() => {
@@ -64,15 +71,15 @@ export function ProductSearchInput({
     [resetGuard, setToolbar],
   );
 
-  // "Đổi input": ưu tiên khớp mã vạch/SKU 100% → auto-add (dropdown đóng vì trả
-  // []); chỉ khi không khớp mới rơi về gợi ý tên/SKU client-side như cũ.
+  // "Đổi input": MỘT request trả cả khớp tuyệt đối lẫn gợi ý. Khớp mã vạch/SKU
+  // 100% → auto-add và dropdown đóng (suggestions rỗng); không khớp → gợi ý
+  // server-side như cũ. Trước đây chỗ này bắn hai request nối tiếp.
   const search = useCallback(
-    async (q: string): Promise<SearchSuggestion<PosCatalogLine>[]> => {
-      const result = await tryAutoAdd(q);
-      if (result === "miss") return productSearchAdapter(q);
-      return [];
+    async (q: string): Promise<SearchSuggestion<PosCatalogSuggestion>[]> => {
+      const { suggestions } = await searchWithAutoAdd(q);
+      return suggestions.slice(0, 8).map((item) => ({ item }));
     },
-    [tryAutoAdd, productSearchAdapter],
+    [searchWithAutoAdd],
   );
 
   // Enter: tra trước; khớp 1 → đã add; chỉ khi không khớp mới giữ addProductByQuery cũ.
@@ -80,7 +87,7 @@ export function ProductSearchInput({
     (q: string): boolean => {
       if (!q.trim()) return true;
       void tryAutoAdd(q).then((result) => {
-        if (result === "miss") addProductByQuery();
+        if (result === "miss") void addProductByQuery();
       });
       return true;
     },
@@ -88,7 +95,7 @@ export function ProductSearchInput({
   );
 
   return (
-    <PosSearchPopover<PosCatalogLine>
+    <PosSearchPopover<PosCatalogSuggestion>
       inputRef={inputRef}
       value={toolbar.query}
       onValueChange={handleValueChange}

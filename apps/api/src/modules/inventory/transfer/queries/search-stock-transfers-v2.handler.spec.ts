@@ -23,7 +23,11 @@ const actor: ActorContext = {
  * fake repository hands out a fresh builder per `createQueryBuilder` call.
  * `builders[0]` is the rows query, `builders[1]` the totals query.
  */
-function makeQb(rows: unknown[], totals: { total: string; totalAmount: string }) {
+function makeQb(
+  rows: unknown[],
+  totals: { total: string; totalAmount: string },
+  rowsRaw: unknown[] = rows.map(() => ({ totalAmount: '0' })),
+) {
   const qb: any = {
     leftJoin: jest.fn(() => qb),
     leftJoinAndSelect: jest.fn(() => qb),
@@ -36,6 +40,9 @@ function makeQb(rows: unknown[], totals: { total: string; totalAmount: string })
     addSelect: jest.fn(() => qb),
     getMany: jest.fn().mockResolvedValue(rows),
     getRawOne: jest.fn().mockResolvedValue(totals),
+    getRawAndEntities: jest
+      .fn()
+      .mockResolvedValue({ entities: rows, raw: rowsRaw }),
   };
   return qb;
 }
@@ -51,11 +58,16 @@ describe('SearchStockTransfersV2Handler', () => {
     total = rows.length,
     users: unknown[] = [],
     totalAmount = '0',
+    rowsRaw?: unknown[],
   ) {
     builders = [];
     repo = {
       createQueryBuilder: jest.fn(() => {
-        const next = makeQb(rows, { total: String(total), totalAmount });
+        const next = makeQb(
+          rows,
+          { total: String(total), totalAmount },
+          rowsRaw,
+        );
         builders.push(next);
         return next;
       }),
@@ -75,7 +87,7 @@ describe('SearchStockTransfersV2Handler', () => {
   const qbOf = () => builders[0];
   const totalsQb = () => builders[1];
 
-  it('scopes by org + branch, hides CANCELLED, joins lines, orders by createdAt', async () => {
+  it('scopes by org + branch, hides CANCELLED, never joins lines, orders by createdAt', async () => {
     await build([]);
     await handler.execute(new SearchStockTransfersV2Query({}, actor));
 
@@ -88,7 +100,11 @@ describe('SearchStockTransfersV2Handler', () => {
     expect(qbOf().andWhere).toHaveBeenCalledWith('st.branchId = :branchId', {
       branchId: 'branch-1',
     });
-    expect(qbOf().leftJoinAndSelect).toHaveBeenCalledWith('st.lines', 'lines');
+    expect(qbOf().leftJoinAndSelect).not.toHaveBeenCalled();
+    expect(qbOf().addSelect).toHaveBeenCalledWith(
+      expect.stringContaining('SUM(l.line_value)'),
+      'totalAmount',
+    );
     expect(qbOf().orderBy).toHaveBeenCalledWith('st.createdAt', 'DESC');
   });
 
@@ -107,12 +123,15 @@ describe('SearchStockTransfersV2Handler', () => {
         id: 'st-1',
         documentNumber: 'CK000001',
         transporterUserId: 'u-1',
-        lines: [{ lineValue: '356000' }, { lineValue: '285000' }],
       },
     ];
-    await build(rows, 12, [
-      { id: 'u-1', firstName: 'Phan', lastName: 'Thanh Hà', organizationId: 'org-1' },
-    ]);
+    await build(
+      rows,
+      12,
+      [{ id: 'u-1', firstName: 'Phan', lastName: 'Thanh Hà', organizationId: 'org-1' }],
+      '0',
+      [{ totalAmount: '641000' }],
+    );
 
     const result = await handler.execute(
       new SearchStockTransfersV2Query({ page: 2, limit: 10 }, actor),

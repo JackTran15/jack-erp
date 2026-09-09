@@ -8,7 +8,10 @@ import type { PaymentMethod } from "@erp/pos/constants/checkout.constant";
 import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import { PaymentMethodEnum } from "@erp/pos/constants/checkout.constant";
 import { PromoMenuOptionEnum } from "@erp/pos/constants/checkout.constant";
-import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
+import type {
+  PosCatalogLine,
+  PosCatalogSuggestion,
+} from "@erp/pos/interfaces/catalog.interface";
 import { formatVnd } from "@erp/ui";
 
 /** Normalize persisted / loose string into {@link CheckoutVariantEnum}. */
@@ -122,7 +125,11 @@ export function formatLineDiscountLabel(line: CartLine): string {
  * cho `false`, tức cảnh báo tắt sạch mà không có lỗi nào — trong khi FE là lớp
  * bảo vệ duy nhất, BE không chặn tồn âm.
  */
-export function readSellableOnHand(product: PosCatalogLine): number | null {
+export function readSellableOnHand(
+  // Nhận shape hẹp: đường dropdown gợi ý (`view=suggest`) không mang
+  // `locations[]`/`quantityOnHand`, và hàm này vốn chỉ đọc `sellableQuantity`.
+  product: PosCatalogSuggestion,
+): number | null {
   const value = product.sellableQuantity;
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }

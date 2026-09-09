@@ -29,7 +29,7 @@ import {
   ValidateNested,
 } from "class-validator";
 import { Transform, Type } from "class-transformer";
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { ApiOkResponse, ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { DocCounterpartyKind, TransferOrderStatus } from "@erp/shared-interfaces";
 import {
   Actor,
@@ -40,6 +40,7 @@ import { AuditInterceptor } from "../../crud/audit.interceptor";
 import { PermissionGuard } from "../../rbac/permission.guard";
 import { BranchScopeGuard } from "../../rbac/branch-scope.guard";
 import { PaginationQueryDto } from "../../crud/dto";
+import { VoucherDetailQueryDto } from "../dto/voucher-detail-query.dto";
 import { ExportPipeline } from "../../reporting/report-core/export/export-pipeline";
 import { HttpResponseSink } from "../../reporting/report-core/export/http-response.sink";
 import { VoucherXlsxWriter } from "../../reporting/report-core/export/voucher-xlsx.writer";
@@ -252,6 +253,11 @@ class ImportableTransferOrderQueryDto extends IssuableTransferOrderQueryDto {
   includeCompleted?: boolean;
 }
 
+class ImportableTransferOrderCountResponseDto {
+  @ApiProperty()
+  count: number;
+}
+
 class CreateTransferOrderDto {
   @IsString()
   sourceBranchId: string;
@@ -396,6 +402,24 @@ export class TransferOrderController {
     );
   }
 
+  @Get("importable/count")
+  @RequirePermission("inventory.transfer.read")
+  @ApiOkResponse({ type: ImportableTransferOrderCountResponseDto })
+  async countImportable(
+    @Query() query: ImportableTransferOrderQueryDto,
+    @Actor() actor: ActorContext,
+  ): Promise<ImportableTransferOrderCountResponseDto> {
+    const count = await this.service.countImportable(
+      {
+        from: query.from,
+        to: query.to,
+        includeCompleted: query.includeCompleted,
+      },
+      actor,
+    );
+    return { count };
+  }
+
   @Get("by-code/:code")
   @RequirePermission("inventory.transfer.read")
   getByCode(@Param("code") code: string, @Actor() actor: ActorContext) {
@@ -406,9 +430,12 @@ export class TransferOrderController {
   @RequirePermission("inventory.transfer.read")
   getById(
     @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: VoucherDetailQueryDto,
     @Actor() actor: ActorContext,
   ) {
-    return this.service.getById(id, actor);
+    return this.service.getById(id, actor, {
+      includeLines: query.includeLines,
+    });
   }
 
   @Get(":id/lines")

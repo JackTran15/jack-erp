@@ -893,6 +893,29 @@ export function computeOversellLines(
  * Dòng `isReturnCredit` không đếm — hàng khách trả không cảnh báo vượt tồn, và
  * `syncPurchaseCartOnHand` cũng bỏ qua chúng.
  */
+/**
+ * Các itemId cần hỏi tồn, gộp từ MỌI session — cùng phạm vi với
+ * `syncPurchaseCartOnHand`, và đó là điều bắt buộc: nếu chỉ gửi itemId của tab
+ * đang mở, dòng ở tab khác sẽ không có mặt trong kết quả trả về, bị đánh dấu
+ * `onHandUnknown`, và `selectUnknownOnHandLineCount` không bao giờ về 0 — vòng
+ * lặp effect biến thành vòng lặp request.
+ *
+ * Trả về CHUỖI đã sort + join chứ không phải mảng: subscribe một mảng dựng mới
+ * mỗi render sẽ làm effect chạy vô hạn, đúng như `selectUnknownOnHandLineCount`
+ * trả số nguyên vì cùng lý do. Caller tách lại bằng `useMemo`.
+ *
+ * Dòng `isReturnCredit` bị bỏ qua — `syncPurchaseCartOnHand` cũng bỏ qua chúng.
+ */
+export function selectCartItemIdsKey(state: PosCheckoutSessionState): string {
+  const ids = new Set<string>();
+  for (const session of state.sessions) {
+    for (const line of session.purchaseCart) {
+      if (!line.isReturnCredit) ids.add(line.itemId);
+    }
+  }
+  return [...ids].sort().join(",");
+}
+
 export function selectUnknownOnHandLineCount(
   state: PosCheckoutSessionState,
 ): number {

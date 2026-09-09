@@ -1,13 +1,19 @@
 import { useCallback } from "react";
 
 import { CHECKOUT_ERRORS } from "@erp/pos/constants/checkout-messages.constant";
-import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
 import { useCheckoutSessionCart } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-session-cart";
 import type { CatalogProduct } from "@erp/pos/interfaces/checkout.interface";
 import type {
   PosCatalogLine,
+  PosCatalogSuggestion,
   PosProductVariant,
 } from "@erp/pos/interfaces/catalog.interface";
+import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
+import {
+  selectCatalogDraft,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
+import { useSearchPosCatalog } from "@erp/pos/hooks/react-query/use-query-catalog";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 /** Một biến thể đã chọn + số lượng từ dialog. */
@@ -19,10 +25,19 @@ export interface VariantSelection {
 export interface UseCheckoutVariantSelectionResult {
   /** Click product trong catalog grid → mở dialog chọn biến thể. */
   openForCatalogCard: (product: CatalogProduct) => void;
-  /** Chọn 1 sản phẩm từ ProductSearchInput → mở dialog. */
-  openForItem: (line: PosCatalogLine) => void;
-  /** Submit query trên ProductSearchInput — đúng 1 match thì mở dialog; 0/nhiều → lỗi. */
-  openForQuery: () => void;
+  /**
+   * Chọn 1 sản phẩm từ ProductSearchInput → mở dialog.
+   *
+   * Nhận shape hẹp: chỉ đọc `productId`, `itemId`, `name` — đủ trong
+   * `PosCatalogSuggestion` (`view=suggest` chỉ bỏ `locations` + `quantityOnHand`).
+   */
+  openForItem: (line: PosCatalogSuggestion) => void;
+  /**
+   * Submit query trên ProductSearchInput — đúng 1 khớp thì mở dialog; 0/nhiều → lỗi.
+   *
+   * Hỏi server thay vì lọc mảng catalog trên client, nên trả `Promise`.
+   */
+  openForQuery: () => Promise<void>;
   /** Người dùng bấm "Đồng ý" trong dialog — thêm các biến thể đã chọn vào giỏ. */
   confirmVariants: (selections: VariantSelection[]) => void;
 }
@@ -53,12 +68,13 @@ function variantToCatalogLine(variant: PosProductVariant): PosCatalogLine {
  * `addProduct` hiện có (giữ nguyên guard tồn kho + focus flow MISA).
  */
 export function useCheckoutVariantSelection(): UseCheckoutVariantSelectionResult {
-  const { filteredProducts } = useCheckoutCatalog();
   const { addProduct } = useCheckoutSessionCart();
+  const branchId = usePosBranchStore((s) => s.branchId) ?? "";
+  const searchCatalog = useSearchPosCatalog();
   const openVariantDialog = usePosCheckoutUiStore((s) => s.openVariantDialog);
 
   const openForItem = useCallback(
-    (line: PosCatalogLine) => {
+    (line: PosCatalogSuggestion) => {
       openVariantDialog({
         id: line.productId ?? line.itemId,
         kind: line.productId ? "PRODUCT" : "ITEM",
@@ -80,16 +96,37 @@ export function useCheckoutVariantSelection(): UseCheckoutVariantSelectionResult
     [openVariantDialog],
   );
 
-  const openForQuery = useCallback(() => {
+  const openForQuery = useCallback(async () => {
     const ui = usePosCheckoutUiStore.getState();
-    if (filteredProducts.length === 1) {
-      openForItem(filteredProducts[0]!);
-    } else if (filteredProducts.length === 0) {
+    const term = selectCatalogDraft(
+      usePosCheckoutSessionStore.getState(),
+    ).toolbar.query.trim();
+    if (!term || !branchId) {
+      ui.setCartError(CHECKOUT_ERRORS.PRODUCT_NOT_FOUND);
+      return;
+    }
+
+    let matches;
+    try {
+      // limit 2 — ba nhánh dưới chỉ phân biệt 0 / 1 / nhiều.
+      ({ suggestions: matches } = await searchCatalog(branchId, {
+        q: term,
+        view: "suggest",
+        limit: 2,
+      }));
+    } catch {
+      ui.setCartError(CHECKOUT_ERRORS.PRODUCT_NOT_FOUND);
+      return;
+    }
+
+    if (matches.length === 1) {
+      openForItem(matches[0]!);
+    } else if (matches.length === 0) {
       ui.setCartError(CHECKOUT_ERRORS.PRODUCT_NOT_FOUND);
     } else {
       ui.setCartError(CHECKOUT_ERRORS.PRODUCT_MULTIPLE_RESULTS);
     }
-  }, [filteredProducts, openForItem]);
+  }, [branchId, searchCatalog, openForItem]);
 
   const confirmVariants = useCallback(
     (selections: VariantSelection[]) => {

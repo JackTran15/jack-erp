@@ -31,12 +31,37 @@ import { EmployeeAddressEntity } from "./employee/employee-address.entity";
 import { EmployeeEmergencyContactEntity } from "./employee/employee-emergency-contact.entity";
 import { EmployeeAccessScheduleEntity } from "./employee/employee-access-schedule.entity";
 import { RbacService } from "./rbac.service";
+import { CacheService } from "../redis/cache.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { EmployeeProfileDto } from "./dto/employee-profile.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 
 const BCRYPT_COST = 10;
+
+/**
+ * Mirrors `AuthService`'s private `IDENTITY_CACHE_NAMESPACE` /
+ * `BranchService`'s `MY_BRANCHES_CACHE_NAMESPACE` — duplicated here rather
+ * than imported because neither service exposes them and this module has no
+ * other dependency on either one. Same trade `BranchCrudService.invalidateStatusCache`
+ * already made for its own copy of that helper (see T-07-03).
+ */
+const IDENTITY_CACHE_NAMESPACE = "identity";
+const MY_BRANCHES_CACHE_NAMESPACE = "my-branches";
+
+/**
+ * `/admin/users/me`. Every page load in both SPAs calls it, and nothing in the
+ * payload changes without one of the writes that already go through
+ * `invalidateUserIdentity`, so it caches well.
+ *
+ * The 15-minute TTL is a safety net for a write path that forgets to
+ * invalidate, not the primary freshness mechanism — see ADR-04 of
+ * 2026090805-pos-initial-load-latency. Longer than the other identity caches on
+ * purpose: correctness here comes from invalidation, and a short TTL would only
+ * hide a missing call site.
+ */
+const USERS_ME_CACHE_NAMESPACE = "users-me";
+const USERS_ME_CACHE_TTL_SECONDS = 15 * 60;
 
 /** Sentinel for "match nothing" — an empty `In([])` would match every row. */
 const NIL_UUID = "00000000-0000-0000-0000-000000000000";
@@ -66,8 +91,47 @@ export class UsersService {
     @InjectRepository(EmployeeProfileEntity)
     private readonly profileRepo: Repository<EmployeeProfileEntity>,
     private readonly rbacService: RbacService,
+    private readonly cacheService: CacheService,
     private readonly dataSource: DataSource,
   ) {}
+
+  /**
+   * Clears the three caches a change to one user's roles or branch assignments
+   * can make stale: the identity report (`AuthService.getSession`), the
+   * `/branches/me` list (`BranchService.listMyBranches`), and `/admin/users/me`
+   * (this service's `getMe`). One call so no call-site has to remember all
+   * three — see T-07-03 / ADR-08.
+   *
+   * Swallows Redis errors and only logs, same as the two
+   * `invalidateStatusCache` helpers: a flaky cache must not fail the
+   * mutation that already committed.
+   */
+  private async invalidateUserIdentity(
+    userId: string,
+    orgId: string,
+  ): Promise<void> {
+    try {
+      await Promise.all([
+        this.cacheService.invalidate(
+          IDENTITY_CACHE_NAMESPACE,
+          `identity:${userId}:${orgId}`,
+        ),
+        this.cacheService.invalidate(
+          MY_BRANCHES_CACHE_NAMESPACE,
+          `${userId}:${orgId}`,
+        ),
+        this.cacheService.invalidate(
+          USERS_ME_CACHE_NAMESPACE,
+          `${userId}:${orgId}`,
+        ),
+      ]);
+    } catch (err) {
+      this.logger.error(
+        `Identity cache invalidation failed for user=${userId} org=${orgId} — falling back to the cache TTL`,
+        err instanceof Error ? err.stack : undefined,
+      );
+    }
+  }
 
   /**
    * User ids the actor may see, or `null` for no restriction. Without
@@ -260,6 +324,31 @@ export class UsersService {
       permissions: string[];
     }
   > {
+    // Read through on any cache failure rather than propagating it. `getOrSet`
+    // does not swallow Redis errors, and this endpoint gates both SPAs: a
+    // flaky cache must not become "nobody can load the app".
+    try {
+      return await this.cacheService.getOrSet(
+        USERS_ME_CACHE_NAMESPACE,
+        `${actor.userId}:${actor.organizationId}`,
+        () => this.buildMe(actor),
+        USERS_ME_CACHE_TTL_SECONDS,
+      );
+    } catch (err) {
+      this.logger.error(
+        `users-me cache unavailable for user=${actor.userId} org=${actor.organizationId} — reading through to the database`,
+        err instanceof Error ? err.stack : undefined,
+      );
+      return this.buildMe(actor);
+    }
+  }
+
+  private async buildMe(actor: ActorContext): Promise<
+    UserDetail & {
+      roles: { id: string; name: string }[];
+      permissions: string[];
+    }
+  > {
     const [detail, roles, permissions] = await Promise.all([
       this.findById(actor.userId, actor),
       this.roleRepo
@@ -344,6 +433,7 @@ export class UsersService {
       created.id,
       actor.organizationId,
     );
+    await this.invalidateUserIdentity(created.id, actor.organizationId);
 
     this.logger.log(
       `Created user ${created.id} (email=${normalizedEmail}, org=${actor.organizationId})`,
@@ -377,12 +467,23 @@ export class UsersService {
       }
     });
 
+    // Permissions only change when the account is switched off, so that cache
+    // is still cleared conditionally.
     if (dto.isActive === false) {
       await this.rbacService.invalidateUserPermissions(
         id,
         actor.organizationId,
       );
     }
+
+    // The identity caches are cleared on *every* edit, not just deactivation.
+    // The condition above used to guard this call too, which was right while the
+    // helper only covered the identity report and `/branches/me` — neither
+    // carries a name or a profile. `/admin/users/me` does (firstName, lastName,
+    // code, profile), so a plain rename left that endpoint serving the old name
+    // until the 15-minute TTL expired. Over-clearing the other two costs one
+    // cache miss; under-clearing this one is a user-visible staleness bug.
+    await this.invalidateUserIdentity(id, actor.organizationId);
 
     return this.buildUserDetail(id, actor);
   }
@@ -428,6 +529,7 @@ export class UsersService {
     user.isActive = false;
     await this.userRepo.save(user);
     await this.rbacService.invalidateUserPermissions(id, actor.organizationId);
+    await this.invalidateUserIdentity(id, actor.organizationId);
   }
 
   async getRoleIds(id: string, actor: ActorContext): Promise<string[]> {
@@ -469,6 +571,7 @@ export class UsersService {
     });
 
     await this.rbacService.invalidateUserPermissions(id, actor.organizationId);
+    await this.invalidateUserIdentity(id, actor.organizationId);
 
     return roleIds;
   }
@@ -510,6 +613,13 @@ export class UsersService {
         await manager.save(UserBranchAssignmentEntity, rows);
       }
     });
+
+    // Not one of the six sites the plan enumerated (it only tracked
+    // `invalidateUserPermissions` call sites), but this writes
+    // `user_branch_assignments` directly and is exactly the "gán chi nhánh
+    // của tôi bị đổi" case AC-24 names — found while auditing every write to
+    // that table per T-07-03.
+    await this.invalidateUserIdentity(id, actor.organizationId);
 
     return branchIds;
   }

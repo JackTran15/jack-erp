@@ -196,7 +196,7 @@ export class TransferOrderService {
       actor,
     );
 
-    const lines = dto.lines.map((l) => this.makeLine(l, actor));
+    const lines = dto.lines.map((l, idx) => this.makeLine(l, actor, idx));
     await this.fillSourceLocations(
       lines,
       dto.sourceStorageId,
@@ -287,8 +287,21 @@ export class TransferOrderService {
 
   // ─── Read ───────────────────────────────────────────────────────────────────
 
-  async getById(id: string, actor: ActorContext): Promise<TransferOrderEntity> {
-    const to = await this.findOrFail(id, actor.organizationId);
+  /**
+   * `opts.includeLines: false` returns the header alone (ADR-01) — the view dialog
+   * pages its lines through {@link getLines}. Default stays `true` so every
+   * existing caller, the edit dialog included, is untouched.
+   */
+  async getById(
+    id: string,
+    actor: ActorContext,
+    opts: { includeLines?: boolean } = {},
+  ): Promise<TransferOrderEntity> {
+    const to = await this.findOrFail(
+      id,
+      actor.organizationId,
+      opts.includeLines ?? true,
+    );
     this.assertParticipantBranch(to, actor);
     await this.attachSourceLocations(to, actor.organizationId);
     return to;
@@ -628,15 +641,14 @@ export class TransferOrderService {
   }
 
   /**
-   * Transfer orders the actor's active branch (as destination) can import.
-   * MISA allows the source form to mark a transfer order "Hoàn thành" before
-   * the destination creates its stock receipt, so both PROGRESS and
-   * COMPLETED-without-import-reference are importable here.
+   * Shared predicate for "transfer orders the actor's active branch (as
+   * destination) can import". Used by both `listImportable` and
+   * `countImportable` so the badge and the list never disagree.
    */
-  async listImportable(
+  private buildImportableWhere(
     params: { from?: string; to?: string; includeCompleted?: boolean },
     actor: ActorContext,
-  ): Promise<ImportableTransferOrderListItem[]> {
+  ): Record<string, unknown> {
     const where: Record<string, unknown> = {
       organizationId: actor.organizationId,
       destinationBranchId: actor.branchId,
@@ -649,6 +661,34 @@ export class TransferOrderService {
     };
     const createdAtRange = this.buildDateRange(params.from, params.to);
     if (createdAtRange) where.createdAt = createdAtRange;
+    return where;
+  }
+
+  /**
+   * Count of transfer orders importable to the actor's active branch, without
+   * loading the source export goods-issues (and their eager lines) that
+   * `listImportable` needs only to render totals.
+   */
+  async countImportable(
+    params: { from?: string; to?: string; includeCompleted?: boolean },
+    actor: ActorContext,
+  ): Promise<number> {
+    return this.toRepo.count({
+      where: this.buildImportableWhere(params, actor),
+    });
+  }
+
+  /**
+   * Transfer orders the actor's active branch (as destination) can import.
+   * MISA allows the source form to mark a transfer order "Hoàn thành" before
+   * the destination creates its stock receipt, so both PROGRESS and
+   * COMPLETED-without-import-reference are importable here.
+   */
+  async listImportable(
+    params: { from?: string; to?: string; includeCompleted?: boolean },
+    actor: ActorContext,
+  ): Promise<ImportableTransferOrderListItem[]> {
+    const where = this.buildImportableWhere(params, actor);
 
     const orders = await this.toRepo.find({
       where,
@@ -905,7 +945,7 @@ export class TransferOrderService {
         await manager.delete(TransferOrderLineEntity, {
           transferOrderId: to.id,
         });
-        to.lines = dto.lines.map((l) => this.makeLine(l, actor));
+        to.lines = dto.lines.map((l, idx) => this.makeLine(l, actor, idx));
         await this.fillSourceLocations(
           to.lines,
           to.sourceStorageId,
@@ -1755,6 +1795,11 @@ export class TransferOrderService {
     deltas: { itemId: string; quantityDelta: number }[],
     actor: ActorContext,
   ): Promise<void> {
+    // Lazily resolved and reused across iterations: this loop can insert
+    // several new lines into the same order (one per item added to the
+    // export issue after the order was created), and each must get the next
+    // free lineNo rather than colliding on a single re-read max.
+    let nextLineNo: number | undefined;
     for (const d of deltas) {
       if (d.quantityDelta === 0) continue;
       const updated = await this.dataSource.manager.query(
@@ -1788,6 +1833,15 @@ export class TransferOrderService {
             to.organizationId,
           )
         : null;
+      if (nextLineNo === undefined) {
+        const maxRows = await this.dataSource.manager.query(
+          `SELECT COALESCE(MAX(line_no), 0) AS max
+             FROM transfer_order_lines
+            WHERE transfer_order_id = $1`,
+          [to.id],
+        );
+        nextLineNo = Number(maxRows[0]?.max ?? 0) + 1;
+      }
       await this.dataSource.manager.insert(TransferOrderLineEntity, {
         organizationId: to.organizationId,
         branchId: to.branchId,
@@ -1797,7 +1851,9 @@ export class TransferOrderService {
         sourceStorageId: to.sourceStorageId,
         sourceLocationId,
         createdBy: actor.userId,
+        lineNo: nextLineNo,
       });
+      nextLineNo++;
       this.logger.log(
         `Transfer order ${to.id}: inserted a new transfer_order_lines row ` +
           `for item ${d.itemId} (qty ${d.quantityDelta}) — item was added to ` +
@@ -1860,11 +1916,13 @@ export class TransferOrderService {
   private makeLine(
     l: TransferOrderLineInput,
     actor: ActorContext,
+    index: number,
   ): TransferOrderLineEntity {
     const line = new TransferOrderLineEntity();
     line.organizationId = actor.organizationId;
     line.branchId = actor.branchId;
     line.createdBy = actor.userId;
+    line.lineNo = index + 1;
     line.itemId = l.itemId;
     line.requestedQty = String(l.requestedQty);
     line.sourceStorageId = l.sourceStorageId;
@@ -1965,8 +2023,14 @@ export class TransferOrderService {
   private async findOrFail(
     id: string,
     organizationId: string,
+    includeLines = true,
   ): Promise<TransferOrderEntity> {
-    const to = await this.toRepo.findOne({ where: { id, organizationId } });
+    const to = await this.toRepo.findOne({
+      where: { id, organizationId },
+      // `loadEagerRelations` is all-or-nothing, but `lines` is the only eager
+      // relation on TransferOrderEntity, so there's nothing to re-declare here.
+      ...(includeLines ? {} : { loadEagerRelations: false }),
+    });
     if (!to) throw new NotFoundException(`Transfer order ${id} not found`);
     return to;
   }

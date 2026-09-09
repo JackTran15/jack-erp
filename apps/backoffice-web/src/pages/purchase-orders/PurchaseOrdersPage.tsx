@@ -162,6 +162,30 @@ interface GoodsReceiptLinesPage {
 
 const LINES_PAGE_SIZE = 50;
 
+// Extracted so the request shape for AC-01 (`includeLines=false` on the
+// select-row header fetch) can be asserted without rendering the page.
+export function buildSelectedGoodsReceiptHeaderRequest(id: string) {
+  return {
+    params: {
+      path: { id },
+      query: { includeLines: false as const },
+    },
+  } as const;
+}
+
+/**
+ * `GET /goods-receipts/:id` with no `includeLines` flag — server default
+ * stays `true` (ADR-01). Used by the three toolbar actions that need the
+ * whole line array: Nhân bản, Sửa, and In tem mã (no rows ticked).
+ */
+async function fetchGoodsReceiptWithLines(id: string): Promise<PurchaseOrder> {
+  return requireErpData(
+    await erpApi.GET<PurchaseOrder>("/goods-receipts/{id}", {
+      params: { path: { id } },
+    }),
+  );
+}
+
 type PurchaseOrdersPageMode = "inventory" | "purchase";
 
 export function PurchaseOrdersPage({
@@ -190,6 +214,10 @@ export function PurchaseOrdersPage({
   const [columnFilters, setColumnFilters] =
     useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  // Locks the one clicked toolbar action (Nhân bản / Sửa) while its
+  // `fetchGoodsReceiptWithLines` round-trip is in flight — not the whole
+  // toolbar.
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
 
   const [dialogMode, setDialogMode] = useState<
     "create" | "edit" | "view" | null
@@ -387,17 +415,20 @@ export function PurchaseOrdersPage({
   }, [columnFilters, period, clearChecked]);
 
   // List rows no longer carry `lines` (v2 search trims them, see
-  // search-goods-receipts-v2.handler.ts). The selected document's full detail
-  // (header + lines) is fetched separately via the unchanged GET /:id, so the
-  // barcode toolbar, the duplicate/view/edit dialog, and DetailPanel all read
-  // from this instead of the stale list row.
+  // search-goods-receipts-v2.handler.ts). The selected document's header is
+  // fetched separately via GET /:id?includeLines=false — DetailPanel pages
+  // its own lines through POST /v2/goods-receipts/:id/lines/search, so this
+  // query never needs them. Actions that need the full line array (barcode
+  // toolbar, duplicate/view/edit dialog) fetch it on demand instead of
+  // reading it off this header.
   const { data: selectedOrderData } = useQuery({
     queryKey: ["goods-receipt", selectedId],
     queryFn: async () =>
       requireErpData(
-        await erpApi.GET<PurchaseOrder>("/goods-receipts/{id}", {
-          params: { path: { id: selectedId! } },
-        }),
+        await erpApi.GET<PurchaseOrder>(
+          "/goods-receipts/{id}",
+          buildSelectedGoodsReceiptHeaderRequest(selectedId!),
+        ),
       ),
     enabled: !!selectedId,
   });
@@ -488,17 +519,34 @@ export function PurchaseOrdersPage({
       // re-seeds its form state on mount, so swapping `editingOrder` under an
       // already-mounted instance would save the old form's data against the
       // newly-picked record's id. See T-06-05.
-      disabled: !selectedOrder || !!dialogMode,
+      //
+      // The dialog seeds its `lines` state from `initial.lines` in create
+      // mode (duplicate reuses create), and `selectedOrder` no longer carries
+      // lines (T-01-01) — fetch the full document on demand instead (ADR-02).
+      tooltip: pendingAction === "duplicate" ? "Đang tải..." : undefined,
+      disabled: !selectedOrder || !!dialogMode || pendingAction === "duplicate",
       onClick: () => {
         if (!selectedOrder || dialogMode) return;
-        setEditingOrder(selectedOrder);
-        setDialogMode("create");
+        setPendingAction("duplicate");
+        void (async () => {
+          try {
+            const full = await fetchGoodsReceiptWithLines(selectedOrder.id);
+            setEditingOrder(full);
+            setDialogMode("create");
+          } catch (err) {
+            toast.error(getUserFacingApiErrorMessage(err));
+          } finally {
+            setPendingAction(null);
+          }
+        })();
       },
     },
     {
       id: "view",
       label: "Xem",
       icon: Eye,
+      // No `fetchGoodsReceiptWithLines` here: the view dialog pages its own
+      // lines through `/lines/search` rather than reading `initial.lines`.
       disabled: !selectedOrder || !!dialogMode,
       onClick: () => {
         if (!selectedOrder || dialogMode) return;
@@ -513,15 +561,31 @@ export function PurchaseOrdersPage({
       // Allow editing any non-terminal row. BE update() handles POSTED by
       // writing the difference as a stock-ledger + accounting adjustment
       // instead of overwriting what was already posted.
+      //
+      // `update()` replaces the whole line array server-side, and the edit
+      // dialog seeds `lines` from `initial.lines` — opening it with an empty
+      // array and saving would wipe the voucher's lines. Fetch full first.
+      tooltip: pendingAction === "edit" ? "Đang tải..." : undefined,
       disabled:
         !selectedOrder ||
         selectedOrder.status === "CANCELLED" ||
         selectedOrder.status === "REVERSED" ||
-        !!dialogMode,
+        !!dialogMode ||
+        pendingAction === "edit",
       onClick: () => {
         if (!selectedOrder || dialogMode) return;
-        setEditingOrder(selectedOrder);
-        setDialogMode("edit");
+        setPendingAction("edit");
+        void (async () => {
+          try {
+            const full = await fetchGoodsReceiptWithLines(selectedOrder.id);
+            setEditingOrder(full);
+            setDialogMode("edit");
+          } catch (err) {
+            toast.error(getUserFacingApiErrorMessage(err));
+          } finally {
+            setPendingAction(null);
+          }
+        })();
       },
     },
     {
@@ -554,13 +618,31 @@ export function PurchaseOrdersPage({
       disabled: gatheringLabels,
       onClick: () => {
         // Không tick phiếu nào → giữ nguyên đường cũ: in theo dòng đang xem.
+        // `selectedOrder` no longer carries `lines` (T-01-01), so fetch the
+        // full document first — same helper, same lock as gathering the
+        // ticked path below (`gatheringLabels` already exists for this;
+        // no second flag).
         if (checkedCount === 0) {
-          const items = toPrefillItems(selectedOrder?.lines ?? []);
-          navigateToBarcodePrint(
-            navigate,
-            "/inventory/purchase-orders",
-            items.length ? items : undefined,
-          );
+          if (!selectedOrder) {
+            navigateToBarcodePrint(navigate, "/inventory/purchase-orders", undefined);
+            return;
+          }
+          setGatheringLabels(true);
+          void (async () => {
+            try {
+              const full = await fetchGoodsReceiptWithLines(selectedOrder.id);
+              const items = toPrefillItems(full.lines ?? []);
+              navigateToBarcodePrint(
+                navigate,
+                "/inventory/purchase-orders",
+                items.length ? items : undefined,
+              );
+            } catch (err) {
+              toast.error(getUserFacingApiErrorMessage(err));
+            } finally {
+              setGatheringLabels(false);
+            }
+          })();
           return;
         }
         // Có tick → gom lines của từng phiếu. Dùng `GET /:id` (trả lines đầy đủ)
@@ -569,13 +651,7 @@ export function PurchaseOrdersPage({
         void (async () => {
           try {
             const orders = await Promise.all(
-              [...checkedIds].map(async (id) =>
-                requireErpData(
-                  await erpApi.GET<PurchaseOrder>("/goods-receipts/{id}", {
-                    params: { path: { id } },
-                  }),
-                ),
-              ),
+              [...checkedIds].map((id) => fetchGoodsReceiptWithLines(id)),
             );
             const items = mergeBarcodePrefillItems(
               orders.flatMap((order) => toPrefillItems(order.lines ?? [])),
@@ -820,8 +896,13 @@ export function PurchaseOrdersPage({
           />
         }
         detailPanel={
+          // `orderId` comes straight from `selectedId` — NOT from
+          // `selectedOrder` (the header fetch). Deriving it from the header
+          // result would gate the lines request behind that round-trip;
+          // measured on this page, that lag was 44-51ms.
           <DetailPanel
             order={selectedOrder}
+            orderId={selectedId}
             storageNameById={storageNameById}
             isPurchaseMode={isPurchaseMode}
           />
@@ -967,15 +1048,15 @@ export function PurchaseOrdersPage({
 
 function DetailPanel({
   order,
+  orderId,
   storageNameById,
   isPurchaseMode,
 }: {
   order: PurchaseOrder | null;
+  orderId: string | null;
   storageNameById: Map<string, string>;
   isPurchaseMode: boolean;
 }) {
-  const orderId = order?.id ?? null;
-
   // Paginated, independent from the header (`order`) query's cache key so a
   // header refetch doesn't discard already-scrolled line pages.
   const linesQuery = useInfiniteQuery({

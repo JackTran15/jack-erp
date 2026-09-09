@@ -1,7 +1,12 @@
 import { useCallback, useRef } from "react";
 
+import type { PosCatalogSuggestion } from "@erp/pos/interfaces/catalog.interface";
+
 import { useCheckoutCartActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cart-actions";
-import { useLookupCatalogByCode } from "@erp/pos/hooks/react-query/use-query-catalog";
+import {
+  POS_CATALOG_SEARCH_LIMIT,
+  useSearchPosCatalog,
+} from "@erp/pos/hooks/react-query/use-query-catalog";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 
 /**
@@ -13,8 +18,20 @@ import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
  */
 export type BarcodeAutoAddResult = "added" | "skipped" | "miss";
 
+export interface CheckoutSearchOutcome {
+  result: BarcodeAutoAddResult;
+  /** Gợi ý cho dropdown. Rỗng khi đã auto-add hoặc khi bị khử trùng. */
+  suggestions: PosCatalogSuggestion[];
+}
+
 export interface UseCheckoutBarcodeAutoAddResult {
+  /** Đường Enter: chỉ cần biết có khớp tuyệt đối không, không cần dropdown. */
   tryAutoAdd: (code: string) => Promise<BarcodeAutoAddResult>;
+  /**
+   * Đường gõ (debounce): **một** lời gọi trả cả khớp tuyệt đối lẫn gợi ý.
+   * Trước đây là hai request nối tiếp — `/catalog/lookup` rồi `/catalog?search=`.
+   */
+  searchWithAutoAdd: (q: string) => Promise<CheckoutSearchOutcome>;
   /** Mở phiên nhập mới — gọi trên mỗi lần gõ/quét thật (`onValueChange`). */
   resetGuard: () => void;
 }
@@ -35,7 +52,7 @@ export interface UseCheckoutBarcodeAutoAddResult {
  */
 export function useCheckoutBarcodeAutoAdd(): UseCheckoutBarcodeAutoAddResult {
   const branchId = usePosBranchStore((s) => s.branchId) ?? "";
-  const lookup = useLookupCatalogByCode();
+  const searchCatalog = useSearchPosCatalog();
   const { addProductByItem } = useCheckoutCartActions();
   const claimRef = useRef<string | null>(null);
 
@@ -43,30 +60,79 @@ export function useCheckoutBarcodeAutoAdd(): UseCheckoutBarcodeAutoAddResult {
     claimRef.current = null;
   }, []);
 
-  const tryAutoAdd = useCallback(
-    async (raw: string): Promise<BarcodeAutoAddResult> => {
-      const code = raw.trim();
-      if (!code || !branchId) return "miss";
-      if (claimRef.current === code) return "skipped";
-      claimRef.current = code;
+  /**
+   * Claim NGAY trước khi gọi API — không phải sau. Đó là điều làm call trùng
+   * đang bay cho cùng chuỗi trả `skipped` thay vì add hai lần.
+   */
+  const claim = useCallback((code: string): boolean => {
+    if (claimRef.current === code) return false;
+    claimRef.current = code;
+    return true;
+  }, []);
 
-      let lines;
-      try {
-        lines = await lookup(branchId, code);
-      } catch {
-        claimRef.current = null;
-        return "miss";
-      }
-
-      if (lines.length === 1) {
-        addProductByItem(lines[0]!, 1);
+  /** Kết sổ một lượt tra: add + GIỮ claim, hoặc NHẢ claim để Enter fallback. */
+  const settle = useCallback(
+    (exact: PosCatalogSuggestion | null): BarcodeAutoAddResult => {
+      // Quy tắc "khớp đúng 1" giờ do server quyết: `exact` đã là null khi 0 khớp
+      // và null khi nhiều hơn 1, nên FE không phải đếm danh sách nữa.
+      if (exact) {
+        addProductByItem(exact, 1);
         return "added"; // giữ claim để chặn debounce cũ nổ lại
       }
       claimRef.current = null; // nhả để Enter fallback
       return "miss";
     },
-    [branchId, lookup, addProductByItem],
+    [addProductByItem],
   );
 
-  return { tryAutoAdd, resetGuard };
+  const tryAutoAdd = useCallback(
+    async (raw: string): Promise<BarcodeAutoAddResult> => {
+      const code = raw.trim();
+      if (!code || !branchId) return "miss";
+      if (!claim(code)) return "skipped";
+
+      try {
+        // `mode: "exact"` bỏ hẳn nhánh gợi ý. Đường này không cần dropdown, và
+        // đó cũng là cách duy nhất tránh ca chuỗi 1–2 ký tự (phím Enter không
+        // bị `minChars` chặn) — pg_trgm cần ≥3 ký tự nên nhánh mờ ở độ dài đó
+        // quét toàn bộ catalog.
+        const { exact } = await searchCatalog(branchId, {
+          q: code,
+          mode: "exact",
+        });
+        return settle(exact);
+      } catch {
+        claimRef.current = null;
+        return "miss";
+      }
+    },
+    [branchId, searchCatalog, claim, settle],
+  );
+
+  const searchWithAutoAdd = useCallback(
+    async (raw: string): Promise<CheckoutSearchOutcome> => {
+      const code = raw.trim();
+      if (!code || !branchId) return { result: "miss", suggestions: [] };
+      if (!claim(code)) return { result: "skipped", suggestions: [] };
+
+      try {
+        const { exact, suggestions } = await searchCatalog(branchId, {
+          q: code,
+          view: "suggest",
+          limit: POS_CATALOG_SEARCH_LIMIT,
+        });
+        const result = settle(exact);
+        // Khớp tuyệt đối thì đã vào giỏ — mở dropdown nữa chỉ tổ che lưới hàng.
+        return { result, suggestions: result === "added" ? [] : suggestions };
+      } catch {
+        claimRef.current = null;
+        // Trước đây lỗi ở lookup sẽ rơi xuống một request thứ hai; giờ chỉ có
+        // một request, nên hỏng là hỏng — dropdown rỗng thay vì thử lại lần nữa.
+        return { result: "miss", suggestions: [] };
+      }
+    },
+    [branchId, searchCatalog, claim, settle],
+  );
+
+  return { tryAutoAdd, searchWithAutoAdd, resetGuard };
 }

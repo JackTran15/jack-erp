@@ -57,10 +57,12 @@ import { InvoiceV2Controller } from './controllers/invoice-v2.controller';
 import { ReturnableInvoiceV2Controller } from './controllers/returnable-invoice-v2.controller';
 import { PurchaseHistoryV2Controller } from './controllers/purchase-history-v2.controller';
 import { DraftInvoiceV2Controller } from './controllers/draft-invoice-v2.controller';
+import { CatalogSearchV2Controller } from './controllers/catalog-search-v2.controller';
 import { SearchInvoicesV2Handler } from './queries/search-invoices-v2.handler';
 import { SearchReturnableInvoicesV2Handler } from './queries/search-returnable-invoices-v2.handler';
 import { SearchPurchaseHistoryV2Handler } from './queries/search-purchase-history-v2.handler';
 import { SearchDraftInvoicesV2Handler } from './queries/search-draft-invoices-v2.handler';
+import { SearchPosCatalogHandler } from './queries/search-pos-catalog.handler';
 import { InvoiceCancelledPublisher } from './publishers/invoice-cancelled.publisher';
 import { DebtPaymentVoucherLinkConsumer } from './consumers/debt-payment-voucher-link.consumer';
 import { ReturnPostedPublisher } from './publishers/return-posted.publisher';
@@ -118,6 +120,7 @@ import { CheckoutSagaModule } from './checkout-saga/checkout-saga.module';
     ReturnableInvoiceV2Controller,
     PurchaseHistoryV2Controller,
     DraftInvoiceV2Controller,
+    CatalogSearchV2Controller,
   ],
   providers: [
     PosSessionService,
@@ -143,6 +146,7 @@ import { CheckoutSagaModule } from './checkout-saga/checkout-saga.module';
     SearchReturnableInvoicesV2Handler,
     SearchPurchaseHistoryV2Handler,
     SearchDraftInvoicesV2Handler,
+    SearchPosCatalogHandler,
   ],
   exports: [
     PosSessionService,

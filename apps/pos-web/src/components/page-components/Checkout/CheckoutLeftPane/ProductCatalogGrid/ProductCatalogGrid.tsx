@@ -1,5 +1,6 @@
 import { ProductCard } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/ProductCatalogGrid/ProductCard/ProductCard";
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
+import { useCheckoutCatalogAutoOpen } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog-auto-open";
 
 export interface ProductCatalogGridProps {
   /** Number of columns on desktop (default 6). */
@@ -9,9 +10,14 @@ export interface ProductCatalogGridProps {
 /**
  * Responsive product grid (default 6 cols at desktop). Đọc danh sách sản phẩm
  * từ catalog store; ProductCard tự gọi cart-actions hook khi click.
+ *
+ * Danh sách đã được server lọc theo từ khoá trên ô tìm — lưới không lọc lại.
  */
 export function ProductCatalogGrid({ columns = 6 }: ProductCatalogGridProps) {
   const { catalogProducts } = useCheckoutCatalog();
+  // Gõ ra đúng một card thì mở luôn dialog chọn biến thể. Mount ở đây vì đây là
+  // nơi đã có sẵn kết quả lưới; không component nào khác phải thêm dependency.
+  useCheckoutCatalogAutoOpen();
 
   return (
     <div

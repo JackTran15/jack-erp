@@ -424,6 +424,14 @@ export class BranchCrudService extends BaseCrudService<
         );
       }
 
+      // Snapshotted before the transaction: `deleteBranchBootstrapData`
+      // deletes this branch's `user_branch_assignments` rows, so a lookup
+      // by branchId afterward would find nothing left to invalidate.
+      const assigneeUserIds = await this.branchService.getBranchAssigneeUserIds(
+        id,
+        actor.organizationId,
+      );
+
       await this.dataSource.transaction(async (manager) => {
         const blockingDependency = await this.findBlockingDependency(
           manager,
@@ -438,6 +446,10 @@ export class BranchCrudService extends BaseCrudService<
       });
 
       await this.invalidateStatusCache(actor.organizationId);
+      await this.branchService.invalidateMyBranchesForUsers(
+        assigneeUserIds,
+        actor.organizationId,
+      );
       this.logger.log(`Deleted branches id=${id} (hard, bootstrap cleanup)`);
     } catch (err) {
       if (this.isForeignKeyViolation(err)) {

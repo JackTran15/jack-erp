@@ -227,6 +227,9 @@ export class StockTakeService {
         resolved.locationId,
         resolved.expectedQty,
       );
+      // 1-based position in the array the caller sent, which is the order the
+      // user sees on the grid — that is what "the order it was typed" means.
+      line.lineNo = lines.length + 1;
       line.expectedValue = String(
         resolved.expectedQty * (itemCostByItemId.get(lineDto.itemId) ?? 0),
       );
@@ -463,6 +466,12 @@ export class StockTakeService {
     );
     line.expectedValue = String(resolved.expectedQty * itemCost);
     line.stockTakeId = st.id;
+    // Incremental add: `st.lines` is eager-loaded by findOrFail(), so we can
+    // number from the current max lineNo without an extra query. Using the
+    // count instead of the max would collide with `uq_stock_take_lines_doc_line_no`
+    // once a line has been removed (removeLine() does not renumber).
+    line.lineNo =
+      Math.max(0, ...(st.lines ?? []).map((l) => l.lineNo ?? 0)) + 1;
     const saved = await this.lineRepo.save(line);
     return this.lineRepo.findOne({
       where: { id: saved.id },
@@ -751,8 +760,17 @@ export class StockTakeService {
     return this.findOrFail(id, actor.organizationId, actor.branchId);
   }
 
-  async getById(id: string, actor: ActorContext): Promise<StockTakeEntity> {
-    return this.findOrFail(id, actor.organizationId, actor.branchId);
+  async getById(
+    id: string,
+    actor: ActorContext,
+    opts: { includeLines?: boolean } = {},
+  ): Promise<StockTakeEntity> {
+    return this.findOrFail(
+      id,
+      actor.organizationId,
+      actor.branchId,
+      opts.includeLines ?? true,
+    );
   }
 
   async exportExcelBuffer(id: string, actor: ActorContext): Promise<Buffer> {
@@ -1671,9 +1689,19 @@ export class StockTakeService {
     id: string,
     organizationId: string,
     branchId?: string,
+    includeLines = true,
   ): Promise<StockTakeEntity> {
     const st = await this.stRepo.findOne({
       where: { id, organizationId, ...(branchId ? { branchId } : {}) },
+      // `loadEagerRelations` is all-or-nothing, so skipping `lines` means naming
+      // `members` back explicitly (ADR-09: the detail panel needs members, and
+      // members don't scale with voucher size the way lines do).
+      ...(includeLines
+        ? {}
+        : {
+            loadEagerRelations: false,
+            relations: { members: true },
+          }),
     });
     if (!st) throw new NotFoundException(`Phiếu kiểm kê ${id} không tìm thấy`);
     return st;
