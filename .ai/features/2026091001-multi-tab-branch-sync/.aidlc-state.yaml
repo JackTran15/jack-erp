@@ -1,0 +1,144 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: multi-tab-branch-sync
+slug: 2026091001-multi-tab-branch-sync
+profile: none
+created: 2026-09-10T11:25:34
+ruleset: 5
+current_gate: G5
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-10T11:39:42
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-10T11:39:42
+    by: Akenzy
+    evidence: 12 assumptions, none blocking-and-pending; 14 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-10T11:39:43
+    by: Akenzy
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-10T11:39:43
+    by: Akenzy
+    evidence: graph valid - 2 UoW, 7 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T11:50:14
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-10T11:51:57
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T11:52:09
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-10T11:52:53
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T11:52:53
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-10T11:53:49
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done
+    at: 2026-09-10T11:54:43
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-10T11:54:43
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-10T11:54:43
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T11:54:52
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T11:54:52
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T11:54:52
+    by: claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T11:54:52
+    by: claude
+    ticket: T-02-04
+  - gate: G4
+    action: ticket review
+    at: 2026-09-10T12:27:46
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-10T12:27:46
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-10T12:27:46
+    by: claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-10T12:27:46
+    by: claude
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done
+    at: 2026-09-10T12:27:46
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-09-10T12:27:46
+    by: Akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done
+    at: 2026-09-10T12:27:46
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done
+    at: 2026-09-10T12:27:47
+    by: Akenzy
+    ticket: T-02-04
+  - gate: G4
+    action: passed
+    at: 2026-09-10T12:28:19
+    by: Akenzy
+    evidence: no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 7 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-09-10T12:28:19
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid
