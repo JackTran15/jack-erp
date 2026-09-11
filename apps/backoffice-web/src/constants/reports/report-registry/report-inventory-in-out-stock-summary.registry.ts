@@ -127,7 +127,7 @@ const columns: ReportColumnConfig[] = [
     label: "Mã vị trí",
     order: 10,
     visible: true,
-    tableConfig: { width: 110, dataType: "text", filterKind: "none" },
+    tableConfig: { width: 220, dataType: "text", filterKind: "none" },
   },
   {
     column: "positionName",
@@ -135,7 +135,7 @@ const columns: ReportColumnConfig[] = [
     label: "Tên vị trí",
     order: 11,
     visible: true,
-    tableConfig: { width: 110, dataType: "text", filterKind: "none" },
+    tableConfig: { width: 220, dataType: "text", filterKind: "none" },
   },
   qty("openingQty", GROUP.OPENING, 12),
   value("openingValue", GROUP.OPENING, 13),

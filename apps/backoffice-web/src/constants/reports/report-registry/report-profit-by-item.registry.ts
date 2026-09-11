@@ -39,7 +39,7 @@ const columns: ReportColumnConfig[] = [
     label: "Vị trí",
     order: 4,
     visible: true,
-    tableConfig: { width: 110, align: "left", dataType: "text" },
+    tableConfig: { width: 220, align: "left", dataType: "text" },
   },
   {
     column: ReportTableColumn.QUANTITY_SOLD,

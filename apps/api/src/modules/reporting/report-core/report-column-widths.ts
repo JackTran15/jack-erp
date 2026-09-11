@@ -34,9 +34,9 @@ export const REPORT_COLUMN_WIDTHS: Readonly<Record<string, number>> = {
   categoryName: 200,
   brand: 120,
   unit: 110,
-  location: 160,
-  locationCode: 110,
-  locationName: 160,
+  location: 220,
+  locationCode: 220,
+  locationName: 220,
   supplier: 180,
 
   // Customer / supplier

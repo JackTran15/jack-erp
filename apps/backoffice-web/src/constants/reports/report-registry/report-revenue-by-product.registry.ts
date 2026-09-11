@@ -38,7 +38,7 @@ const columns: ReportColumnConfig[] = [
     label: "Mã vị trí",
     order: 4,
     visible: true,
-    tableConfig: { width: 110, align: "left", dataType: "text" },
+    tableConfig: { width: 220, align: "left", dataType: "text" },
   },
   {
     column: ReportTableColumn.LOCATION,
@@ -46,7 +46,7 @@ const columns: ReportColumnConfig[] = [
     label: "Tên vị trí",
     order: 5,
     visible: true,
-    tableConfig: { width: 110, align: "left", dataType: "text" },
+    tableConfig: { width: 220, align: "left", dataType: "text" },
   },
   {
     column: ReportTableColumn.QUANTITY_SOLD,
