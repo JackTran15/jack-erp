@@ -586,9 +586,9 @@ export function InventoryItemCreateForm({
     const skip = renderedDynamicKeys.current;
     const managedElsewhere = new Set([
       "description",
-      // Giá mua TB / Giá bán TB — rendered manually in the THÔNG TIN block and
-      // hidden on the edit/detail view; keep them out of the auto-rendered
-      // remainder so they never re-appear at the bottom.
+      // Giá mua TB / Giá bán TB — render tay ở khối THÔNG TIN (màn sửa chỉ hiện
+      // với hàng không có biến thể); giữ trong danh sách này để phần render tự
+      // động bên dưới không hiện lại chúng.
       "purchasePrice",
       "sellingPrice",
       "packageWeightGram",
@@ -648,6 +648,29 @@ export function InventoryItemCreateForm({
 
   const selectClass =
     "h-9 w-full rounded-md border border-input bg-background px-2 text-sm";
+
+  // Bản ghi đang sửa đã có Màu/Size → hàng có biến thể. Đọc từ initialRecord (có ngay ở render
+  // đầu) chứ không chỉ variantRows (sinh trong effect), để ô giá không nháy rồi ẩn và không lộ
+  // ra khi người dùng xoá hết Màu/Size của hàng có biến thể.
+  const recordHasAttributes =
+    isEdit &&
+    ((Array.isArray(initialRecord?.colors) && initialRecord.colors.length > 0) ||
+      (Array.isArray(initialRecord?.sizes) && initialRecord.sizes.length > 0));
+  // colors/sizes chỉ nhận thuộc tính tên Color/Size, còn `variants` có một dòng mỗi item
+  // (mở theo items.id thì không có key này). Nhiều item → vẫn là hàng có biến thể: ô giá chung
+  // sẽ ghi một giá xuống mọi item.
+  const recordItemCount = Array.isArray(initialRecord?.variants)
+    ? initialRecord.variants.length
+    : 0;
+  const showBasePrices =
+    !isEdit ||
+    (!recordHasAttributes && recordItemCount <= 1 && variantRows.length === 0);
+
+  // Cột giá là NOT NULL; sanitizeCrudPayload đổi "" thành null ở chế độ update, nên ở màn sửa
+  // ô trống phải map về 0 trước khi ghi vào values.
+  const setPriceValue =
+    (key: "purchasePrice" | "sellingPrice") => (next: unknown) =>
+      setValues((prev) => ({ ...prev, [key]: isEdit && next === "" ? 0 : next }));
 
   const basicTab = (
     <>
@@ -751,13 +774,22 @@ export function InventoryItemCreateForm({
 
             {renderDynamicField("barcode", variantRows.length > 0)}
 
-            {/* Giá mua TB / Giá bán TB: chỉ hiện khi tạo mới. Ẩn ở màn xem chi
-                tiết/sửa — với hàng có biến thể giá thực nằm ở từng biến thể,
-                khớp với cách MISA hiển thị chi tiết mặt hàng. */}
-            {!isEdit && (
+            {/* Giá mua TB / Giá bán TB: luôn hiện khi thêm mới. Ở màn sửa chỉ hiện
+                với hàng không có biến thể; hàng có biến thể (Màu/Size) sửa giá
+                tại bảng "Danh sách phiên bản", khớp với cách MISA hiển thị chi
+                tiết mặt hàng. */}
+            {showBasePrices && (
               <>
-                {renderDynamicField("purchasePrice", variantRows.length > 0)}
-                {renderDynamicField("sellingPrice", variantRows.length > 0)}
+                {renderDynamicField(
+                  "purchasePrice",
+                  variantRows.length > 0,
+                  setPriceValue("purchasePrice"),
+                )}
+                {renderDynamicField(
+                  "sellingPrice",
+                  variantRows.length > 0,
+                  setPriceValue("sellingPrice"),
+                )}
               </>
             )}
 

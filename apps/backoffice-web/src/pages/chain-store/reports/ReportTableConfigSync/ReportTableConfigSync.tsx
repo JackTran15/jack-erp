@@ -47,7 +47,7 @@ export function ReportTableConfigSync() {
   const backendSource = getReportBackendSource(reportType);
   const { template, isLoading: templateLoading } = useReportColumnTemplate();
 
-  const { data: columnsResult } = useQuery({
+  const { data: columnsResult, isLoading: columnsLoading } = useQuery({
     queryKey: [
       "report-columns",
       backendSource,
@@ -90,9 +90,12 @@ export function ReportTableConfigSync() {
   });
 
   useEffect(() => {
+    // Chờ CẢ catalog cột (BE) lẫn template đã lưu rồi mới ghi config một lần.
+    // Ghi sớm bằng fallback rồi ghi đè bằng catalog thật đổi `columnIds` giữa
+    // chừng, và `ReportPageTable` khoá queryKey theo đó — mỗi lần ghi là thêm
+    // một lượt POST /reports/*/search chạy tới cùng ở BE rồi bị vứt bỏ.
+    if (columnsLoading || templateLoading) return;
     if (columnsResult && columnsResult.columns.length > 0) {
-      // Chờ template load xong để tránh set config 2 lần (giật cột).
-      if (templateLoading) return;
       // profit-by-item "Vị trí" là dữ liệu 1-chi-nhánh — ở Chuỗi cửa hàng (gộp
       // nhiều/mọi cửa hàng vào 1 dòng) không có 1 vị trí duy nhất, bỏ hẳn cột
       // này dù BE (không biết ngữ cảnh chuỗi/1-chi-nhánh) vẫn trả về.
@@ -121,6 +124,7 @@ export function ReportTableConfigSync() {
     }
   }, [
     columnsResult,
+    columnsLoading,
     template,
     templateLoading,
     reportType,

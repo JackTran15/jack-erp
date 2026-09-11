@@ -4,6 +4,7 @@ import {
   Logger,
   VERSION_NEUTRAL,
   VersioningType,
+  type LogLevel,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -12,7 +13,21 @@ import { AppModule } from './app.module';
 import { RedisIoAdapter } from './modules/websocket/redis-io.adapter';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // Nest mặc định bật cả 'debug' và 'verbose' (DEFAULT_LOG_LEVELS trong
+  // @nestjs/common), nên production log mọi cache hit/miss của CacheService.
+  // Dưới PM2 cluster mỗi dòng còn đi qua IPC sang God daemon + logrotate.
+  // LOG_LEVELS=log,warn,error,debug để bật lại debug khi cần soi.
+  const logLevels = (
+    process.env.LOG_LEVELS ??
+    (process.env.NODE_ENV === 'production' ? 'log,warn,error' : 'log,warn,error,debug,verbose')
+  )
+    .split(',')
+    .map((l) => l.trim())
+    .filter(Boolean) as LogLevel[];
+
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: logLevels,
+  });
   const logger = new Logger('Bootstrap');
   const configService = app.get(ConfigService);
 

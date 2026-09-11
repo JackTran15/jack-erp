@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import {
@@ -100,6 +100,8 @@ function listingRow(columns: string[], r: InvoiceRowInput): ReportRow {
 export class InvoiceOrderListingReport implements ReportDefinition {
   readonly key = 'invoice-order-listing';
 
+  private readonly logger = new Logger(InvoiceOrderListingReport.name);
+
   constructor(
     @InjectRepository(InvoiceEntity)
     private readonly invoices: Repository<InvoiceEntity>,
@@ -190,8 +192,12 @@ export class InvoiceOrderListingReport implements ReportDefinition {
       );
     }
 
+    // Đo theo 3 chặng: `buildData` quét cả kỳ để tính footer totals, nên khi
+    // báo cáo chậm cần biết chặng nào ăn thời gian trước khi đổi kiến trúc.
+    const t0 = process.hrtime.bigint();
     const qb = await this.scopedQuery(dto, actor);
     const invoiceRows = (await qb.getMany()).filter((i) => i.issuedAt);
+    const tScan = process.hrtime.bigint();
 
     const rows = (await this.toRowInputs(invoiceRows, referenced, actor)).sort(
       (a, b) => {
@@ -199,6 +205,7 @@ export class InvoiceOrderListingReport implements ReportDefinition {
         return t !== 0 ? t : a.code.localeCompare(b.code);
       },
     );
+    const tEnrich = process.hrtime.bigint();
 
     const filtered = dto.columnFilters?.length
       ? rows.filter((r) =>
@@ -216,6 +223,16 @@ export class InvoiceOrderListingReport implements ReportDefinition {
     const totals = filtered.length
       ? buildListingTotals(dto.columns, filtered)
       : null;
+
+    const ms = (from: bigint, to: bigint): number =>
+      Math.round(Number(to - from) / 1e6);
+    const tEnd = process.hrtime.bigint();
+    this.logger.log(
+      `listing scanned=${invoiceRows.length} kept=${total} page=${rows2.length} ` +
+        `cols=${dto.columns.length} scan=${ms(t0, tScan)}ms ` +
+        `enrich=${ms(tScan, tEnrich)}ms shape=${ms(tEnrich, tEnd)}ms ` +
+        `total=${ms(t0, tEnd)}ms`,
+    );
 
     return { rows: rows2, totals, total };
   }

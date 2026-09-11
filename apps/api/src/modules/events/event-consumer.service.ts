@@ -28,6 +28,19 @@ interface RegisteredConsumer {
   topic: string;
 }
 
+/**
+ * Số consumer group được join song song lúc boot.
+ *
+ * Trước đây vòng lặp chạy tuần tự nên mỗi handler phải chờ JoinGroup +
+ * SyncGroup của handler trước xong mới bắt đầu — 25 handler nối đuôi nhau là
+ * vài phút boot. Join song song nhưng có trần để không dội hết một lượt vào
+ * group coordinator của Redpanda.
+ */
+const CONSUMER_START_CONCURRENCY = 8;
+
+/** Mọi topic DLQ của ERP; dùng cho recorder gom chung. */
+const DLQ_TOPIC_PATTERN = /^erp\..*\.dlq$/;
+
 @Injectable()
 export class EventConsumerManager implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(EventConsumerManager.name);
@@ -37,6 +50,7 @@ export class EventConsumerManager implements OnModuleInit, OnModuleDestroy {
     groupId: string;
     handler: EventHandler;
   }[] = [];
+  private groupPrefix = 'erp-api';
 
   constructor(
     private readonly config: ConfigService,
@@ -68,6 +82,7 @@ export class EventConsumerManager implements OnModuleInit, OnModuleDestroy {
 
   private discoverHandlers(): void {
     const prefix = this.config.get<string>('KAFKA_CONSUMER_GROUP_PREFIX', 'erp-api');
+    this.groupPrefix = prefix;
     const wrappers = this.discoveryService.getProviders();
 
     for (const wrapper of wrappers) {
@@ -110,26 +125,60 @@ export class EventConsumerManager implements OnModuleInit, OnModuleDestroy {
   async startAll(): Promise<void> {
     const kafka = this.publisher.getKafkaInstance();
     const producer = this.publisher.getProducer();
+    const startedAt = Date.now();
 
-    for (const { topic, groupId, handler } of this.pendingHandlers) {
-      const consumer = createConsumer(kafka, { groupId });
-      await consumer.connect();
+    const started = await this.mapWithConcurrency(
+      this.pendingHandlers,
+      CONSUMER_START_CONCURRENCY,
+      async ({ topic, groupId, handler }) => {
+        const consumer = createConsumer(kafka, { groupId });
+        await consumer.connect();
 
-      const dlqTopic = buildDlqTopicName(topic);
-      const wrapWithDlq = createDlqHandler(producer, {
-        dlqTopic,
-        maxRetries: 3,
-      });
+        const wrapWithDlq = createDlqHandler(producer, {
+          dlqTopic: buildDlqTopicName(topic),
+          maxRetries: 3,
+        });
 
-      const idempotentHandler = this.wrapWithIdempotency(groupId, topic, handler);
-      await subscribeAndRun(consumer, topic, wrapWithDlq(idempotentHandler));
+        const idempotentHandler = this.wrapWithIdempotency(
+          groupId,
+          topic,
+          handler,
+        );
+        await subscribeAndRun(consumer, topic, wrapWithDlq(idempotentHandler));
 
-      this.consumers.push({ consumer, topic });
-      this.logger.log(`Consumer started: group=${groupId} topic=${topic}`);
+        this.logger.log(`Consumer started: group=${groupId} topic=${topic}`);
+        return { consumer, topic };
+      },
+    );
+    this.consumers.push(...started);
 
-      // DLQ recorder — subscribes to <topic>.dlq and writes to dead_letter_events
-      await this.startDlqRecorder(topic, dlqTopic, groupId);
-    }
+    await this.startDlqRecorder();
+
+    this.logger.log(
+      `All consumers started: ${started.length} handler group(s) + 1 DLQ recorder in ${Date.now() - startedAt}ms`,
+    );
+  }
+
+  /** Chạy `fn` trên `items` với trần `limit` tác vụ đồng thời, giữ nguyên thứ tự kết quả. */
+  private async mapWithConcurrency<T, R>(
+    items: T[],
+    limit: number,
+    fn: (item: T) => Promise<R>,
+  ): Promise<R[]> {
+    const results = new Array<R>(items.length);
+    let cursor = 0;
+    const workers = Array.from(
+      { length: Math.min(limit, items.length) },
+      async () => {
+        for (;;) {
+          const index = cursor++;
+          if (index >= items.length) return;
+          results[index] = await fn(items[index]);
+        }
+      },
+    );
+    await Promise.all(workers);
+    return results;
   }
 
   private wrapWithIdempotency(
@@ -155,26 +204,35 @@ export class EventConsumerManager implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  private async startDlqRecorder(
-    originalTopic: string,
-    dlqTopic: string,
-    parentGroupId: string,
-  ): Promise<void> {
+  /**
+   * MỘT recorder cho mọi topic `.dlq`, thay vì một group riêng cho mỗi handler.
+   *
+   * Cả 25 recorder cũ chạy đúng một việc giống nhau (ghi vào `dead_letter_events`),
+   * nên tách group không cho thêm gì mà nhân đôi số lần rebalance lúc boot.
+   * Topic gốc lấy từ `originalTopic` trong payload — `createDlqHandler` luôn
+   * ghi field này; bản thân tên topic `.dlq` là đường lui khi payload hỏng.
+   */
+  private async startDlqRecorder(): Promise<void> {
     const kafka = this.publisher.getKafkaInstance();
     const consumer = createConsumer(kafka, {
-      groupId: `${parentGroupId}.dlq-recorder`,
+      groupId: `${this.groupPrefix}.dlq-recorder`,
     });
     await consumer.connect();
-    await consumer.subscribe({ topic: dlqTopic, fromBeginning: false });
+    // Subscribe bằng regex: `ensureTopics()` đã tạo xong mọi topic .dlq trước
+    // khi startAll() chạy, nên không cần liệt kê tay và không vỡ khi thiếu topic.
+    await consumer.subscribe({
+      topics: [DLQ_TOPIC_PATTERN],
+      fromBeginning: false,
+    });
 
     await consumer.run({
       autoCommit: true,
-      eachMessage: async ({ partition, message }) => {
+      eachMessage: async ({ topic: dlqTopic, partition, message }) => {
         try {
           const body = JSON.parse(message.value?.toString() ?? '{}');
           const event = body.event ?? {};
           await this.deadLetterService.record({
-            topic: body.originalTopic ?? originalTopic,
+            topic: body.originalTopic ?? dlqTopic.replace(/\.dlq$/, ''),
             partition: body.originalPartition ?? partition,
             offset: body.originalOffset ?? message.offset,
             key: message.key?.toString(),
@@ -191,8 +249,10 @@ export class EventConsumerManager implements OnModuleInit, OnModuleDestroy {
       },
     });
 
-    this.consumers.push({ consumer, topic: dlqTopic });
-    this.logger.log(`DLQ recorder started: topic=${dlqTopic}`);
+    this.consumers.push({ consumer, topic: 'erp.*.dlq' });
+    this.logger.log(
+      `DLQ recorder started: group=${this.groupPrefix}.dlq-recorder pattern=${DLQ_TOPIC_PATTERN}`,
+    );
   }
 
   async stopAll(): Promise<void> {
