@@ -1,0 +1,10 @@
+{"action": "passed", "at": "2026-09-11T20:40:47", "by": "Akenzy", "evidence": "architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete", "gate": "G0", "id": "d624fdf12125", "ts": "2026-09-11T20:40:47.110832"}
+{"action": "passed", "at": "2026-09-11T20:40:47", "by": "Akenzy", "evidence": "9 assumptions, none blocking-and-pending; 8 acceptance criteria defined", "gate": "G1", "id": "83c773f0ec06", "ts": "2026-09-11T20:40:47.176695"}
+{"action": "passed", "at": "2026-09-11T20:40:47", "by": "Akenzy", "evidence": "2 ADR(s) recorded", "gate": "G2", "id": "91fca0f28fda", "ts": "2026-09-11T20:40:47.241911"}
+{"action": "passed", "at": "2026-09-11T20:40:47", "by": "Akenzy", "evidence": "graph valid - 1 UoW, 3 tickets, no cycles", "gate": "G3", "id": "bfd507e56c2b", "ts": "2026-09-11T20:40:47.356047"}
+{"action": "ticket in_progress", "at": "2026-09-11T20:40:47", "by": "Akenzy", "gate": "G4", "id": "9080dbfd26e9", "ticket": "T-01-01", "ts": "2026-09-11T20:40:47.422739"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-11T20:47:15", "by": "Akenzy", "gate": "G4", "id": "2c7d48979ccc", "ticket": "T-01-01", "ts": "2026-09-11T20:47:15.908135"}
+{"action": "ticket in_progress", "at": "2026-09-11T20:47:16", "by": "Akenzy", "gate": "G4", "id": "72168648295a", "ticket": "T-01-02", "ts": "2026-09-11T20:47:16.023910"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-11T20:51:25", "by": "Akenzy", "gate": "G4", "id": "585397eced63", "ticket": "T-01-02", "ts": "2026-09-11T20:51:25.345957"}
+{"action": "ticket in_progress", "at": "2026-09-11T20:51:25", "by": "Akenzy", "gate": "G4", "id": "aebe51d4daf2", "ticket": "T-01-03", "ts": "2026-09-11T20:51:25.468818"}
+{"action": "ticket blocked", "at": "2026-09-11T21:08:40", "by": "Akenzy", "from": "in_progress", "gate": "G4", "id": "fd6ed76304c1", "reason": "Chờ Akenzy tự chạy migration -run trên erp_dev_3008 (Claude bị chặn quyền) và gỡ lỗi Chrome 'Cannot access a chrome-extension -// URL of different extension' trên tab backoffice", "ticket": "T-01-03", "ts": "2026-09-11T21:08:40.087699"}

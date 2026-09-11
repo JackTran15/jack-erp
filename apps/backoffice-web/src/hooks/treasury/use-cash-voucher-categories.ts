@@ -27,6 +27,8 @@ export function useCashVoucherCategories(
               query: {
                 page: 1,
                 pageSize: 100,
+                sortBy: "displayOrder",
+                sortOrder: "asc",
                 ...(Object.keys(filters).length
                   ? { filters: JSON.stringify(filters) }
                   : {}),

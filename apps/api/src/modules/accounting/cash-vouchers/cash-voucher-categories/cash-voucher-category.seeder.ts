@@ -11,7 +11,11 @@ interface DefaultCategory {
   displayOrder: number;
 }
 
-/** Default cash voucher categories (Mục thu / Mục chi) seeded per organization. */
+/**
+ * Default cash voucher categories (Mục thu / Mục chi) seeded per organization.
+ * Only organizations created after a change here pick it up — existing ones
+ * need a data migration (see 1789930000000-BackfillCashVoucherCategoryOptions).
+ */
 export const DEFAULT_CASH_VOUCHER_CATEGORIES: DefaultCategory[] = [
   // ── Mục thu (IN) ──
   {
@@ -90,7 +94,7 @@ export const DEFAULT_CASH_VOUCHER_CATEGORIES: DefaultCategory[] = [
   },
   {
     code: "CHI_TIEN_NUOC",
-    name: "Tiền nước",
+    name: "Tiền nước sinh hoạt",
     direction: CashVoucherCategoryDirection.OUT,
     displayOrder: 13,
   },
@@ -101,94 +105,178 @@ export const DEFAULT_CASH_VOUCHER_CATEGORIES: DefaultCategory[] = [
     displayOrder: 14,
   },
   {
+    code: "CHI_TIEN_VAN_CHUYEN",
+    name: "Tiền vận chuyển",
+    direction: CashVoucherCategoryDirection.OUT,
+    displayOrder: 15,
+  },
+  {
+    code: "CHI_DUNG_CU_SUA_DEP",
+    name: "Mua dụng cụ sửa dép",
+    direction: CashVoucherCategoryDirection.OUT,
+    displayOrder: 16,
+  },
+  {
     code: "CHI_LUONG",
     name: "Tiền lương",
     direction: CashVoucherCategoryDirection.OUT,
-    displayOrder: 15,
+    displayOrder: 17,
   },
   {
     code: "CHI_THUONG",
     name: "Tiền thưởng",
     direction: CashVoucherCategoryDirection.OUT,
-    displayOrder: 16,
+    displayOrder: 18,
   },
   {
     code: "CHI_PHU_CAP",
     name: "Tiền phụ cấp",
     direction: CashVoucherCategoryDirection.OUT,
-    displayOrder: 17,
+    displayOrder: 19,
+  },
+  {
+    code: "CHI_UNG_LUONG",
+    name: "Ứng lương",
+    direction: CashVoucherCategoryDirection.OUT,
+    displayOrder: 20,
   },
   {
     code: "CHI_CCDC",
-    name: "Công cụ dụng cụ",
+    name: "Mua đồ dùng, công cụ, dụng cụ",
     direction: CashVoucherCategoryDirection.OUT,
-    displayOrder: 18,
+    displayOrder: 21,
   },
   {
     code: "CHI_TSCD",
     name: "Tài sản cố định",
     direction: CashVoucherCategoryDirection.OUT,
-    displayOrder: 19,
+    displayOrder: 22,
+  },
+  {
+    code: "CHI_MAY_MOC_THIET_BI",
+    name: "Mua máy móc thiết bị",
+    direction: CashVoucherCategoryDirection.OUT,
+    displayOrder: 23,
   },
   {
     code: "CHI_KHAC",
     name: "Chi khác",
     direction: CashVoucherCategoryDirection.OUT,
-    displayOrder: 20,
+    displayOrder: 24,
   },
   {
     code: "CHI_TIEP_KHACH",
     name: "Chi tiếp khách",
     direction: CashVoucherCategoryDirection.OUT,
-    displayOrder: 21,
+    displayOrder: 25,
   },
   {
     code: "CHI_VAN_PHONG_PHAM",
     name: "Mua văn phòng phẩm",
     direction: CashVoucherCategoryDirection.OUT,
-    displayOrder: 22,
+    displayOrder: 26,
   },
   {
     code: "CHI_TAM_UNG",
     name: "Chi tạm ứng",
     direction: CashVoucherCategoryDirection.OUT,
-    displayOrder: 23,
+    displayOrder: 27,
+  },
+  {
+    code: "CHI_THUE_MUON_KHAC",
+    name: "Thuê mướn khác",
+    direction: CashVoucherCategoryDirection.OUT,
+    displayOrder: 28,
+  },
+  {
+    code: "CHI_VE_SINH_MOI_TRUONG",
+    name: "Chi vệ sinh môi trường",
+    direction: CashVoucherCategoryDirection.OUT,
+    displayOrder: 29,
+  },
+  {
+    code: "CHI_LY_DO_KHAC",
+    name: "Chi lý do khác",
+    direction: CashVoucherCategoryDirection.OUT,
+    displayOrder: 30,
   },
   {
     code: "CHI_MUA_HANG",
     name: "Chi mua hàng hóa",
     direction: CashVoucherCategoryDirection.OUT,
-    displayOrder: 24,
+    displayOrder: 31,
   },
   {
     code: "CHI_CHUYEN_TIEN_CH",
     name: "Chi chuyển tiền sang cửa hàng khác",
     direction: CashVoucherCategoryDirection.OUT,
-    displayOrder: 25,
+    displayOrder: 32,
   },
   {
     code: "CHI_RUT_TIEN_GUI",
     name: "Rút tiền gửi về nhập quỹ",
     direction: CashVoucherCategoryDirection.OUT,
-    displayOrder: 26,
+    displayOrder: 33,
   },
   {
     code: "CHI_GUI_TIEN_NH",
     name: "Chi gửi tiền vào ngân hàng",
     direction: CashVoucherCategoryDirection.OUT,
-    displayOrder: 27,
+    displayOrder: 34,
+  },
+  {
+    code: "CHI_AN_UONG",
+    name: "Chi ăn uống",
+    direction: CashVoucherCategoryDirection.OUT,
+    displayOrder: 35,
+  },
+  {
+    code: "CHI_XANG_DAU_NHOT",
+    name: "Mua xăng dầu nhớt",
+    direction: CashVoucherCategoryDirection.OUT,
+    displayOrder: 36,
+  },
+  {
+    code: "CHI_NAP_VETC",
+    name: "Nạp VETC",
+    direction: CashVoucherCategoryDirection.OUT,
+    displayOrder: 37,
+  },
+  {
+    code: "CHI_LAM_HANG",
+    name: "Làm Hàng",
+    direction: CashVoucherCategoryDirection.OUT,
+    displayOrder: 38,
+  },
+  {
+    code: "CHI_DO_DUNG_VE_SINH",
+    name: "Đồ dùng vệ sinh",
+    direction: CashVoucherCategoryDirection.OUT,
+    displayOrder: 39,
+  },
+  {
+    code: "CHI_TIEN_AN",
+    name: "Tiền ăn",
+    direction: CashVoucherCategoryDirection.OUT,
+    displayOrder: 40,
+  },
+  {
+    code: "CHI_TIEN_NUOC_UONG",
+    name: "Tiền nước uống",
+    direction: CashVoucherCategoryDirection.OUT,
+    displayOrder: 41,
   },
   {
     code: "CHI_NO_NCC",
     name: "Chi trả nợ nhà cung cấp",
     direction: CashVoucherCategoryDirection.OUT,
-    displayOrder: 28,
+    displayOrder: 42,
   },
   {
     code: "BANK_FEE",
     name: "Phí ngân hàng",
     direction: CashVoucherCategoryDirection.OUT,
-    displayOrder: 29,
+    displayOrder: 43,
   },
 ];
 
