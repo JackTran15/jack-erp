@@ -18,20 +18,36 @@ export interface ItemWarehouseLocationRepos {
 }
 
 /**
- * "Vị trí"/"Mã vị trí" — where each item currently sits in one branch's
- * WAREHOUSE storage(s), explicitly excluding the showroom.
+ * One shelf an item sits on, with its storage's code/name already attached.
+ * Internal to this file — callers only ever see the joined
+ * `ItemWarehouseLocation` string built from a list of these.
+ */
+interface ItemShelf {
+  storageCode: string | null;
+  storageName: string;
+  locationCode: string;
+  locationName: string;
+}
+
+/**
+ * "Vị trí"/"Mã vị trí" — every shelf an item currently sits on, across one
+ * branch's WAREHOUSE storage(s), explicitly excluding the showroom.
  *
  * Deliberately NOT the location recorded on the movement: a POS sale always
  * deducts from the showroom's "Mặc định" shelf, and a shelf can be rearranged
- * after the fact, so the reports resolve the item's *current* warehouse shelf
- * on every load instead of reading a snapshot.
+ * after the fact, so the reports resolve the item's *current* warehouse
+ * shelves on every load instead of reading a snapshot.
  *
- * Priority, same as the "Hàng hóa xuất kho tạm" report:
- *   1. the item's preferred shelf (`item_storage_locations`) in one of the
- *      branch's warehouses;
- *   2. failing that, its highest-stock shelf there.
- * Only active storages and active locations count, and a pair explicitly set
- * to "Ngừng theo dõi" is skipped. Nothing left → empty cell.
+ * A shelf counts if it is either:
+ *   1. the item's preferred shelf (`item_storage_locations`) in that
+ *      warehouse, or
+ *   2. any shelf there still holding stock (`stock_balances.quantity > 0`).
+ * These are a union, not a priority order — an item whose preferred shelf is
+ * empty but has real stock elsewhere reports both. Only active storages and
+ * active locations count, and a pair explicitly set to "Ngừng theo dõi" is
+ * skipped. Every matching shelf is joined into one cell, prefixed with its
+ * storage's code/name (e.g. `"A1-A101, A2-A201"`) since a location code is
+ * only unique within its storage. Nothing left → empty cell.
  *
  * Callers pass one branch at a time because a shelf belongs to exactly one
  * branch; a row spanning several has no single location.
@@ -57,6 +73,7 @@ export async function resolveItemWarehouseLocations(
   const storages = await repos.storages.find({
     where: { organizationId, branchId, isActive: true },
   });
+  const storageById = new Map(storages.map((s) => [s.id, s]));
   const warehouseIds = storages.filter((s) => !s.isMainStorage).map((s) => s.id);
 
   const found = await resolveWithinStorages(
@@ -64,6 +81,7 @@ export async function resolveItemWarehouseLocations(
     itemIds,
     organizationId,
     warehouseIds,
+    storageById,
   );
 
   if (options.showroomFallback) {
@@ -75,29 +93,52 @@ export async function resolveItemWarehouseLocations(
         missing,
         organizationId,
         showroomIds,
+        storageById,
       );
-      for (const [itemId, location] of fallback) found.set(itemId, location);
+      for (const [itemId, shelves] of fallback) found.set(itemId, shelves);
     }
   }
 
   for (const itemId of itemIds) {
-    map.set(itemId, found.get(itemId) ?? { code: null, name: null });
+    map.set(itemId, joinShelves(found.get(itemId)));
   }
   return map;
 }
 
 /**
+ * Deterministic order (storage code, then location code) so the same data
+ * joins into the same string on every load, then the actual "MãKho-MãVịTrí"
+ * join. A null storage code (A-06, data not expected to occur) drops the
+ * prefix instead of emitting a leading "-".
+ */
+function joinShelves(shelves: ItemShelf[] | undefined): ItemWarehouseLocation {
+  if (!shelves?.length) return { code: null, name: null };
+  const sorted = [...shelves].sort((a, b) => {
+    const byStorage = (a.storageCode ?? '').localeCompare(b.storageCode ?? '');
+    return byStorage || a.locationCode.localeCompare(b.locationCode);
+  });
+  return {
+    code: sorted
+      .map((s) => (s.storageCode ? `${s.storageCode}-${s.locationCode}` : s.locationCode))
+      .join(', '),
+    name: sorted.map((s) => `${s.storageName}-${s.locationName}`).join(', '),
+  };
+}
+
+/**
  * The resolution itself, over one set of storages — run once for the branch's
  * warehouses and, when a fallback is asked for, again over its showroom.
- * Only items that actually resolved get an entry.
+ * Returns every shelf an item sits on within these storages; only items that
+ * actually resolved get an entry.
  */
 async function resolveWithinStorages(
   repos: ItemWarehouseLocationRepos,
   itemIds: string[],
   organizationId: string,
   warehouseIds: string[],
-): Promise<Map<string, ItemWarehouseLocation>> {
-  const found = new Map<string, ItemWarehouseLocation>();
+  storageById: Map<string, StorageEntity>,
+): Promise<Map<string, ItemShelf[]>> {
+  const found = new Map<string, ItemShelf[]>();
   if (!itemIds.length || !warehouseIds.length) return found;
 
   // Only shelves still in use can be reported — a location switched off
@@ -107,70 +148,75 @@ async function resolveWithinStorages(
   });
   const byLocationId = new Map(activeLocations.map((l) => [l.id, l]));
 
-  const locationIdByItemId = new Map<string, string>();
+  const pairKey = (itemId: string, locationId: string) => `${itemId}::${locationId}`;
+  const pairs = new Map<string, { itemId: string; locationId: string }>();
 
   const preferred = await repos.itemStorageLocations.find({
     where: { itemId: In(itemIds), storageId: In(warehouseIds), organizationId },
   });
+  const preferredPairs: { itemId: string; locationId: string }[] = [];
   for (const p of preferred) {
-    if (!locationIdByItemId.has(p.itemId) && byLocationId.has(p.locationId)) {
-      locationIdByItemId.set(p.itemId, p.locationId);
-    }
+    if (!byLocationId.has(p.locationId)) continue;
+    const key = pairKey(p.itemId, p.locationId);
+    if (pairs.has(key)) continue;
+    const pair = { itemId: p.itemId, locationId: p.locationId };
+    pairs.set(key, pair);
+    preferredPairs.push(pair);
   }
 
   // The preferred-shelf mapping has no isTracked flag of its own — cross-check
-  // its (item, location) pair against StockBalanceEntity and drop it if that
-  // specific pair was explicitly "Ngừng theo dõi". Dropped BEFORE the fallback
-  // runs so such an item still resolves to its highest-stock shelf instead of
-  // reporting no location at all.
+  // its (item, location) pairs against StockBalanceEntity and drop any pair
+  // explicitly marked "Ngừng theo dõi". The stocked-shelf query below already
+  // filters `isTracked = true` in SQL, so this only matters for pairs sourced
+  // from item_storage_locations.
   //
   // Queried as two IN lists and paired up in memory rather than as one OR
   // branch per pair: the OR form costs 4 bind parameters per pair and blows
   // past Postgres' 65535-parameter limit — a hard failure, not a slowdown —
   // once a branch has ~16k shelved items.
-  if (locationIdByItemId.size) {
+  if (preferredPairs.length) {
     const untracked = await repos.stockBalances.find({
       where: {
         organizationId,
         isTracked: false,
-        itemId: In([...locationIdByItemId.keys()]),
-        locationId: In([...new Set(locationIdByItemId.values())]),
+        itemId: In([...new Set(preferredPairs.map((p) => p.itemId))]),
+        locationId: In([...new Set(preferredPairs.map((p) => p.locationId))]),
       },
     });
-    for (const u of untracked) {
-      // The two IN lists match a cross product; only drop the exact pair.
-      if (locationIdByItemId.get(u.itemId) === u.locationId) {
-        locationIdByItemId.delete(u.itemId);
-      }
-    }
+    for (const u of untracked) pairs.delete(pairKey(u.itemId, u.locationId));
   }
 
-  const remaining = itemIds.filter((id) => !locationIdByItemId.has(id));
-  if (remaining.length) {
-    const balances = await repos.stockBalances
-      .createQueryBuilder('sb')
-      .innerJoin(LocationEntity, 'loc', 'loc.id = sb.locationId')
-      .where('sb.itemId IN (:...remaining)', { remaining })
-      .andWhere('sb.organizationId = :orgId', { orgId: organizationId })
-      .andWhere('sb.quantity > 0')
-      .andWhere('sb.isTracked = true')
-      .andWhere('loc.isActive = true')
-      .andWhere('loc.storageId IN (:...warehouseIds)', { warehouseIds })
-      .orderBy('sb.quantity', 'DESC')
-      .select('sb.itemId', 'itemId')
-      .addSelect('sb.locationId', 'locationId')
-      .getRawMany<{ itemId: string; locationId: string }>();
-    for (const b of balances) {
-      if (!locationIdByItemId.has(b.itemId)) {
-        locationIdByItemId.set(b.itemId, b.locationId);
-      }
-    }
+  const balances = await repos.stockBalances
+    .createQueryBuilder('sb')
+    .innerJoin(LocationEntity, 'loc', 'loc.id = sb.locationId')
+    .where('sb.itemId IN (:...itemIds)', { itemIds })
+    .andWhere('sb.organizationId = :orgId', { orgId: organizationId })
+    .andWhere('sb.quantity > 0')
+    .andWhere('sb.isTracked = true')
+    .andWhere('loc.isActive = true')
+    .andWhere('loc.storageId IN (:...warehouseIds)', { warehouseIds })
+    .select('sb.itemId', 'itemId')
+    .addSelect('sb.locationId', 'locationId')
+    .getRawMany<{ itemId: string; locationId: string }>();
+  for (const b of balances) {
+    const key = pairKey(b.itemId, b.locationId);
+    if (!pairs.has(key)) pairs.set(key, { itemId: b.itemId, locationId: b.locationId });
   }
 
-  for (const itemId of itemIds) {
-    const locationId = locationIdByItemId.get(itemId);
-    const loc = locationId ? byLocationId.get(locationId) : undefined;
-    if (loc) found.set(itemId, { code: loc.code, name: loc.name });
+  for (const { itemId, locationId } of pairs.values()) {
+    const loc = byLocationId.get(locationId);
+    if (!loc) continue;
+    const storage = storageById.get(loc.storageId);
+    const shelf: ItemShelf = {
+      storageCode: storage?.code ?? null,
+      storageName: storage?.name ?? '',
+      locationCode: loc.code,
+      locationName: loc.name,
+    };
+    const list = found.get(itemId);
+    if (list) list.push(shelf);
+    else found.set(itemId, [shelf]);
   }
+
   return found;
 }

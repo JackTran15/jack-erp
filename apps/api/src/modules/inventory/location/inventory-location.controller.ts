@@ -410,10 +410,19 @@ export class InventoryLocationController {
   @Get('showrooms')
   @RequirePermission('inventory.read')
   listShowrooms(
-    @Query() query: PaginationQueryDto & { branchId?: string; storageId?: string },
+    @Query()
+    query: PaginationQueryDto & {
+      branchId?: string;
+      storageId?: string;
+      activeOnly?: string;
+    },
     @Actor() actor: ActorContext,
   ) {
-    return this.service.listShowrooms(query, actor);
+    const activeOnly =
+      query.activeOnly === 'true' ||
+      (query.activeOnly as unknown) === true ||
+      query.activeOnly === '1';
+    return this.service.listShowrooms({ ...query, activeOnly }, actor);
   }
 
   @Get('showrooms/:id')

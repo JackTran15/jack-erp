@@ -656,7 +656,11 @@ export class InventoryLocationService {
   }
 
   async listShowrooms(
-    query: PaginationQuery & { branchId?: string; storageId?: string },
+    query: PaginationQuery & {
+      branchId?: string;
+      storageId?: string;
+      activeOnly?: boolean;
+    },
     actor: ActorContext,
   ): Promise<PaginatedResponse<ShowroomEntity>> {
     const where: Record<string, unknown> = {
@@ -667,6 +671,11 @@ export class InventoryLocationService {
     }
     if (query.storageId) {
       where.storageId = query.storageId;
+    }
+    // Ẩn showroom của kho đã ngừng hoạt động; join qua storage, không select
+    // để hình dạng response không đổi.
+    if (query.activeOnly) {
+      where.storage = { isActive: true };
     }
 
     const [data, total] = await this.showroomRepo.findAndCount({
