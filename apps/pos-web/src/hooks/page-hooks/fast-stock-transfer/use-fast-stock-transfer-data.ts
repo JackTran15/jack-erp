@@ -139,9 +139,19 @@ export function useFastStockTransferData(): FastStockTransferData {
 
   // Exclude the auto-generated showroom-backing storage (isMainStorage); the
   // transfer pickers, the ">= 2 storages" gating, and the default selection
-  // only consider real storage warehouses.
+  // only consider real storage warehouses. The branch's default issuing
+  // warehouse (if any) sorts first; ties fall back to name so the rest of
+  // the list isn't left in the server's arbitrary createdAt DESC order.
   const storages = useMemo(
-    () => (storagesData ?? []).filter((s) => !s.isMainStorage),
+    () =>
+      (storagesData ?? [])
+        .filter((s) => !s.isMainStorage)
+        .sort(
+          (a, b) =>
+            Number(Boolean(b.isDefaultIssuing)) -
+              Number(Boolean(a.isDefaultIssuing)) ||
+            a.name.localeCompare(b.name, "vi"),
+        ),
     [storagesData],
   );
   const showrooms = useMemo(() => showroomsData ?? [], [showroomsData]);

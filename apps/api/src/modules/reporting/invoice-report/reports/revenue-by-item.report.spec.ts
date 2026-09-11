@@ -230,15 +230,63 @@ describe('RevenueByItemReport.buildData', () => {
       lines: [line()],
       items: [{ id: 'it1', categoryId: 'cat1', brand: 'Nike' }],
       categories: [{ id: 'cat1', name: 'Shoes' }],
-      storages: [{ id: 'wh1', branchId: 'b1', isMainStorage: false, isActive: true }],
+      storages: [{ id: 'wh1', branchId: 'b1', code: 'A1', name: 'Kho A1', isMainStorage: false, isActive: true }],
       itemStorageLocations: [{ itemId: 'it1', storageId: 'wh1', locationId: 'loc1' }],
-      locations: [{ id: 'loc1', code: 'A-01', name: 'Aisle A' }],
+      locations: [{ id: 'loc1', storageId: 'wh1', code: 'A-01', name: 'Aisle A' }],
     });
     const res = await report.buildData(
       baseDto({ columns: ['sku', 'locationCode', 'locationName'] }) as any,
       actor,
     );
-    expect(res.rows[0]).toMatchObject({ locationCode: 'A-01', locationName: 'Aisle A' });
+    expect(res.rows[0]).toMatchObject({ locationCode: 'A1-A-01', locationName: 'Kho A1-Aisle A' });
+  });
+
+  it('joins two warehouse shelves for an item stocked on both, sorted by storage code', async () => {
+    const report = makeReport({
+      invoices: [inv()],
+      lines: [line()],
+      items: [{ id: 'it1', categoryId: 'cat1', brand: 'Nike' }],
+      categories: [{ id: 'cat1', name: 'Shoes' }],
+      storages: [
+        { id: 'wh2', branchId: 'b1', code: 'A2', name: 'Kho A2', isMainStorage: false, isActive: true },
+        { id: 'wh1', branchId: 'b1', code: 'A1', name: 'Kho A1', isMainStorage: false, isActive: true },
+      ],
+      itemStorageLocations: [
+        { itemId: 'it1', storageId: 'wh1', locationId: 'loc1' },
+        { itemId: 'it1', storageId: 'wh2', locationId: 'loc2' },
+      ],
+      locations: [
+        { id: 'loc1', storageId: 'wh1', code: 'A101', name: 'Kệ A101', isActive: true },
+        { id: 'loc2', storageId: 'wh2', code: 'A201', name: 'Kệ A201', isActive: true },
+      ],
+    });
+    const res = await report.buildData(
+      baseDto({ columns: ['sku', 'locationCode', 'locationName'] }) as any,
+      actor,
+    );
+    expect(res.rows[0]).toMatchObject({
+      locationCode: 'A1-A101, A2-A201',
+      locationName: 'Kho A1-Kệ A101, Kho A2-Kệ A201',
+    });
+  });
+
+  it('leaves the location empty for an item stocked only on the showroom (AC-08)', async () => {
+    const report = makeReport({
+      invoices: [inv()],
+      lines: [line()],
+      items: [{ id: 'it1', categoryId: 'cat1', brand: 'Nike' }],
+      categories: [{ id: 'cat1', name: 'Shoes' }],
+      storages: [
+        { id: 'showroom1', branchId: 'b1', code: 'SR', name: 'Showroom', isMainStorage: true, isActive: true },
+      ],
+      itemStorageLocations: [{ itemId: 'it1', storageId: 'showroom1', locationId: 'loc1' }],
+      locations: [{ id: 'loc1', storageId: 'showroom1', code: 'MD', name: 'Mặc định', isActive: true }],
+    });
+    const res = await report.buildData(
+      baseDto({ columns: ['sku', 'locationCode', 'locationName'] }) as any,
+      actor,
+    );
+    expect(res.rows[0]).toMatchObject({ locationCode: null, locationName: null });
   });
 
   // The reported defect: a user with consolidated access who never touches the
@@ -252,15 +300,15 @@ describe('RevenueByItemReport.buildData', () => {
       lines: [line()],
       items: [{ id: 'it1', categoryId: 'cat1', brand: 'Nike' }],
       categories: [{ id: 'cat1', name: 'Shoes' }],
-      storages: [{ id: 'wh1', branchId: 'b1', isMainStorage: false, isActive: true }],
+      storages: [{ id: 'wh1', branchId: 'b1', code: 'A1', name: 'Kho A1', isMainStorage: false, isActive: true }],
       itemStorageLocations: [{ itemId: 'it1', storageId: 'wh1', locationId: 'loc1' }],
-      locations: [{ id: 'loc1', code: 'A-01', name: 'Aisle A', isActive: true }],
+      locations: [{ id: 'loc1', storageId: 'wh1', code: 'A-01', name: 'Aisle A', isActive: true }],
     });
     const res = await report.buildData(
       baseDto({ columns: ['sku', 'locationCode', 'locationName'] }) as any,
       actor,
     );
-    expect(res.rows[0]).toMatchObject({ locationCode: 'A-01', locationName: 'Aisle A' });
+    expect(res.rows[0]).toMatchObject({ locationCode: 'A1-A-01', locationName: 'Kho A1-Aisle A' });
   });
 
   it('leaves the location null when the query explicitly spans every store', async () => {
@@ -270,7 +318,7 @@ describe('RevenueByItemReport.buildData', () => {
       lines: [line()],
       items: [{ id: 'it1', categoryId: 'cat1', brand: 'Nike' }],
       categories: [{ id: 'cat1', name: 'Shoes' }],
-      storages: [{ id: 'wh1', branchId: 'b1', isMainStorage: false, isActive: true }],
+      storages: [{ id: 'wh1', branchId: 'b1', code: 'A1', name: 'Kho A1', isMainStorage: false, isActive: true }],
       itemStorageLocations: [{ itemId: 'it1', storageId: 'wh1', locationId: 'loc1' }],
       locations: [{ id: 'loc1', code: 'A-01', name: 'Aisle A', isActive: true }],
     });
@@ -293,11 +341,11 @@ describe('RevenueByItemReport.buildData', () => {
       lines: [line()],
       items: [{ id: 'it1', categoryId: 'cat1', brand: 'Nike' }],
       categories: [{ id: 'cat1', name: 'Shoes' }],
-      storages: [{ id: 'wh1', branchId: 'b1', isMainStorage: false, isActive: true }],
+      storages: [{ id: 'wh1', branchId: 'b1', code: 'A1', name: 'Kho A1', isMainStorage: false, isActive: true }],
       itemStorageLocations: [{ itemId: 'it1', storageId: 'wh1', locationId: 'loc1' }],
       locations: [
-        { id: 'loc1', code: 'A-01', name: 'Aisle A', isActive: true },
-        { id: 'loc2', code: 'B-02', name: 'Aisle B', isActive: true },
+        { id: 'loc1', storageId: 'wh1', code: 'A-01', name: 'Aisle A', isActive: true },
+        { id: 'loc2', storageId: 'wh1', code: 'B-02', name: 'Aisle B', isActive: true },
       ],
       // loc1 is the preferred shelf but that exact pair is untracked…
       stockBalances: [{ itemId: 'it1', locationId: 'loc1', isTracked: false }],
@@ -308,7 +356,7 @@ describe('RevenueByItemReport.buildData', () => {
       baseDto({ columns: ['sku', 'locationCode', 'locationName'] }) as any,
       actor,
     );
-    expect(res.rows[0]).toMatchObject({ locationCode: 'B-02', locationName: 'Aisle B' });
+    expect(res.rows[0]).toMatchObject({ locationCode: 'A1-B-02', locationName: 'Kho A1-Aisle B' });
   });
 
   it('leaves locationCode/locationName null when statBy is not item', async () => {
@@ -317,7 +365,7 @@ describe('RevenueByItemReport.buildData', () => {
       lines: [line()],
       items: [{ id: 'it1', categoryId: 'cat1', brand: 'Nike' }],
       categories: [{ id: 'cat1', name: 'Shoes' }],
-      storages: [{ id: 'wh1', branchId: 'b1', isMainStorage: false, isActive: true }],
+      storages: [{ id: 'wh1', branchId: 'b1', code: 'A1', name: 'Kho A1', isMainStorage: false, isActive: true }],
       itemStorageLocations: [{ itemId: 'it1', storageId: 'wh1', locationId: 'loc1' }],
       locations: [{ id: 'loc1', code: 'A-01', name: 'Aisle A' }],
     });

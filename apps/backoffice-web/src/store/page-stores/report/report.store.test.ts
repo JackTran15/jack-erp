@@ -6,9 +6,11 @@ import {
   getReportFormLines,
   REPORT_TYPE_INVENTORY,
   REPORT_TYPE_PROFIT,
+  REPORT_TYPE_SALES,
 } from "../../../constants/reports/report-type.constant";
 import { STORE_TYPE } from "../../../constants/store.constant";
 import { buildInventorySearchFilters } from "../../../pages/chain-store/reports/_api/inventory-report-v2.api";
+import { buildSearchFilters } from "../../../pages/chain-store/reports/_api/invoice-report.api";
 import { buildInitialReportState } from "./report.factory";
 import { createReportStore } from "./report.store";
 
@@ -25,6 +27,27 @@ const INVENTORY_REPORTS = [
   REPORT_TYPE_INVENTORY.STORE_INVENTORY_IN_OUT_STOCK_SUMMARY,
   REPORT_TYPE_INVENTORY.STOCK_QUANTITY_BY_STORE,
 ];
+
+const SALES_REPORTS = [
+  REPORT_TYPE_SALES.DAILY_SALES_SUMMARY,
+  REPORT_TYPE_SALES.INVOICE_AND_ORDER_LIST,
+  REPORT_TYPE_SALES.REVENUE_DETAIL_BY_INVOICE_AND_PRODUCT,
+  REPORT_TYPE_SALES.REVENUE_BY_PRODUCT,
+];
+
+function salesStore(
+  branch: STORE_TYPE,
+  reportType = REPORT_TYPE_SALES.REVENUE_BY_PRODUCT,
+) {
+  return createReportStore(
+    buildInitialReportState({
+      category: REPORT_CATEGORY.SALES,
+      branch,
+      configs: { listReport: SALES_REPORTS },
+      reportType,
+    }),
+  );
+}
 
 function inventoryStore(branch: STORE_TYPE, reportType = WITH_BRAND) {
   return createReportStore(
@@ -200,6 +223,98 @@ describe("dropping the pivot's period lines (AC-10)", () => {
         backendKey: getReportBackendKey(reportType) as string,
       });
       expect(payload.period).toBeDefined();
+    }
+  });
+});
+
+// P1 / ADR-01: the 4 Sales reports never sent the header branch, so BE fell
+// back to the whole org for anyone with the consolidated-read permission.
+// `buildSearchFilters` now pins `store` to the header branch in SINGLE mode,
+// mirroring the warehouse reports' pin in `inventory-report-v2.api.ts:105-113`.
+describe("buildSearchFilters pins store to the header branch (P1, AC-03/AC-06)", () => {
+  const GROUP_A_B = { scope: "group" as const, storeIds: ["store-a", "store-b"] };
+
+  it("pins all 4 Sales reports to the header branch even when state holds another store group", () => {
+    for (const reportType of SALES_REPORTS) {
+      const store = salesStore(STORE_TYPE.SINGLE, reportType);
+      store
+        .getState()
+        .actions.setFilterValue(REPORT_FILTERS_LINE.STORE, GROUP_A_B);
+
+      const payload = buildSearchFilters(store.getState().filters, {
+        branch: STORE_TYPE.SINGLE,
+        activeBranchId: "branch-1",
+        backendKey: getReportBackendKey(reportType) as string,
+      });
+
+      expect(payload.store).toEqual({ scope: "group", storeIds: ["branch-1"] });
+    }
+  });
+
+  it("keeps the user's own store selection in CHAIN mode even though a header branch id is set", () => {
+    // Chain mode only flips isChain; branchId still holds the last single
+    // branch, so real callers pass a non-null activeBranchId here (AC-05).
+    for (const reportType of SALES_REPORTS) {
+      const store = salesStore(STORE_TYPE.CHAIN, reportType);
+      store
+        .getState()
+        .actions.setFilterValue(REPORT_FILTERS_LINE.STORE, GROUP_A_B);
+
+      const payload = buildSearchFilters(store.getState().filters, {
+        branch: STORE_TYPE.CHAIN,
+        activeBranchId: "branch-1",
+        backendKey: getReportBackendKey(reportType) as string,
+      });
+
+      expect(payload.store).toEqual(GROUP_A_B);
+    }
+  });
+
+  it("does not pin when SINGLE has no active branch id", () => {
+    const store = salesStore(STORE_TYPE.SINGLE);
+    store
+      .getState()
+      .actions.setFilterValue(REPORT_FILTERS_LINE.STORE, GROUP_A_B);
+
+    const payload = buildSearchFilters(store.getState().filters, {
+      branch: STORE_TYPE.SINGLE,
+      activeBranchId: null,
+      backendKey: getReportBackendKey(
+        REPORT_TYPE_SALES.REVENUE_BY_PRODUCT,
+      ) as string,
+    });
+
+    expect(payload.store).toEqual(GROUP_A_B);
+  });
+
+  it("does not pin an invoice backend key outside the allowlist", () => {
+    const store = salesStore(STORE_TYPE.SINGLE);
+    store
+      .getState()
+      .actions.setFilterValue(REPORT_FILTERS_LINE.STORE, GROUP_A_B);
+
+    const payload = buildSearchFilters(store.getState().filters, {
+      branch: STORE_TYPE.SINGLE,
+      activeBranchId: "branch-1",
+      backendKey: "invoice-report-outside-allowlist",
+    });
+
+    expect(payload.store).toEqual(GROUP_A_B);
+  });
+});
+
+// T-01-02, AC-01/AC-05: now that SINGLE mode always pins `store` to the
+// header branch (above), the "Cửa hàng" line is redundant there — it stayed
+// only where CHAIN mode still needs the user to choose a store group.
+describe("Sales reports drop the STORE line in SINGLE mode (AC-01/AC-05)", () => {
+  it("does not render STORE in SINGLE mode but keeps it in CHAIN mode", () => {
+    for (const reportType of SALES_REPORTS) {
+      expect(getReportFormLines(reportType, STORE_TYPE.SINGLE)).not.toContain(
+        REPORT_FILTERS_LINE.STORE,
+      );
+      expect(getReportFormLines(reportType, STORE_TYPE.CHAIN)).toContain(
+        REPORT_FILTERS_LINE.STORE,
+      );
     }
   });
 });

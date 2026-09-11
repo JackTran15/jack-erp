@@ -32,7 +32,14 @@ export function formatCarrierName(
 }
 
 export function locationLabelForLine(line: TempWarehouseLine): string {
-  return line.notes?.trim() ?? "";
+  // `notes` là chữ chụp lúc quét và từng bị Sửa → Lưu ghi đè bằng kệ của phiên;
+  // kệ của dòng tra theo `sourceLocationId` (`sourceShelf`) đáng tin hơn.
+  return (
+    line.sourceShelf?.name?.trim() ||
+    line.sourceShelf?.code?.trim() ||
+    line.notes?.trim() ||
+    ""
+  );
 }
 
 export function lineSku(line: TempWarehouseLine): string {

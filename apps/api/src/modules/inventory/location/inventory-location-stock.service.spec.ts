@@ -164,6 +164,8 @@ describe('InventoryLocationStockService', () => {
   let managerFindOne: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let managerInsert: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let managerUpdate: any;
   let dataSourceMock: any;
 
   function setup(opts: {
@@ -233,7 +235,12 @@ describe('InventoryLocationStockService', () => {
 
     managerFindOne = jest.fn();
     managerInsert = jest.fn().mockResolvedValue(undefined);
-    const manager = { findOne: managerFindOne, insert: managerInsert };
+    managerUpdate = jest.fn().mockResolvedValue(undefined);
+    const manager = {
+      findOne: managerFindOne,
+      insert: managerInsert,
+      update: managerUpdate,
+    };
     dataSourceMock = {
       getRepository: jest.fn().mockReturnValue(itemRepo),
       transaction: jest
@@ -1376,6 +1383,62 @@ describe('InventoryLocationStockService', () => {
         ],
         actor,
       );
+      expect(managerInsert).not.toHaveBeenCalled();
+    });
+
+    it('reactivates an untracked destination balance instead of inserting a duplicate', async () => {
+      locationRepo.findOne.mockResolvedValue({
+        id: 'loc-dest',
+        storageId: 'storage-1',
+        isUnassigned: false,
+        storage: { id: 'storage-1', branchId: 'branch-1' },
+      });
+      managerFindOne.mockResolvedValue({ id: 'sb-1', isTracked: false });
+
+      await service.arrange(
+        {
+          lines: [
+            {
+              itemId: 'item-1',
+              storageId: 'storage-1',
+              destinationLocationId: 'loc-dest',
+              quantity: 3,
+            },
+          ],
+        },
+        actor,
+      );
+
+      expect(managerUpdate).toHaveBeenCalledWith(StockBalanceEntity, 'sb-1', {
+        isTracked: true,
+      });
+      expect(managerInsert).not.toHaveBeenCalled();
+    });
+
+    it('leaves an already-tracked destination balance untouched', async () => {
+      locationRepo.findOne.mockResolvedValue({
+        id: 'loc-dest',
+        storageId: 'storage-1',
+        isUnassigned: false,
+        storage: { id: 'storage-1', branchId: 'branch-1' },
+      });
+      managerFindOne.mockResolvedValue({ id: 'sb-2', isTracked: true });
+
+      await service.arrange(
+        {
+          lines: [
+            {
+              itemId: 'item-1',
+              storageId: 'storage-1',
+              destinationLocationId: 'loc-dest',
+              quantity: 3,
+            },
+          ],
+        },
+        actor,
+      );
+
+      expect(managerUpdate).not.toHaveBeenCalled();
       expect(managerInsert).not.toHaveBeenCalled();
     });
 

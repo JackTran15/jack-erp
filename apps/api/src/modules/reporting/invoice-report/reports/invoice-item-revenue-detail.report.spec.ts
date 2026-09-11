@@ -267,9 +267,9 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
       // The line still carries the showroom shelf POS deducted from.
       lines: [line({ locationId: 'showroom-default' })],
       items: [{ id: 'it1', categoryId: null }],
-      storages: [{ id: 'wh1', branchId: 'b1', isMainStorage: false, isActive: true }],
+      storages: [{ id: 'wh1', branchId: 'b1', code: 'A1', name: 'Kho A1', isMainStorage: false, isActive: true }],
       itemStorageLocations: [{ itemId: 'it1', storageId: 'wh1', locationId: 'loc1' }],
-      locations: [{ id: 'loc1', code: 'A-01', name: 'Kệ A1', isActive: true }],
+      locations: [{ id: 'loc1', storageId: 'wh1', code: 'A-01', name: 'Kệ A1', isActive: true }],
     });
     const result = await report.buildData(
       {
@@ -279,8 +279,127 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
       actor,
     );
     expect(result.rows[0]).toMatchObject({
-      locationCode: 'A-01',
-      locationName: 'Kệ A1',
+      locationCode: 'A1-A-01',
+      locationName: 'Kho A1-Kệ A1',
+    });
+  });
+
+  it('joins two warehouse shelves for an item stocked on both, sorted by storage code', async () => {
+    const report = makeReport({
+      invoices: [inv()],
+      lines: [line()],
+      items: [{ id: 'it1', categoryId: null }],
+      storages: [
+        { id: 'wh2', branchId: 'b1', code: 'A2', name: 'Kho A2', isMainStorage: false, isActive: true },
+        { id: 'wh1', branchId: 'b1', code: 'A1', name: 'Kho A1', isMainStorage: false, isActive: true },
+      ],
+      itemStorageLocations: [
+        { itemId: 'it1', storageId: 'wh1', locationId: 'loc1' },
+        { itemId: 'it1', storageId: 'wh2', locationId: 'loc2' },
+      ],
+      locations: [
+        { id: 'loc1', storageId: 'wh1', code: 'A101', name: 'Kệ A101', isActive: true },
+        { id: 'loc2', storageId: 'wh2', code: 'A201', name: 'Kệ A201', isActive: true },
+      ],
+    });
+    const result = await report.buildData(
+      {
+        columns: ['sku', 'locationCode', 'locationName'],
+        filters: { issuedAt: { from: '2026-06-01', to: '2026-06-30' } },
+      } as any,
+      actor,
+    );
+    expect(result.rows[0]).toMatchObject({
+      locationCode: 'A1-A101, A2-A201',
+      locationName: 'Kho A1-Kệ A101, Kho A2-Kệ A201',
+    });
+  });
+
+  // Branch-scoped, unlike makeReport's generic repos which ignore `where`
+  // entirely — needed here because resolveItemWarehouseLocations is called
+  // once per branch (:531-540) and this is exactly the string-leak risk that
+  // fan-out invites.
+  it('keeps each branch\'s row to only that branch\'s shelves (AC-07, two branches)', async () => {
+    const storagesAll = [
+      { id: 'wh-b1', branchId: 'b1', code: 'B1', name: 'Kho CN1', isMainStorage: false, isActive: true },
+      { id: 'wh-b2', branchId: 'b2', code: 'B2', name: 'Kho CN2', isMainStorage: false, isActive: true },
+    ];
+    const locationsAll = [
+      { id: 'loc-b1', storageId: 'wh-b1', code: 'K1', name: 'Kệ CN1', isActive: true },
+      { id: 'loc-b2', storageId: 'wh-b2', code: 'K2', name: 'Kệ CN2', isActive: true },
+    ];
+    const itemStorageLocationsAll = [
+      { itemId: 'it1', storageId: 'wh-b1', locationId: 'loc-b1' },
+      { itemId: 'it1', storageId: 'wh-b2', locationId: 'loc-b2' },
+    ];
+
+    const qb: any = {
+      where: jest.fn(() => qb),
+      andWhere: jest.fn(() => qb),
+      getMany: jest.fn(async () => [
+        inv({ id: 'i1', code: 'HD000001', branchId: 'b1' }),
+        inv({ id: 'i2', code: 'HD000002', branchId: 'b2' }),
+      ]),
+    };
+    const stockBalanceQb: any = {
+      innerJoin: jest.fn(() => stockBalanceQb),
+      where: jest.fn(() => stockBalanceQb),
+      andWhere: jest.fn(() => stockBalanceQb),
+      orderBy: jest.fn(() => stockBalanceQb),
+      select: jest.fn(() => stockBalanceQb),
+      addSelect: jest.fn(() => stockBalanceQb),
+      getRawMany: jest.fn(async () => []),
+    };
+    const repo = (rows?: any[]) => ({ find: jest.fn(async () => rows ?? []) });
+    const report = new InvoiceItemRevenueDetailReport(
+      { createQueryBuilder: jest.fn(() => qb) } as any,
+      {
+        find: jest.fn(async () => [
+          line({ invoiceId: 'i1', itemId: 'it1', itemCode: 'SKU001' }),
+          line({ invoiceId: 'i2', itemId: 'it1', itemCode: 'SKU001' }),
+        ]),
+      } as any,
+      repo([]) as any,
+      repo([]) as any,
+      repo([]) as any,
+      repo([]) as any,
+      repo([]) as any,
+      repo([{ id: 'it1', categoryId: null }]) as any,
+      repo([]) as any,
+      { find: jest.fn(async (o: any) => locationsAll.filter((l) => o.where.storageId.value.includes(l.storageId))) } as any,
+      repo([]) as any,
+      repo([]) as any,
+      { find: jest.fn(async (o: any) => storagesAll.filter((s) => s.branchId === o.where.branchId)) } as any,
+      {
+        find: jest.fn(async (o: any) =>
+          itemStorageLocationsAll.filter(
+            (p) => o.where.storageId.value.includes(p.storageId) && o.where.itemId.value.includes(p.itemId),
+          ),
+        ),
+      } as any,
+      { ...repo([]), createQueryBuilder: jest.fn(() => stockBalanceQb) } as any,
+      { hasPermission: jest.fn(async () => true) } as any,
+    );
+
+    const result = await report.buildData(
+      {
+        columns: ['invoiceCode', 'sku', 'locationCode', 'locationName'],
+        filters: {
+          issuedAt: { from: '2026-06-01', to: '2026-06-30' },
+          store: { scope: 'all', storeIds: [] },
+        },
+      } as any,
+      actor,
+    );
+    expect(result.rows).toHaveLength(2);
+    const byInvoice = new Map(result.rows.map((r: any) => [r.invoiceCode, r]));
+    expect(byInvoice.get('HD000001')).toMatchObject({
+      locationCode: 'B1-K1',
+      locationName: 'Kho CN1-Kệ CN1',
+    });
+    expect(byInvoice.get('HD000002')).toMatchObject({
+      locationCode: 'B2-K2',
+      locationName: 'Kho CN2-Kệ CN2',
     });
   });
 
@@ -291,6 +410,27 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
       items: [{ id: 'it1', categoryId: null }],
       // Showroom only — no warehouse storage in this branch.
       storages: [{ id: 'sr1', branchId: 'b1', isMainStorage: true, isActive: true }],
+    });
+    const result = await report.buildData(
+      {
+        columns: ['sku', 'locationCode', 'locationName'],
+        filters: { issuedAt: { from: '2026-06-01', to: '2026-06-30' } },
+      } as any,
+      actor,
+    );
+    expect(result.rows[0]).toMatchObject({ locationCode: null, locationName: null });
+  });
+
+  it('leaves the location empty for an item stocked only on the showroom (AC-08)', async () => {
+    const report = makeReport({
+      invoices: [inv()],
+      lines: [line()],
+      items: [{ id: 'it1', categoryId: null }],
+      storages: [
+        { id: 'showroom1', branchId: 'b1', code: 'SR', name: 'Showroom', isMainStorage: true, isActive: true },
+      ],
+      itemStorageLocations: [{ itemId: 'it1', storageId: 'showroom1', locationId: 'loc1' }],
+      locations: [{ id: 'loc1', storageId: 'showroom1', code: 'MD', name: 'Mặc định', isActive: true }],
     });
     const result = await report.buildData(
       {

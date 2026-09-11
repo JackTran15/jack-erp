@@ -1,0 +1,109 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: report-multi-location-column
+slug: 2026091002-report-multi-location-column
+profile: none
+created: 2026-09-10T12:40:36
+ruleset: 5
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-10T12:50:38
+    by: akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-10T13:01:09
+    by: akenzy
+    evidence: 12 assumptions, none blocking-and-pending; 12 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-10T13:05:59
+    by: akenzy
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-10T13:14:39
+    by: akenzy
+    evidence: graph valid - 2 UoW, 6 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T13:26:19
+    by: akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-10T13:40:38
+    by: akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T14:40:48
+    by: akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T14:40:48
+    by: akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T14:40:48
+    by: akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-10T14:44:24
+    by: akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-10T14:50:40
+    by: akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T14:50:40
+    by: akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-10T14:50:40
+    by: akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-10T14:58:52
+    by: akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T14:58:52
+    by: akenzy
+    ticket: T-01-04
+  - gate: G1
+    action: reopened
+    at: 2026-09-10T15:00:08
+    by: akenzy
+    reason: Them AC-13 va ticket T-02-03 - noi cot vi tri cua 3 bao cao doanh thu/loi nhuan (bang do rong dung chung report-column-widths.ts va 2 registry FE). Ke hoach cu chi noi cot o Tong hop nhap xuat ton kho, trong khi A-02 va A-04 ap cho ca 4 bao cao. akenzy chon phuong an nay 2026-09-10.
+  - gate: G1
+    action: passed
+    at: 2026-09-10T15:04:05
+    by: akenzy
+    evidence: 13 assumptions, none blocking-and-pending; 13 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-10T15:04:05
+    by: akenzy
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-10T15:04:05
+    by: akenzy
+    evidence: graph valid - 2 UoW, 7 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T15:05:07
+    by: akenzy
+    ticket: T-02-03

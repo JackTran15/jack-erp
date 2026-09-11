@@ -1,0 +1,20 @@
+{"action": "passed", "at": "2026-09-10T12:50:38", "by": "akenzy", "evidence": "architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete", "gate": "G0", "id": "2f37c57bcb9e", "ts": "2026-09-10T12:50:38.193825"}
+{"action": "passed", "at": "2026-09-10T13:01:09", "by": "akenzy", "evidence": "12 assumptions, none blocking-and-pending; 12 acceptance criteria defined", "gate": "G1", "id": "bf7631d5eef3", "ts": "2026-09-10T13:01:09.811150"}
+{"action": "passed", "at": "2026-09-10T13:05:59", "by": "akenzy", "evidence": "4 ADR(s) recorded", "gate": "G2", "id": "15608b0453a7", "ts": "2026-09-10T13:05:59.298888"}
+{"action": "passed", "at": "2026-09-10T13:14:39", "by": "akenzy", "evidence": "graph valid - 2 UoW, 6 tickets, no cycles", "gate": "G3", "id": "38de136c2aef", "ts": "2026-09-10T13:14:39.391592"}
+{"action": "ticket in_progress", "at": "2026-09-10T13:26:19", "by": "akenzy", "gate": "G4", "id": "f6b3d8f07bbe", "ticket": "T-01-01", "ts": "2026-09-10T13:26:19.109045"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-10T13:40:38", "by": "akenzy", "gate": "G4", "id": "1c83b8ef6845", "ticket": "T-01-01", "ts": "2026-09-10T13:40:38.834169"}
+{"action": "ticket in_progress", "at": "2026-09-10T14:40:48", "by": "akenzy", "gate": "G4", "id": "8c23d3099987", "ticket": "T-01-02", "ts": "2026-09-10T14:40:48.352435"}
+{"action": "ticket in_progress", "at": "2026-09-10T14:40:48", "by": "akenzy", "gate": "G4", "id": "4984a625b80c", "ticket": "T-02-01", "ts": "2026-09-10T14:40:48.420045"}
+{"action": "ticket in_progress", "at": "2026-09-10T14:40:48", "by": "akenzy", "gate": "G4", "id": "b21e76249557", "ticket": "T-02-02", "ts": "2026-09-10T14:40:48.487792"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-10T14:44:24", "by": "akenzy", "gate": "G4", "id": "f197c5f2b3ea", "ticket": "T-02-02", "ts": "2026-09-10T14:44:24.400635"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-10T14:50:40", "by": "akenzy", "gate": "G4", "id": "492204091172", "ticket": "T-01-02", "ts": "2026-09-10T14:50:40.616470"}
+{"action": "ticket in_progress", "at": "2026-09-10T14:50:40", "by": "akenzy", "gate": "G4", "id": "e0c482ffbd8f", "ticket": "T-01-03", "ts": "2026-09-10T14:50:40.732176"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-10T14:50:40", "by": "akenzy", "gate": "G4", "id": "0fa07e03423a", "ticket": "T-02-01", "ts": "2026-09-10T14:50:40.829857"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-10T14:58:52", "by": "akenzy", "gate": "G4", "id": "547bcc0ec77e", "ticket": "T-01-03", "ts": "2026-09-10T14:58:52.761631"}
+{"action": "ticket in_progress", "at": "2026-09-10T14:58:52", "by": "akenzy", "gate": "G4", "id": "8ead15c615d1", "ticket": "T-01-04", "ts": "2026-09-10T14:58:52.881524"}
+{"action": "reopened", "at": "2026-09-10T15:00:08", "by": "akenzy", "gate": "G1", "id": "9a62e92cbc00", "reason": "Them AC-13 va ticket T-02-03 - noi cot vi tri cua 3 bao cao doanh thu/loi nhuan (bang do rong dung chung report-column-widths.ts va 2 registry FE). Ke hoach cu chi noi cot o Tong hop nhap xuat ton kho, trong khi A-02 va A-04 ap cho ca 4 bao cao. akenzy chon phuong an nay 2026-09-10.", "ts": "2026-09-10T15:00:08.476348"}
+{"action": "passed", "at": "2026-09-10T15:04:05", "by": "akenzy", "evidence": "13 assumptions, none blocking-and-pending; 13 acceptance criteria defined", "gate": "G1", "id": "e75c6394f858", "ts": "2026-09-10T15:04:05.708584"}
+{"action": "passed", "at": "2026-09-10T15:04:05", "by": "akenzy", "evidence": "4 ADR(s) recorded", "gate": "G2", "id": "438806606b85", "ts": "2026-09-10T15:04:05.777863"}
+{"action": "passed", "at": "2026-09-10T15:04:05", "by": "akenzy", "evidence": "graph valid - 2 UoW, 7 tickets, no cycles", "gate": "G3", "id": "ef1f5aefc3b2", "ts": "2026-09-10T15:04:05.899274"}
+{"action": "ticket in_progress", "at": "2026-09-10T15:05:07", "by": "akenzy", "gate": "G4", "id": "b9913c12781b", "ticket": "T-02-03", "ts": "2026-09-10T15:05:07.148028"}

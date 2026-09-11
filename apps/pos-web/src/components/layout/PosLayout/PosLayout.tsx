@@ -37,6 +37,7 @@ import {
   type NotificationItem,
 } from "./PosNotificationPopover/PosNotificationPopover";
 import { PosSyncDialog } from "./PosSyncDialog/PosSyncDialog";
+import { PosBranchDriftDialog } from "./PosBranchDriftDialog/PosBranchDriftDialog";
 
 export interface PosMenuItem {
   id: string;
@@ -333,6 +334,10 @@ export function PosLayout() {
         open={syncDialogOpen}
         onClose={() => setSyncDialogOpen(false)}
       />
+
+      {/* Mount ở vỏ chứ không ở PosLocationIndicator: dialog phải hiện cả khi ô chọn chi
+          nhánh chưa render. */}
+      <PosBranchDriftDialog />
 
       <Outlet />
     </div>

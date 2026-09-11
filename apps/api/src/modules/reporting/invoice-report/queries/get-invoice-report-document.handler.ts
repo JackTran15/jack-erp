@@ -4,6 +4,7 @@ import {
   ReportGroupBy,
 } from '@erp/shared-interfaces';
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import {
   dateRangeSubtitle,
   FILTERED_MARKER,
@@ -51,18 +52,27 @@ export const PRODUCT_TYPE_LABELS_VI: Record<string, string> = {
 
 /**
  * The filter line for invoice reports. The issuing branch is already printed in
- * the branch block above the title, so it is deliberately not repeated here.
+ * the branch block above the title, so it is deliberately not repeated here; the
+ * store line is also skipped when the group is exactly the actor's branch, since
+ * single-branch mode pins the payload to it (ADR-01, sales-store-filter-and-location-fixes).
  */
 export function invoiceFilterSummary(
   filters: InvoiceReportFilterDto | undefined,
+  actor?: Pick<ActorContext, 'branchId'>,
 ): string[] {
   if (!filters) return [];
+  const isHeaderBranchGroup =
+    filters.store?.scope === 'group' &&
+    filters.store.storeIds.length === 1 &&
+    filters.store.storeIds[0] === actor?.branchId;
   return filterSummarySubtitle([
-    filters.store?.scope === 'group' && filters.store.storeIds.length
-      ? `Cửa hàng: ${filters.store.storeIds.length} cửa hàng được chọn`
-      : filters.store?.scope === 'all'
-        ? 'Cửa hàng: Toàn hệ thống'
-        : null,
+    isHeaderBranchGroup
+      ? null
+      : filters.store?.scope === 'group' && filters.store.storeIds.length
+        ? `Cửa hàng: ${filters.store.storeIds.length} cửa hàng được chọn`
+        : filters.store?.scope === 'all'
+          ? 'Cửa hàng: Toàn hệ thống'
+          : null,
     filters.statDateType
       ? `Thống kê theo: ${STAT_DATE_LABELS_VI[filters.statDateType] ?? filters.statDateType}`
       : null,
@@ -106,7 +116,7 @@ export class GetInvoiceReportDocumentHandler
     const filterLines =
       dto.reportType === REVENUE_BY_ITEM_REPORT_KEY
         ? await this.revenueByItemParams.build(dto.filters, actor)
-        : invoiceFilterSummary(dto.filters);
+        : invoiceFilterSummary(dto.filters, actor);
 
     // pos-web's "Toàn bộ" preset sends this sentinel `from` (with no `to`) so
     // revenue-by-item's bounded-query guard does not 400 it — treat it as

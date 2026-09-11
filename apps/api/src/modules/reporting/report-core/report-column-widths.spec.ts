@@ -22,6 +22,12 @@ describe('REPORT_COLUMN_WIDTHS', () => {
     expect(reportColumnWidth('documentNumber')).toBe(130);
   });
 
+  it('sizes the location columns of the revenue/profit reports at 220', () => {
+    expect(reportColumnWidth('location')).toBe(220);
+    expect(reportColumnWidth('locationCode')).toBe(220);
+    expect(reportColumnWidth('locationName')).toBe(220);
+  });
+
   it('leaves amount and quantity columns to the FE default', () => {
     for (const col of ['quantity', 'unitPrice', 'lineRevenue', 'revenue', 'debtClosing', 'grossProfit']) {
       expect(reportColumnWidth(col)).toBeUndefined();
@@ -40,12 +46,15 @@ describe('column utils forward the shared width', () => {
     expect(enrichInvoiceHeader(base('sku', ReportColumnDataType.STRING)).width).toBe(140);
     expect(enrichInvoiceHeader(base('itemName', ReportColumnDataType.STRING)).width).toBe(220);
     expect(enrichInvoiceHeader(base('lineRevenue', ReportColumnDataType.CURRENCY)).width).toBeUndefined();
+    expect(enrichInvoiceHeader(base('locationCode', ReportColumnDataType.STRING)).width).toBe(220);
+    expect(enrichInvoiceHeader(base('locationName', ReportColumnDataType.STRING)).width).toBe(220);
   });
 
   it('profit enrichHeader', () => {
     expect(enrichProfitHeader(base('skuCode', ReportColumnDataType.STRING)).width).toBe(140);
     expect(enrichProfitHeader(base('khoanMuc', ReportColumnDataType.STRING)).width).toBe(220);
     expect(enrichProfitHeader(base('grossProfit', ReportColumnDataType.CURRENCY)).width).toBeUndefined();
+    expect(enrichProfitHeader(base('location', ReportColumnDataType.STRING)).width).toBe(220);
   });
 
   it('debtColumn', () => {

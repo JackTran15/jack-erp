@@ -130,6 +130,40 @@ describe('ProfitByItemReport — Vị trí', () => {
     expect(res.rows[0]).toMatchObject({ location: null });
   });
 
+  it('AC-07: joins two shelves across two warehouses into "A1-A101, A2-A201"', async () => {
+    const report = makeReport({
+      ...warehouseFixtures,
+      storages: [
+        { id: 'wh1', branchId: 'b1', code: 'A1', name: 'Kho A1', isMainStorage: false, isActive: true },
+        { id: 'wh2', branchId: 'b1', code: 'A2', name: 'Kho A2', isMainStorage: false, isActive: true },
+      ],
+      itemStorageLocations: [
+        { itemId: 'it1', storageId: 'wh1', locationId: 'loc1' },
+        { itemId: 'it1', storageId: 'wh2', locationId: 'loc2' },
+      ],
+      locations: [
+        { id: 'loc1', storageId: 'wh1', code: 'A101', name: 'Shelf A101', isActive: true },
+        { id: 'loc2', storageId: 'wh2', code: 'A201', name: 'Shelf A201', isActive: true },
+      ],
+    });
+    const res = await report.buildData(dto() as any, actor);
+    expect(res.rows[0]).toMatchObject({ location: 'A1-A101, A2-A201' });
+  });
+
+  it('AC-08: leaves the location empty for an item stocked only on the showroom shelf', async () => {
+    const report = makeReport({
+      ...warehouseFixtures,
+      storages: [
+        { id: 'showroom1', branchId: 'b1', code: 'SR', name: 'Showroom', isMainStorage: true, isActive: true },
+      ],
+      itemStorageLocations: [{ itemId: 'it1', storageId: 'showroom1', locationId: 'locSR' }],
+      locations: [{ id: 'locSR', storageId: 'showroom1', code: 'SR01', name: 'Kệ mặc định', isActive: true }],
+      stockBalanceRaw: [{ itemId: 'it1', locationId: 'locSR' }],
+    });
+    const res = await report.buildData(dto() as any, actor);
+    expect(res.rows[0]).toMatchObject({ location: null });
+  });
+
   it('does not query warehouse locations at parent grain', async () => {
     const itemStorageLocationsFind = jest.fn(async () => []);
     const report = makeReport(warehouseFixtures);

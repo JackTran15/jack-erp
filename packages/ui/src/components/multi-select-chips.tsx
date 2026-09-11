@@ -1,7 +1,6 @@
 import * as React from "react";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { cn } from "../lib/utils";
-import { ScrollArea } from "./scroll-area";
 import { ChevronDown, X } from "lucide-react";
 import type { MultiSelectOption } from "./multi-select";
 
@@ -183,7 +182,7 @@ function MultiSelectChips({
           }
         }}
       >
-        <ScrollArea className="max-h-60">
+        <div className="max-h-60 overflow-y-auto overscroll-contain">
           {availableOptions.length === 0 ? (
             <div
               className={cn(
@@ -213,7 +212,7 @@ function MultiSelectChips({
               </button>
             ))
           )}
-        </ScrollArea>
+        </div>
         {value.length > 0 ? (
           <div className="border-t p-1">
             <button

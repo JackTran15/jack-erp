@@ -208,7 +208,6 @@ export const chain_tableRegistryReportRevenueDetailByInvoiceAndProduct: ReportTa
 };
 
 export const single_filterRegistryReportRevenueDetailByInvoiceAndProduct = [
-  REPORT_FILTERS_LINE.STORE,
   REPORT_FILTERS_LINE.INVOICE_STATUS,
   REPORT_FILTERS_LINE.STAT_DATE_TYPE,
   REPORT_FILTERS_LINE.REPORT_PERIOD,

@@ -89,8 +89,8 @@ function build(rows: StockPeriodRow[], total = rows.length) {
   };
   const storages = {
     find: jest.fn().mockResolvedValue([
-      { id: 'wh-1', isMainStorage: false },
-      { id: 'sr-1', isMainStorage: true },
+      { id: 'wh-1', code: 'A1', name: 'Kho A1', isMainStorage: false },
+      { id: 'sr-1', code: 'SR', name: 'Showroom', isMainStorage: true },
     ]),
   };
   const itemStorageLocations = {
@@ -122,7 +122,7 @@ function build(rows: StockPeriodRow[], total = rows.length) {
     stockBalances as never,
     categories as never,
   );
-  return { report, stockPeriod, branches, locations, storages };
+  return { report, stockPeriod, branches, locations, storages, itemStorageLocations };
 }
 
 const baseDto: InventoryReportSearchDto = {
@@ -152,6 +152,10 @@ describe('StockSummaryReport', () => {
     expect(inQty.align).toBe('right');
     expect(inQty.filterKind).toBe('number');
     expect(cols.find((c) => c.col === 'supplier')!.filterKind).toBe('text');
+    // ADR-04: widened so both shelves of a two-pair join ("A1-A10, A2-A201")
+    // show in full; the hover title still covers anything longer.
+    expect(cols.find((c) => c.col === 'positionCode')!.width).toBe(220);
+    expect(cols.find((c) => c.col === 'positionName')!.width).toBe(220);
   });
 
   it('maps engine rows through — including brand/color/size, closing→ending and supplier', async () => {
@@ -489,8 +493,8 @@ describe('StockSummaryReport', () => {
       );
 
       expect(result.rows[0]).toMatchObject({
-        positionCode: 'A10',
-        positionName: 'A10',
+        positionCode: 'A1-A10',
+        positionName: 'Kho A1-A10',
       });
     });
 
@@ -506,8 +510,47 @@ describe('StockSummaryReport', () => {
       );
 
       expect(result.rows[0]).toMatchObject({
-        positionCode: 'DEFAULT',
-        positionName: 'Mặc định',
+        positionCode: 'SR-DEFAULT',
+        positionName: 'Showroom-Mặc định',
+      });
+    });
+
+    it('joins two warehouse shelves for an item stocked on both, sorted by storage code (AC-01)', async () => {
+      const { report, storages, locations, itemStorageLocations } = build([
+        periodRow({ itemId: 'item-1' }),
+      ]);
+      storages.find.mockResolvedValue([
+        { id: 'wh-2', code: 'A2', name: 'Kho A2', isMainStorage: false },
+        { id: 'wh-1', code: 'A1', name: 'Kho A1', isMainStorage: false },
+        { id: 'sr-1', code: 'SR', name: 'Showroom', isMainStorage: true },
+      ]);
+      locations.find.mockImplementation(({ where }: { where?: { storageId?: { _value: string[] } } }) => {
+        const ids: string[] = where?.storageId?._value ?? [];
+        const rows = [
+          { id: 'loc-wh', code: 'A10', name: 'A10', storageId: 'wh-1' },
+          { id: 'loc-wh2', code: 'A201', name: 'Kệ A201', storageId: 'wh-2' },
+        ];
+        return Promise.resolve(rows.filter((l) => ids.includes(l.storageId)));
+      });
+      itemStorageLocations.find.mockImplementation(
+        ({ where }: { where?: { storageId?: { _value: string[] } } }) => {
+          const ids: string[] = where?.storageId?._value ?? [];
+          const rows = [
+            { itemId: 'item-1', locationId: 'loc-wh', storageId: 'wh-1' },
+            { itemId: 'item-1', locationId: 'loc-wh2', storageId: 'wh-2' },
+          ];
+          return Promise.resolve(rows.filter((r) => ids.includes(r.storageId)));
+        },
+      );
+
+      const result = await report.buildData(
+        { ...baseDto, columns: ['sku', 'positionCode', 'positionName'] },
+        actor,
+      );
+
+      expect(result.rows[0]).toMatchObject({
+        positionCode: 'A1-A10, A2-A201',
+        positionName: 'Kho A1-A10, Kho A2-Kệ A201',
       });
     });
 
@@ -538,6 +581,34 @@ describe('StockSummaryReport', () => {
 
       expect(storages.find).not.toHaveBeenCalled();
       expect(result.rows[0].positionCode).toBeNull();
+    });
+  });
+
+  // ── Bộ lọc "Kho": narrows stock_ledger_entries.location_id, untouched by the
+  // displayed-column rework (AC-09) ──────────────────────────────────────────
+
+  describe('warehouse ("Kho") filter', () => {
+    it('resolves warehouseIds to locationIds and still passes them to the engine (AC-09)', async () => {
+      const { report, stockPeriod } = build([]);
+
+      await report.buildData(
+        { ...baseDto, filters: { ...baseDto.filters, warehouseIds: ['wh-1'] } },
+        actor,
+      );
+
+      expect(stockPeriod.aggregate).toHaveBeenCalledWith(
+        expect.objectContaining({ locationIds: ['loc-wh'] }),
+      );
+    });
+
+    it('leaves locationIds undefined when no "Kho" is selected (AC-09)', async () => {
+      const { report, stockPeriod } = build([]);
+
+      await report.buildData(baseDto, actor);
+
+      expect(stockPeriod.aggregate).toHaveBeenCalledWith(
+        expect.objectContaining({ locationIds: undefined }),
+      );
     });
   });
 

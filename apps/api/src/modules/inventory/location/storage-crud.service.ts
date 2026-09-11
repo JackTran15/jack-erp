@@ -25,6 +25,7 @@ export const INVENTORY_STORAGE_ENTITY_CONFIG: CrudEntityConfig = {
     { key: 'description',        label: 'Diễn giải',               type: 'string',  hideInList: true },
     { key: 'branchName',         label: 'Tên cửa hàng',            type: 'string',  readOnly: true },
     { key: 'isDefaultReceiving', label: 'Kho nhập hàng mặc định',  type: 'boolean', readOnly: true },
+    { key: 'isDefaultIssuing',   label: 'Kho xuất hàng mặc định',  type: 'boolean', readOnly: true },
     { key: 'isActive',           label: 'Trạng thái',              type: 'boolean', readOnly: true },
     { key: 'isMainStorage',      label: 'Kho showroom',            type: 'boolean', readOnly: true, hideInList: true },
     { key: 'createdAt',          label: 'Ngày tạo',                type: 'date',    readOnly: true },
@@ -34,6 +35,15 @@ export const INVENTORY_STORAGE_ENTITY_CONFIG: CrudEntityConfig = {
     {
       key: 'isDefaultReceiving',
       label: 'Kho nhập hàng mặc định',
+      type: 'select',
+      options: [
+        { label: 'Có', value: 'true' },
+        { label: 'Không', value: 'false' },
+      ],
+    },
+    {
+      key: 'isDefaultIssuing',
+      label: 'Kho xuất hàng mặc định',
       type: 'select',
       options: [
         { label: 'Có', value: 'true' },
@@ -142,9 +152,11 @@ export class InventoryStorageCrudService extends BaseCrudService<
   }
 
   /**
-   * isDefaultReceiving is mutated only through SetDefaultReceivingWarehouseCommand
-   * (which enforces the one-per-branch invariant). Strip it from generic updates
-   * so a plain PATCH cannot bypass that rule and trip the partial unique index.
+   * isDefaultReceiving and isDefaultIssuing are mutated only through
+   * SetDefaultReceivingWarehouseCommand and SetDefaultIssuingWarehouseCommand
+   * respectively (each enforces its own one-per-branch invariant). Strip both
+   * from generic updates so a plain PATCH cannot bypass that rule and trip the
+   * partial unique index.
    */
   protected async beforeUpdate(
     id: string,
@@ -153,6 +165,9 @@ export class InventoryStorageCrudService extends BaseCrudService<
   ): Promise<Record<string, any>> {
     if (payload && 'isDefaultReceiving' in payload) {
       delete payload.isDefaultReceiving;
+    }
+    if (payload && 'isDefaultIssuing' in payload) {
+      delete payload.isDefaultIssuing;
     }
     const editsCode = Boolean(payload) && 'code' in payload;
     const deactivates = Boolean(payload) && payload.isActive === false;
@@ -172,6 +187,11 @@ export class InventoryStorageCrudService extends BaseCrudService<
       if (storage?.isDefaultReceiving) {
         throw new BadRequestException(
           'Không thể ngừng hoạt động kho nhập hàng mặc định. Hãy đặt kho khác làm kho nhập mặc định trước.',
+        );
+      }
+      if (storage?.isDefaultIssuing) {
+        throw new BadRequestException(
+          'Không thể ngừng hoạt động kho xuất hàng mặc định. Hãy đặt kho khác làm kho xuất mặc định trước.',
         );
       }
     }
