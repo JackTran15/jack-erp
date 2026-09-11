@@ -143,7 +143,6 @@ export const chain_tableRegistryReportRevenueByProduct: ReportTableConfig =
   single_tableRegistryReportRevenueByProduct;
 
 export const single_filterRegistryReportRevenueByProduct = [
-  REPORT_FILTERS_LINE.STORE,
   REPORT_FILTERS_LINE.PRODUCT_TYPE,
   REPORT_FILTERS_LINE.STATISTIC_BY,
   REPORT_FILTERS_LINE.PRODUCT_GROUP,

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { ItemStorageLocationEntity } from './item-storage-location.entity';
 import { LocationEntity } from '../location/location.entity';
+import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 
 @Injectable()
@@ -14,6 +15,8 @@ export class ItemStorageLocationService {
     private readonly islRepo: Repository<ItemStorageLocationEntity>,
     @InjectRepository(LocationEntity)
     private readonly locationRepo: Repository<LocationEntity>,
+    @InjectRepository(StockBalanceEntity)
+    private readonly stockBalanceRepo: Repository<StockBalanceEntity>,
   ) {}
 
   /**
@@ -297,11 +300,22 @@ export class ItemStorageLocationService {
       where: { itemId, storageId, organizationId },
     });
     if (!mapping) return null;
-    // Location untracked (isActive=false) is not returned; the user must pick a new shelf.
+    // isActive:true filters the shelf itself (deactivated shelf → not returned).
     const location = await this.locationRepo.findOne({
       where: { id: mapping.locationId, storageId, organizationId, isActive: true },
     });
-    return location ? { locationId: location.id, code: location.code } : null;
+    if (!location) return null;
+
+    // "Ngừng theo dõi" only flips stock_balances.is_tracked, not the shelf; a
+    // mapping with no balance row yet (assigned but never received) stays
+    // usable. Same rule as InventoryLocationStockService.isBalanceTracked.
+    const balance = await this.stockBalanceRepo.findOne({
+      where: { organizationId, itemId, locationId: location.id },
+      select: { id: true, isTracked: true },
+    });
+    if (balance && !balance.isTracked) return null;
+
+    return { locationId: location.id, code: location.code };
   }
 
   async setLocation(

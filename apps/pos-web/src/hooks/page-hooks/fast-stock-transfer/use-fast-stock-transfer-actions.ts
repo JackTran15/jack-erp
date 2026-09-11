@@ -370,11 +370,13 @@ export function useFastStockTransferActions() {
               // vượt tồn của màn bán hàng — giữ 0 như `quantityOnHand`.
               sellableQuantity: 0,
               locations: (() => {
+                // Kệ của chính dòng trước, kệ của phiên chỉ là dự phòng.
                 const loc =
-                  line.direction ===
+                  line.sourceShelf ??
+                  (line.direction ===
                   TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM
                     ? line.sourceLocation
-                    : line.destinationLocation;
+                    : line.destinationLocation);
                 if (!loc) return [];
                 return [
                   {
@@ -385,7 +387,10 @@ export function useFastStockTransferActions() {
                 ];
               })(),
               defaultLocationId:
-                line.sourceLocation?.id ?? line.destinationLocation?.id ?? "",
+                line.sourceShelf?.id ??
+                line.sourceLocation?.id ??
+                line.destinationLocation?.id ??
+                "",
             } satisfies PosCatalogLine)
           : null);
 

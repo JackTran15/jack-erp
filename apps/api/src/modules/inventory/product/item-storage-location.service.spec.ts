@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ItemStorageLocationService } from './item-storage-location.service';
 import { ItemStorageLocationEntity } from './item-storage-location.entity';
 import { LocationEntity } from '../location/location.entity';
+import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 
 const actor: ActorContext = {
@@ -21,6 +22,7 @@ describe('ItemStorageLocationService', () => {
     save: jest.Mock;
   };
   let locationRepo: { findOne: jest.Mock; find: jest.Mock };
+  let stockBalanceRepo: { findOne: jest.Mock };
   let insertExecute: jest.Mock;
 
   beforeEach(async () => {
@@ -40,12 +42,14 @@ describe('ItemStorageLocationService', () => {
         execute: insertExecute,
       });
     locationRepo = { findOne: jest.fn(), find: jest.fn() };
+    stockBalanceRepo = { findOne: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ItemStorageLocationService,
         { provide: getRepositoryToken(ItemStorageLocationEntity), useValue: islRepo },
         { provide: getRepositoryToken(LocationEntity), useValue: locationRepo },
+        { provide: getRepositoryToken(StockBalanceEntity), useValue: stockBalanceRepo },
       ],
     }).compile();
 
@@ -345,7 +349,7 @@ describe('ItemStorageLocationService', () => {
       expect(result).toBeNull();
     });
 
-    it('lọc isActive: vị trí đã gán nhưng bị ngừng theo dõi → trả null', async () => {
+    it('lọc isActive của kệ: kệ bị tắt (isActive=false) → trả null', async () => {
       islRepo.findOne.mockResolvedValue({ locationId: 'loc-1' });
       // Query đã ràng buộc isActive: true nên vị trí tắt không match → null.
       locationRepo.findOne.mockResolvedValue(null);
@@ -358,6 +362,41 @@ describe('ItemStorageLocationService', () => {
           where: expect.objectContaining({ isActive: true }),
         }),
       );
+    });
+
+    it('dòng tồn của kệ đã gán isTracked=false → trả null', async () => {
+      islRepo.findOne.mockResolvedValue({ locationId: 'loc-1' });
+      locationRepo.findOne.mockResolvedValue({ id: 'loc-1', code: 'A-01' });
+      stockBalanceRepo.findOne.mockResolvedValue({ id: 'bal-1', isTracked: false });
+
+      const result = await service.resolveAssignedLocation('item-1', 'storage-1', 'org-1');
+
+      expect(result).toBeNull();
+      expect(stockBalanceRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { organizationId: 'org-1', itemId: 'item-1', locationId: 'loc-1' },
+        }),
+      );
+    });
+
+    it('dòng tồn của kệ đã gán isTracked=true → trả kệ', async () => {
+      islRepo.findOne.mockResolvedValue({ locationId: 'loc-1' });
+      locationRepo.findOne.mockResolvedValue({ id: 'loc-1', code: 'A-01' });
+      stockBalanceRepo.findOne.mockResolvedValue({ id: 'bal-1', isTracked: true });
+
+      const result = await service.resolveAssignedLocation('item-1', 'storage-1', 'org-1');
+
+      expect(result).toEqual({ locationId: 'loc-1', code: 'A-01' });
+    });
+
+    it('chưa có dòng tồn cho kệ đã gán → vẫn trả kệ', async () => {
+      islRepo.findOne.mockResolvedValue({ locationId: 'loc-1' });
+      locationRepo.findOne.mockResolvedValue({ id: 'loc-1', code: 'A-01' });
+      stockBalanceRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.resolveAssignedLocation('item-1', 'storage-1', 'org-1');
+
+      expect(result).toEqual({ locationId: 'loc-1', code: 'A-01' });
     });
   });
 
