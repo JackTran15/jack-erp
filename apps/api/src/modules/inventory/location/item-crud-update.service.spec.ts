@@ -174,6 +174,41 @@ describe('InventoryItemCrudService.update (nested reconcile)', () => {
     );
   });
 
+  it('AC-02: passes purchasePrice/sellingPrice through to repo.merge while dropping derived fields for a standalone item', async () => {
+    await service.update(
+      'item-1',
+      {
+        name: 'Item',
+        categoryName: 'Nhóm A',
+        purchasePrice: 110000,
+        sellingPrice: 200000,
+      } as any,
+      actor,
+    );
+
+    expect(repo.merge).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ purchasePrice: 110000, sellingPrice: 200000 }),
+    );
+    expect(repo.merge).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({ categoryName: expect.anything() }),
+    );
+  });
+
+  it('AC-02: passes zero purchasePrice/sellingPrice through to repo.merge as 0, not undefined', async () => {
+    await service.update(
+      'item-1',
+      { purchasePrice: 0, sellingPrice: 0 } as any,
+      actor,
+    );
+
+    expect(repo.merge).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ purchasePrice: 0, sellingPrice: 0 }),
+    );
+  });
+
   it('hydrates initial stock fields from the opening stock ledger entry', async () => {
     dataSource.query.mockResolvedValueOnce([
       {
