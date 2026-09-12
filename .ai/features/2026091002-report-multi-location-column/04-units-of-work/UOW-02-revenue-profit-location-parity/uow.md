@@ -31,14 +31,14 @@ file báo cáo đó và ghi lại lý do.
 1. Dùng chính chi nhánh và mặt hàng A đã dựng ở demo của UOW-01 (kệ ở hai kho `A1`, `A2`).
 2. Tạo một hoá đơn bán mặt hàng A để ba báo cáo có dữ liệu.
 3. Mở Báo cáo > Chi tiết doanh thu theo mặt hàng, bật cột vị trí → cột mã hiện `A101, A201`,
-   cột tên hiện `Kho A1-Kệ A101, Kho A2-Kệ A201`.
+   cột tên hiện `Kệ A101, Kệ A201`.
 4. Mở Báo cáo > Doanh thu theo mặt hàng → cột "Mã vị trí" hiện `A101, A201`, cột "Tên vị trí"
-   hiện `Kho A1-Kệ A101, Kho A2-Kệ A201` (sửa 2026-09-12: hai cột không còn giống nhau).
+   hiện `Kệ A101, Kệ A201` (sửa lần hai 2026-09-12, ADR-06: ô tên bỏ nốt tên kho).
 5. Mở Báo cáo > Lợi nhuận theo mặt hàng → cột vị trí hiện `A101, A201` (báo cáo này lấy `loc.code`).
 6. Lấy một mặt hàng chỉ còn tồn ở showroom → ô vị trí ở cả ba báo cáo **để trống**, khác với
    Tổng hợp nhập xuất tồn kho (nơi nó hiện kệ showroom).
 7. Xem cả ba báo cáo trên khung nhìn 1440x900 → ô **tên** vị trí của mặt hàng A hiện trọn
-   `Kho A1-Kệ A101, Kho A2-Kệ A201`, không bị cắt.
+   `Kệ A101, Kệ A201`, không bị cắt (chuỗi nay ngắn hơn lúc T-02-03 đo, nên `220` dư).
 
 ## In scope
 
@@ -68,6 +68,7 @@ file báo cáo đó và ghi lại lý do.
       mặt hàng" và "Chi tiết doanh thu" có ô mã (`S01.01, A01.01`)
 - [x] Ô vị trí của ba báo cáo này để trống với mặt hàng chỉ ở showroom
 - [x] Nếu có báo cáo nào phải sửa mã sản phẩm, lý do được ghi vào ticket tương ứng — không báo cáo nào phải sửa (T-02-04)
-- [x] `pnpm --filter @erp/api test` xanh — 4663/4669; ba suite đỏ sẵn có, không liên quan (xem DoD của UOW-01)
+- [x] `pnpm --filter @erp/api test` xanh — chạy lại 12/09/2026 sau T-02-05: 4664/4670; ba suite đỏ sẵn có, không liên quan (xem DoD của UOW-01)
 - [x] AC-13 pass: ô vị trí ở ba báo cáo hiện trọn chuỗi hai cặp trên khung nhìn 1440x900 — đo cả ba ngày 12/09/2026,
       bảng số đo ở T-02-04; dữ liệu hai kệ phải dựng bằng một hoá đơn thử ở KHO SG, đã xoá sau khi đo
+- [x] ADR-06 (2026-09-12): kỳ vọng `locationName` của hai spec báo cáo doanh thu bỏ tiền tố tên kho — T-02-05

@@ -34,10 +34,19 @@ const columns: ReportColumnConfig[] = [
     // Chỉ áp dụng ở "Thống kê theo" = Hàng hoá (statBy=item) — BE bỏ cột này
     // khỏi catalog ở grain Mẫu mã/Nhóm hàng hóa (1 dòng gộp nhiều item, không
     // có 1 vị trí duy nhất). Registry này chỉ là fallback dự phòng.
+    column: ReportTableColumn.LOCATION_STORAGE,
+    backendField: "locationStorage",
+    label: "Kho",
+    order: 4,
+    visible: true,
+    tableConfig: { width: 220, align: "left", dataType: "text" },
+  },
+  {
+    // Cùng điều kiện với cột "Kho" ở trên — BE loại cả hai ở grain Mẫu mã.
     column: ReportTableColumn.LOCATION,
     backendField: "location",
     label: "Vị trí",
-    order: 4,
+    order: 5,
     visible: true,
     tableConfig: { width: 220, align: "left", dataType: "text" },
   },
@@ -45,7 +54,7 @@ const columns: ReportColumnConfig[] = [
     column: ReportTableColumn.QUANTITY_SOLD,
     backendField: "quantity",
     label: "Số lượng bán",
-    order: 5,
+    order: 6,
     number: 1,
     visible: true,
     tableConfig: { width: 110 },
@@ -54,7 +63,7 @@ const columns: ReportColumnConfig[] = [
     column: ReportTableColumn.REVENUE_TOTAL,
     backendField: "revenue",
     label: "Doanh thu",
-    order: 6,
+    order: 7,
     number: 3,
     visible: true,
     tableConfig: { width: 130 },
@@ -62,7 +71,7 @@ const columns: ReportColumnConfig[] = [
   {
     column: ReportTableColumn.COST_OF_GOODS,
     backendField: "costOfGoods",
-    order: 7,
+    order: 8,
     number: 5,
     visible: true,
     tableConfig: { width: 130 },
@@ -70,7 +79,7 @@ const columns: ReportColumnConfig[] = [
   {
     column: ReportTableColumn.GROSS_PROFIT,
     backendField: "grossProfit",
-    order: 8,
+    order: 9,
     number: 6,
     formulaDisplay: "(6)=(3)-(5)",
     visible: true,
@@ -79,7 +88,7 @@ const columns: ReportColumnConfig[] = [
   {
     column: ReportTableColumn.PROFIT_PER_UNIT,
     backendField: "profitPerUnit",
-    order: 9,
+    order: 10,
     number: 7,
     formulaDisplay: "(7)=(6)/(1)",
     visible: true,
@@ -88,7 +97,7 @@ const columns: ReportColumnConfig[] = [
   {
     column: ReportTableColumn.MARGIN_ON_REVENUE,
     backendField: "marginOnRevenue",
-    order: 10,
+    order: 11,
     number: 8,
     formulaDisplay: "(8)=(6)/(3)",
     visible: true,
@@ -97,7 +106,7 @@ const columns: ReportColumnConfig[] = [
   {
     column: ReportTableColumn.MARGIN_ON_COST,
     backendField: "marginOnCost",
-    order: 11,
+    order: 12,
     number: 9,
     formulaDisplay: "(9)=(6)/(5)",
     visible: true,
@@ -107,7 +116,7 @@ const columns: ReportColumnConfig[] = [
     column: ReportTableColumn.PRODUCT_GROUP,
     backendField: "categoryName",
     label: "Tên nhóm hàng hóa",
-    order: 12,
+    order: 13,
     visible: true,
     tableConfig: { width: 150, align: "left", dataType: "text" },
   },

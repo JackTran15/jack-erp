@@ -61,6 +61,7 @@ const COLUMNS: InventoryColumnDef[] = [
   { key: 'sku', type: STRING, width: 140 },
   // Reference-only: resolved live from the item's current shelf rather than
   // aggregated from the ledger, so there is nothing for SQL to filter on.
+  { key: 'positionStorage', type: STRING, filterKind: 'none', width: 220 },
   { key: 'positionCode', type: STRING, filterKind: 'none', width: 220 },
   { key: 'positionName', type: STRING, filterKind: 'none', width: 320 },
   { key: 'openingQty', type: NUMBER, band: 'opening', width: 110 },
@@ -89,7 +90,7 @@ const CATALOG_KEYS = new Set(COLUMNS.map((c) => c.key));
  * will always be blank. `CATALOG_KEYS` still lists them — a template saved in the
  * branch view must keep replaying without a 400.
  */
-const LOCATION_COLUMN_KEYS = ['positionCode', 'positionName'];
+const LOCATION_COLUMN_KEYS = ['positionStorage', 'positionCode', 'positionName'];
 
 /**
  * Which identity columns survive each "Thống kê theo" grain.
@@ -134,7 +135,7 @@ const IDENTITY_KEYS = COLUMNS.filter((c) => !c.band).map((c) => c.key);
  * `supplier` and the four transfer columns, which UOW-03 gave SQL expressions of
  * their own.
  *
- * `positionCode`/`positionName` are deliberately absent: they no longer come
+ * `positionStorage`/`positionCode`/`positionName` are deliberately absent: they no longer come
  * from the ledger at all, so mapping them onto the engine's `locationCode` would
  * point a filter at a column the query does not select. They are declared
  * `filterKind: 'none'` for the same reason.
@@ -375,6 +376,7 @@ export class StockSummaryReport implements InventoryReportDefinition {
       group: r.categoryName,
       brand: r.brand ?? null,
       sku: r.sku,
+      positionStorage: location?.storage ?? null,
       positionCode: location?.code ?? null,
       positionName: location?.name ?? null,
       openingQty: r.openingQty,

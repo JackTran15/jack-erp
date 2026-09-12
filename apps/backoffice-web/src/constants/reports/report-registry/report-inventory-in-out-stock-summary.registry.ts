@@ -121,11 +121,22 @@ const columns: ReportColumnConfig[] = [
   },
   // Vị trí là cột tham chiếu: BE phân giải từ kệ hiện tại của hàng, không nằm
   // trong câu truy vấn nên không lọc được (khớp filterKind "none" của catalog).
+  // Ba cột đọc song song: Kho → Mã vị trí → Tên vị trí, cùng một thứ tự kệ.
+  // "Kho" khử trùng (một hàng thường nằm nhiều kệ cùng kho), "Mã vị trí" khử
+  // trùng theo mã, "Tên vị trí" giữ đủ mọi kệ — nên ba ô có thể lệch số mục.
+  {
+    column: "positionStorage",
+    backendField: "positionStorage",
+    label: "Kho",
+    order: 10,
+    visible: true,
+    tableConfig: { width: 220, dataType: "text", filterKind: "none" },
+  },
   {
     column: "positionCode",
     backendField: "positionCode",
     label: "Mã vị trí",
-    order: 10,
+    order: 11,
     visible: true,
     tableConfig: { width: 220, dataType: "text", filterKind: "none" },
   },
@@ -133,28 +144,28 @@ const columns: ReportColumnConfig[] = [
     column: "positionName",
     backendField: "positionName",
     label: "Tên vị trí",
-    order: 11,
+    order: 12,
     visible: true,
     // 320, không phải 220 như cột mã: ô này giữ "TênKho-TênVịTrí" cho từng kệ.
     tableConfig: { width: 320, dataType: "text", filterKind: "none" },
   },
-  qty("openingQty", GROUP.OPENING, 12),
-  value("openingValue", GROUP.OPENING, 13),
-  qty("inQty", GROUP.IN, 14),
-  value("inValue", GROUP.IN, 15),
-  qty("outQty", GROUP.OUT, 16),
-  value("outValue", GROUP.OUT, 17),
-  qty("endingQty", GROUP.ENDING, 18),
-  value("endingValue", GROUP.ENDING, 19, 140),
-  qty("transferOutQty", GROUP.TRANSFER_OUT, 20),
-  value("transferOutValue", GROUP.TRANSFER_OUT, 21),
-  qty("incomingQty", GROUP.INCOMING, 22),
-  value("incomingValue", GROUP.INCOMING, 23),
+  qty("openingQty", GROUP.OPENING, 13),
+  value("openingValue", GROUP.OPENING, 14),
+  qty("inQty", GROUP.IN, 15),
+  value("inValue", GROUP.IN, 16),
+  qty("outQty", GROUP.OUT, 17),
+  value("outValue", GROUP.OUT, 18),
+  qty("endingQty", GROUP.ENDING, 19),
+  value("endingValue", GROUP.ENDING, 20, 140),
+  qty("transferOutQty", GROUP.TRANSFER_OUT, 21),
+  value("transferOutValue", GROUP.TRANSFER_OUT, 22),
+  qty("incomingQty", GROUP.INCOMING, 23),
+  value("incomingValue", GROUP.INCOMING, 24),
   {
     column: "supplier",
     backendField: "supplier",
     label: "Nhà cung cấp",
-    order: 24,
+    order: 25,
     visible: true,
     tableConfig: { width: 160, dataType: "text" },
   },
@@ -171,7 +182,10 @@ export const chain_tableRegistryReportInventoryInOutStockSummary: ReportTableCon
   {
     ...tableConfig,
     columns: columns.filter(
-      (c) => c.column !== "positionCode" && c.column !== "positionName",
+      (c) =>
+        c.column !== "positionStorage" &&
+        c.column !== "positionCode" &&
+        c.column !== "positionName",
     ),
   };
 

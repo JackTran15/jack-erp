@@ -19,10 +19,14 @@ const actor = {
   roles: [],
 } as any;
 
+// ADR-07 adds "Kho" ahead of the location pair. The reference MISA file has no
+// warehouse column, so there is no parity position to match — it leads the
+// location block, same as in the other three reports.
 const MISA_HEADER_LABELS = [
   'Mã SKU',
   'Tên hàng hóa',
   'Đơn vị tính',
+  'Kho',
   'Mã vị trí',
   'Tên vị trí',
   'Số lượng bán',
@@ -139,7 +143,7 @@ describe('revenue-by-item end-to-end export (catalog → payload → workbook)',
   // the SAME path as the real /reports/invoices/export route: catalog →
   // resolveColumns → XlsxStreamWriter, with subtitleLines composed the same
   // way GetInvoiceReportDocumentHandler.execute does after T-04-02.
-  it('produces the 14-column MISA header, formula notation, and the parameter line', async () => {
+  it('produces the 15-column MISA header, formula notation, and the parameter line', async () => {
     const registry = new ReportRegistry([makeReport() as any]);
     const exportService = makeExportService();
     const paramsBuilder = makeParamsBuilder();
@@ -172,7 +176,7 @@ describe('revenue-by-item end-to-end export (catalog → payload → workbook)',
     //
     // AC-36 (2026-08-01) added the band row: five consecutive columns here carry
     // the "Doanh thu" band, so the header is now two rows — band on 8, labels on
-    // 9. That is a deliberate departure from the flat 14-cell header of the MISA
+    // 9. That is a deliberate departure from the flat header of the MISA
     // reference, taken so the exported file matches the two-tier header the user
     // sees on screen. Akenzy chose this over keeping MISA parity, 2026-08-01.
     const BAND_ROW = 8;
@@ -180,23 +184,24 @@ describe('revenue-by-item end-to-end export (catalog → payload → workbook)',
     const DATA_ROW = HEADER_ROW + 1;
     const TOTALS_ROW = DATA_ROW + 1;
 
-    // AC-36: the band spans exactly the five revenue columns, H..L.
-    expect(sheet.getCell(`H${BAND_ROW}`).value).toBe('Doanh thu');
+    // AC-36: the band spans exactly the five revenue columns — I..M since
+    // ADR-07 inserted "Kho" ahead of them, one column to the right of H..L.
+    expect(sheet.getCell(`I${BAND_ROW}`).value).toBe('Doanh thu');
     expect(
       ((sheet.model as unknown as { merges?: string[] }).merges ?? []),
-    ).toContain(`H${BAND_ROW}:L${BAND_ROW}`);
+    ).toContain(`I${BAND_ROW}:M${BAND_ROW}`);
 
-    // AC-01: still 14 columns in MISA order — the band adds a row, not a column.
+    // AC-01: 15 columns in MISA order + "Kho" — the band adds a row, not a column.
     const headerRow = sheet.getRow(HEADER_ROW);
     const headerValues = (headerRow.values as unknown[]).slice(1) as string[];
-    expect(headerValues.length).toBe(14);
+    expect(headerValues.length).toBe(15);
     for (const [i, expected] of MISA_HEADER_LABELS.entries()) {
       expect(headerValues[i].split('\n')[0]).toBe(expected);
     }
 
     // AC-04 / AC-08: formula notation on the 2nd line of the measure columns' cells.
-    expect(sheet.getCell(`G${HEADER_ROW}`).value).toBe('Đơn giá TB\n(2)=(3)/(1)');
-    expect(sheet.getCell(`L${HEADER_ROW}`).value).toBe('Doanh thu\n(6)=(3)-(4)-(9)');
+    expect(sheet.getCell(`H${HEADER_ROW}`).value).toBe('Đơn giá TB\n(2)=(3)/(1)');
+    expect(sheet.getCell(`M${HEADER_ROW}`).value).toBe('Doanh thu\n(6)=(3)-(4)-(9)');
     // Unbanded columns merge down through both rows, so A9 echoes A8's master.
     expect(sheet.getCell(`A${HEADER_ROW}`).value).toBe('Mã SKU');
     expect(sheet.getCell(`A${HEADER_ROW}`).value as string).not.toContain('\n');
@@ -217,9 +222,9 @@ describe('revenue-by-item end-to-end export (catalog → payload → workbook)',
 
     // Footer totals: averages/percent are null, sums are numbers.
     const totalsRow = sheet.getRow(TOTALS_ROW);
-    expect(totalsRow.getCell(7).value).toBeNull(); // unitPrice (G) — average, no sum
-    expect(totalsRow.getCell(11).value).toBeNull(); // promoRate (K) — percent, no sum
-    expect(totalsRow.getCell(6).value).toBe(3); // quantity (F)
-    expect(totalsRow.getCell(12).value).toBe(2250000); // revenue.total (L)
+    expect(totalsRow.getCell(8).value).toBeNull(); // unitPrice (H) — average, no sum
+    expect(totalsRow.getCell(12).value).toBeNull(); // promoRate (L) — percent, no sum
+    expect(totalsRow.getCell(7).value).toBe(3); // quantity (G)
+    expect(totalsRow.getCell(13).value).toBe(2250000); // revenue.total (M)
   });
 });

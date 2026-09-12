@@ -29,6 +29,7 @@ export const PROFIT_REPORT_COLUMN_LABELS_VI: Record<string, string> = {
   skuCode: 'Mã SKU',
   itemName: 'Tên hàng hóa',
   unit: 'Đơn vị tính',
+  locationStorage: 'Kho',
   location: 'Vị trí',
   quantity: 'Số lượng bán',
   profitPerUnit: 'Lợi nhuận đơn vị',

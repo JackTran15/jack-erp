@@ -273,14 +273,15 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
     });
     const result = await report.buildData(
       {
-        columns: ['sku', 'locationCode', 'locationName'],
+        columns: ['sku', 'locationStorage', 'locationCode', 'locationName'],
         filters: { issuedAt: { from: '2026-06-01', to: '2026-06-30' } },
       } as any,
       actor,
     );
     expect(result.rows[0]).toMatchObject({
       locationCode: 'A-01',
-      locationName: 'Kho A1-Kệ A1',
+      locationStorage: 'Kho A1',
+      locationName: 'Kệ A1',
     });
   });
 
@@ -304,14 +305,15 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
     });
     const result = await report.buildData(
       {
-        columns: ['sku', 'locationCode', 'locationName'],
+        columns: ['sku', 'locationStorage', 'locationCode', 'locationName'],
         filters: { issuedAt: { from: '2026-06-01', to: '2026-06-30' } },
       } as any,
       actor,
     );
     expect(result.rows[0]).toMatchObject({
       locationCode: 'A101, A201',
-      locationName: 'Kho A1-Kệ A101, Kho A2-Kệ A201',
+      locationStorage: 'Kho A1, Kho A2',
+      locationName: 'Kệ A101, Kệ A201',
     });
   });
 
@@ -383,7 +385,7 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
 
     const result = await report.buildData(
       {
-        columns: ['invoiceCode', 'sku', 'locationCode', 'locationName'],
+        columns: ['invoiceCode', 'sku', 'locationStorage', 'locationCode', 'locationName'],
         filters: {
           issuedAt: { from: '2026-06-01', to: '2026-06-30' },
           store: { scope: 'all', storeIds: [] },
@@ -395,11 +397,13 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
     const byInvoice = new Map(result.rows.map((r: any) => [r.invoiceCode, r]));
     expect(byInvoice.get('HD000001')).toMatchObject({
       locationCode: 'K1',
-      locationName: 'Kho CN1-Kệ CN1',
+      locationStorage: 'Kho CN1',
+      locationName: 'Kệ CN1',
     });
     expect(byInvoice.get('HD000002')).toMatchObject({
       locationCode: 'K2',
-      locationName: 'Kho CN2-Kệ CN2',
+      locationStorage: 'Kho CN2',
+      locationName: 'Kệ CN2',
     });
   });
 
@@ -413,12 +417,12 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
     });
     const result = await report.buildData(
       {
-        columns: ['sku', 'locationCode', 'locationName'],
+        columns: ['sku', 'locationStorage', 'locationCode', 'locationName'],
         filters: { issuedAt: { from: '2026-06-01', to: '2026-06-30' } },
       } as any,
       actor,
     );
-    expect(result.rows[0]).toMatchObject({ locationCode: null, locationName: null });
+    expect(result.rows[0]).toMatchObject({ locationStorage: null, locationCode: null, locationName: null });
   });
 
   it('leaves the location empty for an item stocked only on the showroom (AC-08)', async () => {
@@ -434,12 +438,12 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
     });
     const result = await report.buildData(
       {
-        columns: ['sku', 'locationCode', 'locationName'],
+        columns: ['sku', 'locationStorage', 'locationCode', 'locationName'],
         filters: { issuedAt: { from: '2026-06-01', to: '2026-06-30' } },
       } as any,
       actor,
     );
-    expect(result.rows[0]).toMatchObject({ locationCode: null, locationName: null });
+    expect(result.rows[0]).toMatchObject({ locationStorage: null, locationCode: null, locationName: null });
   });
 
   it('applies a per-column filter post-build and recomputes totals', async () => {

@@ -22,9 +22,11 @@ describe('REPORT_COLUMN_WIDTHS', () => {
     expect(reportColumnWidth('documentNumber')).toBe(130);
   });
 
-  // Since ADR-05 the code columns hold bare location codes and the name column
-  // holds "TênKho-TênVịTrí" per shelf, so the name column alone needs the room.
-  it('sizes the location code columns at 220 and the name column at 320', () => {
+  // ADR-07 gave the warehouse a column of its own, so the name column no longer
+  // carries a "TênKho-" prefix. ADR-08: all four are re-measured together in
+  // T-03-04; these are the 12/09/2026 numbers, now generous rather than tight.
+  it('sizes the location columns', () => {
+    expect(reportColumnWidth('locationStorage')).toBe(220);
     expect(reportColumnWidth('location')).toBe(220);
     expect(reportColumnWidth('locationCode')).toBe(220);
     expect(reportColumnWidth('locationName')).toBe(320);
