@@ -39,3 +39,6 @@ graphify-out
 .ai/features/*/08-evidence.md
 .ai/features/*/evidence/
 
+
+# macOS
+.DS_Store

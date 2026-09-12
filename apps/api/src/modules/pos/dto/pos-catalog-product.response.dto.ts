@@ -58,6 +58,14 @@ export class PosVariantLocationDto {
 }
 
 /** A branch storage holding stock of a variant, for the storage-breakdown tooltip. */
+/** One other branch's holding of an item, plus the storages it sits in. */
+export class PosBranchStockDto {
+  @ApiProperty({ format: 'uuid' }) branchId: string;
+  @ApiProperty() name: string;
+  @ApiProperty() quantity: number;
+  @ApiProperty({ type: () => [PosVariantStorageDto] }) storages: PosVariantStorageDto[];
+}
+
 export class PosVariantStorageDto {
   @ApiProperty({ format: 'uuid' }) storageId: string;
   @ApiProperty() name: string;
@@ -110,6 +118,15 @@ export class PosProductVariantDto {
       'storage included (even 0 balance), sorted with the main showroom first.',
   })
   storages: PosVariantStorageDto[];
+  @ApiProperty({
+    type: [PosBranchStockDto],
+    description:
+      '`otherBranchQuantity` kept split by branch instead of collapsed, each with the storages ' +
+      'the stock sits in. Only branches that actually HOLD the item appear — the current ' +
+      "branch's `storages` list keeps 0-balance entries, this one does not, because the two " +
+      'answer different questions ("where in this store" vs "which store has it").',
+  })
+  otherBranches: PosBranchStockDto[];
 }
 
 /** An attribute dimension of a product and its available option labels. */

@@ -98,12 +98,31 @@ type VariantStorageStock = {
  * — the current branch's per-storage breakdown — is added by T-02-01 on this same type;
  * wiring it into `PosProductVariantDto` is T-02-02.
  */
+/** One other branch's on-hand for an item, plus the storages it sits in. */
+type BranchStock = {
+  branchId: string;
+  name: string;
+  quantity: number;
+  storages: VariantStorageStock[];
+};
+
 type VariantStockExtras = {
   /** Raw balance at the branch's main showroom storage (`showrooms.is_main_showroom`).
    * Not floored at 0, does not include temp-warehouse staging — see ADR-01/ADR-02. */
   mainShowroomQuantity: number;
   /** Total on-hand across every other ACTIVE branch's active storages. */
   otherBranchQuantity: number;
+  /**
+   * The same total, kept SPLIT BY BRANCH instead of collapsed.
+   *
+   * Added 2026-09-11 for the sales app's item-detail screen, which lists every other store and
+   * drills into that store's storages. No extra query pays for it: the balance lookup below
+   * already runs unscoped by branch, and every active storage is already loaded — the previous
+   * code simply summed and threw the branch dimension away.
+   *
+   * Only ACTIVE branches appear, same rule as `otherBranchQuantity`, so the two always agree.
+   */
+  otherBranches: BranchStock[];
   /**
    * Every active storage of the current branch, including ones with a 0 balance for this
    * item (A-07). Sorted with the main showroom first, then by name (A-10).
@@ -689,6 +708,7 @@ export class PosCatalogProductService {
       mainShowroomQuantity: extras?.mainShowroomQuantity ?? 0,
       otherBranchQuantity: extras?.otherBranchQuantity ?? 0,
       storages: extras?.storages ?? [],
+      otherBranches: extras?.otherBranches ?? [],
     };
   }
 
@@ -920,8 +940,9 @@ export class PosCatalogProductService {
     const locationIds = [...new Set(balances.map((b) => b.locationId))];
     const [activeBranches, storages, mainShowroom, locations] = await Promise.all([
       this.branchRepo.find({
+        // `name` joins `id` so the per-branch breakdown can be labelled without a second lookup.
         where: { organizationId: orgId, status: BranchStatus.ACTIVE },
-        select: ['id'],
+        select: ['id', 'name'],
       }),
       this.storageRepo.find({
         where: { organizationId: orgId, isActive: true },
@@ -939,6 +960,7 @@ export class PosCatalogProductService {
     ]);
 
     const activeBranchIds = new Set(activeBranches.map((b) => b.id));
+    const branchNameById = new Map(activeBranches.map((b) => [b.id, b.name]));
     const storagesById = new Map(storages.map((s) => [s.id, s]));
     const mainShowroomStorageId = mainShowroom?.storageId ?? null;
     const locById = new Map(locations.map((l) => [l.id, l]));
@@ -946,6 +968,9 @@ export class PosCatalogProductService {
     const currentBranchStorages = storages.filter((s) => s.branchId === branchId);
 
     const storageTotalsByItem = new Map<string, Map<string, number>>();
+    // itemId -> branchId -> storageId -> qty. Filled in the same pass that sums
+    // `otherBranchQuantity`, so the two can never disagree.
+    const otherBranchTotalsByItem = new Map<string, Map<string, Map<string, number>>>();
 
     for (const b of balances) {
       const loc = locById.get(b.locationId);
@@ -958,7 +983,7 @@ export class PosCatalogProductService {
       const qty = Number(b.quantity) || 0;
       let extras = map.get(b.itemId);
       if (!extras) {
-        extras = { mainShowroomQuantity: 0, otherBranchQuantity: 0, storages: [] };
+        extras = { mainShowroomQuantity: 0, otherBranchQuantity: 0, storages: [], otherBranches: [] };
         map.set(b.itemId, extras);
       }
 
@@ -971,6 +996,12 @@ export class PosCatalogProductService {
         storageTotalsByItem.set(b.itemId, totals);
       } else if (storage.branchId && activeBranchIds.has(storage.branchId)) {
         extras.otherBranchQuantity += qty;
+
+        const byBranch = otherBranchTotalsByItem.get(b.itemId) ?? new Map<string, Map<string, number>>();
+        const byStorage = byBranch.get(storage.branchId) ?? new Map<string, number>();
+        byStorage.set(storage.id, (byStorage.get(storage.id) ?? 0) + qty);
+        byBranch.set(storage.branchId, byStorage);
+        otherBranchTotalsByItem.set(b.itemId, byBranch);
       }
     }
 
@@ -979,6 +1010,7 @@ export class PosCatalogProductService {
         mainShowroomQuantity: 0,
         otherBranchQuantity: 0,
         storages: [],
+        otherBranches: [],
       };
       const totals = storageTotalsByItem.get(itemId);
       extras.storages = currentBranchStorages
@@ -994,6 +1026,27 @@ export class PosCatalogProductService {
           }
           return a.name.localeCompare(b.name, 'vi');
         });
+      // Unlike the current branch's storages, a branch with NO balance at all is left out
+      // entirely: listing every store in the company with a 0 would bury the few that
+      // actually have the item, which is the only question this list answers.
+      extras.otherBranches = [...(otherBranchTotalsByItem.get(itemId) ?? new Map()).entries()]
+        .map(([branchId, byStorage]) => ({
+          branchId,
+          name: branchNameById.get(branchId) ?? '',
+          quantity: [...byStorage.values()].reduce((sum, qty) => sum + qty, 0),
+          storages: [...byStorage.entries()]
+            .map(([storageId, quantity]) => ({
+              storageId,
+              name: storagesById.get(storageId)?.name ?? '',
+              quantity,
+              // A main showroom belongs to ITS OWN branch; from over here the flag has no
+              // meaning, so it is always false rather than misleadingly true.
+              isMainShowroom: false,
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name, 'vi')),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+
       map.set(itemId, extras);
     }
 
