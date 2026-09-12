@@ -26,6 +26,42 @@ const MOBILE_STATUS_TO_INVOICE: Record<MobileInvoiceStatusFilter, InvoiceStatus[
   cancelled: [InvoiceStatus.CANCELLED],
 };
 
+const INVOICE_NUMERIC_FIELDS = [
+  'subtotal',
+  'discountAmount',
+  'pointsDiscountAmount',
+  'depositAmount',
+  'amountDue',
+  'totalPaid',
+  'refundedAmount',
+  'netAmount',
+  'offsetAmount',
+  'keptChangeAmount',
+] as const;
+const ITEM_NUMERIC_FIELDS = [
+  'quantity',
+  'unitPrice',
+  'unitPriceDefault',
+  'costPrice',
+  'lineDiscount',
+  'lineDiscountValue',
+  'promotionDiscount',
+  'lineTotal',
+  'returnedQuantity',
+] as const;
+const PAYMENT_NUMERIC_FIELDS = ['amount'] as const;
+
+/** `null`/`undefined` giữ nguyên — vắng là ca hợp lệ, không phải `0`. */
+function numbersOf<T extends object, K extends keyof T>(source: T, keys: readonly K[]): Partial<Record<K, number | null>> {
+  const out: Partial<Record<K, number | null>> = {};
+  for (const key of keys) {
+    const value = source[key] as unknown;
+    if (value === null || value === undefined) continue;
+    out[key] = Number(value);
+  }
+  return out;
+}
+
 @Injectable()
 export class MobileInvoiceService {
   constructor(
@@ -107,9 +143,18 @@ export class MobileInvoiceService {
       throw new NotFoundException(`Invoice ${id} not found`);
     }
 
-    return Object.assign(invoice, {
+    // Cột `numeric` của TypeORM về dưới dạng CHUỖI ("650000.00"). Danh sách đã
+    // đi qua `SearchInvoicesV2Handler` (có `Number()`), còn đường này trả thẳng
+    // entity nên app phải tự cứu và bắn một cảnh báo `[parse]` cho MỖI trường,
+    // mỗi lượt mở tờ hoá đơn (Loc thấy 2026-09-12). Ép về số ở đây, đúng một
+    // chỗ, cho cùng hợp đồng với danh sách.
+    return {
+      ...invoice,
+      ...numbersOf(invoice, INVOICE_NUMERIC_FIELDS),
+      items: invoice.items.map((item) => ({ ...item, ...numbersOf(item, ITEM_NUMERIC_FIELDS) })),
+      payments: invoice.payments.map((payment) => ({ ...payment, ...numbersOf(payment, PAYMENT_NUMERIC_FIELDS) })),
       salespersonName: await this.salespersonNameOf(invoice.salespersonId, actor),
-    });
+    };
   }
 
   /**

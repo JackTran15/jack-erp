@@ -29,7 +29,7 @@ describe('MobileInvoiceService', () => {
     salespersonUser,
   }: {
     profileId?: string;
-    invoice?: { id: string; salespersonId?: string };
+    invoice?: { id: string; salespersonId?: string; items?: unknown[]; payments?: unknown[]; [key: string]: unknown };
     /** `users` row đứng sau `salespersonId` của HOÁ ĐƠN. */
     salespersonUser?: { firstName: string; lastName: string } | null;
   }) {
@@ -48,7 +48,7 @@ describe('MobileInvoiceService', () => {
         salespersonUser === undefined ? null : { id: options.where.id, user: salespersonUser },
       );
     });
-    const findOneWithItems = jest.fn().mockResolvedValue(invoice);
+    const findOneWithItems = jest.fn().mockResolvedValue(invoice ? { items: [], payments: [], ...invoice } : invoice);
     const service = new MobileInvoiceService(
       { execute } as never,
       { findOneWithItems } as never,
@@ -171,6 +171,32 @@ describe('MobileInvoiceService', () => {
       });
 
       await expect(service.getById('inv-1', actor)).resolves.toMatchObject({ id: 'inv-1' });
+    });
+
+    it('ép cột numeric (chuỗi từ TypeORM) về SỐ ở cả hoá đơn, dòng hàng và thanh toán', async () => {
+      // Danh sách đã trả số; đường này trả thẳng entity nên app phải cứu từng
+      // trường và bắn một cảnh báo `[parse]` mỗi trường, mỗi lượt mở (Loc thấy
+      // 2026-09-12). Giữ `null` là `null`: vắng không phải `0`.
+      const { service } = build({
+        profileId: 'profile-9',
+        invoice: {
+          id: 'inv-1',
+          salespersonId: 'profile-9',
+          subtotal: '650000.00',
+          amountDue: '650000.00',
+          keptChangeAmount: null,
+          items: [{ quantity: '1.00', unitPrice: '650000.00', lineTotal: '650000.00', lineDiscountValue: null }],
+          payments: [{ amount: '200000.00' }],
+        },
+      });
+
+      await expect(service.getById('inv-1', actor)).resolves.toMatchObject({
+        subtotal: 650000,
+        amountDue: 650000,
+        keptChangeAmount: null,
+        items: [{ quantity: 1, unitPrice: 650000, lineTotal: 650000, lineDiscountValue: null }],
+        payments: [{ amount: 200000 }],
+      });
     });
 
     it('hoá đơn của NGƯỜI KHÁC → 404, không phải 403', async () => {
