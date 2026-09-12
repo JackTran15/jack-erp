@@ -1,7 +1,7 @@
 ---
 feature: report-multi-location-column
 stories: 3
-acceptance_criteria: 13
+acceptance_criteria: 14
 ---
 
 # Requirements — Cột "Vị trí" liệt kê đủ mọi kho–vị trí
@@ -21,18 +21,22 @@ Là nhân viên kho, tôi muốn thấy **mọi** kho–vị trí mà một mặ
 Given mặt hàng A có kệ ưu tiên A101 ở kho lưu trữ mã "A1" và kệ ưu tiên A201 ở kho lưu trữ mã "A2"
   And cả hai kho đều đang hoạt động và thuộc chi nhánh đang xem
 When tôi mở báo cáo Tổng hợp nhập xuất tồn kho ở chế độ một chi nhánh
-Then ô "Mã vị trí" của mặt hàng A hiển thị "A1-A101, A2-A201"
+Then ô "Mã vị trí" của mặt hàng A hiển thị "A101, A201"
   And ô "Tên vị trí" hiển thị "<tên kho A1>-<tên kệ A101>, <tên kho A2>-<tên kệ A201>"
 ```
+> Sửa ngày 2026-09-12 khi mở lại G2 (A-03 đảo): bản trước yêu cầu ô "Mã vị trí" hiển thị
+> "A1-A101, A2-A201". Tên kho nay chỉ còn ở cột "Tên vị trí".
 
-**AC-02** — Một kệ duy nhất vẫn được gắn tiền tố kho
+**AC-02** — Một kệ duy nhất: ô mã chỉ có mã vị trí
 ```gherkin
 Given mặt hàng B chỉ nằm trên đúng một kệ A101 thuộc kho lưu trữ mã "A1"
 When tôi mở báo cáo
-Then ô "Mã vị trí" hiển thị "A1-A101"
+Then ô "Mã vị trí" hiển thị "A101"
+  And ô "Tên vị trí" hiển thị "Kho A1-Kệ A101"
 ```
-> Đây là **thay đổi hành vi cũ**: hôm nay ô đó hiển thị "A101" không kèm kho.
-> Cố ý, theo A-03.
+> Sửa ngày 2026-09-12 (A-03 đảo): bản trước của plan này yêu cầu "A1-A101", và trước nữa
+> hành vi trên prod cũng là "A101". Tức là ô mã trở lại như trước feature này, còn cái
+> feature này thêm vào — liệt kê đủ mọi kệ — vẫn giữ.
 
 **AC-03** — Hợp của kệ ưu tiên và kệ đang có tồn
 ```gherkin
@@ -67,6 +71,16 @@ Then chuỗi trong ô "Mã vị trí" giống hệt nhau ở cả hai lần
   And các cặp được sắp theo mã kho, rồi tới mã vị trí
 ```
 
+**AC-14** — Hai kho trùng mã vị trí thì ô mã gộp còn một
+```gherkin
+Given mặt hàng G nằm trên kệ mã "999" ở kho lưu trữ "A1" và kệ mã "999" ở kho lưu trữ "A2"
+When tôi mở báo cáo
+Then ô "Mã vị trí" hiển thị "999"
+  And ô "Tên vị trí" hiển thị "Kho A1-999, Kho A2-999"
+```
+> Bổ sung ngày 2026-09-12 theo A-18: bỏ tiền tố kho khiến hai kệ khác kho có thể cho cùng một
+> mã, và `999, 999` là chuỗi vô nghĩa — đúng cái ADR-03 cũ lo. Thông tin kho vẫn còn ở ô tên.
+
 ## US-02 — Cột vị trí nhất quán ở các báo cáo doanh thu và lợi nhuận
 
 Là kế toán, tôi muốn cột "Vị trí" ở báo cáo doanh thu/lợi nhuận đọc giống hệt báo cáo tồn,
@@ -81,8 +95,11 @@ Là kế toán, tôi muốn cột "Vị trí" ở báo cáo doanh thu/lợi nhu�
 ```gherkin
 Given mặt hàng A nằm trên hai kệ ở hai kho lưu trữ khác nhau
 When tôi mở "Chi tiết doanh thu theo mặt hàng", "Doanh thu theo mặt hàng" và "Lợi nhuận theo mặt hàng"
-Then cột vị trí ở cả ba báo cáo hiển thị cùng chuỗi "A1-A101, A2-A201"
+Then cột mã vị trí ở cả ba báo cáo hiển thị cùng chuỗi "A101, A201"
+  And cột tên vị trí (hai báo cáo có cột này) hiển thị "Kho A1-Kệ A101, Kho A2-Kệ A201"
 ```
+> Sửa ngày 2026-09-12 (A-03 đảo). "Lợi nhuận theo mặt hàng" chỉ có một cột vị trí và nó lấy
+> `loc.code`, nên nó hiện chuỗi mã: "A101, A201".
 
 **AC-08** — Ba báo cáo này không lẫn kệ showroom
 ```gherkin
@@ -96,8 +113,10 @@ Then ô vị trí của mặt hàng E để trống
 ```gherkin
 Given mặt hàng A nằm trên hai kệ ở hai kho lưu trữ
 When tôi xem "Chi tiết doanh thu theo mặt hàng", "Doanh thu theo mặt hàng" và "Lợi nhuận theo mặt hàng" trên khung nhìn desktop 1440x900
-Then ô vị trí ở cả ba báo cáo hiển thị trọn chuỗi "A1-A101, A2-A201" mà không bị CSS cắt
+Then ô vị trí ở cả ba báo cáo hiển thị trọn chuỗi "Kho A1-Kệ A101, Kho A2-Kệ A201" mà không bị CSS cắt
 ```
+> Ô mã vị trí nay ngắn hơn hẳn ("A101, A201"), nhưng ô **tên** vị trí vẫn dài như trước, nên
+> độ rộng 220 của T-02-03 vẫn cần — lấy chuỗi tên làm mốc đo (sửa 2026-09-12).
 > Bổ sung ngày 2026-09-10 khi mở lại G1: kế hoạch ban đầu chỉ nới cột ở Tổng hợp nhập xuất
 > tồn kho (AC-12), trong khi A-02 ("không giới hạn, chỉ nới rộng cột") và A-04 ("cả 4 báo
 > cáo") áp cho cả bốn báo cáo.

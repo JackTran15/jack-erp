@@ -36,7 +36,10 @@ export const REPORT_COLUMN_WIDTHS: Readonly<Record<string, number>> = {
   unit: 110,
   location: 220,
   locationCode: 220,
-  locationName: 220,
+  // Wider than the code columns since ADR-05: the code cell lists bare location
+  // codes ("A101, A201") while the name cell keeps "TênKho-TênVịTrí" per shelf
+  // ("HANG SUA 2026-S01.01, KHO SG-A01.01" measured 271px on real data at 220).
+  locationName: 320,
   supplier: 180,
 
   // Customer / supplier

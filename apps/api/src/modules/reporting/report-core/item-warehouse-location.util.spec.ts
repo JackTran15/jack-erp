@@ -153,12 +153,12 @@ describe('resolveItemWarehouseLocations', () => {
     const result = await resolveItemWarehouseLocations(repos, ['item-1'], 'org-1', 'branch-1');
 
     expect(result.get('item-1')).toEqual({
-      code: 'A1-A101, A2-A201',
+      code: 'A101, A201',
       name: 'Kho A1-Kệ A101, Kho A2-Kệ A201',
     });
   });
 
-  it('prefixes the warehouse code even for a single shelf (AC-02)', async () => {
+  it('reports a single shelf as its location code alone, with the warehouse only in the name (AC-02)', async () => {
     const { repos } = build({
       storages: [wh1],
       locations: [locA101],
@@ -168,7 +168,7 @@ describe('resolveItemWarehouseLocations', () => {
 
     const result = await resolveItemWarehouseLocations(repos, ['item-2'], 'org-1', 'branch-1');
 
-    expect(result.get('item-2')).toEqual({ code: 'A1-A101', name: 'Kho A1-Kệ A101' });
+    expect(result.get('item-2')).toEqual({ code: 'A101', name: 'Kho A1-Kệ A101' });
   });
 
   it('unions an empty preferred shelf with a different shelf that still has stock (AC-03)', async () => {
@@ -182,7 +182,7 @@ describe('resolveItemWarehouseLocations', () => {
     const result = await resolveItemWarehouseLocations(repos, ['item-3'], 'org-1', 'branch-1');
 
     expect(result.get('item-3')).toEqual({
-      code: 'A1-A101, A2-B202',
+      code: 'A101, B202',
       name: 'Kho A1-Kệ A101, Kho A2-Kệ B202',
     });
   });
@@ -204,7 +204,7 @@ describe('resolveItemWarehouseLocations', () => {
     const first = await resolveItemWarehouseLocations(build4().repos, ['item-4'], 'org-1', 'branch-1');
     const second = await resolveItemWarehouseLocations(build4().repos, ['item-4'], 'org-1', 'branch-1');
 
-    const expected = { code: 'A1-A101, A2-A201', name: 'Kho A1-Kệ A101, Kho A2-Kệ A201' };
+    const expected = { code: 'A101, A201', name: 'Kho A1-Kệ A101, Kho A2-Kệ A201' };
     expect(first.get('item-4')).toEqual(expected);
     expect(second.get('item-4')).toEqual(expected);
   });
@@ -222,7 +222,7 @@ describe('resolveItemWarehouseLocations', () => {
     expect(result.get('item-5')).toEqual({ code: null, name: null });
   });
 
-  it('drops the warehouse prefix instead of emitting a leading "-" when the warehouse has no code', async () => {
+  it('still reports the location code when the warehouse has no code of its own (A-06)', async () => {
     const whNoCode: StorageRow = { id: 'wh-b', code: null, name: 'Kho không mã', isMainStorage: false, isActive: true };
     const locNoCode: LocationRow = { id: 'loc-b101', code: 'A101', name: 'Kệ A101', storageId: 'wh-b', isActive: true };
     const { repos } = build({
@@ -234,8 +234,30 @@ describe('resolveItemWarehouseLocations', () => {
 
     const result = await resolveItemWarehouseLocations(repos, ['item-6'], 'org-1', 'branch-1');
 
-    expect(result.get('item-6')?.code).toBe('A101');
-    expect(result.get('item-6')?.code).not.toBe('-A101');
+    // The code cell never carried a warehouse prefix since ADR-05, so a missing
+    // storage code can no longer produce a leading "-" — the name cell still
+    // names the warehouse.
+    expect(result.get('item-6')).toEqual({ code: 'A101', name: 'Kho không mã-Kệ A101' });
+  });
+
+  it('collapses two warehouses that use the same location code into one code entry (AC-14)', async () => {
+    const loc999A1: LocationRow = { id: 'loc-999-a1', code: '999', name: '999', storageId: 'wh-a1', isActive: true };
+    const loc999A2: LocationRow = { id: 'loc-999-a2', code: '999', name: '999', storageId: 'wh-a2', isActive: true };
+    const { repos } = build({
+      storages: [wh1, wh2],
+      locations: [loc999A1, loc999A2],
+      preferred: [
+        { itemId: 'item-11', storageId: 'wh-a1', locationId: 'loc-999-a1' },
+        { itemId: 'item-11', storageId: 'wh-a2', locationId: 'loc-999-a2' },
+      ],
+      balances: [],
+    });
+
+    const result = await resolveItemWarehouseLocations(repos, ['item-11'], 'org-1', 'branch-1');
+
+    // "999, 999" would be valid but meaningless; the name cell is what tells
+    // the two shelves apart (A-18).
+    expect(result.get('item-11')).toEqual({ code: '999', name: 'Kho A1-999, Kho A2-999' });
   });
 
   it('resolves a page in exactly four repository queries when no preferred shelf needs an untracked check (A-11)', async () => {
@@ -269,7 +291,7 @@ describe('resolveItemWarehouseLocations', () => {
 
     const result = await resolveItemWarehouseLocations(repos, ['item-8'], 'org-1', 'branch-1');
 
-    expect(result.get('item-8')).toEqual({ code: 'A2-A201', name: 'Kho A2-Kệ A201' });
+    expect(result.get('item-8')).toEqual({ code: 'A201', name: 'Kho A2-Kệ A201' });
   });
 
   it('falls back to the showroom shelf when every warehouse pair is untracked and showroomFallback is requested (AC-05)', async () => {
@@ -285,7 +307,7 @@ describe('resolveItemWarehouseLocations', () => {
       showroomFallback: true,
     });
 
-    expect(result.get('item-9')).toEqual({ code: 'SR-MacDinh', name: 'Showroom chính-Mặc định' });
+    expect(result.get('item-9')).toEqual({ code: 'MacDinh', name: 'Showroom chính-Mặc định' });
   });
 
   it('returns an empty cell instead of the showroom shelf when showroomFallback is not requested (AC-05)', async () => {
@@ -314,7 +336,7 @@ describe('resolveItemWarehouseLocations', () => {
       showroomFallback: true,
     });
 
-    expect(result.get('item-10')).toEqual({ code: 'A1-A101', name: 'Kho A1-Kệ A101' });
+    expect(result.get('item-10')).toEqual({ code: 'A101', name: 'Kho A1-Kệ A101' });
     // Proves the showroom round never ran, not just that its output was discarded.
     expect(stockBalances.createQueryBuilder).toHaveBeenCalledTimes(1);
   });

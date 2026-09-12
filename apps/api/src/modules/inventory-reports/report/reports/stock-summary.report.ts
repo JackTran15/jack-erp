@@ -62,7 +62,7 @@ const COLUMNS: InventoryColumnDef[] = [
   // Reference-only: resolved live from the item's current shelf rather than
   // aggregated from the ledger, so there is nothing for SQL to filter on.
   { key: 'positionCode', type: STRING, filterKind: 'none', width: 220 },
-  { key: 'positionName', type: STRING, filterKind: 'none', width: 220 },
+  { key: 'positionName', type: STRING, filterKind: 'none', width: 320 },
   { key: 'openingQty', type: NUMBER, band: 'opening', width: 110 },
   { key: 'openingValue', type: NUMBER, band: 'opening', width: 130 },
   { key: 'inQty', type: NUMBER, band: 'in', width: 110 },

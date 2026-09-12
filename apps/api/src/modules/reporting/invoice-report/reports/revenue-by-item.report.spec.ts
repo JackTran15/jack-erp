@@ -238,7 +238,7 @@ describe('RevenueByItemReport.buildData', () => {
       baseDto({ columns: ['sku', 'locationCode', 'locationName'] }) as any,
       actor,
     );
-    expect(res.rows[0]).toMatchObject({ locationCode: 'A1-A-01', locationName: 'Kho A1-Aisle A' });
+    expect(res.rows[0]).toMatchObject({ locationCode: 'A-01', locationName: 'Kho A1-Aisle A' });
   });
 
   it('joins two warehouse shelves for an item stocked on both, sorted by storage code', async () => {
@@ -265,7 +265,7 @@ describe('RevenueByItemReport.buildData', () => {
       actor,
     );
     expect(res.rows[0]).toMatchObject({
-      locationCode: 'A1-A101, A2-A201',
+      locationCode: 'A101, A201',
       locationName: 'Kho A1-Kệ A101, Kho A2-Kệ A201',
     });
   });
@@ -308,7 +308,7 @@ describe('RevenueByItemReport.buildData', () => {
       baseDto({ columns: ['sku', 'locationCode', 'locationName'] }) as any,
       actor,
     );
-    expect(res.rows[0]).toMatchObject({ locationCode: 'A1-A-01', locationName: 'Kho A1-Aisle A' });
+    expect(res.rows[0]).toMatchObject({ locationCode: 'A-01', locationName: 'Kho A1-Aisle A' });
   });
 
   it('leaves the location null when the query explicitly spans every store', async () => {
@@ -356,7 +356,7 @@ describe('RevenueByItemReport.buildData', () => {
       baseDto({ columns: ['sku', 'locationCode', 'locationName'] }) as any,
       actor,
     );
-    expect(res.rows[0]).toMatchObject({ locationCode: 'A1-B-02', locationName: 'Kho A1-Aisle B' });
+    expect(res.rows[0]).toMatchObject({ locationCode: 'B-02', locationName: 'Kho A1-Aisle B' });
   });
 
   it('leaves locationCode/locationName null when statBy is not item', async () => {

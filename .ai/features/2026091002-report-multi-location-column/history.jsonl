@@ -18,3 +18,12 @@
 {"action": "passed", "at": "2026-09-10T15:04:05", "by": "akenzy", "evidence": "4 ADR(s) recorded", "gate": "G2", "id": "438806606b85", "ts": "2026-09-10T15:04:05.777863"}
 {"action": "passed", "at": "2026-09-10T15:04:05", "by": "akenzy", "evidence": "graph valid - 2 UoW, 7 tickets, no cycles", "gate": "G3", "id": "ef1f5aefc3b2", "ts": "2026-09-10T15:04:05.899274"}
 {"action": "ticket in_progress", "at": "2026-09-10T15:05:07", "by": "akenzy", "gate": "G4", "id": "b9913c12781b", "ticket": "T-02-03", "ts": "2026-09-10T15:05:07.148028"}
+{"action": "reopened", "at": "2026-09-12T09:43:02", "by": "Akenzy", "gate": "G2", "id": "b610ce2a0c87", "reason": "Akenzy 12/09/2026 - cot Ma vi tri chi hien ma vi tri, bo tien to ma kho (dao ADR-03 va A-03); cot Ten vi tri giu ten kho; nhieu ke van noi bang ', ' va gop ma trung", "ts": "2026-09-12T09:43:02.600199"}
+{"action": "passed", "at": "2026-09-12T10:01:53", "by": "Akenzy", "evidence": "5 ADR(s) recorded", "gate": "G2", "id": "9f931ba62952", "ts": "2026-09-12T10:01:53.910211"}
+{"action": "passed", "at": "2026-09-12T10:01:54", "by": "Akenzy", "evidence": "graph valid - 2 UoW, 9 tickets, no cycles", "gate": "G3", "id": "f031cb83a464", "ts": "2026-09-12T10:01:54.025579"}
+{"action": "ticket in_progress", "at": "2026-09-12T10:01:54", "by": "Akenzy", "gate": "G4", "id": "803e89ba239b", "ticket": "T-01-05", "ts": "2026-09-12T10:01:54.096100"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-12T10:04:52", "by": "Akenzy", "gate": "G4", "id": "0e4cfe47a4a8", "ticket": "T-01-05", "ts": "2026-09-12T10:04:52.644457"}
+{"action": "ticket in_progress", "at": "2026-09-12T10:04:52", "by": "Akenzy", "gate": "G4", "id": "340a0be25616", "ticket": "T-02-04", "ts": "2026-09-12T10:04:52.764069"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-12T10:10:22", "by": "Akenzy", "gate": "G4", "id": "de5d04defa0a", "ticket": "T-02-04", "ts": "2026-09-12T10:10:22.112501"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-12T10:35:15", "by": "Akenzy", "gate": "G4", "id": "18a97fa97dec", "ticket": "T-01-04", "ts": "2026-09-12T10:35:15.169136"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-12T11:01:40", "by": "Akenzy", "gate": "G4", "id": "c891178c2663", "ticket": "T-02-03", "ts": "2026-09-12T11:01:40.680399"}

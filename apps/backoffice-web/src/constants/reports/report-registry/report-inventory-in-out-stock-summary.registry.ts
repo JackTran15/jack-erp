@@ -135,7 +135,8 @@ const columns: ReportColumnConfig[] = [
     label: "Tên vị trí",
     order: 11,
     visible: true,
-    tableConfig: { width: 220, dataType: "text", filterKind: "none" },
+    // 320, không phải 220 như cột mã: ô này giữ "TênKho-TênVịTrí" cho từng kệ.
+    tableConfig: { width: 320, dataType: "text", filterKind: "none" },
   },
   qty("openingQty", GROUP.OPENING, 12),
   value("openingValue", GROUP.OPENING, 13),

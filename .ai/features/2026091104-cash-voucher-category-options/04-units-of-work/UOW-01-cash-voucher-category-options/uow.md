@@ -64,8 +64,13 @@ Môi trường `local-backoffice` (Chrome của Akenzy, org MT), DB `erp_dev_300
 
 ## Definition of done
 
-- [ ] AC-01 … AC-08 pass
-- [ ] `pnpm --filter @erp/api test -- cash-voucher-category.seeder.spec.ts` xanh
-- [ ] `pnpm --filter @erp/api test:e2e -- cash-voucher-category-backfill` xanh
-- [ ] `tsc --noEmit` của `apps/api` và `apps/backoffice-web` sạch
-- [ ] Demo script chạy đầu-cuối và được nghiệm thu ở G4
+- [x] AC-01 … AC-08 pass
+- [x] `pnpm --filter @erp/api test -- cash-voucher-category.seeder.spec.ts` xanh (cùng `organization.service.spec.ts`: 23/23)
+- [x] `pnpm --filter @erp/api test:e2e -- cash-voucher-category-backfill` xanh (7/7)
+- [x] `tsc --noEmit` của `apps/api` và `apps/backoffice-web` sạch
+- [x] Demo script chạy đầu-cuối và được nghiệm thu ở G4 — Akenzy nghiệm thu ngày 12/09/2026, chấp nhận hai điểm chệch: bước 8 không có dữ liệu để chạy, bước 7 đổi cách kiểm
+
+Trạng thái 2026-09-12: demo đã chạy trên `erp_dev_3008` sau khi Akenzy tự chạy `migration:run` — cả 4 dialog
+(thu/chi tiền mặt, thu/chi tiền gửi) hiện đúng danh sách và thứ tự, ảnh chụp và số liệu SQL ghi ở T-01-03.
+Bước 8 không chạy được vì org MT không có phiếu nào gắn hai mục đổi tên; bước 7 đổi cách kiểm (xem T-01-03).
+Ô nghiệm thu để trống cho tới khi Akenzy chốt hai điểm chệch này.

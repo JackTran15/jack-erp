@@ -45,9 +45,11 @@ interface ItemShelf {
  * These are a union, not a priority order — an item whose preferred shelf is
  * empty but has real stock elsewhere reports both. Only active storages and
  * active locations count, and a pair explicitly set to "Ngừng theo dõi" is
- * skipped. Every matching shelf is joined into one cell, prefixed with its
- * storage's code/name (e.g. `"A1-A101, A2-A201"`) since a location code is
- * only unique within its storage. Nothing left → empty cell.
+ * skipped. Every matching shelf is joined into one cell: `code` lists the
+ * location codes alone (`"A101, A201"`), de-duplicated, and `name` lists one
+ * `"TênKho-TênVịTrí"` per shelf (`"Kho A1-Kệ A101, Kho A2-Kệ A201"`) — a
+ * location code is only unique within its storage, so the name cell is where
+ * the warehouse is identified. Nothing left → empty cell.
  *
  * Callers pass one branch at a time because a shelf belongs to exactly one
  * branch; a row spanning several has no single location.
@@ -107,9 +109,13 @@ export async function resolveItemWarehouseLocations(
 
 /**
  * Deterministic order (storage code, then location code) so the same data
- * joins into the same string on every load, then the actual "MãKho-MãVịTrí"
- * join. A null storage code (A-06, data not expected to occur) drops the
- * prefix instead of emitting a leading "-".
+ * joins into the same string on every load, then the join itself.
+ *
+ * The two cells are deliberately not symmetric: the code cell carries location
+ * codes alone, de-duplicated because two warehouses of one branch may use the
+ * same code, while the name cell keeps one "TênKho-TênVịTrí" entry per shelf
+ * and is therefore where the warehouse is still named. `Set` preserves
+ * insertion order, so the sort above still decides the order.
  */
 function joinShelves(shelves: ItemShelf[] | undefined): ItemWarehouseLocation {
   if (!shelves?.length) return { code: null, name: null };
@@ -118,9 +124,7 @@ function joinShelves(shelves: ItemShelf[] | undefined): ItemWarehouseLocation {
     return byStorage || a.locationCode.localeCompare(b.locationCode);
   });
   return {
-    code: sorted
-      .map((s) => (s.storageCode ? `${s.storageCode}-${s.locationCode}` : s.locationCode))
-      .join(', '),
+    code: [...new Set(sorted.map((s) => s.locationCode))].join(', '),
     name: sorted.map((s) => `${s.storageName}-${s.locationName}`).join(', '),
   };
 }
