@@ -119,6 +119,24 @@ describe('MobileInvoiceService', () => {
     expect(query.dto.createdAt).toBeUndefined();
   });
 
+  it('chuyển ô tìm xuống bộ lọc tự do `search` của v2', async () => {
+    const { service, execute } = build({ profileId: 'profile-9' });
+
+    await service.list({ search: 'HD0001' }, actor);
+
+    const query = execute.mock.calls[0][0] as SearchInvoicesV2Query;
+    expect(query.dto.search).toBe('HD0001');
+  });
+
+  it('không gõ gì thì KHÔNG gắn `search`', async () => {
+    const { service, execute } = build({ profileId: 'profile-9' });
+
+    await service.list({}, actor);
+
+    const query = execute.mock.calls[0][0] as SearchInvoicesV2Query;
+    expect(query.dto.search).toBeUndefined();
+  });
+
   it('chuyển NGUYÊN actor xuống query — phạm vi tổ chức/chi nhánh vẫn của lớp dưới', async () => {
     const { service, execute } = build({ profileId: 'profile-9' });
 

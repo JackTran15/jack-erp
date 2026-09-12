@@ -1,6 +1,7 @@
 import {
   IsInt,
   IsOptional,
+  IsString,
   IsUUID,
   Max,
   Min,
@@ -29,6 +30,17 @@ export class InvoiceSearchV2Dto {
   limit?: number = 20;
 
   /** Số hóa đơn */
+  /**
+   * Free-text: matches invoice code OR customer name OR customer phone — the
+   * same three columns SearchDraftInvoicesV2Handler searches, so the mobile
+   * list finds what the POS draft grid finds. Applied through
+   * `FilterBuilder.applyOrString`, which escapes `%`/`_` (a typed `%` matches a
+   * percent sign, not every row).
+   */
+  @IsOptional()
+  @IsString()
+  search?: string;
+
   @IsOptional()
   @ValidateNested()
   @Type(() => StringFilterDto)

@@ -98,6 +98,31 @@ describe('SearchInvoicesV2Handler', () => {
     expect(rowsQb().orderBy).toHaveBeenCalledWith('inv.createdAt', 'DESC');
   });
 
+  it('free-text `search` ORs invoice code, customer name and customer phone', async () => {
+    await build();
+    await handler.execute(new SearchInvoicesV2Query({ search: 'HD' }, actor));
+
+    // The exact parameter key is FilterBuilder's business; what must hold is
+    // ONE predicate covering all three columns, joined by OR, bound to `%HD%`.
+    const call = rowsQb().andWhere.mock.calls.find(
+      (c: unknown[]) => typeof c[0] === 'string' && (c[0] as string).includes('customer.phone ILIKE'),
+    );
+    expect(call).toBeDefined();
+    const [predicate, params] = call as [string, Record<string, string>];
+    expect(predicate).toContain('inv.code ILIKE');
+    expect(predicate).toContain('customer.name ILIKE');
+    expect(predicate.split(' OR ')).toHaveLength(3);
+    expect(Object.values(params)).toEqual(['%HD%']);
+  });
+
+  it('no `search` → no free-text predicate', async () => {
+    await build();
+    await handler.execute(new SearchInvoicesV2Query({}, actor));
+
+    const predicates = rowsQb().andWhere.mock.calls.map((c: unknown[]) => c[0] as string);
+    expect(predicates.some((p) => p.includes('customer.phone ILIKE'))).toBe(false);
+  });
+
   it('paginates and returns the { data, total, page, limit, totals } envelope', async () => {
     const rows = [{ id: 'inv-1', code: 'INV-1' }];
     await build(rows, { total: '12', totalAmount: '26337000' });

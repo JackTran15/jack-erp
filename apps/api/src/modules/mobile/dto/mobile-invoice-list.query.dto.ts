@@ -1,12 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsISO8601, IsOptional, Max, Min } from 'class-validator';
+import { IsInt, IsISO8601, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 /**
  * Bộ lọc màn **Danh sách hoá đơn** của app.
  *
- * Bốn tham số, và đó là toàn bộ thứ màn đó có: khoảng ngày của hàng lọc kỳ,
- * cộng phân trang.
+ * Năm tham số, và đó là toàn bộ thứ màn đó có: khoảng ngày của hàng lọc kỳ,
+ * ô tìm ở header, cộng phân trang.
  *
  * **KHÔNG có `salespersonId`.** Phạm vi *"chỉ hoá đơn của mình"* do SERVER ép
  * từ hồ sơ nhân viên của người gọi (ADR-24). Phơi trường đó ra đây là biến một
@@ -50,4 +50,14 @@ export class MobileInvoiceListQueryDto {
   @IsOptional()
   @IsISO8601()
   to?: string;
+
+  /**
+   * Ô tìm ở header màn Danh sách hoá đơn: khớp SỐ HOÁ ĐƠN, TÊN hoặc SĐT khách
+   * — ba cột mà lưới nháp của POS cũng tìm, nên gõ gì ở app ra đúng thứ POS ra.
+   */
+  @ApiPropertyOptional({ maxLength: 200, description: 'Số hoá đơn, tên hoặc SĐT khách' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string;
 }

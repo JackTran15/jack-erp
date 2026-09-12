@@ -59,6 +59,12 @@ export class MobileInvoiceService {
       } as InvoiceSearchV2Dto['createdAt'];
     }
 
+    // Ô tìm ở header đi thẳng xuống bộ lọc tự do của v2 (số HĐ / tên / SĐT
+    // khách). Không `trim` ở đây: `applyOrString` tự trim và bỏ qua chuỗi trống.
+    if (query.search) {
+      dto.search = query.search;
+    }
+
     return this.queryBus.execute(new SearchInvoicesV2Query(dto, actor));
   }
 
