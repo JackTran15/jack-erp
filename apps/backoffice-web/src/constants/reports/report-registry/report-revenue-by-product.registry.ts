@@ -46,7 +46,8 @@ const columns: ReportColumnConfig[] = [
     label: "Tên vị trí",
     order: 5,
     visible: true,
-    tableConfig: { width: 220, align: "left", dataType: "text" },
+    // 320, không phải 220 như cột mã: ô này giữ "TênKho-TênVịTrí" cho từng kệ.
+    tableConfig: { width: 320, align: "left", dataType: "text" },
   },
   {
     column: ReportTableColumn.QUANTITY_SOLD,

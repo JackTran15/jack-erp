@@ -22,10 +22,12 @@ describe('REPORT_COLUMN_WIDTHS', () => {
     expect(reportColumnWidth('documentNumber')).toBe(130);
   });
 
-  it('sizes the location columns of the revenue/profit reports at 220', () => {
+  // Since ADR-05 the code columns hold bare location codes and the name column
+  // holds "TênKho-TênVịTrí" per shelf, so the name column alone needs the room.
+  it('sizes the location code columns at 220 and the name column at 320', () => {
     expect(reportColumnWidth('location')).toBe(220);
     expect(reportColumnWidth('locationCode')).toBe(220);
-    expect(reportColumnWidth('locationName')).toBe(220);
+    expect(reportColumnWidth('locationName')).toBe(320);
   });
 
   it('leaves amount and quantity columns to the FE default', () => {
@@ -47,7 +49,7 @@ describe('column utils forward the shared width', () => {
     expect(enrichInvoiceHeader(base('itemName', ReportColumnDataType.STRING)).width).toBe(220);
     expect(enrichInvoiceHeader(base('lineRevenue', ReportColumnDataType.CURRENCY)).width).toBeUndefined();
     expect(enrichInvoiceHeader(base('locationCode', ReportColumnDataType.STRING)).width).toBe(220);
-    expect(enrichInvoiceHeader(base('locationName', ReportColumnDataType.STRING)).width).toBe(220);
+    expect(enrichInvoiceHeader(base('locationName', ReportColumnDataType.STRING)).width).toBe(320);
   });
 
   it('profit enrichHeader', () => {

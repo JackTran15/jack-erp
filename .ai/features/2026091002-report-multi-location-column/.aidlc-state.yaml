@@ -107,3 +107,48 @@ history:
     at: 2026-09-10T15:05:07
     by: akenzy
     ticket: T-02-03
+  - gate: G2
+    action: reopened
+    at: 2026-09-12T09:43:02
+    by: Akenzy
+    reason: Akenzy 12/09/2026 - cot Ma vi tri chi hien ma vi tri, bo tien to ma kho (dao ADR-03 va A-03); cot Ten vi tri giu ten kho; nhieu ke van noi bang ', ' va gop ma trung
+  - gate: G2
+    action: passed
+    at: 2026-09-12T10:01:53
+    by: Akenzy
+    evidence: 5 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-12T10:01:54
+    by: Akenzy
+    evidence: graph valid - 2 UoW, 9 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-12T10:01:54
+    by: Akenzy
+    ticket: T-01-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-12T10:04:52
+    by: Akenzy
+    ticket: T-01-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-12T10:04:52
+    by: Akenzy
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-12T10:10:22
+    by: Akenzy
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-12T10:35:15
+    by: Akenzy
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-12T11:01:40
+    by: Akenzy
+    ticket: T-02-03

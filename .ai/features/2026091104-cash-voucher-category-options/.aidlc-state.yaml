@@ -5,7 +5,7 @@ slug: 2026091104-cash-voucher-category-options
 profile: none
 created: 2026-09-11T20:27:39
 ruleset: 5
-current_gate: G3
+current_gate: G5
 history:
   - gate: G0
     action: passed
@@ -58,3 +58,24 @@ history:
     by: Akenzy
     reason: Chờ Akenzy tự chạy migration -run trên erp_dev_3008 (Claude bị chặn quyền) và gỡ lỗi Chrome 'Cannot access a chrome-extension -// URL of different extension' trên tab backoffice
     ticket: T-01-03
+  - gate: G4
+    action: ticket unblocked
+    at: 2026-09-12T09:54:06
+    by: Akenzy
+    reason: Chờ Akenzy tự chạy migration -run trên erp_dev_3008 (Claude bị chặn quyền) và gỡ lỗi Chrome 'Cannot access a chrome-exte
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-12T09:59:33
+    by: Akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: passed
+    at: 2026-09-12T10:02:29
+    by: Akenzy
+    evidence: no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 3 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-09-12T10:20:40
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

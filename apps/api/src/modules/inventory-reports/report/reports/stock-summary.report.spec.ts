@@ -152,10 +152,11 @@ describe('StockSummaryReport', () => {
     expect(inQty.align).toBe('right');
     expect(inQty.filterKind).toBe('number');
     expect(cols.find((c) => c.col === 'supplier')!.filterKind).toBe('text');
-    // ADR-04: widened so both shelves of a two-pair join ("A1-A10, A2-A201")
-    // show in full; the hover title still covers anything longer.
+    // ADR-04, re-measured 12/09/2026 after ADR-05: the code cell is bare codes
+    // ("A10, A201") and fits 220, while the name cell keeps a "TênKho-TênVịTrí"
+    // pair per shelf and needed 320 — a real two-shelf row measured 271px.
     expect(cols.find((c) => c.col === 'positionCode')!.width).toBe(220);
-    expect(cols.find((c) => c.col === 'positionName')!.width).toBe(220);
+    expect(cols.find((c) => c.col === 'positionName')!.width).toBe(320);
   });
 
   it('maps engine rows through — including brand/color/size, closing→ending and supplier', async () => {
@@ -493,7 +494,7 @@ describe('StockSummaryReport', () => {
       );
 
       expect(result.rows[0]).toMatchObject({
-        positionCode: 'A1-A10',
+        positionCode: 'A10',
         positionName: 'Kho A1-A10',
       });
     });
@@ -510,7 +511,7 @@ describe('StockSummaryReport', () => {
       );
 
       expect(result.rows[0]).toMatchObject({
-        positionCode: 'SR-DEFAULT',
+        positionCode: 'DEFAULT',
         positionName: 'Showroom-Mặc định',
       });
     });
@@ -549,7 +550,7 @@ describe('StockSummaryReport', () => {
       );
 
       expect(result.rows[0]).toMatchObject({
-        positionCode: 'A1-A10, A2-A201',
+        positionCode: 'A10, A201',
         positionName: 'Kho A1-A10, Kho A2-Kệ A201',
       });
     });

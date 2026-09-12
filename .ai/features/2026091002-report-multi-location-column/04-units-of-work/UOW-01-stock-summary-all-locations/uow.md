@@ -6,7 +6,7 @@ demoable: true
 duration: 2d
 depends_on: []
 requirements: [US-01, US-03]
-verifies: [AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-09, AC-10, AC-11, AC-12]
+verifies: [AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-09, AC-10, AC-11, AC-12, AC-14]
 risk: medium
 status: todo
 rollback: revert `item-warehouse-location.util.ts` về bản một-kệ; không có migration, không có cột dữ liệu mới, nên revert code là đủ
@@ -23,8 +23,9 @@ thừa hưởng được gì từ đây.
 2. Vào Danh mục > Kho hàng, xác nhận chi nhánh có kho `A1` và `A2`.
 3. Vào Chi tiết vị trí hàng hoá, xếp mặt hàng A lên kệ `A101` (kho `A1`) và `A201` (kho `A2`).
 4. Mở Báo cáo > Tổng hợp nhập xuất tồn kho ở chế độ một chi nhánh.
-5. Cột "Mã vị trí" của mặt hàng A hiện `A1-A101, A2-A201`; cột "Tên vị trí" hiện tên tương ứng.
-6. Đặt cặp (mặt hàng A, kệ `A101`) sang Ngừng theo dõi, tải lại → ô chỉ còn `A2-A201`,
+5. Cột "Mã vị trí" của mặt hàng A hiện `A101, A201`; cột "Tên vị trí" hiện
+   `Kho A1-<tên kệ A101>, Kho A2-<tên kệ A201>` (sửa 2026-09-12: ô mã không còn tiền tố kho).
+6. Đặt cặp (mặt hàng A, kệ `A101`) sang Ngừng theo dõi, tải lại → ô "Mã vị trí" chỉ còn `A201`,
    mặt hàng A vẫn nằm trên báo cáo.
 7. Chọn bộ lọc "Kho" = `A1` → tập dòng và các số nhập/xuất/tồn không đổi so với trước khi sửa.
 8. Chuyển sang chế độ xem chuỗi → hai cột vị trí biến mất khỏi danh mục cột.
@@ -33,7 +34,8 @@ thừa hưởng được gì từ đây.
 ## In scope
 
 - Viết lại phần gom kệ trong `item-warehouse-location.util.ts`: hợp kệ ưu tiên và kệ còn tồn,
-  khử trùng, loại đúng cặp Ngừng theo dõi, sắp tất định, nối chuỗi kèm tiền tố mã kho.
+  khử trùng, loại đúng cặp Ngừng theo dõi, sắp tất định, rồi nối chuỗi — ô mã chỉ gồm mã vị trí
+  đã khử trùng, ô tên gồm `Tên kho-Tên vị trí` (A-03 và A-18, sửa 2026-09-12; T-01-05).
 - Giữ nguyên chữ ký và kiểu trả về của `resolveItemWarehouseLocations` (ADR-01).
 - Cập nhật kỳ vọng trong `stock-summary.report.spec.ts` và thêm spec riêng cho hàm dùng chung
   (hiện chưa có file nào).
@@ -55,8 +57,14 @@ thừa hưởng được gì từ đây.
 
 ## Definition of done
 
-- [ ] AC-01 đến AC-06, AC-09 đến AC-12 pass
-- [ ] `resolveItemWarehouseLocations` giữ nguyên chữ ký; bốn nơi gọi không sửa dòng nào
-- [ ] Có spec riêng cho `item-warehouse-location.util.ts`
-- [ ] `pnpm --filter @erp/api test` xanh
+- [x] AC-01 đến AC-06, AC-09 đến AC-12, AC-14 pass
+- [x] `resolveItemWarehouseLocations` giữ nguyên chữ ký; bốn nơi gọi không sửa dòng nào
+- [x] Có spec riêng cho `item-warehouse-location.util.ts`
+- [x] `pnpm --filter @erp/api test` xanh — 4663/4669 test, 359/362 suite. Ba suite đỏ còn lại là lỗi sẵn có, không
+      liên quan và không nằm trong diff: `employee-listing-surfaces` (đòi khai báo `api-key-crud.service.ts`, từ #195),
+      `auth.service` (2 test TTL, lỗi DI `BranchEntityRepository`), `partner-catalog.module` (2 test, lỗi DI `RbacService`)
 - [ ] Demo script chạy được đầu-cuối và được nghiệm thu ở G4
+
+Trạng thái 2026-09-12: AC-12 đã đo thật ở 1440x900 trên `erp_dev_3008` (chi tiết và ảnh ở T-01-04); lần đo đầu
+**đỏ** với `220`, Akenzy chọn nới cột tên lên `320`, đo lại xanh. AC-11 vẫn là bằng chứng đọc mã (`xlsx-stream.writer.ts`
+chép nguyên giá trị ô), không phải test xuất file. Ô nghiệm thu để trống chờ Akenzy chốt.

@@ -130,7 +130,7 @@ describe('ProfitByItemReport — Vị trí', () => {
     expect(res.rows[0]).toMatchObject({ location: null });
   });
 
-  it('AC-07: joins two shelves across two warehouses into "A1-A101, A2-A201"', async () => {
+  it('AC-07: joins two shelves across two warehouses into "A101, A201"', async () => {
     const report = makeReport({
       ...warehouseFixtures,
       storages: [
@@ -147,7 +147,7 @@ describe('ProfitByItemReport — Vị trí', () => {
       ],
     });
     const res = await report.buildData(dto() as any, actor);
-    expect(res.rows[0]).toMatchObject({ location: 'A1-A101, A2-A201' });
+    expect(res.rows[0]).toMatchObject({ location: 'A101, A201' });
   });
 
   it('AC-08: leaves the location empty for an item stocked only on the showroom shelf', async () => {

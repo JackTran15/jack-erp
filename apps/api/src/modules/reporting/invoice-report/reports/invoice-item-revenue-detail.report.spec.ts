@@ -279,7 +279,7 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
       actor,
     );
     expect(result.rows[0]).toMatchObject({
-      locationCode: 'A1-A-01',
+      locationCode: 'A-01',
       locationName: 'Kho A1-Kệ A1',
     });
   });
@@ -310,7 +310,7 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
       actor,
     );
     expect(result.rows[0]).toMatchObject({
-      locationCode: 'A1-A101, A2-A201',
+      locationCode: 'A101, A201',
       locationName: 'Kho A1-Kệ A101, Kho A2-Kệ A201',
     });
   });
@@ -394,11 +394,11 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
     expect(result.rows).toHaveLength(2);
     const byInvoice = new Map(result.rows.map((r: any) => [r.invoiceCode, r]));
     expect(byInvoice.get('HD000001')).toMatchObject({
-      locationCode: 'B1-K1',
+      locationCode: 'K1',
       locationName: 'Kho CN1-Kệ CN1',
     });
     expect(byInvoice.get('HD000002')).toMatchObject({
-      locationCode: 'B2-K2',
+      locationCode: 'K2',
       locationName: 'Kho CN2-Kệ CN2',
     });
   });
