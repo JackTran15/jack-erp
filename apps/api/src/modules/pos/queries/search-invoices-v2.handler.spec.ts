@@ -115,6 +115,15 @@ describe('SearchInvoicesV2Handler', () => {
     expect(Object.values(params)).toEqual(['%HD%']);
   });
 
+  it('`statuses` filters with IN over the given set', async () => {
+    await build();
+    await handler.execute(new SearchInvoicesV2Query({ statuses: ['debt', 'partial_debt'] } as never, actor));
+
+    expect(rowsQb().andWhere).toHaveBeenCalledWith('inv.status IN (:...statuses)', {
+      statuses: ['debt', 'partial_debt'],
+    });
+  });
+
   it('no `search` → no free-text predicate', async () => {
     await build();
     await handler.execute(new SearchInvoicesV2Query({}, actor));

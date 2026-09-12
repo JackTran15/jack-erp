@@ -137,6 +137,24 @@ describe('MobileInvoiceService', () => {
     expect(query.dto.search).toBeUndefined();
   });
 
+  it("'unpaid' (Ghi nợ) gộp pending + debt + partial_debt — đúng tập mà app đọc về `unpaid`", async () => {
+    const { service, execute } = build({ profileId: 'profile-9' });
+
+    await service.list({ status: ['unpaid', 'paid'] }, actor);
+
+    const query = execute.mock.calls[0][0] as SearchInvoicesV2Query;
+    expect(query.dto.statuses).toEqual(['pending', 'debt', 'partial_debt', 'paid']);
+  });
+
+  it('không lọc trạng thái thì KHÔNG gắn `statuses`', async () => {
+    const { service, execute } = build({ profileId: 'profile-9' });
+
+    await service.list({}, actor);
+
+    const query = execute.mock.calls[0][0] as SearchInvoicesV2Query;
+    expect(query.dto.statuses).toBeUndefined();
+  });
+
   it('chuyển NGUYÊN actor xuống query — phạm vi tổ chức/chi nhánh vẫn của lớp dưới', async () => {
     const { service, execute } = build({ profileId: 'profile-9' });
 

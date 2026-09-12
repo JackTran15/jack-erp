@@ -5,9 +5,10 @@ import { Repository } from 'typeorm';
 import type { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { EmployeeProfileEntity } from '../../rbac/employee/employee-profile.entity';
 import { InvoiceSearchV2Dto } from '../../pos/dto/invoice-search-v2.dto';
+import { InvoiceStatus } from '../../pos/entities/invoice.entity';
 import { InvoiceService } from '../../pos/services/invoice.service';
 import { SearchInvoicesV2Query } from '../../pos/queries/search-invoices-v2.query';
-import { MobileInvoiceListQueryDto } from '../dto/mobile-invoice-list.query.dto';
+import { MobileInvoiceListQueryDto, MobileInvoiceStatusFilter } from '../dto/mobile-invoice-list.query.dto';
 
 /**
  * Hoá đơn mà NGƯỜI GỌI được ghi công bán.
@@ -19,6 +20,12 @@ import { MobileInvoiceListQueryDto } from '../dto/mobile-invoice-list.query.dto'
  * **Phạm vi ép ở đây, không ở client** (ADR-24). Đây là khác biệt đáng kể duy
  * nhất so với đường web, và là lý do đường mobile tồn tại thay vì gọi thẳng.
  */
+const MOBILE_STATUS_TO_INVOICE: Record<MobileInvoiceStatusFilter, InvoiceStatus[]> = {
+  paid: [InvoiceStatus.PAID],
+  unpaid: [InvoiceStatus.PENDING, InvoiceStatus.DEBT, InvoiceStatus.PARTIAL_DEBT],
+  cancelled: [InvoiceStatus.CANCELLED],
+};
+
 @Injectable()
 export class MobileInvoiceService {
   constructor(
@@ -63,6 +70,14 @@ export class MobileInvoiceService {
     // khách). Không `trim` ở đây: `applyOrString` tự trim và bỏ qua chuỗi trống.
     if (query.search) {
       dto.search = query.search;
+    }
+
+    // Ba trạng thái của app -> tập giá trị thật. "Ghi nợ" gộp ba giá trị vì đó
+    // đúng là cách `InvoiceModel` phía app đọc về (mọi giá trị không phải
+    // paid/cancelled rơi về `unpaid`); lệch ở đây là lọc ra một tập mà màn
+    // không bày được, hoặc ngược lại.
+    if (query.status?.length) {
+      dto.statuses = [...new Set(query.status.flatMap((s) => MOBILE_STATUS_TO_INVOICE[s]))];
     }
 
     return this.queryBus.execute(new SearchInvoicesV2Query(dto, actor));

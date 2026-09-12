@@ -185,6 +185,11 @@ export class SearchInvoicesV2Handler
       .applyCompare('inv.amountDue',  dto.amountDue)
       .applyString('inv.note',        dto.note);
 
+    // Set form of the status filter — see InvoiceSearchV2Dto.statuses.
+    if (dto.statuses?.length) {
+      qb.andWhere('inv.status IN (:...statuses)', { statuses: dto.statuses });
+    }
+
     if (dto.customerId) {
       qb.andWhere('inv.customerId = :cid', { cid: dto.customerId });
     }
