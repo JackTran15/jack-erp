@@ -7,6 +7,7 @@ import { StockBalanceEntity } from '../../inventory/ledger/stock-balance.entity'
 export interface ItemWarehouseLocation {
   code: string | null;
   name: string | null;
+  storage: string | null;
 }
 
 /** The four tables the resolution below reads. */
@@ -23,6 +24,7 @@ export interface ItemWarehouseLocationRepos {
  * `ItemWarehouseLocation` string built from a list of these.
  */
 interface ItemShelf {
+  /** Not displayed — only the final tie-break in `joinShelves`. */
   storageCode: string | null;
   storageName: string;
   locationCode: string;
@@ -45,11 +47,13 @@ interface ItemShelf {
  * These are a union, not a priority order — an item whose preferred shelf is
  * empty but has real stock elsewhere reports both. Only active storages and
  * active locations count, and a pair explicitly set to "Ngừng theo dõi" is
- * skipped. Every matching shelf is joined into one cell: `code` lists the
- * location codes alone (`"A101, A201"`), de-duplicated, and `name` lists one
- * `"TênKho-TênVịTrí"` per shelf (`"Kho A1-Kệ A101, Kho A2-Kệ A201"`) — a
- * location code is only unique within its storage, so the name cell is where
- * the warehouse is identified. Nothing left → empty cell.
+ * skipped. Every matching shelf is joined into three cells: `code` lists the
+ * location codes (`"A101, A201"`), `name` lists the location names
+ * (`"Kệ A101, Kệ A201"`), and `storage` lists the warehouse names
+ * (`"Kho A1, Kho A2"`). The warehouse gets a column of its own rather than a
+ * prefix inside the location cells — a location code is only unique within its
+ * storage, so the information is needed, but prefixing crowded out the part
+ * actually being read. Nothing left → all three empty.
  *
  * Callers pass one branch at a time because a shelf belongs to exactly one
  * branch; a row spanning several has no single location.
@@ -108,24 +112,33 @@ export async function resolveItemWarehouseLocations(
 }
 
 /**
- * Deterministic order (storage code, then location code) so the same data
- * joins into the same string on every load, then the join itself.
+ * Deterministic order, then the join itself.
  *
- * The two cells are deliberately not symmetric: the code cell carries location
- * codes alone, de-duplicated because two warehouses of one branch may use the
- * same code, while the name cell keeps one "TênKho-TênVịTrí" entry per shelf
- * and is therefore where the warehouse is still named. `Set` preserves
- * insertion order, so the sort above still decides the order.
+ * Sorted by location code, then location name — the keys the reader can
+ * actually see. Storage code is only the final tie-break: two shelves in
+ * different warehouses may share both a code and a name, and without it their
+ * order would fall back to query order.
+ *
+ * The three cells are deliberately not symmetric, so their entry counts can
+ * differ on the same row. `code` and `storage` de-duplicate: two warehouses of
+ * one branch may use the same location code, and one item usually occupies
+ * several shelves of the same warehouse — "999, 999" and "Kho A1, Kho A1" say
+ * nothing. `name` does not: its entry count is the number of shelves the item
+ * actually sits on, which is the point of the column. All three follow the one
+ * sort above, so they read in parallel — `Set` preserves insertion order.
  */
 function joinShelves(shelves: ItemShelf[] | undefined): ItemWarehouseLocation {
-  if (!shelves?.length) return { code: null, name: null };
-  const sorted = [...shelves].sort((a, b) => {
-    const byStorage = (a.storageCode ?? '').localeCompare(b.storageCode ?? '');
-    return byStorage || a.locationCode.localeCompare(b.locationCode);
-  });
+  if (!shelves?.length) return { code: null, name: null, storage: null };
+  const sorted = [...shelves].sort(
+    (a, b) =>
+      a.locationCode.localeCompare(b.locationCode) ||
+      a.locationName.localeCompare(b.locationName) ||
+      (a.storageCode ?? '').localeCompare(b.storageCode ?? ''),
+  );
   return {
     code: [...new Set(sorted.map((s) => s.locationCode))].join(', '),
-    name: sorted.map((s) => `${s.storageName}-${s.locationName}`).join(', '),
+    name: sorted.map((s) => s.locationName).join(', '),
+    storage: [...new Set(sorted.map((s) => s.storageName))].join(', '),
   };
 }
 

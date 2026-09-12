@@ -17,6 +17,7 @@ export const PROFIT_BY_ITEM_COLUMNS: ProfitColumnDef[] = [
   { key: 'skuCode', type: ReportColumnDataType.STRING },
   { key: 'itemName', type: ReportColumnDataType.STRING },
   { key: 'unit', type: ReportColumnDataType.STRING },
+  { key: 'locationStorage', type: ReportColumnDataType.STRING },
   { key: 'location', type: ReportColumnDataType.STRING },
   { key: 'quantity', type: ReportColumnDataType.NUMBER },
   { key: 'revenue', type: ReportColumnDataType.CURRENCY },

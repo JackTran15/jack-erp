@@ -154,7 +154,8 @@ describe('resolveItemWarehouseLocations', () => {
 
     expect(result.get('item-1')).toEqual({
       code: 'A101, A201',
-      name: 'Kho A1-Kệ A101, Kho A2-Kệ A201',
+      name: 'Kệ A101, Kệ A201',
+      storage: 'Kho A1, Kho A2',
     });
   });
 
@@ -168,7 +169,7 @@ describe('resolveItemWarehouseLocations', () => {
 
     const result = await resolveItemWarehouseLocations(repos, ['item-2'], 'org-1', 'branch-1');
 
-    expect(result.get('item-2')).toEqual({ code: 'A101', name: 'Kho A1-Kệ A101' });
+    expect(result.get('item-2')).toEqual({ code: 'A101', name: 'Kệ A101', storage: 'Kho A1' });
   });
 
   it('unions an empty preferred shelf with a different shelf that still has stock (AC-03)', async () => {
@@ -183,17 +184,18 @@ describe('resolveItemWarehouseLocations', () => {
 
     expect(result.get('item-3')).toEqual({
       code: 'A101, B202',
-      name: 'Kho A1-Kệ A101, Kho A2-Kệ B202',
+      name: 'Kệ A101, Kệ B202',
+      storage: 'Kho A1, Kho A2',
     });
   });
 
-  it('is deterministic across repeated calls, ordered by warehouse code then location code (AC-06)', async () => {
+  it('is deterministic across repeated calls, ordered by location code (AC-06)', async () => {
     const build4 = () =>
       build({
         storages: [wh1, wh2],
         locations: [locA101, locA201],
-        // Preferred rows come back "A2 before A1" — the resolved order must not
-        // depend on this and must still sort A1 ahead of A2.
+        // Preferred rows come back "A201 before A101" — the resolved order must
+        // not depend on query order and must still sort A101 ahead of A201.
         preferred: [
           { itemId: 'item-4', storageId: 'wh-a2', locationId: 'loc-a201' },
           { itemId: 'item-4', storageId: 'wh-a1', locationId: 'loc-a101' },
@@ -204,9 +206,30 @@ describe('resolveItemWarehouseLocations', () => {
     const first = await resolveItemWarehouseLocations(build4().repos, ['item-4'], 'org-1', 'branch-1');
     const second = await resolveItemWarehouseLocations(build4().repos, ['item-4'], 'org-1', 'branch-1');
 
-    const expected = { code: 'A101, A201', name: 'Kho A1-Kệ A101, Kho A2-Kệ A201' };
+    const expected = { code: 'A101, A201', name: 'Kệ A101, Kệ A201', storage: 'Kho A1, Kho A2' };
     expect(first.get('item-4')).toEqual(expected);
     expect(second.get('item-4')).toEqual(expected);
+  });
+
+  it('sorts by location code, not by the warehouse the shelf belongs to (AC-06)', async () => {
+    // The two keys disagree here: warehouse A1 holds Z999 and A2 holds A101, so
+    // the old "(storage code, location code)" order would read "Z999, A101" —
+    // deterministic, but sorted on something no column shows any more.
+    const locZ999: LocationRow = { id: 'loc-z999', code: 'Z999', name: 'Kệ Z999', storageId: 'wh-a1', isActive: true };
+    const locA101InA2: LocationRow = { id: 'loc-a101-a2', code: 'A101', name: 'Kệ A101', storageId: 'wh-a2', isActive: true };
+    const { repos } = build({
+      storages: [wh1, wh2],
+      locations: [locZ999, locA101InA2],
+      preferred: [
+        { itemId: 'item-12', storageId: 'wh-a1', locationId: 'loc-z999' },
+        { itemId: 'item-12', storageId: 'wh-a2', locationId: 'loc-a101-a2' },
+      ],
+      balances: [],
+    });
+
+    const result = await resolveItemWarehouseLocations(repos, ['item-12'], 'org-1', 'branch-1');
+
+    expect(result.get('item-12')).toEqual({ code: 'A101, Z999', name: 'Kệ A101, Kệ Z999', storage: 'Kho A2, Kho A1' });
   });
 
   it('returns an empty cell when the item sits on no shelf at all', async () => {
@@ -219,7 +242,7 @@ describe('resolveItemWarehouseLocations', () => {
 
     const result = await resolveItemWarehouseLocations(repos, ['item-5'], 'org-1', 'branch-1');
 
-    expect(result.get('item-5')).toEqual({ code: null, name: null });
+    expect(result.get('item-5')).toEqual({ code: null, name: null, storage: null });
   });
 
   it('still reports the location code when the warehouse has no code of its own (A-06)', async () => {
@@ -237,7 +260,30 @@ describe('resolveItemWarehouseLocations', () => {
     // The code cell never carried a warehouse prefix since ADR-05, so a missing
     // storage code can no longer produce a leading "-" — the name cell still
     // names the warehouse.
-    expect(result.get('item-6')).toEqual({ code: 'A101', name: 'Kho không mã-Kệ A101' });
+    expect(result.get('item-6')).toEqual({ code: 'A101', name: 'Kệ A101', storage: 'Kho không mã' });
+  });
+
+  it('collapses two shelves of the same warehouse into one storage entry (AC-16)', async () => {
+    // The storage cell de-duplicates for the same reason the code cell does:
+    // "Kho A1, Kho A1" says nothing. The location cells still list both shelves.
+    const locA102: LocationRow = { id: 'loc-a102', code: 'A102', name: 'Kệ A102', storageId: 'wh-a1', isActive: true };
+    const { repos } = build({
+      storages: [wh1],
+      locations: [locA101, locA102],
+      preferred: [
+        { itemId: 'item-13', storageId: 'wh-a1', locationId: 'loc-a101' },
+        { itemId: 'item-13', storageId: 'wh-a1', locationId: 'loc-a102' },
+      ],
+      balances: [],
+    });
+
+    const result = await resolveItemWarehouseLocations(repos, ['item-13'], 'org-1', 'branch-1');
+
+    expect(result.get('item-13')).toEqual({
+      code: 'A101, A102',
+      name: 'Kệ A101, Kệ A102',
+      storage: 'Kho A1',
+    });
   });
 
   it('collapses two warehouses that use the same location code into one code entry (AC-14)', async () => {
@@ -255,9 +301,10 @@ describe('resolveItemWarehouseLocations', () => {
 
     const result = await resolveItemWarehouseLocations(repos, ['item-11'], 'org-1', 'branch-1');
 
-    // "999, 999" would be valid but meaningless; the name cell is what tells
-    // the two shelves apart (A-18).
-    expect(result.get('item-11')).toEqual({ code: '999', name: 'Kho A1-999, Kho A2-999' });
+    // The code cell collapses because "999, 999" says nothing. The name cell
+    // does not: its entry count is how many shelves the item is on, and the
+    // warehouse is no longer named anywhere, so both entries read "999" (A-18).
+    expect(result.get('item-11')).toEqual({ code: '999', name: '999, 999', storage: 'Kho A1, Kho A2' });
   });
 
   it('resolves a page in exactly four repository queries when no preferred shelf needs an untracked check (A-11)', async () => {
@@ -291,7 +338,7 @@ describe('resolveItemWarehouseLocations', () => {
 
     const result = await resolveItemWarehouseLocations(repos, ['item-8'], 'org-1', 'branch-1');
 
-    expect(result.get('item-8')).toEqual({ code: 'A201', name: 'Kho A2-Kệ A201' });
+    expect(result.get('item-8')).toEqual({ code: 'A201', name: 'Kệ A201', storage: 'Kho A2' });
   });
 
   it('falls back to the showroom shelf when every warehouse pair is untracked and showroomFallback is requested (AC-05)', async () => {
@@ -307,7 +354,7 @@ describe('resolveItemWarehouseLocations', () => {
       showroomFallback: true,
     });
 
-    expect(result.get('item-9')).toEqual({ code: 'MacDinh', name: 'Showroom chính-Mặc định' });
+    expect(result.get('item-9')).toEqual({ code: 'MacDinh', name: 'Mặc định', storage: 'Showroom chính' });
   });
 
   it('returns an empty cell instead of the showroom shelf when showroomFallback is not requested (AC-05)', async () => {
@@ -321,7 +368,7 @@ describe('resolveItemWarehouseLocations', () => {
 
     const result = await resolveItemWarehouseLocations(repos, ['item-9'], 'org-1', 'branch-1');
 
-    expect(result.get('item-9')).toEqual({ code: null, name: null });
+    expect(result.get('item-9')).toEqual({ code: null, name: null, storage: null });
   });
 
   it('never mixes in the showroom shelf when the item already has a warehouse shelf (A-08)', async () => {
@@ -336,7 +383,7 @@ describe('resolveItemWarehouseLocations', () => {
       showroomFallback: true,
     });
 
-    expect(result.get('item-10')).toEqual({ code: 'A101', name: 'Kho A1-Kệ A101' });
+    expect(result.get('item-10')).toEqual({ code: 'A101', name: 'Kệ A101', storage: 'Kho A1' });
     // Proves the showroom round never ran, not just that its output was discarded.
     expect(stockBalances.createQueryBuilder).toHaveBeenCalledTimes(1);
   });

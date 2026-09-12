@@ -17,6 +17,7 @@ const row = (over: Partial<ProfitByItemRowInput> = {}): ProfitByItemRowInput => 
   categoryCode: 'CAT1',
   categoryName: 'Category 1',
   unit: 'pcs',
+  locationStorage: null,
   location: null,
   direction: ItemDirection.OUT,
   quantity: 2,
@@ -80,6 +81,18 @@ describe('aggregateProfitByItem', () => {
     expect(groups).toHaveLength(2);
     const parentGroup = groups.find((g) => g.skuCode === 'PARENT');
     expect(parentGroup).toMatchObject({ quantity: 3, revenue: 3000, costOfGoods: 1200 });
+  });
+
+  it('carries the warehouse through at item grain, but never at parent/group grain', () => {
+    const withStorage = row({ locationStorage: 'Kho A1' });
+    expect(
+      itemGroupCellValue('locationStorage', aggregateProfitByItem([withStorage], 'item')[0]),
+    ).toBe('Kho A1');
+    for (const grain of ['parent', 'group'] as const) {
+      expect(
+        itemGroupCellValue('locationStorage', aggregateProfitByItem([withStorage], grain)[0]),
+      ).toBeNull();
+    }
   });
 
   it('carries location through at item grain, but never at parent/group grain', () => {

@@ -138,7 +138,7 @@ describe('StockSummaryReport', () => {
 
     expect(cols.map((c) => c.col)).toEqual([
       'name', 'parentSku', 'parentName', 'color', 'size', 'unit', 'group',
-      'brand', 'sku', 'positionCode', 'positionName',
+      'brand', 'sku', 'positionStorage', 'positionCode', 'positionName',
       'openingQty', 'openingValue', 'inQty', 'inValue', 'outQty', 'outValue',
       'endingQty', 'endingValue', 'transferOutQty', 'transferOutValue',
       'incomingQty', 'incomingValue', 'supplier',
@@ -152,9 +152,10 @@ describe('StockSummaryReport', () => {
     expect(inQty.align).toBe('right');
     expect(inQty.filterKind).toBe('number');
     expect(cols.find((c) => c.col === 'supplier')!.filterKind).toBe('text');
-    // ADR-04, re-measured 12/09/2026 after ADR-05: the code cell is bare codes
-    // ("A10, A201") and fits 220, while the name cell keeps a "TênKho-TênVịTrí"
-    // pair per shelf and needed 320 — a real two-shelf row measured 271px.
+    // ADR-08: these three are re-measured together in T-03-04 now that the
+    // warehouse has a column of its own and the name cell no longer carries a
+    // "TênKho-" prefix. Until then they keep the widths measured on 12/09/2026.
+    expect(cols.find((c) => c.col === 'positionStorage')!.width).toBe(220);
     expect(cols.find((c) => c.col === 'positionCode')!.width).toBe(220);
     expect(cols.find((c) => c.col === 'positionName')!.width).toBe(320);
   });
@@ -264,7 +265,7 @@ describe('StockSummaryReport', () => {
 
     const cols = await report.buildColumns();
 
-    for (const key of ['positionCode', 'positionName']) {
+    for (const key of ['positionStorage', 'positionCode', 'positionName']) {
       expect(cols.find((c) => c.col === key)!.filterKind).toBe('none');
     }
   });
@@ -478,7 +479,7 @@ describe('StockSummaryReport', () => {
 
       const cols = await report.buildColumns(actor, { statBy: 'item' });
 
-      expect(cols).toHaveLength(24);
+      expect(cols).toHaveLength(25);
     });
   });
 
@@ -489,13 +490,14 @@ describe('StockSummaryReport', () => {
       const { report } = build([periodRow({ itemId: 'item-1' })]);
 
       const result = await report.buildData(
-        { ...baseDto, columns: ['sku', 'positionCode', 'positionName'] },
+        { ...baseDto, columns: ['sku', 'positionStorage', 'positionCode', 'positionName'] },
         actor,
       );
 
       expect(result.rows[0]).toMatchObject({
+        positionStorage: 'Kho A1',
         positionCode: 'A10',
-        positionName: 'Kho A1-A10',
+        positionName: 'A10',
       });
     });
 
@@ -506,13 +508,14 @@ describe('StockSummaryReport', () => {
       const { report } = build([periodRow({ itemId: 'item-2' })]);
 
       const result = await report.buildData(
-        { ...baseDto, columns: ['sku', 'positionCode', 'positionName'] },
+        { ...baseDto, columns: ['sku', 'positionStorage', 'positionCode', 'positionName'] },
         actor,
       );
 
       expect(result.rows[0]).toMatchObject({
+        positionStorage: 'Showroom',
         positionCode: 'DEFAULT',
-        positionName: 'Showroom-Mặc định',
+        positionName: 'Mặc định',
       });
     });
 
@@ -545,13 +548,14 @@ describe('StockSummaryReport', () => {
       );
 
       const result = await report.buildData(
-        { ...baseDto, columns: ['sku', 'positionCode', 'positionName'] },
+        { ...baseDto, columns: ['sku', 'positionStorage', 'positionCode', 'positionName'] },
         actor,
       );
 
       expect(result.rows[0]).toMatchObject({
+        positionStorage: 'Kho A1, Kho A2',
         positionCode: 'A10, A201',
-        positionName: 'Kho A1-A10, Kho A2-Kệ A201',
+        positionName: 'A10, Kệ A201',
       });
     });
 
@@ -616,11 +620,12 @@ describe('StockSummaryReport', () => {
   // ── Chuỗi cửa hàng: một dòng mỗi hàng hóa, không có vị trí ─────────────────
 
   describe('chain view', () => {
-    it('drops the two location columns from the catalog', async () => {
+    it('drops all three location columns from the catalog', async () => {
       const { report } = build([]);
 
       const cols = await report.buildColumns(actor, { viewMode: 'chain' });
 
+      expect(cols.map((c) => c.col)).not.toContain('positionStorage');
       expect(cols.map((c) => c.col)).not.toContain('positionCode');
       expect(cols.map((c) => c.col)).not.toContain('positionName');
       // Nothing else moves: the chain view is the branch view minus a dimension.

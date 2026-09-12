@@ -18,6 +18,7 @@ export type RevenueByItemDimension =
   | 'itemCategory'
   | 'brand'
   | 'unit'
+  | 'locationStorage'
   | 'locationCode'
   | 'locationName';
 
@@ -58,6 +59,7 @@ export const REVENUE_BY_ITEM_COLUMNS: RevenueByItemColumnDef[] = [
   { key: 'sku', type: ReportColumnDataType.STRING, group: null, source: { kind: 'dimension', field: 'sku' } },
   { key: 'itemName', type: ReportColumnDataType.STRING, group: null, source: { kind: 'dimension', field: 'name' } },
   { key: 'unit', type: ReportColumnDataType.STRING, group: null, source: { kind: 'dimension', field: 'unit' } },
+  { key: 'locationStorage', type: ReportColumnDataType.STRING, group: null, source: { kind: 'dimension', field: 'locationStorage' } },
   { key: 'locationCode', type: ReportColumnDataType.STRING, group: null, source: { kind: 'dimension', field: 'locationCode' } },
   { key: 'locationName', type: ReportColumnDataType.STRING, group: null, source: { kind: 'dimension', field: 'locationName' } },
   { key: 'quantity', type: ReportColumnDataType.NUMBER, group: null, source: { kind: 'measure', field: 'quantity' } },

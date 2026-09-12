@@ -27,9 +27,9 @@ Bên trong, `resolveWithinStorages` đổi từ "chọn một kệ" sang "gom m�
 6. **Loại cặp "Ngừng theo dõi"** — giữ nguyên truy vấn `isTracked = false` hiện có
    (`:130-146`), nhưng loại **đúng cặp** khỏi tập thay vì xoá cả mặt hàng. Bước (4) đã tự
    lọc `isTracked = true`, nên thực chất bước này chỉ còn dọn các cặp đến từ kệ ưu tiên.
-7. **Sắp xếp** tất định theo `(storageCode, locationCode)` rồi **nối chuỗi**: ô mã chỉ gồm
-   `locationCode`, khử trùng theo mã; ô tên gồm `TênKho-TênVịTrí`, không khử trùng
-   (ADR-05, sửa 2026-09-12).
+7. **Sắp xếp** tất định theo `(locationCode, locationName, storageCode)` rồi **nối chuỗi**: ô
+   mã chỉ gồm `locationCode`, khử trùng theo mã; ô tên chỉ gồm `locationName`, **không** khử
+   trùng (ADR-06, sửa lần hai 2026-09-12).
 
 `showroomFallback` giữ nguyên ngữ nghĩa: chỉ chạy vòng hai trên kho showroom cho những mặt
 hàng **không** ra kệ kho lưu trữ nào (A-08). Ba báo cáo doanh thu/lợi nhuận không truyền cờ
@@ -44,16 +44,20 @@ Về độ rộng, chỉ nới cột vị trí: hai cột của Tổng hợp nh�
 | Đẩy việc tính vị trí xuống SQL bằng `string_agg` trong CTE của `stock-period.service.ts` | Engine trả `NULL::text` cho hai cột này ở grain `item` (`:222-224`); vị trí cố ý **không** phải `le.location_id` của chứng từ (lý do ở `item-warehouse-location.util.ts:22-27`). Viết `string_agg` trong CTE là trả lời sai câu hỏi. Chỉ đáng làm nếu cần lọc theo vị trí — đã loại ở A-05 |
 | Dùng `LEFT JOIN LATERAL` như `temp-warehouse-report.service.ts:502-544` | Mẫu đó tồn tại để cột **lọc được**; nó vẫn `LIMIT 1`. Chuyển sang lateral mà không cần lọc là gánh chi phí kiến trúc không đổi lấy gì (A-05) |
 | Trả `Map<itemId, ItemShelf[]>` và để từng báo cáo tự nối chuỗi | Bốn nơi gọi phải sửa, ba trong số đó chỉ để lặp lại đúng một dòng `.join(', ')`. `profit-by-item.report.ts:222-229` còn phải viết thêm vì nó chỉ lấy `code`. Nhiều diff hơn, cùng kết quả |
-| Thêm cột "Kho" riêng | Không được yêu cầu. Sau khi A-03 đảo (2026-09-12), thông tin kho nằm ở cột "Tên vị trí" sẵn có — thêm cột thứ ba là dư |
-| Giữ tiền tố mã kho ở ô mã để phân biệt hai kho trùng mã | Akenzy đã xem trên prod và chốt ngược (ADR-05): ô mã phải là mã vị trí. Việc phân biệt kho chuyển sang cột "Tên vị trí" |
+| ~~Thêm cột "Kho" riêng~~ | **Không còn bị loại** — Akenzy chốt 2026-09-12 đây chính là phương án (ADR-07). Lý do loại cũ ("không được yêu cầu") hết hiệu lực khi ADR-06 làm kho biến mất khỏi mọi cột |
+| Nhét tên kho trở lại ô "Tên vị trí" | Chính thứ Akenzy vừa bác ở ADR-06. Cột "Kho" riêng giữ ô vị trí ngắn mà không mất thông tin |
+| Hai cột "Mã kho" + "Tên kho" | Đối xứng với cặp mã/tên vị trí, nhưng thành 4 cột cho một thông tin. Akenzy chọn một cột tên kho (A-19) |
+| Cột "Kho" chứa **mã** kho | Mã kho thật có dạng `WHxxxxxx` (`inventory-location.service.ts:454`) — ngắn nhưng không đọc được. Akenzy chọn tên kho (A-19) |
+| Giữ tiền tố mã kho ở ô mã để phân biệt hai kho trùng mã | Akenzy đã xem trên prod và chốt ngược (ADR-05): ô mã phải là mã vị trí |
+| Giữ tiền tố tên kho ở ô tên | Akenzy xem lại báo cáo 2026-09-12 và chốt ngược lần hai (ADR-06): ô tên chỉ là tên vị trí. Đánh đổi đã biết và đã chấp nhận — hai ô không còn cho biết hàng nằm ở kho nào |
 | Cắt danh sách sau N cặp kèm "+N" | Đã loại ở A-02; kéo theo phải tách riêng đường xuất Excel để file không bị cắt |
 
 ## Domain model
 
 | Entity | Fields | Notes |
 | --- | --- | --- |
-| `ItemShelf` (mới, nội bộ file) | `storageCode: string \| null`, `storageName: string`, `locationCode: string`, `locationName: string` | Value object, chỉ sống trong `item-warehouse-location.util.ts`; không export |
-| `ItemWarehouseLocation` (giữ nguyên tên, đổi ngữ nghĩa) | `code: string \| null`, `name: string \| null` | Nay là chuỗi **đã nối**: `"A101, A201"` / `"Kho A1-Kệ A101, Kho A2-Kệ A201"` (ADR-05). `code` khử trùng theo mã nên có thể ít mục hơn `name`. `null` khi không có kệ nào |
+| `ItemShelf` (mới, nội bộ file) | `storageCode: string \| null`, `storageName: string`, `locationCode: string`, `locationName: string` | Value object, chỉ sống trong `item-warehouse-location.util.ts`; không export. `storageName` bị xoá ở T-01-06 (ADR-06) rồi **khôi phục ở T-03-01** (ADR-07) khi cột "Kho" cần nó — ghi lại để người đọc `git log` không tưởng là lặp lại sai lầm. `storageCode` là khoá phá hoà cuối trong sắp xếp, không được hiển thị |
+| `ItemWarehouseLocation` (giữ nguyên tên, đổi ngữ nghĩa) | `code: string \| null`, `name: string \| null`, `storage: string \| null` | Chuỗi **đã nối**: `"A101, A201"` / `"Kệ A101, Kệ A201"` / `"Kho A1, Kho A2"`. `code` và `storage` khử trùng, `name` không — nên ba ô có thể lệch số mục, đó là chủ ý (A-18, A-19). `storage` thêm ở ADR-07; ba nơi gọi không dùng nó thì không phải sửa. `null` khi không có kệ nào |
 
 Nguồn dữ liệu không đổi: `storages`, `locations`, `item_storage_locations`, `stock_balances`.
 
@@ -76,14 +80,15 @@ Tổng hợp nhập xuất tồn kho; `locationCode` / `locationName` ở các b
 Quy tắc nối chuỗi:
 
 ```
-// sau ADR-05 (2026-09-12) — pairs đã sắp theo (storageCode, locationCode)
-code = [...new Set(pairs.map(p => p.locationCode))].join(', ')
-name = pairs.map(p => `${p.storageName}-${p.locationName}`).join(', ')
+// sau ADR-06 (2026-09-12) — pairs đã sắp theo (locationCode, locationName, storageCode)
+code    = [...new Set(pairs.map(p => p.locationCode))].join(', ')
+name    = pairs.map(p => p.locationName).join(', ')
+storage = [...new Set(pairs.map(p => p.storageName))].join(', ')   // ADR-07
 ```
 
-Hai ô nay **không** còn đối xứng: ô mã khử trùng theo mã vị trí (A-18), ô tên giữ đủ mọi cặp vì
-tên kho làm chúng khác nhau. `Set` giữ thứ tự chèn nên thứ tự tất định của A-07 và AC-06 không
-đổi. Nhánh phòng thủ `storageCode` rỗng của A-06 không còn cần ở ô mã.
+Hai ô nay **không** còn đối xứng: ô mã khử trùng theo mã vị trí, ô tên giữ đủ một mục cho mỗi kệ
+kể cả khi trùng tên (A-18, Akenzy chốt 2026-09-12). `Set` giữ thứ tự chèn nên thứ tự tất định
+của A-07 và AC-06 không đổi. Nhánh phòng thủ `storageCode` rỗng của A-06 không còn cần ở ô nào.
 
 ## State ownership
 
@@ -103,8 +108,11 @@ tải — nguyên tắc có sẵn, giữ nguyên.
 | Mặt hàng không nằm trên kệ kho lưu trữ nào, và không có showroom fallback | không phải lỗi — `{ code: null, name: null }` | Ô trống, y như hiện nay |
 | Chế độ xem chuỗi (`viewMode === 'chain'`) | không phải lỗi — hai cột bị loại khỏi danh mục | Cột không xuất hiện |
 | Chọn nhiều cửa hàng, không có chi nhánh duy nhất | không phải lỗi — trả `Map` rỗng, không truy vấn | Ô trống |
-| `storages.code` rỗng (A-06, không kỳ vọng xảy ra) | không còn liên quan tới ô mã: từ ADR-05 ô mã không có tiền tố kho; ô tên dùng `storageName` (không nullable) | Không ảnh hưởng |
-| Hai kệ khác kho trùng mã vị trí | không phải lỗi — ô mã gộp còn một mục (A-18) | Ô mã `999`, ô tên `Kho A1-999, Kho A2-999` |
+| `storages.code` rỗng (A-06, không kỳ vọng xảy ra) | không còn liên quan tới nội dung ô nào: từ ADR-06 cả hai ô đều không nhắc tới kho. Chỉ còn là khoá phá hoà cuối trong sắp xếp, `localeCompare` trên chuỗi rỗng vẫn tất định | Không ảnh hưởng |
+| Hai kệ khác kho trùng mã vị trí | không phải lỗi — ô mã gộp còn một mục (A-18) | Ô mã `999`, ô tên giữ đủ hai mục |
+| Hai kệ khác kho trùng cả mã lẫn tên vị trí | không phải lỗi — ô tên đọc ra `999, 999`, đã chấp nhận (A-18, 2026-09-12) | Ô mã `999`, ô tên `999, 999`, ô kho phân biệt được hai kho |
+| Nhiều kệ trong **cùng một** kho | không phải lỗi — ô kho khử trùng còn một tên (A-19, AC-16) | Ô kho `Kho A1`, ô mã `A101, A102` |
+| `storages.name` rỗng | không kỳ vọng xảy ra: cột `name` của `storages` không nullable. `storageName` rơi về `''` chỉ khi `storageById` không có kho đó, mà không thể vì kệ được lọc theo chính tập kho đó | Ô kho trống cho kệ đó |
 | Một cặp `(mặt hàng, vị trí)` bị Ngừng theo dõi | không phải lỗi — loại đúng cặp | Cặp đó biến mất, các cặp khác giữ nguyên |
 | Truy vấn `stock_balances` lỗi | lỗi hạ tầng, ném lên như hiện nay | Báo cáo trả 500 — hành vi không đổi |
 
@@ -188,6 +196,10 @@ Tổng hợp nhập xuất tồn kho lên `320`, cùng `tableConfig.width` của
 Giới hạn vẫn còn và vẫn theo ADR-04: một mặt hàng nằm trên ba kệ trở lên sẽ lại tràn `320`; khi đó
 `title=` là thứ giữ dữ liệu đọc được, đúng như quyết định gốc.
 
+**Sửa lại 2026-09-12 (ADR-06):** mốc đo co xuống `Kệ A101, Kệ A201` — chính chuỗi 271px đo được ở
+trên mất phần `HANG SUA 2026-` và `KHO SG-`. `320` và `220` giữ nguyên, nay dư; AC-12 và AC-13 coi
+như đã pass bằng phép đo với chuỗi dài hơn. Thu hẹp cột là việc khác, không nằm trong lần sửa này.
+
 ### ADR-05 — Mã kho ra khỏi ô "Mã vị trí"; ô mã khử trùng theo mã vị trí
 **Context:** ADR-03 gộp `MãKho-MãVịTrí` vào ô mã để hai kho trùng mã vị trí không đọc thành
 `A101, A101`. Ngày 12/09/2026 Akenzy xem báo cáo Doanh thu theo mặt hàng trên prod: mọi hàng đọc
@@ -201,4 +213,76 @@ không phân biệt được kho; người đọc nhìn cột "Tên vị trí". 
 có một cột và nó lấy `code`, nên báo cáo đó mất thông tin kho — chấp nhận, vì đó là cột vốn có.
 T-01-05 và T-02-04 cập nhật lại chính những kỳ vọng mà T-01-01, T-01-03, T-02-01, T-02-02 vừa
 chốt hai ngày trước; đó là cái giá của việc đảo quyết định, và nó nằm trên trail.
+**Status:** superseded bởi ADR-06 (phần ô "Tên vị trí") — Akenzy, 12/09/2026. Phần ô "Mã vị trí"
+vẫn nguyên hiệu lực.
+
+### ADR-06 — Tên kho ra khỏi nốt ô "Tên vị trí"; sắp xếp đổi sang khoá nhìn thấy được
+**Context:** ADR-05 để tên kho ở lại ô "Tên vị trí" với lập luận "mã vị trí chỉ unique trong
+phạm vi một kho, nên ô tên là nơi định danh kho". Ngày 12/09/2026 Akenzy xem lại Tổng hợp nhập
+xuất tồn kho sau khi T-01-05 lên: cột "Tên vị trí" đọc thành
+`HANG SUA 2026-S01.01, KHO SG-A01.01` — hai tên kho dài chiếm gần hết ô, phần thật sự cần đọc
+là vị trí thì bị đẩy ra sau. Yêu cầu: *"Hiện tại Tên vị trí đang show Kho + Vị trí, nó chỉ nên
+show vị trí 1; vị trí 2, ..."*.
+**Decision:** Ô "Tên vị trí" chỉ chứa `locationName`, nối `", "`, **không** khử trùng — số mục
+bằng số kệ thật. Áp cho cả 4 báo cáo qua `joinShelves`, không thêm option, giữ ADR-01.
+Thứ tự sắp xếp đổi từ `(storageCode, locationCode)` sang `(locationCode, locationName,
+storageCode)`.
+**Alternatives considered:** (a) giữ nguyên thứ tự cũ — bị loại vì khoá sắp xếp không còn nhìn
+thấy được, đúng dòng QA báo sẽ đọc ra `S01.01, A01.01` và trông như chưa sắp; (b) khử trùng ô
+tên như ô mã — Akenzy được hỏi trực tiếp và chọn giữ đủ mọi mục, chấp nhận `999, 999`;
+(c) thêm option cho riêng Tổng hợp nhập xuất tồn kho — bị loại, phá ADR-01 và dựng lại đúng
+tình trạng không nhất quán mà US-02 sinh ra để chống.
+**Consequences:** Không cột nào của 4 báo cáo còn cho biết hàng nằm ở kho nào — đánh đổi đã nêu
+với Akenzy trước khi chốt và được chấp nhận. Muốn kho trở lại thì mở cột "Kho" riêng ở feature
+khác, không nhét lại vào ô vị trí. Mốc đo độ rộng của AC-12/AC-13 co lại, nên `320` và `220` mà
+T-01-04/T-02-03 vừa đo nay dư chứ không thiếu; **không** thu hẹp trong lần này. `storageName` hết
+được hiển thị và đã bị xoá khỏi `ItemShelf` (T-01-06); `storageCode` tụt xuống khoá phá hoà và ở
+lại, vì là thứ duy nhất giữ tất định cho hai kệ trùng cả mã lẫn tên. Đây là lần đảo thứ ba của cùng một quyết
+định định dạng trong ba ngày; nó nằm trên trail, kèm cái giá là T-01-06 và T-02-05 phải sửa lại
+chính kỳ vọng T-01-05 và T-02-04 chốt sáng nay.
 **Status:** accepted — Akenzy, 12/09/2026
+
+### ADR-07 — Kho quay lại bằng một cột riêng, không phải bằng tiền tố
+**Context:** ADR-06 bỏ tên kho khỏi ô "Tên vị trí". Hệ quả đã nêu với Akenzy ngay lúc chốt:
+không cột nào trong 4 báo cáo còn cho biết hàng nằm ở kho nào, và mã vị trí thì chỉ unique trong
+phạm vi một kho — hai kệ `999` ở hai kho đọc y hệt nhau. Ngày 12/09/2026 Akenzy yêu cầu sửa nốt
+hệ quả đó.
+**Decision:** Thêm **một** cột "Kho" cho cả 4 báo cáo, nội dung là **tên kho đã khử trùng**
+(`"Kho A1, Kho A2"`). `ItemWarehouseLocation` thêm trường `storage: string | null`;
+`ItemShelf.storageName` — vừa bị T-01-06 xoá — được khôi phục. Cột mới dùng đúng một lần gọi
+`resolveItemWarehouseLocations` sẵn có, nên nó thừa hưởng nguyên `showroomFallback`, quy tắc
+Ngừng theo dõi, và việc bị loại khỏi catalog ở chế độ chuỗi (AC-18).
+**Alternatives considered:** (a) nhét tên kho trở lại ô vị trí — chính thứ ADR-06 vừa bác;
+(b) hai cột "Mã kho" + "Tên kho" — 4 cột cho một thông tin, Akenzy loại; (c) cột chứa **mã** kho —
+ngắn hơn, nhưng mã thật có dạng `WHxxxxxx` nên không đọc được, Akenzy loại; (d) làm ở feature
+riêng — đúng theo chữ của ADR-06, nhưng feature riêng phải chép lại toàn bộ ngữ cảnh hàm dùng
+chung, 4 khai báo cột và bảng độ rộng, mà lại chốt đúng cùng một phép đo độ rộng. Mở lại G1 ở đây
+rẻ hơn và để cả ba cột cùng nằm trên một trail.
+**Consequences:** `ItemWarehouseLocation` thêm trường là đổi hợp đồng nội bộ, nhưng ba nơi gọi
+không đọc `storage` thì không phải sửa dòng nào — ADR-01 vẫn đứng. `storageName` bị xoá rồi khôi
+phục trong cùng một ngày; ghi rõ ở đây để `git log` đọc được ý định thay vì trông như lặp sai lầm.
+Bốn báo cáo rộng thêm một cột, nên độ rộng của cả ba cột vị trí phải đo lại cùng lúc thay vì chốt
+từng cột (AC-19, thay thế phần "giữ 320/220" của AC-12 và AC-13).
+**Status:** accepted — Akenzy, 12/09/2026
+
+### ADR-08 — Độ rộng chốt bằng phép đo, không bằng suy luận từ độ dài chuỗi
+**Context:** Con số `320` của cột "Tên vị trí" đo được sáng 12/09/2026 với chuỗi
+`HANG SUA 2026-S01.01, KHO SG-A01.01`. ADR-06 làm chuỗi đó ngắn lại còn `S01.01, A01.01`, và
+ADR-07 lại thêm một cột nữa vào cùng hàng. Cả hai con số `320` và `220` nay đến từ một phép đo
+không còn mô tả cái đang hiển thị.
+**Decision:** Không thu hẹp bằng cách trừ đi phần tên kho trên giấy. Dựng lại đúng kịch bản đo của
+T-01-04 — `erp_dev_3008`, 1440x900, mặt hàng nằm hai kho — đo `scrollWidth`/`clientWidth` của cả
+ba ô một lượt, rồi mới chốt ba con số. Số đo ghi vào ticket (A-20, AC-19).
+**Alternatives considered:** ước lượng từ độ dài chuỗi — chính là thứ T-01-04 đã làm và phép đo
+đã bác bỏ (`220` ⇒ 271px trong ô 259px, bị cắt). Một tiền lệ sai trong cùng feature là đủ.
+**Consequences:** Ticket đo (T-03-04) cần API và backoffice chạy được cùng DB dev — nếu môi trường
+không dựng được thì ticket đi `aidlc block`, **không** tự hạ xuống ước lượng. Ba cột chốt cùng lúc
+nên T-03-04 phải đứng sau cả T-03-02 lẫn T-03-03.
+**Status:** accepted, rồi **được miễn trừ cho chính lần này** — Akenzy, 12/09/2026.
+
+> T-03-04 đã đi `aidlc block` đúng như ADR này quy định (không đăng nhập được API local). Akenzy sau đó
+> chốt "mark done" và ticket đóng **không có phép đo**. Ba độ rộng giữ nguyên `220`/`220`/`320`, tức là
+> vẫn là số đo ngày 12/09/2026 với chuỗi dài hơn hiện tại — cột dư chứ không thiếu — nhưng cột "Kho"
+> mới thì chưa ai đo. AC-19 vì thế **không đạt theo câu chữ của nó**; chi tiết ở phần kết quả của
+> T-03-04. Quyết định của ADR này không bị rút lại: lần đo tiếp theo chạm vào dải cột vị trí vẫn phải
+> đo thật.

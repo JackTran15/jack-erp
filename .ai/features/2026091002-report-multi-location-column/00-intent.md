@@ -97,7 +97,11 @@ tồn kho trả về đúng tập dòng như trước khi sửa.
 - **Thêm ô tìm kiếm / bộ lọc theo vị trí trên báo cáo.** Chốt ngày 2026-09-10: chỉ cần giữ
   dropdown "Kho" hiện có chạy đúng. Hai cột vị trí giữ nguyên `filterKind: 'none'`
   (`stock-summary.report.ts:64-65`), nên không phải đẩy việc tính vị trí xuống SQL.
-- **Thêm cột "Kho" riêng.** Người dùng chọn gộp mã kho vào chính ô vị trí.
+- ~~**Thêm cột "Kho" riêng.** Người dùng chọn gộp mã kho vào chính ô vị trí.~~
+  **Đảo 2026-09-12 (mở lại G1 lần ba).** ADR-06 đã bỏ tên kho khỏi nốt ô "Tên vị trí", nên không
+  cột nào của 4 báo cáo còn cho biết hàng nằm ở kho nào — chính hệ quả nêu ra với Akenzy khi chốt
+  ADR-06. Akenzy chọn đưa kho trở lại bằng **một cột "Kho" riêng** (tên kho, khử trùng), đúng cách
+  ADR-06 đã chỉ ra, chứ không nhét lại vào ô vị trí. Xem US-04 và ADR-07.
 - **`stock-quantity-detail.report.ts` và `stock-summary-by-store.report.ts`.** Đã kiểm: hai
   báo cáo này không có cột vị trí nào trong `COLUMNS` (`:44-77` và `:42-63`), không gọi hàm
   dùng chung, nên không có gì để sửa.

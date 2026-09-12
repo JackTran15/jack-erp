@@ -21,6 +21,7 @@ export interface ProfitByItemRowInput {
   categoryName: string | null;
   unit: string | null;
   /** Item's current WAREHOUSE (non-showroom) location code, item grain only. */
+  locationStorage: string | null;
   location: string | null;
   /** Line movement direction — OUT adds, IN (return leg) subtracts. */
   direction: ItemDirection;
@@ -39,6 +40,7 @@ export interface ProfitItemGroupAggregate {
   categoryName: string | null;
   unit: string | null;
   /** Only ever set at item grain — a parent/category row spans multiple items, so no single location applies. */
+  locationStorage: string | null;
   location: string | null;
   quantity: number;
   revenue: number;
@@ -54,6 +56,7 @@ interface Dimension {
   categoryCode: string | null;
   categoryName: string | null;
   unit: string | null;
+  locationStorage: string | null;
   location: string | null;
 }
 
@@ -64,6 +67,7 @@ const EMPTY_DIMENSION: Dimension = {
   categoryCode: null,
   categoryName: null,
   unit: null,
+  locationStorage: null,
   location: null,
 };
 
@@ -79,6 +83,7 @@ function dimensionOf(r: ProfitByItemRowInput, grain: ProfitItemGrain): Dimension
             categoryCode: r.categoryCode,
             categoryName: r.categoryName ?? r.categoryCode ?? r.categoryId,
             unit: null,
+            locationStorage: null,
             location: null,
           }
         : EMPTY_DIMENSION;
@@ -94,6 +99,7 @@ function dimensionOf(r: ProfitByItemRowInput, grain: ProfitItemGrain): Dimension
             categoryCode: r.categoryCode,
             categoryName: r.categoryName,
             unit: r.unit,
+            locationStorage: null,
             location: null,
           }
         : {
@@ -103,6 +109,7 @@ function dimensionOf(r: ProfitByItemRowInput, grain: ProfitItemGrain): Dimension
             categoryCode: r.categoryCode,
             categoryName: r.categoryName,
             unit: r.unit,
+            locationStorage: null,
             location: null,
           };
     case 'item':
@@ -114,6 +121,7 @@ function dimensionOf(r: ProfitByItemRowInput, grain: ProfitItemGrain): Dimension
         categoryCode: r.categoryCode,
         categoryName: r.categoryName,
         unit: r.unit,
+        locationStorage: r.locationStorage,
         location: r.location,
       };
   }
@@ -141,6 +149,7 @@ export function aggregateProfitByItem(
         categoryCode: d.categoryCode,
         categoryName: d.categoryName,
         unit: d.unit,
+        locationStorage: d.locationStorage,
         location: d.location,
         quantity: 0,
         revenue: 0,
@@ -181,6 +190,8 @@ export function itemGroupCellValue(
       return agg.categoryName;
     case 'unit':
       return agg.unit;
+    case 'locationStorage':
+      return agg.locationStorage;
     case 'location':
       return agg.location;
     case 'quantity':

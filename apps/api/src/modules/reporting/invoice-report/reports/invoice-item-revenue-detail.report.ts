@@ -243,7 +243,9 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
     const needsCategory = referenced.includes('itemCategory');
     const needsSupplier = referenced.includes('supplier');
     const needsLocation =
-      referenced.includes('locationCode') || referenced.includes('locationName');
+      referenced.includes('locationStorage') ||
+      referenced.includes('locationCode') ||
+      referenced.includes('locationName');
 
     const customerById = needsCustomer
       ? await this.loadCustomers(invoiceRows, actor.organizationId)
@@ -306,6 +308,7 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
           promoPoints: pointsByLine.get(li) ?? 0,
           itemNote: li.note ?? null,
           itemCategory: categoryByItemId.get(li.itemId) ?? null,
+          locationStorage: location?.storage ?? null,
           locationCode: location?.code ?? null,
           locationName: location?.name ?? null,
           customerCode: customer?.code ?? null,

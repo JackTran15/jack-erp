@@ -24,6 +24,7 @@ import { ProfitReportFilterDto } from '../dto/profit-report-filter.dto';
 import { ProfitReportSearchDto } from '../dto/profit-report-search.dto';
 import { CountedRows } from '../../report-core/report-definition';
 import {
+  ItemWarehouseLocation,
   ItemWarehouseLocationRepos,
   resolveItemWarehouseLocations,
 } from '../../report-core/item-warehouse-location.util';
@@ -116,11 +117,15 @@ export class ProfitByItemReport implements ReportDefinition {
         }),
       );
     }
-    // "Vị trí" only applies at item grain (statBy=item, "Hàng hoá") — a parent
-    // product row spans multiple items, so no single warehouse location fits.
+    // "Kho"/"Vị trí" only apply at item grain (statBy=item, "Hàng hoá") — a
+    // parent product row spans multiple items, so no single warehouse shelf
+    // fits. Both columns drop together; leaving one behind prints a column that
+    // is always empty.
     const defs =
       filters?.statBy === ReportGroupBy.PARENT
-        ? PROFIT_BY_ITEM_COLUMNS.filter((c) => c.key !== 'location')
+        ? PROFIT_BY_ITEM_COLUMNS.filter(
+            (c) => c.key !== 'location' && c.key !== 'locationStorage',
+          )
         : PROFIT_BY_ITEM_COLUMNS;
     return defs.map((c) =>
       enrichHeader({
@@ -211,23 +216,21 @@ export class ProfitByItemReport implements ReportDefinition {
     const metaByItemId = await this.loadItemMeta(lines, actor.organizationId);
 
     const grain = resolveGrain(dto.filters.statBy);
-    // "Vị trí" only resolved at item grain, and only when actually requested.
-    const needsLocation = grain === 'item' && referenced.includes('location');
+    // "Kho"/"Vị trí" only resolved at item grain, and only when actually requested.
+    const needsLocation =
+      grain === 'item' &&
+      (referenced.includes('location') || referenced.includes('locationStorage'));
     // Shelves belong to a branch, so this is the acting branch's warehouse —
     // `ReportTableConfigSync` drops the column entirely in chain mode.
     const locationByItemId =
       needsLocation && actor.branchId
-        ? new Map(
-            [
-              ...(await resolveItemWarehouseLocations(
-                this.locationRepos,
-                [...new Set(lines.map((l) => l.itemId).filter((id): id is string => !!id))],
-                actor.organizationId,
-                actor.branchId,
-              )),
-            ].map(([itemId, loc]) => [itemId, loc.code]),
+        ? await resolveItemWarehouseLocations(
+            this.locationRepos,
+            [...new Set(lines.map((l) => l.itemId).filter((id): id is string => !!id))],
+            actor.organizationId,
+            actor.branchId,
           )
-        : new Map<string, string | null>();
+        : new Map<string, ItemWarehouseLocation>();
 
     let rows: ProfitByItemRowInput[] = lines.map((li) => {
       const meta = li.itemId ? metaByItemId.get(li.itemId) : undefined;
@@ -242,7 +245,10 @@ export class ProfitByItemReport implements ReportDefinition {
         categoryCode: meta?.categoryCode ?? null,
         categoryName: meta?.categoryName ?? null,
         unit: li.unit ?? null,
-        location: li.itemId ? locationByItemId.get(li.itemId) ?? null : null,
+        locationStorage: li.itemId
+          ? locationByItemId.get(li.itemId)?.storage ?? null
+          : null,
+        location: li.itemId ? locationByItemId.get(li.itemId)?.code ?? null : null,
         direction: li.direction,
         quantity: Number(li.quantity ?? 0),
         lineTotal: Number(li.lineTotal ?? 0),

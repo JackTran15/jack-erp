@@ -16,6 +16,7 @@ export enum ReportTableColumn {
   UNIT = 'unit',
   LOCATION = 'location',
   LOCATION_CODE = 'location_code',
+  LOCATION_STORAGE = 'location_storage',
   QUANTITY = 'quantity',
   QUANTITY_SOLD = 'quantity_sold',
 

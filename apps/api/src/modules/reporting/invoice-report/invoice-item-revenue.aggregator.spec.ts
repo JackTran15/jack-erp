@@ -23,6 +23,7 @@ const row = (over: Partial<InvoiceItemRowInput> = {}): InvoiceItemRowInput => ({
   lineTotal: 2200000,
   itemNote: 'ghi chú hàng',
   itemCategory: 'Giày dép',
+  locationStorage: 'Kho A1',
   locationCode: 'A-01',
   locationName: 'Kệ A1',
   customerCode: 'KH000001',
