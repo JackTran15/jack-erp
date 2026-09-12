@@ -87,6 +87,20 @@ export class InvoiceSearchV2Dto {
   @Type(() => CompareFilterDto)
   amountDue?: CompareFilterDto;
 
+  /**
+   * Nhân viên được ghi công bán — `employee_profiles.id`, KHÔNG phải `users.id`.
+   *
+   * Thêm cho `/mobile/invoices`, nơi vai tư vấn chỉ được thấy hoá đơn của chính
+   * mình. Đường mobile tra `employee_profiles` từ `actor.userId` rồi đặt trường
+   * này; **client không đặt được nó** vì DTO của đường mobile không phơi ra.
+   *
+   * Ở đường web thì nó là một bộ lọc bình thường như mọi bộ lọc khác — phạm vi
+   * ở đó vẫn do tổ chức và chi nhánh quyết, không do trường này.
+   */
+  @IsOptional()
+  @IsUUID()
+  salespersonId?: string;
+
   /** Ghi chú */
   @IsOptional()
   @ValidateNested()

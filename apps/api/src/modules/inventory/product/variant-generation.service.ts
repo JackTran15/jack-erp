@@ -318,7 +318,16 @@ function cartesianProduct<T>(arrays: T[][]): T[][] {
   );
 }
 
-function slugPrefix(name: string): string {
+/**
+ * Hậu tố mã sinh từ một nhãn: bỏ dấu, bỏ ký tự không phải chữ/số, lấy 3 ký tự
+ * đầu, viết hoa.
+ *
+ * **Export vì `MobileProductAttributeService` phải trả ra ĐÚNG hậu tố mà hàm
+ * này đã ghép vào mã biến thể.** App lọc danh mục bằng cách so hậu tố của mã,
+ * nên một bản sao thứ hai của luật này ở tầng khác là hai bên phân kỳ và bộ lọc
+ * lặng lẽ rỗng. Đổi luật ở đây là đổi cho cả hai.
+ */
+export function slugPrefix(name: string): string {
   return name
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')

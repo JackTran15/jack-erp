@@ -49,9 +49,14 @@ export class MobileSupplierListQueryDto {
    * Hai cột chứ không chỉ tên: mã nhà cung cấp là chuỗi viết tắt ngắn (`ABA`,
    * `TAU`) do chính người dùng đặt, nên họ gõ nó nhanh hơn gõ tên đầy đủ.
    *
-   * KHÔNG bỏ dấu: cả repo chưa bật `unaccent`, nên `duc tau` không ra
-   * `ĐỨC TÀU`. Giống hệt [MobileItemListQueryDto.search] đang chạy — đổi thì
-   * phải đổi cả hai, và đó là một việc riêng có migration.
+   * KHÔNG bỏ dấu — và nay đó là một LỰA CHỌN CHƯA LÀM, không phải một giới
+   * hạn. `unaccent` đã bật từ migration `1782500000000` và
+   * `SearchCounterpartiesQuery` đã dùng nó từ 2026-09-11; đường NÀY thì chưa,
+   * nên `duc tau` vẫn không ra
+   * `ĐỨC TÀU`. Giống hệt [MobileItemListQueryDto.search] — hai đường này dùng
+   * `ILIKE` trần, và mở `unaccent` cho chúng là một việc riêng: chúng phục vụ
+   * màn quản lý kho của erp_manager, không phải màn chọn khách của app bán
+   * hàng, nên nó cần người dùng của MÀN ĐÓ xác nhận là đáng.
    */
   @ApiPropertyOptional({ description: 'Tìm theo mã hoặc tên', example: 'ABA' })
   @IsOptional()
