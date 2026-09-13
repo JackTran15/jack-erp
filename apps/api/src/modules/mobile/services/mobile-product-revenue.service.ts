@@ -59,6 +59,7 @@ export class MobileProductRevenueService {
         // cũng khai bắt buộc, thay vì để client phát hiện bằng một lỗi 400 đến
         // từ một tầng nó không biết tới.
         issuedAt: { from: query.from, to: query.to },
+        ...(query.search?.trim() ? { search: query.search.trim() } : {}),
       } as InvoiceReportSearchDto['filters'],
       page: query.page,
       limit: query.limit,

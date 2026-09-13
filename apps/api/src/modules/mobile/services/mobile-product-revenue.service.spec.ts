@@ -59,6 +59,16 @@ describe('MobileProductRevenueService', () => {
     expect(queryOf(execute).dto.filters.issuedAt).toEqual(range);
   });
 
+  it('`search` đi vào `filters.search` sau khi cắt khoảng trắng; rỗng thì KHÔNG gửi', () => {
+    const withSearch = build();
+    withSearch.service.list({ ...range, search: '  ABA28 ' } as any, actor);
+    expect(queryOf(withSearch.execute).dto.filters.search).toBe('ABA28');
+
+    const blank = build();
+    blank.service.list({ ...range, search: '   ' } as any, actor);
+    expect(queryOf(blank.execute).dto.filters).not.toHaveProperty('search');
+  });
+
   it('KHÔNG gửi `salespersonId` — báo cáo bỏ qua nó', () => {
     // Đo trên API thật (2026-09-10): uuid có thật, uuid bịa, và không gửi gì
     // đều cho cùng 1283 dòng / 4.226.556.500đ. Gửi một bộ lọc bị bỏ qua rồi ghi

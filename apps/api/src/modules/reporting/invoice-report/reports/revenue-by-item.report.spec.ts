@@ -211,6 +211,24 @@ describe('RevenueByItemReport.buildData', () => {
     expect(totals['quantity']).toBe(5);
   });
 
+  it('filters.search khớp SKU / tên hàng, không phân biệt hoa thường; không khớp thì rỗng', async () => {
+    const report = makeReport({
+      invoices: [inv()],
+      lines: [line(), line({ itemId: 'it2', itemCode: 'BAG-01', itemName: 'Túi xách', lineTotal: 500 })],
+      items: [{ id: 'it1', categoryId: 'cat1' }, { id: 'it2', categoryId: 'cat1' }],
+      categories: [],
+    });
+
+    const bySku = await report.buildData(baseDto({ filters: { issuedAt: { from: '2026-06-01' }, search: 'sku00' } }) as any, actor);
+    expect(bySku.rows.map((r) => r.sku)).toEqual(['SKU001']);
+
+    const byName = await report.buildData(baseDto({ filters: { issuedAt: { from: '2026-06-01' }, search: 'TÚI' } }) as any, actor);
+    expect(byName.rows.map((r) => r.sku)).toEqual(['BAG-01']);
+
+    const none = await report.buildData(baseDto({ filters: { issuedAt: { from: '2026-06-01' }, search: 'zzz' } }) as any, actor);
+    expect(none.total).toBe(0);
+  });
+
   it('groups by category when statBy=group', async () => {
     const report = makeReport({
       invoices: [inv()],

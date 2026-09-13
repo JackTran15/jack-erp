@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository, SelectQueryBuilder } from 'typeorm';
+import { ILike, In, Repository, SelectQueryBuilder } from 'typeorm';
 import {
   INVOICE_REPORT_BAND_LABELS_VI,
   INVOICE_REPORT_COLUMN_LABELS_VI,
@@ -327,6 +327,29 @@ export class RevenueByItemReport implements ReportDefinition {
     }
     if (dto.filters.brand) {
       rows = rows.filter((r) => r.brand === dto.filters.brand);
+    }
+    const search = dto.filters.search?.trim().toLowerCase();
+    if (search) {
+      // Nhóm hàng hoá khớp theo MÃ hoặc TÊN — mã nhóm không nằm trên dòng, nên
+      // tra bảng nhóm một lần rồi so `categoryId`. Không phân biệt hoa thường
+      // (ILIKE), có dấu — cùng luật với ô tìm khách/hoá đơn (POS web).
+      const matchingCategories = await this.categories.find({
+        where: [
+          { organizationId: actor.organizationId, code: ILike(`%${search}%`) },
+          { organizationId: actor.organizationId, name: ILike(`%${search}%`) },
+        ],
+      });
+      const categoryIds = new Set(matchingCategories.map((c) => c.id));
+      const has = (value: string | null | undefined) => !!value && value.toLowerCase().includes(search);
+      rows = rows.filter(
+        (r) =>
+          has(r.itemCode) ||
+          has(r.itemName) ||
+          has(r.parentSku) ||
+          has(r.parentName) ||
+          has(r.itemCategory) ||
+          (!!r.categoryId && categoryIds.has(r.categoryId)),
+      );
     }
     // NOTE: `productType` (product/service/combo) and `allocateComboRevenue`
     // have no backing field on the catalogue item, so they are accepted but
