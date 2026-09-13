@@ -8858,7 +8858,11 @@ export interface components {
             maritalStatus?: "SINGLE" | "MARRIED";
             /** @enum {string} */
             employmentStatus?: "OFFICIAL" | "PROBATION" | "RESIGNED";
-            photoUrl?: string;
+            /**
+             * Format: uuid
+             * @description Media id of the profile photo; null removes it, omit to leave unchanged
+             */
+            photoMediaId?: string | null;
             /** Format: uuid */
             jobPositionId?: string;
             /** @description ISO date YYYY-MM-DD */
@@ -17343,7 +17347,7 @@ export interface components {
             sizes: string[];
             /** @description True when any active variant has stock in any branch this API key may see. Quantities are never exposed. */
             inStock: boolean;
-            /** @description Always empty. This ERP has no image storage yet; the field is part of the contract so images can appear later without a breaking change. */
+            /** @description Public image URLs for this product, in display order. Empty when the product has no images. */
             images: string[];
         };
         PartnerProductSearchResponseDto: {

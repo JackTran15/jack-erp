@@ -26485,9 +26485,11 @@
             ],
             "type": "string"
           },
-          "photoUrl": {
+          "photoMediaId": {
             "type": "string",
-            "maxLength": 500
+            "nullable": true,
+            "format": "uuid",
+            "description": "Media id of the profile photo; null removes it, omit to leave unchanged"
           },
           "jobPositionId": {
             "type": "string",
@@ -50869,7 +50871,7 @@
             "description": "True when any active variant has stock in any branch this API key may see. Quantities are never exposed."
           },
           "images": {
-            "description": "Always empty. This ERP has no image storage yet; the field is part of the contract so images can appear later without a breaking change.",
+            "description": "Public image URLs for this product, in display order. Empty when the product has no images.",
             "type": "array",
             "items": {
               "type": "string"
