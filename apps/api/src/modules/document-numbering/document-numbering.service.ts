@@ -79,6 +79,8 @@ export const DEFAULT_DOC_NUMBER_CONFIG: Record<
   [DocumentType.PURCHASE_ORDER]: { prefix: "PDH", continuous: true },
   [DocumentType.GOODS_RECEIPT]: { prefix: "NK", continuous: true },
   [DocumentType.GOODS_ISSUE]: { prefix: "XK", continuous: true },
+  // Đơn hàng tư vấn: `DT000003` như MISA — liên tục, 6 chữ số, theo chi nhánh.
+  [DocumentType.SALES_ORDER]: { prefix: "DT", continuous: true },
   [DocumentType.TRANSFER]: { prefix: "CK", continuous: true },
   [DocumentType.TRANSFER_ORDER]: { prefix: "LDC", continuous: true },
   [DocumentType.STOCK_COUNT]: { prefix: "KK", continuous: true },
