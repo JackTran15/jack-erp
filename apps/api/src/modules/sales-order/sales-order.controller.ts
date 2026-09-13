@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -19,6 +18,7 @@ import { RequireBranchScope, RequirePermission } from '../auth/decorators';
 import { AuditInterceptor } from '../crud/audit.interceptor';
 import { BranchScopeGuard } from '../rbac/branch-scope.guard';
 import { PermissionGuard } from '../rbac/permission.guard';
+import { CancelSalesOrderDto } from './dto/cancel-sales-order.dto';
 import { CreateSalesOrderDto } from './dto/create-sales-order.dto';
 import { RejectSalesOrderDto } from './dto/reject-sales-order.dto';
 import { SalesOrderListQueryDto } from './dto/sales-order-list.query.dto';
@@ -71,13 +71,6 @@ export class SalesOrderController {
     return this.service.update(id, dto, actor);
   }
 
-  @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @RequirePermission(SALES_ORDER_PERMISSIONS.create)
-  remove(@Param('id', ParseUUIDPipe) id: string, @Actor() actor: ActorContext) {
-    return this.service.remove(id, actor);
-  }
-
   @Post(':id/approve')
   @HttpCode(HttpStatus.OK)
   @RequirePermission(SALES_ORDER_PERMISSIONS.approve)
@@ -95,7 +88,7 @@ export class SalesOrderController {
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
   @RequirePermission(SALES_ORDER_PERMISSIONS.cancel)
-  cancel(@Param('id', ParseUUIDPipe) id: string, @Actor() actor: ActorContext) {
-    return this.service.cancel(id, actor);
+  cancel(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CancelSalesOrderDto, @Actor() actor: ActorContext) {
+    return this.service.cancel(id, dto.reason, actor);
   }
 }

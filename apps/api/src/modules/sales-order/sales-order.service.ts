@@ -33,7 +33,7 @@ export const SALES_ORDER_CHANNEL = 'Ứng dụng Tư Vấn';
 
 /** Chỉ `SENT` có lối ra; ba trạng thái kia là điểm cuối. */
 const VALID_TRANSITIONS: Record<SalesOrderStatus, SalesOrderStatus[]> = {
-  [SalesOrderStatus.DRAFT]: [SalesOrderStatus.SENT],
+  [SalesOrderStatus.DRAFT]: [SalesOrderStatus.SENT, SalesOrderStatus.CANCELLED],
   [SalesOrderStatus.SENT]: [SalesOrderStatus.PROCESSED, SalesOrderStatus.REJECTED, SalesOrderStatus.CANCELLED],
   [SalesOrderStatus.PROCESSED]: [],
   [SalesOrderStatus.REJECTED]: [],
@@ -72,6 +72,7 @@ export interface SalesOrderView {
   amountDue: number;
   note: string | null;
   rejectReason: string | null;
+  cancelReason: string | null;
   lines: SalesOrderLineView[];
 }
 
@@ -177,21 +178,6 @@ export class SalesOrderService {
     });
 
     return this.getById(id, actor);
-  }
-
-  /** Xoá một đơn LƯU TẠM của chính mình. Đơn đã gửi thì huỷ, không xoá. */
-  async remove(id: string, actor: ActorContext): Promise<void> {
-    const me = await this.salespersonOf(actor);
-
-    await this.dataSource.transaction(async (manager) => {
-      const current = await this.lockedOrder(manager, id, actor);
-      if (!this.isOwn(current, me.id, actor)) throw new NotFoundException(`Sales order ${id} not found`);
-      if (current.status !== SalesOrderStatus.DRAFT) {
-        throw new ConflictException('Chỉ xoá được đơn lưu tạm; đơn đã gửi thì huỷ');
-      }
-      await manager.delete(SalesOrderLineEntity, { salesOrderId: id });
-      await manager.delete(SalesOrderEntity, { id });
-    });
   }
 
   /**
@@ -337,14 +323,18 @@ export class SalesOrderService {
     });
   }
 
-  /** Tư vấn huỷ đơn của CHÍNH mình khi còn `SENT`. */
-  async cancel(id: string, actor: ActorContext): Promise<SalesOrderView> {
+  /**
+   * Tư vấn huỷ đơn của CHÍNH mình khi còn `DRAFT` hoặc `SENT`, kèm lý do (MISA:
+   * hộp thoại "Lý do hủy"). Đơn lưu tạm cũng HUỶ chứ không xoá — Loc chốt
+   * 2026-09-13 — nên nó vẫn còn trong lịch sử ở "Đã huỷ".
+   */
+  async cancel(id: string, reason: string | undefined, actor: ActorContext): Promise<SalesOrderView> {
     const salesperson = await this.salespersonOf(actor);
     return this.transition(
       id,
       actor,
       SalesOrderStatus.CANCELLED,
-      { cancelledBy: actor.userId, cancelledAt: new Date() },
+      { cancelledBy: actor.userId, cancelledAt: new Date(), cancelReason: reason?.trim() || null },
       salesperson.id,
     );
   }
@@ -519,6 +509,7 @@ export class SalesOrderService {
       amountDue: Number(order.amountDue),
       note: order.note,
       rejectReason: order.rejectReason,
+      cancelReason: order.cancelReason,
       lines: lines.map((line) => ({
         id: line.id,
         itemId: line.itemId,

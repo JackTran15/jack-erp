@@ -111,7 +111,7 @@ describe('SalesOrderService', () => {
 
   it('cancel đơn của NGƯỜI KHÁC → 404 (không xác nhận sự tồn tại)', async () => {
     const { service } = build({ current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-9' } });
-    await expect(service.cancel('so-1', actor)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.cancel('so-1', undefined, actor)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('reject ghi lý do và đổi trạng thái trong CÙNG một update', async () => {
@@ -136,10 +136,10 @@ describe('SalesOrderService', () => {
     expect(updates).toHaveLength(0);
   });
 
-  it('remove chỉ cho DRAFT — đơn SENT → 409', async () => {
-    const { service, manager } = build({ current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-1' } });
-    await expect(service.remove('so-1', actor)).rejects.toBeInstanceOf(ConflictException);
-    expect(manager.delete).not.toHaveBeenCalled();
+  it('cancel một đơn LƯU TẠM ghi lý do và về CANCELLED (không có xoá)', async () => {
+    const { service, updates } = build({ current: { status: SalesOrderStatus.DRAFT, salespersonId: 'sp-1' } });
+    await service.cancel('so-1', '  Khách đổi ý ', actor);
+    expect(updates[0]).toMatchObject({ status: SalesOrderStatus.CANCELLED, cancelReason: 'Khách đổi ý' });
   });
 
   it('list mặc định LOẠI đơn lưu tạm; xin DRAFT thì luôn thu về CỦA MÌNH, kể cả người có quyền duyệt', async () => {

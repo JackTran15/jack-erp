@@ -7,7 +7,7 @@ import { SalesOrderLineEntity } from './sales-order-line.entity';
  * (`VALID_TRANSITIONS` ở service).
  */
 export enum SalesOrderStatus {
-  /** Lưu tạm — riêng của người gửi, chưa tới thu ngân; lối ra duy nhất là `SENT` (hoặc xoá). */
+  /** Lưu tạm — riêng của người gửi, chưa tới thu ngân; lối ra: `SENT`, hoặc `CANCELLED` (không có xoá). */
   DRAFT = 'DRAFT',
   SENT = 'SENT',
   PROCESSED = 'PROCESSED',
@@ -70,6 +70,9 @@ export class SalesOrderEntity extends BaseEntity {
 
   @Column({ name: 'reject_reason', type: 'varchar', nullable: true })
   rejectReason: string | null;
+
+  @Column({ name: 'cancel_reason', type: 'varchar', nullable: true })
+  cancelReason: string | null;
 
   @Column({ name: 'approved_by', type: 'uuid', nullable: true })
   approvedBy: string | null;
