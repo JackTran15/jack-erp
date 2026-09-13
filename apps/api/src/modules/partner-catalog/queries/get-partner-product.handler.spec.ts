@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { ItemEntity } from '../../inventory/location/item.entity';
+import { MediaQueryService, PublicMedia } from '../../media/media-query.service';
 import { GetPartnerProductHandler } from './get-partner-product.handler';
 import { GetPartnerProductQuery } from './get-partner-product.query';
 
@@ -52,15 +53,25 @@ const ROWS = [
 
 describe('GetPartnerProductHandler', () => {
   let query: jest.Mock;
+  let resolvePublicUrls: jest.Mock;
 
-  const run = async (rows: object[], productCode = 'MY88610') => {
+  const run = async (
+    rows: object[],
+    productId = 'p1',
+    media: Map<string, PublicMedia[]> = new Map(),
+  ) => {
     query = jest.fn().mockResolvedValue(rows);
+    resolvePublicUrls = jest.fn().mockResolvedValue(media);
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
         GetPartnerProductHandler,
         {
           provide: getRepositoryToken(ItemEntity),
           useValue: { manager: { query } },
+        },
+        {
+          provide: MediaQueryService,
+          useValue: { resolvePublicUrls },
         },
       ],
     }).compile();
@@ -112,6 +123,45 @@ describe('GetPartnerProductHandler', () => {
     expect(res.images).toEqual([]);
   });
 
+  // AC-06 — URL ordering itself is covered by `buildDetail`'s own tests
+  // (dto/partner-product-detail.dto.spec.ts); this is just the handler's wiring.
+  it('asks MediaQueryService for this product id, scoped to the actor org', async () => {
+    await run(ROWS, 'p1');
+    expect(resolvePublicUrls).toHaveBeenCalledWith(['p1'], 'org-1');
+  });
+
+  it('projects PublicMedia entries to URL strings only, in order', async () => {
+    const media = new Map<string, PublicMedia[]>([
+      [
+        'p1',
+        [
+          { id: 'm1', url: 'https://cdn.example.com/erp-media-public/org/o1/product/p1/a.jpg', fileName: 'front.jpg' },
+          { id: 'm2', url: 'https://cdn.example.com/erp-media-public/org/o1/product/p1/b.jpg', fileName: 'back.jpg' },
+        ],
+      ],
+    ]);
+    const res = await run(ROWS, 'p1', media);
+    expect(res.images).toEqual([
+      'https://cdn.example.com/erp-media-public/org/o1/product/p1/a.jpg',
+      'https://cdn.example.com/erp-media-public/org/o1/product/p1/b.jpg',
+    ]);
+    expect(JSON.stringify(res.images)).not.toContain('fileName');
+    expect(JSON.stringify(res.images)).not.toContain('m1');
+  });
+
+  // media_objects.owner_id is uuid; Postgres always returns it lowercase, so
+  // the media lookup must key off the row the DB returned, not the request id.
+  it('resolves images by the database id casing, not the request casing', async () => {
+    const media = new Map<string, PublicMedia[]>([
+      ['p1', [{ id: 'm1', url: 'https://cdn.example.com/erp-media-public/org/o1/product/p1/a.jpg', fileName: 'a.jpg' }]],
+    ]);
+    const res = await run(ROWS, 'P1', media);
+    expect(resolvePublicUrls).toHaveBeenCalledWith(['p1'], 'org-1');
+    expect(res.images).toEqual([
+      'https://cdn.example.com/erp-media-public/org/o1/product/p1/a.jpg',
+    ]);
+  });
+
   it('recognises Vietnamese dimension names too', async () => {
     const vi = [
       row('i1', 'MY-38', 750000, true, 'Màu sắc', 'BA'),
@@ -133,13 +183,16 @@ describe('GetPartnerProductHandler', () => {
   // AC-16 / AC-17 / AC-18 — all three are the same zero-row outcome.
   it('throws the identical 404 for missing, foreign and retired products', async () => {
     await expect(run([])).rejects.toBeInstanceOf(NotFoundException);
+    expect(resolvePublicUrls).not.toHaveBeenCalled();
     await expect(run([])).rejects.toThrow('Product not found');
+    expect(resolvePublicUrls).not.toHaveBeenCalled();
   });
 
   it('does not name the code in the not-found message', async () => {
     await expect(run([], 'secret-code-1234')).rejects.toThrow(
       /^Product not found$/,
     );
+    expect(resolvePublicUrls).not.toHaveBeenCalled();
   });
 
   // AC-25 — the queried code is what reaches the database and what comes back.

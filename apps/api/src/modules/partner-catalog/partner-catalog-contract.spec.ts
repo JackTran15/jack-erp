@@ -1,8 +1,12 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { ActorContext } from '../../common/decorators/actor-context.decorator';
+import { PublicMedia } from '../media/media-query.service';
 import { PartnerCategoryNodeDto } from './dto/partner-category-tree.dto';
 import { PartnerProductDetailDto } from './dto/partner-product-detail.dto';
 import { PartnerProductRowDto } from './dto/partner-product-search.dto';
+import { SearchPartnerProductsHandler } from './queries/search-partner-products.handler';
+import { SearchPartnerProductsQuery } from './queries/search-partner-products.query';
 
 /**
  * The partner surface exists to publish a CLOSED list of fields. ADR-01 argues
@@ -148,11 +152,97 @@ describe('partner catalog response shapes', () => {
       'variants',
     ]);
   });
+});
 
-  it('keeps images permanently empty', () => {
-    // Not a placeholder waiting to be filled by accident: there is no image
-    // storage in this ERP at all, so anything non-empty would be invented.
-    const row: Pick<PartnerProductRowDto, 'images'> = { images: [] };
-    expect(row.images).toEqual([]);
+// AC-06 — `images` now carries real public URLs from MediaQueryService,
+// resolved for the whole search page in one call.
+describe('partner catalog search — image resolution', () => {
+  const actor: ActorContext = {
+    userId: 'partner-shadow-1',
+    organizationId: 'org-1',
+    branchId: 'branch-1',
+    roles: [],
+  };
+
+  const RAW = {
+    id: 'p1',
+    code: 'MY88610',
+    name: 'Giày búp bê MY88610',
+    categoryId: null,
+    categoryName: null,
+    priceMin: 495000,
+    priceMax: 750000,
+    inStock: true,
+  };
+
+  const buildHandler = (
+    query: jest.Mock,
+    resolvePublicUrls: jest.Mock,
+  ): SearchPartnerProductsHandler =>
+    new SearchPartnerProductsHandler(
+      { manager: { query } } as any,
+      { find: jest.fn().mockResolvedValue([]) } as any,
+      { resolvePublicUrls } as any,
+    );
+
+  it('returns image URLs in sort order for a product with two images', async () => {
+    const media: PublicMedia[] = [
+      {
+        id: 'm1',
+        url: 'https://cdn.example.com/erp-media-public/org/o1/product/p1/aaa.jpg',
+        fileName: 'front.jpg',
+      },
+      {
+        id: 'm2',
+        url: 'https://cdn.example.com/erp-media-public/org/o1/product/p1/bbb.jpg',
+        fileName: 'back.jpg',
+      },
+    ];
+    const resolvePublicUrls = jest.fn().mockResolvedValue(new Map([['p1', media]]));
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce([RAW])
+      .mockResolvedValueOnce([{ total: 1 }])
+      .mockResolvedValueOnce([]);
+
+    const res = await buildHandler(query, resolvePublicUrls).execute(
+      new SearchPartnerProductsQuery({}, actor),
+    );
+
+    expect(res.data[0]!.images).toEqual([
+      'https://cdn.example.com/erp-media-public/org/o1/product/p1/aaa.jpg',
+      'https://cdn.example.com/erp-media-public/org/o1/product/p1/bbb.jpg',
+    ]);
+  });
+
+  it('returns an empty array for a product without images', async () => {
+    const resolvePublicUrls = jest.fn().mockResolvedValue(new Map());
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce([RAW])
+      .mockResolvedValueOnce([{ total: 1 }])
+      .mockResolvedValueOnce([]);
+
+    const res = await buildHandler(query, resolvePublicUrls).execute(
+      new SearchPartnerProductsQuery({}, actor),
+    );
+
+    expect(res.data[0]!.images).toEqual([]);
+  });
+
+  it('resolves images for the whole page with exactly one media query', async () => {
+    const resolvePublicUrls = jest.fn().mockResolvedValue(new Map());
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce([RAW, { ...RAW, id: 'p2' }])
+      .mockResolvedValueOnce([{ total: 2 }])
+      .mockResolvedValueOnce([]);
+
+    await buildHandler(query, resolvePublicUrls).execute(
+      new SearchPartnerProductsQuery({}, actor),
+    );
+
+    expect(resolvePublicUrls).toHaveBeenCalledTimes(1);
+    expect(resolvePublicUrls).toHaveBeenCalledWith(['p1', 'p2'], 'org-1');
   });
 });

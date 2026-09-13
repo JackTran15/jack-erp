@@ -8,6 +8,7 @@ import { ItemAttributeValueEntity } from '../inventory/product/item-attribute-va
 import { ProductAttributeDefinitionEntity } from '../inventory/product/product-attribute-definition.entity';
 import { ProductAttributeOptionEntity } from '../inventory/product/product-attribute-option.entity';
 import { ProductEntity } from '../inventory/product/product.entity';
+import { MediaQueryService } from '../media/media-query.service';
 import { RbacService } from '../rbac/rbac.service';
 import {
   ATTRIBUTE_COLOR,
@@ -44,12 +45,23 @@ const ENTITIES = [
 })
 class GlobalRbacStubModule {}
 
+// MediaModule is also `@Global()`; SearchPartnerProductsHandler injects
+// MediaQueryService for `images`, so it needs the same stand-in.
+@Global()
+@Module({
+  providers: [
+    { provide: MediaQueryService, useValue: { resolvePublicUrls: async () => new Map() } },
+  ],
+  exports: [MediaQueryService],
+})
+class GlobalMediaQueryStubModule {}
+
 describe('PartnerCatalogModule', () => {
   let moduleRef: TestingModule;
 
   beforeAll(async () => {
     const builder = Test.createTestingModule({
-      imports: [PartnerCatalogModule, GlobalRbacStubModule],
+      imports: [PartnerCatalogModule, GlobalRbacStubModule, GlobalMediaQueryStubModule],
     });
     for (const entity of ENTITIES) {
       builder.overrideProvider(getRepositoryToken(entity)).useValue({});

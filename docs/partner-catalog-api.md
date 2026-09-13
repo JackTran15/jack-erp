@@ -186,7 +186,7 @@ storefront listing works.
       "colors": ["BA", "D"],
       "sizes": ["38", "39"],
       "inStock": true,
-      "images": []
+      "images": ["https://media.example.com/products/photo-1.jpg"]
     }
   ],
   "total": 107,
@@ -257,11 +257,12 @@ in the schema. The reference storefront paints 17 colour swatches; that cannot b
 from this data. The partner must keep its own code → name/hex mapping, and re-check it
 whenever the catalogue gains a code.
 
-### `images` is always empty
+### `images` is public URLs, ordered, possibly empty
 
-There is no image column, no media table, and no upload module anywhere in the ERP. The
-field is in the contract so images can appear later without a breaking change, but today
-it is unconditionally `[]`. The storefront needs its own image source.
+`images` is an array of public, absolute URLs to the product's photos, in display order.
+It is `[]` for a product that has no photos yet — not every product will. URLs need no
+authentication and can be hot-linked directly in an `<img src>`; they carry no id, file
+name or storage detail a partner would need to parse.
 
 ### Product `name` is currently the SKU code
 
