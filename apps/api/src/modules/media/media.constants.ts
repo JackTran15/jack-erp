@@ -9,3 +9,12 @@
  * only ever looks at `object_removed_at IS NULL`).
  */
 export const UPLOAD_TICKET_TTL_SECONDS = 10 * 60;
+
+/**
+ * Added on top of `UPLOAD_TICKET_TTL_SECONDS` everywhere the ADR-05 invariant
+ * above is enforced with a DB-clock comparison. The app server, MinIO and
+ * Postgres are three separate clocks; none of the "past TTL" checks compares
+ * a wall-clock reading from one against a timestamp written by another
+ * without this margin absorbing their skew.
+ */
+export const UPLOAD_TICKET_GRACE_SECONDS = 60;

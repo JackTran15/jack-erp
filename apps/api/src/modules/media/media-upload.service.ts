@@ -97,7 +97,7 @@ export class MediaUploadService {
       throw new MediaException(
         429,
         'MEDIA_QUOTA_EXCEEDED',
-        'Too many unattached uploads by this user; save or discard pending files and try again later',
+        'Too many unattached uploads by this user in the last 24 hours; attach pending files to a record or try again later',
       );
     }
 

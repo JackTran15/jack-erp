@@ -1,11 +1,11 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { isUUID } from 'class-validator';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, Raw, Repository } from 'typeorm';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
 import { MediaObjectEntity, MediaOwnerType, MediaStatus } from './media-object.entity';
 import { MEDIA_OWNER_POLICIES } from './media-owner-policies';
-import { UPLOAD_TICKET_TTL_SECONDS } from './media.constants';
+import { UPLOAD_TICKET_GRACE_SECONDS, UPLOAD_TICKET_TTL_SECONDS } from './media.constants';
 import { MediaException } from './media.exception';
 import { ObjectStorageService } from './object-storage.service';
 
@@ -247,9 +247,15 @@ export class MediaLinkService {
    * the ticket's `UPLOAD_TICKET_TTL_SECONDS` window can still receive a fresh
    * POST at the same object key from whoever was holding that ticket; an
    * early stamp here would make cleanup step 2 skip that key forever
-   * (`objectRemovedAt IS NULL` is the only thing step 2 looks for). Rows this
-   * young are left with `objectRemovedAt` unset — `MediaCleanupJob` re-checks
-   * them (deleting again is a no-op) once they have aged past the window.
+   * (`objectRemovedAt IS NULL` is the only thing step 2 looks for).
+   *
+   * The age comparison is the `WHERE` of the `UPDATE` itself, evaluated by
+   * Postgres's clock against its own `created_at` — comparing this app
+   * server's `Date.now()` against a DB-set timestamp would let the two
+   * clocks' skew push the stamp either too early or too late. A row still
+   * inside the window simply updates zero rows and stays `objectRemovedAt:
+   * null` for `MediaCleanupJob` to re-check later (deleting again is a
+   * no-op).
    */
   private async cleanupRemovedObjects(
     rows: MediaObjectEntity[],
@@ -259,9 +265,17 @@ export class MediaLinkService {
       rows.map(async (row) => {
         try {
           await this.objectStorage.deleteObject(row.bucket, row.objectKey);
-          if (Date.now() - row.createdAt.getTime() >= UPLOAD_TICKET_TTL_SECONDS * 1000) {
-            await this.mediaRepo.update({ id: row.id, organizationId }, { objectRemovedAt: new Date() });
-          }
+          await this.mediaRepo.update(
+            {
+              id: row.id,
+              organizationId,
+              createdAt: Raw(
+                (alias) =>
+                  `${alias} < now() - interval '${UPLOAD_TICKET_TTL_SECONDS + UPLOAD_TICKET_GRACE_SECONDS} seconds'`,
+              ),
+            },
+            { objectRemovedAt: () => 'now()' },
+          );
           this.logger.log(
             `media.detached mediaId=${row.id} ownerType=${row.ownerType} organizationId=${organizationId}`,
           );

@@ -52,7 +52,9 @@ export class CreateMediaUploadDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
-  @Matches(SAFE_FILE_NAME, { message: 'fileName must not contain control or bidi override characters' })
+  @Matches(SAFE_FILE_NAME, {
+    message: 'fileName must not contain control, bidi override, or zero-width characters',
+  })
   fileName: string;
 
   @ApiProperty({ description: 'Declared MIME type; checked against the ownerType allowlist and re-checked at confirm time.' })

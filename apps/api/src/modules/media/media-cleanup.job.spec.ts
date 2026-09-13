@@ -4,7 +4,7 @@ import { FindOperator, IsNull } from 'typeorm';
 import { CLEANUP_BATCH_SIZE, MediaCleanupJob } from './media-cleanup.job';
 import { MediaException } from './media.exception';
 import { MediaObjectEntity, MediaStatus } from './media-object.entity';
-import { UPLOAD_TICKET_TTL_SECONDS } from './media.constants';
+import { UPLOAD_TICKET_GRACE_SECONDS, UPLOAD_TICKET_TTL_SECONDS } from './media.constants';
 import { ObjectStorageService } from './object-storage.service';
 
 /** Well past `UPLOAD_TICKET_TTL_SECONDS`, so a row using this default is eligible for step 2 by default. */
@@ -48,10 +48,10 @@ class InMemoryMediaRepo {
       rows = rows.filter((r) => r.objectRemovedAt === null);
     }
     // Real Postgres evaluates the `Raw(...)` SQL string; this fake instead
-    // reproduces its semantics directly (ticket-TTL cutoff) rather than
-    // parsing the generated SQL.
+    // reproduces its semantics directly (ticket-TTL + grace cutoff) rather
+    // than parsing the generated SQL.
     if (where.createdAt instanceof FindOperator && where.createdAt.type === 'raw') {
-      const cutoff = Date.now() - UPLOAD_TICKET_TTL_SECONDS * 1000;
+      const cutoff = Date.now() - (UPLOAD_TICKET_TTL_SECONDS + UPLOAD_TICKET_GRACE_SECONDS) * 1000;
       rows = rows.filter((r) => r.createdAt.getTime() < cutoff);
     }
     if (where.id instanceof FindOperator && where.id.type === 'moreThan') {
@@ -118,7 +118,7 @@ describe('MediaCleanupJob', () => {
   });
 
   describe('step 2 — removing DELETED objects', () => {
-    it('only selects DELETED rows missing object_removed_at and past the ticket TTL, ordered by id, never ATTACHED', async () => {
+    it('only selects DELETED rows missing object_removed_at and past the ticket TTL + grace, ordered by id, never ATTACHED', async () => {
       await job.run();
 
       const [{ where, order }] = mediaRepo.find.mock.calls[0];
@@ -126,6 +126,11 @@ describe('MediaCleanupJob', () => {
       expect(where.objectRemovedAt).toEqual(IsNull());
       expect(where.createdAt).toBeInstanceOf(FindOperator);
       expect((where.createdAt as FindOperator<unknown>).type).toBe('raw');
+      // Asserts the SQL text itself, not just the operator type: flipping
+      // `<` to `<=`/`>=` or the interval unit would otherwise pass silently.
+      expect((where.createdAt as FindOperator<unknown>).getSql!('c')).toBe(
+        `c < now() - interval '${UPLOAD_TICKET_TTL_SECONDS + UPLOAD_TICKET_GRACE_SECONDS} seconds'`,
+      );
       expect(order).toEqual({ id: 'ASC' });
     });
 

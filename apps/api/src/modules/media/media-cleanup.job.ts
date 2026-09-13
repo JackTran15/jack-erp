@@ -3,7 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, MoreThan, Raw, Repository } from 'typeorm';
 import { affectedRowCount } from '../../common/utils/returning-rows.util';
-import { UPLOAD_TICKET_TTL_SECONDS } from './media.constants';
+import { UPLOAD_TICKET_GRACE_SECONDS, UPLOAD_TICKET_TTL_SECONDS } from './media.constants';
 import { MediaException } from './media.exception';
 import { MediaObjectEntity, MediaStatus } from './media-object.entity';
 import { ObjectStorageService } from './object-storage.service';
@@ -84,9 +84,11 @@ export class MediaCleanupJob {
    * with `object_removed_at` null.
    *
    * Also requires `created_at` to be older than `UPLOAD_TICKET_TTL_SECONDS`
-   * (ADR-05 invariant, DB clock): a row younger than that still has a live
-   * upload ticket for its object key, and a fresh POST could land a new
-   * object there right as this deletes the old one.
+   * plus `UPLOAD_TICKET_GRACE_SECONDS` (ADR-05 invariant, DB clock): a row
+   * younger than that still has a live upload ticket for its object key, and
+   * a fresh POST could land a new object there right as this deletes the old
+   * one. The grace period absorbs skew between this app server's clock and
+   * the DB's.
    */
   private async removeDeletedObjects(): Promise<RemovalOutcome> {
     let removedCount = 0;
@@ -99,7 +101,10 @@ export class MediaCleanupJob {
         where: {
           status: MediaStatus.DELETED,
           objectRemovedAt: IsNull(),
-          createdAt: Raw((alias) => `${alias} < now() - interval '${UPLOAD_TICKET_TTL_SECONDS} seconds'`),
+          createdAt: Raw(
+            (alias) =>
+              `${alias} < now() - interval '${UPLOAD_TICKET_TTL_SECONDS + UPLOAD_TICKET_GRACE_SECONDS} seconds'`,
+          ),
           ...(lastId !== undefined ? { id: MoreThan(lastId) } : {}),
         },
         order: { id: 'ASC' },

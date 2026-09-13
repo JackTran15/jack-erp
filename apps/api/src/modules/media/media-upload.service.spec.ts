@@ -157,6 +157,11 @@ describe('MediaUploadService', () => {
       expect((where.status as FindOperator<unknown>).value).toBe(MediaStatus.ATTACHED);
       expect(where.createdAt).toBeInstanceOf(FindOperator);
       expect((where.createdAt as FindOperator<unknown>).type).toBe('raw');
+      // Asserts the SQL text itself, not just the operator type: flipping
+      // `>=` to `<`/`<=` or the interval unit would otherwise pass silently.
+      expect((where.createdAt as FindOperator<unknown>).getSql!('c')).toBe(
+        "c >= now() - interval '24 hours'",
+      );
     });
 
     it('throws MEDIA_QUOTA_EXCEEDED (429) when 100 unattached uploads already exist today, incl. rejected/DELETED ones', async () => {
@@ -165,6 +170,8 @@ describe('MediaUploadService', () => {
       await expect(service.requestUpload(validDto, actor)).rejects.toMatchObject({
         code: 'MEDIA_QUOTA_EXCEEDED',
         status: 429,
+        message:
+          'Too many unattached uploads by this user in the last 24 hours; attach pending files to a record or try again later',
       });
       expect(storage.createUploadPolicy).not.toHaveBeenCalled();
       expect(mediaRepo.save).not.toHaveBeenCalled();
@@ -258,12 +265,15 @@ describe('MediaUploadService', () => {
 
     it('sets expiresAt to now + the ticket TTL', async () => {
       jest.useFakeTimers().setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
-      storage.createUploadPolicy.mockResolvedValue({ url: 'http://public.example.com', fields: {} });
+      try {
+        storage.createUploadPolicy.mockResolvedValue({ url: 'http://public.example.com', fields: {} });
 
-      const result = await service.requestUpload(validDto, actor);
+        const result = await service.requestUpload(validDto, actor);
 
-      expect(result.expiresAt).toBe(new Date(Date.now() + UPLOAD_TICKET_TTL_SECONDS * 1000).toISOString());
-      jest.useRealTimers();
+        expect(result.expiresAt).toBe(new Date(Date.now() + UPLOAD_TICKET_TTL_SECONDS * 1000).toISOString());
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('resolves the public bucket for a PRODUCT upload', async () => {
@@ -515,9 +525,12 @@ describe('CreateMediaUploadDto validation', () => {
     }
   });
 
-  it('rejects zero-width and BOM characters (U+200B, U+FEFF) that can hide inside an otherwise-identical name', () => {
-    for (const codePoint of [0x200b, 0xfeff]) {
-      const fileName = 'a' + String.fromCharCode(codePoint) + '.pdf';
+  it('rejects zero-width, BOM and Arabic letter mark characters that can hide inside an otherwise-identical name', () => {
+    // U+061C (Arabic Letter Mark), U+200B-U+200D (ZWSP/ZWNJ/ZWJ), U+2060 (Word
+    // Joiner), U+FEFF (BOM / zero-width no-break space).
+    const codePoints = [0x061c, 0x200b, 0x200c, 0x200d, 0x2060, 0xfeff];
+    for (const codePoint of codePoints) {
+      const fileName = 'a' + String.fromCodePoint(codePoint) + '.pdf';
       expect(failedFields({ ...validPayload(), fileName })).toContain('fileName');
     }
   });
