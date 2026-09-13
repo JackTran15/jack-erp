@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
-import { MobileInvoiceDateBasis } from '../dto/mobile-invoice-list.query.dto';
+import { MobileManagerInvoiceDateBasis } from '../dto/mobile-manager-invoice-list.query.dto';
 import {
   MobileRevenueEstimateGroupBy,
   MobileRevenueEstimateStaffRole,
@@ -27,7 +27,7 @@ const actor: ActorContext = {
 const base: RevenueEstimateQuery = {
   from: '2026-09-01',
   to: '2026-09-30',
-  dateBasis: MobileInvoiceDateBasis.ISSUED,
+  dateBasis: MobileManagerInvoiceDateBasis.ISSUED,
   groupBy: MobileRevenueEstimateGroupBy.TIME,
 };
 
@@ -73,7 +73,7 @@ describe('MobileRevenueEstimateService', () => {
     });
 
     it('created → lọc created_at và gộp ngày theo created_at', async () => {
-      await service.getReport({ ...base, dateBasis: MobileInvoiceDateBasis.CREATED }, actor);
+      await service.getReport({ ...base, dateBasis: MobileManagerInvoiceDateBasis.CREATED }, actor);
 
       const sql = sqlOf();
       expect(sql).toContain('i.created_at >= $2::date');
@@ -158,7 +158,7 @@ describe('MobileRevenueEstimateService', () => {
 
     it('payment: KHÔNG qua dòng hàng — bốn nguồn UNION ALL trên cùng phạm vi hoá đơn', async () => {
       await service.getReport(
-        { ...base, groupBy: MobileRevenueEstimateGroupBy.PAYMENT, dateBasis: MobileInvoiceDateBasis.CREATED },
+        { ...base, groupBy: MobileRevenueEstimateGroupBy.PAYMENT, dateBasis: MobileManagerInvoiceDateBasis.CREATED },
         actor,
       );
 

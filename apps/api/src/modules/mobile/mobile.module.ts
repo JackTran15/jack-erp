@@ -2,13 +2,16 @@ import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
+import { EmployeeProfileEntity } from '../rbac/employee/employee-profile.entity';
+import { PosModule } from '../pos/pos.module';
+import { InvoiceReportModule } from '../reporting/invoice-report/invoice-report.module';
+import { PromotionModule } from '../promotion/promotion.module';
 import { BranchModule } from '../branch/branch.module';
 import { CustomerModule } from '../customer/customer.module';
 import { GoodsIssueModule } from '../inventory/goods-issue/goods-issue.module';
 import { GoodsReceiptModule } from '../inventory/goods-receipt/goods-receipt.module';
 import { GoodsIssueEntity } from '../inventory/goods-issue/goods-issue.entity';
 import { ItemEntity } from '../inventory/location/item.entity';
-import { PosModule } from '../pos/pos.module';
 import { GoodsReceiptEntity } from '../inventory/goods-receipt/goods-receipt.entity';
 import { ProviderEntity } from '../inventory/location/provider.entity';
 import { MobileAuthController } from './controllers/mobile-auth.controller';
@@ -23,9 +26,15 @@ import { MobileOverviewReportController } from './controllers/mobile-overview-re
 import { MobileRevenueEstimateController } from './controllers/mobile-revenue-estimate.controller';
 import { MobileRevenueReportController } from './controllers/mobile-revenue-report.controller';
 import { MobileStoreDetailController } from './controllers/mobile-store-detail.controller';
+import { MobileProductAttributeController } from './controllers/mobile-product-attribute.controller';
+import { MobileItemCategoryController } from './controllers/mobile-item-category.controller';
 import { MobileInvoiceController } from './controllers/mobile-invoice.controller';
 import { MobileItemController } from './controllers/mobile-item.controller';
+import { MobileManagerInvoiceController } from './controllers/mobile-manager-invoice.controller';
 import { MobileProductController } from './controllers/mobile-product.controller';
+import { MobileProductRevenueController } from './controllers/mobile-product-revenue.controller';
+import { MobilePromotionController } from './controllers/mobile-promotion.controller';
+import { MobileSalesItemController } from './controllers/mobile-sales-item.controller';
 import { MobileStockDocumentController } from './controllers/mobile-stock-document.controller';
 import { MobileSupplierController } from './controllers/mobile-supplier.controller';
 import { MobileUserController } from './controllers/mobile-user.controller';
@@ -42,9 +51,13 @@ import { MobileOverviewReportService } from './services/mobile-overview-report.s
 import { MobileRevenueEstimateService } from './services/mobile-revenue-estimate.service';
 import { MobileRevenueReportService } from './services/mobile-revenue-report.service';
 import { MobileStoreDetailService } from './services/mobile-store-detail.service';
+import { MobileProductAttributeService } from './services/mobile-product-attribute.service';
 import { MobileInvoiceService } from './services/mobile-invoice.service';
 import { MobileItemService } from './services/mobile-item.service';
+import { MobileManagerInvoiceService } from './services/mobile-manager-invoice.service';
+import { MobileProductRevenueService } from './services/mobile-product-revenue.service';
 import { MobileProductService } from './services/mobile-product.service';
+import { MobileSalesItemService } from './services/mobile-sales-item.service';
 import { MobileStockDocumentService } from './services/mobile-stock-document.service';
 import { MobileStockDocumentWriteService } from './services/mobile-stock-document-write.service';
 import { MobileSupplierService } from './services/mobile-supplier.service';
@@ -57,7 +70,7 @@ import { MobileSupplierService } from './services/mobile-supplier.service';
  * Ưu tiên ủy quyền thẳng cho service sẵn có (`AuthService`, `UsersService`).
  * Chỉ tự đọc dữ liệu khi không đường nào có sẵn trả đúng hình dạng app cần —
  * hiện có mười hai ca — `MobileSupplierService`, `MobileProductService`,
- * `MobileCustomerService`, `MobileInvoiceService`, `MobileInventoryService`,
+ * `MobileCustomerService`, `MobileManagerInvoiceService`, `MobileInventoryService`,
  * `MobileBusinessReportService`, `MobileRevenueReportService`,
  * `MobileOverviewReportService`, `MobileStoreDetailService`,
  * `MobileDebtReportService`, `MobileCashflowReportService`,
@@ -83,6 +96,13 @@ import { MobileSupplierService } from './services/mobile-supplier.service';
  * hoá đơn thì ngược lại — uỷ quyền, vì nghiệp vụ (cấp mã, thẻ thành viên, gom
  * thanh toán) đã nằm sẵn ở service của web.
  *
+ * HAI bề mặt hoá đơn cùng sống ở đây, và đó là chủ ý chứ không phải trùng
+ * lặp: `GET /mobile/invoices` (`MobileInvoiceService`) là hoá đơn CỦA NGƯỜI
+ * ĐANG ĐĂNG NHẬP cho app tư vấn bán hàng — phạm vi ép ở server (ADR-24);
+ * `GET /mobile/manager/invoices` (`MobileManagerInvoiceService`) là lịch sử
+ * bán TOÀN TỔ CHỨC cho app quản lý, lọc cửa hàng/trạng thái là tuỳ chọn.
+ * Gộp hai đường là buộc một app mang bộ lọc mà app kia cấm.
+ *
  * `AuthModule` phải import tường minh (nó export `AuthService`). `UsersService`
  * thì KHÔNG cần: `RbacModule` là `@Global`.
  *
@@ -99,8 +119,17 @@ import { MobileSupplierService } from './services/mobile-supplier.service';
     // thành viên, guard đã gộp). Đọc thì `MobileCustomerService` tự làm.
     CustomerModule,
     CqrsModule,
-    // `InvoiceService.findOneWithItems` — chi tiết hoá đơn uỷ quyền cho nó.
+    // `PosModule` phục vụ BA thứ: `InvoiceService.findOneWithItems` (chi tiết
+    // hoá đơn của cả hai app uỷ quyền cho nó), `EvaluateCartHandler` cùng các
+    // port của nó (`PROMOTION_REPOSITORY`, `CATALOG_READER`, `CUSTOMER_READER`)
+    // và `SearchInvoicesV2Handler`. `CqrsModule` một mình KHÔNG đủ: `QueryBus`
+    // chỉ tìm được handler đã đăng ký, nên thiếu dòng import này là 500
+    // "No handler found" lúc CHẠY, không phải lỗi lúc biên dịch.
     PosModule,
+    // `SearchInvoiceReportHandler` sống trong module này — `CqrsModule` một
+    // mình không đủ để `QueryBus` tìm ra nó.
+    InvoiceReportModule,
+    PromotionModule,
     // Hai service GHI của chứng từ kho — nơi mọi ràng buộc nghiệp vụ đã nằm
     // sẵn. Import để uỷ quyền, không để viết lại.
     GoodsReceiptModule,
@@ -110,6 +139,10 @@ import { MobileSupplierService } from './services/mobile-supplier.service';
       GoodsReceiptEntity,
       GoodsIssueEntity,
       ItemEntity,
+      // Tra `employee_profiles.id` từ `users.id` — khoá mà `invoices.salesperson_id`
+      // thật sự trỏ tới (ADR-24). `RbacModule` là `@Global` nhưng nó export
+      // service chứ không export repository, nên khai riêng ở đây.
+      EmployeeProfileEntity,
     ]),
   ],
   controllers: [
@@ -120,7 +153,7 @@ import { MobileSupplierService } from './services/mobile-supplier.service';
     MobileSupplierController,
     MobileCounterpartyController,
     MobileCustomerController,
-    MobileInvoiceController,
+    MobileManagerInvoiceController,
     MobileInventoryController,
     MobileRevenueReportController,
     MobileOverviewReportController,
@@ -128,8 +161,14 @@ import { MobileSupplierService } from './services/mobile-supplier.service';
     MobileStoreDetailController,
     MobileDebtReportController,
     MobileCashflowReportController,
+    MobileProductAttributeController,
+    MobileInvoiceController,
+    MobileItemCategoryController,
     MobileItemController,
     MobileProductController,
+    MobileProductRevenueController,
+    MobilePromotionController,
+    MobileSalesItemController,
     MobileStockDocumentController,
   ],
   providers: [
@@ -138,7 +177,7 @@ import { MobileSupplierService } from './services/mobile-supplier.service';
     MobileSupplierService,
     MobileCounterpartyService,
     MobileCustomerService,
-    MobileInvoiceService,
+    MobileManagerInvoiceService,
     MobileInventoryService,
     MobileInventoryDrilldownService,
     MobileInventoryCatalogService,
@@ -148,8 +187,12 @@ import { MobileSupplierService } from './services/mobile-supplier.service';
     MobileStoreDetailService,
     MobileDebtReportService,
     MobileCashflowReportService,
+    MobileProductAttributeService,
+    MobileInvoiceService,
     MobileItemService,
+    MobileProductRevenueService,
     MobileProductService,
+    MobileSalesItemService,
     MobileStockDocumentService,
     MobileStockDocumentWriteService,
   ],

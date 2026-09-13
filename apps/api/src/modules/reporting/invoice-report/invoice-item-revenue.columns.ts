@@ -38,6 +38,7 @@ export type ItemRevenueField =
 /** Inline-resolved relation value (joined object flattened per row, not a root map). */
 export type ItemRevenueRelation =
   | 'itemCategory'
+  | 'locationStorage'
   | 'locationCode'
   | 'locationName'
   | 'customerCode'
@@ -89,6 +90,7 @@ export const INVOICE_ITEM_REVENUE_COLUMNS: ItemRevenueColumnDef[] = [
   { key: 'revenue.promoPoints', type: ReportColumnDataType.CURRENCY, classification: 'backed', group: 'revenue', source: { kind: 'field', field: 'promoPoints' } },
   { key: 'lineRevenue', type: ReportColumnDataType.CURRENCY, classification: 'backed', group: 'revenue', source: { kind: 'field', field: 'lineTotal' } },
   { key: 'reference', type: ReportColumnDataType.STRING, classification: 'placeholder', group: null, source: { kind: 'placeholder', placeholder: null } },
+  { key: 'locationStorage', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'relation', rel: 'locationStorage' } },
   { key: 'locationCode', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'relation', rel: 'locationCode' } },
   { key: 'locationName', type: ReportColumnDataType.STRING, classification: 'backed', group: null, source: { kind: 'relation', rel: 'locationName' } },
   { key: 'payment.bankAccount', type: ReportColumnDataType.STRING, classification: 'placeholder', group: null, source: { kind: 'placeholder', placeholder: null } },

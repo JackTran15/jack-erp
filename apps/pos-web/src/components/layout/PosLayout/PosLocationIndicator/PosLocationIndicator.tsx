@@ -8,6 +8,7 @@ import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { resetCheckoutSelections } from "@erp/pos/lib/common/reset-app-state";
 import { useMyBranchesQuery } from "@erp/pos/hooks/react-query/use-query-branch";
 import { useSwitchBranchMutation } from "@erp/pos/hooks/react-query/use-query-auth";
+import { usePosBranchDrift } from "@erp/pos/hooks/common/use-branch-drift";
 import { parseAccessTokenPayload } from "@erp/pos/lib/common/parseJwt";
 import { useNavigate } from "react-router-dom";
 import type { BranchRow } from "@erp/pos/interfaces/branch.interface";
@@ -18,6 +19,7 @@ export function PosLocationIndicator() {
   const branchId = usePosBranchStore((s) => s.branchId);
   const setBranch = usePosBranchStore((s) => s.setBranch);
   const switchBranch = useSwitchBranchMutation();
+  const { drifted, resetBaseline } = usePosBranchDrift();
   // Guards the mount-time token sync so a failed switch isn't retried in a loop.
   const syncedBranchRef = useRef<string | null>(null);
 
@@ -35,6 +37,13 @@ export function PosLocationIndicator() {
     // derives actor.branchId from the JWT — not the X-Branch-Id header — so a
     // mismatch makes branch-scoped reads (e.g. preferred-shelf lookup) hit the
     // wrong branch. Re-issue the token to match the selected branch.
+    //
+    // Nhưng ĐÚNG cùng điều kiện đó cũng đúng khi một tab khác vừa đổi chi nhánh — và lúc
+    // ấy đổi token là cướp phiên của tab kia, không báo ai. Hai ca phân biệt bằng baseline:
+    // đăng nhập mới thì JWT chưa từng đổi kể từ khi tab khởi tạo, tab khác đổi thì nó đã
+    // đổi. Đang lệch ⇒ để PosBranchDriftDialog hỏi người dùng.
+    if (drifted) return;
+
     const token = localStorage.getItem(POS_ACCESS_TOKEN_KEY);
     const jwtBranchId = token
       ? parseAccessTokenPayload(token)?.branchId ?? null
@@ -54,7 +63,7 @@ export function PosLocationIndicator() {
         onSuccess: () => queryClient.clear(),
       });
     }
-  }, [branches, branchId, setBranch, navigate, switchBranch, queryClient]);
+  }, [branches, branchId, setBranch, navigate, switchBranch, queryClient, drifted]);
 
   const current: BranchRow | null =
     branches.find((b) => b.id === branchId) ?? null;
@@ -67,6 +76,9 @@ export function PosLocationIndicator() {
         // under the freshly issued token (new actor.branchId) + X-Branch-Id.
         syncedBranchRef.current = branch.id;
         setBranch(branch.id, branch.name);
+        // Tab này vừa tự đổi chi nhánh: chốt lại baseline để nó không tự hỏi lại chính
+        // mình. POS không reload trang nên thiếu dòng này là dialog bật ngay sau khi đổi.
+        resetBaseline();
         // Giỏ hàng/lựa chọn gắn theo chi nhánh (locationId, tồn, giá) → reset về
         // trạng thái sạch khi đổi chi nhánh, tránh dùng nhầm dữ liệu chi nhánh cũ.
         resetCheckoutSelections();

@@ -210,13 +210,17 @@ export function CrudRecordDialog({
   // Storage: the default-receiving flag is toggled through a dedicated endpoint
   // (one-per-branch invariant), not the generic PATCH — track it separately.
   const [storageDefaultReceiving, setStorageDefaultReceiving] = useState(false);
+  // Storage: same wiring as the default-receiving flag above, for the issuing flag.
+  const [storageDefaultIssuing, setStorageDefaultIssuing] = useState(false);
   // Ngừng hoạt động (isActive=false) — không cho tắt kho showroom / kho nhập mặc định.
   const [storageInactive, setStorageInactive] = useState(false);
   // Đơn vị tính: "Ngừng theo dõi" = isActive=false (đảo chiều checkbox).
   const [unitInactive, setUnitInactive] = useState(false);
   const wasStorageDefault = isStorage && Boolean(record?.isDefaultReceiving);
+  const wasStorageDefaultIssuing = isStorage && Boolean(record?.isDefaultIssuing);
   const cannotDeactivate =
-    isStorage && (Boolean(record?.isMainStorage) || wasStorageDefault);
+    isStorage &&
+    (Boolean(record?.isMainStorage) || wasStorageDefault || wasStorageDefaultIssuing);
 
   useEffect(() => {
     if (!config) return;
@@ -232,6 +236,7 @@ export function CrudRecordDialog({
       setValues(next);
       if (isStorage) {
         setStorageDefaultReceiving(Boolean(record.isDefaultReceiving));
+        setStorageDefaultIssuing(Boolean(record.isDefaultIssuing));
         setStorageInactive(record.isActive === false);
       }
       if (isUnit) setUnitInactive(record.isActive === false);
@@ -243,6 +248,7 @@ export function CrudRecordDialog({
       setValues(defaults);
       if (isStorage) {
         setStorageDefaultReceiving(false);
+        setStorageDefaultIssuing(false);
         setStorageInactive(false);
       }
       if (isUnit) setUnitInactive(false);
@@ -301,6 +307,15 @@ export function CrudRecordDialog({
           );
         }
       }
+      // Storage: same wiring for the default-issuing flag, independent of receiving.
+      if (isStorage && storageDefaultIssuing && !wasStorageDefaultIssuing) {
+        const targetId = isEdit && recordId ? recordId : String(saved.id ?? "");
+        if (targetId) {
+          await apiClient.post(
+            `/v2/inventory/storages/${targetId}/set-default-issuing`,
+          );
+        }
+      }
       toast.success(
         isEdit
           ? `Đã cập nhật ${config?.displayName ?? "bản ghi"}.`
@@ -315,6 +330,7 @@ export function CrudRecordDialog({
         setValues(defaults);
         if (isStorage) {
           setStorageDefaultReceiving(false);
+          setStorageDefaultIssuing(false);
           setStorageInactive(false);
         }
         if (isUnit) setUnitInactive(false);
@@ -430,8 +446,8 @@ export function CrudRecordDialog({
           ? 620
           : isStorage
             ? isEdit
-              ? 470
-              : 400
+              ? 560
+              : 440
             : isUnit
               ? isEdit
                 ? 400
@@ -561,6 +577,24 @@ export function CrudRecordDialog({
                   {wasStorageDefault && (
                     <p className="text-xs text-muted-foreground">
                       Đây đang là kho nhập hàng mặc định của chi nhánh. Để đổi, hãy
+                      mở một kho khác và tích chọn ô này.
+                    </p>
+                  )}
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="h-5 w-5 shrink-0 cursor-pointer rounded border-2 border-input accent-primary disabled:cursor-not-allowed disabled:opacity-70"
+                      checked={storageDefaultIssuing}
+                      disabled={wasStorageDefaultIssuing}
+                      onChange={(e) => setStorageDefaultIssuing(e.target.checked)}
+                    />
+                    <span className="cursor-pointer select-none font-medium">
+                      Kho xuất hàng mặc định
+                    </span>
+                  </label>
+                  {wasStorageDefaultIssuing && (
+                    <p className="text-xs text-muted-foreground">
+                      Đây đang là kho xuất hàng mặc định của chi nhánh. Để đổi, hãy
                       mở một kho khác và tích chọn ô này.
                     </p>
                   )}

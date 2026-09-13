@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
-import { MobileInvoiceDateBasis } from '../dto/mobile-invoice-list.query.dto';
+import { MobileManagerInvoiceDateBasis } from '../dto/mobile-manager-invoice-list.query.dto';
 import {
   MobileRevenueEstimateGroupBy,
   MobileRevenueEstimateStaffRole,
@@ -24,7 +24,7 @@ export interface RevenueEstimateQuery {
   from: string;
   to: string;
   branchIds?: string[];
-  dateBasis: MobileInvoiceDateBasis;
+  dateBasis: MobileManagerInvoiceDateBasis;
   groupBy: MobileRevenueEstimateGroupBy;
   staffRole?: MobileRevenueEstimateStaffRole;
 }

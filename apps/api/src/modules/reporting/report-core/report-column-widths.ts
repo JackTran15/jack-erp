@@ -34,9 +34,14 @@ export const REPORT_COLUMN_WIDTHS: Readonly<Record<string, number>> = {
   categoryName: 200,
   brand: 120,
   unit: 110,
-  location: 160,
-  locationCode: 110,
-  locationName: 160,
+  // ADR-07/ADR-08: the warehouse now has a column of its own, so the name cell
+  // carries bare location names. All three are re-measured together in T-03-04;
+  // until then they keep the widths measured on 12/09/2026 with the longer
+  // "TênKho-TênVịTrí" strings — generous rather than tight.
+  locationStorage: 220,
+  location: 220,
+  locationCode: 220,
+  locationName: 320,
   supplier: 180,
 
   // Customer / supplier

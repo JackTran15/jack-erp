@@ -88,6 +88,7 @@ export type LineWithRelations = TempWarehouseLineEntity & {
   item: PublicItem | null;
   sourceLocation: PublicLocation | null;
   destinationLocation: PublicLocation | null;
+  sourceShelf: PublicLocation | null;
 };
 
 export interface NettedLineView {
@@ -941,9 +942,12 @@ export class TempWarehouseService {
 
     const carrierIds = this.collectCarrierIds(lines);
     const itemIds = Array.from(new Set(lines.map((l) => l.itemId)));
-    const locationIds = session
-      ? [session.warehouseLocationId, session.showroomLocationId]
-      : [];
+    // Session shelves back sourceLocation/destinationLocation; each line's own
+    // sourceLocationId backs sourceShelf. loadLocations dedupes — still one query.
+    const locationIds = [
+      ...(session ? [session.warehouseLocationId, session.showroomLocationId] : []),
+      ...lines.flatMap((l) => (l.sourceLocationId ? [l.sourceLocationId] : [])),
+    ];
 
     const [carriersMap, itemsMap, locationsMap] = await Promise.all([
       this.loadCarriers(carrierIds, organizationId),
@@ -962,6 +966,7 @@ export class TempWarehouseService {
         item: itemsMap[l.itemId] ?? null,
         sourceLocation: isW2s ? wLoc : sLoc,
         destinationLocation: isW2s ? sLoc : wLoc,
+        sourceShelf: l.sourceLocationId ? locationsMap[l.sourceLocationId] ?? null : null,
       };
     });
   }

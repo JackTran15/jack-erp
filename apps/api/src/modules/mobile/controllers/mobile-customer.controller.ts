@@ -31,11 +31,11 @@ import {
   MobileCustomerPageDto,
   MobileCustomerResponseDto,
 } from '../dto/mobile-customer.response.dto';
-import { MobileInvoiceListQueryDto } from '../dto/mobile-invoice-list.query.dto';
-import { MobileInvoicePageDto } from '../dto/mobile-invoice.response.dto';
+import { MobileManagerInvoiceListQueryDto } from '../dto/mobile-manager-invoice-list.query.dto';
+import { MobileManagerInvoicePageDto } from '../dto/mobile-manager-invoice.response.dto';
 import { MobileCustomerService } from '../services/mobile-customer.service';
-import { MobileInvoiceService } from '../services/mobile-invoice.service';
-import { toListQuery } from './mobile-invoice.controller';
+import { MobileManagerInvoiceService } from '../services/mobile-manager-invoice.service';
+import { toListQuery } from './mobile-manager-invoice.controller';
 
 /**
  * Danh mục khách hàng cho app mobile: đọc danh sách/chi tiết, tạo, sửa, xoá.
@@ -49,7 +49,7 @@ import { toListQuery } from './mobile-invoice.controller';
 export class MobileCustomerController {
   constructor(
     private readonly customers: MobileCustomerService,
-    private readonly invoices: MobileInvoiceService,
+    private readonly invoices: MobileManagerInvoiceService,
   ) {}
 
   @Get()
@@ -98,7 +98,7 @@ export class MobileCustomerController {
   }
 
   /**
-   * Lịch sử mua hàng của MỘT khách — cùng service/DTO với `GET /mobile/invoices`,
+   * Lịch sử mua hàng của MỘT khách — cùng service/DTO với `GET /mobile/manager/invoices`,
    * chỉ khoá thêm `customer_id`. Nằm dưới tài nguyên khách hàng vì app mở nó
    * từ màn chi tiết khách, và quyền là quyền ĐỌC HOÁ ĐƠN chứ không phải đọc
    * khách: người thấy được khách chưa chắc được xem họ mua gì.
@@ -108,9 +108,9 @@ export class MobileCustomerController {
   @ApiOperation({ summary: 'Lịch sử mua hàng của một khách, phân trang' })
   invoicesOf(
     @Param('id', ParseUUIDPipe) id: string,
-    @Query() query: MobileInvoiceListQueryDto,
+    @Query() query: MobileManagerInvoiceListQueryDto,
     @Actor() actor: ActorContext,
-  ): Promise<MobileInvoicePageDto> {
+  ): Promise<MobileManagerInvoicePageDto> {
     return this.invoices.list({ ...toListQuery(query), customerId: id }, actor);
   }
 

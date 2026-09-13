@@ -58,7 +58,11 @@ const invoiceDataFetcher: ReportDataFetcher = async (args) => {
   const res = await fetchReportData({
     reportType: backendKey as string,
     columns: args.columns,
-    filters: buildSearchFilters(args.filters),
+    filters: buildSearchFilters(args.filters, {
+      branch: args.branch,
+      activeBranchId: args.activeBranchId,
+      backendKey: backendKey as string,
+    }),
     columnFilters: buildColumnFilters(args.columnFilters, args.numericCols),
     page: args.page,
     limit: args.limit,

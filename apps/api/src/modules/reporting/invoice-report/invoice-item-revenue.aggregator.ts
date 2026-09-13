@@ -43,6 +43,7 @@ export interface InvoiceItemRowInput {
   itemNote: string | null;
   // Resolved relations (inlined)
   itemCategory: string | null;
+  locationStorage: string | null;
   locationCode: string | null;
   locationName: string | null;
   customerCode: string | null;
@@ -114,6 +115,8 @@ const relationValue = (
   switch (rel) {
     case 'itemCategory':
       return r.itemCategory;
+    case 'locationStorage':
+      return r.locationStorage;
     case 'locationCode':
       return r.locationCode;
     case 'locationName':

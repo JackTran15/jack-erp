@@ -44,6 +44,11 @@ export interface ReportColumnConfig {
 export interface ReportTableConfig {
   columns: ReportColumnConfig[];
   summaryLabel?: string;            // nhãn ô đầu dòng footer, vd "Tổng"
+  // Report type mà bộ cột này thuộc về. `ReportTableConfigSync` đóng dấu khi
+  // ghi config; `ReportPageTable` so với `appliedRequest.reportType` để không
+  // gửi cột của báo cáo cũ sang báo cáo mới (BE trả 400 "Unknown report
+  // columns"). Không bắt buộc: registry tĩnh không khai, sync luôn đóng dấu.
+  reportType?: string;
 }
 
 // Domain backend phục vụ report type (chọn bộ endpoint columns/search/filter-options/templates).

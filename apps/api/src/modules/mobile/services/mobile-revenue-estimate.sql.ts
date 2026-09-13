@@ -1,6 +1,6 @@
 import { InvoicePromotionType } from '../../promotion/invoice-promotion.entity';
 import { InvoiceStatus, InvoiceType } from '../../pos/entities/invoice.entity';
-import { MobileInvoiceDateBasis } from '../dto/mobile-invoice-list.query.dto';
+import { MobileManagerInvoiceDateBasis } from '../dto/mobile-manager-invoice-list.query.dto';
 import {
   MobileRevenueEstimateGroupBy,
   MobileRevenueEstimateStaffRole,
@@ -22,9 +22,9 @@ import { InvoiceDateColumn } from './mobile-revenue-report.sql';
  */
 
 /** `dateBasis` của query → cột lọc kỳ. Không có `completed_at`; "hoàn thành" là ngày ghi sổ. */
-export const ESTIMATE_DATE_COLUMN: Record<MobileInvoiceDateBasis, InvoiceDateColumn> = {
-  [MobileInvoiceDateBasis.CREATED]: 'created_at',
-  [MobileInvoiceDateBasis.ISSUED]: 'issued_at',
+export const ESTIMATE_DATE_COLUMN: Record<MobileManagerInvoiceDateBasis, InvoiceDateColumn> = {
+  [MobileManagerInvoiceDateBasis.CREATED]: 'created_at',
+  [MobileManagerInvoiceDateBasis.ISSUED]: 'issued_at',
 };
 
 /** Bucket cho hoá đơn KHÔNG gán nhân viên ở vai đang xem (`salesperson_id` NULL là ca thường gặp). */

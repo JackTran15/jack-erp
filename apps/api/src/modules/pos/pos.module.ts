@@ -150,6 +150,10 @@ import { CheckoutSagaModule } from './checkout-saga/checkout-saga.module';
   ],
   exports: [
     PosSessionService,
+    // Exported for MobileModule: the sales app's item-detail screen needs per-variant,
+    // per-storage and per-branch stock, and this service is the only place that computes
+    // them. A second implementation under /mobile would be a second set of numbers.
+    PosCatalogProductService,
     InvoiceService,
     InvoiceDebtService,
     ReturnEligibilityService,

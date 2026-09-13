@@ -1,0 +1,276 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: report-multi-location-column
+slug: 2026091002-report-multi-location-column
+profile: none
+created: 2026-09-10T12:40:36
+ruleset: 5
+current_gate: G5
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-10T12:50:38
+    by: akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-10T13:01:09
+    by: akenzy
+    evidence: 12 assumptions, none blocking-and-pending; 12 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-10T13:05:59
+    by: akenzy
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-10T13:14:39
+    by: akenzy
+    evidence: graph valid - 2 UoW, 6 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T13:26:19
+    by: akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-10T13:40:38
+    by: akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T14:40:48
+    by: akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T14:40:48
+    by: akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T14:40:48
+    by: akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-10T14:44:24
+    by: akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-10T14:50:40
+    by: akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T14:50:40
+    by: akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-10T14:50:40
+    by: akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-10T14:58:52
+    by: akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T14:58:52
+    by: akenzy
+    ticket: T-01-04
+  - gate: G1
+    action: reopened
+    at: 2026-09-10T15:00:08
+    by: akenzy
+    reason: Them AC-13 va ticket T-02-03 - noi cot vi tri cua 3 bao cao doanh thu/loi nhuan (bang do rong dung chung report-column-widths.ts va 2 registry FE). Ke hoach cu chi noi cot o Tong hop nhap xuat ton kho, trong khi A-02 va A-04 ap cho ca 4 bao cao. akenzy chon phuong an nay 2026-09-10.
+  - gate: G1
+    action: passed
+    at: 2026-09-10T15:04:05
+    by: akenzy
+    evidence: 13 assumptions, none blocking-and-pending; 13 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-10T15:04:05
+    by: akenzy
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-10T15:04:05
+    by: akenzy
+    evidence: graph valid - 2 UoW, 7 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-10T15:05:07
+    by: akenzy
+    ticket: T-02-03
+  - gate: G2
+    action: reopened
+    at: 2026-09-12T09:43:02
+    by: Akenzy
+    reason: Akenzy 12/09/2026 - cot Ma vi tri chi hien ma vi tri, bo tien to ma kho (dao ADR-03 va A-03); cot Ten vi tri giu ten kho; nhieu ke van noi bang ', ' va gop ma trung
+  - gate: G2
+    action: passed
+    at: 2026-09-12T10:01:53
+    by: Akenzy
+    evidence: 5 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-12T10:01:54
+    by: Akenzy
+    evidence: graph valid - 2 UoW, 9 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-12T10:01:54
+    by: Akenzy
+    ticket: T-01-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-12T10:04:52
+    by: Akenzy
+    ticket: T-01-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-12T10:04:52
+    by: Akenzy
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-12T10:10:22
+    by: Akenzy
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-12T10:35:15
+    by: Akenzy
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-12T11:01:40
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G1
+    action: reopened
+    at: 2026-09-12T13:15:07
+    by: Akenzy
+    reason: Akenzy 12/09/2026 - cot Ten vi tri chi hien ten vi tri, bo tien to ten kho (dao A-03 lan hai, thay the ADR-05). Nhieu ke van noi bang ', ' va GIU du moi muc, khong khu trung (dao A-18 cho o ten). Ap cho ca 4 bao cao qua joinShelves.
+  - gate: G1
+    action: passed
+    at: 2026-09-12T13:22:35
+    by: Akenzy
+    evidence: 14 assumptions, none blocking-and-pending; 14 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-12T13:22:35
+    by: Akenzy
+    evidence: 6 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-12T13:22:35
+    by: Akenzy
+    evidence: graph valid - 2 UoW, 11 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-12T13:22:39
+    by: Akenzy
+    ticket: T-01-06
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-12T13:25:00
+    by: Akenzy
+    ticket: T-01-06
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-12T13:25:11
+    by: Akenzy
+    ticket: T-02-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-12T13:25:53
+    by: Akenzy
+    ticket: T-02-05
+  - gate: G1
+    action: reopened
+    at: 2026-09-12T13:33:49
+    by: Akenzy
+    reason: Akenzy 12/09/2026 - hai issue phat sinh tu ADR-06 - (1) khong cot nao con cho biet hang nam o kho nao -> them cot 'Kho' rieng (ten kho, khu trung) cho ca 4 bao cao; (2) cot 'Ten vi tri' rong 320 do voi chuoi dai hon, nay du -> do lai that o 1440x900 va chot so. Dao muc Out of scope 'Them cot Kho rieng' cua 00-intent.
+  - gate: G1
+    action: passed
+    at: 2026-09-12T13:38:53
+    by: Akenzy
+    evidence: 16 assumptions, none blocking-and-pending; 19 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-12T13:38:53
+    by: Akenzy
+    evidence: 8 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-12T13:38:53
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 15 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-12T13:39:16
+    by: Akenzy
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-12T13:40:26
+    by: Akenzy
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-12T13:40:27
+    by: Akenzy
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-12T13:43:06
+    by: Akenzy
+    ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-12T13:43:06
+    by: Akenzy
+    ticket: T-03-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-12T14:00:35
+    by: Akenzy
+    ticket: T-03-03
+  - gate: G4
+    action: ticket blocked
+    at: 2026-09-12T14:02:06
+    by: Akenzy
+    reason: Khong dang nhap duoc API local de do - ca hai bo credentials trong .ai/credentials.env deu that bai voi API dang chay tren erp_dev_3008 (backoffice 401 Invalid credentials, branch-manager 500). ADR-08 cam ha xuong uoc luong, nen ticket cho Akenzy xac nhan credentials hoac dung nguoi dung khac. API  -4000 con dang chay code cu - phai restart sau khi pnpm build -shared moi thay cot Kho.
+    ticket: T-03-04
+  - gate: G4
+    action: ticket unblocked
+    at: 2026-09-12T14:13:37
+    by: Akenzy
+    reason: Khong dang nhap duoc API local de do - ca hai bo credentials trong .ai/credentials.env deu that bai voi API dang chay tr
+    ticket: T-03-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-12T14:14:44
+    by: Akenzy
+    ticket: T-03-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-12T14:14:44
+    by: Akenzy
+    ticket: T-03-04
+  - gate: G4
+    action: passed
+    at: 2026-09-12T14:17:05
+    by: Akenzy
+    evidence: no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 15 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-09-12T14:17:41
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

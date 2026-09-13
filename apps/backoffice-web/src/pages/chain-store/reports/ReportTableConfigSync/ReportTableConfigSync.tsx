@@ -106,7 +106,10 @@ export function ReportTableConfigSync() {
       const effectiveColumnsResult = isChainProfitByItemLocation
         ? { ...columnsResult, columns: columnsResult.columns.filter((h) => h.col !== "location") }
         : columnsResult;
-      setConfig(mapHeadersToTableConfig(effectiveColumnsResult));
+      setConfig({
+        ...mapHeadersToTableConfig(effectiveColumnsResult),
+        reportType,
+      });
       pruneColumnFilters(effectiveColumnsResult.columns.map((h) => h.col));
       if (template?.columns?.length) {
         const merged = mergeTemplateColumnsState(
@@ -119,7 +122,7 @@ export function ReportTableConfigSync() {
       }
     } else {
       const fallback = getReportTableConfig(reportType, branch);
-      setConfig(fallback);
+      setConfig({ ...fallback, reportType });
       pruneColumnFilters(fallback.columns.map((c) => c.column));
     }
   }, [

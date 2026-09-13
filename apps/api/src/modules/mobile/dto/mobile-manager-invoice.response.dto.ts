@@ -4,7 +4,7 @@ import { ApiProperty } from '@nestjs/swagger';
  * Một hoá đơn theo hình dạng app mobile đọc được — dòng của danh sách hoá đơn
  * và của lịch sử mua hàng. Khớp phần "đầu" của `InvoiceEntity` phía Dart.
  *
- * - `status` chỉ còn BA giá trị (bảng ánh xạ ở `MobileInvoiceService`).
+ * - `status` chỉ còn BA giá trị (bảng ánh xạ ở `MobileManagerInvoiceService`).
  * - `type` viết thường; `return` giữ nguyên chữ dù Dart phải đặt enum là
  *   `returned` — hợp đồng dây theo backend, Dart tự nắn.
  * - `amount` là TỔNG CÓ DẤU: `amount_due` với hoá đơn bán, `net_amount` với
@@ -12,7 +12,7 @@ import { ApiProperty } from '@nestjs/swagger';
  * - `createdAt` luôn có; `issuedAt` chỉ có khi đã ghi sổ (mọi dòng trả về
  *   đều đã ghi sổ, nhưng cột vẫn nullable nên giữ `| null`).
  */
-export class MobileInvoiceResponseDto {
+export class MobileManagerInvoiceResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
@@ -42,7 +42,7 @@ export class MobileInvoiceResponseDto {
 }
 
 /** Một dòng hàng của hoá đơn — khớp `InvoiceLineEntity` phía Dart. */
-export class MobileInvoiceLineDto {
+export class MobileManagerInvoiceLineDto {
   @ApiProperty()
   name!: string;
 
@@ -63,7 +63,7 @@ export class MobileInvoiceLineDto {
 }
 
 /** Điểm tích luỹ quanh hoá đơn — khớp `InvoiceLoyaltyEntity` phía Dart. */
-export class MobileInvoiceLoyaltyDto {
+export class MobileManagerInvoiceLoyaltyDto {
   @ApiProperty({ description: 'Điểm trước hoá đơn' })
   opening!: number;
 
@@ -76,13 +76,13 @@ export class MobileInvoiceLoyaltyDto {
 
 /**
  * Chi tiết một hoá đơn = dòng danh sách + phần thân. Một DTO cho cả hai màn
- * gọi tới (`/mobile/invoices/:id` từ tab Hoá đơn và từ lịch sử mua) — chúng
+ * gọi tới (`/mobile/manager/invoices/:id` từ tab Hoá đơn và từ lịch sử mua) — chúng
  * cùng mở một màn chi tiết.
  *
  * `salesChannel` cố ý KHÔNG có: backend không mô hình hoá kênh bán; app hiện
  * dấu gạch cho ô đó.
  */
-export class MobileInvoiceDetailResponseDto extends MobileInvoiceResponseDto {
+export class MobileManagerInvoiceDetailResponseDto extends MobileManagerInvoiceResponseDto {
   @ApiProperty({ nullable: true, type: String, description: 'Nhân viên bán' })
   salesperson!: string | null;
 
@@ -104,11 +104,11 @@ export class MobileInvoiceDetailResponseDto extends MobileInvoiceResponseDto {
   @ApiProperty({ type: [String], description: 'Mã loại chương trình khuyến mãi đã áp' })
   promotions!: string[];
 
-  @ApiProperty({ nullable: true, type: MobileInvoiceLoyaltyDto })
-  loyalty!: MobileInvoiceLoyaltyDto | null;
+  @ApiProperty({ nullable: true, type: MobileManagerInvoiceLoyaltyDto })
+  loyalty!: MobileManagerInvoiceLoyaltyDto | null;
 
-  @ApiProperty({ type: [MobileInvoiceLineDto] })
-  lines!: MobileInvoiceLineDto[];
+  @ApiProperty({ type: [MobileManagerInvoiceLineDto] })
+  lines!: MobileManagerInvoiceLineDto[];
 }
 
 /**
@@ -116,9 +116,9 @@ export class MobileInvoiceDetailResponseDto extends MobileInvoiceResponseDto {
  * đơn đã huỷ — thanh "Tổng" của app nói về tiền còn hiệu lực. Dòng huỷ vẫn
  * mang số tiền gốc để người xem biết đơn đó từng bao nhiêu.
  */
-export class MobileInvoicePageDto {
-  @ApiProperty({ type: [MobileInvoiceResponseDto] })
-  data!: MobileInvoiceResponseDto[];
+export class MobileManagerInvoicePageDto {
+  @ApiProperty({ type: [MobileManagerInvoiceResponseDto] })
+  data!: MobileManagerInvoiceResponseDto[];
 
   @ApiProperty({ description: 'Tổng số bản ghi khớp, không phải số bản ghi của trang' })
   total!: number;

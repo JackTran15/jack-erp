@@ -98,6 +98,30 @@ describe('invoiceFilterSummary', () => {
     ]);
   });
 
+  it('omits the store line when the single group is the actor branch', () => {
+    expect(
+      invoiceFilterSummary(
+        { store: { scope: 'group', storeIds: ['branch-1'] } },
+        { branchId: 'branch-1' },
+      ),
+    ).toEqual([]);
+  });
+
+  it('keeps the store line when the single group is a different branch', () => {
+    expect(
+      invoiceFilterSummary(
+        { store: { scope: 'group', storeIds: ['branch-1'] } },
+        { branchId: 'branch-2' },
+      ),
+    ).toEqual(['Cửa hàng: 1 cửa hàng được chọn']);
+  });
+
+  it('keeps the store line when no actor is passed', () => {
+    expect(
+      invoiceFilterSummary({ store: { scope: 'group', storeIds: ['branch-1'] } }),
+    ).toEqual(['Cửa hàng: 1 cửa hàng được chọn']);
+  });
+
   it('produces no line for an unfiltered request', () => {
     expect(invoiceFilterSummary({})).toEqual([]);
     expect(invoiceFilterSummary(undefined)).toEqual([]);

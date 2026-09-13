@@ -79,7 +79,7 @@ function makeReport(opts: {
 
 const dto = (over: Record<string, any> = {}) => ({
   reportType: 'profit-by-item',
-  columns: ['skuCode', 'location'],
+  columns: ['skuCode', 'locationStorage', 'location'],
   filters: { issuedAt: { from: '2026-06-01', to: '2026-06-30' } },
   ...over,
 });
@@ -89,10 +89,10 @@ const warehouseFixtures = {
   lines: [line()],
   items: [{ id: 'it1', categoryId: 'cat1' }],
   categories: [{ id: 'cat1', name: 'Shoes' }],
-  storages: [{ id: 'wh1', branchId: 'b1', isMainStorage: false, isActive: true }],
+  storages: [{ id: 'wh1', branchId: 'b1', name: 'Kho A1', isMainStorage: false, isActive: true }],
 };
 
-// "Vị trí" here goes through the same resolver as "Doanh thu theo mặt hàng" and
+// "Kho"/"Vị trí" here go through the same resolver as "Doanh thu theo mặt hàng" and
 // "Chi tiết doanh thu theo hóa đơn và mặt hàng", so all three agree on the shelf
 // they report for a given item.
 describe('ProfitByItemReport — Vị trí', () => {
@@ -100,10 +100,10 @@ describe('ProfitByItemReport — Vị trí', () => {
     const report = makeReport({
       ...warehouseFixtures,
       itemStorageLocations: [{ itemId: 'it1', storageId: 'wh1', locationId: 'loc1' }],
-      locations: [{ id: 'loc1', code: 'A-01', name: 'Aisle A', isActive: true }],
+      locations: [{ id: 'loc1', storageId: 'wh1', code: 'A-01', name: 'Aisle A', isActive: true }],
     });
     const res = await report.buildData(dto() as any, actor);
-    expect(res.rows[0]).toMatchObject({ location: 'A-01' });
+    expect(res.rows[0]).toMatchObject({ locationStorage: 'Kho A1', location: 'A-01' });
   });
 
   it('falls back to the highest-stock shelf when the preferred one is "Ngừng theo dõi"', async () => {
@@ -111,14 +111,14 @@ describe('ProfitByItemReport — Vị trí', () => {
       ...warehouseFixtures,
       itemStorageLocations: [{ itemId: 'it1', storageId: 'wh1', locationId: 'loc1' }],
       locations: [
-        { id: 'loc1', code: 'A-01', name: 'Aisle A', isActive: true },
-        { id: 'loc2', code: 'B-02', name: 'Aisle B', isActive: true },
+        { id: 'loc1', storageId: 'wh1', code: 'A-01', name: 'Aisle A', isActive: true },
+        { id: 'loc2', storageId: 'wh1', code: 'B-02', name: 'Aisle B', isActive: true },
       ],
       stockBalances: [{ itemId: 'it1', locationId: 'loc1', isTracked: false }],
       stockBalanceRaw: [{ itemId: 'it1', locationId: 'loc2' }],
     });
     const res = await report.buildData(dto() as any, actor);
-    expect(res.rows[0]).toMatchObject({ location: 'B-02' });
+    expect(res.rows[0]).toMatchObject({ locationStorage: 'Kho A1', location: 'B-02' });
   });
 
   it('leaves the location empty when the branch has no warehouse', async () => {
@@ -127,7 +127,41 @@ describe('ProfitByItemReport — Vị trí', () => {
       storages: [{ id: 'sr1', branchId: 'b1', isMainStorage: true, isActive: true }],
     });
     const res = await report.buildData(dto() as any, actor);
-    expect(res.rows[0]).toMatchObject({ location: null });
+    expect(res.rows[0]).toMatchObject({ locationStorage: null, location: null });
+  });
+
+  it('AC-07: joins two shelves across two warehouses into "A101, A201"', async () => {
+    const report = makeReport({
+      ...warehouseFixtures,
+      storages: [
+        { id: 'wh1', branchId: 'b1', code: 'A1', name: 'Kho A1', isMainStorage: false, isActive: true },
+        { id: 'wh2', branchId: 'b1', code: 'A2', name: 'Kho A2', isMainStorage: false, isActive: true },
+      ],
+      itemStorageLocations: [
+        { itemId: 'it1', storageId: 'wh1', locationId: 'loc1' },
+        { itemId: 'it1', storageId: 'wh2', locationId: 'loc2' },
+      ],
+      locations: [
+        { id: 'loc1', storageId: 'wh1', code: 'A101', name: 'Shelf A101', isActive: true },
+        { id: 'loc2', storageId: 'wh2', code: 'A201', name: 'Shelf A201', isActive: true },
+      ],
+    });
+    const res = await report.buildData(dto() as any, actor);
+    expect(res.rows[0]).toMatchObject({ locationStorage: 'Kho A1, Kho A2', location: 'A101, A201' });
+  });
+
+  it('AC-08: leaves the location empty for an item stocked only on the showroom shelf', async () => {
+    const report = makeReport({
+      ...warehouseFixtures,
+      storages: [
+        { id: 'showroom1', branchId: 'b1', code: 'SR', name: 'Showroom', isMainStorage: true, isActive: true },
+      ],
+      itemStorageLocations: [{ itemId: 'it1', storageId: 'showroom1', locationId: 'locSR' }],
+      locations: [{ id: 'locSR', storageId: 'showroom1', code: 'SR01', name: 'Kệ mặc định', isActive: true }],
+      stockBalanceRaw: [{ itemId: 'it1', locationId: 'locSR' }],
+    });
+    const res = await report.buildData(dto() as any, actor);
+    expect(res.rows[0]).toMatchObject({ locationStorage: null, location: null });
   });
 
   it('does not query warehouse locations at parent grain', async () => {

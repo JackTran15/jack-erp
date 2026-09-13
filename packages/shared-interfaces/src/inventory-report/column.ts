@@ -60,6 +60,7 @@ export const INVENTORY_REPORT_COLUMN_LABELS_VI: Record<
     group: 'Nhóm hàng hóa',
     brand: 'Thương hiệu',
     sku: 'Mã SKU',
+    positionStorage: 'Kho',
     positionCode: 'Mã vị trí',
     positionName: 'Tên vị trí',
     openingQty: 'Số lượng',

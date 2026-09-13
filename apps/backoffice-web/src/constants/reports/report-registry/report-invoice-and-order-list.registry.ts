@@ -261,7 +261,6 @@ export const chain_tableRegistryReportInvoiceAndOrderList: ReportTableConfig = {
 };
 
 export const single_filterRegistryReportInvoiceAndOrderList = [
-  REPORT_FILTERS_LINE.STORE,
   REPORT_FILTERS_LINE.INVOICE_STATUS,
   REPORT_FILTERS_LINE.STAT_DATE_TYPE,
   REPORT_FILTERS_LINE.REPORT_PERIOD,

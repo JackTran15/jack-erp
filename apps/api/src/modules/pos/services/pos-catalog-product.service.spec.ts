@@ -686,7 +686,7 @@ describe('PosCatalogProductService', () => {
       // T-02-01: loadDetailStockExtras always sets an entry per itemId (to carry the
       // storages breakdown) even when the item has no balance at all.
       expect(res.size).toBe(1);
-      expect(res.get('I1')).toEqual({ mainShowroomQuantity: 0, otherBranchQuantity: 0, storages: [] });
+      expect(res.get('I1')).toEqual({ mainShowroomQuantity: 0, otherBranchQuantity: 0, storages: [], otherBranches: [] });
     });
 
     it('skips a balance whose location is missing (inactive location)', async () => {
@@ -703,6 +703,7 @@ describe('PosCatalogProductService', () => {
         mainShowroomQuantity: 0,
         otherBranchQuantity: 0,
         storages: [{ storageId: 'S1', name: 'Kho A', quantity: 0, isMainShowroom: true }],
+        otherBranches: [],
       });
     });
 
@@ -715,7 +716,7 @@ describe('PosCatalogProductService', () => {
       const res = await call(['I1']);
 
       // No active branch storages are known at all, so storages stays empty.
-      expect(res.get('I1')).toEqual({ mainShowroomQuantity: 0, otherBranchQuantity: 0, storages: [] });
+      expect(res.get('I1')).toEqual({ mainShowroomQuantity: 0, otherBranchQuantity: 0, storages: [], otherBranches: [] });
     });
 
     it('adds to mainShowroomQuantity when the storage is the branch main showroom', async () => {
@@ -730,6 +731,7 @@ describe('PosCatalogProductService', () => {
         mainShowroomQuantity: 5,
         otherBranchQuantity: 0,
         storages: [{ storageId: 'S-MAIN', name: 'Kho chính', quantity: 5, isMainShowroom: true }],
+        otherBranches: [],
       });
     });
 
@@ -745,6 +747,7 @@ describe('PosCatalogProductService', () => {
         mainShowroomQuantity: 0,
         otherBranchQuantity: 0,
         storages: [{ storageId: 'S-OTHER', name: 'Kho phụ', quantity: 5, isMainShowroom: false }],
+        otherBranches: [],
       });
     });
 
@@ -752,13 +755,27 @@ describe('PosCatalogProductService', () => {
       balanceRepo.find.mockResolvedValue([{ itemId: 'I1', locationId: 'L1', quantity: 7 }]);
       locationRepo.find.mockResolvedValue([{ id: 'L1', storageId: 'S2' }]);
       storageRepo.find.mockResolvedValue([{ id: 'S2', branchId: 'branch-2' }]);
-      branchRepo.find.mockResolvedValue([{ id: 'branch-2' }]);
+      branchRepo.find.mockResolvedValue([{ id: 'branch-2', name: 'Chi nhánh 2' }]);
       showroomRepo.findOne.mockResolvedValue(null);
 
       const res = await call(['I1']);
 
       // S2 belongs to branch-2, so it never enters branch-1's `storages` breakdown.
-      expect(res.get('I1')).toEqual({ mainShowroomQuantity: 0, otherBranchQuantity: 7, storages: [] });
+      // `otherBranches` is the SAME stock kept split instead of collapsed: the two are summed
+      // in one pass precisely so they can never disagree, and this asserts both halves.
+      expect(res.get('I1')).toEqual({
+        mainShowroomQuantity: 0,
+        otherBranchQuantity: 7,
+        storages: [],
+        otherBranches: [
+          {
+            branchId: 'branch-2',
+            name: 'Chi nhánh 2',
+            quantity: 7,
+            storages: [{ storageId: 'S2', name: '', quantity: 7, isMainShowroom: false }],
+          },
+        ],
+      });
     });
 
     it('contributes to neither bucket when the other branch is not in the active set', async () => {
@@ -770,7 +787,7 @@ describe('PosCatalogProductService', () => {
 
       const res = await call(['I1']);
 
-      expect(res.get('I1')).toEqual({ mainShowroomQuantity: 0, otherBranchQuantity: 0, storages: [] });
+      expect(res.get('I1')).toEqual({ mainShowroomQuantity: 0, otherBranchQuantity: 0, storages: [], otherBranches: [] });
     });
 
     it('leaves mainShowroomQuantity at 0 and does not throw when the branch has no main-showroom record (A-12)', async () => {
@@ -785,6 +802,7 @@ describe('PosCatalogProductService', () => {
         mainShowroomQuantity: 0,
         otherBranchQuantity: 0,
         storages: [{ storageId: 'S1', name: 'Kho A', quantity: 5, isMainShowroom: false }],
+        otherBranches: [],
       });
     });
 
@@ -812,7 +830,7 @@ describe('PosCatalogProductService', () => {
         { id: 'S1', branchId: 'branch-1', name: 'Kho A' },
         { id: 'S2', branchId: 'branch-2', name: 'Kho CN2' },
       ]);
-      branchRepo.find.mockResolvedValue([{ id: 'branch-2' }]);
+      branchRepo.find.mockResolvedValue([{ id: 'branch-2', name: 'Chi nhánh 2' }]);
       showroomRepo.findOne.mockResolvedValue({ storageId: 'S1' });
 
       const res = await call(['I1', 'I2']);
@@ -821,6 +839,7 @@ describe('PosCatalogProductService', () => {
         mainShowroomQuantity: 5,
         otherBranchQuantity: 0,
         storages: [{ storageId: 'S1', name: 'Kho A', quantity: 5, isMainShowroom: true }],
+        otherBranches: [],
       });
       expect(res.get('I2')).toEqual({
         mainShowroomQuantity: 0,
@@ -828,6 +847,17 @@ describe('PosCatalogProductService', () => {
         // I2 has no balance at S1, but S1 is still the branch's only active storage and
         // still the main showroom, so it appears here at quantity 0 (A-07).
         storages: [{ storageId: 'S1', name: 'Kho A', quantity: 0, isMainShowroom: true }],
+        // `isMainShowroom` là FALSE ở đây dù S2 có thể là kho chính của CHÍNH branch-2: cờ đó
+        // chỉ có nghĩa với chi nhánh đang đứng, và bày `true` từ bên này là nói một điều mà
+        // người đọc hiểu sai.
+        otherBranches: [
+          {
+            branchId: 'branch-2',
+            name: 'Chi nhánh 2',
+            quantity: 9,
+            storages: [{ storageId: 'S2', name: 'Kho CN2', quantity: 9, isMainShowroom: false }],
+          },
+        ],
       });
     });
 
@@ -850,13 +880,44 @@ describe('PosCatalogProductService', () => {
         { id: 'S3a', branchId: 'branch-3' },
         { id: 'S3b', branchId: 'branch-3' },
       ]);
-      branchRepo.find.mockResolvedValue([{ id: 'branch-2' }, { id: 'branch-3' }]);
+      branchRepo.find.mockResolvedValue([
+        { id: 'branch-2', name: 'Chi nhánh 2' },
+        { id: 'branch-3', name: 'Chi nhánh 3' },
+      ]);
       showroomRepo.findOne.mockResolvedValue(null);
 
       const res = await call(['I1']);
 
       // None of the balances sit on a branch-1 storage, so `storages` stays empty.
-      expect(res.get('I1')).toEqual({ mainShowroomQuantity: 0, otherBranchQuantity: 15, storages: [] });
+      //
+      // Đây là ca đắt nhất của phần mới: 15 = 10 (chi nhánh 2) + 5 (chi nhánh 3), và mỗi chi
+      // nhánh lại tách tiếp theo kho. Một phép gom sai chiều vẫn ra đúng 15 ở dòng trên mà sai
+      // hẳn ở dòng dưới — nên khẳng định phải hỏi CẢ HAI.
+      expect(res.get('I1')).toEqual({
+        mainShowroomQuantity: 0,
+        otherBranchQuantity: 15,
+        storages: [],
+        otherBranches: [
+          {
+            branchId: 'branch-2',
+            name: 'Chi nhánh 2',
+            quantity: 10,
+            storages: [
+              { storageId: 'S2a', name: '', quantity: 4, isMainShowroom: false },
+              { storageId: 'S2b', name: '', quantity: 6, isMainShowroom: false },
+            ],
+          },
+          {
+            branchId: 'branch-3',
+            name: 'Chi nhánh 3',
+            quantity: 5,
+            storages: [
+              { storageId: 'S3a', name: '', quantity: 3, isMainShowroom: false },
+              { storageId: 'S3b', name: '', quantity: 2, isMainShowroom: false },
+            ],
+          },
+        ],
+      });
     });
 
     it('excludes both a SUSPENDED and an ARCHIVED branch holding stock', async () => {
@@ -879,7 +940,7 @@ describe('PosCatalogProductService', () => {
       const res = await call(['I1']);
 
       // Neither S2 nor S3 belongs to branch-1, so `storages` stays empty.
-      expect(res.get('I1')).toEqual({ mainShowroomQuantity: 0, otherBranchQuantity: 0, storages: [] });
+      expect(res.get('I1')).toEqual({ mainShowroomQuantity: 0, otherBranchQuantity: 0, storages: [], otherBranches: [] });
     });
 
     it('scopes every query to organizationId (AC-04)', async () => {
@@ -925,14 +986,14 @@ describe('PosCatalogProductService', () => {
       locationRepo.find.mockResolvedValue([{ id: 'L1', storageId: 'S-GONE' }]);
       // S-GONE (would belong to branch-2) is not returned -> deactivated storage.
       storageRepo.find.mockResolvedValue([]);
-      branchRepo.find.mockResolvedValue([{ id: 'branch-2' }]);
+      branchRepo.find.mockResolvedValue([{ id: 'branch-2', name: 'Chi nhánh 2' }]);
       showroomRepo.findOne.mockResolvedValue(null);
 
       const res = await call(['I1']);
 
       // Both S1's storage and branch-1's own storage list are unknown here (storageRepo
       // returns [] entirely), so T-02-01's outer loop still sets an all-zero entry.
-      expect(res.get('I1')).toEqual({ mainShowroomQuantity: 0, otherBranchQuantity: 0, storages: [] });
+      expect(res.get('I1')).toEqual({ mainShowroomQuantity: 0, otherBranchQuantity: 0, storages: [], otherBranches: [] });
     });
 
     it('keys mainShowroomQuantity on showrooms.is_main_showroom, not storages.is_main_storage (ADR-03)', async () => {
@@ -963,6 +1024,7 @@ describe('PosCatalogProductService', () => {
           { storageId: 'S-B', name: 'Kho B', quantity: 2, isMainShowroom: true },
           { storageId: 'S-A', name: 'Kho A', quantity: 5, isMainShowroom: false },
         ],
+        otherBranches: [],
       });
     });
 
@@ -978,6 +1040,7 @@ describe('PosCatalogProductService', () => {
         mainShowroomQuantity: -1,
         otherBranchQuantity: 0,
         storages: [{ storageId: 'S-MAIN', name: 'Kho chính', quantity: -1, isMainShowroom: true }],
+        otherBranches: [],
       });
     });
 
@@ -994,12 +1057,29 @@ describe('PosCatalogProductService', () => {
         { id: 'S2a', branchId: 'branch-2' },
         { id: 'S2b', branchId: 'branch-2' },
       ]);
-      branchRepo.find.mockResolvedValue([{ id: 'branch-2' }]);
+      branchRepo.find.mockResolvedValue([{ id: 'branch-2', name: 'Chi nhánh 2' }]);
       showroomRepo.findOne.mockResolvedValue(null);
 
       const res = await call(['I3']);
 
-      expect(res.get('I3')).toEqual({ mainShowroomQuantity: 0, otherBranchQuantity: 10, storages: [] });
+      // Hàng LẺ đi đúng một đường với biến thể, kể cả ở phần tách theo chi nhánh: hai nhánh
+      // code khác nhau cho cùng một phép gom là hai chỗ để phân kỳ.
+      expect(res.get('I3')).toEqual({
+        mainShowroomQuantity: 0,
+        otherBranchQuantity: 10,
+        storages: [],
+        otherBranches: [
+          {
+            branchId: 'branch-2',
+            name: 'Chi nhánh 2',
+            quantity: 10,
+            storages: [
+              { storageId: 'S2a', name: '', quantity: 4, isMainShowroom: false },
+              { storageId: 'S2b', name: '', quantity: 6, isMainShowroom: false },
+            ],
+          },
+        ],
+      });
     });
 
     // T-02-03: the `storages` breakdown of the current branch (T-02-01/T-02-02).
@@ -1106,7 +1186,7 @@ describe('PosCatalogProductService', () => {
           { id: 'S1', branchId: 'branch-1', name: 'Kho A' },
           { id: 'S2', branchId: 'branch-2', name: 'Kho CN2' },
         ]);
-        branchRepo.find.mockResolvedValue([{ id: 'branch-2' }]);
+        branchRepo.find.mockResolvedValue([{ id: 'branch-2', name: 'Chi nhánh 2' }]);
         showroomRepo.findOne.mockResolvedValue(null);
 
         const res = await call(['I1']);
@@ -1237,7 +1317,10 @@ describe('PosCatalogProductService', () => {
       balanceRepo.find.mockResolvedValue(bigBalances);
       locationRepo.find.mockResolvedValue(bigLocations);
       storageRepo.find.mockResolvedValue(bigStorages);
-      branchRepo.find.mockResolvedValue([{ id: 'branch-2' }, { id: 'branch-3' }]);
+      branchRepo.find.mockResolvedValue([
+        { id: 'branch-2', name: 'Chi nhánh 2' },
+        { id: 'branch-3', name: 'Chi nhánh 3' },
+      ]);
       showroomRepo.findOne.mockResolvedValue({ storageId: 'SB-MAIN' });
     });
 

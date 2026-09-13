@@ -88,6 +88,12 @@ export interface TempWarehouseLine {
   item?: TempWarehousePublicItem | null;
   sourceLocation?: TempWarehousePublicLocation | null;
   destinationLocation?: TempWarehousePublicLocation | null;
+  /**
+   * The line's own shelf, resolved from `sourceLocationId`. Unlike
+   * `sourceLocation` / `destinationLocation`, which are the session shelves
+   * shared by every line.
+   */
+  sourceShelf?: TempWarehousePublicLocation | null;
 }
 
 export interface TempWarehouseSession {

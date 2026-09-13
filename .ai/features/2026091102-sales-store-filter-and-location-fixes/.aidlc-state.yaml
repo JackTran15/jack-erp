@@ -1,0 +1,139 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: sales-store-filter-and-location-fixes
+slug: 2026091102-sales-store-filter-and-location-fixes
+profile: none
+created: 2026-09-11T14:56:17
+ruleset: 5
+current_gate: G5
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-11T15:24:20
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-11T15:51:39
+    by: Akenzy
+    evidence: 13 assumptions, none blocking-and-pending; 15 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-11T15:51:39
+    by: Akenzy
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-11T15:51:39
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 5 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-11T15:52:51
+    by: aidlc-implementer
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-11T15:53:14
+    by: aidlc-implementer
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-11T15:54:10
+    by: aidlc-implementer
+    ticket: T-04-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-11T15:54:14
+    by: aidlc-implementer
+    ticket: T-04-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-11T15:55:06
+    by: aidlc-implementer
+    ticket: T-04-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-11T15:56:12
+    by: aidlc-implementer
+    ticket: T-04-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-11T16:22:42
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-11T16:26:53
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-11T16:26:53
+    by: Akenzy
+    ticket: T-04-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-11T16:26:53
+    by: Akenzy
+    ticket: T-04-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-11T16:36:52
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-11T16:41:43
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-11T16:42:42
+    by: aidlc-implementer
+    ticket: T-01-02
+  - gate: G3
+    action: reopened
+    at: 2026-09-11T17:00:34
+    by: Akenzy
+    reason: Review of T-01-02 found a side effect of T-01-01 - single-branch exports/prints of 3 sales reports now print a redundant 'Cửa hàng - 1 cửa hàng được chọn' (invoiceFilterSummary). Adding T-01-03 to suppress it; Akenzy asked to implement the fix.
+  - gate: G3
+    action: passed
+    at: 2026-09-11T17:01:55
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 6 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-11T17:03:11
+    by: aidlc-implementer
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-11T17:40:31
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-11T17:41:14
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-11T17:59:08
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-11T17:59:08
+    by: Akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: passed
+    at: 2026-09-11T20:09:05
+    by: Akenzy
+    evidence: no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 6 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-09-11T20:09:06
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

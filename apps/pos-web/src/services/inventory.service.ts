@@ -45,8 +45,9 @@ export const inventoryService = {
   listBranchShowrooms: async (
     branchId: string,
   ): Promise<ReadonlyArray<InventoryShowroomOption>> => {
+    // Showroom có kho backing đã ngừng hoạt động thì cũng ẩn khỏi dropdown.
     const result = await http.get<PaginatedResponse<InventoryShowroomOption>>(
-      `/inventory/showrooms?${buildListQuery(branchId)}`,
+      `/inventory/showrooms?${buildListQuery(branchId)}&activeOnly=true`,
     );
     return result.data;
   },

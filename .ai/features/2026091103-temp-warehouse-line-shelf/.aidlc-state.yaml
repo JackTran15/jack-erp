@@ -1,0 +1,84 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: temp-warehouse-line-shelf
+slug: 2026091103-temp-warehouse-line-shelf
+profile: none
+created: 2026-09-11T15:43:32
+ruleset: 5
+current_gate: G5
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-11T19:30:44
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-11T19:30:44
+    by: Akenzy
+    evidence: 5 assumptions, none blocking-and-pending; 7 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-11T19:30:44
+    by: Akenzy
+    evidence: 1 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-11T19:30:45
+    by: Akenzy
+    evidence: graph valid - 1 UoW, 3 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-11T19:30:54
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-11T19:34:55
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-11T19:34:55
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-11T19:34:55
+    by: Claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-11T19:34:55
+    by: Claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-11T19:40:37
+    by: Claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-11T19:40:37
+    by: Claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-11T19:55:59
+    by: Claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-11T19:55:59
+    by: Claude
+    ticket: T-01-03
+  - gate: G4
+    action: passed
+    at: 2026-09-11T20:08:55
+    by: Akenzy
+    evidence: no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 3 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-09-11T20:08:56
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

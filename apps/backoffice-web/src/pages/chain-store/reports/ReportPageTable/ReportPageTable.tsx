@@ -33,8 +33,18 @@ export function ReportPageTable() {
     ? getReportDataFetcher(appliedRequest.reportType)
     : undefined;
 
-  // Data chỉ fetch khi đã áp dụng (Đồng ý) + report có nguồn data + đã có cột.
-  const enabled = Boolean(appliedRequest && fetcher && columnIds.length > 0);
+  // Data chỉ fetch khi đã áp dụng (Đồng ý) + report có nguồn data + đã có cột
+  // ĐÚNG của báo cáo đang xem. Đổi report type ghi `appliedRequest` ngay
+  // (report store) nhưng `config` chỉ đổi khi catalog cột của type mới về
+  // (ReportTableConfigSync) — bắn giữa hai mốc đó là gửi cột báo cáo cũ kèm
+  // type mới, BE trả 400 "Unknown report columns". Dấu type trên config khoá
+  // đúng cửa sổ đó; hàng cũ vẫn hiển thị nhờ `placeholderData`.
+  const enabled = Boolean(
+    appliedRequest &&
+      fetcher &&
+      columnIds.length > 0 &&
+      config.reportType === appliedRequest.reportType,
+  );
 
   const query = useQuery({
     queryKey: [

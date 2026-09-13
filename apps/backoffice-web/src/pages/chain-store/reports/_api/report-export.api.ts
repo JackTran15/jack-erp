@@ -111,7 +111,11 @@ function buildExportBody(
   }
   return {
     ...base,
-    filters: buildSearchFilters(args.filters),
+    filters: buildSearchFilters(args.filters, {
+      branch: args.branch,
+      activeBranchId: args.activeBranchId,
+      backendKey,
+    }),
     columnFilters: buildColumnFilters(args.columnFilters, args.numericCols),
   };
 }

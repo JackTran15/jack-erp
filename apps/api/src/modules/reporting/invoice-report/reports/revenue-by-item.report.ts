@@ -283,7 +283,9 @@ export class RevenueByItemReport implements ReportDefinition {
     const needsLocation =
       grain === 'item' &&
       !!locationBranchId &&
-      referenced.some((c) => c === 'locationCode' || c === 'locationName');
+      referenced.some(
+        (c) => c === 'locationStorage' || c === 'locationCode' || c === 'locationName',
+      );
     const locationByItemId = needsLocation
       ? await resolveItemWarehouseLocations(
           this.locationRepos,
@@ -307,6 +309,7 @@ export class RevenueByItemReport implements ReportDefinition {
         itemCategory: meta?.category ?? null,
         brand: meta?.brand ?? null,
         unit: li.unit ?? null,
+        locationStorage: location?.storage ?? null,
         locationCode: location?.code ?? null,
         locationName: location?.name ?? null,
         direction: li.direction,

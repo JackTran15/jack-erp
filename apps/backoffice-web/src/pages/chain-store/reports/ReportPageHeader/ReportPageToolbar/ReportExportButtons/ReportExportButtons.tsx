@@ -70,8 +70,15 @@ export function ReportExportButtons() {
     return out;
   }, [visibleColumns]);
 
-  // Nothing to export until a report has been applied and its columns loaded.
-  const canExport = Boolean(appliedRequest) && visibleColumns.length > 0;
+  // Nothing to export until a report has been applied and ITS columns loaded —
+  // `config.reportType` lags `appliedRequest.reportType` while the new
+  // catalog loads, and exporting in that window sends the previous report's
+  // columns (server answers 400 "Unknown report columns"). Same guard as
+  // `ReportPageTable`'s `enabled`.
+  const canExport =
+    Boolean(appliedRequest) &&
+    visibleColumns.length > 0 &&
+    config.reportType === appliedRequest?.reportType;
 
   // Print always covers every row for the applied filter, not just the
   // current page, so it fetches the payload fresh rather than reading the

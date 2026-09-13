@@ -13,6 +13,7 @@ import type { SwitchBranchResponse } from "@erp/shared-interfaces";
 import { useMyBranches } from "../../hooks/iam/useBranches";
 import { erpApi, requireErpData } from "../../lib/erp-api";
 import { getActiveBranch, persistSwitchBranchResponse } from "../../lib/auth-storage";
+import { resetBranchDriftBaseline } from "../../hooks/useBranchDrift";
 import { canViewChain } from "../../lib/permissions";
 import { CHAIN_OPTION_VALUE } from "../../store/common/branch/branch.constant";
 import {
@@ -30,10 +31,13 @@ export function BranchSelector() {
   const [switching, setSwitching] = useState(false);
   const attemptedSwitchFor = useRef<string | null>(null);
 
-  // Reconcile the store against the authoritative branch (localStorage
-  // active_branch_id — the same source api-axios sends as X-Branch-Id). This
-  // covers a fresh tab / post-login state where the store was initialized
-  // before the session existed, so the selector never drifts from the data.
+  // Giải TÊN chi nhánh cho tab, và chỉ nhận chi nhánh từ localStorage khi tab chưa đứng ở
+  // chi nhánh nào (tab vừa mở, vừa đăng nhập — store khởi tạo trước khi có phiên).
+  //
+  // Effect này TỪNG tự kéo tab sang chi nhánh mới trong localStorage khi hai bên khác nhau.
+  // Đó chính là "header tự đổi tên" trong báo cáo lỗi: tab khác đổi chi nhánh, tab này âm
+  // thầm nhận theo, giữa lúc đó màn hình nói một chi nhánh còn số liệu là chi nhánh khác.
+  // Hai bên khác nhau giờ là việc của BranchDriftDialog — nó hỏi, không tự quyết.
   const moveTo = async (
     value: string,
     opts?: { notice?: string },
@@ -47,6 +51,10 @@ export function BranchSelector() {
         }),
       );
       persistSwitchBranchResponse(res, value);
+      // Tab này vừa tự đổi chi nhánh, nên chốt lại baseline: nó không được tự hỏi lại
+      // chính mình. `storage` vốn không bắn ở tab đã ghi và trang sắp reload, nên đây là
+      // chốt thứ hai — rẻ, và nói ra ý định.
+      resetBranchDriftBaseline();
       if (branch) selectBranch(branch.id, branch.name);
       if (opts?.notice) toast.info(opts.notice);
       window.location.reload();
@@ -58,9 +66,10 @@ export function BranchSelector() {
 
   useEffect(() => {
     if (isChain) return;
-    const active = getActiveBranch();
-    if (!active || (active === branchId && branchName)) return;
-    const branch = branches?.find((b) => b.id === active);
+    const target = branchId ?? getActiveBranch();
+    if (!target) return;
+    if (target === branchId && branchName) return;
+    const branch = branches?.find((b) => b.id === target);
     if (branch) selectBranch(branch.id, branch.name);
   }, [isChain, branchId, branchName, branches, selectBranch]);
 

@@ -12,6 +12,11 @@ import {
 } from "@erp/shared-interfaces";
 import { erpApi, requireErpData } from "../../../../lib/erp-api";
 import { REPORT_FILTERS_LINE } from "../../../../constants/reports/report-filters.constant";
+import {
+  REPORT_TYPE_METADATA,
+  REPORT_TYPE_SALES,
+} from "../../../../constants/reports/report-type.constant";
+import { STORE_TYPE } from "../../../../constants/store.constant";
 import type {
   ReportColumnDataType as FeColumnDataType,
   ReportTableConfig,
@@ -22,6 +27,25 @@ import type {
   ReportColumnFilter,
   ReportFilterValues,
 } from "../../../../store/page-stores/report/report.interface";
+
+export interface InvoiceSearchContext {
+  branch: STORE_TYPE;
+  activeBranchId?: string | null;
+  backendKey: string;
+}
+
+// SINGLE mode: the store line is hidden; the store is fixed to the header
+// branch. Same pattern as inventory-report-v2.api.ts.
+const SINGLE_MODE_HEADER_STORE_SALES_REPORTS = new Set(
+  [
+    REPORT_TYPE_SALES.DAILY_SALES_SUMMARY,
+    REPORT_TYPE_SALES.INVOICE_AND_ORDER_LIST,
+    REPORT_TYPE_SALES.REVENUE_DETAIL_BY_INVOICE_AND_PRODUCT,
+    REPORT_TYPE_SALES.REVENUE_BY_PRODUCT,
+  ]
+    .map((reportType) => REPORT_TYPE_METADATA[reportType]?.backendKey)
+    .filter((backendKey): backendKey is string => !!backendKey),
+);
 
 // Một dòng data từ API: object keyed theo field của cột.
 export type ReportRow = Record<string, ReportCellValue>;
@@ -122,6 +146,7 @@ export function mapHeadersToTableConfig(
 
 export function buildSearchFilters(
   filters: Partial<ReportFilterValues>,
+  ctx?: InvoiceSearchContext,
 ): InvoiceReportFilterPayload {
   const range = filters[REPORT_FILTERS_LINE.RANGE_DATE];
   const store = filters[REPORT_FILTERS_LINE.STORE];
@@ -149,6 +174,14 @@ export function buildSearchFilters(
   };
   if (store?.scope) {
     payload.store = { scope: store.scope, storeIds: store.storeIds ?? [] };
+  }
+  if (
+    ctx &&
+    ctx.branch === STORE_TYPE.SINGLE &&
+    ctx.activeBranchId &&
+    SINGLE_MODE_HEADER_STORE_SALES_REPORTS.has(ctx.backendKey)
+  ) {
+    payload.store = { scope: "group", storeIds: [ctx.activeBranchId] };
   }
   if (invoiceStatus && invoiceStatus.length > 0) {
     payload.invoiceStatus = invoiceStatus;

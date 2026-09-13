@@ -25,6 +25,12 @@ export interface PosDialogProps {
    * be selected so it can be typed over.
    */
   initialFocusRef?: RefObject<HTMLElement | null>;
+  /**
+   * `false` ⇒ ẩn nút X, chặn Esc và click nền: dialog chỉ đóng được qua một hành động
+   * tường minh bên trong. Dùng cho dialog mà mọi trạng thái khác đều là màn hình đang
+   * nói dối (vd lệch chi nhánh giữa các tab). Mặc định `true` = hành vi cũ.
+   */
+  dismissible?: boolean;
 }
 
 export interface PosDialogHeaderProps {
@@ -68,6 +74,7 @@ export function PosDialog({
   ariaDescribedBy,
   returnFocusTo,
   initialFocusRef,
+  dismissible = true,
 }: PosDialogProps) {
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const wasOpenRef = useRef(false);
@@ -89,6 +96,9 @@ export function PosDialog({
         style={{ maxWidth: `${width}px`, ...contentStyle }}
         overlayClassName="bg-black/40"
         className={cn(BASE_CONTENT_CLASSES, contentClassName)}
+        showCloseButton={dismissible}
+        onEscapeKeyDown={dismissible ? undefined : (event) => event.preventDefault()}
+        onInteractOutside={dismissible ? undefined : (event) => event.preventDefault()}
         onOpenAutoFocus={(event) => {
           const target = initialFocusRef?.current;
           if (target && typeof target.focus === "function") {

@@ -40,10 +40,14 @@ export function catalogLineFromTempWarehouseLine(
   line: TempWarehouseLine,
 ): PosCatalogLine | null {
   if (!line.item) return null;
+  // Kệ của chính dòng (theo sourceLocationId). Kệ của phiên giống nhau cho mọi
+  // dòng, chỉ dùng khi API không gửi sourceShelf — lấy nó làm kệ của mặt hàng
+  // từng khiến Sửa → Lưu ghi `notes` thành kệ phiên.
   const loc =
-    line.direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM
+    line.sourceShelf ??
+    (line.direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM
       ? line.sourceLocation
-      : line.destinationLocation;
+      : line.destinationLocation);
   const locationId = loc?.id ?? "";
   const locationName = loc?.name?.trim() || loc?.code?.trim() || "";
   return {

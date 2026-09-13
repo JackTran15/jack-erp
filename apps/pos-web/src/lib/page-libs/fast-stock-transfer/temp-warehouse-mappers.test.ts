@@ -7,6 +7,7 @@ import {
 import {
   isLineSaleTransferred,
   lineMatchesTableFilters,
+  locationLabelForLine,
 } from "./temp-warehouse-mappers";
 import type { FastStockTransferFilters } from "@erp/pos/interfaces/fast-stock-transfer.interface";
 
@@ -90,5 +91,59 @@ describe("temp-warehouse line review filter (AC-06)", () => {
     // but carry no invoice — they must not be mistaken for a sale.
     const batchMoved = line({ status: TempWarehouseLineStatus.TRANSFERRED });
     expect(isLineSaleTransferred(batchMoved)).toBe(false);
+  });
+});
+
+/**
+ * Mục 9 QA 11/09 (temp-warehouse-line-shelf). Sửa → Lưu từng ghi đè `notes` bằng
+ * kệ của phiên (A01.01), nên nhãn Vị trí đọc kệ của dòng theo id trước.
+ */
+describe("locationLabelForLine", () => {
+  const shelf = (code: string, name: string) => ({
+    id: `shelf-${code}`,
+    code,
+    name,
+  });
+
+  it("lấy tên kệ của dòng kể cả khi notes đã bị ghi đè thành kệ phiên (AC-01, AC-03)", () => {
+    expect(
+      locationLabelForLine(
+        line({ notes: "A01.01", sourceShelf: shelf("A0503", "A05.03") }),
+      ),
+    ).toBe("A05.03");
+  });
+
+  it("dùng mã kệ khi tên kệ rỗng", () => {
+    expect(
+      locationLabelForLine(
+        line({ notes: "A01.01", sourceShelf: shelf("A05.03", "  ") }),
+      ),
+    ).toBe("A05.03");
+  });
+
+  it("rơi về notes khi API không gửi sourceShelf, rồi về chuỗi rỗng (AC-05)", () => {
+    expect(locationLabelForLine(line({ notes: " H40.03 " }))).toBe("H40.03");
+    expect(locationLabelForLine(line({ sourceShelf: null }))).toBe("");
+  });
+
+  it("ô lọc Vị trí khớp theo kệ của dòng, không theo notes cũ (AC-06)", () => {
+    const edited = line({
+      notes: "A01.01",
+      sourceShelf: shelf("A05.03", "A05.03"),
+    });
+    expect(
+      lineMatchesTableFilters(
+        edited,
+        { ...filters(false), location: "A05" },
+        new Set(),
+      ),
+    ).toBe(true);
+    expect(
+      lineMatchesTableFilters(
+        edited,
+        { ...filters(false), location: "A01" },
+        new Set(),
+      ),
+    ).toBe(false);
   });
 });

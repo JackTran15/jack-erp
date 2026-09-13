@@ -499,6 +499,77 @@ describe('TempWarehouseService.listLines (includeTransferred)', () => {
   });
 });
 
+describe('TempWarehouseService.getSessionById (line shelves)', () => {
+  const loc = (id: string, code: string) => ({ id, code, name: code });
+
+  const setup = (rawLines: TempWarehouseLineEntity[]) => {
+    const sessionRepo = { findOne: jest.fn().mockResolvedValue(session) };
+    const lineRepo = { find: jest.fn().mockResolvedValue(rawLines) };
+    const itemRepo = { find: jest.fn().mockResolvedValue([]) };
+    const locationRepo = {
+      find: jest
+        .fn()
+        .mockResolvedValue([
+          loc('wh-loc', 'A01.01'),
+          loc('sr-loc', 'SR01'),
+          loc('shelf-a', 'A05.03'),
+          loc('shelf-b', 'T05.05'),
+        ]),
+    };
+    const service = new TempWarehouseService(
+      sessionRepo as any,
+      lineRepo as any,
+      {} as any, // userRepo — no carriers on these lines
+      itemRepo as any,
+      locationRepo as any,
+      {} as any, // ledgerEntryRepo
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    return { service, locationRepo };
+  };
+
+  it('gives each line its own sourceShelf and keeps the session shelves on sourceLocation/destinationLocation', async () => {
+    const { service, locationRepo } = setup([
+      line({ sourceLocationId: 'shelf-a', notes: 'A01.01' }),
+      line({
+        direction: TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE,
+        sourceLocationId: 'shelf-b',
+      }),
+    ]);
+
+    const { lines } = await service.getSessionById(SESSION, actor);
+
+    expect(lines[0].sourceShelf).toEqual(loc('shelf-a', 'A05.03'));
+    expect(lines[0].sourceLocation).toEqual(loc('wh-loc', 'A01.01'));
+    expect(lines[0].destinationLocation).toEqual(loc('sr-loc', 'SR01'));
+    expect(lines[1].sourceShelf).toEqual(loc('shelf-b', 'T05.05'));
+    expect(lines[1].sourceLocation).toEqual(loc('sr-loc', 'SR01'));
+    expect(lines[1].destinationLocation).toEqual(loc('wh-loc', 'A01.01'));
+    // Session and line shelves share one IN (...) lookup.
+    expect(locationRepo.find).toHaveBeenCalledTimes(1);
+    expect(locationRepo.find.mock.calls[0][0].where.id.value).toEqual(
+      expect.arrayContaining(['wh-loc', 'sr-loc', 'shelf-a', 'shelf-b']),
+    );
+  });
+
+  it('sourceShelf is null when the line has no sourceLocationId or the shelf is not found', async () => {
+    const { service } = setup([
+      line({ sourceLocationId: null }),
+      line({ sourceLocationId: 'shelf-other-org' }),
+    ]);
+
+    const { lines } = await service.getSessionById(SESSION, actor);
+
+    expect(lines[0].sourceShelf).toBeNull();
+    expect(lines[1].sourceShelf).toBeNull();
+  });
+});
+
 describe('TempWarehouseService.getLinesStatus', () => {
   // Backs the FE's post-"Xử lý chuyển kho" poll: transferLines only publishes
   // an event and returns 202, so the FE needs this to confirm the consumer

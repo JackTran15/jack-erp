@@ -107,6 +107,7 @@ export const INVOICE_REPORT_COLUMN_LABELS_VI: Record<string, string> = {
   lineDiscount: 'Tiền KM',
   lineRevenue: 'Doanh thu',
   reference: 'Tham chiếu',
+  locationStorage: 'Kho',
   locationCode: 'Mã vị trí',
   locationName: 'Tên vị trí',
   customerCode: 'Mã khách hàng',

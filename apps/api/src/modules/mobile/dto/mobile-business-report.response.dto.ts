@@ -48,7 +48,7 @@ export class MobileBranchPerformanceDto extends MobileBusinessMetricsDto {
  *
  * `totals` là tổng của toàn phạm vi người dùng được xem — server chốt con số
  * này, app không cộng lại từ `branches` (cùng hợp đồng mà `totalAmount` của
- * `/mobile/invoices` đang giữ). Chi nhánh KHÔNG phát sinh gì trong kỳ vẫn có
+ * `/mobile/manager/invoices` đang giữ). Chi nhánh KHÔNG phát sinh gì trong kỳ vẫn có
  * mặt với số 0: thẻ tổng của app xếp hạng mọi chi nhánh, thiếu một là bảng
  * xếp hạng nói dối về số cửa hàng.
  */

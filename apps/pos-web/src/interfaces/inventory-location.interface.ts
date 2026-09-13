@@ -3,6 +3,7 @@ export interface InventoryStorageOption {
   name: string;
   branchId: string;
   isMainStorage: boolean;
+  isDefaultIssuing: boolean;
 }
 
 export interface InventoryShowroomOption {

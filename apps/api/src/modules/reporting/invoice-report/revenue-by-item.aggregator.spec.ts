@@ -18,6 +18,7 @@ const row = (over: Partial<RevenueByItemRowInput> = {}): RevenueByItemRowInput =
   itemCategory: 'Category 1',
   brand: 'Brand A',
   unit: 'pcs',
+  locationStorage: 'Kho A1',
   locationCode: 'A-01',
   locationName: 'Aisle A',
   direction: ItemDirection.OUT,

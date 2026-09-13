@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { cn } from "@erp/ui";
 import { AppHeader } from "./AppHeader";
+import { BranchDriftDialog } from "./BranchDriftDialog";
 import { AppSidebar } from "./AppSidebar";
 import { LayoutContext } from "./LayoutContext";
 import { RouteAccessGuard } from "./RouteAccessGuard";
@@ -16,6 +17,9 @@ export function BackofficeLayout() {
   return (
     <LayoutContext.Provider value={{ sidebarCollapsed, toggleSidebar }}>
       <div className="min-h-screen bg-background">
+        {/* Mount ở layout chứ không ở BranchSelector: dialog phải hiện cả khi header
+            không render selector (danh sách chi nhánh rỗng). */}
+        <BranchDriftDialog />
         <AppHeader />
         <div className="flex w-full pt-14">
           <AppSidebar />

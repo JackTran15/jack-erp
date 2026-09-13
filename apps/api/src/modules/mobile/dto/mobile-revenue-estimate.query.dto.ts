@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional } from 'class-validator';
-import { MobileInvoiceDateBasis } from './mobile-invoice-list.query.dto';
+import { MobileManagerInvoiceDateBasis } from './mobile-manager-invoice-list.query.dto';
 import { MobileRevenueReportQueryDto } from './mobile-revenue-report.query.dto';
 
 /**
@@ -49,9 +49,9 @@ export enum MobileRevenueEstimateStaffRole {
  * trường sẵn — cùng chỗ `compareFrom`/`compareTo` của overview).
  */
 export class MobileRevenueEstimateQueryDto extends MobileRevenueReportQueryDto {
-  @ApiProperty({ enum: MobileInvoiceDateBasis })
-  @IsEnum(MobileInvoiceDateBasis)
-  dateBasis!: MobileInvoiceDateBasis;
+  @ApiProperty({ enum: MobileManagerInvoiceDateBasis })
+  @IsEnum(MobileManagerInvoiceDateBasis)
+  dateBasis!: MobileManagerInvoiceDateBasis;
 
   @ApiProperty({ enum: MobileRevenueEstimateGroupBy })
   @IsEnum(MobileRevenueEstimateGroupBy)

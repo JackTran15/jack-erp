@@ -1,0 +1,4 @@
+{"action": "passed", "at": "2026-09-12T10:31:06", "by": "Akenzy", "evidence": "architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete", "gate": "G0", "id": "27690e1c0709", "ts": "2026-09-12T10:31:06.465876"}
+{"action": "passed", "at": "2026-09-12T10:31:06", "by": "Akenzy", "evidence": "5 assumptions, none blocking-and-pending; 3 acceptance criteria defined", "gate": "G1", "id": "6c31b1df0229", "ts": "2026-09-12T10:31:06.530487"}
+{"action": "passed", "at": "2026-09-12T10:31:06", "by": "Akenzy", "evidence": "1 ADR(s) recorded", "gate": "G2", "id": "7e9474788220", "ts": "2026-09-12T10:31:06.595650"}
+{"action": "passed", "at": "2026-09-12T10:31:06", "by": "Akenzy", "evidence": "graph valid - 1 UoW, 1 tickets, no cycles", "gate": "G3", "id": "d6e765b0c290", "ts": "2026-09-12T10:31:06.706384"}

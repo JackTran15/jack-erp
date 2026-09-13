@@ -1,377 +1,229 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
-import { getDataSourceToken } from '@nestjs/typeorm';
-import { ActorContext } from '../../../common/decorators/actor-context.decorator';
-import { InvoiceService } from '../../pos/services/invoice.service';
-import {
-  MobileInvoiceDateBasis,
-  MobileInvoiceOrder,
-  MobileInvoiceStatus,
-} from '../dto/mobile-invoice-list.query.dto';
+import { NotFoundException } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import type { ActorContext } from '../../../common/decorators/actor-context.decorator';
+import { SearchInvoicesV2Query } from '../../pos/queries/search-invoices-v2.query';
+import { MobileInvoiceListQueryDto } from '../dto/mobile-invoice-list.query.dto';
 import { MobileInvoiceService } from './mobile-invoice.service';
 
-const actor: ActorContext = {
-  userId: 'admin-1',
-  organizationId: 'org-1',
-  branchId: 'branch-1',
-  branchIds: ['branch-1', 'branch-2'],
-  roles: [],
-};
-
-const createdAt = new Date('2026-07-31T14:36:56.719Z');
-const issuedAt = new Date('2026-07-31T14:36:56.908Z');
-
-/** Dòng thô như Postgres trả: `type`/`status` còn là giá trị cột. */
-const rawRow = {
-  id: 'inv-1',
-  code: 'INV-202607-00062',
-  type: 'SALE',
-  status: 'partial_debt',
-  createdAt,
-  issuedAt,
-  amount: 799000,
-  customerName: 'Trần Thị Bình',
-  customerPhone: '0901000003',
-};
-
-/** Bản ghi như `InvoiceService.findOneWithItems` trả về (số là CHUỖI). */
-function detailOf(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 'inv-1',
-    code: 'INV-202607-00062',
-    type: 'SALE',
-    status: 'paid',
-    isDraft: false,
-    createdAt,
-    issuedAt,
-    amountDue: '799000.00',
-    netAmount: '0.00',
-    subtotal: '899000.00',
-    discountAmount: '50000.00',
-    pointsDiscountAmount: '50000.00',
-    pointsBalanceAfter: 1948,
-    pointsEarned: 79,
-    pointsRedeemed: 0,
-    salespersonId: null,
-    staffName: 'Inventory Admin',
-    customer: { name: 'Trần Thị Bình', phone: '0901000003' },
-    items: [
-      {
-        direction: 'OUT',
-        itemName: 'Giày A',
-        itemCode: 'A-41',
-        unit: 'Đôi',
-        quantity: '1.00',
-        unitPrice: '799000.00',
-        lineTotal: '799000.00',
-      },
-      {
-        direction: 'IN',
-        itemName: 'Giày trả',
-        itemCode: 'B-40',
-        unit: 'Đôi',
-        quantity: '1.00',
-        unitPrice: '500000.00',
-        lineTotal: '500000.00',
-      },
-    ],
-    payments: [{ amount: '500000.00' }, { amount: '400000.00' }],
-    appliedPromotions: [{ type: 'BUY_X_GET_Y', discountAmount: 0 }],
-    ...overrides,
-  };
-}
-
 /**
- * Danh sách chạy bằng SQL thô nên phần kiểm được mà KHÔNG cần Postgres là
- * chính câu lệnh; chi tiết uỷ quyền `InvoiceService` nên phần kiểm là phép
- * NẮN sang hình dạng app. E2E lo phần còn lại.
+ * Phạm vi *"chỉ hoá đơn của mình"* — thứ đắt nhất ở đường này.
+ *
+ * Nó hỏng theo hai kiểu, và **cả hai đều im lặng**: lọc theo nhầm khoá thì danh
+ * sách luôn rỗng (trông y hệt một người bán chưa bán gì), còn không lọc thì
+ * người bán đọc được doanh số của đồng nghiệp. Không kiểu nào tự báo.
  */
 describe('MobileInvoiceService', () => {
-  let service: MobileInvoiceService;
-  let query: jest.Mock;
-  let invoices: { findOneWithItems: jest.Mock };
+  const actor: ActorContext = {
+    userId: 'user-1',
+    organizationId: 'org-1',
+    branchId: 'branch-1',
+    roles: [],
+  } as ActorContext;
 
-  const stubCount = [{ total: 7, totalAmount: 3_500_000 }];
+  const page = { data: [], total: 0, page: 1, limit: 20, totals: { totalAmount: 0 } };
 
-  beforeEach(async () => {
-    query = jest
-      .fn()
-      .mockResolvedValueOnce([rawRow])
-      .mockResolvedValueOnce(stubCount);
-    invoices = { findOneWithItems: jest.fn() };
+  function build({
+    profileId,
+    invoice,
+    salespersonUser,
+  }: {
+    profileId?: string;
+    invoice?: { id: string; salespersonId?: string };
+    /** `users` row đứng sau `salespersonId` của HOÁ ĐƠN. */
+    salespersonUser?: { firstName: string; lastName: string } | null;
+  }) {
+    const execute = jest.fn().mockResolvedValue(page);
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        MobileInvoiceService,
-        { provide: getDataSourceToken(), useValue: { query } },
-        { provide: InvoiceService, useValue: invoices },
-      ],
-    }).compile();
+    // MỘT repository phục vụ hai lượt tra khác nhau — theo `userId` (người
+    // gọi) và theo `id` (nhân viên bán của hoá đơn). Rẽ theo `where` chứ không
+    // trả cùng một thứ cho cả hai: trả bừa là test vẫn xanh khi service tra
+    // nhầm khoá, tức mất đúng thứ đang cần khoá lại.
+    const findOne = jest.fn().mockImplementation((options: { where: Record<string, unknown> }) => {
+      if ('userId' in options.where) {
+        return Promise.resolve(profileId ? { id: profileId } : null);
+      }
 
-    service = module.get(MobileInvoiceService);
-  });
-
-  const run = (
-    overrides: Partial<Parameters<MobileInvoiceService['list']>[0]> = {},
-  ) =>
-    service.list(
-      {
-        page: 1,
-        limit: 20,
-        order: MobileInvoiceOrder.DESC,
-        dateBasis: MobileInvoiceDateBasis.CREATED,
-        ...overrides,
-      },
-      actor,
+      return Promise.resolve(
+        salespersonUser === undefined ? null : { id: options.where.id, user: salespersonUser },
+      );
+    });
+    const findOneWithItems = jest.fn().mockResolvedValue(invoice);
+    const service = new MobileInvoiceService(
+      { execute } as never,
+      { findOneWithItems } as never,
+      { findOne } as never,
     );
 
-  const dataSql = (): string => query.mock.calls[0][0] as string;
-  const dataParams = (): unknown[] => query.mock.calls[0][1] as unknown[];
-  const countSql = (): string => query.mock.calls[1][0] as string;
-  const countParams = (): unknown[] => query.mock.calls[1][1] as unknown[];
+    return { service, execute, findOne, findOneWithItems };
+  }
 
-  describe('list', () => {
-    it('phạm vi TỔ CHỨC qua $1 + PHÂN CÔNG qua $3, loại nháp, và chỉ các trạng thái app nhìn thấy', async () => {
-      await run();
+  it('lọc theo `employee_profiles.id`, KHÔNG theo `users.id`', async () => {
+    // `invoices.salesperson_id` trỏ `employee_profiles.id` — comment ngay trên
+    // cột nói vậy. Gán `actor.userId` vào đó là so hai khoá từ hai bảng khác
+    // nhau: không bao giờ khớp, và không có lỗi nào để lần ra.
+    const { service, execute, findOne } = build({ profileId: 'profile-9' });
 
-      expect(dataParams()[0]).toBe('org-1');
-      expect(dataSql()).toContain('i.organization_id = $1');
-      expect(dataSql()).toContain('i.is_draft = false');
-      // Vắng `status` = mọi trạng thái ĐÃ GHI SỔ — không có draft/pending.
-      expect(dataSql()).toContain('i.status::text = ANY($2::text[])');
-      expect(dataParams()[1]).toEqual(['paid', 'debt', 'partial_debt', 'cancelled']);
-      // Vắng `branchIds` = đúng tập phân công — LUÔN có mệnh đề, mobile
-      // không có vế hợp nhất.
-      expect(dataSql()).toContain('i.branch_id = ANY($3::text[])');
-      expect(dataParams()[2]).toEqual(['branch-1', 'branch-2']);
+    await service.list({}, actor);
+
+    expect(findOne).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: 'user-1', organizationId: 'org-1' } }),
+    );
+
+    const query = execute.mock.calls[0][0] as SearchInvoicesV2Query;
+    expect(query.dto.salespersonId).toBe('profile-9');
+    expect(query.dto.salespersonId).not.toBe(actor.userId);
+  });
+
+  it('chưa có hồ sơ nhân viên → trang RỖNG, KHÔNG bỏ bộ lọc', async () => {
+    // Bỏ lọc ở đây là phơi trọn hoá đơn của cả chi nhánh cho đúng tài khoản mà
+    // ta không xác định được danh tính nghiệp vụ. Trang rỗng là chiều sai an
+    // toàn duy nhất.
+    const { service, execute } = build({});
+
+    const result = await service.list({ page: 3, limit: 50 }, actor);
+
+    expect(execute).not.toHaveBeenCalled();
+    expect(result).toEqual({ data: [], total: 0, page: 3, limit: 50, totals: { totalAmount: 0 } });
+  });
+
+  it('KHÔNG đọc `salespersonId` từ query', async () => {
+    // DTO không khai trường đó, nhưng test này khoá cả đường: một `...query`
+    // vô tình thêm vào service sẽ làm client tự chọn xem hoá đơn của ai.
+    const { service, execute } = build({ profileId: 'profile-9' });
+
+    await service.list({ salespersonId: 'profile-KHÁC' } as MobileInvoiceListQueryDto, actor);
+
+    const query = execute.mock.calls[0][0] as SearchInvoicesV2Query;
+    expect(query.dto.salespersonId).toBe('profile-9');
+  });
+
+  it('chuyển khoảng ngày thành bộ lọc `createdAt`', async () => {
+    const { service, execute } = build({ profileId: 'profile-9' });
+
+    await service.list({ from: '2026-09-01T00:00:00.000Z', to: '2026-09-30T23:59:59.999Z' }, actor);
+
+    const query = execute.mock.calls[0][0] as SearchInvoicesV2Query;
+    expect(query.dto.createdAt).toEqual({
+      from: '2026-09-01T00:00:00.000Z',
+      to: '2026-09-30T23:59:59.999Z',
     });
+  });
 
-    it('trạng thái app -> các giá trị cột (unpaid gom debt + partial_debt)', async () => {
-      await run({
-        status: [MobileInvoiceStatus.UNPAID, MobileInvoiceStatus.CANCELLED],
+  it('không có khoảng ngày thì KHÔNG gắn bộ lọc rỗng', async () => {
+    const { service, execute } = build({ profileId: 'profile-9' });
+
+    await service.list({}, actor);
+
+    const query = execute.mock.calls[0][0] as SearchInvoicesV2Query;
+    expect(query.dto.createdAt).toBeUndefined();
+  });
+
+  it('chuyển NGUYÊN actor xuống query — phạm vi tổ chức/chi nhánh vẫn của lớp dưới', async () => {
+    const { service, execute } = build({ profileId: 'profile-9' });
+
+    await service.list({}, actor);
+
+    expect((execute.mock.calls[0][0] as SearchInvoicesV2Query).actor).toBe(actor);
+  });
+
+  describe('getById', () => {
+    it('trả hoá đơn khi nó thuộc về người gọi', async () => {
+      const { service } = build({
+        profileId: 'profile-9',
+        invoice: { id: 'inv-1', salespersonId: 'profile-9' },
       });
 
-      expect(dataParams()[1]).toEqual(['debt', 'partial_debt', 'cancelled']);
+      await expect(service.getById('inv-1', actor)).resolves.toMatchObject({ id: 'inv-1' });
     });
 
-    it('khoá theo khách khi có customerId, theo cửa hàng khi có branchIds (mảng text)', async () => {
-      await run({ customerId: 'cus-1', branchIds: ['branch-1', 'branch-2'] });
+    it('hoá đơn của NGƯỜI KHÁC → 404, không phải 403', async () => {
+      // 403 nói "nó tồn tại, bạn không được xem" — tức xác nhận sự tồn tại của
+      // một hoá đơn cho người không được biết nó tồn tại. Với một đường mà id
+      // đoán được thì khác biệt đó là thật.
+      const { service } = build({
+        profileId: 'profile-9',
+        invoice: { id: 'inv-1', salespersonId: 'profile-KHÁC' },
+      });
 
-      expect(dataSql()).toContain('i.customer_id = $3');
-      // `branch_id` là VARCHAR — ép uuid là so hai kiểu khác nhau.
-      expect(dataSql()).toContain('i.branch_id = ANY($4::text[])');
-      expect(dataParams()).toEqual([
-        'org-1',
-        ['paid', 'debt', 'partial_debt', 'cancelled'],
-        'cus-1',
-        ['branch-1', 'branch-2'],
-        20,
-        0,
-      ]);
+      await expect(service.getById('inv-1', actor)).rejects.toThrow(NotFoundException);
     });
 
-    describe('phạm vi chi nhánh — đúng tập phân công, không có vế hợp nhất', () => {
-      it('xin chi nhánh ngoài phân công → 403, chưa chạm database', async () => {
-        await expect(run({ branchIds: ['branch-9'] })).rejects.toBeInstanceOf(ForbiddenException);
-        expect(query).not.toHaveBeenCalled();
-      });
+    it('hoá đơn KHÔNG gán nhân viên bán cũng → 404', async () => {
+      // `salespersonId` nullable. `undefined !== 'profile-9'` là đúng, nhưng ca
+      // này đáng có test riêng: một `!=` lỏng hay một `?? profileId` lọt vào đây
+      // sẽ mở nó ra cho mọi người.
+      const { service } = build({ profileId: 'profile-9', invoice: { id: 'inv-1' } });
 
-      it('không phân công → 403', async () => {
-        await expect(
-          service.list(
-            { page: 1, limit: 20, order: MobileInvoiceOrder.DESC, dateBasis: MobileInvoiceDateBasis.CREATED },
-            { ...actor, branchIds: [] },
-          ),
-        ).rejects.toBeInstanceOf(ForbiddenException);
-      });
+      await expect(service.getById('inv-1', actor)).rejects.toThrow(NotFoundException);
     });
 
-    it('dateBasis chọn cột cho CẢ khoảng lọc lẫn ORDER BY; `to` bao trọn ngày cuối', async () => {
-      await run({
-        dateBasis: MobileInvoiceDateBasis.ISSUED,
-        from: '2026-08-01',
-        to: '2026-08-31',
-        order: MobileInvoiceOrder.ASC,
+    it('người gọi chưa có hồ sơ nhân viên → 404', async () => {
+      const { service } = build({ invoice: { id: 'inv-1', salespersonId: 'profile-9' } });
+
+      await expect(service.getById('inv-1', actor)).rejects.toThrow(NotFoundException);
+    });
+
+    it('kèm TÊN nhân viên bán cho dòng *NVBH* của tờ hoá đơn', async () => {
+      // Trước đây đường này chỉ trả `salespersonId` — một uuid — nên app để
+      // dòng NVBH TRỐNG thay vì bày mã nội bộ ra chứng từ.
+      const { service, findOne } = build({
+        profileId: 'profile-9',
+        invoice: { id: 'inv-1', salespersonId: 'profile-9' },
+        salespersonUser: { firstName: 'Nguyễn Thị', lastName: 'Hồng Nhung' },
       });
 
-      expect(dataSql()).toContain('i.issued_at >= $4::date');
-      expect(dataSql()).toContain("i.issued_at < ($5::date + INTERVAL '1 day')");
-      expect(dataSql()).toContain(
-        'ORDER BY i.issued_at ASC NULLS LAST, i.created_at ASC, i.id ASC',
+      await expect(service.getById('inv-1', actor)).resolves.toMatchObject({
+        salespersonName: 'Nguyễn Thị Hồng Nhung',
+      });
+
+      // Tra theo `salespersonId` của HOÁ ĐƠN, không theo người đang gọi. Ở
+      // đường này hai thứ luôn trùng nhau, nên chỉ khẳng định này mới phân biệt
+      // được hai cách viết — và ngày phạm vi nới ra, cách kia sẽ ghi tên SAI
+      // lên chứng từ mà không có gì đổ.
+      expect(findOne).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'profile-9', organizationId: 'org-1' } }),
       );
-      expect(dataSql()).not.toContain('created_at >=');
     });
 
-    it('mặc định sắp theo ngày tạo GIẢM dần, tie-break `i.id`', async () => {
-      await run();
+    it('hồ sơ không có `users` đi kèm → tên `null`, KHÔNG phải chuỗi rỗng', async () => {
+      // `null` để tầng UI bày dấu "—". Một chuỗi rỗng cho ra dòng NVBH trống
+      // trơn, tức trông y hệt lỗi cũ mà không ai biết là vì sao.
+      const { service } = build({
+        profileId: 'profile-9',
+        invoice: { id: 'inv-1', salespersonId: 'profile-9' },
+        salespersonUser: null,
+      });
 
-      expect(dataSql()).toContain(
-        'ORDER BY i.created_at DESC NULLS LAST, i.created_at DESC, i.id ASC',
-      );
-    });
-
-    it('tìm kiếm tra số hoá đơn, đã escape ký tự đại diện', async () => {
-      await run({ search: '50%_x' });
-
-      expect(dataSql()).toContain('i.code ILIKE $4');
-      expect(dataParams()[3]).toBe('%50\\%\\_x%');
-    });
-
-    it('câu ĐẾM cùng WHERE, không LIMIT, và totalAmount LOẠI hoá đơn huỷ', async () => {
-      await run({ customerId: 'cus-1', search: 'INV' });
-
-      expect(countSql()).toContain('i.customer_id = $3');
-      expect(countSql()).toContain('i.code ILIKE $5');
-      expect(countSql()).not.toContain('LIMIT');
-      expect(countSql()).toContain("FILTER (WHERE i.status::text <> 'cancelled')");
-      expect(countParams()).toEqual([
-        'org-1',
-        ['paid', 'debt', 'partial_debt', 'cancelled'],
-        'cus-1',
-        ['branch-1', 'branch-2'],
-        '%INV%',
-      ]);
-    });
-
-    it('số tiền là tổng CÓ DẤU: net_amount cho trả/đổi, amount_due cho bán', async () => {
-      await run();
-
-      expect(dataSql()).toContain(
-        "CASE WHEN i.type IN ('RETURN', 'EXCHANGE') THEN i.net_amount ELSE i.amount_due END",
-      );
-    });
-
-    it('nắn dòng thô: type/status về chữ thường của app, ngày về ISO', async () => {
-      const result = await run({ page: 2, limit: 5 });
-
-      expect(result).toEqual({
-        data: [
-          {
-            id: 'inv-1',
-            code: 'INV-202607-00062',
-            type: 'sale',
-            status: 'unpaid',
-            createdAt: '2026-07-31T14:36:56.719Z',
-            issuedAt: '2026-07-31T14:36:56.908Z',
-            amount: 799000,
-            customerName: 'Trần Thị Bình',
-            customerPhone: '0901000003',
-          },
-        ],
-        total: 7,
-        page: 2,
-        limit: 5,
-        totalAmount: 3_500_000,
+      await expect(service.getById('inv-1', actor)).resolves.toMatchObject({
+        salespersonName: null,
       });
     });
   });
 
-  describe('findById', () => {
-    beforeEach(() => query.mockReset());
-
-    it('nắn bản ghi của InvoiceService sang hình dạng app', async () => {
-      invoices.findOneWithItems.mockResolvedValue(detailOf());
-
-      const result = await service.findById('inv-1', actor);
-
-      expect(invoices.findOneWithItems).toHaveBeenCalledWith('inv-1', actor);
-      expect(result).toEqual({
-        id: 'inv-1',
-        code: 'INV-202607-00062',
-        type: 'sale',
-        status: 'paid',
-        createdAt: '2026-07-31T14:36:56.719Z',
-        issuedAt: '2026-07-31T14:36:56.908Z',
-        amount: 799000,
-        customerName: 'Trần Thị Bình',
-        customerPhone: '0901000003',
-        salesperson: null,
-        cashier: 'Inventory Admin',
-        subtotal: 899000,
-        // Chiết khấu hoá đơn + chiết khấu điểm — app có đúng một dòng.
-        discount: 100000,
-        // Tổng tiền khách ĐƯA qua mọi phương thức, rồi thừa = đưa − phải trả.
-        cashReceived: 900000,
-        changeAmount: 101000,
-        promotions: ['BUY_X_GET_Y'],
-        // Số dư TRƯỚC hoá đơn suy ngược từ số dư sau.
-        loyalty: { opening: 1869, earned: 79, used: 0 },
-        // Hoá đơn BÁN chỉ lấy dòng đi RA; dòng `IN` (đổi hàng) bị bỏ.
-        lines: [
-          {
-            name: 'Giày A',
-            sku: 'A-41',
-            unit: 'Đôi',
-            quantity: 1,
-            unitPrice: 799000,
-            total: 799000,
-          },
-        ],
+  describe('MobileInvoiceListQueryDto', () => {
+    const check = (payload: Record<string, unknown>) =>
+      validate(plainToInstance(MobileInvoiceListQueryDto, payload), {
+        whitelist: true,
+        forbidNonWhitelisted: true,
       });
-      // Không có nhân viên bán thì không tra tên — không câu SQL nào.
-      expect(query).not.toHaveBeenCalled();
+
+    it('TỪ CHỐI `salespersonId` — client không tự chọn xem hoá đơn của ai', async () => {
+      expect(await check({ salespersonId: '3f1e9c8a-1b2c-4d5e-8f90-a1b2c3d4e5f6' })).not.toHaveLength(0);
     });
 
-    it('trả hàng: số tiền ÂM từ net_amount, dòng đi VÀO, không có tiền thừa', async () => {
-      invoices.findOneWithItems.mockResolvedValue(
-        detailOf({
-          type: 'RETURN',
-          amountDue: '0.00',
-          netAmount: '-500000.00',
-          payments: [],
-          pointsBalanceAfter: null,
-        }),
-      );
-
-      const result = await service.findById('inv-1', actor);
-
-      expect(result.type).toBe('return');
-      expect(result.amount).toBe(-500000);
-      expect(result.lines.map((line) => line.sku)).toEqual(['B-40']);
-      expect(result.cashReceived).toBe(0);
-      // Tiền hoàn KHÔNG phải tiền thừa: `max(0, 0 − max(−500000, 0))`.
-      expect(result.changeAmount).toBe(0);
-      expect(result.loyalty).toBeNull();
+    it('nhận bốn tham số hợp lệ', async () => {
+      expect(
+        await check({ page: 2, limit: 50, from: '2026-09-01T00:00:00.000Z', to: '2026-09-30T00:00:00.000Z' }),
+      ).toHaveLength(0);
     });
 
-    it('có nhân viên bán -> tra tên qua employee_profiles JOIN users, lọc tổ chức', async () => {
-      invoices.findOneWithItems.mockResolvedValue(detailOf({ salespersonId: 'ep-1' }));
-      query.mockResolvedValueOnce([{ name: 'Nguyễn Văn Bán' }]);
-
-      const result = await service.findById('inv-1', actor);
-
-      const [sql, params] = query.mock.calls[0] as [string, unknown[]];
-      expect(sql).toContain('FROM employee_profiles ep');
-      expect(sql).toContain('JOIN users u ON u.id = ep.user_id');
-      expect(sql).toContain('ep.organization_id = $1');
-      expect(params).toEqual(['org-1', 'ep-1']);
-      expect(result.salesperson).toBe('Nguyễn Văn Bán');
+    it('TỪ CHỐI `limit` vượt trần', async () => {
+      expect(await check({ limit: 500 })).not.toHaveLength(0);
     });
 
-    it('404 tiếng Việt: không có, hoặc là NHÁP / pending', async () => {
-      invoices.findOneWithItems.mockRejectedValueOnce(
-        new NotFoundException('Invoice inv-1 not found'),
-      );
-      await expect(service.findById('inv-1', actor)).rejects.toThrow(
-        new NotFoundException('Không tìm thấy hoá đơn.'),
-      );
-
-      invoices.findOneWithItems.mockResolvedValueOnce(detailOf({ isDraft: true }));
-      await expect(service.findById('inv-1', actor)).rejects.toThrow(
-        new NotFoundException('Không tìm thấy hoá đơn.'),
-      );
-
-      invoices.findOneWithItems.mockResolvedValueOnce(detailOf({ status: 'pending' }));
-      await expect(service.findById('inv-1', actor)).rejects.toThrow(
-        new NotFoundException('Không tìm thấy hoá đơn.'),
-      );
-    });
-
-    it('lỗi KHÁC 404 của InvoiceService đi qua nguyên vẹn', async () => {
-      const boom = new Error('db down');
-      invoices.findOneWithItems.mockRejectedValueOnce(boom);
-
-      await expect(service.findById('inv-1', actor)).rejects.toBe(boom);
+    it('TỪ CHỐI ngày không phải ISO-8601', async () => {
+      expect(await check({ from: '01/09/2026' })).not.toHaveLength(0);
     });
   });
 });

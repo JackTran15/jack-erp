@@ -59,7 +59,8 @@ function locationFromLine(
     const matched = options.find((l) => l.locationId === sourceLocationId);
     if (matched) return matched;
 
-    const apiLoc = line.sourceLocation;
+    // Kệ của dòng trước; kệ của phiên (`sourceLocation`) chỉ còn cho API cũ.
+    const apiLoc = line.sourceShelf ?? line.sourceLocation;
     const name =
       apiLoc?.name?.trim() ||
       apiLoc?.code?.trim() ||

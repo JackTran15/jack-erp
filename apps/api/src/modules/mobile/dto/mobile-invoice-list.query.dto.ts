@@ -1,53 +1,20 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
-import {
-  IsArray,
-  IsEnum,
-  IsInt,
-  IsISO8601,
-  IsOptional,
-  IsString,
-  IsUUID,
-  Max,
-  MaxLength,
-  Min,
-} from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsInt, IsISO8601, IsOptional, Max, Min } from 'class-validator';
 
 /**
- * Trạng thái hoá đơn theo cách app nhìn — BA giá trị, không phải sáu của
- * `InvoiceStatus` backend. App gộp `debt` và `partial_debt` thành "chưa thu
- * tiền", còn `draft`/`pending` không bao giờ tới app (chưa ghi sổ). Bảng ánh
- * xạ hai chiều nằm ở `MobileInvoiceService`.
- */
-export enum MobileInvoiceStatus {
-  PAID = 'paid',
-  UNPAID = 'unpaid',
-  CANCELLED = 'cancelled',
-}
-
-/** Chiều sắp xếp theo thời gian — màn lịch sử mua có hai mục tăng/giảm. */
-export enum MobileInvoiceOrder {
-  ASC = 'asc',
-  DESC = 'desc',
-}
-
-/**
- * Mốc thời gian mà cả khoảng lọc lẫn thứ tự sắp xếp bám vào: ngày TẠO hay
- * ngày GHI SỔ (`issued_at`). Màn lịch sử mua của app có nhóm "Xem theo" với
- * đúng hai lựa chọn này.
- */
-export enum MobileInvoiceDateBasis {
-  CREATED = 'created',
-  ISSUED = 'issued',
-}
-
-/** Chuỗi đơn -> mảng một phần tử, để `?status=paid` và `?status=paid&status=unpaid` cùng hợp lệ. */
-const toArray = () =>
-  Transform(({ value }) => (Array.isArray(value) ? value : [value]));
-
-/**
- * Query của `GET /mobile/invoices` và `GET /mobile/customers/:id/invoices` —
- * cùng một DTO, khác nhau đúng ở khoá khách hàng đi trên đường dẫn.
+ * Bộ lọc màn **Danh sách hoá đơn** của app.
+ *
+ * Bốn tham số, và đó là toàn bộ thứ màn đó có: khoảng ngày của hàng lọc kỳ,
+ * cộng phân trang.
+ *
+ * **KHÔNG có `salespersonId`.** Phạm vi *"chỉ hoá đơn của mình"* do SERVER ép
+ * từ hồ sơ nhân viên của người gọi (ADR-24). Phơi trường đó ra đây là biến một
+ * ràng buộc thành một lời hứa của client — và client thì sửa được.
+ *
+ * `forbidNonWhitelisted: true` bật toàn cục, nên gửi thừa một khoá là **400 cho
+ * cả lượt gọi**. Đó là hiệu lực mong muốn: ai đó thử `?salespersonId=...` sẽ
+ * nhận một lỗi rõ ràng thay vì một danh sách không phải của mình.
  */
 export class MobileInvoiceListQueryDto {
   @ApiPropertyOptional({ minimum: 1, default: 1 })
@@ -65,60 +32,22 @@ export class MobileInvoiceListQueryDto {
   @Max(100)
   limit?: number = 20;
 
-  @ApiPropertyOptional({
-    enum: MobileInvoiceOrder,
-    default: MobileInvoiceOrder.DESC,
-    description: 'Mặc định mới nhất lên đầu',
-  })
+  /**
+   * Đầu kỳ, ISO-8601. Lọc theo `createdAt` — cùng trường mà màn Lịch sử đơn
+   * hàng dùng, nên hai màn nói về cùng một mốc thời gian.
+   */
+  @ApiPropertyOptional({ description: 'ISO-8601, đầu kỳ (bao gồm)' })
   @IsOptional()
-  @IsEnum(MobileInvoiceOrder)
-  order?: MobileInvoiceOrder = MobileInvoiceOrder.DESC;
-
-  @ApiPropertyOptional({
-    enum: MobileInvoiceDateBasis,
-    default: MobileInvoiceDateBasis.CREATED,
-  })
-  @IsOptional()
-  @IsEnum(MobileInvoiceDateBasis)
-  dateBasis?: MobileInvoiceDateBasis = MobileInvoiceDateBasis.CREATED;
-
-  /** Đầu kỳ, `YYYY-MM-DD`, tính theo `dateBasis`. Bao gồm trọn ngày. */
-  @ApiPropertyOptional({ example: '2026-08-01' })
-  @IsOptional()
-  @IsISO8601({ strict: true })
+  @IsISO8601()
   from?: string;
 
-  /** Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
-  @ApiPropertyOptional({ example: '2026-08-31' })
-  @IsOptional()
-  @IsISO8601({ strict: true })
-  to?: string;
-
   /**
-   * Lọc theo tập trạng thái. Vắng = mọi hoá đơn đã ghi sổ.
-   *
-   * Nhận MẢNG (`?status=paid&status=unpaid`): màn lọc cho tick nhiều trạng
-   * thái cùng lúc, và tab Hoá đơn chỉ gửi một — cùng một khoá cho cả hai.
+   * Cuối kỳ, ISO-8601, **bao gồm**. Client đẩy nó tới 23:59:59.999 của ngày
+   * cuối — nếu nó là 00:00 thì mọi hoá đơn lập trong ngày cuối rơi ra ngoài, và
+   * lỗi đó KHÔNG lộ ở kỳ *Hôm nay*.
    */
-  @ApiPropertyOptional({ enum: MobileInvoiceStatus, isArray: true })
+  @ApiPropertyOptional({ description: 'ISO-8601, cuối kỳ (bao gồm)' })
   @IsOptional()
-  @toArray()
-  @IsArray()
-  @IsEnum(MobileInvoiceStatus, { each: true })
-  status?: MobileInvoiceStatus[];
-
-  /** Thu hẹp theo cửa hàng. Vắng = toàn chuỗi. */
-  @ApiPropertyOptional({ type: [String], format: 'uuid' })
-  @IsOptional()
-  @toArray()
-  @IsArray()
-  @IsUUID('all', { each: true })
-  branchIds?: string[];
-
-  /** Tìm theo số hoá đơn. KHÔNG bỏ dấu — cùng luật mọi ô tìm mobile. */
-  @ApiPropertyOptional({ example: 'INV-202607' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  search?: string;
+  @IsISO8601()
+  to?: string;
 }

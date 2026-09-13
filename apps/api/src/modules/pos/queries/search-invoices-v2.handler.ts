@@ -185,6 +185,13 @@ export class SearchInvoicesV2Handler
       qb.andWhere('inv.customerId = :cid', { cid: dto.customerId });
     }
 
+    // `employee_profiles.id`, not `users.id` — see the column comment on
+    // InvoiceEntity.salespersonId. The mobile endpoint resolves the profile
+    // from the caller and sets this; the web grid may pass it as a filter.
+    if (dto.salespersonId) {
+      qb.andWhere('inv.salespersonId = :spid', { spid: dto.salespersonId });
+    }
+
     return qb;
   }
 }
