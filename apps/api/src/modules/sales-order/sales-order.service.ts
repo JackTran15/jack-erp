@@ -250,6 +250,9 @@ export class SalesOrderService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const scope = await this.scopeOf(actor);
+    const mine = await this.profileIdOf(actor);
+    const own = '(so.salespersonId = :sp OR so.createdBy = :me)';
+    const ownParams = { sp: mine ?? '00000000-0000-0000-0000-000000000000', me: actor.userId };
 
     const qb = this.orders
       .createQueryBuilder('so')
@@ -261,15 +264,19 @@ export class SalesOrderService {
     // — trừ đơn LƯU TẠM, thứ riêng của người gửi. Ép ở đây, không nhận từ
     // query — cùng luật với `/mobile/invoices`.
     if (scope.salespersonId) {
-      qb.andWhere('(so.salespersonId = :sp OR so.createdBy = :me)', { sp: scope.salespersonId, me: actor.userId });
-    } else {
-      qb.andWhere('so.status <> :draft', { draft: SalesOrderStatus.DRAFT });
+      qb.andWhere(own, ownParams);
     }
-    if (query.status) {
+    if (query.status === SalesOrderStatus.DRAFT) {
+      // Đơn LƯU TẠM luôn là "của mình", kể cả với người có quyền duyệt: thu ngân
+      // cũng có giỏ riêng, và không ai được thấy giỏ dở của người khác. (Lượt e2e
+      // 2026-09-13 đỏ đúng ở đây: tài khoản test có quyền duyệt nên bị loại
+      // draft của chính nó.)
+      qb.andWhere(own, ownParams).andWhere('so.status = :status', { status: SalesOrderStatus.DRAFT });
+    } else if (query.status) {
       qb.andWhere('so.status = :status', { status: query.status });
     } else {
       // Không lọc = "lịch sử": đơn lưu tạm có màn riêng, không trộn vào đây.
-      qb.andWhere('so.status <> :draftDefault', { draftDefault: SalesOrderStatus.DRAFT });
+      qb.andWhere('so.status <> :draft', { draft: SalesOrderStatus.DRAFT });
     }
     if (query.from) qb.andWhere('so.createdAt >= :from', { from: new Date(query.from) });
     if (query.to) qb.andWhere('so.createdAt <= :to', { to: new Date(query.to) });
@@ -305,9 +312,10 @@ export class SalesOrderService {
     if (!order || (scope.salespersonId && !this.isOwn(order, scope.salespersonId, actor))) {
       throw new NotFoundException(`Sales order ${id} not found`);
     }
-    if (!scope.salespersonId && order.status === SalesOrderStatus.DRAFT && order.createdBy !== actor.userId) {
-      // Thu ngân không thấy đơn lưu tạm của người khác.
-      throw new NotFoundException(`Sales order ${id} not found`);
+    if (!scope.salespersonId && order.status === SalesOrderStatus.DRAFT) {
+      // Người có quyền duyệt vẫn chỉ thấy đơn lưu tạm CỦA MÌNH.
+      const mine = await this.profileIdOf(actor);
+      if (!this.isOwn(order, mine ?? '', actor)) throw new NotFoundException(`Sales order ${id} not found`);
     }
 
     const lines = await this.lines.find({ where: { salesOrderId: id }, order: { lineNo: 'ASC' } });
@@ -386,6 +394,14 @@ export class SalesOrderService {
     // Không có hồ sơ nhân viên thì không có đơn nào là "của mình" — id giả để
     // truy vấn trả rỗng thay vì trả cả chi nhánh.
     return { salespersonId: profile?.id ?? '00000000-0000-0000-0000-000000000000' };
+  }
+
+  private async profileIdOf(actor: ActorContext): Promise<string | undefined> {
+    const profile = await this.profiles.findOne({
+      where: { userId: actor.userId, organizationId: actor.organizationId },
+      select: ['id'],
+    });
+    return profile?.id;
   }
 
   /** "Của mình" = ghi công bán cho hồ sơ mình, HOẶC do chính mình tạo (gửi giùm người khác). */

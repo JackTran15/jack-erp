@@ -142,14 +142,16 @@ describe('SalesOrderService', () => {
     expect(manager.delete).not.toHaveBeenCalled();
   });
 
-  it('list mặc định LOẠI đơn lưu tạm; thu ngân không thấy DRAFT của ai', async () => {
+  it('list mặc định LOẠI đơn lưu tạm; xin DRAFT thì luôn thu về CỦA MÌNH, kể cả người có quyền duyệt', async () => {
     const mine = build({ canApprove: false });
     await mine.service.list({}, actor);
-    expect(mine.listQb.andWhere).toHaveBeenCalledWith('so.status <> :draftDefault', { draftDefault: SalesOrderStatus.DRAFT });
+    expect(mine.listQb.andWhere).toHaveBeenCalledWith('so.status <> :draft', { draft: SalesOrderStatus.DRAFT });
 
+    // Lượt e2e 2026-09-13 đỏ vì bản trước loại draft của chính người có quyền duyệt.
     const branch = build({ canApprove: true });
     await branch.service.list({ status: SalesOrderStatus.DRAFT }, actor);
-    expect(branch.listQb.andWhere).toHaveBeenCalledWith('so.status <> :draft', { draft: SalesOrderStatus.DRAFT });
+    expect(branch.listQb.andWhere).toHaveBeenCalledWith('(so.salespersonId = :sp OR so.createdBy = :me)', { sp: 'sp-1', me: 'u-1' });
+    expect(branch.listQb.andWhere).toHaveBeenCalledWith('so.status = :status', { status: SalesOrderStatus.DRAFT });
   });
 
   it('list: KHÔNG có quyền duyệt thì thu về đơn của mình; CÓ thì thấy cả chi nhánh', async () => {
