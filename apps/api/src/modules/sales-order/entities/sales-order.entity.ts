@@ -3,10 +3,12 @@ import { BaseEntity } from '../../../database/entities/base.entity';
 import { SalesOrderLineEntity } from './sales-order-line.entity';
 
 /**
- * Trạng thái đơn hàng của tư vấn viên. Chỉ `SENT` có lối ra; ba trạng thái còn
- * lại đều là ĐIỂM CUỐI (`VALID_TRANSITIONS` ở service).
+ * Trạng thái đơn hàng của tư vấn viên. `DRAFT` → `SENT` → một trong ba điểm cuối
+ * (`VALID_TRANSITIONS` ở service).
  */
 export enum SalesOrderStatus {
+  /** Lưu tạm — riêng của người gửi, chưa tới thu ngân; lối ra duy nhất là `SENT` (hoặc xoá). */
+  DRAFT = 'DRAFT',
   SENT = 'SENT',
   PROCESSED = 'PROCESSED',
   REJECTED = 'REJECTED',

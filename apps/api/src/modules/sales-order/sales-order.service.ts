@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { DocumentType } from '@erp/shared-interfaces';
 import type { ActorContext } from '../../common/decorators/actor-context.decorator';
+import { UserBranchAssignmentEntity } from '../branch/user-branch-assignment.entity';
 import { CustomerEntity } from '../customer/customer.entity';
 import { DocumentNumberingService } from '../document-numbering/document-numbering.service';
 import { ItemEntity } from '../inventory/location/item.entity';
@@ -32,6 +33,7 @@ export const SALES_ORDER_CHANNEL = 'Ứng dụng Tư Vấn';
 
 /** Chỉ `SENT` có lối ra; ba trạng thái kia là điểm cuối. */
 const VALID_TRANSITIONS: Record<SalesOrderStatus, SalesOrderStatus[]> = {
+  [SalesOrderStatus.DRAFT]: [SalesOrderStatus.SENT],
   [SalesOrderStatus.SENT]: [SalesOrderStatus.PROCESSED, SalesOrderStatus.REJECTED, SalesOrderStatus.CANCELLED],
   [SalesOrderStatus.PROCESSED]: [],
   [SalesOrderStatus.REJECTED]: [],
@@ -95,7 +97,9 @@ export class SalesOrderService {
 
   async create(dto: CreateSalesOrderDto, actor: ActorContext): Promise<SalesOrderView> {
     const branchId = this.branchOf(actor);
-    const salesperson = await this.salespersonOf(actor);
+    const salesperson = dto.salespersonId
+      ? await this.salespersonById(dto.salespersonId, actor)
+      : await this.salespersonOf(actor);
     const prepared = await this.prepareLines(dto.lines, actor);
     const customer = await this.customerSnapshotOf(dto.customerId, actor);
 
@@ -109,7 +113,7 @@ export class SalesOrderService {
         branchId,
         createdBy: actor.userId,
         documentNumber,
-        status: SalesOrderStatus.SENT,
+        status: dto.isDraft ? SalesOrderStatus.DRAFT : SalesOrderStatus.SENT,
         salespersonId: salesperson.id,
         salespersonName: salesperson.name,
         salesChannel: SALES_ORDER_CHANNEL,
@@ -131,20 +135,28 @@ export class SalesOrderService {
     return this.getById(saved.id, actor);
   }
 
-  /** Sửa đơn còn `SENT` của CHÍNH mình — thay trọn dòng, giữ số chứng từ. */
+  /**
+   * Sửa đơn của CHÍNH mình khi còn `DRAFT` hoặc `SENT` — thay trọn dòng, giữ số
+   * chứng từ. `DRAFT` + `isDraft: false` là GỬI; `SENT` + `isDraft: true` bị từ
+   * chối: đơn đã tới thu ngân không rút về lưu tạm được.
+   */
   async update(id: string, dto: CreateSalesOrderDto, actor: ActorContext): Promise<SalesOrderView> {
-    const salesperson = await this.salespersonOf(actor);
+    const me = await this.salespersonOf(actor);
+    const salesperson = dto.salespersonId ? await this.salespersonById(dto.salespersonId, actor) : me;
     const prepared = await this.prepareLines(dto.lines, actor);
     const customer = await this.customerSnapshotOf(dto.customerId, actor);
 
     await this.dataSource.transaction(async (manager) => {
       const current = await this.lockedOrder(manager, id, actor);
-      if (current.salespersonId !== salesperson.id) {
+      if (!this.isOwn(current, me.id, actor)) {
         // 404 chứ không 403: không xác nhận sự tồn tại của đơn người khác.
         throw new NotFoundException(`Sales order ${id} not found`);
       }
-      if (current.status !== SalesOrderStatus.SENT) {
+      if (current.status !== SalesOrderStatus.SENT && current.status !== SalesOrderStatus.DRAFT) {
         throw new ConflictException('Đơn hàng đã được xử lý, không sửa được nữa');
+      }
+      if (current.status === SalesOrderStatus.SENT && dto.isDraft) {
+        throw new BadRequestException('Đơn đã gửi không lưu tạm lại được');
       }
 
       await manager.delete(SalesOrderLineEntity, { salesOrderId: id });
@@ -153,6 +165,9 @@ export class SalesOrderService {
         prepared.lines.map((line) => manager.create(SalesOrderLineEntity, { ...line, salesOrderId: id })),
       );
       await manager.update(SalesOrderEntity, id, {
+        status: dto.isDraft ? SalesOrderStatus.DRAFT : SalesOrderStatus.SENT,
+        salespersonId: salesperson.id,
+        salespersonName: salesperson.name,
         customerId: customer?.id ?? null,
         customerName: customer?.name ?? null,
         customerPhone: customer?.phone ?? null,
@@ -162,6 +177,73 @@ export class SalesOrderService {
     });
 
     return this.getById(id, actor);
+  }
+
+  /** Xoá một đơn LƯU TẠM của chính mình. Đơn đã gửi thì huỷ, không xoá. */
+  async remove(id: string, actor: ActorContext): Promise<void> {
+    const me = await this.salespersonOf(actor);
+
+    await this.dataSource.transaction(async (manager) => {
+      const current = await this.lockedOrder(manager, id, actor);
+      if (!this.isOwn(current, me.id, actor)) throw new NotFoundException(`Sales order ${id} not found`);
+      if (current.status !== SalesOrderStatus.DRAFT) {
+        throw new ConflictException('Chỉ xoá được đơn lưu tạm; đơn đã gửi thì huỷ');
+      }
+      await manager.delete(SalesOrderLineEntity, { salesOrderId: id });
+      await manager.delete(SalesOrderEntity, { id });
+    });
+  }
+
+  /**
+   * Nhân viên của CHI NHÁNH hiện tại để gắn vào đơn: có hồ sơ, tài khoản đang
+   * hoạt động, được phân vào chi nhánh (`user_branch_assignments`).
+   */
+  async salespeople(query: { page?: number; limit?: number; search?: string }, actor: ActorContext) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+
+    const qb = this.profiles
+      .createQueryBuilder('profile')
+      .innerJoin('profile.user', 'user')
+      .innerJoin(
+        UserBranchAssignmentEntity,
+        'uba',
+        // So sánh qua TEXT ở cả hai vế: bảng này lưu uuid thật còn `employee_profiles`
+        // /`users` trộn uuid với varchar tuỳ cột (đo 2026-09-13) — để Postgres tự suy
+        // kiểu là `operator does not exist: character varying = uuid`.
+        'CAST(uba.userId AS text) = CAST(user.id AS text) AND CAST(uba.branchId AS text) = :branch AND CAST(uba.organizationId AS text) = :org',
+        { branch: this.branchOf(actor), org: actor.organizationId },
+      )
+      .where('profile.organizationId = :org', { org: actor.organizationId })
+      .andWhere('user.isActive = true');
+
+    const search = query.search?.trim();
+    if (search) {
+      qb.andWhere(
+        "(profile.code ILIKE :q OR user.firstName ILIKE :q OR user.lastName ILIKE :q OR (user.firstName || ' ' || user.lastName) ILIKE :q OR profile.mobile ILIKE :q)",
+        { q: `%${search.replace(/[%_]/g, (c) => `\\${c}`)}%` },
+      );
+    }
+
+    const [rows, total] = await qb
+      .select(['profile.id', 'profile.code', 'profile.mobile', 'user.firstName', 'user.lastName'])
+      .orderBy('user.lastName', 'ASC')
+      .addOrderBy('user.firstName', 'ASC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      data: rows.map((profile) => ({
+        id: profile.id,
+        code: profile.code,
+        name: `${profile.user?.firstName ?? ''} ${profile.user?.lastName ?? ''}`.trim(),
+        phone: profile.mobile ?? null,
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 
   async list(query: SalesOrderListQueryDto, actor: ActorContext) {
@@ -174,12 +256,21 @@ export class SalesOrderService {
       .where('so.organizationId = :org', { org: actor.organizationId })
       .andWhere('so.branchId = :branch', { branch: this.branchOf(actor) });
 
-    // Tư vấn thấy đơn CỦA MÌNH; người có quyền duyệt (thu ngân) thấy mọi đơn của
-    // chi nhánh. Ép ở đây, không nhận từ query — cùng luật với `/mobile/invoices`.
+    // Tư vấn thấy đơn CỦA MÌNH (ghi công bán cho mình, hoặc do mình tạo cho
+    // người khác); người có quyền duyệt (thu ngân) thấy mọi đơn của chi nhánh
+    // — trừ đơn LƯU TẠM, thứ riêng của người gửi. Ép ở đây, không nhận từ
+    // query — cùng luật với `/mobile/invoices`.
     if (scope.salespersonId) {
-      qb.andWhere('so.salespersonId = :sp', { sp: scope.salespersonId });
+      qb.andWhere('(so.salespersonId = :sp OR so.createdBy = :me)', { sp: scope.salespersonId, me: actor.userId });
+    } else {
+      qb.andWhere('so.status <> :draft', { draft: SalesOrderStatus.DRAFT });
     }
-    if (query.status) qb.andWhere('so.status = :status', { status: query.status });
+    if (query.status) {
+      qb.andWhere('so.status = :status', { status: query.status });
+    } else {
+      // Không lọc = "lịch sử": đơn lưu tạm có màn riêng, không trộn vào đây.
+      qb.andWhere('so.status <> :draftDefault', { draftDefault: SalesOrderStatus.DRAFT });
+    }
     if (query.from) qb.andWhere('so.createdAt >= :from', { from: new Date(query.from) });
     if (query.to) qb.andWhere('so.createdAt <= :to', { to: new Date(query.to) });
 
@@ -211,7 +302,11 @@ export class SalesOrderService {
     const order = await this.orders.findOne({ where: { id, organizationId: actor.organizationId } });
     const scope = await this.scopeOf(actor);
 
-    if (!order || (scope.salespersonId && order.salespersonId !== scope.salespersonId)) {
+    if (!order || (scope.salespersonId && !this.isOwn(order, scope.salespersonId, actor))) {
+      throw new NotFoundException(`Sales order ${id} not found`);
+    }
+    if (!scope.salespersonId && order.status === SalesOrderStatus.DRAFT && order.createdBy !== actor.userId) {
+      // Thu ngân không thấy đơn lưu tạm của người khác.
       throw new NotFoundException(`Sales order ${id} not found`);
     }
 
@@ -257,7 +352,7 @@ export class SalesOrderService {
       // Đọc CÓ KHOÁ: hai thu ngân bấm *Nhận xử lý* cùng lúc không được cùng thắng.
       const current = await this.lockedOrder(manager, id, actor);
 
-      if (ownerSalespersonId && current.salespersonId !== ownerSalespersonId) {
+      if (ownerSalespersonId && !this.isOwn(current, ownerSalespersonId, actor)) {
         throw new NotFoundException(`Sales order ${id} not found`);
       }
       if (!VALID_TRANSITIONS[current.status].includes(target)) {
@@ -291,6 +386,29 @@ export class SalesOrderService {
     // Không có hồ sơ nhân viên thì không có đơn nào là "của mình" — id giả để
     // truy vấn trả rỗng thay vì trả cả chi nhánh.
     return { salespersonId: profile?.id ?? '00000000-0000-0000-0000-000000000000' };
+  }
+
+  /** "Của mình" = ghi công bán cho hồ sơ mình, HOẶC do chính mình tạo (gửi giùm người khác). */
+  private isOwn(order: SalesOrderEntity, salespersonId: string, actor: ActorContext): boolean {
+    return order.salespersonId === salespersonId || order.createdBy === actor.userId;
+  }
+
+  /** Nhân viên được CHỌN trên đơn — phải thuộc tổ chức, đang hoạt động, và ở chi nhánh này. */
+  private async salespersonById(id: string, actor: ActorContext): Promise<{ id: string; name: string }> {
+    const profile = await this.profiles
+      .createQueryBuilder('profile')
+      .innerJoinAndSelect('profile.user', 'user')
+      .innerJoin(UserBranchAssignmentEntity, 'uba', 'CAST(uba.userId AS text) = CAST(user.id AS text) AND CAST(uba.branchId AS text) = :branch', {
+        branch: this.branchOf(actor),
+      })
+      .where('profile.id = :id AND profile.organizationId = :org', { id, org: actor.organizationId })
+      .andWhere('user.isActive = true')
+      .getOne();
+    if (!profile) {
+      throw new BadRequestException('Nhân viên bán hàng không thuộc chi nhánh này hoặc đã ngừng hoạt động');
+    }
+    const name = `${profile.user?.firstName ?? ''} ${profile.user?.lastName ?? ''}`.trim();
+    return { id: profile.id, name: name || 'Nhân viên' };
   }
 
   private async salespersonOf(actor: ActorContext): Promise<{ id: string; name: string }> {

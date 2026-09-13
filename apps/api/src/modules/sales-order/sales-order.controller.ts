@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -21,6 +22,7 @@ import { PermissionGuard } from '../rbac/permission.guard';
 import { CreateSalesOrderDto } from './dto/create-sales-order.dto';
 import { RejectSalesOrderDto } from './dto/reject-sales-order.dto';
 import { SalesOrderListQueryDto } from './dto/sales-order-list.query.dto';
+import { SalespeopleQueryDto } from './dto/salespeople.query.dto';
 import { SALES_ORDER_PERMISSIONS, SalesOrderService } from './sales-order.service';
 
 /**
@@ -44,6 +46,13 @@ export class SalesOrderController {
     return this.service.list(query, actor);
   }
 
+  /** Khai TRƯỚC `:id` — không thì `salespeople` bị `ParseUUIDPipe` của route kia bắt. */
+  @Get('salespeople')
+  @RequirePermission(SALES_ORDER_PERMISSIONS.create)
+  salespeople(@Query() query: SalespeopleQueryDto, @Actor() actor: ActorContext) {
+    return this.service.salespeople(query, actor);
+  }
+
   @Get(':id')
   @RequirePermission(SALES_ORDER_PERMISSIONS.read)
   getById(@Param('id', ParseUUIDPipe) id: string, @Actor() actor: ActorContext) {
@@ -60,6 +69,13 @@ export class SalesOrderController {
   @RequirePermission(SALES_ORDER_PERMISSIONS.create)
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateSalesOrderDto, @Actor() actor: ActorContext) {
     return this.service.update(id, dto, actor);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission(SALES_ORDER_PERMISSIONS.create)
+  remove(@Param('id', ParseUUIDPipe) id: string, @Actor() actor: ActorContext) {
+    return this.service.remove(id, actor);
   }
 
   @Post(':id/approve')

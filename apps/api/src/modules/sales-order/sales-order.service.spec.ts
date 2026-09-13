@@ -120,13 +120,45 @@ describe('SalesOrderService', () => {
     expect(updates[0]).toMatchObject({ status: SalesOrderStatus.REJECTED, rejectReason: 'Hết hàng trong kho' });
   });
 
+  it('create với isDraft → DRAFT; update DRAFT không isDraft → SENT (lưu tạm rồi gửi)', async () => {
+    const created = build();
+    await created.service.create({ lines: [lineB], isDraft: true }, actor);
+    expect(created.saved[0]).toMatchObject({ status: SalesOrderStatus.DRAFT });
+
+    const sent = build({ current: { status: SalesOrderStatus.DRAFT, salespersonId: 'sp-1', createdBy: 'u-1' } });
+    await sent.service.update('so-1', { lines: [lineB] }, actor);
+    expect(sent.updates[0]).toMatchObject({ status: SalesOrderStatus.SENT });
+  });
+
+  it('update SENT với isDraft → 400: đơn đã tới thu ngân không rút về lưu tạm', async () => {
+    const { service, updates } = build({ current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-1' } });
+    await expect(service.update('so-1', { lines: [lineB], isDraft: true }, actor)).rejects.toThrow('không lưu tạm');
+    expect(updates).toHaveLength(0);
+  });
+
+  it('remove chỉ cho DRAFT — đơn SENT → 409', async () => {
+    const { service, manager } = build({ current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-1' } });
+    await expect(service.remove('so-1', actor)).rejects.toBeInstanceOf(ConflictException);
+    expect(manager.delete).not.toHaveBeenCalled();
+  });
+
+  it('list mặc định LOẠI đơn lưu tạm; thu ngân không thấy DRAFT của ai', async () => {
+    const mine = build({ canApprove: false });
+    await mine.service.list({}, actor);
+    expect(mine.listQb.andWhere).toHaveBeenCalledWith('so.status <> :draftDefault', { draftDefault: SalesOrderStatus.DRAFT });
+
+    const branch = build({ canApprove: true });
+    await branch.service.list({ status: SalesOrderStatus.DRAFT }, actor);
+    expect(branch.listQb.andWhere).toHaveBeenCalledWith('so.status <> :draft', { draft: SalesOrderStatus.DRAFT });
+  });
+
   it('list: KHÔNG có quyền duyệt thì thu về đơn của mình; CÓ thì thấy cả chi nhánh', async () => {
     const mine = build({ canApprove: false });
     await mine.service.list({}, actor);
-    expect(mine.listQb.andWhere).toHaveBeenCalledWith('so.salespersonId = :sp', { sp: 'sp-1' });
+    expect(mine.listQb.andWhere).toHaveBeenCalledWith('(so.salespersonId = :sp OR so.createdBy = :me)', { sp: 'sp-1', me: 'u-1' });
 
     const branch = build({ canApprove: true });
     await branch.service.list({}, actor);
-    expect(branch.listQb.andWhere).not.toHaveBeenCalledWith('so.salespersonId = :sp', expect.anything());
+    expect(branch.listQb.andWhere).not.toHaveBeenCalledWith('(so.salespersonId = :sp OR so.createdBy = :me)', expect.anything());
   });
 });

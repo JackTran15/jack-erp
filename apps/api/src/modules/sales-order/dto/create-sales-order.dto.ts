@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsInt,
   IsNumber,
   IsOptional,
@@ -69,6 +70,22 @@ export class CreateSalesOrderDto {
   @IsOptional()
   @IsUUID()
   customerId?: string;
+
+  /**
+   * `employee_profiles.id` được ghi công bán. Vắng = hồ sơ của người gọi.
+   * Phải là nhân viên đang hoạt động, được phân vào chi nhánh của request.
+   */
+  @IsOptional()
+  @IsUUID()
+  salespersonId?: string;
+
+  /**
+   * `true` = LƯU TẠM: đơn ở `DRAFT`, chỉ người gửi thấy, thu ngân không thấy.
+   * `PATCH` một đơn `DRAFT` với `isDraft: false` (hoặc vắng) là GỬI nó.
+   */
+  @IsOptional()
+  @IsBoolean()
+  isDraft?: boolean;
 
   @IsOptional()
   @IsString()
