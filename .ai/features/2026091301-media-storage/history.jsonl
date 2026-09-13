@@ -6,3 +6,6 @@
 {"action": "ticket in_progress", "at": "2026-09-13T12:34:23", "by": "Claude", "gate": "G4", "id": "64712c50a3d3", "ticket": "T-01-01", "ts": "2026-09-13T12:34:23.601734"}
 {"action": "ticket in_progress", "at": "2026-09-13T12:34:23", "by": "Claude", "gate": "G4", "id": "1270346fcf9e", "ticket": "T-01-02", "ts": "2026-09-13T12:34:23.665872"}
 {"action": "ticket done (review bypassed)", "at": "2026-09-13T13:57:56", "by": "Claude", "gate": "G4", "id": "c6ff977885a4", "ticket": "T-01-02", "ts": "2026-09-13T13:57:56.317317"}
+{"action": "ticket in_progress", "at": "2026-09-13T13:57:56", "by": "Claude", "gate": "G4", "id": "a1643e55fb8b", "ticket": "T-01-03", "ts": "2026-09-13T13:57:56.554512"}
+{"action": "ticket in_progress", "at": "2026-09-13T13:59:51", "by": "Claude", "gate": "G4", "id": "1355a9561d66", "ticket": "T-01-08", "ts": "2026-09-13T13:59:51.343300"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-13T13:59:51", "by": "Claude", "gate": "G4", "id": "3c4744fc6115", "ticket": "T-01-08", "ts": "2026-09-13T13:59:51.407541"}

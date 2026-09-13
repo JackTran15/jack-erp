@@ -48,6 +48,7 @@ link đọc). Ảnh nhân viên được chọn làm lát cắt đầu tiên vì
 | Nhiều ticket song song cùng cần đăng ký class trong `media.module.ts` | Quyết định G3: T-01-02 dựng stub và đăng ký sẵn cả 9 class; không ticket nào sau sửa file module |
 | T-01-04, T-01-07 (và T-03-02, T-04-01 ở UoW khác) cùng sinh lại `schema.ts` + `openapi.snapshot.json` | Quyết định G3: mỗi ticket chỉ sinh lại sau khi rebase lên main, ngay trước khi merge, không bao giờ song song; partner-catalog T-05-03 cũng tuân theo |
 | Migration dọn `blob:` không đảo được | T-01-08 đếm và ghi số dòng bị ảnh hưởng trước khi chạy ở mỗi môi trường |
+| Migration dọn `blob:` lên môi trường trước khi form thôi ghi `blob:` → dọn bị vô hiệu | T-01-08 chỉ triển khai cùng release với T-01-07 và T-01-10 (cả nhánh phát hành một lần); đếm lại sau triển khai |
 
 ## Definition of done
 - [ ] AC-03, AC-07, AC-08, AC-09, AC-10, AC-11, AC-12, AC-17, AC-18, AC-19 pass
