@@ -3,3 +3,6 @@
 {"action": "passed", "at": "2026-09-13T12:09:05", "by": "Akenzy", "evidence": "6 ADR(s) recorded", "gate": "G2", "id": "c9fe8fac0a5c", "ts": "2026-09-13T12:09:05.114343"}
 {"action": "passed", "at": "2026-09-13T12:25:01", "by": "Akenzy", "evidence": "graph valid - 5 UoW, 27 tickets, no cycles", "gate": "G3", "id": "efd6b1def4ee", "ts": "2026-09-13T12:25:01.851772"}
 {"action": "ticket blocked", "at": "2026-09-13T12:33:15", "by": "Claude", "from": "todo", "gate": "G4", "id": "533b685b85fc", "reason": "Spike cần người có quyền trên máy staging/production (nginx + MinIO) — Claude không có quyền truy cập; chưa có người nhận vận hành (A-07)", "ticket": "T-05-02", "ts": "2026-09-13T12:33:15.095798"}
+{"action": "ticket in_progress", "at": "2026-09-13T12:34:23", "by": "Claude", "gate": "G4", "id": "64712c50a3d3", "ticket": "T-01-01", "ts": "2026-09-13T12:34:23.601734"}
+{"action": "ticket in_progress", "at": "2026-09-13T12:34:23", "by": "Claude", "gate": "G4", "id": "1270346fcf9e", "ticket": "T-01-02", "ts": "2026-09-13T12:34:23.665872"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-13T13:57:56", "by": "Claude", "gate": "G4", "id": "c6ff977885a4", "ticket": "T-01-02", "ts": "2026-09-13T13:57:56.317317"}

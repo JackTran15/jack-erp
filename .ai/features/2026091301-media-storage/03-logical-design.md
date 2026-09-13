@@ -17,7 +17,7 @@ module media để gắn, gỡ và đọc media của bản ghi mình.
 
 | Thành phần | Trách nhiệm |
 |---|---|
-| `MediaModule` | `@Global()` và export các service dưới đây, theo mẫu `RedisModule` (`apps/api/src/modules/redis/redis.module.ts:7-12`), để 7 module chứng từ không phải sửa `imports` |
+| `MediaModule` | `@Global()` theo mẫu `RedisModule` (`apps/api/src/modules/redis/redis.module.ts:7-12`), export `MediaLinkService`, `MediaQueryService`, `MediaOwnerReaderRegistry` để 7 module chứng từ không phải sửa `imports`. **Không** export `ObjectStorageService`: module nghiệp vụ không được tự ký URL cho object key bất kỳ, bỏ qua lọc tổ chức (security review T-01-02, 2026-09-13) |
 | Bảng `media_objects` | Nguồn sự thật cho mọi file (ADR-03) |
 | `ObjectStorageService` | Bọc `@aws-sdk/client-s3`, `@aws-sdk/s3-presigned-post`, `@aws-sdk/s3-request-presigner` (ADR-01). Không gọi mạng khi khởi tạo; cấu hình đọc qua hàm thuần `resolveMediaStorageConfig(config)` theo mẫu `resolveKafkaConfig` (`kafka-config.ts:34-78`), trả `null` khi thiếu biến → mọi thao tác ném `STORAGE_UNAVAILABLE`, API vẫn khởi động (AC-19, A-22) |
 | `MEDIA_OWNER_POLICIES` | Hằng số **tĩnh** theo `ownerType`: bucket, giới hạn, quyền ghi, quyền đọc. Cùng kiểu bảng tra `EXTRA_PURPOSE_PERMISSION_OF` ở `mobile-stock-document-write.service.ts:261`. Không import service nghiệp vụ nào |
