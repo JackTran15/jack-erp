@@ -14,6 +14,7 @@ import { ItemAttributeValueEntity } from '../../inventory/product/item-attribute
 import { ItemCategoryEntity } from '../../inventory/location/item-category.entity';
 import { BranchEntity } from '../../branch/branch.entity';
 import { TempWarehouseStagedStockService } from '../../inventory/temp-warehouse/temp-warehouse-staged-stock.service';
+import { MediaQueryService } from '../../media/media-query.service';
 import { PosCatalogDirection } from '../dto/pos-catalog.query.dto';
 import { PosCatalogProductService } from './pos-catalog-product.service';
 
@@ -162,6 +163,7 @@ describe('PosCatalogProductService', () => {
   let categoryRepo: RepoMock;
   let getBranchDelta: jest.Mock;
   let dataSource: { query: jest.Mock };
+  let mediaQuery: { resolvePublicUrls: jest.Mock };
 
   beforeEach(async () => {
     // Default: nothing staged, so the pre-existing expectations keep meaning
@@ -189,6 +191,10 @@ describe('PosCatalogProductService', () => {
     // what the service asks for — which predicates and which ORDER BY.
     dataSource = { query: jest.fn().mockResolvedValue([]) };
 
+    // Default: no images anywhere, so pre-existing expectations of `imageUrl:
+    // null` keep meaning "nothing came back from media".
+    mediaQuery = { resolvePublicUrls: jest.fn().mockResolvedValue(new Map()) };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PosCatalogProductService,
@@ -206,6 +212,7 @@ describe('PosCatalogProductService', () => {
           provide: TempWarehouseStagedStockService,
           useValue: { getBranchDelta },
         },
+        { provide: MediaQueryService, useValue: mediaQuery },
         { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
@@ -486,6 +493,52 @@ describe('PosCatalogProductService', () => {
       expect(balanceRepo.find).not.toHaveBeenCalled();
       expect(locationRepo.find).not.toHaveBeenCalled();
     });
+
+    // T-03-01: imageUrl is the first resolved media URL per card, or null.
+    describe('imageUrl', () => {
+      it('uses the first resolved URL per card and null for a card with no image', async () => {
+        mediaQuery.resolvePublicUrls.mockResolvedValue(
+          new Map([
+            [
+              'P1',
+              [
+                { id: 'm1', url: 'https://cdn/p1-a.jpg', fileName: 'a.jpg' },
+                { id: 'm2', url: 'https://cdn/p1-b.jpg', fileName: 'b.jpg' },
+              ],
+            ],
+          ]),
+        );
+
+        const res = await service.listProducts('branch-1', actor, {
+          page: 1,
+          pageSize: 20,
+        } as any);
+
+        const [productCard, itemCard] = res.data;
+        expect(productCard.imageUrl).toBe('https://cdn/p1-a.jpg');
+        expect(itemCard.imageUrl).toBeNull();
+      });
+
+      it('resolves images for the whole page with one call, keyed by card id', async () => {
+        await service.listProducts('branch-1', actor, {
+          page: 1,
+          pageSize: 20,
+        } as any);
+
+        expect(mediaQuery.resolvePublicUrls).toHaveBeenCalledTimes(1);
+        expect(mediaQuery.resolvePublicUrls).toHaveBeenCalledWith(['P1', 'I3'], 'org-1');
+      });
+
+      it('also resolves images with exactly one call on the stock-rank sort path', async () => {
+        await service.listProducts('branch-1', actor, {
+          page: 1,
+          pageSize: 20,
+          sortBy: 'quantityOnHand',
+        } as any);
+
+        expect(mediaQuery.resolvePublicUrls).toHaveBeenCalledTimes(1);
+      });
+    });
   });
 
   describe('getProductDetail', () => {
@@ -547,6 +600,82 @@ describe('PosCatalogProductService', () => {
       await expect(
         service.getProductDetail('branch-1', 'missing', undefined, actor),
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    // T-03-01: imageUrl on the detail route, and A-08's rule that every variant
+    // shares the parent product's images.
+    describe('imageUrl', () => {
+      it("resolves the product's images and gives every variant the same first URL (A-08)", async () => {
+        productRepo.findOne.mockResolvedValue(product);
+        itemRepo.find.mockResolvedValue([variantS, variantM]);
+        attrDefRepo.find.mockResolvedValue([]);
+        itemAttrValueRepo.find.mockResolvedValue([]);
+        balanceRepo.find.mockResolvedValue([]);
+        locationRepo.find.mockResolvedValue([]);
+        mediaQuery.resolvePublicUrls.mockResolvedValue(
+          new Map([
+            [
+              'P1',
+              [
+                { id: 'm1', url: 'https://cdn/p1-a.jpg', fileName: 'a.jpg' },
+                { id: 'm2', url: 'https://cdn/p1-b.jpg', fileName: 'b.jpg' },
+              ],
+            ],
+          ]),
+        );
+
+        const res = await service.getProductDetail('branch-1', 'P1', undefined, actor);
+
+        expect(mediaQuery.resolvePublicUrls).toHaveBeenCalledWith(['P1'], 'org-1');
+        expect(res.imageUrl).toBe('https://cdn/p1-a.jpg');
+        expect(res.variants.map((v) => v.imageUrl)).toEqual([
+          'https://cdn/p1-a.jpg',
+          'https://cdn/p1-a.jpg',
+        ]);
+      });
+
+      it("resolves a standalone item's own images (A-25)", async () => {
+        productRepo.findOne.mockResolvedValue(null);
+        itemRepo.findOne.mockResolvedValue(standalone);
+        balanceRepo.find.mockResolvedValue([]);
+        locationRepo.find.mockResolvedValue([]);
+        mediaQuery.resolvePublicUrls.mockResolvedValue(
+          new Map([['I3', [{ id: 'm1', url: 'https://cdn/i3.jpg', fileName: 'i3.jpg' }]]]),
+        );
+
+        const res = await service.getProductDetail('branch-1', 'I3', undefined, actor);
+
+        expect(mediaQuery.resolvePublicUrls).toHaveBeenCalledWith(['I3'], 'org-1');
+        expect(res.imageUrl).toBe('https://cdn/i3.jpg');
+        expect(res.variants[0].imageUrl).toBe('https://cdn/i3.jpg');
+      });
+
+      it('returns null for both the card and its variant when the owner has no image', async () => {
+        productRepo.findOne.mockResolvedValue(null);
+        itemRepo.findOne.mockResolvedValue(standalone);
+        balanceRepo.find.mockResolvedValue([]);
+        locationRepo.find.mockResolvedValue([]);
+
+        const res = await service.getProductDetail('branch-1', 'I3', undefined, actor);
+
+        expect(res.imageUrl).toBeNull();
+        expect(res.variants[0].imageUrl).toBeNull();
+      });
+
+      it("falls back to the parent product's images when an ITEM detail resolves to a variant (has product_id)", async () => {
+        itemRepo.findOne.mockResolvedValue(variantS);
+        balanceRepo.find.mockResolvedValue([]);
+        locationRepo.find.mockResolvedValue([]);
+        mediaQuery.resolvePublicUrls.mockResolvedValue(
+          new Map([['P1', [{ id: 'm1', url: 'https://cdn/p1.jpg', fileName: 'p1.jpg' }]]]),
+        );
+
+        const res = await service.getProductDetail('branch-1', 'I1', 'ITEM', actor);
+
+        expect(mediaQuery.resolvePublicUrls).toHaveBeenCalledWith(['P1'], 'org-1');
+        expect(res.imageUrl).toBe('https://cdn/p1.jpg');
+        expect(res.variants[0].imageUrl).toBe('https://cdn/p1.jpg');
+      });
     });
   });
 
