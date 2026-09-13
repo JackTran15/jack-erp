@@ -2,6 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -42,6 +43,16 @@ export class MobileSupplierListQueryDto {
   @IsOptional()
   @IsEnum(MobileSupplierSort)
   sort?: MobileSupplierSort = MobileSupplierSort.NAME;
+
+  /**
+   * Thu hẹp theo trạng thái theo dõi. Vắng = CẢ HAI — màn lọc của app có mục
+   * "Tất cả", và đó là nghĩa của việc không gửi khoá này. Viết thường như
+   * `MobileSupplierResponseDto.status`; service dịch sang cột `isActive`.
+   */
+  @ApiPropertyOptional({ enum: ['active', 'inactive'] })
+  @IsOptional()
+  @IsIn(['active', 'inactive'])
+  status?: 'active' | 'inactive';
 
   /**
    * Tìm theo mã hoặc tên.

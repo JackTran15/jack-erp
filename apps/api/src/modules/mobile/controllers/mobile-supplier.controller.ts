@@ -60,6 +60,7 @@ export class MobileSupplierController {
         page: query.page ?? 1,
         limit: query.limit ?? 20,
         sort: query.sort ?? MobileSupplierSort.NAME,
+        status: query.status,
         search: query.search,
       },
       actor,

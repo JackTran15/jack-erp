@@ -55,11 +55,12 @@ export class MobileSupplierService {
       page: number;
       limit: number;
       sort: MobileSupplierSort;
+      status?: 'active' | 'inactive';
       search?: string;
     },
     actor: ActorContext,
   ): Promise<MobileSupplierPageDto> {
-    const { page, limit, sort, search } = query;
+    const { page, limit, sort, status, search } = query;
 
     const qb = this.repo
       .createQueryBuilder('provider')
@@ -67,6 +68,14 @@ export class MobileSupplierService {
       .where('provider.organizationId = :orgId', {
         orgId: actor.organizationId,
       });
+
+    // Trạng thái app (`active`/`inactive`) -> cột `isActive`. Vắng thì không
+    // thêm mệnh đề: "Tất cả" là không lọc, không phải lọc theo hai giá trị.
+    if (status !== undefined) {
+      qb.andWhere('provider.isActive = :isActive', {
+        isActive: status === 'active',
+      });
+    }
 
     // Cả hai vế `OR` nằm trong MỘT cặp ngoặc và MỘT `andWhere`. Tách thành hai
     // lời gọi là `OR` leo ra ngoài và phá luôn điều kiện `organizationId` ở

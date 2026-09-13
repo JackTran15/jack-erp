@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
@@ -6,12 +6,42 @@ import { escapeLikeTerm } from '../../../common/utils/like-escape.util';
 import { COMBINED_CTE } from '../../inventory/location/queries/search-inventory-items-v2.handler';
 import { MobileProductSort } from '../dto/mobile-product-list.query.dto';
 import {
+  MobileProductDetailResponseDto,
+  MobileProductVariantDto,
+} from '../dto/mobile-product-detail.response.dto';
+import {
   MobileProductPageDto,
   MobileProductResponseDto,
 } from '../dto/mobile-product.response.dto';
 
 interface CountRow {
   total: number;
+}
+
+/** Phần "đầu" của chi tiết — một dòng của CTE `combined`, xem [findById]. */
+interface HeaderRow {
+  type: 'product' | 'orphan';
+  id: string;
+  code: string;
+  name: string;
+  purchasePrice: number;
+  sellingPrice: number;
+  isActive: boolean;
+}
+
+/** Một item của mẫu mã (hoặc chính item lẻ), câu thứ hai của [findById]. */
+interface ItemRow {
+  id: string;
+  code: string;
+  variantLabel: string | null;
+  unit: string;
+  categoryName: string | null;
+  purchasePrice: number;
+  sellingPrice: number;
+  weightGram: number | null;
+  lengthCm: number | null;
+  widthCm: number | null;
+  heightCm: number | null;
 }
 
 /**
@@ -67,6 +97,10 @@ const ORDER_BY: Record<MobileProductSort, string> = {
  *
  * Hàng hoá scope theo TỔ CHỨC: `X-Branch-Id` không dự phần, y hệt nhà cung cấp.
  * TỒN KHO mới theo chi nhánh, và tồn kho không nằm trong response này.
+ *
+ * Hai đường đọc, `list` và `findById`, cùng đi qua CTE `combined` — nên `id`
+ * mà danh sách trả ra (hỗn hợp: mẫu mã hay item lẻ) đưa thẳng vào chi tiết
+ * là ra đúng bản ghi, không cần client mang thêm `type`.
  */
 @Injectable()
 export class MobileProductService {
@@ -155,5 +189,112 @@ export class MobileProductService {
     ]);
 
     return { data, total: countResult[0]?.total ?? 0, page, limit };
+  }
+
+  /**
+   * Chi tiết một hàng hoá theo `id` HỖN HỢP của danh sách.
+   *
+   * HAI câu lệnh tuần tự, không gộp:
+   *
+   * 1. Tra `id` trên CTE `combined` — chính CTE của [list], nên `code`/`name`/
+   *    giá/`isActive` ở đây KHỚP con số màn danh sách (mẫu mã: giá trung bình,
+   *    `bool_and(is_active)`). Cột `type` cho biết dòng đó là mẫu mã hay item
+   *    lẻ — đó là toàn bộ lý do client không phải gửi kèm `type`.
+   * 2. Lấy các item thuộc dòng đó: mẫu mã -> mọi item có `product_id = id`;
+   *    item lẻ -> chính nó. Item ĐẠI DIỆN (mã nhỏ nhất) cấp nhóm hàng, đơn vị,
+   *    cân nặng, kích thước — `products` không có các cột này. Với mẫu mã, cả
+   *    danh sách đó thành `variants`.
+   *
+   * Không gộp thành một `JOIN` vì hai nhánh của CTE nối với `items` theo hai
+   * cột khác nhau (`product_id` với mẫu mã, `id` với item lẻ); một câu `OR`
+   * vẫn đúng nhưng câu lệnh và test của nó khó đọc hơn hẳn hai câu thẳng.
+   *
+   * `::float` ở MỌI cột decimal là bắt buộc: driver `pg` trả `numeric` thành
+   * CHUỖI, và app đọc `"250.00"` được nhưng phát cảnh báo sai kiểu mỗi lần mở
+   * màn. CTE đã tự ép ở phía nó.
+   *
+   * Câu 404 KHÔNG nội suy `id`: cùng luật với nhà cung cấp — thông điệp đi
+   * thẳng ra toast của app.
+   */
+  async findById(
+    id: string,
+    actor: ActorContext,
+  ): Promise<MobileProductDetailResponseDto> {
+    // `$1` là organizationId — CTE tham chiếu nó nhiều lần nên phải đứng đầu.
+    const params = [actor.organizationId, id];
+
+    const headerSql = `
+      ${COMBINED_CTE}
+      SELECT type, id, code, name, "purchasePrice", "sellingPrice", "isActive"
+      FROM combined
+      WHERE id = $2
+    `;
+    const [header] = await this.dataSource.query<HeaderRow[]>(
+      headerSql,
+      params,
+    );
+    if (!header) {
+      throw new NotFoundException('Không tìm thấy hàng hoá.');
+    }
+
+    // Vẫn giữ `i.organization_id = $1` dù `id` đã qua CTE có scope: ranh giới
+    // multi-tenant phải đứng ở TỪNG câu, không dựa vào câu trước.
+    const itemFilter =
+      header.type === 'product' ? 'i.product_id = $2' : 'i.id = $2';
+    const itemSql = `
+      SELECT
+        i.id,
+        i.code,
+        i.variant_label          AS "variantLabel",
+        i.unit,
+        c.name                   AS "categoryName",
+        i.purchase_price::float  AS "purchasePrice",
+        i.selling_price::float   AS "sellingPrice",
+        i.weight_gram::float     AS "weightGram",
+        i.length_cm::float       AS "lengthCm",
+        i.width_cm::float        AS "widthCm",
+        i.height_cm::float       AS "heightCm"
+      FROM items i
+      LEFT JOIN inventory_item_categories c ON c.id = i.category_id
+      WHERE i.organization_id = $1 AND ${itemFilter}
+      ORDER BY i.code ASC, i.id ASC
+    `;
+    const items = await this.dataSource.query<ItemRow[]>(itemSql, params);
+
+    // Rỗng chỉ khi bản ghi bị xoá giữa hai câu lệnh: vẫn là 404, không phải
+    // `TypeError` đọc thuộc tính của `undefined`.
+    const representative = items[0];
+    if (!representative) {
+      throw new NotFoundException('Không tìm thấy hàng hoá.');
+    }
+
+    // Map TỪNG trường chứ không spread `ItemRow`: `unit`/`weightGram`… của
+    // từng item không được rò vào mảng biến thể.
+    const variants: MobileProductVariantDto[] =
+      header.type === 'product'
+        ? items.map(({ id, code, variantLabel, purchasePrice, sellingPrice }) => ({
+            id,
+            code,
+            variantLabel,
+            purchasePrice,
+            sellingPrice,
+          }))
+        : [];
+
+    return {
+      id: header.id,
+      code: header.code,
+      name: header.name,
+      isActive: header.isActive,
+      purchasePrice: header.purchasePrice,
+      sellingPrice: header.sellingPrice,
+      categoryName: representative.categoryName,
+      unit: representative.unit,
+      weightGram: representative.weightGram,
+      lengthCm: representative.lengthCm,
+      widthCm: representative.widthCm,
+      heightCm: representative.heightCm,
+      variants,
+    };
   }
 }
