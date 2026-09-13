@@ -80,8 +80,9 @@ vì đó là thay đổi hành vi ngoài phạm vi.
 
 ### Hạ tầng
 
-- **Local**: MinIO trong `docker-compose.yml` (9000 API, 9001 console — M5), ghim tag image cuối
-  cùng được publish, xác minh trên registry khi làm ticket (A-03). Vite dev server của backoffice
+- **Local**: MinIO trong `docker-compose.yml` (9000 API, 9001 console — M5; cổng console đổi được qua
+  `MINIO_CONSOLE_PORT`), ghim tag `RELEASE` thường cuối cùng `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z`
+  (docker.io không còn repo này); tag `.hotfix` mới hơn được xem xét trước production ở T-05-02 (A-03). Vite dev server của backoffice
   proxy `/erp-media-public` và `/erp-media-private` sang `localhost:9000`, giữ nguyên path và
   header `Host`, mô phỏng nginx production (A-06). Vì vậy local dùng
   `MEDIA_PUBLIC_BASE_URL=http://localhost:3000` và trình duyệt không phải gọi khác origin.
