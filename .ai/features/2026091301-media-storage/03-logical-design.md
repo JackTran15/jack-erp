@@ -24,7 +24,7 @@ module media để gắn, gỡ và đọc media của bản ghi mình.
 | `MediaOwnerReaderRegistry` | Module chủ sở hữu đăng ký trong `onModuleInit` một hàm `(ownerId, actor) => Promise<boolean>` trả `true` khi actor xem được bản ghi đó, theo mẫu `EntityRegistryService.registerEntity` của nền tảng CRUD. Tránh vòng import media ↔ inventory/accounting (ADR-06) |
 | `MediaUploadController` + `MediaUploadService` | Cấp vé tải lên, xác nhận tải lên, cấp link tải về |
 | `MediaLinkService` | Ghi: `syncOwner`, `detachAll` |
-| `MediaQueryService` | Đọc: `listForOwner`, `resolvePublicUrls`, `signReadUrl` |
+| `MediaQueryService` | Đọc: `listForOwners(ownerType, ownerIds, organizationId)`, `resolvePublicUrls(ownerIds, organizationId)` → `{ id, url, fileName }[]` theo chủ sở hữu, `publicUrlFor(summary)`, `signReadUrl(summary, organizationId, disposition)` (interface chốt sau review T-01-06) |
 | `MediaCleanupJob` | `@Cron` hằng ngày; `ScheduleModule` đã đăng ký (`app.module.ts:95`) |
 | `MediaException` | `extends HttpException` với `public readonly code`, như `AuthException` (`common/exceptions/auth.exception.ts:4-10`), vì filter chỉ lấy `code` từ thuộc tính của exception (`http-exception.filter.ts:30-36`) |
 
@@ -52,6 +52,16 @@ module media để gắn, gỡ và đọc media của bản ghi mình.
      có luật trạng thái riêng: chứng từ ở trạng thái kết thúc đã bị chính endpoint sửa của nó từ
      chối trước khi tới bước này (A-26).
    - Trả mảng id đã sắp xếp để service chứng từ ghi lại vào `attachment_ids` (ADR-03).
+   - **Luật cho mọi caller** (security review T-01-05, 2026-09-13) — reviewer của T-01-07, T-02-01,
+     T-04-02..05 phải kiểm:
+     - `ownerType` và `ownerId` luôn là bản ghi **đang được lưu** mà service đã tự kiểm quyền và phạm vi,
+       không bao giờ lấy từ body request. `ids` thì từ body là đúng.
+     - Đang ở trong transaction nghiệp vụ thì **bắt buộc** truyền `manager`; gọi không kèm `manager` sẽ
+       commit việc gỡ và xoá object ngay, dù transaction ngoài rollback sau đó (mất bảo vệ của ADR-05).
+     - Chỉ truyền `undefined` khi client không gửi trường; `null` từ body không được hiểu là "không đổi".
+     - Phía đọc (review T-01-06): `MediaSummary` giữ `bucket`, `objectKey`, `ownerType` **chỉ ở server** —
+       response chép đúng các trường cần trả (`id`, `fileName`, `contentType`, `size`, `url`), không spread
+       summary. `signReadUrl` luôn nhận `organizationId` của actor và tự từ chối key ngoài tổ chức đó.
 
 **Transaction.** Khi service nghiệp vụ có sẵn transaction thì `syncOwner` chạy trong đó (item
 đơn: `item-crud.service.ts:365,451`). `createProductWithVariants` và
@@ -68,7 +78,7 @@ vì đó là thay đổi hành vi ngoài phạm vi.
 
 - **Công khai** (`PRODUCT`, `ITEM`): `url = ${MEDIA_PUBLIC_BASE_URL}/${MEDIA_BUCKET_PUBLIC}/${object_key}`,
   ghép chuỗi, không gọi storage. POS list/detail và partner search/detail gọi
-  `MediaQueryService.resolvePublicUrls(ownerIds)` **một lần cho cả trang** (`owner_id = ANY($1)`),
+  `MediaQueryService.resolvePublicUrls(ownerIds, organizationId)` (trả `{ id, url, fileName }[]` theo chủ sở hữu) **một lần cho cả trang** (`owner_id = ANY($1)`),
   theo đúng kiểu truy vấn thứ hai theo id của trang mà partner search đã dùng cho facet
   (`search-partner-products.handler.ts:335`).
 - **Ảnh nhân viên**: `photoUrl` trong response `/admin/users` được tính lúc đọc bằng
@@ -278,12 +288,13 @@ cũ trong `generalInfo`. Code dùng chung đặt ở `apps/backoffice-web/src/co
 | Loại file không được phép | 400 | `MEDIA_TYPE_NOT_ALLOWED` | Lỗi ngay dưới ô chọn file; file không được tải |
 | File quá dung lượng | 400 | `MEDIA_TOO_LARGE` | Như trên |
 | Vượt số file của một chủ sở hữu | 400 | `MEDIA_LIMIT_EXCEEDED` | Lỗi ngay dưới ô chọn file; khi lưu thì toast lỗi |
+| Người dùng giữ quá nhiều file tải lên chưa gắn (A-30) | 429 | `MEDIA_QUOTA_EXCEEDED` | Toast "Có quá nhiều tệp tải lên chưa được lưu, hãy lưu biểu mẫu rồi thử lại" |
 | Object thiếu, sai kích thước hoặc sai loại lúc xác nhận | 400 | `MEDIA_INVALID` | File chuyển sang trạng thái lỗi, có nút bỏ |
 | Media không tồn tại, khác tổ chức, không phải người tạo, hoặc chủ sở hữu ngoài phạm vi | 404 | `MEDIA_NOT_FOUND` | Toast lỗi |
 | Xác nhận media đã gắn/đã xoá; gắn media đang thuộc chủ sở hữu khác | 409 | `MEDIA_STATE_CONFLICT` | Toast lỗi |
 | Sửa đính kèm của chứng từ ở trạng thái kết thúc (A-26) | mã hiện có của endpoint sửa chứng từ | mã hiện có | Như lỗi sửa chứng từ hôm nay; ô đính kèm chỉ đọc ở trạng thái đó |
 | Thiếu quyền của `ownerType` | 403 | `HTTP_403` (fallback của filter, `http-exception.filter.ts:30-36`) | Toast lỗi hiện có |
-| Storage chưa cấu hình hoặc không với tới | 503 | `STORAGE_UNAVAILABLE` | Toast "Không thể tải tệp lên lúc này"; dữ liệu form giữ nguyên |
+| Storage chưa cấu hình hoặc không với tới | 503 | `STORAGE_UNAVAILABLE` | Toast "Không thể tải tệp lên lúc này"; dữ liệu form giữ nguyên. **Ngoại lệ** (T-01-06, 2026-09-13): đường đọc URL ảnh công khai (catalog POS, API đối tác) không lỗi — trả không có ảnh và log cảnh báo một lần; ký link riêng tư vẫn 503 |
 | Trình duyệt POST lên storage thất bại (vé hết hạn, mạng, 413 ở nginx, vượt `content-length-range`) | — | lỗi phía FE `UploadFailed` | File chuyển trạng thái lỗi, nút "Thử lại" xin vé mới |
 
 ## ADRs
@@ -307,8 +318,9 @@ của MinIO từ code; việc gì cần `mc` thì nằm trong runbook. Dependenc
 PUT không giới hạn được kích thước ở tầng storage: người có vé đổ được file rất lớn lên MinIO
 trước khi bước xác nhận kịp xoá, mà MinIO dự kiến chung đĩa với Postgres (A-07). Chữ ký PUT còn
 phụ thuộc host và path mà nginx phải giữ nguyên (A-06).
-**Decision:** Dùng `createPresignedPost` với điều kiện `content-length-range` [1, giới hạn của
-`ownerType`], `Content-Type` bằng đúng giá trị đã khai, `key` cố định, hạn 10 phút. Bước xác nhận
+**Decision:** Dùng `createPresignedPost` với điều kiện `content-length-range` [1, kích thước đã khai]
+(kích thước đã khai không vượt giới hạn của `ownerType`; siết từ [1, giới hạn] sau security review T-01-04 để vé
+không dùng lại được cho file lớn hơn — A-29), `Content-Type` bằng đúng giá trị đã khai, `key` cố định, hạn 10 phút. Bước xác nhận
 vẫn `HeadObject` để đối chiếu, vì client có thể khai sai rồi gửi đúng trong giới hạn.
 **Consequences:** Storage từ chối file quá cỡ ngay khi nhận. Chữ ký nằm trên policy, không trên
 host/path, nên đường **ghi** bớt phụ thuộc cấu hình nginx; đường **đọc** riêng tư vẫn là presigned
