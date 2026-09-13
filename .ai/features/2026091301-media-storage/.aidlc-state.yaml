@@ -68,3 +68,8 @@ history:
     at: 2026-09-13T14:02:11
     by: Claude
     ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-13T14:52:31
+    by: Claude
+    ticket: T-01-03

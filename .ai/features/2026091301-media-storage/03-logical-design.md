@@ -86,9 +86,10 @@ vì đó là thay đổi hành vi ngoài phạm vi.
   proxy `/erp-media-public` và `/erp-media-private` sang `localhost:9000`, giữ nguyên path và
   header `Host`, mô phỏng nginx production (A-06). Vì vậy local dùng
   `MEDIA_PUBLIC_BASE_URL=http://localhost:3000` và trình duyệt không phải gọi khác origin.
-- **Bootstrap**: `pnpm --filter @erp/api media:bootstrap` gọi `CreateBucket` (bỏ qua nếu đã có) và
-  `PutBucketPolicy` cho phép `s3:GetObject` ẩn danh trên bucket công khai; bucket riêng tư không có
-  policy. Chạy lại nhiều lần không đổi kết quả (AC-18).
+- **Bootstrap**: `pnpm --filter @erp/api media:bootstrap` gọi `HeadBucket` → `CreateBucket` nếu thiếu;
+  bucket công khai nhận `PutBucketPolicy` (ghi đè toàn bộ policy) chỉ cho phép `s3:GetObject` ẩn danh;
+  bucket riêng tư được kiểm bằng `GetBucketPolicy` và bootstrap **dừng với lỗi** nếu đã có policy, không
+  tự xoá. Không khởi động `AppModule`, không kết nối Postgres. Chạy lại nhiều lần không đổi kết quả (AC-18).
 - **Production** (A-06, A-07): người vận hành thêm hai `location` nginx proxy nguyên path tới
   MinIO, giữ `Host`, và nâng `client_max_body_size` cho hai location này lên ít nhất 11 MB — mặc
   định của nginx là 1 MB, nên thiếu dòng này thì mọi đính kèm trên 1 MB bị 413 ở nginx trước khi tới
@@ -293,7 +294,7 @@ S3-compatible khác, code không được phải viết lại. SDK `minio` bản
 `@aws-sdk/client-s3`, `@aws-sdk/s3-presigned-post`, `@aws-sdk/s3-request-presigner` publish
 2026-09-11.
 **Decision:** `ObjectStorageService` chỉ dùng `@aws-sdk/client-s3` (`HeadObject`, `DeleteObject`,
-`CreateBucket`, `PutBucketPolicy`), `@aws-sdk/s3-presigned-post` và `@aws-sdk/s3-request-presigner`,
+`HeadBucket`, `CreateBucket`, `PutBucketPolicy`, `GetBucketPolicy`), `@aws-sdk/s3-presigned-post` và `@aws-sdk/s3-request-presigner`,
 với `forcePathStyle: true`. Hai client: một trỏ `MEDIA_S3_ENDPOINT` để gọi thật, một trỏ
 `MEDIA_PUBLIC_BASE_URL` chỉ để ký (không gọi mạng). Không import `minio`; kiểm bằng grep trong
 DoD.
