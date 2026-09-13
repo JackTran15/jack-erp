@@ -34,6 +34,7 @@ on historical documents that reference someone now outside the branch (ADR-04).
 | `inventory/transfer/stock-transfer.service.ts` | Hydrates `transporter` from ids already on the rows |
 | `inventory/transfer/queries/search-stock-transfers-v2.handler.ts` | As above |
 | `pos/services/invoice.service.ts` | id → cashier for one invoice |
+| `mobile/services/mobile-invoice.service.ts` | The caller's own profile id, and id → salesperson name for one invoice |
 | `reporting/invoice-report/queries/get-invoice-detail.handler.ts` | id → names for one invoice |
 | `reporting/invoice-report/reports/invoice-item-revenue-detail.report.ts` | Report rows, not a chooser |
 | `reporting/invoice-report/reports/invoice-order-listing.report.ts` | Report rows, not a chooser |
@@ -42,6 +43,7 @@ on historical documents that reference someone now outside the branch (ADR-04).
 | `customer/csv/customer-export.service.ts` | id → staff name for an export column |
 | `customer/csv/customer-import.service.ts` | Matches an imported code/email to one account |
 | `auth/auth.service.ts` | Authentication, not selection |
+| `api-key/api-key-crud.service.ts` | Creates and deactivates the key's own shadow user; reads no people |
 | `rbac/users.service.ts` (write paths) | Same file as the list above; the list is scoped |
 | `api-key/api-key-crud.service.ts` | Revoking a key deactivates the service account bound to it (`users.update`) — a write on one known id, nothing is listed |
 | `mobile/services/mobile-invoice.service.ts` | Two lookups by id: the caller's own `employee_profiles.id` (to scope "my invoices" — `salesperson_id` is a profile id, not a user id), and id → salesperson name for one invoice |

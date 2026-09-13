@@ -195,6 +195,10 @@ describe('AuthService', () => {
           provide: getRepositoryToken(UserBranchAssignmentEntity),
           useValue: userBranchRepo,
         },
+        {
+          provide: getRepositoryToken(BranchEntity),
+          useValue: branchRepo,
+        },
       ],
     }).compile();
     return module.get(AuthService);
@@ -903,6 +907,7 @@ describe('AuthService', () => {
         { branchId: 'branch-1' } as UserBranchAssignmentEntity,
         { branchId: 'branch-2' } as UserBranchAssignmentEntity,
       ]);
+      activeBranchStubs = [{ id: 'branch-1' }, { id: 'branch-2' }];
       sessionStore.revokeSession.mockResolvedValue(undefined);
       sessionStore.createSession.mockResolvedValue(undefined);
       useRealJwtSign();
