@@ -22526,6 +22526,7 @@
             }
           },
           {
+<<<<<<< HEAD
             "name": "sort",
             "required": false,
             "in": "query",
@@ -22565,13 +22566,18 @@
             }
           },
           {
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
             "name": "search",
             "required": false,
             "in": "query",
             "description": "Tìm theo mã, tên hoặc số điện thoại",
             "schema": {
               "maxLength": 200,
+<<<<<<< HEAD
               "example": "0901",
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
               "type": "string"
             }
           }
@@ -22588,6 +22594,7 @@
             }
           }
         },
+<<<<<<< HEAD
         "summary": "Danh sách khách hàng kèm doanh thu, phân trang",
         "tags": [
           "mobile"
@@ -24550,6 +24557,9 @@
           }
         },
         "summary": "Tiền thu (hoặc chi) theo cửa hàng, mỗi cửa hàng tách theo hạng mục thu/chi",
+=======
+        "summary": "Khách hàng để gắn vào đơn bán",
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
         "tags": [
           "mobile"
         ]
@@ -24622,6 +24632,7 @@
             "schema": {
               "type": "string"
             }
+<<<<<<< HEAD
           },
           {
             "name": "search",
@@ -24649,6 +24660,8 @@
                 ]
               }
             }
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
           }
         ],
         "responses": {
@@ -24730,6 +24743,7 @@
         ]
       }
     },
+<<<<<<< HEAD
     "/mobile/item-categories": {
       "post": {
         "operationId": "MobileItemCategoryController_create",
@@ -24762,6 +24776,8 @@
         ]
       }
     },
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
     "/mobile/items": {
       "get": {
         "operationId": "MobileItemController_list",
@@ -25260,6 +25276,251 @@
         ]
       }
     },
+    "/mobile/product-revenue": {
+      "get": {
+        "operationId": "MobileProductRevenueController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "ISO-8601, đầu kỳ (bao gồm)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "ISO-8601, cuối kỳ (bao gồm)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "statBy",
+            "required": false,
+            "in": "query",
+            "description": "Grain của một dòng. `parent` = **mẫu mã** (sản phẩm cha), `group` = **nhóm\nhàng hóa**.\n\n`item` — grain BIẾN THỂ — cố ý không nhận: nút gạt của bản gốc chỉ có hai\nnấc, và một giá trị thứ ba đi lọt sẽ cho ra một danh sách mà không nấc nào\ntrên màn ứng với nó.",
+            "schema": {
+              "default": "parent",
+              "type": "string",
+              "enum": [
+                "parent",
+                "group"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ data, total, page, limit } — mỗi dòng là một mẫu mã hoặc một nhóm"
+          }
+        },
+        "summary": "Doanh thu theo mặt hàng — gộp theo mẫu mã hoặc nhóm hàng hóa",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/promotions/evaluate": {
+      "post": {
+        "operationId": "MobilePromotionController_evaluate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileEvaluateCartDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "subtotal, promotionDiscount, amountAfterPromotion, appliedPrograms, availablePrograms, skippedPrograms"
+          }
+        },
+        "summary": "Định giá giỏ hàng theo khuyến mại — KHÔNG ghi gì",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/sales-items": {
+      "get": {
+        "operationId": "MobileSalesItemController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Tìm theo mã, tên, hoặc nhãn biến thể.\n\nBa trường chứ không chỉ tên: người lập phiếu gõ mã SKU (`GELLI-39-NAU`)\nnhiều hơn gõ tên, và nhãn biến thể (`39 · Nâu`) là thứ phân biệt các dòng\ncùng tên với nhau.",
+            "schema": {
+              "maxLength": 200,
+              "example": "GELLI",
+              "type": "string"
+            }
+          },
+          {
+            "name": "viewBy",
+            "required": false,
+            "in": "query",
+            "description": "Xem danh mục ở mức nào — hai nút *\"Mẫu mã\"* / *\"Hàng hoá\"* của panel lọc.\n\nQuyết định này đổi Ý NGHĨA của `id` trong response, nên nó phải là một tham\nsố của request chứ không phải một phép gộp ở client: ở `model`, `id` là\n`products.id` và **không đặt được vào dòng đơn hàng**. `type` trong mỗi\ndòng trả về nói lại điều đó để client không phải nhớ mình đã hỏi gì.\n\n**Mặc định là `model`** (Loc chốt 2026-09-10): người bán tìm hàng theo MẪU\nMÃ — một dòng \"Giày Gelli\" thay vì mười bốn dòng chỉ khác nhau ở đuôi mã.\nTrên dữ liệu dev, chênh lệch là 2.539 dòng so với 20.997. Mức `item` vẫn\ngiữ, nhưng nay là lựa chọn phải bấm chứ không phải thứ nhận được khi không\nnói gì.",
+            "schema": {
+              "default": "model",
+              "type": "string",
+              "enum": [
+                "item",
+                "model"
+              ]
+            }
+          },
+          {
+            "name": "inStockOnly",
+            "required": false,
+            "in": "query",
+            "description": "Chỉ giữ hàng **còn tồn**: tổng tồn có dấu > 0 tại `actor.branchId`.\n\n**Chi nhánh nào, chính xác:** `ActorContext` giải ra\n`JWT.branchId ?? X-Branch-Id ?? JWT.branchIds[0]` — comment tại chỗ ghi\n*\"always: jwt > header > jwtList\"*. `/mobile/auth/login` CÓ phát claim\n`branchId`, nên với client mobile thì **JWT thắng header**: đổi cửa hàng\ntrong app KHÔNG đổi chi nhánh mà bộ lọc này đọc. Đã đo trên dev\n(2026-09-10): bốn `X-Branch-Id` khác nhau cho ra cùng một tập 103 mặt\nhàng. Muốn bộ lọc đi theo cửa hàng đang chọn thì phải sửa MỘT trong hai —\nbỏ claim `branchId` khỏi token mobile, hoặc cho route này đọc\n`resolveExplicitBranchId` — và cả hai đều là quyết định cấp nền tảng.\n\nLà PHẦN BÙ CHẶT của `outOfStock` bên `POST /v2/inventory-items/search`\n(`<= 0`) — cùng phép cộng, cùng phạm vi chi nhánh, ngưỡng đối nhau — nên một\nmặt hàng không bao giờ vừa \"còn hàng\" ở app vừa \"hết hàng\" ở web. Nhãn trên\napp là *\"Hàng hoá còn hàng (SL > 0)\"*, và dấu `>` đó là hợp đồng.\n\nTổng có DẤU: một mặt hàng có -1 ở kho này và +1 ở kho kia tổng bằng 0 và\nđọc là hết hàng. Mặt hàng chưa từng có dòng `stock_balances` nào cũng vậy.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "Chỉ giữ hàng thuộc MỘT nhóm hàng hoá (`items.category_id`).\n\nNhóm lấy từ `GET /mobile/item-categories/tree` — cùng cây mà backoffice\ndùng. Bỏ trống = *Tất cả*.\n\n**Lọc theo ĐÚNG nhóm đó, không gồm nhóm con.** Cây chỉ có hai tầng trong dữ\nliệu thật (`GIÀY DÉP` → `Giày nam`…), và mặt hàng luôn gắn vào nhóm LÁ, nên\n\"gồm cả con\" chỉ đổi kết quả khi người dùng chọn một nhóm cha — thứ mà ảnh\nMISA cho thấy là một TIÊU ĐỀ, không chạm được. Ngày cây sâu hơn thì đây là\nchỗ phải mở rộng, không phải ở client.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileSalesItemPageDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Danh mục để bán — biến thể hoặc mẫu mã, kèm giá bán, phân trang",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/sales-items/models/{productId}": {
+      "get": {
+        "operationId": "MobileSalesItemController_getModel",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileSalesModelDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Các chiều biến thiên và biến thể của một mẫu mã",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/sales-items/models/{productId}/stock": {
+      "get": {
+        "operationId": "MobileSalesItemController_getModelStock",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileSalesModelStockDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tồn kho của một mẫu mã: theo biến thể, theo kho, theo chi nhánh khác",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
     "/mobile/stock-documents": {
       "get": {
         "operationId": "MobileStockDocumentController_list",
@@ -25490,6 +25751,7 @@
         ]
       }
     },
+<<<<<<< HEAD
     "/mobile/sales-orders": {
       "get": {
         "operationId": "SalesOrderController_list",
@@ -25806,6 +26068,8 @@
         ]
       }
     },
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
     "/v2/partner/catalog/categories/tree": {
       "post": {
         "operationId": "PartnerCategoryV2Controller_tree_v2",
@@ -25880,6 +26144,7 @@
         ]
       }
     },
+<<<<<<< HEAD
     "/v2/partner/catalog/products/{productCode}": {
       "get": {
         "operationId": "PartnerProductV2Controller_detail_v2",
@@ -25889,6 +26154,47 @@
             "required": true,
             "in": "path",
             "description": "products.code, matched exactly (case-sensitive), not products.id or a variant SKU",
+=======
+    "/media/uploads": {
+      "post": {
+        "operationId": "MediaUploadController_requestUpload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMediaUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestMediaUploadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/media/uploads/{id}/complete": {
+      "post": {
+        "operationId": "MediaUploadController_completeUpload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
             "schema": {
               "type": "string"
             }
@@ -25900,6 +26206,7 @@
             "content": {
               "application/json": {
                 "schema": {
+<<<<<<< HEAD
                   "$ref": "#/components/schemas/PartnerProductDetailDto"
                 }
               }
@@ -25917,6 +26224,16 @@
         "summary": "Product detail with its attribute dimensions and variants",
         "tags": [
           "Partner catalog"
+=======
+                  "$ref": "#/components/schemas/CompleteMediaUploadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "media"
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
         ]
       }
     }
@@ -39302,7 +39619,7 @@
           "imageUrl": {
             "type": "string",
             "nullable": true,
-            "description": "Image URL placeholder — always null until image storage is implemented."
+            "description": "Public URL of the card's first image (product images for a PRODUCT card, the item's own images for a standalone ITEM card), or null when it has none."
           },
           "minPrice": {
             "type": "number",
@@ -47147,6 +47464,7 @@
           },
           "code": {
             "type": "string",
+<<<<<<< HEAD
             "description": "Mã khách hàng, duy nhất trong tổ chức"
           },
           "name": {
@@ -47207,12 +47525,25 @@
           "invoiceCount": {
             "type": "number",
             "description": "Số hoá đơn bán đã chốt"
+=======
+            "nullable": true,
+            "description": "Mã khách hàng. NULL là hợp lệ — khách vãng lai chưa có mã."
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "description": "Số điện thoại — khoá tra cứu chính của màn chọn khách."
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
           }
         },
         "required": [
           "id",
           "code",
           "name",
+<<<<<<< HEAD
           "phone",
           "email",
           "address",
@@ -47224,6 +47555,9 @@
           "cardTier",
           "revenue",
           "invoiceCount"
+=======
+          "phone"
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
         ]
       },
       "MobileCustomerPageDto": {
@@ -47236,6 +47570,7 @@
             }
           },
           "total": {
+<<<<<<< HEAD
             "type": "number",
             "description": "Tổng số bản ghi khớp, không phải số bản ghi của trang"
           },
@@ -48064,6 +48399,8 @@
             }
           },
           "total": {
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
             "type": "number"
           },
           "page": {
@@ -48071,6 +48408,7 @@
           },
           "limit": {
             "type": "number"
+<<<<<<< HEAD
           },
           "totalQuantity": {
             "type": "number",
@@ -48079,12 +48417,15 @@
           "totalValue": {
             "type": "number",
             "description": "Tổng giá trị tuyệt đối toàn tập khớp, đơn vị đồng"
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
           }
         },
         "required": [
           "data",
           "total",
           "page",
+<<<<<<< HEAD
           "limit",
           "totalQuantity",
           "totalValue"
@@ -48850,6 +49191,9 @@
         },
         "required": [
           "data"
+=======
+          "limit"
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
         ]
       },
       "MobileProductAttributeValueDto": {
@@ -48889,6 +49233,7 @@
           "values"
         ]
       },
+<<<<<<< HEAD
       "MobileItemCategoryCreateDto": {
         "type": "object",
         "properties": {
@@ -48917,6 +49262,8 @@
           "name"
         ]
       },
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
       "MobileItemResponseDto": {
         "type": "object",
         "properties": {
@@ -49037,6 +49384,7 @@
           "limit"
         ]
       },
+<<<<<<< HEAD
       "MobileProductVariantDto": {
         "type": "object",
         "properties": {
@@ -49470,6 +49818,8 @@
           }
         }
       },
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
       "MobileEvaluateCartLineDto": {
         "type": "object",
         "properties": {
@@ -50229,6 +50579,7 @@
           "lines"
         ]
       },
+<<<<<<< HEAD
       "SalesOrderLineDto": {
         "type": "object",
         "properties": {
@@ -50340,6 +50691,8 @@
           }
         }
       },
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
       "PartnerCategoryTreeRequestDto": {
         "type": "object",
         "properties": {}
@@ -50438,10 +50791,13 @@
               "type": "string"
             }
           },
+<<<<<<< HEAD
           "inStock": {
             "type": "boolean",
             "description": "Stock filter, matched on the SAME variant as colors/sizes/price (ADR-08). `true`: only products with at least one variant that matches every other variant-level filter and has stock in a branch this API key may see; the row describes those variants. `false`: only products that have at least one variant matching every other variant-level filter and NONE of those matching variants has stock in a branch this API key may see (a product with any in-stock matching variant is excluded); the row describes those, all out-of-stock, variants. Omitted: no stock filtering."
           },
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
           "sort": {
             "type": "string",
             "default": "newest",
@@ -50561,6 +50917,7 @@
           "limit"
         ]
       },
+<<<<<<< HEAD
       "PartnerAttributeDto": {
         "type": "object",
         "properties": {
@@ -50607,12 +50964,68 @@
           "attributes": {
             "type": "object",
             "description": "Dimension name to chosen value, e.g. { \"Size\": \"38\", \"Color\": \"BA\" }",
+=======
+      "CreateMediaUploadDto": {
+        "type": "object",
+        "properties": {
+          "ownerType": {
+            "enum": [
+              "PRODUCT",
+              "ITEM",
+              "EMPLOYEE_PROFILE",
+              "GOODS_RECEIPT",
+              "TRANSFER_ORDER",
+              "STOCK_TRANSFER",
+              "CASH_RECEIPT",
+              "CASH_PAYMENT",
+              "BANK_RECEIPT",
+              "BANK_PAYMENT"
+            ],
+            "type": "string",
+            "description": "Owner type this upload will belong to; decides the bucket, size limit and content-type allowlist."
+          },
+          "fileName": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "Original file name; used for display and Content-Disposition only."
+          },
+          "contentType": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Declared MIME type; checked against the ownerType allowlist and re-checked at confirm time."
+          },
+          "size": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10485760,
+            "description": "Declared size in bytes; checked against the ownerType limit and re-checked at confirm time."
+          }
+        },
+        "required": [
+          "ownerType",
+          "fileName",
+          "contentType",
+          "size"
+        ]
+      },
+      "UploadPolicyResponseDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Absolute URL the browser POSTs the multipart/form-data upload to."
+          },
+          "fields": {
+            "type": "object",
+            "description": "Form fields the browser must send verbatim alongside the file, generated by createPresignedPost.",
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
             "additionalProperties": {
               "type": "string"
             }
           }
         },
         "required": [
+<<<<<<< HEAD
           "id",
           "code",
           "variantLabel",
@@ -50708,6 +51121,74 @@
           "description",
           "attributes",
           "variants"
+=======
+          "url",
+          "fields"
+        ]
+      },
+      "RequestMediaUploadResponseDto": {
+        "type": "object",
+        "properties": {
+          "mediaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "upload": {
+            "$ref": "#/components/schemas/UploadPolicyResponseDto"
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "When the upload ticket expires (10 minutes from issuance).",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "mediaId",
+          "upload",
+          "expiresAt"
+        ]
+      },
+      "MediaStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "UPLOADED",
+          "ATTACHED",
+          "DELETED"
+        ]
+      },
+      "CompleteMediaUploadResponseDto": {
+        "type": "object",
+        "properties": {
+          "mediaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MediaStatus"
+              }
+            ]
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "size": {
+            "type": "number",
+            "description": "Size in bytes."
+          }
+        },
+        "required": [
+          "mediaId",
+          "status",
+          "fileName",
+          "contentType",
+          "size"
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
         ]
       }
     }
