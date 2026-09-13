@@ -287,6 +287,25 @@ describe('Mobile facade (E2E)', () => {
       expect(res.body.data).toEqual([]);
     });
 
+    it('status=inactive chỉ ra nhà cung cấp đã ngừng; active loại nó; giá trị lạ -> 400', async () => {
+      const inactive = await request(app.getHttpServer())
+        .get('/mobile/suppliers?status=inactive')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+      expect(inactive.body.data.map((s: { code: string }) => s.code)).toEqual(['AAA']);
+
+      const active = await request(app.getHttpServer())
+        .get('/mobile/suppliers?status=active')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+      expect(active.body.data.map((s: { code: string }) => s.code)).not.toContain('AAA');
+
+      await request(app.getHttpServer())
+        .get('/mobile/suppliers?status=archived')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(400);
+    });
+
     it('limit vượt trần 100 -> 400', async () => {
       await request(app.getHttpServer())
         .get('/mobile/suppliers?limit=101')
@@ -1102,7 +1121,1007 @@ describe('Mobile facade (E2E)', () => {
     });
   });
 
+  // ─── Khách hàng ───────────────────────────────────────────────────
+
+  // Id CỐ ĐỊNH, cùng lý do với `supplierIds`: app điều hướng bằng `id`, test
+  // phải cầm được nó mới gọi `GET :id`.
+  const customerIds = {
+    AN: 'f1000000-0000-4000-8000-000000000001',
+    BINH: 'f1000000-0000-4000-8000-000000000002',
+    CHI: 'f1000000-0000-4000-8000-000000000003',
+    MERGED: 'f1000000-0000-4000-8000-000000000004',
+  } as const;
+
+  const missingCustomerId = 'f1000000-0000-4000-8000-0000000000ff';
+
+  /** Id cố định cho hoá đơn, cùng lý do với `customerIds`. */
+  const invoiceIds = {
+    PAID: 'f3000000-0000-4000-8000-000000000001',
+    DEBT: 'f3000000-0000-4000-8000-000000000002',
+    DRAFT: 'f3000000-0000-4000-8000-000000000003',
+    RETURN: 'f3000000-0000-4000-8000-000000000004',
+    CANCELLED: 'f3000000-0000-4000-8000-000000000005',
+  } as const;
+
+  describe('GET /mobile/customers', () => {
+    const groupId = 'f2000000-0000-4000-8000-000000000001';
+
+    beforeAll(async () => {
+      const ds = app.get(DataSource);
+
+      await ds.query(
+        `INSERT INTO customer_groups (id, organization_id, code, name, created_by, created_at, updated_at)
+         VALUES ($1::uuid, $2, 'NKH000001', 'Khách sỉ', $3, NOW(), NOW())
+         ON CONFLICT (id) DO NOTHING`,
+        [groupId, seed.organizationId, seed.userId],
+      );
+
+      // Bốn bản ghi cố ý lệch nhau: một có nhóm + thẻ + đủ trường phụ, một
+      // ngừng theo dõi, một trống trơn, và một ĐÃ GỘP — cái cuối không bao giờ
+      // được xuất hiện ở bất kỳ đường nào.
+      const rows: [string, string, string, string, string | null, string | null, string | null, string | null][] = [
+        [customerIds.AN, 'KH000001', 'Nguyễn Văn An', 'ACTIVE', groupId, '0901000001', 'an@example.com', '1990-05-20'],
+        [customerIds.BINH, 'KH000002', 'Trần Thị Bình', 'INACTIVE', null, '0901000002', null, null],
+        [customerIds.CHI, 'KH000003', 'Lê Quang Chi', 'ACTIVE', null, null, null, null],
+        [customerIds.MERGED, 'KH000004', 'Khách Đã Gộp', 'MERGED', null, '0901000004', null, null],
+      ];
+
+      for (const [id, code, name, status, gid, phone, email, birthDate] of rows) {
+        await ds.query(
+          `INSERT INTO customers
+             (id, organization_id, code, name, status, group_id, phone, email, birth_date,
+              gender, national_id, tax_code, created_by, created_at, updated_at)
+           VALUES ($1::uuid, $2, $3, $4, $5::customers_status_enum, $6::uuid, $7, $8, $9::date,
+                   'male', '012345678901', '0301234567', $10, NOW(), NOW())
+           ON CONFLICT (id) DO NOTHING`,
+          [id, seed.organizationId, code, name, status, gid, phone, email, birthDate, seed.userId],
+        );
+      }
+
+      await ds.query(
+        `INSERT INTO membership_card_types (id, organization_id, name, tier, created_by, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1, 'Thẻ Vàng', 'gold'::membership_tier_enum, $2, NOW(), NOW())
+         ON CONFLICT DO NOTHING`,
+        [seed.organizationId, seed.userId],
+      );
+
+      await ds.query(
+        `INSERT INTO membership_cards (id, organization_id, customer_id, card_number, tier, issued_at, created_by, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1, $2::uuid, 'MC-0001', 'gold'::membership_tier_enum, CURRENT_DATE, $3, NOW(), NOW())
+         ON CONFLICT DO NOTHING`,
+        [seed.organizationId, customerIds.AN, seed.userId],
+      );
+
+      // Hoá đơn: hai đã chốt cho An (paid + debt), một NHÁP cho An, một trả hàng
+      // cho Bình. Chỉ hai cái đầu được tính vào doanh thu — đúng định nghĩa của
+      // `CustomerSummaryService`.
+      // `issued_at` lùi dần theo số thứ tự để thứ tự sắp xếp có chỗ mà sai.
+      // Hoá đơn trả hàng mang `net_amount` ÂM — tổng có dấu của app đọc cột đó.
+      const invoices: [string, string, string, string, string, number, number, boolean][] = [
+        [invoiceIds.PAID, 'HD-0001', customerIds.AN, 'SALE', 'paid', 500000, 0, false],
+        [invoiceIds.DEBT, 'HD-0002', customerIds.AN, 'SALE', 'debt', 350000, 0, false],
+        [invoiceIds.DRAFT, 'HD-0003', customerIds.AN, 'SALE', 'draft', 999999, 0, true],
+        [invoiceIds.RETURN, 'HD-0004', customerIds.BINH, 'RETURN', 'paid', 120000, -120000, false],
+        [invoiceIds.CANCELLED, 'HD-0005', customerIds.AN, 'SALE', 'cancelled', 70000, 0, false],
+      ];
+
+      for (const [index, [id, code, customerId, type, status, amountDue, netAmount, isDraft]] of invoices.entries()) {
+        await ds.query(
+          `INSERT INTO invoices
+             (id, organization_id, branch_id, code, session_id, staff_id, customer_id,
+              type, status, amount_due, net_amount, subtotal, is_draft, issued_at,
+              points_balance_after, points_earned, created_by, created_at, updated_at)
+           VALUES ($11::uuid, $1, $2, $3, 'e2e-session', $4::uuid, $5::uuid,
+                   $6::invoice_type_enum, $7::invoice_status_enum, $8, $9, $8, $10,
+                   NOW() - ($12 || ' days')::interval, 150, 50, $4,
+                   NOW() - ($12 || ' days')::interval, NOW())
+           ON CONFLICT DO NOTHING`,
+          [seed.organizationId, seed.branchId, code, seed.userId, customerId, type, status,
+           amountDue, netAmount, isDraft, id, String(index)],
+        );
+      }
+
+      // Một dòng hàng + một dòng thanh toán cho hoá đơn đã thu — đủ để kiểm
+      // phép gom ở màn chi tiết.
+      await ds.query(
+        `INSERT INTO invoice_items
+           (id, organization_id, branch_id, invoice_id, item_id, item_code, item_name, unit,
+            quantity, unit_price, line_total, direction, sort_order, created_by, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, $3::uuid, gen_random_uuid(), 'A-41', 'Giày A', 'Đôi',
+                 1, 500000, 500000, 'OUT', 0, $4, NOW(), NOW())
+         ON CONFLICT DO NOTHING`,
+        [seed.organizationId, seed.branchId, invoiceIds.PAID, seed.userId],
+      );
+      await ds.query(
+        `INSERT INTO invoice_payments
+           (id, organization_id, branch_id, invoice_id, payment_method, amount, account_id,
+            created_by, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, $3::uuid, 'cash', 520000, gen_random_uuid(),
+                 $4, NOW(), NOW())
+         ON CONFLICT DO NOTHING`,
+        [seed.organizationId, seed.branchId, invoiceIds.PAID, seed.userId],
+      );
+    });
+
+    const byCode = (res: request.Response, code: string) =>
+      res.body.data.find((c: { code: string }) => c.code === code);
+
+    it('trả ĐÚNG mười bốn trường — không rò CCCD, mã số thuế hay id nhóm', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/mobile/customers')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      expect(res.body).toEqual(
+        expect.objectContaining({
+          total: expect.any(Number),
+          page: 1,
+          limit: 20,
+          totalRevenue: expect.any(Number),
+        }),
+      );
+
+      const row = byCode(res, 'KH000001');
+      expect(Object.keys(row).sort()).toEqual([
+        'address', 'birthDate', 'cardTier', 'code', 'email', 'gender', 'groupName', 'id',
+        'invoiceCount', 'name', 'note', 'phone', 'revenue', 'status',
+      ]);
+      expect(row.id).toBe(customerIds.AN);
+    });
+
+    it('nắn status về viết thường, join sẵn nhóm + hạng thẻ, ngày sinh không giờ', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/mobile/customers')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      const an = byCode(res, 'KH000001');
+      expect(an.status).toBe('active');
+      expect(an.groupName).toBe('Khách sỉ');
+      // TÊN do tổ chức đặt, không phải mã `gold`.
+      expect(an.cardTier).toBe('Thẻ Vàng');
+      // Chuỗi ngày trần, KHÔNG phải ISO có giờ: cột `date` đi qua `Date` của
+      // driver sẽ lệch một ngày tuỳ múi giờ máy chủ.
+      expect(an.birthDate).toBe('1990-05-20');
+
+      const binh = byCode(res, 'KH000002');
+      expect(binh.status).toBe('inactive');
+      expect(binh.groupName).toBeNull();
+      expect(binh.cardTier).toBeNull();
+      expect(binh.email).toBeNull();
+      expect(binh.birthDate).toBeNull();
+    });
+
+    it('doanh thu = tổng hoá đơn BÁN đã chốt; nháp và trả hàng KHÔNG tính', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/mobile/customers')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      const an = byCode(res, 'KH000001');
+      expect(an.revenue).toBe(850000);
+      expect(an.invoiceCount).toBe(2);
+
+      // Bình chỉ có một hoá đơn TRẢ HÀNG -> 0, nhưng vẫn là một dòng (LEFT JOIN).
+      const binh = byCode(res, 'KH000002');
+      expect(binh.revenue).toBe(0);
+      expect(binh.invoiceCount).toBe(0);
+
+      // Tổng của toàn tập, không phải của một trang.
+      expect(res.body.totalRevenue).toBe(850000);
+    });
+
+    it('khách ĐÃ GỘP không xuất hiện, kể cả khi không lọc trạng thái', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/mobile/customers')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      expect(byCode(res, 'KH000004')).toBeUndefined();
+      expect(res.body.total).toBe(3);
+    });
+
+    it('status=inactive chỉ trả khách ngừng theo dõi', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/mobile/customers?status=inactive')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      expect(res.body.data.map((c: { code: string }) => c.code)).toEqual(['KH000002']);
+    });
+
+    it('sắp theo TÊN mặc định; sort=revenue&order=desc đưa khách mua nhiều lên đầu', async () => {
+      const byName = await request(app.getHttpServer())
+        .get('/mobile/customers')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+      const names = byName.body.data.map((c: { name: string }) => c.name);
+      expect(names).toEqual([...names].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())));
+
+      const byRevenue = await request(app.getHttpServer())
+        .get('/mobile/customers?sort=revenue&order=desc')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+      expect(byRevenue.body.data[0].code).toBe('KH000001');
+      // Hai khách cùng doanh thu 0 xếp theo tên — tie-break có nghĩa cho người
+      // đọc, không phải theo id.
+      expect(byRevenue.body.data.slice(1).map((c: { code: string }) => c.code)).toEqual(['KH000003', 'KH000002']);
+    });
+
+    it('tìm theo mã, tên HOẶC số điện thoại', async () => {
+      for (const [term, expected] of [
+        ['KH00000', ['KH000001', 'KH000002', 'KH000003']],
+        ['Bình', ['KH000002']],
+        ['0901000001', ['KH000001']],
+      ] as const) {
+        const res = await request(app.getHttpServer())
+          .get('/mobile/customers')
+          .query({ search: term })
+          .set('Authorization', authHeader(seed.accessToken))
+          .expect(200);
+
+        expect(res.body.data.map((c: { code: string }) => c.code).sort()).toEqual([...expected]);
+      }
+    });
+
+    it('phân trang: limit=1 chỉ trả 1 dòng, total và totalRevenue vẫn là của toàn tập', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/mobile/customers?page=2&limit=1&sort=revenue&order=desc')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.total).toBe(3);
+      expect(res.body.totalRevenue).toBe(850000);
+    });
+
+    it('trang vượt quá cuối trả mảng rỗng, total vẫn đúng', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/mobile/customers?page=999')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      expect(res.body.data).toEqual([]);
+      expect(res.body.total).toBe(3);
+    });
+
+    it('sort / order / status lạ -> 400', async () => {
+      for (const q of ['sort=createdAt', 'order=random', 'status=merged']) {
+        await request(app.getHttpServer())
+          .get(`/mobile/customers?${q}`)
+          .set('Authorization', authHeader(seed.accessToken))
+          .expect(400);
+      }
+    });
+
+    it('query param lạ -> 400, chứng minh whitelist còn sống', async () => {
+      await request(app.getHttpServer())
+        .get('/mobile/customers?branchId=x')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(400);
+    });
+
+    it('KHÔNG đòi X-Branch-Id, khác /customers của web', async () => {
+      // Đường web 403 khi thiếu header; đường mobile phải 200 với cùng token.
+      await request(app.getHttpServer())
+        .get('/customers')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(403);
+      await request(app.getHttpServer())
+        .get('/mobile/customers')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+    });
+
+    it('401 khi không có token', async () => {
+      await request(app.getHttpServer()).get('/mobile/customers').expect(401);
+    });
+  });
+
+  describe('GET /mobile/customers/:id', () => {
+    it('trả đúng một khách hàng theo id, cùng hình dạng với dòng danh sách', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/mobile/customers/${customerIds.AN}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      expect(res.body.id).toBe(customerIds.AN);
+      expect(res.body.code).toBe('KH000001');
+      expect(res.body.revenue).toBe(850000);
+      expect(res.body.cardTier).toBe('Thẻ Vàng');
+      expect(res.body).not.toHaveProperty('nationalId');
+    });
+
+    it('khách đã gộp -> 404 dù id có thật', async () => {
+      await request(app.getHttpServer())
+        .get(`/mobile/customers/${customerIds.MERGED}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(404);
+    });
+
+    it('id đúng dạng uuid nhưng không tồn tại -> 404 tiếng Việt', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/mobile/customers/${missingCustomerId}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(404);
+
+      expect(res.body.message).toBe('Không tìm thấy khách hàng.');
+    });
+
+    it('id KHÔNG phải uuid -> 400, không phải 500', async () => {
+      await request(app.getHttpServer())
+        .get('/mobile/customers/KHONG-PHAI-UUID')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(400);
+    });
+  });
+
+  // ─── Ghi khách hàng ───────────────────────────────────────────────
+
+  describe('POST /mobile/customers', () => {
+    it('tạo tối thiểu (chỉ tên) -> 201, mã do hệ thống cấp, envelope y hệt bản đọc', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/mobile/customers')
+        .set('Authorization', authHeader(seed.accessToken))
+        .send({ name: '  Khách Mới  ', email: '', phone: '0909000001' })
+        .expect(201);
+
+      expect(res.body.name).toBe('Khách Mới');
+      expect(res.body.code).toMatch(/\S/);
+      expect(res.body.status).toBe('active');
+      // Chuỗi rỗng KHÔNG thành `''` trong DB — nó là "chưa nhập".
+      expect(res.body.email).toBeNull();
+      expect(Object.keys(res.body).sort()).toEqual([
+        'address', 'birthDate', 'cardTier', 'code', 'email', 'gender', 'groupName', 'id',
+        'invoiceCount', 'name', 'note', 'phone', 'revenue', 'status',
+      ]);
+
+      // Vòng đọc–ghi khớp.
+      const read = await request(app.getHttpServer())
+        .get(`/mobile/customers/${res.body.id}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+      expect(read.body).toEqual(res.body);
+    });
+
+    it('status=inactive và mã tự chọn được ghi nhận', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/mobile/customers')
+        .set('Authorization', authHeader(seed.accessToken))
+        .send({ name: 'Khách Ngừng', code: 'KHE2E01', status: 'inactive', birthDate: '1990-05-20' })
+        .expect(201);
+
+      expect(res.body.code).toBe('KHE2E01');
+      expect(res.body.status).toBe('inactive');
+      expect(res.body.birthDate).toBe('1990-05-20');
+    });
+
+    it('trùng mã / SĐT -> 409 tiếng Việt, không phải 500 hay câu tiếng Anh', async () => {
+      const byCode = await request(app.getHttpServer())
+        .post('/mobile/customers')
+        .set('Authorization', authHeader(seed.accessToken))
+        .send({ name: 'X', code: 'KHE2E01' })
+        .expect(409);
+      expect(byCode.body.message).toBe('Mã khách hàng "KHE2E01" đã tồn tại.');
+
+      const byPhone = await request(app.getHttpServer())
+        .post('/mobile/customers')
+        .set('Authorization', authHeader(seed.accessToken))
+        .send({ name: 'X', phone: '0901000001' })
+        .expect(409);
+      expect(byPhone.body.message).toBe(
+        'Số điện thoại "0901000001" đã được dùng cho khách hàng khác.',
+      );
+    });
+
+    it('thiếu tên, email sai, trường lạ -> 400', async () => {
+      for (const body of [
+        { phone: '0909' },
+        { name: 'X', email: 'khong-phai-email' },
+        { name: 'X', groupId: 'f2000000-0000-4000-8000-000000000001' },
+      ]) {
+        await request(app.getHttpServer())
+          .post('/mobile/customers')
+          .set('Authorization', authHeader(seed.accessToken))
+          .send(body)
+          .expect(400);
+      }
+    });
+
+    it('401 khi không có token', async () => {
+      await request(app.getHttpServer()).post('/mobile/customers').send({ name: 'X' }).expect(401);
+    });
+  });
+
+  describe('PATCH /mobile/customers/:id', () => {
+    it('đổi mỗi tên -> các trường khác GIỮ NGUYÊN', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/mobile/customers/${customerIds.AN}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .send({ name: 'Nguyễn Văn An (sửa)' })
+        .expect(200);
+
+      expect(res.body.name).toBe('Nguyễn Văn An (sửa)');
+      expect(res.body.phone).toBe('0901000001');
+      expect(res.body.groupName).toBe('Khách sỉ');
+      expect(res.body.cardTier).toBe('Thẻ Vàng');
+    });
+
+    it('null -> XOÁ TRẮNG ô đó; code rỗng -> GIỮ mã cũ', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/mobile/customers/${customerIds.CHI}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .send({ email: null, note: '', code: '', status: 'inactive' })
+        .expect(200);
+
+      expect(res.body.email).toBeNull();
+      expect(res.body.note).toBeNull();
+      expect(res.body.code).toBe('KH000003');
+      expect(res.body.status).toBe('inactive');
+    });
+
+    it('SĐT của khách KHÁC -> 409 tiếng Việt', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/mobile/customers/${customerIds.CHI}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .send({ phone: '0901000001' })
+        .expect(409);
+
+      expect(res.body.message).toBe(
+        'Số điện thoại "0901000001" đã được dùng cho khách hàng khác.',
+      );
+    });
+
+    it('khách đã gộp / id không có -> 404 tiếng Việt', async () => {
+      for (const id of [customerIds.MERGED, missingCustomerId]) {
+        const res = await request(app.getHttpServer())
+          .patch(`/mobile/customers/${id}`)
+          .set('Authorization', authHeader(seed.accessToken))
+          .send({ name: 'X' })
+          .expect(404);
+        expect(res.body.message).toBe('Không tìm thấy khách hàng.');
+      }
+    });
+
+    it('body rỗng -> 200, bản ghi không đổi', async () => {
+      const before = await request(app.getHttpServer())
+        .get(`/mobile/customers/${customerIds.AN}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+      const after = await request(app.getHttpServer())
+        .patch(`/mobile/customers/${customerIds.AN}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .send({})
+        .expect(200);
+
+      expect(after.body).toEqual(before.body);
+    });
+  });
+
+  describe('DELETE /mobile/customers/:id', () => {
+    it('khách không vướng gì -> 204, xoá CỨNG, thẻ thành viên xoá theo', async () => {
+      const created = await request(app.getHttpServer())
+        .post('/mobile/customers')
+        .set('Authorization', authHeader(seed.accessToken))
+        .send({ name: 'Khách Sẽ Xoá' })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .delete(`/mobile/customers/${created.body.id}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(204);
+
+      await request(app.getHttpServer())
+        .get(`/mobile/customers/${created.body.id}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(404);
+
+      const ds = app.get(DataSource);
+      const cards = await ds.query(
+        `SELECT COUNT(*)::int AS n FROM membership_cards WHERE customer_id = $1::uuid`,
+        [created.body.id],
+      );
+      expect(cards[0].n).toBe(0);
+    });
+
+    it('khách còn công nợ -> 409 tiếng Việt, bản ghi còn nguyên', async () => {
+      const ds = app.get(DataSource);
+      await ds.query(
+        `INSERT INTO invoice_debts
+           (id, organization_id, branch_id, invoice_id, customer_id, reference_code, document_type,
+            original_amount, paid_amount, remaining_amount, issued_at, status, created_by, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, $3::uuid, $4::uuid, 'HD-0002', 'credit_invoice',
+                 350000, 0, 350000, CURRENT_DATE, 'open', $5, NOW(), NOW())
+         ON CONFLICT DO NOTHING`,
+        [seed.organizationId, seed.branchId, invoiceIds.DEBT, customerIds.AN, seed.userId],
+      );
+
+      const res = await request(app.getHttpServer())
+        .delete(`/mobile/customers/${customerIds.AN}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(409);
+      expect(res.body.message).toBe(
+        'Khách hàng đang có công nợ, tín dụng hoặc bản ghi liên quan, không thể xoá.',
+      );
+
+      await request(app.getHttpServer())
+        .get(`/mobile/customers/${customerIds.AN}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+    });
+
+    it('id không có / đã gộp -> 404; không uuid -> 400; 401 khi không có token', async () => {
+      for (const id of [missingCustomerId, customerIds.MERGED]) {
+        await request(app.getHttpServer())
+          .delete(`/mobile/customers/${id}`)
+          .set('Authorization', authHeader(seed.accessToken))
+          .expect(404);
+      }
+      await request(app.getHttpServer())
+        .delete('/mobile/customers/KHONG-PHAI-UUID')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(400);
+      await request(app.getHttpServer()).delete(`/mobile/customers/${customerIds.AN}`).expect(401);
+    });
+  });
+
+  // ─── Hoá đơn ──────────────────────────────────────────────────────
+
+  describe('GET /mobile/invoices', () => {
+    const codesOf = (res: request.Response) => res.body.data.map((i: { code: string }) => i.code);
+
+    it('trả ĐÚNG chín trường, KHÔNG có nháp, envelope có totalAmount', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/mobile/invoices')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      expect(res.body).toEqual(
+        expect.objectContaining({ total: 4, page: 1, limit: 20, totalAmount: expect.any(Number) }),
+      );
+      expect(codesOf(res)).not.toContain('HD-0003');
+      expect(Object.keys(res.body.data[0]).sort()).toEqual([
+        'amount', 'code', 'createdAt', 'customerName', 'customerPhone', 'id', 'issuedAt', 'status', 'type',
+      ]);
+    });
+
+    it('trạng thái/loại về chữ thường của app; trả hàng mang số tiền ÂM', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/mobile/invoices')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      const byCode = (code: string) => res.body.data.find((i: { code: string }) => i.code === code);
+      expect(byCode('HD-0002').status).toBe('unpaid');
+      expect(byCode('HD-0004')).toEqual(expect.objectContaining({ type: 'return', amount: -120000 }));
+      expect(byCode('HD-0005').status).toBe('cancelled');
+      expect(byCode('HD-0001').customerName).toMatch(/Nguyễn Văn An/);
+    });
+
+    it('totalAmount LOẠI hoá đơn huỷ nhưng data vẫn có nó', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/mobile/invoices')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      // 500000 + 350000 − 120000; HD-0005 (70000, huỷ) không cộng.
+      expect(res.body.totalAmount).toBe(730000);
+      expect(codesOf(res)).toContain('HD-0005');
+    });
+
+    it('lọc theo NHIỀU trạng thái; unpaid gom debt + partial_debt', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/mobile/invoices')
+        .query({ status: ['unpaid', 'cancelled'] })
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      expect(codesOf(res).sort()).toEqual(['HD-0002', 'HD-0005']);
+    });
+
+    it('mặc định MỚI NHẤT lên đầu; order=asc đảo lại', async () => {
+      const desc = await request(app.getHttpServer())
+        .get('/mobile/invoices')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+      const asc = await request(app.getHttpServer())
+        .get('/mobile/invoices?order=asc')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      expect(codesOf(desc)[0]).toBe('HD-0001');
+      expect(codesOf(asc)).toEqual([...codesOf(desc)].reverse());
+    });
+
+    it('khoảng ngày bao TRỌN ngày cuối, theo dateBasis', async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const res = await request(app.getHttpServer())
+        .get('/mobile/invoices')
+        .query({ from: today, to: today, dateBasis: 'issued' })
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      // Chỉ HD-0001 lập hôm nay (`NOW() - 0 days`); `to = hôm nay` mà so `<=`
+      // 00:00 sẽ cắt mất nó.
+      expect(codesOf(res)).toEqual(['HD-0001']);
+    });
+
+    it('lọc theo cửa hàng và tìm theo số hoá đơn', async () => {
+      const byBranch = await request(app.getHttpServer())
+        .get('/mobile/invoices')
+        .query({ branchIds: [seed.branchId] })
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+      expect(byBranch.body.total).toBe(4);
+
+      // Chi nhánh ngoài phân công → 403, kể cả với quản trị viên: mobile
+      // không có vế hợp nhất (`resolveReportBranchScope`).
+      await request(app.getHttpServer())
+        .get('/mobile/invoices')
+        .query({ branchIds: ['20000000-0000-4000-8000-0000000000ff'] })
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(403);
+
+      const bySearch = await request(app.getHttpServer())
+        .get('/mobile/invoices?search=0004')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+      expect(codesOf(bySearch)).toEqual(['HD-0004']);
+    });
+
+    it('status lạ / param lạ -> 400; 401 khi không có token', async () => {
+      await request(app.getHttpServer())
+        .get('/mobile/invoices?status=draft')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(400);
+      await request(app.getHttpServer())
+        .get('/mobile/invoices?customerId=x')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(400);
+      await request(app.getHttpServer()).get('/mobile/invoices').expect(401);
+    });
+  });
+
+  describe('GET /mobile/customers/:id/invoices', () => {
+    it('chỉ hoá đơn của khách đó, tổng của khách đó', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/mobile/customers/${customerIds.AN}/invoices`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      expect(res.body.data.map((i: { code: string }) => i.code).sort()).toEqual([
+        'HD-0001', 'HD-0002', 'HD-0005',
+      ]);
+      expect(res.body.totalAmount).toBe(850000);
+    });
+
+    it('khách không có hoá đơn -> rỗng, không 404', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/mobile/customers/${missingCustomerId}/invoices`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      expect(res.body.data).toEqual([]);
+      expect(res.body.total).toBe(0);
+    });
+  });
+
+  describe('GET /mobile/invoices/:id', () => {
+    it('gom dòng hàng, thanh toán, tiền thừa, điểm — đúng hình dạng app', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/mobile/invoices/${invoiceIds.PAID}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      expect(res.body).toEqual(
+        expect.objectContaining({
+          code: 'HD-0001',
+          type: 'sale',
+          status: 'paid',
+          amount: 500000,
+          subtotal: 500000,
+          cashReceived: 520000,
+          changeAmount: 20000,
+          loyalty: { opening: 100, earned: 50, used: 0 },
+          lines: [
+            { name: 'Giày A', sku: 'A-41', unit: 'Đôi', quantity: 1, unitPrice: 500000, total: 500000 },
+          ],
+        }),
+      );
+      expect(res.body.cashier).toMatch(/\S/);
+      expect(res.body).not.toHaveProperty('items');
+      expect(res.body).not.toHaveProperty('payments');
+    });
+
+    it('nháp -> 404 tiếng Việt dù id có thật', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/mobile/invoices/${invoiceIds.DRAFT}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(404);
+      expect(res.body.message).toBe('Không tìm thấy hoá đơn.');
+    });
+
+    it('id không có -> 404; không phải uuid -> 400', async () => {
+      await request(app.getHttpServer())
+        .get('/mobile/invoices/f3000000-0000-4000-8000-0000000000ff')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(404);
+      await request(app.getHttpServer())
+        .get('/mobile/invoices/KHONG-PHAI-UUID')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(400);
+    });
+  });
+
   // ─── Tương thích ngược ────────────────────────────────────────────
+
+  // ─── Tình hình kinh doanh ─────────────────────────────────────────
+
+  describe('GET /mobile/reports/business', () => {
+    /** Kỳ 30 ngày tới hôm nay — ôm trọn hoá đơn seed (`issued_at` = NOW() − n ngày). */
+    const isoOf = (d: Date) => d.toISOString().slice(0, 10);
+    const today = new Date();
+    const range = {
+      from: isoOf(new Date(today.getTime() - 30 * 86_400_000)),
+      to: isoOf(today),
+    };
+
+    it('trả totals + branches đúng hình dạng, chi nhánh seed có doanh thu từ dòng hàng HD-0001', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/mobile/reports/business')
+        .set('Authorization', authHeader(seed.accessToken))
+        .query(range)
+        .expect(200);
+
+      expect(Object.keys(res.body).sort()).toEqual(['branches', 'totals']);
+      expect(Object.keys(res.body.totals).sort()).toEqual(['cost', 'profit', 'revenue']);
+
+      const branch = res.body.branches.find((b: { id: string }) => b.id === seed.branchId);
+      expect(Object.keys(branch).sort()).toEqual([
+        'address', 'cost', 'id', 'months', 'name', 'profit', 'revenue',
+      ]);
+      // Dòng hàng duy nhất của seed: 1 × 500000, giá vốn 0 → profit = revenue.
+      // Hoá đơn trả HD-0004 và huỷ HD-0005 không có dòng hàng nên không đổi số.
+      expect(branch.revenue).toBeGreaterThanOrEqual(500000);
+      expect(branch.profit).toBe(branch.revenue - branch.cost);
+      expect(res.body.totals.profit).toBe(res.body.totals.revenue - res.body.totals.cost);
+
+      // Cửa sổ biểu đồ: đúng 7 tháng, tăng dần, kết thúc ở tháng của `to`.
+      expect(branch.months).toHaveLength(7);
+      expect(branch.months.at(-1)).toEqual(
+        expect.objectContaining({ year: today.getFullYear(), month: today.getMonth() + 1 }),
+      );
+      expect(Object.keys(branch.months[0]).sort()).toEqual(['cost', 'month', 'profit', 'revenue', 'year']);
+    });
+
+    it('400 khi thiếu `from` hoặc có khoá lạ', async () => {
+      await request(app.getHttpServer())
+        .get('/mobile/reports/business')
+        .set('Authorization', authHeader(seed.accessToken))
+        .query({ to: range.to })
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .get('/mobile/reports/business')
+        .set('Authorization', authHeader(seed.accessToken))
+        .query({ ...range, branchIds: [seed.branchId] })
+        .expect(400);
+    });
+
+    it('401 khi không có token', async () => {
+      await request(app.getHttpServer()).get('/mobile/reports/business').query(range).expect(401);
+    });
+  });
+
+  // ─── Tổng quan ────────────────────────────────────────────────────
+
+  describe('GET /mobile/reports/overview', () => {
+    const isoOf = (d: Date) => d.toISOString().slice(0, 10);
+    const today = new Date();
+    const range = {
+      from: isoOf(new Date(today.getTime() - 30 * 86_400_000)),
+      to: isoOf(today),
+    };
+    /** Kỳ so sánh = ĐÚNG kỳ chính, để compareRevenue phải bằng revenue. */
+    const sameCompare = { compareFrom: range.from, compareTo: range.to };
+
+    it('trả totals + branches đúng hình dạng; tổng khớp /revenue/items cùng kỳ; kỳ so sánh trùng kỳ chính thì compareRevenue = revenue', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/mobile/reports/overview')
+        .set('Authorization', authHeader(seed.accessToken))
+        .query({ ...range, ...sameCompare })
+        .expect(200);
+
+      expect(Object.keys(res.body).sort()).toEqual(['branches', 'totals']);
+      expect(Object.keys(res.body.totals).sort()).toEqual(['compareRevenue', 'invoiceCount', 'revenue']);
+      expect(res.body.totals.compareRevenue).toBe(res.body.totals.revenue);
+
+      const branch = res.body.branches.find((b: { id: string }) => b.id === seed.branchId);
+      expect(Object.keys(branch).sort()).toEqual(['compareRevenue', 'id', 'invoiceCount', 'name', 'revenue']);
+      // HD-0001 có dòng hàng 500000; HD-0005 huỷ KHÔNG được đếm.
+      expect(branch.revenue).toBeGreaterThanOrEqual(500000);
+      expect(branch.invoiceCount).toBeGreaterThanOrEqual(1);
+
+      const items = await request(app.getHttpServer())
+        .get('/mobile/reports/revenue/items')
+        .set('Authorization', authHeader(seed.accessToken))
+        .query({ ...range, limit: 1 })
+        .expect(200);
+      expect(res.body.totals.revenue).toBe(items.body.totalRevenue);
+    });
+
+    it('vắng kỳ so sánh → compareRevenue = 0 ở mọi dòng', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/mobile/reports/overview')
+        .set('Authorization', authHeader(seed.accessToken))
+        .query(range)
+        .expect(200);
+
+      expect(res.body.totals.compareRevenue).toBe(0);
+      for (const b of res.body.branches) expect(b.compareRevenue).toBe(0);
+    });
+
+    it('400 khi thiếu `from`, có khoá lạ, hoặc kỳ so sánh thiếu một vế', async () => {
+      const get = () =>
+        request(app.getHttpServer())
+          .get('/mobile/reports/overview')
+          .set('Authorization', authHeader(seed.accessToken));
+
+      await get().query({ to: range.to }).expect(400);
+      await get().query({ ...range, foo: 1 }).expect(400);
+      await get().query({ ...range, compareFrom: range.from }).expect(400);
+    });
+
+    it('401 khi không có token', async () => {
+      await request(app.getHttpServer()).get('/mobile/reports/overview').query(range).expect(401);
+    });
+  });
+
+  describe('GET /mobile/reports/revenue-estimate', () => {
+    const isoOf = (d: Date) => d.toISOString().slice(0, 10);
+    const today = new Date();
+    const range = {
+      from: isoOf(new Date(today.getTime() - 30 * 86_400_000)),
+      to: isoOf(today),
+    };
+    const get = () =>
+      request(app.getHttpServer())
+        .get('/mobile/reports/revenue-estimate')
+        .set('Authorization', authHeader(seed.accessToken));
+    const keysOf = (res: request.Response): string[] =>
+      res.body.items.map((i: { key: string }) => i.key);
+
+    it('time: khoá yyyy-MM-dd tăng dần; tổng khớp /revenue/items cùng kỳ (cùng CTE)', async () => {
+      const res = await get()
+        .query({ ...range, dateBasis: 'issued', groupBy: 'time' })
+        .expect(200);
+
+      expect(Object.keys(res.body).sort()).toEqual(['items', 'totals']);
+      expect(Object.keys(res.body.totals).sort()).toEqual(['orderCount', 'revenue']);
+      const keys = keysOf(res);
+      expect(keys.length).toBeGreaterThanOrEqual(1);
+      for (const k of keys) expect(k).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect([...keys].sort()).toEqual(keys);
+      for (const i of res.body.items) {
+        expect(Object.keys(i).sort()).toEqual(['key', 'label', 'orderCount', 'revenue']);
+        expect(i.label).toBeNull();
+      }
+
+      const items = await request(app.getHttpServer())
+        .get('/mobile/reports/revenue/items')
+        .set('Authorization', authHeader(seed.accessToken))
+        .query({ ...range, limit: 1 })
+        .expect(200);
+      expect(res.body.totals.revenue).toBe(items.body.totalRevenue);
+    });
+
+    it('status: có paid (HD-0001), KHÔNG có cancelled (HD-0005) hay draft (HD-0003)', async () => {
+      const res = await get()
+        .query({ ...range, dateBasis: 'issued', groupBy: 'status' })
+        .expect(200);
+
+      const keys = keysOf(res);
+      expect(keys).toContain('paid');
+      expect(keys).not.toContain('cancelled');
+      expect(keys).not.toContain('draft');
+    });
+
+    it('payment: tiền mặt của HD-0001 và phần nợ của HD-0002 (không có dòng hàng vẫn được đếm)', async () => {
+      const res = await get()
+        .query({ ...range, dateBasis: 'issued', groupBy: 'payment' })
+        .expect(200);
+
+      const byKey = (key: string) => res.body.items.find((i: { key: string }) => i.key === key);
+      expect(byKey('cash').revenue).toBeGreaterThanOrEqual(520000);
+      expect(byKey('unpaid').revenue).toBeGreaterThanOrEqual(350000);
+      expect(byKey('unpaid').orderCount).toBeGreaterThanOrEqual(1);
+    });
+
+    it('staff/creator: một dòng cho người tạo seed, label là tên; salesperson chưa gán → unassigned, label null', async () => {
+      const creator = await get()
+        .query({ ...range, dateBasis: 'issued', groupBy: 'staff', staffRole: 'creator' })
+        .expect(200);
+      const mine = creator.body.items.find((i: { key: string }) => i.key === seed.userId);
+      expect(mine).toBeDefined();
+      expect(typeof mine.label).toBe('string');
+
+      const sales = await get()
+        .query({ ...range, dateBasis: 'issued', groupBy: 'staff', staffRole: 'salesperson' })
+        .expect(200);
+      const unassigned = sales.body.items.find((i: { key: string }) => i.key === 'unassigned');
+      expect(unassigned).toBeDefined();
+      expect(unassigned.label).toBeNull();
+    });
+
+    it('channel: đúng một dòng in_store; dateBasis=created cũng 200', async () => {
+      const res = await get()
+        .query({ ...range, dateBasis: 'created', groupBy: 'channel' })
+        .expect(200);
+      expect(keysOf(res)).toEqual(['in_store']);
+    });
+
+    it('400 khi thiếu groupBy/dateBasis, khoá lạ, staff thiếu staffRole, hay staffRole đi lạc', async () => {
+      await get().query({ ...range, dateBasis: 'issued' }).expect(400);
+      await get().query({ ...range, groupBy: 'time' }).expect(400);
+      await get().query({ ...range, dateBasis: 'issued', groupBy: 'time', foo: 1 }).expect(400);
+      await get().query({ ...range, dateBasis: 'issued', groupBy: 'staff' }).expect(400);
+      await get()
+        .query({ ...range, dateBasis: 'issued', groupBy: 'time', staffRole: 'cashier' })
+        .expect(400);
+    });
+
+    it('401 khi không có token', async () => {
+      await request(app.getHttpServer())
+        .get('/mobile/reports/revenue-estimate')
+        .query({ ...range, dateBasis: 'issued', groupBy: 'time' })
+        .expect(401);
+    });
+  });
+
+  describe('GET /mobile/reports/overview/branches/:id', () => {
+    const isoOf = (d: Date) => d.toISOString().slice(0, 10);
+    const today = new Date();
+    const range = {
+      from: isoOf(new Date(today.getTime() - 30 * 86_400_000)),
+      to: isoOf(today),
+    };
+    const path = `/mobile/reports/overview/branches/${seed.branchId}`;
+
+    it('trả đúng hình dạng; total = dòng chi nhánh ở Tổng quan; paid + unpaid = total', async () => {
+      const res = await request(app.getHttpServer())
+        .get(path)
+        .set('Authorization', authHeader(seed.accessToken))
+        .query(range)
+        .expect(200);
+
+      expect(Object.keys(res.body).sort()).toEqual([
+        'collected', 'id', 'inventory', 'name', 'newCustomers', 'pendingUnpaidCount', 'revenue',
+      ]);
+      expect(Object.keys(res.body.revenue).sort()).toEqual([
+        'cancelledCount', 'invoiceCount', 'paidAmount', 'paidCount', 'total', 'unpaidAmount', 'unpaidCount',
+      ]);
+      expect(Object.keys(res.body.collected.sales).sort()).toEqual(['card', 'cash', 'transfer']);
+      expect(res.body.revenue.paidAmount + res.body.revenue.unpaidAmount).toBe(res.body.revenue.total);
+
+      const overview = await request(app.getHttpServer())
+        .get('/mobile/reports/overview')
+        .set('Authorization', authHeader(seed.accessToken))
+        .query({ ...range, branchIds: [seed.branchId] })
+        .expect(200);
+      expect(res.body.revenue.total).toBe(overview.body.branches[0].revenue);
+      expect(res.body.revenue.invoiceCount).toBe(overview.body.branches[0].invoiceCount);
+    });
+
+    it('400 thiếu `from`; 403 chi nhánh ngoài phân công; 400 id không phải uuid; 401 không token', async () => {
+      const get = (p: string) =>
+        request(app.getHttpServer()).get(p).set('Authorization', authHeader(seed.accessToken));
+
+      await get(path).query({ to: range.to }).expect(400);
+      await get('/mobile/reports/overview/branches/20000000-0000-4000-8000-0000000000ff').query(range).expect(403);
+      await get('/mobile/reports/overview/branches/not-a-uuid').query(range).expect(400);
+      await request(app.getHttpServer()).get(path).query(range).expect(401);
+    });
+  });
 
   describe('Route phẳng của backoffice/POS không bị đụng', () => {
     it('POST /auth/login vẫn hoạt động', async () => {
@@ -1127,6 +2146,313 @@ describe('Mobile facade (E2E)', () => {
 
       expect(res.body).toHaveProperty('firstName');
       expect(res.body).toHaveProperty('permissions');
+    });
+  });
+  // ─── Tồn kho ──────────────────────────────────────────────────────
+
+  describe('GET /mobile/inventory/*', () => {
+    const storageId = 'ad000000-0000-4000-8000-000000000001';
+    const locationId = 'ad000000-0000-4000-8000-000000000002';
+    const productId = 'ae000000-0000-4000-8000-000000000001';
+    const variantIds = [
+      'ae000000-0000-4000-8000-000000000011',
+      'ae000000-0000-4000-8000-000000000012',
+    ];
+    const orphanId = 'ae000000-0000-4000-8000-000000000021';
+
+    /**
+     * Một kho + một vị trí ở chi nhánh của seed; mẫu mã `INV-GELLI` có hai
+     * biến thể (tồn 5 và 3 → gộp thành 8), item lẻ `INV-ZERO` nhập 4 rồi xuất
+     * 4 (→ tồn 0, thuộc `out_of_stock`). Bút toán xuất ghi ngày 2026-09-05
+     * để ca `asOf` trước ngày đó thấy tồn CHƯA trừ.
+     */
+    beforeAll(async () => {
+      const ds = app.get(DataSource);
+
+      await ds.query(
+        `INSERT INTO storages (id, organization_id, branch_id, name, is_active, is_main_storage,
+                               created_by, created_at, updated_at)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, 'Kho e2e', true, true, $4::uuid, NOW(), NOW())
+         ON CONFLICT (id) DO NOTHING`,
+        [storageId, seed.organizationId, seed.branchId, seed.userId],
+      );
+      await ds.query(
+        `INSERT INTO locations (id, organization_id, branch_id, storage_id, code, name, type,
+                                is_active, created_by, created_at, updated_at)
+         VALUES ($1::uuid, $2::uuid, $3, $4::uuid, 'E2E-01', 'Kệ e2e', 'SHELF', true,
+                 $5::uuid, NOW(), NOW())
+         ON CONFLICT (id) DO NOTHING`,
+        [locationId, seed.organizationId, seed.branchId, storageId, seed.userId],
+      );
+      await ds.query(
+        `INSERT INTO products (id, organization_id, code, name, created_by, created_at, updated_at)
+         VALUES ($1::uuid, $2::uuid, 'INV-GELLI', 'Giay Gelli ton kho', $3::uuid, NOW(), NOW())
+         ON CONFLICT (id) DO NOTHING`,
+        [productId, seed.organizationId, seed.userId],
+      );
+
+      const items: [string, string, string, string | null][] = [
+        [variantIds[0], 'INV-GELLI-39', 'Giay Gelli 39', productId],
+        [variantIds[1], 'INV-GELLI-40', 'Giay Gelli 40', productId],
+        [orphanId, 'INV-ZERO', 'Hang het ton', null],
+      ];
+      for (const [id, code, name, pid] of items) {
+        await ds.query(
+          `INSERT INTO items
+             (id, organization_id, branch_id, code, name, unit, selling_price, purchase_price,
+              is_active, is_pos_visible, product_id, created_by, created_at, updated_at)
+           VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, 'Đôi', 100, 50, true, true,
+                   $6::uuid, $7::uuid, NOW(), NOW())
+           ON CONFLICT (id) DO NOTHING`,
+          [id, seed.organizationId, seed.branchId, code, name, pid, seed.userId],
+        );
+      }
+
+      const entries: [string, number, number, string][] = [
+        [variantIds[0], 5, 500, '2026-09-01T10:00:00Z'],
+        [variantIds[1], 3, 300, '2026-09-01T10:00:00Z'],
+        [orphanId, 4, 400, '2026-09-01T10:00:00Z'],
+        [orphanId, -4, -400, '2026-09-05T10:00:00Z'],
+      ];
+      for (const [itemId, quantity, lineValue, postedAt] of entries) {
+        await ds.query(
+          `INSERT INTO stock_ledger_entries
+             (id, organization_id, branch_id, item_id, location_id, movement_type,
+              quantity, reference_type, reference_id, unit_cost, line_value,
+              posted_at, created_by, created_at, updated_at)
+           VALUES (gen_random_uuid(), $1::uuid, $2, $3::uuid, $4::uuid,
+                   $5, $6, 'E2E_TEST', gen_random_uuid(), 100, $7,
+                   $8::timestamptz, $9::uuid, NOW(), NOW())`,
+          [
+            seed.organizationId,
+            seed.branchId,
+            itemId,
+            locationId,
+            quantity > 0 ? 'PURCHASE_RECEIPT' : 'GOODS_ISSUE',
+            quantity,
+            lineValue,
+            postedAt,
+            seed.userId,
+          ],
+        );
+      }
+    });
+
+    const get = (path: string) =>
+      request(app.getHttpServer())
+        .get(`/mobile/inventory${path}`)
+        .set('Authorization', authHeader(seed.accessToken));
+
+    it('products: mẫu mã gộp thành MỘT dòng, đúng bảy trường, tổng là của toàn tập', async () => {
+      const res = await get('/products?asOf=2026-09-30&search=INV-').expect(200);
+
+      expect(res.body).toEqual(
+        expect.objectContaining({
+          total: 2,
+          page: 1,
+          limit: 20,
+          totalQuantity: 8,
+          totalValue: 800,
+        }),
+      );
+      const gelli = res.body.data.find((r: { id: string }) => r.id === productId);
+      expect(Object.keys(gelli).sort()).toEqual([
+        'code',
+        'groupId',
+        'id',
+        'name',
+        'quantity',
+        'stockValue',
+        'unit',
+      ]);
+      expect(gelli.quantity).toBe(8);
+      expect(gelli.stockValue).toBe(800);
+      expect(gelli.unit).toBe('Đôi');
+    });
+
+    it('products: level=variant tách từng biến thể; status=out_of_stock chỉ ra hàng tồn <= 0', async () => {
+      const variants = await get(
+        '/products?asOf=2026-09-30&search=INV-&level=variant',
+      ).expect(200);
+      expect(variants.body.total).toBe(3);
+
+      const empty = await get(
+        '/products?asOf=2026-09-30&search=INV-&status=out_of_stock',
+      ).expect(200);
+      expect(empty.body.data.map((r: { id: string }) => r.id)).toEqual([orphanId]);
+    });
+
+    it('products: asOf là mốc CUỐI — trước ngày xuất thì hàng còn tồn', async () => {
+      const res = await get(
+        '/products?asOf=2026-09-03&search=INV-ZERO',
+      ).expect(200);
+
+      expect(res.body.data[0].quantity).toBe(4);
+    });
+
+    it('products: sort=value_asc đảo thứ tự so với mặc định', async () => {
+      const asc = await get('/products?asOf=2026-09-30&search=INV-&sort=value_asc').expect(200);
+      const desc = await get('/products?asOf=2026-09-30&search=INV-&sort=value_desc').expect(200);
+
+      expect(asc.body.data.map((r: { id: string }) => r.id)).toEqual(
+        [...desc.body.data.map((r: { id: string }) => r.id)].reverse(),
+      );
+    });
+
+    it('stores: thẻ của chi nhánh seed có kho e2e, tổng khớp danh sách mặt hàng', async () => {
+      const res = await get(`/stores/${seed.branchId}?asOf=2026-09-30`).expect(200);
+
+      expect(Object.keys(res.body).sort()).toEqual([
+        'id',
+        'name',
+        'periodIn',
+        'periodOut',
+        'quantity',
+        'stockValue',
+        'storages',
+      ]);
+      // Kỳ = 2026-09-01 -> 2026-09-30: nhập 5+3+4, xuất 4.
+      expect(res.body.periodIn).toBe(12);
+      expect(res.body.periodOut).toBe(4);
+      const storage = res.body.storages.find((s: { id: string }) => s.id === storageId);
+      expect(storage).toEqual({ id: storageId, name: 'Kho e2e', quantity: 8 });
+
+      const list = await get('/stores?asOf=2026-09-30').expect(200);
+      expect(Array.isArray(list.body)).toBe(true);
+      expect(list.body.map((s: { id: string }) => s.id)).toContain(seed.branchId);
+    });
+
+    it('kind=in_transit / incoming đọc phiếu chuyển: envelope y hệt on_hand, seed không có phiếu -> rỗng', async () => {
+      for (const kind of ['in_transit', 'incoming']) {
+        const res = await get(`/products?kind=${kind}&search=INV-`).expect(200);
+        expect(res.body).toEqual({ data: [], total: 0, page: 1, limit: 20, totalQuantity: 0, totalValue: 0 });
+
+        const stores = await get(`/stores/${seed.branchId}?kind=${kind}`).expect(200);
+        expect(stores.body).toEqual(
+          expect.objectContaining({ id: seed.branchId, quantity: 0, periodIn: 0, periodOut: 0 }),
+        );
+
+        const flow = await get(`/products/${orphanId}/stores/${seed.branchId}?kind=${kind}`).expect(200);
+        expect(flow.body).toEqual(
+          expect.objectContaining({ openingQuantity: 0, closingQuantity: 0 }),
+        );
+        expect(flow.body.inbound.lines).toEqual([]);
+        expect(flow.body.outbound.lines).toEqual([]);
+
+        const vouchers = await get(`/products/${orphanId}/stores/${seed.branchId}/vouchers?kind=${kind}`).expect(200);
+        expect(vouchers.body.total).toBe(0);
+      }
+      await get('/products?kind=teleport').expect(400);
+    });
+
+    it('chi nhánh ngoài quyền -> 403; khoá lạ -> 400', async () => {
+      await get('/products?branchIds=20000000-0000-4000-8000-0000000000ff').expect(403);
+      await get('/stores/20000000-0000-4000-8000-0000000000ff').expect(403);
+      await get('/stores?status=in_stock').expect(400);
+      await get('/stores/not-a-uuid').expect(400);
+    });
+
+    it('drill-down: biến thể của mẫu mã cộng lại bằng dòng mẫu mã, kèm số theo kỳ', async () => {
+      const res = await get(`/products/${productId}/variants?asOf=2026-09-30`).expect(200);
+
+      expect(res.body).toHaveLength(2);
+      expect(Object.keys(res.body[0]).sort()).toEqual([
+        'code',
+        'id',
+        'name',
+        'openingQuantity',
+        'periodIn',
+        'periodOut',
+        'quantity',
+        'stockValue',
+        'unit',
+      ]);
+      const total = res.body.reduce((acc: number, v: { quantity: number }) => acc + v.quantity, 0);
+      expect(total).toBe(8);
+      // Nhập ngày 01/09 nằm TRONG kỳ tháng 9 → tồn đầu kỳ 0, nhập trong kỳ = tồn.
+      const v39 = res.body.find((v: { id: string }) => v.id === variantIds[0]);
+      expect(v39).toEqual(expect.objectContaining({ openingQuantity: 0, periodIn: 5, periodOut: 0, quantity: 5 }));
+
+      // Id item lẻ -> đúng một dòng là chính nó.
+      const single = await get(`/products/${orphanId}/variants?asOf=2026-09-30`).expect(200);
+      expect(single.body.map((v: { id: string }) => v.id)).toEqual([orphanId]);
+    });
+
+    it('drill-down: cửa hàng đang giữ mặt hàng — CHỈ chi nhánh có bút toán, kho thu hẹp về mặt hàng', async () => {
+      const res = await get(`/products/${productId}/stores?asOf=2026-09-30`).expect(200);
+
+      expect(res.body.map((s: { id: string }) => s.id)).toEqual([seed.branchId]);
+      expect(res.body[0].storages).toEqual([{ id: storageId, name: 'Kho e2e', quantity: 8 }]);
+      expect(res.body[0].quantity).toBe(8);
+    });
+
+    it('drill-down: luồng tại một cửa hàng — tồn cuối = đầu + nhập − xuất, lines chỉ loại có phát sinh', async () => {
+      const res = await get(`/products/${orphanId}/stores/${seed.branchId}?asOf=2026-09-30`).expect(200);
+
+      expect(res.body).toEqual({
+        storeId: seed.branchId,
+        openingQuantity: 0,
+        closingQuantity: 0,
+        // `reference_type` của seed là `E2E_TEST`, không có nhãn -> giữ nguyên mã.
+        inbound: { quantity: 4, value: 400, lines: [{ name: 'E2E_TEST', quantity: 4, value: 400 }] },
+        outbound: { quantity: 4, value: 400, lines: [{ name: 'E2E_TEST', quantity: 4, value: 400 }] },
+      });
+    });
+
+    it('drill-down: phiếu phân trang, chiều theo dấu, số tuyệt đối, tổng toàn tập, lọc theo kho', async () => {
+      const res = await get(`/products/${orphanId}/stores/${seed.branchId}/vouchers?asOf=2026-09-30`).expect(200);
+
+      expect(res.body).toEqual(
+        expect.objectContaining({ total: 2, page: 1, limit: 20, totalQuantity: 8, totalValue: 800 }),
+      );
+      // Mới nhất trước: phiếu xuất ngày 05/09 đứng trên phiếu nhập ngày 01/09.
+      expect(res.body.data.map((v: { direction: string; quantity: number }) => [v.direction, v.quantity])).toEqual([
+        ['outbound', 4],
+        ['inbound', 4],
+      ]);
+      expect(res.body.data[0]).toEqual(
+        expect.objectContaining({ warehouseId: storageId, warehouseName: 'Kho e2e', unit: 'Đôi', code: 'E2E_TEST' }),
+      );
+      // `E2E_TEST` không phải loại phiếu app mở được -> `document` null (khoá vẫn có mặt).
+      expect(res.body.data[0]).toHaveProperty('document', null);
+
+      const byStorage = await get(
+        `/products/${orphanId}/stores/${seed.branchId}/vouchers?asOf=2026-09-30&storageId=ad000000-0000-4000-8000-0000000000ff`,
+      ).expect(200);
+      expect(byStorage.body.total).toBe(0);
+
+      const asc = await get(
+        `/products/${productId}/stores/${seed.branchId}/vouchers?asOf=2026-09-30&sort=quantity_asc`,
+      ).expect(200);
+      expect(asc.body.data.map((v: { quantity: number }) => v.quantity)).toEqual([3, 5]);
+    });
+
+    it('drill-down: id đúng dạng uuid nhưng không phải mẫu mã/item -> 404 tiếng Việt; chi nhánh ngoài quyền -> 403', async () => {
+      const notFound = await get('/products/ae000000-0000-4000-8000-0000000000ff/variants').expect(404);
+      expect(notFound.body.message).toBe('Không tìm thấy hàng hoá.');
+
+      await get(`/products/${productId}/stores/20000000-0000-4000-8000-0000000000ff`).expect(403);
+      await get(`/products/${productId}/stores/${seed.branchId}?branchIds=${seed.branchId}`).expect(400);
+    });
+
+    it('danh mục: nhóm hàng phẳng ba trường, đơn vị gộp không phân biệt hoa/thường', async () => {
+      const categories = await get('/categories').expect(200);
+      expect(Array.isArray(categories.body)).toBe(true);
+      for (const row of categories.body) {
+        expect(Object.keys(row).sort()).toEqual(['id', 'name', 'parentId']);
+      }
+
+      const units = await get('/units').expect(200);
+      const codes = units.body.map((u: { code: string }) => u.code);
+      // Seed của khối này dùng `Đôi`; đơn vị về dạng chữ thường và không lặp.
+      expect(codes).toContain('đôi');
+      expect(new Set(codes).size).toBe(codes.length);
+      const doi = units.body.find((u: { code: string }) => u.code === 'đôi');
+      expect(doi.name.toLowerCase()).toBe('đôi');
+    });
+
+    it('401 khi không có token', async () => {
+      await request(app.getHttpServer()).get('/mobile/inventory/products').expect(401);
     });
   });
 });

@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
@@ -177,6 +178,214 @@ describe('MobileProductService', () => {
       expect(dataSql()).not.toContain('ILIKE');
       expect(dataSql()).toContain('LIMIT $2 OFFSET $3');
       expect(dataParams()).toEqual(['org-1', 20, 0]);
+    });
+  });
+
+  describe('findById', () => {
+    const productId = 'a0000000-0000-4000-8000-000000000001';
+
+    // Giá của header CỐ Ý khác giá của item[0]: phát hiện ngay nếu code lấy
+    // nhầm nguồn (giá màn chi tiết phải là giá TRUNG BÌNH của CTE, khớp danh
+    // sách, không phải giá của item đại diện).
+    const productHeader = {
+      type: 'product',
+      id: productId,
+      code: 'GELLI',
+      name: 'Giày Gelli',
+      purchasePrice: 355000,
+      sellingPrice: 595000,
+      isActive: true,
+    };
+    const orphanHeader = {
+      type: 'orphan',
+      id: 'i-9',
+      code: 'BELT-01',
+      name: 'Thắt lưng da',
+      purchasePrice: 120000,
+      sellingPrice: 250000,
+      isActive: false,
+    };
+    const items = [
+      {
+        id: 'i-1',
+        code: 'GELLI-39-NAU',
+        variantLabel: '39 · Nâu',
+        unit: 'đôi',
+        categoryName: 'Giày dép',
+        purchasePrice: 350000,
+        sellingPrice: 590000,
+        weightGram: null,
+        lengthCm: null,
+        widthCm: null,
+        heightCm: null,
+      },
+      {
+        id: 'i-2',
+        code: 'GELLI-40-NAU',
+        variantLabel: '40 · Nâu',
+        unit: 'đôi',
+        categoryName: 'Giày dép',
+        purchasePrice: 360000,
+        sellingPrice: 600000,
+        weightGram: 250,
+        lengthCm: 30,
+        widthCm: 20,
+        heightCm: 10,
+      },
+    ];
+
+    /** Câu ĐẦU tra header trên CTE; câu THỨ HAI lấy item/biến thể. */
+    const headerSql = (): string => query.mock.calls[0][0] as string;
+    const headerParams = (): unknown[] => query.mock.calls[0][1] as unknown[];
+    const itemSql = (): string => query.mock.calls[1][0] as string;
+    const itemParams = (): unknown[] => query.mock.calls[1][1] as unknown[];
+
+    beforeEach(() => {
+      // `beforeEach` ngoài đã xếp sẵn hai stub cho `list`; ở đây tự cấp.
+      query.mockReset();
+    });
+
+    it('phạm vi TỔ CHỨC đi qua `$1` ở CẢ HAI câu, không nội suy', async () => {
+      query
+        .mockResolvedValueOnce([productHeader])
+        .mockResolvedValueOnce(items);
+
+      await service.findById(productId, actor);
+
+      expect(headerParams()[0]).toBe('org-1');
+      expect(itemParams()[0]).toBe('org-1');
+      expect(headerSql()).toContain('organization_id = $1');
+      // Câu hai KHÔNG được dựa vào việc câu một đã lọc — ranh giới
+      // multi-tenant phải đứng ở từng câu.
+      expect(itemSql()).toContain('i.organization_id = $1');
+      expect(headerSql()).not.toContain('org-1');
+      expect(itemSql()).not.toContain('org-1');
+    });
+
+    it('tra header bằng `WHERE id = $2` trên CTE dùng chung với danh sách', async () => {
+      query
+        .mockResolvedValueOnce([productHeader])
+        .mockResolvedValueOnce(items);
+
+      await service.findById(productId, actor);
+
+      expect(headerSql()).toContain('FROM combined');
+      expect(headerSql()).toContain('WHERE id = $2');
+      expect(headerParams()).toEqual(['org-1', productId]);
+    });
+
+    it('không có dòng nào -> 404, và KHÔNG chạy câu thứ hai', async () => {
+      query.mockResolvedValueOnce([]);
+
+      await expect(service.findById(productId, actor)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(query).toHaveBeenCalledTimes(1);
+    });
+
+    it('mẫu mã: header từ CTE, mô tả từ item đại diện, mọi item thành `variants`', async () => {
+      query
+        .mockResolvedValueOnce([productHeader])
+        .mockResolvedValueOnce(items);
+
+      const result = await service.findById(productId, actor);
+
+      // Nhóm header — phải là con số của CTE (khớp danh sách).
+      expect(result).toMatchObject({
+        id: productId,
+        code: 'GELLI',
+        name: 'Giày Gelli',
+        isActive: true,
+        purchasePrice: 355000,
+        sellingPrice: 595000,
+      });
+      // Nhóm mô tả — lấy ở item ĐẦU TIÊN (mã nhỏ nhất), không phải item nào khác.
+      expect(result).toMatchObject({
+        categoryName: 'Giày dép',
+        unit: 'đôi',
+        weightGram: null,
+        lengthCm: null,
+        widthCm: null,
+        heightCm: null,
+      });
+      expect(result.variants).toHaveLength(2);
+      expect(result.variants[1]).toEqual({
+        id: 'i-2',
+        code: 'GELLI-40-NAU',
+        variantLabel: '40 · Nâu',
+        purchasePrice: 360000,
+        sellingPrice: 600000,
+      });
+      // ĐÚNG năm khoá — `unit`/`weightGram` của từng item không được rò vào.
+      expect(Object.keys(result.variants[0])).toEqual([
+        'id',
+        'code',
+        'variantLabel',
+        'purchasePrice',
+        'sellingPrice',
+      ]);
+
+      expect(itemSql()).toContain('i.product_id = $2');
+      expect(itemSql()).toContain('ORDER BY i.code ASC, i.id ASC');
+      expect(itemParams()).toEqual(['org-1', productId]);
+    });
+
+    it('item lẻ: tra chính nó, `variants` rỗng', async () => {
+      query
+        .mockResolvedValueOnce([orphanHeader])
+        .mockResolvedValueOnce([items[0]]);
+
+      const result = await service.findById('i-9', actor);
+
+      expect(result.variants).toEqual([]);
+      expect(result.isActive).toBe(false);
+      expect(result.code).toBe('BELT-01');
+      expect(itemSql()).toContain('i.id = $2');
+      expect(itemSql()).not.toContain('product_id');
+    });
+
+    it('bản ghi biến mất giữa hai câu -> vẫn 404, không TypeError', async () => {
+      query.mockResolvedValueOnce([productHeader]).mockResolvedValueOnce([]);
+
+      await expect(service.findById(productId, actor)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('KHÔNG `SELECT *`, và không kéo cột ngoài những gì màn hình vẽ', async () => {
+      query
+        .mockResolvedValueOnce([productHeader])
+        .mockResolvedValueOnce(items);
+
+      await service.findById(productId, actor);
+
+      expect(headerSql()).toMatch(
+        /SELECT type, id, code, name, "purchasePrice", "sellingPrice", "isActive"\s+FROM combined/,
+      );
+      expect(headerSql()).not.toContain('SELECT * FROM combined');
+      expect(itemSql()).not.toContain('SELECT *');
+      for (const column of ['description', 'composition', 'barcode', 'brand']) {
+        expect(itemSql()).not.toContain(column);
+      }
+    });
+
+    it('MỌI cột decimal ép `::float` — driver pg trả numeric thành chuỗi', async () => {
+      query
+        .mockResolvedValueOnce([productHeader])
+        .mockResolvedValueOnce(items);
+
+      await service.findById(productId, actor);
+
+      for (const column of [
+        'purchase_price',
+        'selling_price',
+        'weight_gram',
+        'length_cm',
+        'width_cm',
+        'height_cm',
+      ]) {
+        expect(itemSql()).toContain(`${column}::float`);
+      }
     });
   });
 });

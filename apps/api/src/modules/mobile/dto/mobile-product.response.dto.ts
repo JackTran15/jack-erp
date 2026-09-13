@@ -18,10 +18,12 @@ import { ApiProperty } from '@nestjs/swagger';
  *   hiển thị.
  * - `unit` — thêm lại khi màn chọn hàng hoá của phiếu kho bỏ dữ liệu giả
  *   (`ItemMock` phía Dart) và chuyển sang gọi API này.
- * - `type` (`'product' | 'orphan'`) — thêm lại khi app có màn CHI TIẾT, vì lúc
- *   đó mới cần biết `id` là product hay item để gọi đúng endpoint.
+ * - `type` (`'product' | 'orphan'`) — từng dự tính thêm khi có màn chi tiết,
+ *   nhưng KHÔNG cần: `GET /mobile/products/:id` tra `id` trên chính CTE này
+ *   nên tự biết dòng đó là mẫu mã hay item lẻ. Client chỉ cầm `id`.
  *
- * Cả bốn đều là thay đổi CỘNG THÊM, không phá client cũ.
+ * Cả bốn đều là thay đổi CỘNG THÊM, không phá client cũ. Màn chi tiết có DTO
+ * riêng (`MobileProductDetailResponseDto`) chứ không mở rộng class này.
  */
 export class MobileProductResponseDto {
   @ApiProperty({

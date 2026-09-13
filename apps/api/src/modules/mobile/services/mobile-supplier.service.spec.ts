@@ -66,6 +66,7 @@ describe('MobileSupplierService', () => {
       page?: number;
       limit?: number;
       sort?: MobileSupplierSort;
+      status?: 'active' | 'inactive';
       search?: string;
     } = {},
   ) =>
@@ -125,6 +126,24 @@ describe('MobileSupplierService', () => {
     await run({ search: '   ' });
 
     expect(conditions()).not.toContain('ILIKE');
+  });
+
+  it('lọc trạng thái: active -> isActive true, inactive -> false, vắng -> không mệnh đề', async () => {
+    await run({ status: 'active' });
+    expect(qb.andWhere).toHaveBeenCalledWith('provider.isActive = :isActive', {
+      isActive: true,
+    });
+
+    qb.andWhere.mockClear();
+    await run({ status: 'inactive' });
+    expect(qb.andWhere).toHaveBeenCalledWith('provider.isActive = :isActive', {
+      isActive: false,
+    });
+
+    qb.andWhere.mockClear();
+    await run();
+    // "Tất cả" = không lọc: không thêm mệnh đề nào chứ không phải `IN (true, false)`.
+    expect(conditions()).not.toContain('isActive');
   });
 
   it('sắp theo TÊN mặc định, theo MÃ khi màn chọn yêu cầu', async () => {
