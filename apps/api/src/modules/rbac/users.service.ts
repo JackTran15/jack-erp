@@ -20,6 +20,10 @@ import {
   IAM_PERMISSION_KEYS,
 } from "@erp/shared-interfaces";
 import { ActorContext } from "../../common/decorators/actor-context.decorator";
+import { MediaLinkService } from "../media/media-link.service";
+import { MediaQueryService, MediaSummary } from "../media/media-query.service";
+import { MediaOwnerType } from "../media/media-object.entity";
+import { MediaException } from "../media/media.exception";
 import { UserEntity } from "../auth/user.entity";
 import { RoleEntity } from "../auth/role.entity";
 import { UserRoleEntity } from "../auth/user-role.entity";
@@ -66,6 +70,13 @@ const USERS_ME_CACHE_TTL_SECONDS = 15 * 60;
 /** Sentinel for "match nothing" — an empty `In([])` would match every row. */
 const NIL_UUID = "00000000-0000-0000-0000-000000000000";
 
+interface EmployeeProfilePhoto {
+  photoMediaId: string | null;
+  photoUrl: string | null;
+}
+
+const EMPTY_PROFILE_PHOTO: EmployeeProfilePhoto = { photoMediaId: null, photoUrl: null };
+
 export interface UserListParams {
   page: number;
   pageSize: number;
@@ -93,6 +104,8 @@ export class UsersService {
     private readonly rbacService: RbacService,
     private readonly cacheService: CacheService,
     private readonly dataSource: DataSource,
+    private readonly mediaLink: MediaLinkService,
+    private readonly mediaQuery: MediaQueryService,
   ) {}
 
   /**
@@ -255,10 +268,110 @@ export class UsersService {
       this.unmanageableUserIds(actor),
     ]);
     const profileByUser = new Map(profiles.map((p) => [p.userId, p]));
-    return rows.map((u) => ({
-      ...this.toListItem(u, profileByUser.get(u.id)),
-      canEdit: !unmanageable.has(u.id),
-    }));
+    const photosByProfile = await this.loadProfilePhotos(
+      profiles.map((p) => p.id),
+      actor.organizationId,
+    );
+    return rows.map((u) => {
+      const profile = profileByUser.get(u.id);
+      const photo = (profile && photosByProfile.get(profile.id)) ?? EMPTY_PROFILE_PHOTO;
+      return {
+        ...this.toListItem(u, profile, photo),
+        canEdit: !unmanageable.has(u.id),
+      };
+    });
+  }
+
+  /**
+   * Batch-loads and signs employee photo URLs for a set of profile ids —
+   * `toListItems` (a whole list page) and `buildUserDetail` (a single profile,
+   * including `/admin/users/me`) both go through this, so
+   * `MediaQueryService.listForOwners` is always called exactly once per
+   * caller (03-logical-design.md > read flow).
+   *
+   * Listing/reading users must never fail because storage is unconfigured,
+   * unreachable, or a stored row no longer resolves to a real object:
+   * `STORAGE_UNAVAILABLE` from signing degrades the whole batch to
+   * `photoUrl: null` (one warning); `MEDIA_NOT_FOUND` degrades only the
+   * affected row (see `signPhotoUrls`); any other error propagates.
+   */
+  private async loadProfilePhotos(
+    profileIds: string[],
+    organizationId: string,
+  ): Promise<Map<string, EmployeeProfilePhoto>> {
+    const result = new Map<string, EmployeeProfilePhoto>();
+    if (profileIds.length === 0) return result;
+
+    const mediaByProfile = await this.mediaQuery.listForOwners(
+      MediaOwnerType.EMPLOYEE_PROFILE,
+      profileIds,
+      organizationId,
+    );
+    if (mediaByProfile.size === 0) return result;
+
+    let photoUrlByProfile: Map<string, string>;
+    try {
+      photoUrlByProfile = await this.signPhotoUrls(mediaByProfile, organizationId);
+    } catch (err) {
+      if (err instanceof MediaException && err.code === "STORAGE_UNAVAILABLE") {
+        this.logger.warn(
+          `employee-profile.photoUrl.unavailable: media storage is not configured or unreachable (org=${organizationId}); returning photoUrl=null for this page`,
+        );
+        photoUrlByProfile = new Map();
+      } else {
+        throw err;
+      }
+    }
+
+    for (const [profileId, summaries] of mediaByProfile) {
+      const summary = summaries[0];
+      if (!summary) continue;
+      result.set(profileId, {
+        photoMediaId: summary.id,
+        photoUrl: photoUrlByProfile.get(profileId) ?? null,
+      });
+    }
+    return result;
+  }
+
+  /**
+   * Signs every profile's first photo in parallel. A `MEDIA_NOT_FOUND` for one
+   * row (its stored bucket/key no longer matches config — e.g. after a bucket
+   * rename) only nulls that row instead of failing the whole batch; any other
+   * error, including `STORAGE_UNAVAILABLE`, propagates to `loadProfilePhotos`.
+   */
+  private async signPhotoUrls(
+    mediaByProfile: Map<string, MediaSummary[]>,
+    organizationId: string,
+  ): Promise<Map<string, string>> {
+    const entries = [...mediaByProfile]
+      .map(([profileId, summaries]) => [profileId, summaries[0]] as const)
+      .filter((entry): entry is [string, MediaSummary] => Boolean(entry[1]));
+
+    const signed = await Promise.all(
+      entries.map(async ([profileId, summary]) => {
+        try {
+          return [
+            profileId,
+            await this.mediaQuery.signReadUrl(summary, organizationId, "inline"),
+          ] as const;
+        } catch (err) {
+          if (err instanceof MediaException && err.code === "MEDIA_NOT_FOUND") {
+            this.logger.warn(
+              `employee-profile.photoUrl.notFound: media ${summary.id} no longer resolves to a storage object; returning photoUrl=null for this profile`,
+            );
+            return [profileId, null] as const;
+          }
+          throw err;
+        }
+      }),
+    );
+
+    const urls = new Map<string, string>();
+    for (const [profileId, url] of signed) {
+      if (url) urls.set(profileId, url);
+    }
+    return urls;
   }
 
   async findById(id: string, actor: ActorContext): Promise<UserDetail> {
@@ -303,11 +416,19 @@ export class UsersService {
         ],
       }),
     ]);
+    const photosByProfile = profile
+      ? await this.loadProfilePhotos([profile.id], actor.organizationId)
+      : new Map<string, EmployeeProfilePhoto>();
     return {
       ...this.toView(user, profile),
       roleIds: roles.map((r) => r.roleId),
       branchIds: branches.map((b) => b.branchId),
-      profile: profile ? this.toProfileView(profile) : null,
+      profile: profile
+        ? this.toProfileView(
+            profile,
+            photosByProfile.get(profile.id) ?? EMPTY_PROFILE_PHOTO,
+          )
+        : null,
       canEdit: !(await this.unmanageableUserIds(actor)).has(id),
     };
   }
@@ -908,7 +1029,6 @@ export class UsersService {
       gender: dto.gender ?? null,
       maritalStatus: dto.maritalStatus ?? null,
       employmentStatus: dto.employmentStatus ?? EmploymentStatus.OFFICIAL,
-      photoUrl: dto.photoUrl ?? null,
       jobPositionId: dto.jobPositionId ?? null,
       probationDate: this.toDateOnly(dto.probationDate),
       officialDate: this.toDateOnly(dto.officialDate),
@@ -940,6 +1060,19 @@ export class UsersService {
           branchId: actor.branchId,
           createdBy: actor.userId,
         }),
+      );
+    }
+
+    // `undefined` means the client didn't send the field at all — leave the
+    // attachment as-is. `null` means "remove the photo", passed to `syncOwner`
+    // as `[]` (03-logical-design.md > write flow, step 4 > "Rules for every caller").
+    if (dto.photoMediaId !== undefined) {
+      await this.mediaLink.syncOwner(
+        MediaOwnerType.EMPLOYEE_PROFILE,
+        profile.id,
+        dto.photoMediaId ? [dto.photoMediaId] : [],
+        actor,
+        manager,
       );
     }
 
@@ -1026,7 +1159,10 @@ export class UsersService {
     return value.slice(0, 10);
   }
 
-  private toProfileView(p: EmployeeProfileEntity): EmployeeProfileView {
+  private toProfileView(
+    p: EmployeeProfileEntity,
+    photo: EmployeeProfilePhoto,
+  ): EmployeeProfileView {
     const trimTime = (t: string): string =>
       typeof t === "string" && t.length >= 5 ? t.slice(0, 5) : t;
     return {
@@ -1040,7 +1176,8 @@ export class UsersService {
       gender: p.gender ?? null,
       maritalStatus: p.maritalStatus ?? null,
       employmentStatus: p.employmentStatus,
-      photoUrl: p.photoUrl ?? null,
+      photoUrl: photo.photoUrl,
+      photoMediaId: photo.photoMediaId,
       jobPositionId: p.jobPositionId ?? null,
       jobPosition: p.jobPosition
         ? { id: p.jobPosition.id, name: p.jobPosition.name }
@@ -1098,6 +1235,7 @@ export class UsersService {
   private toListItem(
     u: UserEntity,
     p: EmployeeProfileEntity | undefined,
+    photo: EmployeeProfilePhoto,
   ): UserListItem {
     return {
       ...this.toView(u, p),
@@ -1108,7 +1246,8 @@ export class UsersService {
             jobPosition: p.jobPosition
               ? { id: p.jobPosition.id, name: p.jobPosition.name }
               : null,
-            photoUrl: p.photoUrl ?? null,
+            photoUrl: photo.photoUrl,
+            photoMediaId: photo.photoMediaId,
             mobile: p.mobile ?? null,
             employmentStatus: p.employmentStatus,
           }

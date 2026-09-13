@@ -57,7 +57,9 @@ export interface EmployeeProfileSummary {
   code: string;
   /** Inline job position (id + name); null when unset. */
   jobPosition: JobPositionRef | null;
+  /** Presigned GET URL, 1-hour expiry; null when the profile has no photo. */
   photoUrl: string | null;
+  photoMediaId: string | null;
   mobile: string | null;
   employmentStatus: EmploymentStatus;
 }
@@ -199,7 +201,8 @@ export interface EmployeeProfilePayload {
   gender?: EmployeeGender;
   maritalStatus?: MaritalStatus;
   employmentStatus?: EmploymentStatus;
-  photoUrl?: string;
+  /** Media id of the profile photo; null removes it, omit to leave unchanged. */
+  photoMediaId?: string | null;
   jobPositionId?: string;
   probationDate?: string;
   officialDate?: string;
@@ -248,7 +251,9 @@ export interface EmployeeProfileView {
   gender: EmployeeGender | null;
   maritalStatus: MaritalStatus | null;
   employmentStatus: EmploymentStatus;
+  /** Presigned GET URL, 1-hour expiry; null when the profile has no photo. */
   photoUrl: string | null;
+  photoMediaId: string | null;
   jobPositionId: string | null;
   /** Inline job position (id + name); null when unset. */
   jobPosition: JobPositionRef | null;
