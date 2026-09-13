@@ -357,9 +357,15 @@ cần hai `location` (A-06).
 **Context:** DB và storage không chung transaction. Xoá object trước commit mà transaction
 rollback thì mất file của bản ghi vẫn còn; xoá sau commit mà tiến trình chết thì còn object rác.
 **Decision:** Trong transaction nghiệp vụ chỉ đổi `status = DELETED` và `deleted_at`. Sau commit
-xoá object theo kiểu best-effort và đặt `object_removed_at`. `MediaCleanupJob` hằng ngày: chuyển
-`PENDING`/`UPLOADED` quá 24 giờ sang `DELETED` (A-18), rồi xoá mọi object `DELETED` chưa có
-`object_removed_at`.
+xoá object theo kiểu best-effort. `MediaCleanupJob` hằng ngày: chuyển `PENDING`/`UPLOADED` quá 24 giờ
+sang `DELETED` (A-18), rồi xoá mọi object `DELETED` chưa có `object_removed_at`.
+**Bất biến** (re-review T-01-04, 2026-09-13): `object_removed_at` **chỉ được đặt khi vé tải lên của key
+đó đã hết hạn** (`created_at` cũ hơn hạn vé, hằng số dùng chung). Trước đó người giữ vé vẫn POST lại được
+vào cùng key; đặt dấu sớm sẽ biến object mới thành rác vĩnh viễn mà job không bao giờ quét lại. Vì vậy:
+nhánh từ chối khi xác nhận không đặt dấu; xoá sau commit của `MediaLinkService` chỉ đặt dấu cho dòng đã quá
+hạn vé; bước 2 của job bỏ qua dòng còn trong hạn vé. Cả hai phép so tuổi đều chạy bằng đồng hồ Postgres
+(`created_at < now() - interval …` trong chính câu `UPDATE`/`SELECT`) với ngưỡng hạn vé cộng
+`UPLOAD_TICKET_GRACE_SECONDS` (60 giây), để độ lệch đồng hồ giữa app, MinIO và DB không đẩy dấu đặt sớm.
 **Consequences:** Object bị gỡ có thể còn trong storage tới một ngày; với bucket công khai, URL
 của ảnh vừa gỡ vẫn mở được tới khi job hoặc bước sau commit chạy xong. Job chạy một lần mỗi
 deployment vì API chạy một tiến trình PM2 (M8).

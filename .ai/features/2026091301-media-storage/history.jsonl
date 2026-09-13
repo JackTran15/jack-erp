@@ -25,3 +25,6 @@
 {"action": "ticket review", "at": "2026-09-13T15:44:45", "by": "claude-sonnet-5", "gate": "G4", "id": "a5236b350ab5", "ticket": "T-03-01", "ts": "2026-09-13T15:44:45.133974"}
 {"action": "ticket done (review bypassed)", "at": "2026-09-13T15:49:44", "by": "Claude", "gate": "G4", "id": "08507f822223", "ticket": "T-03-01", "ts": "2026-09-13T15:49:44.636241"}
 {"action": "ticket done (review bypassed)", "at": "2026-09-13T15:57:26", "by": "Claude", "gate": "G4", "id": "82172e933ff1", "ticket": "T-01-04", "ts": "2026-09-13T15:57:26.448664"}
+{"action": "ticket in_progress", "at": "2026-09-13T15:57:26", "by": "Claude", "gate": "G4", "id": "4da99ed2efe6", "ticket": "T-01-09", "ts": "2026-09-13T15:57:26.681363"}
+{"action": "ticket in_progress", "at": "2026-09-13T15:57:26", "by": "Claude", "gate": "G4", "id": "3bc242f96b9e", "ticket": "T-01-11", "ts": "2026-09-13T15:57:26.745697"}
+{"action": "ticket in_progress", "at": "2026-09-13T15:57:26", "by": "Claude", "gate": "G4", "id": "2626d09af6c1", "ticket": "T-04-01", "ts": "2026-09-13T15:57:26.809186"}
