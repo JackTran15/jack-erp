@@ -11,3 +11,8 @@
 {"action": "ticket done (review bypassed)", "at": "2026-09-13T13:59:51", "by": "Claude", "gate": "G4", "id": "3c4744fc6115", "ticket": "T-01-08", "ts": "2026-09-13T13:59:51.407541"}
 {"action": "ticket done (review bypassed)", "at": "2026-09-13T14:02:11", "by": "Claude", "gate": "G4", "id": "c233ad13c31f", "ticket": "T-01-01", "ts": "2026-09-13T14:02:11.412130"}
 {"action": "ticket done (review bypassed)", "at": "2026-09-13T14:52:31", "by": "Claude", "gate": "G4", "id": "17a9549e92c2", "ticket": "T-01-03", "ts": "2026-09-13T14:52:31.360289"}
+{"action": "ticket in_progress", "at": "2026-09-13T14:52:31", "by": "Claude", "gate": "G4", "id": "151bdc2993e5", "ticket": "T-01-04", "ts": "2026-09-13T14:52:31.598254"}
+{"action": "ticket in_progress", "at": "2026-09-13T14:52:31", "by": "Claude", "gate": "G4", "id": "e9dec2dbed43", "ticket": "T-01-05", "ts": "2026-09-13T14:52:31.662498"}
+{"action": "ticket in_progress", "at": "2026-09-13T14:52:31", "by": "Claude", "gate": "G4", "id": "6f4f97b7576c", "ticket": "T-01-06", "ts": "2026-09-13T14:52:31.726701"}
+{"action": "ticket in_progress", "at": "2026-09-13T14:52:31", "by": "Claude", "gate": "G4", "id": "2d99a17c4b67", "ticket": "T-05-01", "ts": "2026-09-13T14:52:31.790261"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-13T15:26:29", "by": "Claude", "gate": "G4", "id": "cb1326ac3a02", "ticket": "T-01-05", "ts": "2026-09-13T15:26:29.270622"}
