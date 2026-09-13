@@ -1,8 +1,12 @@
 import { BadRequestException, Logger } from '@nestjs/common';
 import { MediaLinkService } from './media-link.service';
 import { MediaObjectEntity, MediaOwnerType, MediaStatus } from './media-object.entity';
+import { UPLOAD_TICKET_TTL_SECONDS } from './media.constants';
 import { MediaException } from './media.exception';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
+
+/** Comfortably past `UPLOAD_TICKET_TTL_SECONDS`, so the row's upload ticket has certainly expired. */
+const TICKET_EXPIRED_AT = new Date(Date.now() - (UPLOAD_TICKET_TTL_SECONDS + 60) * 1000);
 
 const ORG_1 = 'org-1';
 const OWNER_1 = 'owner-1';
@@ -436,8 +440,8 @@ describe('MediaLinkService', () => {
     expect(trxManager.query).not.toHaveBeenCalled();
   });
 
-  it('without a manager, deletes the object after commit and stamps object_removed_at', async () => {
-    const rowY = makeRow({ id: ID_Y, status: MediaStatus.ATTACHED, ownerId: OWNER_1 });
+  it('without a manager, deletes the object after commit and stamps object_removed_at once the ticket has expired', async () => {
+    const rowY = makeRow({ id: ID_Y, status: MediaStatus.ATTACHED, ownerId: OWNER_1, createdAt: TICKET_EXPIRED_AT });
     // ids is empty, so applySync skips the requested-ids lookup entirely and
     // only queries currently-attached rows.
     const attachedQb = makeQueryBuilder();
@@ -449,6 +453,19 @@ describe('MediaLinkService', () => {
     expect(result).toEqual([]);
     expect(objectStorage.deleteObject).toHaveBeenCalledWith(rowY.bucket, rowY.objectKey);
     expect(mediaRepo.update).toHaveBeenCalledWith({ id: ID_Y, organizationId: ORG_1 }, { objectRemovedAt: expect.any(Date) });
+  });
+
+  it('deletes the object but leaves object_removed_at null while the row is still inside its ticket TTL (ADR-05)', async () => {
+    const rowY = makeRow({ id: ID_Y, status: MediaStatus.ATTACHED, ownerId: OWNER_1, createdAt: new Date() });
+    const attachedQb = makeQueryBuilder();
+    attachedQb.getMany.mockResolvedValueOnce([rowY]);
+    queueQueryBuilders(attachedQb);
+
+    const result = await service.syncOwner(MediaOwnerType.GOODS_RECEIPT, OWNER_1, [], actor);
+
+    expect(result).toEqual([]);
+    expect(objectStorage.deleteObject).toHaveBeenCalledWith(rowY.bucket, rowY.objectKey);
+    expect(mediaRepo.update).not.toHaveBeenCalled();
   });
 
   it('does not call deleteObject while the transaction callback is still running', async () => {
@@ -472,7 +489,14 @@ describe('MediaLinkService', () => {
 
   it('cleans up removed objects independently: one failure does not block another row', async () => {
     const rowY = makeRow({ id: ID_Y, status: MediaStatus.ATTACHED, ownerId: OWNER_1, bucket: 'b-y', objectKey: 'key-y' });
-    const rowC = makeRow({ id: ID_C, status: MediaStatus.ATTACHED, ownerId: OWNER_1, bucket: 'b-c', objectKey: 'key-c' });
+    const rowC = makeRow({
+      id: ID_C,
+      status: MediaStatus.ATTACHED,
+      ownerId: OWNER_1,
+      bucket: 'b-c',
+      objectKey: 'key-c',
+      createdAt: TICKET_EXPIRED_AT,
+    });
     const attachedQb = makeQueryBuilder();
     attachedQb.getMany.mockResolvedValueOnce([rowY, rowC]);
     queueQueryBuilders(attachedQb);

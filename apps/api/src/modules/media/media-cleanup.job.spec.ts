@@ -4,7 +4,11 @@ import { FindOperator, IsNull } from 'typeorm';
 import { CLEANUP_BATCH_SIZE, MediaCleanupJob } from './media-cleanup.job';
 import { MediaException } from './media.exception';
 import { MediaObjectEntity, MediaStatus } from './media-object.entity';
+import { UPLOAD_TICKET_TTL_SECONDS } from './media.constants';
 import { ObjectStorageService } from './object-storage.service';
+
+/** Well past `UPLOAD_TICKET_TTL_SECONDS`, so a row using this default is eligible for step 2 by default. */
+const LONG_AGO = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
 function rowStub(overrides: Partial<MediaObjectEntity> = {}): MediaObjectEntity {
   const id = overrides.id ?? 'media-1';
@@ -14,6 +18,7 @@ function rowStub(overrides: Partial<MediaObjectEntity> = {}): MediaObjectEntity 
     objectRemovedAt: null,
     bucket: 'erp-media-private',
     objectKey: `org/org-1/goods_receipt/${id}`,
+    createdAt: LONG_AGO,
     ...overrides,
   } as MediaObjectEntity;
 }
@@ -41,6 +46,13 @@ class InMemoryMediaRepo {
     let rows = this.rows.filter((r) => r.status === where.status);
     if (where.objectRemovedAt instanceof FindOperator && where.objectRemovedAt.type === 'isNull') {
       rows = rows.filter((r) => r.objectRemovedAt === null);
+    }
+    // Real Postgres evaluates the `Raw(...)` SQL string; this fake instead
+    // reproduces its semantics directly (ticket-TTL cutoff) rather than
+    // parsing the generated SQL.
+    if (where.createdAt instanceof FindOperator && where.createdAt.type === 'raw') {
+      const cutoff = Date.now() - UPLOAD_TICKET_TTL_SECONDS * 1000;
+      rows = rows.filter((r) => r.createdAt.getTime() < cutoff);
     }
     if (where.id instanceof FindOperator && where.id.type === 'moreThan') {
       const cursor = where.id.value as string;
@@ -106,15 +118,39 @@ describe('MediaCleanupJob', () => {
   });
 
   describe('step 2 — removing DELETED objects', () => {
-    it('only selects DELETED rows missing object_removed_at, ordered by id, never ATTACHED', async () => {
+    it('only selects DELETED rows missing object_removed_at and past the ticket TTL, ordered by id, never ATTACHED', async () => {
       await job.run();
 
-      expect(mediaRepo.find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { status: MediaStatus.DELETED, objectRemovedAt: IsNull() },
-          order: { id: 'ASC' },
-        }),
-      );
+      const [{ where, order }] = mediaRepo.find.mock.calls[0];
+      expect(where.status).toBe(MediaStatus.DELETED);
+      expect(where.objectRemovedAt).toEqual(IsNull());
+      expect(where.createdAt).toBeInstanceOf(FindOperator);
+      expect((where.createdAt as FindOperator<unknown>).type).toBe('raw');
+      expect(order).toEqual({ id: 'ASC' });
+    });
+
+    it('skips a DELETED row younger than the ticket TTL — its object key may still receive a fresh upload', async () => {
+      const oldRow = rowStub({ id: 'old-1' });
+      const youngRow = rowStub({ id: 'young-1', createdAt: new Date() });
+      const fakeRepo = new InMemoryMediaRepo([oldRow, youngRow]);
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          MediaCleanupJob,
+          { provide: getRepositoryToken(MediaObjectEntity), useValue: fakeRepo },
+          { provide: ObjectStorageService, useValue: storage },
+        ],
+      }).compile();
+      const ttlJob = module.get(MediaCleanupJob);
+      jest.spyOn(ttlJob['logger'], 'log').mockImplementation();
+      jest.spyOn(ttlJob['logger'], 'error').mockImplementation();
+
+      const summary = await ttlJob.run();
+
+      expect(summary.removedCount).toBe(1);
+      expect(storage.deleteObject).toHaveBeenCalledTimes(1);
+      expect(storage.deleteObject).toHaveBeenCalledWith(oldRow.bucket, oldRow.objectKey);
+      expect(youngRow.objectRemovedAt).toBeNull();
     });
 
     it('deletes the object and stamps object_removed_at with the DB clock for a DELETED row', async () => {

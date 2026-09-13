@@ -5,6 +5,7 @@ import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
 import { MediaObjectEntity, MediaOwnerType, MediaStatus } from './media-object.entity';
 import { MEDIA_OWNER_POLICIES } from './media-owner-policies';
+import { UPLOAD_TICKET_TTL_SECONDS } from './media.constants';
 import { MediaException } from './media.exception';
 import { ObjectStorageService } from './object-storage.service';
 
@@ -240,6 +241,16 @@ export class MediaLinkService {
     return toRemove;
   }
 
+  /**
+   * ADR-05 invariant: `object_removed_at` may only be stamped once the row's
+   * own upload ticket has expired. A row detached (or never attached) inside
+   * the ticket's `UPLOAD_TICKET_TTL_SECONDS` window can still receive a fresh
+   * POST at the same object key from whoever was holding that ticket; an
+   * early stamp here would make cleanup step 2 skip that key forever
+   * (`objectRemovedAt IS NULL` is the only thing step 2 looks for). Rows this
+   * young are left with `objectRemovedAt` unset — `MediaCleanupJob` re-checks
+   * them (deleting again is a no-op) once they have aged past the window.
+   */
   private async cleanupRemovedObjects(
     rows: MediaObjectEntity[],
     organizationId: string,
@@ -248,7 +259,9 @@ export class MediaLinkService {
       rows.map(async (row) => {
         try {
           await this.objectStorage.deleteObject(row.bucket, row.objectKey);
-          await this.mediaRepo.update({ id: row.id, organizationId }, { objectRemovedAt: new Date() });
+          if (Date.now() - row.createdAt.getTime() >= UPLOAD_TICKET_TTL_SECONDS * 1000) {
+            await this.mediaRepo.update({ id: row.id, organizationId }, { objectRemovedAt: new Date() });
+          }
           this.logger.log(
             `media.detached mediaId=${row.id} ownerType=${row.ownerType} organizationId=${organizationId}`,
           );

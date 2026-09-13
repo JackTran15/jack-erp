@@ -7,6 +7,7 @@ export type MediaErrorCode =
   | 'MEDIA_INVALID'
   | 'MEDIA_NOT_FOUND'
   | 'MEDIA_STATE_CONFLICT'
+  | 'MEDIA_QUOTA_EXCEEDED'
   | 'STORAGE_UNAVAILABLE';
 
 /**
