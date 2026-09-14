@@ -13,6 +13,9 @@ import { StorageEntity } from '../location/storage.entity';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
 import { GoodsIssueService } from '../goods-issue/goods-issue.service';
 import { GoodsReceiptService } from '../goods-receipt/goods-receipt.service';
+import { MediaLinkService } from '../../media/media-link.service';
+import { MediaOwnerReaderRegistry } from '../../media/media-owner-reader.registry';
+import { MediaQueryService } from '../../media/media-query.service';
 
 /**
  * Regression lock for vouchers the system raises on its own.
@@ -135,6 +138,10 @@ describe('TransferOrderService — system-generated export leg (AC-11, ADR-04)',
           provide: GoodsReceiptService,
           useValue: { createAndPost: jest.fn(), getById: jest.fn(), update: jest.fn() },
         },
+        // T-04-03: stub the media constructor deps this test does not exercise.
+        { provide: MediaLinkService, useValue: { syncOwner: jest.fn() } },
+        { provide: MediaQueryService, useValue: { listForOwners: jest.fn().mockResolvedValue(new Map()) } },
+        { provide: MediaOwnerReaderRegistry, useValue: { register: jest.fn() } },
       ],
     }).compile();
 

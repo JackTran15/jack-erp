@@ -7,6 +7,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
+
+// create() pre-generates the row id (T-04-03 review: syncOwner must run
+// before a document number is minted) via `crypto.randomUUID()` — pinned to
+// the fixture id used throughout this file so every existing assertion on
+// 'to-1' keeps meaning what it always meant.
+jest.mock('crypto', () => ({
+  ...jest.requireActual('crypto'),
+  randomUUID: jest.fn(() => 'to-1'),
+}));
 import {
   DocCounterpartyKind,
   GoodsIssuePurpose,
@@ -27,6 +36,10 @@ import { DocumentNumberingService } from '../../document-numbering/document-numb
 import { GoodsReceiptEntity } from '../goods-receipt/goods-receipt.entity';
 import { GoodsIssueService } from '../goods-issue/goods-issue.service';
 import { GoodsReceiptService } from '../goods-receipt/goods-receipt.service';
+import { MediaLinkService } from '../../media/media-link.service';
+import { MediaOwnerType } from '../../media/media-object.entity';
+import { MediaOwnerReaderRegistry } from '../../media/media-owner-reader.registry';
+import { MediaQueryService } from '../../media/media-query.service';
 
 describe('TransferOrderService', () => {
   let service: TransferOrderService;
@@ -42,6 +55,12 @@ describe('TransferOrderService', () => {
   let goodsReceiptService: Record<string, jest.Mock>;
   let dataSourceManagerQuery: jest.Mock;
   let dataSourceManagerInsert: jest.Mock;
+  let transactionManager: Record<string, jest.Mock>;
+  let transactionMock: jest.Mock;
+  let mediaLink: Record<string, jest.Mock>;
+  let mediaQuery: Record<string, jest.Mock>;
+  let mediaOwnerReaderRegistry: Record<string, jest.Mock>;
+  let docNumbering: Record<string, jest.Mock>;
 
   const actorSource = {
     userId: 'user-1',
@@ -142,6 +161,36 @@ describe('TransferOrderService', () => {
       .mockResolvedValue([[{ id: 'line-1' }], 1]);
     dataSourceManagerInsert = jest.fn().mockResolvedValue(undefined);
 
+    transactionManager = {
+      create: jest.fn().mockImplementation((_entity, data) => data),
+      delete: jest.fn().mockResolvedValue(undefined),
+      // Mirrors TypeORM's single-arg `manager.save(entity)`: returns the
+      // entity, defaulting a generated id only when the entity has none yet
+      // (a brand-new row from create()).
+      save: jest
+        .fn()
+        .mockImplementation((data) =>
+          Promise.resolve({ id: 'to-1', ...data }),
+        ),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    transactionMock = jest
+      .fn()
+      .mockImplementation((cb) => cb(transactionManager));
+
+    mediaLink = {
+      syncOwner: jest.fn().mockResolvedValue([]),
+    };
+    mediaQuery = {
+      listForOwners: jest.fn().mockResolvedValue(new Map()),
+    };
+    mediaOwnerReaderRegistry = {
+      register: jest.fn(),
+    };
+    docNumbering = {
+      generate: jest.fn().mockResolvedValue('LDC000001'),
+    };
+
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
         TransferOrderService,
@@ -158,24 +207,19 @@ describe('TransferOrderService', () => {
         {
           provide: DataSource,
           useValue: {
-            transaction: jest.fn().mockImplementation((cb) =>
-              cb({
-                delete: jest.fn().mockResolvedValue(undefined),
-                save: jest.fn().mockResolvedValue(undefined),
-              }),
-            ),
+            transaction: transactionMock,
             manager: {
               query: dataSourceManagerQuery,
               insert: dataSourceManagerInsert,
             },
           },
         },
-        {
-          provide: DocumentNumberingService,
-          useValue: { generate: jest.fn().mockResolvedValue('LDC000001') },
-        },
+        { provide: DocumentNumberingService, useValue: docNumbering },
         { provide: GoodsIssueService, useValue: goodsIssueService },
         { provide: GoodsReceiptService, useValue: goodsReceiptService },
+        { provide: MediaLinkService, useValue: mediaLink },
+        { provide: MediaQueryService, useValue: mediaQuery },
+        { provide: MediaOwnerReaderRegistry, useValue: mediaOwnerReaderRegistry },
       ],
     }).compile();
 
@@ -184,7 +228,6 @@ describe('TransferOrderService', () => {
 
   describe('create', () => {
     it('generates an LDC number and persists a DRAFT', async () => {
-      toRepo.save.mockResolvedValueOnce({ id: 'to-1' });
       toRepo.findOne.mockResolvedValue(baseOrder());
       await service.create(
         {
@@ -194,7 +237,7 @@ describe('TransferOrderService', () => {
         },
         actorSource,
       );
-      const saved = toRepo.save.mock.calls[0][0];
+      const saved = transactionManager.save.mock.calls[0][0];
       expect(saved.status).toBe(TransferOrderStatus.DRAFT);
       expect(saved.documentNumber).toBe('LDC000001');
     });
@@ -220,14 +263,13 @@ describe('TransferOrderService', () => {
         ),
       ).rejects.toThrow('Cửa hàng đích phải khác cửa hàng hiện tại');
 
-      expect(toRepo.save).not.toHaveBeenCalled();
+      expect(transactionMock).not.toHaveBeenCalled();
     });
 
     it('creates and exports a transfer order from a direct transfer-out request', async () => {
       locationRepo.findOne
         .mockResolvedValueOnce({ id: 'loc-A', storageId: 'storage-A' })
         .mockResolvedValue({ id: 'loc-unassigned', storageId: 'storage-A' });
-      toRepo.save.mockResolvedValueOnce({ id: 'to-1' });
       toRepo.findOne
         .mockResolvedValueOnce(baseOrder())
         .mockResolvedValueOnce(baseOrder())
@@ -278,7 +320,6 @@ describe('TransferOrderService', () => {
         id: 'loc-A',
         storageId: 'storage-A',
       });
-      toRepo.save.mockResolvedValueOnce({ id: 'to-1' });
       toRepo.findOne
         .mockResolvedValueOnce(baseOrder())
         .mockResolvedValueOnce(baseOrder());
@@ -298,6 +339,82 @@ describe('TransferOrderService', () => {
       ).rejects.toThrow('posting failed');
 
       expect(toRepo.softDelete).not.toHaveBeenCalled();
+    });
+
+    describe('attachments (T-04-03)', () => {
+      it('syncs attachmentIds through the same transaction as the insert, before the document number is minted, and inserts the sorted list directly', async () => {
+        toRepo.findOne.mockResolvedValue(baseOrder());
+        mediaLink.syncOwner.mockResolvedValueOnce(['media-1', 'media-2']);
+
+        await service.create(
+          {
+            sourceBranchId: 'branch-A',
+            destinationBranchId: 'branch-B',
+            attachmentIds: ['media-2', 'media-1'],
+            lines: [{ itemId: 'item-1', requestedQty: 5 }],
+          },
+          actorSource,
+        );
+
+        expect(mediaLink.syncOwner).toHaveBeenCalledWith(
+          MediaOwnerType.TRANSFER_ORDER,
+          'to-1',
+          ['media-2', 'media-1'],
+          actorSource,
+          transactionManager,
+        );
+        // The synced (sorted) list is written as part of the one INSERT —
+        // there is no second write to the attachmentIds column.
+        expect(transactionManager.save).toHaveBeenCalledWith(
+          expect.objectContaining({ attachmentIds: ['media-1', 'media-2'] }),
+        );
+        expect(transactionManager.update).not.toHaveBeenCalled();
+        // syncOwner runs before the document number is minted, so an
+        // invalid attachment id never burns a number gap.
+        expect(
+          mediaLink.syncOwner.mock.invocationCallOrder[0],
+        ).toBeLessThan(docNumbering.generate.mock.invocationCallOrder[0]);
+      });
+
+      it('never calls syncOwner when attachmentIds is not sent', async () => {
+        toRepo.findOne.mockResolvedValue(baseOrder());
+
+        await service.create(
+          {
+            sourceBranchId: 'branch-A',
+            destinationBranchId: 'branch-B',
+            lines: [{ itemId: 'item-1', requestedQty: 5 }],
+          },
+          actorSource,
+        );
+
+        expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+        expect(transactionManager.update).not.toHaveBeenCalled();
+      });
+
+      it('rolls back the whole create (rejects, never reaches findOrFail) when an attachment id belongs to another organization', async () => {
+        const crossOrgError = new NotFoundException('Media not found');
+        mediaLink.syncOwner.mockRejectedValueOnce(crossOrgError);
+
+        await expect(
+          service.create(
+            {
+              sourceBranchId: 'branch-A',
+              destinationBranchId: 'branch-B',
+              attachmentIds: ['media-other-org'],
+              lines: [{ itemId: 'item-1', requestedQty: 5 }],
+            },
+            actorSource,
+          ),
+        ).rejects.toBe(crossOrgError);
+
+        // The entity insert and the media sync ran in the same transaction
+        // callback — a real DataSource rolls the insert back when this
+        // throws. Here we prove the create() call itself never reaches the
+        // post-create read (findOrFail), i.e. no order is handed back.
+        expect(toRepo.findOne).not.toHaveBeenCalled();
+        expect(transactionManager.update).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -483,6 +600,53 @@ describe('TransferOrderService', () => {
       expect(balanceRepo.createQueryBuilder).not.toHaveBeenCalled();
     });
 
+    it('inlines attachments from MediaQueryService.listForOwners (T-04-03)', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder());
+      mediaQuery.listForOwners.mockResolvedValueOnce(
+        new Map([
+          [
+            'to-1',
+            [
+              {
+                id: 'media-1',
+                fileName: 'hop-dong.pdf',
+                contentType: 'application/pdf',
+                size: 1024,
+                sortOrder: 0,
+                bucket: 'erp-media-private',
+                objectKey: 'org/org-1/transfer_order/media-1',
+                ownerType: MediaOwnerType.TRANSFER_ORDER,
+              },
+            ],
+          ],
+        ]),
+      );
+
+      const to = await service.getById('to-1', actorSource);
+
+      expect(mediaQuery.listForOwners).toHaveBeenCalledWith(
+        MediaOwnerType.TRANSFER_ORDER,
+        ['to-1'],
+        'org-1',
+      );
+      expect((to as any).attachments).toEqual([
+        {
+          id: 'media-1',
+          fileName: 'hop-dong.pdf',
+          contentType: 'application/pdf',
+          size: 1024,
+        },
+      ]);
+    });
+
+    it('returns an empty attachments array when nothing is attached', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder());
+
+      const to = await service.getById('to-1', actorSource);
+
+      expect((to as any).attachments).toEqual([]);
+    });
+
     it('falls back to live stock resolution for legacy null bins', async () => {
       toRepo.findOne.mockResolvedValue(orderWithBin(null));
       balanceQb.getOne.mockResolvedValue({ locationId: 'loc-A01' });
@@ -556,7 +720,6 @@ describe('TransferOrderService', () => {
 
   describe('create — source bin', () => {
     it('persists each line bin from current stock', async () => {
-      toRepo.save.mockResolvedValueOnce({ id: 'to-1' });
       toRepo.findOne.mockResolvedValue(baseOrder());
       balanceQb.getOne.mockResolvedValue({ locationId: 'loc-A01' });
 
@@ -1114,6 +1277,85 @@ describe('TransferOrderService', () => {
         service.update('to-1', { notes: 'updated' }, actorDest),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
+
+    describe('attachments (T-04-03)', () => {
+      it('IN_PROGRESS: syncs attachmentIds through syncOwner (in its own transaction), after the status checks, and stores the SYNCED array (not the submitted one)', async () => {
+        toRepo.findOne.mockResolvedValue(
+          baseOrder({ status: TransferOrderStatus.IN_PROGRESS }),
+        );
+        // syncOwner drops 'media-x' (not actually attachable) — the saved row
+        // must reflect that, not the raw client-submitted list.
+        mediaLink.syncOwner.mockResolvedValueOnce(['media-1']);
+
+        await service.update(
+          'to-1',
+          { attachmentIds: ['media-1', 'media-x'] },
+          actorSource,
+        );
+
+        expect(mediaLink.syncOwner).toHaveBeenCalledWith(
+          MediaOwnerType.TRANSFER_ORDER,
+          'to-1',
+          ['media-1', 'media-x'],
+          actorSource,
+          transactionManager,
+        );
+        expect(transactionManager.save).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'to-1', attachmentIds: ['media-1'] }),
+        );
+      });
+
+      it('IN_PROGRESS: leaves attachments untouched (no syncOwner call) when attachmentIds is not sent', async () => {
+        toRepo.findOne.mockResolvedValue(
+          baseOrder({ status: TransferOrderStatus.IN_PROGRESS }),
+        );
+
+        await service.update('to-1', { notes: 'updated' }, actorSource);
+
+        expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+        expect(toRepo.save).toHaveBeenCalled();
+      });
+
+      it('DRAFT: syncs attachmentIds inside the same transaction as the header/lines save, and stores the SYNCED array (not the submitted one)', async () => {
+        toRepo.findOne.mockResolvedValue(baseOrder());
+        // syncOwner's sorted result differs from what was submitted — the
+        // saved row must carry that result, not the raw input order/content.
+        mediaLink.syncOwner.mockResolvedValueOnce(['media-1']);
+
+        await service.update(
+          'to-1',
+          { attachmentIds: ['media-2', 'media-1'] },
+          actorSource,
+        );
+
+        expect(mediaLink.syncOwner).toHaveBeenCalledWith(
+          MediaOwnerType.TRANSFER_ORDER,
+          'to-1',
+          ['media-2', 'media-1'],
+          actorSource,
+          transactionManager,
+        );
+        expect(transactionManager.save).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'to-1', attachmentIds: ['media-1'] }),
+        );
+      });
+
+      it.each([
+        ['COMPLETED', TransferOrderStatus.COMPLETED],
+        ['CANCELLED', TransferOrderStatus.CANCELLED],
+      ])(
+        '%s: rejects the edit and never calls syncOwner',
+        async (_label, status) => {
+          toRepo.findOne.mockResolvedValue(baseOrder({ status }));
+
+          await expect(
+            service.update('to-1', { attachmentIds: ['media-1'] }, actorSource),
+          ).rejects.toBeInstanceOf(BadRequestException);
+
+          expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+        },
+      );
+    });
   });
 
   describe('cancel', () => {
@@ -1652,6 +1894,56 @@ describe('TransferOrderService', () => {
         service.getImportGoodsReceipt('to-1', actorSource),
       ).rejects.toThrow(NotFoundException);
       expect(goodsReceiptService.buildPrintPayload).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('onModuleInit — media reader registration (ADR-06, T-04-03)', () => {
+    function registeredReader() {
+      service.onModuleInit();
+      expect(mediaOwnerReaderRegistry.register).toHaveBeenCalledWith(
+        MediaOwnerType.TRANSFER_ORDER,
+        expect.any(Function),
+      );
+      return mediaOwnerReaderRegistry.register.mock.calls[0][1] as (
+        ownerId: string,
+        actor: typeof actorSource,
+      ) => Promise<boolean>;
+    }
+
+    it('returns true when the actor can view the order (reuses getById)', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder());
+      const reader = registeredReader();
+
+      await expect(reader('to-1', actorSource)).resolves.toBe(true);
+    });
+
+    it('returns false (never throws) when getById 404s (org/branch mismatch)', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder());
+      const reader = registeredReader();
+
+      await expect(
+        reader('to-1', { ...actorSource, branchId: 'branch-C' }),
+      ).resolves.toBe(false);
+    });
+
+    it('rethrows an unexpected error instead of swallowing it to false', async () => {
+      toRepo.findOne.mockRejectedValue(new Error('db down'));
+      const reader = registeredReader();
+
+      await expect(reader('to-1', actorSource)).rejects.toThrow('db down');
+    });
+
+    it('also maps a ForbiddenException from getById to false (not just NotFoundException)', async () => {
+      // getById never actually throws ForbiddenException today, but the
+      // reader's contract (map NotFound/Forbidden to false, rethrow else)
+      // must hold regardless — assert it directly against the method, not
+      // against which exception getById happens to throw.
+      jest.spyOn(service, 'getById').mockRejectedValueOnce(
+        new ForbiddenException('no'),
+      );
+      const reader = registeredReader();
+
+      await expect(reader('to-1', actorSource)).resolves.toBe(false);
     });
   });
 });
