@@ -138,6 +138,13 @@ export const SALES_PERMISSION_KEYS: string[] = [
   'inventory.temp-warehouse.write',
   'inventory.temp-warehouse.close',
   'pos.sale.create',
+  // Mobile sales orders (erp_sales, consultant role): send / read / cancel own
+  // orders. Mirrors migration 1789960000000-SalesOrderPermissions, which grants
+  // these to every role holding `pos.sale.create`. Keep both in step — the
+  // sync seed rebuilds role_permissions from THIS list.
+  'pos.sales-order.read',
+  'pos.sales-order.create',
+  'pos.sales-order.cancel',
   'pos.invoice.read',
   'pos.invoice.write',
   'pos.return.create',
@@ -166,6 +173,14 @@ export const CASHIER_PERMISSION_KEYS: string[] = [
   'inventory.read',
   'inventory.item.read',
   'pos.sale.create',
+  // Mobile sales orders: the cashier sells like SALES (send / read / cancel)
+  // AND is the one who approves or rejects what consultants send. Same source
+  // as the migration: approve/reject follow `accounting.cash_receipt.create`.
+  'pos.sales-order.read',
+  'pos.sales-order.create',
+  'pos.sales-order.cancel',
+  'pos.sales-order.approve',
+  'pos.sales-order.reject',
   'pos.invoice.read',
   'pos.invoice.write',
   'pos.return.create',
