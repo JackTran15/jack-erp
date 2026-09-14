@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 import { MobileCustomerOrder } from './mobile-customer-list.query.dto';
-import { MobileRevenueItemListQueryDto } from './mobile-revenue-report.query.dto';
+import { MobilePagedReportQueryDto } from './mobile-revenue-report.query.dto';
 
 /**
  * Tiêu chí sắp xếp của `GET /mobile/reports/debts/customers` — khớp ba mục
@@ -17,16 +17,20 @@ export enum MobileCustomerDebtSort {
 /**
  * Query của `GET /mobile/reports/debts/customers`.
  *
- * Kế thừa `MobileRevenueItemListQueryDto` để lấy trọn bộ `from`/`to` BẮT BUỘC,
- * `branchIds`, `page`/`limit` — cùng tiền lệ `MobileOverviewReportQueryDto`
- * kế thừa chéo báo cáo. Thêm đúng ba trục mà màn Công nợ cần và báo cáo doanh
- * thu không có: tìm kiếm, tiêu chí sắp xếp, chiều sắp xếp.
+ * Kế thừa `MobilePagedReportQueryDto` để lấy trọn bộ `from`/`to` BẮT BUỘC,
+ * `branchIds`, `page`/`limit`. Thêm đúng ba trục mà màn Công nợ cần: tìm kiếm,
+ * tiêu chí sắp xếp, chiều sắp xếp.
+ *
+ * **Kế thừa base PHÂN TRANG, KHÔNG phải `MobileRevenueItemListQueryDto`** —
+ * trước đây nó kế thừa DTO của báo cáo doanh thu để mượn `page`/`limit`, và
+ * khi đường đó mọc ô tìm riêng thì hai `search` khác nghĩa đè lên nhau. Ô tìm
+ * của màn này tra KHÁCH HÀNG; ô kia tra MẶT HÀNG. Đừng nối lại.
  *
  * Kỳ ở đây có nghĩa KHÁC báo cáo doanh thu: nó không lọc dòng mà cắt sổ —
  * nợ CUỐI KỲ = mọi phát sinh tới hết `to`. `from` chỉ tách phần "đầu kỳ" khỏi
  * phần "trong kỳ" và hiện app chỉ dùng tổng của hai phần.
  */
-export class MobileCustomerDebtListQueryDto extends MobileRevenueItemListQueryDto {
+export class MobileCustomerDebtListQueryDto extends MobilePagedReportQueryDto {
   /** Tìm theo mã, tên hoặc số điện thoại khách — server tra, app không đoán trường. */
   @ApiPropertyOptional({ maxLength: 200 })
   @IsOptional()

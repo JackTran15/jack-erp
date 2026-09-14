@@ -172,6 +172,27 @@ export const SUBJECT_ROW_SQL = `
       COALESCE(SUM(qty), 0)::float      AS quantity,
       COALESCE(SUM(amount), 0)::float   AS revenue`;
 
+/**
+ * Mảnh WHERE của ô TÌM KIẾM trên `lines` — chỉ `GET /mobile/reports/revenue/items`
+ * dùng. [param] là placeholder ĐÃ bind sẵn chuỗi `%từ khoá%`.
+ *
+ * Ba cột khớp ĐÚNG nhánh `parent` của web (`revenue-by-item.report.ts`):
+ * `subject_code` ≡ `parentSku ?? itemCode`, `subject_name` ≡ `parentName ?? itemName`,
+ * `category_name` ≡ `itemCategory`.
+ *
+ * `item_code`/`item_name` (mã/tên BIẾN THỂ) cố ý VẮNG: grain của đường này là
+ * mẫu mã, và web loại hai cột đó ở đúng grain này vì một từ khoá ngắn khớp một
+ * biến thể sẽ kéo nguyên mẫu mã lên. Đừng "thêm cho đủ".
+ *
+ * MỘT placeholder dùng lại ba lần — nhờ vậy câu dữ liệu và câu tổng chia nhau
+ * đúng một tham số, và mảng tham số của hai câu không lệch nhau.
+ */
+export function searchMatchSql(param: string): string {
+  return `subject_code ILIKE ${param}
+         OR subject_name ILIKE ${param}
+         OR category_name ILIKE ${param}`;
+}
+
 export const SUBJECT_GROUP_BY_SQL = 'GROUP BY subject_id';
 
 /** Doanh thu giảm dần, hoà thì theo mã rồi id — thứ tự cố định, app không chọn. */

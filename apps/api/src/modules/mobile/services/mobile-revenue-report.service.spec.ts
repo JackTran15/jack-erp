@@ -135,6 +135,62 @@ describe('MobileRevenueReportService', () => {
       const result = await service.listItems({ ...range, page: 1, limit: 20 }, actor);
       expect(result).toMatchObject({ data: [], total: 0, totalQuantity: 0, totalRevenue: 0 });
     });
+
+    describe('search', () => {
+      it('lọc trên mã/tên mẫu mã và tên nhóm, MỘT tham số dùng cho cả ba cột', async () => {
+        await service.listItems({ ...range, page: 1, limit: 20, search: 'áo' }, actor);
+
+        const [dataSql, dataParams] = query.mock.calls[0];
+
+        expect(dataSql).toContain('subject_code ILIKE $5');
+        expect(dataSql).toContain('subject_name ILIKE $5');
+        expect(dataSql).toContain('category_name ILIKE $5');
+        expect(dataParams[4]).toBe('%áo%');
+
+        // Grain của đường này là MẪU MÃ: mã/tên biến thể cố ý không được tìm,
+        // đúng nhánh `parent` của web. Đây là cái chốt duy nhất giữ điều đó.
+        expect(dataSql).not.toContain('item_code ILIKE');
+        expect(dataSql).not.toContain('item_name ILIKE');
+      });
+
+      it('câu TỔNG cũng lọc, và chia đúng tham số với câu dữ liệu', async () => {
+        query
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([{ total: 2, totalQuantity: 5, totalRevenue: 500 }]);
+
+        await service.listItems({ ...range, page: 1, limit: 20, search: 'áo' }, actor);
+
+        const [dataSql, dataParams] = query.mock.calls[0];
+        const [totalsSql, totalsParams] = query.mock.calls[1];
+
+        // Thiếu vế này thì thanh Tổng nói về một tập khác các dòng bên dưới,
+        // và `total` (nguồn của `hasMore`) đếm trên tập chưa lọc.
+        expect(totalsSql).toContain('subject_code ILIKE $5');
+        expect(totalsSql).not.toContain('LIMIT');
+
+        // Tham số của `search` phải bind TRƯỚC khi chụp `totalsParams`; sai thứ
+        // tự là Postgres ném "bind message supplies N parameters".
+        expect(totalsParams).toEqual(dataParams.slice(0, 5));
+        expect(totalsParams[4]).toBe('%áo%');
+      });
+
+      it('rỗng / toàn khoảng trắng → không thêm mệnh đề nào', async () => {
+        for (const search of ['', '   ', undefined]) {
+          query.mockClear();
+          await service.listItems({ ...range, page: 1, limit: 20, search }, actor);
+
+          const [dataSql, dataParams] = query.mock.calls[0];
+          expect(dataSql).not.toContain('ILIKE');
+          expect(dataSql).toContain('LIMIT $5 OFFSET $6');
+          expect(dataParams).toHaveLength(6);
+        }
+      });
+
+      it('cắt khoảng trắng thừa quanh từ khoá', async () => {
+        await service.listItems({ ...range, page: 1, limit: 20, search: '  áo  ' }, actor);
+        expect(query.mock.calls[0][1][4]).toBe('%áo%');
+      });
+    });
   });
 
   describe('listCategories', () => {

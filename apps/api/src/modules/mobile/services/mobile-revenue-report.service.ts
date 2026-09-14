@@ -18,6 +18,7 @@ import {
 import { resolveReportBranchScope } from './mobile-report-scope.util';
 import {
   revenueLinesSql,
+  searchMatchSql,
   SUBJECT_GROUP_BY_SQL,
   SUBJECT_ORDER_BY_SQL,
   SUBJECT_ROW_SQL,
@@ -85,15 +86,26 @@ export class MobileRevenueReportService {
 
   /** Trang 1: mặt hàng (mẫu mã) có phát sinh trong kỳ, doanh thu giảm dần, kèm hai tổng toàn tập. */
   async listItems(
-    query: ScopeQuery & { page: number; limit: number },
+    query: ScopeQuery & { page: number; limit: number; search?: string },
     actor: ActorContext,
   ): Promise<MobileRevenueItemPageDto> {
     const scope = await this.resolveScope(query, actor);
     const { page, limit } = query;
     const cte = `WITH ${revenueLinesSql(scope)}`;
 
+    // Ô tìm ở header app. Lọc Ở CÂU NGOÀI, trên CTE `lines` — KHÔNG đụng
+    // `revenueLinesSql`, vì sáu endpoint dùng chung nó và chỉ đường này có ô tìm.
+    //
+    // Ba cột dưới đây ứng ĐÚNG nhánh `parent` của web (`revenue-by-item.report.ts`):
+    // `subject_code` ≡ `parentSku ?? itemCode`, `subject_name` ≡ `parentName ?? itemName`,
+    // `category_name` ≡ `itemCategory`. `item_code`/`item_name` (biến thể) cố ý
+    // KHÔNG có mặt — xem doc của `MobileRevenueItemListQueryDto.search`.
+    const term = query.search?.trim();
+    const searchWhere = term ? `WHERE ${searchMatchSql(scope.bind(`%${term}%`))}` : '';
+
     // Chốt tham số của câu tổng TRƯỚC khi thêm `LIMIT`/`OFFSET` — cùng bẫy
     // "bind message supplies N parameters" đã ghi ở `MobileInventoryService`.
+    // Tham số của `search` phải bind TRƯỚC dòng này: câu tổng cũng dùng nó.
     const totalsParams = [...scope.params];
     const limitParam = scope.bind(limit);
     const offsetParam = scope.bind((page - 1) * limit);
@@ -102,20 +114,23 @@ export class MobileRevenueReportService {
       ${cte}
       SELECT ${SUBJECT_ROW_SQL}
       FROM lines
+      ${searchWhere}
       ${SUBJECT_GROUP_BY_SQL}
       ${SUBJECT_ORDER_BY_SQL}
       LIMIT ${limitParam} OFFSET ${offsetParam}
     `;
 
     // Câu tổng không phân trang: `total` phải khớp `data`, và hai tổng là của
-    // TOÀN tập chứ không phải của trang.
+    // TOÀN tập chứ không phải của trang. `searchWhere` PHẢI có mặt ở cả hai câu
+    // — thiếu ở đây thì thanh Tổng nói về một tập khác các dòng bên dưới, và
+    // `total` (nguồn của `hasMore`) đếm trên tập chưa lọc nên cuộn vô tận hỏng.
     const totalsSql = `
       ${cte}
       SELECT
         COUNT(*)::int                          AS total,
         COALESCE(SUM(quantity), 0)::float      AS "totalQuantity",
         COALESCE(SUM(revenue), 0)::float       AS "totalRevenue"
-      FROM (SELECT ${SUBJECT_ROW_SQL} FROM lines ${SUBJECT_GROUP_BY_SQL}) t
+      FROM (SELECT ${SUBJECT_ROW_SQL} FROM lines ${searchWhere} ${SUBJECT_GROUP_BY_SQL}) t
     `;
 
     const [data, totalsRows] = await Promise.all([

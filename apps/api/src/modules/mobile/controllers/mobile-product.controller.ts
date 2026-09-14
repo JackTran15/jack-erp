@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -31,9 +33,12 @@ import { MobileProductService } from '../services/mobile-product.service';
 /**
  * Danh mục hàng hoá cho app mobile.
  *
- * Đọc (danh sách + chi tiết) và GHI (tạo + sửa). **Chưa có `DELETE`** vì app
- * chưa có đường xoá — nút Xoá trên màn chi tiết vẫn báo "sắp có". Thêm khi màn
- * tương ứng ra đời, đừng dựng sẵn.
+ * Đọc (danh sách + chi tiết) và GHI (tạo + sửa + xoá).
+ *
+ * `DELETE` uỷ quyền TRẦN cho `InventoryItemCrudService.remove` — đúng service
+ * mà web gọi qua `/admin/entities/inventory-items/records/:id`, để hai đầu
+ * hành xử giống hệt nhau kể cả khi đường xoá đang hỏng. Hệ quả và hai khiếm
+ * khuyết đã biết của đường dùng chung ở `MobileProductService.remove`.
  *
  * Một dòng là một MẪU MÃ chứ không phải một biến thể; lý do và cách gộp ở
  * `MobileProductService`.
@@ -119,5 +124,17 @@ export class MobileProductController {
     @Actor() actor: ActorContext,
   ): Promise<MobileProductDetailResponseDto> {
     return this.products.update(id, dto, actor);
+  }
+
+  /** Xoá CỨNG — hệ quả và các giới hạn ở `MobileProductService.remove`. */
+  @Delete(':id')
+  @HttpCode(204)
+  @RequirePermission('inventory.write')
+  @ApiOperation({ summary: 'Xoá hàng hoá theo id (mẫu mã hoặc item lẻ)' })
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ): Promise<void> {
+    return this.products.remove(id, actor);
   }
 }

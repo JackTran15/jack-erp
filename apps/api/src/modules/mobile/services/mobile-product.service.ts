@@ -485,6 +485,39 @@ export class MobileProductService {
   }
 
   /**
+   * Xoá một hàng hoá — UỶ QUYỀN TRẦN cho `InventoryItemCrudService.remove`,
+   * ĐÚNG service mà web gọi qua `DELETE /admin/entities/inventory-items/records/:id`
+   * (client ở `apps/backoffice-web/src/components/crud/useCrudApi.ts`).
+   *
+   * Yêu cầu là **web và mobile hành xử GIỐNG HỆT nhau**, kể cả ở những chỗ
+   * đường xoá đang hỏng — nên method này cố ý không thêm bất cứ thứ gì.
+   *
+   * **KHÔNG có `await this.findById(id, actor)` phủ đầu như [update].** Ở đó nó
+   * cần thiết vì lượt GHI phải chắc chắn bản ghi tồn tại trước khi đụng vào
+   * nhiều bảng; ở đây thêm vào là mobile ném 404 tiếng Việt trong khi web ném
+   * `Record ... not found` của `BaseCrudService.getById` — tức lệch.
+   *
+   * **Hai khiếm khuyết ĐÃ BIẾT của đường dùng chung, cố ý không vá ở đây:**
+   *
+   * 1. `BaseCrudService.remove` truyền kết quả `getById` vào `manager.remove`,
+   *    mà `InventoryItemCrudService` override `getById` để trả một OBJECT
+   *    LITERAL (nó spread `transformListResults`; nhánh product-id thì
+   *    `getRepresentativeItemForProduct` cũng spread). TypeORM từ chối xoá một
+   *    object không có prototype entity — `CannotDetermineEntityError` — nên
+   *    lượt xoá hợp lệ hiện trả 500 ở CẢ hai đầu.
+   * 2. `beforeDelete` dò `stock_ledger_entries WHERE item_id = $1`. `id` ở đây
+   *    là HỖN HỢP (mẫu mã hoặc item lẻ), nên một `products.id` không khớp dòng
+   *    nào và guard "đã phát sinh chứng từ" im lặng cho qua.
+   *
+   * Cả hai thuộc `BaseCrudService` / `InventoryItemCrudService`. Sửa ở FILE NÀY
+   * là làm mobile lệch web — đúng thứ yêu cầu cấm. Sửa ở đó thì cả hai đầu cùng
+   * đúng mà không phải mở lại file này.
+   */
+  remove(id: string, actor: ActorContext): Promise<void> {
+    return this.itemCrud.remove(id, actor);
+  }
+
+  /**
    * Hình dạng của app -> hình dạng mà `InventoryItemCrudService` đọc.
    *
    * Chỉ có hai phép biến đổi thật, phần còn lại là chuyển tiếp nguyên văn:
