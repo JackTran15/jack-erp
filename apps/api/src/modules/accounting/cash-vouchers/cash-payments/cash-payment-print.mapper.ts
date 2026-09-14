@@ -19,7 +19,7 @@ const LINE_COLUMNS = [
   { col: 'amount', label: 'Số tiền', type: ReportColumnDataType.CURRENCY },
 ];
 
-const SIGNATURES = ['Người lập phiếu', 'Kế toán trưởng', 'Thủ quỹ', LABELS.lastSignature];
+const SIGNATURES = [LABELS.staffLabel, 'Kế toán trưởng', 'Thủ quỹ', LABELS.lastSignature];
 
 /** One `info` row, or none when the value is blank — an empty label:value line looks like a bug on paper. */
 function infoRow(label: string, value?: string | null): InfoRow[] {
@@ -30,14 +30,14 @@ function infoRow(label: string, value?: string | null): InfoRow[] {
 /**
  * Maps a `CashPaymentEntity` (as returned by `CashPaymentsService.getById`, already
  * carrying its `lines`) into a `VoucherPrintPayload` (ADR-05). Pure — the caller
- * resolves `branch`, the cash account's display name, and each line's category
+ * resolves `branch`, the staff/creator display names, and each line's category
  * name (`categoryId` is a plain FK column, not a loaded relation) before calling
  * this. Same contract as `mapCashReceiptToVoucherPayload`.
  */
 export function mapCashPaymentToVoucherPayload(
   payment: CashPaymentEntity,
   branch: DocumentBranchInfo | null,
-  cashAccountName: string,
+  staffName: string | null,
   categoryNames: Map<string, string>,
 ): VoucherPrintPayload {
   const lines: ReportRow[] = payment.lines.map((line) => ({
@@ -57,8 +57,8 @@ export function mapCashPaymentToVoucherPayload(
     ...infoRow(LABELS.partyLabel, payment.partnerNameSnapshot),
     ...infoRow('Địa chỉ', payment.partnerAddressSnapshot),
     ...infoRow(LABELS.personLabel, payment.payeeName),
+    ...infoRow(LABELS.staffLabel, staffName),
     ...infoRow('Lý do', payment.reason),
-    ...infoRow('Quỹ tiền mặt', cashAccountName),
   ];
 
   return {

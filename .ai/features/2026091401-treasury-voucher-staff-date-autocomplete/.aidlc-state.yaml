@@ -1,0 +1,274 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: treasury-voucher-staff-date-autocomplete
+slug: 2026091401-treasury-voucher-staff-date-autocomplete
+profile: none
+created: 2026-09-14T14:05:16
+ruleset: 5
+current_gate: G5
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-14T14:28:47
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-14T14:28:55
+    by: Akenzy
+    evidence: 15 assumptions, none blocking-and-pending; 18 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-14T14:28:55
+    by: Akenzy
+    evidence: 6 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-14T14:28:55
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 10 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-14T14:30:47
+    by: claude-implementer
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-14T14:30:53
+    by: claude-implementer
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-14T14:31:05
+    by: claude-implementer
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-14T14:31:15
+    by: claude-implementer
+    ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-14T14:31:57
+    by: claude-implementer
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-14T14:33:02
+    by: claude-implementer
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-14T14:34:30
+    by: claude-implementer
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-14T14:36:10
+    by: claude-implementer
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-14T14:41:34
+    by: claude-implementer
+    ticket: T-03-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-14T14:41:35
+    by: claude-implementer
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done
+    at: 2026-09-14T14:57:52
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-14T14:57:52
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-09-14T14:57:52
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-14T14:57:52
+    by: Akenzy
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-14T14:57:52
+    by: Akenzy
+    ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-14T14:58:43
+    by: claude-implementer
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-14T15:00:02
+    by: claude-implementer
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-14T15:00:09
+    by: claude-implementer
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-14T15:01:13
+    by: claude-implementer
+    ticket: T-02-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-14T15:06:51
+    by: claude-implementer
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done
+    at: 2026-09-14T15:08:46
+    by: Akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done
+    at: 2026-09-14T15:08:47
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-14T15:09:52
+    by: claude-implementer
+    ticket: T-01-04
+  - gate: G4
+    action: ticket review
+    at: 2026-09-14T15:10:50
+    by: claude-implementer
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done
+    at: 2026-09-14T15:11:41
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-14T15:16:15
+    by: claude-implementer
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done
+    at: 2026-09-14T15:18:18
+    by: Akenzy
+    ticket: T-01-04
+  - gate: G1
+    action: reopened
+    at: 2026-09-14T15:21:40
+    by: Akenzy
+    reason: Akenzy 14/09/2026 sau khi xem bản xuất - cột ký đầu tiên phải ghi 'Nhân viên thu' (phiếu thu) / 'Nhân viên chi' (phiếu chi) thay cho 'Người lập phiếu'. AC-05..AC-08 và ADR-02 viết theo nhãn cũ; thêm A-16, ADR-07, ticket T-01-06 trước T-01-05.
+  - gate: G1
+    action: passed
+    at: 2026-09-14T15:24:41
+    by: Akenzy
+    evidence: 16 assumptions, none blocking-and-pending; 18 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-14T15:24:41
+    by: Akenzy
+    evidence: 7 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-14T15:24:41
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 11 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-14T15:25:17
+    by: claude-implementer
+    ticket: T-01-06
+  - gate: G4
+    action: ticket review
+    at: 2026-09-14T15:28:50
+    by: claude-implementer
+    ticket: T-01-06
+  - gate: G4
+    action: ticket done
+    at: 2026-09-14T15:33:45
+    by: Akenzy
+    ticket: T-01-06
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-14T15:38:59
+    by: claude-implementer
+    ticket: T-01-05
+  - gate: G1
+    action: reopened
+    at: 2026-09-14T15:47:00
+    by: Akenzy
+    reason: Akenzy 14/09/2026 sau khi xem bản in - không in sẵn tên dưới cột ký 'Nhân viên thu'/'Nhân viên chi'. Chọn gỡ hẳn phần in tên (signatureNames, tra người tạo). Giữ nhãn cột ký (A-16) và dòng 'Nhân viên thu/chi' trong khối thông tin. A-01, A-10 bị bác; AC-05..AC-08 viết lại; thêm ADR-08, ticket T-01-07, T-01-08; T-01-05 đổi kỳ vọng.
+  - gate: G1
+    action: passed
+    at: 2026-09-14T15:55:28
+    by: Akenzy
+    evidence: 15 assumptions, none blocking-and-pending; 18 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-14T15:55:28
+    by: Akenzy
+    evidence: 8 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-14T15:55:28
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 13 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-14T15:57:56
+    by: claude-implementer
+    ticket: T-01-07
+  - gate: G4
+    action: ticket review
+    at: 2026-09-14T16:07:29
+    by: claude-implementer
+    ticket: T-01-07
+  - gate: G4
+    action: ticket done
+    at: 2026-09-14T16:17:26
+    by: Akenzy
+    ticket: T-01-07
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-14T16:18:31
+    by: claude-implementer
+    ticket: T-01-08
+  - gate: G4
+    action: ticket review
+    at: 2026-09-14T16:21:38
+    by: claude-implementer
+    ticket: T-01-08
+  - gate: G4
+    action: ticket done
+    at: 2026-09-14T16:27:06
+    by: Akenzy
+    ticket: T-01-08
+  - gate: G4
+    action: ticket review
+    at: 2026-09-14T16:33:38
+    by: claude-implementer
+    ticket: T-01-05
+  - gate: G4
+    action: ticket done
+    at: 2026-09-14T16:35:27
+    by: Akenzy
+    ticket: T-01-05
+  - gate: G4
+    action: passed
+    at: 2026-09-14T16:44:56
+    by: Akenzy
+    evidence: no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 13 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-09-14T19:20:00
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

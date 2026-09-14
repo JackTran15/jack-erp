@@ -12,7 +12,7 @@ import { CashVouchersModule } from '../cash-vouchers/cash-vouchers.module';
 import { PartnerResolverService } from '../cash-vouchers/shared/partner-resolver.service';
 import { UserEntity } from '../../auth/user.entity';
 import { EmployeeProfileEntity } from '../../rbac/employee/employee-profile.entity';
-import { VoucherStaffResolver } from './shared/voucher-staff.resolver';
+import { VoucherStaffResolver } from '../cash-vouchers/shared/voucher-staff.resolver';
 import { DepositDebtCollectionSagaEntity } from './debt-collection/deposit-debt-collection-saga.entity';
 import { DepositDebtCollectionSagaService } from './debt-collection/deposit-debt-collection-saga.service';
 import { DepositDebtCollectionController } from './debt-collection/deposit-debt-collection.controller';

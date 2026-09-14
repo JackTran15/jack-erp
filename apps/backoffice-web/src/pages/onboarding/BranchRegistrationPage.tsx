@@ -177,6 +177,7 @@ export function BranchRegistrationPage() {
             <input
               className="h-9 rounded-md border border-input bg-background px-3 text-sm font-normal outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
               type="text"
+              autoComplete="off"
               required
               minLength={2}
               maxLength={200}
@@ -190,6 +191,7 @@ export function BranchRegistrationPage() {
             <input
               className="h-9 rounded-md border border-input bg-background px-3 text-sm font-normal outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
               type="text"
+              autoComplete="off"
               maxLength={500}
               value={form.address}
               onChange={(e) => handleChange("address", e.target.value)}
@@ -201,6 +203,7 @@ export function BranchRegistrationPage() {
             <input
               className="h-9 rounded-md border border-input bg-background px-3 text-sm font-normal outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
               type="tel"
+              autoComplete="off"
               maxLength={30}
               value={form.phone}
               onChange={(e) => handleChange("phone", e.target.value)}
@@ -212,6 +215,7 @@ export function BranchRegistrationPage() {
             <input
               className="h-9 rounded-md border border-input bg-background px-3 text-sm font-normal outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
               type="email"
+              autoComplete="off"
               value={form.email}
               onChange={(e) => handleChange("email", e.target.value)}
             />
@@ -222,6 +226,7 @@ export function BranchRegistrationPage() {
             <input
               className="h-9 rounded-md border border-input bg-background px-3 text-sm font-normal outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
               type="text"
+              autoComplete="off"
               placeholder="UUID chi nhánh cha (tuỳ chọn)"
               value={form.parentBranchId}
               onChange={(e) => handleChange("parentBranchId", e.target.value)}

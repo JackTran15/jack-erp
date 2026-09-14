@@ -1086,6 +1086,7 @@ export function TransferLocationDialog({
                     <td className="border-b px-2 py-2">
                       <input
                         type="number"
+                        autoComplete="off"
                         min={0}
                         step="any"
                         value={row.qty}

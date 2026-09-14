@@ -172,6 +172,7 @@ export function OrgRegistrationPage() {
             <input
               className="h-9 rounded-md border border-input bg-background px-3 text-sm font-normal outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
               type="text"
+              autoComplete="off"
               required
               minLength={2}
               maxLength={200}
@@ -185,6 +186,7 @@ export function OrgRegistrationPage() {
             <input
               className="h-9 rounded-md border border-input bg-background px-3 text-sm font-normal outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
               type="email"
+              autoComplete="off"
               required
               value={form.contactEmail}
               onChange={(e) => handleChange("contactEmail", e.target.value)}
@@ -196,6 +198,7 @@ export function OrgRegistrationPage() {
             <input
               className="h-9 rounded-md border border-input bg-background px-3 text-sm font-normal outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
               type="tel"
+              autoComplete="off"
               maxLength={30}
               value={form.contactPhone}
               onChange={(e) => handleChange("contactPhone", e.target.value)}
@@ -207,6 +210,7 @@ export function OrgRegistrationPage() {
             <input
               className="h-9 rounded-md border border-input bg-background px-3 text-sm font-normal outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
               type="text"
+              autoComplete="off"
               required
               minLength={2}
               value={form.ownerName}
@@ -219,6 +223,7 @@ export function OrgRegistrationPage() {
             <input
               className="h-9 rounded-md border border-input bg-background px-3 text-sm font-normal outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
               type="email"
+              autoComplete="off"
               required
               value={form.ownerEmail}
               onChange={(e) => handleChange("ownerEmail", e.target.value)}

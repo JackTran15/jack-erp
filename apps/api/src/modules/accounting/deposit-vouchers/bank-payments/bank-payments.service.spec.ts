@@ -7,14 +7,13 @@ import { BankPaymentsService } from './bank-payments.service';
 import { BankPaymentEntity } from './bank-payment.entity';
 import { BankPaymentLineEntity } from './bank-payment-line.entity';
 import { DepositService } from '../../deposit/deposit.service';
-import { DepositAccountEntity } from '../../deposit/deposit-account.entity';
 import { DocumentNumberingService } from '../../../document-numbering/document-numbering.service';
 import { PartnerResolverService } from '../../cash-vouchers/shared/partner-resolver.service';
 import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
 import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
 import { SupplierDepositPaymentSagaService } from '../supplier-deposit-payment/supplier-deposit-payment-saga.service';
 import { DepositPeriodGuardService } from '../../deposit-period-lock/deposit-period-guard.service';
-import { VoucherStaffResolver } from '../shared/voucher-staff.resolver';
+import { VoucherStaffResolver } from '../../cash-vouchers/shared/voucher-staff.resolver';
 import {
   BankPaymentPurpose,
   BankPaymentReferenceType,
@@ -69,6 +68,7 @@ describe('BankPaymentsService', () => {
   let accountResolver: { resolveContraAccount: jest.Mock };
   let supplierDepositPaymentSaga: { compensate: jest.Mock };
   let periodGuard: { assertNotLocked: jest.Mock };
+  let staffResolver: { resolveMany: jest.Mock };
   let dataSource: { transaction: jest.Mock; manager: any };
 
   const setup = async (manager: any) => {
@@ -84,6 +84,14 @@ describe('BankPaymentsService', () => {
     };
     supplierDepositPaymentSaga = { compensate: jest.fn().mockResolvedValue(undefined) };
     periodGuard = { assertNotLocked: jest.fn().mockResolvedValue(undefined) };
+    // Read paths resolve the cashier name via `resolveMany` inside `attachStaff`
+    // (called once by `getById`); `getPrintPayload` reads the resulting
+    // `paidByName` straight off the entity rather than resolving again
+    // (T-01-07). Most specs only assert voucher fields, so an empty resolution
+    // is enough.
+    staffResolver = {
+      resolveMany: jest.fn().mockResolvedValue(new Map()),
+    };
     dataSource = {
       transaction: jest.fn((cb) => cb(manager)),
       manager,
@@ -100,12 +108,7 @@ describe('BankPaymentsService', () => {
         { provide: PartnerResolverService, useValue: partnerResolver },
         { provide: AccountResolverService, useValue: accountResolver },
         { provide: DepositPeriodGuardService, useValue: periodGuard },
-        // Read paths resolve the cashier name; the specs assert voucher fields,
-        // so an empty resolution is enough.
-        {
-          provide: VoucherStaffResolver,
-          useValue: { resolveMany: jest.fn().mockResolvedValue(new Map()) },
-        },
+        { provide: VoucherStaffResolver, useValue: staffResolver },
         {
           provide: SupplierDepositPaymentSagaService,
           useValue: supplierDepositPaymentSaga,
@@ -568,7 +571,7 @@ describe('BankPaymentsService', () => {
     });
   });
 
-  describe('getPrintPayload (T-03-03, AC-11)', () => {
+  describe('getPrintPayload (T-03-03, AC-11; staff/creator T-01-04)', () => {
     const basePayment = {
       id: 'p-1',
       organizationId: 'org-1',
@@ -587,6 +590,8 @@ describe('BankPaymentsService', () => {
       totalAmount: 500000,
       referenceType: BankPaymentReferenceType.MANUAL,
       revision: 0,
+      paidBy: 'staff-1',
+      createdBy: 'creator-1',
       lines: [
         { id: 'line-1', description: 'Mua vật tư', categoryId: 'cat-1', amount: 500000 },
       ],
@@ -596,7 +601,8 @@ describe('BankPaymentsService', () => {
      * Entity-aware `EntityManager` mock: `getPrintPayload` fans out to
      * `getById` (via `manager.findOne`), `loadVoucherBranch` (via
      * `manager.getRepository(BranchEntity).findOne`), and the service's own
-     * `manager.findOne`/`manager.find` for the deposit account and categories.
+     * `manager.find` for categories. Staff/creator names come from the
+     * separately-mocked `staffResolver`, not the manager.
      * The `BankPaymentEntity` branch mirrors the real query's WHERE clause so
      * an org/id mismatch reproduces the same 404 `getById` would give.
      */
@@ -604,7 +610,6 @@ describe('BankPaymentsService', () => {
       opts: {
         payment?: typeof basePayment;
         branch?: any;
-        depositAccount?: any;
         categories?: any[];
       } = {},
     ) {
@@ -617,7 +622,6 @@ describe('BankPaymentsService', () => {
             if (options.where.id !== payment.id) return null;
             return payment;
           }
-          if (entity === DepositAccountEntity) return opts.depositAccount ?? null;
           return null;
         }),
         find: jest.fn(async (entity: any) =>
@@ -632,19 +636,21 @@ describe('BankPaymentsService', () => {
       return manager;
     }
 
-    it('resolves branch, bank account name and category names into a BANK_PAYMENT payload', async () => {
+    it('resolves branch, the staff name (via attachStaff\'s paidByName) and category names into a BANK_PAYMENT payload, and drops "Tài khoản ngân hàng"; no signatureNames key, no creator id/name anywhere (AC-03, T-01-07)', async () => {
       const manager = buildPrintPayloadManager({
-        payment: basePayment,
+        payment: { ...basePayment },
         branch: {
           id: 'branch-1',
           name: 'Chi nhánh Q1',
           address: '1 Đường ABC',
           phone: '0900000000',
         },
-        depositAccount: { id: 'dep-acc-1', name: 'Vietcombank CN Q1' },
         categories: [{ id: 'cat-1', name: 'Mua vật tư' }],
       });
       await setup(manager);
+      staffResolver.resolveMany.mockResolvedValue(
+        new Map([['staff-1', { code: null, name: 'Nguyễn Văn A' }]]),
+      );
 
       const payload = await service.getPrintPayload('p-1', actor);
 
@@ -658,13 +664,35 @@ describe('BankPaymentsService', () => {
         phone: '0900000000',
       });
       expect(payload.info).toContainEqual({
-        label: 'Tài khoản ngân hàng',
-        value: 'Vietcombank CN Q1',
+        label: 'Nhân viên chi',
+        value: 'Nguyễn Văn A',
       });
+      expect(payload.info.some((row) => row.label === 'Tài khoản ngân hàng')).toBe(false);
+      expect(payload).not.toHaveProperty('signatureNames');
+      expect(JSON.stringify(payload)).not.toContain('creator-1');
       expect(payload.lines[0]).toMatchObject({
         categoryName: 'Mua vật tư',
         amount: 500000,
       });
+    });
+
+    it('reads paidByName straight off the entity that getById/attachStaff already resolved — resolveMany is called only once, not a second time by getPrintPayload', async () => {
+      const manager = buildPrintPayloadManager({
+        payment: { ...basePayment },
+        branch: null,
+        categories: [],
+      });
+      await setup(manager);
+      staffResolver.resolveMany.mockResolvedValue(
+        new Map([['staff-1', { code: null, name: 'Nguyễn Văn A' }]]),
+      );
+
+      const payload = await service.getPrintPayload('p-1', actor);
+
+      expect(payload.info.find((row) => row.label === 'Nhân viên chi')?.value).toBe(
+        'Nguyễn Văn A',
+      );
+      expect(staffResolver.resolveMany).toHaveBeenCalledTimes(1);
     });
 
     it('id not found ⇒ 404 (not 403)', async () => {

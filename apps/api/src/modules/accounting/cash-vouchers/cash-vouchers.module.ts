@@ -21,6 +21,9 @@ import {
 } from './cash-voucher-categories/cash-voucher-categories.service';
 import { CashVoucherCategorySeederService } from './cash-voucher-categories/cash-voucher-category.seeder';
 import { PartnerResolverService } from './shared/partner-resolver.service';
+import { VoucherStaffResolver } from './shared/voucher-staff.resolver';
+import { UserEntity } from '../../auth/user.entity';
+import { EmployeeProfileEntity } from '../../rbac/employee/employee-profile.entity';
 import { PartnerLookupService } from './shared/partner-lookup.service';
 import { PartnerLookupController } from './shared/partner-lookup.controller';
 import { ReceivingAccountController } from './shared/receiving-account.controller';
@@ -65,6 +68,8 @@ import { SearchCashLedgerV2Handler } from './cash-ledger/queries/search-cash-led
       CashAccountEntity,
       DebtCollectionSagaEntity,
       SupplierDebtPaymentSagaEntity,
+      UserEntity,
+      EmployeeProfileEntity,
     ]),
     CashModule,
     PaymentAccountsModule,
@@ -92,6 +97,7 @@ import { SearchCashLedgerV2Handler } from './cash-ledger/queries/search-cash-led
     },
     CashVoucherCategorySeederService,
     PartnerResolverService,
+    VoucherStaffResolver,
     PartnerLookupService,
     CashVoucherCategoryResolverService,
     CashReceiptsService,

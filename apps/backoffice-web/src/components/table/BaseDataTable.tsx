@@ -486,6 +486,7 @@ export function BaseDataTable<T>({
                           <span className="inline-flex w-7 shrink-0 items-center justify-center border-r bg-muted/30 text-xs font-semibold text-muted-foreground">=</span>
                           <input
                             type={kind}
+                            autoComplete="off"
                             className="h-8 min-w-0 flex-1 border-0 bg-background px-2 text-xs font-normal outline-none focus:ring-1 focus:ring-inset focus:ring-ring"
                             value={activeFilter?.value ?? ""}
                             onChange={(event) => {
@@ -550,6 +551,7 @@ export function BaseDataTable<T>({
                           <input
                             type="number"
                             inputMode="numeric"
+                            autoComplete="off"
                             className="h-8 min-w-0 flex-1 border-0 bg-background px-2 text-xs font-normal outline-none focus:ring-1 focus:ring-inset focus:ring-ring"
                             placeholder="Giá trị..."
                             value={activeFilter?.value ?? ""}

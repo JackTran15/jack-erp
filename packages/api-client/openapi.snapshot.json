@@ -22184,6 +22184,49 @@
         ]
       }
     },
+    "/mobile/reports/business": {
+      "get": {
+        "operationId": "MobileBusinessReportController_getBusiness",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Ngày đầu kỳ (yyyy-MM-dd)",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Ngày cuối kỳ (yyyy-MM-dd), bao TRỌN ngày đó",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileBusinessReportResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tình hình kinh doanh: doanh thu / chi phí / lợi nhuận theo chi nhánh trong kỳ, kèm 7 tháng để vẽ biểu đồ",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
     "/mobile/users/me": {
       "get": {
         "operationId": "MobileUserController_getMe",
@@ -22241,6 +22284,19 @@
               "enum": [
                 "name",
                 "code"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo trạng thái theo dõi. Vắng = CẢ HAI — màn lọc của app có mục\n\"Tất cả\", và đó là nghĩa của việc không gửi khoá này. Viết thường như\n`MobileSupplierResponseDto.status`; service dịch sang cột `isActive`.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "inactive"
               ]
             }
           },
@@ -22470,12 +22526,52 @@
             }
           },
           {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "name",
+              "type": "string",
+              "enum": [
+                "name",
+                "revenue"
+              ]
+            }
+          },
+          {
+            "name": "order",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Vắng = cả đang theo dõi lẫn đã ngừng (màn tìm kiếm không lọc).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "inactive"
+              ]
+            }
+          },
+          {
             "name": "search",
             "required": false,
             "in": "query",
             "description": "Tìm theo mã, tên hoặc số điện thoại",
             "schema": {
               "maxLength": 200,
+              "example": "0901",
               "type": "string"
             }
           }
@@ -22492,7 +22588,1968 @@
             }
           }
         },
-        "summary": "Khách hàng để gắn vào đơn bán",
+        "summary": "Danh sách khách hàng kèm doanh thu, phân trang",
+        "tags": [
+          "mobile"
+        ]
+      },
+      "post": {
+        "operationId": "MobileCustomerController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileCustomerCreateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileCustomerResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo khách hàng; để trống mã thì hệ thống tự cấp",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/customers/{id}": {
+      "get": {
+        "operationId": "MobileCustomerController_findById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileCustomerResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Chi tiết một khách hàng theo id",
+        "tags": [
+          "mobile"
+        ]
+      },
+      "patch": {
+        "operationId": "MobileCustomerController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileCustomerUpdateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileCustomerResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sửa một phần khách hàng theo id",
+        "tags": [
+          "mobile"
+        ]
+      },
+      "delete": {
+        "operationId": "MobileCustomerController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Xoá khách hàng; 409 khi còn công nợ/tín dụng",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/customers/{id}/invoices": {
+      "get": {
+        "operationId": "MobileCustomerController_invoicesOf",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "order",
+            "required": false,
+            "in": "query",
+            "description": "Mặc định mới nhất lên đầu",
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "dateBasis",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "created",
+              "type": "string",
+              "enum": [
+                "created",
+                "issued"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo `dateBasis`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo tập trạng thái. Vắng = mọi hoá đơn đã ghi sổ.\n\nNhận MẢNG (`?status=paid&status=unpaid`): màn lọc cho tick nhiều trạng\nthái cùng lúc, và tab Hoá đơn chỉ gửi một — cùng một khoá cho cả hai.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "paid",
+                  "unpaid",
+                  "cancelled"
+                ]
+              }
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = toàn chuỗi.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Tìm theo số hoá đơn. KHÔNG bỏ dấu — cùng luật mọi ô tìm mobile.",
+            "schema": {
+              "maxLength": 200,
+              "example": "INV-202607",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileManagerInvoicePageDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lịch sử mua hàng của một khách, phân trang",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/manager/invoices": {
+      "get": {
+        "operationId": "MobileManagerInvoiceController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "order",
+            "required": false,
+            "in": "query",
+            "description": "Mặc định mới nhất lên đầu",
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "dateBasis",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "created",
+              "type": "string",
+              "enum": [
+                "created",
+                "issued"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo `dateBasis`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo tập trạng thái. Vắng = mọi hoá đơn đã ghi sổ.\n\nNhận MẢNG (`?status=paid&status=unpaid`): màn lọc cho tick nhiều trạng\nthái cùng lúc, và tab Hoá đơn chỉ gửi một — cùng một khoá cho cả hai.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "paid",
+                  "unpaid",
+                  "cancelled"
+                ]
+              }
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = toàn chuỗi.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Tìm theo số hoá đơn. KHÔNG bỏ dấu — cùng luật mọi ô tìm mobile.",
+            "schema": {
+              "maxLength": 200,
+              "example": "INV-202607",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileManagerInvoicePageDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Danh sách hoá đơn đã ghi sổ, phân trang",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/manager/invoices/{id}": {
+      "get": {
+        "operationId": "MobileManagerInvoiceController_findById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileManagerInvoiceDetailResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Chi tiết một hoá đơn kèm dòng hàng",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/inventory/categories": {
+      "get": {
+        "operationId": "MobileInventoryController_listCategories",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MobileInventoryCategoryResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Nhóm hàng đang hoạt động — danh sách phẳng kèm parentId",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/inventory/units": {
+      "get": {
+        "operationId": "MobileInventoryController_listUnits",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MobileInventoryUnitResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Đơn vị tính cho màn chọn, gộp không phân biệt hoa/thường",
+        "tags": [
+          "mobile"
+        ]
+      },
+      "post": {
+        "operationId": "MobileInventoryController_createUnit",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileUnitCreateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileInventoryUnitResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo một đơn vị tính",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/inventory/products": {
+      "get": {
+        "operationId": "MobileInventoryController_listProducts",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Tìm theo mã hoặc tên. KHÔNG bỏ dấu — cùng luật mọi ô tìm mobile.",
+            "schema": {
+              "maxLength": 200,
+              "example": "Gelli",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = MỌI cửa hàng người dùng được phép — không\nphải toàn tổ chức. Phần tử ngoài quyền là 403, xem `resolveBranchIds`.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "asOf",
+            "required": false,
+            "in": "query",
+            "description": "Tồn \"tính đến ngày\" — `YYYY-MM-DD`, bao gồm TRỌN ngày đó. Vắng = hôm nay.\nĐây là mốc CUỐI của kỳ; app không có ô \"từ ngày\", kỳ nhập-xuất của thẻ\ncửa hàng lấy đầu tháng của chính ngày này.",
+            "schema": {
+              "example": "2026-09-11",
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "on_hand",
+              "type": "string",
+              "enum": [
+                "on_hand",
+                "in_transit",
+                "incoming"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "all",
+              "type": "string",
+              "enum": [
+                "all",
+                "in_stock",
+                "out_of_stock"
+              ]
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "quantity_desc",
+              "type": "string",
+              "enum": [
+                "quantity_asc",
+                "quantity_desc",
+                "value_asc",
+                "value_desc"
+              ]
+            }
+          },
+          {
+            "name": "level",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "product",
+              "type": "string",
+              "enum": [
+                "product",
+                "variant"
+              ]
+            }
+          },
+          {
+            "name": "unit",
+            "required": false,
+            "in": "query",
+            "description": "Đơn vị tính, so KHÔNG phân biệt hoa/thường: `items.unit` là chuỗi tự do,\nvà dữ liệu thật có cả `Đôi` lẫn `đôi` cho cùng một nghĩa.",
+            "schema": {
+              "maxLength": 50,
+              "example": "Đôi",
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "Nhóm hàng — lọc CẢ cây con, cùng luật với tổng hợp tồn kho của web.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileInventoryProductPageDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tồn kho theo mặt hàng, phân trang, kèm tổng toàn tập",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/inventory/stores": {
+      "get": {
+        "operationId": "MobileInventoryController_listStores",
+        "parameters": [
+          {
+            "name": "asOf",
+            "required": false,
+            "in": "query",
+            "description": "Cùng nghĩa với `asOf` của danh sách mặt hàng: tồn tính đến hết ngày.",
+            "schema": {
+              "example": "2026-09-11",
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "on_hand",
+              "type": "string",
+              "enum": [
+                "on_hand",
+                "in_transit",
+                "incoming"
+              ]
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp danh sách thẻ. Vắng = mọi cửa hàng người dùng được phép.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MobileInventoryStoreResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Thẻ tồn kho của từng cửa hàng người dùng được phép",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/inventory/stores/{branchId}": {
+      "get": {
+        "operationId": "MobileInventoryController_findStore",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asOf",
+            "required": false,
+            "in": "query",
+            "description": "Tồn tính đến hết ngày; kỳ nhập-xuất = đầu tháng của ngày này -> ngày này.",
+            "schema": {
+              "example": "2026-09-11",
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "on_hand",
+              "type": "string",
+              "enum": [
+                "on_hand",
+                "in_transit",
+                "incoming"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileInventoryStoreResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Thẻ tồn kho của một cửa hàng",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/inventory/products/{id}/variants": {
+      "get": {
+        "operationId": "MobileInventoryController_listVariants",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asOf",
+            "required": false,
+            "in": "query",
+            "description": "Cùng nghĩa với `asOf` của danh sách mặt hàng: tồn tính đến hết ngày.",
+            "schema": {
+              "example": "2026-09-11",
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "on_hand",
+              "type": "string",
+              "enum": [
+                "on_hand",
+                "in_transit",
+                "incoming"
+              ]
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp danh sách thẻ. Vắng = mọi cửa hàng người dùng được phép.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MobileInventoryVariantResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Biến thể của một mặt hàng trong kỳ, kèm tồn đầu/cuối và nhập/xuất",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/inventory/products/{id}/stores": {
+      "get": {
+        "operationId": "MobileInventoryController_listStoresOf",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asOf",
+            "required": false,
+            "in": "query",
+            "description": "Cùng nghĩa với `asOf` của danh sách mặt hàng: tồn tính đến hết ngày.",
+            "schema": {
+              "example": "2026-09-11",
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "on_hand",
+              "type": "string",
+              "enum": [
+                "on_hand",
+                "in_transit",
+                "incoming"
+              ]
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp danh sách thẻ. Vắng = mọi cửa hàng người dùng được phép.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MobileInventoryStoreResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cửa hàng đang giữ một mặt hàng — thẻ thu hẹp về mặt hàng đó",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/inventory/products/{id}/stores/{branchId}": {
+      "get": {
+        "operationId": "MobileInventoryController_getFlow",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asOf",
+            "required": false,
+            "in": "query",
+            "description": "Tồn tính đến hết ngày; kỳ nhập-xuất = đầu tháng của ngày này -> ngày này.",
+            "schema": {
+              "example": "2026-09-11",
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "on_hand",
+              "type": "string",
+              "enum": [
+                "on_hand",
+                "in_transit",
+                "incoming"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileInventoryFlowResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Luồng nhập/xuất của một mặt hàng tại một cửa hàng trong kỳ",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/inventory/products/{id}/stores/{branchId}/vouchers": {
+      "get": {
+        "operationId": "MobileInventoryController_listVouchers",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "asOf",
+            "required": false,
+            "in": "query",
+            "description": "Cùng nghĩa `asOf` của các đường tồn kho khác.",
+            "schema": {
+              "example": "2026-09-11",
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "on_hand",
+              "type": "string",
+              "enum": [
+                "on_hand",
+                "in_transit",
+                "incoming"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Tìm theo MÃ chứng từ hoặc TÊN kho — hai thứ hiện trên một dòng phiếu.",
+            "schema": {
+              "maxLength": 200,
+              "example": "NK0001",
+              "type": "string"
+            }
+          },
+          {
+            "name": "storageId",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp về một kho của cửa hàng. Vắng = mọi kho.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "date",
+              "type": "string",
+              "enum": [
+                "date",
+                "quantity_asc",
+                "quantity_desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileInventoryVoucherPageDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Phiếu của một mặt hàng tại một cửa hàng trong kỳ, phân trang",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/reports/revenue/items": {
+      "get": {
+        "operationId": "MobileRevenueReportController_listItems",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileRevenueItemPageDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Doanh thu theo mặt hàng (mẫu mã) trong kỳ, phân trang, kèm tổng toàn tập",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/reports/revenue/categories": {
+      "get": {
+        "operationId": "MobileRevenueReportController_listCategories",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileRevenueCategoryListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tỉ trọng doanh thu theo nhóm hàng trong kỳ",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/reports/revenue/timeline": {
+      "get": {
+        "operationId": "MobileRevenueReportController_getTimeline",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "unit",
+            "required": true,
+            "in": "query",
+            "description": "BẮT BUỘC, không mặc định: mức là thứ người dùng vừa chọn ở bộ lọc, server không đoán hộ.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "hour",
+                "weekday",
+                "day",
+                "week",
+                "month",
+                "year"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileRevenueTimelineDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Doanh thu theo thời gian: giờ / thứ / ngày / tuần / tháng / năm, đủ mốc của kỳ",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/reports/revenue/items/{id}/branches": {
+      "get": {
+        "operationId": "MobileRevenueReportController_listBranchesOfItem",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileRevenueItemBranchesDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Doanh thu của một mặt hàng tách theo chi nhánh",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/reports/revenue/items/{id}/variants": {
+      "get": {
+        "operationId": "MobileRevenueReportController_listVariantsOfItem",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileRevenueItemVariantsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Doanh thu của một mẫu mã tách theo biến thể",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/reports/revenue/categories/{id}/items": {
+      "get": {
+        "operationId": "MobileRevenueReportController_listItemsOfCategory",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileRevenueCategoryItemsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Doanh thu của một nhóm hàng tách theo mặt hàng",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/reports/overview": {
+      "get": {
+        "operationId": "MobileOverviewReportController_getOverview",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "compareFrom",
+            "required": false,
+            "in": "query",
+            "description": "Đầu kỳ so sánh, `YYYY-MM-DD`. Phải đi cùng `compareTo`.",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "compareTo",
+            "required": false,
+            "in": "query",
+            "description": "Cuối kỳ so sánh, `YYYY-MM-DD`, bao trọn ngày cuối. Phải đi cùng `compareFrom`.",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileOverviewReportResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tổng quan: doanh thu + số hoá đơn theo chi nhánh trong kỳ, kèm doanh thu kỳ so sánh",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/reports/revenue-estimate": {
+      "get": {
+        "operationId": "MobileRevenueEstimateController_getRevenueEstimate",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "dateBasis",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "created",
+                "issued"
+              ]
+            }
+          },
+          {
+            "name": "groupBy",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "time",
+                "status",
+                "payment",
+                "staff",
+                "channel"
+              ]
+            }
+          },
+          {
+            "name": "staffRole",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "creator",
+                "salesperson",
+                "cashier"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileRevenueEstimateResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Doanh thu ước tính: số đơn + doanh thu trong kỳ, gộp theo ngày / trạng thái / thanh toán / nhân viên / kênh",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/reports/overview/branches/{id}": {
+      "get": {
+        "operationId": "MobileStoreDetailController_getBranch",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Ngày đầu kỳ (yyyy-MM-dd)",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Ngày cuối kỳ (yyyy-MM-dd), bao TRỌN ngày đó",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileStoreDetailResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Chi tiết một cửa hàng trong kỳ: doanh thu theo trạng thái HĐ, tiền thu theo phương thức, khách mới, HĐ còn nợ, tồn kho",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/reports/debts/customers": {
+      "get": {
+        "operationId": "MobileDebtReportController_listCustomers",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Tìm theo mã, tên hoặc số điện thoại khách — server tra, app không đoán trường.",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "name",
+              "type": "string",
+              "enum": [
+                "name",
+                "debt"
+              ]
+            }
+          },
+          {
+            "name": "order",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileCustomerDebtPageDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Công nợ khách hàng: nợ cuối kỳ từng khách (sổ POS + sổ kế toán), phân trang, kèm tổng toàn tập",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/reports/cashflow": {
+      "get": {
+        "operationId": "MobileCashflowReportController_getSummary",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileCashflowSummaryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tình hình thu chi: số dư đầu/cuối kỳ và tổng thu/chi quỹ TIỀN MẶT của các cửa hàng được phân công",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/reports/cashflow/stores": {
+      "get": {
+        "operationId": "MobileCashflowReportController_listStores",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "income",
+              "type": "string",
+              "enum": [
+                "income",
+                "expense"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileCashflowStoreListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tiền thu (hoặc chi) theo cửa hàng, mỗi cửa hàng tách theo hạng mục thu/chi",
         "tags": [
           "mobile"
         ]
@@ -22564,6 +24621,33 @@
             "description": "ISO-8601, cuối kỳ (bao gồm)",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Số hoá đơn, tên hoặc SĐT khách",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Lọc trạng thái, MẢNG: `?status[]=paid&status[]=unpaid`. Một giá trị đơn\n(`?status=paid`) cũng được — `Transform` bọc nó thành mảng, cùng khuôn với\n`kinds` của `/mobile/counterparties`.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "paid",
+                  "unpaid",
+                  "cancelled"
+                ]
+              }
             }
           }
         ],
@@ -22641,6 +24725,38 @@
           }
         },
         "summary": "Nhóm hàng hoá dạng cây cha → con",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/item-categories": {
+      "post": {
+        "operationId": "MobileItemCategoryController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileItemCategoryCreateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemCategoryTreeNodeDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo một nhóm hàng hoá",
         "tags": [
           "mobile"
         ]
@@ -22750,6 +24866,25 @@
               "example": "ABA",
               "type": "string"
             }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo nhóm hàng hoá",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "true = đang kinh doanh, false = ngừng, bỏ trống = tất cả",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -22765,6 +24900,106 @@
           }
         },
         "summary": "Danh sách hàng hoá, phân trang",
+        "tags": [
+          "mobile"
+        ]
+      },
+      "post": {
+        "operationId": "MobileProductController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileProductCreateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileProductDetailResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo hàng hoá",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/products/{id}": {
+      "get": {
+        "operationId": "MobileProductController_findById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileProductDetailResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Chi tiết một hàng hoá theo id (mẫu mã hoặc item lẻ)",
+        "tags": [
+          "mobile"
+        ]
+      },
+      "patch": {
+        "operationId": "MobileProductController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileProductUpdateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileProductDetailResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sửa hàng hoá theo id (mẫu mã hoặc item lẻ)",
         "tags": [
           "mobile"
         ]
@@ -22825,6 +25060,16 @@
                 "parent",
                 "group"
               ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Ô tìm ở header: tên, mã SKU, mã nhóm hàng hoá — chuyển vào `filters.search`.",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
             }
           }
         ],
@@ -23240,6 +25485,322 @@
           }
         },
         "summary": "Sửa chứng từ kho",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/sales-orders": {
+      "get": {
+        "operationId": "SalesOrderController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "SENT",
+                "PROCESSED",
+                "REJECTED",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "mobile"
+        ]
+      },
+      "post": {
+        "operationId": "SalesOrderController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSalesOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/sales-orders/salespeople": {
+      "get": {
+        "operationId": "SalesOrderController_salespeople",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Khai TRƯỚC `:id` — không thì `salespeople` bị `ParseUUIDPipe` của route kia bắt.",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/sales-orders/{id}": {
+      "get": {
+        "operationId": "SalesOrderController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "mobile"
+        ]
+      },
+      "patch": {
+        "operationId": "SalesOrderController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSalesOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/sales-orders/{id}/approve": {
+      "post": {
+        "operationId": "SalesOrderController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/sales-orders/{id}/reject": {
+      "post": {
+        "operationId": "SalesOrderController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectSalesOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/sales-orders/{id}/cancel": {
+      "post": {
+        "operationId": "SalesOrderController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelSalesOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
         "tags": [
           "mobile"
         ]
@@ -24331,8 +26892,8 @@
               "REVERSED"
             ]
           },
-          "createdAt": {
-            "description": "Creation-timestamp column, also fed by the period (from/to) filter. The grid\norders on this column too.",
+          "voucherDate": {
+            "description": "Voucher-date column (\"Ngày thu/chi\"), also fed by the period (from/to) filter.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/DateRangeFilterDto"
@@ -26459,7 +29020,8 @@
               "DELIVERY_PARTNER",
               "WAREHOUSE",
               "CUSTOMER_GROUP",
-              "PROMOTION"
+              "PROMOTION",
+              "SALES_ORDER"
             ]
           },
           "branchId": {
@@ -26539,7 +29101,8 @@
               "DELIVERY_PARTNER",
               "WAREHOUSE",
               "CUSTOMER_GROUP",
-              "PROMOTION"
+              "PROMOTION",
+              "SALES_ORDER"
             ],
             "type": "string"
           },
@@ -26686,7 +29249,8 @@
               "DELIVERY_PARTNER",
               "WAREHOUSE",
               "CUSTOMER_GROUP",
-              "PROMOTION"
+              "PROMOTION",
+              "SALES_ORDER"
             ],
             "type": "string"
           },
@@ -38715,13 +41279,27 @@
             "minimum": 1,
             "maximum": 100
           },
+          "search": {
+            "type": "string",
+            "description": "Số hóa đơn"
+          },
+          "statuses": {
+            "type": "array",
+            "description": "Status IN (...) — a set, unlike `status` which is a single equality. The\nmobile list folds its three user-facing states into these values\n(e.g. \"debt\" = pending + debt + partial_debt), so it needs the set form.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "pending",
+                "paid",
+                "debt",
+                "partial_debt",
+                "cancelled"
+              ]
+            }
+          },
           "code": {
-            "description": "Số hóa đơn",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/StringFilterDto"
-              }
-            ]
+            "$ref": "#/components/schemas/StringFilterDto"
           },
           "status": {
             "description": "Trạng thái",
@@ -40507,6 +43085,11 @@
             "type": "string",
             "description": "Per-line reports — narrow to one item by its snapshot code\n(`invoice_items.item_code`). Pushed into the line query's WHERE, not applied\nafter loading, so a drill-down does not pull a month of lines per click.\nBounded because it reaches a query parameter on a hot path.",
             "maxLength": 64
+          },
+          "search": {
+            "type": "string",
+            "description": "Tìm tự do trên mặt hàng: mã SKU / tên hàng / mã & tên mẫu mã cha / mã & tên\nnhóm hàng hoá — ô tìm ở header màn \"Doanh thu theo mặt hàng\" của mobile\n(placeholder MISA: \"Nhập tên, mã SKU, mã nhóm hàng hoá\"). Áp SAU khi tải\ndòng, cùng chỗ với `categoryId`/`brand`, vì báo cáo này gom trong bộ nhớ.",
+            "maxLength": 200
           },
           "statisticByBrand": {
             "type": "boolean",
@@ -44165,6 +46748,124 @@
           "isMain"
         ]
       },
+      "MobileBusinessMetricsDto": {
+        "type": "object",
+        "properties": {
+          "revenue": {
+            "type": "number",
+            "description": "Doanh thu (mục II của \"Kết quả kinh doanh\")"
+          },
+          "cost": {
+            "type": "number",
+            "description": "Chi phí (mục III): giá vốn + chi khác"
+          },
+          "profit": {
+            "type": "number",
+            "description": "Lợi nhuận (mục IV) = revenue − cost, có thể ÂM"
+          }
+        },
+        "required": [
+          "revenue",
+          "cost",
+          "profit"
+        ]
+      },
+      "MobileBusinessMonthDto": {
+        "type": "object",
+        "properties": {
+          "revenue": {
+            "type": "number",
+            "description": "Doanh thu (mục II của \"Kết quả kinh doanh\")"
+          },
+          "cost": {
+            "type": "number",
+            "description": "Chi phí (mục III): giá vốn + chi khác"
+          },
+          "profit": {
+            "type": "number",
+            "description": "Lợi nhuận (mục IV) = revenue − cost, có thể ÂM"
+          },
+          "year": {
+            "type": "number",
+            "example": 2026
+          },
+          "month": {
+            "type": "number",
+            "example": 9,
+            "minimum": 1,
+            "maximum": 12
+          }
+        },
+        "required": [
+          "revenue",
+          "cost",
+          "profit",
+          "year",
+          "month"
+        ]
+      },
+      "MobileBranchPerformanceDto": {
+        "type": "object",
+        "properties": {
+          "revenue": {
+            "type": "number",
+            "description": "Doanh thu (mục II của \"Kết quả kinh doanh\")"
+          },
+          "cost": {
+            "type": "number",
+            "description": "Chi phí (mục III): giá vốn + chi khác"
+          },
+          "profit": {
+            "type": "number",
+            "description": "Lợi nhuận (mục IV) = revenue − cost, có thể ÂM"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string",
+            "description": "Địa chỉ chi nhánh; chuỗi rỗng khi chưa nhập"
+          },
+          "months": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileBusinessMonthDto"
+            }
+          }
+        },
+        "required": [
+          "revenue",
+          "cost",
+          "profit",
+          "id",
+          "name",
+          "address",
+          "months"
+        ]
+      },
+      "MobileBusinessReportResponseDto": {
+        "type": "object",
+        "properties": {
+          "totals": {
+            "$ref": "#/components/schemas/MobileBusinessMetricsDto"
+          },
+          "branches": {
+            "description": "Sắp theo doanh thu giảm dần, cùng doanh thu thì theo tên",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileBranchPerformanceDto"
+            }
+          }
+        },
+        "required": [
+          "totals",
+          "branches"
+        ]
+      },
       "MobileMeResponseDto": {
         "type": "object",
         "properties": {
@@ -44446,23 +47147,83 @@
           },
           "code": {
             "type": "string",
-            "nullable": true,
-            "description": "Mã khách hàng. NULL là hợp lệ — khách vãng lai chưa có mã."
+            "description": "Mã khách hàng, duy nhất trong tổ chức"
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "Tên khách hàng, giữ nguyên hoa/thường đã nhập"
           },
           "phone": {
             "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "birthDate": {
+            "type": "string",
             "nullable": true,
-            "description": "Số điện thoại — khoá tra cứu chính của màn chọn khách."
+            "description": "Ngày sinh dạng YYYY-MM-DD, không có giờ"
+          },
+          "gender": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "male",
+              "female",
+              "unspecified"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ]
+          },
+          "groupName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Tên nhóm khách hàng"
+          },
+          "cardTier": {
+            "type": "string",
+            "nullable": true,
+            "description": "TÊN hạng thẻ do tổ chức đặt (vd \"Thẻ Vàng\"); null khi chưa có thẻ hoặc thẻ hạng `none`"
+          },
+          "revenue": {
+            "type": "number",
+            "description": "Tổng tiền hoá đơn bán đã chốt (paid / debt / partial_debt), đơn vị đồng"
+          },
+          "invoiceCount": {
+            "type": "number",
+            "description": "Số hoá đơn bán đã chốt"
           }
         },
         "required": [
           "id",
           "code",
           "name",
-          "phone"
+          "phone",
+          "email",
+          "address",
+          "note",
+          "birthDate",
+          "gender",
+          "status",
+          "groupName",
+          "cardTier",
+          "revenue",
+          "invoiceCount"
         ]
       },
       "MobileCustomerPageDto": {
@@ -44475,6 +47236,834 @@
             }
           },
           "total": {
+            "type": "number",
+            "description": "Tổng số bản ghi khớp, không phải số bản ghi của trang"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "totalRevenue": {
+            "type": "number",
+            "description": "Tổng doanh thu của toàn bộ bản ghi khớp bộ lọc"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit",
+          "totalRevenue"
+        ]
+      },
+      "MobileCustomerCreateDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Mã khách hàng; để trống thì hệ thống tự cấp"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Tên khách hàng"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 30
+          },
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "format": "email"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "birthDate": {
+            "type": "string",
+            "nullable": true,
+            "description": "Ngày sinh dạng YYYY-MM-DD"
+          },
+          "gender": {
+            "nullable": true,
+            "enum": [
+              "male",
+              "female",
+              "unspecified"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "type": "string",
+            "default": "active",
+            "description": "Vắng = active. Bản ghi mới bao giờ cũng đang theo dõi."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "MobileManagerInvoiceResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Số hoá đơn"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "sale",
+              "return",
+              "exchange"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "unpaid",
+              "cancelled"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO-8601"
+          },
+          "issuedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO-8601"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Tổng thanh toán có dấu, đơn vị đồng"
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerPhone": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "type",
+          "status",
+          "createdAt",
+          "issuedAt",
+          "amount",
+          "customerName",
+          "customerPhone"
+        ]
+      },
+      "MobileManagerInvoicePageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileManagerInvoiceResponseDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "description": "Tổng số bản ghi khớp, không phải số bản ghi của trang"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "totalAmount": {
+            "type": "number",
+            "description": "Tổng tiền toàn tập khớp, không tính hoá đơn huỷ"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit",
+          "totalAmount"
+        ]
+      },
+      "MobileCustomerUpdateDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Mã khách hàng; để trống thì hệ thống tự cấp"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Tên khách hàng"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 30
+          },
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "format": "email"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "birthDate": {
+            "type": "string",
+            "nullable": true,
+            "description": "Ngày sinh dạng YYYY-MM-DD"
+          },
+          "gender": {
+            "nullable": true,
+            "enum": [
+              "male",
+              "female",
+              "unspecified"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "type": "string",
+            "default": "active",
+            "description": "Vắng = active. Bản ghi mới bao giờ cũng đang theo dõi."
+          }
+        }
+      },
+      "MobileManagerInvoiceLoyaltyDto": {
+        "type": "object",
+        "properties": {
+          "opening": {
+            "type": "number",
+            "description": "Điểm trước hoá đơn"
+          },
+          "earned": {
+            "type": "number"
+          },
+          "used": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "opening",
+          "earned",
+          "used"
+        ]
+      },
+      "MobileManagerInvoiceLineDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "sku": {
+            "type": "string",
+            "description": "Mã hàng (SKU) tại thời điểm bán"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unitPrice": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number",
+            "description": "Thành tiền sau chiết khấu dòng"
+          }
+        },
+        "required": [
+          "name",
+          "sku",
+          "unit",
+          "quantity",
+          "unitPrice",
+          "total"
+        ]
+      },
+      "MobileManagerInvoiceDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Số hoá đơn"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "sale",
+              "return",
+              "exchange"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "unpaid",
+              "cancelled"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO-8601"
+          },
+          "issuedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO-8601"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Tổng thanh toán có dấu, đơn vị đồng"
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "salesperson": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nhân viên bán"
+          },
+          "cashier": {
+            "type": "string",
+            "nullable": true,
+            "description": "Thu ngân (người lập)"
+          },
+          "subtotal": {
+            "type": "number",
+            "description": "Tổng tiền hàng trước chiết khấu"
+          },
+          "discount": {
+            "type": "number",
+            "description": "Chiết khấu hoá đơn + chiết khấu điểm"
+          },
+          "cashReceived": {
+            "type": "number",
+            "description": "Tổng tiền khách đưa qua mọi phương thức"
+          },
+          "changeAmount": {
+            "type": "number",
+            "description": "Tiền thừa trả lại"
+          },
+          "promotions": {
+            "description": "Mã loại chương trình khuyến mãi đã áp",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "loyalty": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MobileManagerInvoiceLoyaltyDto"
+              }
+            ]
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileManagerInvoiceLineDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "type",
+          "status",
+          "createdAt",
+          "issuedAt",
+          "amount",
+          "customerName",
+          "customerPhone",
+          "salesperson",
+          "cashier",
+          "subtotal",
+          "discount",
+          "cashReceived",
+          "changeAmount",
+          "promotions",
+          "loyalty",
+          "lines"
+        ]
+      },
+      "MobileInventoryCategoryResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "description": "Nhóm cha; NULL = nhóm gốc. Cha ngừng hoạt động thì con thành gốc."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "parentId"
+        ]
+      },
+      "MobileInventoryUnitResponseDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Chữ thường của đơn vị, dùng để lọc"
+          },
+          "name": {
+            "type": "string",
+            "description": "Cách viết hiển thị"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ]
+      },
+      "MobileUnitCreateDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Tên đơn vị tính, vd \"Đôi\""
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Diễn giải"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "MobileInventoryProductResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Mã hàng hoá (SKU)"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "description": "Đơn vị tính; mẫu mã lấy của item đại diện"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Số lượng tồn tính đến hết ngày `asOf`, có thể ÂM"
+          },
+          "stockValue": {
+            "type": "number",
+            "description": "Giá trị tồn theo giá vốn sổ cái, đơn vị đồng"
+          },
+          "groupId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "description": "Nhóm hàng của item (mẫu mã: của item đại diện). NULL = chưa xếp nhóm."
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "unit",
+          "quantity",
+          "stockValue",
+          "groupId"
+        ]
+      },
+      "MobileInventoryProductPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileInventoryProductResponseDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "description": "Tổng số dòng khớp, không phải số dòng của trang"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "totalQuantity": {
+            "type": "number",
+            "description": "Tổng số lượng toàn tập khớp"
+          },
+          "totalValue": {
+            "type": "number",
+            "description": "Tổng giá trị toàn tập khớp, đơn vị đồng"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit",
+          "totalQuantity",
+          "totalValue"
+        ]
+      },
+      "MobileInventoryStorageDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Số lượng tồn của kho tính đến hết ngày `asOf`"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "quantity"
+        ]
+      },
+      "MobileInventoryStoreResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Id chi nhánh"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Tổng tồn mọi kho của cửa hàng, có thể ÂM"
+          },
+          "stockValue": {
+            "type": "number",
+            "description": "Giá trị tồn theo giá vốn sổ cái, đơn vị đồng"
+          },
+          "periodIn": {
+            "type": "number",
+            "description": "Số lượng nhập trong kỳ (đầu tháng của asOf -> asOf)"
+          },
+          "periodOut": {
+            "type": "number",
+            "description": "Số lượng xuất trong kỳ"
+          },
+          "storages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileInventoryStorageDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "quantity",
+          "stockValue",
+          "periodIn",
+          "periodOut",
+          "storages"
+        ]
+      },
+      "MobileInventoryVariantResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Id item"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Tồn cuối kỳ, có thể ÂM"
+          },
+          "stockValue": {
+            "type": "number",
+            "description": "Giá trị tồn theo giá vốn sổ cái, đơn vị đồng"
+          },
+          "openingQuantity": {
+            "type": "number",
+            "description": "Tồn đầu kỳ (đầu tháng của asOf)"
+          },
+          "periodIn": {
+            "type": "number",
+            "description": "Số lượng nhập trong kỳ"
+          },
+          "periodOut": {
+            "type": "number",
+            "description": "Số lượng xuất trong kỳ"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "unit",
+          "quantity",
+          "stockValue",
+          "openingQuantity",
+          "periodIn",
+          "periodOut"
+        ]
+      },
+      "MobileInventoryFlowLineDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Nhãn tiếng Việt của loại chứng từ (REFERENCE_TYPE_LABELS)"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Số lượng, luôn DƯƠNG — chiều nằm ở phía chứa nó"
+          },
+          "value": {
+            "type": "number",
+            "description": "Giá trị, luôn DƯƠNG, đơn vị đồng"
+          }
+        },
+        "required": [
+          "name",
+          "quantity",
+          "value"
+        ]
+      },
+      "MobileInventoryFlowSideDto": {
+        "type": "object",
+        "properties": {
+          "quantity": {
+            "type": "number"
+          },
+          "value": {
+            "type": "number"
+          },
+          "lines": {
+            "description": "CHỈ những loại có bút toán trong kỳ ở chiều này; rỗng = không phát sinh",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileInventoryFlowLineDto"
+            }
+          }
+        },
+        "required": [
+          "quantity",
+          "value",
+          "lines"
+        ]
+      },
+      "MobileInventoryFlowResponseDto": {
+        "type": "object",
+        "properties": {
+          "storeId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Id chi nhánh"
+          },
+          "openingQuantity": {
+            "type": "number",
+            "description": "Tồn đầu kỳ"
+          },
+          "closingQuantity": {
+            "type": "number",
+            "description": "Tồn cuối kỳ — bằng số trên thẻ cửa hàng của cùng mặt hàng"
+          },
+          "inbound": {
+            "$ref": "#/components/schemas/MobileInventoryFlowSideDto"
+          },
+          "outbound": {
+            "$ref": "#/components/schemas/MobileInventoryFlowSideDto"
+          }
+        },
+        "required": [
+          "storeId",
+          "openingQuantity",
+          "closingQuantity",
+          "inbound",
+          "outbound"
+        ]
+      },
+      "MobileInventoryVoucherDocumentDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "goods-receipt",
+              "stock-in",
+              "stock-out"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ]
+      },
+      "MobileInventoryVoucherResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Khoá dòng: `<reference_type>:<reference_id|none>:<storage_id>`"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "inbound",
+              "outbound"
+            ],
+            "description": "Chiều theo DẤU của tổng số lượng"
+          },
+          "warehouseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "Số chứng từ; không có thì là nhãn loại chứng từ"
+          },
+          "date": {
+            "type": "string",
+            "description": "ISO-8601 — thời điểm ghi sổ sớm nhất của phiếu"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Số lượng TUYỆT ĐỐI"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number",
+            "description": "Giá trị TUYỆT ĐỐI, đơn vị đồng"
+          },
+          "document": {
+            "nullable": true,
+            "description": "Chứng từ mở được từ app; NULL với hoá đơn, phiếu chuyển, tồn đầu kỳ… — app hiện toast thay vì mở",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MobileInventoryVoucherDocumentDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "direction",
+          "warehouseId",
+          "warehouseName",
+          "code",
+          "date",
+          "quantity",
+          "unit",
+          "value",
+          "document"
+        ]
+      },
+      "MobileInventoryVoucherPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileInventoryVoucherResponseDto"
+            }
+          },
+          "total": {
             "type": "number"
           },
           "page": {
@@ -44482,13 +48071,785 @@
           },
           "limit": {
             "type": "number"
+          },
+          "totalQuantity": {
+            "type": "number",
+            "description": "Tổng số lượng tuyệt đối toàn tập khớp"
+          },
+          "totalValue": {
+            "type": "number",
+            "description": "Tổng giá trị tuyệt đối toàn tập khớp, đơn vị đồng"
           }
         },
         "required": [
           "data",
           "total",
           "page",
-          "limit"
+          "limit",
+          "totalQuantity",
+          "totalValue"
+        ]
+      },
+      "MobileRevenueItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Id mẫu mã, hoặc id item khi item không thuộc mẫu mã"
+          },
+          "code": {
+            "type": "string",
+            "description": "Mã mẫu mã; item lẻ thì mã item (snapshot trên dòng hoá đơn)"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "description": "Đơn vị tính lấy từ dòng hoá đơn"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Số lượng bán ròng trong kỳ (bán − trả), có thể ÂM"
+          },
+          "revenue": {
+            "type": "number",
+            "description": "Doanh thu ròng trong kỳ, đơn vị đồng, có thể ÂM"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "unit",
+          "quantity",
+          "revenue"
+        ]
+      },
+      "MobileRevenueItemPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileRevenueItemDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "description": "Tổng số mặt hàng có phát sinh trong kỳ, không phải số dòng của trang"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "totalQuantity": {
+            "type": "number",
+            "description": "Tổng số lượng bán ròng toàn tập"
+          },
+          "totalRevenue": {
+            "type": "number",
+            "description": "Tổng doanh thu toàn tập, đơn vị đồng"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit",
+          "totalQuantity",
+          "totalRevenue"
+        ]
+      },
+      "MobileRevenueCategoryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "revenue": {
+            "type": "number",
+            "description": "Doanh thu ròng của nhóm trong kỳ, đơn vị đồng"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "revenue"
+        ]
+      },
+      "MobileRevenueCategoryListDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "Sắp doanh thu giảm dần, cùng doanh thu thì theo tên",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileRevenueCategoryDto"
+            }
+          },
+          "totalRevenue": {
+            "type": "number",
+            "description": "Tổng doanh thu của các nhóm trong `data`"
+          }
+        },
+        "required": [
+          "data",
+          "totalRevenue"
+        ]
+      },
+      "MobileRevenuePointDto": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "example": "2026-09-01T09:00:00"
+          },
+          "revenue": {
+            "type": "number",
+            "description": "Doanh thu ròng của mốc, đơn vị đồng, có thể ÂM; mốc không phát sinh = 0"
+          }
+        },
+        "required": [
+          "start",
+          "revenue"
+        ]
+      },
+      "MobileRevenueTimelineDto": {
+        "type": "object",
+        "properties": {
+          "unit": {
+            "enum": [
+              "hour",
+              "weekday",
+              "day",
+              "week",
+              "month",
+              "year"
+            ],
+            "type": "string"
+          },
+          "totalRevenue": {
+            "type": "number",
+            "description": "Tổng doanh thu của kỳ = Σ `data`, bằng `totalRevenue` của `items` cùng bộ lọc"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileRevenuePointDto"
+            }
+          }
+        },
+        "required": [
+          "unit",
+          "totalRevenue",
+          "data"
+        ]
+      },
+      "MobileRevenueBranchDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id chi nhánh (`invoices.branch_id`)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Tên chi nhánh; chi nhánh đã xoá thì là chính id"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Số lượng bán ròng của mặt hàng tại chi nhánh"
+          },
+          "revenue": {
+            "type": "number",
+            "description": "Doanh thu ròng của mặt hàng tại chi nhánh, đơn vị đồng"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "quantity",
+          "revenue"
+        ]
+      },
+      "MobileRevenueItemBranchesDto": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/MobileRevenueItemDto"
+          },
+          "data": {
+            "description": "Sắp doanh thu giảm dần",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileRevenueBranchDto"
+            }
+          }
+        },
+        "required": [
+          "item",
+          "data"
+        ]
+      },
+      "MobileRevenueVariantDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Id item"
+          },
+          "code": {
+            "type": "string",
+            "description": "Mã item (SKU), snapshot trên dòng hoá đơn"
+          },
+          "name": {
+            "type": "string",
+            "description": "Tên item, snapshot trên dòng hoá đơn"
+          },
+          "revenue": {
+            "type": "number",
+            "description": "Doanh thu ròng của biến thể trong kỳ, đơn vị đồng"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "revenue"
+        ]
+      },
+      "MobileRevenueItemVariantsDto": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/MobileRevenueItemDto"
+          },
+          "data": {
+            "description": "Sắp doanh thu giảm dần",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileRevenueVariantDto"
+            }
+          }
+        },
+        "required": [
+          "item",
+          "data"
+        ]
+      },
+      "MobileRevenueCategoryItemsDto": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/MobileRevenueCategoryDto"
+          },
+          "data": {
+            "description": "Sắp doanh thu giảm dần",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileRevenueItemDto"
+            }
+          }
+        },
+        "required": [
+          "category",
+          "data"
+        ]
+      },
+      "MobileOverviewTotalsDto": {
+        "type": "object",
+        "properties": {
+          "revenue": {
+            "type": "number",
+            "description": "Doanh thu trong kỳ, công thức khớp \"Doanh thu theo mặt hàng\""
+          },
+          "invoiceCount": {
+            "type": "number",
+            "description": "Số hoá đơn đã ghi sổ trong kỳ, LOẠI hoá đơn huỷ, tính cả phiếu trả/đổi"
+          },
+          "compareRevenue": {
+            "type": "number",
+            "description": "Doanh thu của kỳ so sánh; 0 khi không gửi compareFrom/compareTo"
+          }
+        },
+        "required": [
+          "revenue",
+          "invoiceCount",
+          "compareRevenue"
+        ]
+      },
+      "MobileOverviewBranchDto": {
+        "type": "object",
+        "properties": {
+          "revenue": {
+            "type": "number",
+            "description": "Doanh thu trong kỳ, công thức khớp \"Doanh thu theo mặt hàng\""
+          },
+          "invoiceCount": {
+            "type": "number",
+            "description": "Số hoá đơn đã ghi sổ trong kỳ, LOẠI hoá đơn huỷ, tính cả phiếu trả/đổi"
+          },
+          "compareRevenue": {
+            "type": "number",
+            "description": "Doanh thu của kỳ so sánh; 0 khi không gửi compareFrom/compareTo"
+          },
+          "id": {
+            "type": "string",
+            "description": "`invoices.branch_id`; chi nhánh đã xoá vẫn có mặt nếu có phát sinh"
+          },
+          "name": {
+            "type": "string",
+            "description": "Tên chi nhánh; bằng `id` khi chi nhánh không còn trong danh mục"
+          }
+        },
+        "required": [
+          "revenue",
+          "invoiceCount",
+          "compareRevenue",
+          "id",
+          "name"
+        ]
+      },
+      "MobileOverviewReportResponseDto": {
+        "type": "object",
+        "properties": {
+          "totals": {
+            "$ref": "#/components/schemas/MobileOverviewTotalsDto"
+          },
+          "branches": {
+            "description": "Sắp theo doanh thu giảm dần, cùng doanh thu thì theo tên rồi id",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileOverviewBranchDto"
+            }
+          }
+        },
+        "required": [
+          "totals",
+          "branches"
+        ]
+      },
+      "MobileRevenueEstimateTotalsDto": {
+        "type": "object",
+        "properties": {
+          "orderCount": {
+            "type": "number",
+            "description": "Số đơn (hoá đơn) trong kỳ, loại nháp và huỷ"
+          },
+          "revenue": {
+            "type": "number",
+            "description": "Doanh thu trong kỳ. Ở mọi chế độ trừ `payment`: công thức dòng hàng khớp \"Doanh thu theo mặt hàng\". Ở `payment`: Σ tiền của sáu phương thức — KHÁC doanh thu dòng hàng"
+          }
+        },
+        "required": [
+          "orderCount",
+          "revenue"
+        ]
+      },
+      "MobileRevenueEstimateBucketDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "orderCount": {
+            "type": "number",
+            "description": "Số đơn rơi vào bucket này"
+          },
+          "revenue": {
+            "type": "number",
+            "description": "Tiền của bucket này; có thể ÂM (trả hàng)"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "orderCount",
+          "revenue"
+        ]
+      },
+      "MobileRevenueEstimateResponseDto": {
+        "type": "object",
+        "properties": {
+          "totals": {
+            "$ref": "#/components/schemas/MobileRevenueEstimateTotalsDto"
+          },
+          "items": {
+            "description": "`time`: tăng dần theo ngày; còn lại: doanh thu giảm dần, hoà thì theo nhãn rồi key",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileRevenueEstimateBucketDto"
+            }
+          }
+        },
+        "required": [
+          "totals",
+          "items"
+        ]
+      },
+      "MobileStoreRevenueDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "Tổng doanh thu — cùng công thức và cùng số với dòng chi nhánh ở /mobile/reports/overview"
+          },
+          "paidAmount": {
+            "type": "number",
+            "description": "Doanh thu của hoá đơn `paid`"
+          },
+          "paidCount": {
+            "type": "number",
+            "description": "Số hoá đơn `paid`"
+          },
+          "unpaidAmount": {
+            "type": "number",
+            "description": "Doanh thu của hoá đơn `debt` + `partial_debt` (chưa thanh toán đủ)"
+          },
+          "unpaidCount": {
+            "type": "number",
+            "description": "Số hoá đơn `debt` + `partial_debt`"
+          },
+          "cancelledCount": {
+            "type": "number",
+            "description": "Số hoá đơn HUỶ trong kỳ — không nằm trong `total`"
+          },
+          "invoiceCount": {
+            "type": "number",
+            "description": "Số hoá đơn đã ghi sổ trừ huỷ — bằng `invoiceCount` ở Tổng quan"
+          }
+        },
+        "required": [
+          "total",
+          "paidAmount",
+          "paidCount",
+          "unpaidAmount",
+          "unpaidCount",
+          "cancelledCount",
+          "invoiceCount"
+        ]
+      },
+      "MobilePaymentSplitDto": {
+        "type": "object",
+        "properties": {
+          "cash": {
+            "type": "number",
+            "description": "`cash`"
+          },
+          "card": {
+            "type": "number",
+            "description": "`card`"
+          },
+          "transfer": {
+            "type": "number",
+            "description": "`bank_transfer`"
+          }
+        },
+        "required": [
+          "cash",
+          "card",
+          "transfer"
+        ]
+      },
+      "MobileStoreCollectedDto": {
+        "type": "object",
+        "properties": {
+          "sales": {
+            "description": "Thanh toán trên hoá đơn (`invoice_payments`), trả hàng mang dấu âm",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MobilePaymentSplitDto"
+              }
+            ]
+          },
+          "debt": {
+            "description": "Thu nợ sau bán (`debt_payments`, theo `paid_at`)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MobilePaymentSplitDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "sales",
+          "debt"
+        ]
+      },
+      "MobileStoreNewCustomerDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "ISO-8601"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Doanh thu của khách tại cửa hàng TRONG KỲ, cùng công thức `total`"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "createdAt",
+          "amount"
+        ]
+      },
+      "MobileStoreNewCustomersDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "Tổng số khách tạo trong kỳ — của TOÀN tập, không chỉ `items`"
+          },
+          "totalAmount": {
+            "type": "number",
+            "description": "Tổng doanh thu của toàn tập khách mới"
+          },
+          "items": {
+            "description": "Tối đa 20 khách mới nhất",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileStoreNewCustomerDto"
+            }
+          }
+        },
+        "required": [
+          "count",
+          "totalAmount",
+          "items"
+        ]
+      },
+      "MobileStoreInventoryDto": {
+        "type": "object",
+        "properties": {
+          "quantity": {
+            "type": "number",
+            "description": "Tổng SỐ LƯỢNG tồn hiện tại (mọi kho của cửa hàng), như /mobile/inventory/stores/:id"
+          },
+          "stockValue": {
+            "type": "number",
+            "description": "Giá trị tồn theo giá vốn"
+          }
+        },
+        "required": [
+          "quantity",
+          "stockValue"
+        ]
+      },
+      "MobileStoreDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "revenue": {
+            "$ref": "#/components/schemas/MobileStoreRevenueDto"
+          },
+          "collected": {
+            "$ref": "#/components/schemas/MobileStoreCollectedDto"
+          },
+          "pendingUnpaidCount": {
+            "type": "number",
+            "description": "Hoá đơn còn nợ của cửa hàng — KHÔNG theo kỳ, là trạng thái hiện tại"
+          },
+          "newCustomers": {
+            "$ref": "#/components/schemas/MobileStoreNewCustomersDto"
+          },
+          "inventory": {
+            "$ref": "#/components/schemas/MobileStoreInventoryDto"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "revenue",
+          "collected",
+          "pendingUnpaidCount",
+          "newCustomers",
+          "inventory"
+        ]
+      },
+      "MobileCustomerDebtDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Mã khách hàng, vd KH000017"
+          },
+          "name": {
+            "type": "string"
+          },
+          "closing": {
+            "type": "number",
+            "description": "Nợ CUỐI KỲ = đầu kỳ + tăng − giảm, gộp sổ POS và sổ kế toán, đơn vị đồng. Có thể ÂM (khách trả dư) hoặc 0"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "closing"
+        ]
+      },
+      "MobileCustomerDebtPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileCustomerDebtDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "description": "Tổng số khách có phát sinh trong sổ, không phải số dòng của trang"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "totalClosing": {
+            "type": "number",
+            "description": "Tổng nợ cuối kỳ toàn tập, đơn vị đồng, có thể ÂM"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit",
+          "totalClosing"
+        ]
+      },
+      "MobileCashflowSummaryDto": {
+        "type": "object",
+        "properties": {
+          "opening": {
+            "type": "number",
+            "description": "Số dư quỹ tiền mặt TRƯỚC ngày đầu kỳ, đơn vị đồng, có thể ÂM"
+          },
+          "closing": {
+            "type": "number",
+            "description": "Số dư quỹ tiền mặt đến HẾT ngày cuối kỳ, đơn vị đồng, có thể ÂM"
+          },
+          "income": {
+            "type": "number",
+            "description": "Tổng tiền VÀO quỹ trong kỳ, đơn vị đồng, ≥ 0"
+          },
+          "expense": {
+            "type": "number",
+            "description": "Tổng tiền RA khỏi quỹ trong kỳ, đơn vị đồng, ≥ 0"
+          }
+        },
+        "required": [
+          "opening",
+          "closing",
+          "income",
+          "expense"
+        ]
+      },
+      "MobileCashflowCategoryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "number",
+            "description": "Đơn vị đồng, > 0"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "amount"
+        ]
+      },
+      "MobileCashflowStoreDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "id chi nhánh"
+          },
+          "name": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Tổng tiền theo chiều đã chọn, đơn vị đồng, > 0"
+          },
+          "categories": {
+            "description": "Sắp theo tiền giảm dần; dòng \"chưa xếp hạng mục\" (id null) đứng cuối",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileCashflowCategoryDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "amount",
+          "categories"
+        ]
+      },
+      "MobileCashflowStoreListDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileCashflowStoreDto"
+            }
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "MobileProductAttributeValueDto": {
@@ -44526,6 +48887,34 @@
         "required": [
           "name",
           "values"
+        ]
+      },
+      "MobileItemCategoryCreateDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Tên nhóm hàng"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Mã nhóm hàng"
+          },
+          "parentGroupId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Id nhóm cha"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Diễn giải"
+          }
+        },
+        "required": [
+          "name"
         ]
       },
       "MobileItemResponseDto": {
@@ -44647,6 +49036,439 @@
           "page",
           "limit"
         ]
+      },
+      "MobileProductVariantDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "id của item biến thể"
+          },
+          "code": {
+            "type": "string",
+            "description": "Mã SKU của biến thể"
+          },
+          "variantLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nhãn phân loại đã ghép sẵn, vd \"39 · Nâu\". `null` khi biến thể không mang thuộc tính nào — app lùi về `code`."
+          },
+          "purchasePrice": {
+            "type": "number",
+            "description": "Giá mua của riêng biến thể này"
+          },
+          "sellingPrice": {
+            "type": "number",
+            "description": "Giá bán của riêng biến thể này"
+          },
+          "color": {
+            "type": "string",
+            "nullable": true,
+            "description": "Giá trị thuộc tính `Color` của biến thể, vd \"Nâu\". `null` khi mẫu mã không khai chiều màu sắc"
+          },
+          "size": {
+            "type": "string",
+            "nullable": true,
+            "description": "Giá trị thuộc tính `Size`, vd \"39\". `null` như [color]"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "variantLabel",
+          "purchasePrice",
+          "sellingPrice",
+          "color",
+          "size"
+        ]
+      },
+      "MobileProductDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Đúng giá trị id mà `GET /mobile/products` trả cho dòng này: id của mẫu mã, hoặc id của item nếu nó không thuộc mẫu mã nào"
+          },
+          "code": {
+            "type": "string",
+            "description": "Mã hàng hoá. Mẫu mã không có mã riêng thì lùi về tên, rồi về mã nhỏ nhất của các biến thể — cùng luật với danh sách"
+          },
+          "name": {
+            "type": "string",
+            "description": "Tên hàng hoá"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Đang kinh doanh hay không. Mẫu mã: false khi có ÍT NHẤT một biến thể ngừng kinh doanh"
+          },
+          "categoryName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Tên nhóm hàng hoá. `null` = chưa xếp nhóm"
+          },
+          "categoryId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Id nhóm hàng hoá — thứ màn Sửa cần. `null` = chưa xếp nhóm",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string",
+            "description": "Đơn vị tính cơ bản"
+          },
+          "purchasePrice": {
+            "type": "number",
+            "description": "Giá mua (giá vốn). Mẫu mã: trung bình các biến thể — khớp danh sách"
+          },
+          "sellingPrice": {
+            "type": "number",
+            "description": "Giá bán. Mẫu mã: trung bình các biến thể — khớp danh sách"
+          },
+          "weightGram": {
+            "type": "number",
+            "nullable": true,
+            "description": "Trọng lượng (g). `null` = chưa nhập"
+          },
+          "lengthCm": {
+            "type": "number",
+            "nullable": true,
+            "description": "Chiều dài (cm). `null` = chưa nhập"
+          },
+          "widthCm": {
+            "type": "number",
+            "nullable": true,
+            "description": "Chiều rộng (cm). `null` = chưa nhập"
+          },
+          "heightCm": {
+            "type": "number",
+            "nullable": true,
+            "description": "Chiều cao (cm). `null` = chưa nhập"
+          },
+          "barcode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Mã vạch đầu tiên của item đại diện. `null` = chưa có"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "Mô tả. `null` = chưa nhập"
+          },
+          "isPosVisible": {
+            "type": "boolean",
+            "description": "Có hiện trên màn bán hàng (POS) không. Mẫu mã: `bool_and` các biến thể, cùng luật với [isActive]"
+          },
+          "variants": {
+            "description": "Các biến thể, xếp theo mã. RỖNG với item lẻ — app ẩn bảng thuộc tính",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileProductVariantDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "isActive",
+          "categoryName",
+          "categoryId",
+          "unit",
+          "purchasePrice",
+          "sellingPrice",
+          "weightGram",
+          "lengthCm",
+          "widthCm",
+          "heightCm",
+          "barcode",
+          "description",
+          "isPosVisible",
+          "variants"
+        ]
+      },
+      "MobileProductVariantInputDto": {
+        "type": "object",
+        "properties": {
+          "color": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Giá trị chiều Màu sắc"
+          },
+          "size": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Giá trị chiều Size"
+          },
+          "sku": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Mã SKU riêng của biến thể"
+          },
+          "barcode": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "purchasePrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "sellPrice": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Giá bán của biến thể"
+          }
+        }
+      },
+      "MobileProductUnitInputDto": {
+        "type": "object",
+        "properties": {
+          "unitName": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Tên đơn vị, vd \"Thùng\""
+          },
+          "ratio": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Tỉ lệ quy đổi về đơn vị cơ bản"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "purchasePrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "sellPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "isDefaultSell": {
+            "type": "boolean",
+            "description": "Là đơn vị bán mặc định"
+          },
+          "isDefaultBuy": {
+            "type": "boolean",
+            "description": "Là đơn vị nhập mặc định"
+          }
+        },
+        "required": [
+          "unitName"
+        ]
+      },
+      "MobileProductCreateDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Tên hàng hoá"
+          },
+          "code": {
+            "type": "string",
+            "description": "Mã hàng hoá; để trống thì hệ thống tự sinh từ tên",
+            "maxLength": 50
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Đơn vị tính cơ bản"
+          },
+          "categoryId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Id nhóm hàng hoá"
+          },
+          "barcode": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "purchasePrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "sellingPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": true,
+            "description": "Đang kinh doanh"
+          },
+          "isPosVisible": {
+            "type": "boolean",
+            "default": true,
+            "description": "Hiện trên màn bán hàng"
+          },
+          "weightGram": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Trọng lượng (gram)"
+          },
+          "lengthCm": {
+            "type": "number",
+            "minimum": 0
+          },
+          "widthCm": {
+            "type": "number",
+            "minimum": 0
+          },
+          "heightCm": {
+            "type": "number",
+            "minimum": 0
+          },
+          "initialStock": {
+            "type": "number",
+            "description": "Tồn kho ban đầu",
+            "minimum": 0
+          },
+          "colors": {
+            "maxItems": 50,
+            "description": "Các giá trị chiều Màu sắc; có giá trị = tạo mẫu mã có biến thể",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          "sizes": {
+            "maxItems": 50,
+            "description": "Các giá trị chiều Size",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          "variants": {
+            "description": "Giá / SKU / mã vạch riêng của từng biến thể.\n\n`ArrayMaxSize(500)` khớp đúng ngưỡng mà `generate-variants` của backoffice\ndùng cho số tổ hợp — 50 màu × 50 size là 2500 tổ hợp, và gửi trọn chúng qua\nmột request là thứ phải chặn ở đây chứ không ở DB.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileProductVariantInputDto"
+            }
+          },
+          "units": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileProductUnitInputDto"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "unit"
+        ]
+      },
+      "MobileProductUpdateDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Tên hàng hoá"
+          },
+          "code": {
+            "type": "string",
+            "description": "Mã hàng hoá; để trống thì hệ thống tự sinh từ tên",
+            "maxLength": 50
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Đơn vị tính cơ bản"
+          },
+          "categoryId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Id nhóm hàng hoá"
+          },
+          "barcode": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "purchasePrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "sellingPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": true,
+            "description": "Đang kinh doanh"
+          },
+          "isPosVisible": {
+            "type": "boolean",
+            "default": true,
+            "description": "Hiện trên màn bán hàng"
+          },
+          "weightGram": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Trọng lượng (gram)"
+          },
+          "lengthCm": {
+            "type": "number",
+            "minimum": 0
+          },
+          "widthCm": {
+            "type": "number",
+            "minimum": 0
+          },
+          "heightCm": {
+            "type": "number",
+            "minimum": 0
+          },
+          "colors": {
+            "maxItems": 50,
+            "description": "Các giá trị chiều Màu sắc; có giá trị = tạo mẫu mã có biến thể",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          "sizes": {
+            "maxItems": 50,
+            "description": "Các giá trị chiều Size",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          "variants": {
+            "description": "Giá / SKU / mã vạch riêng của từng biến thể.\n\n`ArrayMaxSize(500)` khớp đúng ngưỡng mà `generate-variants` của backoffice\ndùng cho số tổ hợp — 50 màu × 50 size là 2500 tổ hợp, và gửi trọn chúng qua\nmột request là thứ phải chặn ở đây chứ không ở DB.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileProductVariantInputDto"
+            }
+          },
+          "units": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileProductUnitInputDto"
+            }
+          }
+        }
       },
       "MobileEvaluateCartLineDto": {
         "type": "object",
@@ -45406,6 +50228,117 @@
           "documentDate",
           "lines"
         ]
+      },
+      "SalesOrderLineDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemCode": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "itemName": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1
+          },
+          "unitPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "manualDiscount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "manualDiscountReason": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "promotionDiscount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "promotionName": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "itemId",
+          "itemCode",
+          "itemName",
+          "unit",
+          "quantity",
+          "unitPrice"
+        ]
+      },
+      "CreateSalesOrderDto": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "salespersonId": {
+            "type": "string",
+            "description": "`employee_profiles.id` được ghi công bán. Vắng = hồ sơ của người gọi.\nPhải là nhân viên đang hoạt động, được phân vào chi nhánh của request.",
+            "format": "uuid"
+          },
+          "isDraft": {
+            "type": "boolean",
+            "description": "`true` = LƯU TẠM: đơn ở `DRAFT`, chỉ người gửi thấy, thu ngân không thấy.\n`PATCH` một đơn `DRAFT` với `isDraft: false` (hoặc vắng) là GỬI nó."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderLineDto"
+            }
+          }
+        },
+        "required": [
+          "lines"
+        ]
+      },
+      "RejectSalesOrderDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Cùng ngưỡng 5 ký tự với `CancelInvoiceDto.reason`.",
+            "minLength": 5,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "CancelSalesOrderDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
       },
       "PartnerCategoryTreeRequestDto": {
         "type": "object",

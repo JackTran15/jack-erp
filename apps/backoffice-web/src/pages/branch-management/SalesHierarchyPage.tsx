@@ -188,6 +188,7 @@ export function SalesHierarchyPage() {
               <input
                 style={styles.input}
                 type="text"
+                autoComplete="off"
                 placeholder="ID người dùng cần gán"
                 value={salesmanUserId}
                 onChange={(e) => setSalesmanUserId(e.target.value)}
@@ -244,6 +245,7 @@ export function SalesHierarchyPage() {
               <input
                 style={styles.input}
                 type="text"
+                autoComplete="off"
                 placeholder="ID người dùng cần gán"
                 value={managerUserId}
                 onChange={(e) => setManagerUserId(e.target.value)}

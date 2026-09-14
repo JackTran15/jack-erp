@@ -133,7 +133,7 @@ export class SearchCashVouchersV2Handler
     const cte = buildCte(1, branchIdx, accountIdx);
 
     const where: string[] = [];
-    this.applyDateRange(where, params, '"createdAt"::date', dto.createdAt);
+    this.applyDateRange(where, params, '"voucherDate"::date', dto.voucherDate);
     this.applyString(where, params, '"documentNumber"', dto.documentNumber);
     this.applyEnum(where, params, '"documentKind"', dto.documentKind?.value);
     this.applyEnum(where, params, 'status', dto.status?.value);
@@ -151,7 +151,7 @@ export class SearchCashVouchersV2Handler
              counterparty, "personName", reason
       FROM combined
       ${whereSql}
-      ORDER BY "createdAt" DESC, id DESC
+      ORDER BY "voucherDate" DESC, "createdAt" DESC, id DESC
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}
     `;
     // COUNT and SUM in one scalar pass (no GROUP BY). The sum must span every

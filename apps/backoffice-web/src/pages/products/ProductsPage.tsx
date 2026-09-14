@@ -116,6 +116,7 @@ export function ProductsPage() {
       <div className="mb-4">
         <input
           type="search"
+          autoComplete="off"
           className="w-full max-w-sm rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           placeholder="Tìm kiếm sản phẩm..."
           value={search}
