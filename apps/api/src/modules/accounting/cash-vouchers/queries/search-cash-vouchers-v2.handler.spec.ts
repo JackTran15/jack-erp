@@ -187,10 +187,10 @@ describe('SearchCashVouchersV2Handler', () => {
     expect(sql).toContain("ELSE 'CASH_PAYMENT'");
   });
 
-  it('orders by createdAt DESC with id as the tiebreaker', async () => {
+  it('orders by voucherDate DESC, then createdAt DESC, with id as the tiebreaker (AC-13)', async () => {
     await run({});
     const [sql] = dataCall();
-    expect(sql).toMatch(/ORDER BY "createdAt" DESC, id DESC/);
+    expect(sql).toMatch(/ORDER BY "voucherDate" DESC, "createdAt" DESC, id DESC/);
   });
 
   it('omits the WHERE clause when no filters are supplied', async () => {
@@ -257,13 +257,14 @@ describe('SearchCashVouchersV2Handler', () => {
     expect(params).toContain('POSTED');
   });
 
-  it('applies an inclusive date range on createdAt', async () => {
-    await run({ createdAt: { from: '2026-07-01', to: '2026-07-31' } });
+  it('applies an inclusive date range on voucherDate, not createdAt (AC-11, AC-12)', async () => {
+    await run({ voucherDate: { from: '2026-09-01', to: '2026-09-30' } });
     const [sql, params] = dataCall();
-    expect(sql).toMatch(/"createdAt"::date >= \$3::date/);
-    expect(sql).toMatch(/"createdAt"::date <= \$4::date/);
-    expect(params).toContain('2026-07-01');
-    expect(params).toContain('2026-07-31');
+    expect(sql).toMatch(/"voucherDate"::date >= \$3::date/);
+    expect(sql).toMatch(/"voucherDate"::date <= \$4::date/);
+    expect(sql).not.toContain('"createdAt"::date');
+    expect(params).toContain('2026-09-01');
+    expect(params).toContain('2026-09-30');
   });
 
   it('applies the same filters to the totals query so the footer matches the grid', async () => {
@@ -277,5 +278,14 @@ describe('SearchCashVouchersV2Handler', () => {
     expect(totalsParams).toEqual(['org-1', 'branch-1', 'CASH_RECEIPT']);
     expect(dataSql).toContain('LIMIT');
     expect(totalsSql).not.toContain('LIMIT');
+  });
+
+  it('applies the voucherDate filter to the totals (COUNT/SUM) query too (AC-11)', async () => {
+    await run({ voucherDate: { from: '2026-09-01', to: '2026-09-30' } });
+    const [totalsSql, totalsParams] = query.mock.calls[1] as [string, unknown[]];
+
+    expect(totalsSql).toMatch(/"voucherDate"::date >= \$3::date/);
+    expect(totalsSql).toMatch(/"voucherDate"::date <= \$4::date/);
+    expect(totalsParams).toEqual(['org-1', 'branch-1', '2026-09-01', '2026-09-30']);
   });
 });

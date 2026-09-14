@@ -43,13 +43,12 @@ export class CashVoucherSearchV2Dto {
   cashAccountId?: string;
 
   /**
-   * Creation-timestamp column, also fed by the period (from/to) filter. The grid
-   * orders on this column too.
+   * Voucher-date column ("Ngày thu/chi"), also fed by the period (from/to) filter.
    */
   @IsOptional()
   @ValidateNested()
   @Type(() => DateRangeFilterDto)
-  createdAt?: DateRangeFilterDto;
+  voucherDate?: DateRangeFilterDto;
 
   /** Document number column. */
   @IsOptional()

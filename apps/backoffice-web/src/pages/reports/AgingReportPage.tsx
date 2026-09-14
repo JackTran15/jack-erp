@@ -66,7 +66,7 @@ export function AgingReportPage() {
         </label>
         <label style={styles.filterLabel}>
           ID chi nhánh
-          <input style={styles.input} type="text" placeholder="Tất cả chi nhánh" value={branchId} onChange={(e) => setBranchId(e.target.value)} />
+          <input style={styles.input} type="text" autoComplete="off" placeholder="Tất cả chi nhánh" value={branchId} onChange={(e) => setBranchId(e.target.value)} />
         </label>
         <button style={styles.btn} onClick={() => void refetch()}>Làm mới</button>
       </div>

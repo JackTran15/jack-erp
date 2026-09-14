@@ -18,6 +18,19 @@ const XLSX_CONTENT_TYPE =
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 /**
+ * T-01-05: the second, non-creator user granted as Nhân viên thu/chi on a
+ * voucher below — resolved name is `firstName + ' ' + lastName` trimmed
+ * (`VoucherStaffResolver.resolveMany`).
+ */
+const STAFF_NAME = 'Nguyễn Văn A';
+
+/**
+ * seedBaseData's fixed identity (test-app.ts: first_name 'Admin', last_name
+ * 'User') — the name a voucher falls back to when it names no staff (AC-06).
+ */
+const CREATOR_NAME = 'Admin User';
+
+/**
  * The two facts T-04-01 (controller wiring) could not honestly assert on its
  * own, per ADR-05: the `Content-Disposition` filename really carries the
  * voucher's type and document number (it is set by `HttpResponseSink`, not by
@@ -37,6 +50,8 @@ describe('Treasury voucher export (E2E)', () => {
   let seed: SeedResult;
   let cashAccountId: string;
   let depositAccountId: string;
+  /** A user in `seed.organizationId`, distinct from `seed.userId`, used as Nhân viên thu/chi (T-01-05). */
+  let staffUserId: string;
 
   const headers = () => ({
     Authorization: authHeader(seed.accessToken),
@@ -158,6 +173,21 @@ describe('Treasury voucher export (E2E)', () => {
                'BANK_ACCOUNT', $5, 0, '2026-01-01', 100000000, false, true,
                'ACTIVE', $6, NOW(), NOW())`,
       [depositAccountId, seed.organizationId, seed.branchId, bankId, coaBankId, seed.userId],
+    );
+
+    // T-01-05: a second user in the same org, never logged in — only its id
+    // and name matter, as `staffId` / `collectedBy` / `paidBy` on a voucher.
+    staffUserId = randomUUID();
+    // `VoucherStaffResolver` reconstructs the name as `firstName + ' ' + lastName`
+    // trimmed, so the last space-separated word is the last name and everything
+    // before it is the first name — not a 2-way split, which would drop "A".
+    const staffNameParts = STAFF_NAME.split(' ');
+    const staffLastName = staffNameParts[staffNameParts.length - 1];
+    const staffFirstName = staffNameParts.slice(0, -1).join(' ');
+    await ds.query(
+      `INSERT INTO users (id, organization_id, email, password_hash, first_name, last_name, is_active, created_at, updated_at)
+       VALUES ($1, $2, $3, 'unused-t0105-staff-hash', $4, $5, true, NOW(), NOW())`,
+      [staffUserId, seed.organizationId, `staff-t0105-${staffUserId}@example.com`, staffFirstName, staffLastName],
     );
   }, 180000);
 
@@ -358,5 +388,168 @@ describe('Treasury voucher export (E2E)', () => {
         expect(typeof res.body.message).toBe('string');
       },
     );
+  });
+
+  /**
+   * T-01-05 (AC-01, AC-02, AC-03, AC-05, AC-06, AC-08): locks the wiring
+   * T-01-01…T-01-04 only unit-tested in isolation — the staff line and first
+   * signature really travel through `getPrintPayload` and the xlsx writer for
+   * all 4 kinds, over the real HTTP route, against a real second user in
+   * `erp_test`.
+   */
+  const staffFieldOf = (kind: Kind): 'staffId' | 'collectedBy' | 'paidBy' =>
+    kind.table === 'bank_receipts'
+      ? 'collectedBy'
+      : kind.table === 'bank_payments'
+        ? 'paidBy'
+        : 'staffId';
+
+  const staffLabelOf = (kind: Kind): string =>
+    kind.typeWord === 'thu' ? 'Nhân viên thu' : 'Nhân viên chi';
+
+  describe.each(kinds())(
+    '$label with a Nhân viên thu/chi (AC-01, AC-02, AC-03, AC-05)',
+    (kind) => {
+      it('info has the staff line right before "Lý do", no fund/account line; signatures[0] is the staff label + name', async () => {
+        const staffLabel = staffLabelOf(kind);
+        const body: Record<string, unknown> = {
+          ...kind.body(),
+          reason: 'Kiểm tra nhân viên thu chi',
+          [staffFieldOf(kind)]: staffUserId,
+        };
+        if (kind.isDeposit && kind.typeWord === 'thu') {
+          // AC-03: "Tham chiếu" must survive alongside the new staff line.
+          body.reference = 'FT2609';
+        }
+
+        const created = await request(app.getHttpServer())
+          .post(kind.path)
+          .set(headers())
+          .send(body)
+          .expect(201);
+
+        const res = await request(app.getHttpServer())
+          .get(`${kind.path}/${created.body.id}/print-payload`)
+          .set(headers())
+          .expect(200);
+
+        const info: Array<{ label: string; value: string }> = res.body.info;
+        const staffIndex = info.findIndex((row) => row.label === staffLabel);
+        const reasonIndex = info.findIndex((row) => row.label === 'Lý do');
+
+        // AC-01/AC-02/AC-03: the staff line exists, carries the resolved
+        // name, and sits right before "Lý do"; the fund/account line is gone.
+        expect(staffIndex).toBeGreaterThanOrEqual(0);
+        expect(info[staffIndex].value).toBe(STAFF_NAME);
+        expect(reasonIndex).toBe(staffIndex + 1);
+        expect(info.some((row) => row.label === 'Quỹ tiền mặt')).toBe(false);
+        expect(info.some((row) => row.label === 'Tài khoản ngân hàng')).toBe(false);
+        if (kind.isDeposit && kind.typeWord === 'thu') {
+          expect(
+            info.some((row) => row.label === 'Tham chiếu' && row.value === 'FT2609'),
+          ).toBe(true);
+        }
+
+        // AC-05: first signature column is labelled "Nhân viên thu/chi" (never
+        // "Người lập phiếu"). A-17/ADR-08: no name is printed under any
+        // signature column, so the payload carries no `signatureNames` key at
+        // all.
+        expect(res.body.signatures[0]).toBe(staffLabel);
+        expect(res.body.signatures).not.toContain('Người lập phiếu');
+        expect(res.body).not.toHaveProperty('signatureNames');
+      });
+    },
+  );
+
+  describe('print-payload — voucher without a staff member (AC-06)', () => {
+    it('cash payment with no Nhân viên chi -> no staff row in info, no signatureNames key, creator name nowhere in the payload', async () => {
+      const kind = kinds().find((k) => k.table === 'cash_payments')!;
+      const created = await request(app.getHttpServer())
+        .post(kind.path)
+        .set(headers())
+        .send(kind.body())
+        .expect(201);
+
+      const res = await request(app.getHttpServer())
+        .get(`${kind.path}/${created.body.id}/print-payload`)
+        .set(headers())
+        .expect(200);
+
+      const info: Array<{ label: string; value: string }> = res.body.info;
+      expect(info.some((row) => row.label === 'Nhân viên chi')).toBe(false);
+      expect(res.body.signatures[0]).toBe('Nhân viên chi');
+      // A-17/ADR-08: the creator's name is never looked up or printed, so it
+      // cannot appear anywhere in the payload — not as a fallback name, not
+      // under any other key.
+      expect(res.body).not.toHaveProperty('signatureNames');
+      expect(JSON.stringify(res.body)).not.toContain(CREATOR_NAME);
+    });
+  });
+
+  describe('export xlsx — staff line and signature label, no name under any signature (AC-08)', () => {
+    it('cash payment export: "Nhân viên chi" info line + signature label, staff name appears exactly once, sheet ends at "(Ký, họ tên)"', async () => {
+      const kind = kinds().find((k) => k.table === 'cash_payments')!;
+      const created = await request(app.getHttpServer())
+        .post(kind.path)
+        .set(headers())
+        .send({ ...kind.body(), reason: 'Kiểm tra xuất khẩu', staffId: staffUserId })
+        .expect(201);
+
+      const res = await request(app.getHttpServer())
+        .get(`${kind.path}/${created.body.id}/export`)
+        .set(headers())
+        .responseType('blob')
+        .expect(200);
+
+      const sheet = (await readWorkbook(res.body as Buffer)).worksheets[0];
+
+      // Every non-empty string cell, skipping the satellite cells of a merged
+      // range (`type === ValueType.Merge`) — exceljs echoes the master cell's
+      // value on every cell the merge covers, so counting those in too made
+      // one written name look like it appeared in every column of its row.
+      // That misread is what the first version of this test hit.
+      const cells: Array<{ row: number; col: number; value: string }> = [];
+      for (let r = 1; r <= sheet.rowCount; r++) {
+        const row = sheet.getRow(r);
+        for (let c = 1; c <= sheet.columnCount; c++) {
+          const cell = row.getCell(c);
+          if (cell.type === ExcelJS.ValueType.Merge) continue;
+          const value = cell.value;
+          if (typeof value === 'string' && value.length > 0) {
+            cells.push({ row: r, col: c, value });
+          }
+        }
+      }
+
+      // AC-08: the info block carries the staff line; no fund/account line,
+      // no "Người lập phiếu" anywhere in the sheet.
+      expect(cells.some((cell) => cell.value === `Nhân viên chi: ${STAFF_NAME}`)).toBe(true);
+      expect(cells.some((cell) => cell.value.includes('Quỹ tiền mặt'))).toBe(false);
+      expect(cells.some((cell) => cell.value === 'Người lập phiếu')).toBe(false);
+
+      // The signature block's own label cell reads exactly "Nhân viên chi" —
+      // distinct from the "Nhân viên chi: <name>" banner line above — and it
+      // is the first (leftmost) content in its row, i.e. the signature row
+      // starts with it.
+      const labelRowNumber = cells.find((cell) => cell.value === 'Nhân viên chi')?.row;
+      expect(labelRowNumber).toBeGreaterThan(0);
+      const firstCellOfLabelRow = cells
+        .filter((cell) => cell.row === labelRowNumber)
+        .sort((a, b) => a.col - b.col)[0];
+      expect(firstCellOfLabelRow.value).toBe('Nhân viên chi');
+
+      // A-17/ADR-08: no name is printed under any signature — the staff name
+      // appears exactly once in the whole sheet, in the info line above.
+      expect(cells.filter((cell) => cell.value.includes(STAFF_NAME)).length).toBe(1);
+
+      // The sheet ends at the "(Ký, họ tên)" hint row — no name row, no blank
+      // gap rows below it (the writer is back to `main`, per ADR-08).
+      const lastRow = Math.max(...cells.map((cell) => cell.row));
+      const lastRowValues = cells
+        .filter((cell) => cell.row === lastRow)
+        .map((cell) => cell.value);
+      expect(lastRowValues.length).toBeGreaterThan(0);
+      expect(lastRowValues.every((value) => value === '(Ký, họ tên)')).toBe(true);
+    });
   });
 });

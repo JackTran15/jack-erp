@@ -6,10 +6,7 @@ import {
   type StatusBadgeVariant,
 } from "../../../../components/status/StatusBadge";
 import { VoucherLink } from "../../documents";
-import {
-  LEDGER_CASH_VI_DATE,
-  TABLE_NUM_CLASS,
-} from "../../ledger-cash/ledger-cash.constants";
+import { TABLE_NUM_CLASS } from "../../ledger-cash/ledger-cash.constants";
 import {
   CASH_VOUCHER_STATUS_LABEL,
   receiptPaymentDocumentTypeLabel,
@@ -29,18 +26,27 @@ const STATUS_BADGE_VARIANT: Record<CashVoucherStatus, StatusBadgeVariant> = {
   [CashVoucherStatus.REVERSED]: "warning",
 };
 
+/**
+ * `voucherDate` is a plain `YYYY-MM-DD` string — split it instead of going
+ * through `new Date()`, which reinterprets it as UTC midnight and can roll
+ * back a day in negative-offset timezones.
+ */
+function formatPlainDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
 export function useReceiptCashTableColumns(
   onOpenVoucher: (row: ReceiptPaymentListItem) => void,
 ) {
   return useMemo(
     (): TableColumn<ReceiptPaymentListItem>[] => [
       {
-        key: "createdAt",
-        label: "Ngày tạo",
+        key: "voucherDate",
+        label: "Ngày thu/chi",
         width: 110,
         filterKind: "date-range",
-        render: (r) =>
-          new Date(r.createdAt).toLocaleDateString("vi-VN", LEDGER_CASH_VI_DATE),
+        render: (r) => formatPlainDate(r.voucherDate),
       },
       {
         key: "documentNumber",

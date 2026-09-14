@@ -41,6 +41,18 @@ describe('Cash voucher list export (E2E)', () => {
   const SPLIT_PARTY_NUMBER = 'PT-SPLIT-PARTY';
   /** Past the shared row cap, so the export route actually refuses it. */
   const OVER_CAP_ROWS = MAX_REPORT_ROWS + 2_000;
+  /**
+   * X and Y (AC-11/AC-12/AC-13/AC-14): a voucher dated one month but recorded
+   * (created_at) in another. The only fixture shape that can tell a
+   * voucherDate filter/sort/export column from a createdAt one.
+   */
+  const VOUCHERDATE_PREFIX = 'EXPORT-VOUCHERDATE-';
+  const VOUCHERDATE_X_NUMBER = `${VOUCHERDATE_PREFIX}X`;
+  const VOUCHERDATE_X_VOUCHER_DATE = '2026-09-06';
+  const VOUCHERDATE_X_CREATED_AT = '2026-09-13T00:00:00.000Z';
+  const VOUCHERDATE_Y_NUMBER = `${VOUCHERDATE_PREFIX}Y`;
+  const VOUCHERDATE_Y_VOUCHER_DATE = '2026-08-31';
+  const VOUCHERDATE_Y_CREATED_AT = '2026-09-01T00:00:00.000Z';
 
   const headers = () => ({
     Authorization: authHeader(seed.accessToken),
@@ -64,7 +76,7 @@ describe('Cash voucher list export (E2E)', () => {
 
   /** The "Số chứng từ" column, top to bottom, below the header row. */
   function documentNumbersOf(sheet: ExcelJS.Worksheet): unknown[] {
-    const headerRow = headerRowNumber(sheet, 'Ngày tạo');
+    const headerRow = headerRowNumber(sheet, 'Ngày thu/chi');
     const values: unknown[] = [];
     for (let r = headerRow + 1; r <= sheet.rowCount; r++) {
       values.push(sheet.getRow(r).getCell(2).value);
@@ -94,6 +106,36 @@ describe('Cash voucher list export (E2E)', () => {
         seed.userId,
         party,
         person,
+      ],
+    );
+  }
+
+  /**
+   * Like `insertReceipt`, but with an explicit `voucher_date` and `created_at`
+   * instead of both defaulting to "now" — the raw SQL insert bypasses the
+   * `@CreateDateColumn` default, so the two can be set to different days.
+   */
+  async function insertReceiptWithDates(
+    documentNumber: string,
+    voucherDate: string,
+    createdAt: string,
+  ): Promise<void> {
+    await ds.query(
+      `INSERT INTO cash_receipts
+         (id, organization_id, branch_id, document_number, voucher_date, status,
+          purpose, cash_account_id, contra_account_id, total_amount,
+          created_by, created_at, updated_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4::date, 'POSTED', 'OTHER',
+               $5::uuid, $6::uuid, 1000, $7, $8::timestamptz, $8::timestamptz)`,
+      [
+        seed.organizationId,
+        seed.branchId,
+        documentNumber,
+        voucherDate,
+        cashAccountId,
+        contraAccountId,
+        seed.userId,
+        createdAt,
       ],
     );
   }
@@ -172,6 +214,16 @@ describe('Cash voucher list export (E2E)', () => {
     // tell a two-column export from a one-column one.
     await insertReceipt(SPLIT_PARTY_NUMBER, 'kkkk', '123123');
     await insertReceipt(OUT_OF_FILTER_NUMBER);
+    await insertReceiptWithDates(
+      VOUCHERDATE_X_NUMBER,
+      VOUCHERDATE_X_VOUCHER_DATE,
+      VOUCHERDATE_X_CREATED_AT,
+    );
+    await insertReceiptWithDates(
+      VOUCHERDATE_Y_NUMBER,
+      VOUCHERDATE_Y_VOUCHER_DATE,
+      VOUCHERDATE_Y_CREATED_AT,
+    );
     await seedOverCapReceipts();
   }, 300_000);
 
@@ -236,7 +288,7 @@ describe('Cash voucher list export (E2E)', () => {
       .expect(200);
 
     const sheet = await readSheet(exported.body);
-    const headerRow = headerRowNumber(sheet, 'Ngày tạo');
+    const headerRow = headerRowNumber(sheet, 'Ngày thu/chi');
 
     // Adjacency is the promise EXPORT_COLUMNS makes to the grid ("same order the
     // treasury grid renders them"), and it is the part that rots silently.
@@ -277,7 +329,75 @@ describe('Cash voucher list export (E2E)', () => {
     const sheet = await readSheet(exported.body);
     expect(documentNumbersOf(sheet)).toHaveLength(0);
     // The header row itself is still there.
-    expect(() => headerRowNumber(sheet, 'Ngày tạo')).not.toThrow();
+    expect(() => headerRowNumber(sheet, 'Ngày thu/chi')).not.toThrow();
+  });
+
+  it('filters by voucher date, not creation date (AC-11, AC-12)', async () => {
+    const scoped = {
+      documentNumber: { operator: StringOperator.STARTS_WITH, value: VOUCHERDATE_PREFIX },
+    };
+    const documentNumbersFor = async (voucherDate: {
+      from?: string;
+      to?: string;
+    }): Promise<string[]> => {
+      const res = await request(app.getHttpServer())
+        .post('/v2/cash-vouchers/search')
+        .set(headers())
+        .send({ ...scoped, voucherDate })
+        .expect(201);
+      return (res.body.data as Array<{ documentNumber: string }>).map(
+        (r) => r.documentNumber,
+      );
+    };
+
+    // Period 01/09–30/09: X (voucher_date 06/09) is in, Y (voucher_date 31/08,
+    // even though created 01/09 — inside the period) is not.
+    const september = await documentNumbersFor({ from: '2026-09-01', to: '2026-09-30' });
+    expect(september).toContain(VOUCHERDATE_X_NUMBER);
+    expect(september).not.toContain(VOUCHERDATE_Y_NUMBER);
+
+    // Narrowed to X's *creation* day (13/09) rather than its voucher date
+    // (06/09): X must drop out — proves the filter runs on voucherDate, not
+    // createdAt.
+    const creationDayOnly = await documentNumbersFor({ from: '2026-09-13', to: '2026-09-13' });
+    expect(creationDayOnly).not.toContain(VOUCHERDATE_X_NUMBER);
+
+    // Narrowed to X's actual voucher date: X is back.
+    const voucherDayOnly = await documentNumbersFor({ from: '2026-09-06', to: '2026-09-06' });
+    expect(voucherDayOnly).toContain(VOUCHERDATE_X_NUMBER);
+  });
+
+  it('rejects a search body that still sends createdAt (ADR-04)', async () => {
+    // Whitelist validation (`forbidNonWhitelisted`) locks the contract: a
+    // client that has not migrated off the old field name gets a 400, not a
+    // silently ignored filter.
+    await request(app.getHttpServer())
+      .post('/v2/cash-vouchers/search')
+      .set(headers())
+      .send({ createdAt: { from: '2026-09-01', to: '2026-09-30' } })
+      .expect(400);
+  });
+
+  it('carries the voucher date, not the creation date, in the export (AC-14)', async () => {
+    const exported = await request(app.getHttpServer())
+      .post('/v2/cash-vouchers/export')
+      .set(headers())
+      .responseType('blob')
+      .send({
+        documentNumber: { operator: StringOperator.EQUALS, value: VOUCHERDATE_X_NUMBER },
+      })
+      .expect(200);
+
+    const sheet = await readSheet(exported.body);
+    const headerRow = headerRowNumber(sheet, 'Ngày thu/chi');
+
+    // The header row must not carry the retired "Ngày tạo" label anywhere.
+    const headerLabels = sheet.getRow(headerRow).values as unknown[];
+    expect(headerLabels).not.toContain('Ngày tạo');
+
+    const dataRow = sheet.getRow(headerRow + 1);
+    // The voucher's date column, not its creation timestamp's day.
+    expect(dataRow.getCell(1).value).toBe(VOUCHERDATE_X_VOUCHER_DATE);
   });
 
   it('refuses to export past the row cap, with a JSON body rather than a file', async () => {

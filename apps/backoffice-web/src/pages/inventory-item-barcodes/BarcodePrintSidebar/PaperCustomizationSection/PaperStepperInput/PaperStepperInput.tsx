@@ -65,6 +65,7 @@ export function PaperStepperInput({
       <span className="flex h-8 items-stretch overflow-hidden rounded border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
         <input
           className="h-full w-full min-w-0 bg-transparent px-2 text-right text-sm outline-none"
+          autoComplete="off"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onBlur={commit}

@@ -26,6 +26,7 @@ import {
   VoucherLinksService,
 } from '../../voucher-links/voucher-links.service';
 import { PartnerResolverService } from '../shared/partner-resolver.service';
+import { VoucherStaffResolver } from '../shared/voucher-staff.resolver';
 import { isFreeTextParty } from '../shared/voucher-party';
 import {
   assertEditable,
@@ -128,6 +129,7 @@ export class CashReceiptsService {
     private readonly docNumbering: DocumentNumberingService,
     private readonly partnerResolver: PartnerResolverService,
     private readonly accountResolver: AccountResolverService,
+    private readonly staffResolver: VoucherStaffResolver,
     private readonly debtCollectionSaga: DebtCollectionSagaService,
     private readonly voucherLinks: VoucherLinksService,
   ) {}
@@ -849,23 +851,17 @@ export class CashReceiptsService {
   ): Promise<VoucherPrintPayload> {
     const receipt = await this.getById(id, actor);
     const manager = this.dataSource.manager;
-    const [branch, cashAccountName, categoryNames] = await Promise.all([
+    const [branch, staff, categoryNames] = await Promise.all([
       loadVoucherBranch(manager, receipt.branchId, actor.organizationId),
-      this.resolveCashAccountName(manager, receipt.cashAccountId, actor.organizationId),
+      this.staffResolver.resolveOne(receipt.staffId, actor.organizationId),
       this.resolveCategoryNames(manager, receipt.lines, actor.organizationId),
     ]);
-    return mapCashReceiptToVoucherPayload(receipt, branch, cashAccountName, categoryNames);
-  }
-
-  private async resolveCashAccountName(
-    manager: EntityManager,
-    cashAccountId: string,
-    organizationId: string,
-  ): Promise<string> {
-    const account = await manager.findOne(CashAccountEntity, {
-      where: { id: cashAccountId, organizationId },
-    });
-    return account?.name ?? '';
+    return mapCashReceiptToVoucherPayload(
+      receipt,
+      branch,
+      staff?.name ?? null,
+      categoryNames,
+    );
   }
 
   /** Batch-resolves category names for a receipt's lines, keyed by category id. */

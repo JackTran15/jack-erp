@@ -43,7 +43,7 @@ const EXPORT_ROW_CAP = MAX_REPORT_ROWS;
 
 /** Columns kept in the export, in the same order the treasury grid renders them. */
 const EXPORT_COLUMNS: DocumentColumn[] = [
-  { col: 'createdAt', label: 'Ngày tạo', type: ReportColumnDataType.DATE },
+  { col: 'voucherDate', label: 'Ngày thu/chi', type: ReportColumnDataType.DATE },
   { col: 'documentNumber', label: 'Số chứng từ', type: ReportColumnDataType.STRING },
   { col: 'documentKind', label: 'Loại chứng từ', type: ReportColumnDataType.STRING },
   { col: 'status', label: 'Trạng thái', type: ReportColumnDataType.STRING },

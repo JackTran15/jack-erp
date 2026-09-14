@@ -1,4 +1,5 @@
 import { DocumentBranchInfo, VoucherKind, VoucherPrintPayload } from '@erp/shared-interfaces';
+import { TREASURY_PRINT_LABELS, TreasuryVoucherKind } from './treasury-print-labels';
 import { mapCashReceiptToVoucherPayload } from '../cash-receipts/cash-receipt-print.mapper';
 import { CashReceiptEntity } from '../cash-receipts/cash-receipt.entity';
 import { mapCashPaymentToVoucherPayload } from '../cash-payments/cash-payment-print.mapper';
@@ -16,16 +17,18 @@ import { BankPaymentEntity } from '../../deposit-vouchers/bank-payments/bank-pay
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type TreasuryMapper = (entity: any, branch: DocumentBranchInfo | null, accountName: string, categoryNames: Map<string, string>) => VoucherPrintPayload;
+type TreasuryMapper = (entity: any, branch: DocumentBranchInfo | null, thirdArg: any, categoryNames: Map<string, string>) => VoucherPrintPayload;
 
 interface Row {
-  kind: VoucherKind;
+  kind: TreasuryVoucherKind;
   label: string;
   mapper: TreasuryMapper;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fixture: (overrides?: Record<string, unknown>) => any;
   expectedTitle: string;
   expectedPartyLabel: string;
+  /** All four mappers take a plain `staffName: string | null` as of T-01-07. */
+  thirdArg: string | null;
 }
 
 function cashReceiptFixture(overrides: Record<string, unknown> = {}): CashReceiptEntity {
@@ -94,6 +97,13 @@ function bankPaymentFixture(overrides: Record<string, unknown> = {}): BankPaymen
   } as any as BankPaymentEntity;
 }
 
+const categoryNames = new Map([
+  ['cat-1', 'Thu khác'],
+  ['cat-2', 'Chi phí văn phòng'],
+]);
+
+const STAFF_NAME = 'Nguyễn Văn A';
+
 const ROWS: Row[] = [
   {
     kind: VoucherKind.CASH_RECEIPT,
@@ -102,6 +112,7 @@ const ROWS: Row[] = [
     fixture: cashReceiptFixture,
     expectedTitle: 'PHIẾU THU',
     expectedPartyLabel: 'Người nộp tiền',
+    thirdArg: STAFF_NAME,
   },
   {
     kind: VoucherKind.CASH_PAYMENT,
@@ -110,6 +121,7 @@ const ROWS: Row[] = [
     fixture: cashPaymentFixture,
     expectedTitle: 'PHIẾU CHI',
     expectedPartyLabel: 'Người nhận tiền',
+    thirdArg: STAFF_NAME,
   },
   {
     kind: VoucherKind.BANK_RECEIPT,
@@ -118,6 +130,7 @@ const ROWS: Row[] = [
     fixture: bankReceiptFixture,
     expectedTitle: 'PHIẾU THU (tiền gửi)',
     expectedPartyLabel: 'Người nộp tiền',
+    thirdArg: STAFF_NAME,
   },
   {
     kind: VoucherKind.BANK_PAYMENT,
@@ -126,40 +139,45 @@ const ROWS: Row[] = [
     fixture: bankPaymentFixture,
     expectedTitle: 'PHIẾU CHI (tiền gửi)',
     expectedPartyLabel: 'Người nhận tiền',
+    thirdArg: STAFF_NAME,
   },
 ];
 
-const categoryNames = new Map([
-  ['cat-1', 'Thu khác'],
-  ['cat-2', 'Chi phí văn phòng'],
-]);
-
-const ACCOUNT_NAME = 'Quỹ/Tài khoản kiểm thử';
-
-describe.each(ROWS)('$label print payload — shared treasury invariants', ({ mapper, fixture, expectedTitle, expectedPartyLabel }) => {
+describe.each(ROWS)('$label print payload — shared treasury invariants', ({ kind, mapper, fixture, expectedTitle, expectedPartyLabel, thirdArg }) => {
   it('prints on A5 paper', () => {
-    const payload = mapper(fixture(), null, ACCOUNT_NAME, categoryNames);
+    const payload = mapper(fixture(), null, thirdArg, categoryNames);
     expect(payload.paper).toBe('A5');
   });
 
   it('titles the document without embedding the document number (voucher-payload.ts:34-35)', () => {
-    const payload = mapper(fixture(), null, ACCOUNT_NAME, categoryNames);
+    const payload = mapper(fixture(), null, thirdArg, categoryNames);
     expect(payload.title).toBe(expectedTitle);
     expect(payload.title.includes(payload.docNo)).toBe(false);
   });
 
   it('renders docDate without the leading "Ngày" word', () => {
-    const payload = mapper(fixture(), null, ACCOUNT_NAME, categoryNames);
+    const payload = mapper(fixture(), null, thirdArg, categoryNames);
     expect(payload.docDate.startsWith('Ngày')).toBe(false);
   });
 
   it('carries exactly 4 signature slots', () => {
-    const payload = mapper(fixture(), null, ACCOUNT_NAME, categoryNames);
+    const payload = mapper(fixture(), null, thirdArg, categoryNames);
     expect(payload.signatures).toHaveLength(4);
   });
 
+  it('never emits a signatureNames key — no name prints under any signature column (T-01-07, AC-05)', () => {
+    const payload = mapper(fixture(), null, thirdArg, categoryNames);
+    expect(payload).not.toHaveProperty('signatureNames');
+  });
+
+  it('labels the first signature column with this kind\'s staff label, never "Người lập phiếu" (AC-05, AC-08)', () => {
+    const payload = mapper(fixture(), null, thirdArg, categoryNames);
+    expect(payload.signatures[0]).toBe(TREASURY_PRINT_LABELS[kind].staffLabel);
+    expect(payload.signatures).not.toContain('Người lập phiếu');
+  });
+
   it('never emits an info row with an empty value', () => {
-    const payload = mapper(fixture(), null, ACCOUNT_NAME, categoryNames);
+    const payload = mapper(fixture(), null, thirdArg, categoryNames);
     expect(payload.info.every((row) => row.value.trim().length > 0)).toBe(true);
   });
 
@@ -171,7 +189,7 @@ describe.each(ROWS)('$label print payload — shared treasury invariants', ({ ma
         partnerAddressSnapshot: '45 Lê Lợi',
       }),
       null,
-      ACCOUNT_NAME,
+      thirdArg,
       categoryNames,
     );
 
@@ -182,7 +200,7 @@ describe.each(ROWS)('$label print payload — shared treasury invariants', ({ ma
   });
 
   it('drops the "Địa chỉ" row entirely when partnerAddressSnapshot is empty', () => {
-    const payload = mapper(fixture({ partnerAddressSnapshot: null }), null, ACCOUNT_NAME, categoryNames);
+    const payload = mapper(fixture({ partnerAddressSnapshot: null }), null, thirdArg, categoryNames);
     expect(payload.info.find((row) => row.label === 'Địa chỉ')).toBeUndefined();
   });
 });
@@ -190,7 +208,7 @@ describe.each(ROWS)('$label print payload — shared treasury invariants', ({ ma
 describe('amountInWords parity across all four treasury kinds', () => {
   it('reads the same amount identically, proving there is no second number-reading implementation', () => {
     const words = ROWS.map(
-      ({ mapper, fixture }) => mapper(fixture({ totalAmount: '1234567' }), null, ACCOUNT_NAME, categoryNames).amountInWords,
+      ({ mapper, fixture, thirdArg }) => mapper(fixture({ totalAmount: '1234567' }), null, thirdArg, categoryNames).amountInWords,
     );
 
     expect(new Set(words).size).toBe(1);

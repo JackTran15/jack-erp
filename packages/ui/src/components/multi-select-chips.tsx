@@ -137,6 +137,7 @@ function MultiSelectChips({
           <input
             ref={inputRef}
             type="text"
+            autoComplete="off"
             className="min-w-[60px] flex-1 bg-transparent outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
             value={search}
             disabled={disabled}

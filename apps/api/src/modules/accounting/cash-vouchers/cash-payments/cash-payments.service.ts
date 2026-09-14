@@ -26,6 +26,7 @@ import {
   VoucherLinksService,
 } from '../../voucher-links/voucher-links.service';
 import { PartnerResolverService } from '../shared/partner-resolver.service';
+import { VoucherStaffResolver } from '../shared/voucher-staff.resolver';
 import { isFreeTextParty } from '../shared/voucher-party';
 import {
   assertEditable,
@@ -123,6 +124,7 @@ export class CashPaymentsService {
     private readonly docNumbering: DocumentNumberingService,
     private readonly partnerResolver: PartnerResolverService,
     private readonly accountResolver: AccountResolverService,
+    private readonly staffResolver: VoucherStaffResolver,
     private readonly supplierDebtPaymentSaga: SupplierDebtPaymentSagaService,
     private readonly voucherLinks: VoucherLinksService,
   ) {}
@@ -849,23 +851,17 @@ export class CashPaymentsService {
   ): Promise<VoucherPrintPayload> {
     const payment = await this.getById(id, actor);
     const manager = this.dataSource.manager;
-    const [branch, cashAccountName, categoryNames] = await Promise.all([
+    const [branch, staff, categoryNames] = await Promise.all([
       loadVoucherBranch(manager, payment.branchId, actor.organizationId),
-      this.resolveCashAccountName(manager, payment.cashAccountId, actor.organizationId),
+      this.staffResolver.resolveOne(payment.staffId, actor.organizationId),
       this.resolveCategoryNames(manager, payment.lines, actor.organizationId),
     ]);
-    return mapCashPaymentToVoucherPayload(payment, branch, cashAccountName, categoryNames);
-  }
-
-  private async resolveCashAccountName(
-    manager: EntityManager,
-    cashAccountId: string,
-    organizationId: string,
-  ): Promise<string> {
-    const account = await manager.findOne(CashAccountEntity, {
-      where: { id: cashAccountId, organizationId },
-    });
-    return account?.name ?? '';
+    return mapCashPaymentToVoucherPayload(
+      payment,
+      branch,
+      staff?.name ?? null,
+      categoryNames,
+    );
   }
 
   /** Batch-resolves category names for a payment's lines, keyed by category id. */

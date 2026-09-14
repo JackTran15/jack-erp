@@ -24,6 +24,11 @@ export interface TreasuryPrintLabels {
   personLabel: string;
   /** Last entry of `signatures` — same wording as `partyLabel`. */
   lastSignature: string;
+  /**
+   * Label of the staff (thu/chi) row in `info`, just before "Lý do" (A-06):
+   * "Nhân viên thu" on a receipt, "Nhân viên chi" on a payment.
+   */
+  staffLabel: string;
 }
 
 /**
@@ -37,23 +42,27 @@ export const TREASURY_PRINT_LABELS: Record<TreasuryVoucherKind, TreasuryPrintLab
     partyLabel: 'Người nộp tiền',
     personLabel: 'Người nộp',
     lastSignature: 'Người nộp tiền',
+    staffLabel: 'Nhân viên thu',
   },
   [VoucherKind.CASH_PAYMENT]: {
     title: 'PHIẾU CHI',
     partyLabel: 'Người nhận tiền',
     personLabel: 'Người nhận',
     lastSignature: 'Người nhận tiền',
+    staffLabel: 'Nhân viên chi',
   },
   [VoucherKind.BANK_RECEIPT]: {
     title: 'PHIẾU THU (tiền gửi)',
     partyLabel: 'Người nộp tiền',
     personLabel: 'Người nộp',
     lastSignature: 'Người nộp tiền',
+    staffLabel: 'Nhân viên thu',
   },
   [VoucherKind.BANK_PAYMENT]: {
     title: 'PHIẾU CHI (tiền gửi)',
     partyLabel: 'Người nhận tiền',
     personLabel: 'Người nhận',
     lastSignature: 'Người nhận tiền',
+    staffLabel: 'Nhân viên chi',
   },
 };

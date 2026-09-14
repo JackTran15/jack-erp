@@ -35,7 +35,7 @@ import { CashVoucherPartnerType } from "../../cash-vouchers/enums";
 import { CashVoucherCategoryEntity } from "../../cash-vouchers/cash-voucher-categories/cash-voucher-category.entity";
 import { AccountResolverService } from "../../payment-accounts/account-resolver.service";
 import { AccountingDefaultAccountRole } from "../../payment-accounts/enums";
-import { VoucherStaffResolver } from "../shared/voucher-staff.resolver";
+import { VoucherStaffResolver } from "../../cash-vouchers/shared/voucher-staff.resolver";
 import { mapBankPaymentToVoucherPayload } from "./bank-payment-print.mapper";
 import { BankPaymentEntity } from "./bank-payment.entity";
 import { BankPaymentLineEntity } from "./bank-payment-line.entity";
@@ -998,23 +998,16 @@ export class BankPaymentsService {
   ): Promise<VoucherPrintPayload> {
     const payment = await this.getById(id, actor);
     const manager = this.dataSource.manager;
-    const [branch, bankAccountName, categoryNames] = await Promise.all([
+    const [branch, categoryNames] = await Promise.all([
       loadVoucherBranch(manager, payment.branchId, actor.organizationId),
-      this.resolveBankAccountName(manager, payment.depositAccountId, actor.organizationId),
       this.resolveCategoryNames(manager, payment.lines, actor.organizationId),
     ]);
-    return mapBankPaymentToVoucherPayload(payment, branch, bankAccountName, categoryNames);
-  }
-
-  private async resolveBankAccountName(
-    manager: EntityManager,
-    depositAccountId: string,
-    organizationId: string,
-  ): Promise<string> {
-    const account = await manager.findOne(DepositAccountEntity, {
-      where: { id: depositAccountId, organizationId },
-    });
-    return account?.name ?? "";
+    return mapBankPaymentToVoucherPayload(
+      payment,
+      branch,
+      payment.paidByName ?? null,
+      categoryNames,
+    );
   }
 
   /** Batch-resolves category names for a payment's lines, keyed by category id. */

@@ -30,7 +30,7 @@ on historical documents that reference someone now outside the branch (ADR-04).
 |---|---|
 | `inventory/location/services/counterparty-name.util.ts` | id → name for a saved document |
 | `inventory/location/services/resolve-doc-counterparty.util.ts` | id → party for a saved document |
-| `accounting/deposit-vouchers/shared/voucher-staff.resolver.ts` | id → staff for a saved voucher |
+| `accounting/cash-vouchers/shared/voucher-staff.resolver.ts` | id → staff for a saved voucher |
 | `inventory/transfer/stock-transfer.service.ts` | Hydrates `transporter` from ids already on the rows |
 | `inventory/transfer/queries/search-stock-transfers-v2.handler.ts` | As above |
 | `pos/services/invoice.service.ts` | id → cashier for one invoice |
