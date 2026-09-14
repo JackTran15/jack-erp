@@ -13,6 +13,7 @@ import { GoodsReceiptModule } from '../inventory/goods-receipt/goods-receipt.mod
 import { GoodsIssueEntity } from '../inventory/goods-issue/goods-issue.entity';
 import { ItemEntity } from '../inventory/location/item.entity';
 import { GoodsReceiptEntity } from '../inventory/goods-receipt/goods-receipt.entity';
+import { InventoryLocationModule } from '../inventory/location/inventory-location.module';
 import { ProviderEntity } from '../inventory/location/provider.entity';
 import { MobileAuthController } from './controllers/mobile-auth.controller';
 import { MobileBranchController } from './controllers/mobile-branch.controller';
@@ -134,6 +135,11 @@ import { MobileSupplierService } from './services/mobile-supplier.service';
     // sẵn. Import để uỷ quyền, không để viết lại.
     GoodsReceiptModule,
     GoodsIssueModule,
+    // `InventoryItemCrudService` (ghi hàng hoá, kèm ma trận biến thể / đơn vị
+    // quy đổi / mã vạch / tồn đầu kỳ), `UnitOfMeasureCrudService` (đơn vị tính)
+    // và `ItemCategoryCrudService` (nhóm hàng). Cùng lý do hai module trên:
+    // uỷ quyền, không viết lại.
+    InventoryLocationModule,
     TypeOrmModule.forFeature([
       ProviderEntity,
       GoodsReceiptEntity,

@@ -158,9 +158,15 @@ describe('InventoryItemCrudService.update (nested reconcile)', () => {
   });
 
   it('treats colors/sizes as virtual fields when updating a real item id', async () => {
+    // Mảng RỖNG: không có chiều nào để phân loại nên KHÔNG thăng cấp, lượt sửa
+    // đi đường item thường. Đây là ca chứng minh `colors`/`sizes` không bao giờ
+    // trở thành CỘT của `items` — hai cột đó không tồn tại.
+    //
+    // Ca có GIÁ TRỊ (thăng cấp item lẻ thành mẫu mã) nằm ở
+    // `item-crud-promote.service.spec.ts`, nơi mock đủ cả product/attribute repo.
     await service.update(
       'item-1',
-      { name: 'Renamed', colors: ['Đen'], sizes: ['39'] } as any,
+      { name: 'Renamed', colors: [], sizes: [] } as any,
       actor,
     );
 
@@ -173,6 +179,7 @@ describe('InventoryItemCrudService.update (nested reconcile)', () => {
       expect.not.objectContaining({ colors: expect.anything(), sizes: expect.anything() }),
     );
   });
+
 
   it('AC-02: passes purchasePrice/sellingPrice through to repo.merge while dropping derived fields for a standalone item', async () => {
     await service.update(

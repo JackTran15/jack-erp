@@ -1,8 +1,11 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -18,15 +21,19 @@ import {
   MobileProductSort,
 } from '../dto/mobile-product-list.query.dto';
 import { MobileProductDetailResponseDto } from '../dto/mobile-product-detail.response.dto';
+import {
+  MobileProductCreateDto,
+  MobileProductUpdateDto,
+} from '../dto/mobile-product-write.dto';
 import { MobileProductPageDto } from '../dto/mobile-product.response.dto';
 import { MobileProductService } from '../services/mobile-product.service';
 
 /**
  * Danh mục hàng hoá cho app mobile.
  *
- * CHỈ có đường ĐỌC: danh sách và chi tiết. Chưa có `POST`/`PATCH`/`DELETE` vì
- * app chưa có form — hai nút Sửa/Xoá trên màn chi tiết của app hiện chỉ báo
- * "sắp có". Thêm khi màn tương ứng ra đời, đừng dựng sẵn.
+ * Đọc (danh sách + chi tiết) và GHI (tạo + sửa). **Chưa có `DELETE`** vì app
+ * chưa có đường xoá — nút Xoá trên màn chi tiết vẫn báo "sắp có". Thêm khi màn
+ * tương ứng ra đời, đừng dựng sẵn.
  *
  * Một dòng là một MẪU MÃ chứ không phải một biến thể; lý do và cách gộp ở
  * `MobileProductService`.
@@ -50,6 +57,8 @@ export class MobileProductController {
         limit: query.limit ?? 20,
         sort: query.sort ?? MobileProductSort.NAME,
         search: query.search,
+        categoryId: query.categoryId,
+        isActive: query.isActive,
       },
       actor,
     );
@@ -71,5 +80,44 @@ export class MobileProductController {
     @Actor() actor: ActorContext,
   ): Promise<MobileProductDetailResponseDto> {
     return this.products.findById(id, actor);
+  }
+
+  /**
+   * 201 chứ không 200: đây là tạo bản ghi thật — cùng luật mà
+   * `MobileSupplierController.create` đã khai.
+   *
+   * Trả về ĐÚNG hình dạng của `GET /mobile/products/:id`, để
+   * `ProductDetailModel.fromJson` phía Dart parse thẳng response mà không cần
+   * model thứ hai.
+   *
+   * **`id` trong response có thể là mẫu mã HOẶC item lẻ**, tuỳ người dùng có gõ
+   * chip Màu sắc/Size hay không. App không cần phân biệt: chính giá trị đó đưa
+   * lại vào `GET`/`PATCH` là đúng bản ghi.
+   */
+  @Post()
+  @RequirePermission('inventory.write')
+  @ApiOperation({ summary: 'Tạo hàng hoá' })
+  create(
+    @Body() dto: MobileProductCreateDto,
+    @Actor() actor: ActorContext,
+  ): Promise<MobileProductDetailResponseDto> {
+    return this.products.create(dto, actor);
+  }
+
+  /**
+   * Định danh bằng `id` hỗn hợp, gương đúng `GET :id`.
+   *
+   * `dto.code` là mã MỚI thuần tuý; để trống nghĩa là GIỮ NGUYÊN mã cũ, không
+   * phải xin cấp mã mới — xem `MobileProductService.update`.
+   */
+  @Patch(':id')
+  @RequirePermission('inventory.write')
+  @ApiOperation({ summary: 'Sửa hàng hoá theo id (mẫu mã hoặc item lẻ)' })
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: MobileProductUpdateDto,
+    @Actor() actor: ActorContext,
+  ): Promise<MobileProductDetailResponseDto> {
+    return this.products.update(id, dto, actor);
   }
 }

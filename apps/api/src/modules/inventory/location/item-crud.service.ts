@@ -429,6 +429,17 @@ export class InventoryItemCrudService extends BaseCrudService<
       return updated;
     }
 
+    // `id` là một ITEM LẺ mà payload lại mang chiều thuộc tính -> THĂNG CẤP nó
+    // thành mẫu mã, thay vì vứt `colors`/`sizes` đi.
+    //
+    // Trước đây nhánh này không tồn tại, nên dòng destructure ở dưới nuốt trọn
+    // hai mảng đó: người dùng bấm Lưu, server trả 200, và thuộc tính biến mất
+    // KHÔNG một lời báo. Mất dữ liệu trong im lặng là kiểu hỏng đắt nhất — nó
+    // chỉ lộ ra khi có người mở lại bản ghi.
+    if (this.hasAttributeValues(normalized)) {
+      return this.promoteItemToProduct(id, normalized, actor);
+    }
+
     // Only reconcile nested collections that were explicitly provided — a patch
     // that omits them must leave the existing rows untouched.
     const hasProviders = "providers" in normalized;
@@ -948,6 +959,120 @@ export class InventoryItemCrudService extends BaseCrudService<
       Array.isArray(payload.variants) ||
       Object.keys(pickProductVariantSharedItemFields(payload)).length > 0
     );
+  }
+
+  /** Payload có ÍT NHẤT một giá trị thuộc tính thật, không phải mảng rỗng. */
+  private hasAttributeValues(payload: Record<string, any>): boolean {
+    const values = [...(payload.colors ?? []), ...(payload.sizes ?? [])];
+
+    // Mảng RỖNG không tính: `colors: []` nghĩa là "không có chiều nào", và
+    // thăng cấp một mặt hàng lẻ thành mẫu mã KHÔNG biến thể là đổi hình dạng
+    // bản ghi mà chẳng đổi lấy gì.
+    return values.some((value) => typeof value === 'string' && value.trim());
+  }
+
+  /**
+   * Biến một MẶT HÀNG LẺ thành MẪU MÃ có biến thể, giữ nguyên bản ghi đang có.
+   *
+   * Người dùng mở một hàng hoá thường, gõ thêm `Màu sắc`/`Size` rồi Lưu. Ý định
+   * rõ ràng: "hàng này từ nay có phân loại". Nhưng `items` và `products` là hai
+   * bảng, nên việc đó là một phép CHUYỂN HÌNH DẠNG chứ không phải một lượt
+   * `UPDATE` thường.
+   *
+   * **Bản ghi cũ được GIỮ LẠI làm biến thể đầu tiên** — nguyên `id`, nguyên
+   * `code`. Đây là điểm then chốt: item đó đang mang tồn kho, sổ cái, mã vạch
+   * và lịch sử chứng từ. Tạo một loạt biến thể mới rồi bỏ nó lại bên ngoài mẫu
+   * mã là để một mặt hàng "mồ côi" mang toàn bộ tồn kho mà không màn nào còn
+   * bày ra. Đổi `code` của nó cũng không được: mã đó đã nằm trên phiếu đã lập.
+   *
+   * Hệ quả NHÌN THẤY được, nêu ra để không ai tưởng là lỗi: biến thể đầu giữ mã
+   * cũ (`AOTHUN`) trong khi các biến thể sau mang mã sinh tự động
+   * (`AOTHUN-38-Đỏ`). Một tập mã không đều, nhưng đổi lại là không bản ghi nào
+   * mất lịch sử.
+   *
+   * Tổ hợp ĐẦU TIÊN gán cho item cũ. Không có cách nào đoán đúng hơn: một mặt
+   * hàng lẻ chưa từng khai màu/size nên không có thông tin nào nói nó "vốn là"
+   * tổ hợp nào.
+   */
+  private async promoteItemToProduct(
+    itemId: string,
+    payload: Record<string, any>,
+    actor: ActorContext,
+  ): Promise<{ productId: string; itemsAdded: number }> {
+    const item = await this.repository.findOne({
+      where: { id: itemId, organizationId: actor.organizationId },
+    });
+    if (!item) throw new NotFoundException(`Item ${itemId} not found`);
+
+    const productRepo = this.dataSource.getRepository(ProductEntity);
+
+    // `code` lấy từ ITEM chứ không từ `payload`: payload.code là mã của chính
+    // item đó (form nạp sẵn), và `products.code` duy nhất theo tổ chức — mã
+    // nào trùng thì 409 ngay đây, thay vì tạo nửa chừng rồi hỏng.
+    const product = await productRepo
+      .save(
+        productRepo.create({
+          code: payload.code || item.code || undefined,
+          name: payload.name || item.name,
+          isActive: payload.isActive !== undefined ? payload.isActive !== false : item.isActive,
+          organizationId: actor.organizationId,
+          createdBy: actor.userId,
+        }),
+      )
+      .catch((err) => this.toConflictIfDuplicate(err));
+
+    const colors: string[] = Array.isArray(payload.colors) ? payload.colors : [];
+    const sizes: string[] = Array.isArray(payload.sizes) ? payload.sizes : [];
+
+    const colorDef =
+      colors.length > 0 ? await this.resolveOrCreateAttrDef(product.id, 'Color', actor) : null;
+    const sizeDef =
+      sizes.length > 0 ? await this.resolveOrCreateAttrDef(product.id, 'Size', actor) : null;
+
+    const colorOptions = colorDef
+      ? await Promise.all(
+          colors.map(async (label) => ({
+            id: await this.resolveOrCreateAttrOption(colorDef, label, actor),
+            label,
+          })),
+        )
+      : [];
+    const sizeOptions = sizeDef
+      ? await Promise.all(
+          sizes.map(async (label) => ({
+            id: await this.resolveOrCreateAttrOption(sizeDef, label, actor),
+            label,
+          })),
+        )
+      : [];
+
+    const [first] = this.buildCombos(colorOptions, sizeOptions);
+    if (!first) throw new BadRequestException('Thiếu giá trị thuộc tính để tạo phân loại.');
+
+    // Nối item cũ vào mẫu mã và gán tổ hợp đầu cho nó.
+    const variantLabel = [first.size?.label, first.color?.label].filter(Boolean).join(' · ');
+    item.productId = product.id;
+    item.variantLabel = variantLabel || undefined;
+    await this.repository.save(item);
+
+    if (first.color && colorDef) {
+      await this.upsertAttrValue(item.id, colorDef, first.color.id, actor);
+    }
+    if (first.size && sizeDef) {
+      await this.upsertAttrValue(item.id, sizeDef, first.size.id, actor);
+    }
+
+    // Các tổ hợp CÒN LẠI uỷ quyền cho đường sửa mẫu mã — nó đã có `variantExists`
+    // nên bỏ qua đúng tổ hợp vừa gán ở trên, và nó cũng lo phần patch các trường
+    // dùng chung xuống mọi biến thể. Viết lại vòng lặp đó ở đây là bản sao thứ
+    // hai của cùng một logic.
+    const { itemsAdded } = await this.updateProductWithVariants(product.id, payload, actor);
+
+    this.logger.log(
+      `Promoted item ${itemId} to product ${product.id} (+${itemsAdded} variants)`,
+    );
+
+    return { productId: product.id, itemsAdded };
   }
 
   private async updateProductWithVariants(
