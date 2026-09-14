@@ -170,6 +170,10 @@ export class SearchInvoicesV2Handler
     qb.andWhere('inv.status != :draftStatus', { draftStatus: InvoiceStatus.DRAFT });
 
     new FilterBuilder(qb)
+      // Single search box: code OR customer name OR customer phone — the same
+      // three columns SearchDraftInvoicesV2Handler uses, so a query typed on
+      // the mobile list finds what the POS grid finds.
+      .applyOrString(['inv.code', 'customer.name', 'customer.phone'], dto.search)
       .applyString('inv.code',        dto.code)
       .applyEnum('inv.status',        dto.status?.value)
       .applyEnum('inv.type',          dto.type?.value)
@@ -180,6 +184,11 @@ export class SearchInvoicesV2Handler
       .applyString('customer.name',   dto.customerName)
       .applyCompare('inv.amountDue',  dto.amountDue)
       .applyString('inv.note',        dto.note);
+
+    // Set form of the status filter — see InvoiceSearchV2Dto.statuses.
+    if (dto.statuses?.length) {
+      qb.andWhere('inv.status IN (:...statuses)', { statuses: dto.statuses });
+    }
 
     if (dto.customerId) {
       qb.andWhere('inv.customerId = :cid', { cid: dto.customerId });

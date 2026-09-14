@@ -104,6 +104,17 @@ export class InvoiceReportFilterDto {
   @MaxLength(64)
   sku?: string;
 
+  /**
+   * Tìm tự do trên mặt hàng: mã SKU / tên hàng / mã & tên mẫu mã cha / mã & tên
+   * nhóm hàng hoá — ô tìm ở header màn "Doanh thu theo mặt hàng" của mobile
+   * (placeholder MISA: "Nhập tên, mã SKU, mã nhóm hàng hoá"). Áp SAU khi tải
+   * dòng, cùng chỗ với `categoryId`/`brand`, vì báo cáo này gom trong bộ nhớ.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string;
+
   /** revenue-by-item only — product kind filter. */
   @ApiPropertyOptional({ enum: ['product', 'service', 'combo'] })
   @IsOptional()

@@ -1,12 +1,16 @@
 import {
+  IsArray,
+  IsEnum,
   IsInt,
   IsOptional,
+  IsString,
   IsUUID,
   Max,
   Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { InvoiceStatus } from '../entities/invoice.entity';
 import {
   CompareFilterDto,
   DateRangeFilterDto,
@@ -29,6 +33,27 @@ export class InvoiceSearchV2Dto {
   limit?: number = 20;
 
   /** Số hóa đơn */
+  /**
+   * Free-text: matches invoice code OR customer name OR customer phone — the
+   * same three columns SearchDraftInvoicesV2Handler searches, so the mobile
+   * list finds what the POS draft grid finds. Applied through
+   * `FilterBuilder.applyOrString`, which escapes `%`/`_` (a typed `%` matches a
+   * percent sign, not every row).
+   */
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  /**
+   * Status IN (...) — a set, unlike `status` which is a single equality. The
+   * mobile list folds its three user-facing states into these values
+   * (e.g. "debt" = pending + debt + partial_debt), so it needs the set form.
+   */
+  @IsOptional()
+  @IsArray()
+  @IsEnum(InvoiceStatus, { each: true })
+  statuses?: InvoiceStatus[];
+
   @IsOptional()
   @ValidateNested()
   @Type(() => StringFilterDto)

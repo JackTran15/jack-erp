@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ReportGroupBy } from '@erp/shared-interfaces';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsISO8601, IsOptional, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsISO8601, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 /** Hai chế độ gộp mà màn của app bày: *Mẫu mã* và *Nhóm hàng hóa*. */
 export type MobileRevenueGroupBy = ReportGroupBy.PARENT | ReportGroupBy.GROUP;
@@ -65,4 +65,11 @@ export class MobileProductRevenueQueryDto {
   @IsOptional()
   @IsIn([ReportGroupBy.PARENT, ReportGroupBy.GROUP])
   statBy?: MobileRevenueGroupBy = ReportGroupBy.PARENT;
+
+  /** Ô tìm ở header: tên, mã SKU, mã nhóm hàng hoá — chuyển vào `filters.search`. */
+  @ApiPropertyOptional({ maxLength: 200 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string;
 }

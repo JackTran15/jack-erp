@@ -29,6 +29,7 @@ export enum DocumentType {
   WAREHOUSE = 'WAREHOUSE', // WH
   CUSTOMER_GROUP = 'CUSTOMER_GROUP', // NKH
   PROMOTION = 'PROMOTION', // KM
+  SALES_ORDER = 'SALES_ORDER', // DT — đơn hàng tư vấn (mobile)
 }
 
 export interface DocumentNumberRule {
