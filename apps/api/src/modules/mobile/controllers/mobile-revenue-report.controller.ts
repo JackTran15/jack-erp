@@ -62,13 +62,18 @@ export class MobileRevenueReportController {
   @Get('items')
   @RequirePermission(REVENUE_BY_ITEM_READ)
   @ApiOperation({
-    summary: 'Doanh thu theo mặt hàng (mẫu mã) trong kỳ, phân trang, kèm tổng toàn tập',
+    summary:
+      'Doanh thu theo mặt hàng (mẫu mã) trong kỳ, phân trang, kèm tổng toàn tập. `search` lọc theo mã/tên mẫu mã và tên nhóm hàng hoá.',
   })
   @ApiOkResponse({ type: MobileRevenueItemPageDto })
   listItems(
     @Query() query: MobileRevenueItemListQueryDto,
     @Actor() actor: ActorContext,
   ): Promise<MobileRevenueItemPageDto> {
+    // Trường nào cũng chép TAY sang, không `...query`: DTO là bề mặt công khai
+    // còn tham số của service là hợp đồng nội bộ, và chép tay thì thêm một khoá
+    // vào DTO không lặng lẽ chảy xuống service. Cái giá là phải nhớ thêm dòng
+    // ở đây khi DTO có khoá mới — đúng chỗ này, `search`.
     return this.report.listItems(
       {
         from: query.from,
@@ -76,6 +81,7 @@ export class MobileRevenueReportController {
         branchIds: query.branchIds,
         page: query.page ?? 1,
         limit: query.limit ?? 20,
+        search: query.search,
       },
       actor,
     );

@@ -25,6 +25,7 @@ describe('MobileProductService', () => {
   let repoExist: jest.Mock;
   let itemCrudCreate: jest.Mock;
   let itemCrudUpdate: jest.Mock;
+  let itemCrudRemove: jest.Mock;
 
   const stubRows = [
     { id: 'p-1', code: 'GELLI', name: 'Giày Gelli', sellingPrice: 600000 },
@@ -42,6 +43,7 @@ describe('MobileProductService', () => {
     repoExist = jest.fn().mockResolvedValue(false);
     itemCrudCreate = jest.fn();
     itemCrudUpdate = jest.fn();
+    itemCrudRemove = jest.fn().mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -55,7 +57,11 @@ describe('MobileProductService', () => {
         // nó — cái đó đã có spec riêng.
         {
           provide: InventoryItemCrudService,
-          useValue: { create: itemCrudCreate, update: itemCrudUpdate },
+          useValue: {
+            create: itemCrudCreate,
+            update: itemCrudUpdate,
+            remove: itemCrudRemove,
+          },
         },
       ],
     }).compile();
@@ -767,6 +773,40 @@ describe('MobileProductService', () => {
         actor,
       );
       expect(result.id).toBe(id);
+    });
+  });
+
+  /**
+   * Lượt XOÁ là một UỶ QUYỀN TRẦN — cùng service method mà web gọi qua
+   * `/admin/entities/inventory-items/records/:id`. Hai ca dưới đây khoá đúng
+   * tính chất đó, vì nó là YÊU CẦU chứ không phải chi tiết cài đặt: web và
+   * mobile phải hành xử giống hệt nhau, kể cả khi đường xoá đang hỏng.
+   */
+  describe('remove', () => {
+    const id = '3f2f1c4e-0000-4000-8000-000000000001';
+
+    it('chuyển thẳng id và actor cho InventoryItemCrudService', async () => {
+      await service.remove(id, actor);
+
+      expect(itemCrudRemove).toHaveBeenCalledWith(id, actor);
+      expect(itemCrudRemove).toHaveBeenCalledTimes(1);
+    });
+
+    it('KHÔNG tự chạy SQL nào — không đọc phủ đầu, không xoá tay', async () => {
+      query.mockReset();
+
+      await service.remove(id, actor);
+
+      // Thêm một lượt `findById` ở đây là mobile ném 404 tiếng Việt trong khi
+      // web ném `Record ... not found` — tức lệch. Xem doc của `remove`.
+      expect(query).not.toHaveBeenCalled();
+    });
+
+    it('để lỗi của service kia đi nguyên lên, không bọc lại', async () => {
+      const boom = new Error('Cannot remove, given value must be instance of entity class');
+      itemCrudRemove.mockRejectedValue(boom);
+
+      await expect(service.remove(id, actor)).rejects.toBe(boom);
     });
   });
 });

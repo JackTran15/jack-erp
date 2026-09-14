@@ -6,8 +6,10 @@ import {
   IsInt,
   IsISO8601,
   IsOptional,
+  IsString,
   IsUUID,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 
@@ -64,14 +66,17 @@ export class MobileRevenueReportQueryDto {
 }
 
 /**
- * Query của `GET /mobile/reports/revenue/items` — trang 1 của màn, có phân
- * trang thật vì một cửa hàng bán vài trăm mẫu mã trong một năm.
+ * Kỳ + cửa hàng + PHÂN TRANG — phần dùng chung của những báo cáo trả danh sách
+ * dài. Tách khỏi [MobileRevenueItemListQueryDto] khi báo cáo Công nợ cũng cần
+ * đúng năm khoá này: trước đó nó kế thừa thẳng DTO của báo cáo doanh thu, và
+ * ngày doanh thu mọc thêm `search` thì hai ô tìm mang HAI nghĩa khác nhau va
+ * vào nhau (TS2612).
  *
- * Không có `sort`: màn không có nhóm sắp xếp, server cố định doanh thu giảm
- * dần. Không có `search`: nút tìm kiếm ở header app còn là `comingSoon`; thêm
- * khoá vào DTO khi chưa ai gửi là dựng sẵn thứ chưa dùng.
+ * Đặt ở file này chứ không tách file riêng: nó là phần mở rộng trực tiếp của
+ * [MobileRevenueReportQueryDto] ngay trên, và tách ra thì đọc một khuôn phải
+ * mở hai file.
  */
-export class MobileRevenueItemListQueryDto extends MobileRevenueReportQueryDto {
+export class MobilePagedReportQueryDto extends MobileRevenueReportQueryDto {
   @ApiPropertyOptional({ minimum: 1, default: 1 })
   @IsOptional()
   @Type(() => Number)
@@ -86,6 +91,37 @@ export class MobileRevenueItemListQueryDto extends MobileRevenueReportQueryDto {
   @Min(1)
   @Max(100)
   limit?: number = 20;
+}
+
+/**
+ * Query của `GET /mobile/reports/revenue/items` — trang 1 của màn, có phân
+ * trang thật vì một cửa hàng bán vài trăm mẫu mã trong một năm.
+ *
+ * Không có `sort`: màn không có nhóm sắp xếp, server cố định doanh thu giảm
+ * dần.
+ *
+ * `search` là khoá RIÊNG của đường này — năm endpoint còn lại của nhóm
+ * (`categories`, `timeline`, ba màn con) không có ô tìm, và tập khoá của cả
+ * nhóm là ĐÓNG (`forbidNonWhitelisted`) nên gửi sang đó là 400. Vì vậy nó khai
+ * ở lớp CON chứ không ở [MobileRevenueReportQueryDto] hay
+ * [MobilePagedReportQueryDto].
+ */
+export class MobileRevenueItemListQueryDto extends MobilePagedReportQueryDto {
+  /**
+   * Ô tìm ở header màn "Doanh thu theo mặt hàng": mã/tên MẪU MÃ và tên NHÓM
+   * hàng hoá, khớp chuỗi con, không phân biệt hoa thường.
+   *
+   * **Cố ý KHÔNG tìm trên mã/tên BIẾN THỂ** — grain của đường này là mẫu mã
+   * (web `statBy=parent`), và web loại hai cột đó ở đúng grain này vì gõ `"1"`
+   * khớp một biến thể sẽ kéo nguyên mẫu mã lên. Xem `revenue-by-item.report.ts`.
+   *
+   * Rỗng / toàn khoảng trắng = không lọc gì, y như vắng khoá.
+   */
+  @ApiPropertyOptional({ maxLength: 200 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string;
 }
 
 /** Query của `GET /mobile/reports/revenue/timeline` — thêm đúng một trục: mức gộp. */
