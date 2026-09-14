@@ -1,6 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CashPaymentsService } from './cash-payments.service';
 import { CashPaymentEntity } from './cash-payment.entity';
@@ -22,11 +27,17 @@ import {
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { BranchEntity } from '../../../branch/branch.entity';
 import { CashVoucherCategoryEntity } from '../cash-voucher-categories/cash-voucher-category.entity';
+import { MediaLinkService } from '../../../media/media-link.service';
+import { MediaQueryService } from '../../../media/media-query.service';
+import { MediaOwnerReaderRegistry } from '../../../media/media-owner-reader.registry';
+import { MediaOwnerType } from '../../../media/media-object.entity';
+import { MediaException } from '../../../media/media.exception';
 
 const actor: ActorContext = {
   userId: 'user-1',
   organizationId: 'org-1',
   branchId: 'branch-1',
+  branchIds: ['branch-1'],
   roles: ['admin'],
 };
 
@@ -68,8 +79,21 @@ describe('CashPaymentsService', () => {
   let accountResolver: { resolveContraAccount: jest.Mock };
   let staffResolver: { resolveOne: jest.Mock };
   let dataSource: { transaction: jest.Mock; manager: any };
+  let mediaLink: { syncOwner: jest.Mock };
+  let mediaQuery: { listForOwners: jest.Mock };
+  let mediaReaders: { register: jest.Mock };
 
-  const setup = async (manager: any) => {
+  /**
+   * `dataSourceManager` defaults to `manager` (identical to the pre-T-04-04
+   * shape) for every test that never opens a transaction (`getById`,
+   * `getPrintPayload`). Tests that DO run inside `dataSource.transaction`
+   * pass a distinct object here on purpose (security review T-04-04): if
+   * the service ever read/wrote through `this.dataSource.manager` instead
+   * of the transaction's own `manager` argument, `toHaveBeenCalledWith(...,
+   * manager)` must be able to fail, which it cannot if the two happen to be
+   * the same object.
+   */
+  const setup = async (manager: any, dataSourceManager: any = manager) => {
     cashService = {
       recordMovement: jest
         .fn()
@@ -80,10 +104,10 @@ describe('CashPaymentsService', () => {
     accountResolver = {
       resolveContraAccount: jest.fn().mockResolvedValue('contra-resolved'),
     };
-    staffResolver = {
-      resolveOne: jest.fn().mockResolvedValue(null),
-    };
-    dataSource = { transaction: jest.fn((cb) => cb(manager)), manager };
+    dataSource = { transaction: jest.fn((cb) => cb(manager)), manager: dataSourceManager };
+    mediaLink = { syncOwner: jest.fn().mockResolvedValue([]) };
+    mediaQuery = { listForOwners: jest.fn().mockResolvedValue(new Map()) };
+    mediaReaders = { register: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -104,6 +128,9 @@ describe('CashPaymentsService', () => {
           provide: SupplierDebtPaymentSagaService,
           useValue: { compensate: jest.fn().mockResolvedValue(undefined) },
         },
+        { provide: MediaLinkService, useValue: mediaLink },
+        { provide: MediaQueryService, useValue: mediaQuery },
+        { provide: MediaOwnerReaderRegistry, useValue: mediaReaders },
       ],
     }).compile();
 
@@ -934,6 +961,317 @@ describe('CashPaymentsService', () => {
       await expect(service.getPrintPayload('p-1', actor)).rejects.toBeInstanceOf(
         NotFoundException,
       );
+    });
+  });
+
+  describe('create — attachments (AC-14)', () => {
+    it('syncs attachments before minting a document number or posting the movement/journal', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'p-new', status: CashVoucherStatus.POSTED },
+      });
+      await setup(manager, buildManager({}));
+      mediaLink.syncOwner.mockResolvedValue(['media-1']);
+
+      await service.create(
+        {
+          voucherDate: '2026-06-30',
+          purpose: CashPaymentPurpose.OTHER,
+          cashAccountId: 'cash-1',
+          totalAmount: 100,
+          attachmentIds: ['media-1'],
+          lines: [{ description: 'Chi khác', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      // Call order, not just "both were called": a routine media conflict
+      // must never leave a burned PC number or a JOURNAL_POSTED event for an
+      // entry that never actually commits (security review T-04-04).
+      const syncOrder = mediaLink.syncOwner.mock.invocationCallOrder[0];
+      const numberOrder = docNumbering.generate.mock.invocationCallOrder[0];
+      const movementOrder = cashService.recordMovement.mock.invocationCallOrder[0];
+      expect(syncOrder).toBeLessThan(numberOrder);
+      expect(syncOrder).toBeLessThan(movementOrder);
+
+      expect(mediaLink.syncOwner).toHaveBeenCalledWith(
+        MediaOwnerType.CASH_PAYMENT,
+        expect.any(String),
+        ['media-1'],
+        actor,
+        manager,
+      );
+      // The array `syncOwner` actually returned is what lands on the row —
+      // never a second, unvalidated write of the caller's raw ids.
+      expect(manager.update).toHaveBeenCalledWith(
+        CashPaymentEntity,
+        expect.any(String),
+        { attachmentIds: ['media-1'] },
+      );
+    });
+
+    it('rejects with 404 before minting a number or calling recordMovement when an id belongs to another organization', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'p-new', status: CashVoucherStatus.POSTED },
+      });
+      await setup(manager, buildManager({}));
+      mediaLink.syncOwner.mockRejectedValue(
+        new MediaException(404, 'MEDIA_NOT_FOUND', 'Media not found'),
+      );
+
+      const call = service.create(
+        {
+          voucherDate: '2026-06-30',
+          purpose: CashPaymentPurpose.OTHER,
+          cashAccountId: 'cash-1',
+          totalAmount: 100,
+          attachmentIds: ['other-org-media'],
+          lines: [{ description: 'Chi khác', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      await expect(call).rejects.toBeInstanceOf(MediaException);
+      await expect(call).rejects.toMatchObject({ status: 404 });
+      // Nothing downstream of the rejected syncOwner call ever runs: no
+      // number minted, no movement/journal posted, no attachmentIds write.
+      // The real transaction then rolls back the whole thing.
+      expect(docNumbering.generate).not.toHaveBeenCalled();
+      expect(cashService.recordMovement).not.toHaveBeenCalled();
+      expect(manager.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('update — attachments (AC-14, AC-16)', () => {
+    const posted = (over: any = {}) => ({
+      id: 'p-1',
+      status: CashVoucherStatus.POSTED,
+      referenceType: CashPaymentReferenceType.MANUAL,
+      revision: 0,
+      totalAmount: 100,
+      documentNumber: 'PC-26-00001',
+      cashAccountId: 'cash-1',
+      contraAccountId: 'contra-1',
+      organizationId: 'org-1',
+      attachmentIds: ['existing-media'],
+      ...over,
+    });
+
+    it('syncs and stores the returned array when attachmentIds is sent', async () => {
+      const payment = posted();
+      const manager = buildManager({
+        qbResult: payment,
+        findOneResult: payment,
+        findResults: [{ amount: 100 }],
+      });
+      await setup(manager, buildManager({}));
+      mediaLink.syncOwner.mockResolvedValue(['new-media']);
+
+      await service.update(
+        'p-1',
+        { revision: 0, attachmentIds: ['new-media'] } as any,
+        actor,
+      );
+
+      expect(mediaLink.syncOwner).toHaveBeenCalledWith(
+        MediaOwnerType.CASH_PAYMENT,
+        'p-1',
+        ['new-media'],
+        actor,
+        manager,
+      );
+      expect(payment.attachmentIds).toEqual(['new-media']);
+    });
+
+    it('leaves the list unchanged when attachmentIds is omitted', async () => {
+      const payment = posted();
+      const manager = buildManager({
+        qbResult: payment,
+        findOneResult: payment,
+        findResults: [{ amount: 100 }],
+      });
+      await setup(manager);
+
+      await service.update(
+        'p-1',
+        { revision: 0, reason: 'Đổi lý do' } as any,
+        actor,
+      );
+
+      expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+      expect(payment.attachmentIds).toEqual(['existing-media']);
+    });
+
+    it('never reaches syncOwner for a REVERSED voucher (AC-16)', async () => {
+      const payment = posted({ reversedByVoucherId: 'p-2' });
+      const manager = buildManager({ qbResult: payment, findOneResult: payment });
+      await setup(manager);
+
+      await expect(
+        service.update(
+          'p-1',
+          { revision: 0, attachmentIds: ['new-media'] } as any,
+          actor,
+        ),
+      ).rejects.toThrow(ConflictException);
+      expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+    });
+
+    it('never reaches syncOwner for a non-manual (saga) voucher', async () => {
+      const payment = posted({
+        referenceType: CashPaymentReferenceType.GOODS_RECEIPT,
+      });
+      const manager = buildManager({ qbResult: payment, findOneResult: payment });
+      await setup(manager);
+
+      await expect(
+        service.update(
+          'p-1',
+          { revision: 0, attachmentIds: ['new-media'] } as any,
+          actor,
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+    });
+
+    it('never reaches syncOwner for a stale revision', async () => {
+      const payment = posted({ revision: 3 });
+      const manager = buildManager({ qbResult: payment, findOneResult: payment });
+      await setup(manager);
+
+      await expect(
+        service.update(
+          'p-1',
+          { revision: 1, attachmentIds: ['new-media'] } as any,
+          actor,
+        ),
+      ).rejects.toThrow(ConflictException);
+      expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+    });
+
+    it('never reaches syncOwner for a deleted voucher', async () => {
+      const payment = posted({ deletedAt: new Date() });
+      const manager = buildManager({ qbResult: payment, findOneResult: payment });
+      await setup(manager);
+
+      await expect(
+        service.update(
+          'p-1',
+          { revision: 0, attachmentIds: ['new-media'] } as any,
+          actor,
+        ),
+      ).rejects.toThrow(ConflictException);
+      expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getById — attachments (AC-14)', () => {
+    it('maps media summaries to id/fileName/contentType/size', async () => {
+      const payment = {
+        id: 'p-1',
+        organizationId: 'org-1',
+        status: CashVoucherStatus.POSTED,
+        referenceType: CashPaymentReferenceType.MANUAL,
+      };
+      const manager = buildManager({ findOneResult: payment });
+      await setup(manager);
+      mediaQuery.listForOwners.mockResolvedValue(
+        new Map([
+          [
+            'p-1',
+            [
+              {
+                id: 'media-1',
+                fileName: 'hoa-don.pdf',
+                contentType: 'application/pdf',
+                size: 1024,
+                sortOrder: 0,
+                bucket: 'erp-media-private',
+                objectKey: 'org/org-1/cash_payment/media-1',
+                ownerType: MediaOwnerType.CASH_PAYMENT,
+              },
+            ],
+          ],
+        ]),
+      );
+
+      const result = await service.getById('p-1', actor);
+
+      expect(mediaQuery.listForOwners).toHaveBeenCalledWith(
+        MediaOwnerType.CASH_PAYMENT,
+        ['p-1'],
+        'org-1',
+      );
+      expect(result.attachments).toEqual([
+        {
+          id: 'media-1',
+          fileName: 'hoa-don.pdf',
+          contentType: 'application/pdf',
+          size: 1024,
+        },
+      ]);
+    });
+
+    it('returns an empty array when no media is attached', async () => {
+      const payment = {
+        id: 'p-1',
+        organizationId: 'org-1',
+        status: CashVoucherStatus.POSTED,
+        referenceType: CashPaymentReferenceType.MANUAL,
+      };
+      const manager = buildManager({ findOneResult: payment });
+      await setup(manager);
+
+      const result = await service.getById('p-1', actor);
+
+      expect(result.attachments).toEqual([]);
+    });
+  });
+
+  describe('onModuleInit — media reader (AC-15, ADR-06)', () => {
+    it('registers a CASH_PAYMENT reader that maps NotFound/Forbidden to false and rethrows anything else', async () => {
+      const manager = buildManager({});
+      await setup(manager);
+
+      service.onModuleInit();
+
+      expect(mediaReaders.register).toHaveBeenCalledWith(
+        MediaOwnerType.CASH_PAYMENT,
+        expect.any(Function),
+      );
+      const reader = mediaReaders.register.mock.calls[0][1];
+      const getByIdSpy = jest.spyOn(service, 'getById');
+
+      getByIdSpy.mockResolvedValueOnce({} as any);
+      await expect(reader('p-1', actor)).resolves.toBe(true);
+
+      getByIdSpy.mockRejectedValueOnce(new NotFoundException());
+      await expect(reader('p-1', actor)).resolves.toBe(false);
+
+      getByIdSpy.mockRejectedValueOnce(new ForbiddenException());
+      await expect(reader('p-1', actor)).resolves.toBe(false);
+
+      getByIdSpy.mockRejectedValueOnce(new Error('db down'));
+      await expect(reader('p-1', actor)).rejects.toThrow('db down');
+    });
+
+    it('denies a branchless actor without ever calling getById (BranchScopeGuard parity)', async () => {
+      const manager = buildManager({});
+      await setup(manager);
+
+      service.onModuleInit();
+      const reader = mediaReaders.register.mock.calls[0][1];
+      const getByIdSpy = jest.spyOn(service, 'getById');
+
+      await expect(
+        reader('p-1', { ...actor, branchId: undefined }),
+      ).resolves.toBe(false);
+      await expect(
+        reader('p-1', { ...actor, branchIds: [] }),
+      ).resolves.toBe(false);
+      await expect(
+        reader('p-1', { ...actor, branchId: 'branch-2' }),
+      ).resolves.toBe(false);
+      expect(getByIdSpy).not.toHaveBeenCalled();
     });
   });
 });
