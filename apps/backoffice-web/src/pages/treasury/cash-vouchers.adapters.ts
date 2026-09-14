@@ -96,6 +96,7 @@ export function cashReceiptToVoucherDetail(
     employeeName: "",
     reference: r.sourceLink?.sourceDocumentNumber ?? undefined,
     lines: mapVoucherLines(r.lines, categoryNames),
+    attachments: r.attachments ?? [],
   };
 }
 
@@ -126,6 +127,7 @@ export function cashPaymentToVoucherDetail(
     referenceType: p.referenceType,
     referenceId: p.referenceId,
     lines: mapVoucherLines(p.lines, categoryNames),
+    attachments: p.attachments ?? [],
     goodsReceipt: isGr
       ? {
           receiptNo: p.sourceLink?.sourceDocumentNumber ?? "",

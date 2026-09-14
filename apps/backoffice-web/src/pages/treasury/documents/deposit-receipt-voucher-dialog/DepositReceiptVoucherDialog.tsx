@@ -16,6 +16,7 @@ import { DocumentType, VoucherKind } from "@erp/shared-interfaces";
 import { CloudUpload, Pencil, Printer, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { useGenerateDocumentNumber } from "../../../../hooks/document-numbering/useGenerateDocumentNumber";
+import { MediaAttachmentList, type MediaAttachment } from "../../../../components/media/MediaAttachmentList";
 import { fetchVoucherPrintPayload } from "../../../../lib/print/voucher-print.api";
 import { renderVoucherHtml } from "../../../../lib/print/render-voucher-html";
 import { printHtmlDocument } from "../../../../lib/print/print-html-document";
@@ -189,6 +190,13 @@ export function DepositReceiptVoucherDialog({
   const [debtPickOpen, setDebtPickOpen] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [attachmentIds, setAttachmentIds] = useState<string[]>([]);
+  const [attachmentItems, setAttachmentItems] = useState<MediaAttachment[]>([]);
+  // Flips true once MediaAttachmentList has mounted with a real seed (create,
+  // or `initial` loaded) — guards the update payload from ever sending `[]`
+  // before the actual list is known.
+  const [attachmentsReady, setAttachmentsReady] = useState(false);
+  const [attachmentsUploading, setAttachmentsUploading] = useState(false);
 
   const { data: receiptCategories = [] } = useCashVoucherCategories(
     CashVoucherCategoryDirection.IN,
@@ -196,6 +204,11 @@ export function DepositReceiptVoucherDialog({
 
   const isDebtCollection = purpose === BankReceiptPurpose.DEBT_COLLECTION;
   const debtFieldsLocked = isDebtCollection && !readOnly;
+  // Thu nợ posts to POST /bank-receipts/debt-collection, which has no
+  // attachmentIds slot (see handleSave below) — unlike the cash receipt
+  // dialog, this dialog's `handleSave` takes that branch regardless of mode,
+  // so there is no CREATE-only carve-out here.
+  const attachmentsUnsupported = isDebtCollection;
 
   // Append the current purpose as a display-only option when it's one of the
   // dropped legacy values (see LEGACY_RECEIPT_PURPOSE_LABELS) — keeps an
@@ -233,6 +246,9 @@ export function DepositReceiptVoucherDialog({
       setLines([emptyFormLine()]);
       setDocumentLines([]);
       setDetailTab(ReceiptVoucherDetailTabEnum.LINES);
+      setAttachmentIds([]);
+      setAttachmentItems([]);
+      setAttachmentsReady(false);
       return;
     }
     if (initial) {
@@ -278,6 +294,9 @@ export function DepositReceiptVoucherDialog({
           })),
       );
       setDetailTab(ReceiptVoucherDetailTabEnum.LINES);
+      setAttachmentIds(initial.attachments.map((a) => a.id));
+      setAttachmentItems(initial.attachments);
+      setAttachmentsReady(false);
     }
   }, [resetKey, open, mode, initial]);
 
@@ -364,8 +383,19 @@ export function DepositReceiptVoucherDialog({
     setEmployeeName(item.name);
   }, []);
 
+  const handleAttachmentsChange = useCallback((ids: string[], items: MediaAttachment[]) => {
+    setAttachmentIds(ids);
+    setAttachmentItems(items);
+    setAttachmentsReady(true);
+  }, []);
+
   const handlePurposeChange = useCallback((next: BankReceiptPurpose) => {
     setPurpose(next);
+    // Thu nợ has no attachmentIds slot (see `attachmentsUnsupported`) —
+    // forget anything picked so it can't silently resurface later.
+    setAttachmentIds([]);
+    setAttachmentItems([]);
+    setAttachmentsReady(false);
     if (next === BankReceiptPurpose.DEBT_COLLECTION) {
       setPartnerKind(PartnerLookupType.CUSTOMER);
       setPartnerId("");
@@ -573,6 +603,7 @@ export function DepositReceiptVoucherDialog({
       reference: reference || undefined,
       affectRevenue,
       totalAmount,
+      ...(attachmentsReady ? { attachmentIds } : {}),
       lines: validLines.map((l) => ({
         description: l.description,
         amount: Number(l.amount) || 0,
@@ -603,6 +634,8 @@ export function DepositReceiptVoucherDialog({
     address,
     isDebtCollection,
     documentLines,
+    attachmentIds,
+    attachmentsReady,
     depositAccountId,
     mode,
     handleClose,
@@ -671,7 +704,13 @@ export function DepositReceiptVoucherDialog({
       items.push({ id: "edit", label: "Sửa", icon: Pencil, onClick: onRequestEdit });
     }
     if (!readOnly && onSave) {
-      items.push({ id: "save", label: "Lưu", icon: Save, onClick: handleSave });
+      items.push({
+        id: "save",
+        label: "Lưu",
+        icon: Save,
+        disabled: attachmentsUploading,
+        onClick: handleSave,
+      });
     }
     if (canPrint) {
       items.push({
@@ -702,6 +741,7 @@ export function DepositReceiptVoucherDialog({
     handlePrint,
     exporting,
     handleExport,
+    attachmentsUploading,
   ]);
 
   const title =
@@ -864,9 +904,21 @@ export function DepositReceiptVoucherDialog({
               </FormField>
             ) : null}
             <FormField label="Tài liệu đính kèm" layout="horizontal" labelWidth="8rem">
-              <Button variant="outline" size="sm" disabled>
-                Tải tệp…
-              </Button>
+              {attachmentsUnsupported ? (
+                <span className="text-sm text-muted-foreground">
+                  Loại chứng từ này chưa hỗ trợ đính kèm.
+                </span>
+              ) : mode === TreasuryVoucherDialogModeEnum.CREATE || initial ? (
+                <MediaAttachmentList
+                  ownerType="BANK_RECEIPT"
+                  value={attachmentItems}
+                  onChange={handleAttachmentsChange}
+                  onUploadingChange={setAttachmentsUploading}
+                  readOnly={readOnly}
+                />
+              ) : (
+                <span className="text-sm text-muted-foreground">Đang tải danh sách đính kèm…</span>
+              )}
             </FormField>
           </>
         }

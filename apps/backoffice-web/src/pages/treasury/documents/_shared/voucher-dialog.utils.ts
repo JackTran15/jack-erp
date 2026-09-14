@@ -76,6 +76,8 @@ export function buildReceiptDetailFromForm(state: {
   voucherDate: string;
   lines: VoucherFormLine[];
   documentLines?: LedgerCashVoucherDetail["documentLines"];
+  /** Omit to leave attachments unchanged on update — see `LedgerCashVoucherDetail`. */
+  attachmentIds?: string[];
 }): LedgerCashVoucherDetail {
   // Delegate to `resolvePartyFields` instead of re-deriving the rule here: it
   // is the one place (ADR-04) both cash and bank voucher dialogs decide
@@ -110,6 +112,7 @@ export function buildReceiptDetailFromForm(state: {
       categoryId: l.categoryId,
     })),
     documentLines: state.documentLines,
+    attachmentIds: state.attachmentIds,
   };
 }
 
@@ -134,6 +137,8 @@ export function buildPaymentDetailFromForm(state: {
   lines: VoucherFormLine[];
   documentLines?: LedgerCashVoucherDocumentLine[];
   transferAccountId?: string;
+  /** Omit to leave attachments unchanged on update — see `LedgerCashVoucherDetail`. */
+  attachmentIds?: string[];
 }): LedgerCashVoucherDetail {
   // Delegate to `resolvePartyFields` instead of re-deriving the rule here: it
   // is the one place (ADR-04) both cash and bank voucher dialogs decide
@@ -170,5 +175,6 @@ export function buildPaymentDetailFromForm(state: {
     })),
     documentLines: state.documentLines,
     transferAccountId: state.transferAccountId || undefined,
+    attachmentIds: state.attachmentIds,
   };
 }

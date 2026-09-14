@@ -18,6 +18,7 @@ export interface Props {
   value: MediaAttachment[];
   onChange: (ids: string[], items: MediaAttachment[]) => void;
   readOnly?: boolean;
+  onUploadingChange?: (uploading: boolean) => void;
 }
 
 const sizeFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 });
@@ -66,7 +67,13 @@ function sizeLabel(f: MediaFileState, known: Map<string, MediaAttachment>): stri
  * for its state exactly once and ignores every later change once the list
  * has been touched.
  */
-export function MediaAttachmentList({ ownerType, value, onChange, readOnly = false }: Props) {
+export function MediaAttachmentList({
+  ownerType,
+  value,
+  onChange,
+  readOnly = false,
+  onUploadingChange,
+}: Props) {
   const valueIdsKey = value.map((item) => item.id).join(",");
   const knownById = useMemo(
     () => new Map(value.map((item) => [item.id, item])),
@@ -79,7 +86,7 @@ export function MediaAttachmentList({ ownerType, value, onChange, readOnly = fal
     [valueIdsKey],
   );
 
-  const { files, add, remove, retry, mediaIds } = useMediaUpload(ownerType, initial);
+  const { files, add, remove, retry, mediaIds, isUploading } = useMediaUpload(ownerType, initial);
 
   const items = useMemo(
     () => files.map((f) => attachmentFor(f, knownById)).filter((a): a is MediaAttachment => !!a),
@@ -93,6 +100,14 @@ export function MediaAttachmentList({ ownerType, value, onChange, readOnly = fal
   useEffect(() => {
     onChangeRef.current(mediaIds, items);
   }, [mediaIds, items]);
+
+  const onUploadingChangeRef = useRef(onUploadingChange);
+  useEffect(() => {
+    onUploadingChangeRef.current = onUploadingChange;
+  });
+  useEffect(() => {
+    onUploadingChangeRef.current?.(isUploading);
+  }, [isUploading]);
 
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);

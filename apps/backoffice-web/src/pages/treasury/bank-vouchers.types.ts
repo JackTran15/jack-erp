@@ -1,4 +1,4 @@
-import type { CashVoucherPartnerType } from "./cash-vouchers.types";
+import type { CashVoucherAttachment, CashVoucherPartnerType } from "./cash-vouchers.types";
 
 export enum BankVoucherStatus {
   DRAFT = "DRAFT",
@@ -79,6 +79,7 @@ export interface BankReceipt {
   contraAccountId?: string;
   totalAmount: number;
   attachmentIds: string[];
+  attachments: CashVoucherAttachment[];
   referenceType?: BankReceiptReferenceType;
   referenceId?: string;
   depositMovementId?: string;
@@ -118,6 +119,7 @@ export interface BankPayment {
   contraAccountId?: string;
   totalAmount: number;
   attachmentIds: string[];
+  attachments: CashVoucherAttachment[];
   referenceType?: BankPaymentReferenceType;
   referenceId?: string;
   depositMovementId?: string;
