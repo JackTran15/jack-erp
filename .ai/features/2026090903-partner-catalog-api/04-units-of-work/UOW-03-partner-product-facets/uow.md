@@ -44,8 +44,8 @@ rollback: Gỡ các mệnh đề lọc thuộc tính và cột `inStock` khỏi 
 
 ## Definition of done
 
-- [ ] AC-07, AC-08, AC-12 pass
-- [ ] Có ca kiểm tổ hợp màu+size không tồn tại trả đúng 0 dòng
-- [ ] `EXPLAIN ANALYZE` của truy vấn lọc màu+size đính kèm ticket
-- [ ] Số đo p95 < 500 ms ghi kèm cổng và tên DB
-- [ ] Demo và nghiệm thu tại gate G4
+- [x] AC-07, AC-08, AC-12 pass — e2e `partner-catalog.e2e-spec.ts` 38/38 (2026-09-13, `OUTBOX_RELAY_DISABLED=1`), nhóm price, colour, size and stock; `pnpm --filter @erp/api test -- partner-catalog` 172/172, 10 suite (2026-09-13)
+- [x] Có ca kiểm tổ hợp màu+size không tồn tại trả đúng 0 dòng — e2e 'matches colour and size only when the SAME variant satisfies both' (BA/39 → total 0) và 'combines price, colour and size on one variant' (D/39 + priceTo 500000 → 0)
+- [x] `EXPLAIN ANALYZE` của truy vấn lọc màu+size đính kèm ticket — T-03-02 "Đo thực tế" (18,9 / 120,4 ms), đo lại ở T-06-01 và T-06-03
+- [x] Số đo p95 < 500 ms ghi kèm cổng và tên DB — T-03-03: 167,6 ms, `:4100`, erp_dev_3008 (2026-09-09); đo lại qua HTTP 2026-09-13: 105,3 ms, `:4200`, erp_dev_3008 (docs §4)
+- [x] Demo và nghiệm thu tại gate G4 — nghiệm thu: Akenzy, 2026-09-14 ("please done it. pass G5"), dựa trên bằng chứng demo tự động: gói cURL `docs/partner-catalog-api-curls` 37/37 qua HTTP, e2e `partner-catalog.e2e-spec.ts` 38/38 và `partner-catalog-filters.e2e-spec.ts` 17/17, `07-performance.md`; không có buổi demo trực tiếp

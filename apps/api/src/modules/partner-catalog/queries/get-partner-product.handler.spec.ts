@@ -53,7 +53,7 @@ const ROWS = [
 describe('GetPartnerProductHandler', () => {
   let query: jest.Mock;
 
-  const run = async (rows: object[], productId = 'p1') => {
+  const run = async (rows: object[], productCode = 'MY88610') => {
     query = jest.fn().mockResolvedValue(rows);
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -66,7 +66,7 @@ describe('GetPartnerProductHandler', () => {
     }).compile();
     return moduleRef
       .get(GetPartnerProductHandler)
-      .execute(new GetPartnerProductQuery(productId, actor));
+      .execute(new GetPartnerProductQuery(productCode, actor));
   };
 
   const sql = () => query.mock.calls[0]![0] as string;
@@ -136,10 +136,29 @@ describe('GetPartnerProductHandler', () => {
     await expect(run([])).rejects.toThrow('Product not found');
   });
 
-  it('does not name the id in the not-found message', async () => {
-    await expect(run([], 'secret-id-1234')).rejects.toThrow(
+  it('does not name the code in the not-found message', async () => {
+    await expect(run([], 'secret-code-1234')).rejects.toThrow(
       /^Product not found$/,
     );
+  });
+
+  // AC-25 — the queried code is what reaches the database and what comes back.
+  it('looks up and returns the code that was queried', async () => {
+    const rows = ROWS.map((r) => ({ ...r, code: 'TN398' }));
+    const res = await run(rows, 'TN398');
+    expect(query.mock.calls[0]![1][1]).toBe('TN398');
+    expect(res.code).toBe('TN398');
+  });
+
+  // AC-25 — the lookup key is products.code, exact match, not products.id.
+  it('filters on p.code with an exact match, never p.id', async () => {
+    await run(ROWS);
+    expect(sql()).toContain('p.code = $2');
+    expect(sql()).not.toContain('p.id = $2');
+    // $2 is bound exactly once: no `OR i.code = $2` or cast fallback.
+    expect(sql().match(/\$2\b/g)).toHaveLength(1);
+    expect(sql()).not.toMatch(/lower\(\s*p\.code/i);
+    expect(sql()).not.toMatch(/p\.code\s+ilike/i);
   });
 
   // AC-17 — the organization predicate must be in the query, not applied after.
@@ -147,7 +166,11 @@ describe('GetPartnerProductHandler', () => {
     await run(ROWS);
     expect(sql()).toContain('p.organization_id = $1');
     expect(sql()).toContain('i.organization_id = $1');
-    expect(query.mock.calls[0]![1]).toEqual(['org-1', 'p1', ['branch-1', 'branch-2']]);
+    expect(query.mock.calls[0]![1]).toEqual([
+      'org-1',
+      'MY88610',
+      ['branch-1', 'branch-2'],
+    ]);
   });
 
   // AC-18

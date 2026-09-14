@@ -21,7 +21,7 @@ import { GetPartnerProductQuery } from './get-partner-product.query';
  *
  * "Does not exist", "belongs to another organization" and "has no sellable
  * variant" must be indistinguishable from outside. Answering 403 for the
- * second would confirm the id is real, which is exactly what an enumeration
+ * second would confirm the code is real, which is exactly what an enumeration
  * attempt is looking for.
  */
 const NOT_FOUND_MESSAGE = 'Product not found';
@@ -52,10 +52,10 @@ export class GetPartnerProductHandler
   ) {}
 
   async execute({
-    productId,
+    productCode,
     actor,
   }: GetPartnerProductQuery): Promise<PartnerProductDetailDto> {
-    const params: unknown[] = [actor.organizationId, productId];
+    const params: unknown[] = [actor.organizationId, productCode];
 
     const branchIds = resolveStockBranchIds(actor.branchIds);
     let branchParam: string | undefined;
@@ -92,15 +92,15 @@ export class GetPartnerProductHandler
       LEFT JOIN item_attribute_values iav ON iav.item_id = i.id
       LEFT JOIN product_attribute_definitions d ON d.id = iav.attribute_definition_id
       LEFT JOIN product_attribute_options o ON o.id = iav.option_id
-      WHERE p.id = $2
+      WHERE p.code = $2
         AND p.organization_id = $1
         AND p.is_active = true
       ORDER BY i.code ASC, d.sort_order ASC, o.sort_order ASC
     `;
 
     const rows = await this.items.manager.query<DetailRow[]>(sql, params);
-    // Zero rows covers all three cases at once: unknown id, another org's id,
-    // and a product whose variants are all retired. Same answer, by design.
+    // Zero rows covers all three cases at once: unknown code, another org's
+    // code, and a product whose variants are all retired. Same answer, by design.
     if (rows.length === 0) throw new NotFoundException(NOT_FOUND_MESSAGE);
 
     return buildDetail(rows);

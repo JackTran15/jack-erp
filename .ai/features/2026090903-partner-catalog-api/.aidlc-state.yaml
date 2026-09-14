@@ -5,7 +5,7 @@ slug: 2026090903-partner-catalog-api
 profile: none
 created: 2026-09-09T12:10:11
 ruleset: 5
-current_gate: G3
+current_gate: G5
 history:
   - gate: G0
     action: passed
@@ -172,3 +172,118 @@ history:
     at: 2026-09-09T17:08:44
     by: Akenzy
     ticket: T-05-01
+  - gate: G1
+    action: reopened
+    at: 2026-09-13T09:10:16
+    by: Akenzy
+    reason: 2026-09-13 change request - list endpoint - row colors/sizes/price/inStock must describe the matched variants, dimension-name matching tolerant, new inStock filter on the same variant; detail endpoint keyed by products.code instead of products.id
+  - gate: G1
+    action: passed
+    at: 2026-09-13T09:27:33
+    by: Akenzy
+    evidence: 20 assumptions, none blocking-and-pending; 25 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-13T09:27:33
+    by: Akenzy
+    evidence: 9 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-13T09:27:33
+    by: Akenzy
+    evidence: graph valid - 6 UoW, 23 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-13T09:28:06
+    by: Akenzy
+    ticket: T-04-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-13T09:28:06
+    by: Akenzy
+    ticket: T-06-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-13T09:38:14
+    by: Akenzy
+    ticket: T-04-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-13T09:53:22
+    by: Akenzy
+    ticket: T-03-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-13T09:53:22
+    by: Akenzy
+    ticket: T-04-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-13T10:07:54
+    by: Akenzy
+    ticket: T-06-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-13T10:07:54
+    by: Akenzy
+    ticket: T-06-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-13T10:20:59
+    by: Akenzy
+    ticket: T-04-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-13T10:20:59
+    by: Akenzy
+    ticket: T-05-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-13T10:27:31
+    by: Akenzy
+    ticket: T-06-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-13T10:27:31
+    by: Akenzy
+    ticket: T-06-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-13T10:30:12
+    by: Akenzy
+    ticket: T-05-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-13T10:59:49
+    by: Akenzy
+    ticket: T-06-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-13T10:59:49
+    by: Akenzy
+    ticket: T-06-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-13T10:59:49
+    by: Akenzy
+    ticket: T-05-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-13T11:07:45
+    by: Akenzy
+    ticket: T-05-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-13T11:16:05
+    by: Akenzy
+    ticket: T-06-04
+  - gate: G4
+    action: passed
+    at: 2026-09-14T08:38:23
+    by: Akenzy
+    evidence: no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 23 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-09-14T08:38:23
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

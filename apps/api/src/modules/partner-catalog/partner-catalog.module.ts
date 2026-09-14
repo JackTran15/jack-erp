@@ -10,6 +10,7 @@ import { ProductAttributeOptionEntity } from '../inventory/product/product-attri
 import { ProductEntity } from '../inventory/product/product.entity';
 import { PartnerCategoryV2Controller } from './controllers/partner-category-v2.controller';
 import { PartnerProductV2Controller } from './controllers/partner-product-v2.controller';
+import { GetPartnerProductHandler } from './queries/get-partner-product.handler';
 import { SearchPartnerCategoriesHandler } from './queries/search-partner-categories.handler';
 import { SearchPartnerProductsHandler } from './queries/search-partner-products.handler';
 
@@ -41,9 +42,13 @@ import { SearchPartnerProductsHandler } from './queries/search-partner-products.
     CqrsModule,
   ],
   // PartnerProductV2Controller carries the static products/search route and
-  // will later carry products/:productId; keep it registered after the
+  // the dynamic products/:productCode route; keep it registered after the
   // category controller and keep its static route first inside the class.
   controllers: [PartnerCategoryV2Controller, PartnerProductV2Controller],
-  providers: [SearchPartnerCategoriesHandler, SearchPartnerProductsHandler],
+  providers: [
+    SearchPartnerCategoriesHandler,
+    SearchPartnerProductsHandler,
+    GetPartnerProductHandler,
+  ],
 })
 export class PartnerCatalogModule {}

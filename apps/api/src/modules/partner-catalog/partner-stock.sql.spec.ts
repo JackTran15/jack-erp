@@ -1,6 +1,41 @@
-import { inStockExistsSql, resolveStockBranchIds } from './partner-stock.sql';
+import {
+  inStockExistsSql,
+  resolveStockBranchIds,
+  stockedItemIdsSql,
+} from './partner-stock.sql';
 
 const squash = (sql: string) => sql.replace(/\s+/g, ' ').trim();
+
+describe('stockedItemIdsSql', () => {
+  it('returns each stocked item id once', () => {
+    const sql = squash(stockedItemIdsSql({ orgParam: '$1' }));
+    expect(sql).toMatch(/^SELECT DISTINCT sb\.item_id FROM stock_balances sb WHERE /);
+    expect(sql).toContain('sb.organization_id = $1');
+    expect(sql).toContain('sb.quantity > 0');
+    expect(sql).not.toContain('branch_id');
+  });
+
+  // The set form and the per-item form must be the same definition of stock:
+  // a listing that disagrees with its own detail page is the failure the
+  // shared module exists to prevent.
+  it.each([undefined, '$3'])(
+    'uses exactly the conditions inStockExistsSql uses (branchParam=%s)',
+    (branchParam) => {
+      const set = squash(stockedItemIdsSql({ orgParam: '$1', branchParam }));
+      const conditions = set.split(' WHERE ')[1]!;
+      const exists = squash(
+        inStockExistsSql({ itemIdExpr: 'i.id', orgParam: '$1', branchParam }),
+      );
+      expect(exists).toContain(`WHERE sb.item_id = i.id AND ${conditions} )`);
+    },
+  );
+
+  it('casts the branch array to varchar, not uuid', () => {
+    const sql = squash(stockedItemIdsSql({ orgParam: '$1', branchParam: '$2' }));
+    expect(sql).toContain('sb.branch_id = ANY($2::varchar[])');
+    expect(sql).not.toContain('::uuid[]');
+  });
+});
 
 describe('inStockExistsSql', () => {
   it('scopes to the organization even without a branch list', () => {

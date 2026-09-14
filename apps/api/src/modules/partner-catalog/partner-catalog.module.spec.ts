@@ -13,11 +13,15 @@ import {
   PARTNER_CATALOG_PERMISSION,
   matchesAttributeDimension,
 } from './partner-catalog.constants';
+import { PermissionGuard } from '../rbac/permission.guard';
 import { PartnerCatalogModule } from './partner-catalog.module';
+import { GetPartnerProductHandler } from './queries/get-partner-product.handler';
 
 // The repositories are overridden rather than connected: this asserts the
 // module graph compiles and every entity it declares is actually resolvable,
-// without standing up a database.
+// without standing up a database. PermissionGuard is overridden for the same
+// reason: it needs RbacService, which the app supplies from the @Global()
+// RbacModule, and this isolated module graph does not import it.
 const ENTITIES = [
   ItemCategoryEntity,
   ProductEntity,
@@ -38,6 +42,7 @@ describe('PartnerCatalogModule', () => {
     for (const entity of ENTITIES) {
       builder.overrideProvider(getRepositoryToken(entity)).useValue({});
     }
+    builder.overrideGuard(PermissionGuard).useValue({ canActivate: () => true });
     moduleRef = await builder.compile();
   });
 
@@ -55,6 +60,12 @@ describe('PartnerCatalogModule', () => {
     for (const entity of ENTITIES) {
       expect(moduleRef.get(getRepositoryToken(entity))).toBeDefined();
     }
+  });
+
+  it('registers the product detail handler', () => {
+    expect(moduleRef.get(GetPartnerProductHandler)).toBeInstanceOf(
+      GetPartnerProductHandler,
+    );
   });
 });
 

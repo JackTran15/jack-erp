@@ -40,8 +40,8 @@ rollback: Gỡ `PartnerCatalogModule` khỏi `app.module.ts` — route biến m�
 
 ## Definition of done
 
-- [ ] AC-01..04, AC-21, AC-22 pass
-- [ ] Demo chạy bằng một API key thật, không phải JWT
-- [ ] Không endpoint nào của module gắn `@Public()`
-- [ ] `pnpm --filter @erp/api test` xanh cho các spec của module
-- [ ] Demo và nghiệm thu tại gate G4
+- [x] AC-01..04, AC-21, AC-22 pass — e2e `partner-catalog.e2e-spec.ts` 38/38 (2026-09-13, `OUTBOX_RELAY_DISABLED=1`): nhóm category tree, cùng 401/403 ở cả 3 endpoint
+- [x] Demo chạy bằng một API key thật, không phải JWT — gói cURL chạy 37/37 qua HTTP bằng API key thật (không JWT) trên build `:4200`, gồm `10-tree-01..04`; `07-performance.md` cũng đo bằng API key thật cho cả 2 tổ chức
+- [x] Không endpoint nào của module gắn `@Public()` — grep `@Public` trong `modules/partner-catalog` chỉ ra 2 dòng comment nói *không* gắn; e2e trả 401 khi thiếu credential ở cả 3 endpoint
+- [x] `pnpm --filter @erp/api test` xanh cho các spec của module — `pnpm --filter @erp/api test -- partner-catalog` 172/172, 10 suite (2026-09-13); `partner-catalog.module.spec.ts` đỏ từ 27b6f406 và được sửa trong T-04-03
+- [x] Demo và nghiệm thu tại gate G4 — nghiệm thu: Akenzy, 2026-09-14 ("please done it. pass G5"), dựa trên bằng chứng demo tự động: gói cURL `docs/partner-catalog-api-curls` 37/37 qua HTTP, e2e `partner-catalog.e2e-spec.ts` 38/38 và `partner-catalog-filters.e2e-spec.ts` 17/17, `07-performance.md`; không có buổi demo trực tiếp

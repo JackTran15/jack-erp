@@ -7508,6 +7508,30 @@
         ]
       }
     },
+    "/v2/inventory/storages/{id}/set-default-issuing": {
+      "post": {
+        "operationId": "StorageDefaultIssuingController_setDefaultIssuing_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Set a storage as the active branch's single default issuing warehouse",
+        "tags": [
+          "inventory/storages"
+        ]
+      }
+    },
     "/v2/inventory/items/resolve-locations": {
       "post": {
         "operationId": "ResolveItemLocationsController_resolve_v2",
@@ -22420,6 +22444,208 @@
         ]
       }
     },
+    "/mobile/customers": {
+      "get": {
+        "operationId": "MobileCustomerController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Tìm theo mã, tên hoặc số điện thoại",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileCustomerPageDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Khách hàng để gắn vào đơn bán",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/product-attributes": {
+      "get": {
+        "operationId": "MobileProductAttributeController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MobileProductAttributeDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Chiều thuộc tính của cả danh mục (Màu sắc, Size…)",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/invoices": {
+      "get": {
+        "operationId": "MobileInvoiceController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "ISO-8601, đầu kỳ (bao gồm)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "ISO-8601, cuối kỳ (bao gồm)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ data, total, page, limit, totals: { totalAmount } }"
+          }
+        },
+        "summary": "Hoá đơn mà người đang đăng nhập được ghi công bán",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/invoices/{id}": {
+      "get": {
+        "operationId": "MobileInvoiceController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoá đơn đầy đủ; 404 nếu không phải hoá đơn của người gọi"
+          }
+        },
+        "summary": "Một hoá đơn, kèm dòng hàng và các khoản đã thu",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/item-categories/tree": {
+      "get": {
+        "operationId": "MobileItemCategoryController_tree",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Match on category name or code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "INACTIVE"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchItemCategoryTreeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Nhóm hàng hoá dạng cây cha → con",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
     "/mobile/items": {
       "get": {
         "operationId": "MobileItemController_list",
@@ -22539,6 +22765,251 @@
           }
         },
         "summary": "Danh sách hàng hoá, phân trang",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/product-revenue": {
+      "get": {
+        "operationId": "MobileProductRevenueController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "ISO-8601, đầu kỳ (bao gồm)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "ISO-8601, cuối kỳ (bao gồm)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "statBy",
+            "required": false,
+            "in": "query",
+            "description": "Grain của một dòng. `parent` = **mẫu mã** (sản phẩm cha), `group` = **nhóm\nhàng hóa**.\n\n`item` — grain BIẾN THỂ — cố ý không nhận: nút gạt của bản gốc chỉ có hai\nnấc, và một giá trị thứ ba đi lọt sẽ cho ra một danh sách mà không nấc nào\ntrên màn ứng với nó.",
+            "schema": {
+              "default": "parent",
+              "type": "string",
+              "enum": [
+                "parent",
+                "group"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ data, total, page, limit } — mỗi dòng là một mẫu mã hoặc một nhóm"
+          }
+        },
+        "summary": "Doanh thu theo mặt hàng — gộp theo mẫu mã hoặc nhóm hàng hóa",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/promotions/evaluate": {
+      "post": {
+        "operationId": "MobilePromotionController_evaluate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileEvaluateCartDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "subtotal, promotionDiscount, amountAfterPromotion, appliedPrograms, availablePrograms, skippedPrograms"
+          }
+        },
+        "summary": "Định giá giỏ hàng theo khuyến mại — KHÔNG ghi gì",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/sales-items": {
+      "get": {
+        "operationId": "MobileSalesItemController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Tìm theo mã, tên, hoặc nhãn biến thể.\n\nBa trường chứ không chỉ tên: người lập phiếu gõ mã SKU (`GELLI-39-NAU`)\nnhiều hơn gõ tên, và nhãn biến thể (`39 · Nâu`) là thứ phân biệt các dòng\ncùng tên với nhau.",
+            "schema": {
+              "maxLength": 200,
+              "example": "GELLI",
+              "type": "string"
+            }
+          },
+          {
+            "name": "viewBy",
+            "required": false,
+            "in": "query",
+            "description": "Xem danh mục ở mức nào — hai nút *\"Mẫu mã\"* / *\"Hàng hoá\"* của panel lọc.\n\nQuyết định này đổi Ý NGHĨA của `id` trong response, nên nó phải là một tham\nsố của request chứ không phải một phép gộp ở client: ở `model`, `id` là\n`products.id` và **không đặt được vào dòng đơn hàng**. `type` trong mỗi\ndòng trả về nói lại điều đó để client không phải nhớ mình đã hỏi gì.\n\n**Mặc định là `model`** (Loc chốt 2026-09-10): người bán tìm hàng theo MẪU\nMÃ — một dòng \"Giày Gelli\" thay vì mười bốn dòng chỉ khác nhau ở đuôi mã.\nTrên dữ liệu dev, chênh lệch là 2.539 dòng so với 20.997. Mức `item` vẫn\ngiữ, nhưng nay là lựa chọn phải bấm chứ không phải thứ nhận được khi không\nnói gì.",
+            "schema": {
+              "default": "model",
+              "type": "string",
+              "enum": [
+                "item",
+                "model"
+              ]
+            }
+          },
+          {
+            "name": "inStockOnly",
+            "required": false,
+            "in": "query",
+            "description": "Chỉ giữ hàng **còn tồn**: tổng tồn có dấu > 0 tại `actor.branchId`.\n\n**Chi nhánh nào, chính xác:** `ActorContext` giải ra\n`JWT.branchId ?? X-Branch-Id ?? JWT.branchIds[0]` — comment tại chỗ ghi\n*\"always: jwt > header > jwtList\"*. `/mobile/auth/login` CÓ phát claim\n`branchId`, nên với client mobile thì **JWT thắng header**: đổi cửa hàng\ntrong app KHÔNG đổi chi nhánh mà bộ lọc này đọc. Đã đo trên dev\n(2026-09-10): bốn `X-Branch-Id` khác nhau cho ra cùng một tập 103 mặt\nhàng. Muốn bộ lọc đi theo cửa hàng đang chọn thì phải sửa MỘT trong hai —\nbỏ claim `branchId` khỏi token mobile, hoặc cho route này đọc\n`resolveExplicitBranchId` — và cả hai đều là quyết định cấp nền tảng.\n\nLà PHẦN BÙ CHẶT của `outOfStock` bên `POST /v2/inventory-items/search`\n(`<= 0`) — cùng phép cộng, cùng phạm vi chi nhánh, ngưỡng đối nhau — nên một\nmặt hàng không bao giờ vừa \"còn hàng\" ở app vừa \"hết hàng\" ở web. Nhãn trên\napp là *\"Hàng hoá còn hàng (SL > 0)\"*, và dấu `>` đó là hợp đồng.\n\nTổng có DẤU: một mặt hàng có -1 ở kho này và +1 ở kho kia tổng bằng 0 và\nđọc là hết hàng. Mặt hàng chưa từng có dòng `stock_balances` nào cũng vậy.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "Chỉ giữ hàng thuộc MỘT nhóm hàng hoá (`items.category_id`).\n\nNhóm lấy từ `GET /mobile/item-categories/tree` — cùng cây mà backoffice\ndùng. Bỏ trống = *Tất cả*.\n\n**Lọc theo ĐÚNG nhóm đó, không gồm nhóm con.** Cây chỉ có hai tầng trong dữ\nliệu thật (`GIÀY DÉP` → `Giày nam`…), và mặt hàng luôn gắn vào nhóm LÁ, nên\n\"gồm cả con\" chỉ đổi kết quả khi người dùng chọn một nhóm cha — thứ mà ảnh\nMISA cho thấy là một TIÊU ĐỀ, không chạm được. Ngày cây sâu hơn thì đây là\nchỗ phải mở rộng, không phải ở client.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileSalesItemPageDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Danh mục để bán — biến thể hoặc mẫu mã, kèm giá bán, phân trang",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/sales-items/models/{productId}": {
+      "get": {
+        "operationId": "MobileSalesItemController_getModel",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileSalesModelDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Các chiều biến thiên và biến thể của một mẫu mã",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/sales-items/models/{productId}/stock": {
+      "get": {
+        "operationId": "MobileSalesItemController_getModelStock",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileSalesModelStockDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tồn kho của một mẫu mã: theo biến thể, theo kho, theo chi nhánh khác",
         "tags": [
           "mobile"
         ]
@@ -22773,6 +23244,120 @@
           "mobile"
         ]
       }
+    },
+    "/v2/partner/catalog/categories/tree": {
+      "post": {
+        "operationId": "PartnerCategoryV2Controller_tree_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartnerCategoryTreeRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerCategoryTreeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Active product category tree with per-branch-independent product counts",
+        "tags": [
+          "Partner catalog"
+        ]
+      }
+    },
+    "/v2/partner/catalog/products/search": {
+      "post": {
+        "operationId": "PartnerProductV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartnerProductSearchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerProductSearchResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Search products by keyword, category, price and attributes",
+        "tags": [
+          "Partner catalog"
+        ]
+      }
+    },
+    "/v2/partner/catalog/products/{productCode}": {
+      "get": {
+        "operationId": "PartnerProductV2Controller_detail_v2",
+        "parameters": [
+          {
+            "name": "productCode",
+            "required": true,
+            "in": "path",
+            "description": "products.code, matched exactly (case-sensitive), not products.id or a variant SKU",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerProductDetailDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Product not found — unknown code, another organization's code, or no active variant. The same response for all three."
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Product detail with its attribute dimensions and variants",
+        "tags": [
+          "Partner catalog"
+        ]
+      }
     }
   },
   "info": {
@@ -22805,6 +23390,11 @@
         "type": "apiKey",
         "in": "header",
         "name": "X-Idempotency-Key"
+      },
+      "api-key": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Api-Key"
       }
     },
     "schemas": {
@@ -28700,6 +29290,9 @@
           "isDefaultReceiving": {
             "type": "boolean"
           },
+          "isDefaultIssuing": {
+            "type": "boolean"
+          },
           "isActive": {
             "type": "boolean"
           },
@@ -28734,6 +29327,7 @@
           "name",
           "isMainStorage",
           "isDefaultReceiving",
+          "isDefaultIssuing",
           "isActive",
           "id",
           "organizationId",
@@ -36283,6 +36877,33 @@
           "isMainShowroom"
         ]
       },
+      "PosBranchStockDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "storages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosVariantStorageDto"
+            }
+          }
+        },
+        "required": [
+          "branchId",
+          "name",
+          "quantity",
+          "storages"
+        ]
+      },
       "PosProductVariantDto": {
         "type": "object",
         "properties": {
@@ -36344,6 +36965,13 @@
             "items": {
               "$ref": "#/components/schemas/PosVariantStorageDto"
             }
+          },
+          "otherBranches": {
+            "description": "`otherBranchQuantity` kept split by branch instead of collapsed, each with the storages the stock sits in. Only branches that actually HOLD the item appear — the current branch's `storages` list keeps 0-balance entries, this one does not, because the two answer different questions (\"where in this store\" vs \"which store has it\").",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosBranchStockDto"
+            }
           }
         },
         "required": [
@@ -36358,7 +36986,8 @@
           "locations",
           "mainShowroomQuantity",
           "otherBranchQuantity",
-          "storages"
+          "storages",
+          "otherBranches"
         ]
       },
       "PosProductDetailDto": {
@@ -38162,6 +38791,11 @@
                 "$ref": "#/components/schemas/CompareFilterDto"
               }
             ]
+          },
+          "salespersonId": {
+            "type": "string",
+            "description": "Nhân viên được ghi công bán — `employee_profiles.id`, KHÔNG phải `users.id`.\n\nThêm cho `/mobile/invoices`, nơi vai tư vấn chỉ được thấy hoá đơn của chính\nmình. Đường mobile tra `employee_profiles` từ `actor.userId` rồi đặt trường\nnày; **client không đặt được nó** vì DTO của đường mobile không phơi ra.\n\nỞ đường web thì nó là một bộ lọc bình thường như mọi bộ lọc khác — phạm vi\nở đó vẫn do tổ chức và chi nhánh quyết, không do trường này.",
+            "format": "uuid"
           },
           "note": {
             "description": "Ghi chú",
@@ -43803,6 +44437,97 @@
           "limit"
         ]
       },
+      "MobileCustomerResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true,
+            "description": "Mã khách hàng. NULL là hợp lệ — khách vãng lai chưa có mã."
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "description": "Số điện thoại — khoá tra cứu chính của màn chọn khách."
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "phone"
+        ]
+      },
+      "MobileCustomerPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileCustomerResponseDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
+      "MobileProductAttributeValueDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "Nhãn hiển thị — `product_attribute_options.value_label`"
+          },
+          "codeSuffix": {
+            "type": "string",
+            "nullable": true,
+            "description": "Hậu tố ghép vào mã biến thể — `product_attribute_options.code_suffix`"
+          }
+        },
+        "required": [
+          "label",
+          "codeSuffix"
+        ]
+      },
+      "MobileProductAttributeDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Tên chiều — vd `Màu sắc`, `Size`"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileProductAttributeValueDto"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "values"
+        ]
+      },
       "MobileItemResponseDto": {
         "type": "object",
         "properties": {
@@ -43921,6 +44646,370 @@
           "total",
           "page",
           "limit"
+        ]
+      },
+      "MobileEvaluateCartLineDto": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "string",
+            "description": "Do CLIENT tự đặt và được trả lại nguyên trong `appliedPrograms[].lineDiscounts[]`,\nnên app ghép kết quả về dòng mà không phải đoán theo thứ tự."
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1
+          },
+          "unitPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "manualLineDiscount": {
+            "type": "number",
+            "description": "Giảm giá TAY cho riêng dòng này, tính bằng TIỀN (không phải %).\n\nMở cho mobile ngày 2026-09-11 theo yêu cầu của Loc: màn Chi tiết đơn hàng\ncủa vai tư vấn nay có thao tác vuốt dòng -> \"Khuyến mại\", đúng thứ mà\npos-web đã làm qua `LineDiscountDialog`.\n\nEngine trừ nó TRƯỚC khi áp chương trình tự động\n(`discount-math.ts`: `quantity*unitPrice - manualLineDiscount`), nên nó\nkhông cộng dồn lên trên giá đã giảm.\n\nChỉ nhận SỐ TIỀN — giống hệt `EvaluateCartLineInputDto` của bản web. Client\nnào muốn nhập theo % thì tự quy ra tiền trước khi gửi; mở thêm một trường\n`%` ở đây là hai đường tính cho cùng một con số.",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "lineId",
+          "itemId",
+          "quantity",
+          "unitPrice"
+        ]
+      },
+      "MobileEvaluateCartDto": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Bỏ trống = khách vãng lai"
+          },
+          "selectedProgramIds": {
+            "description": "Id các chương trình người dùng TỰ CHỌN. Hai nghĩa, và đó là chủ ý của bản\nweb (ADR-03 bên đó): bật một chương trình `auto_apply=false`, và cho một\nchương trình thắng tranh chấp tài nguyên trước cả `priority`.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "lines": {
+            "description": "RỖNG là hợp lệ, có chủ ý: màn *Chương trình khuyến mại* của app bày danh\nmục chương trình (`availablePrograms`) trước khi đơn có dòng nào.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileEvaluateCartLineDto"
+            }
+          }
+        },
+        "required": [
+          "lines"
+        ]
+      },
+      "MobileSalesItemResponseDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "item",
+              "model"
+            ],
+            "description": "`item` = một biến thể, `id` là `items.id` và đặt thẳng vào dòng đơn được. `model` = một mẫu mã, `id` là `products.id` và **KHÔNG** đặt vào dòng đơn được — phải chọn một biến thể trước."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "`items.id` khi `type=item`, `products.id` khi `type=model`. Ý nghĩa đổi theo `type`, nên đừng dereference nó mà không đọc `type` trước."
+          },
+          "code": {
+            "type": "string",
+            "description": "Mã SKU"
+          },
+          "name": {
+            "type": "string",
+            "description": "Tên hàng hoá, đã kèm nhãn biến thể — vd `Giày Gelli (39 · Nâu)`"
+          },
+          "variantLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nhãn biến thể tách riêng (`39 · Nâu`). NULL với mặt hàng không có biến thể."
+          },
+          "unit": {
+            "type": "string",
+            "description": "Đơn vị tính, dùng để hiển thị và làm `uomCode` của dòng đơn."
+          },
+          "sellingPrice": {
+            "type": "number",
+            "description": "Giá bán của hàng hoá, đơn vị đồng. `0` là giá trị HỢP LỆ — hàng chưa đặt giá — và app vẫn phải hiển thị nó chứ không ẩn đi. Với `type=model` là giá TRUNG BÌNH của các biến thể, cùng phép tính mà `/mobile/products` và lưới `/admin/inventory-items` đang dùng."
+          },
+          "variantCount": {
+            "type": "number",
+            "description": "Số biến thể gộp trong dòng. Luôn `1` khi `type=item`. Client dùng nó để biết có phải mở bảng chọn biến thể hay không."
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "code",
+          "name",
+          "variantLabel",
+          "unit",
+          "sellingPrice",
+          "variantCount"
+        ]
+      },
+      "MobileSalesItemPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileSalesItemResponseDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
+      "MobileSalesModelAttributeDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Tên chiều — vd `Màu sắc`, `Size`"
+          },
+          "options": {
+            "description": "Các nhãn theo đúng thứ tự hiển thị đã cấu hình (`sort_order`), KHÔNG phải theo bảng chữ cái: `38, 39, 40` xếp theo alphabet vẫn đúng nhưng `S, M, L` thì không.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "options"
+        ]
+      },
+      "MobileSalesVariantAttributeDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "value"
+        ]
+      },
+      "MobileSalesVariantDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "`items.id` — khoá dòng đơn hàng"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "variantLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nhãn biến thể gộp sẵn — vd `39 · Nâu`"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "sellingPrice": {
+            "type": "number",
+            "description": "`0` là giá trị HỢP LỆ — hàng chưa đặt giá."
+          },
+          "attributes": {
+            "description": "Nhãn của biến thể ở từng chiều. Client dò TỔ HỢP người dùng chọn vào đây để tìm ra đúng biến thể — nên nó phải đủ MỌI chiều mà mẫu mã khai, không chỉ các chiều khác nhau giữa các biến thể.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileSalesVariantAttributeDto"
+            }
+          },
+          "barcodes": {
+            "description": "Mã vạch của biến thể. **MẢNG, không phải một chuỗi** — `item_barcodes` là quan hệ một-nhiều và KHÔNG có cờ `isPrimary`, nên không có cái nào là \"mã vạch chính\". Một mặt hàng thường mang cả EAN của nhà sản xuất lẫn mã nội bộ. Rỗng là ca hợp lệ và phổ biến. Thứ tự ổn định theo `created_at` rồi `code`, để hai lượt gọi không đảo chỗ.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "variantLabel",
+          "unit",
+          "sellingPrice",
+          "attributes",
+          "barcodes"
+        ]
+      },
+      "MobileSalesModelDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "`products.id`"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "attributes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileSalesModelAttributeDto"
+            }
+          },
+          "variants": {
+            "description": "Chỉ các biến thể CÒN BÁN ĐƯỢC (`isActive` và `isPosVisible`) — cùng tập đã dựng nên dòng mẫu mã ở danh sách, nên hai màn không lệch nhau.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileSalesVariantDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "attributes",
+          "variants"
+        ]
+      },
+      "MobileStorageStockDto": {
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Tồn của mặt hàng trong kho này. CÓ THỂ là 0 — xem ghi chú ở dưới."
+          }
+        },
+        "required": [
+          "storageId",
+          "name",
+          "quantity"
+        ]
+      },
+      "MobileBranchStockDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Tổng tồn của mặt hàng tại chi nhánh này."
+          },
+          "storages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileStorageStockDto"
+            }
+          }
+        },
+        "required": [
+          "branchId",
+          "name",
+          "quantity",
+          "storages"
+        ]
+      },
+      "MobileVariantStockDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "`items.id`"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Tồn tại chi nhánh ĐANG LÀM VIỆC, cộng qua mọi kho của nó."
+          },
+          "storages": {
+            "description": "Mọi kho đang hoạt động của chi nhánh hiện tại, **kể cả kho tồn 0** — vắng mặt đọc thành \"không có kho đó\". Kho chính đứng đầu.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileStorageStockDto"
+            }
+          },
+          "otherBranches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileBranchStockDto"
+            }
+          }
+        },
+        "required": [
+          "itemId",
+          "quantity",
+          "storages",
+          "otherBranches"
+        ]
+      },
+      "MobileSalesModelStockDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "`products.id`"
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileVariantStockDto"
+            }
+          }
+        },
+        "required": [
+          "productId",
+          "variants"
         ]
       },
       "MobileStockDocumentResponseDto": {
@@ -44316,6 +45405,376 @@
         "required": [
           "documentDate",
           "lines"
+        ]
+      },
+      "PartnerCategoryTreeRequestDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "PartnerCategoryNodeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Category id, stable across requests"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true,
+            "description": "Category code, null when unset"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name, as stored"
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Parent category id; null at the root"
+          },
+          "productCount": {
+            "type": "number",
+            "description": "Distinct active products in this category AND every category below it. A parent with no products attached directly still reports its children."
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PartnerCategoryNodeDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "parentId",
+          "productCount",
+          "children"
+        ]
+      },
+      "PartnerCategoryTreeResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PartnerCategoryNodeDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PartnerProductSearchDto": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Free text matched against product name, product code and variant SKU"
+          },
+          "categoryId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Category id. Matches products in this category AND in every category below it, so a top-level menu entry returns the whole branch."
+          },
+          "priceFrom": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Minimum variant selling price, inclusive"
+          },
+          "priceTo": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Maximum variant selling price, inclusive"
+          },
+          "colors": {
+            "maxItems": 50,
+            "description": "Raw ERP colour codes (e.g. \"BA\", \"D\"), not display names — this catalogue stores short internal codes and has no colour name or hex value. Combined with `sizes` the match must come from the SAME variant.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sizes": {
+            "maxItems": 50,
+            "description": "Size values as stored (e.g. \"38\", \"39\").",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "inStock": {
+            "type": "boolean",
+            "description": "Stock filter, matched on the SAME variant as colors/sizes/price (ADR-08). `true`: only products with at least one variant that matches every other variant-level filter and has stock in a branch this API key may see; the row describes those variants. `false`: only products that have at least one variant matching every other variant-level filter and NONE of those matching variants has stock in a branch this API key may see (a product with any in-stock matching variant is excluded); the row describes those, all out-of-stock, variants. Omitted: no stock filtering."
+          },
+          "sort": {
+            "type": "string",
+            "default": "newest",
+            "enum": [
+              "newest",
+              "price_asc",
+              "price_desc"
+            ]
+          },
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          }
+        }
+      },
+      "PartnerProductRowDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true,
+            "description": "Product code, null when unset"
+          },
+          "name": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryName": {
+            "type": "string",
+            "nullable": true
+          },
+          "priceMin": {
+            "type": "number",
+            "description": "Cheapest active variant, in VND"
+          },
+          "priceMax": {
+            "type": "number",
+            "description": "Dearest active variant, in VND"
+          },
+          "colors": {
+            "description": "Raw ERP colour codes across active variants",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sizes": {
+            "description": "Size values across active variants",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "inStock": {
+            "type": "boolean",
+            "description": "True when any active variant has stock in any branch this API key may see. Quantities are never exposed."
+          },
+          "images": {
+            "description": "Always empty. This ERP has no image storage yet; the field is part of the contract so images can appear later without a breaking change.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "categoryId",
+          "categoryName",
+          "priceMin",
+          "priceMax",
+          "colors",
+          "sizes",
+          "inStock",
+          "images"
+        ]
+      },
+      "PartnerProductSearchResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PartnerProductRowDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "description": "Total matching products, not the size of this page"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
+      "PartnerAttributeDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Dimension name as stored, e.g. \"Color\" or \"Size\""
+          },
+          "options": {
+            "description": "Selectable values, in catalogue order",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "options"
+        ]
+      },
+      "PartnerVariantDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "Variant SKU"
+          },
+          "variantLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "Pre-composed label as stored on the variant, e.g. \"38 · BA\". Provided as-is; use `attributes` when you need the parts rather than the label."
+          },
+          "price": {
+            "type": "number",
+            "description": "Selling price of this variant, in VND"
+          },
+          "inStock": {
+            "type": "boolean",
+            "description": "Stock in any branch this API key may see"
+          },
+          "attributes": {
+            "type": "object",
+            "description": "Dimension name to chosen value, e.g. { \"Size\": \"38\", \"Color\": \"BA\" }",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "variantLabel",
+          "price",
+          "inStock",
+          "attributes"
+        ]
+      },
+      "PartnerProductDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true,
+            "description": "Product code, null when unset"
+          },
+          "name": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryName": {
+            "type": "string",
+            "nullable": true
+          },
+          "priceMin": {
+            "type": "number",
+            "description": "Cheapest active variant, in VND"
+          },
+          "priceMax": {
+            "type": "number",
+            "description": "Dearest active variant, in VND"
+          },
+          "colors": {
+            "description": "Raw ERP colour codes across active variants",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sizes": {
+            "description": "Size values across active variants",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "inStock": {
+            "type": "boolean",
+            "description": "True when any active variant has stock in any branch this API key may see. Quantities are never exposed."
+          },
+          "images": {
+            "description": "Always empty. This ERP has no image storage yet; the field is part of the contract so images can appear later without a breaking change.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "attributes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PartnerAttributeDto"
+            }
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PartnerVariantDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "categoryId",
+          "categoryName",
+          "priceMin",
+          "priceMax",
+          "colors",
+          "sizes",
+          "inStock",
+          "images",
+          "description",
+          "attributes",
+          "variants"
         ]
       }
     }
