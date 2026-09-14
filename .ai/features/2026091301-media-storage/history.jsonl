@@ -28,3 +28,4 @@
 {"action": "ticket in_progress", "at": "2026-09-13T15:57:26", "by": "Claude", "gate": "G4", "id": "4da99ed2efe6", "ticket": "T-01-09", "ts": "2026-09-13T15:57:26.681363"}
 {"action": "ticket in_progress", "at": "2026-09-13T15:57:26", "by": "Claude", "gate": "G4", "id": "3bc242f96b9e", "ticket": "T-01-11", "ts": "2026-09-13T15:57:26.745697"}
 {"action": "ticket in_progress", "at": "2026-09-13T15:57:26", "by": "Claude", "gate": "G4", "id": "2626d09af6c1", "ticket": "T-04-01", "ts": "2026-09-13T15:57:26.809186"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-14T08:26:14", "by": "Claude", "gate": "G4", "id": "61a0a246e2db", "ticket": "T-02-01", "ts": "2026-09-14T08:26:14.016418"}

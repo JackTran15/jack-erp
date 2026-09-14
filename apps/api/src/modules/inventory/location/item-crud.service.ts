@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
+import { isUUID } from "class-validator";
 import {
   Brackets,
   DataSource,
@@ -28,6 +29,11 @@ import { BaseCrudService } from "../../crud/base-crud.service";
 import { PaginationQueryDto } from "../../crud/dto/pagination-query.dto";
 import type { PaginatedResponse } from "@erp/shared-interfaces";
 import { StockLedgerService } from "../ledger/stock-ledger.service";
+import { MediaLinkService } from "../../media/media-link.service";
+import { MediaQueryService } from "../../media/media-query.service";
+import { MediaOwnerType } from "../../media/media-object.entity";
+import { MediaException } from "../../media/media.exception";
+import { MEDIA_OWNER_POLICIES } from "../../media/media-owner-policies";
 import { ItemEntity } from "./item.entity";
 import { ItemCategoryEntity } from "./item-category.entity";
 import { BrandEntity } from "./brand.entity";
@@ -51,6 +57,12 @@ import type {
 import type { ItemLookupResultDto } from "./dto/item-lookup.dto";
 
 export const INVENTORY_ITEM_SERVICE_TOKEN = "InventoryItemCrudService";
+
+// PRODUCT and ITEM share the same media owner policy (GOODS_POLICY in
+// media-owner-policies.ts), so this limit is valid before either owner type
+// is known — the shape check below runs before create()/update() decides
+// which branch (and therefore which owner type) applies.
+const MAX_IMAGE_IDS = MEDIA_OWNER_POLICIES[MediaOwnerType.PRODUCT].maxPerOwner;
 
 interface NestedPayload {
   barcodes?: CreateItemBarcodeInput[];
@@ -96,6 +108,8 @@ export class InventoryItemCrudService extends BaseCrudService<
     private readonly attrValRepo: Repository<ItemAttributeValueEntity>,
     protected readonly dataSource: DataSource,
     private readonly stockLedger: StockLedgerService,
+    private readonly mediaLink: MediaLinkService,
+    private readonly mediaQuery: MediaQueryService,
   ) {
     super(dataSource);
   }
@@ -183,7 +197,13 @@ export class InventoryItemCrudService extends BaseCrudService<
         ? await this.loadProductAttributes(item.productId)
         : await this.loadItemAttributes(item.id);
       const opening = await this.loadInitialStockSnapshot(actor, item.id);
-      return { ...transformed, ...attrs, ...opening };
+      // A-08/A-25: a variant item (productId set) shows its product's
+      // images, never its own — same split as `attrs` above.
+      const images = await this.loadImages(
+        item.productId ?? item.id,
+        actor.organizationId,
+      );
+      return { ...transformed, ...attrs, ...opening, images };
     }
 
     // Fall back: treat id as a product ID → return representative item
@@ -327,10 +347,25 @@ export class InventoryItemCrudService extends BaseCrudService<
     }
   }
 
+  /**
+   * A-19: detach media of the deleted owner. `id` is whatever the caller sent
+   * to DELETE — a product id for a grouped row, an item id for a standalone
+   * one (A-25) — so the owner type has to be resolved the same way `update()`
+   * routes a patch, by checking whether a product with this id exists.
+   */
   protected override async afterDelete(
-    _id: string,
+    id: string,
     actor: ActorContext,
   ): Promise<void> {
+    const productRepo = this.dataSource.getRepository(ProductEntity);
+    const isProduct = await productRepo.exist({
+      where: { id, organizationId: actor.organizationId },
+    });
+    await this.mediaLink.detachAll(
+      isProduct ? MediaOwnerType.PRODUCT : MediaOwnerType.ITEM,
+      id,
+      actor.organizationId,
+    );
   }
 
   /**
@@ -342,7 +377,8 @@ export class InventoryItemCrudService extends BaseCrudService<
     payload: Record<string, any>,
     actor: ActorContext,
   ): Promise<any> {
-    const normalized = normalizePayload(payload);
+    const { imageIds, rest: payloadWithoutImages } = extractImageIds(payload);
+    const normalized = normalizePayload(payloadWithoutImages);
 
     // Resolve brand FK → denormalize the brand name onto the item.
     if (normalized.brandId) {
@@ -352,6 +388,14 @@ export class InventoryItemCrudService extends BaseCrudService<
     // When colors/sizes arrays are present → create product with variant matrix
     if (Array.isArray(normalized.colors) || Array.isArray(normalized.sizes)) {
       const created = await this.createProductWithVariants(normalized, actor);
+      if (imageIds !== undefined) {
+        await this.mediaLink.syncOwner(
+          MediaOwnerType.PRODUCT,
+          created.productId,
+          imageIds,
+          actor,
+        );
+      }
       return created;
     }
 
@@ -382,6 +426,16 @@ export class InventoryItemCrudService extends BaseCrudService<
       await this.saveUnits(manager, savedItem.id, actor, nested.units);
       await this.saveThreshold(manager, savedItem.id, actor, nested.threshold);
 
+      if (imageIds !== undefined) {
+        await this.mediaLink.syncOwner(
+          MediaOwnerType.ITEM,
+          savedItem.id,
+          imageIds,
+          actor,
+          manager,
+        );
+      }
+
       return savedItem;
     });
 
@@ -404,7 +458,8 @@ export class InventoryItemCrudService extends BaseCrudService<
     payload: Record<string, any>,
     actor: ActorContext,
   ): Promise<any> {
-    const normalized = normalizePayload(payload);
+    const { imageIds, rest: payloadWithoutImages } = extractImageIds(payload);
+    const normalized = normalizePayload(payloadWithoutImages);
 
     // Resolve / clear brand FK and keep the denormalized name in sync. Do this
     // before the product-variant branch as those payloads also carry brandId.
@@ -426,6 +481,9 @@ export class InventoryItemCrudService extends BaseCrudService<
     });
     if (isProductUuid && this.hasProductLevelPatch(normalized)) {
       const updated = await this.updateProductWithVariants(id, normalized, actor);
+      if (imageIds !== undefined) {
+        await this.mediaLink.syncOwner(MediaOwnerType.PRODUCT, id, imageIds, actor);
+      }
       return updated;
     }
 
@@ -458,7 +516,17 @@ export class InventoryItemCrudService extends BaseCrudService<
     const { colors: _c, sizes: _s, ...rest } = normalized;
     const saved = (await super.update(id, rest as any, actor)) as ItemEntity;
 
-    if (hasProviders || hasUnits || hasBarcodes) {
+    // The owner for images follows what `saved` actually is, not which
+    // branch ran: `saved.productId` is set both for a genuine variant item
+    // (A-08 — it shows its product's images, never its own) and for the
+    // product-id fall-through (`isProductUuid` true, no product-level patch
+    // in the same request — `saved` there is the representative item, whose
+    // own `productId` column equals the product id from the URL).
+    const imageOwner = saved.productId
+      ? { type: MediaOwnerType.PRODUCT, id: saved.productId }
+      : { type: MediaOwnerType.ITEM, id };
+
+    if (hasProviders || hasUnits || hasBarcodes || imageIds !== undefined) {
       await this.dataSource.transaction(async (manager) => {
         if (hasProviders) {
           await manager.delete(ItemProviderEntity, {
@@ -481,7 +549,27 @@ export class InventoryItemCrudService extends BaseCrudService<
           });
           await this.saveUnits(manager, id, actor, units);
         }
+        if (imageIds !== undefined) {
+          await this.mediaLink.syncOwner(
+            imageOwner.type,
+            imageOwner.id,
+            imageIds,
+            actor,
+            manager,
+          );
+        }
       });
+
+      // `saved.images` (via the `getById` call inside `super.update()`) was
+      // loaded before the sync above ran, so it would otherwise echo the
+      // pre-sync list back to the caller. Reload once, only when the sync
+      // actually happened.
+      if (imageIds !== undefined) {
+        (saved as any).images = await this.loadImages(
+          imageOwner.id,
+          actor.organizationId,
+        );
+      }
     }
 
     return saved;
@@ -755,6 +843,18 @@ export class InventoryItemCrudService extends BaseCrudService<
       actorContext: actor,
       unitCost: cost,
     });
+  }
+
+  /** `{ id, url, fileName }[]`, ordered by `sort_order`; never bucket/objectKey. */
+  private async loadImages(
+    ownerId: string,
+    organizationId: string,
+  ): Promise<Array<{ id: string; url: string; fileName: string }>> {
+    const imagesByOwner = await this.mediaQuery.resolvePublicUrls(
+      [ownerId],
+      organizationId,
+    );
+    return imagesByOwner.get(ownerId) ?? [];
   }
 
   private async ensureCategoryBelongsToOrg(
@@ -1620,12 +1720,14 @@ export class InventoryItemCrudService extends BaseCrudService<
       actor,
       productId,
     );
+    const images = await this.loadImages(productId, actor.organizationId);
 
     return {
       ...rest,
       ...attrs,
       ...opening,
       variants,
+      images,
       categoryName: category?.name ?? "",
       productName: product?.name ?? "",
       // Override code/name with the PRODUCT values so the form shows product-level fields
@@ -1868,6 +1970,45 @@ function normalizePayload<T extends Record<string, any>>(payload: T): T {
     if (value === "") next[key] = undefined;
   }
   return next as T;
+}
+
+/**
+ * Splits `imageIds` off the raw CRUD payload before anything else touches it,
+ * so it never reaches `hasProductLevelPatch`, `productRepo.save/update`, or
+ * item entity assignment (03-logical-design.md > Approach > write flow > the
+ * rule for every caller). `null` is not treated as "no change" — only an
+ * absent key is; anything present but not a valid id array is rejected here,
+ * before either write branch runs. `syncOwner` still re-checks shape and
+ * ownership authoritatively once the owner is known; this is a shape-only
+ * pre-check so a bad payload cannot save the record and fail on images after.
+ */
+function extractImageIds<T extends Record<string, any>>(
+  payload: T,
+): { imageIds: string[] | undefined; rest: Omit<T, "imageIds"> } {
+  const { imageIds, ...rest } = payload;
+  if (imageIds === undefined) {
+    return { imageIds: undefined, rest };
+  }
+  const hasValidShape =
+    Array.isArray(imageIds) &&
+    imageIds.every((id) => typeof id === "string" && isUUID(id));
+  if (!hasValidShape) {
+    throw new BadRequestException(
+      "imageIds must be an array of UUID strings",
+    );
+  }
+  // Count the way `syncOwner` does: it lowercases every id and dedupes
+  // before comparing against `maxPerOwner`, so the same id repeated (in any
+  // case) must not be rejected here as if each copy were a distinct image.
+  const uniqueCount = new Set(imageIds.map((id) => id.toLowerCase())).size;
+  if (uniqueCount > MAX_IMAGE_IDS) {
+    throw new MediaException(
+      400,
+      "MEDIA_LIMIT_EXCEEDED",
+      `PRODUCT/ITEM allows at most ${MAX_IMAGE_IDS} media object(s), got ${uniqueCount}`,
+    );
+  }
+  return { imageIds, rest };
 }
 
 export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
