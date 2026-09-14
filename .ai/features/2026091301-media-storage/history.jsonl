@@ -53,3 +53,5 @@
 {"action": "ticket done (review bypassed)", "at": "2026-09-14T09:59:04", "by": "Claude", "gate": "G4", "id": "4526e40c0267", "ticket": "T-04-02", "ts": "2026-09-14T09:59:04.233634"}
 {"action": "ticket in_progress", "at": "2026-09-14T09:59:04", "by": "Claude", "gate": "G4", "id": "a62b22733c8a", "ticket": "T-04-09", "ts": "2026-09-14T09:59:04.548532"}
 {"action": "ticket done (review bypassed)", "at": "2026-09-14T10:08:13", "by": "Claude", "gate": "G4", "id": "f5fcf3a155e9", "ticket": "T-04-03", "ts": "2026-09-14T10:08:13.638524"}
+{"action": "ticket in_progress", "at": "2026-09-14T10:08:13", "by": "Claude", "gate": "G4", "id": "7885f709ed3e", "ticket": "T-04-07", "ts": "2026-09-14T10:08:13.973685"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-14T10:15:59", "by": "Claude", "gate": "G4", "id": "a256436c747b", "ticket": "T-04-09", "ts": "2026-09-14T10:15:59.836301"}
