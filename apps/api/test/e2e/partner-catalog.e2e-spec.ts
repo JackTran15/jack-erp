@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { DataSource } from 'typeorm';
 import { RbacService } from '../../src/modules/rbac/rbac.service';
 import {
@@ -29,13 +30,32 @@ const CATEGORY = {
 const PRODUCT = {
   inGrandchild: 'e2000000-0000-4000-8000-000000000001',
   inSibling: 'e2000000-0000-4000-8000-000000000002',
+  // Every variant below is is_active = false — used to prove AC-18: a product
+  // with no active variant is 404, identically to one that does not exist.
+  allInactive: 'e2000000-0000-4000-8000-000000000003',
 };
 const ITEM = {
   heel38: 'e3000000-0000-4000-8000-000000000001',
   heel39: 'e3000000-0000-4000-8000-000000000002',
   sandal37: 'e3000000-0000-4000-8000-000000000003',
   retired: 'e3000000-0000-4000-8000-000000000004',
+  allInactive1: 'e3000000-0000-4000-8000-000000000005',
+  allInactive2: 'e3000000-0000-4000-8000-000000000006',
+  allInactive3: 'e3000000-0000-4000-8000-000000000007',
 };
+const HEEL_CODE = 'HHB2940';
+const SANDAL_CODE = 'TRUC2025';
+const ALL_INACTIVE_CODE = 'RETIRED01';
+// AC-17: a product that exists only in another organization.
+const OTHER_ORG_ID = 'a0000000-0000-4000-8000-000000000099';
+const OTHER_ORG_PRODUCT_ID = 'e2000000-0000-4000-8000-000000000099';
+const OTHER_ORG_PRODUCT_CODE = 'BONLY01';
+const OTHER_ORG_ITEM_ID = 'f9000000-0000-4000-8000-0000000000a1';
+// Another organization reusing the heel's code: (organization_id, code) is
+// unique, not code alone, so this row is legal and must never answer for key A.
+const OTHER_ORG_SAME_CODE_PRODUCT_ID = 'f9000000-0000-4000-8000-0000000000a2';
+const OTHER_ORG_SAME_CODE_ITEM_ID = 'f9000000-0000-4000-8000-0000000000a3';
+const OTHER_ORG_SAME_CODE_SKU = 'OB-HHB2940-40';
 // A branch the seeded admin is NOT working in, used to prove that stock is
 // aggregated across the whole organization rather than the current branch.
 const OTHER_BRANCH_ID = 'b0000000-0000-4000-8000-000000000077';
@@ -44,6 +64,7 @@ const LOCATION_ID = 'e7000000-0000-4000-8000-000000000001';
 
 const TREE_URL = '/v2/partner/catalog/categories/tree';
 const SEARCH_URL = '/v2/partner/catalog/products/search';
+const detailUrl = (code: string) => `/v2/partner/catalog/products/${code}`;
 const WHITELISTED_IP = '203.0.113.7';
 
 async function ensurePermission(ds: DataSource, key: string, module: string) {
@@ -81,15 +102,16 @@ async function seedCatalog(ds: DataSource) {
   await cat(CATEGORY.sibling, 'PC-1006', 'Dép nữ', CATEGORY.root);
   await cat(CATEGORY.inactive, 'PC-DEAD', 'Nhóm đã ngừng', null, 'INACTIVE');
 
-  const product = async (id: string, name: string) =>
+  const product = async (id: string, code: string, name: string) =>
     ds.query(
-      `INSERT INTO products (id, organization_id, created_by, name, is_active, created_at, updated_at)
-       VALUES ($1::uuid, $2, $3, $4, true, NOW(), NOW())
+      `INSERT INTO products (id, organization_id, created_by, code, name, is_active, created_at, updated_at)
+       VALUES ($1::uuid, $2, $3, $4, $5, true, NOW(), NOW())
        ON CONFLICT (id) DO NOTHING`,
-      [id, SEEDED_ORG_ID, SEEDED_USER_ID, name],
+      [id, SEEDED_ORG_ID, SEEDED_USER_ID, code, name],
     );
-  await product(PRODUCT.inGrandchild, 'Giày cao gót HHB2940');
-  await product(PRODUCT.inSibling, 'Dép nữ TRUC2025');
+  await product(PRODUCT.inGrandchild, HEEL_CODE, 'Giày cao gót HHB2940');
+  await product(PRODUCT.inSibling, SANDAL_CODE, 'Dép nữ TRUC2025');
+  await product(PRODUCT.allInactive, ALL_INACTIVE_CODE, 'Ngừng bán toàn bộ');
 
   const item = async (
     id: string,
@@ -113,6 +135,11 @@ async function seedCatalog(ds: DataSource) {
   await item(ITEM.sandal37, 'PC-TRUC2025-37', 'Dép nữ TRUC2025 (37)', PRODUCT.inSibling, CATEGORY.sibling, 495000);
   // Inactive variant: must never be counted, priced, or shown.
   await item(ITEM.retired, 'PC-GHOST-40', 'Ngừng bán (40)', PRODUCT.inSibling, CATEGORY.child, 999000, false);
+  // AC-18 fixture: every variant of this product is retired, so the product
+  // itself must be as unreachable as one that never existed.
+  await item(ITEM.allInactive1, 'PC-RETIRED01-1', 'Ngừng bán toàn bộ (1)', PRODUCT.allInactive, CATEGORY.child, 100000, false);
+  await item(ITEM.allInactive2, 'PC-RETIRED01-2', 'Ngừng bán toàn bộ (2)', PRODUCT.allInactive, CATEGORY.child, 100000, false);
+  await item(ITEM.allInactive3, 'PC-RETIRED01-3', 'Ngừng bán toàn bộ (3)', PRODUCT.allInactive, CATEGORY.child, 100000, false);
 
   // ── Attributes ───────────────────────────────────────────────────────────
   // Deliberate combination: the heel exists in BA/38 and in D/39, but NEVER in
@@ -219,6 +246,45 @@ async function seedCatalog(ds: DataSource) {
   );
 }
 
+// AC-17: a product code that is real, but belongs to a different organization.
+// Seeded on its own organization row (not the shared seed org), so only the
+// organization predicates — on products and on the items join — keep the
+// partner key away from this row.
+async function seedOtherOrgProduct(ds: DataSource) {
+  await ds.query(
+    `INSERT INTO organizations (id, organization_id, name, contact_email, status, created_by, created_at, updated_at)
+     VALUES ($1::uuid, $1::uuid, 'Other Org', 'other-org@test.com', 'ACTIVE', $2, NOW(), NOW())
+     ON CONFLICT (id) DO NOTHING`,
+    [OTHER_ORG_ID, SEEDED_USER_ID],
+  );
+  await ds.query(
+    `INSERT INTO products (id, organization_id, created_by, code, name, is_active, created_at, updated_at)
+     VALUES ($1::uuid, $2, $3, $4, 'Sản phẩm tổ chức khác', true, NOW(), NOW())
+     ON CONFLICT (id) DO NOTHING`,
+    [OTHER_ORG_PRODUCT_ID, OTHER_ORG_ID, SEEDED_USER_ID, OTHER_ORG_PRODUCT_CODE],
+  );
+  await ds.query(
+    `INSERT INTO products (id, organization_id, created_by, code, name, is_active, created_at, updated_at)
+     VALUES ($1::uuid, $2, $3, $4, 'Trùng mã ở tổ chức khác', true, NOW(), NOW())
+     ON CONFLICT (id) DO NOTHING`,
+    [OTHER_ORG_SAME_CODE_PRODUCT_ID, OTHER_ORG_ID, SEEDED_USER_ID, HEEL_CODE],
+  );
+
+  // Each gets an ACTIVE variant: without one the detail query returns no rows
+  // whatever the organization predicate says, and the 404 would prove nothing.
+  const otherOrgItem = async (id: string, code: string, productId: string) =>
+    ds.query(
+      `INSERT INTO items
+         (id, organization_id, created_by, code, name, unit, is_active,
+          selling_price, purchase_price, product_id, created_at, updated_at)
+       VALUES ($1::uuid, $2, $3, $4, $4, 'pcs', true, 111000, 50000, $5::uuid, NOW(), NOW())
+       ON CONFLICT (id) DO NOTHING`,
+      [id, OTHER_ORG_ID, SEEDED_USER_ID, code, productId],
+    );
+  await otherOrgItem(OTHER_ORG_ITEM_ID, 'OB-BONLY01-40', OTHER_ORG_PRODUCT_ID);
+  await otherOrgItem(OTHER_ORG_SAME_CODE_ITEM_ID, OTHER_ORG_SAME_CODE_SKU, OTHER_ORG_SAME_CODE_PRODUCT_ID);
+}
+
 interface TreeNode {
   id: string;
   code: string | null;
@@ -286,6 +352,7 @@ describe('Partner catalog (E2E)', () => {
       .invalidateUserPermissions(SEEDED_USER_ID, SEEDED_ORG_ID);
 
     await seedCatalog(ds);
+    await seedOtherOrgProduct(ds);
 
     const mintKey = async (name: string, roleId: string): Promise<string> => {
       const res = await request(app.getHttpServer())
@@ -305,13 +372,6 @@ describe('Partner catalog (E2E)', () => {
   });
 
   describe('Partner catalog — category tree (E2E)', () => {
-    let app!: INestApplication;
-    let seed!: SeedResult;
-    let partnerKey!: string;
-    let noPermissionKey!: string;
-
-
-
     // AC-21
     it('rejects a request with no credential (401)', async () => {
       await request(app.getHttpServer()).post(TREE_URL).send({}).expect(401);
@@ -402,19 +462,12 @@ describe('Partner catalog (E2E)', () => {
   });
 
   describe('Partner catalog — product search (E2E)', () => {
-    let app!: INestApplication;
-    let seed!: SeedResult;
-    let partnerKey!: string;
-    let noPermissionKey!: string;
-
     const search = (key: string, body: object) =>
       request(app.getHttpServer())
         .post(SEARCH_URL)
         .set('X-Api-Key', key)
         .set('X-Forwarded-For', WHITELISTED_IP)
         .send(body);
-
-
 
     // AC-21 / AC-22
     it('requires a credential and the partner permission', async () => {
@@ -531,18 +584,12 @@ describe('Partner catalog (E2E)', () => {
   });
 
   describe('Partner catalog — price, colour, size and stock (E2E)', () => {
-    let app!: INestApplication;
-    let seed!: SeedResult;
-    let partnerKey!: string;
-
     const search = (body: object) =>
       request(app.getHttpServer())
         .post(SEARCH_URL)
         .set('X-Api-Key', partnerKey)
         .set('X-Forwarded-For', WHITELISTED_IP)
         .send(body);
-
-
 
     const names = (body: { data: ProductRow[] }) =>
       body.data.map((r) => r.name).sort();
@@ -608,6 +655,25 @@ describe('Partner catalog (E2E)', () => {
       expect(names(res.body)).toEqual(['Dép nữ TRUC2025']);
     });
 
+    it('combines price, colour and size on one variant', async () => {
+      // D/39 is a real heel variant at 750 000.
+      const inBand = await search({
+        colors: ['D'],
+        sizes: ['39'],
+        priceFrom: 700000,
+        priceTo: 800000,
+      }).expect(200);
+      expect(names(inBand.body)).toEqual(['Giày cao gót HHB2940']);
+
+      // Same colour and size, but that variant is dearer than the band.
+      const outOfBand = await search({
+        colors: ['D'],
+        sizes: ['39'],
+        priceTo: 500000,
+      }).expect(200);
+      expect(outOfBand.body.total).toBe(0);
+    });
+
     // AC-12 — the only stock sits in a branch the caller is not working in
     it('reports stock across the whole organization', async () => {
       const res = await search({}).expect(200);
@@ -641,6 +707,217 @@ describe('Partner catalog (E2E)', () => {
       const body = JSON.stringify(res.body);
       expect(body).not.toContain('quantity');
       expect(body).not.toContain('400000');
+    });
+  });
+
+  describe('Partner catalog — product detail (E2E)', () => {
+    const detail = (key: string, code: string) =>
+      request(app.getHttpServer())
+        .get(detailUrl(code))
+        .set('X-Api-Key', key)
+        .set('X-Forwarded-For', WHITELISTED_IP);
+
+    const NOT_FOUND_MESSAGE = 'Product not found';
+
+    // AC-21 / AC-22
+    it('requires a credential and the partner permission', async () => {
+      await request(app.getHttpServer())
+        .get(detailUrl(HEEL_CODE))
+        .expect(401);
+      await detail(noPermissionKey, HEEL_CODE).expect(403);
+    });
+
+    // AC-15
+    it('returns the full detail shape for a real product code', async () => {
+      const res = await detail(partnerKey, HEEL_CODE).expect(200);
+
+      // The exact published key set: a missing field and a leaked one both fail.
+      expect(Object.keys(res.body).sort()).toEqual([
+        'attributes', 'categoryId', 'categoryName', 'code', 'colors', 'description',
+        'id', 'images', 'inStock', 'name', 'priceMax', 'priceMin', 'sizes', 'variants',
+      ]);
+      expect(res.body).toMatchObject({
+        id: PRODUCT.inGrandchild,
+        code: HEEL_CODE,
+        name: 'Giày cao gót HHB2940',
+        description: null,
+        categoryId: CATEGORY.grandchild,
+        categoryName: 'Giày cao gót',
+        priceMin: 750000,
+        priceMax: 750000,
+        colors: ['BA', 'D'],
+        sizes: ['38', '39'],
+        inStock: true,
+        images: [],
+      });
+      // The seeded purchase price is 400000; it must appear nowhere.
+      expect(JSON.stringify(res.body)).not.toContain('400000');
+
+      expect(res.body.attributes).toHaveLength(2);
+      expect(res.body.attributes).toEqual(
+        expect.arrayContaining([
+          { name: 'Size', options: ['38', '39'] },
+          { name: 'Color', options: ['BA', 'D'] },
+        ]),
+      );
+
+      // Both variants in full: stock is per variant, and only heel38 holds any,
+      // so copying the product-level flag onto every variant must fail here.
+      const byCode = (code: string) =>
+        res.body.variants.find((v: { code: string }) => v.code === code);
+      expect(res.body.variants).toHaveLength(2);
+      expect(byCode('PC-HHB2940-38')).toEqual({
+        id: ITEM.heel38,
+        code: 'PC-HHB2940-38',
+        variantLabel: null,
+        price: 750000,
+        inStock: true,
+        attributes: { Size: '38', Color: 'BA' },
+      });
+      expect(byCode('PC-HHB2940-39')).toEqual({
+        id: ITEM.heel39,
+        code: 'PC-HHB2940-39',
+        variantLabel: null,
+        price: 750000,
+        inStock: false,
+        attributes: { Size: '39', Color: 'D' },
+      });
+    });
+
+    // AC-16
+    it('returns 404 for a code that does not exist in any organization', async () => {
+      const res = await detail(partnerKey, 'DOES-NOT-EXIST').expect(404);
+      expect(res.body.message).toBe(NOT_FOUND_MESSAGE);
+    });
+
+    // AC-17
+    it('returns 404, not 403, for a code that exists only in another organization', async () => {
+      const foreign = await detail(partnerKey, OTHER_ORG_PRODUCT_CODE).expect(404);
+      const unknown = await detail(partnerKey, 'DOES-NOT-EXIST').expect(404);
+      // Indistinguishable from a code that exists nowhere — that is the point.
+      const essence = (body: { statusCode?: number; message?: unknown; error?: unknown }) => ({
+        statusCode: body.statusCode,
+        message: body.message,
+        error: body.error,
+      });
+      expect(foreign.body.message).toBe(NOT_FOUND_MESSAGE);
+      expect(essence(foreign.body)).toEqual(essence(unknown.body));
+    });
+
+    // AC-25 — another organization reusing the code never answers for this key.
+    it("returns this organization's product when another organization reuses the code", async () => {
+      const res = await detail(partnerKey, HEEL_CODE).expect(200);
+      expect(res.body.id).toBe(PRODUCT.inGrandchild);
+      expect(res.body.variants.map((v: { code: string }) => v.code)).not.toContain(
+        OTHER_ORG_SAME_CODE_SKU,
+      );
+      expect(res.body.priceMin).toBe(750000);
+    });
+
+    // AC-18
+    it('returns 404 for a product whose every variant is inactive', async () => {
+      const res = await detail(partnerKey, ALL_INACTIVE_CODE).expect(404);
+      expect(res.body.message).toBe(NOT_FOUND_MESSAGE);
+    });
+
+    // AC-25 — products.id, a lowercase code and a variant SKU are all 404.
+    it('rejects products.id, a lowercase code and a variant SKU alike', async () => {
+      const byId = await detail(partnerKey, PRODUCT.inGrandchild).expect(404);
+      expect(byId.body.message).toBe(NOT_FOUND_MESSAGE);
+
+      const byLowercase = await detail(partnerKey, HEEL_CODE.toLowerCase()).expect(404);
+      expect(byLowercase.body.message).toBe(NOT_FOUND_MESSAGE);
+
+      const bySku = await detail(partnerKey, 'PC-HHB2940-38').expect(404);
+      expect(bySku.body.message).toBe(NOT_FOUND_MESSAGE);
+    });
+
+    it('exposes the productCode path parameter and the response schema in the OpenAPI document', () => {
+      const document = SwaggerModule.createDocument(
+        app,
+        new DocumentBuilder().build(),
+      );
+      const path = document.paths['/v2/partner/catalog/products/{productCode}'];
+      expect(path).toBeDefined();
+
+      const operation = path!.get!;
+      expect(
+        operation.parameters?.some(
+          (p) => 'name' in p && p.name === 'productCode' && p.in === 'path',
+        ),
+      ).toBe(true);
+
+      const response = operation.responses['200'] as unknown as {
+        content: { 'application/json': { schema: { $ref: string } } };
+      };
+      expect(response.content['application/json'].schema.$ref).toBe(
+        '#/components/schemas/PartnerProductDetailDto',
+      );
+      const schema = document.components?.schemas?.PartnerProductDetailDto as
+        | { properties?: Record<string, unknown> }
+        | undefined;
+      expect(Object.keys(schema?.properties ?? {})).toEqual(
+        expect.arrayContaining(['description', 'attributes', 'variants']),
+      );
+      expect(operation.responses['404']).toBeDefined();
+    });
+  });
+
+  describe('Partner catalog — permission boundary vs internal inventory endpoints (E2E)', () => {
+    const INVENTORY_SEARCH_URL = '/v2/inventory-items/search';
+    const INVENTORY_PRODUCTS_URL = '/inventory/items/products';
+
+    // AC-20 — a key holding only partner.catalog.read must not reach the
+    // internal endpoints that expose purchasePrice (InventoryItemGroupRowDto,
+    // ProductGroupRow), even though the request is otherwise well-formed: a
+    // whitelisted IP and a body/query these endpoints actually accept. Both
+    // DTOs make every field optional, and neither route carries
+    // `@RequireBranchScope()`, so `{}` / no query is a legitimate call.
+    it('rejects the partner key on both internal inventory endpoints, and still accepts it on the partner endpoint', async () => {
+      await request(app.getHttpServer())
+        .post(INVENTORY_SEARCH_URL)
+        .set('X-Api-Key', partnerKey)
+        .set('X-Forwarded-For', WHITELISTED_IP)
+        .send({})
+        .expect(403);
+
+      await request(app.getHttpServer())
+        .get(INVENTORY_PRODUCTS_URL)
+        .set('X-Api-Key', partnerKey)
+        .set('X-Forwarded-For', WHITELISTED_IP)
+        .expect(403);
+
+      await request(app.getHttpServer())
+        .post(SEARCH_URL)
+        .set('X-Api-Key', partnerKey)
+        .set('X-Forwarded-For', WHITELISTED_IP)
+        .send({})
+        .expect(200);
+    });
+
+    // Positive control: `noPermissionKey` is minted on the seeded admin role
+    // (SEEDED_ROLE_ID), which `seedBaseData` (test-app.ts) grants
+    // `inventory.read` directly. The same request that 403s for partnerKey
+    // above must succeed here — otherwise the 403 could just as well be a
+    // missing header, a validation failure, or the IP whitelist, not the
+    // permission boundary ADR-02 claims.
+    it('accepts a key holding inventory.read on both internal inventory endpoints (positive control)', async () => {
+      // 201, not 200: this POST has no `@HttpCode` override, so Nest's
+      // default Created status applies — confirmed against
+      // inventory-item-search-v2.e2e-spec.ts, which asserts the same 201 for
+      // a successful call to this endpoint.
+      await request(app.getHttpServer())
+        .post(INVENTORY_SEARCH_URL)
+        .set('X-Api-Key', noPermissionKey)
+        .set('X-Forwarded-For', WHITELISTED_IP)
+        .send({})
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .get(INVENTORY_PRODUCTS_URL)
+        .set('X-Api-Key', noPermissionKey)
+        .set('X-Forwarded-For', WHITELISTED_IP)
+        .expect(200);
     });
   });
 });

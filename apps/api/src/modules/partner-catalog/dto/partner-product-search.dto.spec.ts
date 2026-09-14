@@ -88,6 +88,20 @@ describe('PartnerProductSearchDto', () => {
     expect(propsWithErrors({ sizes: many })).toContain('sizes');
   });
 
+  // AC-14 / ADR-08 — body is JSON, so a stray string must fail rather than
+  // silently coerce; there is no @Transform on this field on purpose.
+  it('accepts true and false for inStock', () => {
+    expect(propsWithErrors({ inStock: true })).toHaveLength(0);
+    expect(propsWithErrors({ inStock: false })).toHaveLength(0);
+  });
+
+  it.each([['yes'], ['true'], [1]])(
+    'rejects %p for inStock',
+    (value) => {
+      expect(propsWithErrors({ inStock: value })).toContain('inStock');
+    },
+  );
+
   it('does not accept an internal filter-operator object', () => {
     // The internal surfaces take { operator, value }; the partner contract is
     // deliberately a bare value, and mixing the two must not silently pass.

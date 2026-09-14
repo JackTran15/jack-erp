@@ -6,7 +6,7 @@
 > **Reference storefront:** <https://giaymt.com.vn/> — the shape of these responses is
 > driven by the three screens that site needs (category menu, listing, product page).
 > **Feature plan:** `.ai/features/2026090903-partner-catalog-api/`
-> **Last updated:** 2026-09-09
+> **Last updated:** 2026-09-13
 
 ---
 
@@ -18,11 +18,7 @@ Three read-only endpoints. Nothing here writes.
 | - | -------- | ------- | ------ |
 | 1 | `POST /v2/partner/catalog/categories/tree` | Nested category menu with product counts | **Live** |
 | 2 | `POST /v2/partner/catalog/products/search` | Listing: filter, sort, paginate | **Live** |
-| 3 | `GET /v2/partner/catalog/products/:productId` | Product page: variants + attributes | **Not routable yet** — see §7 |
-
-Endpoint 3's query handler, DTOs and unit tests exist
-(`queries/get-partner-product.handler.ts`, 13 unit tests green), but **no controller is
-registered for it**, so the route does not resolve. Do not integrate against it yet.
+| 3 | `GET /v2/partner/catalog/products/:productCode` | Product page: variants + attributes | **Live** |
 
 ### Why a separate surface
 
@@ -152,6 +148,7 @@ storefront listing works.
 | `priceFrom` / `priceTo` | number ≥ 0 | — | Inclusive, against variant selling price |
 | `colors` | string[] ≤ 50 | — | **Raw ERP colour codes**, see §5 |
 | `sizes` | string[] ≤ 50 | — | Size values as stored, e.g. `"38"` |
+| `inStock` | boolean | — | Stock filter, matched on the **same variant** as `colors`/`sizes`/`priceFrom`/`priceTo`. `true`: only products with at least one variant that matches every other variant-level filter *and* has stock in a branch this key may see — the row describes those variants. `false`: only products that have at least one variant matching every other variant-level filter, and **none** of those matching variants has stock — a product with any in-stock matching variant is excluded; the row describes those (all out-of-stock) variants. Omitted: no stock filtering. Must be a JSON boolean; the string `"true"` is a `400` |
 | `sort` | enum | `newest` | `newest` \| `price_asc` \| `price_desc` |
 | `page` | int ≥ 1 | `1` | |
 | `limit` | int 1–100 | `20` | |
@@ -165,6 +162,13 @@ storefront listing works.
   by "BA in size 39".
 - `priceFrom`/`priceTo` apply to that same variant, so "BA, size 39, under 800k" is one
   coherent statement.
+- When any variant-level filter (`colors`, `sizes`, `priceFrom`, `priceTo`, `inStock`) is
+  present, a product's row describes **only the variants that match all of them**:
+  `priceMin`, `priceMax`, `colors`, `sizes` and `inStock` are computed over that matching
+  set, and `price_asc`/`price_desc` sort by those narrowed prices. `keyword` and
+  `categoryId` are product-level filters — they choose which products appear but never
+  narrow a row. With no variant-level filter present, a row still describes every active
+  variant of the product.
 
 ### Response `200`
 
@@ -195,8 +199,8 @@ storefront listing works.
 | ----- | ----- |
 | `priceMin` / `priceMax` | Numbers, in VND. A **range**, because price lives on the variant, not the product |
 | `categoryId` / `categoryName` | Derived from the variants; `products` has no category column |
-| `colors` / `sizes` | Values across all active variants — see §5 |
-| `inStock` | Boolean only. True when any active variant has stock in any branch the key may see. **No quantity is ever returned** |
+| `colors` / `sizes` | With no variant-level filter (`colors`, `sizes`, `priceFrom`, `priceTo`, `inStock`), values across all active variants. Under any such filter, narrowed to only the matching variants — see §5 |
+| `inStock` | Boolean only. With no variant-level filter, true when any active variant has stock in any branch the key may see. Under a variant-level filter, computed over the matching variants only, and equal to the requested `inStock` value when that filter was set. **No quantity is ever returned** |
 | `images` | **Always `[]`** — see §5 |
 | `total` | Total matching products, not the size of this page. Drives "Hiển thị 1–20 của 107 kết quả" |
 
@@ -218,6 +222,26 @@ Against the reference dataset (`erp_dev_3008`: 4,731 products / 41,718 items /
 
 The attribute join is only added when a `colors`/`sizes` filter is present, which is why
 unfiltered requests stay under 50 ms. Deep paging costs nothing extra at this scale.
+
+**Re-measured 2026-09-13**, after row narrowing and the `inStock` filter: over HTTP with real
+partner API keys against `erp_dev_3008` (organization `f1000000-…0001`: 2,317 sellable products,
+13,013 stock rows), a dedicated build of this checkout on `:4200`, 3 warm-up requests then 20
+measured requests per scenario.
+
+| Scenario | total | p50 | p95 |
+| -------- | ----- | --- | --- |
+| No filter | 2,317 | 35.4 ms | **38.4 ms** |
+| Colour `BA` + size `39` | 52 | 101.1 ms | **105.3 ms** |
+| Colour `BA` + size `39` + `inStock: true` | 18 | 102.4 ms | **106.9 ms** |
+| `inStock: true` | 1,434 | 34.7 ms | **36.1 ms** |
+| `inStock: false` | 883 | 36.1 ms | **40.2 ms** |
+| No filter, `limit: 100` | 2,317 | 47.7 ms | **50.1 ms** |
+| Key limited to 2 branches, `inStock: true` | 899 | 28.5 ms | **30.1 ms** |
+| Key limited to 2 branches, colour + size + `inStock: true` | 0 | 95.4 ms | **97.5 ms** |
+| Product detail by code | — | 3.4 ms | **4.2 ms** |
+
+Stock is resolved once per request as the set of stocked item ids, joined to the variants, so its
+cost grows with the organization's stock rows rather than with the page size.
 
 ---
 
@@ -262,6 +286,17 @@ either normalise before sending or accept the gap. Closing it server-side would 
 - **Sort by popularity is not offered.** Nothing in the schema counts units sold, so the
   value was removed from the contract rather than faked; `sort: "popular"` returns `400`.
 
+### Product detail is keyed by `products.code`, not `products.id`
+
+`GET /v2/partner/catalog/products/:productCode` matches `products.code` **exactly and
+case-sensitively** — no UUID, no variant SKU, and no case-insensitive fallback. A product
+with no `products.code` set **cannot be opened through this endpoint at all**; it still
+appears in search results, with `code: null`.
+
+Codes containing characters reserved in a URL path must be percent-encoded by the
+caller. On the reference dataset no active `products.code` contains anything outside
+`[A-Za-z0-9._~-]`, so this has not been exercised in practice.
+
 ---
 
 ## 6. Errors
@@ -273,11 +308,11 @@ either normalise before sending or accept the gap. Closing it server-side would 
 | Valid key from a non-whitelisted IP | `403` | `Forbidden` |
 | Key lacks `partner.catalog.read` | `403` | `Forbidden` |
 | Unknown field, `limit > 100`, bad `sort`, malformed `categoryId` | `400` | class-validator messages |
-| Product not found / other organization / no active variant | `404` | `Product not found` |
+| `productCode` matches no `products.code` in the caller's organization exactly — an unknown code, a `products.id` UUID, a lowercase (or otherwise re-cased) variant of a real code, and a variant SKU all fall here, since none of them equal any code byte-for-byte — or matches a code that exists only in another organization, or matches a product whose variants are all `is_active = false` | `404` | `Product not found` |
 
-The three `404` cases return an **identical** message on purpose. Answering `403` for
-"belongs to another organization" would confirm that the id exists, which is what an
-enumeration attempt is looking for.
+Every one of these `404` cases returns an **identical** message on purpose. Answering
+`403` for "belongs to another organization" would confirm that the id exists, which is
+what an enumeration attempt is looking for.
 
 ### Guarantees under test
 
@@ -290,14 +325,16 @@ enumeration attempt is looking for.
 
 ---
 
-## 7. Endpoint 3 — Product detail (not yet routable)
-
-The handler and DTOs are written and unit-tested; the controller is not. Once wired, the
-contract will be:
+## 7. Endpoint 3 — Product detail
 
 ```
-GET /v2/partner/catalog/products/:productId
+GET /v2/partner/catalog/products/:productCode
 ```
+
+`:productCode` is matched against `products.code`, exactly and case-sensitively (§5, §6).
+The endpoint takes no request body or query filters; it always returns **every active
+variant** of the product, regardless of anything a caller might otherwise filter a
+listing by.
 
 **Response `200`** — the listing row plus:
 
@@ -326,16 +363,12 @@ exist. Both are needed — the dimension lists alone would imply combinations th
 sold. `variantLabel` is the pre-composed string stored on the variant; use `attributes`
 when you need the parts rather than the label.
 
-Remaining work to make it live: register `GET products/:productId` on
-`PartnerProductV2Controller` (**after** the static `products/search` route — Express 5
-matches in registration order), then regenerate the OpenAPI client.
-
 ---
 
 ## 8. OpenAPI
 
 The live contract is published at `/docs` (Swagger UI) and `/docs-json`, tagged
-**Partner catalog**, with the `api-key` security scheme declared. Both live endpoints
+**Partner catalog**, with the `api-key` security scheme declared. All three endpoints
 return a concrete response schema rather than `unknown`.
 
 After changing any endpoint here: run the API, then `pnpm openapi:generate`, and commit
@@ -355,7 +388,7 @@ another checkout serving `:4000` will silently produce a snapshot of code you di
 | Category subtree expansion (shared) | `category-subtree.util.ts` |
 | Product search | `queries/search-partner-products.{query,handler}.ts`, `dto/partner-product-search.dto.ts` |
 | Sort lookup table | `partner-product-sort.ts` |
-| Stock predicate (shared) | `partner-stock.sql.ts` |
+| Stock predicate (shared) | `partner-stock.sql.ts` — `stockedItemIdsSql` (listing, one `LEFT JOIN`) and `inStockExistsSql` (detail, per-variant `EXISTS`) |
 | Product detail | `queries/get-partner-product.{query,handler}.ts`, `dto/partner-product-detail.dto.ts` |
 | Controllers | `controllers/partner-category-v2.controller.ts`, `controllers/partner-product-v2.controller.ts` |
 | Contract guard | `partner-catalog-contract.spec.ts` |

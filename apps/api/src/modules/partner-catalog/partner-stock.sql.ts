@@ -10,9 +10,7 @@
  * third party leaks commercial information, and the number would be stale the
  * moment it left the server (ADR-06).
  */
-export interface InStockSqlParams {
-  /** SQL expression for the item id, e.g. `ai.id`. */
-  itemIdExpr: string;
+export interface StockScopeParams {
   /** Placeholder holding the organization id, e.g. `$1`. */
   orgParam: string;
   /**
@@ -22,26 +20,54 @@ export interface InStockSqlParams {
   branchParam?: string;
 }
 
+export interface InStockSqlParams extends StockScopeParams {
+  /** SQL expression for the item id, e.g. `ai.id`. */
+  itemIdExpr: string;
+}
+
 /**
+ * The conditions that make a `stock_balances` row count as stock. Both shapes
+ * below are built from this, so they cannot drift apart.
+ *
  * `branch_id` is a varchar on `stock_balances`, not a uuid, so the array cast
  * has to be `varchar[]`; casting to `uuid[]` fails at runtime with a type
  * mismatch that only shows up once a branch filter is actually supplied.
  */
+function stockRowConditions({ orgParam, branchParam }: StockScopeParams): string {
+  const branchClause = branchParam
+    ? `AND sb.branch_id = ANY(${branchParam}::varchar[])`
+    : '';
+  return `sb.organization_id = ${orgParam}
+      AND sb.quantity > 0
+      ${branchClause}`;
+}
+
+/** Per-item form, for a query that reads the flag once per row (the detail). */
 export function inStockExistsSql({
   itemIdExpr,
   orgParam,
   branchParam,
 }: InStockSqlParams): string {
-  const branchClause = branchParam
-    ? `AND sb.branch_id = ANY(${branchParam}::varchar[])`
-    : '';
   return `EXISTS (
     SELECT 1 FROM stock_balances sb
     WHERE sb.item_id = ${itemIdExpr}
-      AND sb.organization_id = ${orgParam}
-      AND sb.quantity > 0
-      ${branchClause}
+      AND ${stockRowConditions({ orgParam, branchParam })}
   )`;
+}
+
+/**
+ * Set form: the id of every item that has stock, once each — for joining.
+ *
+ * Use this where the flag is read more than once per row. Postgres inlines a
+ * CTE that is referenced once, so an `in_stock` column defined as an EXISTS is
+ * re-evaluated at every place the column is read: on erp_dev_3008 (2026-09-13)
+ * the listing with `inStock=true` scanned `stock_balances` six times and took
+ * 654 ms, against 34 ms when the flag came from a `LEFT JOIN` on this set.
+ * DISTINCT because an item holds one balance row per location.
+ */
+export function stockedItemIdsSql(scope: StockScopeParams): string {
+  return `SELECT DISTINCT sb.item_id FROM stock_balances sb
+    WHERE ${stockRowConditions(scope)}`;
 }
 
 /**

@@ -14,7 +14,7 @@ import {
   ATTRIBUTE_SIZE,
 } from '../partner-catalog.constants';
 import { resolveProductOrderBy } from '../partner-product-sort';
-import { inStockExistsSql, resolveStockBranchIds } from '../partner-stock.sql';
+import { resolveStockBranchIds, stockedItemIdsSql } from '../partner-stock.sql';
 import { SearchPartnerProductsQuery } from './search-partner-products.query';
 
 interface CountRow {
@@ -30,6 +30,8 @@ interface RawProductRow {
   priceMin: number;
   priceMax: number;
   inStock: boolean;
+  /** Ids of the matching active variants; internal, never reaches the DTO. */
+  matchedItemIds: string[] | null;
 }
 
 interface FacetRow {
@@ -42,9 +44,28 @@ export interface ProductSearchSqlParts {
   where: string[];
   having: string[];
   orderBy: string;
-  inStockExpr: string;
+  /**
+   * `SELECT DISTINCT item_id` of every stocked item (partner-stock.sql.ts),
+   * joined once into `active_items` to produce the `in_stock` column.
+   */
+  stockedItemsSql: string;
   /** Placeholders for the colour/size dimension-name alias arrays, when filtering. */
   attributeNames?: { colorParam: string; sizeParam: string };
+  /**
+   * The variant-level "match" expression `m`, evaluated per `active_items`
+   * row: the AND of every active colour/size/price predicate, plus
+   * `ai.in_stock` when `inStock=true`. The builder applies it as
+   * `FILTER (WHERE m)` on `agg`'s MIN/MAX/bool_or, and the handler builds
+   * membership from this same string — except for `inStock=false`, whose
+   * membership is an inverted test the builder never sees. There `m` stays the
+   * colour/size/price match, because `bool_or(m AND NOT in_stock)` as
+   * membership is exactly the definition ADR-08 rejects; for every row that
+   * passes the inverted test the matching variants are all out of stock
+   * anyway, so the FILTERs describe the same variants either way.
+   * `undefined` when no variant-level filter is present, in which case `agg`
+   * carries no FILTER at all (ADR-07).
+   */
+  variantMatch?: string;
 }
 
 /**
@@ -53,17 +74,26 @@ export interface ProductSearchSqlParts {
  * Two facts about this schema drive the shape:
  *
  *  - Price lives on the VARIANT (`items.selling_price`), never on the product,
- *    so a product's price is a MIN/MAX range across its active variants.
+ *    so a product's price is a MIN/MAX range across its matching active
+ *    variants (all of them when no variant-level filter is set).
  *  - Category also lives on the variant (`items.category_id`); `products` has
  *    no category column at all.
  *
  * `::float` on the money columns is load-bearing: TypeORM returns `numeric` as
  * a *string*, which would put `"750000.00"` into the partner's JSON.
  *
- * Every product-level predicate goes in HAVING, never inside `active_items`.
- * Filtering the variant set would recompute MIN/MAX over only the matching
- * variants, so searching for "size 39" would silently change the product's
- * displayed price range.
+ * Variant-level predicates — colour, size, price, and `inStock=true` — are
+ * ANDed into one "match" expression `m` (`variantMatch`), applied as
+ * `FILTER (WHERE m)` on the MIN/MAX/bool_or in `agg`; the handler derives
+ * membership from the same `m`. Under a filter, `priceMin`/`priceMax`/
+ * `inStock` narrow to the matching variants on purpose: a row under
+ * `colors=['BA']` describes the BA variants, not every active variant of the
+ * product (ADR-07). `inStock=false` is variant-level too but needs an
+ * inverted membership test the builder does not construct here — the handler
+ * passes `m` for colour/size/price only, alongside a `HAVING` clause it built itself (ADR-08). Product-
+ * level predicates — `keyword`, `categoryId` — stay in `HAVING` alone and
+ * never enter `active_items` or `m`: they choose which products appear
+ * without changing what a chosen product's row reports (A-19).
  *
  * Items with no parent product (`product_id IS NULL`) are out of scope: the
  * storefront sells products, and a standalone stock row has no product page.
@@ -72,7 +102,14 @@ export function buildProductSearchSql(parts: ProductSearchSqlParts): {
   dataSql: string;
   countSql: string;
 } {
-  const { where, having, orderBy, inStockExpr, attributeNames } = parts;
+  const {
+    where,
+    having,
+    orderBy,
+    stockedItemsSql,
+    attributeNames,
+    variantMatch,
+  } = parts;
   const whereSql = where.length > 0 ? `AND ${where.join(' AND ')}` : '';
   const havingSql = having.length > 0 ? `HAVING ${having.join(' AND ')}` : '';
 
@@ -106,12 +143,33 @@ export function buildProductSearchSql(parts: ProductSearchSqlParts): {
     ? 'LEFT JOIN item_attrs ia ON ia.item_id = i.id'
     : '';
 
+  // `m`: shared verbatim between the FILTER clauses below and `HAVING
+  // bool_or(m)`, so membership and the narrowed price/stock can never
+  // disagree with each other.
+  const filterSql = variantMatch ? ` FILTER (WHERE ${variantMatch})` : '';
+  const priceMinExpr = variantMatch
+    ? `(MIN(ai.selling_price)${filterSql})::float`
+    : `MIN(ai.selling_price)::float`;
+  const priceMaxExpr = variantMatch
+    ? `(MAX(ai.selling_price)${filterSql})::float`
+    : `MAX(ai.selling_price)::float`;
+  // Same `filterSql` as priceMin/priceMax/inStock above: with no variant-level
+  // filter this is every active variant, which is what the facet query needs
+  // to reproduce the unfiltered shape (ADR-07).
+  const matchedItemIdsExpr = `array_agg(ai.id)${filterSql}`;
+
+  // `in_stock` comes from one LEFT JOIN on the stocked-item set, not an EXISTS
+  // column: Postgres inlines active_items, and an EXISTS column is re-evaluated
+  // at every read of ai.in_stock (FILTERs, matchedItemIds, HAVING) — six
+  // stock_balances scans and 654 ms for inStock=true on erp_dev_3008 (T-06-03).
   const cte = `
     WITH ${attrCte}
     active_items AS (
       SELECT i.id, i.product_id, i.code, i.category_id, i.selling_price,
-             ${attrCols}
+             ${attrCols},
+             (stk.item_id IS NOT NULL) AS in_stock
       FROM items i
+      LEFT JOIN (${stockedItemsSql}) stk ON stk.item_id = i.id
       ${attrJoin}
       WHERE i.organization_id = $1
         AND i.is_active = true
@@ -123,14 +181,15 @@ export function buildProductSearchSql(parts: ProductSearchSqlParts): {
         p.code,
         p.name,
         p.created_at,
-        MIN(ai.selling_price)::float AS "priceMin",
-        MAX(ai.selling_price)::float AS "priceMax",
+        ${priceMinExpr} AS "priceMin",
+        ${priceMaxExpr} AS "priceMax",
         -- Category of the lowest-coded variant that actually has one, so a
         -- product whose variants span categories still reports one stable value.
         (array_agg(ai.category_id ORDER BY ai.code ASC)
            FILTER (WHERE ai.category_id IS NOT NULL))[1] AS "categoryId",
-        -- A product is in stock when ANY active variant is.
-        bool_or(${inStockExpr}) AS "inStock"
+        -- A product is in stock when ANY matching active variant is.
+        bool_or(ai.in_stock)${filterSql} AS "inStock",
+        ${matchedItemIdsExpr} AS "matchedItemIds"
       FROM products p
       JOIN active_items ai ON ai.product_id = p.id
       WHERE p.organization_id = $1
@@ -145,7 +204,7 @@ export function buildProductSearchSql(parts: ProductSearchSqlParts): {
     dataSql: `
       ${cte}
       SELECT a.id, a.code, a.name, a."priceMin", a."priceMax",
-             a."categoryId", a."inStock", c.name AS "categoryName"
+             a."categoryId", a."inStock", a."matchedItemIds", c.name AS "categoryName"
       FROM agg a
       LEFT JOIN inventory_item_categories c ON c.id = a."categoryId"
       ORDER BY ${orderBy}
@@ -161,11 +220,16 @@ export function buildProductSearchSql(parts: ProductSearchSqlParts): {
 /**
  * Colour and size values for the products on the current page.
  *
- * Run as a second, tiny query keyed on the page's product ids rather than
- * aggregated into the main statement. Postgres will not nest an aggregate
- * inside an aggregate, so collecting per-product arrays in the grouped query
- * needs contortions; twenty ids and one indexed lookup is both faster to run
- * and far easier to read.
+ * Run as a second, tiny query keyed on the matched variant ids the main query
+ * returned per row, rather than aggregated into the main statement. Postgres
+ * will not nest an aggregate inside an aggregate, so collecting per-product
+ * arrays in the grouped query needs contortions; a handful of ids and one
+ * indexed lookup is both faster to run and far easier to read.
+ *
+ * Keyed on `items.id`, not `product_id`: under a variant-level filter a
+ * product's matched variants are a subset of its active ones, and re-deriving
+ * that subset here from `product_id` alone would reintroduce the bug this
+ * ticket exists to fix (ADR-07).
  */
 const FACETS_SQL = `
   SELECT
@@ -180,7 +244,7 @@ const FACETS_SQL = `
   JOIN product_attribute_definitions d ON d.id = iav.attribute_definition_id
   WHERE i.organization_id = $1
     AND i.is_active = true
-    AND i.product_id = ANY($4::uuid[])
+    AND i.id = ANY($4::uuid[])
   GROUP BY i.product_id
 `;
 
@@ -275,8 +339,37 @@ export class SearchPartnerProductsHandler
       params.push(dto.priceTo);
       variantPredicates.push(`ai.selling_price <= $${params.length}`);
     }
-    if (variantPredicates.length > 0) {
-      having.push(`bool_or(${variantPredicates.join(' AND ')})`);
+    // `m`: the AND of every active colour/size/price predicate, shared,
+    // verbatim, with the FILTER clauses that narrow priceMin/priceMax/inStock
+    // to the matching variants (ADR-07). No predicates means no `m` at all, so
+    // the unfiltered query keeps its unfiltered shape.
+    const variantMatchBase =
+      variantPredicates.length > 0
+        ? variantPredicates.join(' AND ')
+        : undefined;
+
+    // `inStock=true` folds straight into `m`, same as colour/size/price.
+    // `inStock=false` cannot: "false" means the matching variants (if any)
+    // are ALL out of stock, which is an inverted test — bool_or(m) AND NOT
+    // bool_or(m AND in_stock) — not another AND term inside `m`. Folding `NOT
+    // in_stock` into `m` would make membership "some matching variant is out
+    // of stock", the definition ADR-08 rejects. The FILTERs keep plain `m`: for
+    // every row this HAVING admits, those variants are all out of stock, so
+    // narrowing by stock as well would describe exactly the same variants.
+    let variantMatch = variantMatchBase;
+    if (dto.inStock === true) {
+      variantMatch = variantMatchBase
+        ? `${variantMatchBase} AND ai.in_stock`
+        : 'ai.in_stock';
+      having.push(`bool_or(${variantMatch})`);
+    } else if (dto.inStock === false) {
+      having.push(
+        variantMatchBase
+          ? `bool_or(${variantMatchBase}) AND NOT bool_or(${variantMatchBase} AND ai.in_stock)`
+          : 'NOT bool_or(ai.in_stock)',
+      );
+    } else if (variantMatch) {
+      having.push(`bool_or(${variantMatch})`);
     }
 
     // Stock is scoped to the branches this credential may see. X-Branch-Id
@@ -293,12 +386,11 @@ export class SearchPartnerProductsHandler
       where,
       having,
       orderBy: resolveProductOrderBy(dto.sort),
-      inStockExpr: inStockExistsSql({
-        itemIdExpr: 'ai.id',
-        orgParam: '$1',
-        branchParam,
-      }),
+      // Joined once into `active_items` as the `in_stock` column; FILTER and
+      // HAVING read that column, never a stock subquery of their own.
+      stockedItemsSql: stockedItemIdsSql({ orgParam: '$1', branchParam }),
       attributeNames,
+      variantMatch,
     });
 
     const paginated = dataSql
@@ -316,7 +408,7 @@ export class SearchPartnerProductsHandler
 
     const facets = await this.loadFacets(
       actor.organizationId,
-      rows.map((r) => r.id),
+      rows.flatMap((r) => r.matchedItemIds ?? []),
     );
 
     return {
@@ -329,14 +421,14 @@ export class SearchPartnerProductsHandler
 
   private async loadFacets(
     organizationId: string,
-    productIds: string[],
+    matchedItemIds: string[],
   ): Promise<Map<string, FacetRow>> {
-    if (productIds.length === 0) return new Map();
+    if (matchedItemIds.length === 0) return new Map();
     const rows = await this.items.manager.query<FacetRow[]>(FACETS_SQL, [
       organizationId,
       COLOR_ALIASES,
       SIZE_ALIASES,
-      productIds,
+      matchedItemIds,
     ]);
     return new Map(rows.map((r) => [r.productId, r]));
   }
