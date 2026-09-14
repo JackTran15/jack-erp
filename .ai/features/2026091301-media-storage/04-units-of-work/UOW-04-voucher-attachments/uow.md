@@ -47,7 +47,8 @@ rollback: Revert các commit của UoW. `attachmentIds` quay về nhận UUID b�
 ## Definition of done
 - [ ] AC-13, AC-14, AC-15, AC-16, AC-17 pass
 - [ ] Cả 7 loại chứng từ đính kèm và mở lại được file trong demo
-- [ ] Số dòng `attachment_ids <> '[]'` của 7 bảng được ghi lại trước khi bắt đầu
+- [x] Số dòng `attachment_ids <> '[]'` của 7 bảng được ghi lại trước khi bắt đầu
+  - 2026-09-14 trên `erp_dev`, trước khi code: goods_receipts 0 (T-04-02); transfer_orders 0, stock_transfers 0 (T-04-03); cash_receipts 0, cash_payments 0 (T-04-04); bank_receipts 0, bank_payments 0 (T-04-05). Production chưa đo; phải đo lại trước khi triển khai (runbook T-05-02).
 - [ ] `pnpm --filter @erp/api test`, `pnpm --filter @erp/api test:e2e`, `pnpm --filter @erp/backoffice-web build` xanh
 - [ ] Demo và nghiệm thu tại gate G4
 - [ ] **Trước merge — client** (T-04-01): sau khi rebase lên `main`, `schema.ts` + `openapi.snapshot.json` được sinh lại
