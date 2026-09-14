@@ -46,3 +46,5 @@ rollback: Revert các commit của UoW. Service cũ bỏ qua `imageIds` trong pa
 - [ ] Payload lưu hàng hoá chỉ chứa `imageIds`, không chứa `File` hay data URL
 - [ ] `pnpm --filter @erp/api test` và `pnpm --filter @erp/backoffice-web build` xanh
 - [ ] Demo và nghiệm thu tại gate G4
+- [ ] **Trước merge — e2e** (T-02-03): chạy toàn bộ e2e trên `main` và trên nhánh, cùng lượt với UOW-01; không suite nào PASS trên `main` mà FAIL trên nhánh.
+- [ ] **Trước merge — trình duyệt** (T-02-02): với phiên đăng nhập có `inventory.write`: AC-01 tạo hàng hoá 3 ảnh rồi mở lại thấy đúng 3 ảnh; AC-02 file không phải ảnh, ảnh > 2 MB, ảnh thứ 11 bị chặn với đúng thông báo cũ; AC-04 xoá 1 ảnh, lưu, mở lại còn 2; "Lưu và nhân bản" tạo bản sao không kèm ảnh.

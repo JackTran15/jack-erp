@@ -66,3 +66,4 @@ link đọc). Ảnh nhân viên được chọn làm lát cắt đầu tiên vì
 - [ ] **Trước merge — e2e** (T-01-11): `MEDIA_S3_ENDPOINT=http://127.0.0.1:1 pnpm --filter @erp/api test:e2e -- media-upload`
   xanh trên code cuối; chạy toàn bộ e2e trên `main` và trên nhánh (không chạy API dev song song vì dùng chung consumer
   group Kafka), không suite nào PASS trên `main` mà FAIL trên nhánh. `main` đã có suite FAIL sẵn (xem T-01-11).
+  - 2026-09-14: `media-upload` chạy lại trên code cuối (trong lượt T-02-03) → 1/1 suite, 5/5 test. Phần so sánh toàn bộ còn nợ.

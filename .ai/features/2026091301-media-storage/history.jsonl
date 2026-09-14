@@ -34,3 +34,13 @@
 {"action": "ticket done (review bypassed)", "at": "2026-09-14T09:11:16", "by": "Claude", "gate": "G4", "id": "f0d3bcdba4b5", "ticket": "T-01-11", "ts": "2026-09-14T09:11:16.644981"}
 {"action": "ticket done (review bypassed)", "at": "2026-09-14T09:11:16", "by": "Claude", "gate": "G4", "id": "ff307dd40d19", "ticket": "T-03-02", "ts": "2026-09-14T09:11:16.769659"}
 {"action": "ticket done (review bypassed)", "at": "2026-09-14T09:11:16", "by": "Claude", "gate": "G4", "id": "00cb21f1b190", "ticket": "T-04-01", "ts": "2026-09-14T09:11:16.895339"}
+{"action": "ticket in_progress", "at": "2026-09-14T09:12:10", "by": "Claude", "gate": "G4", "id": "fe074b74f8c6", "ticket": "T-01-10", "ts": "2026-09-14T09:12:10.657978"}
+{"action": "ticket in_progress", "at": "2026-09-14T09:12:10", "by": "Claude", "gate": "G4", "id": "10026bb509ad", "ticket": "T-02-02", "ts": "2026-09-14T09:12:10.727277"}
+{"action": "ticket in_progress", "at": "2026-09-14T09:12:10", "by": "Claude", "gate": "G4", "id": "7ca46b8dcaf9", "ticket": "T-02-03", "ts": "2026-09-14T09:12:10.798954"}
+{"action": "ticket in_progress", "at": "2026-09-14T09:12:10", "by": "Claude", "gate": "G4", "id": "0a625daf19d3", "ticket": "T-04-02", "ts": "2026-09-14T09:12:10.868144"}
+{"action": "ticket in_progress", "at": "2026-09-14T09:12:10", "by": "Claude", "gate": "G4", "id": "8f480fb103fc", "ticket": "T-04-03", "ts": "2026-09-14T09:12:10.937437"}
+{"action": "ticket in_progress", "at": "2026-09-14T09:12:11", "by": "Claude", "gate": "G4", "id": "aa267ddf12d2", "ticket": "T-04-04", "ts": "2026-09-14T09:12:11.006484"}
+{"action": "ticket in_progress", "at": "2026-09-14T09:12:11", "by": "Claude", "gate": "G4", "id": "9a898a0a7e52", "ticket": "T-04-05", "ts": "2026-09-14T09:12:11.076819"}
+{"action": "ticket in_progress", "at": "2026-09-14T09:12:11", "by": "Claude", "gate": "G4", "id": "d6d25919927d", "ticket": "T-04-06", "ts": "2026-09-14T09:12:11.146157"}
+{"action": "ticket review", "at": "2026-09-14T09:26:14", "by": "claude-sonnet-5", "gate": "G4", "id": "b2227f942117", "ticket": "T-04-05", "ts": "2026-09-14T09:26:14.042660"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-14T09:30:23", "by": "Claude", "gate": "G4", "id": "8a31d983a1aa", "ticket": "T-02-03", "ts": "2026-09-14T09:30:23.700336"}
