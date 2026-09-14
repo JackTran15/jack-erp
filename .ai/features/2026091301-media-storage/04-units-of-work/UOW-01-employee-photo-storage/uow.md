@@ -62,7 +62,9 @@ link đọc). Ảnh nhân viên được chọn làm lát cắt đầu tiên vì
 - [ ] **Trước merge — trình duyệt** (T-01-09): với phiên đăng nhập có `iam.user.write` hoặc `inventory.write`, (1) tải
   một file thật tới `/erp-media-private` và thấy request không có `Authorization`, `X-Branch-Id`, `X-Idempotency-Key`;
   (2) tắt MinIO, chọn file → "Không thể tải tệp lên lúc này.", form không vỡ.
-- [ ] **Trước merge — build** (T-01-09): `pnpm --filter @erp/backoffice-web build` xanh toàn app (lỗi `user-form.ts(55,5)` hết sau T-01-10).
+- [ ] **Trước merge — trình duyệt** (T-01-10): với phiên đăng nhập có `iam.user.write`: AC-09 chọn ảnh, lưu, tải lại → ảnh vẫn hiện; lưu mà không đổi ảnh thì payload không có khoá `photoMediaId`, gỡ ảnh thì gửi `null`; nút lưu bị khoá khi đang tải ảnh; AC-11 nhân viên có `photo_url` đã NULL hiện placeholder.
+- [x] **Trước merge — build** (T-01-09): `pnpm --filter @erp/backoffice-web build` xanh toàn app (lỗi `user-form.ts(55,5)` hết sau T-01-10).
+  - 2026-09-14: coordinator chạy `pnpm --filter @erp/backoffice-web build` đầy đủ sau khi T-01-10, T-02-02 và T-04-06 xong → exit 0, `✓ built in 5.47s`.
 - [ ] **Trước merge — e2e** (T-01-11): `MEDIA_S3_ENDPOINT=http://127.0.0.1:1 pnpm --filter @erp/api test:e2e -- media-upload`
   xanh trên code cuối; chạy toàn bộ e2e trên `main` và trên nhánh (không chạy API dev song song vì dùng chung consumer
   group Kafka), không suite nào PASS trên `main` mà FAIL trên nhánh. `main` đã có suite FAIL sẵn (xem T-01-11).

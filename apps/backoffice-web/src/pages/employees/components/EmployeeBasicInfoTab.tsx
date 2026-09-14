@@ -1,7 +1,8 @@
 import { DateTimeField, FormField, FormFieldProps, Input, cn } from "@erp/ui";
 import { RadioGroup } from "../../../components/forms/RadioGroup";
-import { Eye, EyeOff, Upload } from "lucide-react";
-import { useRef, useState } from "react";
+import { Eye, EyeOff, Loader2, Upload, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useMediaUpload } from "../../../lib/media/useMediaUpload";
 import { formatEmploymentStatus } from "../employee.mappers";
 import {
   EmploymentStatusEnum,
@@ -15,6 +16,9 @@ interface EmployeeBasicInfoTabProps {
   onChange: (draft: EmployeeFormDraft) => void;
   isEdit: boolean;
   isGeneratingCode?: boolean;
+  /** Whether the employee record (edit mode) has finished loading; always true in create mode. Gates the photo picker's trigger button so it can't fire before `currentPhoto` reflects the real record. */
+  isRecordReady: boolean;
+  onPhotoUploadingChange: (isUploading: boolean) => void;
 }
 
 const EMPLOYMENT_OPTIONS = Object.values(EmploymentStatusEnum);
@@ -65,6 +69,8 @@ export function EmployeeBasicInfoTab({
   onChange,
   isEdit,
   isGeneratingCode = false,
+  isRecordReady,
+  onPhotoUploadingChange,
 }: EmployeeBasicInfoTabProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -90,10 +96,47 @@ export function EmployeeBasicInfoTab({
     }
   };
 
+  const { files: photoFiles, add: addPhoto, remove: removePhoto, isUploading: isUploadingPhoto } =
+    useMediaUpload("EMPLOYEE_PROFILE", basic.currentPhoto ? [basic.currentPhoto] : undefined);
+
+  const activePhoto = photoFiles.find((f) => f.status !== "error");
+  const photoError = [...photoFiles].reverse().find((f) => f.status === "error")?.error;
+  const uploadedPhotoMediaId = photoFiles.find((f) => f.status === "done")?.mediaId;
+  const currentPhotoId = basic.currentPhoto?.id;
+  const hasPendingPhotoUpload = photoFiles.some((f) => f.status === "uploading");
+
+  /**
+   * Mirrors the hook's attachment state into `photoMediaId`, the field the
+   * save payload actually reads. Only fires once an upload settles: while one
+   * is in flight there is briefly no "done" entry even mid-replace, and
+   * reacting to that would send `null` (delete) before the new id is known.
+   */
+  useEffect(() => {
+    if (hasPendingPhotoUpload) return;
+    const nextPhotoMediaId = uploadedPhotoMediaId
+      ? uploadedPhotoMediaId === currentPhotoId
+        ? undefined
+        : uploadedPhotoMediaId
+      : currentPhotoId
+        ? null
+        : undefined;
+    if (nextPhotoMediaId !== basic.photoMediaId) {
+      onChange(setBasic(draft, { photoMediaId: nextPhotoMediaId }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uploadedPhotoMediaId, currentPhotoId, hasPendingPhotoUpload]);
+
+  useEffect(() => {
+    onPhotoUploadingChange(isUploadingPhoto);
+  }, [isUploadingPhoto, onPhotoUploadingChange]);
+
   const handlePhoto = (file: File | undefined) => {
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    onChange(setBasic(draft, { photoDataUrl: url }));
+    addPhoto([file]);
+  };
+
+  const handleRemovePhoto = () => {
+    if (activePhoto) removePhoto(activePhoto.localId);
   };
 
   const fieldProps: Partial<FormFieldProps> = {
@@ -143,33 +186,65 @@ export function EmployeeBasicInfoTab({
           <input
             ref={fileRef}
             type="file"
-            accept=".jpg,.jpeg,.png,.gif"
+            accept=".jpg,.jpeg,.png,.webp"
             className="hidden"
-            onChange={(e) => handlePhoto(e.target.files?.[0])}
+            onChange={(e) => {
+              handlePhoto(e.target.files?.[0]);
+              e.target.value = "";
+            }}
           />
-          <button
-            type="button"
-            className={cn(
-              "flex h-28 w-full flex-col items-center justify-center gap-2 rounded-md border border-dashed border-input",
-              "bg-muted/20 px-2 text-center text-xs text-muted-foreground hover:bg-muted/40",
+          <div className="relative h-28 w-full">
+            <button
+              type="button"
+              disabled={!isRecordReady || Boolean(activePhoto)}
+              className={cn(
+                "flex h-28 w-full flex-col items-center justify-center gap-2 rounded-md border border-dashed border-input",
+                "bg-muted/20 px-2 text-center text-xs text-muted-foreground hover:bg-muted/40 disabled:cursor-default disabled:opacity-70",
+              )}
+              onClick={() => fileRef.current?.click()}
+            >
+              {activePhoto ? (
+                <img
+                  src={activePhoto.previewUrl}
+                  alt=""
+                  className="max-h-24 max-w-full object-contain"
+                />
+              ) : !isRecordReady ? (
+                <>
+                  <Loader2 className="h-6 w-6 animate-spin opacity-50" />
+                  <span>Đang tải...</span>
+                </>
+              ) : (
+                <>
+                  <Upload className="h-8 w-8 opacity-50" />
+                  <span>
+                    Định dạng ảnh (.jpg, .jpeg, .png, .webp) và dung lượng tối đa 5MB
+                  </span>
+                </>
+              )}
+            </button>
+            {activePhoto && (
+              <button
+                type="button"
+                aria-label="Bỏ ảnh"
+                className="absolute right-1 top-1 rounded-full bg-background/80 p-1 text-muted-foreground hover:text-destructive"
+                onClick={handleRemovePhoto}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
             )}
-            onClick={() => fileRef.current?.click()}
-          >
-            {basic.photoDataUrl ? (
-              <img
-                src={basic.photoDataUrl}
-                alt=""
-                className="max-h-24 max-w-full object-contain"
-              />
-            ) : (
-              <>
-                <Upload className="h-8 w-8 opacity-50" />
-                <span>
-                  Định dạng ảnh (.jpg, .jpeg, .png, .gif) và dung lượng &lt; 5MB
-                </span>
-              </>
+            {activePhoto?.status === "uploading" && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-md bg-background/40">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
             )}
-          </button>
+          </div>
+          {photoError && !activePhoto && (
+            <p className="text-xs text-destructive">{photoError}</p>
+          )}
+          {isUploadingPhoto && (
+            <p className="text-xs text-muted-foreground">Đang tải ảnh lên...</p>
+          )}
         </FormField>
       </div>
 
