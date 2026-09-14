@@ -54,3 +54,5 @@ rollback: Revert các commit của UoW. `attachmentIds` quay về nhận UUID b�
 - [ ] Demo và nghiệm thu tại gate G4
 - [ ] **Trước merge — client** (T-04-01): sau khi rebase lên `main`, `schema.ts` + `openapi.snapshot.json` được sinh lại
   (cùng một lần sinh với UOW-01 và UOW-03) và có `GET /media/{id}/download-url`.
+- [ ] **Trước merge — trình duyệt** (T-04-07, T-04-08): với phiên đăng nhập có quyền ghi và đọc từng loại chứng từ, mỗi dialog trong 7 dialog đính kèm 1 file, lưu, mở lại thấy file và tải về được, so checksum với file gốc (AC-13, AC-14); chứng từ ở trạng thái kết thúc hoặc đã đảo hiện danh sách chỉ đọc; nút lưu bị khoá khi đang tải file.
+- [ ] **Trước merge — e2e** (T-04-09): chạy toàn bộ e2e trên `main` và trên nhánh, cùng lượt với UOW-01 và UOW-02; không suite nào PASS trên `main` mà FAIL trên nhánh.
