@@ -1,14 +1,39 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
 } from 'class-validator';
+
+/**
+ * Cờ BA TRẠNG THÁI: `undefined` = không lọc, `true`/`false` = lọc.
+ *
+ * KHÁC `inStockOnly` của `MobileSalesItemListQueryDto`, vốn ép mọi giá trị lạ
+ * về `false` — cờ đó chỉ có hai trạng thái nên làm vậy là đúng. Ở đây "không
+ * lọc" là một trạng thái RIÊNG, nên nuốt giá trị lạ thành `false` sẽ lặng lẽ
+ * đổi "Tất cả" thành "Ngừng kinh doanh".
+ *
+ * Giá trị không đọc được thì trả NGUYÊN VĂN để `@IsBoolean` bắt và ném 400,
+ * chứ không trả `undefined`: `?isActive=xyz` là lỗi ở client, và im lặng trả
+ * về toàn bộ danh sách là giấu nó đi.
+ */
+const parseTriStateBool = ({ value }: { value: unknown }): unknown => {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value === 'boolean') return value;
+
+  const normalized = String(value).toLowerCase();
+  if (normalized === 'true' || normalized === '1') return true;
+  if (normalized === 'false' || normalized === '0') return false;
+
+  return value;
+};
 
 /**
  * Tiêu chí sắp xếp do SERVER quyết, không phải client.
@@ -65,4 +90,44 @@ export class MobileProductListQueryDto {
   @IsString()
   @MaxLength(200)
   search?: string;
+
+  /**
+   * Chỉ giữ hàng thuộc MỘT nhóm hàng hoá (`items.category_id`).
+   *
+   * Nhóm lấy từ `GET /mobile/item-categories/tree`. Bỏ trống = *Tất cả nhóm*.
+   *
+   * **Lọc theo ĐÚNG nhóm đó, KHÔNG gồm nhóm con** — cùng luật với
+   * `MobileSalesItemListQueryDto.categoryId`, và cố ý khác
+   * `MobileInventoryProductListQueryDto.categoryId` (bên đó gồm cả cây con).
+   * Hai màn hỏi hai câu khác nhau: màn tồn kho hỏi "kho còn gì dưới nhánh
+   * này", còn màn danh mục hỏi "những hàng nào ĐƯỢC XẾP vào nhóm này".
+   *
+   * Mặt hàng thật luôn gắn vào nhóm LÁ, nên khác biệt chỉ lộ ra khi người dùng
+   * chọn một nhóm cha.
+   */
+  @ApiPropertyOptional({ format: 'uuid', description: 'Lọc theo nhóm hàng hoá' })
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
+  /**
+   * Lọc theo trạng thái kinh doanh. Bỏ trống = *Tất cả*.
+   *
+   * **Mặc định KHÔNG lọc, và đó là chủ ý** — [MobileProductService.list] đã ghi
+   * lý do: đây là màn quản lý danh mục, một mặt hàng biến mất khỏi danh sách
+   * thì người dùng không còn đường nào tìm lại nó. Web cũng gửi
+   * `includeInactive: true`.
+   *
+   * **Cạm bẫy của `true`:** nhánh mẫu mã của CTE tính `bool_and(i.is_active)`,
+   * nên một mẫu mã mười biến thể chỉ cần MỘT biến thể ngừng kinh doanh là cả
+   * mẫu mã rơi khỏi `isActive = true`. Đây là cùng cột mà web lọc, nên hai bên
+   * vẫn khớp nhau — đừng "sửa cho hợp lý" bằng `bool_or`.
+   */
+  @ApiPropertyOptional({
+    description: 'true = đang kinh doanh, false = ngừng, bỏ trống = tất cả',
+  })
+  @IsOptional()
+  @Transform(parseTriStateBool)
+  @IsBoolean()
+  isActive?: boolean;
 }

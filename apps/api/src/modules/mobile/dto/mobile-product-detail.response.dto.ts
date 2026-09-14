@@ -4,10 +4,16 @@ import { ApiProperty } from '@nestjs/swagger';
  * Một biến thể của mẫu mã, theo hình dạng bảng "THUỘC TÍNH" của app vẽ ra:
  * nhãn phân loại, giá mua, giá bán — cộng mã và khoá định danh.
  *
- * NĂM trường, không hơn. Cố ý KHÔNG trả `unit`, `weightGram`, `barcode`…:
- * chúng là dữ liệu của MẪU MÃ (lấy ở item đại diện, xem
- * [MobileProductDetailResponseDto]) và lặp lại ở từng biến thể chỉ làm phình
- * response với mẫu mã nhiều size.
+ * Cố ý KHÔNG trả `unit`, `weightGram`, `barcode`…: chúng là dữ liệu của MẪU MÃ
+ * (lấy ở item đại diện, xem [MobileProductDetailResponseDto]) và lặp lại ở từng
+ * biến thể chỉ làm phình response với mẫu mã nhiều size.
+ *
+ * [color] và [size] là NGOẠI LỆ có khai báo của câu trên, và chúng phục vụ màn
+ * SỬA chứ không phải màn chi tiết: form phải dựng lại đúng các chip
+ * `Màu sắc`/`Size` người dùng đã gõ, mà [variantLabel] là chuỗi ĐÃ GHÉP nên
+ * tách ngược không an toàn — một giá trị chip tự chứa dấu ngăn cách là hỏng.
+ * Cũng là lý do hai trường này rời nhau chứ không gộp: khoá biến thể ở
+ * `ItemCrudService` là `${color}__${size}`, hai vế độc lập.
  */
 export class MobileProductVariantDto {
   @ApiProperty({ format: 'uuid', description: 'id của item biến thể' })
@@ -29,6 +35,20 @@ export class MobileProductVariantDto {
 
   @ApiProperty({ description: 'Giá bán của riêng biến thể này' })
   sellingPrice!: number;
+
+  @ApiProperty({
+    nullable: true,
+    description:
+      'Giá trị thuộc tính `Color` của biến thể, vd "Nâu". `null` khi mẫu mã ' +
+      'không khai chiều màu sắc',
+  })
+  color!: string | null;
+
+  @ApiProperty({
+    nullable: true,
+    description: 'Giá trị thuộc tính `Size`, vd "39". `null` như [color]',
+  })
+  size!: string | null;
 }
 
 /**
@@ -89,6 +109,21 @@ export class MobileProductDetailResponseDto {
   })
   categoryName!: string | null;
 
+  /**
+   * Định danh nhóm hàng, cặp với [categoryName].
+   *
+   * Màn chi tiết chỉ cần cái TÊN, nhưng màn SỬA cần cái ID: danh mục thật có
+   * HAI nhóm con cùng tên `Nón`, nên tra ngược từ tên là chọn nhầm một trong
+   * hai. Thiếu trường này thì mở màn chọn nhóm từ một hàng hoá đang có nhóm sẽ
+   * không dòng nào được tô sẵn.
+   */
+  @ApiProperty({
+    format: 'uuid',
+    nullable: true,
+    description: 'Id nhóm hàng hoá — thứ màn Sửa cần. `null` = chưa xếp nhóm',
+  })
+  categoryId!: string | null;
+
   @ApiProperty({ description: 'Đơn vị tính cơ bản' })
   unit!: string;
 
@@ -114,6 +149,36 @@ export class MobileProductDetailResponseDto {
 
   @ApiProperty({ nullable: true, description: 'Chiều cao (cm). `null` = chưa nhập' })
   heightCm!: number | null;
+
+  /**
+   * Mã vạch của item ĐẠI DIỆN, không phải của cả mẫu mã.
+   *
+   * Một item có thể mang NHIỀU mã vạch (`item_barcodes` không có cờ "chính"),
+   * còn form của app có đúng MỘT ô. Trả cái đầu tiên theo `created_at` rồi
+   * `code` — thứ tự ổn định, và là cái người dùng nhập trước.
+   *
+   * Hệ quả phải biết: lưu lại từ app sẽ THAY cả tập mã vạch bằng đúng giá trị
+   * trong ô đó. Mất mã vạch thứ hai là có thật, nhưng app không có chỗ nào bày
+   * chúng ra để giữ — đổi lại một ô trống ở đây sẽ XOÁ sạch, còn tệ hơn.
+   */
+  @ApiProperty({
+    nullable: true,
+    description: 'Mã vạch đầu tiên của item đại diện. `null` = chưa có',
+  })
+  barcode!: string | null;
+
+  @ApiProperty({
+    nullable: true,
+    description: 'Mô tả. `null` = chưa nhập',
+  })
+  description!: string | null;
+
+  @ApiProperty({
+    description:
+      'Có hiện trên màn bán hàng (POS) không. Mẫu mã: `bool_and` các biến thể, ' +
+      'cùng luật với [isActive]',
+  })
+  isPosVisible!: boolean;
 
   @ApiProperty({
     type: [MobileProductVariantDto],

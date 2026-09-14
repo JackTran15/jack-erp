@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
+import { InventoryItemCrudService } from '../../inventory/location/item-crud.service';
 import { MobileProductSort } from '../dto/mobile-product-list.query.dto';
 import { MobileProductService } from './mobile-product.service';
 
@@ -21,6 +22,9 @@ const actor: ActorContext = {
 describe('MobileProductService', () => {
   let service: MobileProductService;
   let query: jest.Mock;
+  let repoExist: jest.Mock;
+  let itemCrudCreate: jest.Mock;
+  let itemCrudUpdate: jest.Mock;
 
   const stubRows = [
     { id: 'p-1', code: 'GELLI', name: 'Giày Gelli', sellingPrice: 600000 },
@@ -34,10 +38,25 @@ describe('MobileProductService', () => {
       .mockResolvedValueOnce(stubRows)
       .mockResolvedValueOnce(stubCount);
 
+    // Mặc định "mã chưa ai dùng" — `generateItemCode` dừng ở lượt đầu.
+    repoExist = jest.fn().mockResolvedValue(false);
+    itemCrudCreate = jest.fn();
+    itemCrudUpdate = jest.fn();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MobileProductService,
-        { provide: getDataSourceToken(), useValue: { query } },
+        {
+          provide: getDataSourceToken(),
+          useValue: { query, getRepository: () => ({ exist: repoExist }) },
+        },
+        // Đường GHI uỷ quyền trọn cho service này. Stub ở đây vì phần đáng kiểm
+        // là payload gửi sang và cách nắn kết quả, không phải logic bên trong
+        // nó — cái đó đã có spec riêng.
+        {
+          provide: InventoryItemCrudService,
+          useValue: { create: itemCrudCreate, update: itemCrudUpdate },
+        },
       ],
     }).compile();
 
@@ -49,7 +68,8 @@ describe('MobileProductService', () => {
     page = 1,
     limit = 20,
     search?: string,
-  ) => service.list({ page, limit, sort, search }, actor);
+    extra: { categoryId?: string; isActive?: boolean } = {},
+  ) => service.list({ page, limit, sort, search, ...extra }, actor);
 
   /** Câu lệnh lấy dữ liệu là lần gọi ĐẦU; lần thứ hai là đếm. */
   const dataSql = (): string => query.mock.calls[0][0] as string;
@@ -181,6 +201,79 @@ describe('MobileProductService', () => {
     });
   });
 
+  describe('bộ lọc', () => {
+    const categoryId = 'c0000000-0000-4000-8000-000000000001';
+
+    it('nhóm hàng lọc bằng EXISTS ngoài CTE, phủ cả mẫu mã lẫn item lẻ', async () => {
+      await run(MobileProductSort.NAME, 1, 20, undefined, { categoryId });
+
+      // `EXISTS` chứ không thêm cột vào `buildCombinedCte`: CTE đó dùng chung
+      // với `SearchInventoryItemsV2Handler` của web và tự cảnh báo rằng sửa nó
+      // sẽ làm hỏng phía kia mà không có gì báo.
+      expect(dataSql()).toContain('EXISTS (');
+      expect(dataSql()).toContain('FROM items f');
+      expect(dataSql()).toContain('f.category_id = $2');
+      // Hai vế phủ hai nhánh của `combined` mà không cần đọc cột `type`.
+      expect(dataSql()).toContain(
+        'f.product_id = combined.id OR f.id = combined.id',
+      );
+      // Ranh giới multi-tenant lặp lại ở chính subquery.
+      expect(dataSql()).toContain('f.organization_id = $1');
+      expect(dataParams()).toEqual(['org-1', categoryId, 20, 0]);
+    });
+
+    it('trạng thái lọc thẳng trên cột của CTE, không cần EXISTS', async () => {
+      await run(MobileProductSort.NAME, 1, 20, undefined, { isActive: false });
+
+      expect(dataSql()).toContain('"isActive" = $2');
+      expect(dataSql()).not.toContain('EXISTS (');
+      expect(dataParams()).toEqual(['org-1', false, 20, 0]);
+    });
+
+    it('KHÔNG lọc trạng thái khi `isActive` vắng — mặc định hiện cả hàng đã ngừng', async () => {
+      await run(MobileProductSort.NAME);
+
+      // Màn quản lý danh mục: một mặt hàng biến mất khỏi danh sách thì người
+      // dùng không còn đường nào tìm lại nó.
+      expect(dataSql()).not.toContain('"isActive" =');
+    });
+
+    it('ba bộ lọc nối bằng AND, và LIMIT/OFFSET nhảy đúng số', async () => {
+      await run(MobileProductSort.NAME, 2, 10, 'gelli', {
+        categoryId,
+        isActive: true,
+      });
+
+      // Nối bằng AND chứ không gán đè: gán đè là cách chắc chắn có ngày một bộ
+      // lọc nuốt mất bộ lọc trước nó.
+      expect(dataSql()).toMatch(/ILIKE \$2[\s\S]*AND EXISTS/);
+      expect(dataSql()).toContain('"isActive" = $4');
+      expect(dataSql()).toContain('LIMIT $5 OFFSET $6');
+      expect(dataParams()).toEqual([
+        'org-1',
+        '%gelli%',
+        categoryId,
+        true,
+        10,
+        10,
+      ]);
+    });
+
+    it('câu ĐẾM mang y hệt mệnh đề lọc, không kèm LIMIT', async () => {
+      await run(MobileProductSort.NAME, 1, 20, undefined, {
+        categoryId,
+        isActive: true,
+      });
+
+      // Lệch một chữ giữa hai câu là `total` không khớp `data`, và cuộn vô tận
+      // đòi thêm trang cho những dòng không tồn tại.
+      expect(countSql()).toContain('f.category_id = $2');
+      expect(countSql()).toContain('"isActive" = $3');
+      expect(countSql()).not.toContain('LIMIT');
+      expect(countParams()).toEqual(['org-1', categoryId, true]);
+    });
+  });
+
   describe('findById', () => {
     const productId = 'a0000000-0000-4000-8000-000000000001';
 
@@ -195,6 +288,7 @@ describe('MobileProductService', () => {
       purchasePrice: 355000,
       sellingPrice: 595000,
       isActive: true,
+      isPosVisible: true,
     };
     const orphanHeader = {
       type: 'orphan',
@@ -204,6 +298,7 @@ describe('MobileProductService', () => {
       purchasePrice: 120000,
       sellingPrice: 250000,
       isActive: false,
+      isPosVisible: false,
     };
     const items = [
       {
@@ -211,6 +306,7 @@ describe('MobileProductService', () => {
         code: 'GELLI-39-NAU',
         variantLabel: '39 · Nâu',
         unit: 'đôi',
+        categoryId: 'cat-1',
         categoryName: 'Giày dép',
         purchasePrice: 350000,
         sellingPrice: 590000,
@@ -218,12 +314,17 @@ describe('MobileProductService', () => {
         lengthCm: null,
         widthCm: null,
         heightCm: null,
+        barcode: '8938000000001',
+        description: 'Da bò thật',
+        color: 'Nâu',
+        size: '39',
       },
       {
         id: 'i-2',
         code: 'GELLI-40-NAU',
         variantLabel: '40 · Nâu',
         unit: 'đôi',
+        categoryId: 'cat-1',
         categoryName: 'Giày dép',
         purchasePrice: 360000,
         sellingPrice: 600000,
@@ -231,6 +332,10 @@ describe('MobileProductService', () => {
         lengthCm: 30,
         widthCm: 20,
         heightCm: 10,
+        barcode: '8938000000002',
+        description: 'Da bò thật',
+        color: 'Nâu',
+        size: '40',
       },
     ];
 
@@ -315,14 +420,20 @@ describe('MobileProductService', () => {
         variantLabel: '40 · Nâu',
         purchasePrice: 360000,
         sellingPrice: 600000,
+        color: 'Nâu',
+        size: '40',
       });
-      // ĐÚNG năm khoá — `unit`/`weightGram` của từng item không được rò vào.
+      // Tập khoá ĐÓNG — `unit`/`weightGram`/`description` của từng item không
+      // được rò vào mảng biến thể. `color`/`size` có mặt là NGOẠI LỆ đã khai ở
+      // `MobileProductVariantDto`: chúng phục vụ màn Sửa dựng lại chip.
       expect(Object.keys(result.variants[0])).toEqual([
         'id',
         'code',
         'variantLabel',
         'purchasePrice',
         'sellingPrice',
+        'color',
+        'size',
       ]);
 
       expect(itemSql()).toContain('i.product_id = $2');
@@ -360,13 +471,51 @@ describe('MobileProductService', () => {
       await service.findById(productId, actor);
 
       expect(headerSql()).toMatch(
-        /SELECT type, id, code, name, "purchasePrice", "sellingPrice", "isActive"\s+FROM combined/,
+        /SELECT type, id, code, name, "purchasePrice", "sellingPrice",\s+"isActive", "isPosVisible"\s+FROM combined/,
       );
       expect(headerSql()).not.toContain('SELECT * FROM combined');
       expect(itemSql()).not.toContain('SELECT *');
-      for (const column of ['description', 'composition', 'barcode', 'brand']) {
+
+      // `description` và `barcode` nay CÓ mặt một cách có chủ ý — màn Sửa cần
+      // chúng để nạp lại ô đã nhập. Thứ vẫn phải vắng là các cột không màn nào
+      // của app vẽ ra.
+      for (const column of ['composition', 'brand', 'manufacture_year']) {
         expect(itemSql()).not.toContain(column);
       }
+    });
+
+    it('lấy đủ trường mà màn SỬA cần nạp lại, từ item đại diện', async () => {
+      query
+        .mockResolvedValueOnce([productHeader])
+        .mockResolvedValueOnce(items);
+
+      const result = await service.findById(productId, actor);
+
+      // Thiếu bất kỳ trường nào dưới đây là Sửa-rồi-Lưu làm MẤT dữ liệu đang
+      // có: ô hiện ra trống, người dùng bấm Lưu, giá trị cũ bị ghi đè.
+      expect(result).toMatchObject({
+        categoryId: 'cat-1',
+        barcode: '8938000000001',
+        description: 'Da bò thật',
+        isPosVisible: true,
+      });
+    });
+
+    it('color/size dò theo LOWER(def.name), cùng cách ItemCrudService tạo ra chúng', async () => {
+      query
+        .mockResolvedValueOnce([productHeader])
+        .mockResolvedValueOnce(items);
+
+      await service.findById(productId, actor);
+
+      // Hai chỗ phải khớp: chính `ItemCrudService` tạo định nghĩa với tên
+      // `"Color"`/`"Size"` và dò lại bằng `LOWER(...)`. Lệch là chip Màu sắc /
+      // Size không bao giờ nạp lại được ở chế độ Sửa.
+      expect(itemSql()).toContain("LOWER(d.name) = 'color'");
+      expect(itemSql()).toContain("LOWER(d.name) = 'size'");
+      // Subquery chứ KHÔNG join: join nhân đôi dòng item và `items[0]` thôi là
+      // item đại diện.
+      expect(itemSql()).not.toContain('JOIN item_attribute_values');
     });
 
     it('MỌI cột decimal ép `::float` — driver pg trả numeric thành chuỗi', async () => {
@@ -386,6 +535,238 @@ describe('MobileProductService', () => {
       ]) {
         expect(itemSql()).toContain(`${column}::float`);
       }
+    });
+  });
+
+  describe('create', () => {
+    const productId = 'a0000000-0000-4000-8000-000000000001';
+
+    const header = {
+      type: 'product',
+      id: productId,
+      code: 'GELLI',
+      name: 'Giày Gelli',
+      purchasePrice: 0,
+      sellingPrice: 0,
+      isActive: true,
+      isPosVisible: true,
+    };
+    const item = {
+      id: 'i-1',
+      code: 'GELLI',
+      variantLabel: null,
+      unit: 'đôi',
+      categoryId: null,
+      categoryName: null,
+      purchasePrice: 0,
+      sellingPrice: 0,
+      weightGram: null,
+      lengthCm: null,
+      widthCm: null,
+      heightCm: null,
+      barcode: null,
+      description: null,
+      color: null,
+      size: null,
+    };
+
+    /** Xếp sẵn hai lượt query mà `findById` sẽ gọi sau khi ghi. */
+    const stubReadBack = () => {
+      query.mockReset();
+      query.mockResolvedValueOnce([header]).mockResolvedValueOnce([item]);
+    };
+
+    it('nhánh ma trận biến thể: đọc lại theo `productId` mà service kia trả', async () => {
+      itemCrudCreate.mockResolvedValue({ productId, itemsCreated: 4 });
+      stubReadBack();
+
+      const result = await service.create(
+        { name: 'Giày Gelli', code: 'GELLI', unit: 'đôi', colors: ['Nâu'] },
+        actor,
+      );
+
+      // `{productId, itemsCreated}` KHÔNG phải một bản ghi — chuẩn hoá bằng
+      // cách đọc lại là thứ giữ cho response luôn gương đúng `GET :id`.
+      expect(query.mock.calls[0][1]).toEqual(['org-1', productId]);
+      expect(result.id).toBe(productId);
+    });
+
+    it('nhánh item lẻ: đọc lại theo `id` của ItemEntity', async () => {
+      itemCrudCreate.mockResolvedValue({ id: 'i-1', code: 'GELLI' });
+      query.mockReset();
+      query
+        .mockResolvedValueOnce([{ ...header, type: 'orphan', id: 'i-1' }])
+        .mockResolvedValueOnce([item]);
+
+      const result = await service.create(
+        { name: 'Giày Gelli', code: 'GELLI', unit: 'đôi' },
+        actor,
+      );
+
+      expect(result.id).toBe('i-1');
+    });
+
+    it('kết quả không có id nào -> ném lỗi có tên, không thành 404 gây hiểu nhầm', async () => {
+      itemCrudCreate.mockResolvedValue({ itemsCreated: 0 });
+
+      await expect(
+        service.create({ name: 'X', unit: 'cái' }, actor),
+      ).rejects.toThrow(/hợp đồng đã đổi/);
+    });
+
+    it('`barcode` MỘT chuỗi -> `barcodes: [{code}]`, tên mà saveBarcodes đọc', async () => {
+      itemCrudCreate.mockResolvedValue({ id: 'i-1' });
+      stubReadBack();
+
+      await service.create(
+        { name: 'Giày', code: 'GIAY', unit: 'đôi', barcode: '893800' },
+        actor,
+      );
+
+      const payload = itemCrudCreate.mock.calls[0][0] as Record<string, unknown>;
+      expect(payload.barcodes).toEqual([{ code: '893800' }]);
+      // Khoá số ít phải BIẾN MẤT: `items` không có cột `barcode`, gửi kèm là
+      // một khoá thừa đi thẳng vào `manager.create`.
+      expect(payload).not.toHaveProperty('barcode');
+    });
+
+    it('`barcode` vắng -> KHÔNG có khoá `barcodes` (giữ nguyên, không xoá)', async () => {
+      itemCrudCreate.mockResolvedValue({ id: 'i-1' });
+      stubReadBack();
+
+      await service.create({ name: 'Giày', code: 'GIAY', unit: 'đôi' }, actor);
+
+      expect(itemCrudCreate.mock.calls[0][0]).not.toHaveProperty('barcodes');
+    });
+
+    it('`code` trống -> sinh từ tên: bỏ dấu, đ->d, viết hoa, chỉ A-Z0-9', async () => {
+      itemCrudCreate.mockResolvedValue({ id: 'i-1' });
+      stubReadBack();
+
+      await service.create({ name: 'Giày Đá Bóng 39', unit: 'đôi' }, actor);
+
+      expect(
+        (itemCrudCreate.mock.calls[0][0] as Record<string, unknown>).code,
+      ).toBe('GIAYDABONG39');
+    });
+
+    it('`code` sinh ra bị trùng -> thêm hậu tố, không để thành 409', async () => {
+      // Form của app ghi "để trống thì máy tự sinh mã"; người dùng không gõ mã
+      // nào thì cũng không có ô nào để tự gỡ va chạm.
+      repoExist.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+      itemCrudCreate.mockResolvedValue({ id: 'i-1' });
+      stubReadBack();
+
+      await service.create({ name: 'Giày', unit: 'đôi' }, actor);
+
+      expect(
+        (itemCrudCreate.mock.calls[0][0] as Record<string, unknown>).code,
+      ).toBe('GIAY-2');
+    });
+
+    it('tên không còn ký tự nào hợp lệ -> lùi về tiền tố mặc định', async () => {
+      itemCrudCreate.mockResolvedValue({ id: 'i-1' });
+      stubReadBack();
+
+      await service.create({ name: '!!! ???', unit: 'cái' }, actor);
+
+      expect(
+        (itemCrudCreate.mock.calls[0][0] as Record<string, unknown>).code,
+      ).toBe('SP');
+    });
+
+    it('`code` do người dùng gõ thì KHÔNG đụng tới, và không dò trùng', async () => {
+      itemCrudCreate.mockResolvedValue({ id: 'i-1' });
+      stubReadBack();
+
+      await service.create(
+        { name: 'Giày Gelli', code: 'my-sku', unit: 'đôi' },
+        actor,
+      );
+
+      expect(
+        (itemCrudCreate.mock.calls[0][0] as Record<string, unknown>).code,
+      ).toBe('my-sku');
+      expect(repoExist).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('update', () => {
+    const id = 'a0000000-0000-4000-8000-000000000001';
+
+    const header = {
+      type: 'orphan',
+      id,
+      code: 'GELLI',
+      name: 'Giày Gelli',
+      purchasePrice: 0,
+      sellingPrice: 0,
+      isActive: true,
+      isPosVisible: true,
+    };
+    const item = {
+      id,
+      code: 'GELLI',
+      variantLabel: null,
+      unit: 'đôi',
+      categoryId: null,
+      categoryName: null,
+      purchasePrice: 0,
+      sellingPrice: 0,
+      weightGram: null,
+      lengthCm: null,
+      widthCm: null,
+      heightCm: null,
+      barcode: null,
+      description: null,
+      color: null,
+      size: null,
+    };
+
+    it('bản ghi không tồn tại -> 404 TRƯỚC khi ghi bất cứ thứ gì', async () => {
+      query.mockReset();
+      query.mockResolvedValueOnce([]);
+
+      await expect(service.update(id, { name: 'X' }, actor)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(itemCrudUpdate).not.toHaveBeenCalled();
+    });
+
+    it('`code` trống KHÔNG sinh mã mới — bỏ trống nghĩa là giữ nguyên', async () => {
+      query.mockReset();
+      query
+        .mockResolvedValueOnce([header])
+        .mockResolvedValueOnce([item])
+        .mockResolvedValueOnce([header])
+        .mockResolvedValueOnce([item]);
+
+      await service.update(id, { name: 'Giày Gelli' }, actor);
+
+      // Sinh mã ở đây sẽ âm thầm đổi SKU của một mặt hàng đang lưu hành.
+      expect(
+        (itemCrudUpdate.mock.calls[0][1] as Record<string, unknown>),
+      ).not.toHaveProperty('code');
+      expect(repoExist).not.toHaveBeenCalled();
+    });
+
+    it('đọc lại theo CHÍNH `id` đã nhận, không theo kết quả của service kia', async () => {
+      query.mockReset();
+      query
+        .mockResolvedValueOnce([header])
+        .mockResolvedValueOnce([item])
+        .mockResolvedValueOnce([header])
+        .mockResolvedValueOnce([item]);
+      itemCrudUpdate.mockResolvedValue({ id: 'khac-han' });
+
+      const result = await service.update(id, { name: 'Giày' }, actor);
+
+      expect(itemCrudUpdate).toHaveBeenCalledWith(
+        id,
+        expect.any(Object),
+        actor,
+      );
+      expect(result.id).toBe(id);
     });
   });
 });

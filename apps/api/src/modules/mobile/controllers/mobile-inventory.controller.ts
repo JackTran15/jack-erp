@@ -1,8 +1,10 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
   ParseUUIDPipe,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -13,6 +15,7 @@ import {
 } from '../../../common/decorators/actor-context.decorator';
 import { RequirePermission } from '../../auth/decorators';
 import { PermissionGuard } from '../../rbac/permission.guard';
+import { MobileUnitCreateDto } from '../dto/mobile-catalog-write.dto';
 import {
   MobileInventoryCategoryResponseDto,
   MobileInventoryUnitResponseDto,
@@ -87,10 +90,30 @@ export class MobileInventoryController {
 
   @Get('units')
   @RequirePermission('inventory.read')
-  @ApiOperation({ summary: 'Đơn vị tính đang có trên hàng hoá, gộp không phân biệt hoa/thường' })
+  @ApiOperation({ summary: 'Đơn vị tính cho màn chọn, gộp không phân biệt hoa/thường' })
   @ApiOkResponse({ type: [MobileInventoryUnitResponseDto] })
   listUnits(@Actor() actor: ActorContext): Promise<MobileInventoryUnitResponseDto[]> {
     return this.catalog.listUnits(actor);
+  }
+
+  /**
+   * Tạo một đơn vị tính — mở từ nút `+` ngay trong form hàng hoá của app.
+   *
+   * Response gương đúng MỘT PHẦN TỬ của `GET units`, để app điền thẳng giá trị
+   * vừa tạo vào ô đang mở mà không cần nạp lại cả danh mục.
+   *
+   * Quyền `inventory.write`, khác `inventory.read` của đường đọc: đây là ghi
+   * vào danh mục dùng chung toàn tổ chức.
+   */
+  @Post('units')
+  @RequirePermission('inventory.write')
+  @ApiOperation({ summary: 'Tạo một đơn vị tính' })
+  @ApiOkResponse({ type: MobileInventoryUnitResponseDto })
+  createUnit(
+    @Body() dto: MobileUnitCreateDto,
+    @Actor() actor: ActorContext,
+  ): Promise<MobileInventoryUnitResponseDto> {
+    return this.catalog.createUnit(dto, actor);
   }
 
   @Get('products')
