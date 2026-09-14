@@ -41,6 +41,8 @@ rollback: Revert các commit của UoW. `attachmentIds` quay về nhận UUID b�
 | Hai đường tạo song song (legacy + v2) cho phiếu nhập kho và phiếu chuyển kho | T-04-02 và T-04-03 phải sửa cả hai đường; test cho cả hai |
 | `GET`/`PATCH` của lệnh chuyển kho và phiếu chuyển kho không có decorator phạm vi chi nhánh | ADR-06 kế thừa đúng phạm vi của màn xem; ghi lại, không sửa trong feature này |
 | 7 dialog copy-paste khác nhau (`FieldRow` vs `FormField`) | Một component dùng chung (T-04-06), mỗi dialog chỉ thay đúng một hàng |
+| **Follow-up, chưa có ticket** (security review T-04-05, 2026-09-14): `GET :id` của chứng từ chạy `BranchScopeGuard` (403 khi người dùng không có chi nhánh hoặc thiếu `X-Branch-Id` hợp lệ), còn `GET /media/:id/download-url` thì không. Người dùng còn quyền đọc nhưng không còn chi nhánh vẫn lấy được link nếu biết UUID của file. Mức Low: không vượt tổ chức, và cả guard lẫn `getById` đều không kiểm chi nhánh của chính chứng từ | Sửa ở `MediaDownloadService` (ví dụ từ chối file riêng tư khi actor không có chi nhánh hợp lệ), sau khi kiểm từng endpoint detail của 7 loại có guard đó không (lệnh chuyển kho và phiếu chuyển kho không có) |
+| **Follow-up, chưa có ticket** (security review T-04-05, 2026-09-14): design hứa xoá chủ sở hữu thì gọi `detachAll` (A-19), nhưng không ticket nào của UOW-04 giao việc này. Chứng từ xoá mềm vẫn giữ media `ATTACHED`, nên file tài chính nằm mãi trong bucket riêng tư. Không lộ quyền: reader trả `false` cho chứng từ đã xoá | Sau `softDelete` của từng loại chứng từ, gọi `mediaLink.detachAll(ownerType, id, organizationId, manager)` trong cùng transaction; cần ticket riêng |
 
 ## Definition of done
 - [ ] AC-13, AC-14, AC-15, AC-16, AC-17 pass
