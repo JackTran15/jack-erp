@@ -33,7 +33,7 @@ export interface PublicMedia {
 }
 
 const INLINE_URL_EXPIRES_SEC = 60 * 60;
-const ATTACHMENT_URL_EXPIRES_SEC = 15 * 60;
+export const ATTACHMENT_URL_EXPIRES_SEC = 15 * 60;
 
 /**
  * Content types allowed to render `inline` on the ERP origin. An allow-list,
