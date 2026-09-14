@@ -290,6 +290,10 @@ describe('StockTransferService', () => {
 
         expect(transferRepo.findOne).not.toHaveBeenCalled();
         expect((dataSource._mockManager as any).update).not.toHaveBeenCalled();
+        // syncOwner runs before both the document number and the insert —
+        // neither must happen once it rejects.
+        expect(docNumbering.generate).not.toHaveBeenCalled();
+        expect((dataSource._mockManager as any).save).not.toHaveBeenCalled();
       });
     });
   });
@@ -1106,7 +1110,7 @@ describe('StockTransferService', () => {
         );
       });
 
-      it('never calls syncOwner when attachmentIds is not sent', async () => {
+      it('POSTED: never calls syncOwner when attachmentIds is not sent, and the headerPatch write carries no attachmentIds key', async () => {
         storageRepo.find.mockResolvedValue([storageA, storageB]);
         mockDefaultLocations();
         transferRepo.findOne
@@ -1116,6 +1120,27 @@ describe('StockTransferService', () => {
         await service.update('xfer-1', editDto, actor);
 
         expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+        // Pins the fix: headerPatch must never carry `attachmentIds` itself —
+        // `resolved.attachmentIds ?? []` used to wipe attachments on every
+        // edit that omitted the field. A test that only checks syncOwner was
+        // not called would still pass if that line came back.
+        const [, , patch] = (dataSource._mockManager as any).update.mock.calls[0];
+        expect(patch).not.toHaveProperty('attachmentIds');
+      });
+
+      it('DRAFT: never calls syncOwner when attachmentIds is not sent, and the headerPatch write carries no attachmentIds key', async () => {
+        storageRepo.find.mockResolvedValue([storageA, storageB]);
+        mockDefaultLocations();
+        const draft = { ...postedTransfer, status: TransferStatus.DRAFT };
+        transferRepo.findOne
+          .mockResolvedValueOnce(draft)
+          .mockResolvedValueOnce(draft);
+
+        await service.update('xfer-1', editDto, actor);
+
+        expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+        const [, , patch] = (dataSource._mockManager as any).update.mock.calls[0];
+        expect(patch).not.toHaveProperty('attachmentIds');
       });
 
       it('CANCELLED: rejects the edit and never calls syncOwner', async () => {
