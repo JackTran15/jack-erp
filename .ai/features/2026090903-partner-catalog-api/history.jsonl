@@ -31,3 +31,26 @@
 {"action": "ticket done (review bypassed)", "at": "2026-09-09T17:06:54", "by": "Akenzy", "gate": "G4", "id": "da4e0fcb748f", "ticket": "T-04-02", "ts": "2026-09-09T17:06:54.776310"}
 {"action": "ticket in_progress", "at": "2026-09-09T17:06:54", "by": "Akenzy", "gate": "G4", "id": "a0f70401fded", "ticket": "T-05-01", "ts": "2026-09-09T17:06:54.899151"}
 {"action": "ticket done (review bypassed)", "at": "2026-09-09T17:08:44", "by": "Akenzy", "gate": "G4", "id": "39c332ebf154", "ticket": "T-05-01", "ts": "2026-09-09T17:08:44.131584"}
+{"action": "reopened", "at": "2026-09-13T09:10:16", "by": "Akenzy", "gate": "G1", "id": "067a6b350e02", "reason": "2026-09-13 change request - list endpoint - row colors/sizes/price/inStock must describe the matched variants, dimension-name matching tolerant, new inStock filter on the same variant; detail endpoint keyed by products.code instead of products.id", "ts": "2026-09-13T09:10:16.484705"}
+{"action": "passed", "at": "2026-09-13T09:27:33", "by": "Akenzy", "evidence": "20 assumptions, none blocking-and-pending; 25 acceptance criteria defined", "gate": "G1", "id": "5f06e2be1aee", "ts": "2026-09-13T09:27:33.770003"}
+{"action": "passed", "at": "2026-09-13T09:27:33", "by": "Akenzy", "evidence": "9 ADR(s) recorded", "gate": "G2", "id": "27495a966b70", "ts": "2026-09-13T09:27:33.836284"}
+{"action": "passed", "at": "2026-09-13T09:27:33", "by": "Akenzy", "evidence": "graph valid - 6 UoW, 23 tickets, no cycles", "gate": "G3", "id": "1aba0f703ff6", "ts": "2026-09-13T09:27:33.957022"}
+{"action": "ticket in_progress", "at": "2026-09-13T09:28:06", "by": "Akenzy", "gate": "G4", "id": "a2463c2ea135", "ticket": "T-04-04", "ts": "2026-09-13T09:28:06.106872"}
+{"action": "ticket in_progress", "at": "2026-09-13T09:28:06", "by": "Akenzy", "gate": "G4", "id": "5d2a7c9bba8d", "ticket": "T-06-01", "ts": "2026-09-13T09:28:06.175218"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-13T09:38:14", "by": "Akenzy", "gate": "G4", "id": "5b3f417a4f56", "ticket": "T-04-04", "ts": "2026-09-13T09:38:14.974865"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-13T09:53:22", "by": "Akenzy", "gate": "G4", "id": "db18e3ecb77b", "ticket": "T-03-03", "ts": "2026-09-13T09:53:22.380018"}
+{"action": "ticket in_progress", "at": "2026-09-13T09:53:22", "by": "Akenzy", "gate": "G4", "id": "51339c6f3ad3", "ticket": "T-04-03", "ts": "2026-09-13T09:53:22.496886"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-13T10:07:54", "by": "Akenzy", "gate": "G4", "id": "87e8d201228b", "ticket": "T-06-01", "ts": "2026-09-13T10:07:54.377591"}
+{"action": "ticket in_progress", "at": "2026-09-13T10:07:54", "by": "Akenzy", "gate": "G4", "id": "d1323458e79b", "ticket": "T-06-02", "ts": "2026-09-13T10:07:54.497808"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-13T10:20:59", "by": "Akenzy", "gate": "G4", "id": "bd7a2b6bfbc1", "ticket": "T-04-03", "ts": "2026-09-13T10:20:59.772740"}
+{"action": "ticket in_progress", "at": "2026-09-13T10:20:59", "by": "Akenzy", "gate": "G4", "id": "82ae7d952d25", "ticket": "T-05-02", "ts": "2026-09-13T10:20:59.890052"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-13T10:27:31", "by": "Akenzy", "gate": "G4", "id": "9d0ca0999f73", "ticket": "T-06-02", "ts": "2026-09-13T10:27:31.615404"}
+{"action": "ticket in_progress", "at": "2026-09-13T10:27:31", "by": "Akenzy", "gate": "G4", "id": "ca205064712f", "ticket": "T-06-03", "ts": "2026-09-13T10:27:31.733608"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-13T10:30:12", "by": "Akenzy", "gate": "G4", "id": "13a0cf9bacba", "ticket": "T-05-02", "ts": "2026-09-13T10:30:12.252023"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-13T10:59:49", "by": "Akenzy", "gate": "G4", "id": "2a17d78df032", "ticket": "T-06-03", "ts": "2026-09-13T10:59:49.333085"}
+{"action": "ticket in_progress", "at": "2026-09-13T10:59:49", "by": "Akenzy", "gate": "G4", "id": "98aa9ddee360", "ticket": "T-06-04", "ts": "2026-09-13T10:59:49.446060"}
+{"action": "ticket in_progress", "at": "2026-09-13T10:59:49", "by": "Akenzy", "gate": "G4", "id": "f9c57a11920b", "ticket": "T-05-03", "ts": "2026-09-13T10:59:49.512274"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-13T11:07:45", "by": "Akenzy", "gate": "G4", "id": "11a37a149e25", "ticket": "T-05-03", "ts": "2026-09-13T11:07:45.808919"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-13T11:16:05", "by": "Akenzy", "gate": "G4", "id": "6208679b649c", "ticket": "T-06-04", "ts": "2026-09-13T11:16:05.772219"}
+{"action": "passed", "at": "2026-09-14T08:38:23", "by": "Akenzy", "evidence": "no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 23 tickets done, all UoW checklists ticked", "gate": "G4", "id": "2fb50150f9a3", "ts": "2026-09-14T08:38:23.572466"}
+{"action": "passed", "at": "2026-09-14T08:38:23", "by": "Akenzy", "evidence": "assumptions resolved, ADRs settled, graph valid", "gate": "G5", "id": "1d868a999c5c", "ts": "2026-09-14T08:38:23.804633"}

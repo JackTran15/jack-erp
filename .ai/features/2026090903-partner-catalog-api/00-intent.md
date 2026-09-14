@@ -3,7 +3,7 @@ feature: partner-catalog-api
 slug: 2026090903-partner-catalog-api
 owner: Akenzy
 created: 2026-09-09
-status: draft
+status: done
 ---
 
 # Intent — 3 API danh mục hàng hoá cho đối tác
@@ -43,7 +43,11 @@ danh sách trường mà bên ngoài nhìn thấy.
 
 - Đối tác dựng được 3 màn hình của storefront tham chiếu **chỉ bằng 3 endpoint này**:
   menu nhóm hàng nhiều cấp, trang danh sách (lọc từ khoá + nhóm hàng + khoảng giá + màu +
-  size, 4 kiểu sắp xếp, phân trang kiểu "Hiển thị 1–20 của 107 kết quả"), trang chi tiết.
+  size + còn hàng/hết hàng, 4 kiểu sắp xếp, phân trang kiểu "Hiển thị 1–20 của 107 kết quả"), trang chi tiết mở theo mã
+  hàng (`products.code`).
+- Dưới bộ lọc màu, size, giá hoặc tồn kho, mỗi dòng sản phẩm chỉ nói về các biến thể khớp: lọc
+  `BA` + `39` không hiện màu `D` và không báo còn hàng khi chính đôi BA/39 đã hết (đo 2026-09-13
+  trên erp_dev_3008: 47/106 sản phẩm khớp đang báo sai).
 - `grep` toàn bộ response DTO của bề mặt đối tác không tìm thấy `purchasePrice` /
   `purchase_price` — kiểm được bằng một test, không phải bằng mắt.
 - Một API key có `branchIds = NULL` và một key giới hạn 1 chi nhánh gọi cùng một endpoint

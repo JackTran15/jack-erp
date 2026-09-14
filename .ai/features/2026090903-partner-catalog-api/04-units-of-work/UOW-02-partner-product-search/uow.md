@@ -43,8 +43,8 @@ rollback: Gỡ route `products/search` khỏi controller; cây nhóm hàng của
 
 ## Definition of done
 
-- [ ] AC-05, AC-06, AC-09, AC-10, AC-11, AC-13, AC-14 pass
-- [ ] Mỗi bộ lọc có một test dùng giá trị không thể có và đòi 0 dòng
-- [ ] Thứ tự phân trang ổn định: có khoá phụ `p.id` trong mọi mệnh đề `ORDER BY`
-- [ ] Không sửa file nào ngoài `modules/partner-catalog/` và test
-- [ ] Demo và nghiệm thu tại gate G4
+- [x] AC-05, AC-06, AC-09, AC-10, AC-11, AC-13, AC-14 pass — `pnpm --filter @erp/api test -- partner-catalog` 172/172, 10 suite (2026-09-13); e2e `partner-catalog.e2e-spec.ts` 38/38 (2026-09-13, `OUTBOX_RELAY_DISABLED=1`), nhóm product search
+- [x] Mỗi bộ lọc có một test dùng giá trị không thể có và đòi 0 dòng — keyword: e2e 'returns zero rows for a keyword that cannot match anything'; categoryId: e2e 'returns nothing for a category id belonging to nobody'
+- [x] Thứ tự phân trang ổn định: có khoá phụ `p.id` trong mọi mệnh đề `ORDER BY` — `partner-product-sort.ts`: cả 3 mệnh đề kết thúc `a.id ASC` (`agg.id` = `p.id`); e2e 'pages without repeating or dropping a row'
+- [x] Không sửa file nào ngoài `modules/partner-catalog/` và test — theo `touches:` đã khai báo của T-02-01..05 (tất cả trong `modules/partner-catalog/` và `test/e2e/partner-catalog.e2e-spec.ts`), `aidlc lint-touches` sạch; commit gốc 27b6f406 gộp nhiều feature nên không tách được theo file thực tế
+- [x] Demo và nghiệm thu tại gate G4 — nghiệm thu: Akenzy, 2026-09-14 ("please done it. pass G5"), dựa trên bằng chứng demo tự động: gói cURL `docs/partner-catalog-api-curls` 37/37 qua HTTP, e2e `partner-catalog.e2e-spec.ts` 38/38 và `partner-catalog-filters.e2e-spec.ts` 17/17, `07-performance.md`; không có buổi demo trực tiếp
