@@ -43,3 +43,7 @@ rollback: Revert các commit của UoW. `imageUrl` quay về `null`, `images` qu
 - [ ] Việc báo đối tác (A-10) được ghi trong T-03-02
 - [ ] `pnpm --filter @erp/api test` xanh
 - [ ] Demo và nghiệm thu tại gate G4
+- [ ] **Trước merge — báo đối tác** (T-03-02, A-10): người dùng báo đối tác storefront rằng `images` bắt đầu có URL, và
+  điền người báo, người nhận, ngày vào mục "Báo đối tác" của T-03-02.
+- [ ] **Trước merge — client** (T-03-02): sau khi rebase lên `main`, `schema.ts` + `openapi.snapshot.json` được sinh lại
+  (cùng một lần sinh với UOW-01 và UOW-04) và mô tả `images` không còn "Always empty".

@@ -48,3 +48,5 @@ rollback: Revert các commit của UoW. `attachmentIds` quay về nhận UUID b�
 - [ ] Số dòng `attachment_ids <> '[]'` của 7 bảng được ghi lại trước khi bắt đầu
 - [ ] `pnpm --filter @erp/api test`, `pnpm --filter @erp/api test:e2e`, `pnpm --filter @erp/backoffice-web build` xanh
 - [ ] Demo và nghiệm thu tại gate G4
+- [ ] **Trước merge — client** (T-04-01): sau khi rebase lên `main`, `schema.ts` + `openapi.snapshot.json` được sinh lại
+  (cùng một lần sinh với UOW-01 và UOW-03) và có `GET /media/{id}/download-url`.

@@ -163,3 +163,28 @@ history:
     at: 2026-09-14T08:26:14
     by: Claude
     ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-14T09:11:16
+    by: Claude
+    ticket: T-01-07
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-14T09:11:16
+    by: Claude
+    ticket: T-01-09
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-14T09:11:16
+    by: Claude
+    ticket: T-01-11
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-14T09:11:16
+    by: Claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-14T09:11:16
+    by: Claude
+    ticket: T-04-01

@@ -57,3 +57,12 @@ link đọc). Ảnh nhân viên được chọn làm lát cắt đầu tiên vì
 - [ ] `pnpm --filter @erp/api test` xanh; `pnpm --filter @erp/api test:e2e` xanh khi MinIO tắt (đọc output thật, không chỉ exit code)
 - [ ] `pnpm openapi:generate` đã chạy; `schema.ts` + `openapi.snapshot.json` được commit
 - [ ] Demo và nghiệm thu tại gate G4
+- [ ] **Trước merge — client** (T-01-04, T-01-07): rebase lên `main`, chạy `pnpm openapi:generate` một lần từ commit sạch,
+  commit `schema.ts` + `openapi.snapshot.json`. Không sinh song song với T-03-02, T-04-01 hay partner-catalog T-05-03.
+- [ ] **Trước merge — trình duyệt** (T-01-09): với phiên đăng nhập có `iam.user.write` hoặc `inventory.write`, (1) tải
+  một file thật tới `/erp-media-private` và thấy request không có `Authorization`, `X-Branch-Id`, `X-Idempotency-Key`;
+  (2) tắt MinIO, chọn file → "Không thể tải tệp lên lúc này.", form không vỡ.
+- [ ] **Trước merge — build** (T-01-09): `pnpm --filter @erp/backoffice-web build` xanh toàn app (lỗi `user-form.ts(55,5)` hết sau T-01-10).
+- [ ] **Trước merge — e2e** (T-01-11): `MEDIA_S3_ENDPOINT=http://127.0.0.1:1 pnpm --filter @erp/api test:e2e -- media-upload`
+  xanh trên code cuối; chạy toàn bộ e2e trên `main` và trên nhánh (không chạy API dev song song vì dùng chung consumer
+  group Kafka), không suite nào PASS trên `main` mà FAIL trên nhánh. `main` đã có suite FAIL sẵn (xem T-01-11).
