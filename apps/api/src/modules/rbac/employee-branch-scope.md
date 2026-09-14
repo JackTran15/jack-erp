@@ -18,6 +18,7 @@ looks authoritative and is not.
 | `admin-search/queries/search-employees-v2.handler.ts` | `POST /v2/employees/search` | Màn Nhân viên (backoffice) | `UsersService.visibleUserIds()` — every branch the actor belongs to. A different question, deliberately; see ADR-01 |
 | `rbac/users.service.ts` `list()` | `GET /admin/users` | Màn Nhân viên (backoffice) | As above |
 | `sales-hierarchy/sales-hierarchy.service.ts` | `GET /branches/:id/salesmen`, `GET /branches/:id/sales-managers` | Ô NV bán hàng trên POS Checkout; màn gán NVBH ở backoffice | Branch on the path, via `employeeBranchScopeSqlNamed()` on the profile's linked user. `salesman_assignments` is written by assign/unassign but read by nothing, so it is not the branch link. The controller still declares no `@UseGuards`, so its `@RequireBranchScope()` is inert — scoping here is the service's, not the guard's |
+| `sales-order/sales-order.service.ts` `salespeople()` / `salespersonById()` | `GET /mobile/sales-orders/salespeople`; `salespersonId` on `POST`/`PATCH /mobile/sales-orders` | Ô NV bán hàng trên đơn nháp của erp_sales (vai tư vấn, UOW-13) | Branch from `X-Branch-Id` (`@RequireBranchScope()` + `BranchScopeGuard`), via a `user_branch_assignments` join on the profile's linked user — same shape as `sales-hierarchy`, not `EmployeeBranchScopeService`. Both sides `CAST(... AS text)` because the assignment columns are uuid while org ids are varchar. `salespersonById()` runs the same join, so a profile from another branch is rejected on write, not only hidden on read |
 | `inventory/temp-warehouse/temp-warehouse.service.ts` `listCarriersForBranch()` | `GET /inventory/temp-warehouse/carriers` | Chọn người vận chuyển (kho tạm) | Branch in the query, via `employeeBranchScopeSqlNamed()` — the same `user_branch_assignments` EXISTS as the pickers above. The `employee_profiles` join is for the code column and search only; it never narrows the set, so an account with no HR profile still lists |
 
 ## Not pickers — deliberately unscoped
@@ -42,6 +43,9 @@ on historical documents that reference someone now outside the branch (ADR-04).
 | `customer/csv/customer-import.service.ts` | Matches an imported code/email to one account |
 | `auth/auth.service.ts` | Authentication, not selection |
 | `rbac/users.service.ts` (write paths) | Same file as the list above; the list is scoped |
+| `api-key/api-key-crud.service.ts` | Revoking a key deactivates the service account bound to it (`users.update`) — a write on one known id, nothing is listed |
+| `mobile/services/mobile-invoice.service.ts` | Two lookups by id: the caller's own `employee_profiles.id` (to scope "my invoices" — `salesperson_id` is a profile id, not a user id), and id → salesperson name for one invoice |
+| `mobile/services/mobile-manager-invoice.service.ts` | id → salesperson name for one invoice, one SQL over `employee_profiles` ⋈ `users`; the invoice list itself is scoped by `branchIds` on `invoices`, not by people |
 
 ## Frontend
 

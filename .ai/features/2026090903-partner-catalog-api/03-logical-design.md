@@ -1,6 +1,6 @@
 ---
 feature: partner-catalog-api
-adr_count: 6
+adr_count: 9
 ---
 
 # Logical design — 3 API danh mục hàng hoá cho đối tác
@@ -86,10 +86,15 @@ Request:
 { "keyword": "búp bê", "categoryId": "…",
   "priceFrom": 500000, "priceTo": 1000000,
   "colors": ["BA"], "sizes": ["38", "39"],
+  "inStock": true,
   "sort": "newest", "page": 1, "limit": 20 }
 ```
 Mọi trường optional. `sort` ∈ `newest` (mặc định) | `price_asc` | `price_desc`.
-`limit` ∈ [1, 100], mặc định 20.
+`limit` ∈ [1, 100], mặc định 20. `inStock` ∈ `true` | `false`, bỏ trống = không lọc (ADR-08).
+
+Khi có bất kỳ bộ lọc mức biến thể nào (`colors`, `sizes`, `priceFrom`, `priceTo`, `inStock`),
+`priceMin`, `priceMax`, `colors`, `sizes`, `inStock` của mỗi dòng tính trên đúng các biến thể khớp
+(ADR-07).
 
 Response 200:
 ```json
@@ -101,7 +106,10 @@ Response 200:
   "total": 107, "page": 1, "limit": 20 }
 ```
 
-### 3. `GET /v2/partner/catalog/products/:productId`
+### 3. `GET /v2/partner/catalog/products/:productCode`
+
+`:productCode` là `products.code`, khớp chính xác (ADR-09). Chi tiết không nhận bộ lọc và luôn trả
+mọi biến thể active.
 
 Response 200: `PartnerProductRowDto` cộng thêm
 ```json
@@ -121,8 +129,8 @@ Response 200: `PartnerProductRowDto` cộng thêm
 | `X-Api-Key` không tồn tại hoặc đã thu hồi | 401 | `AuthGuard.authenticateApiKey` (`auth.guard.ts:89`) | `Invalid API key` |
 | Key hợp lệ nhưng IP ngoài whitelist | 403 | `AuthGuard.authenticateApiKey` (`auth.guard.ts:93`) | `Forbidden` |
 | Key thiếu `partner.catalog.read` | 403 | `PermissionGuard` | `Forbidden` |
-| Field lạ, `limit > 100`, `sort` sai, `categoryId` không phải uuid | 400 | `ValidationPipe` toàn cục | danh sách lỗi của class-validator |
-| `productId` không tồn tại, thuộc tổ chức khác, hoặc mọi biến thể `is_active = false` | 404 | `GetPartnerProductHandler` | `NotFoundException` với thông điệp **giống hệt** cho cả ba trường hợp |
+| Field lạ, `limit > 100`, `sort` sai, `categoryId` không phải uuid, `inStock` không phải boolean | 400 | `ValidationPipe` toàn cục | danh sách lỗi của class-validator |
+| `productCode` không khớp chính xác mã nào trong tổ chức của key (gồm UUID, SKU biến thể, mã khác hoa thường), chỉ tồn tại ở tổ chức khác, hoặc mọi biến thể `is_active = false` | 404 | `GetPartnerProductHandler` | `NotFoundException` với thông điệp **giống hệt** cho cả ba trường hợp |
 | Lỗi DB | 500 | filter mặc định của Nest | `Internal server error` |
 
 Nguyên tắc: **404 phải không phân biệt được** giữa "không có" và "có nhưng của tổ chức
@@ -252,10 +260,77 @@ thương mại cho bên ngoài, và số đó lỗi thời ngay khi trả về.
 
 **Decision:** `inStock = EXISTS(SELECT 1 FROM stock_balances WHERE item_id = … AND
 branch_id = ANY(actor.branchIds) AND quantity > 0)`. Ở mức product là `EXISTS` trên bất kỳ
-biến thể nào. Không trường `quantity` trong bất kỳ DTO nào.
+biến thể nào. Không trường `quantity` trong bất kỳ DTO nào. Danh sách dùng dạng tập (`LEFT JOIN` trên item còn tồn)
+thay cho EXISTS theo từng dòng — cùng nghĩa, lý do ở ADR-08 "Sửa khi làm T-06-03".
 
 **Consequences:** Đối tác không hiện được "chỉ còn 3 đôi" và không chặn được đặt vượt tồn —
 đúng phạm vi, vì đặt hàng nằm ngoài feature này. Thêm số lượng về sau là thêm trường, không
 phá hợp đồng.
+
+**Status:** accepted
+
+### ADR-07 — Dòng kết quả mô tả các biến thể khớp khi có bộ lọc mức biến thể
+
+**Context:** Bản đầu gộp `priceMin`, `priceMax`, `colors`, `sizes`, `inStock` trên **mọi** biến thể
+active, và chỉ dùng bộ lọc để chọn product — handler ghi rõ *"Every product-level predicate goes in
+HAVING, never inside `active_items`"*. Phản ánh 2026-09-13: lọc `colors=["BA"]` vẫn thấy `D` trong
+dòng; lọc BA + 39 thấy `inStock: true` trong khi chính biến thể BA/39 đã hết — đo trên erp_dev_3008 là
+47/106 sản phẩm khớp. Dưới bộ lọc, thẻ sản phẩm của storefront phải nói về thứ người mua vừa chọn.
+
+**Decision:** Bộ lọc **mức biến thể** là `colors`, `sizes`, `priceFrom`, `priceTo`, `inStock`. Khi có ít
+nhất một bộ lọc này, *biến thể khớp* là các biến thể active thoả **tất cả** chúng; product vào kết quả
+khi có ít nhất một biến thể khớp (trừ `inStock=false`, xem ADR-08); `priceMin`, `priceMax`, `colors`,
+`sizes`, `inStock` của dòng tính trên đúng tập biến thể khớp; `price_asc`/`price_desc` xếp theo giá đã
+thu hẹp. `keyword` và `categoryId` là bộ lọc **mức product**: chọn product, không thu hẹp dòng (A-19).
+Không có bộ lọc mức biến thể thì hành vi giữ nguyên.
+
+**Consequences:** Cùng một product hiện khác nhau giữa hai request lọc khác nhau — đúng ý đồ, và docs
+đối tác phải nói ra. Trang chi tiết không nhận bộ lọc nên vẫn trả mọi biến thể. Truy vấn facet phải
+nhận tập biến thể khớp từ truy vấn chính, **không** tự dựng lại điều kiện lọc: hai bản sao điều kiện sẽ
+lệch nhau (T-06-02). Quyết định này thay câu doc cũ của `buildProductSearchSql`, và T-06-01 phải sửa câu
+đó thay vì để nó nói ngược code.
+
+**Status:** accepted
+
+### ADR-08 — Bộ lọc `inStock` khớp trên cùng biến thể
+
+**Context:** Đối tác cần lọc còn hàng / hết hàng. ADR-05 đã chốt màu + size + giá khớp trên **cùng một**
+biến thể; "BA size 39 còn hàng" nghĩa là đôi BA/39 còn, không phải product còn ở size khác.
+
+**Decision:** `inStock?: boolean` trong body search. `true`: tồn tại biến thể khớp mọi bộ lọc mức biến
+thể khác **và** còn tồn theo định nghĩa duy nhất ở `partner-stock.sql.ts` (ADR-06). `false`: tồn tại
+biến thể khớp các bộ lọc khác **và không** biến thể nào trong số đó còn tồn. Bỏ trống: không lọc. Hai
+bất biến kiểm được: với cùng các bộ lọc khác, `total(true) + total(false) = total(bỏ trống)`; và mọi dòng
+trả về có `inStock` bằng giá trị đã lọc.
+
+**Consequences:** `false` **không** phải "có ít nhất một biến thể hết hàng" — định nghĩa đó cho một
+product nằm ở cả hai phía. Chuỗi `"true"` là 400: body là JSON, không cần `@Transform`. Predicate tồn
+kho tính **một lần** mỗi biến thể thành cột của `active_items`, không lặp `EXISTS` ở `FILTER` và
+`HAVING`. **Sửa khi làm T-06-03:** "một lần" phải đúng lúc *chạy*, không chỉ trên *chữ*: Postgres inline CTE
+`active_items`, nên một cột `in_stock` viết bằng `EXISTS` bị tính lại ở mọi chỗ đọc `ai.in_stock` — đo trên
+erp_dev_3008 là 6 lượt quét `stock_balances`, 654 ms cho `inStock=true` và 890 ms cho màu + size + `inStock=true`.
+Cột này vì vậy lấy từ **một** `LEFT JOIN` trên tập item còn tồn (`stockedItemIdsSql` trong `partner-stock.sql.ts`,
+dựng từ cùng điều kiện với `inStockExistsSql` mà endpoint chi tiết vẫn dùng): 33 ms và 120 ms, kết quả giống hệt
+trên cả 7 tổ hợp lọc đã so. `MATERIALIZED` cũng chữa được nhưng làm request không lọc chậm gấp đôi (33 → 62 ms).
+
+**Status:** accepted
+
+### ADR-09 — Chi tiết tra theo `products.code`, bỏ `products.id` khỏi route
+
+**Context:** Storefront dựng URL theo mã hàng (`/products/TN398`); đối tác có mã, không có UUID. Route
+`:productId` chưa từng live (T-04-03 chưa làm; docs §7 ghi *"Not routable yet"*), nên đổi khoá không phá
+hợp đồng nào. `UQ_products_org_code` là unique index `(organization_id, code) WHERE code IS NOT NULL` —
+tối đa một product mỗi mã trong một tổ chức. Đo 2026-09-13 trên erp_dev_3008: 0/4.731 mã active chứa ký
+tự ngoài `[A-Za-z0-9._~-]`, 0 cặp trùng khi so không phân biệt hoa thường, 1 product bán được không có mã.
+
+**Decision:** `GET /v2/partner/catalog/products/:productCode`, lọc
+`p.code = $2 AND p.organization_id = $1` — so khớp **chính xác**, dùng đúng index unique. Không nhận
+UUID, không nhận SKU biến thể, không so không phân biệt hoa thường. Mọi trường hợp không trả được vẫn
+là 404 cùng một thông điệp (AC-16..18). Bỏ `ParseUUIDPipe`.
+
+**Consequences:** Product không có mã không mở được chi tiết (1 trường hợp) — search vẫn trả nó với
+`code: null`, docs phải nói. So không phân biệt hoa thường sẽ cần index `lower(code)` và có thể ra hai
+dòng khi tổ chức tạo `abc` cạnh `ABC` — không làm. Mã dễ đoán hơn UUID, nhưng key đó liệt kê được mọi
+mã qua search, nên 404 không phân biệt vẫn đủ.
 
 **Status:** accepted

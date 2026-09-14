@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsNumber,
@@ -101,6 +102,21 @@ export class PartnerProductSearchDto {
   @IsString({ each: true })
   @ArrayMaxSize(50)
   sizes?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'Stock filter, matched on the SAME variant as colors/sizes/price (ADR-08). ' +
+      '`true`: only products with at least one variant that matches every other ' +
+      'variant-level filter and has stock in a branch this API key may see; the row ' +
+      'describes those variants. `false`: only products that have at least one variant ' +
+      'matching every other variant-level filter and NONE of those matching variants has ' +
+      'stock in a branch this API key may see (a product with any in-stock matching ' +
+      'variant is excluded); the row describes those, all out-of-stock, variants. ' +
+      'Omitted: no stock filtering.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  inStock?: boolean;
 
   @ApiPropertyOptional({
     enum: PARTNER_PRODUCT_SORTS,

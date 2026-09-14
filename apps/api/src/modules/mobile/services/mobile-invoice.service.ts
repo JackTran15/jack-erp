@@ -5,9 +5,10 @@ import { Repository } from 'typeorm';
 import type { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { EmployeeProfileEntity } from '../../rbac/employee/employee-profile.entity';
 import { InvoiceSearchV2Dto } from '../../pos/dto/invoice-search-v2.dto';
+import { InvoiceStatus } from '../../pos/entities/invoice.entity';
 import { InvoiceService } from '../../pos/services/invoice.service';
 import { SearchInvoicesV2Query } from '../../pos/queries/search-invoices-v2.query';
-import { MobileInvoiceListQueryDto } from '../dto/mobile-invoice-list.query.dto';
+import { MobileInvoiceListQueryDto, MobileInvoiceStatusFilter } from '../dto/mobile-invoice-list.query.dto';
 
 /**
  * Hoá đơn mà NGƯỜI GỌI được ghi công bán.
@@ -19,6 +20,48 @@ import { MobileInvoiceListQueryDto } from '../dto/mobile-invoice-list.query.dto'
  * **Phạm vi ép ở đây, không ở client** (ADR-24). Đây là khác biệt đáng kể duy
  * nhất so với đường web, và là lý do đường mobile tồn tại thay vì gọi thẳng.
  */
+const MOBILE_STATUS_TO_INVOICE: Record<MobileInvoiceStatusFilter, InvoiceStatus[]> = {
+  paid: [InvoiceStatus.PAID],
+  unpaid: [InvoiceStatus.PENDING, InvoiceStatus.DEBT, InvoiceStatus.PARTIAL_DEBT],
+  cancelled: [InvoiceStatus.CANCELLED],
+};
+
+const INVOICE_NUMERIC_FIELDS = [
+  'subtotal',
+  'discountAmount',
+  'pointsDiscountAmount',
+  'depositAmount',
+  'amountDue',
+  'totalPaid',
+  'refundedAmount',
+  'netAmount',
+  'offsetAmount',
+  'keptChangeAmount',
+] as const;
+const ITEM_NUMERIC_FIELDS = [
+  'quantity',
+  'unitPrice',
+  'unitPriceDefault',
+  'costPrice',
+  'lineDiscount',
+  'lineDiscountValue',
+  'promotionDiscount',
+  'lineTotal',
+  'returnedQuantity',
+] as const;
+const PAYMENT_NUMERIC_FIELDS = ['amount'] as const;
+
+/** `null`/`undefined` giữ nguyên — vắng là ca hợp lệ, không phải `0`. */
+function numbersOf<T extends object, K extends keyof T>(source: T, keys: readonly K[]): Partial<Record<K, number | null>> {
+  const out: Partial<Record<K, number | null>> = {};
+  for (const key of keys) {
+    const value = source[key] as unknown;
+    if (value === null || value === undefined) continue;
+    out[key] = Number(value);
+  }
+  return out;
+}
+
 @Injectable()
 export class MobileInvoiceService {
   constructor(
@@ -59,6 +102,20 @@ export class MobileInvoiceService {
       } as InvoiceSearchV2Dto['createdAt'];
     }
 
+    // Ô tìm ở header đi thẳng xuống bộ lọc tự do của v2 (số HĐ / tên / SĐT
+    // khách). Không `trim` ở đây: `applyOrString` tự trim và bỏ qua chuỗi trống.
+    if (query.search) {
+      dto.search = query.search;
+    }
+
+    // Ba trạng thái của app -> tập giá trị thật. "Ghi nợ" gộp ba giá trị vì đó
+    // đúng là cách `InvoiceModel` phía app đọc về (mọi giá trị không phải
+    // paid/cancelled rơi về `unpaid`); lệch ở đây là lọc ra một tập mà màn
+    // không bày được, hoặc ngược lại.
+    if (query.status?.length) {
+      dto.statuses = [...new Set(query.status.flatMap((s) => MOBILE_STATUS_TO_INVOICE[s]))];
+    }
+
     return this.queryBus.execute(new SearchInvoicesV2Query(dto, actor));
   }
 
@@ -86,9 +143,18 @@ export class MobileInvoiceService {
       throw new NotFoundException(`Invoice ${id} not found`);
     }
 
-    return Object.assign(invoice, {
+    // Cột `numeric` của TypeORM về dưới dạng CHUỖI ("650000.00"). Danh sách đã
+    // đi qua `SearchInvoicesV2Handler` (có `Number()`), còn đường này trả thẳng
+    // entity nên app phải tự cứu và bắn một cảnh báo `[parse]` cho MỖI trường,
+    // mỗi lượt mở tờ hoá đơn (Loc thấy 2026-09-12). Ép về số ở đây, đúng một
+    // chỗ, cho cùng hợp đồng với danh sách.
+    return {
+      ...invoice,
+      ...numbersOf(invoice, INVOICE_NUMERIC_FIELDS),
+      items: invoice.items.map((item) => ({ ...item, ...numbersOf(item, ITEM_NUMERIC_FIELDS) })),
+      payments: invoice.payments.map((payment) => ({ ...payment, ...numbersOf(payment, PAYMENT_NUMERIC_FIELDS) })),
       salespersonName: await this.salespersonNameOf(invoice.salespersonId, actor),
-    });
+    };
   }
 
   /**

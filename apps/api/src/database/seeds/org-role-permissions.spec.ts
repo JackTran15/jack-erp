@@ -115,7 +115,27 @@ describe('staff roles separate warehouse, selling and cash duties', () => {
     ['CASHIER', CASHIER_PERMISSION_KEYS],
     ['WAREHOUSE', WAREHOUSE_PERMISSION_KEYS],
   ])('never lets %s approve a document', (_role, keys) => {
-    expect(keys.filter((key) => key.endsWith('.approve'))).toEqual([]);
+    // `pos.sales-order.approve` is the one deliberate exception: a mobile sales
+    // order is a consultant's request TO the cashier, and "approve" there means
+    // "take it to the till" — not the manager sign-off that every other
+    // `.approve` key guards. Granted by migration 1789960000000 to whoever holds
+    // `accounting.cash_receipt.create`; the CASHIER list mirrors that.
+    expect(
+      keys.filter((key) => key.endsWith('.approve') && key !== 'pos.sales-order.approve'),
+    ).toEqual([]);
+  });
+
+  it('lets CASHIER, and only CASHIER among staff, approve or reject mobile sales orders', () => {
+    for (const key of ['pos.sales-order.approve', 'pos.sales-order.reject']) {
+      expect(CASHIER_PERMISSION_KEYS).toContain(key);
+      expect(SALES_PERMISSION_KEYS).not.toContain(key);
+      expect(WAREHOUSE_PERMISSION_KEYS).not.toContain(key);
+    }
+    // Sending and cancelling one's own order is selling — both selling roles have it.
+    for (const key of ['pos.sales-order.read', 'pos.sales-order.create', 'pos.sales-order.cancel']) {
+      expect(SALES_PERMISSION_KEYS).toContain(key);
+      expect(CASHIER_PERMISSION_KEYS).toContain(key);
+    }
   });
 
   it('keeps chuyển kho tạm (POS fast transfer) for SALES and WAREHOUSE', () => {

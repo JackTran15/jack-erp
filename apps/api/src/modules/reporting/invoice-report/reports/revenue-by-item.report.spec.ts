@@ -211,6 +211,74 @@ describe('RevenueByItemReport.buildData', () => {
     expect(totals['quantity']).toBe(5);
   });
 
+  it('filters.search khớp SKU / tên hàng, không phân biệt hoa thường; không khớp thì rỗng', async () => {
+    const report = makeReport({
+      invoices: [inv()],
+      lines: [line(), line({ itemId: 'it2', itemCode: 'BAG-01', itemName: 'Túi xách', lineTotal: 500 })],
+      items: [{ id: 'it1', categoryId: 'cat1' }, { id: 'it2', categoryId: 'cat1' }],
+      categories: [],
+    });
+
+    const bySku = await report.buildData(baseDto({ filters: { issuedAt: { from: '2026-06-01' }, search: 'sku00' } }) as any, actor);
+    expect(bySku.rows.map((r) => r.sku)).toEqual(['SKU001']);
+
+    const byName = await report.buildData(baseDto({ filters: { issuedAt: { from: '2026-06-01' }, search: 'TÚI' } }) as any, actor);
+    expect(byName.rows.map((r) => r.sku)).toEqual(['BAG-01']);
+
+    const none = await report.buildData(baseDto({ filters: { issuedAt: { from: '2026-06-01' }, search: 'zzz' } }) as any, actor);
+    expect(none.total).toBe(0);
+  });
+
+  it('statBy=parent: search khớp mã/tên MẪU MÃ đang hiển thị, KHÔNG khớp mã biến thể', async () => {
+    const report = makeReport({
+      invoices: [inv()],
+      lines: [
+        line({ itemId: 'v41', itemCode: 'ABA2777-D-41', itemName: 'Giày nam ABA2777-D-41', lineTotal: 500 }),
+        line({ itemId: 'v39', itemCode: 'TX1018-BO-39', itemName: 'Giày TX1018-BO-39', lineTotal: 300 }),
+      ],
+      items: [
+        { id: 'v41', categoryId: 'cat1', productId: 'p1' },
+        { id: 'v39', categoryId: 'cat1', productId: 'p2' },
+      ],
+      products: [
+        { id: 'p1', code: 'ABA2777', name: 'ABA2777' },
+        { id: 'p2', code: 'TX1018', name: 'TX1018' },
+      ],
+      // Mã nhóm `1001` chứa "1" và BẮT ĐẦU bằng "1" — KHÔNG được kéo cả nhóm lên vì một chữ số.
+      categories: [{ id: 'cat1', code: '1001', name: 'Giày' }],
+    });
+    // `repo()` trả mọi bản ghi bất kể `where`; riêng test này cần ILIKE thật
+    // (tiền tố cho mã, chuỗi con cho tên) — nếu không thì "1" khớp mọi nhóm và
+    // test không phân biệt được hai luật.
+    const categories = [{ id: 'cat1', code: '1001', name: 'Giày' }];
+    const ilike = (pattern: string, value: string) =>
+      new RegExp('^' + pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*') + '$', 'i').test(value);
+    (report as any).categories.find = jest.fn(async ({ where }: { where: Record<string, any> | Array<Record<string, any>> }) =>
+      categories.filter((c) =>
+        (Array.isArray(where) ? where : [where]).some((clause) =>
+          Object.entries(clause).every(([key, cond]) =>
+            key === 'organizationId' ? true : ilike(String((cond as any).value ?? cond), String((c as any)[key])),
+          ),
+        ),
+      ),
+    );
+    const parentDto = (search: string) =>
+      baseDto({ filters: { issuedAt: { from: '2026-06-01' }, statBy: ReportGroupBy.PARENT, search } }) as any;
+
+    // "1" nằm trong `ABA2777-D-41` (mã biến thể) nhưng KHÔNG nằm trong `ABA2777` — mẫu đó không được lên.
+    const one = await report.buildData(parentDto('1'), actor);
+    expect(one.rows.map((r) => r.sku)).toEqual(['TX1018']);
+
+    const byParent = await report.buildData(parentDto('aba2'), actor);
+    expect(byParent.rows.map((r) => r.sku)).toEqual(['ABA2777']);
+
+    // Mã nhóm khớp CHÍNH XÁC ("1001"), tên nhóm khớp chuỗi con ("iày" → Giày): cả hai mẫu cùng nhóm đều lên.
+    const byCategoryCode = await report.buildData(parentDto('1001'), actor);
+    expect(byCategoryCode.rows.map((r) => r.sku).sort()).toEqual(['ABA2777', 'TX1018']);
+    const byCategoryName = await report.buildData(parentDto('iày'), actor);
+    expect(byCategoryName.rows.map((r) => r.sku).sort()).toEqual(['ABA2777', 'TX1018']);
+  });
+
   it('groups by category when statBy=group', async () => {
     const report = makeReport({
       invoices: [inv()],

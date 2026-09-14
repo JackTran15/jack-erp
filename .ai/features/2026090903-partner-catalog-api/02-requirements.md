@@ -1,7 +1,7 @@
 ---
 feature: partner-catalog-api
 stories: 4
-acceptance_criteria: 22
+acceptance_criteria: 25
 ---
 
 # Requirements — 3 API danh mục hàng hoá cho đối tác
@@ -12,7 +12,7 @@ Ba endpoint, một bề mặt. Ký hiệu route dùng trong tài liệu này (ch
 |---|---|---|
 | 1 | Nhóm hàng hoá | `POST /v2/partner/catalog/categories/tree` |
 | 2 | Tìm sản phẩm | `POST /v2/partner/catalog/products/search` |
-| 3 | Chi tiết sản phẩm | `GET /v2/partner/catalog/products/:productId` |
+| 3 | Chi tiết sản phẩm | `GET /v2/partner/catalog/products/:productCode` |
 
 Mọi request xác thực bằng header `X-Api-Key` (hoặc JWT, vì `AuthGuard` nhận cả hai).
 Không endpoint nào gắn `@Public()`.
@@ -67,7 +67,8 @@ And không trả lỗi
 ## US-02 — Đối tác tìm sản phẩm có lọc, phân trang, sắp xếp
 
 Là hệ thống storefront, tôi muốn truy vấn danh sách sản phẩm theo từ khoá, nhóm hàng,
-khoảng giá, màu và kích thước, có phân trang và 3 kiểu sắp xếp, để dựng trang danh mục.
+khoảng giá, màu, kích thước và tình trạng còn hàng/hết hàng, có phân trang và 3 kiểu sắp xếp,
+để dựng trang danh mục.
 
 **Priority:** must
 **Depends on:** US-01
@@ -166,6 +167,40 @@ When đối tác gửi limit=500
 Then response 400, vì limit tối đa là 100
 When đối tác gửi sort="random"
 Then response 400
+When đối tác gửi inStock="yes"
+Then response 400, vì inStock chỉ nhận boolean
+```
+
+**AC-23** — Dòng kết quả chỉ mô tả các biến thể khớp bộ lọc
+```gherkin
+Given product P có biến thể (38, BA, 495.000, còn hàng), (39, BA, 750.000, hết hàng) và (39, D, 800.000, còn hàng)
+When đối tác search với colors=["BA"]
+Then dòng của P có colors=["BA"], sizes=["38","39"], priceMin=495000, priceMax=750000, inStock=true
+When đối tác search với colors=["BA"] và sizes=["39"]
+Then dòng của P có colors=["BA"], sizes=["39"], priceMin=750000, priceMax=750000, inStock=false
+When đối tác search với sizes=["39"]
+Then dòng của P có colors=["BA","D"], sizes=["39"], priceMin=750000, priceMax=800000, inStock=true
+When đối tác search với priceFrom=700000 và priceTo=760000
+Then dòng của P có colors=["BA"], sizes=["39"], priceMin=750000, priceMax=750000, inStock=false
+When đối tác search không có colors, sizes, priceFrom, priceTo, inStock
+Then dòng của P mô tả mọi biến thể active: colors=["BA","D"], sizes=["38","39"], priceMin=495000, priceMax=800000, inStock=true
+And keyword và categoryId chọn product nhưng không thu hẹp dòng
+And sort="price_asc" và sort="price_desc" xếp theo priceMin/priceMax đã thu hẹp
+```
+
+**AC-24** — Lọc còn hàng / hết hàng trên cùng biến thể
+```gherkin
+Given product P như AC-23, và product Q có mọi biến thể active đều hết hàng
+When đối tác search với inStock=true
+Then P nằm trong kết quả, Q không, và mọi dòng có inStock=true
+When đối tác search với inStock=false
+Then Q nằm trong kết quả, P không, và mọi dòng có inStock=false
+When đối tác search với colors=["BA"], sizes=["39"], inStock=true
+Then P không nằm trong kết quả, vì biến thể BA/39 hết hàng dù P còn hàng ở biến thể khác
+When đối tác search với colors=["BA"], sizes=["39"], inStock=false
+Then P nằm trong kết quả với inStock=false
+And với cùng các bộ lọc khác, total khi inStock=true cộng total khi inStock=false bằng total khi không truyền inStock
+And "còn hàng" dùng đúng định nghĩa của AC-12: tồn > 0 ở bất kỳ chi nhánh nào key được thấy
 ```
 
 ---
@@ -182,8 +217,8 @@ dựng trang chi tiết có chọn màu và size.
 
 **AC-15** — Happy path
 ```gherkin
-Given product "Giày búp bê MY88610" có 5 biến thể size 35..39
-When đối tác gọi GET /v2/partner/catalog/products/<id>
+Given product mã "MY88610" (products.code) có 5 biến thể size 35..39
+When đối tác gọi GET /v2/partner/catalog/products/MY88610
 Then response 200 có id, code, name, description, categoryId, categoryName, priceMin, priceMax, inStock, images, attributes, variants
 And attributes liệt kê các chiều thuộc tính và giá trị có thể chọn, ví dụ Size: [35,36,37,38,39]
 And variants có 5 phần tử, mỗi phần tử có id, code, variantLabel, price, inStock, attributes
@@ -192,15 +227,15 @@ And images là mảng rỗng
 
 **AC-16** — Không tìm thấy
 ```gherkin
-Given id không tồn tại
-When đối tác gọi GET /v2/partner/catalog/products/<id>
+Given mã sản phẩm không tồn tại trong tổ chức của key
+When đối tác gọi GET /v2/partner/catalog/products/<mã>
 Then response 404
 ```
 
 **AC-17** — Không lộ sự tồn tại của sản phẩm tổ chức khác
 ```gherkin
-Given product P thuộc tổ chức B
-When đối tác dùng API key của tổ chức A gọi GET /v2/partner/catalog/products/<id của P>
+Given product P mã "BONLY01" chỉ tồn tại ở tổ chức B
+When đối tác dùng API key của tổ chức A gọi GET /v2/partner/catalog/products/BONLY01
 Then response 404, không phải 403
 And thông điệp lỗi không tiết lộ P có tồn tại
 ```
@@ -210,6 +245,22 @@ And thông điệp lỗi không tiết lộ P có tồn tại
 Given product P có 3 item nhưng cả 3 đều is_active = false
 When đối tác gọi GET chi tiết của P
 Then response 404, đồng nhất với việc P không xuất hiện trong kết quả search
+```
+
+**AC-25** — Chi tiết tra theo mã sản phẩm, khớp chính xác
+```gherkin
+Given product mã "TN398" (products.code) thuộc tổ chức A, có biến thể SKU "TN398-BO-38"
+When đối tác dùng API key của tổ chức A gọi GET /v2/partner/catalog/products/TN398
+Then response 200 với code="TN398" và hình dạng như AC-15
+When đối tác gọi GET /v2/partner/catalog/products/<uuid products.id của TN398>
+Then response 404 "Product not found", vì id không còn là khoá của route
+When đối tác gọi GET /v2/partner/catalog/products/tn398
+Then response 404, vì so khớp phân biệt hoa thường
+When đối tác gọi GET /v2/partner/catalog/products/TN398-BO-38
+Then response 404, vì SKU biến thể không phải mã sản phẩm
+Given tổ chức B cũng có product mã "TN398"
+When đối tác dùng API key của tổ chức A gọi GET /v2/partner/catalog/products/TN398
+Then response là product của tổ chức A, không bao giờ là của tổ chức B
 ```
 
 ---
@@ -266,3 +317,5 @@ Then response 403
 | Tương thích | Không sửa DTO/handler nào đang phục vụ backoffice hoặc POS | T-04-02 |
 | Tài liệu | Cả 3 endpoint có `@ApiOkResponse` với response DTO khai đủ `@ApiProperty`, theo mẫu `inventory-item-v2.controller.ts:27`, và `@ApiSecurity('api-key')` | T-04-03 |
 | Tài liệu | `pnpm openapi:generate` chạy lại, `schema.ts` + `openapi.snapshot.json` được commit | T-04-03 |
+| Hiệu năng | `products/search` có `colors` + `sizes` + `inStock` trả trong < 500 ms (p95) trên erp_dev_3008, page=1 limit=20 | T-06-04 |
+| Tài liệu | `docs/partner-catalog-api.md` mô tả bộ lọc `inStock`, việc dòng thu hẹp về biến thể khớp và route `:productCode` | T-05-03 |

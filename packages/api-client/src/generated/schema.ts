@@ -2560,6 +2560,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/inventory/storages/{id}/set-default-issuing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set a storage as the active branch's single default issuing warehouse */
+        post: operations["StorageDefaultIssuingController_setDefaultIssuing_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v2/inventory/items/resolve-locations": {
         parameters: {
             query?: never;
@@ -7777,6 +7794,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/mobile/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Khách hàng để gắn vào đơn bán */
+        get: operations["MobileCustomerController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/product-attributes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chiều thuộc tính của cả danh mục (Màu sắc, Size…) */
+        get: operations["MobileProductAttributeController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hoá đơn mà người đang đăng nhập được ghi công bán */
+        get: operations["MobileInvoiceController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/invoices/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một hoá đơn, kèm dòng hàng và các khoản đã thu */
+        get: operations["MobileInvoiceController_getById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/item-categories/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhóm hàng hoá dạng cây cha → con */
+        get: operations["MobileItemCategoryController_tree"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/mobile/items": {
         parameters: {
             query?: never;
@@ -7803,6 +7905,91 @@ export interface paths {
         };
         /** Danh sách hàng hoá, phân trang */
         get: operations["MobileProductController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/product-revenue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Doanh thu theo mặt hàng — gộp theo mẫu mã hoặc nhóm hàng hóa */
+        get: operations["MobileProductRevenueController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/promotions/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Định giá giỏ hàng theo khuyến mại — KHÔNG ghi gì */
+        post: operations["MobilePromotionController_evaluate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/sales-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh mục để bán — biến thể hoặc mẫu mã, kèm giá bán, phân trang */
+        get: operations["MobileSalesItemController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/sales-items/models/{productId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Các chiều biến thiên và biến thể của một mẫu mã */
+        get: operations["MobileSalesItemController_getModel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/sales-items/models/{productId}/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tồn kho của một mẫu mã: theo biến thể, theo kho, theo chi nhánh khác */
+        get: operations["MobileSalesItemController_getModelStock"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7845,6 +8032,57 @@ export interface paths {
         head?: never;
         /** Sửa chứng từ kho */
         patch: operations["MobileStockDocumentController_update"];
+        trace?: never;
+    };
+    "/v2/partner/catalog/categories/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Active product category tree with per-branch-independent product counts */
+        post: operations["PartnerCategoryV2Controller_tree_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/partner/catalog/products/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search products by keyword, category, price and attributes */
+        post: operations["PartnerProductV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/partner/catalog/products/{productCode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Product detail with its attribute dimensions and variants */
+        get: operations["PartnerProductV2Controller_detail_v2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }
@@ -9716,6 +9954,7 @@ export interface components {
             description?: string;
             isMainStorage: boolean;
             isDefaultReceiving: boolean;
+            isDefaultIssuing: boolean;
             isActive: boolean;
             branch?: components["schemas"]["BranchEntity"];
             id: string;
@@ -12291,6 +12530,13 @@ export interface components {
             /** @description True for the storage backing the branch main showroom. */
             isMainShowroom: boolean;
         };
+        PosBranchStockDto: {
+            /** Format: uuid */
+            branchId: string;
+            name: string;
+            quantity: number;
+            storages: components["schemas"]["PosVariantStorageDto"][];
+        };
         PosProductVariantDto: {
             /** Format: uuid */
             itemId: string;
@@ -12312,6 +12558,8 @@ export interface components {
             otherBranchQuantity: number;
             /** @description Per-storage breakdown of this variant's stock at the current branch, every active storage included (even 0 balance), sorted with the main showroom first. */
             storages: components["schemas"]["PosVariantStorageDto"][];
+            /** @description `otherBranchQuantity` kept split by branch instead of collapsed, each with the storages the stock sits in. Only branches that actually HOLD the item appear — the current branch's `storages` list keeps 0-balance entries, this one does not, because the two answer different questions ("where in this store" vs "which store has it"). */
+            otherBranches: components["schemas"]["PosBranchStockDto"][];
         };
         PosProductDetailDto: {
             /** @enum {string} */
@@ -12980,6 +13228,18 @@ export interface components {
             customerName?: components["schemas"]["StringFilterDto"];
             /** @description Tổng thanh toán */
             amountDue?: components["schemas"]["CompareFilterDto"];
+            /**
+             * Format: uuid
+             * @description Nhân viên được ghi công bán — `employee_profiles.id`, KHÔNG phải `users.id`.
+             *
+             *     Thêm cho `/mobile/invoices`, nơi vai tư vấn chỉ được thấy hoá đơn của chính
+             *     mình. Đường mobile tra `employee_profiles` từ `actor.userId` rồi đặt trường
+             *     này; **client không đặt được nó** vì DTO của đường mobile không phơi ra.
+             *
+             *     Ở đường web thì nó là một bộ lọc bình thường như mọi bộ lọc khác — phạm vi
+             *     ở đó vẫn do tổ chức và chi nhánh quyết, không do trường này.
+             */
+            salespersonId?: string;
             /** @description Ghi chú */
             note?: components["schemas"]["StringFilterDto"];
         };
@@ -15097,6 +15357,32 @@ export interface components {
             page: number;
             limit: number;
         };
+        MobileCustomerResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description Mã khách hàng. NULL là hợp lệ — khách vãng lai chưa có mã. */
+            code: string | null;
+            name: string;
+            /** @description Số điện thoại — khoá tra cứu chính của màn chọn khách. */
+            phone: string | null;
+        };
+        MobileCustomerPageDto: {
+            data: components["schemas"]["MobileCustomerResponseDto"][];
+            total: number;
+            page: number;
+            limit: number;
+        };
+        MobileProductAttributeValueDto: {
+            /** @description Nhãn hiển thị — `product_attribute_options.value_label` */
+            label: string;
+            /** @description Hậu tố ghép vào mã biến thể — `product_attribute_options.code_suffix` */
+            codeSuffix: string | null;
+        };
+        MobileProductAttributeDto: {
+            /** @description Tên chiều — vd `Màu sắc`, `Size` */
+            name: string;
+            values: components["schemas"]["MobileProductAttributeValueDto"][];
+        };
         MobileItemResponseDto: {
             /**
              * Format: uuid
@@ -15139,6 +15425,156 @@ export interface components {
             total: number;
             page: number;
             limit: number;
+        };
+        MobileEvaluateCartLineDto: {
+            /**
+             * @description Do CLIENT tự đặt và được trả lại nguyên trong `appliedPrograms[].lineDiscounts[]`,
+             *     nên app ghép kết quả về dòng mà không phải đoán theo thứ tự.
+             */
+            lineId: string;
+            /** Format: uuid */
+            itemId: string;
+            quantity: number;
+            unitPrice: number;
+            /**
+             * @description Giảm giá TAY cho riêng dòng này, tính bằng TIỀN (không phải %).
+             *
+             *     Mở cho mobile ngày 2026-09-11 theo yêu cầu của Loc: màn Chi tiết đơn hàng
+             *     của vai tư vấn nay có thao tác vuốt dòng -> "Khuyến mại", đúng thứ mà
+             *     pos-web đã làm qua `LineDiscountDialog`.
+             *
+             *     Engine trừ nó TRƯỚC khi áp chương trình tự động
+             *     (`discount-math.ts`: `quantity*unitPrice - manualLineDiscount`), nên nó
+             *     không cộng dồn lên trên giá đã giảm.
+             *
+             *     Chỉ nhận SỐ TIỀN — giống hệt `EvaluateCartLineInputDto` của bản web. Client
+             *     nào muốn nhập theo % thì tự quy ra tiền trước khi gửi; mở thêm một trường
+             *     `%` ở đây là hai đường tính cho cùng một con số.
+             */
+            manualLineDiscount?: number;
+        };
+        MobileEvaluateCartDto: {
+            /**
+             * Format: uuid
+             * @description Bỏ trống = khách vãng lai
+             */
+            customerId?: string;
+            /**
+             * @description Id các chương trình người dùng TỰ CHỌN. Hai nghĩa, và đó là chủ ý của bản
+             *     web (ADR-03 bên đó): bật một chương trình `auto_apply=false`, và cho một
+             *     chương trình thắng tranh chấp tài nguyên trước cả `priority`.
+             */
+            selectedProgramIds?: string[];
+            /**
+             * @description RỖNG là hợp lệ, có chủ ý: màn *Chương trình khuyến mại* của app bày danh
+             *     mục chương trình (`availablePrograms`) trước khi đơn có dòng nào.
+             */
+            lines: components["schemas"]["MobileEvaluateCartLineDto"][];
+        };
+        MobileSalesItemResponseDto: {
+            /**
+             * @description `item` = một biến thể, `id` là `items.id` và đặt thẳng vào dòng đơn được. `model` = một mẫu mã, `id` là `products.id` và **KHÔNG** đặt vào dòng đơn được — phải chọn một biến thể trước.
+             * @enum {string}
+             */
+            type: "item" | "model";
+            /**
+             * Format: uuid
+             * @description `items.id` khi `type=item`, `products.id` khi `type=model`. Ý nghĩa đổi theo `type`, nên đừng dereference nó mà không đọc `type` trước.
+             */
+            id: string;
+            /** @description Mã SKU */
+            code: string;
+            /** @description Tên hàng hoá, đã kèm nhãn biến thể — vd `Giày Gelli (39 · Nâu)` */
+            name: string;
+            /** @description Nhãn biến thể tách riêng (`39 · Nâu`). NULL với mặt hàng không có biến thể. */
+            variantLabel: string | null;
+            /** @description Đơn vị tính, dùng để hiển thị và làm `uomCode` của dòng đơn. */
+            unit: string;
+            /** @description Giá bán của hàng hoá, đơn vị đồng. `0` là giá trị HỢP LỆ — hàng chưa đặt giá — và app vẫn phải hiển thị nó chứ không ẩn đi. Với `type=model` là giá TRUNG BÌNH của các biến thể, cùng phép tính mà `/mobile/products` và lưới `/admin/inventory-items` đang dùng. */
+            sellingPrice: number;
+            /** @description Số biến thể gộp trong dòng. Luôn `1` khi `type=item`. Client dùng nó để biết có phải mở bảng chọn biến thể hay không. */
+            variantCount: number;
+        };
+        MobileSalesItemPageDto: {
+            data: components["schemas"]["MobileSalesItemResponseDto"][];
+            total: number;
+            page: number;
+            limit: number;
+        };
+        MobileSalesModelAttributeDto: {
+            /** @description Tên chiều — vd `Màu sắc`, `Size` */
+            name: string;
+            /** @description Các nhãn theo đúng thứ tự hiển thị đã cấu hình (`sort_order`), KHÔNG phải theo bảng chữ cái: `38, 39, 40` xếp theo alphabet vẫn đúng nhưng `S, M, L` thì không. */
+            options: string[];
+        };
+        MobileSalesVariantAttributeDto: {
+            name: string;
+            value: string;
+        };
+        MobileSalesVariantDto: {
+            /**
+             * Format: uuid
+             * @description `items.id` — khoá dòng đơn hàng
+             */
+            id: string;
+            code: string;
+            name: string;
+            /** @description Nhãn biến thể gộp sẵn — vd `39 · Nâu` */
+            variantLabel: string | null;
+            unit: string;
+            /** @description `0` là giá trị HỢP LỆ — hàng chưa đặt giá. */
+            sellingPrice: number;
+            /** @description Nhãn của biến thể ở từng chiều. Client dò TỔ HỢP người dùng chọn vào đây để tìm ra đúng biến thể — nên nó phải đủ MỌI chiều mà mẫu mã khai, không chỉ các chiều khác nhau giữa các biến thể. */
+            attributes: components["schemas"]["MobileSalesVariantAttributeDto"][];
+            /** @description Mã vạch của biến thể. **MẢNG, không phải một chuỗi** — `item_barcodes` là quan hệ một-nhiều và KHÔNG có cờ `isPrimary`, nên không có cái nào là "mã vạch chính". Một mặt hàng thường mang cả EAN của nhà sản xuất lẫn mã nội bộ. Rỗng là ca hợp lệ và phổ biến. Thứ tự ổn định theo `created_at` rồi `code`, để hai lượt gọi không đảo chỗ. */
+            barcodes: string[];
+        };
+        MobileSalesModelDetailDto: {
+            /**
+             * Format: uuid
+             * @description `products.id`
+             */
+            id: string;
+            code: string;
+            name: string;
+            attributes: components["schemas"]["MobileSalesModelAttributeDto"][];
+            /** @description Chỉ các biến thể CÒN BÁN ĐƯỢC (`isActive` và `isPosVisible`) — cùng tập đã dựng nên dòng mẫu mã ở danh sách, nên hai màn không lệch nhau. */
+            variants: components["schemas"]["MobileSalesVariantDto"][];
+        };
+        MobileStorageStockDto: {
+            /** Format: uuid */
+            storageId: string;
+            name: string;
+            /** @description Tồn của mặt hàng trong kho này. CÓ THỂ là 0 — xem ghi chú ở dưới. */
+            quantity: number;
+        };
+        MobileBranchStockDto: {
+            /** Format: uuid */
+            branchId: string;
+            name: string;
+            /** @description Tổng tồn của mặt hàng tại chi nhánh này. */
+            quantity: number;
+            storages: components["schemas"]["MobileStorageStockDto"][];
+        };
+        MobileVariantStockDto: {
+            /**
+             * Format: uuid
+             * @description `items.id`
+             */
+            itemId: string;
+            /** @description Tồn tại chi nhánh ĐANG LÀM VIỆC, cộng qua mọi kho của nó. */
+            quantity: number;
+            /** @description Mọi kho đang hoạt động của chi nhánh hiện tại, **kể cả kho tồn 0** — vắng mặt đọc thành "không có kho đó". Kho chính đứng đầu. */
+            storages: components["schemas"]["MobileStorageStockDto"][];
+            otherBranches: components["schemas"]["MobileBranchStockDto"][];
+        };
+        MobileSalesModelStockDto: {
+            /**
+             * Format: uuid
+             * @description `products.id`
+             */
+            productId: string;
+            variants: components["schemas"]["MobileVariantStockDto"][];
         };
         MobileStockDocumentResponseDto: {
             /** Format: uuid */
@@ -15287,6 +15723,122 @@ export interface components {
             deliverer?: string;
             note?: string;
             lines: components["schemas"]["MobileStockDocumentLineWriteDto"][];
+        };
+        PartnerCategoryTreeRequestDto: Record<string, never>;
+        PartnerCategoryNodeDto: {
+            /** @description Category id, stable across requests */
+            id: string;
+            /** @description Category code, null when unset */
+            code: string | null;
+            /** @description Display name, as stored */
+            name: string;
+            /** @description Parent category id; null at the root */
+            parentId: string | null;
+            /** @description Distinct active products in this category AND every category below it. A parent with no products attached directly still reports its children. */
+            productCount: number;
+            children: components["schemas"]["PartnerCategoryNodeDto"][];
+        };
+        PartnerCategoryTreeResponseDto: {
+            data: components["schemas"]["PartnerCategoryNodeDto"][];
+        };
+        PartnerProductSearchDto: {
+            /** @description Free text matched against product name, product code and variant SKU */
+            keyword?: string;
+            /**
+             * Format: uuid
+             * @description Category id. Matches products in this category AND in every category below it, so a top-level menu entry returns the whole branch.
+             */
+            categoryId?: string;
+            /** @description Minimum variant selling price, inclusive */
+            priceFrom?: number;
+            /** @description Maximum variant selling price, inclusive */
+            priceTo?: number;
+            /** @description Raw ERP colour codes (e.g. "BA", "D"), not display names — this catalogue stores short internal codes and has no colour name or hex value. Combined with `sizes` the match must come from the SAME variant. */
+            colors?: string[];
+            /** @description Size values as stored (e.g. "38", "39"). */
+            sizes?: string[];
+            /** @description Stock filter, matched on the SAME variant as colors/sizes/price (ADR-08). `true`: only products with at least one variant that matches every other variant-level filter and has stock in a branch this API key may see; the row describes those variants. `false`: only products that have at least one variant matching every other variant-level filter and NONE of those matching variants has stock in a branch this API key may see (a product with any in-stock matching variant is excluded); the row describes those, all out-of-stock, variants. Omitted: no stock filtering. */
+            inStock?: boolean;
+            /**
+             * @default newest
+             * @enum {string}
+             */
+            sort: "newest" | "price_asc" | "price_desc";
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+        };
+        PartnerProductRowDto: {
+            id: string;
+            /** @description Product code, null when unset */
+            code: string | null;
+            name: string;
+            categoryId: string | null;
+            categoryName: string | null;
+            /** @description Cheapest active variant, in VND */
+            priceMin: number;
+            /** @description Dearest active variant, in VND */
+            priceMax: number;
+            /** @description Raw ERP colour codes across active variants */
+            colors: string[];
+            /** @description Size values across active variants */
+            sizes: string[];
+            /** @description True when any active variant has stock in any branch this API key may see. Quantities are never exposed. */
+            inStock: boolean;
+            /** @description Always empty. This ERP has no image storage yet; the field is part of the contract so images can appear later without a breaking change. */
+            images: string[];
+        };
+        PartnerProductSearchResponseDto: {
+            data: components["schemas"]["PartnerProductRowDto"][];
+            /** @description Total matching products, not the size of this page */
+            total: number;
+            page: number;
+            limit: number;
+        };
+        PartnerAttributeDto: {
+            /** @description Dimension name as stored, e.g. "Color" or "Size" */
+            name: string;
+            /** @description Selectable values, in catalogue order */
+            options: string[];
+        };
+        PartnerVariantDto: {
+            id: string;
+            /** @description Variant SKU */
+            code: string;
+            /** @description Pre-composed label as stored on the variant, e.g. "38 · BA". Provided as-is; use `attributes` when you need the parts rather than the label. */
+            variantLabel: string | null;
+            /** @description Selling price of this variant, in VND */
+            price: number;
+            /** @description Stock in any branch this API key may see */
+            inStock: boolean;
+            /** @description Dimension name to chosen value, e.g. { "Size": "38", "Color": "BA" } */
+            attributes: {
+                [key: string]: string;
+            };
+        };
+        PartnerProductDetailDto: {
+            id: string;
+            /** @description Product code, null when unset */
+            code: string | null;
+            name: string;
+            categoryId: string | null;
+            categoryName: string | null;
+            /** @description Cheapest active variant, in VND */
+            priceMin: number;
+            /** @description Dearest active variant, in VND */
+            priceMax: number;
+            /** @description Raw ERP colour codes across active variants */
+            colors: string[];
+            /** @description Size values across active variants */
+            sizes: string[];
+            /** @description True when any active variant has stock in any branch this API key may see. Quantities are never exposed. */
+            inStock: boolean;
+            /** @description Always empty. This ERP has no image storage yet; the field is part of the contract so images can appear later without a breaking change. */
+            images: string[];
+            description: string | null;
+            attributes: components["schemas"]["PartnerAttributeDto"][];
+            variants: components["schemas"]["PartnerVariantDto"][];
         };
     };
     responses: never;
@@ -20066,6 +20618,25 @@ export interface operations {
         };
     };
     StorageDefaultReceivingController_setDefaultReceiving_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StorageDefaultIssuingController_setDefaultIssuing_v2: {
         parameters: {
             query?: never;
             header?: never;
@@ -28934,6 +29505,117 @@ export interface operations {
             };
         };
     };
+    MobileCustomerController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                /** @description Tìm theo mã, tên hoặc số điện thoại */
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileCustomerPageDto"];
+                };
+            };
+        };
+    };
+    MobileProductAttributeController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileProductAttributeDto"][];
+                };
+            };
+        };
+    };
+    MobileInvoiceController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                /** @description ISO-8601, đầu kỳ (bao gồm) */
+                from?: string;
+                /** @description ISO-8601, cuối kỳ (bao gồm) */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description { data, total, page, limit, totals: { totalAmount } } */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileInvoiceController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hoá đơn đầy đủ; 404 nếu không phải hoá đơn của người gọi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileItemCategoryController_tree: {
+        parameters: {
+            query?: {
+                /** @description Match on category name or code */
+                search?: string;
+                status?: "ACTIVE" | "INACTIVE";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchItemCategoryTreeResponseDto"];
+                };
+            };
+        };
+    };
     MobileItemController_list: {
         parameters: {
             query?: {
@@ -28985,6 +29667,184 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MobileProductPageDto"];
+                };
+            };
+        };
+    };
+    MobileProductRevenueController_list: {
+        parameters: {
+            query: {
+                page?: number;
+                limit?: number;
+                /** @description ISO-8601, đầu kỳ (bao gồm) */
+                from: string;
+                /** @description ISO-8601, cuối kỳ (bao gồm) */
+                to: string;
+                /**
+                 * @description Grain của một dòng. `parent` = **mẫu mã** (sản phẩm cha), `group` = **nhóm
+                 *     hàng hóa**.
+                 *
+                 *     `item` — grain BIẾN THỂ — cố ý không nhận: nút gạt của bản gốc chỉ có hai
+                 *     nấc, và một giá trị thứ ba đi lọt sẽ cho ra một danh sách mà không nấc nào
+                 *     trên màn ứng với nó.
+                 */
+                statBy?: "parent" | "group";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description { data, total, page, limit } — mỗi dòng là một mẫu mã hoặc một nhóm */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobilePromotionController_evaluate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileEvaluateCartDto"];
+            };
+        };
+        responses: {
+            /** @description subtotal, promotionDiscount, amountAfterPromotion, appliedPrograms, availablePrograms, skippedPrograms */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileSalesItemController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                /**
+                 * @description Tìm theo mã, tên, hoặc nhãn biến thể.
+                 *
+                 *     Ba trường chứ không chỉ tên: người lập phiếu gõ mã SKU (`GELLI-39-NAU`)
+                 *     nhiều hơn gõ tên, và nhãn biến thể (`39 · Nâu`) là thứ phân biệt các dòng
+                 *     cùng tên với nhau.
+                 */
+                search?: string;
+                /**
+                 * @description Xem danh mục ở mức nào — hai nút *"Mẫu mã"* / *"Hàng hoá"* của panel lọc.
+                 *
+                 *     Quyết định này đổi Ý NGHĨA của `id` trong response, nên nó phải là một tham
+                 *     số của request chứ không phải một phép gộp ở client: ở `model`, `id` là
+                 *     `products.id` và **không đặt được vào dòng đơn hàng**. `type` trong mỗi
+                 *     dòng trả về nói lại điều đó để client không phải nhớ mình đã hỏi gì.
+                 *
+                 *     **Mặc định là `model`** (Loc chốt 2026-09-10): người bán tìm hàng theo MẪU
+                 *     MÃ — một dòng "Giày Gelli" thay vì mười bốn dòng chỉ khác nhau ở đuôi mã.
+                 *     Trên dữ liệu dev, chênh lệch là 2.539 dòng so với 20.997. Mức `item` vẫn
+                 *     giữ, nhưng nay là lựa chọn phải bấm chứ không phải thứ nhận được khi không
+                 *     nói gì.
+                 */
+                viewBy?: "item" | "model";
+                /**
+                 * @description Chỉ giữ hàng **còn tồn**: tổng tồn có dấu > 0 tại `actor.branchId`.
+                 *
+                 *     **Chi nhánh nào, chính xác:** `ActorContext` giải ra
+                 *     `JWT.branchId ?? X-Branch-Id ?? JWT.branchIds[0]` — comment tại chỗ ghi
+                 *     *"always: jwt > header > jwtList"*. `/mobile/auth/login` CÓ phát claim
+                 *     `branchId`, nên với client mobile thì **JWT thắng header**: đổi cửa hàng
+                 *     trong app KHÔNG đổi chi nhánh mà bộ lọc này đọc. Đã đo trên dev
+                 *     (2026-09-10): bốn `X-Branch-Id` khác nhau cho ra cùng một tập 103 mặt
+                 *     hàng. Muốn bộ lọc đi theo cửa hàng đang chọn thì phải sửa MỘT trong hai —
+                 *     bỏ claim `branchId` khỏi token mobile, hoặc cho route này đọc
+                 *     `resolveExplicitBranchId` — và cả hai đều là quyết định cấp nền tảng.
+                 *
+                 *     Là PHẦN BÙ CHẶT của `outOfStock` bên `POST /v2/inventory-items/search`
+                 *     (`<= 0`) — cùng phép cộng, cùng phạm vi chi nhánh, ngưỡng đối nhau — nên một
+                 *     mặt hàng không bao giờ vừa "còn hàng" ở app vừa "hết hàng" ở web. Nhãn trên
+                 *     app là *"Hàng hoá còn hàng (SL > 0)"*, và dấu `>` đó là hợp đồng.
+                 *
+                 *     Tổng có DẤU: một mặt hàng có -1 ở kho này và +1 ở kho kia tổng bằng 0 và
+                 *     đọc là hết hàng. Mặt hàng chưa từng có dòng `stock_balances` nào cũng vậy.
+                 */
+                inStockOnly?: boolean;
+                /**
+                 * @description Chỉ giữ hàng thuộc MỘT nhóm hàng hoá (`items.category_id`).
+                 *
+                 *     Nhóm lấy từ `GET /mobile/item-categories/tree` — cùng cây mà backoffice
+                 *     dùng. Bỏ trống = *Tất cả*.
+                 *
+                 *     **Lọc theo ĐÚNG nhóm đó, không gồm nhóm con.** Cây chỉ có hai tầng trong dữ
+                 *     liệu thật (`GIÀY DÉP` → `Giày nam`…), và mặt hàng luôn gắn vào nhóm LÁ, nên
+                 *     "gồm cả con" chỉ đổi kết quả khi người dùng chọn một nhóm cha — thứ mà ảnh
+                 *     MISA cho thấy là một TIÊU ĐỀ, không chạm được. Ngày cây sâu hơn thì đây là
+                 *     chỗ phải mở rộng, không phải ở client.
+                 */
+                categoryId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileSalesItemPageDto"];
+                };
+            };
+        };
+    };
+    MobileSalesItemController_getModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileSalesModelDetailDto"];
+                };
+            };
+        };
+    };
+    MobileSalesItemController_getModelStock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileSalesModelStockDto"];
                 };
             };
         };
@@ -29099,6 +29959,81 @@ export interface operations {
         };
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PartnerCategoryV2Controller_tree_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PartnerCategoryTreeRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerCategoryTreeResponseDto"];
+                };
+            };
+        };
+    };
+    PartnerProductV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PartnerProductSearchDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerProductSearchResponseDto"];
+                };
+            };
+        };
+    };
+    PartnerProductV2Controller_detail_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description products.code, matched exactly (case-sensitive), not products.id or a variant SKU */
+                productCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerProductDetailDto"];
+                };
+            };
+            /** @description Product not found — unknown code, another organization's code, or no active variant. The same response for all three. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
