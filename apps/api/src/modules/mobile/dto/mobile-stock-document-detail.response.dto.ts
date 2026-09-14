@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { DocCounterpartyKind } from '@erp/shared-interfaces';
 import { GoodsReceiptPaymentMethod } from '../../inventory/goods-receipt/goods-receipt.entity';
+import { MobileStockDocumentPurpose } from './mobile-stock-document-list.query.dto';
 import { MobileStockDocumentStatus } from './mobile-stock-document.response.dto';
 
 /**
@@ -24,6 +25,21 @@ import { MobileStockDocumentStatus } from './mobile-stock-document.response.dto'
  */
 /** Một người được nhắc tới trong chứng từ: chỉ định danh và tên, không hơn. */
 export class MobileStockDocumentPersonDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty()
+  name!: string;
+}
+
+/**
+ * Một cửa hàng được nhắc tới trong chứng từ điều chuyển.
+ *
+ * Hình dạng trùng `MobileStockDocumentPersonDto` nhưng là class RIÊNG: hai thứ
+ * không liên quan gì nhau, và gộp lại thì ngày một bên cần thêm `code` là bên
+ * kia lặng lẽ nhận theo.
+ */
+export class MobileStockDocumentBranchDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
@@ -87,7 +103,14 @@ export class MobileStockDocumentLineDto {
  * vụ màn SỬA: app phải gửi lại chính những gì nó vừa đọc, mà tên và mã đối
  * tượng thì không suy ngược ra định danh được.
  *
- * Vẫn KHÔNG trả `references`, `purpose`, `journalEntryId`, `transferImported`,
+ * Bốn trường [purpose], [sourceBranch], [targetBranch] và [transferOrderId] cũng
+ * KHÔNG phải để hiển thị — chúng phục vụ màn SỬA của phiếu ĐIỀU CHUYỂN: app phải
+ * dựng lại đúng mục đích và cửa hàng nguồn/đích đã lưu, mà không trường nào khác
+ * suy ra được chúng. Trước đây `purpose` cố ý KHÔNG được trả, và đó đúng lúc app
+ * chưa lập được phiếu điều chuyển; nay lập được thì thiếu nó nghĩa là mở màn Sửa
+ * ra thấy "Khác" và lưu lại là MẤT thông tin điều chuyển.
+ *
+ * Vẫn KHÔNG trả `references`, `journalEntryId`, `transferImported`,
  * `attachmentIds`: app không hiển thị và cũng không gửi lại chúng.
  *
  * KHÔNG phân trang dòng hàng. Đường v1 có `GET /:id/lines` phân trang cho bảng
@@ -178,6 +201,41 @@ export class MobileStockDocumentDetailDto {
     description: 'Diễn giải. `description` ở phiếu nhập, `notes` ở phiếu xuất.',
   })
   note!: string;
+
+  @ApiProperty({
+    enum: MobileStockDocumentPurpose,
+    nullable: true,
+    description:
+      'Mục đích phiếu, để màn SỬA của app dựng lại đúng lựa chọn cũ. `null` khi ' +
+      'mục đích của phiếu không nằm trong tập app lập được (vd phiếu bán hàng ' +
+      'hay phiếu kiểm kê do hệ thống sinh) — app hiện "Khác" ở ca đó.',
+  })
+  purpose!: MobileStockDocumentPurpose | null;
+
+  @ApiProperty({
+    type: MobileStockDocumentBranchDto,
+    nullable: true,
+    description:
+      'Cửa hàng NGUỒN — chỉ phiếu nhập kho điều chuyển có. Phục vụ màn SỬA, ' +
+      'không hiển thị ở màn chi tiết.',
+  })
+  sourceBranch!: MobileStockDocumentBranchDto | null;
+
+  @ApiProperty({
+    type: MobileStockDocumentBranchDto,
+    nullable: true,
+    description: 'Cửa hàng ĐÍCH — chỉ phiếu xuất kho điều chuyển có. Xem [sourceBranch].',
+  })
+  targetBranch!: MobileStockDocumentBranchDto | null;
+
+  @ApiProperty({
+    format: 'uuid',
+    nullable: true,
+    description:
+      'Lệnh điều chuyển mà phiếu này là một chân của nó. `null` khi phiếu điều ' +
+      'chuyển được lập độc lập (không chọn lệnh nào).',
+  })
+  transferOrderId!: string | null;
 
   @ApiProperty({ type: [MobileStockDocumentLineDto] })
   lines!: MobileStockDocumentLineDto[];
