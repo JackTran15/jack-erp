@@ -8,7 +8,11 @@ import { RbacService } from '../../rbac/rbac.service';
 import { GoodsIssueService } from '../../inventory/goods-issue/goods-issue.service';
 import { GoodsReceiptService } from '../../inventory/goods-receipt/goods-receipt.service';
 import { ItemEntity } from '../../inventory/location/item.entity';
-import { MobileStockDocumentKind } from '../dto/mobile-stock-document-list.query.dto';
+import {
+  MobileStockDocumentKind,
+  MobileStockDocumentPurpose,
+} from '../dto/mobile-stock-document-list.query.dto';
+import { TransferOrderService } from '../../inventory/transfer-order/transfer-order.service';
 import { MobileStockDocumentWriteService } from './mobile-stock-document-write.service';
 
 const actor: ActorContext = {
@@ -41,6 +45,8 @@ describe('MobileStockDocumentWriteService', () => {
   let receiptUpdate: jest.Mock;
   let issueCreate: jest.Mock;
   let issueUpdate: jest.Mock;
+  let directExport: jest.Mock;
+  let confirmImport: jest.Mock;
   let findItems: jest.Mock;
 
   beforeEach(async () => {
@@ -49,6 +55,14 @@ describe('MobileStockDocumentWriteService', () => {
     receiptUpdate = jest.fn().mockResolvedValue({ id: 'gr-1' });
     issueCreate = jest.fn().mockResolvedValue({ id: 'gi-1' });
     issueUpdate = jest.fn().mockResolvedValue({ id: 'gi-1' });
+    // Hai chân mà lệnh điều chuyển sinh ra. Service trả về ID CỦA CHÂN, không
+    // phải id lệnh — app điều hướng sang màn chi tiết chứng từ kho.
+    directExport = jest
+      .fn()
+      .mockResolvedValue({ id: 'to-1', exportGoodsIssueId: 'gi-transfer' });
+    confirmImport = jest
+      .fn()
+      .mockResolvedValue({ id: 'to-1', importGoodsReceiptId: 'gr-transfer' });
     findItems = jest
       .fn()
       .mockResolvedValue([{ id: ITEM_ID, unit: 'đôi' } as ItemEntity]);
@@ -68,6 +82,13 @@ describe('MobileStockDocumentWriteService', () => {
         {
           provide: GoodsIssueService,
           useValue: { createAndPost: issueCreate, update: issueUpdate },
+        },
+        {
+          provide: TransferOrderService,
+          useValue: {
+            createAndConfirmExport: directExport,
+            confirmImport,
+          },
         },
         {
           provide: getRepositoryToken(ItemEntity),
@@ -116,16 +137,29 @@ describe('MobileStockDocumentWriteService', () => {
 
       receiptCreate.mockClear();
       await create(MobileStockDocumentKind.STOCK_IN);
-      // `OTHER` chứ không `TRANSFER_IN`: điều chuyển đi endpoint khác hẳn.
+      // `OTHER` là nhánh MẶC ĐỊNH; "Điều chuyển" đi nhánh riêng, xem nhóm test
+      // về điều chuyển bên dưới.
       expect(sentReceipt().purpose).toBe(GoodsReceiptPurpose.OTHER);
     });
 
-    it('client gửi kèm `purpose` cũng KHÔNG được dùng', async () => {
-      await create(MobileStockDocumentKind.STOCK_IN, {
-        purpose: GoodsReceiptPurpose.PURCHASE,
-      } as never);
+    it('`purpose` vắng vẫn ra `OTHER` — client cũ không phải đổi gì', async () => {
+      // Ca hồi quy: trường này mới có, và mọi bản app đang chạy đều không gửi nó.
+      await create(MobileStockDocumentKind.STOCK_IN);
 
       expect(sentReceipt().purpose).toBe(GoodsReceiptPurpose.OTHER);
+    });
+
+    it('`purpose` ngoài tập GHI ĐƯỢC thì 400, không lặng lẽ lùi về OTHER', async () => {
+      // `stock-take` có trong enum vì bộ LỌC danh sách dùng nó, nhưng phiếu kiểm
+      // kê do hệ thống sinh — app không lập tay được. Lùi im lặng về `OTHER`
+      // nghĩa là người dùng bấm Lưu và nhận một phiếu sai loại.
+      await expect(
+        create(MobileStockDocumentKind.STOCK_IN, {
+          purpose: MobileStockDocumentPurpose.STOCK_TAKE,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(receiptCreate).not.toHaveBeenCalled();
     });
   });
 
@@ -312,6 +346,161 @@ describe('MobileStockDocumentWriteService', () => {
       const sent = receiptUpdate.mock.calls[0][1];
       expect(sent.lines[0].locationId).toBe('loc-1');
       expect(sent.lines[0].uomCode).toBe('đôi');
+    });
+  });
+
+  /**
+   * Điều chuyển KHÔNG đi qua hai service phiếu — nó uỷ quyền cho
+   * `TransferOrderService` để phiếu nối được vào LỆNH điều chuyển. Nhóm này
+   * khoá đúng chỗ đó: gọi sai service thì hàng vẫn trừ khỏi kho nguồn mà cửa
+   * hàng đích không bao giờ thấy nó đang về, và không test nào khác bắt được.
+   */
+  describe('mục đích ĐIỀU CHUYỂN', () => {
+    const TRANSFER = { purpose: MobileStockDocumentPurpose.TRANSFER };
+    const TARGET = '22222222-2222-4222-8222-222222222222';
+    const SOURCE = '33333333-3333-4333-8333-333333333333';
+    const ORDER = '44444444-4444-4444-8444-444444444444';
+
+    describe('xuất kho', () => {
+      it('đi `createAndConfirmExport`, KHÔNG đi `issues.createAndPost`', async () => {
+        await create(MobileStockDocumentKind.STOCK_OUT, {
+          ...TRANSFER,
+          targetBranchId: TARGET,
+        });
+
+        expect(directExport).toHaveBeenCalledTimes(1);
+        expect(issueCreate).not.toHaveBeenCalled();
+
+        const sent = directExport.mock.calls[0][0];
+        expect(sent.targetBranchId).toBe(TARGET);
+        // Dòng hàng vẫn phải mang `locationId` đã giải — lệnh điều chuyển suy
+        // kho NGUỒN từ chính vị trí đó.
+        expect(sent.lines[0].locationId).toBe('loc-1');
+      });
+
+      it('trả id PHIẾU XUẤT, không phải id lệnh', async () => {
+        // App điều hướng sang màn chi tiết chứng từ kho; lệnh điều chuyển không
+        // có màn nào ở app, nên trả id lệnh là một đường dẫn chết.
+        const result = await create(MobileStockDocumentKind.STOCK_OUT, {
+          ...TRANSFER,
+          targetBranchId: TARGET,
+        });
+
+        expect(result).toEqual({ id: 'gi-transfer' });
+      });
+
+      it('thiếu cửa hàng đích thì 400 TRƯỚC khi dựng lệnh', async () => {
+        // Bắt ở đây thay vì để `GoodsIssueService` bắt: nhánh này dựng lệnh
+        // TRƯỚC rồi mới xác nhận xuất, nên hỏng muộn là để lại một lệnh rác.
+        await expect(
+          create(MobileStockDocumentKind.STOCK_OUT, TRANSFER),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        expect(directExport).not.toHaveBeenCalled();
+      });
+
+      it('không nhận cửa hàng nguồn hay lệnh — hai trường của chiều NHẬP', async () => {
+        await expect(
+          create(MobileStockDocumentKind.STOCK_OUT, {
+            ...TRANSFER,
+            targetBranchId: TARGET,
+            transferOrderId: ORDER,
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+    });
+
+    describe('nhập kho', () => {
+      it('có lệnh: đi `confirmImport` và KHÔNG gửi `lines`', async () => {
+        await create(MobileStockDocumentKind.STOCK_IN, {
+          ...TRANSFER,
+          transferOrderId: ORDER,
+        });
+
+        expect(confirmImport).toHaveBeenCalledTimes(1);
+        expect(receiptCreate).not.toHaveBeenCalled();
+
+        const [id, , dto] = confirmImport.mock.calls[0];
+        expect(id).toBe(ORDER);
+        // Ca đáng khoá nhất: `confirmImport` tự lấy dòng hàng từ LỆNH khi
+        // `lines` vắng, nên số lượng nhận không bao giờ lệch thứ đã xuất. Gửi
+        // kèm `lines` là mở lại đúng đường lệch đó.
+        expect(dto.lines).toBeUndefined();
+      });
+
+      it('có lệnh: trả id PHIẾU NHẬP mà lệnh vừa sinh', async () => {
+        const result = await create(MobileStockDocumentKind.STOCK_IN, {
+          ...TRANSFER,
+          transferOrderId: ORDER,
+        });
+
+        expect(result).toEqual({ id: 'gr-transfer' });
+      });
+
+      it('không có lệnh: phiếu nhập ĐỘC LẬP, `TRANSFER_IN` + cửa hàng nguồn', async () => {
+        await create(MobileStockDocumentKind.STOCK_IN, {
+          ...TRANSFER,
+          sourceBranchId: SOURCE,
+        });
+
+        expect(confirmImport).not.toHaveBeenCalled();
+        expect(sentReceipt().purpose).toBe(GoodsReceiptPurpose.TRANSFER_IN);
+        expect(sentReceipt().sourceBranchId).toBe(SOURCE);
+      });
+
+      it('vắng CẢ HAI vẫn đi tới service phiếu — server dưới mới chặn', async () => {
+        // Đã chốt: app không validate ca này, để `GoodsReceiptService` trả câu
+        // tiếng Việt của nó ("cần chi nhánh nguồn hoặc tham chiếu"). Thêm một
+        // câu thứ hai ở tầng này là hai chỗ nói cùng một điều.
+        await create(MobileStockDocumentKind.STOCK_IN, TRANSFER);
+
+        expect(receiptCreate).toHaveBeenCalledTimes(1);
+        expect(sentReceipt().purpose).toBe(GoodsReceiptPurpose.TRANSFER_IN);
+        expect(sentReceipt().sourceBranchId).toBeUndefined();
+      });
+
+      it('gửi cả lệnh lẫn cửa hàng nguồn thì 400 — không đoán nghe ai', async () => {
+        await expect(
+          create(MobileStockDocumentKind.STOCK_IN, {
+            ...TRANSFER,
+            transferOrderId: ORDER,
+            sourceBranchId: SOURCE,
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      it('không nhận cửa hàng đích — trường của chiều XUẤT', async () => {
+        await expect(
+          create(MobileStockDocumentKind.STOCK_IN, {
+            ...TRANSFER,
+            targetBranchId: TARGET,
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+    });
+
+    it('phiếu NHẬP HÀNG không có mục đích điều chuyển', async () => {
+      // Màn đó không có field Mục đích — mục đích của nó luôn là mua hàng.
+      await expect(
+        create(MobileStockDocumentKind.GOODS_RECEIPT, {
+          ...TRANSFER,
+          sourceBranchId: SOURCE,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('ba trường điều chuyển bị CHẶN khi mục đích không phải điều chuyển', async () => {
+      // Nhận mà bỏ qua thì app tưởng mình đã gửi một cửa hàng đích, và phiếu
+      // lặng lẽ ra sai.
+      for (const stray of [
+        { sourceBranchId: SOURCE },
+        { targetBranchId: TARGET },
+        { transferOrderId: ORDER },
+      ]) {
+        await expect(
+          create(MobileStockDocumentKind.STOCK_IN, stray),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      }
     });
   });
 });

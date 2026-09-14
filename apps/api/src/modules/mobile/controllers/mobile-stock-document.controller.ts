@@ -64,6 +64,10 @@ export class MobileStockDocumentController {
    * phiếu xuất. Phép kiểm ĐÚNG theo `kind` nằm ở `MobileStockDocumentService`,
    * chỗ duy nhất biết client đang hỏi loại nào. Gỡ một trong hai lớp là mở lại
    * lỗ phân quyền.
+   *
+   * `purpose` là nhóm lọc thứ hai của màn bộ lọc trong app ("Trạng thái" ở Nhập
+   * kho, "Loại chứng từ" ở Xuất kho). Cặp `kind` × `purpose` cũng kiểm ở service
+   * chứ không ở đây, cùng lý do với quyền: decorator và DTO không biết cả hai.
    */
   @Get()
   @RequirePermission(['goods_receipt.read', 'inventory.goods-issue.read'])
@@ -82,6 +86,7 @@ export class MobileStockDocumentController {
         to: query.to,
         branchId: query.branchId,
         search: query.search,
+        purpose: query.purpose,
       },
       actor,
     );

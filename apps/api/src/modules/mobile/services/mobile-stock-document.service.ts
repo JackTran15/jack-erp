@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -7,8 +8,11 @@ import { QueryBus } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
+  GoodsIssuePurpose,
+  GoodsIssueReferenceType,
   GoodsIssueStatus,
   GoodsReceiptPurpose,
+  GoodsReceiptReferenceType,
   GoodsReceiptStatus,
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
@@ -17,6 +21,7 @@ import {
   attachCounterparties,
   attachPurchasingEmployees,
 } from '../../inventory/location/services/counterparty-name.util';
+import { BranchEntity } from '../../branch/branch.entity';
 import { GoodsIssueEntity } from '../../inventory/goods-issue/goods-issue.entity';
 import { GoodsIssueLineEntity } from '../../inventory/goods-issue/goods-issue-line.entity';
 import { GoodsIssueSearchV2Dto } from '../../inventory/goods-issue/dto/goods-issue-search-v2.dto';
@@ -25,8 +30,12 @@ import { GoodsReceiptEntity } from '../../inventory/goods-receipt/goods-receipt.
 import { GoodsReceiptLineEntity } from '../../inventory/goods-receipt/goods-receipt-line.entity';
 import { GoodsReceiptSearchV2Dto } from '../../inventory/goods-receipt/dto/goods-receipt-search-v2.dto';
 import { SearchGoodsReceiptsV2Query } from '../../inventory/goods-receipt/queries/search-goods-receipts-v2.query';
-import { MobileStockDocumentKind } from '../dto/mobile-stock-document-list.query.dto';
 import {
+  MobileStockDocumentKind,
+  MobileStockDocumentPurpose,
+} from '../dto/mobile-stock-document-list.query.dto';
+import {
+  MobileStockDocumentBranchDto,
   MobileStockDocumentDetailDto,
   MobileStockDocumentLineDto,
 } from '../dto/mobile-stock-document-detail.response.dto';
@@ -59,6 +68,91 @@ const PERMISSION_OF: Record<MobileStockDocumentKind, string> = {
   [MobileStockDocumentKind.STOCK_IN]: 'goods_receipt.read',
   [MobileStockDocumentKind.STOCK_OUT]: 'inventory.goods-issue.read',
 };
+
+/**
+ * Lựa chọn ở màn bộ lọc -> `purpose` của bảng `goods_receipts`.
+ *
+ * `Partial` có nghĩa: `sale` và `disposal` KHÔNG có mặt vì phiếu nhập không có
+ * hai khái niệm đó. Vắng khoá là đường đi tới 400, xem [receiptPurposeOrThrow].
+ *
+ * `PURCHASE` cũng vắng, và đó là chủ ý khác: nó thuộc màn "Nhập hàng" riêng
+ * (`kind=goods-receipt`), nơi bộ lọc này không chạy. Thêm nó vào đây là mở cho
+ * màn "Nhập kho" hiện phiếu mua hàng — đúng thứ `excludePurposes` đang chặn.
+ */
+const RECEIPT_PURPOSE_OF: Partial<
+  Record<MobileStockDocumentPurpose, GoodsReceiptPurpose>
+> = {
+  [MobileStockDocumentPurpose.TRANSFER]: GoodsReceiptPurpose.TRANSFER_IN,
+  [MobileStockDocumentPurpose.STOCK_TAKE]: GoodsReceiptPurpose.STOCK_TAKE,
+  [MobileStockDocumentPurpose.OTHER]: GoodsReceiptPurpose.OTHER,
+};
+
+/**
+ * Lựa chọn ở màn bộ lọc -> `purpose` của bảng `goods_issues`.
+ *
+ * ĐỦ cả năm giá trị, nên `Partial` ở đây chỉ để hai bảng cùng một hình dạng.
+ *
+ * Chỗ dễ trượt: `transfer` ra `TRANSFER_OUT`, không phải `TRANSFER_IN` như bảng
+ * trên. Một lựa chọn của người dùng, hai giá trị backend — đó là toàn bộ lý do
+ * `MobileStockDocumentPurpose` tồn tại thay vì phơi enum backend ra client.
+ */
+const ISSUE_PURPOSE_OF: Partial<
+  Record<MobileStockDocumentPurpose, GoodsIssuePurpose>
+> = {
+  [MobileStockDocumentPurpose.TRANSFER]: GoodsIssuePurpose.TRANSFER_OUT,
+  [MobileStockDocumentPurpose.STOCK_TAKE]: GoodsIssuePurpose.STOCK_TAKE,
+  [MobileStockDocumentPurpose.SALE]: GoodsIssuePurpose.SALE,
+  [MobileStockDocumentPurpose.DISPOSAL]: GoodsIssuePurpose.DISPOSAL,
+  [MobileStockDocumentPurpose.OTHER]: GoodsIssuePurpose.OTHER,
+};
+
+/**
+ * Chiều NGƯỢC của hai bảng trên — `purpose` của bảng ra lựa chọn app hiểu.
+ *
+ * Chỉ khai những giá trị app LẬP ĐƯỢC. `PURCHASE` (phiếu nhập hàng mua), `SALE`
+ * (phiếu bán hàng) và `STOCK_TAKE` (phiếu kiểm kê) cố ý vắng: app không có màn
+ * Mục đích cho chúng, nên trả về `null` và màn Sửa hiện "Khác" là đúng — bày ra
+ * một lựa chọn app không lập lại được thì lưu lại là 400.
+ *
+ * KHÔNG suy ngược từ hai bảng kia bằng một hàm tìm khoá: chúng có giá trị mà
+ * chiều này cố ý không nhận, nên một phép đảo tự động sẽ kéo cả `stock-take` về.
+ */
+const WRITE_PURPOSE_OF_RECEIPT: Partial<
+  Record<GoodsReceiptPurpose, MobileStockDocumentPurpose>
+> = {
+  [GoodsReceiptPurpose.TRANSFER_IN]: MobileStockDocumentPurpose.TRANSFER,
+  [GoodsReceiptPurpose.OTHER]: MobileStockDocumentPurpose.OTHER,
+};
+
+const WRITE_PURPOSE_OF_ISSUE: Partial<
+  Record<GoodsIssuePurpose, MobileStockDocumentPurpose>
+> = {
+  [GoodsIssuePurpose.TRANSFER_OUT]: MobileStockDocumentPurpose.TRANSFER,
+  [GoodsIssuePurpose.OTHER]: MobileStockDocumentPurpose.OTHER,
+};
+
+/**
+ * Giải một lựa chọn của bộ lọc thành `purpose` của bảng tương ứng.
+ *
+ * Không map được thì **400**, không phải trả danh sách rỗng: `purpose=sale` ở
+ * màn Nhập kho là một câu hỏi vô nghĩa, và một danh sách rỗng nói với người
+ * dùng rằng "cửa hàng này không có phiếu bán hàng nhập kho" — một câu sai.
+ */
+function purposeOrThrow<T>(
+  table: Partial<Record<MobileStockDocumentPurpose, T>>,
+  purpose: MobileStockDocumentPurpose,
+  kind: MobileStockDocumentKind,
+): T {
+  const mapped = table[purpose];
+
+  if (mapped === undefined) {
+    throw new BadRequestException(
+      `purpose=${purpose} không dùng được với kind=${kind}`,
+    );
+  }
+
+  return mapped;
+}
 
 /**
  * Bốn trạng thái của phiếu NHẬP gộp còn ba nhãn app hiển thị.
@@ -130,12 +224,22 @@ export class MobileStockDocumentService {
       to?: string;
       branchId?: string;
       search?: string;
+      purpose?: MobileStockDocumentPurpose;
     },
     actor: ActorContext,
   ): Promise<MobileStockDocumentPageDto> {
-    const { kind, page, limit, from, to, search } = query;
+    const { kind, page, limit, from, to, search, purpose } = query;
 
     await this.assertCanRead(kind, actor);
+
+    // Màn "Nhập hàng" theo định nghĩa chỉ chứa phiếu mua hàng, nên nó không có
+    // nhóm lọc này và không bao giờ gửi `purpose`. Nhận mà bỏ qua thì app tưởng
+    // mình đã lọc — xem doc của `MobileStockDocumentListQueryDto.purpose`.
+    if (purpose && kind === MobileStockDocumentKind.GOODS_RECEIPT) {
+      throw new BadRequestException(
+        `purpose không dùng được với kind=${kind}`,
+      );
+    }
 
     // Giải chi nhánh TRƯỚC khi dựng DTO: hai handler v2 đọc `actor.branchId`,
     // nên cách duy nhất đổi được cửa hàng là đưa cho chúng một actor khác.
@@ -146,8 +250,11 @@ export class MobileStockDocumentService {
     const dateFilter = from || to ? { date: { from, to } } : {};
 
     return kind === MobileStockDocumentKind.STOCK_OUT
-      ? this.listIssues({ page, limit, dateFilter, search }, scoped)
-      : this.listReceipts({ kind, page, limit, dateFilter, search }, scoped);
+      ? this.listIssues({ page, limit, dateFilter, search, purpose }, scoped)
+      : this.listReceipts(
+          { kind, page, limit, dateFilter, search, purpose },
+          scoped,
+        );
   }
 
   /**
@@ -174,6 +281,31 @@ export class MobileStockDocumentService {
     return kind === MobileStockDocumentKind.STOCK_OUT
       ? this.findIssue(id, scoped)
       : this.findReceipt(id, kind, scoped);
+  }
+
+  /**
+   * Tên cửa hàng của một định danh — chỉ màn SỬA phiếu nhập điều chuyển cần.
+   *
+   * Phải TRA RIÊNG vì `GoodsReceiptEntity.sourceBranchId` là một CỘT TRẦN, không
+   * phải quan hệ: khác `GoodsIssueEntity.targetBranch` vốn là `ManyToOne` nên
+   * TypeORM tự nạp. Bất đối xứng của schema, không phải chỗ ai đó quên khai —
+   * đừng thêm `relations: { sourceBranch: true }`, nó không compile.
+   *
+   * Lọc theo TỔ CHỨC chứ không theo chi nhánh: cửa hàng nguồn theo định nghĩa là
+   * một chi nhánh KHÁC chi nhánh đang đọc.
+   */
+  private async findBranch(
+    id: string | null | undefined,
+    actor: ActorContext,
+  ): Promise<MobileStockDocumentBranchDto | null> {
+    if (!id) return null;
+
+    const branch = await this.receiptRepo.manager.findOne(BranchEntity, {
+      where: { id, organizationId: actor.organizationId },
+      select: { id: true, name: true },
+    });
+
+    return branch ? { id: branch.id, name: branch.name } : null;
   }
 
   private async findReceipt(
@@ -205,6 +337,12 @@ export class MobileStockDocumentService {
         // Hai trường CHỈ màn Sửa dùng — xem doc của DTO chi tiết.
         purchasingEmployeeId: true,
         paymentMethod: true,
+        // Ba trường CHỈ màn Sửa của phiếu ĐIỀU CHUYỂN dùng. `referenceType` phải
+        // đi kèm `referenceId`: một `referenceId` trần không nói được nó trỏ vào
+        // lệnh điều chuyển hay đơn mua hàng.
+        sourceBranchId: true,
+        referenceType: true,
+        referenceId: true,
         provider: { id: true, code: true, name: true },
         lines: {
           id: true,
@@ -246,7 +384,7 @@ export class MobileStockDocumentService {
       actor.organizationId,
     );
 
-    return toDetailFromReceipt(row);
+    return toDetailFromReceipt(row, await this.findBranch(row.sourceBranchId, actor));
   }
 
   private async findIssue(
@@ -267,6 +405,12 @@ export class MobileStockDocumentService {
         notes: true,
         counterpartyKind: true,
         counterpartyId: true,
+        // Hai trường CHỈ màn Sửa của phiếu ĐIỀU CHUYỂN dùng — xem ghi chú cùng
+        // tên ở `findReceipt`. `purpose` cũng chỉ màn đó cần: danh sách không
+        // lọc theo nó, nhưng màn Sửa phải dựng lại đúng lựa chọn cũ.
+        purpose: true,
+        referenceType: true,
+        referenceId: true,
         provider: { id: true, code: true, name: true },
         targetBranch: { id: true, name: true },
         lines: {
@@ -325,10 +469,11 @@ export class MobileStockDocumentService {
       limit: number;
       dateFilter: Partial<GoodsReceiptSearchV2Dto>;
       search?: string;
+      purpose?: MobileStockDocumentPurpose;
     },
     actor: ActorContext,
   ): Promise<MobileStockDocumentPageDto> {
-    const { kind, page, limit, dateFilter, search } = args;
+    const { kind, page, limit, dateFilter, search, purpose } = args;
 
     const dto: GoodsReceiptSearchV2Dto = {
       page,
@@ -344,9 +489,19 @@ export class MobileStockDocumentService {
       // `excludePurposes` chứ không liệt kê `[OTHER, TRANSFER_IN, STOCK_TAKE]`:
       // liệt kê thì thêm một purpose mới ở backend là nó lặng lẽ vắng mặt khỏi
       // màn Nhập kho, còn loại trừ thì nó tự xuất hiện.
+      //
+      // Người dùng CHỌN một loại ở bộ lọc thì đổi sang allow-list: một
+      // `purposes: [X]` đã tự loại `PURCHASE` (vì `X` không bao giờ là
+      // `PURCHASE`, xem `RECEIPT_PURPOSE_OF`), nên gửi kèm `excludePurposes`
+      // chỉ là một mệnh đề WHERE vô nghĩa. Nhánh KHÔNG lọc vẫn giữ deny-list
+      // để lập luận ở đoạn trên còn đúng.
       ...(kind === MobileStockDocumentKind.GOODS_RECEIPT
         ? { purposes: [GoodsReceiptPurpose.PURCHASE] }
-        : { excludePurposes: [GoodsReceiptPurpose.PURCHASE] }),
+        : purpose
+          ? {
+              purposes: [purposeOrThrow(RECEIPT_PURPOSE_OF, purpose, kind)],
+            }
+          : { excludePurposes: [GoodsReceiptPurpose.PURCHASE] }),
       ...dateFilter,
     };
 
@@ -365,19 +520,33 @@ export class MobileStockDocumentService {
       limit: number;
       dateFilter: Partial<GoodsIssueSearchV2Dto>;
       search?: string;
+      purpose?: MobileStockDocumentPurpose;
     },
     actor: ActorContext,
   ): Promise<MobileStockDocumentPageDto> {
-    const { page, limit, dateFilter, search } = args;
+    const { page, limit, dateFilter, search, purpose } = args;
 
-    // KHÔNG lọc `purpose`: màn Xuất kho của web cũng hiện mọi loại (bán hàng,
-    // điều chuyển, huỷ hàng, kiểm kê). Và DTO bên này chỉ nhận MỘT giá trị
-    // `purpose`, không có `purposes`/`excludePurposes` như bên nhập.
+    // Không lọc thì hiện MỌI loại — màn Xuất kho của web cũng vậy (bán hàng,
+    // điều chuyển, huỷ hàng, kiểm kê). Có lọc thì đi qua `EnumFilterDto`, tức
+    // hình dạng `{ value }`: DTO bên này chỉ nhận MỘT giá trị `purpose`, không
+    // có `purposes`/`excludePurposes` như bên nhập — nên bộ lọc của app cố ý là
+    // chọn-MỘT chứ không chọn-nhiều.
     // Xem ghi chú ở `listReceipts` về vì sao là MỘT khoá `search`.
     const dto: GoodsIssueSearchV2Dto = {
       page,
       limit,
       ...(search?.trim() ? { search: search.trim() } : {}),
+      ...(purpose
+        ? {
+            purpose: {
+              value: purposeOrThrow(
+                ISSUE_PURPOSE_OF,
+                purpose,
+                MobileStockDocumentKind.STOCK_OUT,
+              ),
+            },
+          }
+        : {}),
       ...dateFilter,
     };
 
@@ -592,6 +761,7 @@ function toIssueLine(line: GoodsIssueLineEntity): MobileStockDocumentLineDto {
  */
 function toDetailFromReceipt(
   row: GoodsReceiptEntity,
+  sourceBranch: MobileStockDocumentBranchDto | null,
 ): MobileStockDocumentDetailDto {
   const lines = (row.lines ?? []).map(toReceiptLine);
 
@@ -613,6 +783,16 @@ function toDetailFromReceipt(
     // luôn có mặt, chỉ là chưa ai điền.
     deliverer: row.deliveredBy ?? '',
     note: row.description ?? '',
+    purpose: WRITE_PURPOSE_OF_RECEIPT[row.purpose] ?? null,
+    sourceBranch,
+    // Phiếu NHẬP không có cửa hàng đích — hàng về ĐÂY.
+    targetBranch: null,
+    // Phiếu nhập dùng `STOCK_TRANSFER`, phiếu xuất dùng `TRANSFER_ORDER`. HAI
+    // tên, cùng giữ một `transfer_orders.id` — đừng gom hai phép so này lại.
+    transferOrderId:
+      row.referenceType === GoodsReceiptReferenceType.STOCK_TRANSFER
+        ? (row.referenceId ?? null)
+        : null,
     lines,
   };
 }
@@ -651,6 +831,17 @@ function toDetailFromIssue(row: GoodsIssueEntity): MobileStockDocumentDetailDto 
     status: ISSUE_STATUS_MAP[row.status],
     deliverer: row.deliverer ?? '',
     note: row.notes ?? '',
+    purpose: WRITE_PURPOSE_OF_ISSUE[row.purpose] ?? null,
+    // Phiếu XUẤT không có cửa hàng nguồn — hàng đi TỪ ĐÂY.
+    sourceBranch: null,
+    targetBranch: row.targetBranch
+      ? { id: row.targetBranch.id, name: row.targetBranch.name }
+      : null,
+    // Xem ghi chú ở `toDetailFromReceipt`: tên loại tham chiếu KHÁC bên nhập.
+    transferOrderId:
+      row.referenceType === GoodsIssueReferenceType.TRANSFER_ORDER
+        ? (row.referenceId ?? null)
+        : null,
     lines,
   };
 }

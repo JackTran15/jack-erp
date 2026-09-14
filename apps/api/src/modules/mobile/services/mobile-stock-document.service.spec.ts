@@ -1,8 +1,13 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { QueryBus } from '@nestjs/cqrs';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
+  GoodsIssuePurpose,
   GoodsIssueStatus,
   GoodsReceiptPurpose,
   GoodsReceiptStatus,
@@ -17,7 +22,10 @@ import {
   GoodsReceiptPaymentMethod,
 } from '../../inventory/goods-receipt/goods-receipt.entity';
 import { SearchGoodsReceiptsV2Query } from '../../inventory/goods-receipt/queries/search-goods-receipts-v2.query';
-import { MobileStockDocumentKind } from '../dto/mobile-stock-document-list.query.dto';
+import {
+  MobileStockDocumentKind,
+  MobileStockDocumentPurpose,
+} from '../dto/mobile-stock-document-list.query.dto';
 import { MobileStockDocumentService } from './mobile-stock-document.service';
 
 const actor: ActorContext = {
@@ -208,6 +216,7 @@ describe('MobileStockDocumentService', () => {
       from?: string;
       to?: string;
       search?: string;
+      purpose?: MobileStockDocumentPurpose;
     } = {},
   ) => service.list({ kind, page: 1, limit: 20, ...query }, actor);
 
@@ -273,6 +282,96 @@ describe('MobileStockDocumentService', () => {
       // mới là nó lặng lẽ vắng mặt khỏi màn Nhập kho.
       expect(sentDto().excludePurposes).toEqual([GoodsReceiptPurpose.PURCHASE]);
       expect(sentDto().purposes).toBeUndefined();
+    });
+  });
+
+  /// Nhóm lọc thứ hai của màn bộ lọc trong app. Không có gì trên màn hình báo
+  /// khi phép map này lệch — người dùng chỉ thấy một danh sách sai.
+  describe('lọc theo loại chứng từ (`purpose`)', () => {
+    it('nhập kho + transfer -> allow-list [TRANSFER_IN], BỎ deny-list', async () => {
+      await run(MobileStockDocumentKind.STOCK_IN, {
+        purpose: MobileStockDocumentPurpose.TRANSFER,
+      });
+
+      expect(sentDto().purposes).toEqual([GoodsReceiptPurpose.TRANSFER_IN]);
+      // Gửi kèm `excludePurposes: [PURCHASE]` chỉ là một mệnh đề WHERE vô nghĩa:
+      // `TRANSFER_IN` vốn đã không phải `PURCHASE`.
+      expect(sentDto().excludePurposes).toBeUndefined();
+    });
+
+    it('nhập kho + stock-take / other map đúng bảng', async () => {
+      await run(MobileStockDocumentKind.STOCK_IN, {
+        purpose: MobileStockDocumentPurpose.STOCK_TAKE,
+      });
+      expect(sentDto().purposes).toEqual([GoodsReceiptPurpose.STOCK_TAKE]);
+
+      execute.mockClear();
+      await run(MobileStockDocumentKind.STOCK_IN, {
+        purpose: MobileStockDocumentPurpose.OTHER,
+      });
+      expect(sentDto().purposes).toEqual([GoodsReceiptPurpose.OTHER]);
+    });
+
+    it('xuất kho + transfer -> TRANSFER_OUT, KHÔNG phải TRANSFER_IN', async () => {
+      execute.mockResolvedValue(page([issue()], 350000));
+
+      await run(MobileStockDocumentKind.STOCK_OUT, {
+        purpose: MobileStockDocumentPurpose.TRANSFER,
+      });
+
+      // Ca đáng khoá nhất của cả nhóm: MỘT lựa chọn của người dùng ra HAI giá
+      // trị backend tuỳ `kind`. Đó là toàn bộ lý do `MobileStockDocumentPurpose`
+      // tồn tại thay vì phơi enum backend xuống client.
+      expect(sentDto().purpose).toEqual({
+        value: GoodsIssuePurpose.TRANSFER_OUT,
+      });
+    });
+
+    it('xuất kho + sale / disposal map đúng bảng', async () => {
+      execute.mockResolvedValue(page([issue()], 350000));
+
+      await run(MobileStockDocumentKind.STOCK_OUT, {
+        purpose: MobileStockDocumentPurpose.SALE,
+      });
+      expect(sentDto().purpose).toEqual({ value: GoodsIssuePurpose.SALE });
+
+      execute.mockClear();
+      await run(MobileStockDocumentKind.STOCK_OUT, {
+        purpose: MobileStockDocumentPurpose.DISPOSAL,
+      });
+      expect(sentDto().purpose).toEqual({ value: GoodsIssuePurpose.DISPOSAL });
+    });
+
+    it('không lọc thì KHÔNG gửi khoá `purpose` nào', async () => {
+      execute.mockResolvedValue(page([issue()], 350000));
+
+      await run(MobileStockDocumentKind.STOCK_OUT);
+
+      // `forbidNonWhitelisted` không phải vấn đề ở đây, nhưng một
+      // `purpose: undefined` vẫn thành một mệnh đề WHERE ở `FilterBuilder`.
+      expect('purpose' in sentDto()).toBe(false);
+    });
+
+    it('nhập kho + sale -> 400, KHÔNG phải danh sách rỗng', async () => {
+      await expect(
+        run(MobileStockDocumentKind.STOCK_IN, {
+          purpose: MobileStockDocumentPurpose.SALE,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      // Danh sách rỗng sẽ nói với người dùng "cửa hàng này không có phiếu bán
+      // hàng nhập kho" — một câu sai.
+      expect(execute).not.toHaveBeenCalled();
+    });
+
+    it('nhập HÀNG không nhận `purpose` — màn đó chỉ có phiếu mua hàng', async () => {
+      await expect(
+        run(MobileStockDocumentKind.GOODS_RECEIPT, {
+          purpose: MobileStockDocumentPurpose.TRANSFER,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(execute).not.toHaveBeenCalled();
     });
   });
 
@@ -507,9 +606,12 @@ describe('MobileStockDocumentService', () => {
       );
     });
 
-    it('phiếu nhập: đúng 14 trường, dòng hàng đúng 7 — không rò gì thêm', async () => {
+    it('phiếu nhập: đúng 18 trường, dòng hàng đúng 7 — không rò gì thêm', async () => {
       const result = await detail(MobileStockDocumentKind.GOODS_RECEIPT);
 
+      // Bốn trường cuối là của màn SỬA phiếu ĐIỀU CHUYỂN. Danh sách này là một
+      // hàng rào: mở rộng nó phải là một quyết định, không phải hệ quả của việc
+      // ai đó thêm một `select`.
       expect(Object.keys(result).sort()).toEqual([
         'amount',
         'code',
@@ -524,7 +626,11 @@ describe('MobileStockDocumentService', () => {
         'partyName',
         'paymentMethod',
         'purchasingEmployee',
+        'purpose',
+        'sourceBranch',
         'status',
+        'targetBranch',
+        'transferOrderId',
       ]);
       expect(Object.keys(result.lines[0]).sort()).toEqual([
         'itemId',

@@ -15,7 +15,10 @@ import {
 } from 'class-validator';
 import { DocCounterpartyKind } from '@erp/shared-interfaces';
 import { GoodsReceiptPaymentMethod } from '../../inventory/goods-receipt/goods-receipt.entity';
-import { MobileStockDocumentKind } from './mobile-stock-document-list.query.dto';
+import {
+  MobileStockDocumentKind,
+  MobileStockDocumentPurpose,
+} from './mobile-stock-document-list.query.dto';
 
 /**
  * Một dòng hàng do app gửi lên — BA trường.
@@ -57,11 +60,15 @@ export class MobileStockDocumentLineWriteDto {
  * **Ba trường app KHÔNG gửi, server tự giải:**
  *
  * - `locationId` mỗi dòng — qua `ResolveItemLocationsQuery`, từ [branchId];
- * - `uomCode` mỗi dòng — từ `items.unit`;
- * - `purpose` — ép theo [kind].
+ * - `uomCode` mỗi dòng — từ `items.unit`.
  *
- * Cả ba là khái niệm nội bộ backend. Bắt app mang chúng là bắt nó biết ba thứ
+ * Cả hai là khái niệm nội bộ backend. Bắt app mang chúng là bắt nó biết hai thứ
  * mà màn hình không hề hiển thị.
+ *
+ * `purpose` TRƯỚC ĐÂY cũng nằm trong danh sách đó (server ép theo [kind]) và nay
+ * KHÔNG còn: màn "Mục đích nhập/xuất kho" của app cho người dùng chọn giữa
+ * "Khác" và "Điều chuyển", nên nó là một quyết định của người dùng chứ không
+ * phải một hằng suy ra được. Bỏ trống vẫn ra đúng hành vi cũ — xem [purpose].
  */
 export class MobileStockDocumentCreateDto {
   @ApiProperty({ enum: MobileStockDocumentKind })
@@ -75,6 +82,67 @@ export class MobileStockDocumentCreateDto {
   @ApiProperty({ description: 'Ngày chứng từ, ISO-8601' })
   @IsISO8601()
   documentDate!: string;
+
+  /**
+   * Mục đích phiếu. Bỏ trống = `other`, tức ĐÚNG hành vi trước khi trường này
+   * tồn tại — client cũ không phải đổi gì.
+   *
+   * **Đường GHI chỉ hiểu `other` và `transfer`**, dù enum có năm giá trị vì nó
+   * dùng chung với bộ LỌC danh sách. Ba giá trị còn lại (`sale`, `disposal`,
+   * `stock-take`) là phiếu do hệ thống sinh hoặc do luồng khác lập, không phải
+   * thứ app tạo tay — gửi lên là 400 tường minh ở
+   * `MobileStockDocumentWriteService`. Dùng chung enum thay vì dựng cái thứ hai
+   * vì đó là CÙNG một từ vựng nhìn từ hai chiều; chỗ lệch là tập giá trị hợp
+   * lệ, và nó được kiểm ở service — nơi duy nhất biết cả `kind` lẫn `purpose`.
+   *
+   * `transfer` kéo theo ba trường dưới đây và đổi hẳn đường ghi — xem service.
+   */
+  @ApiPropertyOptional({ enum: MobileStockDocumentPurpose, default: MobileStockDocumentPurpose.OTHER })
+  @IsOptional()
+  @IsEnum(MobileStockDocumentPurpose)
+  purpose?: MobileStockDocumentPurpose;
+
+  /**
+   * Cửa hàng NGUỒN của phiếu nhập kho điều chuyển, khi người dùng KHÔNG chọn
+   * lệnh điều chuyển nào.
+   *
+   * Phải khác [branchId] — nhận hàng điều chuyển từ chính mình là vô nghĩa, và
+   * `GoodsReceiptService` từ chối ca đó.
+   *
+   * Chọn được lệnh thì đừng gửi trường này: [transferOrderId] đã mang cửa hàng
+   * nguồn theo, và server lấy từ đó.
+   */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  sourceBranchId?: string;
+
+  /**
+   * Cửa hàng ĐÍCH của phiếu xuất kho điều chuyển. **BẮT BUỘC** ở ca đó — không
+   * có nó thì không biết hàng đi đâu, và `GoodsIssueService` trả 400
+   * "Vui lòng chọn cửa hàng đích để điều chuyển".
+   *
+   * Phải khác [branchId], cùng lý do với [sourceBranchId].
+   */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  targetBranchId?: string;
+
+  /**
+   * Lệnh điều chuyển mà phiếu NHẬP KHO này đang nhận về — lấy từ
+   * `GET /mobile/transfer-orders/importable`.
+   *
+   * Có nó thì server đi đường XÁC NHẬN NHẬP: phiếu nhập được sinh ra kèm tham
+   * chiếu tới lệnh, và lệnh chuyển sang "hoàn thành". **`lines` gửi kèm bị BỎ
+   * QUA** ở ca này — số lượng nhận lấy từ chính lệnh, để nó không bao giờ lệch
+   * thứ cửa hàng nguồn đã xuất. App vẫn phải gửi `lines` (DTO đòi không rỗng)
+   * và nên gửi đúng dòng của lệnh để hai bên nhìn giống nhau.
+   */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  transferOrderId?: string;
 
   /**
    * Đối tượng. Hai trường đi CÙNG NHAU: gửi `counterpartyKind` mà thiếu

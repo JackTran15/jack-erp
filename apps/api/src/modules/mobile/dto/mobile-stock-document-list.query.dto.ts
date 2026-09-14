@@ -38,10 +38,59 @@ export enum MobileStockDocumentKind {
   STOCK_OUT = 'stock-out',
 }
 
+/**
+ * Loại chứng từ mà màn BỘ LỌC của app bày ra — nhóm "Trạng thái" ở màn Nhập kho
+ * và "Loại chứng từ" ở màn Xuất kho.
+ *
+ * Enum RIÊNG chứ không phơi `GoodsReceiptPurpose`/`GoodsIssuePurpose` xuống
+ * client, đúng lập luận vẫn đang giữ ở `MobileStockDocumentService.listReceipts`:
+ * `purpose` là khái niệm nội bộ backend, để nó rò xuống Dart thì mọi lần backend
+ * thêm một purpose là một lần app phải biết.
+ *
+ * Lớp enum này còn giải được một chuyện mà hai enum kia không giải được: cùng
+ * một lựa chọn "Điều chuyển" của người dùng là `TRANSFER_IN` với phiếu nhập và
+ * `TRANSFER_OUT` với phiếu xuất. App gửi MỘT giá trị, server tự phân giải theo
+ * `kind` — cùng cách [MobileStockDocumentKind] giấu chuyện hai bảng.
+ *
+ * Kebab-case gương theo [MobileStockDocumentKind]. Đừng đổi sang camelCase cho
+ * "giống `branchId`": phía Dart có bảng tra riêng khớp đúng các slug này, và
+ * backend bật `forbidNonWhitelisted` nên lệch một chữ là 400 cho cả lượt gọi.
+ *
+ * Hai giá trị KHÔNG dùng được ở mọi `kind`: `sale` và `disposal` chỉ tồn tại ở
+ * phiếu xuất. Gửi sai cặp là **400**, không phải một danh sách rỗng khó hiểu —
+ * cùng chính sách mà [MobileStockDocumentKind] đang áp cho giá trị lạ.
+ */
+export enum MobileStockDocumentPurpose {
+  /** `TRANSFER_IN` với phiếu nhập, `TRANSFER_OUT` với phiếu xuất. */
+  TRANSFER = 'transfer',
+  STOCK_TAKE = 'stock-take',
+  /** Chỉ `stock-out`. */
+  SALE = 'sale',
+  /** Chỉ `stock-out`. */
+  DISPOSAL = 'disposal',
+  OTHER = 'other',
+}
+
 export class MobileStockDocumentListQueryDto {
   @ApiProperty({ enum: MobileStockDocumentKind })
   @IsEnum(MobileStockDocumentKind)
   kind!: MobileStockDocumentKind;
+
+  /**
+   * Lọc theo loại chứng từ. Bỏ trống = MỌI loại mà `kind` đó vốn chứa.
+   *
+   * KHÔNG nhận được với `kind=goods-receipt`: màn "Nhập hàng" theo định nghĩa
+   * chỉ chứa phiếu mua hàng (`purposes: [PURCHASE]`), nên một tiêu chí lọc ở đó
+   * là câu hỏi không có nghĩa. Gửi lên vẫn là **400** chứ không bị bỏ qua — bỏ
+   * qua thì app tưởng mình đã lọc và người dùng đọc một danh sách sai.
+   *
+   * Phép kiểm cặp `kind` × `purpose` nằm ở `MobileStockDocumentService`, chỗ
+   * duy nhất biết cả hai — `@IsEnum` ở đây chỉ chặn được giá trị lạ.
+   */
+  @ApiPropertyOptional({ enum: MobileStockDocumentPurpose })
+  @IsOptional()
+  @IsEnum(MobileStockDocumentPurpose)
+  purpose?: MobileStockDocumentPurpose;
 
   /**
    * Cửa hàng cần xem. Bỏ trống thì lấy cửa hàng mặc định trong token.
