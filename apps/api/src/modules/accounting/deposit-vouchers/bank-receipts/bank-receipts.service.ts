@@ -21,7 +21,7 @@ import { loadVoucherBranch } from '../../../inventory/location/services/voucher-
 import { DepositService } from '../../deposit/deposit.service';
 import { DepositAccountEntity } from '../../deposit/deposit-account.entity';
 import { DepositPeriodGuardService } from '../../deposit-period-lock/deposit-period-guard.service';
-import { VoucherStaffResolver } from '../shared/voucher-staff.resolver';
+import { VoucherStaffResolver } from '../../cash-vouchers/shared/voucher-staff.resolver';
 import { DepositDebtCollectionSagaService } from '../debt-collection/deposit-debt-collection-saga.service';
 import {
   BankReceiptPurpose,
@@ -910,23 +910,16 @@ export class BankReceiptsService {
   ): Promise<VoucherPrintPayload> {
     const receipt = await this.getById(id, actor);
     const manager = this.dataSource.manager;
-    const [branch, bankAccountName, categoryNames] = await Promise.all([
+    const [branch, categoryNames] = await Promise.all([
       loadVoucherBranch(manager, receipt.branchId, actor.organizationId),
-      this.resolveBankAccountName(manager, receipt.depositAccountId, actor.organizationId),
       this.resolveCategoryNames(manager, receipt.lines, actor.organizationId),
     ]);
-    return mapBankReceiptToVoucherPayload(receipt, branch, bankAccountName, categoryNames);
-  }
-
-  private async resolveBankAccountName(
-    manager: EntityManager,
-    depositAccountId: string,
-    organizationId: string,
-  ): Promise<string> {
-    const account = await manager.findOne(DepositAccountEntity, {
-      where: { id: depositAccountId, organizationId },
-    });
-    return account?.name ?? '';
+    return mapBankReceiptToVoucherPayload(
+      receipt,
+      branch,
+      receipt.collectedByName ?? null,
+      categoryNames,
+    );
   }
 
   /** Batch-resolves category names for a receipt's lines, keyed by category id. */

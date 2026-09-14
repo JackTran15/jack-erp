@@ -149,13 +149,13 @@ export function TreasuryCashReceiptsPage() {
   const debouncedFilters = useDebouncedValue(columnFilters, 300);
 
   const searchBody = useMemo(() => {
-    // The period filter feeds the same createdAt range the column cell uses.
+    // The period filter feeds the same voucherDate range the column cell uses.
     const merged: Record<string, ColumnFilter> = {
       ...debouncedFilters,
-      createdAt: {
-        ...debouncedFilters.createdAt,
-        from: debouncedFilters.createdAt.from || appliedPeriod.from,
-        to: debouncedFilters.createdAt.to || appliedPeriod.to,
+      voucherDate: {
+        ...debouncedFilters.voucherDate,
+        from: debouncedFilters.voucherDate.from || appliedPeriod.from,
+        to: debouncedFilters.voucherDate.to || appliedPeriod.to,
       },
     };
     return {

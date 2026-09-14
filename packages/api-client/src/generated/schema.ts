@@ -7724,6 +7724,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/mobile/reports/business": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tình hình kinh doanh: doanh thu / chi phí / lợi nhuận theo chi nhánh trong kỳ, kèm 7 tháng để vẽ biểu đồ */
+        get: operations["MobileBusinessReportController_getBusiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/mobile/users/me": {
         parameters: {
             query?: never;
@@ -7801,8 +7818,437 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Khách hàng để gắn vào đơn bán */
+        /** Danh sách khách hàng kèm doanh thu, phân trang */
         get: operations["MobileCustomerController_list"];
+        put?: never;
+        /** Tạo khách hàng; để trống mã thì hệ thống tự cấp */
+        post: operations["MobileCustomerController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/customers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết một khách hàng theo id */
+        get: operations["MobileCustomerController_findById"];
+        put?: never;
+        post?: never;
+        /** Xoá khách hàng; 409 khi còn công nợ/tín dụng */
+        delete: operations["MobileCustomerController_remove"];
+        options?: never;
+        head?: never;
+        /** Sửa một phần khách hàng theo id */
+        patch: operations["MobileCustomerController_update"];
+        trace?: never;
+    };
+    "/mobile/customers/{id}/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử mua hàng của một khách, phân trang */
+        get: operations["MobileCustomerController_invoicesOf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/manager/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách hoá đơn đã ghi sổ, phân trang */
+        get: operations["MobileManagerInvoiceController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/manager/invoices/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết một hoá đơn kèm dòng hàng */
+        get: operations["MobileManagerInvoiceController_findById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/inventory/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhóm hàng đang hoạt động — danh sách phẳng kèm parentId */
+        get: operations["MobileInventoryController_listCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/inventory/units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Đơn vị tính cho màn chọn, gộp không phân biệt hoa/thường */
+        get: operations["MobileInventoryController_listUnits"];
+        put?: never;
+        /** Tạo một đơn vị tính */
+        post: operations["MobileInventoryController_createUnit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/inventory/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tồn kho theo mặt hàng, phân trang, kèm tổng toàn tập */
+        get: operations["MobileInventoryController_listProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/inventory/stores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Thẻ tồn kho của từng cửa hàng người dùng được phép */
+        get: operations["MobileInventoryController_listStores"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/inventory/stores/{branchId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Thẻ tồn kho của một cửa hàng */
+        get: operations["MobileInventoryController_findStore"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/inventory/products/{id}/variants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Biến thể của một mặt hàng trong kỳ, kèm tồn đầu/cuối và nhập/xuất */
+        get: operations["MobileInventoryController_listVariants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/inventory/products/{id}/stores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cửa hàng đang giữ một mặt hàng — thẻ thu hẹp về mặt hàng đó */
+        get: operations["MobileInventoryController_listStoresOf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/inventory/products/{id}/stores/{branchId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Luồng nhập/xuất của một mặt hàng tại một cửa hàng trong kỳ */
+        get: operations["MobileInventoryController_getFlow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/inventory/products/{id}/stores/{branchId}/vouchers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phiếu của một mặt hàng tại một cửa hàng trong kỳ, phân trang */
+        get: operations["MobileInventoryController_listVouchers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/reports/revenue/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Doanh thu theo mặt hàng (mẫu mã) trong kỳ, phân trang, kèm tổng toàn tập */
+        get: operations["MobileRevenueReportController_listItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/reports/revenue/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tỉ trọng doanh thu theo nhóm hàng trong kỳ */
+        get: operations["MobileRevenueReportController_listCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/reports/revenue/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Doanh thu theo thời gian: giờ / thứ / ngày / tuần / tháng / năm, đủ mốc của kỳ */
+        get: operations["MobileRevenueReportController_getTimeline"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/reports/revenue/items/{id}/branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Doanh thu của một mặt hàng tách theo chi nhánh */
+        get: operations["MobileRevenueReportController_listBranchesOfItem"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/reports/revenue/items/{id}/variants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Doanh thu của một mẫu mã tách theo biến thể */
+        get: operations["MobileRevenueReportController_listVariantsOfItem"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/reports/revenue/categories/{id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Doanh thu của một nhóm hàng tách theo mặt hàng */
+        get: operations["MobileRevenueReportController_listItemsOfCategory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/reports/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tổng quan: doanh thu + số hoá đơn theo chi nhánh trong kỳ, kèm doanh thu kỳ so sánh */
+        get: operations["MobileOverviewReportController_getOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/reports/revenue-estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Doanh thu ước tính: số đơn + doanh thu trong kỳ, gộp theo ngày / trạng thái / thanh toán / nhân viên / kênh */
+        get: operations["MobileRevenueEstimateController_getRevenueEstimate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/reports/overview/branches/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết một cửa hàng trong kỳ: doanh thu theo trạng thái HĐ, tiền thu theo phương thức, khách mới, HĐ còn nợ, tồn kho */
+        get: operations["MobileStoreDetailController_getBranch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/reports/debts/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Công nợ khách hàng: nợ cuối kỳ từng khách (sổ POS + sổ kế toán), phân trang, kèm tổng toàn tập */
+        get: operations["MobileDebtReportController_listCustomers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/reports/cashflow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tình hình thu chi: số dư đầu/cuối kỳ và tổng thu/chi quỹ TIỀN MẶT của các cửa hàng được phân công */
+        get: operations["MobileCashflowReportController_getSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/reports/cashflow/stores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tiền thu (hoặc chi) theo cửa hàng, mỗi cửa hàng tách theo hạng mục thu/chi */
+        get: operations["MobileCashflowReportController_listStores"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7879,6 +8325,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/mobile/item-categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tạo một nhóm hàng hoá */
+        post: operations["MobileItemCategoryController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/mobile/items": {
         parameters: {
             query?: never;
@@ -7906,11 +8369,30 @@ export interface paths {
         /** Danh sách hàng hoá, phân trang */
         get: operations["MobileProductController_list"];
         put?: never;
-        post?: never;
+        /** Tạo hàng hoá */
+        post: operations["MobileProductController_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/mobile/products/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết một hàng hoá theo id (mẫu mã hoặc item lẻ) */
+        get: operations["MobileProductController_findById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Sửa hàng hoá theo id (mẫu mã hoặc item lẻ) */
+        patch: operations["MobileProductController_update"];
         trace?: never;
     };
     "/mobile/product-revenue": {
@@ -8032,6 +8514,103 @@ export interface paths {
         head?: never;
         /** Sửa chứng từ kho */
         patch: operations["MobileStockDocumentController_update"];
+        trace?: never;
+    };
+    "/mobile/sales-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesOrderController_list"];
+        put?: never;
+        post: operations["SalesOrderController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/sales-orders/salespeople": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Khai TRƯỚC `:id` — không thì `salespeople` bị `ParseUUIDPipe` của route kia bắt. */
+        get: operations["SalesOrderController_salespeople"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/sales-orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesOrderController_getById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["SalesOrderController_update"];
+        trace?: never;
+    };
+    "/mobile/sales-orders/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SalesOrderController_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/sales-orders/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SalesOrderController_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/sales-orders/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SalesOrderController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v2/partner/catalog/categories/tree": {
@@ -8385,11 +8964,8 @@ export interface components {
              * @enum {string}
              */
             status?: "DRAFT" | "POSTED" | "REVERSED";
-            /**
-             * @description Creation-timestamp column, also fed by the period (from/to) filter. The grid
-             *     orders on this column too.
-             */
-            createdAt?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Voucher-date column ("Ngày thu/chi"), also fed by the period (from/to) filter. */
+            voucherDate?: components["schemas"]["DateRangeFilterDto"];
             /** @description Document number column. */
             documentNumber?: components["schemas"]["StringFilterDto"];
             /** @description Total amount column. */
@@ -9121,7 +9697,7 @@ export interface components {
         };
         CreateDocumentNumberRuleDto: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP" | "PROMOTION";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP" | "PROMOTION" | "SALES_ORDER";
             branchId?: string;
             prefix: string;
             suffix?: string;
@@ -9134,7 +9710,7 @@ export interface components {
         };
         DocumentNumberRuleEntity: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP" | "PROMOTION";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP" | "PROMOTION" | "SALES_ORDER";
             prefix: string;
             suffix?: string;
             separator: string;
@@ -9168,7 +9744,7 @@ export interface components {
         };
         GenerateDocumentNumberDto: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP" | "PROMOTION";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE" | "CUSTOMER_GROUP" | "PROMOTION" | "SALES_ORDER";
             branchId?: string;
         };
         CreateMembershipCardInlineDto: {
@@ -13206,6 +13782,13 @@ export interface components {
             /** @default 20 */
             limit: number;
             /** @description Số hóa đơn */
+            search?: string;
+            /**
+             * @description Status IN (...) — a set, unlike `status` which is a single equality. The
+             *     mobile list folds its three user-facing states into these values
+             *     (e.g. "debt" = pending + debt + partial_debt), so it needs the set form.
+             */
+            statuses?: ("draft" | "pending" | "paid" | "debt" | "partial_debt" | "cancelled")[];
             code?: components["schemas"]["StringFilterDto"];
             /** @description Trạng thái */
             status?: components["schemas"]["EnumFilterDto"];
@@ -13923,6 +14506,13 @@ export interface components {
              *     Bounded because it reaches a query parameter on a hot path.
              */
             sku?: string;
+            /**
+             * @description Tìm tự do trên mặt hàng: mã SKU / tên hàng / mã & tên mẫu mã cha / mã & tên
+             *     nhóm hàng hoá — ô tìm ở header màn "Doanh thu theo mặt hàng" của mobile
+             *     (placeholder MISA: "Nhập tên, mã SKU, mã nhóm hàng hoá"). Áp SAU khi tải
+             *     dòng, cùng chỗ với `categoryId`/`brand`, vì báo cáo này gom trong bộ nhớ.
+             */
+            search?: string;
             /** @description Add a brand-grain split (daily-summary / revenue-by-item). */
             statisticByBrand?: boolean;
             /** @description revenue-by-item only — split combo revenue across components. */
@@ -15240,6 +15830,45 @@ export interface components {
             /** @description Cửa hàng chính của tổ chức. Trường của entity tên là `isMainBranch`; rút gọn ở đây vì trong một danh sách chi nhánh thì chữ "Branch" là thừa. */
             isMain: boolean;
         };
+        MobileBusinessMetricsDto: {
+            /** @description Doanh thu (mục II của "Kết quả kinh doanh") */
+            revenue: number;
+            /** @description Chi phí (mục III): giá vốn + chi khác */
+            cost: number;
+            /** @description Lợi nhuận (mục IV) = revenue − cost, có thể ÂM */
+            profit: number;
+        };
+        MobileBusinessMonthDto: {
+            /** @description Doanh thu (mục II của "Kết quả kinh doanh") */
+            revenue: number;
+            /** @description Chi phí (mục III): giá vốn + chi khác */
+            cost: number;
+            /** @description Lợi nhuận (mục IV) = revenue − cost, có thể ÂM */
+            profit: number;
+            /** @example 2026 */
+            year: number;
+            /** @example 9 */
+            month: number;
+        };
+        MobileBranchPerformanceDto: {
+            /** @description Doanh thu (mục II của "Kết quả kinh doanh") */
+            revenue: number;
+            /** @description Chi phí (mục III): giá vốn + chi khác */
+            cost: number;
+            /** @description Lợi nhuận (mục IV) = revenue − cost, có thể ÂM */
+            profit: number;
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @description Địa chỉ chi nhánh; chuỗi rỗng khi chưa nhập */
+            address: string;
+            months: components["schemas"]["MobileBusinessMonthDto"][];
+        };
+        MobileBusinessReportResponseDto: {
+            totals: components["schemas"]["MobileBusinessMetricsDto"];
+            /** @description Sắp theo doanh thu giảm dần, cùng doanh thu thì theo tên */
+            branches: components["schemas"]["MobileBranchPerformanceDto"][];
+        };
         MobileMeResponseDto: {
             /** Format: uuid */
             id: string;
@@ -15360,17 +15989,570 @@ export interface components {
         MobileCustomerResponseDto: {
             /** Format: uuid */
             id: string;
-            /** @description Mã khách hàng. NULL là hợp lệ — khách vãng lai chưa có mã. */
-            code: string | null;
+            /** @description Mã khách hàng, duy nhất trong tổ chức */
+            code: string;
+            /** @description Tên khách hàng, giữ nguyên hoa/thường đã nhập */
             name: string;
-            /** @description Số điện thoại — khoá tra cứu chính của màn chọn khách. */
             phone: string | null;
+            email: string | null;
+            address: string | null;
+            note: string | null;
+            /** @description Ngày sinh dạng YYYY-MM-DD, không có giờ */
+            birthDate: string | null;
+            /** @enum {string|null} */
+            gender: "male" | "female" | "unspecified" | null;
+            /** @enum {string} */
+            status: "active" | "inactive";
+            /** @description Tên nhóm khách hàng */
+            groupName: string | null;
+            /** @description TÊN hạng thẻ do tổ chức đặt (vd "Thẻ Vàng"); null khi chưa có thẻ hoặc thẻ hạng `none` */
+            cardTier: string | null;
+            /** @description Tổng tiền hoá đơn bán đã chốt (paid / debt / partial_debt), đơn vị đồng */
+            revenue: number;
+            /** @description Số hoá đơn bán đã chốt */
+            invoiceCount: number;
         };
         MobileCustomerPageDto: {
             data: components["schemas"]["MobileCustomerResponseDto"][];
+            /** @description Tổng số bản ghi khớp, không phải số bản ghi của trang */
             total: number;
             page: number;
             limit: number;
+            /** @description Tổng doanh thu của toàn bộ bản ghi khớp bộ lọc */
+            totalRevenue: number;
+        };
+        MobileCustomerCreateDto: {
+            /** @description Mã khách hàng; để trống thì hệ thống tự cấp */
+            code?: string;
+            /** @description Tên khách hàng */
+            name: string;
+            phone?: string | null;
+            /** Format: email */
+            email?: string | null;
+            address?: string | null;
+            /** @description Ngày sinh dạng YYYY-MM-DD */
+            birthDate?: string | null;
+            /** @enum {string|null} */
+            gender?: "male" | "female" | "unspecified" | null;
+            note?: string | null;
+            /**
+             * @description Vắng = active. Bản ghi mới bao giờ cũng đang theo dõi.
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+        };
+        MobileManagerInvoiceResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description Số hoá đơn */
+            code: string;
+            /** @enum {string} */
+            type: "sale" | "return" | "exchange";
+            /** @enum {string} */
+            status: "paid" | "unpaid" | "cancelled";
+            /** @description ISO-8601 */
+            createdAt: string;
+            /** @description ISO-8601 */
+            issuedAt: string | null;
+            /** @description Tổng thanh toán có dấu, đơn vị đồng */
+            amount: number;
+            customerName: string | null;
+            customerPhone: string | null;
+        };
+        MobileManagerInvoicePageDto: {
+            data: components["schemas"]["MobileManagerInvoiceResponseDto"][];
+            /** @description Tổng số bản ghi khớp, không phải số bản ghi của trang */
+            total: number;
+            page: number;
+            limit: number;
+            /** @description Tổng tiền toàn tập khớp, không tính hoá đơn huỷ */
+            totalAmount: number;
+        };
+        MobileCustomerUpdateDto: {
+            /** @description Mã khách hàng; để trống thì hệ thống tự cấp */
+            code?: string;
+            /** @description Tên khách hàng */
+            name?: string;
+            phone?: string | null;
+            /** Format: email */
+            email?: string | null;
+            address?: string | null;
+            /** @description Ngày sinh dạng YYYY-MM-DD */
+            birthDate?: string | null;
+            /** @enum {string|null} */
+            gender?: "male" | "female" | "unspecified" | null;
+            note?: string | null;
+            /**
+             * @description Vắng = active. Bản ghi mới bao giờ cũng đang theo dõi.
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+        };
+        MobileManagerInvoiceLoyaltyDto: {
+            /** @description Điểm trước hoá đơn */
+            opening: number;
+            earned: number;
+            used: number;
+        };
+        MobileManagerInvoiceLineDto: {
+            name: string;
+            /** @description Mã hàng (SKU) tại thời điểm bán */
+            sku: string;
+            unit: string;
+            quantity: number;
+            unitPrice: number;
+            /** @description Thành tiền sau chiết khấu dòng */
+            total: number;
+        };
+        MobileManagerInvoiceDetailResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description Số hoá đơn */
+            code: string;
+            /** @enum {string} */
+            type: "sale" | "return" | "exchange";
+            /** @enum {string} */
+            status: "paid" | "unpaid" | "cancelled";
+            /** @description ISO-8601 */
+            createdAt: string;
+            /** @description ISO-8601 */
+            issuedAt: string | null;
+            /** @description Tổng thanh toán có dấu, đơn vị đồng */
+            amount: number;
+            customerName: string | null;
+            customerPhone: string | null;
+            /** @description Nhân viên bán */
+            salesperson: string | null;
+            /** @description Thu ngân (người lập) */
+            cashier: string | null;
+            /** @description Tổng tiền hàng trước chiết khấu */
+            subtotal: number;
+            /** @description Chiết khấu hoá đơn + chiết khấu điểm */
+            discount: number;
+            /** @description Tổng tiền khách đưa qua mọi phương thức */
+            cashReceived: number;
+            /** @description Tiền thừa trả lại */
+            changeAmount: number;
+            /** @description Mã loại chương trình khuyến mãi đã áp */
+            promotions: string[];
+            loyalty: components["schemas"]["MobileManagerInvoiceLoyaltyDto"] | null;
+            lines: components["schemas"]["MobileManagerInvoiceLineDto"][];
+        };
+        MobileInventoryCategoryResponseDto: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /**
+             * Format: uuid
+             * @description Nhóm cha; NULL = nhóm gốc. Cha ngừng hoạt động thì con thành gốc.
+             */
+            parentId: string | null;
+        };
+        MobileInventoryUnitResponseDto: {
+            /** @description Chữ thường của đơn vị, dùng để lọc */
+            code: string;
+            /** @description Cách viết hiển thị */
+            name: string;
+        };
+        MobileUnitCreateDto: {
+            /** @description Tên đơn vị tính, vd "Đôi" */
+            name: string;
+            /** @description Diễn giải */
+            description?: string;
+        };
+        MobileInventoryProductResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description Mã hàng hoá (SKU) */
+            code: string;
+            name: string;
+            /** @description Đơn vị tính; mẫu mã lấy của item đại diện */
+            unit: string;
+            /** @description Số lượng tồn tính đến hết ngày `asOf`, có thể ÂM */
+            quantity: number;
+            /** @description Giá trị tồn theo giá vốn sổ cái, đơn vị đồng */
+            stockValue: number;
+            /**
+             * Format: uuid
+             * @description Nhóm hàng của item (mẫu mã: của item đại diện). NULL = chưa xếp nhóm.
+             */
+            groupId: string | null;
+        };
+        MobileInventoryProductPageDto: {
+            data: components["schemas"]["MobileInventoryProductResponseDto"][];
+            /** @description Tổng số dòng khớp, không phải số dòng của trang */
+            total: number;
+            page: number;
+            limit: number;
+            /** @description Tổng số lượng toàn tập khớp */
+            totalQuantity: number;
+            /** @description Tổng giá trị toàn tập khớp, đơn vị đồng */
+            totalValue: number;
+        };
+        MobileInventoryStorageDto: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @description Số lượng tồn của kho tính đến hết ngày `asOf` */
+            quantity: number;
+        };
+        MobileInventoryStoreResponseDto: {
+            /**
+             * Format: uuid
+             * @description Id chi nhánh
+             */
+            id: string;
+            name: string;
+            /** @description Tổng tồn mọi kho của cửa hàng, có thể ÂM */
+            quantity: number;
+            /** @description Giá trị tồn theo giá vốn sổ cái, đơn vị đồng */
+            stockValue: number;
+            /** @description Số lượng nhập trong kỳ (đầu tháng của asOf -> asOf) */
+            periodIn: number;
+            /** @description Số lượng xuất trong kỳ */
+            periodOut: number;
+            storages: components["schemas"]["MobileInventoryStorageDto"][];
+        };
+        MobileInventoryVariantResponseDto: {
+            /**
+             * Format: uuid
+             * @description Id item
+             */
+            id: string;
+            code: string;
+            name: string;
+            unit: string;
+            /** @description Tồn cuối kỳ, có thể ÂM */
+            quantity: number;
+            /** @description Giá trị tồn theo giá vốn sổ cái, đơn vị đồng */
+            stockValue: number;
+            /** @description Tồn đầu kỳ (đầu tháng của asOf) */
+            openingQuantity: number;
+            /** @description Số lượng nhập trong kỳ */
+            periodIn: number;
+            /** @description Số lượng xuất trong kỳ */
+            periodOut: number;
+        };
+        MobileInventoryFlowLineDto: {
+            /** @description Nhãn tiếng Việt của loại chứng từ (REFERENCE_TYPE_LABELS) */
+            name: string;
+            /** @description Số lượng, luôn DƯƠNG — chiều nằm ở phía chứa nó */
+            quantity: number;
+            /** @description Giá trị, luôn DƯƠNG, đơn vị đồng */
+            value: number;
+        };
+        MobileInventoryFlowSideDto: {
+            quantity: number;
+            value: number;
+            /** @description CHỈ những loại có bút toán trong kỳ ở chiều này; rỗng = không phát sinh */
+            lines: components["schemas"]["MobileInventoryFlowLineDto"][];
+        };
+        MobileInventoryFlowResponseDto: {
+            /**
+             * Format: uuid
+             * @description Id chi nhánh
+             */
+            storeId: string;
+            /** @description Tồn đầu kỳ */
+            openingQuantity: number;
+            /** @description Tồn cuối kỳ — bằng số trên thẻ cửa hàng của cùng mặt hàng */
+            closingQuantity: number;
+            inbound: components["schemas"]["MobileInventoryFlowSideDto"];
+            outbound: components["schemas"]["MobileInventoryFlowSideDto"];
+        };
+        MobileInventoryVoucherDocumentDto: {
+            /** @enum {string} */
+            kind: "goods-receipt" | "stock-in" | "stock-out";
+            /** Format: uuid */
+            id: string;
+        };
+        MobileInventoryVoucherResponseDto: {
+            /** @description Khoá dòng: `<reference_type>:<reference_id|none>:<storage_id>` */
+            id: string;
+            /**
+             * @description Chiều theo DẤU của tổng số lượng
+             * @enum {string}
+             */
+            direction: "inbound" | "outbound";
+            /** Format: uuid */
+            warehouseId: string;
+            warehouseName: string;
+            /** @description Số chứng từ; không có thì là nhãn loại chứng từ */
+            code: string;
+            /** @description ISO-8601 — thời điểm ghi sổ sớm nhất của phiếu */
+            date: string;
+            /** @description Số lượng TUYỆT ĐỐI */
+            quantity: number;
+            unit: string;
+            /** @description Giá trị TUYỆT ĐỐI, đơn vị đồng */
+            value: number;
+            /** @description Chứng từ mở được từ app; NULL với hoá đơn, phiếu chuyển, tồn đầu kỳ… — app hiện toast thay vì mở */
+            document: components["schemas"]["MobileInventoryVoucherDocumentDto"] | null;
+        };
+        MobileInventoryVoucherPageDto: {
+            data: components["schemas"]["MobileInventoryVoucherResponseDto"][];
+            total: number;
+            page: number;
+            limit: number;
+            /** @description Tổng số lượng tuyệt đối toàn tập khớp */
+            totalQuantity: number;
+            /** @description Tổng giá trị tuyệt đối toàn tập khớp, đơn vị đồng */
+            totalValue: number;
+        };
+        MobileRevenueItemDto: {
+            /**
+             * Format: uuid
+             * @description Id mẫu mã, hoặc id item khi item không thuộc mẫu mã
+             */
+            id: string;
+            /** @description Mã mẫu mã; item lẻ thì mã item (snapshot trên dòng hoá đơn) */
+            code: string;
+            name: string;
+            /** @description Đơn vị tính lấy từ dòng hoá đơn */
+            unit: string;
+            /** @description Số lượng bán ròng trong kỳ (bán − trả), có thể ÂM */
+            quantity: number;
+            /** @description Doanh thu ròng trong kỳ, đơn vị đồng, có thể ÂM */
+            revenue: number;
+        };
+        MobileRevenueItemPageDto: {
+            data: components["schemas"]["MobileRevenueItemDto"][];
+            /** @description Tổng số mặt hàng có phát sinh trong kỳ, không phải số dòng của trang */
+            total: number;
+            page: number;
+            limit: number;
+            /** @description Tổng số lượng bán ròng toàn tập */
+            totalQuantity: number;
+            /** @description Tổng doanh thu toàn tập, đơn vị đồng */
+            totalRevenue: number;
+        };
+        MobileRevenueCategoryDto: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @description Doanh thu ròng của nhóm trong kỳ, đơn vị đồng */
+            revenue: number;
+        };
+        MobileRevenueCategoryListDto: {
+            /** @description Sắp doanh thu giảm dần, cùng doanh thu thì theo tên */
+            data: components["schemas"]["MobileRevenueCategoryDto"][];
+            /** @description Tổng doanh thu của các nhóm trong `data` */
+            totalRevenue: number;
+        };
+        MobileRevenuePointDto: {
+            /** @example 2026-09-01T09:00:00 */
+            start: string;
+            /** @description Doanh thu ròng của mốc, đơn vị đồng, có thể ÂM; mốc không phát sinh = 0 */
+            revenue: number;
+        };
+        MobileRevenueTimelineDto: {
+            /** @enum {string} */
+            unit: "hour" | "weekday" | "day" | "week" | "month" | "year";
+            /** @description Tổng doanh thu của kỳ = Σ `data`, bằng `totalRevenue` của `items` cùng bộ lọc */
+            totalRevenue: number;
+            data: components["schemas"]["MobileRevenuePointDto"][];
+        };
+        MobileRevenueBranchDto: {
+            /** @description Id chi nhánh (`invoices.branch_id`) */
+            id: string;
+            /** @description Tên chi nhánh; chi nhánh đã xoá thì là chính id */
+            name: string;
+            /** @description Số lượng bán ròng của mặt hàng tại chi nhánh */
+            quantity: number;
+            /** @description Doanh thu ròng của mặt hàng tại chi nhánh, đơn vị đồng */
+            revenue: number;
+        };
+        MobileRevenueItemBranchesDto: {
+            item: components["schemas"]["MobileRevenueItemDto"];
+            /** @description Sắp doanh thu giảm dần */
+            data: components["schemas"]["MobileRevenueBranchDto"][];
+        };
+        MobileRevenueVariantDto: {
+            /**
+             * Format: uuid
+             * @description Id item
+             */
+            id: string;
+            /** @description Mã item (SKU), snapshot trên dòng hoá đơn */
+            code: string;
+            /** @description Tên item, snapshot trên dòng hoá đơn */
+            name: string;
+            /** @description Doanh thu ròng của biến thể trong kỳ, đơn vị đồng */
+            revenue: number;
+        };
+        MobileRevenueItemVariantsDto: {
+            item: components["schemas"]["MobileRevenueItemDto"];
+            /** @description Sắp doanh thu giảm dần */
+            data: components["schemas"]["MobileRevenueVariantDto"][];
+        };
+        MobileRevenueCategoryItemsDto: {
+            category: components["schemas"]["MobileRevenueCategoryDto"];
+            /** @description Sắp doanh thu giảm dần */
+            data: components["schemas"]["MobileRevenueItemDto"][];
+        };
+        MobileOverviewTotalsDto: {
+            /** @description Doanh thu trong kỳ, công thức khớp "Doanh thu theo mặt hàng" */
+            revenue: number;
+            /** @description Số hoá đơn đã ghi sổ trong kỳ, LOẠI hoá đơn huỷ, tính cả phiếu trả/đổi */
+            invoiceCount: number;
+            /** @description Doanh thu của kỳ so sánh; 0 khi không gửi compareFrom/compareTo */
+            compareRevenue: number;
+        };
+        MobileOverviewBranchDto: {
+            /** @description Doanh thu trong kỳ, công thức khớp "Doanh thu theo mặt hàng" */
+            revenue: number;
+            /** @description Số hoá đơn đã ghi sổ trong kỳ, LOẠI hoá đơn huỷ, tính cả phiếu trả/đổi */
+            invoiceCount: number;
+            /** @description Doanh thu của kỳ so sánh; 0 khi không gửi compareFrom/compareTo */
+            compareRevenue: number;
+            /** @description `invoices.branch_id`; chi nhánh đã xoá vẫn có mặt nếu có phát sinh */
+            id: string;
+            /** @description Tên chi nhánh; bằng `id` khi chi nhánh không còn trong danh mục */
+            name: string;
+        };
+        MobileOverviewReportResponseDto: {
+            totals: components["schemas"]["MobileOverviewTotalsDto"];
+            /** @description Sắp theo doanh thu giảm dần, cùng doanh thu thì theo tên rồi id */
+            branches: components["schemas"]["MobileOverviewBranchDto"][];
+        };
+        MobileRevenueEstimateTotalsDto: {
+            /** @description Số đơn (hoá đơn) trong kỳ, loại nháp và huỷ */
+            orderCount: number;
+            /** @description Doanh thu trong kỳ. Ở mọi chế độ trừ `payment`: công thức dòng hàng khớp "Doanh thu theo mặt hàng". Ở `payment`: Σ tiền của sáu phương thức — KHÁC doanh thu dòng hàng */
+            revenue: number;
+        };
+        MobileRevenueEstimateBucketDto: {
+            key: string;
+            label: string | null;
+            /** @description Số đơn rơi vào bucket này */
+            orderCount: number;
+            /** @description Tiền của bucket này; có thể ÂM (trả hàng) */
+            revenue: number;
+        };
+        MobileRevenueEstimateResponseDto: {
+            totals: components["schemas"]["MobileRevenueEstimateTotalsDto"];
+            /** @description `time`: tăng dần theo ngày; còn lại: doanh thu giảm dần, hoà thì theo nhãn rồi key */
+            items: components["schemas"]["MobileRevenueEstimateBucketDto"][];
+        };
+        MobileStoreRevenueDto: {
+            /** @description Tổng doanh thu — cùng công thức và cùng số với dòng chi nhánh ở /mobile/reports/overview */
+            total: number;
+            /** @description Doanh thu của hoá đơn `paid` */
+            paidAmount: number;
+            /** @description Số hoá đơn `paid` */
+            paidCount: number;
+            /** @description Doanh thu của hoá đơn `debt` + `partial_debt` (chưa thanh toán đủ) */
+            unpaidAmount: number;
+            /** @description Số hoá đơn `debt` + `partial_debt` */
+            unpaidCount: number;
+            /** @description Số hoá đơn HUỶ trong kỳ — không nằm trong `total` */
+            cancelledCount: number;
+            /** @description Số hoá đơn đã ghi sổ trừ huỷ — bằng `invoiceCount` ở Tổng quan */
+            invoiceCount: number;
+        };
+        MobilePaymentSplitDto: {
+            /** @description `cash` */
+            cash: number;
+            /** @description `card` */
+            card: number;
+            /** @description `bank_transfer` */
+            transfer: number;
+        };
+        MobileStoreCollectedDto: {
+            /** @description Thanh toán trên hoá đơn (`invoice_payments`), trả hàng mang dấu âm */
+            sales: components["schemas"]["MobilePaymentSplitDto"];
+            /** @description Thu nợ sau bán (`debt_payments`, theo `paid_at`) */
+            debt: components["schemas"]["MobilePaymentSplitDto"];
+        };
+        MobileStoreNewCustomerDto: {
+            /** Format: uuid */
+            id: string;
+            code: string | null;
+            name: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601
+             */
+            createdAt: string;
+            /** @description Doanh thu của khách tại cửa hàng TRONG KỲ, cùng công thức `total` */
+            amount: number;
+        };
+        MobileStoreNewCustomersDto: {
+            /** @description Tổng số khách tạo trong kỳ — của TOÀN tập, không chỉ `items` */
+            count: number;
+            /** @description Tổng doanh thu của toàn tập khách mới */
+            totalAmount: number;
+            /** @description Tối đa 20 khách mới nhất */
+            items: components["schemas"]["MobileStoreNewCustomerDto"][];
+        };
+        MobileStoreInventoryDto: {
+            /** @description Tổng SỐ LƯỢNG tồn hiện tại (mọi kho của cửa hàng), như /mobile/inventory/stores/:id */
+            quantity: number;
+            /** @description Giá trị tồn theo giá vốn */
+            stockValue: number;
+        };
+        MobileStoreDetailResponseDto: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            revenue: components["schemas"]["MobileStoreRevenueDto"];
+            collected: components["schemas"]["MobileStoreCollectedDto"];
+            /** @description Hoá đơn còn nợ của cửa hàng — KHÔNG theo kỳ, là trạng thái hiện tại */
+            pendingUnpaidCount: number;
+            newCustomers: components["schemas"]["MobileStoreNewCustomersDto"];
+            inventory: components["schemas"]["MobileStoreInventoryDto"];
+        };
+        MobileCustomerDebtDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description Mã khách hàng, vd KH000017 */
+            code: string;
+            name: string;
+            /** @description Nợ CUỐI KỲ = đầu kỳ + tăng − giảm, gộp sổ POS và sổ kế toán, đơn vị đồng. Có thể ÂM (khách trả dư) hoặc 0 */
+            closing: number;
+        };
+        MobileCustomerDebtPageDto: {
+            data: components["schemas"]["MobileCustomerDebtDto"][];
+            /** @description Tổng số khách có phát sinh trong sổ, không phải số dòng của trang */
+            total: number;
+            page: number;
+            limit: number;
+            /** @description Tổng nợ cuối kỳ toàn tập, đơn vị đồng, có thể ÂM */
+            totalClosing: number;
+        };
+        MobileCashflowSummaryDto: {
+            /** @description Số dư quỹ tiền mặt TRƯỚC ngày đầu kỳ, đơn vị đồng, có thể ÂM */
+            opening: number;
+            /** @description Số dư quỹ tiền mặt đến HẾT ngày cuối kỳ, đơn vị đồng, có thể ÂM */
+            closing: number;
+            /** @description Tổng tiền VÀO quỹ trong kỳ, đơn vị đồng, ≥ 0 */
+            income: number;
+            /** @description Tổng tiền RA khỏi quỹ trong kỳ, đơn vị đồng, ≥ 0 */
+            expense: number;
+        };
+        MobileCashflowCategoryDto: {
+            /** Format: uuid */
+            id: string | null;
+            name: string | null;
+            /** @description Đơn vị đồng, > 0 */
+            amount: number;
+        };
+        MobileCashflowStoreDto: {
+            /**
+             * Format: uuid
+             * @description id chi nhánh
+             */
+            id: string;
+            name: string;
+            /** @description Tổng tiền theo chiều đã chọn, đơn vị đồng, > 0 */
+            amount: number;
+            /** @description Sắp theo tiền giảm dần; dòng "chưa xếp hạng mục" (id null) đứng cuối */
+            categories: components["schemas"]["MobileCashflowCategoryDto"][];
+        };
+        MobileCashflowStoreListDto: {
+            data: components["schemas"]["MobileCashflowStoreDto"][];
         };
         MobileProductAttributeValueDto: {
             /** @description Nhãn hiển thị — `product_attribute_options.value_label` */
@@ -15382,6 +16564,19 @@ export interface components {
             /** @description Tên chiều — vd `Màu sắc`, `Size` */
             name: string;
             values: components["schemas"]["MobileProductAttributeValueDto"][];
+        };
+        MobileItemCategoryCreateDto: {
+            /** @description Tên nhóm hàng */
+            name: string;
+            /** @description Mã nhóm hàng */
+            code?: string;
+            /**
+             * Format: uuid
+             * @description Id nhóm cha
+             */
+            parentGroupId?: string;
+            /** @description Diễn giải */
+            description?: string;
         };
         MobileItemResponseDto: {
             /**
@@ -15425,6 +16620,184 @@ export interface components {
             total: number;
             page: number;
             limit: number;
+        };
+        MobileProductVariantDto: {
+            /**
+             * Format: uuid
+             * @description id của item biến thể
+             */
+            id: string;
+            /** @description Mã SKU của biến thể */
+            code: string;
+            /** @description Nhãn phân loại đã ghép sẵn, vd "39 · Nâu". `null` khi biến thể không mang thuộc tính nào — app lùi về `code`. */
+            variantLabel: string | null;
+            /** @description Giá mua của riêng biến thể này */
+            purchasePrice: number;
+            /** @description Giá bán của riêng biến thể này */
+            sellingPrice: number;
+            /** @description Giá trị thuộc tính `Color` của biến thể, vd "Nâu". `null` khi mẫu mã không khai chiều màu sắc */
+            color: string | null;
+            /** @description Giá trị thuộc tính `Size`, vd "39". `null` như [color] */
+            size: string | null;
+        };
+        MobileProductDetailResponseDto: {
+            /**
+             * Format: uuid
+             * @description Đúng giá trị id mà `GET /mobile/products` trả cho dòng này: id của mẫu mã, hoặc id của item nếu nó không thuộc mẫu mã nào
+             */
+            id: string;
+            /** @description Mã hàng hoá. Mẫu mã không có mã riêng thì lùi về tên, rồi về mã nhỏ nhất của các biến thể — cùng luật với danh sách */
+            code: string;
+            /** @description Tên hàng hoá */
+            name: string;
+            /** @description Đang kinh doanh hay không. Mẫu mã: false khi có ÍT NHẤT một biến thể ngừng kinh doanh */
+            isActive: boolean;
+            /** @description Tên nhóm hàng hoá. `null` = chưa xếp nhóm */
+            categoryName: string | null;
+            /**
+             * Format: uuid
+             * @description Id nhóm hàng hoá — thứ màn Sửa cần. `null` = chưa xếp nhóm
+             */
+            categoryId: string | null;
+            /** @description Đơn vị tính cơ bản */
+            unit: string;
+            /** @description Giá mua (giá vốn). Mẫu mã: trung bình các biến thể — khớp danh sách */
+            purchasePrice: number;
+            /** @description Giá bán. Mẫu mã: trung bình các biến thể — khớp danh sách */
+            sellingPrice: number;
+            /** @description Trọng lượng (g). `null` = chưa nhập */
+            weightGram: number | null;
+            /** @description Chiều dài (cm). `null` = chưa nhập */
+            lengthCm: number | null;
+            /** @description Chiều rộng (cm). `null` = chưa nhập */
+            widthCm: number | null;
+            /** @description Chiều cao (cm). `null` = chưa nhập */
+            heightCm: number | null;
+            /** @description Mã vạch đầu tiên của item đại diện. `null` = chưa có */
+            barcode: string | null;
+            /** @description Mô tả. `null` = chưa nhập */
+            description: string | null;
+            /** @description Có hiện trên màn bán hàng (POS) không. Mẫu mã: `bool_and` các biến thể, cùng luật với [isActive] */
+            isPosVisible: boolean;
+            /** @description Các biến thể, xếp theo mã. RỖNG với item lẻ — app ẩn bảng thuộc tính */
+            variants: components["schemas"]["MobileProductVariantDto"][];
+        };
+        MobileProductVariantInputDto: {
+            /** @description Giá trị chiều Màu sắc */
+            color?: string;
+            /** @description Giá trị chiều Size */
+            size?: string;
+            /** @description Mã SKU riêng của biến thể */
+            sku?: string;
+            barcode?: string;
+            purchasePrice?: number;
+            /** @description Giá bán của biến thể */
+            sellPrice?: number;
+        };
+        MobileProductUnitInputDto: {
+            /** @description Tên đơn vị, vd "Thùng" */
+            unitName: string;
+            /** @description Tỉ lệ quy đổi về đơn vị cơ bản */
+            ratio?: number;
+            description?: string;
+            purchasePrice?: number;
+            sellPrice?: number;
+            /** @description Là đơn vị bán mặc định */
+            isDefaultSell?: boolean;
+            /** @description Là đơn vị nhập mặc định */
+            isDefaultBuy?: boolean;
+        };
+        MobileProductCreateDto: {
+            /** @description Tên hàng hoá */
+            name: string;
+            /** @description Mã hàng hoá; để trống thì hệ thống tự sinh từ tên */
+            code?: string;
+            /** @description Đơn vị tính cơ bản */
+            unit: string;
+            /**
+             * Format: uuid
+             * @description Id nhóm hàng hoá
+             */
+            categoryId?: string;
+            barcode?: string;
+            description?: string;
+            purchasePrice?: number;
+            sellingPrice?: number;
+            /**
+             * @description Đang kinh doanh
+             * @default true
+             */
+            isActive: boolean;
+            /**
+             * @description Hiện trên màn bán hàng
+             * @default true
+             */
+            isPosVisible: boolean;
+            /** @description Trọng lượng (gram) */
+            weightGram?: number;
+            lengthCm?: number;
+            widthCm?: number;
+            heightCm?: number;
+            /** @description Tồn kho ban đầu */
+            initialStock?: number;
+            /** @description Các giá trị chiều Màu sắc; có giá trị = tạo mẫu mã có biến thể */
+            colors?: string[];
+            /** @description Các giá trị chiều Size */
+            sizes?: string[];
+            /**
+             * @description Giá / SKU / mã vạch riêng của từng biến thể.
+             *
+             *     `ArrayMaxSize(500)` khớp đúng ngưỡng mà `generate-variants` của backoffice
+             *     dùng cho số tổ hợp — 50 màu × 50 size là 2500 tổ hợp, và gửi trọn chúng qua
+             *     một request là thứ phải chặn ở đây chứ không ở DB.
+             */
+            variants?: components["schemas"]["MobileProductVariantInputDto"][];
+            units?: components["schemas"]["MobileProductUnitInputDto"][];
+        };
+        MobileProductUpdateDto: {
+            /** @description Tên hàng hoá */
+            name?: string;
+            /** @description Mã hàng hoá; để trống thì hệ thống tự sinh từ tên */
+            code?: string;
+            /** @description Đơn vị tính cơ bản */
+            unit?: string;
+            /**
+             * Format: uuid
+             * @description Id nhóm hàng hoá
+             */
+            categoryId?: string;
+            barcode?: string;
+            description?: string;
+            purchasePrice?: number;
+            sellingPrice?: number;
+            /**
+             * @description Đang kinh doanh
+             * @default true
+             */
+            isActive: boolean;
+            /**
+             * @description Hiện trên màn bán hàng
+             * @default true
+             */
+            isPosVisible: boolean;
+            /** @description Trọng lượng (gram) */
+            weightGram?: number;
+            lengthCm?: number;
+            widthCm?: number;
+            heightCm?: number;
+            /** @description Các giá trị chiều Màu sắc; có giá trị = tạo mẫu mã có biến thể */
+            colors?: string[];
+            /** @description Các giá trị chiều Size */
+            sizes?: string[];
+            /**
+             * @description Giá / SKU / mã vạch riêng của từng biến thể.
+             *
+             *     `ArrayMaxSize(500)` khớp đúng ngưỡng mà `generate-variants` của backoffice
+             *     dùng cho số tổ hợp — 50 màu × 50 size là 2500 tổ hợp, và gửi trọn chúng qua
+             *     một request là thứ phải chặn ở đây chứ không ở DB.
+             */
+            variants?: components["schemas"]["MobileProductVariantInputDto"][];
+            units?: components["schemas"]["MobileProductUnitInputDto"][];
         };
         MobileEvaluateCartLineDto: {
             /**
@@ -15723,6 +17096,44 @@ export interface components {
             deliverer?: string;
             note?: string;
             lines: components["schemas"]["MobileStockDocumentLineWriteDto"][];
+        };
+        SalesOrderLineDto: {
+            /** Format: uuid */
+            itemId: string;
+            itemCode: string;
+            itemName: string;
+            unit: string;
+            quantity: number;
+            unitPrice: number;
+            manualDiscount?: number;
+            manualDiscountReason?: string;
+            promotionDiscount?: number;
+            promotionName?: string;
+            note?: string;
+        };
+        CreateSalesOrderDto: {
+            /** Format: uuid */
+            customerId?: string;
+            /**
+             * Format: uuid
+             * @description `employee_profiles.id` được ghi công bán. Vắng = hồ sơ của người gọi.
+             *     Phải là nhân viên đang hoạt động, được phân vào chi nhánh của request.
+             */
+            salespersonId?: string;
+            /**
+             * @description `true` = LƯU TẠM: đơn ở `DRAFT`, chỉ người gửi thấy, thu ngân không thấy.
+             *     `PATCH` một đơn `DRAFT` với `isDraft: false` (hoặc vắng) là GỬI nó.
+             */
+            isDraft?: boolean;
+            note?: string;
+            lines: components["schemas"]["SalesOrderLineDto"][];
+        };
+        RejectSalesOrderDto: {
+            /** @description Cùng ngưỡng 5 ký tự với `CancelInvoiceDto.reason`. */
+            reason: string;
+        };
+        CancelSalesOrderDto: {
+            reason?: string;
         };
         PartnerCategoryTreeRequestDto: Record<string, never>;
         PartnerCategoryNodeDto: {
@@ -29357,6 +30768,30 @@ export interface operations {
             };
         };
     };
+    MobileBusinessReportController_getBusiness: {
+        parameters: {
+            query: {
+                /** @description Ngày đầu kỳ (yyyy-MM-dd) */
+                from: string;
+                /** @description Ngày cuối kỳ (yyyy-MM-dd), bao TRỌN ngày đó */
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileBusinessReportResponseDto"];
+                };
+            };
+        };
+    };
     MobileUserController_getMe: {
         parameters: {
             query?: never;
@@ -29382,6 +30817,12 @@ export interface operations {
                 page?: number;
                 limit?: number;
                 sort?: "name" | "code";
+                /**
+                 * @description Thu hẹp theo trạng thái theo dõi. Vắng = CẢ HAI — màn lọc của app có mục
+                 *     "Tất cả", và đó là nghĩa của việc không gửi khoá này. Viết thường như
+                 *     `MobileSupplierResponseDto.status`; service dịch sang cột `isActive`.
+                 */
+                status?: "active" | "inactive";
                 /** @description Tìm theo mã hoặc tên */
                 search?: string;
             };
@@ -29510,6 +30951,10 @@ export interface operations {
             query?: {
                 page?: number;
                 limit?: number;
+                sort?: "name" | "revenue";
+                order?: "asc" | "desc";
+                /** @description Vắng = cả đang theo dõi lẫn đã ngừng (màn tìm kiếm không lọc). */
+                status?: "active" | "inactive";
                 /** @description Tìm theo mã, tên hoặc số điện thoại */
                 search?: string;
             };
@@ -29525,6 +30970,803 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MobileCustomerPageDto"];
+                };
+            };
+        };
+    };
+    MobileCustomerController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileCustomerCreateDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileCustomerResponseDto"];
+                };
+            };
+        };
+    };
+    MobileCustomerController_findById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileCustomerResponseDto"];
+                };
+            };
+        };
+    };
+    MobileCustomerController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileCustomerController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileCustomerUpdateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileCustomerResponseDto"];
+                };
+            };
+        };
+    };
+    MobileCustomerController_invoicesOf: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                /** @description Mặc định mới nhất lên đầu */
+                order?: "asc" | "desc";
+                dateBasis?: "created" | "issued";
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo `dateBasis`. Bao gồm trọn ngày. */
+                from?: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to?: string;
+                /**
+                 * @description Lọc theo tập trạng thái. Vắng = mọi hoá đơn đã ghi sổ.
+                 *
+                 *     Nhận MẢNG (`?status=paid&status=unpaid`): màn lọc cho tick nhiều trạng
+                 *     thái cùng lúc, và tab Hoá đơn chỉ gửi một — cùng một khoá cho cả hai.
+                 */
+                status?: ("paid" | "unpaid" | "cancelled")[];
+                /** @description Thu hẹp theo cửa hàng. Vắng = toàn chuỗi. */
+                branchIds?: string[];
+                /** @description Tìm theo số hoá đơn. KHÔNG bỏ dấu — cùng luật mọi ô tìm mobile. */
+                search?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileManagerInvoicePageDto"];
+                };
+            };
+        };
+    };
+    MobileManagerInvoiceController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                /** @description Mặc định mới nhất lên đầu */
+                order?: "asc" | "desc";
+                dateBasis?: "created" | "issued";
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo `dateBasis`. Bao gồm trọn ngày. */
+                from?: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to?: string;
+                /**
+                 * @description Lọc theo tập trạng thái. Vắng = mọi hoá đơn đã ghi sổ.
+                 *
+                 *     Nhận MẢNG (`?status=paid&status=unpaid`): màn lọc cho tick nhiều trạng
+                 *     thái cùng lúc, và tab Hoá đơn chỉ gửi một — cùng một khoá cho cả hai.
+                 */
+                status?: ("paid" | "unpaid" | "cancelled")[];
+                /** @description Thu hẹp theo cửa hàng. Vắng = toàn chuỗi. */
+                branchIds?: string[];
+                /** @description Tìm theo số hoá đơn. KHÔNG bỏ dấu — cùng luật mọi ô tìm mobile. */
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileManagerInvoicePageDto"];
+                };
+            };
+        };
+    };
+    MobileManagerInvoiceController_findById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileManagerInvoiceDetailResponseDto"];
+                };
+            };
+        };
+    };
+    MobileInventoryController_listCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileInventoryCategoryResponseDto"][];
+                };
+            };
+        };
+    };
+    MobileInventoryController_listUnits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileInventoryUnitResponseDto"][];
+                };
+            };
+        };
+    };
+    MobileInventoryController_createUnit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileUnitCreateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileInventoryUnitResponseDto"];
+                };
+            };
+        };
+    };
+    MobileInventoryController_listProducts: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                /** @description Tìm theo mã hoặc tên. KHÔNG bỏ dấu — cùng luật mọi ô tìm mobile. */
+                search?: string;
+                /**
+                 * @description Thu hẹp theo cửa hàng. Vắng = MỌI cửa hàng người dùng được phép — không
+                 *     phải toàn tổ chức. Phần tử ngoài quyền là 403, xem `resolveBranchIds`.
+                 */
+                branchIds?: string[];
+                /**
+                 * @description Tồn "tính đến ngày" — `YYYY-MM-DD`, bao gồm TRỌN ngày đó. Vắng = hôm nay.
+                 *     Đây là mốc CUỐI của kỳ; app không có ô "từ ngày", kỳ nhập-xuất của thẻ
+                 *     cửa hàng lấy đầu tháng của chính ngày này.
+                 */
+                asOf?: string;
+                kind?: "on_hand" | "in_transit" | "incoming";
+                status?: "all" | "in_stock" | "out_of_stock";
+                sort?: "quantity_asc" | "quantity_desc" | "value_asc" | "value_desc";
+                level?: "product" | "variant";
+                /**
+                 * @description Đơn vị tính, so KHÔNG phân biệt hoa/thường: `items.unit` là chuỗi tự do,
+                 *     và dữ liệu thật có cả `Đôi` lẫn `đôi` cho cùng một nghĩa.
+                 */
+                unit?: string;
+                /** @description Nhóm hàng — lọc CẢ cây con, cùng luật với tổng hợp tồn kho của web. */
+                categoryId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileInventoryProductPageDto"];
+                };
+            };
+        };
+    };
+    MobileInventoryController_listStores: {
+        parameters: {
+            query?: {
+                /** @description Cùng nghĩa với `asOf` của danh sách mặt hàng: tồn tính đến hết ngày. */
+                asOf?: string;
+                kind?: "on_hand" | "in_transit" | "incoming";
+                /** @description Thu hẹp danh sách thẻ. Vắng = mọi cửa hàng người dùng được phép. */
+                branchIds?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileInventoryStoreResponseDto"][];
+                };
+            };
+        };
+    };
+    MobileInventoryController_findStore: {
+        parameters: {
+            query?: {
+                /** @description Tồn tính đến hết ngày; kỳ nhập-xuất = đầu tháng của ngày này -> ngày này. */
+                asOf?: string;
+                kind?: "on_hand" | "in_transit" | "incoming";
+            };
+            header?: never;
+            path: {
+                branchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileInventoryStoreResponseDto"];
+                };
+            };
+        };
+    };
+    MobileInventoryController_listVariants: {
+        parameters: {
+            query?: {
+                /** @description Cùng nghĩa với `asOf` của danh sách mặt hàng: tồn tính đến hết ngày. */
+                asOf?: string;
+                kind?: "on_hand" | "in_transit" | "incoming";
+                /** @description Thu hẹp danh sách thẻ. Vắng = mọi cửa hàng người dùng được phép. */
+                branchIds?: string[];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileInventoryVariantResponseDto"][];
+                };
+            };
+        };
+    };
+    MobileInventoryController_listStoresOf: {
+        parameters: {
+            query?: {
+                /** @description Cùng nghĩa với `asOf` của danh sách mặt hàng: tồn tính đến hết ngày. */
+                asOf?: string;
+                kind?: "on_hand" | "in_transit" | "incoming";
+                /** @description Thu hẹp danh sách thẻ. Vắng = mọi cửa hàng người dùng được phép. */
+                branchIds?: string[];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileInventoryStoreResponseDto"][];
+                };
+            };
+        };
+    };
+    MobileInventoryController_getFlow: {
+        parameters: {
+            query?: {
+                /** @description Tồn tính đến hết ngày; kỳ nhập-xuất = đầu tháng của ngày này -> ngày này. */
+                asOf?: string;
+                kind?: "on_hand" | "in_transit" | "incoming";
+            };
+            header?: never;
+            path: {
+                id: string;
+                branchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileInventoryFlowResponseDto"];
+                };
+            };
+        };
+    };
+    MobileInventoryController_listVouchers: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                /** @description Cùng nghĩa `asOf` của các đường tồn kho khác. */
+                asOf?: string;
+                kind?: "on_hand" | "in_transit" | "incoming";
+                /** @description Tìm theo MÃ chứng từ hoặc TÊN kho — hai thứ hiện trên một dòng phiếu. */
+                search?: string;
+                /** @description Thu hẹp về một kho của cửa hàng. Vắng = mọi kho. */
+                storageId?: string;
+                sort?: "date" | "quantity_asc" | "quantity_desc";
+            };
+            header?: never;
+            path: {
+                id: string;
+                branchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileInventoryVoucherPageDto"];
+                };
+            };
+        };
+    };
+    MobileRevenueReportController_listItems: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileRevenueItemPageDto"];
+                };
+            };
+        };
+    };
+    MobileRevenueReportController_listCategories: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileRevenueCategoryListDto"];
+                };
+            };
+        };
+    };
+    MobileRevenueReportController_getTimeline: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+                /** @description BẮT BUỘC, không mặc định: mức là thứ người dùng vừa chọn ở bộ lọc, server không đoán hộ. */
+                unit: "hour" | "weekday" | "day" | "week" | "month" | "year";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileRevenueTimelineDto"];
+                };
+            };
+        };
+    };
+    MobileRevenueReportController_listBranchesOfItem: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileRevenueItemBranchesDto"];
+                };
+            };
+        };
+    };
+    MobileRevenueReportController_listVariantsOfItem: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileRevenueItemVariantsDto"];
+                };
+            };
+        };
+    };
+    MobileRevenueReportController_listItemsOfCategory: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileRevenueCategoryItemsDto"];
+                };
+            };
+        };
+    };
+    MobileOverviewReportController_getOverview: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+                /** @description Đầu kỳ so sánh, `YYYY-MM-DD`. Phải đi cùng `compareTo`. */
+                compareFrom?: string;
+                /** @description Cuối kỳ so sánh, `YYYY-MM-DD`, bao trọn ngày cuối. Phải đi cùng `compareFrom`. */
+                compareTo?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileOverviewReportResponseDto"];
+                };
+            };
+        };
+    };
+    MobileRevenueEstimateController_getRevenueEstimate: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+                dateBasis: "created" | "issued";
+                groupBy: "time" | "status" | "payment" | "staff" | "channel";
+                staffRole?: "creator" | "salesperson" | "cashier";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileRevenueEstimateResponseDto"];
+                };
+            };
+        };
+    };
+    MobileStoreDetailController_getBranch: {
+        parameters: {
+            query: {
+                /** @description Ngày đầu kỳ (yyyy-MM-dd) */
+                from: string;
+                /** @description Ngày cuối kỳ (yyyy-MM-dd), bao TRỌN ngày đó */
+                to: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileStoreDetailResponseDto"];
+                };
+            };
+        };
+    };
+    MobileDebtReportController_listCustomers: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+                page?: number;
+                limit?: number;
+                /** @description Tìm theo mã, tên hoặc số điện thoại khách — server tra, app không đoán trường. */
+                search?: string;
+                sort?: "name" | "debt";
+                order?: "asc" | "desc";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileCustomerDebtPageDto"];
+                };
+            };
+        };
+    };
+    MobileCashflowReportController_getSummary: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileCashflowSummaryDto"];
+                };
+            };
+        };
+    };
+    MobileCashflowReportController_listStores: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+                kind: "income" | "expense";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileCashflowStoreListDto"];
                 };
             };
         };
@@ -29557,6 +31799,14 @@ export interface operations {
                 from?: string;
                 /** @description ISO-8601, cuối kỳ (bao gồm) */
                 to?: string;
+                /** @description Số hoá đơn, tên hoặc SĐT khách */
+                search?: string;
+                /**
+                 * @description Lọc trạng thái, MẢNG: `?status[]=paid&status[]=unpaid`. Một giá trị đơn
+                 *     (`?status=paid`) cũng được — `Transform` bọc nó thành mảng, cùng khuôn với
+                 *     `kinds` của `/mobile/counterparties`.
+                 */
+                status?: ("paid" | "unpaid" | "cancelled")[];
             };
             header?: never;
             path?: never;
@@ -29616,6 +31866,29 @@ export interface operations {
             };
         };
     };
+    MobileItemCategoryController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileItemCategoryCreateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemCategoryTreeNodeDto"];
+                };
+            };
+        };
+    };
     MobileItemController_list: {
         parameters: {
             query?: {
@@ -29654,6 +31927,10 @@ export interface operations {
                 sort?: "name" | "code" | "sellingPrice";
                 /** @description Tìm theo mã hoặc tên */
                 search?: string;
+                /** @description Lọc theo nhóm hàng hoá */
+                categoryId?: string;
+                /** @description true = đang kinh doanh, false = ngừng, bỏ trống = tất cả */
+                isActive?: boolean;
             };
             header?: never;
             path?: never;
@@ -29667,6 +31944,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MobileProductPageDto"];
+                };
+            };
+        };
+    };
+    MobileProductController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileProductCreateDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileProductDetailResponseDto"];
+                };
+            };
+        };
+    };
+    MobileProductController_findById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileProductDetailResponseDto"];
+                };
+            };
+        };
+    };
+    MobileProductController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileProductUpdateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileProductDetailResponseDto"];
                 };
             };
         };
@@ -29689,6 +32035,8 @@ export interface operations {
                  *     trên màn ứng với nó.
                  */
                 statBy?: "parent" | "group";
+                /** @description Ô tìm ở header: tên, mã SKU, mã nhóm hàng hoá — chuyển vào `filters.search`. */
+                search?: string;
             };
             header?: never;
             path?: never;
@@ -29963,6 +32311,190 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    SalesOrderController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                status?: "DRAFT" | "SENT" | "PROCESSED" | "REJECTED" | "CANCELLED";
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SalesOrderController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSalesOrderDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    SalesOrderController_salespeople: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SalesOrderController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    SalesOrderController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSalesOrderDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    SalesOrderController_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    SalesOrderController_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectSalesOrderDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    SalesOrderController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelSalesOrderDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };

@@ -52,6 +52,8 @@ function cashReceipt(overrides: Record<string, unknown> = {}): CashReceiptEntity
   } as any as CashReceiptEntity;
 }
 
+const STAFF_NAME = 'Nguyễn Văn A';
+
 describe('mapBankReceiptToVoucherPayload / mapBankPaymentToVoucherPayload', () => {
   const categoryNames = new Map([
     ['cat-1', 'Thu khác'],
@@ -59,12 +61,7 @@ describe('mapBankReceiptToVoucherPayload / mapBankPaymentToVoucherPayload', () =
   ]);
 
   it('titles and labels a bank receipt correctly (AC-11)', () => {
-    const payload = mapBankReceiptToVoucherPayload(
-      receipt(),
-      null,
-      'Vietcombank - CN1 (0011...)',
-      categoryNames,
-    );
+    const payload = mapBankReceiptToVoucherPayload(receipt(), null, STAFF_NAME, categoryNames);
 
     expect(payload.title).toBe('PHIẾU THU (tiền gửi)');
     expect(payload.info.find((row) => row.label === 'Người nộp tiền')?.value).toBe(
@@ -72,7 +69,7 @@ describe('mapBankReceiptToVoucherPayload / mapBankPaymentToVoucherPayload', () =
     );
     expect(payload.info.find((row) => row.label === 'Người nộp')?.value).toBe('Nguyễn Văn A');
     expect(payload.signatures).toEqual([
-      'Người lập phiếu',
+      'Nhân viên thu',
       'Kế toán trưởng',
       'Thủ quỹ',
       'Người nộp tiền',
@@ -80,12 +77,7 @@ describe('mapBankReceiptToVoucherPayload / mapBankPaymentToVoucherPayload', () =
   });
 
   it('titles and labels a bank payment correctly (AC-11)', () => {
-    const payload = mapBankPaymentToVoucherPayload(
-      payment(),
-      null,
-      'Vietcombank - CN1 (0011...)',
-      categoryNames,
-    );
+    const payload = mapBankPaymentToVoucherPayload(payment(), null, STAFF_NAME, categoryNames);
 
     expect(payload.title).toBe('PHIẾU CHI (tiền gửi)');
     expect(payload.info.find((row) => row.label === 'Người nhận tiền')?.value).toBe(
@@ -93,31 +85,18 @@ describe('mapBankReceiptToVoucherPayload / mapBankPaymentToVoucherPayload', () =
     );
     expect(payload.info.find((row) => row.label === 'Người nhận')?.value).toBe('Nguyễn Văn B');
     expect(payload.signatures).toEqual([
-      'Người lập phiếu',
+      'Nhân viên chi',
       'Kế toán trưởng',
       'Thủ quỹ',
       'Người nhận tiền',
     ]);
   });
 
-  it('shows the bank account row using the caller-resolved display name', () => {
-    const payload = mapBankReceiptToVoucherPayload(
-      receipt(),
-      null,
-      'Vietcombank - CN1 (0011...)',
-      categoryNames,
-    );
-
-    expect(payload.info.find((row) => row.label === 'Tài khoản ngân hàng')?.value).toBe(
-      'Vietcombank - CN1 (0011...)',
-    );
-  });
-
   it('shows the "Tham chiếu" row when the voucher carries a reference', () => {
     const payload = mapBankReceiptToVoucherPayload(
       receipt({ reference: 'UNC-000456' }),
       null,
-      'Vietcombank - CN1 (0011...)',
+      STAFF_NAME,
       categoryNames,
     );
 
@@ -128,7 +107,7 @@ describe('mapBankReceiptToVoucherPayload / mapBankPaymentToVoucherPayload', () =
     const payload = mapBankPaymentToVoucherPayload(
       payment({ reference: null }),
       null,
-      'Vietcombank - CN1 (0011...)',
+      STAFF_NAME,
       categoryNames,
     );
 
@@ -139,7 +118,7 @@ describe('mapBankReceiptToVoucherPayload / mapBankPaymentToVoucherPayload', () =
     const payload = mapBankReceiptToVoucherPayload(
       receipt({ partnerAddressSnapshot: null }),
       null,
-      'Vietcombank - CN1 (0011...)',
+      STAFF_NAME,
       categoryNames,
     );
 
@@ -150,7 +129,7 @@ describe('mapBankReceiptToVoucherPayload / mapBankPaymentToVoucherPayload', () =
     const payload = mapBankReceiptToVoucherPayload(
       receipt({ docDate: '2026-01-15' }),
       null,
-      'Vietcombank - CN1 (0011...)',
+      STAFF_NAME,
       categoryNames,
     );
 
@@ -161,13 +140,13 @@ describe('mapBankReceiptToVoucherPayload / mapBankPaymentToVoucherPayload', () =
     const bankPayload = mapBankReceiptToVoucherPayload(
       receipt({ totalAmount: '1234567' }),
       null,
-      'Vietcombank - CN1 (0011...)',
+      STAFF_NAME,
       categoryNames,
     );
     const cashPayload = mapCashReceiptToVoucherPayload(
       cashReceipt({ totalAmount: '1234567' }),
       null,
-      'Quỹ tiền mặt chi nhánh 1',
+      STAFF_NAME,
       categoryNames,
     );
 
@@ -175,5 +154,49 @@ describe('mapBankReceiptToVoucherPayload / mapBankPaymentToVoucherPayload', () =
     expect(bankPayload.amountInWords).toBe(
       'Một triệu hai trăm ba mươi bốn nghìn năm trăm sáu mươi bảy đồng chẵn.',
     );
+  });
+
+  describe('staff row, no bank account row, and signature name (T-01-04)', () => {
+    it('bank receipt: staff row "Nhân viên thu" right before "Lý do"; no "Tài khoản ngân hàng"; keeps "Tham chiếu" (AC-03)', () => {
+      const payload = mapBankReceiptToVoucherPayload(
+        receipt({ reference: 'FT2609' }),
+        null,
+        STAFF_NAME,
+        categoryNames,
+      );
+
+      const staffIdx = payload.info.findIndex((row) => row.label === 'Nhân viên thu');
+      const reasonIdx = payload.info.findIndex((row) => row.label === 'Lý do');
+      expect(staffIdx).toBeGreaterThanOrEqual(0);
+      expect(reasonIdx).toBe(staffIdx + 1);
+      expect(payload.info.find((row) => row.label === 'Nhân viên thu')?.value).toBe(
+        'Nguyễn Văn A',
+      );
+      expect(payload.info.find((row) => row.label === 'Tham chiếu')?.value).toBe('FT2609');
+      expect(payload.info.some((row) => row.label === 'Tài khoản ngân hàng')).toBe(false);
+      expect(payload).not.toHaveProperty('signatureNames');
+    });
+
+    it('bank payment: staff row labelled "Nhân viên chi"; no "Tài khoản ngân hàng"; no signatureNames key (AC-03)', () => {
+      const payload = mapBankPaymentToVoucherPayload(payment(), null, STAFF_NAME, categoryNames);
+
+      expect(payload.info.find((row) => row.label === 'Nhân viên chi')?.value).toBe(
+        'Nguyễn Văn A',
+      );
+      expect(payload.info.some((row) => row.label === 'Tài khoản ngân hàng')).toBe(false);
+      expect(payload).not.toHaveProperty('signatureNames');
+    });
+
+    it('no staff on the voucher ⇒ no staff row, no signatureNames key, and no creator name anywhere in the payload (AC-04, AC-07)', () => {
+      const receiptPayload = mapBankReceiptToVoucherPayload(receipt(), null, null, categoryNames);
+      expect(receiptPayload.info.some((row) => row.label === 'Nhân viên thu')).toBe(false);
+      expect(receiptPayload).not.toHaveProperty('signatureNames');
+      expect(JSON.stringify(receiptPayload)).not.toContain('Trần Thị B');
+
+      const paymentPayload = mapBankPaymentToVoucherPayload(payment(), null, null, categoryNames);
+      expect(paymentPayload.info.some((row) => row.label === 'Nhân viên chi')).toBe(false);
+      expect(paymentPayload).not.toHaveProperty('signatureNames');
+      expect(JSON.stringify(paymentPayload)).not.toContain('Trần Thị B');
+    });
   });
 });

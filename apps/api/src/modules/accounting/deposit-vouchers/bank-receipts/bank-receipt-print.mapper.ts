@@ -19,7 +19,7 @@ const LINE_COLUMNS = [
   { col: 'amount', label: 'Số tiền', type: ReportColumnDataType.CURRENCY },
 ];
 
-const SIGNATURES = ['Người lập phiếu', 'Kế toán trưởng', 'Thủ quỹ', LABELS.lastSignature];
+const SIGNATURES = [LABELS.staffLabel, 'Kế toán trưởng', 'Thủ quỹ', LABELS.lastSignature];
 
 /** One `info` row, or none when the value is blank — an empty label:value line looks like a bug on paper. */
 function infoRow(label: string, value?: string | null): InfoRow[] {
@@ -30,15 +30,15 @@ function infoRow(label: string, value?: string | null): InfoRow[] {
 /**
  * Maps a `BankReceiptEntity` (as returned by `BankReceiptsService.getById`, already
  * carrying its `lines`) into a `VoucherPrintPayload` (ADR-05). Pure — the caller
- * resolves `branch`, the bank account's display name, and each line's category
+ * resolves `branch`, the staff/creator display names, and each line's category
  * name (`categoryId` is a plain FK column, not a loaded relation) before calling
  * this. Same contract as `mapCashReceiptToVoucherPayload`, aside from the date
- * column (`docDate`, not `voucherDate`) and the extra `reference` row.
+ * column (`docDate`, not `voucherDate`) and the extra `reference` row (A-08).
  */
 export function mapBankReceiptToVoucherPayload(
   receipt: BankReceiptEntity,
   branch: DocumentBranchInfo | null,
-  bankAccountName: string,
+  staffName: string | null,
   categoryNames: Map<string, string>,
 ): VoucherPrintPayload {
   const lines: ReportRow[] = receipt.lines.map((line) => ({
@@ -58,8 +58,8 @@ export function mapBankReceiptToVoucherPayload(
     ...infoRow(LABELS.partyLabel, receipt.partnerNameSnapshot),
     ...infoRow('Địa chỉ', receipt.partnerAddressSnapshot),
     ...infoRow(LABELS.personLabel, receipt.payerName),
+    ...infoRow(LABELS.staffLabel, staffName),
     ...infoRow('Lý do', receipt.reason),
-    ...infoRow('Tài khoản ngân hàng', bankAccountName),
     ...infoRow('Tham chiếu', receipt.reference),
   ];
 

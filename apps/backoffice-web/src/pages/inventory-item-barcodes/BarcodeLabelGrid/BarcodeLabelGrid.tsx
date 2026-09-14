@@ -288,6 +288,7 @@ export function BarcodeLabelGrid({
           row.itemId ? (
             <input
               type="number"
+              autoComplete="off"
               min={0}
               className="h-8 w-full bg-transparent px-2 text-right text-sm outline-none focus:bg-background focus:ring-1 focus:ring-inset focus:ring-ring"
               value={row.quantity}

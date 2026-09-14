@@ -102,9 +102,10 @@ describe('CashVoucherExportFetcher', () => {
     expect(pushed).toHaveLength(1);
     expect(pushed[0]).toEqual([
       {
-        // 20:00 UTC + 7h business offset rolls into the next calendar day —
-        // proves the business-timezone conversion runs, not a naive slice.
-        createdAt: '2026-07-16',
+        // Passed through as-is from the CTE's bare 'YYYY-MM-DD' string — not
+        // routed through `new Date()` / business-timezone conversion, which
+        // would risk shifting the calendar day (AC-14).
+        voucherDate: '2026-07-15',
         documentNumber: 'PT0001',
         documentKind: 'CASH_RECEIPT',
         status: 'POSTED',
@@ -114,7 +115,7 @@ describe('CashVoucherExportFetcher', () => {
         reason: 'Thu tiền hàng',
       },
       {
-        createdAt: '2026-07-16',
+        voucherDate: '2026-07-15',
         documentNumber: 'PT0002',
         documentKind: 'CASH_RECEIPT',
         status: 'POSTED',
@@ -125,6 +126,22 @@ describe('CashVoucherExportFetcher', () => {
       },
     ]);
     expect(totals).toBeNull();
+  });
+
+  it('passes voucherDate through untouched even when it differs from createdAt (AC-14)', async () => {
+    // Guards the exact scenario the ADR calls out: a voucher dated one day and
+    // recorded another, e.g. a late entry. If this ever regressed to deriving
+    // the export cell from createdAt, this is the row that would catch it.
+    const rows = [row({ createdAt: '2026-09-13T20:00:00.000Z', voucherDate: '2026-09-06' })];
+    const { fetcher, execute } = build({});
+    execute.mockResolvedValue({ data: rows, total: 1, page: 1, limit: 50_000, totalAmount: 0 });
+
+    const pushed: Record<string, unknown>[][] = [];
+    await fetcher.drain(async (batch) => {
+      pushed.push(batch as Record<string, unknown>[]);
+    });
+
+    expect(pushed[0][0].voucherDate).toBe('2026-09-06');
   });
 
   it('keeps party and person as two separate export cells (AC-14)', async () => {

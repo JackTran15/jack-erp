@@ -39,6 +39,7 @@ export function DashboardReportPage() {
           <input
             style={styles.input}
             type="text"
+            autoComplete="off"
             placeholder="Để trống = gộp toàn hệ thống"
             value={branchId}
             onChange={(e) => setBranchId(e.target.value)}

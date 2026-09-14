@@ -82,6 +82,7 @@ export function FilterHeaderCell({
           />
           <input
             className={inputClass}
+            autoComplete="off"
             value={value}
             onChange={(e) => {
               // Toán tử mặc định chỉ hiển thị (fallback) -> chốt vào state khi nhập
@@ -109,6 +110,7 @@ export function FilterHeaderCell({
         />
         <input
           type={inputType}
+          autoComplete="off"
           inputMode={kind === "number" ? "decimal" : undefined}
           className={[
             inputClass,

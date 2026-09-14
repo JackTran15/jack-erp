@@ -11,7 +11,7 @@ import {
  * body without a translation table.
  */
 export const RECEIPT_CASH_FILTER_KEYS = [
-  "createdAt",
+  "voucherDate",
   "documentNumber",
   "documentKind",
   "status",
@@ -44,7 +44,7 @@ export const RECEIPT_CASH_STATUS_FILTER_OPTIONS = Object.values(
 export const RECEIPT_CASH_SEARCH: V2SearchConfig = {
   path: "/v2/cash-vouchers/search",
   fields: {
-    createdAt: "date-range",
+    voucherDate: "date-range",
     documentNumber: "string",
     documentKind: "enum",
     status: "enum",

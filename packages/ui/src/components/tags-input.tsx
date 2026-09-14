@@ -80,6 +80,7 @@ function TagsInput({
       <input
         ref={inputRef}
         type="text"
+        autoComplete="off"
         className="flex-1 min-w-[80px] bg-transparent outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}

@@ -1,7 +1,6 @@
 import { ReportRow } from '@erp/shared-interfaces';
 import { QueryBus } from '@nestjs/cqrs';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
-import { toBusinessDate } from '../../../../common/utils/business-timezone.util';
 import { ExportFetcher, PushRows } from '../../../reporting/report-core/export/export.types';
 import {
   CashVoucherRowDto,
@@ -13,7 +12,10 @@ import { SearchCashVouchersV2Query } from './search-cash-vouchers-v2.query';
 /** Projects one merged voucher row onto the columns the export actually prints. */
 function toRow(row: CashVoucherRowDto): ReportRow {
   return {
-    createdAt: toBusinessDate(new Date(row.createdAt)),
+    // Already a bare 'YYYY-MM-DD' from the voucher_date::text CTE column —
+    // passed through as-is, since routing it through `new Date()` risks a
+    // timezone-driven off-by-one-day shift.
+    voucherDate: row.voucherDate,
     documentNumber: row.documentNumber,
     documentKind: row.documentKind,
     status: row.status,

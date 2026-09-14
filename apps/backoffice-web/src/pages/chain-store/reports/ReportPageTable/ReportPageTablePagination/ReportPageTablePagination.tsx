@@ -55,6 +55,7 @@ export function ReportPageTablePagination({ total }: Props) {
         <span>Trang</span>
         <input
           className="h-8 w-9 rounded-sm border border-input bg-background text-center text-foreground outline-none"
+          autoComplete="off"
           value={currentPage}
           readOnly
         />

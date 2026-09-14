@@ -33,6 +33,8 @@ function payment(overrides: Record<string, unknown> = {}): CashPaymentEntity {
   } as any as CashPaymentEntity;
 }
 
+const STAFF_NAME = 'Nguyễn Văn A';
+
 describe('mapCashReceiptToVoucherPayload / mapCashPaymentToVoucherPayload', () => {
   const categoryNames = new Map([
     ['cat-1', 'Thu khác'],
@@ -40,7 +42,7 @@ describe('mapCashReceiptToVoucherPayload / mapCashPaymentToVoucherPayload', () =
   ]);
 
   it('titles and labels a cash receipt correctly (AC-11)', () => {
-    const payload = mapCashReceiptToVoucherPayload(receipt(), null, 'Quỹ tiền mặt chi nhánh 1', categoryNames);
+    const payload = mapCashReceiptToVoucherPayload(receipt(), null, STAFF_NAME, categoryNames);
 
     expect(payload.title).toBe('PHIẾU THU');
     expect(payload.info.find((row) => row.label === 'Người nộp tiền')?.value).toBe(
@@ -48,7 +50,7 @@ describe('mapCashReceiptToVoucherPayload / mapCashPaymentToVoucherPayload', () =
     );
     expect(payload.info.find((row) => row.label === 'Người nộp')?.value).toBe('Nguyễn Văn A');
     expect(payload.signatures).toEqual([
-      'Người lập phiếu',
+      'Nhân viên thu',
       'Kế toán trưởng',
       'Thủ quỹ',
       'Người nộp tiền',
@@ -56,7 +58,7 @@ describe('mapCashReceiptToVoucherPayload / mapCashPaymentToVoucherPayload', () =
   });
 
   it('titles and labels a cash payment correctly (AC-11)', () => {
-    const payload = mapCashPaymentToVoucherPayload(payment(), null, 'Quỹ tiền mặt chi nhánh 1', categoryNames);
+    const payload = mapCashPaymentToVoucherPayload(payment(), null, STAFF_NAME, categoryNames);
 
     expect(payload.title).toBe('PHIẾU CHI');
     expect(payload.info.find((row) => row.label === 'Người nhận tiền')?.value).toBe(
@@ -64,7 +66,7 @@ describe('mapCashReceiptToVoucherPayload / mapCashPaymentToVoucherPayload', () =
     );
     expect(payload.info.find((row) => row.label === 'Người nhận')?.value).toBe('Nguyễn Văn B');
     expect(payload.signatures).toEqual([
-      'Người lập phiếu',
+      'Nhân viên chi',
       'Kế toán trưởng',
       'Thủ quỹ',
       'Người nhận tiền',
@@ -75,7 +77,7 @@ describe('mapCashReceiptToVoucherPayload / mapCashPaymentToVoucherPayload', () =
     const payload = mapCashPaymentToVoucherPayload(
       payment({ partnerNameSnapshot: 'Anh Ba (khách vãng lai)', partnerAddressSnapshot: '45 Lê Lợi' }),
       null,
-      'Quỹ tiền mặt chi nhánh 1',
+      STAFF_NAME,
       categoryNames,
     );
 
@@ -89,7 +91,7 @@ describe('mapCashReceiptToVoucherPayload / mapCashPaymentToVoucherPayload', () =
     const payload = mapCashReceiptToVoucherPayload(
       receipt({ partnerAddressSnapshot: null }),
       null,
-      'Quỹ tiền mặt chi nhánh 1',
+      STAFF_NAME,
       categoryNames,
     );
 
@@ -100,7 +102,7 @@ describe('mapCashReceiptToVoucherPayload / mapCashPaymentToVoucherPayload', () =
     const payload = mapCashReceiptToVoucherPayload(
       receipt({ totalAmount: '1234567' }),
       null,
-      'Quỹ tiền mặt chi nhánh 1',
+      STAFF_NAME,
       categoryNames,
     );
 
@@ -113,10 +115,50 @@ describe('mapCashReceiptToVoucherPayload / mapCashPaymentToVoucherPayload', () =
     const payload = mapCashReceiptToVoucherPayload(
       receipt({ totalAmount: '1000005' }),
       null,
-      'Quỹ tiền mặt chi nhánh 1',
+      STAFF_NAME,
       categoryNames,
     );
 
     expect(payload.amountInWords).toBe('Một triệu không trăm lẻ năm đồng chẵn.');
+  });
+
+  describe('staff row, no name under any signature (T-01-07)', () => {
+    it('cash payment: staff row "Nhân viên chi" right before "Lý do"; no signatureNames key (AC-01, AC-05)', () => {
+      const payload = mapCashPaymentToVoucherPayload(payment(), null, STAFF_NAME, categoryNames);
+
+      const staffIdx = payload.info.findIndex((row) => row.label === 'Nhân viên chi');
+      const reasonIdx = payload.info.findIndex((row) => row.label === 'Lý do');
+      expect(staffIdx).toBeGreaterThanOrEqual(0);
+      expect(reasonIdx).toBe(staffIdx + 1);
+      expect(payload.info.find((row) => row.label === 'Nhân viên chi')?.value).toBe(
+        'Nguyễn Văn A',
+      );
+      expect(payload.info.some((row) => row.label === 'Quỹ tiền mặt')).toBe(false);
+      expect(payload).not.toHaveProperty('signatureNames');
+    });
+
+    it('cash receipt: staff row labelled "Nhân viên thu"; no signatureNames key (AC-02)', () => {
+      const payload = mapCashReceiptToVoucherPayload(receipt(), null, STAFF_NAME, categoryNames);
+
+      expect(payload.info.find((row) => row.label === 'Nhân viên thu')?.value).toBe(
+        'Nguyễn Văn A',
+      );
+      expect(payload.info.some((row) => row.label === 'Quỹ tiền mặt')).toBe(false);
+      expect(payload).not.toHaveProperty('signatureNames');
+    });
+
+    it('no staff on the voucher ⇒ no staff row, no empty info row, no signatureNames key, and no creator name anywhere in the payload (AC-04, AC-07)', () => {
+      const receiptPayload = mapCashReceiptToVoucherPayload(receipt(), null, null, categoryNames);
+      expect(receiptPayload.info.some((row) => row.label === 'Nhân viên thu')).toBe(false);
+      expect(receiptPayload.info.every((row) => row.value.trim().length > 0)).toBe(true);
+      expect(receiptPayload).not.toHaveProperty('signatureNames');
+      expect(JSON.stringify(receiptPayload)).not.toContain('Trần Thị B');
+
+      const paymentPayload = mapCashPaymentToVoucherPayload(payment(), null, null, categoryNames);
+      expect(paymentPayload.info.some((row) => row.label === 'Nhân viên chi')).toBe(false);
+      expect(paymentPayload.info.every((row) => row.value.trim().length > 0)).toBe(true);
+      expect(paymentPayload).not.toHaveProperty('signatureNames');
+      expect(JSON.stringify(paymentPayload)).not.toContain('Trần Thị B');
+    });
   });
 });

@@ -7,9 +7,9 @@ import { CashPaymentEntity } from './cash-payment.entity';
 import { CashPaymentLineEntity } from './cash-payment-line.entity';
 import { CashService } from '../../cash/cash.service';
 import { CashMovementType } from '../../cash/cash-movement.entity';
-import { CashAccountEntity } from '../../cash/cash-account.entity';
 import { DocumentNumberingService } from '../../../document-numbering/document-numbering.service';
 import { PartnerResolverService } from '../shared/partner-resolver.service';
+import { VoucherStaffResolver } from '../shared/voucher-staff.resolver';
 import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
 import { VoucherLinksService } from '../../voucher-links/voucher-links.service';
 import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
@@ -66,6 +66,7 @@ describe('CashPaymentsService', () => {
   let docNumbering: { generate: jest.Mock };
   let partnerResolver: { resolve: jest.Mock };
   let accountResolver: { resolveContraAccount: jest.Mock };
+  let staffResolver: { resolveOne: jest.Mock };
   let dataSource: { transaction: jest.Mock; manager: any };
 
   const setup = async (manager: any) => {
@@ -79,6 +80,9 @@ describe('CashPaymentsService', () => {
     accountResolver = {
       resolveContraAccount: jest.fn().mockResolvedValue('contra-resolved'),
     };
+    staffResolver = {
+      resolveOne: jest.fn().mockResolvedValue(null),
+    };
     dataSource = { transaction: jest.fn((cb) => cb(manager)), manager };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -91,6 +95,7 @@ describe('CashPaymentsService', () => {
         { provide: DocumentNumberingService, useValue: docNumbering },
         { provide: PartnerResolverService, useValue: partnerResolver },
         { provide: AccountResolverService, useValue: accountResolver },
+        { provide: VoucherStaffResolver, useValue: staffResolver },
         {
           provide: VoucherLinksService,
           useValue: { findLinkedVoucher: jest.fn().mockResolvedValue(null) },
@@ -810,6 +815,8 @@ describe('CashPaymentsService', () => {
       totalAmount: 500000,
       referenceType: CashPaymentReferenceType.MANUAL,
       revision: 0,
+      staffId: 'staff-1',
+      createdBy: 'creator-1',
       lines: [
         { id: 'line-1', description: 'Mua vật tư', categoryId: 'cat-1', amount: 500000 },
       ],
@@ -819,7 +826,8 @@ describe('CashPaymentsService', () => {
      * Entity-aware `EntityManager` mock: `getPrintPayload` fans out to
      * `getById` (via `manager.findOne`), `loadVoucherBranch` (via
      * `manager.getRepository(BranchEntity).findOne`), and the service's own
-     * `manager.findOne`/`manager.find` for the cash account and categories.
+     * `manager.find` for categories. Staff/creator names come from the
+     * separately-mocked `staffResolver`, not the manager.
      * The `CashPaymentEntity` branch mirrors the real query's WHERE clause so
      * an org/id mismatch reproduces the same 404 `getById` would give.
      */
@@ -827,7 +835,6 @@ describe('CashPaymentsService', () => {
       opts: {
         payment?: typeof basePayment;
         branch?: any;
-        cashAccount?: any;
         categories?: any[];
       } = {},
     ) {
@@ -840,7 +847,6 @@ describe('CashPaymentsService', () => {
             if (options.where.id !== payment.id) return null;
             return payment;
           }
-          if (entity === CashAccountEntity) return opts.cashAccount ?? null;
           return null;
         }),
         find: jest.fn(async (entity: any) =>
@@ -855,7 +861,7 @@ describe('CashPaymentsService', () => {
       return manager;
     }
 
-    it('resolves branch, cash account name and category names into a CASH_PAYMENT payload', async () => {
+    it('resolves branch, the staff name and category names into a CASH_PAYMENT payload; no signatureNames key, no creator id/name anywhere (T-01-07)', async () => {
       const manager = buildPrintPayloadManager({
         payment: basePayment,
         branch: {
@@ -864,10 +870,10 @@ describe('CashPaymentsService', () => {
           address: '1 Đường ABC',
           phone: '0900000000',
         },
-        cashAccount: { id: 'cash-acc-1', name: 'Quỹ tiền mặt chính' },
         categories: [{ id: 'cat-1', name: 'Mua vật tư' }],
       });
       await setup(manager);
+      staffResolver.resolveOne.mockResolvedValue({ code: null, name: 'Nguyễn Văn A' });
 
       const payload = await service.getPrintPayload('p-1', actor);
 
@@ -881,13 +887,33 @@ describe('CashPaymentsService', () => {
         phone: '0900000000',
       });
       expect(payload.info).toContainEqual({
-        label: 'Quỹ tiền mặt',
-        value: 'Quỹ tiền mặt chính',
+        label: 'Nhân viên chi',
+        value: 'Nguyễn Văn A',
       });
+      expect(payload.info.some((row) => row.label === 'Quỹ tiền mặt')).toBe(false);
+      expect(payload).not.toHaveProperty('signatureNames');
+      expect(JSON.stringify(payload)).not.toContain('creator-1');
       expect(payload.lines[0]).toMatchObject({
         categoryName: 'Mua vật tư',
         amount: 500000,
       });
+    });
+
+    it('calls resolveOne exactly once with the voucher staffId; never queries the creator (AC-06)', async () => {
+      const manager = buildPrintPayloadManager({
+        payment: basePayment,
+        branch: null,
+        categories: [],
+      });
+      await setup(manager);
+
+      await service.getPrintPayload('p-1', actor);
+
+      expect(staffResolver.resolveOne).toHaveBeenCalledTimes(1);
+      expect(staffResolver.resolveOne).toHaveBeenCalledWith(
+        'staff-1',
+        actor.organizationId,
+      );
     });
 
     it('id not found ⇒ 404 (not 403)', async () => {
