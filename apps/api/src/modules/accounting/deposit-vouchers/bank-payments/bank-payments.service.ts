@@ -1,9 +1,12 @@
+import { randomUUID } from "crypto";
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleInit,
   forwardRef,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -24,6 +27,10 @@ import { DepositAccountEntity } from "../../deposit/deposit-account.entity";
 import { DepositMovementEntity } from "../../deposit/deposit-movement.entity";
 import { DepositPeriodGuardService } from "../../deposit-period-lock/deposit-period-guard.service";
 import { SupplierDepositPaymentSagaService } from "../supplier-deposit-payment/supplier-deposit-payment-saga.service";
+import { MediaLinkService } from "../../../media/media-link.service";
+import { MediaQueryService } from "../../../media/media-query.service";
+import { MediaOwnerReaderRegistry } from "../../../media/media-owner-reader.registry";
+import { MediaOwnerType } from "../../../media/media-object.entity";
 import {
   BankPaymentPurpose,
   BankPaymentReferenceType,
@@ -53,6 +60,13 @@ import {
 } from "../../cash-vouchers/shared/editable-voucher.util";
 
 export interface BankPaymentCreateAndPostArgs {
+  /**
+   * Pre-assigned by `create()` so media can be synced to this id *before* any
+   * document number is minted or the movement/journal entry is posted
+   * (T-04-05 security review) — omit to let the DB default-generate one, as
+   * every internal caller other than `create()` still does.
+   */
+  id?: string;
   purpose: BankPaymentPurpose;
   depositAccountId: string;
   contraAccountId: string;
@@ -69,7 +83,6 @@ export interface BankPaymentCreateAndPostArgs {
   paidBy?: string;
   reference?: string;
   affectExpense?: boolean;
-  attachmentIds?: string[];
   reason?: string;
   description?: string;
   categoryId?: string;
@@ -99,6 +112,14 @@ export interface BankPaymentCreateForMovementArgs extends BankPaymentCreateAndPo
 export interface ReverseBankPaymentResult {
   original: BankPaymentEntity;
   reversal: BankPaymentEntity;
+}
+
+/** Detail-endpoint shape for one attached file — never spread a `MediaSummary` (03-logical-design.md). */
+export interface BankPaymentAttachment {
+  id: string;
+  fileName: string;
+  contentType: string;
+  size: number;
 }
 
 /**
@@ -132,7 +153,7 @@ const FUND_MOVE_PURPOSES: ReadonlySet<BankPaymentPurpose> = new Set([
 ]);
 
 @Injectable()
-export class BankPaymentsService {
+export class BankPaymentsService implements OnModuleInit {
   private readonly logger = new Logger(BankPaymentsService.name);
 
   constructor(
@@ -149,7 +170,40 @@ export class BankPaymentsService {
     private readonly staffResolver: VoucherStaffResolver,
     @Inject(forwardRef(() => SupplierDepositPaymentSagaService))
     private readonly supplierDepositPaymentSaga: SupplierDepositPaymentSagaService,
+    private readonly mediaLink: MediaLinkService,
+    private readonly mediaQuery: MediaQueryService,
+    private readonly mediaReaders: MediaOwnerReaderRegistry,
   ) {}
+
+  /**
+   * ADR-06: the reader is the exact read function the `GET :id` endpoint uses
+   * (`getById`, same `actor`) — download access tracks voucher-view access
+   * with no second rule to maintain. Only NotFound/Forbidden mean "actor
+   * cannot see this voucher"; any other error (e.g. a DB outage) must not be
+   * swallowed into a false "not found".
+   *
+   * `getById` itself only filters by `organizationId` — the branch check
+   * `GET :id` gets from `BranchScopeGuard` never runs for this direct call, so
+   * it is mirrored here explicitly: an actor with no active branch (or whose
+   * only branch was deactivated, dropping it from `branchIds`) must not get a
+   * download link for a voucher they could no longer open through the API.
+   */
+  onModuleInit(): void {
+    this.mediaReaders.register(MediaOwnerType.BANK_PAYMENT, async (ownerId, actor) => {
+      if (!actor.branchId || !actor.branchIds?.includes(actor.branchId)) {
+        return false;
+      }
+      try {
+        await this.getById(ownerId, actor);
+        return true;
+      } catch (err) {
+        if (err instanceof NotFoundException || err instanceof ForbiddenException) {
+          return false;
+        }
+        throw err;
+      }
+    });
+  }
 
   // ---------------------------------------------------------------------------
   // CRUD (DRAFT lifecycle)
@@ -197,8 +251,24 @@ export class BankPaymentsService {
         dto.contraAccountId,
       );
 
-      const { voucherId } = await this.createAndPostInternalInTx(
+      // Assign the voucher id up front and validate/attach media to it BEFORE
+      // minting the document number or posting the movement/journal entry
+      // (T-04-05 security review): `docNumbering.generate` and the journal's
+      // Kafka publish are not undone by this transaction rolling back, so a
+      // routine 404/409 from `syncOwner` must happen first, while everything
+      // is still cheaply reversible.
+      const voucherId = randomUUID();
+      const attachmentIds = await this.mediaLink.syncOwner(
+        MediaOwnerType.BANK_PAYMENT,
+        voucherId,
+        dto.attachmentIds,
+        actor,
+        manager,
+      );
+
+      const { voucherId: insertedId } = await this.createAndPostInternalInTx(
         {
+          id: voucherId,
           purpose,
           depositAccountId: dto.depositAccountId,
           contraAccountId,
@@ -218,7 +288,6 @@ export class BankPaymentsService {
           paidBy: dto.paidBy,
           reference: dto.reference,
           affectExpense: this.resolveAffectExpense(purpose, dto.affectExpense),
-          attachmentIds: dto.attachmentIds ?? [],
           reason: dto.reason,
           lines: dto.lines.map((l) => ({
             description: l.description,
@@ -230,7 +299,9 @@ export class BankPaymentsService {
         manager,
       );
 
-      return this.getByIdInTx(manager, voucherId, actor.organizationId);
+      await manager.update(BankPaymentEntity, insertedId, { attachmentIds });
+
+      return this.getByIdInTx(manager, insertedId, actor.organizationId);
     });
   }
 
@@ -320,8 +391,20 @@ export class BankPaymentsService {
           dto.affectExpense ?? payment.affectExpense,
         ),
         contraAccountId: dto.contraAccountId ?? payment.contraAccountId,
-        attachmentIds: dto.attachmentIds ?? payment.attachmentIds,
       });
+
+      // Not sent at all ⇒ leave attachments untouched (no syncOwner call, no
+      // extra query). `assertEditable` above has already rejected a voucher
+      // this actor may not touch, so a rejected voucher never reaches here.
+      if (dto.attachmentIds !== undefined) {
+        payment.attachmentIds = await this.mediaLink.syncOwner(
+          MediaOwnerType.BANK_PAYMENT,
+          payment.id,
+          dto.attachmentIds,
+          actor,
+          manager,
+        );
+      }
 
       if (dto.lines) {
         await this.syncLines(manager, payment.id, actor, dto.lines);
@@ -699,6 +782,7 @@ export class BankPaymentsService {
               },
             ];
       const voucher = m.create(BankPaymentEntity, {
+        id: args.id,
         organizationId: actor.organizationId,
         branchId: actor.branchId,
         createdBy: actor.userId,
@@ -717,7 +801,10 @@ export class BankPaymentsService {
           args.purpose,
           args.affectExpense,
         ),
-        attachmentIds: args.attachmentIds ?? [],
+        // Media is synced separately by whichever caller knows the real ids
+        // (only `create()` today, before this insert); this insert never
+        // writes anything else here.
+        attachmentIds: [],
         reason: args.reason,
         referenceType: args.referenceType,
         referenceId: args.referenceId,
@@ -862,6 +949,7 @@ export class BankPaymentsService {
           ];
 
     const voucher = manager.create(BankPaymentEntity, {
+      id: args.id,
       organizationId: actor.organizationId,
       branchId: actor.branchId,
       createdBy: actor.userId,
@@ -881,7 +969,10 @@ export class BankPaymentsService {
         args.purpose,
         args.affectExpense,
       ),
-      attachmentIds: args.attachmentIds ?? [],
+      // Media is synced separately by whichever caller knows the real ids
+      // (only `create()` today, before this insert — see the field's doc
+      // comment); this insert never writes anything else here.
+      attachmentIds: [],
       reason: args.reason,
       referenceType: args.referenceType,
       referenceId: args.referenceId,
@@ -957,14 +1048,40 @@ export class BankPaymentsService {
     return { data, total, page, pageSize };
   }
 
-  async getById(id: string, actor: ActorContext): Promise<BankPaymentEntity> {
+  async getById(
+    id: string,
+    actor: ActorContext,
+  ): Promise<BankPaymentEntity & { attachments: BankPaymentAttachment[] }> {
     const payment = await this.getByIdInTx(
       this.dataSource.manager,
       id,
       actor.organizationId,
     );
     await this.attachStaff([payment], actor.organizationId);
-    return payment;
+    const attachments = await this.loadAttachments(payment.id, actor.organizationId);
+    return Object.assign(payment, { attachments });
+  }
+
+  /**
+   * Copies out only the display fields (03-logical-design.md > "Rules for
+   * every caller") — never spreads the `MediaSummary`, which also carries
+   * `bucket`/`objectKey`/`ownerType` that must stay server-side.
+   */
+  private async loadAttachments(
+    id: string,
+    organizationId: string,
+  ): Promise<BankPaymentAttachment[]> {
+    const byOwner = await this.mediaQuery.listForOwners(
+      MediaOwnerType.BANK_PAYMENT,
+      [id],
+      organizationId,
+    );
+    return (byOwner.get(id) ?? []).map((m) => ({
+      id: m.id,
+      fileName: m.fileName,
+      contentType: m.contentType,
+      size: m.size,
+    }));
   }
 
   /** Fill in `paidByCode`/`paidByName` for a page of payments in one batch. */
