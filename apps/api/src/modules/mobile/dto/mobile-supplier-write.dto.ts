@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
 } from 'class-validator';
 import { ProviderType } from '../../inventory/location/provider.entity';
@@ -12,15 +13,15 @@ import { ProviderType } from '../../inventory/location/provider.entity';
 /**
  * Body của `POST /mobile/suppliers`.
  *
- * Gương ĐÚNG `MobileSupplierResponseDto` trừ `groupCode`: đọc ra trường nào thì
- * ghi vào được trường đó, nên `SupplierModel.toJson` phía Dart chỉ là bản đảo
- * của `fromJson` và không phải nhớ thêm luật nào.
+ * Gương `MobileSupplierResponseDto` ở phần ghi được: đọc ra trường nào thì ghi
+ * vào được trường đó, nên `SupplierModel.toJson` phía Dart chỉ là bản đảo của
+ * `fromJson` và không phải nhớ thêm luật nào.
  *
- * KHÔNG nhận `groupCode` ở đợt này: app chưa có danh mục nhóm thật (ô "Nhóm"
- * trong form đang chạy dữ liệu mock và đã bị vô hiệu hoá), mà nhận một mã nhóm
- * rồi tra `provider_groups` là dựng nửa tính năng chưa ai gọi. Khi có danh mục
- * thật thì thêm trường vào ĐÂY và thêm bước tra `groupId` trong service —
- * response đã trả sẵn `groupCode` nên phía Dart không phải đổi gì.
+ * Nhóm đi vào bằng `groupId` (uuid). CỐ Ý KHÔNG nhận `groupCode` lẫn
+ * `groupName`: mã nhóm sửa được nên không đủ tư cách làm khoá ghi, còn tên thì
+ * thuần hiển thị. Cả hai vẫn được TRẢ RA trong response — chiều đọc và chiều
+ * ghi lệch nhau đúng ở chỗ này, và `forbidNonWhitelisted` biến mọi lượt gửi
+ * `groupCode` thành 400 để lệch đó không trôi qua im lặng.
  *
  * KHÔNG nhận `email`, `notes`, `maxDebt`, `debtTermDays`, ngân hàng, liên hệ,
  * CMND, `isCustomer`: app không có ô nào cho chúng. `forbidNonWhitelisted` biến
@@ -109,6 +110,23 @@ export class MobileSupplierCreateDto {
   @IsString({ message: 'Mã số thuế phải là chuỗi.' })
   @MaxLength(50, { message: 'Mã số thuế tối đa 50 ký tự.' })
   taxCode?: string | null;
+
+  /**
+   * Nhóm nhà cung cấp, định danh bằng **UUID** chứ không bằng mã.
+   *
+   * Mã nhóm SỬA ĐƯỢC (form nhóm mở ô đó), nên dùng mã làm khoá ghi là mỗi lần
+   * đổi mã lại đứt liên kết — cùng lập luận đã đưa `MobileSupplierController` từ
+   * tra-theo-mã sang tra-theo-id.
+   *
+   * `null` = GỠ nhóm khỏi nhà cung cấp này. Picker của app cho bỏ chọn bằng
+   * cách chạm lại card đang chọn, nên đây là thao tác có thật; `@IsOptional()`
+   * bỏ qua cả `undefined` lẫn `null` nên `null` đi lọt tới service, nơi nó được
+   * phân biệt với "vắng khoá = giữ nguyên".
+   */
+  @ApiPropertyOptional({ format: 'uuid', nullable: true })
+  @IsOptional()
+  @IsUUID('4', { message: 'Nhóm nhà cung cấp không hợp lệ.' })
+  groupId?: string | null;
 }
 
 /**

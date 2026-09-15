@@ -188,13 +188,15 @@ import { BrandEntity } from "./brand.entity";
     ItemStockThresholdService,
     InventoryItemCrudService,
     ProductLocationService,
-    // Hai service dưới đây export để `MobileModule` uỷ quyền đường GHI của
-    // `POST /mobile/inventory/units` và `POST /mobile/item-categories` — cùng
-    // cách `InventoryItemCrudService` đang phục vụ `POST /mobile/products`.
+    // Ba service dưới đây export để `MobileModule` uỷ quyền đường GHI của
+    // `POST /mobile/inventory/units`, `POST /mobile/item-categories` và
+    // `POST|PATCH /mobile/supplier-groups` — cùng cách `InventoryItemCrudService`
+    // đang phục vụ `POST /mobile/products`.
     // Chúng vẫn được đăng ký vào `EntityRegistryService` như cũ cho đường
     // `/admin/entities`; export chỉ thêm một nơi dùng, không đổi nơi cũ.
     UnitOfMeasureCrudService,
     InventoryItemCategoryCrudService,
+    ProviderGroupCrudService,
   ],
 })
 export class InventoryLocationModule implements OnModuleInit {

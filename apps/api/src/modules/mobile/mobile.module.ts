@@ -16,6 +16,7 @@ import { ItemEntity } from '../inventory/location/item.entity';
 import { GoodsReceiptEntity } from '../inventory/goods-receipt/goods-receipt.entity';
 import { InventoryLocationModule } from '../inventory/location/inventory-location.module';
 import { ProviderEntity } from '../inventory/location/provider.entity';
+import { SupplierGroupEntity } from '../inventory/location/supplier-group.entity';
 import { MobileAuthController } from './controllers/mobile-auth.controller';
 import { MobileBranchController } from './controllers/mobile-branch.controller';
 import { MobileBusinessReportController } from './controllers/mobile-business-report.controller';
@@ -39,6 +40,7 @@ import { MobilePromotionController } from './controllers/mobile-promotion.contro
 import { MobileSalesItemController } from './controllers/mobile-sales-item.controller';
 import { MobileStockDocumentController } from './controllers/mobile-stock-document.controller';
 import { MobileSupplierController } from './controllers/mobile-supplier.controller';
+import { MobileSupplierGroupController } from './controllers/mobile-supplier-group.controller';
 import { MobileTransferOrderController } from './controllers/mobile-transfer-order.controller';
 import { MobileUserController } from './controllers/mobile-user.controller';
 import { MobileBranchService } from './services/mobile-branch.service';
@@ -65,6 +67,7 @@ import { MobileStockDocumentService } from './services/mobile-stock-document.ser
 import { MobileStockDocumentWriteService } from './services/mobile-stock-document-write.service';
 import { MobileTransferOrderService } from './services/mobile-transfer-order.service';
 import { MobileSupplierService } from './services/mobile-supplier.service';
+import { MobileSupplierGroupService } from './services/mobile-supplier-group.service';
 
 /**
  * Bề mặt API DUY NHẤT mà app mobile gọi (`/mobile/**`) — mục đích là để `/docs`
@@ -140,8 +143,8 @@ import { MobileSupplierService } from './services/mobile-supplier.service';
     GoodsIssueModule,
     // `InventoryItemCrudService` (ghi hàng hoá, kèm ma trận biến thể / đơn vị
     // quy đổi / mã vạch / tồn đầu kỳ), `UnitOfMeasureCrudService` (đơn vị tính)
-    // và `ItemCategoryCrudService` (nhóm hàng). Cùng lý do hai module trên:
-    // uỷ quyền, không viết lại.
+    // `ItemCategoryCrudService` (nhóm hàng) và `ProviderGroupCrudService`
+    // (nhóm nhà cung cấp). Cùng lý do hai module trên: uỷ quyền, không viết lại.
     InventoryLocationModule,
     // `TransferOrderService` — vòng đời hai pha của lệnh điều chuyển
     // (tạo-và-xuất, xác nhận nhập) cùng vị từ "chờ nhận". Import để uỷ quyền:
@@ -150,6 +153,11 @@ import { MobileSupplierService } from './services/mobile-supplier.service';
     TransferOrderModule,
     TypeOrmModule.forFeature([
       ProviderEntity,
+      // Danh mục nhóm nhà cung cấp: `MobileSupplierGroupService` đọc trực tiếp
+      // (đường `/admin/entities` bắt phân trang, app cần trọn danh mục phẳng),
+      // và `MobileSupplierService.resolveGroup` tra nhóm để kiểm ranh giới tổ
+      // chức trước khi gán cho một nhà cung cấp.
+      SupplierGroupEntity,
       GoodsReceiptEntity,
       GoodsIssueEntity,
       ItemEntity,
@@ -165,6 +173,7 @@ import { MobileSupplierService } from './services/mobile-supplier.service';
     MobileBusinessReportController,
     MobileUserController,
     MobileSupplierController,
+    MobileSupplierGroupController,
     MobileCounterpartyController,
     MobileCustomerController,
     MobileManagerInvoiceController,
@@ -190,6 +199,7 @@ import { MobileSupplierService } from './services/mobile-supplier.service';
     MobileBranchService,
     MobileBusinessReportService,
     MobileSupplierService,
+    MobileSupplierGroupService,
     MobileCounterpartyService,
     MobileCustomerService,
     MobileManagerInvoiceService,

@@ -3,10 +3,10 @@ import { ApiProperty } from '@nestjs/swagger';
 /**
  * Nhà cung cấp theo hình dạng app mobile đọc được.
  *
- * Chín trường này khớp ĐÚNG `SupplierEntity` phía Dart, nên `SupplierModel`
+ * Mười một trường này khớp ĐÚNG `SupplierEntity` phía Dart, nên `SupplierModel`
  * chỉ là phép chép thẳng và entity không phải đổi. Ba lệch được nắn ở đây:
- * `isActive` (bool) -> `status`, `group.code` -> `groupCode`, còn `type` vốn
- * đã trùng giá trị.
+ * `isActive` (bool) -> `status`, quan hệ `group` -> bộ ba
+ * `groupId`/`groupCode`/`groupName`, còn `type` vốn đã trùng giá trị.
  *
  * `id` LÀ khoá định danh: `GET`/`PATCH :id` tra theo nó, và app điều hướng
  * bằng nó. Trước đây trường này cố ý bị giấu và `code` gánh vai đó — nhưng form
@@ -45,8 +45,39 @@ export class MobileSupplierResponseDto {
   @ApiProperty({ nullable: true, description: 'null = chưa từng nhập' })
   taxCode!: string | null;
 
-  @ApiProperty({ nullable: true, description: 'Mã nhóm NCC; null = chưa xếp nhóm' })
+  /**
+   * Khoá GHI của nhóm — thứ mà `PATCH`/`POST` nhận lại qua `groupId`.
+   *
+   * Đọc từ CỘT `group_id`, không từ quan hệ `group`: cột luôn có, còn quan hệ
+   * chỉ có khi lượt truy vấn nạp kèm nó. Nhờ vậy một đường quên `relations`
+   * vẫn trả đúng `groupId`, và app vẫn tô đúng dòng trong picker.
+   */
+  @ApiProperty({
+    type: String,
+    format: 'uuid',
+    nullable: true,
+    description: 'Khoá của nhóm NCC; null = chưa xếp nhóm',
+  })
+  groupId!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Mã nhóm NCC; null = chưa xếp nhóm',
+  })
   groupCode!: string | null;
+
+  /**
+   * Giữ [groupCode] lẫn [groupName] dù cả hai đều tra được từ danh mục: nhãn
+   * app hiện là `MÃ - TÊN VIẾT HOA`, nên thiếu chúng là form Sửa phải nạp trọn
+   * danh mục nhóm chỉ để dựng một chuỗi.
+   */
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Tên nhóm NCC; null = chưa xếp nhóm',
+  })
+  groupName!: string | null;
 }
 
 /** Một trang nhà cung cấp. `limit` chứ không phải `pageSize` — gương theo v2 search. */
