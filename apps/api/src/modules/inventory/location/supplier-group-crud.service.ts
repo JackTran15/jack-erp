@@ -68,16 +68,63 @@ export class ProviderGroupCrudService extends BaseCrudService<
         throw new BadRequestException('A supplier group cannot be its own parent');
       }
       await this.validateParentExists(next.parentGroupId, actor);
+      await this.assertNoCycle(id, next.parentGroupId, actor);
     }
     return next;
   }
 
+  /**
+   * Chuẩn hoá "không có nhóm cha" về `null`, KHÔNG phải `undefined`.
+   *
+   * `BaseCrudService.update` dùng `repository.merge`, và TypeORM BỎ QUA mọi giá
+   * trị `undefined` (`PlainObjectToNewEntityTransformer` chỉ gán khi
+   * `objectColumnValue !== undefined`). Nên bản trước — vốn map về `undefined` —
+   * làm thao tác "đưa một nhóm con lên làm nhóm gốc" trả 200 OK mà không đổi gì.
+   *
+   * `ItemCategoryCrudService.normalizeScalars` đã map về `null` từ trước; đây
+   * chỉ là bắt kịp nó. Guard `if (next.parentGroupId)` ở hai hàm trên vẫn bỏ qua
+   * `null` vì nó falsy, nên không phát sinh lượt tra thừa.
+   */
   private normalizePayload(p: Record<string, any>): Record<string, any> {
     const n = { ...p };
     if (n.parentGroupId === '' || n.parentGroupId === null) {
-      n.parentGroupId = undefined;
+      n.parentGroupId = null;
     }
     return n;
+  }
+
+  /**
+   * Chặn vòng lặp cha-con Ở MỌI TẦNG.
+   *
+   * `beforeUpdate` chỉ so `parentGroupId === id`, tức chỉ chặn một tầng: `A -> B`
+   * rồi `B -> A` vẫn dựng được một vòng, và khi đó mọi phép duyệt cây — kể cả
+   * `SupplierGroupHelper.selectableParents` phía app — chạy vô tận.
+   *
+   * Tập [seen] KHÔNG thừa: dữ liệu có thể ĐÃ mang sẵn một vòng (tạo trước khi có
+   * hàng rào này), và vòng `while` không có nó sẽ không bao giờ dừng.
+   */
+  private async assertNoCycle(
+    id: string,
+    parentGroupId: string,
+    actor: ActorContext,
+  ): Promise<void> {
+    const seen = new Set<string>([id]);
+    let cursor: string | undefined = parentGroupId;
+
+    while (cursor) {
+      if (seen.has(cursor)) {
+        throw new BadRequestException(
+          'Không thể chọn nhóm con làm nhóm cha.',
+        );
+      }
+      seen.add(cursor);
+
+      const node: SupplierGroupEntity | null = await this.repository.findOne({
+        where: { id: cursor, organizationId: actor.organizationId },
+        select: { id: true, parentGroupId: true },
+      });
+      cursor = node?.parentGroupId;
+    }
   }
 
   private async validateParentExists(

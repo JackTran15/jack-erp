@@ -1,7 +1,9 @@
+import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { ProviderEntity } from '../../inventory/location/provider.entity';
+import { SupplierGroupEntity } from '../../inventory/location/supplier-group.entity';
 import { MobileSupplierSort } from '../dto/mobile-supplier-list.query.dto';
 import { MobileSupplierService } from './mobile-supplier.service';
 
@@ -35,6 +37,7 @@ function provider(overrides: Partial<ProviderEntity> = {}): ProviderEntity {
 describe('MobileSupplierService', () => {
   let service: MobileSupplierService;
   let qb: Record<string, jest.Mock>;
+  let groupRepo: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     qb = {
@@ -48,12 +51,25 @@ describe('MobileSupplierService', () => {
       getManyAndCount: jest.fn().mockResolvedValue([[provider()], 1]),
     };
 
+    // Mặc định "không tìm thấy nhóm nào" — mọi test ĐỌC ở dưới không đụng tới
+    // nhóm, và test nào cần thì tự `mockResolvedValue` lại.
+    groupRepo = { findOne: jest.fn().mockResolvedValue(null) };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MobileSupplierService,
         {
           provide: getRepositoryToken(ProviderEntity),
-          useValue: { createQueryBuilder: () => qb },
+          useValue: {
+            createQueryBuilder: () => qb,
+            create: (input: Partial<ProviderEntity>) => input,
+            save: jest.fn((row: ProviderEntity) => Promise.resolve(row)),
+            findOne: jest.fn().mockResolvedValue(provider()),
+          },
+        },
+        {
+          provide: getRepositoryToken(SupplierGroupEntity),
+          useValue: groupRepo,
         },
       ],
     }).compile();
@@ -170,5 +186,60 @@ describe('MobileSupplierService', () => {
 
     expect(qb.skip).toHaveBeenCalledWith(40);
     expect(qb.take).toHaveBeenCalledWith(20);
+  });
+
+  /**
+   * Hàng rào MULTI-TENANT, không phải một phép kiểm cho đẹp.
+   *
+   * Khoá ngoại `inventory_providers.group_id` chỉ đòi uuid tồn tại trong
+   * `provider_groups`, KHÔNG đòi cùng tổ chức. Bỏ mệnh đề `organizationId` ở
+   * `resolveGroup` là một uuid rò rỉ gán được nhà cung cấp của tổ chức này vào
+   * nhóm của tổ chức khác — và cả hai bên đều đọc ra bình thường sau đó.
+   */
+  describe('groupId — ranh giới tổ chức', () => {
+    it('tra nhóm LUÔN kèm organizationId của actor', async () => {
+      groupRepo.findOne.mockResolvedValue({
+        id: 'g-1',
+        code: 'NCC-MN',
+        name: 'Miền Nam',
+        isActive: true,
+      });
+
+      await service.create(
+        { code: 'ABA', name: 'AN BA', groupId: 'g-1' },
+        actor,
+      );
+
+      expect(groupRepo.findOne).toHaveBeenCalledWith({
+        where: { id: 'g-1', organizationId: 'org-1' },
+      });
+    });
+
+    it('nhóm không thuộc tổ chức của actor -> 400, KHÔNG lưu gì', async () => {
+      groupRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.create({ code: 'ABA', name: 'AN BA', groupId: 'g-other' }, actor),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('không gửi groupId thì KHÔNG tra nhóm lần nào', async () => {
+      await service.create({ code: 'ABA', name: 'AN BA' }, actor);
+
+      expect(groupRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('nhóm đã ngừng theo dõi -> 400 khi TẠO mới', async () => {
+      groupRepo.findOne.mockResolvedValue({
+        id: 'g-1',
+        code: 'NCC-CU',
+        name: 'Nhóm cũ',
+        isActive: false,
+      });
+
+      await expect(
+        service.create({ code: 'ABA', name: 'AN BA', groupId: 'g-1' }, actor),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 });

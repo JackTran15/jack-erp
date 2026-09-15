@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -11,6 +12,7 @@ import {
   ProviderEntity,
   ProviderType,
 } from '../../inventory/location/provider.entity';
+import { SupplierGroupEntity } from '../../inventory/location/supplier-group.entity';
 import {
   MobileSupplierPageDto,
   MobileSupplierResponseDto,
@@ -32,7 +34,7 @@ import {
  *    tới được bằng `ModuleRef.get('InventoryProviderCrudService')`, tức bám vào
  *    một chuỗi token.
  * 2. Mọi đường đọc có sẵn đều vứt `group` và chỉ giữ `groupName`, trong khi
- *    `SupplierEntity` phía Dart cần `groupCode`.
+ *    `SupplierEntity` phía Dart cần cả `groupId`, `groupCode` lẫn `groupName`.
  * 3. Không đường nào sắp được theo `name`/`code` — v2 search khoá cứng
  *    `createdAt DESC`.
  * 4. Đường GHI cũng vậy: `POST /admin/entities/inventory-providers/records`
@@ -48,7 +50,39 @@ export class MobileSupplierService {
   constructor(
     @InjectRepository(ProviderEntity)
     private readonly repo: Repository<ProviderEntity>,
+    @InjectRepository(SupplierGroupEntity)
+    private readonly groups: Repository<SupplierGroupEntity>,
   ) {}
+
+  /**
+   * Nắn `groupId` từ DTO thành entity nhóm, hoặc ném 400.
+   *
+   * Ba trạng thái, KHÔNG phải hai:
+   * - `undefined` -> `undefined`: vắng khoá, giữ nguyên nhóm đang có;
+   * - `null`      -> `null`:      gỡ nhóm khỏi nhà cung cấp này;
+   * - uuid        -> entity nhóm, hoặc `BadRequestException`.
+   *
+   * **Lọc `organizationId` là RANH GIỚI MULTI-TENANT, không phải tối ưu.** Khoá
+   * ngoại `inventory_providers.group_id` chỉ đòi uuid tồn tại trong
+   * `provider_groups`, KHÔNG đòi cùng tổ chức. Bỏ phép tra này là một uuid rò rỉ
+   * gán được nhà cung cấp của tổ chức A vào nhóm của tổ chức B, và nó sẽ đọc ra
+   * bình thường ở cả hai bên.
+   */
+  private async resolveGroup(
+    groupId: string | null | undefined,
+    actor: ActorContext,
+  ): Promise<SupplierGroupEntity | null | undefined> {
+    if (groupId === undefined) return undefined;
+    if (groupId === null) return null;
+
+    const group = await this.groups.findOne({
+      where: { id: groupId, organizationId: actor.organizationId },
+    });
+    if (!group) {
+      throw new BadRequestException('Nhóm nhà cung cấp không tồn tại.');
+    }
+    return group;
+  }
 
   async list(
     query: {
@@ -145,6 +179,11 @@ export class MobileSupplierService {
     actor: ActorContext,
   ): Promise<MobileSupplierResponseDto> {
     const code = dto.code.trim();
+    const group = await this.resolveGroup(dto.groupId, actor);
+
+    if (group && !group.isActive) {
+      throw new BadRequestException('Nhóm nhà cung cấp này đã ngừng theo dõi.');
+    }
 
     const row = this.repo.create({
       organizationId: actor.organizationId,
@@ -160,22 +199,26 @@ export class MobileSupplierService {
       address: toColumnValue(dto.address),
       phone: toColumnValue(dto.phone),
       taxCode: toColumnValue(dto.taxCode),
+      groupId: (group?.id ?? null) as unknown as string | undefined,
     });
 
     const saved = await this.repo
       .save(row)
       .catch((err) => rethrowDuplicateCode(err, code));
 
-    // Bản ghi mới chắc chắn chưa xếp nhóm (DTO không nhận `groupCode`), nên
-    // không cần nạp lại quan hệ `group`: `toMobileSupplier` trả `groupCode:
-    // null` là đúng sự thật.
+    // Gán LẠI quan hệ trước khi map. `save` không nạp quan hệ giùm, nên thiếu
+    // dòng này thì `toMobileSupplier` đọc `saved.group` là `undefined` và trả
+    // `groupCode`/`groupName` bằng `null` cho một bản ghi vừa được xếp nhóm.
+    saved.group = group ?? undefined;
+
     return toMobileSupplier(saved);
   }
 
   /**
    * Tra theo TỔ CHỨC + ID, đúng khuôn [findById] — `X-Branch-Id` không dự
-   * phần. Nạp kèm `group` để response giữ nguyên `groupCode` của bản ghi: đợt
-   * này không cho sửa nhóm, mà trả `null` thì app tưởng nhóm vừa bị xoá.
+   * phần. Nạp kèm `group` vì hai lẽ: response phải giữ `groupCode`/`groupName`
+   * của bản ghi khi lượt PATCH không đụng tới nhóm, và [resolveGroup] cần so
+   * `group.id !== row.groupId` để biết người dùng có THỰC SỰ đổi nhóm hay không.
    *
    * Định danh là `id` nên `dto.code` là mã MỚI thuần tuý — không còn cảnh "mã
    * cũ trên path, mã mới trong body" như bản tra theo mã. Đổi mã xong, chính
@@ -206,6 +249,23 @@ export class MobileSupplierService {
     if (dto.phone !== undefined) row.phone = toColumnValue(dto.phone);
     if (dto.taxCode !== undefined) row.taxCode = toColumnValue(dto.taxCode);
 
+    const group = await this.resolveGroup(dto.groupId, actor);
+    if (group !== undefined) {
+      // Chỉ chặn nhóm đã ngừng theo dõi khi người dùng THỰC SỰ ĐỔI sang nó.
+      // Form mobile gửi đủ mọi khoá ở mỗi lượt lưu, nên chặn vô điều kiện sẽ
+      // khoá cứng cả việc sửa TÊN một nhà cung cấp mà nhóm của nó vừa bị ngừng.
+      if (group && !group.isActive && group.id !== row.groupId) {
+        throw new BadRequestException(
+          'Nhóm nhà cung cấp này đã ngừng theo dõi.',
+        );
+      }
+      // `null` chứ KHÔNG `undefined`: `save` trên entity đã nạp coi `undefined`
+      // là "không đổi", tức thao tác gỡ nhóm lặng lẽ không làm gì. Cùng cái bẫy
+      // mà `toColumnValue` ngay dưới sinh ra để chữa cho ba ô văn bản.
+      row.groupId = (group?.id ?? null) as unknown as string | undefined;
+      row.group = group ?? undefined;
+    }
+
     // `row.code` là mã SAU khi đã áp `dto`: khi người dùng vừa đổi mã thì mã
     // ĐỤNG NHAU là mã mới, và câu báo lỗi phải nhắc đúng mã đó.
     const saved = await this.repo
@@ -233,7 +293,12 @@ function toMobileSupplier(row: ProviderEntity): MobileSupplierResponseDto {
     address: row.address ?? null,
     phone: row.phone ?? null,
     taxCode: row.taxCode ?? null,
+    // `groupId` đọc từ CỘT, hai trường kia từ QUAN HỆ: cột luôn có, còn quan hệ
+    // chỉ có khi lượt truy vấn nạp kèm nó. Lệch này là chủ ý — một đường quên
+    // `relations` vẫn trả đúng `groupId`, nên app vẫn tô đúng dòng trong picker.
+    groupId: row.groupId ?? null,
     groupCode: row.group?.code ?? null,
+    groupName: row.group?.name ?? null,
   };
 }
 

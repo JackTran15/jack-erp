@@ -211,7 +211,7 @@ describe('Mobile facade (E2E)', () => {
       }
     });
 
-    it('trả ĐÚNG chín trường — có id, không rò email, maxDebt hay thông tin ngân hàng', async () => {
+    it('trả ĐÚNG mười một trường — có id, không rò email, maxDebt hay thông tin ngân hàng', async () => {
       const res = await request(app.getHttpServer())
         .get('/mobile/suppliers')
         .set('Authorization', authHeader(seed.accessToken))
@@ -223,14 +223,26 @@ describe('Mobile facade (E2E)', () => {
 
       const row = res.body.data.find((s: { code: string }) => s.code === 'ZZZ');
       expect(Object.keys(row).sort()).toEqual(
-        ['address', 'code', 'groupCode', 'id', 'name', 'phone', 'status', 'taxCode', 'type'],
+        [
+          'address',
+          'code',
+          'groupCode',
+          'groupId',
+          'groupName',
+          'id',
+          'name',
+          'phone',
+          'status',
+          'taxCode',
+          'type',
+        ],
       );
       // `id` là khoá app dùng để điều hướng — trả thiếu hoặc trả rỗng thì màn
       // danh sách không mở được chi tiết, mà lỗi đó chỉ lộ ra lúc chạm tay.
       expect(row.id).toBe(supplierIds.ZZZ);
     });
 
-    it('nắn isActive -> status và group.code -> groupCode', async () => {
+    it('nắn isActive -> status và quan hệ group -> bộ ba groupId/Code/Name', async () => {
       const res = await request(app.getHttpServer())
         .get('/mobile/suppliers')
         .set('Authorization', authHeader(seed.accessToken))
@@ -239,12 +251,18 @@ describe('Mobile facade (E2E)', () => {
       const withGroup = res.body.data.find((s: { code: string }) => s.code === 'ZZZ');
       expect(withGroup.status).toBe('active');
       expect(withGroup.groupCode).toBe('NCC-HCM');
+      expect(withGroup.groupName).toEqual(expect.any(String));
+      // `groupId` là khoá GHI: form gửi lại chính nó khi lưu, và picker dùng nó
+      // để tô sẵn dòng đang chọn. Trả thiếu là ô nhóm mở ra trống trơn.
+      expect(withGroup.groupId).toEqual(expect.any(String));
 
       const inactive = res.body.data.find((s: { code: string }) => s.code === 'AAA');
       expect(inactive.status).toBe('inactive');
       expect(inactive.type).toBe('individual');
       // Chưa xếp nhóm là `null`, KHÔNG phải chuỗi rỗng.
       expect(inactive.groupCode).toBeNull();
+      expect(inactive.groupId).toBeNull();
+      expect(inactive.groupName).toBeNull();
       expect(inactive.address).toBeNull();
     });
 
@@ -335,6 +353,7 @@ describe('Mobile facade (E2E)', () => {
       expect(res.body.id).toBe(supplierIds.ZZZ);
       expect(res.body.code).toBe('ZZZ');
       expect(res.body.groupCode).toBe('NCC-HCM');
+      expect(res.body.groupId).toEqual(expect.any(String));
     });
 
     it('id đúng dạng uuid nhưng không tồn tại -> 404', async () => {
@@ -364,11 +383,23 @@ describe('Mobile facade (E2E)', () => {
         .set('Authorization', authHeader(seed.accessToken))
         .send(body);
 
-    it('tạo tối thiểu -> 201, trả ĐÚNG chín trường của bản đọc', async () => {
+    it('tạo tối thiểu -> 201, trả ĐÚNG mười một trường của bản đọc', async () => {
       const res = await post({ code: 'NEW1', name: 'Tân Lập' }).expect(201);
 
       expect(Object.keys(res.body).sort()).toEqual(
-        ['address', 'code', 'groupCode', 'id', 'name', 'phone', 'status', 'taxCode', 'type'],
+        [
+          'address',
+          'code',
+          'groupCode',
+          'groupId',
+          'groupName',
+          'id',
+          'name',
+          'phone',
+          'status',
+          'taxCode',
+          'type',
+        ],
       );
       // Mặc định của bản ghi mới: đang theo dõi, là pháp nhân, phần còn lại
       // `null` chứ KHÔNG phải chuỗi rỗng.
@@ -383,7 +414,9 @@ describe('Mobile facade (E2E)', () => {
         address: null,
         phone: null,
         taxCode: null,
+        groupId: null,
         groupCode: null,
+        groupName: null,
       });
     });
 
@@ -417,10 +450,24 @@ describe('Mobile facade (E2E)', () => {
       expect(res.body.message).toMatch(/Mã nhà cung cấp "DUP1" đã tồn tại/);
     });
 
-    it('gửi groupCode -> 400: nhóm cố ý NẰM NGOÀI đợt này', async () => {
-      // Test này đỏ nghĩa là có người vừa thêm `groupCode` vào DTO — phải bàn
-      // trước, vì phía Dart đang cố ý bỏ trường đó khỏi `toJson`.
+    it('gửi groupCode -> 400: nhóm đi vào bằng `groupId`, không bằng mã', async () => {
+      // Chiều ĐỌC trả `groupCode`, chiều GHI chỉ nhận `groupId` — lệch có chủ ý
+      // vì mã nhóm sửa được nên không đủ tư cách làm khoá ghi. Test này đỏ
+      // nghĩa là có người vừa mở `groupCode` ở DTO ghi; phải bàn trước, vì phía
+      // Dart cố ý chỉ gửi `groupId`.
       await post({ code: 'GRP1', name: 'Có nhóm', groupCode: 'NCC-HCM' }).expect(400);
+    });
+
+    it('groupId của tổ chức KHÁC -> 400', async () => {
+      // Hàng rào multi-tenant: khoá ngoại `group_id` chỉ đòi uuid tồn tại trong
+      // `provider_groups`, KHÔNG đòi cùng tổ chức. Thiếu phép tra ở
+      // `resolveGroup` là một uuid rò rỉ gán được NCC sang nhóm của tổ chức
+      // khác — và cả hai bên đọc ra bình thường sau đó.
+      await post({
+        code: 'GRPX',
+        name: 'Nhóm lạ',
+        groupId: '00000000-0000-4000-8000-0000000000ff',
+      }).expect(400);
     });
 
     it('gửi id -> 400: định danh nằm ở ĐƯỜNG DẪN, không ở body', async () => {
@@ -492,7 +539,9 @@ describe('Mobile facade (E2E)', () => {
         address: '1 Nguyễn Huệ',
         phone: '0900000001',
         taxCode: '0311111111',
+        groupId: null,
         groupCode: null,
+        groupName: null,
       });
     });
 
@@ -531,12 +580,14 @@ describe('Mobile facade (E2E)', () => {
       expect(res.body.message).toMatch(/Mã nhà cung cấp "CLASH1" đã tồn tại/);
     });
 
-    it('giữ nguyên groupCode của bản ghi khi sửa trường khác', async () => {
+    it('giữ nguyên nhóm của bản ghi khi sửa trường khác', async () => {
       // `relations: ['group']` phải được nạp, không thì response trả `null` và
       // app tưởng nhóm vừa bị xoá.
       const res = await patch(supplierIds.ZZZ, { name: 'Zeta đã sửa' }).expect(200);
 
       expect(res.body.groupCode).toBe('NCC-HCM');
+      expect(res.body.groupId).toEqual(expect.any(String));
+      expect(res.body.groupName).toEqual(expect.any(String));
     });
 
     it('id đúng dạng uuid nhưng không tồn tại -> 404 tiếng Việt', async () => {
@@ -564,6 +615,157 @@ describe('Mobile facade (E2E)', () => {
       const id = await create({ code: 'NOOP2', name: 'Trường lạ' });
 
       await patch(id, { maxDebt: 1 }).expect(400);
+    });
+  });
+
+  // ─── Nhóm nhà cung cấp ────────────────────────────────────────────
+
+  describe('/mobile/supplier-groups', () => {
+    // Dùng LẠI nhóm `NCC-HCM` mà `GET /mobile/suppliers` đã seed — jest chạy
+    // các `describe` trong CÙNG một file theo thứ tự khai báo, và `beforeAll`
+    // của khối đó đã chạy xong. Seed trùng ở đây là hai nguồn cho một dòng.
+    const seededGroupId = 'e0000000-0000-4000-8000-000000000001';
+
+    const get = () =>
+      request(app.getHttpServer())
+        .get('/mobile/supplier-groups')
+        .set('Authorization', authHeader(seed.accessToken));
+
+    const post = (body: Record<string, unknown>) =>
+      request(app.getHttpServer())
+        .post('/mobile/supplier-groups')
+        .set('Authorization', authHeader(seed.accessToken))
+        .send(body);
+
+    const patch = (id: string, body: Record<string, unknown>) =>
+      request(app.getHttpServer())
+        .patch(`/mobile/supplier-groups/${id}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .send(body);
+
+    it('không token -> 401', async () => {
+      await request(app.getHttpServer()).get('/mobile/supplier-groups').expect(401);
+    });
+
+    it('trả phong bì { data }, KHÔNG có total/page/limit', async () => {
+      const res = await get().expect(200);
+
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(Object.keys(res.body)).toEqual(['data']);
+    });
+
+    it('mỗi dòng ĐÚNG sáu trường, khoá cha là `parentGroupId`', async () => {
+      const res = await get().expect(200);
+      const row = res.body.data.find(
+        (g: { code: string }) => g.code === 'NCC-HCM',
+      );
+
+      // `parentGroupId` chứ không `parentId`: nhánh nhóm HÀNG HOÁ trả `parentId`
+      // ở chiều đọc nhưng đọc `parentGroupId` ở chiều ghi — một lệch tên có
+      // thật mà nhánh này cố ý không lặp lại.
+      expect(Object.keys(row).sort()).toEqual([
+        'code',
+        'description',
+        'id',
+        'isActive',
+        'name',
+        'parentGroupId',
+      ]);
+      expect(row.id).toBe(seededGroupId);
+      expect(row.parentGroupId).toBeNull();
+    });
+
+    it('thiếu code -> 400, KHÁC nhóm hàng hoá nơi code tuỳ chọn', async () => {
+      // Không ai sinh mã hộ: `ProviderGroupCrudService` không gọi
+      // `DocumentNumberingService`. Test này là tài liệu sống của khác biệt đó.
+      await post({ name: 'Không mã' }).expect(400);
+    });
+
+    it('tạo tối thiểu -> 201, nhóm gốc và đang theo dõi', async () => {
+      const res = await post({ code: 'E2E-G1', name: 'Nhóm E2E' }).expect(201);
+
+      expect(res.body).toEqual({
+        id: expect.any(String),
+        code: 'E2E-G1',
+        name: 'Nhóm E2E',
+        parentGroupId: null,
+        description: null,
+        isActive: true,
+      });
+    });
+
+    it('mã trùng -> 409 nói TIẾNG VIỆT', async () => {
+      await post({ code: 'E2E-DUP', name: 'Bản đầu' }).expect(201);
+
+      const res = await post({ code: 'E2E-DUP', name: 'Bản trùng' }).expect(409);
+
+      expect(res.body.message).toMatch(/Mã nhóm nhà cung cấp "E2E-DUP" đã tồn tại/);
+    });
+
+    it('gửi isActive -> 400: form không có ô đó', async () => {
+      await post({ code: 'E2E-ACT', name: 'Có cờ', isActive: false }).expect(400);
+    });
+
+    it('id KHÔNG phải uuid -> 400, không phải 500', async () => {
+      await patch('KHONG-PHAI-UUID', { name: 'x' }).expect(400);
+    });
+
+    /**
+     * Ca ĐẮT NHẤT của khối này.
+     *
+     * `BaseCrudService.update` dùng `repository.merge`, và TypeORM BỎ QUA mọi
+     * giá trị `undefined`. Bản trước của `normalizePayload` nắn `null` về
+     * `undefined`, nên thao tác "đưa một nhóm con lên làm nhóm gốc" trả 200 OK
+     * mà không đổi gì — và chỉ ĐỌC LẠI mới thấy.
+     */
+    it('parentGroupId: null -> đưa lên nhóm gốc THẬT, đọc lại vẫn null', async () => {
+      const parent = await post({ code: 'E2E-P', name: 'Cha' }).expect(201);
+      const child = await post({
+        code: 'E2E-C',
+        name: 'Con',
+        parentGroupId: parent.body.id,
+      }).expect(201);
+
+      expect(child.body.parentGroupId).toBe(parent.body.id);
+
+      await patch(child.body.id, { parentGroupId: null }).expect(200);
+
+      const res = await get().expect(200);
+      const row = res.body.data.find((g: { code: string }) => g.code === 'E2E-C');
+      expect(row.parentGroupId).toBeNull();
+    });
+
+    it('chọn HẬU DUỆ làm nhóm cha -> 400, không treo', async () => {
+      const a = await post({ code: 'E2E-A', name: 'A' }).expect(201);
+      const b = await post({
+        code: 'E2E-B',
+        name: 'B',
+        parentGroupId: a.body.id,
+      }).expect(201);
+
+      // A -> B dựng ra vòng A->B->A. Backend chỉ chặn self-parent MỘT tầng nên
+      // ca này từng lọt, và mọi phép duyệt cây phía app sẽ chạy vô tận.
+      const res = await patch(a.body.id, { parentGroupId: b.body.id }).expect(400);
+
+      expect(res.body.message).toMatch(/nhóm con làm nhóm cha/);
+    });
+
+    it('tự làm cha của chính mình -> 400', async () => {
+      const g = await post({ code: 'E2E-SELF', name: 'Tự thân' }).expect(201);
+
+      await patch(g.body.id, { parentGroupId: g.body.id }).expect(400);
+    });
+
+    it('gán nhóm cho NCC bằng groupId -> response có đủ bộ ba', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/mobile/suppliers')
+        .set('Authorization', authHeader(seed.accessToken))
+        .send({ code: 'E2E-SUP', name: 'Có nhóm', groupId: seededGroupId })
+        .expect(201);
+
+      expect(res.body.groupId).toBe(seededGroupId);
+      expect(res.body.groupCode).toBe('NCC-HCM');
+      expect(res.body.groupName).toBe('TP. Hồ Chí Minh');
     });
   });
 
