@@ -299,9 +299,9 @@ export class InventoryLocationStockService {
   }
 
   /**
-   * Remove an item from a real shelf without destroying stock. Positive stock
-   * is moved back to the storage's virtual "Chưa xếp" location first. Negative
-   * balances remain blocked because they require an inventory correction.
+   * Remove an item from a real shelf. Only allowed when the shelf's balance is
+   * exactly zero — non-zero stock (positive or negative) must be resolved via
+   * an explicit transfer/adjustment first, never moved implicitly here.
    */
   async removeItemFromLocation(
     locationId: string,
@@ -324,22 +324,9 @@ export class InventoryLocationStockService {
         'Không thể bỏ hàng hóa đang có tồn kho âm. Hãy điều chỉnh tồn trước.',
       );
     }
-
     if (quantity > 0) {
-      const unassigned = await this.locationService.ensureUnassignedLocation(
-        location.storage.id,
-        actor,
-      );
-      await this.stockTransferService.postIntraWarehouseMoves(
-        [
-          {
-            itemId,
-            quantity,
-            sourceLocationId: locationId,
-            destinationLocationId: unassigned.id,
-          },
-        ],
-        actor,
+      throw new ForbiddenException(
+        'Không thể bỏ hàng hóa đang còn tồn kho. Hãy chuyển hết tồn sang vị trí khác trước.',
       );
     }
 
