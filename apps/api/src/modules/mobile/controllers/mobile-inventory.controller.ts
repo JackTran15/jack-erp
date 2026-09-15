@@ -18,8 +18,14 @@ import { PermissionGuard } from '../../rbac/permission.guard';
 import { MobileUnitCreateDto } from '../dto/mobile-catalog-write.dto';
 import {
   MobileInventoryCategoryResponseDto,
+  MobileInventoryLocationResponseDto,
+  MobileInventoryStorageResponseDto,
   MobileInventoryUnitResponseDto,
 } from '../dto/mobile-inventory-catalog.response.dto';
+import {
+  MobileInventoryLocationListQueryDto,
+  MobileInventoryStorageListQueryDto,
+} from '../dto/mobile-inventory-place.query.dto';
 import {
   MobileInventoryFlowResponseDto,
   MobileInventoryVariantResponseDto,
@@ -114,6 +120,37 @@ export class MobileInventoryController {
     @Actor() actor: ActorContext,
   ): Promise<MobileInventoryUnitResponseDto> {
     return this.catalog.createUnit(dto, actor);
+  }
+
+  /**
+   * Kho của một cửa hàng — màn chọn "Kho" khi sửa dòng hàng của chứng từ kho.
+   *
+   * Quyền `inventory.read` như mọi đường đọc của controller này: kho là danh mục
+   * kho vận, cùng hạng với nhóm hàng và đơn vị tính. KHÔNG dùng
+   * `goods_receipt.read` dù người gọi đến từ màn chứng từ — quyền phải theo DỮ
+   * LIỆU được đọc, không theo màn hình đang mở.
+   */
+  @Get('storages')
+  @RequirePermission('inventory.read')
+  @ApiOperation({ summary: 'Kho đang hoạt động của một cửa hàng, danh sách phẳng' })
+  @ApiOkResponse({ type: [MobileInventoryStorageResponseDto] })
+  listStorages(
+    @Query() query: MobileInventoryStorageListQueryDto,
+    @Actor() actor: ActorContext,
+  ): Promise<MobileInventoryStorageResponseDto[]> {
+    return this.catalog.listStorages(query.branchId, actor);
+  }
+
+  /** Bin của một kho — màn chọn "Vị trí". Xem ghi chú quyền ở [listStorages]. */
+  @Get('locations')
+  @RequirePermission('inventory.read')
+  @ApiOperation({ summary: 'Vị trí lưu kho của một kho, "Chưa xếp" đứng đầu' })
+  @ApiOkResponse({ type: [MobileInventoryLocationResponseDto] })
+  listLocations(
+    @Query() query: MobileInventoryLocationListQueryDto,
+    @Actor() actor: ActorContext,
+  ): Promise<MobileInventoryLocationResponseDto[]> {
+    return this.catalog.listLocations(query.storageId, actor);
   }
 
   @Get('products')

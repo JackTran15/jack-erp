@@ -249,18 +249,24 @@ describe('MobileTransferOrderService', () => {
       ]);
     });
 
-    it('dòng hàng chỉ còn BẢY trường — đúng thứ dòng phiếu cần', async () => {
+    it('dòng hàng chỉ còn MƯỜI MỘT trường — đúng thứ dòng phiếu cần', async () => {
       const [row] = (await run()).data;
 
       // Hình dạng DÙNG CHUNG với dòng của chứng từ kho (`name`/`sku`, không
       // phải `itemName`/`itemCode`) — đó là điều kiện để app có một parser duy
-      // nhất và thay thẳng dòng của phiếu bằng danh sách này.
+      // nhất và thay thẳng dòng của phiếu bằng danh sách này. Bốn trường
+      // kho/vị trí có mặt vì hình dạng là dùng chung; GIÁ TRỊ của chúng phải
+      // null, xem test ngay dưới.
       expect(Object.keys(row.lines[0]).sort()).toEqual([
         'itemId',
         'lineTotal',
+        'locationId',
+        'locationName',
         'name',
         'quantity',
         'sku',
+        'storageId',
+        'storageName',
         'unit',
         'unitPrice',
       ]);
@@ -272,8 +278,28 @@ describe('MobileTransferOrderService', () => {
       expect(serialized).not.toContain('status');
       expect(serialized).not.toContain('importGoodsReceiptId');
       expect(serialized).not.toContain('counterpartyName');
-      expect(serialized).not.toContain('storageName');
       expect(serialized).not.toContain('locationCode');
+    });
+
+    it('bốn trường kho/vị trí là NULL — kho của lệnh là kho NGUỒN', async () => {
+      // Guard này trước đây là `not.toContain('storageName')`, tức canh cái
+      // KHOÁ. Từ khi dòng phiếu kho mang bốn trường kho/vị trí thì khoá buộc
+      // phải có mặt (một parser, một hình dạng), nên thứ đáng canh là GIÁ TRỊ.
+      //
+      // Điều phải chặn không đổi: `storageName`/`locationName` mà lệnh điều
+      // chuyển mang là kho NGUỒN — nơi chi nhánh kia đã xuất hàng. Chép chúng
+      // sang đây là nói với màn Sửa rằng hàng đang nằm ở bin của một cửa hàng
+      // khác, và app sẽ gửi lại đúng thứ đó khi lưu.
+      const [row] = (await run()).data;
+
+      expect(row.lines[0]).toEqual(
+        expect.objectContaining({
+          locationId: null,
+          locationName: null,
+          storageId: null,
+          storageName: null,
+        }),
+      );
     });
 
     it('`exportDocumentNumber` giữ NULL — app tự lùi về mã lệnh', async () => {

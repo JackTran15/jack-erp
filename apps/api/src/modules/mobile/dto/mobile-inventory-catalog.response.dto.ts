@@ -37,3 +37,42 @@ export class MobileInventoryUnitResponseDto {
   @ApiProperty({ description: 'Cách viết hiển thị' })
   name!: string;
 }
+
+/**
+ * Một KHO (`storages`) của một cửa hàng — cho màn chọn "Kho" khi sửa dòng hàng.
+ *
+ * Hai trường, và cố ý không hơn. `GET /mobile/inventory/stores/:branchId` cũng
+ * trả `storages` nhưng đó là endpoint BÁO CÁO TỒN KHO: nó đòi `asOf`/`kind` và
+ * tính tồn cho từng kho. Bẻ một endpoint báo cáo thành nguồn cho màn chọn là
+ * buộc hai màn không liên quan vào nhau — ngày báo cáo đổi tham số là màn chọn
+ * gãy theo.
+ */
+export class MobileInventoryStorageResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty({ description: 'Tên kho' })
+  name!: string;
+}
+
+/**
+ * Một BIN (vị trí lưu kho) trong một kho.
+ *
+ * `isUnassigned` là bin ẢO "Chưa xếp" mà mỗi kho có đúng một cái: hàng đã nhập
+ * kho nhưng chưa xếp lên kệ nằm ở đó. Nó **luôn đứng đầu danh sách**, nên app
+ * không cần luật riêng để chọn giá trị mặc định — đúng thứ trang web đi tìm khi
+ * nó không giải được kệ ưu tiên.
+ */
+export class MobileInventoryLocationResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty({ description: 'Mã vị trí, vd `A-01-03`' })
+  code!: string;
+
+  @ApiProperty({ description: 'Tên hiển thị' })
+  name!: string;
+
+  @ApiProperty({ description: 'Bin ảo "Chưa xếp" — mỗi kho một cái, luôn đứng đầu' })
+  isUnassigned!: boolean;
+}

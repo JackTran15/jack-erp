@@ -1142,12 +1142,17 @@ describe('Mobile facade (E2E)', () => {
           .get(`/mobile/stock-documents/${id}?kind=${kind}`)
           .set('Authorization', authHeader(seed.accessToken));
 
-      it('trả phần đầu phiếu kèm dòng hàng, đúng 10 + 6 trường', async () => {
+      it('trả phần đầu phiếu kèm dòng hàng, đúng 18 + 11 trường', async () => {
         const res = await detail(purchaseId).expect(200);
 
+        // Hai danh sách này là HÀNG RÀO, không phải ảnh chụp: mở rộng chúng
+        // phải là một quyết định, không phải hệ quả của việc ai đó thêm một
+        // `select`. Chúng từng bị bỏ lại ở 10 + 6 trong khi DTO đã đi tiếp.
         expect(Object.keys(res.body).sort()).toEqual([
           'amount',
           'code',
+          'counterpartyId',
+          'counterpartyKind',
           'deliverer',
           'documentDate',
           'id',
@@ -1155,15 +1160,26 @@ describe('Mobile facade (E2E)', () => {
           'note',
           'partyCode',
           'partyName',
+          'paymentMethod',
+          'purchasingEmployee',
+          'purpose',
+          'sourceBranch',
           'status',
+          'targetBranch',
+          'transferOrderId',
         ]);
         expect(res.body.code).toBe('NKM-001');
         expect(res.body.lines).toHaveLength(1);
         expect(Object.keys(res.body.lines[0]).sort()).toEqual([
+          'itemId',
           'lineTotal',
+          'locationId',
+          'locationName',
           'name',
           'quantity',
           'sku',
+          'storageId',
+          'storageName',
           'unit',
           'unitPrice',
         ]);
@@ -1282,6 +1298,268 @@ describe('Mobile facade (E2E)', () => {
           .set('Authorization', authHeader(seed.accessToken))
           .expect(403);
       });
+    });
+
+    describe('DELETE /mobile/stock-documents/:id', () => {
+      const doomedId = 'ba000000-0000-4000-8000-0000000000d1';
+      const issueId = 'ba000000-0000-4000-8000-0000000000d2';
+
+      /**
+       * Phiếu RIÊNG để xoá, không dùng lại `purchaseId`: xoá nó là rút nền khỏi
+       * mọi test phía trên, và thứ tự chạy giữa các describe là thứ không nên
+       * phải nhớ.
+       */
+      beforeAll(async () => {
+        const ds = app.get(DataSource);
+
+        const [{ id: locationId }] = await ds.query(
+          `SELECT id FROM locations WHERE organization_id = $1::uuid LIMIT 1`,
+          [seed.organizationId],
+        );
+
+        await ds.query(
+          `INSERT INTO goods_receipts
+             (id, organization_id, branch_id, document_number, status, purpose,
+              received_at, location_id, attachment_ids, references,
+              created_by, created_at, updated_at)
+           VALUES ($1::uuid, $2::uuid, $3::uuid, 'NKM-DEL', 'POSTED',
+                   'PURCHASE', NOW(), $4::uuid, '[]'::jsonb, '[]'::jsonb,
+                   $5::uuid, NOW(), NOW())
+           ON CONFLICT (id) DO NOTHING`,
+          [doomedId, seed.organizationId, seed.branchId, locationId, seed.userId],
+        );
+
+        await ds.query(
+          `INSERT INTO goods_issues
+             (id, organization_id, branch_id, document_number, status, purpose,
+              location_id, occurred_at, references, created_by, created_at, updated_at)
+           VALUES ($1::uuid, $2::uuid, $3::uuid, 'PX-DEL', 'POSTED', 'OTHER',
+                   $4::uuid, NOW(), '[]'::jsonb, $5::uuid, NOW(), NOW())
+           ON CONFLICT (id) DO NOTHING`,
+          [issueId, seed.organizationId, seed.branchId, locationId, seed.userId],
+        );
+      });
+
+      const remove = (id: string, query: string) =>
+        request(app.getHttpServer())
+          .delete(`/mobile/stock-documents/${id}?${query}`)
+          .set('Authorization', authHeader(seed.accessToken));
+
+      it('phiếu XUẤT KHO -> 400, và phiếu vẫn đọc được sau đó', async () => {
+        // Quyết định SẢN PHẨM, không phải giới hạn kỹ thuật:
+        // `GoodsIssueService.cancel` tồn tại và trang web vẫn dùng.
+        await remove(issueId, `kind=stock-out&branchId=${seed.branchId}`).expect(400);
+
+        await request(app.getHttpServer())
+          .get(`/mobile/stock-documents/${issueId}?kind=stock-out`)
+          .set('Authorization', authHeader(seed.accessToken))
+          .expect(200);
+      });
+
+      it('thiếu `branchId` -> 400', async () => {
+        await remove(doomedId, 'kind=goods-receipt').expect(400);
+      });
+
+      it('khoá query lạ -> 400 (whitelist)', async () => {
+        await remove(
+          doomedId,
+          `kind=goods-receipt&branchId=${seed.branchId}&foo=1`,
+        ).expect(400);
+      });
+
+      it('401 khi không có token', async () => {
+        await request(app.getHttpServer())
+          .delete(
+            `/mobile/stock-documents/${doomedId}?kind=goods-receipt&branchId=${seed.branchId}`,
+          )
+          .expect(401);
+      });
+
+      it('xoá được -> 204, đọc lại -> 404, xoá lần hai -> 409', async () => {
+        // Ba vế trong MỘT test vì chúng là một chuỗi trạng thái: tách ra thì
+        // vế sau phụ thuộc thứ tự chạy của vế trước mà không nói ra điều đó.
+        await remove(
+          doomedId,
+          `kind=goods-receipt&branchId=${seed.branchId}`,
+        ).expect(204);
+
+        await request(app.getHttpServer())
+          .get(`/mobile/stock-documents/${doomedId}?kind=goods-receipt`)
+          .set('Authorization', authHeader(seed.accessToken))
+          .expect(404);
+
+        await remove(
+          doomedId,
+          `kind=goods-receipt&branchId=${seed.branchId}`,
+        ).expect(409);
+      });
+    });
+
+    /**
+     * Đường `PATCH` TRƯỚC ĐÂY không có ca e2e nào — mọi phủ sóng nằm ở unit
+     * spec với repository giả. Ba ca dưới đây là ca đầu tiên chạm CSDL thật, và
+     * chúng khoá đúng thứ unit spec không thấy: bin người dùng chọn có ĐI VỀ
+     * được không.
+     */
+    describe('PATCH /mobile/stock-documents/:id — bin và đơn vị theo từng dòng', () => {
+      const editId = 'ba000000-0000-4000-8000-0000000000e1';
+
+      beforeAll(async () => {
+        const ds = app.get(DataSource);
+
+        const [{ id: locationId }] = await ds.query(
+          `SELECT id FROM locations WHERE organization_id = $1::uuid LIMIT 1`,
+          [seed.organizationId],
+        );
+
+        await ds.query(
+          `INSERT INTO goods_receipts
+             (id, organization_id, branch_id, document_number, status, purpose,
+              received_at, location_id, attachment_ids, references,
+              created_by, created_at, updated_at)
+           VALUES ($1::uuid, $2::uuid, $3::uuid, 'NKM-EDIT', 'POSTED',
+                   'PURCHASE', NOW(), $4::uuid, '[]'::jsonb, '[]'::jsonb,
+                   $5::uuid, NOW(), NOW())
+           ON CONFLICT (id) DO NOTHING`,
+          [editId, seed.organizationId, seed.branchId, locationId, seed.userId],
+        );
+
+        await ds.query(
+          `INSERT INTO goods_receipt_lines
+             (id, organization_id, branch_id, goods_receipt_id, item_id, location_id,
+              uom_code, quantity, unit_price, line_total, created_by, created_at, updated_at)
+           SELECT uuid_generate_v4(), $1::uuid, $2::uuid, $3::uuid, i.id, $4::uuid,
+                  'Cai', 1, 1000, 1000, $5::uuid, NOW(), NOW()
+           FROM items i WHERE i.organization_id = $1::uuid LIMIT 1`,
+          [seed.organizationId, seed.branchId, editId, locationId, seed.userId],
+        );
+      });
+
+      const detailOf = () =>
+        request(app.getHttpServer())
+          .get(`/mobile/stock-documents/${editId}?kind=goods-receipt`)
+          .set('Authorization', authHeader(seed.accessToken));
+
+      const patch = (lines: unknown[]) =>
+        request(app.getHttpServer())
+          .patch(
+            `/mobile/stock-documents/${editId}?kind=goods-receipt&branchId=${seed.branchId}`,
+          )
+          .set('Authorization', authHeader(seed.accessToken))
+          .send({ documentDate: new Date().toISOString(), lines });
+
+      it('dòng đọc về mang `locationId` và `storageId` — thứ màn Sửa gửi lại', async () => {
+        const res = await detailOf().expect(200);
+        const line = res.body.lines[0];
+
+        // Vế này canh `relations: { lines: { location: { storage: true } } }`.
+        // Thiếu nó thì cả bốn trường về null, app gửi null, và server giải lại
+        // bin ở MỖI lượt sửa — hàng đổi vị trí mà không ai bấm gì.
+        expect(line.locationId).toEqual(expect.any(String));
+        expect(line.storageId).toEqual(expect.any(String));
+      });
+
+      it('bin người dùng chọn được GIỮ nguyên sau khi lưu', async () => {
+        const before = await detailOf().expect(200);
+        const line = before.body.lines[0];
+
+        const locations = await request(app.getHttpServer())
+          .get(`/mobile/inventory/locations?storageId=${line.storageId}`)
+          .set('Authorization', authHeader(seed.accessToken))
+          .expect(200);
+
+        const target =
+          locations.body.find((l: { id: string }) => l.id !== line.locationId) ??
+          locations.body[0];
+
+        await patch([
+          {
+            itemId: line.itemId,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+            locationId: target.id,
+            uomCode: 'Thùng',
+          },
+        ]).expect(200);
+
+        const after = await detailOf().expect(200);
+        expect(after.body.lines[0].locationId).toBe(target.id);
+        expect(after.body.lines[0].unit).toBe('Thùng');
+      });
+
+      it('bin của cửa hàng KHÁC -> 400', async () => {
+        const before = await detailOf().expect(200);
+        const line = before.body.lines[0];
+
+        await patch([
+          {
+            itemId: line.itemId,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+            locationId: '00000000-0000-4000-8000-0000000000ff',
+          },
+        ]).expect(400);
+      });
+    });
+  });
+
+  describe('GET /mobile/inventory/storages + /locations', () => {
+    it('kho: mảng phẳng, đúng hai trường', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/mobile/inventory/storages?branchId=${seed.branchId}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeGreaterThan(0);
+      expect(Object.keys(res.body[0]).sort()).toEqual(['id', 'name']);
+    });
+
+    it('vị trí: đúng bốn trường, và bin "Chưa xếp" đứng ĐẦU', async () => {
+      const storages = await request(app.getHttpServer())
+        .get(`/mobile/inventory/storages?branchId=${seed.branchId}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .get(`/mobile/inventory/locations?storageId=${storages.body[0].id}`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      expect(res.body.length).toBeGreaterThan(0);
+      expect(Object.keys(res.body[0]).sort()).toEqual([
+        'code',
+        'id',
+        'isUnassigned',
+        'name',
+      ]);
+
+      const unassigned = res.body.findIndex(
+        (l: { isUnassigned: boolean }) => l.isUnassigned,
+      );
+      if (unassigned >= 0) expect(unassigned).toBe(0);
+    });
+
+    it('kho của tổ chức khác -> mảng RỖNG, không 403', async () => {
+      // 403 ở đây là dựng một máy dò sự tồn tại của id xuyên tổ chức.
+      const res = await request(app.getHttpServer())
+        .get('/mobile/inventory/locations?storageId=00000000-0000-4000-8000-0000000000ff')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(200);
+
+      expect(res.body).toEqual([]);
+    });
+
+    it('thiếu tham số bắt buộc -> 400; khoá lạ -> 400', async () => {
+      await request(app.getHttpServer())
+        .get('/mobile/inventory/locations')
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .get(`/mobile/inventory/storages?branchId=${seed.branchId}&foo=1`)
+        .set('Authorization', authHeader(seed.accessToken))
+        .expect(400);
     });
   });
 

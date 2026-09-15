@@ -113,6 +113,13 @@ function receiptDetail(
         quantity: '2.000',
         unitPrice: '100.00',
         lineTotal: '150.00',
+        locationId: 'loc-1',
+        location: {
+          id: 'loc-1',
+          name: 'Kệ A1',
+          storageId: 'st-1',
+          storage: { id: 'st-1', name: 'Kho chính' },
+        },
         item: {
           id: 'i-1',
           code: 'JUNO-38',
@@ -148,6 +155,13 @@ function issueDetail(
         quantity: '0.500',
         unitPrice: '400000.00',
         lineTotal: '200000.00',
+        locationId: 'loc-2',
+        location: {
+          id: 'loc-2',
+          name: 'Chưa xếp',
+          storageId: 'st-2',
+          storage: { id: 'st-2', name: 'Kho Cà Mau' },
+        },
         item: { id: 'i-1', code: 'GAO-ST25', name: 'Gạo ST25', unit: 'Kg' },
       },
     ],
@@ -606,7 +620,7 @@ describe('MobileStockDocumentService', () => {
       );
     });
 
-    it('phiếu nhập: đúng 18 trường, dòng hàng đúng 7 — không rò gì thêm', async () => {
+    it('phiếu nhập: đúng 18 trường, dòng hàng đúng 11 — không rò gì thêm', async () => {
       const result = await detail(MobileStockDocumentKind.GOODS_RECEIPT);
 
       // Bốn trường cuối là của màn SỬA phiếu ĐIỀU CHUYỂN. Danh sách này là một
@@ -635,9 +649,13 @@ describe('MobileStockDocumentService', () => {
       expect(Object.keys(result.lines[0]).sort()).toEqual([
         'itemId',
         'lineTotal',
+        'locationId',
+        'locationName',
         'name',
         'quantity',
         'sku',
+        'storageId',
+        'storageName',
         'unit',
         'unitPrice',
       ]);
@@ -648,6 +666,103 @@ describe('MobileStockDocumentService', () => {
       expect(serialized).not.toContain('maxDebt');
       expect(serialized).not.toContain('bankAccountNumber');
       expect(serialized).not.toContain('purchasePrice');
+      // Quan hệ `location.storage` vừa được nạp — nó cũng phải bị mapper chặn.
+      expect(serialized).not.toContain('isMainStorage');
+      expect(serialized).not.toContain('isDefaultReceiving');
+    });
+
+    it('nạp quan hệ location.storage cho CẢ hai họ chứng từ', async () => {
+      // Không có dòng này thì `loadEagerRelations: false` khiến `location` về
+      // `undefined`, mọi `locationId` thành null, app gửi null, và server giải
+      // lại bin ở MỖI lượt sửa — tức hàng lặng lẽ đổi vị trí mà không ai bấm gì.
+      await detail(MobileStockDocumentKind.GOODS_RECEIPT);
+      expect(findReceipt.mock.calls[0][0].relations).toEqual(
+        expect.objectContaining({
+          lines: expect.objectContaining({ location: { storage: true } }),
+        }),
+      );
+
+      findIssue.mockResolvedValue(issueDetail());
+      await detail(MobileStockDocumentKind.STOCK_OUT);
+      expect(findIssue.mock.calls[0][0].relations).toEqual(
+        expect.objectContaining({
+          lines: expect.objectContaining({ location: { storage: true } }),
+        }),
+      );
+    });
+
+    it('dòng hàng mang kho và vị trí — thứ màn SỬA hiện sẵn và gửi lại', async () => {
+      const receipt = await detail(MobileStockDocumentKind.GOODS_RECEIPT);
+      expect(receipt.lines[0]).toEqual(
+        expect.objectContaining({
+          locationId: 'loc-1',
+          locationName: 'Kệ A1',
+          storageId: 'st-1',
+          storageName: 'Kho chính',
+        }),
+      );
+
+      findIssue.mockResolvedValue(issueDetail());
+      const issue = await detail(MobileStockDocumentKind.STOCK_OUT);
+      expect(issue.lines[0]).toEqual(
+        expect.objectContaining({
+          locationId: 'loc-2',
+          storageName: 'Kho Cà Mau',
+        }),
+      );
+    });
+
+    it('ưu tiên CỘT locationId, không phải quan hệ location.id', async () => {
+      // Cột luôn có mặt khi đã `select`; quan hệ thì im lặng thành `undefined`
+      // nếu ai đó gỡ `location` khỏi `relations`. Đọc nhầm thứ tự là mở lại
+      // đúng đường hỏng mà test phía trên đang canh.
+      findReceipt.mockResolvedValue(
+        receiptDetail({
+          lines: [
+            {
+              id: 'l-1',
+              uomCode: 'Đôi',
+              quantity: '1.000',
+              unitPrice: '100.00',
+              lineTotal: '100.00',
+              locationId: 'loc-9',
+              location: { id: 'loc-1', name: 'Kệ A1' },
+              item: { id: 'i-1', code: 'X', name: 'X', unit: 'Cái' },
+            },
+          ],
+        } as unknown as Partial<GoodsReceiptEntity>),
+      );
+
+      const result = await detail(MobileStockDocumentKind.GOODS_RECEIPT);
+      expect(result.lines[0].locationId).toBe('loc-9');
+    });
+
+    it('dòng hàng KHÔNG có location: bốn trường về null, không ném', async () => {
+      // Bin đã bị xoá, hoặc dữ liệu đời trước. Mapper phải chịu được.
+      findReceipt.mockResolvedValue(
+        receiptDetail({
+          lines: [
+            {
+              id: 'l-1',
+              uomCode: 'Đôi',
+              quantity: '1.000',
+              unitPrice: '100.00',
+              lineTotal: '100.00',
+              item: { id: 'i-1', code: 'X', name: 'X', unit: 'Cái' },
+            },
+          ],
+        } as unknown as Partial<GoodsReceiptEntity>),
+      );
+
+      const result = await detail(MobileStockDocumentKind.GOODS_RECEIPT);
+      expect(result.lines[0]).toEqual(
+        expect.objectContaining({
+          locationId: null,
+          locationName: null,
+          storageId: null,
+          storageName: null,
+        }),
+      );
     });
 
     it('mọi dòng hàng mang itemId — thứ màn SỬA gửi lại', async () => {

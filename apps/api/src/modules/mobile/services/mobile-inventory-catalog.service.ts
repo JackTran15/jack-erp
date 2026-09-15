@@ -12,8 +12,11 @@ import {
 } from '../dto/mobile-catalog-write.dto';
 import {
   MobileInventoryCategoryResponseDto,
+  MobileInventoryLocationResponseDto,
+  MobileInventoryStorageResponseDto,
   MobileInventoryUnitResponseDto,
 } from '../dto/mobile-inventory-catalog.response.dto';
+import { resolveBranchIds } from './mobile-inventory-scope.util';
 
 /**
  * Hai danh mục mà màn LỌC tồn kho của app cần để người dùng chọn: nhóm hàng
@@ -98,6 +101,67 @@ export class MobileInventoryCatalogService {
        GROUP BY code
        ORDER BY code ASC`,
       [actor.organizationId],
+    );
+  }
+
+  /**
+   * Kho của MỘT cửa hàng, cho màn chọn "Kho" khi sửa dòng hàng.
+   *
+   * Phạm vi đi qua `branches` trong JWT chứ không qua `X-Branch-Id`, như mọi
+   * đường `/mobile/inventory/*`. Cửa hàng ngoài tầm -> mảng RỖNG chứ không 403:
+   * phân biệt được "cửa hàng của tổ chức khác" với "cửa hàng chưa có kho nào"
+   * đòi thêm một truy vấn, và chính câu trả lời đó là một máy dò sự tồn tại của
+   * id xuyên tổ chức.
+   */
+  async listStorages(
+    branchId: string,
+    actor: ActorContext,
+  ): Promise<MobileInventoryStorageResponseDto[]> {
+    return this.dataSource.query<MobileInventoryStorageResponseDto[]>(
+      `SELECT
+         s.id::text AS id,
+         s.name
+       FROM storages s
+       WHERE s.organization_id = $1
+         AND s.branch_id = $2::uuid
+         AND s.branch_id = ANY($3::uuid[])
+         AND s.is_active = true
+       ORDER BY s.is_main_storage DESC, s.name ASC, s.id ASC`,
+      [actor.organizationId, branchId, resolveBranchIds(actor)],
+    );
+  }
+
+  /**
+   * Bin (vị trí lưu kho) của MỘT kho, cho màn chọn "Vị trí".
+   *
+   * KHÔNG uỷ quyền cho `InventoryLocationService.listLocations`: nó phân trang,
+   * trả trọn `LocationEntity` kèm `storage` lồng, và còn chạy thêm một truy vấn
+   * `stock_balances` chỉ để tô cột "Đã xếp / Chưa xếp" của bảng bên web. Màn
+   * chọn của app cần bốn cột.
+   *
+   * `is_unassigned DESC` đưa bin ảo "Chưa xếp" lên đầu — quy tắc dự phòng của
+   * trang web trở thành VỊ TRÍ TRONG DANH SÁCH, nên app không cần luật riêng.
+   * `id ASC` là tiêu chí phá hoà, giữ thứ tự ổn định giữa hai lượt gọi.
+   */
+  async listLocations(
+    storageId: string,
+    actor: ActorContext,
+  ): Promise<MobileInventoryLocationResponseDto[]> {
+    return this.dataSource.query<MobileInventoryLocationResponseDto[]>(
+      `SELECT
+         l.id::text           AS id,
+         COALESCE(l.code, '') AS code,
+         l.name,
+         l.is_unassigned      AS "isUnassigned"
+       FROM locations l
+       JOIN storages s ON s.id = l.storage_id
+       WHERE l.organization_id = $1
+         AND l.storage_id = $2::uuid
+         AND s.branch_id = ANY($3::uuid[])
+         AND l.is_active = true
+         AND s.is_active = true
+       ORDER BY l.is_unassigned DESC, l.code ASC, l.name ASC, l.id ASC`,
+      [actor.organizationId, storageId, resolveBranchIds(actor)],
     );
   }
 

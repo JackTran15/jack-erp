@@ -319,7 +319,7 @@ export class MobileStockDocumentService {
       // phiếu VÀ `location` của TỪNG dòng hàng — trọn `LocationEntity` mỗi cái,
       // cho một màn không vẽ vị trí kho.
       loadEagerRelations: false,
-      relations: { provider: true, lines: { item: true } },
+      relations: { provider: true, lines: { item: true, location: { storage: true } } },
       // `select` là phép TỐI ƯU, không phải hàng rào. Hàng rào là hai mapper ở
       // cuối file: chúng chép TƯỜNG MINH từng trường, nên kể cả khi TypeORM bỏ
       // qua `select` này thì `purchasePrice` của hàng hoá hay `maxDebt` của nhà
@@ -351,7 +351,19 @@ export class MobileStockDocumentService {
           unitPrice: true,
           lineTotal: true,
           createdAt: true,
+          // Cột vô hướng PHẢI có mặt cạnh quan hệ: hai mapper ở cuối file đọc
+          // nó TRƯỚC `location?.id`, vì quan hệ im lặng thành `undefined` nếu
+          // ai đó gỡ `location` khỏi `relations` — và một `locationId` null ở
+          // đó nghĩa là lượt sửa sau server tự giải lại vị trí, tức hàng đổi
+          // bin mà không ai bấm gì.
+          locationId: true,
           item: { id: true, code: true, name: true, unit: true },
+          location: {
+            id: true,
+            name: true,
+            storageId: true,
+            storage: { id: true, name: true },
+          },
         },
       },
       // Dòng hàng phải ra theo thứ tự ổn định, nếu không mỗi lần kéo-để-làm-mới
@@ -394,7 +406,11 @@ export class MobileStockDocumentService {
     const row = await this.issueRepo.findOne({
       where: scopeOf(id, actor),
       loadEagerRelations: false,
-      relations: { provider: true, targetBranch: true, lines: { item: true } },
+      relations: {
+        provider: true,
+        targetBranch: true,
+        lines: { item: true, location: { storage: true } },
+      },
       select: {
         id: true,
         documentNumber: true,
@@ -418,7 +434,15 @@ export class MobileStockDocumentService {
           quantity: true,
           unitPrice: true,
           lineTotal: true,
+          // Xem ghi chú cùng tên ở `findReceipt`.
+          locationId: true,
           item: { id: true, code: true, name: true, unit: true },
+          location: {
+            id: true,
+            name: true,
+            storageId: true,
+            storage: { id: true, name: true },
+          },
         },
       },
       // `id ASC` chứ không `createdAt`: `GoodsIssueLineEntity` KHÔNG có cột
@@ -731,6 +755,7 @@ function toReceiptLine(line: GoodsReceiptLineEntity): MobileStockDocumentLineDto
     quantity: toNumber(line.quantity),
     unitPrice: toNumber(line.unitPrice),
     lineTotal: toNumber(line.lineTotal),
+    ...locationOf(line),
   };
 }
 
@@ -750,6 +775,33 @@ function toIssueLine(line: GoodsIssueLineEntity): MobileStockDocumentLineDto {
     quantity: toNumber(line.quantity),
     unitPrice: toNumber(line.unitPrice),
     lineTotal: toNumber(line.lineTotal),
+    ...locationOf(line),
+  };
+}
+
+/**
+ * Bốn trường kho/vị trí, chung cho cả hai họ dòng hàng.
+ *
+ * Đọc CỘT `locationId` trước, quan hệ `location?.id` sau: cột luôn có mặt khi
+ * đã `select`, còn quan hệ thì im lặng thành `undefined` nếu ai đó gỡ
+ * `location` khỏi `relations` — và hệ quả của một `locationId` null không phải
+ * là một ô trống trên màn hình mà là HÀNG ĐỔI BIN ở lượt sửa kế tiếp.
+ *
+ * Bốn trường đều nullable: dòng cũ có bin đã bị xoá, và dòng phiếu xuất từ dữ
+ * liệu đời trước, đều không được làm mapper ném.
+ */
+function locationOf(line: {
+  locationId?: string | null;
+  location?: { id?: string; name?: string; storageId?: string; storage?: { id?: string; name?: string } } | null;
+}): Pick<
+  MobileStockDocumentLineDto,
+  'locationId' | 'locationName' | 'storageId' | 'storageName'
+> {
+  return {
+    locationId: line.locationId ?? line.location?.id ?? null,
+    locationName: line.location?.name ?? null,
+    storageId: line.location?.storageId ?? line.location?.storage?.id ?? null,
+    storageName: line.location?.storage?.name ?? null,
   };
 }
 

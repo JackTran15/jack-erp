@@ -156,5 +156,16 @@ function toMobileLine(
     quantity: Number(line.quantity ?? 0),
     unitPrice: Number(line.unitPrice ?? 0),
     lineTotal: Number(line.lineTotal ?? 0),
+    // Bốn trường kho/vị trí đều `null`, CÓ CHỦ Ý — không phải chưa map xong.
+    //
+    // Dòng ở đây là dòng của LỆNH điều chuyển, tức thứ chi nhánh kia đã XUẤT;
+    // `storageName`/`locationName` mà lệnh mang là kho NGUỒN. Chép chúng sang
+    // đây là nói với màn Sửa rằng hàng đang nằm ở một bin của cửa hàng khác,
+    // và app sẽ gửi lại đúng thứ đó khi lưu. Bin NHẬN do server giải lúc nhập,
+    // từ `branchId` của chính người nhập.
+    locationId: null,
+    locationName: null,
+    storageId: null,
+    storageName: null,
   };
 }
