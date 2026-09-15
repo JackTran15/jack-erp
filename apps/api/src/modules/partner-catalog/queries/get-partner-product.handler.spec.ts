@@ -57,7 +57,7 @@ describe('GetPartnerProductHandler', () => {
 
   const run = async (
     rows: object[],
-    productId = 'p1',
+    productCode = 'MY88610',
     media: Map<string, PublicMedia[]> = new Map(),
   ) => {
     query = jest.fn().mockResolvedValue(rows);
@@ -126,7 +126,7 @@ describe('GetPartnerProductHandler', () => {
   // AC-06 — URL ordering itself is covered by `buildDetail`'s own tests
   // (dto/partner-product-detail.dto.spec.ts); this is just the handler's wiring.
   it('asks MediaQueryService for this product id, scoped to the actor org', async () => {
-    await run(ROWS, 'p1');
+    await run(ROWS);
     expect(resolvePublicUrls).toHaveBeenCalledWith(['p1'], 'org-1');
   });
 
@@ -140,7 +140,7 @@ describe('GetPartnerProductHandler', () => {
         ],
       ],
     ]);
-    const res = await run(ROWS, 'p1', media);
+    const res = await run(ROWS, 'MY88610', media);
     expect(res.images).toEqual([
       'https://cdn.example.com/erp-media-public/org/o1/product/p1/a.jpg',
       'https://cdn.example.com/erp-media-public/org/o1/product/p1/b.jpg',
@@ -155,7 +155,7 @@ describe('GetPartnerProductHandler', () => {
     const media = new Map<string, PublicMedia[]>([
       ['p1', [{ id: 'm1', url: 'https://cdn.example.com/erp-media-public/org/o1/product/p1/a.jpg', fileName: 'a.jpg' }]],
     ]);
-    const res = await run(ROWS, 'P1', media);
+    const res = await run(ROWS, 'my88610', media);
     expect(resolvePublicUrls).toHaveBeenCalledWith(['p1'], 'org-1');
     expect(res.images).toEqual([
       'https://cdn.example.com/erp-media-public/org/o1/product/p1/a.jpg',

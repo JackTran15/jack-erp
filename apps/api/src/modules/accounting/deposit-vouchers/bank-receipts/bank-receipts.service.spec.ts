@@ -79,6 +79,7 @@ describe('BankReceiptsService', () => {
   let partnerResolver: { resolve: jest.Mock };
   let accountResolver: { resolveContraAccount: jest.Mock };
   let periodGuard: { assertNotLocked: jest.Mock };
+  let staffResolver: { resolveMany: jest.Mock };
   let mediaLink: { syncOwner: jest.Mock };
   let mediaQuery: { listForOwners: jest.Mock };
   let mediaReaders: { register: jest.Mock };
@@ -107,6 +108,14 @@ describe('BankReceiptsService', () => {
       resolveContraAccount: jest.fn().mockResolvedValue('contra-resolved'),
     };
     periodGuard = { assertNotLocked: jest.fn().mockResolvedValue(undefined) };
+    // Read paths resolve the cashier name via `resolveMany` inside `attachStaff`
+    // (called once by `getById`); `getPrintPayload` reads the resulting
+    // `collectedByName` straight off the entity rather than resolving again
+    // (T-01-07). Most specs only assert voucher fields, so an empty resolution
+    // is enough.
+    staffResolver = {
+      resolveMany: jest.fn().mockResolvedValue(new Map()),
+    };
     // Default: no attachments sent, nothing attached — individual tests override.
     mediaLink = { syncOwner: jest.fn().mockResolvedValue([]) };
     mediaQuery = { listForOwners: jest.fn().mockResolvedValue(new Map()) };
@@ -793,6 +802,9 @@ describe('BankReceiptsService', () => {
       // `getPrintPayload`/`getById` never open a transaction — they read only
       // through `this.dataSource.manager`, so this manager must back that slot.
       await setup(manager, manager);
+      staffResolver.resolveMany.mockResolvedValue(
+        new Map([['staff-1', { code: null, name: 'Nguyễn Văn A' }]]),
+      );
 
       const payload = await service.getPrintPayload('r-1', actor);
 
@@ -824,7 +836,7 @@ describe('BankReceiptsService', () => {
         branch: null,
         categories: [],
       });
-      await setup(manager);
+      await setup(manager, manager);
       staffResolver.resolveMany.mockResolvedValue(
         new Map([['staff-1', { code: null, name: 'Nguyễn Văn A' }]]),
       );

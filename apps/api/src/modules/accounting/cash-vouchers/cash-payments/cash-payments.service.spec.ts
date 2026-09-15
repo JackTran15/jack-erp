@@ -104,6 +104,9 @@ describe('CashPaymentsService', () => {
     accountResolver = {
       resolveContraAccount: jest.fn().mockResolvedValue('contra-resolved'),
     };
+    staffResolver = {
+      resolveOne: jest.fn().mockResolvedValue(null),
+    };
     dataSource = { transaction: jest.fn((cb) => cb(manager)), manager: dataSourceManager };
     mediaLink = { syncOwner: jest.fn().mockResolvedValue([]) };
     mediaQuery = { listForOwners: jest.fn().mockResolvedValue(new Map()) };

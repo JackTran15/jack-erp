@@ -201,7 +201,7 @@ storefront listing works.
 | `categoryId` / `categoryName` | Derived from the variants; `products` has no category column |
 | `colors` / `sizes` | With no variant-level filter (`colors`, `sizes`, `priceFrom`, `priceTo`, `inStock`), values across all active variants. Under any such filter, narrowed to only the matching variants — see §5 |
 | `inStock` | Boolean only. With no variant-level filter, true when any active variant has stock in any branch the key may see. Under a variant-level filter, computed over the matching variants only, and equal to the requested `inStock` value when that filter was set. **No quantity is ever returned** |
-| `images` | **Always `[]`** — see §5 |
+| `images` | Public, absolute photo URLs, in display order. `[]` when the product has no photos — see §5 |
 | `total` | Total matching products, not the size of this page. Drives "Hiển thị 1–20 của 107 kết quả" |
 
 `sort` orders by product creation date or by `priceMin`/`priceMax`, and always breaks ties

@@ -410,7 +410,10 @@ export class SearchPartnerProductsHandler
 
     const productIds = rows.map((r) => r.id);
     const [facets, images] = await Promise.all([
-      this.loadFacets(actor.organizationId, productIds),
+      this.loadFacets(
+        actor.organizationId,
+        rows.flatMap((r) => r.matchedItemIds ?? []),
+      ),
       this.mediaQuery.resolvePublicUrls(productIds, actor.organizationId),
     ]);
 

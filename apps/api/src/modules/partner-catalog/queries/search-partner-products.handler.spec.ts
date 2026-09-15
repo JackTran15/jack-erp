@@ -712,6 +712,10 @@ describe('SearchPartnerProductsHandler — price, colour and size', () => {
           provide: getRepositoryToken(ItemCategoryEntity),
           useValue: { find: jest.fn().mockResolvedValue([]) },
         },
+        {
+          provide: MediaQueryService,
+          useValue: { resolvePublicUrls: jest.fn().mockResolvedValue(new Map()) },
+        },
       ],
     }).compile();
     const res = await moduleRef
