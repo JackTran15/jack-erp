@@ -317,32 +317,23 @@ describe('InventoryLocationStockService', () => {
       );
     });
 
-    it('moves positive stock to Chưa xếp before removing the shelf row', async () => {
+    it('rejects positive stock without moving or deleting anything', async () => {
       setup({});
       stockBalanceRepo.findOne.mockResolvedValue({
         id: 'balance-1',
         quantity: '8',
       });
 
-      await service.removeItemFromLocation('loc-1', 'item-1', actor);
+      await expect(
+        service.removeItemFromLocation('loc-1', 'item-1', actor),
+      ).rejects.toThrow(ForbiddenException);
 
-      expect(locationService.ensureUnassignedLocation).toHaveBeenCalledWith(
-        'stor-1',
-        actor,
-      );
-      expect(stockTransferService.postIntraWarehouseMoves).toHaveBeenCalledWith(
-        [
-          {
-            itemId: 'item-1',
-            quantity: 8,
-            sourceLocationId: 'loc-1',
-            destinationLocationId: 'loc-unassigned',
-          },
-        ],
-        actor,
-      );
-      expect(stockBalanceRepo.delete).toHaveBeenCalledWith('balance-1');
-      expect(pslService.clearLocation).toHaveBeenCalled();
+      expect(locationService.ensureUnassignedLocation).not.toHaveBeenCalled();
+      expect(
+        stockTransferService.postIntraWarehouseMoves,
+      ).not.toHaveBeenCalled();
+      expect(stockBalanceRepo.delete).not.toHaveBeenCalled();
+      expect(pslService.clearLocation).not.toHaveBeenCalled();
     });
 
     it('rejects negative stock without deleting anything', async () => {

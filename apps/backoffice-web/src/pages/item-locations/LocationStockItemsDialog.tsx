@@ -292,17 +292,25 @@ export function LocationStockItemsDialog({
         key: "_actions",
         label: "",
         width: 56,
-        render: (r) => (
-          <button
-            type="button"
-            aria-label={`Bỏ ${r.code} khỏi vị trí`}
-            title="Đánh dấu bỏ khỏi vị trí"
-            className="inline-flex h-8 w-8 items-center justify-center rounded text-destructive hover:bg-destructive/10"
-            onClick={() => markForDelete(r.itemId)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        ),
+        render: (r) => {
+          const hasStock = Number(r.quantity) > 0;
+          return (
+            <button
+              type="button"
+              aria-label={`Bỏ ${r.code} khỏi vị trí`}
+              title={
+                hasStock
+                  ? "Không thể bỏ hàng hóa đang còn tồn kho. Hãy chuyển hết tồn sang vị trí khác trước."
+                  : "Đánh dấu bỏ khỏi vị trí"
+              }
+              disabled={hasStock}
+              className="inline-flex h-8 w-8 items-center justify-center rounded text-destructive hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+              onClick={() => markForDelete(r.itemId)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          );
+        },
       },
     ],
     [markForDelete, meta?.location.code, meta?.location.name],

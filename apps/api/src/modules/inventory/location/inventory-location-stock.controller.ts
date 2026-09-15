@@ -234,7 +234,7 @@ export class InventoryLocationStockController {
   @RequireBranchScope()
   @ApiOperation({
     summary:
-      'Bỏ hàng hóa khỏi vị trí; tồn dương được chuyển về "Chưa xếp" cùng kho',
+      'Bỏ hàng hóa khỏi vị trí; từ chối nếu vị trí còn tồn kho (khác 0)',
   })
   async removeItemFromLocation(
     @Param('locationId', ParseUUIDPipe) locationId: string,

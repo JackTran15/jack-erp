@@ -1,0 +1,8 @@
+{"action": "passed", "at": "2026-09-15T09:22:22", "by": "Akenzy", "evidence": "architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete", "gate": "G0", "id": "1dadca2a0e5b", "ts": "2026-09-15T09:22:22.241584"}
+{"action": "passed", "at": "2026-09-15T09:23:14", "by": "Akenzy", "evidence": "2 assumptions, none blocking-and-pending; 3 acceptance criteria defined", "gate": "G1", "id": "63522b6b1074", "ts": "2026-09-15T09:23:14.597451"}
+{"action": "passed", "at": "2026-09-15T09:23:17", "by": "Akenzy", "evidence": "1 ADR(s) recorded", "gate": "G2", "id": "91d86b4c20c0", "ts": "2026-09-15T09:23:17.080635"}
+{"action": "passed", "at": "2026-09-15T09:24:12", "by": "Akenzy", "evidence": "graph valid - 1 UoW, 2 tickets, no cycles", "gate": "G3", "id": "7615170b99ea", "ts": "2026-09-15T09:24:12.727989"}
+{"action": "ticket in_progress", "at": "2026-09-15T09:24:17", "by": "Akenzy", "gate": "G4", "id": "ae7b6181e4d3", "ticket": "T-01-01", "ts": "2026-09-15T09:24:17.917768"}
+{"action": "ticket in_progress", "at": "2026-09-15T09:24:17", "by": "Akenzy", "gate": "G4", "id": "b5c9fcfdf39b", "ticket": "T-01-02", "ts": "2026-09-15T09:24:17.987813"}
+{"action": "ticket review", "at": "2026-09-15T09:25:53", "by": "Akenzy", "gate": "G4", "id": "61e2426a80a2", "ticket": "T-01-01", "ts": "2026-09-15T09:25:53.593709"}
+{"action": "ticket review", "at": "2026-09-15T09:25:53", "by": "Akenzy", "gate": "G4", "id": "138c7f4b52c0", "ticket": "T-01-02", "ts": "2026-09-15T09:25:53.661982"}
