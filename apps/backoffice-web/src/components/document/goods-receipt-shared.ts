@@ -33,6 +33,13 @@ export interface GoodsReceiptLine {
   } | null;
 }
 
+export interface GoodsReceiptAttachment {
+  id: string;
+  fileName: string;
+  contentType: string;
+  size: number;
+}
+
 export interface GoodsReceipt {
   id: string;
   documentNumber?: string | null;
@@ -71,6 +78,7 @@ export interface GoodsReceipt {
     storageId?: string;
   } | null;
   attachmentIds?: string[];
+  attachments?: GoodsReceiptAttachment[];
   /**
    * Optional since T-02-01: `GET /:id?includeLines=false` returns the header
    * alone, and the view dialog pages the lines separately. Every other caller

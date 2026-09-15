@@ -1,8 +1,11 @@
+import { randomUUID } from 'crypto';
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, DataSource, EntityManager, In, Not, Repository } from 'typeorm';
@@ -10,6 +13,10 @@ import { DocumentType, VoucherPrintPayload } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { DocumentNumberingService } from '../../../document-numbering/document-numbering.service';
 import { loadVoucherBranch } from '../../../inventory/location/services/voucher-print-context.util';
+import { MediaLinkService } from '../../../media/media-link.service';
+import { MediaQueryService } from '../../../media/media-query.service';
+import { MediaOwnerReaderRegistry } from '../../../media/media-owner-reader.registry';
+import { MediaOwnerType } from '../../../media/media-object.entity';
 import { CashService } from '../../cash/cash.service';
 import { CashMovementType } from '../../cash/cash-movement.entity';
 import { CashAccountEntity } from '../../cash/cash-account.entity';
@@ -44,6 +51,12 @@ import { QueryCashPaymentDto, CashPaymentSource } from './dto/query-cash-payment
 import { SupplierDebtPaymentSagaService } from '../supplier-debt-payment/supplier-debt-payment-saga.service';
 
 export interface CashPaymentCreateAndPostArgs {
+  /**
+   * Pre-assigned by `create()` so media can be synced to it before any
+   * number is minted or journal posted (security review T-04-04). Omit to
+   * let TypeORM generate one, as every other caller of this shared path does.
+   */
+  id?: string;
   purpose: CashPaymentPurpose;
   cashAccountId: string;
   contraAccountId: string;
@@ -58,7 +71,6 @@ export interface CashPaymentCreateAndPostArgs {
   partnerAddress?: string;
   payeeName?: string;
   staffId?: string;
-  attachmentIds?: string[];
   reason?: string;
   description?: string;
   categoryId?: string;
@@ -110,8 +122,16 @@ export interface PaymentSourceLink {
   sourceDocumentNumber: string | null;
 }
 
+/** Attachment shape exposed on voucher detail — never the storage bucket/key. */
+export interface VoucherAttachment {
+  id: string;
+  fileName: string;
+  contentType: string;
+  size: number;
+}
+
 @Injectable()
-export class CashPaymentsService {
+export class CashPaymentsService implements OnModuleInit {
   private readonly logger = new Logger(CashPaymentsService.name);
 
   constructor(
@@ -127,7 +147,46 @@ export class CashPaymentsService {
     private readonly staffResolver: VoucherStaffResolver,
     private readonly supplierDebtPaymentSaga: SupplierDebtPaymentSagaService,
     private readonly voucherLinks: VoucherLinksService,
+    private readonly mediaLink: MediaLinkService,
+    private readonly mediaQuery: MediaQueryService,
+    private readonly mediaReaders: MediaOwnerReaderRegistry,
   ) {}
+
+  /**
+   * ADR-06: reuses `getById`, the exact function the detail endpoint calls,
+   * so a media download can never outreach voucher access.
+   */
+  onModuleInit(): void {
+    this.mediaReaders.register(MediaOwnerType.CASH_PAYMENT, (id, actor) =>
+      this.canReadForMedia(id, actor),
+    );
+  }
+
+  /**
+   * `getById` never checks branch itself — that is `BranchScopeGuard`'s job
+   * on the HTTP route (`@RequireBranchScope()` on the whole controller), and
+   * the reader is called outside that guard. Denying here first keeps a
+   * branchless actor from reading via a media link what the detail route
+   * itself would 403 on.
+   *
+   * NotFound/Forbidden from `getById` mean "this actor cannot see this
+   * voucher" (`false` for the reader); anything else is a real failure and
+   * must propagate rather than be swallowed into a misleading 404.
+   */
+  private async canReadForMedia(id: string, actor: ActorContext): Promise<boolean> {
+    if (!actor.branchId || !actor.branchIds?.includes(actor.branchId)) {
+      return false;
+    }
+    try {
+      await this.getById(id, actor);
+      return true;
+    } catch (err) {
+      if (err instanceof NotFoundException || err instanceof ForbiddenException) {
+        return false;
+      }
+      throw err;
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // CRUD (DRAFT lifecycle)
@@ -168,8 +227,24 @@ export class CashPaymentsService {
         dto.contraAccountId,
       );
 
-      const { voucherId } = await this.createAndPostInternalInTx(
+      // The id is minted here, before any document number or journal entry,
+      // so media can be synced — and can reject on a limit/ownership
+      // conflict — before `createAndPostInternalInTx` burns a PC number and
+      // posts the movement/journal (security review T-04-04): a routine
+      // 409 here must never leave a numbering gap or an event for an entry
+      // that never actually commits.
+      const voucherId = randomUUID();
+      const attachmentIds = await this.mediaLink.syncOwner(
+        MediaOwnerType.CASH_PAYMENT,
+        voucherId,
+        dto.attachmentIds ?? [],
+        actor,
+        manager,
+      );
+
+      const { voucherId: createdId } = await this.createAndPostInternalInTx(
         {
+          id: voucherId,
           purpose,
           cashAccountId: dto.cashAccountId,
           contraAccountId,
@@ -190,7 +265,6 @@ export class CashPaymentsService {
             : dto.address?.trim() ?? partner?.address ?? undefined,
           payeeName: dto.payeeName,
           staffId: dto.staffId,
-          attachmentIds: dto.attachmentIds ?? [],
           reason: dto.reason,
           lines: dto.lines.map((l) => ({
             description: l.description,
@@ -202,7 +276,9 @@ export class CashPaymentsService {
         manager,
       );
 
-      return this.getByIdInTx(manager, voucherId, actor.organizationId);
+      await manager.update(CashPaymentEntity, createdId, { attachmentIds });
+
+      return this.getByIdInTx(manager, createdId, actor.organizationId);
     });
   }
 
@@ -283,8 +359,22 @@ export class CashPaymentsService {
         staffId: dto.staffId ?? payment.staffId,
         cashAccountId: dto.cashAccountId ?? payment.cashAccountId,
         contraAccountId: dto.contraAccountId ?? payment.contraAccountId,
-        attachmentIds: dto.attachmentIds ?? payment.attachmentIds,
       });
+
+      // Only sent when the caller actually means to change it — `assertEditable`
+      // above already refused a non-manual/deleted/reversed voucher, so a
+      // REVERSED voucher never reaches `syncOwner` (AC-16). Omitting
+      // `attachmentIds` must leave the list untouched, not resync it to
+      // "currently attached" for no reason.
+      if (dto.attachmentIds !== undefined) {
+        payment.attachmentIds = await this.mediaLink.syncOwner(
+          MediaOwnerType.CASH_PAYMENT,
+          payment.id,
+          dto.attachmentIds,
+          actor,
+          manager,
+        );
+      }
 
       if (dto.lines) {
         await this.syncLines(manager, payment.id, actor, dto.lines);
@@ -733,6 +823,10 @@ export class CashPaymentsService {
           ];
 
     const voucher = manager.create(CashPaymentEntity, {
+      // Only `create()` passes this, to sync media before any number is
+      // minted (see `CashPaymentCreateAndPostArgs.id`); every other caller
+      // leaves it undefined and TypeORM generates one as before.
+      ...(args.id ? { id: args.id } : {}),
       organizationId: actor.organizationId,
       branchId: actor.branchId,
       createdBy: actor.userId,
@@ -746,7 +840,10 @@ export class CashPaymentsService {
       partnerAddressSnapshot: args.partnerAddress,
       payeeName: args.payeeName,
       staffId: args.staffId,
-      attachmentIds: args.attachmentIds ?? [],
+      // Never the caller's ids directly: `create()` already validated and
+      // attached them via `syncOwner` before this insert and writes the
+      // synced result on top right after. Every other caller has none.
+      attachmentIds: [],
       reason: args.reason,
       referenceType: args.referenceType,
       referenceId: args.referenceId,
@@ -820,6 +917,7 @@ export class CashPaymentsService {
     CashPaymentEntity & {
       sourceLink: PaymentSourceLink | null;
       linkedVoucher: LinkedVoucher | null;
+      attachments: VoucherAttachment[];
     }
   > {
     const payment = await this.getByIdInTx(
@@ -834,7 +932,20 @@ export class CashPaymentsService {
       payment.id,
       actor.organizationId,
     );
-    return Object.assign(payment, { sourceLink, linkedVoucher });
+    const attachmentsByOwner = await this.mediaQuery.listForOwners(
+      MediaOwnerType.CASH_PAYMENT,
+      [payment.id],
+      actor.organizationId,
+    );
+    const attachments: VoucherAttachment[] = (
+      attachmentsByOwner.get(payment.id) ?? []
+    ).map((m) => ({
+      id: m.id,
+      fileName: m.fileName,
+      contentType: m.contentType,
+      size: m.size,
+    }));
+    return Object.assign(payment, { sourceLink, linkedVoucher, attachments });
   }
 
   /**

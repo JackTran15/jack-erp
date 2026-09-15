@@ -95,6 +95,10 @@ import {
   type SelectedLine,
 } from "../../components/shared/product-select/ProductSelectDialog";
 import { BarcodeScanRow } from "../../components/shared/BarcodeScanRow";
+import {
+  MediaAttachmentList,
+  type MediaAttachment,
+} from "../../components/media/MediaAttachmentList";
 import { OverstockConfirmDialog } from "../../components/document/OverstockConfirmDialog";
 import {
   findOverstockRows,
@@ -172,6 +176,7 @@ interface Transfer {
     name: string;
   } | null;
   attachmentIds?: string[];
+  attachments?: MediaAttachment[];
   transferredAt?: string;
   /** Tổng tiền (∑ line_value), inlined by the v2 search handler. */
   totalAmount?: number;
@@ -975,6 +980,25 @@ function TransferFormDialog({
     "supplier" | "customer" | "employee" | ""
   >(initial?.counterpartyKind ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [attachmentIds, setAttachmentIds] = useState<string[]>(
+    initial?.attachments?.map((a) => a.id) ?? [],
+  );
+  const [attachmentItems, setAttachmentItems] = useState<MediaAttachment[]>(
+    initial?.attachments ?? [],
+  );
+  // Flips true once MediaAttachmentList reports its seeded state — guards the
+  // save payload from ever sending `attachmentIds: []` before the real list
+  // (from `initial.attachments`) is known.
+  const [attachmentsReady, setAttachmentsReady] = useState(false);
+  const [attachmentsUploading, setAttachmentsUploading] = useState(false);
+  const handleAttachmentsChange = useCallback(
+    (ids: string[], items: MediaAttachment[]) => {
+      setAttachmentIds(ids);
+      setAttachmentItems(items);
+      setAttachmentsReady(true);
+    },
+    [],
+  );
   const [docDate, setDocDate] = useState(
     (initial?.transferredAt ?? initial?.createdAt ?? new Date().toISOString()).slice(
       0,
@@ -1241,6 +1265,7 @@ function TransferFormDialog({
         counterpartyKind: counterpartyKind || undefined,
         counterpartyId: counterpartyId || undefined,
         transferredAt,
+        ...(attachmentsReady ? { attachmentIds } : {}),
         lines: persistableLines.map((l) => ({
           itemId: l.itemId,
           sourceStorageId: l.sourceStorageId,
@@ -1277,6 +1302,8 @@ function TransferFormDialog({
     counterpartyId,
     docDate,
     docTime,
+    attachmentIds,
+    attachmentsReady,
     initial,
     mode,
     onSaved,
@@ -1339,7 +1366,7 @@ function TransferFormDialog({
       id: "save",
       label: "Lưu",
       icon: Save,
-      disabled: isView || saving,
+      disabled: isView || saving || attachmentsUploading,
       onClick: () => void handleSave(),
     },
     { id: "sep2", type: "separator" },
@@ -1965,9 +1992,19 @@ function TransferFormDialog({
               />
             </FieldRow>
             <FieldRow label="Tài liệu đính kèm">
-              <Button type="button" variant="outline" size="sm" disabled>
-                Tải tệp …
-              </Button>
+              {mode === "create" || initial ? (
+                <MediaAttachmentList
+                  ownerType="STOCK_TRANSFER"
+                  value={attachmentItems}
+                  onChange={handleAttachmentsChange}
+                  onUploadingChange={setAttachmentsUploading}
+                  readOnly={isView}
+                />
+              ) : (
+                <span className="text-sm text-muted-foreground">
+                  Đang tải danh sách đính kèm…
+                </span>
+              )}
             </FieldRow>
           </>
         }

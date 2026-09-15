@@ -1,11 +1,13 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   forwardRef,
   Inject,
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleInit,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, In, Not, Repository } from "typeorm";
@@ -81,6 +83,10 @@ import {
   CashReceiptReferenceType,
   CashVoucherPartnerType,
 } from "../../accounting/cash-vouchers/enums";
+import { MediaLinkService } from "../../media/media-link.service";
+import { MediaQueryService } from "../../media/media-query.service";
+import { MediaOwnerReaderRegistry } from "../../media/media-owner-reader.registry";
+import { MediaOwnerType } from "../../media/media-object.entity";
 
 /** Both persisted lines and freshly built ones expose the fields the delta needs. */
 function toLineSnapshot(line: {
@@ -104,9 +110,20 @@ export interface GoodsReceiptQuery extends PaginationQuery {
   branchId?: string;
 }
 
+export interface GoodsReceiptAttachmentSummary {
+  id: string;
+  fileName: string;
+  contentType: string;
+  size: number;
+}
+
+/** `getById`'s response shape: the persisted entity plus its resolved attachments (03-logical-design.md > read flow). */
+export type GoodsReceiptDetail = GoodsReceiptEntity & {
+  attachments: GoodsReceiptAttachmentSummary[];
+};
 
 @Injectable()
-export class GoodsReceiptService {
+export class GoodsReceiptService implements OnModuleInit {
   private readonly logger = new Logger(GoodsReceiptService.name);
 
   constructor(
@@ -127,7 +144,45 @@ export class GoodsReceiptService {
     @Inject(forwardRef(() => TransferOrderService))
     private readonly transferOrderService: TransferOrderService,
     private readonly rbacService: RbacService,
+    private readonly mediaLink: MediaLinkService,
+    private readonly mediaQuery: MediaQueryService,
+    private readonly readerRegistry: MediaOwnerReaderRegistry,
   ) {}
+
+  /**
+   * ADR-06: the reader reuses `getById` verbatim, so file-download scope never
+   * drifts from voucher-view scope — with the same branch check the endpoint's
+   * own `BranchScopeGuard` enforces first. `findOrFail` drops its branch filter
+   * entirely when `actor.branchId` is falsy, which would otherwise turn "no
+   * active branch" into "every receipt in the org is visible"; checking
+   * `branchId` is one of the actor's own `branchIds` (mirroring
+   * `BranchScopeGuard.canActivate`) closes that before `getById` ever runs.
+   * `includeLines: false` keeps the query as cheap as the guard's own check.
+   *
+   * `getById` only ever rejects with `NotFoundException` today; a
+   * `ForbiddenException` is mapped the same way in case that changes. Any
+   * other error (a DB outage, for instance) must not be reported as "no
+   * access" — it is rethrown so the download endpoint surfaces it as a real
+   * failure instead of a misleading 404, and no voucher detail is folded into
+   * the error either way (this method never constructs one, only forwards
+   * `getById`'s own).
+   */
+  onModuleInit(): void {
+    this.readerRegistry.register(MediaOwnerType.GOODS_RECEIPT, async (id, actor) => {
+      if (!actor.branchId || !actor.branchIds?.includes(actor.branchId)) {
+        return false;
+      }
+      try {
+        await this.getById(id, actor, { includeLines: false });
+        return true;
+      } catch (err) {
+        if (err instanceof NotFoundException || err instanceof ForbiddenException) {
+          return false;
+        }
+        throw err;
+      }
+    });
+  }
 
   // ─── Create (DRAFT) ───────────────────────────────────────────────────────
 
@@ -173,7 +228,9 @@ export class GoodsReceiptService {
       locationId: dto.locationId,
       paymentMethod: dto.paymentMethod,
       cashAccountId: dto.cashAccountId,
-      attachmentIds: dto.attachmentIds ?? [],
+      // Corrected below, inside the same transaction as the insert, once
+      // syncOwner has validated whatever ids the request sent (ADR-03).
+      attachmentIds: [],
       references: dto.references ?? [],
       lines: dto.lines.map((l, index) =>
         this.makeLine(
@@ -186,7 +243,27 @@ export class GoodsReceiptService {
       ),
     });
 
-    const saved = await this.receiptRepo.save(receipt);
+    // Insert and, when the request touched attachments, validate + attach them
+    // in the same transaction (ADR-03): a `syncOwner` rejection (wrong org,
+    // wrong state, over the per-owner limit) rolls back the insert itself, so
+    // there is nothing left to compensate for afterwards.
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const savedReceipt = await manager.save(GoodsReceiptEntity, receipt);
+      if (dto.attachmentIds !== undefined) {
+        const ids = await this.mediaLink.syncOwner(
+          MediaOwnerType.GOODS_RECEIPT,
+          savedReceipt.id,
+          dto.attachmentIds,
+          actor,
+          manager,
+        );
+        await manager.update(GoodsReceiptEntity, savedReceipt.id, {
+          attachmentIds: ids,
+        });
+      }
+      return savedReceipt;
+    });
+
     this.logger.log(
       `Goods receipt ${saved.id} created as DRAFT ${documentNumber} by ${actor.userId}`,
     );
@@ -198,7 +275,8 @@ export class GoodsReceiptService {
   // The HTTP create endpoint must yield a POSTED phiếu (number assigned, stock
   // ledger written) so it shows up in reports immediately. We persist the DRAFT
   // then post it; if posting fails we hard-delete the just-created DRAFT (its
-  // lines cascade) so no orphan phiếu is left behind — atomic from the user's
+  // lines cascade) and detach any media it already picked up, so no orphan
+  // phiếu — or orphan ATTACHED media — is left behind. Atomic from the user's
   // point of view. The standalone post() endpoint is untouched.
 
   async createAndPost(
@@ -209,14 +287,27 @@ export class GoodsReceiptService {
     try {
       return await this.post(draft.id, actor);
     } catch (err) {
-      // Roll back the orphan DRAFT (lines FK has onDelete: CASCADE) so a failed
-      // post leaves nothing persisted.
-      await this.receiptRepo.delete({
-        id: draft.id,
-        organizationId: actor.organizationId,
+      // Roll back the orphan DRAFT (lines FK has onDelete: CASCADE) and detach
+      // whatever media create() just ATTACHED to it, in one transaction — a
+      // plain delete alone leaves those rows ATTACHED to a receipt that no
+      // longer exists: the cleanup job only collects DELETED rows, and a retry
+      // with the same ids would then get 409 MEDIA_STATE_CONFLICT forever.
+      // detachAll marks them DELETED (not re-attachable), so a retry after
+      // this needs the files re-uploaded.
+      await this.dataSource.transaction(async (manager) => {
+        await this.mediaLink.detachAll(
+          MediaOwnerType.GOODS_RECEIPT,
+          draft.id,
+          actor.organizationId,
+          manager,
+        );
+        await manager.delete(GoodsReceiptEntity, {
+          id: draft.id,
+          organizationId: actor.organizationId,
+        });
       });
       this.logger.warn(
-        `Goods receipt ${draft.id} create+post failed; orphan DRAFT removed: ${
+        `Goods receipt ${draft.id} create+post failed; orphan DRAFT and its attachments removed: ${
           err instanceof Error ? err.message : String(err)
         }`,
       );
@@ -308,8 +399,6 @@ export class GoodsReceiptService {
     if (dto.receivedAt !== undefined)
       receipt.receivedAt = new Date(dto.receivedAt);
     if (dto.locationId !== undefined) receipt.locationId = dto.locationId;
-    if (dto.attachmentIds !== undefined)
-      receipt.attachmentIds = dto.attachmentIds;
 
     // Re-validate combined state
     this.validateBusinessRules(
@@ -423,6 +512,22 @@ export class GoodsReceiptService {
         );
       }
 
+      // Runs only now that the receipt is confirmed editable — a CANCELLED or
+      // REVERSED receipt is rejected above and never reaches syncOwner (A-26).
+      // `undefined` means the request didn't touch attachments at all, so the
+      // stored list is left untouched below (TypeORM's update() skips
+      // undefined-valued columns) instead of calling syncOwner for nothing.
+      let nextAttachmentIds: string[] | undefined;
+      if (dto.attachmentIds !== undefined) {
+        nextAttachmentIds = await this.mediaLink.syncOwner(
+          MediaOwnerType.GOODS_RECEIPT,
+          receipt.id,
+          dto.attachmentIds,
+          actor,
+          manager,
+        );
+      }
+
       if (isCredit) {
         await this.applyCreditDelta(
           manager,
@@ -471,7 +576,7 @@ export class GoodsReceiptService {
         sourceBranchId: receipt.sourceBranchId,
         receivedAt: receipt.receivedAt,
         locationId: receipt.locationId,
-        attachmentIds: receipt.attachmentIds,
+        attachmentIds: nextAttachmentIds,
         ...(wasPosted ? { revision: nextRevision } : {}),
       });
 
@@ -1096,7 +1201,7 @@ export class GoodsReceiptService {
     id: string,
     actor: ActorContext,
     opts: { includeLines?: boolean } = {},
-  ): Promise<GoodsReceiptEntity> {
+  ): Promise<GoodsReceiptDetail> {
     const receipt = await this.findOrFail(
       id,
       actor.organizationId,
@@ -1113,7 +1218,23 @@ export class GoodsReceiptService {
       [receipt],
       actor.organizationId,
     );
-    return receipt;
+
+    const attachmentsByOwner = await this.mediaQuery.listForOwners(
+      MediaOwnerType.GOODS_RECEIPT,
+      [receipt.id],
+      actor.organizationId,
+    );
+    const detail = receipt as GoodsReceiptDetail;
+    // Copy only the fields the response is allowed to carry — never spread a
+    // `MediaSummary`, which also holds `bucket`/`objectKey` (03-logical-design.md
+    // > write flow, step 4 > "Rules for every caller").
+    detail.attachments = (attachmentsByOwner.get(receipt.id) ?? []).map((media) => ({
+      id: media.id,
+      fileName: media.fileName,
+      contentType: media.contentType,
+      size: media.size,
+    }));
+    return detail;
   }
 
   

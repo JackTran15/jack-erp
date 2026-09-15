@@ -12,6 +12,8 @@ import { ImagePlus, Plus, Trash2, X } from "lucide-react";
 import { CrudFieldInput } from "../CrudFieldInput";
 import { LookupField } from "../../forms/LookupField";
 import { TreeSelectInput } from "../../forms/TreeSelectInput";
+import { useMediaUpload, type InitialMediaItem } from "../../../lib/media/useMediaUpload";
+import type { MediaOwnerType } from "../../../lib/media/media-limits";
 
 import {
   COMMISSION_METHOD_OPTIONS,
@@ -109,10 +111,28 @@ export function InventoryItemCreateForm({
   const [addedBrands, setAddedBrands] = useState<Option[]>([]);
   const [addedUnits, setAddedUnits] = useState<string[]>([]);
 
-  const [productImages, setProductImages] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
   const [imageError, setImageError] = useState<string | null>(null);
-  const previewsRef = useRef<string[]>([]);
+
+  // Hàng có màu/size là PRODUCT (ảnh dùng chung cho các biến thể); hàng đơn là ITEM (A-25).
+  const hasColorsOrSizes =
+    (Array.isArray(values.colors) && (values.colors as unknown[]).length > 0) ||
+    (Array.isArray(values.sizes) && (values.sizes as unknown[]).length > 0);
+  const mediaOwnerType: MediaOwnerType = hasColorsOrSizes ? "PRODUCT" : "ITEM";
+
+  // Màn sửa nạp `values` từ record trong effect của CrudEditPage (values={} ở lần render đầu) —
+  // đợi values.images có mặt trước khi khởi tạo/hiện ô chọn ảnh, nếu không hook sẽ bị "chạm" bởi
+  // add() trước khi ảnh cũ kịp nạp và bỏ luôn ảnh cũ khỏi mediaIds (xem "Hợp đồng hook" ở ticket).
+  const imagesReady = !isEdit || Array.isArray(values.images);
+  const initialImages: InitialMediaItem[] | undefined = imagesReady
+    ? ((values.images as Record<string, unknown>[] | undefined) ?? []).map((img) => ({
+        id: String(img.id ?? ""),
+        url: String(img.url ?? ""),
+        fileName: String(img.fileName ?? ""),
+      }))
+    : undefined;
+
+  const media = useMediaUpload(mediaOwnerType, initialImages);
+  const prevMediaOwnerTypeRef = useRef(mediaOwnerType);
 
   const [unitRows, setUnitRows] = useState<ConversionUnitRow[]>([
     createBlankConversionUnitRow(),
@@ -425,14 +445,23 @@ export function InventoryItemCreateForm({
     });
   };
 
+  // useMediaUpload tự huỷ upload đang chạy và bỏ ảnh tải cục bộ khi ownerType đổi
+  // (VD: xoá hết Màu/Size của hàng đang có biến thể) — báo lại cho người dùng.
   useEffect(() => {
-    previewsRef.current = previews;
-  }, [previews]);
+    if (prevMediaOwnerTypeRef.current === mediaOwnerType) return;
+    prevMediaOwnerTypeRef.current = mediaOwnerType;
+    setImageError(
+      "Đã đổi giữa hàng có/không biến thể nên ảnh vừa tải bị huỷ, vui lòng tải lại ảnh.",
+    );
+  }, [mediaOwnerType]);
+
+  // Chỉ đưa imageIds vào values sau khi ảnh cũ (nếu có) đã nạp xong, để một lần lưu
+  // sớm không bao giờ gửi danh sách rỗng/thiếu và xoá mất ảnh chưa kịp đọc.
   useEffect(() => {
-    return () => {
-      previewsRef.current.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, []);
+    if (!imagesReady) return;
+    setValues((prev) => ({ ...prev, imageIds: media.mediaIds }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [media.mediaIds, imagesReady]);
 
   const updateExtras = <K extends keyof FormExtras>(
     key: K,
@@ -471,36 +500,30 @@ export function InventoryItemCreateForm({
   const addImages = (files: FileList | null) => {
     if (!files?.length) return;
     setImageError(null);
-    setProductImages((prevFiles) => {
-      const next: File[] = [...prevFiles];
-      const newPreviewUrls: string[] = [];
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (!file.type.startsWith("image/")) {
-          setImageError("Chỉ chấp nhận file ảnh.");
-          continue;
-        }
-        if (file.size > MAX_IMAGE_BYTES) {
-          setImageError(`Mỗi ảnh tối đa 2MB (${file.name}).`);
-          continue;
-        }
-        if (next.length >= MAX_IMAGE_COUNT) {
-          setImageError(`Tối đa ${MAX_IMAGE_COUNT} ảnh.`);
-          break;
-        }
-        next.push(file);
-        newPreviewUrls.push(URL.createObjectURL(file));
+    let count = media.files.filter((f) => f.status !== "error").length;
+    const accepted: File[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!file.type.startsWith("image/")) {
+        setImageError("Chỉ chấp nhận file ảnh.");
+        continue;
       }
-      if (newPreviewUrls.length) setPreviews((p) => [...p, ...newPreviewUrls]);
-      return next;
-    });
+      if (file.size > MAX_IMAGE_BYTES) {
+        setImageError(`Mỗi ảnh tối đa 2MB (${file.name}).`);
+        continue;
+      }
+      if (count >= MAX_IMAGE_COUNT) {
+        setImageError(`Tối đa ${MAX_IMAGE_COUNT} ảnh.`);
+        break;
+      }
+      accepted.push(file);
+      count += 1;
+    }
+    if (accepted.length) media.add(accepted);
   };
 
-  const removeImageAt = (index: number) => {
-    const url = previews[index];
-    if (url) URL.revokeObjectURL(url);
-    setProductImages((prev) => prev.filter((_, i) => i !== index));
-    setPreviews((prev) => prev.filter((_, i) => i !== index));
+  const removeImage = (localId: string) => {
+    media.remove(localId);
     setImageError(null);
   };
 
@@ -927,44 +950,66 @@ export function InventoryItemCreateForm({
         <h3 className="mb-1 text-sm font-semibold">Ảnh hàng hóa</h3>
         <p className="mb-3 text-xs text-muted-foreground">
           Định dạng .jpg, .jpeg, .png, .gif, .webp — tối đa 2MB mỗi ảnh, tối đa{" "}
-          {MAX_IMAGE_COUNT} ảnh. Ảnh chỉ lưu trên trình duyệt cho đến khi máy
-          chủ hỗ trợ tải lên.
+          {MAX_IMAGE_COUNT} ảnh.
         </p>
-        {imageError ? (
-          <p className="mb-2 text-sm text-destructive">{imageError}</p>
-        ) : null}
-        <div className="flex flex-wrap gap-3">
-          <label className="flex h-28 w-28 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/40 bg-muted/20 text-center text-xs text-muted-foreground hover:bg-muted/40">
-            <ImagePlus className="mb-1 h-7 w-7 text-primary" />
-            Thêm hình ảnh ({productImages.length}/{MAX_IMAGE_COUNT})
-            <input
-              type="file"
-              accept={IMAGE_ACCEPT}
-              multiple
-              className="sr-only"
-              onChange={(e) => {
-                addImages(e.target.files);
-                e.target.value = "";
-              }}
-            />
-          </label>
-          {previews.map((src, i) => (
-            <div
-              key={src}
-              className="relative h-28 w-28 overflow-hidden rounded-lg border border-border"
-            >
-              <img src={src} alt="" className="h-full w-full object-cover" />
-              <button
-                type="button"
-                className="absolute right-1 top-1 rounded-full bg-background/90 p-0.5 shadow"
-                aria-label="Xóa ảnh"
-                onClick={() => removeImageAt(i)}
-              >
-                <X className="h-4 w-4" />
-              </button>
+        {imagesReady ? (
+          <>
+            {imageError ? (
+              <p className="mb-2 text-sm text-destructive">{imageError}</p>
+            ) : null}
+            <div className="flex flex-wrap gap-3">
+              <label className="flex h-28 w-28 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/40 bg-muted/20 text-center text-xs text-muted-foreground hover:bg-muted/40">
+                <ImagePlus className="mb-1 h-7 w-7 text-primary" />
+                Thêm hình ảnh (
+                {media.files.filter((f) => f.status !== "error").length}/
+                {MAX_IMAGE_COUNT})
+                <input
+                  type="file"
+                  accept={IMAGE_ACCEPT}
+                  multiple
+                  className="sr-only"
+                  onChange={(e) => {
+                    addImages(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {media.files.map((f) => (
+                <div
+                  key={f.localId}
+                  className="relative h-28 w-28 overflow-hidden rounded-lg border border-border"
+                >
+                  {f.previewUrl ? (
+                    <img
+                      src={f.previewUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-muted/40 p-1 text-center text-xs text-destructive">
+                      {f.error ?? "Lỗi tải ảnh"}
+                    </div>
+                  )}
+                  {f.status === "uploading" && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/60 text-xs text-muted-foreground">
+                      Đang tải…
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="absolute right-1 top-1 rounded-full bg-background/90 p-0.5 shadow"
+                    aria-label="Xóa ảnh"
+                    onClick={() => removeImage(f.localId)}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">Đang tải ảnh…</p>
+        )}
 
         <label className="mt-4 inline-flex cursor-pointer items-center gap-2 text-sm">
           <input
@@ -1396,7 +1441,7 @@ export function InventoryItemCreateForm({
       </div>
 
       <InventoryItemActionBar
-        isSaving={isSaving}
+        isSaving={isSaving || media.isUploading}
         onCancel={onCancel ?? (() => navigate(`/admin/${entityKey}`))}
         onSaveMode={onSaveMode ?? (() => {})}
       />

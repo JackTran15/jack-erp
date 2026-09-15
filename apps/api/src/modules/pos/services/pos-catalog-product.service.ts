@@ -11,6 +11,7 @@ import { ShowroomEntity } from '../../inventory/location/showroom.entity';
 import { StorageEntity } from '../../inventory/location/storage.entity';
 import { BranchEntity } from '../../branch/branch.entity';
 import { TempWarehouseStagedStockService } from '../../inventory/temp-warehouse/temp-warehouse-staged-stock.service';
+import { MediaQueryService } from '../../media/media-query.service';
 import { ItemCategoryEntity } from '../../inventory/location/item-category.entity';
 import { ProductAttributeDefinitionEntity } from '../../inventory/product/product-attribute-definition.entity';
 import { ItemAttributeValueEntity } from '../../inventory/product/item-attribute-value.entity';
@@ -162,6 +163,7 @@ export class PosCatalogProductService {
     @InjectRepository(ItemCategoryEntity)
     private readonly categoryRepo: Repository<ItemCategoryEntity>,
     private readonly stagedStock: TempWarehouseStagedStockService,
+    private readonly mediaQuery: MediaQueryService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -185,6 +187,11 @@ export class PosCatalogProductService {
         : await this.pageCardsInSql(orgId, query, categoryIds);
 
     const details = await this.loadCardDetails(orgId, cardIds);
+
+    // One call for the whole page, regardless of which sort path produced
+    // `cardIds` — `card_id` is a product id or a standalone item id, and
+    // `resolvePublicUrls` accepts both owner types in a single query.
+    const imagesByCard = await this.mediaQuery.resolvePublicUrls(cardIds, orgId);
 
     // The ranking path already had to total every item in the branch, so reuse
     // that map rather than asking again for a subset of what it just read.
@@ -210,7 +217,7 @@ export class PosCatalogProductService {
           description: card.description,
           categoryId: card.categoryId,
           categoryName: card.categoryName,
-          imageUrl: null,
+          imageUrl: imagesByCard.get(id)?.[0]?.url ?? null,
           minPrice: card.minPrice,
           maxPrice: card.maxPrice,
           unit: card.unit,
@@ -631,9 +638,12 @@ export class PosCatalogProductService {
 
     const stockByItem = await this.loadBranchStock(orgId, branchId, undefined, itemIds);
     const extrasByItem = await this.loadDetailStockExtras(orgId, branchId, itemIds);
+    // Every variant shares the parent product's images (A-08).
+    const images = await this.mediaQuery.resolvePublicUrls([product.id], orgId);
+    const imageUrl = images.get(product.id)?.[0]?.url ?? null;
 
     const variantDtos = variants.map((v) =>
-      this.toVariantDto(v, attrByItem.get(v.id), stockByItem.get(v.id), extrasByItem.get(v.id)),
+      this.toVariantDto(v, attrByItem.get(v.id), stockByItem.get(v.id), extrasByItem.get(v.id), imageUrl),
     );
 
     const prices = variants.map((v) => Number(v.sellingPrice) || 0);
@@ -648,7 +658,7 @@ export class PosCatalogProductService {
       description: product.description ?? null,
       categoryId: categoryRef?.id ?? null,
       categoryName: categoryRef?.name ?? null,
-      imageUrl: null,
+      imageUrl,
       isActive: product.isActive,
       minPrice,
       maxPrice,
@@ -664,6 +674,11 @@ export class PosCatalogProductService {
   ): Promise<PosProductDetailDto> {
     const stockByItem = await this.loadBranchStock(orgId, branchId, undefined, [item.id]);
     const extrasByItem = await this.loadDetailStockExtras(orgId, branchId, [item.id]);
+    // A variant item (has a product_id) shows its parent product's images
+    // (A-08); a standalone item's images are attached to its own row (A-25).
+    const imageOwnerId = item.productId ?? item.id;
+    const images = await this.mediaQuery.resolvePublicUrls([imageOwnerId], orgId);
+    const imageUrl = images.get(imageOwnerId)?.[0]?.url ?? null;
     const price = Number(item.sellingPrice) || 0;
     return {
       kind: 'ITEM',
@@ -672,13 +687,13 @@ export class PosCatalogProductService {
       description: item.description ?? null,
       categoryId: item.categoryId ?? null,
       categoryName: item.category?.name ?? null,
-      imageUrl: null,
+      imageUrl,
       isActive: item.isActive,
       minPrice: price,
       maxPrice: price,
       attributes: [],
       variants: [
-        this.toVariantDto(item, undefined, stockByItem.get(item.id), extrasByItem.get(item.id)),
+        this.toVariantDto(item, undefined, stockByItem.get(item.id), extrasByItem.get(item.id), imageUrl),
       ],
     };
   }
@@ -688,6 +703,7 @@ export class PosCatalogProductService {
     attrs: VariantAttr[] | undefined,
     stock: ItemStock | undefined,
     extras: VariantStockExtras | undefined,
+    imageUrl: string | null,
   ): PosProductVariantDto {
     const attributes = (attrs ?? [])
       .slice()
@@ -700,7 +716,7 @@ export class PosCatalogProductService {
       variantLabel: item.variantLabel ?? null,
       unit: item.unit,
       sellingPrice: Number(item.sellingPrice) || 0,
-      imageUrl: null,
+      imageUrl,
       attributes,
       quantityOnHand: stock?.total ?? 0,
       sellableQuantity: stock?.sellableTotal ?? 0,

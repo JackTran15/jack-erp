@@ -1,9 +1,28 @@
+import { buildDetail } from '../queries/get-partner-product.handler';
 import {
   PartnerAttributeDto,
   PartnerProductDetailDto,
   PartnerVariantDto,
 } from './partner-product-detail.dto';
 import { PartnerProductRowDto } from './partner-product-search.dto';
+
+const DETAIL_ROWS = [
+  {
+    id: 'p1',
+    code: 'MY88610',
+    name: 'Giày búp bê MY88610',
+    description: 'Da bò thật',
+    categoryId: 'c1',
+    categoryName: 'Giày nữ',
+    itemId: 'i1',
+    itemCode: 'MY88610-BA-38',
+    variantLabel: '38 · BA',
+    price: 750000,
+    inStock: true,
+    attrName: 'Size',
+    attrValue: '38',
+  },
+];
 
 const variant = (): PartnerVariantDto => ({
   id: 'i1',
@@ -61,8 +80,18 @@ describe('PartnerProductDetailDto', () => {
     expect(row.images).toEqual([]);
   });
 
-  it('keeps images empty — there is nowhere to store one', () => {
-    expect(detail().images).toEqual([]);
+  // AC-06 — `buildDetail` now receives the resolved public URLs rather than
+  // hard-coding an empty array.
+  it('returns image URLs in sort order for a product with two images', () => {
+    const images = [
+      'https://cdn.example.com/erp-media-public/org/o1/product/p1/aaa.jpg',
+      'https://cdn.example.com/erp-media-public/org/o1/product/p1/bbb.jpg',
+    ];
+    expect(buildDetail(DETAIL_ROWS, images).images).toEqual(images);
+  });
+
+  it('returns an empty array for a product without images', () => {
+    expect(buildDetail(DETAIL_ROWS, []).images).toEqual([]);
   });
 
   it('describes a variant with a numeric price and a structured attribute map', () => {

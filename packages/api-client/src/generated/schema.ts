@@ -8250,6 +8250,9 @@ export interface paths {
         /** Tiền thu (hoặc chi) theo cửa hàng, mỗi cửa hàng tách theo hạng mục thu/chi */
         get: operations["MobileCashflowReportController_listStores"];
         put?: never;
+        /** Khách hàng để gắn vào đơn bán */
+        get: operations["MobileCustomerController_list"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -8325,6 +8328,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+<<<<<<< HEAD
     "/mobile/item-categories": {
         parameters: {
             query?: never;
@@ -8342,6 +8346,8 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
     "/mobile/items": {
         parameters: {
             query?: never;
@@ -8480,6 +8486,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/mobile/product-revenue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Doanh thu theo mặt hàng — gộp theo mẫu mã hoặc nhóm hàng hóa */
+        get: operations["MobileProductRevenueController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/promotions/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Định giá giỏ hàng theo khuyến mại — KHÔNG ghi gì */
+        post: operations["MobilePromotionController_evaluate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/sales-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh mục để bán — biến thể hoặc mẫu mã, kèm giá bán, phân trang */
+        get: operations["MobileSalesItemController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/sales-items/models/{productId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Các chiều biến thiên và biến thể của một mẫu mã */
+        get: operations["MobileSalesItemController_getModel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/sales-items/models/{productId}/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tồn kho của một mẫu mã: theo biến thể, theo kho, theo chi nhánh khác */
+        get: operations["MobileSalesItemController_getModelStock"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/mobile/stock-documents": {
         parameters: {
             query?: never;
@@ -8516,6 +8607,7 @@ export interface paths {
         patch: operations["MobileStockDocumentController_update"];
         trace?: never;
     };
+<<<<<<< HEAD
     "/mobile/sales-orders": {
         parameters: {
             query?: never;
@@ -8613,6 +8705,8 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
     "/v2/partner/catalog/categories/tree": {
         parameters: {
             query?: never;
@@ -8647,17 +8741,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+<<<<<<< HEAD
     "/v2/partner/catalog/products/{productCode}": {
+=======
+    "/media/uploads": {
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
+<<<<<<< HEAD
         /** Product detail with its attribute dimensions and variants */
         get: operations["PartnerProductV2Controller_detail_v2"];
         put?: never;
         post?: never;
+=======
+        get?: never;
+        put?: never;
+        post: operations["MediaUploadController_requestUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/uploads/{id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MediaUploadController_completeUpload"];
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
         delete?: never;
         options?: never;
         head?: never;
@@ -8738,7 +8858,11 @@ export interface components {
             maritalStatus?: "SINGLE" | "MARRIED";
             /** @enum {string} */
             employmentStatus?: "OFFICIAL" | "PROBATION" | "RESIGNED";
-            photoUrl?: string;
+            /**
+             * Format: uuid
+             * @description Media id of the profile photo; null removes it, omit to leave unchanged
+             */
+            photoMediaId?: string | null;
             /** Format: uuid */
             jobPositionId?: string;
             /** @description ISO date YYYY-MM-DD */
@@ -13064,7 +13188,7 @@ export interface components {
             /** Format: uuid */
             categoryId?: string | null;
             categoryName?: string | null;
-            /** @description Image URL placeholder — always null until image storage is implemented. */
+            /** @description Public URL of the card's first image (product images for a PRODUCT card, the item's own images for a standalone ITEM card), or null when it has none. */
             imageUrl?: string | null;
             /** @description Lowest selling price among the visible variants. */
             minPrice: number;
@@ -15989,6 +16113,7 @@ export interface components {
         MobileCustomerResponseDto: {
             /** Format: uuid */
             id: string;
+<<<<<<< HEAD
             /** @description Mã khách hàng, duy nhất trong tổ chức */
             code: string;
             /** @description Tên khách hàng, giữ nguyên hoa/thường đã nhập */
@@ -16553,6 +16678,19 @@ export interface components {
         };
         MobileCashflowStoreListDto: {
             data: components["schemas"]["MobileCashflowStoreDto"][];
+=======
+            /** @description Mã khách hàng. NULL là hợp lệ — khách vãng lai chưa có mã. */
+            code: string | null;
+            name: string;
+            /** @description Số điện thoại — khoá tra cứu chính của màn chọn khách. */
+            phone: string | null;
+        };
+        MobileCustomerPageDto: {
+            data: components["schemas"]["MobileCustomerResponseDto"][];
+            total: number;
+            page: number;
+            limit: number;
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
         };
         MobileProductAttributeValueDto: {
             /** @description Nhãn hiển thị — `product_attribute_options.value_label` */
@@ -16565,6 +16703,7 @@ export interface components {
             name: string;
             values: components["schemas"]["MobileProductAttributeValueDto"][];
         };
+<<<<<<< HEAD
         MobileItemCategoryCreateDto: {
             /** @description Tên nhóm hàng */
             name: string;
@@ -16578,6 +16717,8 @@ export interface components {
             /** @description Diễn giải */
             description?: string;
         };
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
         MobileItemResponseDto: {
             /**
              * Format: uuid
@@ -16621,6 +16762,7 @@ export interface components {
             page: number;
             limit: number;
         };
+<<<<<<< HEAD
         MobileProductVariantDto: {
             /**
              * Format: uuid
@@ -16799,6 +16941,8 @@ export interface components {
             variants?: components["schemas"]["MobileProductVariantInputDto"][];
             units?: components["schemas"]["MobileProductUnitInputDto"][];
         };
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
         MobileEvaluateCartLineDto: {
             /**
              * @description Do CLIENT tự đặt và được trả lại nguyên trong `appliedPrograms[].lineDiscounts[]`,
@@ -17097,6 +17241,7 @@ export interface components {
             note?: string;
             lines: components["schemas"]["MobileStockDocumentLineWriteDto"][];
         };
+<<<<<<< HEAD
         SalesOrderLineDto: {
             /** Format: uuid */
             itemId: string;
@@ -17135,6 +17280,8 @@ export interface components {
         CancelSalesOrderDto: {
             reason?: string;
         };
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
         PartnerCategoryTreeRequestDto: Record<string, never>;
         PartnerCategoryNodeDto: {
             /** @description Category id, stable across requests */
@@ -17168,8 +17315,11 @@ export interface components {
             colors?: string[];
             /** @description Size values as stored (e.g. "38", "39"). */
             sizes?: string[];
+<<<<<<< HEAD
             /** @description Stock filter, matched on the SAME variant as colors/sizes/price (ADR-08). `true`: only products with at least one variant that matches every other variant-level filter and has stock in a branch this API key may see; the row describes those variants. `false`: only products that have at least one variant matching every other variant-level filter and NONE of those matching variants has stock in a branch this API key may see (a product with any in-stock matching variant is excluded); the row describes those, all out-of-stock, variants. Omitted: no stock filtering. */
             inStock?: boolean;
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
             /**
              * @default newest
              * @enum {string}
@@ -17197,7 +17347,7 @@ export interface components {
             sizes: string[];
             /** @description True when any active variant has stock in any branch this API key may see. Quantities are never exposed. */
             inStock: boolean;
-            /** @description Always empty. This ERP has no image storage yet; the field is part of the contract so images can appear later without a breaking change. */
+            /** @description Public image URLs for this product, in display order. Empty when the product has no images. */
             images: string[];
         };
         PartnerProductSearchResponseDto: {
@@ -17207,6 +17357,7 @@ export interface components {
             page: number;
             limit: number;
         };
+<<<<<<< HEAD
         PartnerAttributeDto: {
             /** @description Dimension name as stored, e.g. "Color" or "Size" */
             name: string;
@@ -17250,6 +17401,49 @@ export interface components {
             description: string | null;
             attributes: components["schemas"]["PartnerAttributeDto"][];
             variants: components["schemas"]["PartnerVariantDto"][];
+=======
+        CreateMediaUploadDto: {
+            /**
+             * @description Owner type this upload will belong to; decides the bucket, size limit and content-type allowlist.
+             * @enum {string}
+             */
+            ownerType: "PRODUCT" | "ITEM" | "EMPLOYEE_PROFILE" | "GOODS_RECEIPT" | "TRANSFER_ORDER" | "STOCK_TRANSFER" | "CASH_RECEIPT" | "CASH_PAYMENT" | "BANK_RECEIPT" | "BANK_PAYMENT";
+            /** @description Original file name; used for display and Content-Disposition only. */
+            fileName: string;
+            /** @description Declared MIME type; checked against the ownerType allowlist and re-checked at confirm time. */
+            contentType: string;
+            /** @description Declared size in bytes; checked against the ownerType limit and re-checked at confirm time. */
+            size: number;
+        };
+        UploadPolicyResponseDto: {
+            /** @description Absolute URL the browser POSTs the multipart/form-data upload to. */
+            url: string;
+            /** @description Form fields the browser must send verbatim alongside the file, generated by createPresignedPost. */
+            fields: {
+                [key: string]: string;
+            };
+        };
+        RequestMediaUploadResponseDto: {
+            /** Format: uuid */
+            mediaId: string;
+            upload: components["schemas"]["UploadPolicyResponseDto"];
+            /**
+             * Format: date-time
+             * @description When the upload ticket expires (10 minutes from issuance).
+             */
+            expiresAt: string;
+        };
+        /** @enum {string} */
+        MediaStatus: "PENDING" | "UPLOADED" | "ATTACHED" | "DELETED";
+        CompleteMediaUploadResponseDto: {
+            /** Format: uuid */
+            mediaId: string;
+            status: components["schemas"]["MediaStatus"];
+            fileName: string;
+            contentType: string;
+            /** @description Size in bytes. */
+            size: number;
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
         };
     };
     responses: never;
@@ -30951,10 +31145,13 @@ export interface operations {
             query?: {
                 page?: number;
                 limit?: number;
+<<<<<<< HEAD
                 sort?: "name" | "revenue";
                 order?: "asc" | "desc";
                 /** @description Vắng = cả đang theo dõi lẫn đã ngừng (màn tìm kiếm không lọc). */
                 status?: "active" | "inactive";
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
                 /** @description Tìm theo mã, tên hoặc số điện thoại */
                 search?: string;
             };
@@ -30974,6 +31171,7 @@ export interface operations {
             };
         };
     };
+<<<<<<< HEAD
     MobileCustomerController_create: {
         parameters: {
             query?: never;
@@ -31771,6 +31969,8 @@ export interface operations {
             };
         };
     };
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
     MobileProductAttributeController_list: {
         parameters: {
             query?: never;
@@ -31799,6 +31999,7 @@ export interface operations {
                 from?: string;
                 /** @description ISO-8601, cuối kỳ (bao gồm) */
                 to?: string;
+<<<<<<< HEAD
                 /** @description Số hoá đơn, tên hoặc SĐT khách */
                 search?: string;
                 /**
@@ -31807,6 +32008,8 @@ export interface operations {
                  *     `kinds` của `/mobile/counterparties`.
                  */
                 status?: ("paid" | "unpaid" | "cancelled")[];
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
             };
             header?: never;
             path?: never;
@@ -31866,6 +32069,7 @@ export interface operations {
             };
         };
     };
+<<<<<<< HEAD
     MobileItemCategoryController_create: {
         parameters: {
             query?: never;
@@ -31889,6 +32093,8 @@ export interface operations {
             };
         };
     };
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
     MobileItemController_list: {
         parameters: {
             query?: {
@@ -31948,6 +32154,7 @@ export interface operations {
             };
         };
     };
+<<<<<<< HEAD
     MobileProductController_create: {
         parameters: {
             query?: never;
@@ -32017,6 +32224,8 @@ export interface operations {
             };
         };
     };
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
     MobileProductRevenueController_list: {
         parameters: {
             query: {
@@ -32035,8 +32244,11 @@ export interface operations {
                  *     trên màn ứng với nó.
                  */
                 statBy?: "parent" | "group";
+<<<<<<< HEAD
                 /** @description Ô tìm ở header: tên, mã SKU, mã nhóm hàng hoá — chuyển vào `filters.search`. */
                 search?: string;
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
             };
             header?: never;
             path?: never;
@@ -32314,6 +32526,7 @@ export interface operations {
             };
         };
     };
+<<<<<<< HEAD
     SalesOrderController_list: {
         parameters: {
             query?: {
@@ -32498,6 +32711,8 @@ export interface operations {
             };
         };
     };
+=======
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
     PartnerCategoryV2Controller_tree_v2: {
         parameters: {
             query?: never;
@@ -32544,13 +32759,44 @@ export interface operations {
             };
         };
     };
+<<<<<<< HEAD
     PartnerProductV2Controller_detail_v2: {
+=======
+    MediaUploadController_requestUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMediaUploadDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestMediaUploadResponseDto"];
+                };
+            };
+        };
+    };
+    MediaUploadController_completeUpload: {
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
         parameters: {
             query?: never;
             header?: never;
             path: {
+<<<<<<< HEAD
                 /** @description products.code, matched exactly (case-sensitive), not products.id or a variant SKU */
                 productCode: string;
+=======
+                id: string;
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
             };
             cookie?: never;
         };
@@ -32561,6 +32807,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+<<<<<<< HEAD
                     "application/json": components["schemas"]["PartnerProductDetailDto"];
                 };
             };
@@ -32571,6 +32818,11 @@ export interface operations {
                 };
                 content?: never;
             };
+=======
+                    "application/json": components["schemas"]["CompleteMediaUploadResponseDto"];
+                };
+            };
+>>>>>>> d4a3ae49 (chore(api-client): regenerate OpenAPI client for media uploads)
         };
     };
 }

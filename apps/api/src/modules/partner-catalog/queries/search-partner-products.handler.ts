@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ItemCategoryEntity } from '../../inventory/location/item-category.entity';
 import { ItemEntity } from '../../inventory/location/item.entity';
+import { MediaQueryService, PublicMedia } from '../../media/media-query.service';
 import { collectCategorySubtreeIds } from '../category-subtree.util';
 import {
   PartnerProductRowDto,
@@ -260,6 +261,7 @@ export class SearchPartnerProductsHandler
     private readonly items: Repository<ItemEntity>,
     @InjectRepository(ItemCategoryEntity)
     private readonly categories: Repository<ItemCategoryEntity>,
+    private readonly mediaQuery: MediaQueryService,
   ) {}
 
   async execute({
@@ -406,13 +408,14 @@ export class SearchPartnerProductsHandler
       this.items.manager.query<CountRow[]>(countSql, params),
     ]);
 
-    const facets = await this.loadFacets(
-      actor.organizationId,
-      rows.flatMap((r) => r.matchedItemIds ?? []),
-    );
+    const productIds = rows.map((r) => r.id);
+    const [facets, images] = await Promise.all([
+      this.loadFacets(actor.organizationId, productIds),
+      this.mediaQuery.resolvePublicUrls(productIds, actor.organizationId),
+    ]);
 
     return {
-      data: rows.map((raw) => toRow(raw, facets.get(raw.id))),
+      data: rows.map((raw) => toRow(raw, facets.get(raw.id), images.get(raw.id))),
       total: countResult[0]?.total ?? 0,
       page,
       limit,
@@ -434,11 +437,11 @@ export class SearchPartnerProductsHandler
   }
 }
 
-/**
- * `images` is permanently empty: this ERP has nowhere to store one. The field
- * exists so images can appear later without a breaking change.
- */
-function toRow(raw: RawProductRow, facet?: FacetRow): PartnerProductRowDto {
+function toRow(
+  raw: RawProductRow,
+  facet?: FacetRow,
+  media?: PublicMedia[],
+): PartnerProductRowDto {
   return {
     id: raw.id,
     code: raw.code ?? null,
@@ -452,7 +455,9 @@ function toRow(raw: RawProductRow, facet?: FacetRow): PartnerProductRowDto {
     colors: sorted(facet?.colors),
     sizes: sorted(facet?.sizes),
     inStock: raw.inStock ?? false,
-    images: [],
+    // Public URLs only, in `resolvePublicUrls`'s sort_order — never the media
+    // id, file name, bucket or key.
+    images: media?.map((m) => m.url) ?? [],
   };
 }
 

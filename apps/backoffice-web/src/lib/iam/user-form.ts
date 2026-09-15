@@ -52,7 +52,11 @@ export function draftToEmployeeProfilePayload(
     gender: basic.gender,
     maritalStatus: basic.maritalStatus,
     employmentStatus: basic.employmentStatus,
-    photoUrl: blank(basic.photoDataUrl),
+    // Direct pass-through, not blank(): `undefined` here must reach the API as an
+    // omitted key (leave the current photo untouched), and `null` must reach it as
+    // literal null (remove the photo). blank() collapses both to `undefined`, which
+    // would silently turn an explicit "remove photo" into a no-op.
+    photoMediaId: basic.photoMediaId,
     jobPositionId: blank(profile.jobPositionId),
     probationDate: blank(profile.probationDate),
     officialDate: blank(profile.officialDate),

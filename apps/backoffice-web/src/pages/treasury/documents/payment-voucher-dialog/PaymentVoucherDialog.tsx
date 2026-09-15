@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { RadioGroup } from "../../../../components/forms/RadioGroup";
 import { useGenerateDocumentNumber } from "../../../../hooks/document-numbering/useGenerateDocumentNumber";
+import { MediaAttachmentList, type MediaAttachment } from "../../../../components/media/MediaAttachmentList";
 import { fetchVoucherPrintPayload } from "../../../../lib/print/voucher-print.api";
 import { renderVoucherHtml } from "../../../../lib/print/render-voucher-html";
 import { printHtmlDocument } from "../../../../lib/print/print-html-document";
@@ -189,6 +190,13 @@ export function PaymentVoucherDialog({
     CashTransferFundKind.CASH,
   );
   const [toAccountId, setToAccountId] = useState("");
+  const [attachmentIds, setAttachmentIds] = useState<string[]>([]);
+  const [attachmentItems, setAttachmentItems] = useState<MediaAttachment[]>([]);
+  // Flips true once MediaAttachmentList has mounted with a real seed (create,
+  // or `initial` loaded) — guards the update payload from ever sending `[]`
+  // before the actual list is known.
+  const [attachmentsReady, setAttachmentsReady] = useState(false);
+  const [attachmentsUploading, setAttachmentsUploading] = useState(false);
 
   const currentBranchId = useBranchStore((s) => s.branchId);
   const { data: branches = [] } = useBranches();
@@ -207,6 +215,16 @@ export function PaymentVoucherDialog({
   const debtFieldsLocked = isDebtRepayment && !readOnly;
   // Both auto-filled sub-modes lock the grid to one row; only Trả nợ also locks Số tiền.
   const lockRowCount = isDebtRepayment || isFundMove;
+  // Trả nợ NCC at creation settles debts through a saga endpoint
+  // (POST /supplier-debt-payment); the two fund-move sub-modes post to
+  // POST /fund-swaps / a cash-transfer endpoint. None of the three bodies has
+  // an attachmentIds slot (see handleSave below) — editing an already-saved
+  // Trả nợ payment goes through the plain update endpoint instead, which does
+  // support attachments.
+  const attachmentsUnsupported =
+    (isDebtRepayment && mode === TreasuryVoucherDialogModeEnum.CREATE) ||
+    isCashToDeposit ||
+    isBranchTransfer;
 
   const branchOptions = useMemo<SingleSelectOption[]>(
     () =>
@@ -281,6 +299,9 @@ export function PaymentVoucherDialog({
       setCountAsExpense(true);
       setLines([emptyFormLine()]);
       setDocumentLines([]);
+      setAttachmentIds([]);
+      setAttachmentItems([]);
+      setAttachmentsReady(false);
       return;
     }
     if (initial && !isGoodsReceiptPaymentVoucher(initial)) {
@@ -316,6 +337,9 @@ export function PaymentVoucherDialog({
             }))
           : [emptyFormLine()],
       );
+      setAttachmentIds((initial.attachments ?? []).map((a) => a.id));
+      setAttachmentItems(initial.attachments ?? []);
+      setAttachmentsReady(false);
     }
   }, [resetKey, open, mode, initial, isGoodsView]);
 
@@ -356,6 +380,12 @@ export function PaymentVoucherDialog({
     setEmployeeName(item.name);
   }, []);
 
+  const handleAttachmentsChange = useCallback((ids: string[], items: MediaAttachment[]) => {
+    setAttachmentIds(ids);
+    setAttachmentItems(items);
+    setAttachmentsReady(true);
+  }, []);
+
   /**
    * Auto-fills "Lý do chi" + the single locked detail line for a transfer
    * sub-mode. Done here rather than in an effect so re-picking the same option
@@ -370,6 +400,12 @@ export function PaymentVoucherDialog({
     setToBranchId("");
     setToFundKind(CashTransferFundKind.CASH);
     setToAccountId("");
+    // The two transfer sub-options post to endpoints with no attachmentIds
+    // slot (see `attachmentsUnsupported`) — forget anything picked so it can't
+    // silently resurface after switching back to a plain payment.
+    setAttachmentIds([]);
+    setAttachmentItems([]);
+    setAttachmentsReady(false);
     if (!isTransferSubOption(next)) return;
     const text = TRANSFER_SUB_OPTION_REASON[next];
     setReason(text);
@@ -384,6 +420,13 @@ export function PaymentVoucherDialog({
   }, [toBranchId]);
 
   const handleRadioChange = useCallback((next: PaymentPurposeRadio) => {
+    // Switching the top-level radio forgets locally-picked attachments too,
+    // same as it already forgets `lines`/`documentLines` below — moving into
+    // Trả nợ NCC at creation moves to a saga endpoint with no attachmentIds
+    // slot (see `attachmentsUnsupported`).
+    setAttachmentIds([]);
+    setAttachmentItems([]);
+    setAttachmentsReady(false);
     if (next === PaymentPurposeRadio.DEBT_GROUP) {
       setPaymentPurpose(CashPaymentPurpose.SUPPLIER_PAYMENT);
       setPaymentSubOption(PaymentOtherSubOption.OTHER);
@@ -671,6 +714,7 @@ export function PaymentVoucherDialog({
           voucherDate,
           lines: validLines,
           documentLines,
+          attachmentIds: attachmentsReady ? attachmentIds : undefined,
         }),
       });
     }
@@ -708,6 +752,8 @@ export function PaymentVoucherDialog({
     mode,
     onSave,
     handleClose,
+    attachmentIds,
+    attachmentsReady,
   ]);
 
   const canPrint = Boolean(initial?.id);
@@ -755,6 +801,7 @@ export function PaymentVoucherDialog({
         id: "save",
         label: "Lưu",
         icon: Save,
+        disabled: attachmentsUploading,
         onClick: handleSave,
       });
     }
@@ -792,6 +839,7 @@ export function PaymentVoucherDialog({
     handlePrint,
     exporting,
     handleExport,
+    attachmentsUploading,
   ]);
 
   const title =
@@ -1097,9 +1145,21 @@ export function PaymentVoucherDialog({
               layout="horizontal"
               labelWidth="8rem"
             >
-              <Button variant="outline" size="sm" disabled>
-                Tải tệp…
-              </Button>
+              {attachmentsUnsupported ? (
+                <span className="text-sm text-muted-foreground">
+                  Loại chứng từ này chưa hỗ trợ đính kèm.
+                </span>
+              ) : mode === TreasuryVoucherDialogModeEnum.CREATE || initial ? (
+                <MediaAttachmentList
+                  ownerType="CASH_PAYMENT"
+                  value={attachmentItems}
+                  onChange={handleAttachmentsChange}
+                  onUploadingChange={setAttachmentsUploading}
+                  readOnly={readOnly}
+                />
+              ) : (
+                <span className="text-sm text-muted-foreground">Đang tải danh sách đính kèm…</span>
+              )}
             </FormField>
           </>
         }

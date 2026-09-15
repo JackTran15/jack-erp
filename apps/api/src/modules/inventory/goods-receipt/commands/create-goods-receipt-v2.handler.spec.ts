@@ -1,5 +1,6 @@
 import { BadRequestException, UnprocessableEntityException } from '@nestjs/common';
 import { DocCounterpartyKind, GoodsReceiptStatus } from '@erp/shared-interfaces';
+import { MediaException } from '../../../media/media.exception';
 import { CreateGoodsReceiptV2Handler } from './create-goods-receipt-v2.handler';
 import { CreateGoodsReceiptV2Command } from './create-goods-receipt-v2.command';
 
@@ -9,22 +10,41 @@ function makeHandler(opts: {
   items: { id: string; productId: string | null }[];
   counterparty?: unknown;
 }) {
+  // The ambient, non-transactional manager: used for every read/validation
+  // before the write.
   const manager = {
     find: jest.fn(async () => opts.items),
     findOne: jest.fn(async () => opts.counterparty ?? null),
     create: jest.fn((_entity: unknown, obj: unknown) => obj),
+  };
+  // Distinct object from `manager` above, handed to the `dataSource.transaction`
+  // callback — the insert and the media attach both run through this one, so a
+  // test can tell whether the write path actually used the transaction's own
+  // manager (T-04-02 security review) rather than the ambient one.
+  const trxManager = {
     save: jest.fn(async (r: Record<string, unknown>) => ({ ...r, id: 'gr1' })),
+    update: jest.fn(),
+    delete: jest.fn(),
+  };
+  const dataSource = {
+    manager,
+    transaction: jest.fn((cb: (m: unknown) => Promise<unknown>) => cb(trxManager)),
   };
   const documentNumbering = { generate: jest.fn(async () => 'PNK-1') };
   // Permissive by default: these cases are about the write path, not the
   // purpose gate. The gate has its own tests.
   const rbac = { hasPermission: jest.fn(async () => true) };
+  // Stub added for the ticket T-04-02 dependency (`MediaLinkService`); its own
+  // tests below override `syncOwner` where the return value or a rejection
+  // matters.
+  const mediaLink = { syncOwner: jest.fn(async (): Promise<string[]> => []) };
   const handler = new CreateGoodsReceiptV2Handler(
-    { manager } as never,
+    dataSource as never,
     documentNumbering as never,
     rbac as never,
+    mediaLink as never,
   );
-  return { handler, manager, documentNumbering, rbac };
+  return { handler, manager, trxManager, documentNumbering, rbac, mediaLink };
 }
 
 const line = (itemId: string, locationId: string) => ({
@@ -70,7 +90,7 @@ describe('CreateGoodsReceiptV2Handler', () => {
   });
 
   it('creates a DRAFT, mirrors a supplier counterparty into provider_id', async () => {
-    const { handler, manager } = makeHandler({
+    const { handler, trxManager } = makeHandler({
       items: [
         { id: 'v1', productId: 'p1' },
         { id: 'v2', productId: 'p1' },
@@ -91,7 +111,7 @@ describe('CreateGoodsReceiptV2Handler', () => {
     );
 
     expect(res).toEqual({ id: 'gr1', documentNumber: 'PNK-1' });
-    const saved = manager.save.mock.calls[0][0] as Record<string, unknown>;
+    const saved = trxManager.save.mock.calls[0][0] as Record<string, unknown>;
     expect(saved.status).toBe(GoodsReceiptStatus.DRAFT);
     expect(saved.providerId).toBe('prov1');
     expect(saved.counterpartyKind).toBe(DocCounterpartyKind.SUPPLIER);
@@ -153,5 +173,88 @@ describe('CreateGoodsReceiptV2Handler', () => {
         ),
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  describe('media attachments (T-04-02)', () => {
+    it('inserts and attaches inside one transaction, writing back the order syncOwner returns', async () => {
+      const { handler, trxManager, mediaLink } = makeHandler({
+        items: [{ id: 'v1', productId: 'p1' }],
+      });
+      mediaLink.syncOwner.mockResolvedValue(['media-1', 'media-2']);
+
+      await handler.execute(
+        new CreateGoodsReceiptV2Command(
+          {
+            receivedAt: '2026-06-18T00:00:00.000Z',
+            attachmentIds: ['media-2', 'media-1'],
+            lines: [line('v1', 'L1')],
+          } as never,
+          actor,
+        ),
+      );
+
+      // syncOwner receives the transaction's own manager — distinct from the
+      // ambient `dataSource.manager` — proving the insert and the attach share
+      // one transaction.
+      expect(mediaLink.syncOwner).toHaveBeenCalledWith(
+        'GOODS_RECEIPT',
+        'gr1',
+        ['media-2', 'media-1'],
+        actor,
+        trxManager,
+      );
+      expect(trxManager.update).toHaveBeenCalledWith(expect.anything(), 'gr1', {
+        attachmentIds: ['media-1', 'media-2'],
+      });
+    });
+
+    it('rolls back the insert when an id belongs to another organization — no compensating delete', async () => {
+      const { handler, trxManager, mediaLink } = makeHandler({
+        items: [{ id: 'v1', productId: 'p1' }],
+      });
+      mediaLink.syncOwner.mockRejectedValue(
+        new MediaException(404, 'MEDIA_NOT_FOUND', 'Media other-org-media not found'),
+      );
+
+      await expect(
+        handler.execute(
+          new CreateGoodsReceiptV2Command(
+            {
+              receivedAt: '2026-06-18T00:00:00.000Z',
+              attachmentIds: ['other-org-media'],
+              lines: [line('v1', 'L1')],
+            } as never,
+            actor,
+          ),
+        ),
+      ).rejects.toMatchObject({ code: 'MEDIA_NOT_FOUND' });
+
+      // syncOwner ran inside the transaction's own manager, so its rejection is
+      // what rolls back the insert — there is nothing left to compensate.
+      expect(mediaLink.syncOwner).toHaveBeenCalledWith(
+        'GOODS_RECEIPT',
+        'gr1',
+        ['other-org-media'],
+        actor,
+        trxManager,
+      );
+      expect(trxManager.delete).not.toHaveBeenCalled();
+    });
+
+    it('does not call syncOwner when attachmentIds is not sent', async () => {
+      const { handler, trxManager, mediaLink } = makeHandler({
+        items: [{ id: 'v1', productId: 'p1' }],
+      });
+
+      await handler.execute(
+        new CreateGoodsReceiptV2Command(
+          { receivedAt: '2026-06-18T00:00:00.000Z', lines: [line('v1', 'L1')] } as never,
+          actor,
+        ),
+      );
+
+      expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+      expect(trxManager.update).not.toHaveBeenCalled();
+    });
   });
 });

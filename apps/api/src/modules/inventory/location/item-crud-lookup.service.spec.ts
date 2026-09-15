@@ -11,6 +11,8 @@ import { ProductAttributeOptionEntity } from "../product/product-attribute-optio
 import { ItemAttributeValueEntity } from "../product/item-attribute-value.entity";
 import { StockLedgerService } from "../ledger/stock-ledger.service";
 import { CacheService } from "../../redis/cache.service";
+import { MediaLinkService } from "../../media/media-link.service";
+import { MediaQueryService } from "../../media/media-query.service";
 
 /**
  * lookupByCode — item lookup by SKU/barcode for the ERP barcode-scan field.
@@ -73,6 +75,14 @@ describe("InventoryItemCrudService.lookupByCode", () => {
         { provide: DataSource, useValue: dataSource },
         { provide: StockLedgerService, useValue: { recordMovement: jest.fn() } },
         { provide: CacheService, useValue: { invalidate: jest.fn() } },
+        {
+          provide: MediaLinkService,
+          useValue: { syncOwner: jest.fn(), detachAll: jest.fn() },
+        },
+        {
+          provide: MediaQueryService,
+          useValue: { resolvePublicUrls: jest.fn().mockResolvedValue(new Map()) },
+        },
       ],
     }).compile();
 

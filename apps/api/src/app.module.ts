@@ -53,6 +53,7 @@ import { SalesOrderModule } from './modules/sales-order/sales-order.module';
 applyUtcTimestampCodec();
 import { ApiKeyModule } from './modules/api-key/api-key.module';
 import { PartnerCatalogModule } from './modules/partner-catalog/partner-catalog.module';
+import { MediaModule } from './modules/media/media.module';
 
 @Module({
   imports: [
@@ -140,6 +141,7 @@ import { PartnerCatalogModule } from './modules/partner-catalog/partner-catalog.
     SalesOrderModule,
     ApiKeyModule,
     PartnerCatalogModule,
+    MediaModule,
   ],
 })
 export class AppModule {}

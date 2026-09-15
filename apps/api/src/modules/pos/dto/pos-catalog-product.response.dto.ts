@@ -22,7 +22,9 @@ export class PosProductCardDto {
 
   @ApiPropertyOptional({
     nullable: true,
-    description: 'Image URL placeholder — always null until image storage is implemented.',
+    description:
+      "Public URL of the card's first image (product images for a PRODUCT card, the " +
+      "item's own images for a standalone ITEM card), or null when it has none.",
   })
   imageUrl: string | null;
 
