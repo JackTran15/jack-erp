@@ -21,11 +21,18 @@ import {
 } from './mobile-stock-document-list.query.dto';
 
 /**
- * Một dòng hàng do app gửi lên — BA trường.
+ * Một dòng hàng do app gửi lên.
  *
- * Cố ý KHÔNG có `locationId` và `uomCode` dù DTO của phiếu nhập bắt buộc cả
- * hai: chúng là chi tiết kho vận mà màn hình không vẽ ra, và server tự giải
- * được. Xem `MobileStockDocumentWriteService`.
+ * `locationId` và `uomCode` là TUỲ CHỌN, và sự vắng mặt của chúng MANG NGHĨA:
+ * vắng = server tự giải như trước (bin từ `branchId`, đơn vị từ `items.unit`),
+ * có = dùng đúng thứ người dùng đã chọn trên màn Sửa dòng hàng. Nhờ vậy màn cũ
+ * không gửi gì vẫn chạy nguyên như cũ.
+ *
+ * **KHÔNG có `id` của dòng, và sẽ không bao giờ có.** Đường `update` của cả hai
+ * họ chứng từ XOÁ SẠCH rồi CHÈN LẠI, đánh số `lineNo` theo chỉ số mảng — nên
+ * dòng không có định danh bền qua một lượt sửa. Hệ quả: **xoá một dòng là gửi
+ * `PATCH` với mảng ngắn đi một phần tử**, và một route
+ * `DELETE :id/lines/:lineId` thì không thể có nghĩa. Đừng thêm.
  */
 export class MobileStockDocumentLineWriteDto {
   @ApiProperty({ format: 'uuid', description: 'Lấy từ `GET /mobile/items` — là `items.id`' })
@@ -47,6 +54,34 @@ export class MobileStockDocumentLineWriteDto {
   @IsString()
   @MaxLength(500)
   note?: string;
+
+  /**
+   * Bin (vị trí lưu kho) người dùng CHỌN cho dòng này — lấy từ
+   * `GET /mobile/inventory/locations?storageId=…`.
+   *
+   * Vắng = giữ nguyên hành vi cũ: server tự giải qua `ResolveItemLocationsQuery`
+   * từ `branchId`. Có = server DÙNG ĐÚNG giá trị này, sau khi kiểm nó thuộc một
+   * kho của chính cửa hàng lập phiếu — `location_id` chỉ có khoá ngoại tới
+   * `locations`, KHÔNG có ràng buộc nào buộc bin thuộc đúng cửa hàng.
+   */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  locationId?: string;
+
+  /**
+   * Đơn vị tính của dòng. Vắng = lấy `items.unit` như trước.
+   *
+   * CHỈ phiếu NHẬP lưu được: `goods_receipt_lines.uom_code` là cột thật, còn
+   * `goods_issue_lines` KHÔNG có cột nào tương ứng. Với `kind=stock-out`, gửi
+   * lại ĐÚNG đơn vị đang có là hợp lệ (màn Sửa gửi lại thứ nó vừa đọc) nhưng
+   * đổi sang đơn vị khác thì 400 — xem `MobileStockDocumentWriteService`.
+   */
+  @ApiPropertyOptional({ maxLength: 50 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  uomCode?: string;
 }
 
 /**
@@ -57,13 +92,14 @@ export class MobileStockDocumentLineWriteDto {
  * `description`/`notes`, `deliveredBy`/`deliverer`) được giấu ở đây — app không
  * có lý do gì để biết chúng.
  *
- * **Ba trường app KHÔNG gửi, server tự giải:**
+ * **Hai trường mỗi dòng mà app ĐƯỢC BỎ TRỐNG, server tự giải:**
  *
- * - `locationId` mỗi dòng — qua `ResolveItemLocationsQuery`, từ [branchId];
- * - `uomCode` mỗi dòng — từ `items.unit`.
+ * - `locationId` — qua `ResolveItemLocationsQuery`, từ [branchId];
+ * - `uomCode` — từ `items.unit`.
  *
- * Cả hai là khái niệm nội bộ backend. Bắt app mang chúng là bắt nó biết hai thứ
- * mà màn hình không hề hiển thị.
+ * Trước đây app KHÔNG gửi được chúng. Nay màn Sửa dòng hàng cho người dùng chọn
+ * Kho/Vị trí và Đơn vị tính, nên chúng thành TUỲ CHỌN: vắng thì server giải như
+ * cũ, có thì server dùng đúng lựa chọn đó. Xem `MobileStockDocumentLineWriteDto`.
  *
  * `purpose` TRƯỚC ĐÂY cũng nằm trong danh sách đó (server ép theo [kind]) và nay
  * KHÔNG còn: màn "Mục đích nhập/xuất kho" của app cho người dùng chọn giữa
@@ -203,6 +239,10 @@ export class MobileStockDocumentCreateDto {
  * `lines` bắt buộc và không rỗng: phiếu không dòng hàng bị tầng dưới từ chối,
  * và một `PATCH` thiếu `lines` sẽ lặng lẽ giữ nguyên dòng cũ — trong khi màn
  * hình đang hiện danh sách người dùng vừa sửa.
+ *
+ * Hệ quả trực tiếp: **SỬA hay XOÁ một dòng đều là một lượt `PATCH` với trọn
+ * mảng `lines`**, đúng cách trang web làm. Không có, và không nên có, endpoint
+ * thao tác trên từng dòng — lý do ở `MobileStockDocumentLineWriteDto`.
  */
 export class MobileStockDocumentUpdateDto {
   @ApiProperty({ description: 'Ngày chứng từ, ISO-8601' })

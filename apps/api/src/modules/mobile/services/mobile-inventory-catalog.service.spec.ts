@@ -43,6 +43,16 @@ describe('MobileInventoryCatalogService', () => {
   const sql = (): string => query.mock.calls[0][0] as string;
   const params = (): unknown[] => query.mock.calls[0][1] as unknown[];
 
+  /**
+   * Actor CÓ `branchIds` — `actor` dùng chung ở trên cố ý không có, và hai
+   * đường kho/vị trí lại scope theo đúng trường đó. Dùng một fixture riêng thay
+   * vì sửa `actor`, để bốn test phía trên không đổi nghĩa.
+   */
+  const branchActor: ActorContext = {
+    ...actor,
+    branchIds: ['branch-1', 'branch-2'],
+  };
+
   it('nhóm hàng: scope $1, chỉ ACTIVE, ba cột app cần, sắp theo mã rồi tên', async () => {
     await service.listCategories(actor);
 
@@ -151,5 +161,39 @@ describe('MobileInventoryCatalogService', () => {
     await expect(service.createCategory({ name: 'Phụ kiện' }, actor)).rejects.toThrow(
       /hợp đồng đã đổi/,
     );
+  });
+
+  describe('kho và vị trí — nguồn cho màn Sửa dòng hàng', () => {
+    it('kho: lọc theo cửa hàng VÀ theo tập cửa hàng trong JWT', async () => {
+      // Hai điều kiện, không phải một: `$2` là cửa hàng người dùng hỏi, `$3` là
+      // những cửa hàng họ được phép. Bỏ `$3` là để một id đoán được đọc kho của
+      // tổ chức khác.
+      await service.listStorages('branch-1', branchActor);
+
+      expect(params()).toEqual(['org-1', 'branch-1', ['branch-1', 'branch-2']]);
+      expect(sql()).toContain('s.organization_id = $1');
+      expect(sql()).toContain('s.branch_id = $2::uuid');
+      expect(sql()).toContain('s.branch_id = ANY($3::uuid[])');
+      expect(sql()).toContain('s.is_active = true');
+    });
+
+    it('vị trí: "Chưa xếp" đứng ĐẦU, kho ngừng hoạt động bị loại', async () => {
+      await service.listLocations('st-1', branchActor);
+
+      expect(params()).toEqual(['org-1', 'st-1', ['branch-1', 'branch-2']]);
+      expect(sql()).toContain('l.storage_id = $2::uuid');
+      expect(sql()).toContain('s.branch_id = ANY($3::uuid[])');
+      expect(sql()).toContain('l.is_active = true');
+      expect(sql()).toContain('s.is_active = true');
+      // Thứ tự LÀ chính sách: nó biến quy tắc dự phòng của trang web (tìm bin
+      // "Chưa xếp") thành vị trí trong danh sách, nên app không cần luật riêng.
+      expect(sql()).toContain('ORDER BY l.is_unassigned DESC');
+    });
+
+    it('người chưa được gán cửa hàng nào: ANY của mảng RỖNG, không phải bỏ điều kiện', async () => {
+      await service.listLocations('st-1', { ...actor, branchIds: [] });
+
+      expect(params()[2]).toEqual([]);
+    });
   });
 });

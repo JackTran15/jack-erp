@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -91,6 +92,7 @@ const SELECT_COLUMNS = `
     to_char(c.birth_date, 'YYYY-MM-DD')                       AS "birthDate",
     c.gender::text                                            AS gender,
     CASE WHEN c.status::text = 'ACTIVE' THEN 'active' ELSE 'inactive' END AS status,
+    c.group_id::text                                          AS "groupId",
     g.name                                                    AS "groupName",
     CASE WHEN m.tier IS NULL OR m.tier::text = 'none' THEN NULL
          ELSE COALESCE(t.name, m.tier::text) END              AS "cardTier",
@@ -309,6 +311,33 @@ export class MobileCustomerService {
   }
 
   /**
+   * Kiểm `groupId` thuộc ĐÚNG tổ chức của actor, rồi trả lại chính nó.
+   *
+   * Ba trạng thái, KHÔNG phải hai: `undefined` = vắng khoá, giữ nguyên;
+   * `null` = gỡ nhóm; uuid = gán.
+   *
+   * **Phép tra này là RANH GIỚI MULTI-TENANT, không phải tối ưu.** Khoá ngoại
+   * `customers.group_id` chỉ đòi uuid tồn tại trong `customer_groups`, KHÔNG
+   * đòi cùng tổ chức — và `CustomerService.create/update` spread trọn payload
+   * vào entity chứ không kiểm gì. Bỏ nó là một uuid rò rỉ gán được khách hàng
+   * của tổ chức A vào nhóm của tổ chức B, và cả hai bên đều đọc ra bình thường.
+   */
+  private async assertGroupInOrg(
+    groupId: string | null | undefined,
+    actor: ActorContext,
+  ): Promise<void> {
+    if (groupId === undefined || groupId === null) return;
+
+    const rows = await this.dataSource.query<{ id: string }[]>(
+      'SELECT id FROM customer_groups WHERE id = $1::uuid AND organization_id = $2::uuid LIMIT 1',
+      [groupId, actor.organizationId],
+    );
+    if (rows.length === 0) {
+      throw new BadRequestException('Nhóm khách hàng không tồn tại.');
+    }
+  }
+
+  /**
    * Tạo khách hàng — UỶ QUYỀN cho `CustomerService.create`, KHÁC đường ghi
    * nhà cung cấp vốn tự `INSERT`. Lý do: bản ghi khách hàng không đứng một
    * mình. `CustomerService.create` còn cấp mã `KH…` qua `CustomerCodeService`
@@ -333,6 +362,7 @@ export class MobileCustomerService {
     const email = toOptional(dto.email);
 
     await this.assertNoDuplicate({ code, phone, email, actor });
+    await this.assertGroupInOrg(dto.groupId, actor);
 
     // `status` không có trong `CreateCustomerDto` của web (web luôn tạo khách
     // đang theo dõi), nhưng `CustomerService.create` spread trọn payload vào
@@ -348,6 +378,7 @@ export class MobileCustomerService {
       gender: dto.gender ?? undefined,
       note: toOptional(dto.note),
       status: STATUS_COLUMN_VALUE[dto.status ?? MobileCustomerStatus.ACTIVE],
+      groupId: dto.groupId ?? undefined,
     } as CreateCustomerDto;
 
     const saved = await this.customers.create(payload, actor);
@@ -378,6 +409,7 @@ export class MobileCustomerService {
     const email = dto.email === undefined ? undefined : toOptional(dto.email);
 
     await this.assertNoDuplicate({ code, phone, email, actor, excludeId: id });
+    await this.assertGroupInOrg(dto.groupId, actor);
 
     const payload: UpdateCustomerDto = {};
     if (dto.code !== undefined) payload.code = dto.code;
@@ -399,6 +431,11 @@ export class MobileCustomerService {
       payload.note = toOptional(dto.note) as string | undefined;
     }
     if (dto.status !== undefined) payload.status = STATUS_COLUMN_VALUE[dto.status];
+    // `null` đi XUỐNG nguyên vẹn để `repository.merge` ghi NULL — đó là thao
+    // tác GỠ nhóm. Cùng phép ép kiểu một-chỗ như `phone`/`email` ngay trên.
+    if (dto.groupId !== undefined) {
+      payload.groupId = dto.groupId as string | undefined;
+    }
 
     await this.customers.update(id, payload, actor);
 

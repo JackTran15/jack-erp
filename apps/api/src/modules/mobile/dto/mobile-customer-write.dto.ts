@@ -8,6 +8,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
 } from 'class-validator';
 import { Gender } from '../../customer/customer.entity';
@@ -29,9 +30,13 @@ const blankToNull = () =>
  * Body tạo khách hàng từ app. Message tiếng Việt vì app hiện thẳng `message`
  * của server lên toast — cùng lý do `MobileSupplierCreateDto` đã ghi.
  *
- * Cố ý KHÔNG nhận `groupId`, `nationalId`, `companyName`, `taxCode`,
- * `assignedStaffId`, `membershipCard`: form của app không có ô nào cho chúng.
- * Whitelist đang bật nên gửi tới là 400 — đúng ý, đừng nới "cho rộng".
+ * Cố ý KHÔNG nhận `nationalId`, `companyName`, `taxCode`, `assignedStaffId`,
+ * `membershipCard`: form của app không có ô nào cho chúng. Whitelist đang bật
+ * nên gửi tới là 400 — đúng ý, đừng nới "cho rộng".
+ *
+ * `groupId` thì ĐÃ nhận (app có ô "Nhóm khách hàng" từ đợt này). Cố ý KHÔNG
+ * nhận `groupName`: tên nhóm thuần hiển thị, và nhóm được định danh bằng uuid
+ * — chiều đọc trả cả hai, chiều ghi chỉ một.
  *
  * `code` để trống thì server tự cấp (`CustomerCodeService`), nên nó tuỳ chọn
  * ngay cả ở create — khác nhà cung cấp, nơi mã là bắt buộc.
@@ -105,6 +110,20 @@ export class MobileCustomerCreateDto {
     message: 'Trạng thái chỉ nhận "active" hoặc "inactive".',
   })
   status?: MobileCustomerStatus;
+
+  /**
+   * Nhóm khách hàng, định danh bằng **UUID**.
+   *
+   * `null` = GỠ nhóm khỏi khách hàng này — picker của app cho bỏ chọn, nên đây
+   * là thao tác có thật. `@IsOptional()` bỏ qua cả `undefined` lẫn `null`, nên
+   * `null` đi lọt tới service, nơi nó được phân biệt với "vắng khoá = giữ
+   * nguyên". Cùng ngữ nghĩa `MobileSupplierCreateDto.groupId`.
+   */
+  @ApiPropertyOptional({ format: 'uuid', nullable: true })
+  @blankToNull()
+  @IsOptional()
+  @IsUUID('4', { message: 'Nhóm khách hàng không hợp lệ.' })
+  groupId?: string | null;
 }
 
 export class MobileCustomerUpdateDto extends PartialType(

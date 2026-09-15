@@ -17,8 +17,15 @@ import { MobileStockDocumentStatus } from './mobile-stock-document.response.dto'
  * Cố ý KHÔNG trả `item` và `location` dạng object. Cả hai là quan hệ `eager`
  * của entity dòng hàng, nên đường v1 trả TRỌN `ItemEntity` (~30 trường: giá
  * vốn, cân nặng, năm sản xuất, chất liệu…) và trọn `LocationEntity` cho MỖI
- * dòng — một phiếu 3 dòng đã nặng 8,2–8,9 KB. App chỉ cần ba mẩu chữ trong số
+ * dòng — một phiếu 3 dòng đã nặng 8,2–8,9 KB. App chỉ cần vài mẩu chữ trong số
  * đó.
+ *
+ * Bốn trường KHO/VỊ TRÍ (`locationId`, `locationName`, `storageId`,
+ * `storageName`) nay CÓ mặt, nhưng vẫn theo đúng nguyên tắc trên: chúng là bốn
+ * cột phẳng lấy qua một `select` tường minh, không phải hai object lồng. Màn
+ * Sửa dòng hàng cần chúng để hiện sẵn lựa chọn cũ **và để gửi lại `locationId`**
+ * — thiếu nó thì mỗi lượt lưu là server giải lại vị trí, và một dòng người dùng
+ * đã xếp tay lặng lẽ nhảy sang bin khác.
  *
  * `note` của dòng cũng chưa có ở đây: `StockLineRow` không vẽ nó. Thêm khi màn
  * hình cần — đó là thay đổi cộng thêm, không phá client cũ.
@@ -86,7 +93,39 @@ export class MobileStockDocumentLineDto {
       'lệch nhau khi có chiết khấu, và trang web cũng ưu tiên trường này.',
   })
   lineTotal!: number;
+
+  @ApiProperty({
+    format: 'uuid',
+    nullable: true,
+    description:
+      'Bin (vị trí lưu kho) đã lưu của dòng. App gửi lại ĐÚNG giá trị này khi ' +
+      'SỬA — thiếu nó thì mỗi lượt lưu là server giải lại vị trí, tức hàng đổi ' +
+      'bin mà không ai bấm gì.',
+  })
+  locationId!: string | null;
+
+  @ApiProperty({
+    nullable: true,
+    description: 'Tên bin, để màn Sửa hiện sẵn lựa chọn cũ',
+  })
+  locationName!: string | null;
+
+  @ApiProperty({
+    format: 'uuid',
+    nullable: true,
+    description: 'Kho chứa bin — `storages.id`',
+  })
+  storageId!: string | null;
+
+  @ApiProperty({ nullable: true, description: 'Tên kho' })
+  storageName!: string | null;
 }
+
+/*
+ * KHÔNG có `id` của dòng, và sẽ không bao giờ có: đường `update` của cả hai họ
+ * chứng từ xoá sạch rồi chèn lại dòng, đánh số `lineNo` theo chỉ số mảng. Một
+ * định danh phơi ra ở đây là lời nói dối mà app sẽ dựng lên trên.
+ */
 
 /**
  * Chi tiết một chứng từ kho: phần đầu phiếu cộng toàn bộ dòng hàng.

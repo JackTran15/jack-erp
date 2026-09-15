@@ -2,7 +2,9 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -42,9 +44,14 @@ import { MobileStockDocumentWriteService } from '../services/mobile-stock-docume
  * đây nghĩa là thêm loại chứng từ sau này chỉ là thêm một giá trị enum chứ
  * không phải một đường dẫn mới.
  *
- * Có cả đường ĐỌC (danh sách, chi tiết) lẫn đường GHI (tạo, sửa). Xoá/huỷ chưa
- * có — app chưa có màn cho nó, và hai họ chứng từ xoá theo hai kiểu khác nhau
- * (`DELETE` cho phiếu nhập, `POST :id/cancel` cho phiếu xuất).
+ * Có cả đường ĐỌC (danh sách, chi tiết) lẫn đường GHI (tạo, sửa, xoá).
+ *
+ * **Xoá CHỈ có cho phiếu nhập** (`goods-receipt`, `stock-in`). Phiếu xuất vẫn
+ * huỷ trên web, và đó là một quyết định SẢN PHẨM chứ không phải một khoảng
+ * trống chờ lấp: `GoodsIssueService.cancel` tồn tại và chạy được. Hai họ chứng
+ * từ cũng xoá theo hai kiểu khác nhau ở web (`DELETE` cho phiếu nhập,
+ * `POST :id/cancel` cho phiếu xuất), nên gộp chúng vào một đường mobile là gộp
+ * hai luồng nghiệp vụ không giống nhau.
  */
 @ApiTags('mobile')
 @Controller('mobile/stock-documents')
@@ -167,6 +174,39 @@ export class MobileStockDocumentController {
 
     return this.writes.update(
       { id, kind: query.kind, branchId: query.branchId, dto },
+      actor,
+    );
+  }
+
+  /**
+   * Xoá chứng từ — **CHỈ phiếu nhập** (`goods-receipt`, `stock-in`).
+   *
+   * `kind` + `branchId` qua QUERY, dùng lại đúng DTO của `PATCH` và vì đúng lý
+   * do đó: server cần biết tra bảng nào và kiểm cửa hàng nào, còn `DELETE` thì
+   * không có body để đặt chúng vào.
+   *
+   * MỘT quyền ở decorator, không phải hai OR như bốn đường trên: phiếu xuất
+   * không xoá được ở đây bằng bất kỳ quyền nào, nên cho `inventory.goods-issue.*`
+   * lọt qua guard rồi mới 400 ở service là mời người dùng đi một vòng vô nghĩa.
+   *
+   * 204 chứ không `{ id }`: hai đường ghi kia trả id vì app ĐIỀU HƯỚNG bằng nó;
+   * xoá xong thì không còn gì để điều hướng tới.
+   */
+  @Delete(':id')
+  @HttpCode(204)
+  @RequirePermission('goods_receipt.write')
+  @ApiOperation({ summary: 'Xoá chứng từ kho — chỉ phiếu nhập' })
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: MobileStockDocumentDetailQueryDto,
+    @Actor() actor: ActorContext,
+  ): Promise<void> {
+    if (!query.branchId) {
+      throw new BadRequestException('branchId là bắt buộc khi xoá chứng từ');
+    }
+
+    return this.writes.remove(
+      { id, kind: query.kind, branchId: query.branchId },
       actor,
     );
   }

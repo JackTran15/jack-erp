@@ -60,6 +60,22 @@ export class MobileCustomerResponseDto {
   @ApiProperty({ enum: ['active', 'inactive'] })
   status!: 'active' | 'inactive';
 
+  /**
+   * Khoá GHI của nhóm — thứ mà `POST`/`PATCH` nhận lại qua `groupId`.
+   *
+   * Đọc từ CỘT `c.group_id`, không từ quan hệ `g`: cột luôn có, còn `LEFT JOIN`
+   * chỉ cho tên khi nhóm còn tồn tại. Thiếu trường này thì form SỬA của app
+   * biết TÊN nhóm nhưng không biết id để tô sẵn picker hay gửi lại — và lượt
+   * lưu tiếp theo sẽ lặng lẽ GỠ nhóm khỏi khách hàng.
+   */
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    format: 'uuid',
+    description: 'Khoá nhóm khách hàng; null = chưa xếp nhóm',
+  })
+  groupId!: string | null;
+
   @ApiProperty({ nullable: true, type: String, description: 'Tên nhóm khách hàng' })
   groupName!: string | null;
 

@@ -22,6 +22,19 @@ export class MobileCustomerDebtDto {
   @ApiProperty()
   name!: string;
 
+  /**
+   * Số điện thoại, để BẤM GỌI ngay trên dòng — không phải để hiển thị.
+   *
+   * Màn công nợ của app giấu nút gọi sau cử chỉ vuốt, và nếu không có số ở đây
+   * thì nút đó phải gọi thêm một lượt `/mobile/customers/:id` chỉ để lấy một
+   * chuỗi. Bảng `customers` đã nằm trong `JOIN` sẵn có nên đây là một cột thêm,
+   * không phải một phép nối thêm.
+   *
+   * `null` = khách chưa từng nhập số, KHÔNG phải lỗi dữ liệu.
+   */
+  @ApiProperty({ type: String, nullable: true })
+  phone!: string | null;
+
   @ApiProperty({
     description:
       'Nợ CUỐI KỲ = đầu kỳ + tăng − giảm, gộp sổ POS và sổ kế toán, đơn vị đồng. Có thể ÂM (khách trả dư) hoặc 0',

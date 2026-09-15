@@ -23,6 +23,7 @@ import { MobileBusinessReportController } from './controllers/mobile-business-re
 import { MobileCashflowReportController } from './controllers/mobile-cashflow-report.controller';
 import { MobileCounterpartyController } from './controllers/mobile-counterparty.controller';
 import { MobileCustomerController } from './controllers/mobile-customer.controller';
+import { MobileCustomerGroupController } from './controllers/mobile-customer-group.controller';
 import { MobileDebtReportController } from './controllers/mobile-debt-report.controller';
 import { MobileInventoryController } from './controllers/mobile-inventory.controller';
 import { MobileOverviewReportController } from './controllers/mobile-overview-report.controller';
@@ -48,6 +49,7 @@ import { MobileBusinessReportService } from './services/mobile-business-report.s
 import { MobileCashflowReportService } from './services/mobile-cashflow-report.service';
 import { MobileCounterpartyService } from './services/mobile-counterparty.service';
 import { MobileCustomerService } from './services/mobile-customer.service';
+import { MobileCustomerGroupService } from './services/mobile-customer-group.service';
 import { MobileDebtReportService } from './services/mobile-debt-report.service';
 import { MobileInventoryCatalogService } from './services/mobile-inventory-catalog.service';
 import { MobileInventoryDrilldownService } from './services/mobile-inventory-drilldown.service';
@@ -176,6 +178,7 @@ import { MobileSupplierGroupService } from './services/mobile-supplier-group.ser
     MobileSupplierGroupController,
     MobileCounterpartyController,
     MobileCustomerController,
+    MobileCustomerGroupController,
     MobileManagerInvoiceController,
     MobileInventoryController,
     MobileRevenueReportController,
@@ -202,6 +205,7 @@ import { MobileSupplierGroupService } from './services/mobile-supplier-group.ser
     MobileSupplierGroupService,
     MobileCounterpartyService,
     MobileCustomerService,
+    MobileCustomerGroupService,
     MobileManagerInvoiceService,
     MobileInventoryService,
     MobileInventoryDrilldownService,

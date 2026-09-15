@@ -225,6 +225,7 @@ export class MobileDebtReportService {
       SELECT c.id::text AS id,
              c.code,
              c.name,
+             c.phone,
              b.closing
       ${FROM_CLAUSE}
       ${whereSql}

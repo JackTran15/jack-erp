@@ -12,6 +12,7 @@ import { RbacService } from '../../rbac/rbac.service';
 import { GoodsIssueService } from '../../inventory/goods-issue/goods-issue.service';
 import { GoodsReceiptService } from '../../inventory/goods-receipt/goods-receipt.service';
 import { ItemEntity } from '../../inventory/location/item.entity';
+import { LocationEntity } from '../../inventory/location/location.entity';
 import { ResolveItemLocationsQuery } from '../../inventory/location/queries/resolve-item-locations.query';
 import { ResolveItemLocationsResponseDto } from '../../inventory/location/dto/resolve-item-locations.dto';
 import { TransferOrderService } from '../../inventory/transfer-order/transfer-order.service';
@@ -42,6 +43,26 @@ const UPDATE_PERMISSION_OF: Record<MobileStockDocumentKind, string> = {
   [MobileStockDocumentKind.GOODS_RECEIPT]: 'goods_receipt.write',
   [MobileStockDocumentKind.STOCK_IN]: 'goods_receipt.write',
   [MobileStockDocumentKind.STOCK_OUT]: 'inventory.goods-issue.update',
+};
+
+/**
+ * Quyền XOÁ — và cũng là danh sách những loại chứng từ xoá được.
+ *
+ * `Partial` KHÔNG phải để cho đồng dạng với hai bảng trên: **`STOCK_OUT` vắng
+ * mặt là CÓ NGHĨA**. App không xoá phiếu xuất — `GoodsIssueService.cancel` tồn
+ * tại và trang web vẫn dùng, nhưng huỷ một phiếu xuất đã ghi sổ là nghiệp vụ
+ * của web. Thiếu khoá = từ chối, xem [MobileStockDocumentWriteService.remove];
+ * thêm một khoá vào đây là mở nguyên một luồng nghiệp vụ, không phải sửa một
+ * bảng tra.
+ *
+ * `goods_receipt.write`, KHÔNG phải `goods_receipt.delete`: khoá đó không tồn
+ * tại trong RBAC, và `DELETE /goods-receipts/:id` của web cũng gác bằng
+ * `write`. Xoá ở đây là "sửa phiếu xuống còn rỗng" chứ không phải một quyền
+ * riêng.
+ */
+const DELETE_PERMISSION_OF: Partial<Record<MobileStockDocumentKind, string>> = {
+  [MobileStockDocumentKind.GOODS_RECEIPT]: 'goods_receipt.write',
+  [MobileStockDocumentKind.STOCK_IN]: 'goods_receipt.write',
 };
 
 /**
@@ -91,9 +112,11 @@ interface ResolvedLine {
  * hàng, số lượng dương, không sửa phiếu đã huỷ, khoá lạc quan theo `revision`,
  * và kiểm tồn kho lúc ghi sổ. Viết lại là chép một tập luật chắc chắn phân kỳ.
  *
- * Việc RIÊNG của service này gói gọn trong ba phép dịch:
+ * Việc RIÊNG của service này gói gọn trong ba phép dịch, cộng một đường xoá:
  *
- * 1. **Bổ sung ba trường app không gửi** — `locationId`, `uomCode`, `purpose`;
+ * 1. **Giải ba trường khi app bỏ trống** — `locationId`, `uomCode`, `purpose`.
+ *    Hai cái đầu nay app GỬI ĐƯỢC (màn Sửa dòng hàng cho chọn Kho/Vị trí và Đơn
+ *    vị tính), nên đây là đường DỰ PHÒNG chứ không còn là đường duy nhất;
  * 2. **Đổi tên trường** giữa hai họ chứng từ (`receivedAt`/`occurredAt`,
  *    `description`/`notes`, `deliveredBy`/`deliverer`);
  * 3. **Kiểm quyền theo `kind`**, vì decorator nhiều key là OR.
@@ -131,6 +154,7 @@ export class MobileStockDocumentWriteService {
     });
 
     const lines = await this.resolveLines({
+      kind: dto.kind,
       lines: dto.lines,
       branchId: dto.branchId,
       actor: scoped,
@@ -350,6 +374,7 @@ export class MobileStockDocumentWriteService {
     });
 
     const lines = await this.resolveLines({
+      kind,
       lines: dto.lines,
       branchId,
       actor: scoped,
@@ -447,22 +472,70 @@ export class MobileStockDocumentWriteService {
   }
 
   /**
-   * Bổ sung `locationId` và `uomCode` cho từng dòng.
+   * Xoá (huỷ) một chứng từ NHẬP.
    *
-   * `locationId` đi qua `ResolveItemLocationsQuery` — cùng đường trang web dùng.
-   * Nó trả kho mặc định của cửa hàng CỘNG vị trí cho từng mặt hàng, phân giải
-   * theo ba bậc (kệ ưu tiên -> bin đang giữ tồn -> vị trí mặc định), nên một
-   * lượt gọi là đủ cho cả phiếu.
+   * `GoodsReceiptService.cancel` làm hết phần khó: đảo bút tồn kho cho phiếu đã
+   * ghi sổ, gỡ công nợ của phiếu mua chịu, đặt `CANCELLED` rồi soft-delete. Nó
+   * cũng đã có sẵn câu tiếng Việt cho phiếu đã huỷ/đã đảo bút (409). Việc riêng
+   * ở đây gói gọn trong hai phép dịch: `kind` -> "xoá được không", và `kind` ->
+   * quyền.
    *
-   * `uomCode` lấy từ `items.unit` — nó là bản CHỤP đơn vị tính tại thời điểm
-   * lập phiếu, nên đọc từ danh mục đúng lúc này là đúng nghĩa.
+   * Dùng lại [scopedActor] nghĩa là `stock-in` còn đòi thêm
+   * `goods_receipt.other-receipt` (bảng `EXTRA_PURPOSE_PERMISSION_OF`). ĐÓ LÀ
+   * CHỦ Ý: ai không tạo được một phiếu nhập khác thì cũng không được xoá nó.
+   */
+  async remove(
+    args: {
+      id: string;
+      kind: MobileStockDocumentKind;
+      branchId: string;
+    },
+    actor: ActorContext,
+  ): Promise<void> {
+    const { id, kind, branchId } = args;
+
+    const permission = DELETE_PERMISSION_OF[kind];
+
+    // 400, KHÔNG 403: người có đủ mọi quyền trên đời cũng không xoá được phiếu
+    // xuất ở app. 403 nói sai chuyện — nó bảo người dùng đi xin một vai trò
+    // không giúp được gì.
+    if (!permission) {
+      throw new BadRequestException(
+        'Phiếu xuất kho không xoá được trên ứng dụng — vui lòng huỷ phiếu trên web',
+      );
+    }
+
+    const scoped = await this.scopedActor({
+      kind,
+      branchId,
+      permission,
+      actor,
+    });
+
+    await this.receipts.cancel(id, scoped);
+  }
+
+  /**
+   * Bổ sung `locationId` và `uomCode` cho từng dòng — hoặc GIỮ thứ app đã chọn.
+   *
+   * Dòng nào tự mang `locationId` thì dùng đúng nó; những dòng còn lại đi qua
+   * `ResolveItemLocationsQuery` — cùng đường trang web dùng, phân giải theo ba
+   * bậc (kệ ưu tiên -> bin đang giữ tồn -> vị trí mặc định) nên một lượt gọi là
+   * đủ cho cả phiếu.
+   *
+   * Cả phiếu tự chọn hết thì KHÔNG gọi query nào. Không phải để tiết kiệm: nó
+   * còn tránh câu "Cửa hàng chưa có vị trí lưu kho" bật ra cho một cửa hàng mà
+   * người dùng vừa chọn bin bằng tay.
+   *
+   * `uomCode` xem [resolveUom].
    */
   private async resolveLines(args: {
+    kind: MobileStockDocumentKind;
     lines: MobileStockDocumentLineWriteDto[];
     branchId: string;
     actor: ActorContext;
   }): Promise<ResolvedLine[]> {
-    const { lines, branchId, actor } = args;
+    const { kind, lines, branchId, actor } = args;
 
     const itemIds = [...new Set(lines.map((line) => line.itemId))];
 
@@ -481,21 +554,35 @@ export class MobileStockDocumentWriteService {
       );
     }
 
-    const resolved = await this.queryBus.execute<
-      ResolveItemLocationsQuery,
-      ResolveItemLocationsResponseDto
-    >(
-      new ResolveItemLocationsQuery(
-        { variantItemIds: itemIds, branchId },
-        actor,
+    await this.assertLocationsOfBranch({ lines, branchId, actor });
+
+    // Chỉ hỏi vị trí cho những dòng KHÔNG tự mang bin.
+    const unresolvedItemIds = [
+      ...new Set(
+        lines.filter((line) => !line.locationId).map((line) => line.itemId),
       ),
-    );
-    const locationByItem = new Map(
-      resolved.data.map((row) => [row.itemId, row.locationId]),
-    );
+    ];
+
+    const locationByItem = new Map<string, string>();
+    if (unresolvedItemIds.length) {
+      const resolved = await this.queryBus.execute<
+        ResolveItemLocationsQuery,
+        ResolveItemLocationsResponseDto
+      >(
+        new ResolveItemLocationsQuery(
+          { variantItemIds: unresolvedItemIds, branchId },
+          actor,
+        ),
+      );
+      for (const row of resolved.data) {
+        if (row.locationId) {
+          locationByItem.set(row.itemId, row.locationId);
+        }
+      }
+    }
 
     return lines.map((line) => {
-      const locationId = locationByItem.get(line.itemId);
+      const locationId = line.locationId ?? locationByItem.get(line.itemId);
 
       if (!locationId) {
         throw new BadRequestException(
@@ -506,14 +593,107 @@ export class MobileStockDocumentWriteService {
       return {
         itemId: line.itemId,
         locationId,
-        // `'Cái'` khi danh mục bỏ trống đơn vị: cột `uom_code` là NOT NULL, và
-        // đây đúng là giá trị dự phòng trang web dùng.
-        uomCode: unitById.get(line.itemId) || 'Cái',
+        uomCode: this.resolveUom({
+          kind,
+          line,
+          catalogUnit: unitById.get(line.itemId),
+        }),
         quantity: line.quantity,
         unitPrice: line.unitPrice,
         note: line.note,
       };
     });
+  }
+
+  /**
+   * Bin do NGƯỜI DÙNG chọn phải thuộc chính cửa hàng lập phiếu.
+   *
+   * Phép kiểm này BẮT BUỘC, không phải phòng xa: `goods_*_lines.location_id`
+   * chỉ có khoá ngoại tới `locations`, và KHÔNG ràng buộc nào buộc bin đó thuộc
+   * cửa hàng của chứng từ. Thiếu nó là ghi tồn vào kho của cửa hàng khác bằng
+   * một id đoán được — cùng lớp lỗ hổng đã phải vá ở nhóm khách hàng và nhóm
+   * nhà cung cấp.
+   *
+   * Cố ý KHÔNG lọc `isActive`: một dòng có bin vừa bị ngừng hoạt động vẫn phải
+   * sửa được số lượng, nếu không người dùng kẹt hẳn. Việc chặn ghi tồn vào kho
+   * đã ngừng nằm ở tầng sổ kho, nơi nó vốn đã ở.
+   */
+  private async assertLocationsOfBranch(args: {
+    lines: MobileStockDocumentLineWriteDto[];
+    branchId: string;
+    actor: ActorContext;
+  }): Promise<void> {
+    const { lines, branchId, actor } = args;
+
+    const ids = [
+      ...new Set(
+        lines
+          .map((line) => line.locationId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (!ids.length) {
+      return;
+    }
+
+    const found = await this.items.manager.find(LocationEntity, {
+      where: {
+        id: In(ids),
+        organizationId: actor.organizationId,
+        storage: { branchId },
+      },
+      relations: { storage: true },
+      select: { id: true },
+    });
+
+    const ok = new Set(found.map((location) => location.id));
+    const stray = ids.filter((id) => !ok.has(id));
+    if (stray.length) {
+      throw new BadRequestException(
+        `Vị trí lưu kho không thuộc cửa hàng lập phiếu: ${stray.join(', ')}`,
+      );
+    }
+  }
+
+  /**
+   * Đơn vị tính của dòng.
+   *
+   * Phiếu NHẬP lưu được `uom_code`, nên lựa chọn của người dùng thắng. Phiếu
+   * XUẤT **không có cột đó**: nhận lại đúng đơn vị đang có là hợp lệ — màn Sửa
+   * gửi lại chính thứ nó vừa đọc — nhưng ĐỔI sang đơn vị khác thì 400 chứ không
+   * nuốt im. Nuốt im nghĩa là người dùng bấm Lưu, thấy thành công, mở lại thấy
+   * đơn vị cũ.
+   *
+   * Cùng hình dạng mà `UpdateGoodsReceiptDto.paymentMethod` đã dùng cho ca
+   * round-trip: nhận để form gửi lại được, từ chối khi đổi thật.
+   */
+  private resolveUom(args: {
+    kind: MobileStockDocumentKind;
+    line: MobileStockDocumentLineWriteDto;
+    catalogUnit: string | undefined;
+  }): string {
+    const { kind, line, catalogUnit } = args;
+
+    // `'Cái'` khi danh mục bỏ trống đơn vị: cột `uom_code` là NOT NULL, và đây
+    // đúng là giá trị dự phòng trang web dùng.
+    const fallback = catalogUnit || 'Cái';
+    const wanted = line.uomCode?.trim();
+
+    if (!wanted) {
+      return fallback;
+    }
+
+    if (kind === MobileStockDocumentKind.STOCK_OUT) {
+      if (wanted.toLowerCase() !== fallback.toLowerCase()) {
+        throw new BadRequestException(
+          'Phiếu xuất kho không đổi được đơn vị tính — đơn vị lấy theo hàng hoá',
+        );
+      }
+
+      return fallback;
+    }
+
+    return wanted;
   }
 }
 
