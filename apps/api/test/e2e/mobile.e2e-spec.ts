@@ -1465,8 +1465,8 @@ describe('Mobile facade (E2E)', () => {
 
       const row = byCode(res, 'KH000001');
       expect(Object.keys(row).sort()).toEqual([
-        'address', 'birthDate', 'cardTier', 'code', 'email', 'gender', 'groupName', 'id',
-        'invoiceCount', 'name', 'note', 'phone', 'revenue', 'status',
+        'address', 'birthDate', 'cardTier', 'code', 'email', 'gender', 'groupId',
+        'groupName', 'id', 'invoiceCount', 'name', 'note', 'phone', 'revenue', 'status',
       ]);
       expect(row.id).toBe(customerIds.AN);
     });
@@ -1480,6 +1480,9 @@ describe('Mobile facade (E2E)', () => {
       const an = byCode(res, 'KH000001');
       expect(an.status).toBe('active');
       expect(an.groupName).toBe('Khách sỉ');
+      // `groupId` là khoá GHI: form Sửa gửi lại chính nó. Trả thiếu là lượt lưu
+      // tiếp theo lặng lẽ GỠ nhóm khỏi khách hàng.
+      expect(an.groupId).toEqual(expect.any(String));
       // TÊN do tổ chức đặt, không phải mã `gold`.
       expect(an.cardTier).toBe('Thẻ Vàng');
       // Chuỗi ngày trần, KHÔNG phải ISO có giờ: cột `date` đi qua `Date` của
@@ -1489,6 +1492,7 @@ describe('Mobile facade (E2E)', () => {
       const binh = byCode(res, 'KH000002');
       expect(binh.status).toBe('inactive');
       expect(binh.groupName).toBeNull();
+      expect(binh.groupId).toBeNull();
       expect(binh.cardTier).toBeNull();
       expect(binh.email).toBeNull();
       expect(binh.birthDate).toBeNull();
@@ -1674,8 +1678,8 @@ describe('Mobile facade (E2E)', () => {
       // Chuỗi rỗng KHÔNG thành `''` trong DB — nó là "chưa nhập".
       expect(res.body.email).toBeNull();
       expect(Object.keys(res.body).sort()).toEqual([
-        'address', 'birthDate', 'cardTier', 'code', 'email', 'gender', 'groupName', 'id',
-        'invoiceCount', 'name', 'note', 'phone', 'revenue', 'status',
+        'address', 'birthDate', 'cardTier', 'code', 'email', 'gender', 'groupId',
+        'groupName', 'id', 'invoiceCount', 'name', 'note', 'phone', 'revenue', 'status',
       ]);
 
       // Vòng đọc–ghi khớp.
@@ -1864,6 +1868,114 @@ describe('Mobile facade (E2E)', () => {
         .set('Authorization', authHeader(seed.accessToken))
         .expect(400);
       await request(app.getHttpServer()).delete(`/mobile/customers/${customerIds.AN}`).expect(401);
+    });
+  });
+
+  // ─── Nhóm khách hàng ──────────────────────────────────────────────
+
+  describe('/mobile/customer-groups', () => {
+    // Dùng LẠI nhóm "Khách sỉ" mà khối Khách hàng đã seed — jest chạy các
+    // `describe` trong CÙNG file theo thứ tự khai báo.
+    const get = () =>
+      request(app.getHttpServer())
+        .get('/mobile/customer-groups')
+        .set('Authorization', authHeader(seed.accessToken));
+
+    const post = (body: Record<string, unknown>) =>
+      request(app.getHttpServer())
+        .post('/mobile/customer-groups')
+        .set('Authorization', authHeader(seed.accessToken))
+        .send(body);
+
+    it('không token -> 401', async () => {
+      await request(app.getHttpServer()).get('/mobile/customer-groups').expect(401);
+    });
+
+    it('trả phong bì { data }, KHÔNG có total/page/limit', async () => {
+      const res = await get().expect(200);
+
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(Object.keys(res.body)).toEqual(['data']);
+    });
+
+    /**
+     * Bản ghi gốc mang cả `organizationId`, `branchId`, `createdBy`,
+     * `createdAt`. Bốn khoá này là toàn bộ thứ app được thấy — đây chính là lý
+     * do không dùng lại `/customers/groups`.
+     */
+    it('mỗi dòng ĐÚNG bốn trường, không rò cột hạ tầng', async () => {
+      const res = await get().expect(200);
+      const row = res.body.data.find(
+        (g: { name: string }) => g.name === 'Khách sỉ',
+      );
+
+      expect(row).toBeDefined();
+      expect(Object.keys(row).sort()).toEqual([
+        'code',
+        'description',
+        'id',
+        'name',
+      ]);
+      // PHẲNG: bảng `customer_groups` không có cột tự trỏ, khác `provider_groups`.
+      expect(row).not.toHaveProperty('parentGroupId');
+      expect(row).not.toHaveProperty('isActive');
+    });
+
+    it('KHÔNG gửi `code` mà vẫn ra mã NKHxxxxxx do server cấp', async () => {
+      const res = await post({ name: 'E2E nhóm KH' }).expect(201);
+
+      expect(res.body).toEqual({
+        id: expect.any(String),
+        code: expect.stringMatching(/^NKH/),
+        name: 'E2E nhóm KH',
+        description: null,
+      });
+    });
+
+    it('gửi `code` -> 400: mã do server cấp, client không đặt', async () => {
+      await post({ name: 'E2E mã tay', code: 'NKH999999' }).expect(400);
+    });
+
+    it('thiếu tên -> 400', async () => {
+      await post({ description: 'không tên' }).expect(400);
+    });
+
+    /**
+     * Khoá duy nhất của bảng này là TÊN (`uq_customer_group_org_name`), không
+     * phải mã — khác hẳn nhóm nhà cung cấp.
+     */
+    it('trùng TÊN -> 409 nói TIẾNG VIỆT', async () => {
+      await post({ name: 'E2E trùng' }).expect(201);
+
+      const res = await post({ name: 'E2E trùng' }).expect(409);
+
+      expect(res.body.message).toMatch(/Nhóm khách hàng "E2E trùng" đã tồn tại/);
+    });
+
+    it('gán nhóm cho khách hàng bằng groupId -> response có đủ cặp id + tên', async () => {
+      const created = await post({ name: 'E2E gán nhóm' }).expect(201);
+
+      const res = await request(app.getHttpServer())
+        .post('/mobile/customers')
+        .set('Authorization', authHeader(seed.accessToken))
+        .send({ name: 'Khách có nhóm', groupId: created.body.id })
+        .expect(201);
+
+      expect(res.body.groupId).toBe(created.body.id);
+      expect(res.body.groupName).toBe('E2E gán nhóm');
+    });
+
+    it('groupId của tổ chức KHÁC -> 400', async () => {
+      // Hàng rào multi-tenant: khoá ngoại `customers.group_id` KHÔNG đòi cùng
+      // tổ chức, và `CustomerService` không kiểm gì.
+      await request(app.getHttpServer())
+        .post('/mobile/customers')
+        .set('Authorization', authHeader(seed.accessToken))
+        .send({
+          name: 'Khách nhóm lạ',
+          groupId: '00000000-0000-4000-8000-0000000000fe',
+        })
+        .expect(400);
     });
   });
 

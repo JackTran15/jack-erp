@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { QueryFailedError } from 'typeorm';
@@ -512,6 +516,103 @@ describe('MobileCustomerService', () => {
       query.mockResolvedValueOnce(stubRows).mockRejectedValueOnce(boom);
 
       await expect(service.remove(customerId, actor)).rejects.toBe(boom);
+    });
+  });
+
+  /**
+   * Hàng rào MULTI-TENANT, không phải một phép kiểm cho đẹp.
+   *
+   * Khoá ngoại `customers.group_id` chỉ đòi uuid tồn tại trong
+   * `customer_groups`, KHÔNG đòi cùng tổ chức — và `CustomerService.create`
+   * spread trọn payload vào entity chứ không kiểm gì. Bỏ `assertGroupInOrg` là
+   * một uuid rò rỉ gán được khách hàng của tổ chức này vào nhóm của tổ chức
+   * khác, và cả hai bên đều đọc ra bình thường sau đó.
+   */
+  describe('groupId — ranh giới tổ chức', () => {
+    const groupId = '00000000-0000-4000-8000-0000000000a1';
+
+    /**
+     * Mock định tuyến theo NỘI DUNG câu SQL, không theo thứ tự gọi.
+     *
+     * `assertNoDuplicate` chỉ chạy truy vấn khi có mã/sđt/email để kiểm, nên
+     * đếm lượt gọi là một giả định sai ngay khi test đổi dữ liệu vào.
+     */
+    function routeQueries({ groupFound }: { groupFound: boolean }) {
+      query.mockReset().mockImplementation((sql: string) => {
+        if (String(sql).includes('customer_groups')) {
+          return Promise.resolve(groupFound ? [{ id: groupId }] : []);
+        }
+        return Promise.resolve(stubRows);
+      });
+    }
+
+    it('tra nhóm LUÔN kèm organizationId của actor', async () => {
+      routeQueries({ groupFound: true });
+      customers.create.mockResolvedValue({ id: 'c-1' });
+
+      await service.create({ name: 'An', groupId }, actor);
+
+      const call = query.mock.calls.find(([sql]) =>
+        String(sql).includes('customer_groups'),
+      );
+      expect(call).toBeDefined();
+      expect(call![1]).toEqual([groupId, 'org-1']);
+    });
+
+    it('nhóm không thuộc tổ chức của actor -> 400, KHÔNG lưu gì', async () => {
+      routeQueries({ groupFound: false });
+
+      await expect(
+        service.create({ name: 'An', groupId }, actor),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(customers.create).not.toHaveBeenCalled();
+    });
+
+    it('không gửi groupId thì KHÔNG tra nhóm lần nào', async () => {
+      routeQueries({ groupFound: true });
+      customers.create.mockResolvedValue({ id: 'c-1' });
+
+      await service.create({ name: 'An' }, actor);
+
+      const touched = query.mock.calls.some(([sql]) =>
+        String(sql).includes('customer_groups WHERE'),
+      );
+      expect(touched).toBe(false);
+    });
+
+    it('groupId đi xuống CustomerService khi TẠO', async () => {
+      routeQueries({ groupFound: true });
+      customers.create.mockResolvedValue({ id: 'c-1' });
+
+      await service.create({ name: 'An', groupId }, actor);
+
+      const payload = customers.create.mock.calls[0][0] as Record<string, unknown>;
+      expect(payload).toHaveProperty('groupId', groupId);
+    });
+
+    /**
+     * `null` = GỠ nhóm. Nắn nó về `undefined` ở bất kỳ đâu trên đường đi là
+     * `repository.merge` bỏ qua, và thao tác lặng lẽ không làm gì.
+     */
+    it('update với groupId: null đi qua NGUYÊN VẸN xuống CustomerService', async () => {
+      routeQueries({ groupFound: true });
+      customers.update.mockResolvedValue(undefined);
+
+      await service.update('c-1', { groupId: null }, actor);
+
+      const payload = customers.update.mock.calls[0][1] as Record<string, unknown>;
+      expect(payload).toHaveProperty('groupId', null);
+    });
+
+    it('update VẮNG groupId thì payload KHÔNG có khoá đó — "giữ nguyên"', async () => {
+      routeQueries({ groupFound: true });
+      customers.update.mockResolvedValue(undefined);
+
+      await service.update('c-1', { name: 'An sửa' }, actor);
+
+      const payload = customers.update.mock.calls[0][1] as Record<string, unknown>;
+      expect(payload).not.toHaveProperty('groupId');
     });
   });
 });

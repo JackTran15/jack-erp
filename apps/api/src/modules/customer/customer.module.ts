@@ -67,6 +67,10 @@ import { LoyaltyPointsReverseConsumer } from './consumers/loyalty-points-reverse
   ],
   exports: [
     CustomerService,
+    // Export để `MobileModule` uỷ quyền `GET|POST /mobile/customer-groups` —
+    // cùng cách `CustomerService` đang phục vụ `/mobile/customers`. Đường
+    // `/customers/groups` của web không đổi.
+    CustomerGroupService,
     CustomerCodeService,
     MembershipCardService,
     MembershipCardTypeSeederService,
