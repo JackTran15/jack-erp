@@ -124,6 +124,38 @@ describe('SearchInvoicesV2Handler', () => {
     });
   });
 
+  it('`salespersonId` alone narrows to that salesperson', async () => {
+    await build();
+    await handler.execute(new SearchInvoicesV2Query({ salespersonId: 'profile-9' } as never, actor));
+
+    expect(rowsQb().andWhere).toHaveBeenCalledWith('inv.salespersonId = :spid', { spid: 'profile-9' });
+  });
+
+  it('`createdByUserId` turns the salesperson clause into a parenthesised OR', async () => {
+    await build();
+    await handler.execute(
+      new SearchInvoicesV2Query({ salespersonId: 'profile-9', createdByUserId: 'user-1' } as never, actor),
+    );
+
+    const predicates = rowsQb().andWhere.mock.calls.map((c: unknown[]) => c[0] as string);
+    const clause = predicates.find((p) => p.includes('inv.salespersonId'))!;
+
+    expect(clause).toContain('inv.createdBy = :cbid');
+
+    // The brackets are the whole point: without them the OR climbs over every
+    // earlier andWhere — organization, branch, status — and the query leaks
+    // other branches' invoices.
+    expect(clause.startsWith('(') && clause.endsWith(')')).toBe(true);
+  });
+
+  it('`createdByUserId` without a salesperson is ignored', async () => {
+    await build();
+    await handler.execute(new SearchInvoicesV2Query({ createdByUserId: 'user-1' } as never, actor));
+
+    const predicates = rowsQb().andWhere.mock.calls.map((c: unknown[]) => c[0] as string);
+    expect(predicates.some((p) => p.includes('inv.createdBy'))).toBe(false);
+  });
+
   it('no `search` → no free-text predicate', async () => {
     await build();
     await handler.execute(new SearchInvoicesV2Query({}, actor));

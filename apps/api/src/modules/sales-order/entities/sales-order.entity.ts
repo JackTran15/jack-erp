@@ -74,6 +74,24 @@ export class SalesOrderEntity extends BaseEntity {
   @Column({ name: 'cancel_reason', type: 'varchar', nullable: true })
   cancelReason: string | null;
 
+  /**
+   * Điểm tích luỹ khách MUỐN dùng — do tư vấn ghi, thu ngân chốt.
+   *
+   * KHÔNG trừ vào {@link amountDue}: đơn hàng chưa có hoá đơn nên chưa có gì để
+   * trừ, và một tổng đã trừ sẵn là hứa một con số có thể sai lúc thu tiền (khách
+   * tiêu điểm ở cửa hàng khác trong lúc đơn còn chờ). `approve` mới là nơi trừ
+   * thật, trong cùng transaction tạo hoá đơn nháp.
+   */
+  @Column({ name: 'points_redeemed', type: 'int', default: 0 })
+  pointsRedeemed: number;
+
+  /**
+   * Hoá đơn nháp do `approve` tạo (ADR-32). Không FK: huỷ hoá đơn chỉ dọn về
+   * null. Đọc mã hoá đơn qua join ở `toView` của đường chi tiết.
+   */
+  @Column({ name: 'invoice_id', type: 'uuid', nullable: true })
+  invoiceId: string | null;
+
   @Column({ name: 'approved_by', type: 'uuid', nullable: true })
   approvedBy: string | null;
 

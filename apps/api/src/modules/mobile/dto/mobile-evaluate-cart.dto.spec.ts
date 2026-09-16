@@ -43,12 +43,22 @@ describe('MobileEvaluateCartDto', () => {
     await expect(run({ lines: [line({ manualLineDiscount: -1 })] })).rejects.toThrow();
   });
 
-  it('still rejects the web-only fields the mobile DTO deliberately omits', async () => {
-    // These three are the whole reason the mobile DTO exists as a narrower
-    // copy. A regression that widens it would otherwise be invisible.
+  it('still rejects `at`, the one web-only field the mobile DTO omits', async () => {
+    // `at` lets a caller price a cart at last week's prices with a salesperson
+    // token. A regression that widens the DTO back would otherwise be invisible.
     await expect(run({ at: new Date().toISOString(), lines: [line()] })).rejects.toThrow();
+  });
+
+  it('accepts excludedProgramIds — the app un-ticks an auto_apply program with it', async () => {
+    // Opened 2026-09-14. `selectedProgramIds` only ever ADDS a program, so
+    // without this key un-ticking an `auto_apply=true` program does nothing and
+    // the next pricing round applies it again.
     await expect(
       run({ excludedProgramIds: ['3f1b9a2c-0d4e-4f6a-8b7c-1d2e3f4a5b6c'], lines: [line()] }),
-    ).rejects.toThrow();
+    ).resolves.toBeInstanceOf(MobileEvaluateCartDto);
+  });
+
+  it('rejects an excludedProgramIds entry that is not a uuid', async () => {
+    await expect(run({ excludedProgramIds: ['nope'], lines: [line()] })).rejects.toThrow();
   });
 });

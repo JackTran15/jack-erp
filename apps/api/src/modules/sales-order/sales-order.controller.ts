@@ -22,6 +22,7 @@ import { CancelSalesOrderDto } from './dto/cancel-sales-order.dto';
 import { CreateSalesOrderDto } from './dto/create-sales-order.dto';
 import { RejectSalesOrderDto } from './dto/reject-sales-order.dto';
 import { SalesOrderListQueryDto } from './dto/sales-order-list.query.dto';
+import { SalesOrderPointsDto } from './dto/sales-order-points.dto';
 import { SalespeopleQueryDto } from './dto/salespeople.query.dto';
 import { SALES_ORDER_PERMISSIONS, SalesOrderService } from './sales-order.service';
 
@@ -69,6 +70,23 @@ export class SalesOrderController {
   @RequirePermission(SALES_ORDER_PERMISSIONS.create)
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateSalesOrderDto, @Actor() actor: ActorContext) {
     return this.service.update(id, dto, actor);
+  }
+
+  /**
+   * Sửa số điểm DỰ KIẾN — quyền của CẢ HAI vai.
+   *
+   * Mảng `@RequirePermission` nghĩa là HOẶC (tiền lệ: `promotion-v2.controller`).
+   * Tư vấn ghi con số lúc lập đơn; thu ngân sửa nó khi *Nhận xử lý* bị chặn vì
+   * số dư không còn đủ.
+   */
+  @Patch(':id/points')
+  @RequirePermission([SALES_ORDER_PERMISSIONS.create, SALES_ORDER_PERMISSIONS.approve])
+  setPoints(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SalesOrderPointsDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.setPoints(id, dto.points, actor);
   }
 
   @Post(':id/approve')

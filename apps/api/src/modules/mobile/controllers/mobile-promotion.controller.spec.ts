@@ -107,13 +107,19 @@ describe('MobilePromotionController', () => {
       expect(errors).not.toHaveLength(0);
     });
 
-    it('TỪ CHỐI `excludedProgramIds` — app không có lối vào cho việc loại trừ', async () => {
-      const errors = await build({
-        excludedProgramIds: ['3f1e9c8a-1b2c-4d5e-8f90-a1b2c3d4e5f6'],
-        lines: [],
-      });
-
-      expect(errors).not.toHaveLength(0);
+    it('NHẬN `excludedProgramIds` — bỏ tick một chương trình tự chạy là thao tác CÓ THẬT', async () => {
+      // Test này từng khẳng định điều NGƯỢC LẠI ("app không có lối vào cho việc
+      // loại trừ"), và nó đúng cho tới 2026-09-14: màn *Chương trình khuyến mại*
+      // khi ấy chỉ TICK để chọn. Loc rà — *"Bỏ chọn, vẫn còn lưu khuyến mãi"* —
+      // và trường này được MỞ, vì `selectedProgramIds` chỉ biết THÊM nên không
+      // diễn tả nổi việc bỏ một chương trình `auto_apply=true`.
+      //
+      // DTO đổi ở nhánh này mà test thì không: nó đỏ suốt từ hôm đó và chỉ lộ ra
+      // khi chạy CẢ bộ `mobile` thay vì lọc theo tên. Ghi lại vì cái giá thật
+      // của việc chạy test có lọc nằm ở đây, không ở đâu khác.
+      expect(await build({ excludedProgramIds: ['3f1e9c8a-1b2c-4d5e-8f90-a1b2c3d4e5f6'], lines: [] })).toHaveLength(0);
+      // Vẫn là UUID v4, không phải chuỗi bất kỳ.
+      expect(await build({ excludedProgramIds: ['khong-phai-uuid'], lines: [] })).not.toHaveLength(0);
     });
 
     it('TỪ CHỐI dòng số lượng 0 — một dòng như vậy không định giá được gì', async () => {

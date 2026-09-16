@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import type { ActorContext } from '../../../common/decorators/actor-context.decorator';
+import { InvoiceType } from '../../pos/entities/invoice.entity';
 import { SearchInvoicesV2Query } from '../../pos/queries/search-invoices-v2.query';
 import { MobileInvoiceListQueryDto } from '../dto/mobile-invoice-list.query.dto';
 import { MobileInvoiceService } from './mobile-invoice.service';
@@ -27,11 +28,14 @@ describe('MobileInvoiceService', () => {
     profileId,
     invoice,
     salespersonUser,
+    salesOrder,
   }: {
     profileId?: string;
     invoice?: { id: string; salespersonId?: string; items?: unknown[]; payments?: unknown[]; [key: string]: unknown };
     /** `users` row đứng sau `salespersonId` của HOÁ ĐƠN. */
     salespersonUser?: { firstName: string; lastName: string } | null;
+    /** Đơn hàng đứng sau `invoice.salesOrderId` — nháp sinh từ *Nhận xử lý*. */
+    salesOrder?: { id: string; createdBy: string; approvedBy: string | null } | null;
   }) {
     const execute = jest.fn().mockResolvedValue(page);
 
@@ -49,13 +53,19 @@ describe('MobileInvoiceService', () => {
       );
     });
     const findOneWithItems = jest.fn().mockResolvedValue(invoice ? { items: [], payments: [], ...invoice } : invoice);
+    const salesOrderFindOne = jest.fn().mockResolvedValue(salesOrder ?? null);
+    const cancelInvoice = { cancel: jest.fn().mockResolvedValue(undefined) };
+    const cancelReturn = { cancel: jest.fn().mockResolvedValue(undefined) };
     const service = new MobileInvoiceService(
       { execute } as never,
       { findOneWithItems } as never,
       { findOne } as never,
+      { findOne: salesOrderFindOne } as never,
+      cancelInvoice as never,
+      cancelReturn as never,
     );
 
-    return { service, execute, findOne, findOneWithItems };
+    return { service, execute, findOne, findOneWithItems, salesOrderFindOne, cancelInvoice, cancelReturn };
   }
 
   it('lọc theo `employee_profiles.id`, KHÔNG theo `users.id`', async () => {
@@ -73,6 +83,21 @@ describe('MobileInvoiceService', () => {
     const query = execute.mock.calls[0][0] as SearchInvoicesV2Query;
     expect(query.dto.salespersonId).toBe('profile-9');
     expect(query.dto.salespersonId).not.toBe(actor.userId);
+  });
+
+  it('gắn thêm `createdByUserId` — chứng từ thu ngân lập KHÔNG có salesperson', async () => {
+    // Đo trên dev 2026-09-15: 23/23 phiếu trả hàng và 2/2 phiếu đổi hàng để
+    // `salesperson_id` TRỐNG, và hoá đơn thu ngân lập từ giỏ cũng vậy. Chỉ lọc
+    // theo `salespersonId` thì mọi chứng từ ấy biến mất khỏi danh sách của
+    // chính người vừa lập chúng (Loc rà: "hoá đơn ghi nợ 2609150028 sao không
+    // hiện?").
+    const { service, execute } = build({ profileId: 'profile-9' });
+
+    await service.list({}, actor);
+
+    const query = execute.mock.calls[0][0] as SearchInvoicesV2Query;
+    expect(query.dto.createdByUserId).toBe(actor.userId);
+    expect(query.dto.salespersonId).toBe('profile-9');
   });
 
   it('chưa có hồ sơ nhân viên → trang RỖNG, KHÔNG bỏ bộ lọc', async () => {
@@ -211,13 +236,25 @@ describe('MobileInvoiceService', () => {
       await expect(service.getById('inv-1', actor)).rejects.toThrow(NotFoundException);
     });
 
-    it('hoá đơn KHÔNG gán nhân viên bán cũng → 404', async () => {
+    it('hoá đơn KHÔNG gán nhân viên bán, và cũng KHÔNG do mình lập → 404', async () => {
       // `salespersonId` nullable. `undefined !== 'profile-9'` là đúng, nhưng ca
       // này đáng có test riêng: một `!=` lỏng hay một `?? profileId` lọt vào đây
       // sẽ mở nó ra cho mọi người.
       const { service } = build({ profileId: 'profile-9', invoice: { id: 'inv-1' } });
 
       await expect(service.getById('inv-1', actor)).rejects.toThrow(NotFoundException);
+    });
+
+    it('hoá đơn mình LẬP thì mở được, dù không gán nhân viên bán', async () => {
+      // Vế này mở cùng lúc với bộ lọc danh sách (2026-09-15). Thiếu nó thì danh
+      // sách bày ra phiếu trả / phiếu đổi / hoá đơn thu ngân lập, mà chạm vào
+      // là 404 — chọn được một thứ không dùng được.
+      const { service } = build({
+        profileId: 'profile-9',
+        invoice: { id: 'inv-1', createdBy: actor.userId },
+      });
+
+      await expect(service.getById('inv-1', actor)).resolves.toMatchObject({ id: 'inv-1' });
     });
 
     it('người gọi chưa có hồ sơ nhân viên → 404', async () => {
@@ -286,6 +323,103 @@ describe('MobileInvoiceService', () => {
 
     it('TỪ CHỐI ngày không phải ISO-8601', async () => {
       expect(await check({ from: '01/09/2026' })).not.toHaveLength(0);
+    });
+  });
+  describe('cancel — quyền nói ĐƯỢC LÀM GÌ, phạm vi nói TRÊN TỜ NÀO', () => {
+    const owner = { userId: 'user-1', organizationId: 'org-1' } as never;
+    const reason = { reason: 'Khách đổi ý' };
+
+    it('hoá đơn BÁN đi đường huỷ hoá đơn, KHÔNG đi đường huỷ phiếu trả', async () => {
+      const { service, cancelInvoice, cancelReturn } = build({
+        profileId: 'profile-me',
+        invoice: { id: 'inv-1', salespersonId: 'profile-me', type: InvoiceType.SALE },
+      });
+
+      await service.cancel('inv-1', reason, owner);
+
+      expect(cancelInvoice.cancel).toHaveBeenCalledWith('inv-1', reason, owner);
+      expect(cancelReturn.cancel).not.toHaveBeenCalled();
+    });
+
+    it('phiếu TRẢ đi đường huỷ phiếu trả — tiền và hàng đi ngược chiều', async () => {
+      const { service, cancelInvoice, cancelReturn } = build({
+        profileId: 'profile-me',
+        invoice: { id: 'inv-2', salespersonId: 'profile-me', type: InvoiceType.RETURN },
+      });
+
+      await service.cancel('inv-2', reason, owner);
+
+      expect(cancelReturn.cancel).toHaveBeenCalledWith('inv-2', reason, owner);
+      expect(cancelInvoice.cancel).not.toHaveBeenCalled();
+    });
+
+    it('tờ của NGƯỜI KHÁC → 404 và KHÔNG service nào chạy', async () => {
+      // Vế đắt nhất, và là vế mà một phép kiểm quyền đơn thuần bỏ sót: người
+      // gọi CÓ `pos.invoice.cancel` (guard đã cho qua trước khi tới đây) nhưng
+      // tờ này app không cho họ mở. Thiếu vế phạm vi thì gõ đúng một `id` là
+      // huỷ được chứng từ của bất kỳ ai — và huỷ thì hoàn tiền, trả kho, đảo
+      // điểm, không có nút hoàn tác nào.
+      const { service, cancelInvoice, cancelReturn } = build({
+        profileId: 'profile-me',
+        invoice: { id: 'inv-3', salespersonId: 'profile-other', salesOrderId: null, type: InvoiceType.SALE },
+      });
+
+      await expect(service.cancel('inv-3', reason, owner)).rejects.toThrow('not found');
+      expect(cancelInvoice.cancel).not.toHaveBeenCalled();
+      expect(cancelReturn.cancel).not.toHaveBeenCalled();
+    });
+
+    it('trả về tờ chứng từ ĐỌC LẠI sau khi huỷ, không phải ảnh chụp trước đó', async () => {
+      // Cùng bài học với bản nháp mang điểm: một đường trả về ảnh chụp cũ làm
+      // màn hình nói một đằng còn dữ liệu một nẻo.
+      const { service, findOneWithItems } = build({
+        profileId: 'profile-me',
+        invoice: { id: 'inv-1', salespersonId: 'profile-me', type: InvoiceType.SALE },
+      });
+
+      await service.cancel('inv-1', reason, owner);
+
+      expect(findOneWithItems).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('getById — hoá đơn NHÁP sinh từ đơn hàng (AC-60)', () => {
+    const actor = { userId: 'user-1', organizationId: 'org-1' } as never;
+
+    it('NGƯỜI LẬP ĐƠN mở được dù NV bán hàng trên hoá đơn là người khác', async () => {
+      const { service } = build({
+        profileId: 'profile-me',
+        invoice: { id: 'inv-1', salespersonId: 'profile-other', salesOrderId: 'so-1' },
+        salesOrder: { id: 'so-1', createdBy: 'user-1', approvedBy: 'user-cashier' },
+      });
+      await expect(service.getById('inv-1', actor)).resolves.toMatchObject({ id: 'inv-1' });
+    });
+
+    it('THU NGÂN ĐÃ DUYỆT đơn mở được', async () => {
+      const { service } = build({
+        profileId: 'profile-cashier',
+        invoice: { id: 'inv-1', salespersonId: 'profile-other', salesOrderId: 'so-1' },
+        salesOrder: { id: 'so-1', createdBy: 'user-consultant', approvedBy: 'user-1' },
+      });
+      await expect(service.getById('inv-1', actor)).resolves.toMatchObject({ id: 'inv-1' });
+    });
+
+    it('người KHÔNG liên quan tới đơn vẫn 404 — không nới rộng hơn hai vai đó', async () => {
+      const { service } = build({
+        profileId: 'profile-me',
+        invoice: { id: 'inv-1', salespersonId: 'profile-other', salesOrderId: 'so-1' },
+        salesOrder: { id: 'so-1', createdBy: 'user-x', approvedBy: 'user-y' },
+      });
+      await expect(service.getById('inv-1', actor)).rejects.toThrow('not found');
+    });
+
+    it('hoá đơn KHÔNG gắn đơn hàng giữ luật cũ: khác NV bán hàng → 404, không tra đơn', async () => {
+      const { service, salesOrderFindOne } = build({
+        profileId: 'profile-me',
+        invoice: { id: 'inv-1', salespersonId: 'profile-other', salesOrderId: null },
+      });
+      await expect(service.getById('inv-1', actor)).rejects.toThrow('not found');
+      expect(salesOrderFindOne).not.toHaveBeenCalled();
     });
   });
 });

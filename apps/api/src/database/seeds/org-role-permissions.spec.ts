@@ -92,6 +92,7 @@ describe('staff roles separate warehouse, selling and cash duties', () => {
   it('gives the cash drawer to CASHIER only', () => {
     for (const key of [
       'accounting.cash_receipt.create',
+      'accounting.bank_receipt.create',
       'accounting.cash_payment.create',
       'accounting.cash_count.create',
       'accounting.cash_ledger.read',

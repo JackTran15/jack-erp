@@ -4,8 +4,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { EmployeeProfileEntity } from '../../rbac/employee/employee-profile.entity';
+import { SalesOrderEntity } from '../../sales-order/entities/sales-order.entity';
 import { InvoiceSearchV2Dto } from '../../pos/dto/invoice-search-v2.dto';
-import { InvoiceStatus } from '../../pos/entities/invoice.entity';
+import { InvoiceStatus, InvoiceType } from '../../pos/entities/invoice.entity';
+import { CancelInvoiceDto } from '../../pos/dto/cancel-invoice.dto';
+import { CancelInvoiceService } from '../../pos/services/cancel-invoice.service';
+import { CancelReturnService } from '../../pos/services/cancel-return.service';
 import { InvoiceService } from '../../pos/services/invoice.service';
 import { SearchInvoicesV2Query } from '../../pos/queries/search-invoices-v2.query';
 import { MobileInvoiceListQueryDto, MobileInvoiceStatusFilter } from '../dto/mobile-invoice-list.query.dto';
@@ -69,6 +73,10 @@ export class MobileInvoiceService {
     private readonly invoices: InvoiceService,
     @InjectRepository(EmployeeProfileEntity)
     private readonly profiles: Repository<EmployeeProfileEntity>,
+    @InjectRepository(SalesOrderEntity)
+    private readonly salesOrders: Repository<SalesOrderEntity>,
+    private readonly cancelInvoice: CancelInvoiceService,
+    private readonly cancelReturn: CancelReturnService,
   ) {}
 
   async list(query: MobileInvoiceListQueryDto, actor: ActorContext) {
@@ -91,6 +99,10 @@ export class MobileInvoiceService {
       page: query.page,
       limit: query.limit,
       salespersonId,
+      // Vế thứ hai của "hoá đơn của tôi" — xem doc của `createdByUserId`. Thiếu
+      // nó thì thu ngân không thấy chính hoá đơn mình vừa lập, vì chứng từ lập
+      // tại quầy để `salesperson_id` trống.
+      createdByUserId: actor.userId,
     };
 
     // Khoảng ngày chỉ gắn khi có ÍT NHẤT một đầu: một `DateRangeFilterDto` rỗng
@@ -139,7 +151,17 @@ export class MobileInvoiceService {
     // ra cùng một phản hồi mà không cần dựng thêm nhánh nào.
     const invoice = await this.invoices.findOneWithItems(id, actor);
 
-    if (!salespersonId || invoice.salespersonId !== salespersonId) {
+    // BA cách một hoá đơn là "của tôi", đúng ba cách mà danh sách đã dùng — bán
+    // nó, LẬP nó, hoặc nó sinh ra từ đơn hàng của tôi.
+    //
+    // Vế `createdBy` mở cùng lúc với bộ lọc danh sách (2026-09-15). Thiếu nó ở
+    // đây thì danh sách bày ra những chứng từ mà chạm vào là 404 — đúng cái bẫy
+    // "chọn được một thứ không dùng được" mà `MobileBranchService` đã ghi, chỉ
+    // là ở chiều ngược lại.
+    const own =
+      (!!salespersonId && invoice.salespersonId === salespersonId) || invoice.createdBy === actor.userId;
+
+    if (!own && !(await this.viaOwnSalesOrder(invoice.salesOrderId, actor))) {
       throw new NotFoundException(`Invoice ${id} not found`);
     }
 
@@ -155,6 +177,36 @@ export class MobileInvoiceService {
       payments: invoice.payments.map((payment) => ({ ...payment, ...numbersOf(payment, PAYMENT_NUMERIC_FIELDS) })),
       salespersonName: await this.salespersonNameOf(invoice.salespersonId, actor),
     };
+  }
+
+  /**
+   * Huỷ một chứng từ — cùng hai service mà POS gọi, không có bản thứ hai.
+   *
+   * **Phép NHÌN THẤY đi trước phép HUỶ.** `getById` ném 404 cho hoá đơn không
+   * phải của người gọi, nên một người có `pos.invoice.cancel` vẫn không huỷ
+   * được tờ hoá đơn mà chính app không cho họ mở. Quyền trả lời "được làm việc
+   * này không"; phạm vi trả lời "trên tờ nào" — thiếu vế sau thì một quản lý
+   * gõ đúng một `id` là huỷ được chứng từ của bất kỳ ai.
+   *
+   * Rẽ theo LOẠI chứng từ đúng như `InvoiceController.cancel`: huỷ một phiếu
+   * trả/đổi là ảnh gương của huỷ một hoá đơn bán (tiền và hàng đi ngược chiều),
+   * nên chính loại của chứng từ chọn service chứ không phải nơi gọi.
+   *
+   * Trả về tờ hoá đơn dưới HÌNH DẠNG MOBILE, không phải entity thô: cột
+   * `numeric` của TypeORM về dưới dạng chuỗi, và app đã hai lần dính đúng cái
+   * bẫy đó (`totalPaid` đọc nhầm, `type` viết HOA). Một đường trả về hình dạng
+   * khác là mời nó lần thứ ba.
+   */
+  async cancel(id: string, dto: CancelInvoiceDto, actor: ActorContext) {
+    const invoice = await this.getById(id, actor);
+
+    if (invoice.type === InvoiceType.SALE) {
+      await this.cancelInvoice.cancel(id, dto, actor);
+    } else {
+      await this.cancelReturn.cancel(id, dto, actor);
+    }
+
+    return this.getById(id, actor);
   }
 
   /**
@@ -203,6 +255,23 @@ export class MobileInvoiceService {
    *
    * Bảng có `@Index(unique)` trên `user_id` nên tra ra tối đa một dòng.
    */
+  /**
+   * Hoá đơn NHÁP sinh từ *Nhận xử lý* (erp-sales-cashier, ADR-32) mang
+   * `salesperson_id` của NV BÁN HÀNG ghi trên đơn — thường KHÔNG phải người
+   * lập đơn. Tư vấn lập đơn vẫn phải mở được tờ hoá đơn đó (dòng "Hoá đơn"
+   * trên tờ đơn, AC-60), và thu ngân đã duyệt cũng vậy. Đo 2026-09-14: đơn
+   * chọn NV khác → `GET /mobile/invoices/:id` 404 cho chính người lập đơn.
+   */
+  private async viaOwnSalesOrder(salesOrderId: string | null | undefined, actor: ActorContext): Promise<boolean> {
+    if (!salesOrderId) return false;
+    const order = await this.salesOrders.findOne({
+      where: { id: salesOrderId, organizationId: actor.organizationId },
+      select: ['id', 'createdBy', 'approvedBy'],
+    });
+
+    return !!order && (order.createdBy === actor.userId || order.approvedBy === actor.userId);
+  }
+
   private async salespersonIdOf(actor: ActorContext): Promise<string | undefined> {
     const profile = await this.profiles.findOne({
       where: { userId: actor.userId, organizationId: actor.organizationId },

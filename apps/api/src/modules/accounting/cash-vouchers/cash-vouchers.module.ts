@@ -124,6 +124,10 @@ import { SearchCashLedgerV2Handler } from './cash-ledger/queries/search-cash-led
     CashLedgerService,
     CashCountsService,
     CashVoucherCategoryResolverService,
+    // Mobile thu ngân (T-17-01): thu nợ đi đúng saga của web.
+    PartnerLookupService,
+    // Mobile thu ngân (T-17-01): thu nợ đi đúng saga của web.
+    DebtCollectionSagaService,
   ],
 })
 export class CashVouchersModule implements OnModuleInit {

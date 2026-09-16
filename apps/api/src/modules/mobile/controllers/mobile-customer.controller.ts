@@ -33,6 +33,7 @@ import {
 } from '../dto/mobile-customer.response.dto';
 import { MobileManagerInvoiceListQueryDto } from '../dto/mobile-manager-invoice-list.query.dto';
 import { MobileManagerInvoicePageDto } from '../dto/mobile-manager-invoice.response.dto';
+import { CustomerSummaryService } from '../../customer/services/customer-summary.service';
 import { MobileCustomerService } from '../services/mobile-customer.service';
 import { MobileManagerInvoiceService } from '../services/mobile-manager-invoice.service';
 import { toListQuery } from './mobile-manager-invoice.controller';
@@ -50,6 +51,7 @@ export class MobileCustomerController {
   constructor(
     private readonly customers: MobileCustomerService,
     private readonly invoices: MobileManagerInvoiceService,
+    private readonly summaries: CustomerSummaryService,
   ) {}
 
   @Get()
@@ -95,6 +97,30 @@ export class MobileCustomerController {
     @Actor() actor: ActorContext,
   ): Promise<MobileCustomerResponseDto> {
     return this.customers.findById(id, actor);
+  }
+
+  /**
+   * Tổng quan một khách: chi tiêu, công nợ, và THẺ THÀNH VIÊN (hạng + số dư điểm).
+   *
+   * Uỷ quyền thẳng `CustomerSummaryService` — cùng service mà web gọi ở
+   * `GET /customers/:id/summary`, **không dựng DTO thứ hai**. Ba con số màn
+   * *Sử dụng điểm* cần (hạng thẻ, doanh thu, điểm tích luỹ) đã nằm trọn trong
+   * hình dạng nó trả về.
+   *
+   * Vì sao vẫn cần một đường ở đây thay vì để app gọi đường của web: MỌI đường
+   * trong `ApiEndpoints` phía Dart đều dưới `/mobile` (đếm được 47/47), và bề
+   * mặt đó là thứ giữ cho app không phụ thuộc vào route của web.
+   *
+   * `membership` là `null` khi khách chưa có thẻ — ca hợp lệ, KHÔNG phải 0 điểm.
+   */
+  @Get(':id/summary')
+  @RequirePermission('customer.read')
+  @ApiOperation({ summary: 'Tổng quan một khách: chi tiêu, công nợ, thẻ thành viên' })
+  summaryOf(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.summaries.getSummary(id, actor);
   }
 
   /**

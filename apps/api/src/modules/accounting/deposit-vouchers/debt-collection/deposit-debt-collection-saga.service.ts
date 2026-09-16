@@ -17,6 +17,7 @@ import { DepositService } from '../../deposit/deposit.service';
 import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
 import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
 import { DebtCollectionSagaStatus } from '../../cash-vouchers/enums';
+import { syncInvoiceAfterDebtChange } from '../../shared/invoice-debt-sync';
 import { CashVoucherCategoryResolverService } from '../../cash-vouchers/shared/category-resolver.service';
 import {
   InvoiceDebtEntity,
@@ -286,6 +287,7 @@ export class DepositDebtCollectionSagaService {
           (debt as { settledAt?: Date | null }).settledAt = null;
         }
         await manager.save(debt);
+        await syncInvoiceAfterDebtChange(manager, debt, -alloc.amount);
       }
       if (alloc.debtPaymentId) {
         await manager.delete(DebtPaymentEntity, alloc.debtPaymentId);
@@ -332,7 +334,10 @@ export class DepositDebtCollectionSagaService {
       debt.status = DebtStatus.PAID;
       debt.settledAt = new Date();
     }
-    return manager.save(debt);
+    const saved = await manager.save(debt);
+    // Hoá đơn gốc đi theo khoản nợ: hết nợ → `paid`, còn → `partial_debt` (Loc bắt được 2026-09-14).
+    await syncInvoiceAfterDebtChange(manager, saved, amount);
+    return saved;
   }
 
   private async recordInstalment(

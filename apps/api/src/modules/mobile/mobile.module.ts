@@ -3,7 +3,13 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { EmployeeProfileEntity } from '../rbac/employee/employee-profile.entity';
+import { CashAccountEntity } from '../accounting/cash/cash-account.entity';
+import { SalesOrderEntity } from '../sales-order/entities/sales-order.entity';
+import { PaymentAccountEntity } from '../accounting/payment-accounts/payment-account.entity';
+import { PosSessionEntity } from '../pos/entities/pos-session.entity';
 import { PosModule } from '../pos/pos.module';
+import { CashVouchersModule } from '../accounting/cash-vouchers/cash-vouchers.module';
+import { DepositVouchersModule } from '../accounting/deposit-vouchers/deposit-vouchers.module';
 import { InvoiceReportModule } from '../reporting/invoice-report/invoice-report.module';
 import { PromotionModule } from '../promotion/promotion.module';
 import { BranchModule } from '../branch/branch.module';
@@ -32,6 +38,7 @@ import { MobileRevenueReportController } from './controllers/mobile-revenue-repo
 import { MobileStoreDetailController } from './controllers/mobile-store-detail.controller';
 import { MobileProductAttributeController } from './controllers/mobile-product-attribute.controller';
 import { MobileItemCategoryController } from './controllers/mobile-item-category.controller';
+import { MobileCashierController } from './controllers/mobile-cashier.controller';
 import { MobileInvoiceController } from './controllers/mobile-invoice.controller';
 import { MobileItemController } from './controllers/mobile-item.controller';
 import { MobileManagerInvoiceController } from './controllers/mobile-manager-invoice.controller';
@@ -59,6 +66,7 @@ import { MobileRevenueEstimateService } from './services/mobile-revenue-estimate
 import { MobileRevenueReportService } from './services/mobile-revenue-report.service';
 import { MobileStoreDetailService } from './services/mobile-store-detail.service';
 import { MobileProductAttributeService } from './services/mobile-product-attribute.service';
+import { MobileCashierService } from './services/mobile-cashier.service';
 import { MobileInvoiceService } from './services/mobile-invoice.service';
 import { MobileItemService } from './services/mobile-item.service';
 import { MobileManagerInvoiceService } from './services/mobile-manager-invoice.service';
@@ -135,6 +143,9 @@ import { MobileSupplierGroupService } from './services/mobile-supplier-group.ser
     // chỉ tìm được handler đã đăng ký, nên thiếu dòng import này là 500
     // "No handler found" lúc CHẠY, không phải lỗi lúc biên dịch.
     PosModule,
+    // Thu nợ của thu ngân (T-17-01) đi đúng hai saga phiếu thu của web.
+    CashVouchersModule,
+    DepositVouchersModule,
     // `SearchInvoiceReportHandler` sống trong module này — `CqrsModule` một
     // mình không đủ để `QueryBus` tìm ra nó.
     InvoiceReportModule,
@@ -154,6 +165,10 @@ import { MobileSupplierGroupService } from './services/mobile-supplier-group.ser
     // hàng đích phải khác cửa hàng hiện tại) đã nằm sẵn trong đó.
     TransferOrderModule,
     TypeOrmModule.forFeature([
+      PosSessionEntity,
+      CashAccountEntity,
+      SalesOrderEntity,
+      PaymentAccountEntity,
       ProviderEntity,
       // Danh mục nhóm nhà cung cấp: `MobileSupplierGroupService` đọc trực tiếp
       // (đường `/admin/entities` bắt phân trang, app cần trọn danh mục phẳng),
@@ -188,6 +203,7 @@ import { MobileSupplierGroupService } from './services/mobile-supplier-group.ser
     MobileDebtReportController,
     MobileCashflowReportController,
     MobileProductAttributeController,
+    MobileCashierController,
     MobileInvoiceController,
     MobileItemCategoryController,
     MobileItemController,
@@ -217,6 +233,7 @@ import { MobileSupplierGroupService } from './services/mobile-supplier-group.ser
     MobileDebtReportService,
     MobileCashflowReportService,
     MobileProductAttributeService,
+    MobileCashierService,
     MobileInvoiceService,
     MobileItemService,
     MobileProductRevenueService,

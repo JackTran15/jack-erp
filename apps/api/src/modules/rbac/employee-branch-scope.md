@@ -46,6 +46,7 @@ on historical documents that reference someone now outside the branch (ADR-04).
 | `api-key/api-key-crud.service.ts` | Revoking a key deactivates the service account bound to it (`users.update`) — a write on one known id, nothing is listed |
 | `mobile/services/mobile-invoice.service.ts` | Two lookups by id: the caller's own `employee_profiles.id` (to scope "my invoices" — `salesperson_id` is a profile id, not a user id), and id → salesperson name for one invoice |
 | `mobile/services/mobile-manager-invoice.service.ts` | id → salesperson name for one invoice, one SQL over `employee_profiles` ⋈ `users`; the invoice list itself is scoped by `branchIds` on `invoices`, not by people |
+| `mobile/services/mobile-cashier.service.ts` | id → salesperson name for one draft invoice, same lookup as the two rows above; nothing about people is listed or chosen here — the cart is reached by invoice id and scoped by `X-Branch-Id` |
 
 ## Frontend
 
