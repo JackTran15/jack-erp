@@ -7,8 +7,10 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleInit,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
+import { randomUUID } from "crypto";
 import {
   Between,
   DataSource,
@@ -47,6 +49,10 @@ import { mapTransferOrderToVoucherPayload } from "./transfer-order-print.mapper"
 import { BranchEntity } from "../../branch/branch.entity";
 import { GoodsIssueService } from "../goods-issue/goods-issue.service";
 import { GoodsReceiptService } from "../goods-receipt/goods-receipt.service";
+import { MediaLinkService } from "../../media/media-link.service";
+import { MediaOwnerType } from "../../media/media-object.entity";
+import { MediaOwnerReaderRegistry } from "../../media/media-owner-reader.registry";
+import { MediaQueryService } from "../../media/media-query.service";
 import { LocationEntity } from "../location/location.entity";
 import { attachCounterparties } from "../location/services/counterparty-name.util";
 import { StockBalanceEntity } from "../ledger/stock-balance.entity";
@@ -146,7 +152,7 @@ export interface TransferOrderLinesPage {
 }
 
 @Injectable()
-export class TransferOrderService {
+export class TransferOrderService implements OnModuleInit {
   private readonly logger = new Logger(TransferOrderService.name);
 
   constructor(
@@ -170,7 +176,35 @@ export class TransferOrderService {
     private readonly goodsIssueService: GoodsIssueService,
     @Inject(forwardRef(() => GoodsReceiptService))
     private readonly goodsReceiptService: GoodsReceiptService,
+    private readonly mediaLink: MediaLinkService,
+    private readonly mediaQuery: MediaQueryService,
+    private readonly mediaOwnerReaderRegistry: MediaOwnerReaderRegistry,
   ) {}
+
+  /**
+   * ADR-06: register the same read check `getById` already enforces
+   * (org scope + participant-branch), so "who can view this transfer order"
+   * and "who can download its attachments" never diverge.
+   */
+  onModuleInit(): void {
+    this.mediaOwnerReaderRegistry.register(
+      MediaOwnerType.TRANSFER_ORDER,
+      async (ownerId, actor) => {
+        try {
+          await this.getById(ownerId, actor);
+          return true;
+        } catch (err) {
+          if (
+            err instanceof NotFoundException ||
+            err instanceof ForbiddenException
+          ) {
+            return false;
+          }
+          throw err;
+        }
+      },
+    );
+  }
 
   // ─── Create (DRAFT) ─────────────────────────────────────────────────────────
 
@@ -190,12 +224,6 @@ export class TransferOrderService {
       );
     }
 
-    const documentNumber = await this.documentNumberingService.generate(
-      DocumentType.TRANSFER_ORDER,
-      actor.branchId,
-      actor,
-    );
-
     const lines = dto.lines.map((l, idx) => this.makeLine(l, actor, idx));
     await this.fillSourceLocations(
       lines,
@@ -203,27 +231,61 @@ export class TransferOrderService {
       actor.organizationId,
     );
 
-    const to = this.toRepo.create({
-      organizationId: actor.organizationId,
-      branchId: actor.branchId,
-      createdBy: actor.userId,
-      documentNumber,
-      status: TransferOrderStatus.DRAFT,
-      sourceBranchId: actor.branchId,
-      destinationBranchId: dto.destinationBranchId,
-      sourceStorageId: dto.sourceStorageId,
-      destinationStorageId: dto.destinationStorageId,
-      requestedDate: dto.requestedDate,
-      notes: dto.notes,
-      attachmentIds: dto.attachmentIds ?? [],
-      lines,
-    });
+    // Pre-generate the id so attachment ids can be validated and attached to
+    // it *before* a document number is minted or the row exists — `syncOwner`
+    // never queries `transfer_orders`, only `media_objects`, so this is safe.
+    // An invalid (wrong-org / wrong-state) attachment id must reject before a
+    // number is burned, not after (T-04-03 review).
+    const id = randomUUID();
 
-    const saved = await this.toRepo.save(to);
-    this.logger.log(
-      `Transfer order ${saved.id} created as DRAFT ${documentNumber}`,
+    const { savedId, documentNumber } = await this.dataSource.transaction(
+      async (manager) => {
+        let attachmentIds: string[] = [];
+        if (dto.attachmentIds !== undefined) {
+          attachmentIds = await this.mediaLink.syncOwner(
+            MediaOwnerType.TRANSFER_ORDER,
+            id,
+            dto.attachmentIds,
+            actor,
+            manager,
+          );
+        }
+
+        // `manager` is passed through: DocumentNumberingService.generate must
+        // reuse this transaction's connection, or opening its own risks a
+        // pool deadlock (see that method's own doc comment).
+        const documentNumber = await this.documentNumberingService.generate(
+          DocumentType.TRANSFER_ORDER,
+          actor.branchId!,
+          actor,
+          manager,
+        );
+
+        const to = this.toRepo.create({
+          id,
+          organizationId: actor.organizationId,
+          branchId: actor.branchId,
+          createdBy: actor.userId,
+          documentNumber,
+          status: TransferOrderStatus.DRAFT,
+          sourceBranchId: actor.branchId,
+          destinationBranchId: dto.destinationBranchId,
+          sourceStorageId: dto.sourceStorageId,
+          destinationStorageId: dto.destinationStorageId,
+          requestedDate: dto.requestedDate,
+          notes: dto.notes,
+          attachmentIds,
+          lines,
+        });
+
+        const saved = await manager.save(to);
+        return { savedId: saved.id, documentNumber };
+      },
     );
-    return this.findOrFail(saved.id, actor.organizationId);
+    this.logger.log(
+      `Transfer order ${savedId} created as DRAFT ${documentNumber}`,
+    );
+    return this.findOrFail(savedId, actor.organizationId);
   }
 
   async createAndConfirmExport(
@@ -304,7 +366,26 @@ export class TransferOrderService {
     );
     this.assertParticipantBranch(to, actor);
     await this.attachSourceLocations(to, actor.organizationId);
+    await this.attachAttachments(to, actor.organizationId);
     return to;
+  }
+
+  /** Detail response: `attachments` (M11 — attachment display, no URL). */
+  private async attachAttachments(
+    to: TransferOrderEntity,
+    organizationId: string,
+  ): Promise<void> {
+    const byOwner = await this.mediaQuery.listForOwners(
+      MediaOwnerType.TRANSFER_ORDER,
+      [to.id],
+      organizationId,
+    );
+    (to as any).attachments = (byOwner.get(to.id) ?? []).map((m) => ({
+      id: m.id,
+      fileName: m.fileName,
+      contentType: m.contentType,
+      size: m.size,
+    }));
   }
 
   /** Print/export payload for one transfer order (T-03-02, UOW-08) — reuses `getById`'s 404. */
@@ -885,13 +966,12 @@ export class TransferOrderService {
         );
       }
       if (dto.notes !== undefined) to.notes = dto.notes;
-      if (dto.attachmentIds !== undefined) to.attachmentIds = dto.attachmentIds;
       if (dto.status === TransferOrderStatus.COMPLETED) {
-        await this.toRepo.save(to);
+        await this.saveWithAttachments(to, dto.attachmentIds, actor);
         return this.completeOrderImmediately(to, actor);
       }
       if (dto.status !== undefined) to.status = dto.status;
-      await this.toRepo.save(to);
+      await this.saveWithAttachments(to, dto.attachmentIds, actor);
       return this.findOrFail(id, actor.organizationId);
     }
 
@@ -932,7 +1012,6 @@ export class TransferOrderService {
         to.destinationStorageId = dto.destinationStorageId;
       if (dto.requestedDate !== undefined) to.requestedDate = dto.requestedDate;
       if (dto.notes !== undefined) to.notes = dto.notes;
-      if (dto.attachmentIds !== undefined) to.attachmentIds = dto.attachmentIds;
       if (
         dto.status !== undefined &&
         dto.status !== TransferOrderStatus.COMPLETED &&
@@ -950,6 +1029,16 @@ export class TransferOrderService {
           to.lines,
           to.sourceStorageId,
           actor.organizationId,
+        );
+      }
+
+      if (dto.attachmentIds !== undefined) {
+        to.attachmentIds = await this.mediaLink.syncOwner(
+          MediaOwnerType.TRANSFER_ORDER,
+          to.id,
+          dto.attachmentIds,
+          actor,
+          manager,
         );
       }
 
@@ -1909,6 +1998,33 @@ export class TransferOrderService {
       actor,
       "Chi nhánh nhận đã nhập phiếu này nên không sửa được nữa. Chi nhánh nhận phải xoá phiếu nhập trước.",
     );
+  }
+
+  /**
+   * Shared save for the IN_PROGRESS branch of `update()`: `attachmentIds`
+   * only routes through `syncOwner` (own transaction, so a media failure
+   * cannot corrupt the row) when the caller actually sent the field —
+   * `undefined` must leave existing attachments untouched, not clear them.
+   */
+  private async saveWithAttachments(
+    to: TransferOrderEntity,
+    attachmentIds: string[] | undefined,
+    actor: ActorContext,
+  ): Promise<void> {
+    if (attachmentIds === undefined) {
+      await this.toRepo.save(to);
+      return;
+    }
+    await this.dataSource.transaction(async (manager) => {
+      to.attachmentIds = await this.mediaLink.syncOwner(
+        MediaOwnerType.TRANSFER_ORDER,
+        to.id,
+        attachmentIds,
+        actor,
+        manager,
+      );
+      await manager.save(to);
+    });
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────────

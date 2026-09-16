@@ -186,7 +186,7 @@ storefront listing works.
       "colors": ["BA", "D"],
       "sizes": ["38", "39"],
       "inStock": true,
-      "images": []
+      "images": ["https://media.example.com/products/photo-1.jpg"]
     }
   ],
   "total": 107,
@@ -201,7 +201,7 @@ storefront listing works.
 | `categoryId` / `categoryName` | Derived from the variants; `products` has no category column |
 | `colors` / `sizes` | With no variant-level filter (`colors`, `sizes`, `priceFrom`, `priceTo`, `inStock`), values across all active variants. Under any such filter, narrowed to only the matching variants — see §5 |
 | `inStock` | Boolean only. With no variant-level filter, true when any active variant has stock in any branch the key may see. Under a variant-level filter, computed over the matching variants only, and equal to the requested `inStock` value when that filter was set. **No quantity is ever returned** |
-| `images` | **Always `[]`** — see §5 |
+| `images` | Public, absolute photo URLs, in display order. `[]` when the product has no photos — see §5 |
 | `total` | Total matching products, not the size of this page. Drives "Hiển thị 1–20 của 107 kết quả" |
 
 `sort` orders by product creation date or by `priceMin`/`priceMax`, and always breaks ties
@@ -257,11 +257,12 @@ in the schema. The reference storefront paints 17 colour swatches; that cannot b
 from this data. The partner must keep its own code → name/hex mapping, and re-check it
 whenever the catalogue gains a code.
 
-### `images` is always empty
+### `images` is public URLs, ordered, possibly empty
 
-There is no image column, no media table, and no upload module anywhere in the ERP. The
-field is in the contract so images can appear later without a breaking change, but today
-it is unconditionally `[]`. The storefront needs its own image source.
+`images` is an array of public, absolute URLs to the product's photos, in display order.
+It is `[]` for a product that has no photos yet — not every product will. URLs need no
+authentication and can be hot-linked directly in an `<img src>`; they carry no id, file
+name or storage detail a partner would need to parse.
 
 ### Product `name` is currently the SKU code
 

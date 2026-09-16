@@ -45,6 +45,9 @@ export function ledgerDetailToCreateReceiptBody(
     cashAccountId,
     // contraAccountId omitted — resolved server-side from the purpose.
     totalAmount,
+    // Omitted key (not `[]`) means "leave attachments unchanged" on update —
+    // `detail.attachmentIds` is only set once the dialog has a definitive list.
+    ...(detail.attachmentIds !== undefined ? { attachmentIds: detail.attachmentIds } : {}),
     lines,
   };
 }
@@ -97,6 +100,9 @@ export function ledgerDetailToCreatePaymentBody(
     // transfer sub-options (cash→bank, branch transfer) currently resolve by
     // purpose too; booking them against the destination account is follow-up.
     totalAmount,
+    // Omitted key (not `[]`) means "leave attachments unchanged" on update —
+    // `detail.attachmentIds` is only set once the dialog has a definitive list.
+    ...(detail.attachmentIds !== undefined ? { attachmentIds: detail.attachmentIds } : {}),
     lines,
   };
 }

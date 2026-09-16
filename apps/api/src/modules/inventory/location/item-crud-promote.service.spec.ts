@@ -13,6 +13,8 @@ import { ProductAttributeOptionEntity } from '../product/product-attribute-optio
 import { ItemAttributeValueEntity } from '../product/item-attribute-value.entity';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
 import { CacheService } from '../../redis/cache.service';
+import { MediaLinkService } from '../../media/media-link.service';
+import { MediaQueryService } from '../../media/media-query.service';
 
 /**
  * Khoá nhánh THĂNG CẤP: sửa một MẶT HÀNG LẺ và gửi kèm `colors`/`sizes` thì nó
@@ -154,6 +156,14 @@ describe('InventoryItemCrudService.update (thăng cấp mặt hàng lẻ)', () =
         { provide: DataSource, useValue: dataSource },
         { provide: StockLedgerService, useValue: { recordMovement: jest.fn() } },
         { provide: CacheService, useValue: { invalidate: jest.fn(), getOrSet: jest.fn() } },
+        {
+          provide: MediaLinkService,
+          useValue: { syncOwner: jest.fn(), detachAll: jest.fn() },
+        },
+        {
+          provide: MediaQueryService,
+          useValue: { resolvePublicUrls: jest.fn().mockResolvedValue(new Map()) },
+        },
       ],
     }).compile();
 

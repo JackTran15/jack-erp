@@ -134,7 +134,10 @@ export function userDetailToEmployeeDraft(
       idCardIssuePlace: profile?.idCardIssuePlace ?? "",
       idCardIssueDate: profile?.idCardIssueDate ?? undefined,
       maritalStatus: profile?.maritalStatus ?? MaritalStatusEnum.SINGLE,
-      photoDataUrl: profile?.photoUrl ?? undefined,
+      currentPhoto:
+        profile?.photoMediaId && profile?.photoUrl
+          ? { id: profile.photoMediaId, url: profile.photoUrl, fileName: "" }
+          : undefined,
       employmentStatus:
         profile?.employmentStatus ?? employmentStatusFromActive(detail.isActive),
       birthDate: profile?.birthDate ?? undefined,

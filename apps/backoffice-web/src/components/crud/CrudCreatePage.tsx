@@ -17,7 +17,17 @@ import { isNotFoundHttpError } from "../../lib/not-found-http-error";
 import { HttpErrorView } from "../../pages/errors/HttpErrorPage";
 
 /** Fields stripped when cloning an inventory item (must be unique per item). */
-const CLONE_STRIP_FIELDS = new Set(["code", "sku", "barcode", "id", "createdAt", "updatedAt"]);
+const CLONE_STRIP_FIELDS = new Set([
+  "code",
+  "sku",
+  "barcode",
+  "id",
+  "createdAt",
+  "updatedAt",
+  // Media has exactly one owner, so a clone can't reuse the source's files.
+  "images",
+  "imageIds",
+]);
 
 function stripCloneFields(source: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
@@ -161,6 +171,10 @@ export function CrudCreatePage() {
     } else {
       payload = buildCrudPayload(editableFields, values, "create");
     }
+
+    // `images` is the read-model preview (id/url/fileName), not a write field — the
+    // server only takes `imageIds` (synced by the media hook).
+    if (entityKey === "inventory-items") delete payload.images;
 
     try {
       await createMutation.mutateAsync(payload);

@@ -106,6 +106,13 @@ export interface VoucherSourceLink {
   sourceDocumentNumber: string | null;
 }
 
+export interface CashVoucherAttachment {
+  id: string;
+  fileName: string;
+  contentType: string;
+  size: number;
+}
+
 export interface CashReceipt extends BaseRecord {
   documentNumber?: string;
   voucherDate: string;
@@ -126,6 +133,7 @@ export interface CashReceipt extends BaseRecord {
   contraAccountId: string;
   totalAmount: number;
   attachmentIds?: string[];
+  attachments?: CashVoucherAttachment[];
   cashMovementId?: string;
   journalEntryId?: string;
   lines?: CashReceiptLine[];
@@ -152,6 +160,7 @@ export interface CashPayment extends BaseRecord {
   contraAccountId: string;
   totalAmount: number;
   attachmentIds?: string[];
+  attachments?: CashVoucherAttachment[];
   cashMovementId?: string;
   journalEntryId?: string;
   lines?: CashPaymentLine[];

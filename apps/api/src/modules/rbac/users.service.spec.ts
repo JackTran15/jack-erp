@@ -6,6 +6,7 @@ import {
   ConflictException,
   ForbiddenException,
   NotFoundException,
+  ValidationPipe,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { RbacService } from './rbac.service';
@@ -16,7 +17,27 @@ import { UserRoleEntity } from '../auth/user-role.entity';
 import { UserBranchAssignmentEntity } from '../branch/user-branch-assignment.entity';
 import { BranchEntity } from '../branch/branch.entity';
 import { EmployeeProfileEntity } from './employee/employee-profile.entity';
+import { EmployeeProfileDto } from './dto/employee-profile.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
+import { MediaLinkService } from '../media/media-link.service';
+import { MediaQueryService, MediaSummary } from '../media/media-query.service';
+import { MediaOwnerType } from '../media/media-object.entity';
+import { MediaException } from '../media/media.exception';
+
+function makeMediaSummary(overrides: Partial<MediaSummary> = {}): MediaSummary {
+  return {
+    id: 'media-1',
+    fileName: 'photo.png',
+    contentType: 'image/png',
+    size: 1024,
+    sortOrder: 0,
+    bucket: 'erp-media-private',
+    objectKey: 'org/org-1/employee_profile/media-1',
+    ownerType: MediaOwnerType.EMPLOYEE_PROFILE,
+    ...overrides,
+  };
+}
 
 const actor: ActorContext = {
   userId: 'admin-1',
@@ -52,6 +73,9 @@ function makeMockRepo() {
 
 function makeMockManager() {
   return {
+    // Defaults to "not found" so upsertProfile's code-owner/existing-profile
+    // lookups take the create branch unless a test overrides them.
+    findOne: jest.fn().mockResolvedValue(null),
     create: jest.fn().mockImplementation((_entity, data) => ({ ...data })),
     save: jest.fn().mockImplementation(async (_entity, value) => value),
     delete: jest.fn().mockResolvedValue({ affected: 0 }),
@@ -79,6 +103,8 @@ describe('UsersService', () => {
   >;
   let cacheService: jest.Mocked<Pick<CacheService, 'invalidate' | 'getOrSet'>>;
   let manager: ReturnType<typeof makeMockManager>;
+  let mediaLink: jest.Mocked<Pick<MediaLinkService, 'syncOwner'>>;
+  let mediaQuery: jest.Mocked<Pick<MediaQueryService, 'listForOwners' | 'signReadUrl'>>;
 
   beforeEach(async () => {
     userRepo = makeMockRepo();
@@ -122,6 +148,15 @@ describe('UsersService', () => {
       // about caching itself override this.
       getOrSet: jest.fn(async (_ns, _key, fetchFn) => fetchFn()) as any,
     };
+    mediaLink = {
+      syncOwner: jest.fn().mockResolvedValue([]),
+    };
+    mediaQuery = {
+      // Most tests never touch an employee photo; default to "no photo found"
+      // so they do not have to stub this themselves.
+      listForOwners: jest.fn().mockResolvedValue(new Map()),
+      signReadUrl: jest.fn().mockResolvedValue('https://signed.example/media-1'),
+    };
 
     const dataSource = {
       transaction: jest.fn((cb: any) => cb(manager)),
@@ -145,6 +180,8 @@ describe('UsersService', () => {
         { provide: RbacService, useValue: rbac },
         { provide: CacheService, useValue: cacheService },
         { provide: DataSource, useValue: dataSource },
+        { provide: MediaLinkService, useValue: mediaLink },
+        { provide: MediaQueryService, useValue: mediaQuery },
       ],
     }).compile();
 
@@ -170,14 +207,18 @@ describe('UsersService', () => {
       userRepo.findAndCount.mockResolvedValue([[userWith, userWithout], 2]);
       profileRepo.find.mockResolvedValue([
         {
+          id: 'p-1',
           userId: 'u-1',
           code: 'NV000001',
           jobPosition: { id: 'jp-1', name: 'Sales' },
-          photoUrl: 'http://cdn/p1.png',
           mobile: '0900000001',
           employmentStatus: 'OFFICIAL',
         },
       ]);
+      mediaQuery.listForOwners.mockResolvedValue(
+        new Map([['p-1', [makeMediaSummary({ id: 'media-1' })]]]),
+      );
+      mediaQuery.signReadUrl.mockResolvedValue('https://signed.example/media-1');
 
       const result = await service.list(
         { page: 1, pageSize: 20 },
@@ -191,7 +232,8 @@ describe('UsersService', () => {
         profile: {
           code: 'NV000001',
           jobPosition: { id: 'jp-1', name: 'Sales' },
-          photoUrl: 'http://cdn/p1.png',
+          photoUrl: 'https://signed.example/media-1',
+          photoMediaId: 'media-1',
           mobile: '0900000001',
           employmentStatus: 'OFFICIAL',
         },
@@ -200,6 +242,142 @@ describe('UsersService', () => {
         id: 'u-2',
         code: null,
         profile: null,
+      });
+    });
+
+    /** AC-09/AC-10: batch photo resolution. */
+    describe('employee photo (T-01-07)', () => {
+      it('signs a batch of N employees with a single listForOwners call', async () => {
+        const users = [makeUser({ id: 'u-1' }), makeUser({ id: 'u-2', email: 'b@example.com' })];
+        userRepo.findAndCount.mockResolvedValue([users, 2]);
+        profileRepo.find.mockResolvedValue([
+          { id: 'p-1', userId: 'u-1', code: 'NV0001', jobPosition: null, mobile: null, employmentStatus: 'OFFICIAL' },
+          { id: 'p-2', userId: 'u-2', code: 'NV0002', jobPosition: null, mobile: null, employmentStatus: 'OFFICIAL' },
+        ]);
+        const summary = makeMediaSummary({ id: 'media-1' });
+        mediaQuery.listForOwners.mockResolvedValue(new Map([['p-1', [summary]]]));
+
+        await service.list({ page: 1, pageSize: 20 }, actor);
+
+        expect(mediaQuery.listForOwners).toHaveBeenCalledTimes(1);
+        expect(mediaQuery.listForOwners).toHaveBeenCalledWith(
+          MediaOwnerType.EMPLOYEE_PROFILE,
+          ['p-1', 'p-2'],
+          'org-1',
+        );
+        expect(mediaQuery.signReadUrl).toHaveBeenCalledWith(summary, 'org-1', 'inline');
+      });
+
+      it('degrades every photoUrl to null and logs once when a later row hits STORAGE_UNAVAILABLE', async () => {
+        const users = [makeUser({ id: 'u-1' }), makeUser({ id: 'u-2', email: 'b@example.com' })];
+        userRepo.findAndCount.mockResolvedValue([users, 2]);
+        profileRepo.find.mockResolvedValue([
+          { id: 'p-1', userId: 'u-1', code: 'NV0001', jobPosition: null, mobile: null, employmentStatus: 'OFFICIAL' },
+          { id: 'p-2', userId: 'u-2', code: 'NV0002', jobPosition: null, mobile: null, employmentStatus: 'OFFICIAL' },
+        ]);
+        mediaQuery.listForOwners.mockResolvedValue(
+          new Map([
+            ['p-1', [makeMediaSummary({ id: 'media-1' })]],
+            ['p-2', [makeMediaSummary({ id: 'media-2' })]],
+          ]),
+        );
+        mediaQuery.signReadUrl.mockImplementation(async (summary: MediaSummary) =>
+          summary.id === 'media-1'
+            ? 'https://signed.example/media-1'
+            : Promise.reject(new MediaException(503, 'STORAGE_UNAVAILABLE', 'Media storage is not configured')),
+        );
+        const logged = jest
+          .spyOn((service as unknown as { logger: { warn: jest.Mock } }).logger, 'warn')
+          .mockImplementation(() => undefined);
+
+        const result = await service.list({ page: 1, pageSize: 20 }, actor);
+
+        expect(result.data[0].profile).toMatchObject({ photoUrl: null });
+        expect(result.data[1].profile).toMatchObject({ photoUrl: null });
+        expect(logged).toHaveBeenCalledTimes(1);
+        logged.mockRestore();
+      });
+
+      it('nulls only the row whose media no longer resolves (MEDIA_NOT_FOUND), keeping the others signed', async () => {
+        const users = [makeUser({ id: 'u-1' }), makeUser({ id: 'u-2', email: 'b@example.com' })];
+        userRepo.findAndCount.mockResolvedValue([users, 2]);
+        profileRepo.find.mockResolvedValue([
+          { id: 'p-1', userId: 'u-1', code: 'NV0001', jobPosition: null, mobile: null, employmentStatus: 'OFFICIAL' },
+          { id: 'p-2', userId: 'u-2', code: 'NV0002', jobPosition: null, mobile: null, employmentStatus: 'OFFICIAL' },
+        ]);
+        mediaQuery.listForOwners.mockResolvedValue(
+          new Map([
+            ['p-1', [makeMediaSummary({ id: 'media-1' })]],
+            ['p-2', [makeMediaSummary({ id: 'media-2' })]],
+          ]),
+        );
+        mediaQuery.signReadUrl.mockImplementation(async (summary: MediaSummary) =>
+          summary.id === 'media-1'
+            ? Promise.reject(new MediaException(404, 'MEDIA_NOT_FOUND', 'Media not found'))
+            : 'https://signed.example/media-2',
+        );
+        const logged = jest
+          .spyOn((service as unknown as { logger: { warn: jest.Mock } }).logger, 'warn')
+          .mockImplementation(() => undefined);
+
+        const result = await service.list({ page: 1, pageSize: 20 }, actor);
+
+        expect(result.data[0].profile).toMatchObject({ photoUrl: null, photoMediaId: 'media-1' });
+        expect(result.data[1].profile).toMatchObject({
+          photoUrl: 'https://signed.example/media-2',
+          photoMediaId: 'media-2',
+        });
+        logged.mockRestore();
+      });
+
+      it('returns photoUrl: null for an employee with no attached photo', async () => {
+        userRepo.findAndCount.mockResolvedValue([[makeUser({ id: 'u-1' })], 1]);
+        profileRepo.find.mockResolvedValue([
+          { id: 'p-1', userId: 'u-1', code: 'NV0001', jobPosition: null, mobile: null, employmentStatus: 'OFFICIAL' },
+        ]);
+        mediaQuery.listForOwners.mockResolvedValue(new Map());
+
+        const result = await service.list({ page: 1, pageSize: 20 }, actor);
+
+        expect(result.data[0].profile).toMatchObject({ photoUrl: null, photoMediaId: null });
+        expect(mediaQuery.signReadUrl).not.toHaveBeenCalled();
+      });
+
+      it('degrades to photoUrl: null for the whole page and logs once when storage is unavailable', async () => {
+        userRepo.findAndCount.mockResolvedValue([[makeUser({ id: 'u-1' })], 1]);
+        profileRepo.find.mockResolvedValue([
+          { id: 'p-1', userId: 'u-1', code: 'NV0001', jobPosition: null, mobile: null, employmentStatus: 'OFFICIAL' },
+        ]);
+        mediaQuery.listForOwners.mockResolvedValue(
+          new Map([['p-1', [makeMediaSummary({ id: 'media-1' })]]]),
+        );
+        mediaQuery.signReadUrl.mockRejectedValue(
+          new MediaException(503, 'STORAGE_UNAVAILABLE', 'Media storage is not configured'),
+        );
+        const logged = jest
+          .spyOn((service as unknown as { logger: { warn: jest.Mock } }).logger, 'warn')
+          .mockImplementation(() => undefined);
+
+        const result = await service.list({ page: 1, pageSize: 20 }, actor);
+
+        expect(result.data[0].profile).toMatchObject({ photoUrl: null, photoMediaId: 'media-1' });
+        expect(logged).toHaveBeenCalledTimes(1);
+        logged.mockRestore();
+      });
+
+      it('propagates a signing error that is not STORAGE_UNAVAILABLE', async () => {
+        userRepo.findAndCount.mockResolvedValue([[makeUser({ id: 'u-1' })], 1]);
+        profileRepo.find.mockResolvedValue([
+          { id: 'p-1', userId: 'u-1', code: 'NV0001', jobPosition: null, mobile: null, employmentStatus: 'OFFICIAL' },
+        ]);
+        mediaQuery.listForOwners.mockResolvedValue(
+          new Map([['p-1', [makeMediaSummary({ id: 'media-1' })]]]),
+        );
+        mediaQuery.signReadUrl.mockRejectedValue(new Error('boom'));
+
+        await expect(
+          service.list({ page: 1, pageSize: 20 }, actor),
+        ).rejects.toThrow('boom');
       });
     });
 
@@ -964,6 +1142,29 @@ describe('UsersService', () => {
       );
     });
 
+    /** AC-09/AC-10: a single-profile detail read still batches through listForOwners once. */
+    it('resolves the profile photo with a single listForOwners call for [profileId]', async () => {
+      profileRepo.findOne.mockResolvedValue({
+        id: 'p-me',
+        userId: 'u-me',
+        code: 'NV0001',
+        employmentStatus: 'OFFICIAL',
+      });
+      mediaQuery.listForOwners.mockResolvedValue(
+        new Map([['p-me', [makeMediaSummary({ id: 'media-me' })]]]),
+      );
+
+      const result = await service.getMe(me);
+
+      expect(mediaQuery.listForOwners).toHaveBeenCalledTimes(1);
+      expect(mediaQuery.listForOwners).toHaveBeenCalledWith(
+        MediaOwnerType.EMPLOYEE_PROFILE,
+        ['p-me'],
+        'org-1',
+      );
+      expect(result.profile).toMatchObject({ photoMediaId: 'media-me' });
+    });
+
     it('does not touch the repositories when the cache answers', async () => {
       (cacheService.getOrSet as jest.Mock).mockResolvedValue({
         id: 'u-me',
@@ -1007,6 +1208,89 @@ describe('UsersService', () => {
       expect(userRepo.findOne).toHaveBeenCalled();
       expect(logged).toHaveBeenCalled();
       logged.mockRestore();
+    });
+  });
+
+  /** AC-09: profile.photoMediaId is the only write path into media_objects for a profile photo. */
+  describe('upsertProfile — photoMediaId (T-01-07)', () => {
+    beforeEach(() => {
+      userRepo.findOne.mockResolvedValue({
+        id: 'u-1',
+        isActive: true,
+        organizationId: 'org-1',
+        lastLoginAt: null,
+        createdAt: new Date('2025-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2025-01-02T00:00:00.000Z'),
+      });
+      // upsertProfile saves the new EmployeeProfileEntity through `manager.save`;
+      // give it an id the way the real repository would.
+      manager.save = jest.fn().mockImplementation(async (_entity, value) =>
+        value && typeof value === 'object' && 'code' in value ? { id: 'p-1', ...value } : value,
+      );
+    });
+
+    it('calls syncOwner with [id] when a valid photoMediaId is sent', async () => {
+      await service.update('u-1', { profile: { code: 'NV0001', photoMediaId: 'media-1' } } as any, actor);
+
+      expect(mediaLink.syncOwner).toHaveBeenCalledWith(
+        MediaOwnerType.EMPLOYEE_PROFILE,
+        'p-1',
+        ['media-1'],
+        actor,
+        manager,
+      );
+    });
+
+    it('calls syncOwner with [] when photoMediaId is explicitly null (remove photo)', async () => {
+      await service.update('u-1', { profile: { code: 'NV0001', photoMediaId: null } } as any, actor);
+
+      expect(mediaLink.syncOwner).toHaveBeenCalledWith(
+        MediaOwnerType.EMPLOYEE_PROFILE,
+        'p-1',
+        [],
+        actor,
+        manager,
+      );
+    });
+
+    it('does not call syncOwner when photoMediaId is not sent at all', async () => {
+      await service.update('u-1', { profile: { code: 'NV0001' } } as any, actor);
+
+      expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+    });
+  });
+
+  /** AC-12: `profile.photoUrl` is no longer part of the request contract. */
+  describe('EmployeeProfileDto photoUrl removal (AC-12)', () => {
+    // Mirrors the global pipe registered in main.ts, so what passes here is
+    // what passes in production.
+    const pipe = new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+    });
+
+    it('rejects a legacy profile.photoUrl through the real nested UpdateUserDto path', async () => {
+      await expect(
+        pipe.transform(
+          { profile: { code: 'NV0001', photoUrl: 'blob:http://example/dead-preview' } },
+          { type: 'body', metatype: UpdateUserDto },
+        ),
+      ).rejects.toMatchObject({
+        response: {
+          message: expect.arrayContaining([
+            expect.stringContaining('property photoUrl should not exist'),
+          ]),
+        },
+      });
+    });
+
+    it('still accepts photoMediaId, including null', async () => {
+      const dto = await pipe.transform(
+        { code: 'NV0001', photoMediaId: null },
+        { type: 'body', metatype: EmployeeProfileDto },
+      );
+      expect(dto.photoMediaId).toBeNull();
     });
   });
 });

@@ -16,6 +16,7 @@ import { DocumentType, VoucherKind } from "@erp/shared-interfaces";
 import { CloudUpload, Pencil, Printer, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { useGenerateDocumentNumber } from "../../../../hooks/document-numbering/useGenerateDocumentNumber";
+import { MediaAttachmentList, type MediaAttachment } from "../../../../components/media/MediaAttachmentList";
 import { fetchVoucherPrintPayload } from "../../../../lib/print/voucher-print.api";
 import { renderVoucherHtml } from "../../../../lib/print/render-voucher-html";
 import { printHtmlDocument } from "../../../../lib/print/print-html-document";
@@ -151,6 +152,13 @@ export function ReceiptVoucherDialog({
   const [debtPickOpen, setDebtPickOpen] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [attachmentIds, setAttachmentIds] = useState<string[]>([]);
+  const [attachmentItems, setAttachmentItems] = useState<MediaAttachment[]>([]);
+  // Flips true once MediaAttachmentList has mounted with a real seed (create,
+  // or `initial` loaded) — guards the update payload from ever sending `[]`
+  // before the actual list is known.
+  const [attachmentsReady, setAttachmentsReady] = useState(false);
+  const [attachmentsUploading, setAttachmentsUploading] = useState(false);
 
   const { data: receiptCategories = [] } = useCashVoucherCategories(
     CashVoucherCategoryDirection.IN,
@@ -159,6 +167,13 @@ export function ReceiptVoucherDialog({
   const isDebtCollection =
     purpose === LedgerCashVoucherPurposeEnum.DEBT_COLLECTION;
   const debtFieldsLocked = isDebtCollection && !readOnly;
+  // "Thu nợ" at creation settles debts through a saga endpoint
+  // (POST /debt-collection) that has no attachmentIds slot — see
+  // TreasuryCashReceiptsPage.handleSaveVoucher. Editing an already-saved
+  // Thu nợ receipt goes through the plain update endpoint instead, which does
+  // support attachments.
+  const attachmentsUnsupported =
+    isDebtCollection && mode === TreasuryVoucherDialogModeEnum.CREATE;
 
   const resetKey = `receipt-${mode}-${initial?.voucherNo ?? "new"}-${initial?.partnerId ?? ""}`;
 
@@ -183,6 +198,9 @@ export function ReceiptVoucherDialog({
       setLines([emptyFormLine()]);
       setDocumentLines([]);
       setDetailTab(ReceiptVoucherDetailTabEnum.LINES);
+      setAttachmentIds([]);
+      setAttachmentItems([]);
+      setAttachmentsReady(false);
       return;
     }
     if (initial) {
@@ -214,6 +232,9 @@ export function ReceiptVoucherDialog({
       );
       setDocumentLines(initial.documentLines ?? []);
       setDetailTab(ReceiptVoucherDetailTabEnum.LINES);
+      setAttachmentIds((initial.attachments ?? []).map((a) => a.id));
+      setAttachmentItems(initial.attachments ?? []);
+      setAttachmentsReady(false);
     }
   }, [resetKey, open, mode, initial]);
 
@@ -254,9 +275,23 @@ export function ReceiptVoucherDialog({
     setEmployeeName(item.name);
   }, []);
 
+  const handleAttachmentsChange = useCallback((ids: string[], items: MediaAttachment[]) => {
+    setAttachmentIds(ids);
+    setAttachmentItems(items);
+    setAttachmentsReady(true);
+  }, []);
+
   const handlePurposeChange = useCallback(
     (next: LedgerCashVoucherPurposeEnum) => {
       setPurpose(next);
+      // Switching purpose forgets locally-picked attachments too, same as it
+      // already forgets `lines`/`documentLines` below — a switch into "Thu
+      // nợ" at creation moves to a saga endpoint with no attachmentIds slot
+      // (see `attachmentsUnsupported`), so nothing already selected there
+      // should silently resurface after switching back.
+      setAttachmentIds([]);
+      setAttachmentItems([]);
+      setAttachmentsReady(false);
       if (next === LedgerCashVoucherPurposeEnum.DEBT_COLLECTION) {
         setPartnerKind(PartnerLookupType.CUSTOMER);
         setPartnerId("");
@@ -564,6 +599,7 @@ export function ReceiptVoucherDialog({
         voucherDate,
         lines: validLines,
         documentLines,
+        attachmentIds: attachmentsReady ? attachmentIds : undefined,
       }),
     );
     toast.success(
@@ -592,6 +628,8 @@ export function ReceiptVoucherDialog({
     onSave,
     handleClose,
     documentLines,
+    attachmentIds,
+    attachmentsReady,
   ]);
 
   const voucherId = initial?.id;
@@ -640,6 +678,7 @@ export function ReceiptVoucherDialog({
         id: "save",
         label: "Lưu",
         icon: Save,
+        disabled: attachmentsUploading,
         onClick: handleSave,
       });
     }
@@ -677,6 +716,7 @@ export function ReceiptVoucherDialog({
     handlePrint,
     exporting,
     handleExport,
+    attachmentsUploading,
   ]);
 
   const title =
@@ -862,9 +902,21 @@ export function ReceiptVoucherDialog({
               layout="horizontal"
               labelWidth="8rem"
             >
-              <Button variant="outline" size="sm" disabled>
-                Tải tệp…
-              </Button>
+              {attachmentsUnsupported ? (
+                <span className="text-sm text-muted-foreground">
+                  Loại chứng từ này chưa hỗ trợ đính kèm.
+                </span>
+              ) : mode === TreasuryVoucherDialogModeEnum.CREATE || initial ? (
+                <MediaAttachmentList
+                  ownerType="CASH_RECEIPT"
+                  value={attachmentItems}
+                  onChange={handleAttachmentsChange}
+                  onUploadingChange={setAttachmentsUploading}
+                  readOnly={readOnly}
+                />
+              ) : (
+                <span className="text-sm text-muted-foreground">Đang tải danh sách đính kèm…</span>
+              )}
             </FormField>
           </>
         }

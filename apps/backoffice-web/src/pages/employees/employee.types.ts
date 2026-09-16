@@ -6,6 +6,7 @@ import {
   EmployeeAccessMode as AccessModeEnum,
   Weekday as WeekdayEnum,
 } from "@erp/shared-interfaces";
+import type { InitialMediaItem } from "../../lib/media/useMediaUpload";
 
 // Re-export the IAM/HR enums under the names the employee UI components already use,
 // so the form draft stays in sync with the API contract (CreateUserRequest.profile).
@@ -85,7 +86,15 @@ export interface EmployeeFormDraft {
     idCardNumber: string;
     idCardIssuePlace: string;
     maritalStatus: MaritalStatusEnum;
-    photoDataUrl?: string;
+    /** Existing profile photo as loaded from the server; undefined when there is none. Feeds useMediaUpload's `initial` seed, never sent to the API directly. */
+    currentPhoto?: InitialMediaItem;
+    /**
+     * Pending photo change: a new upload's media id, `null` to remove the
+     * current photo, `undefined` to leave it untouched. Must stay `undefined`
+     * unless the user explicitly picks or removes a photo this session — see
+     * the delete trap noted in draftToEmployeeProfilePayload.
+     */
+    photoMediaId?: string | null;
     employmentStatus: EmploymentStatusEnum;
     idCardIssueDate?: string;
     birthDate?: string;

@@ -24,6 +24,8 @@
     "seed:org": "ts-node src/database/seeds/org-baseline.seed.ts",
     "seed:new-org": "ts-node src/database/seeds/new-org.seed.ts",
     "seed:sync-admin-permissions": "ts-node src/database/seeds/sync-admin-permissions.seed.ts",
+    "media:bootstrap": "ts-node src/database/seeds/media-buckets.seed.ts",
+    "media:cleanup": "ts-node src/database/seeds/media-cleanup.seed.ts",
     "seed:report-types": "ts-node src/database/seeds/report-types.seed.ts",
     "seed:demo": "ts-node src/database/seeds/inventory-demo.seed.ts",
     "seed:all": "pnpm seed:inventory && pnpm seed:demo",
@@ -34,6 +36,9 @@
     "reconcile:transfer-order-lines": "ts-node src/scripts/reconcile-transfer-order-lines.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1131.0",
+    "@aws-sdk/s3-presigned-post": "^3.1131.0",
+    "@aws-sdk/s3-request-presigner": "^3.1131.0",
     "@erp/shared-interfaces": "workspace:*",
     "@erp/shared-kafka-client": "workspace:*",
     "@nestjs/common": "^11.0.0",

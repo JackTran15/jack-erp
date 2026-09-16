@@ -3,6 +3,7 @@ import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ItemEntity } from '../../inventory/location/item.entity';
+import { MediaQueryService } from '../../media/media-query.service';
 import {
   PartnerAttributeDto,
   PartnerProductDetailDto,
@@ -49,6 +50,7 @@ export class GetPartnerProductHandler
   constructor(
     @InjectRepository(ItemEntity)
     private readonly items: Repository<ItemEntity>,
+    private readonly mediaQuery: MediaQueryService,
   ) {}
 
   async execute({
@@ -103,7 +105,18 @@ export class GetPartnerProductHandler
     // code, and a product whose variants are all retired. Same answer, by design.
     if (rows.length === 0) throw new NotFoundException(NOT_FOUND_MESSAGE);
 
-    return buildDetail(rows);
+    // `rows[0].id` — the database's own casing — not the request `productId`:
+    // `media_objects.owner_id` is uuid and Postgres always returns it
+    // lowercase, so an uppercase id would still match `p.id = $2` here but
+    // then miss the map lookup below and silently produce `images: []`.
+    const id = rows[0]!.id;
+    const media = await this.mediaQuery.resolvePublicUrls(
+      [id],
+      actor.organizationId,
+    );
+    const images = (media.get(id) ?? []).map((m) => m.url);
+
+    return buildDetail(rows, images);
   }
 }
 
@@ -115,7 +128,10 @@ export class GetPartnerProductHandler
  * of dimensions. That is the opposite trade-off from the listing query, where
  * the row count is the whole catalogue and pushing down is the only option.
  */
-export function buildDetail(rows: DetailRow[]): PartnerProductDetailDto {
+export function buildDetail(
+  rows: DetailRow[],
+  images: string[],
+): PartnerProductDetailDto {
   const first = rows[0]!;
 
   const variants = new Map<string, PartnerVariantDto>();
@@ -162,7 +178,7 @@ export function buildDetail(rows: DetailRow[]): PartnerProductDetailDto {
     colors: optionsOf(dimensions, ATTRIBUTE_COLOR),
     sizes: optionsOf(dimensions, ATTRIBUTE_SIZE),
     inStock: variantList.some((v) => v.inStock),
-    images: [],
+    images,
     attributes,
     variants: variantList,
   };

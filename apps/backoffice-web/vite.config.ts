@@ -18,10 +18,25 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    proxy: {
+      // Mirrors the two nginx locations production points at MinIO (A-06): same
+      // path, same Host, no rewrite — presigned URLs sign over the path.
+      "/erp-media-public": {
+        target: "http://localhost:9000",
+        changeOrigin: false,
+      },
+      "/erp-media-private": {
+        target: "http://localhost:9000",
+        changeOrigin: false,
+      },
+    },
   },
   preview: {
     port: 3000,
     host: true,
     allowedHosts: ["jack-erp-backoffice.ducanhzed.com", "erp.giaymt.com.vn", "jack-erp.ducanhzed.com"],
+    // Production runs `vite preview`, and Vite falls back to `server.proxy` when
+    // this is unset. Media paths belong to nginx there, so opt out explicitly.
+    proxy: {},
   },
 });

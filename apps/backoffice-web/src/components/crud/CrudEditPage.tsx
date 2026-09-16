@@ -162,6 +162,9 @@ export function CrudEditPage() {
     let payload: Record<string, unknown>;
     if (entityKey === "inventory-providers" || entityKey === "inventory-items") {
       payload = sanitizeCrudPayload(editableFields, values, "update");
+      // `images` is the read-model preview (id/url/fileName) hydrated onto `values`
+      // from the loaded record; only `imageIds` (synced by the media hook) is a write field.
+      if (entityKey === "inventory-items") delete payload.images;
     } else {
       payload = buildCrudPayload(editableFields, values, "update");
     }

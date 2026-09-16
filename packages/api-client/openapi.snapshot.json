@@ -5921,7 +5921,7 @@
             "description": ""
           }
         },
-        "summary": "Bỏ hàng hóa khỏi vị trí; tồn dương được chuyển về \"Chưa xếp\" cùng kho",
+        "summary": "Bỏ hàng hóa khỏi vị trí; từ chối nếu vị trí còn tồn kho (khác 0)",
         "tags": [
           "inventory"
         ]
@@ -6092,6 +6092,37 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SetItemActiveStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "InventoryLocation"
+        ]
+      }
+    },
+    "/inventory/items/set-images": {
+      "post": {
+        "operationId": "InventoryLocationController_setItemImages",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetItemImagesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetItemImagesResponseDto"
                 }
               }
             }
@@ -7479,6 +7510,70 @@
           }
         },
         "summary": "Product-grouped inventory item search (server-side filters)",
+        "tags": [
+          "InventoryItemV2"
+        ]
+      }
+    },
+    "/v2/inventory-items/images/search": {
+      "post": {
+        "operationId": "InventoryItemV2Controller_searchImages_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductImageSearchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductImageSearchResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Product-grouped search by image status, category subtree and keyword (Update images page)",
+        "tags": [
+          "InventoryItemV2"
+        ]
+      }
+    },
+    "/v2/inventory-items/resolve-image-names": {
+      "post": {
+        "operationId": "InventoryItemV2Controller_resolveImageNames_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveImageNamesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveImageNamesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Split dropped image file names into code + sequence and resolve each to its product/item owner (Quick image update page)",
         "tags": [
           "InventoryItemV2"
         ]
@@ -10622,7 +10717,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BankReceiptEntity"
+                  "type": "object"
                 }
               }
             }
@@ -10987,7 +11082,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BankPaymentEntity"
+                  "type": "object"
                 }
               }
             }
@@ -20942,7 +21037,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GoodsReceiptEntity"
+                  "type": "object"
                 }
               }
             }
@@ -22430,6 +22525,99 @@
         ]
       }
     },
+    "/mobile/supplier-groups": {
+      "get": {
+        "operationId": "MobileSupplierGroupController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileSupplierGroupListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Trọn danh mục nhóm nhà cung cấp, PHẲNG, không phân trang",
+        "tags": [
+          "mobile"
+        ]
+      },
+      "post": {
+        "operationId": "MobileSupplierGroupController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileSupplierGroupCreateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileSupplierGroupResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo một nhóm nhà cung cấp",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/supplier-groups/{id}": {
+      "patch": {
+        "operationId": "MobileSupplierGroupController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileSupplierGroupUpdateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileSupplierGroupResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sửa một nhóm nhà cung cấp",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
     "/mobile/counterparties": {
       "get": {
         "operationId": "MobileCounterpartyController_list",
@@ -22856,6 +23044,58 @@
         ]
       }
     },
+    "/mobile/customer-groups": {
+      "get": {
+        "operationId": "MobileCustomerGroupController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileCustomerGroupListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Trọn danh mục nhóm khách hàng, PHẲNG, không phân trang",
+        "tags": [
+          "mobile"
+        ]
+      },
+      "post": {
+        "operationId": "MobileCustomerGroupController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileCustomerGroupCreateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileCustomerGroupResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo một nhóm khách hàng; mã do server cấp",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
     "/mobile/manager/invoices": {
       "get": {
         "operationId": "MobileManagerInvoiceController_list",
@@ -23094,6 +23334,78 @@
           }
         },
         "summary": "Tạo một đơn vị tính",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/inventory/storages": {
+      "get": {
+        "operationId": "MobileInventoryController_listStorages",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "query",
+            "description": "Cửa hàng — `branches.id`",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MobileInventoryStorageResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Kho đang hoạt động của một cửa hàng, danh sách phẳng",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/inventory/locations": {
+      "get": {
+        "operationId": "MobileInventoryController_listLocations",
+        "parameters": [
+          {
+            "name": "storageId",
+            "required": true,
+            "in": "query",
+            "description": "Kho — `storages.id`, lấy từ `GET /mobile/inventory/storages`",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MobileInventoryLocationResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Vị trí lưu kho của một kho, \"Chưa xếp\" đứng đầu",
         "tags": [
           "mobile"
         ]
@@ -23753,6 +24065,16 @@
               "default": 20,
               "type": "number"
             }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Ô tìm ở header màn \"Doanh thu theo mặt hàng\": mã/tên MẪU MÃ và tên NHÓM\nhàng hoá, khớp chuỗi con, không phân biệt hoa thường.\n\n**Cố ý KHÔNG tìm trên mã/tên BIẾN THỂ** — grain của đường này là mẫu mã\n(web `statBy=parent`), và web loại hai cột đó ở đúng grain này vì gõ `\"1\"`\nkhớp một biến thể sẽ kéo nguyên mẫu mã lên. Xem `revenue-by-item.report.ts`.\n\nRỗng / toàn khoảng trắng = không lọc gì, y như vắng khoá.",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -23767,7 +24089,7 @@
             }
           }
         },
-        "summary": "Doanh thu theo mặt hàng (mẫu mã) trong kỳ, phân trang, kèm tổng toàn tập",
+        "summary": "Doanh thu theo mặt hàng (mẫu mã) trong kỳ, phân trang, kèm tổng toàn tập. `search` lọc theo mã/tên mẫu mã và tên nhóm hàng hoá.",
         "tags": [
           "mobile"
         ]
@@ -25003,6 +25325,28 @@
         "tags": [
           "mobile"
         ]
+      },
+      "delete": {
+        "operationId": "MobileProductController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Xoá hàng hoá theo id (mẫu mã hoặc item lẻ)",
+        "tags": [
+          "mobile"
+        ]
       }
     },
     "/mobile/product-revenue": {
@@ -25278,6 +25622,22 @@
             }
           },
           {
+            "name": "purpose",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo loại chứng từ. Bỏ trống = MỌI loại mà `kind` đó vốn chứa.\n\nKHÔNG nhận được với `kind=goods-receipt`: màn \"Nhập hàng\" theo định nghĩa\nchỉ chứa phiếu mua hàng (`purposes: [PURCHASE]`), nên một tiêu chí lọc ở đó\nlà câu hỏi không có nghĩa. Gửi lên vẫn là **400** chứ không bị bỏ qua — bỏ\nqua thì app tưởng mình đã lọc và người dùng đọc một danh sách sai.\n\nPhép kiểm cặp `kind` × `purpose` nằm ở `MobileStockDocumentService`, chỗ\nduy nhất biết cả hai — `@IsEnum` ở đây chỉ chặn được giá trị lạ.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "transfer",
+                "stock-take",
+                "sale",
+                "disposal",
+                "other"
+              ]
+            }
+          },
+          {
             "name": "branchId",
             "required": false,
             "in": "query",
@@ -25485,6 +25845,145 @@
           }
         },
         "summary": "Sửa chứng từ kho",
+        "tags": [
+          "mobile"
+        ]
+      },
+      "delete": {
+        "operationId": "MobileStockDocumentController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "goods-receipt",
+                "stock-in",
+                "stock-out"
+              ]
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "Cửa hàng chứa chứng từ. Xem ghi chú ở DTO danh sách.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Xoá chứng từ kho — chỉ phiếu nhập",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/transfer-orders/importable": {
+      "get": {
+        "operationId": "MobileTransferOrderController_listImportable",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "Cửa hàng đang làm việc — cũng là cửa hàng ĐÍCH của những lệnh trả về. Bỏ\ntrống thì lấy cửa hàng mặc định trong token.\n\nPhải đi qua query chứ không qua header `X-Branch-Id`: `@Actor` giải chi\nnhánh theo thứ tự `jwt > header`, mà token luôn mang sẵn một `branchId`.\nCùng ràng buộc đã ghi ở `MobileStockDocumentListQueryDto`.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Đầu kỳ, tính theo NGÀY LẬP lệnh (`createdAt`) — không phải `requestedDate`.\n\nNhận `YYYY-MM-DD`. Cùng ràng buộc định dạng đã ghi ở\n`MobileStockDocumentListQueryDto.from`.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Cuối kỳ, BAO GỒM cả ngày này. Xem ghi chú ở [from].",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceBranchId",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp về MỘT cửa hàng nguồn — màn \"Mục đích nhập kho\" của app cho người\ndùng chọn \"Điều chuyển từ cửa hàng\" trước, rồi chỉ bày ra chứng từ của cửa\nhàng đó.\n\nLọc ở tầng này chứ không đẩy xuống `listImportable`: vị từ đó không nhận\ntham số nguồn, và nó vốn đã trả trọn danh sách nên lọc thêm trong bộ nhớ\nkhông tốn một lượt truy vấn nào.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Tìm theo số chứng từ hoặc tên cửa hàng nguồn",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileTransferOrderPageDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lệnh điều chuyển đang chờ cửa hàng hiện tại nhập, phân trang",
         "tags": [
           "mobile"
         ]
@@ -25919,6 +26418,97 @@
           "Partner catalog"
         ]
       }
+    },
+    "/media/uploads": {
+      "post": {
+        "operationId": "MediaUploadController_requestUpload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMediaUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestMediaUploadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/media/uploads/{id}/complete": {
+      "post": {
+        "operationId": "MediaUploadController_completeUpload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompleteMediaUploadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/media/{id}/download-url": {
+      "get": {
+        "operationId": "MediaDownloadController_getDownloadUrl",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetMediaDownloadUrlResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "media"
+        ]
+      }
     }
   },
   "info": {
@@ -26168,9 +26758,11 @@
             ],
             "type": "string"
           },
-          "photoUrl": {
+          "photoMediaId": {
             "type": "string",
-            "maxLength": 500
+            "nullable": true,
+            "format": "uuid",
+            "description": "Media id of the profile photo; null removes it, omit to leave unchanged"
           },
           "jobPositionId": {
             "type": "string",
@@ -32378,6 +32970,118 @@
           "skipped"
         ]
       },
+      "SetItemImagesAssignmentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "products.id of a grouped row or items.id of an ungrouped row."
+          },
+          "imageIds": {
+            "maxItems": 10,
+            "description": "Full replacement image set, in display order. Ids not listed are detached; an empty list removes every image.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "imageIds"
+        ]
+      },
+      "SetItemImagesDto": {
+        "type": "object",
+        "properties": {
+          "assignments": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SetItemImagesAssignmentDto"
+            }
+          }
+        },
+        "required": [
+          "assignments"
+        ]
+      },
+      "SetItemImagesUpdatedDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Code of the product or item that was updated."
+          },
+          "imageCount": {
+            "type": "number",
+            "description": "Number of images attached after the write."
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "imageCount"
+        ]
+      },
+      "SetItemImagesFailedDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true,
+            "description": "Code of the owner, or null when the id matched nothing."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "OWNER_NOT_FOUND",
+              "MEDIA_NOT_FOUND",
+              "MEDIA_STATE_CONFLICT",
+              "MEDIA_LIMIT_EXCEEDED"
+            ],
+            "description": "OWNER_NOT_FOUND — id is not a product or ungrouped item of this organization (variant ids count as not found); otherwise the MediaException code from syncOwner."
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "reason"
+        ]
+      },
+      "SetItemImagesResponseDto": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SetItemImagesUpdatedDto"
+            }
+          },
+          "failed": {
+            "description": "Assignments left untouched. A non-empty list is a normal outcome, not an error.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SetItemImagesFailedDto"
+            }
+          }
+        },
+        "required": [
+          "updated",
+          "failed"
+        ]
+      },
       "ItemLookupResultDto": {
         "type": "object",
         "properties": {
@@ -33100,6 +33804,207 @@
           "total",
           "page",
           "limit"
+        ]
+      },
+      "ProductImageSearchDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "imageStatus": {
+            "description": "MISSING = no ATTACHED image, PRESENT = at least one, ALL = no predicate.",
+            "default": "MISSING",
+            "enum": [
+              "ALL",
+              "MISSING",
+              "PRESENT"
+            ],
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Item category id; descendants are included (A-06).",
+            "format": "uuid"
+          },
+          "keyword": {
+            "type": "string",
+            "description": "Case-insensitive \"contains\" on group code, group name and variant code (A-17).",
+            "maxLength": 200
+          }
+        }
+      },
+      "ProductImageRowDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "product",
+              "orphan"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "categoryName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Category of the group (MIN over variants)"
+          },
+          "imageCount": {
+            "type": "number",
+            "description": "Number of ATTACHED images on the group"
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Public URL of the first image, if any"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "code",
+          "name",
+          "categoryName",
+          "imageCount",
+          "thumbnailUrl"
+        ]
+      },
+      "ProductImageSearchResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductImageRowDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
+      "ResolveImageNamesDto": {
+        "type": "object",
+        "properties": {
+          "names": {
+            "minItems": 1,
+            "maxItems": 500,
+            "description": "File names, with or without an image extension",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 255
+            }
+          }
+        },
+        "required": [
+          "names"
+        ]
+      },
+      "ResolvedImageNameDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name exactly as sent"
+          },
+          "code": {
+            "type": "string",
+            "description": "Code part of the name (extension and `(NN)` removed); empty when nothing is left"
+          },
+          "seq": {
+            "type": "number",
+            "nullable": true,
+            "description": "The `NN` of a `(NN)` suffix, or null"
+          },
+          "match": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "product",
+              "orphan",
+              "variant"
+            ],
+            "description": "What the code matched in the organization: a product code, an orphan item code, or a variant code (attached to the parent product)"
+          },
+          "ownerId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Id to send to set-images; for a variant this is the parent product id"
+          },
+          "ownerCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Code of the owner (parent product for a variant)"
+          },
+          "ownerName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Name of the owner (parent product for a variant)"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "SEQ_OUT_OF_RANGE",
+              "DUPLICATE_SEQ"
+            ],
+            "description": "SEQ_OUT_OF_RANGE: `(NN)` outside 1..10; DUPLICATE_SEQ: an earlier name in this call already used the same owner and sequence"
+          }
+        },
+        "required": [
+          "name",
+          "code",
+          "seq",
+          "match",
+          "ownerId",
+          "ownerCode",
+          "ownerName",
+          "error"
+        ]
+      },
+      "ResolveImageNamesResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResolvedImageNameDto"
+            }
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "ResolveItemLocationsDto": {
@@ -39302,7 +40207,7 @@
           "imageUrl": {
             "type": "string",
             "nullable": true,
-            "description": "Image URL placeholder — always null until image storage is implemented."
+            "description": "Public URL of the card's first image (product images for a PRODUCT card, the item's own images for a standalone ITEM card), or null when it has none."
           },
           "minPrice": {
             "type": "number",
@@ -46934,10 +47839,21 @@
             "nullable": true,
             "description": "null = chưa từng nhập"
           },
+          "groupId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Khoá của nhóm NCC; null = chưa xếp nhóm",
+            "format": "uuid"
+          },
           "groupCode": {
             "type": "string",
             "nullable": true,
             "description": "Mã nhóm NCC; null = chưa xếp nhóm"
+          },
+          "groupName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Tên nhóm NCC; null = chưa xếp nhóm"
           }
         },
         "required": [
@@ -46949,7 +47865,9 @@
           "address",
           "phone",
           "taxCode",
-          "groupCode"
+          "groupId",
+          "groupCode",
+          "groupName"
         ]
       },
       "MobileSupplierPageDto": {
@@ -47025,6 +47943,12 @@
             "type": "string",
             "nullable": true,
             "maxLength": 50
+          },
+          "groupId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nhóm nhà cung cấp, định danh bằng **UUID** chứ không bằng mã.\n\nMã nhóm SỬA ĐƯỢC (form nhóm mở ô đó), nên dùng mã làm khoá ghi là mỗi lần\nđổi mã lại đứt liên kết — cùng lập luận đã đưa `MobileSupplierController` từ\ntra-theo-mã sang tra-theo-id.\n\n`null` = GỠ nhóm khỏi nhà cung cấp này. Picker của app cho bỏ chọn bằng\ncách chạm lại card đang chọn, nên đây là thao tác có thật; `@IsOptional()`\nbỏ qua cả `undefined` lẫn `null` nên `null` đi lọt tới service, nơi nó được\nphân biệt với \"vắng khoá = giữ nguyên\".",
+            "format": "uuid"
           }
         },
         "required": [
@@ -47078,6 +48002,125 @@
             "type": "string",
             "nullable": true,
             "maxLength": 50
+          },
+          "groupId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nhóm nhà cung cấp, định danh bằng **UUID** chứ không bằng mã.\n\nMã nhóm SỬA ĐƯỢC (form nhóm mở ô đó), nên dùng mã làm khoá ghi là mỗi lần\nđổi mã lại đứt liên kết — cùng lập luận đã đưa `MobileSupplierController` từ\ntra-theo-mã sang tra-theo-id.\n\n`null` = GỠ nhóm khỏi nhà cung cấp này. Picker của app cho bỏ chọn bằng\ncách chạm lại card đang chọn, nên đây là thao tác có thật; `@IsOptional()`\nbỏ qua cả `undefined` lẫn `null` nên `null` đi lọt tới service, nơi nó được\nphân biệt với \"vắng khoá = giữ nguyên\".",
+            "format": "uuid"
+          }
+        }
+      },
+      "MobileSupplierGroupResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Khoá định danh, bất biến"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Mã nhóm, duy nhất trong tổ chức. SỬA ĐƯỢC — không phải khoá"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "parentGroupId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "description": "Nhóm cha; null = nhóm gốc"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "false = ngừng theo dõi. Vẫn trả về để app tra được nhãn của nhóm đang gắn, nhưng app tự loại khỏi danh sách CHỌN"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "parentGroupId",
+          "description",
+          "isActive"
+        ]
+      },
+      "MobileSupplierGroupListDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileSupplierGroupResponseDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "MobileSupplierGroupCreateDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Mã nhóm, duy nhất trong tổ chức",
+            "maxLength": 50
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Tên nhóm nhà cung cấp"
+          },
+          "parentGroupId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nhóm cha. `null` ĐƯỢC PHÉP và mang nghĩa \"nhóm gốc\" — picker của app cho\nbỏ chọn nhóm cha bằng cách chạm lại card đang chọn, nên đây là thao tác có\nthật chứ không phải ca biên.\n\n`@IsOptional()` bỏ qua cả `undefined` lẫn `null`, nên `null` đi lọt xuống\nservice. Service mới là chỗ phân biệt \"vắng khoá = giữ nguyên\" với\n\"`null` = đưa lên gốc\" — xem `MobileSupplierGroupService.update`.",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500,
+            "description": "Mô tả"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ]
+      },
+      "MobileSupplierGroupUpdateDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Mã nhóm, duy nhất trong tổ chức",
+            "maxLength": 50
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Tên nhóm nhà cung cấp"
+          },
+          "parentGroupId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nhóm cha. `null` ĐƯỢC PHÉP và mang nghĩa \"nhóm gốc\" — picker của app cho\nbỏ chọn nhóm cha bằng cách chạm lại card đang chọn, nên đây là thao tác có\nthật chứ không phải ca biên.\n\n`@IsOptional()` bỏ qua cả `undefined` lẫn `null`, nên `null` đi lọt xuống\nservice. Service mới là chỗ phân biệt \"vắng khoá = giữ nguyên\" với\n\"`null` = đưa lên gốc\" — xem `MobileSupplierGroupService.update`.",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500,
+            "description": "Mô tả"
           }
         }
       },
@@ -47190,6 +48233,12 @@
               "inactive"
             ]
           },
+          "groupId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Khoá nhóm khách hàng; null = chưa xếp nhóm",
+            "format": "uuid"
+          },
           "groupName": {
             "type": "string",
             "nullable": true,
@@ -47220,6 +48269,7 @@
           "birthDate",
           "gender",
           "status",
+          "groupId",
           "groupName",
           "cardTier",
           "revenue",
@@ -47312,6 +48362,12 @@
             "type": "string",
             "default": "active",
             "description": "Vắng = active. Bản ghi mới bao giờ cũng đang theo dõi."
+          },
+          "groupId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nhóm khách hàng, định danh bằng **UUID**.\n\n`null` = GỠ nhóm khỏi khách hàng này — picker của app cho bỏ chọn, nên đây\nlà thao tác có thật. `@IsOptional()` bỏ qua cả `undefined` lẫn `null`, nên\n`null` đi lọt tới service, nơi nó được phân biệt với \"vắng khoá = giữ\nnguyên\". Cùng ngữ nghĩa `MobileSupplierCreateDto.groupId`.",
+            "format": "uuid"
           }
         },
         "required": [
@@ -47465,8 +48521,75 @@
             "type": "string",
             "default": "active",
             "description": "Vắng = active. Bản ghi mới bao giờ cũng đang theo dõi."
+          },
+          "groupId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nhóm khách hàng, định danh bằng **UUID**.\n\n`null` = GỠ nhóm khỏi khách hàng này — picker của app cho bỏ chọn, nên đây\nlà thao tác có thật. `@IsOptional()` bỏ qua cả `undefined` lẫn `null`, nên\n`null` đi lọt tới service, nơi nó được phân biệt với \"vắng khoá = giữ\nnguyên\". Cùng ngữ nghĩa `MobileSupplierCreateDto.groupId`.",
+            "format": "uuid"
           }
         }
+      },
+      "MobileCustomerGroupResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true,
+            "description": "Mã nhóm do server cấp, dạng NKHxxxxxx; null nếu chưa backfill"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Duy nhất trong một tổ chức"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "description"
+        ]
+      },
+      "MobileCustomerGroupListDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileCustomerGroupResponseDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "MobileCustomerGroupCreateDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Tên nhóm, duy nhất trong tổ chức",
+            "maxLength": 100
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Mô tả"
+          }
+        },
+        "required": [
+          "name"
+        ]
       },
       "MobileManagerInvoiceLoyaltyDto": {
         "type": "object",
@@ -47695,6 +48818,50 @@
         },
         "required": [
           "name"
+        ]
+      },
+      "MobileInventoryStorageResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Tên kho"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "MobileInventoryLocationResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Mã vị trí, vd `A-01-03`"
+          },
+          "name": {
+            "type": "string",
+            "description": "Tên hiển thị"
+          },
+          "isUnassigned": {
+            "type": "boolean",
+            "description": "Bin ảo \"Chưa xếp\" — mỗi kho một cái, luôn đứng đầu"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "isUnassigned"
         ]
       },
       "MobileInventoryProductResponseDto": {
@@ -48714,6 +49881,11 @@
           "name": {
             "type": "string"
           },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "description": "Số điện thoại, để BẤM GỌI ngay trên dòng — không phải để hiển thị.\n\nMàn công nợ của app giấu nút gọi sau cử chỉ vuốt, và nếu không có số ở đây\nthì nút đó phải gọi thêm một lượt `/mobile/customers/:id` chỉ để lấy một\nchuỗi. Bảng `customers` đã nằm trong `JOIN` sẵn có nên đây là một cột thêm,\nkhông phải một phép nối thêm.\n\n`null` = khách chưa từng nhập số, KHÔNG phải lỗi dữ liệu."
+          },
           "closing": {
             "type": "number",
             "description": "Nợ CUỐI KỲ = đầu kỳ + tăng − giảm, gộp sổ POS và sổ kế toán, đơn vị đồng. Có thể ÂM (khách trả dư) hoặc 0"
@@ -48723,6 +49895,7 @@
           "id",
           "code",
           "name",
+          "phone",
           "closing"
         ]
       },
@@ -49939,6 +51112,22 @@
           "name"
         ]
       },
+      "MobileStockDocumentBranchDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
       "MobileStockDocumentLineDto": {
         "type": "object",
         "properties": {
@@ -49969,6 +51158,28 @@
           "lineTotal": {
             "type": "number",
             "description": "Thành tiền do BACKEND tính, không phải `quantity × unitPrice`. Hai số lệch nhau khi có chiết khấu, và trang web cũng ưu tiên trường này."
+          },
+          "locationId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "description": "Bin (vị trí lưu kho) đã lưu của dòng. App gửi lại ĐÚNG giá trị này khi SỬA — thiếu nó thì mỗi lượt lưu là server giải lại vị trí, tức hàng đổi bin mà không ai bấm gì."
+          },
+          "locationName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Tên bin, để màn Sửa hiện sẵn lựa chọn cũ"
+          },
+          "storageId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "description": "Kho chứa bin — `storages.id`"
+          },
+          "storageName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Tên kho"
           }
         },
         "required": [
@@ -49978,7 +51189,11 @@
           "unit",
           "quantity",
           "unitPrice",
-          "lineTotal"
+          "lineTotal",
+          "locationId",
+          "locationName",
+          "storageId",
+          "storageName"
         ]
       },
       "MobileStockDocumentDetailDto": {
@@ -50061,6 +51276,44 @@
             "type": "string",
             "description": "Diễn giải. `description` ở phiếu nhập, `notes` ở phiếu xuất."
           },
+          "purpose": {
+            "nullable": true,
+            "enum": [
+              "transfer",
+              "stock-take",
+              "sale",
+              "disposal",
+              "other"
+            ],
+            "type": "string",
+            "description": "Mục đích phiếu, để màn SỬA của app dựng lại đúng lựa chọn cũ. `null` khi mục đích của phiếu không nằm trong tập app lập được (vd phiếu bán hàng hay phiếu kiểm kê do hệ thống sinh) — app hiện \"Khác\" ở ca đó."
+          },
+          "sourceBranch": {
+            "nullable": true,
+            "description": "Cửa hàng NGUỒN — chỉ phiếu nhập kho điều chuyển có. Phục vụ màn SỬA, không hiển thị ở màn chi tiết.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MobileStockDocumentBranchDto"
+              }
+            ]
+          },
+          "targetBranch": {
+            "nullable": true,
+            "description": "Cửa hàng ĐÍCH — chỉ phiếu xuất kho điều chuyển có. Xem [sourceBranch].",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MobileStockDocumentBranchDto"
+              }
+            ]
+          },
+          "transferOrderId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "description": "Lệnh điều chuyển mà phiếu này là một chân của nó. `null` khi phiếu điều chuyển được lập độc lập (không chọn lệnh nào)."
+          },
           "lines": {
             "type": "array",
             "items": {
@@ -50082,6 +51335,10 @@
           "status",
           "deliverer",
           "note",
+          "purpose",
+          "sourceBranch",
+          "targetBranch",
+          "transferOrderId",
           "lines"
         ]
       },
@@ -50106,6 +51363,16 @@
           "note": {
             "type": "string",
             "maxLength": 500
+          },
+          "locationId": {
+            "type": "string",
+            "description": "Bin (vị trí lưu kho) người dùng CHỌN cho dòng này — lấy từ\n`GET /mobile/inventory/locations?storageId=…`.\n\nVắng = giữ nguyên hành vi cũ: server tự giải qua `ResolveItemLocationsQuery`\ntừ `branchId`. Có = server DÙNG ĐÚNG giá trị này, sau khi kiểm nó thuộc một\nkho của chính cửa hàng lập phiếu — `location_id` chỉ có khoá ngoại tới\n`locations`, KHÔNG có ràng buộc nào buộc bin thuộc đúng cửa hàng.",
+            "format": "uuid"
+          },
+          "uomCode": {
+            "type": "string",
+            "description": "Đơn vị tính của dòng. Vắng = lấy `items.unit` như trước.\n\nCHỈ phiếu NHẬP lưu được: `goods_receipt_lines.uom_code` là cột thật, còn\n`goods_issue_lines` KHÔNG có cột nào tương ứng. Với `kind=stock-out`, gửi\nlại ĐÚNG đơn vị đang có là hợp lệ (màn Sửa gửi lại thứ nó vừa đọc) nhưng\nđổi sang đơn vị khác thì 400 — xem `MobileStockDocumentWriteService`.",
+            "maxLength": 50
           }
         },
         "required": [
@@ -50133,6 +51400,33 @@
           "documentDate": {
             "type": "string",
             "description": "Ngày chứng từ, ISO-8601"
+          },
+          "purpose": {
+            "description": "Mục đích phiếu. Bỏ trống = `other`, tức ĐÚNG hành vi trước khi trường này\ntồn tại — client cũ không phải đổi gì.\n\n**Đường GHI chỉ hiểu `other` và `transfer`**, dù enum có năm giá trị vì nó\ndùng chung với bộ LỌC danh sách. Ba giá trị còn lại (`sale`, `disposal`,\n`stock-take`) là phiếu do hệ thống sinh hoặc do luồng khác lập, không phải\nthứ app tạo tay — gửi lên là 400 tường minh ở\n`MobileStockDocumentWriteService`. Dùng chung enum thay vì dựng cái thứ hai\nvì đó là CÙNG một từ vựng nhìn từ hai chiều; chỗ lệch là tập giá trị hợp\nlệ, và nó được kiểm ở service — nơi duy nhất biết cả `kind` lẫn `purpose`.\n\n`transfer` kéo theo ba trường dưới đây và đổi hẳn đường ghi — xem service.",
+            "enum": [
+              "transfer",
+              "stock-take",
+              "sale",
+              "disposal",
+              "other"
+            ],
+            "type": "string",
+            "default": "other"
+          },
+          "sourceBranchId": {
+            "type": "string",
+            "description": "Cửa hàng NGUỒN của phiếu nhập kho điều chuyển, khi người dùng KHÔNG chọn\nlệnh điều chuyển nào.\n\nPhải khác [branchId] — nhận hàng điều chuyển từ chính mình là vô nghĩa, và\n`GoodsReceiptService` từ chối ca đó.\n\nChọn được lệnh thì đừng gửi trường này: [transferOrderId] đã mang cửa hàng\nnguồn theo, và server lấy từ đó.",
+            "format": "uuid"
+          },
+          "targetBranchId": {
+            "type": "string",
+            "description": "Cửa hàng ĐÍCH của phiếu xuất kho điều chuyển. **BẮT BUỘC** ở ca đó — không\ncó nó thì không biết hàng đi đâu, và `GoodsIssueService` trả 400\n\"Vui lòng chọn cửa hàng đích để điều chuyển\".\n\nPhải khác [branchId], cùng lý do với [sourceBranchId].",
+            "format": "uuid"
+          },
+          "transferOrderId": {
+            "type": "string",
+            "description": "Lệnh điều chuyển mà phiếu NHẬP KHO này đang nhận về — lấy từ\n`GET /mobile/transfer-orders/importable`.\n\nCó nó thì server đi đường XÁC NHẬN NHẬP: phiếu nhập được sinh ra kèm tham\nchiếu tới lệnh, và lệnh chuyển sang \"hoàn thành\". **`lines` gửi kèm bị BỎ\nQUA** ở ca này — số lượng nhận lấy từ chính lệnh, để nó không bao giờ lệch\nthứ cửa hàng nguồn đã xuất. App vẫn phải gửi `lines` (DTO đòi không rỗng)\nvà nên gửi đúng dòng của lệnh để hai bên nhìn giống nhau.",
+            "format": "uuid"
           },
           "counterpartyKind": {
             "description": "Đối tượng. Hai trường đi CÙNG NHAU: gửi `counterpartyKind` mà thiếu\n`counterpartyId` là 400 ở tầng dưới.\n\n`customer` sẽ bị từ chối — phiếu kho chỉ nhận nhà cung cấp và nhân viên.",
@@ -50227,6 +51521,92 @@
         "required": [
           "documentDate",
           "lines"
+        ]
+      },
+      "MobileTransferOrderResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Định danh LỆNH điều chuyển — thứ gửi lại khi lưu phiếu"
+          },
+          "documentNumber": {
+            "type": "string",
+            "description": "Mã lệnh điều chuyển (`LDC…`)"
+          },
+          "exportDocumentNumber": {
+            "type": "string",
+            "nullable": true,
+            "description": "Mã phiếu XUẤT KHO của cửa hàng nguồn — thứ app hiển thị. NULL khi phiếu xuất chưa được ghi sổ; khi đó app lùi về `documentNumber`."
+          },
+          "documentDate": {
+            "type": "string",
+            "nullable": true,
+            "description": "Ngày của lệnh — `requestedDate` nếu có, không thì ngày lập. ISO-8601."
+          },
+          "sourceBranchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceBranchName": {
+            "type": "string",
+            "description": "Tên cửa hàng nguồn — server đã tra sẵn, app không phải tra lại"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "description": "Lý do / diễn giải của lệnh"
+          },
+          "totalAmount": {
+            "type": "number",
+            "description": "Tổng thành tiền của phiếu xuất nguồn"
+          },
+          "lines": {
+            "description": "Dòng hàng của lệnh.\n\nDùng CHUNG `MobileStockDocumentLineDto` với chứng từ kho — không phải cho\ngọn, mà vì đây LÀ cùng một khái niệm: chọn một lệnh xong thì app thay dòng\nhàng của phiếu bằng đúng danh sách này. Hai hình dạng riêng nghĩa là phía\nDart phải có hai parser rồi một phép chuyển đổi giữa chúng, cho một tập\ntrường trùng khít.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileStockDocumentLineDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "documentNumber",
+          "exportDocumentNumber",
+          "documentDate",
+          "sourceBranchId",
+          "sourceBranchName",
+          "note",
+          "totalAmount",
+          "lines"
+        ]
+      },
+      "MobileTransferOrderPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileTransferOrderResponseDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "description": "Tổng số lệnh khớp bộ lọc, không phải số lệnh của trang"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
         ]
       },
       "SalesOrderLineDto": {
@@ -50513,7 +51893,7 @@
             "description": "True when any active variant has stock in any branch this API key may see. Quantities are never exposed."
           },
           "images": {
-            "description": "Always empty. This ERP has no image storage yet; the field is part of the contract so images can appear later without a breaking change.",
+            "description": "Public image URLs for this product, in display order. Empty when the product has no images.",
             "type": "array",
             "items": {
               "type": "string"
@@ -50670,7 +52050,7 @@
             "description": "True when any active variant has stock in any branch this API key may see. Quantities are never exposed."
           },
           "images": {
-            "description": "Always empty. This ERP has no image storage yet; the field is part of the contract so images can appear later without a breaking change.",
+            "description": "Public image URLs for this product, in display order. Empty when the product has no images.",
             "type": "array",
             "items": {
               "type": "string"
@@ -50708,6 +52088,152 @@
           "description",
           "attributes",
           "variants"
+        ]
+      },
+      "CreateMediaUploadDto": {
+        "type": "object",
+        "properties": {
+          "ownerType": {
+            "enum": [
+              "PRODUCT",
+              "ITEM",
+              "EMPLOYEE_PROFILE",
+              "GOODS_RECEIPT",
+              "TRANSFER_ORDER",
+              "STOCK_TRANSFER",
+              "CASH_RECEIPT",
+              "CASH_PAYMENT",
+              "BANK_RECEIPT",
+              "BANK_PAYMENT"
+            ],
+            "type": "string",
+            "description": "Owner type this upload will belong to; decides the bucket, size limit and content-type allowlist."
+          },
+          "fileName": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "Original file name; used for display and Content-Disposition only."
+          },
+          "contentType": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Declared MIME type; checked against the ownerType allowlist and re-checked at confirm time."
+          },
+          "size": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10485760,
+            "description": "Declared size in bytes; checked against the ownerType limit and re-checked at confirm time."
+          }
+        },
+        "required": [
+          "ownerType",
+          "fileName",
+          "contentType",
+          "size"
+        ]
+      },
+      "UploadPolicyResponseDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Absolute URL the browser POSTs the multipart/form-data upload to."
+          },
+          "fields": {
+            "type": "object",
+            "description": "Form fields the browser must send verbatim alongside the file, generated by createPresignedPost.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "url",
+          "fields"
+        ]
+      },
+      "RequestMediaUploadResponseDto": {
+        "type": "object",
+        "properties": {
+          "mediaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "upload": {
+            "$ref": "#/components/schemas/UploadPolicyResponseDto"
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "When the upload ticket expires (10 minutes from issuance).",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "mediaId",
+          "upload",
+          "expiresAt"
+        ]
+      },
+      "MediaStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "UPLOADED",
+          "ATTACHED",
+          "DELETED"
+        ]
+      },
+      "CompleteMediaUploadResponseDto": {
+        "type": "object",
+        "properties": {
+          "mediaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MediaStatus"
+              }
+            ]
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "size": {
+            "type": "number",
+            "description": "Size in bytes."
+          }
+        },
+        "required": [
+          "mediaId",
+          "status",
+          "fileName",
+          "contentType",
+          "size"
+        ]
+      },
+      "GetMediaDownloadUrlResponseDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Public URL for public media, or a presigned GET URL for private media."
+          },
+          "expiresAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "When the link expires. Always null for public media; ~15 minutes for a private attachment link.",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "url",
+          "expiresAt"
         ]
       }
     }

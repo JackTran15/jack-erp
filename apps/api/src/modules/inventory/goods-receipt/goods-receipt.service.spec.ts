@@ -4,15 +4,19 @@ import {
   GoodsReceiptStatus,
   TransferOrderStatus,
 } from '@erp/shared-interfaces';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { GoodsReceiptService } from './goods-receipt.service';
 import { GoodsReceiptEntity } from './goods-receipt.entity';
 import { TransferOrderEntity } from '../transfer-order/transfer-order.entity';
+import { MediaException } from '../../media/media.exception';
 
 describe('GoodsReceiptService', () => {
   const receiptRepo = {
     create: jest.fn(),
     save: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
     findOne: jest.fn(),
     softDelete: jest.fn(),
     manager: {
@@ -84,10 +88,23 @@ describe('GoodsReceiptService', () => {
   const transferOrderService = {
     applyLegRevision: jest.fn().mockResolvedValue(undefined),
   };
+  // `syncOwner`'s default is a no-op empty order; tests that care about the
+  // returned order or a rejection override it.
+  const mediaLink = {
+    syncOwner: jest.fn().mockResolvedValue([]),
+    detachAll: jest.fn().mockResolvedValue([]),
+  };
+  const mediaQuery = {
+    listForOwners: jest.fn().mockResolvedValue(new Map()),
+  };
+  const readerRegistry = {
+    register: jest.fn(),
+  };
   const actor = {
     userId: 'user-1',
     organizationId: 'org-1',
     branchId: 'branch-A',
+    branchIds: ['branch-A'],
     roles: [],
     permissions: [],
   };
@@ -114,6 +131,9 @@ describe('GoodsReceiptService', () => {
       cashReceiptsService as never,
       transferOrderService as never,
       rbacService as never,
+      mediaLink as never,
+      mediaQuery as never,
+      readerRegistry as never,
     );
   });
 
@@ -1554,10 +1574,6 @@ describe('GoodsReceiptService', () => {
 
     beforeEach(() => {
       receiptRepo.create.mockImplementation((input: unknown) => input);
-      receiptRepo.save.mockImplementation(async (r: unknown) => ({
-        ...(r as object),
-        id: 'receipt-new',
-      }));
       documentNumberingService.generate.mockResolvedValue('PN0001');
       // `create` re-reads the saved document through `findOrFail` before
       // returning; without this the assertion below never runs.
@@ -1571,6 +1587,14 @@ describe('GoodsReceiptService', () => {
     });
 
     it('numbers a new receipt 1..n in the order the lines were submitted', async () => {
+      // `create()` now inserts through the transaction's own manager, not
+      // `receiptRepo.save` directly; scoped to this one call so it can't leak
+      // into unrelated `update()` line-array saves elsewhere in the file.
+      txManager.save.mockImplementationOnce(async (_entity: unknown, r: unknown) => ({
+        ...(r as object),
+        id: 'receipt-new',
+      }));
+
       await service.create(
         {
           purpose: GoodsReceiptPurpose.OTHER,
@@ -1728,6 +1752,427 @@ describe('GoodsReceiptService', () => {
 
       expect(payload.lines).toHaveLength(120);
       expect(payload.lines.length).toBeGreaterThan(50);
+    });
+  });
+
+  describe('media attachments on create (T-04-02)', () => {
+    const line1 = {
+      itemId: 'item-1',
+      locationId: 'loc-A01',
+      uomCode: 'pcs',
+      quantity: 1,
+      unitPrice: 100,
+    };
+
+    beforeEach(() => {
+      receiptRepo.create.mockImplementation((input: unknown) => input);
+      documentNumberingService.generate.mockResolvedValue('PN0099');
+    });
+
+    it('inserts and attaches inside one transaction, writing back the order syncOwner returns', async () => {
+      // The manager `create()` saves through is the transaction's own —
+      // distinct from `dataSource.manager` (undefined in this mock) — so this
+      // also proves the insert and the attach share one transaction.
+      txManager.save.mockImplementationOnce(async (_entity: unknown, r: unknown) => ({
+        ...(r as object),
+        id: 'receipt-new',
+      }));
+      receiptRepo.findOne.mockResolvedValue({
+        id: 'receipt-new',
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        status: GoodsReceiptStatus.DRAFT,
+        lines: [],
+      });
+      mediaLink.syncOwner.mockResolvedValueOnce(['media-1', 'media-2']);
+
+      await service.create(
+        {
+          purpose: GoodsReceiptPurpose.OTHER,
+          receivedAt: '2026-06-10T00:00:00.000Z',
+          locationId: 'loc-A01',
+          attachmentIds: ['media-2', 'media-1'],
+          lines: [line1],
+        },
+        actor,
+      );
+
+      expect(dataSource.transaction).toHaveBeenCalled();
+      expect(mediaLink.syncOwner).toHaveBeenCalledWith(
+        'GOODS_RECEIPT',
+        'receipt-new',
+        ['media-2', 'media-1'],
+        actor,
+        txManager,
+      );
+      expect(txManager.update).toHaveBeenCalledWith(GoodsReceiptEntity, 'receipt-new', {
+        attachmentIds: ['media-1', 'media-2'],
+      });
+    });
+
+    it('rolls back the insert when an id belongs to another organization — no compensating delete', async () => {
+      txManager.save.mockImplementationOnce(async (_entity: unknown, r: unknown) => ({
+        ...(r as object),
+        id: 'receipt-orphan',
+      }));
+      mediaLink.syncOwner.mockRejectedValueOnce(
+        new MediaException(404, 'MEDIA_NOT_FOUND', 'Media other-org-media not found'),
+      );
+
+      await expect(
+        service.create(
+          {
+            purpose: GoodsReceiptPurpose.OTHER,
+            receivedAt: '2026-06-10T00:00:00.000Z',
+            locationId: 'loc-A01',
+            attachmentIds: ['other-org-media'],
+            lines: [line1],
+          },
+          actor,
+        ),
+      ).rejects.toMatchObject({ code: 'MEDIA_NOT_FOUND' });
+
+      // syncOwner ran inside the transaction's own manager, so its rejection
+      // is what rolls back the insert — there is nothing left to compensate.
+      expect(mediaLink.syncOwner).toHaveBeenCalledWith(
+        'GOODS_RECEIPT',
+        'receipt-orphan',
+        ['other-org-media'],
+        actor,
+        txManager,
+      );
+      expect(receiptRepo.delete).not.toHaveBeenCalled();
+      expect(txManager.delete).not.toHaveBeenCalled();
+      expect(receiptRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('does not call syncOwner when attachmentIds is not sent', async () => {
+      txManager.save.mockImplementationOnce(async (_entity: unknown, r: unknown) => ({
+        ...(r as object),
+        id: 'receipt-plain',
+      }));
+      receiptRepo.findOne.mockResolvedValue({
+        id: 'receipt-plain',
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        status: GoodsReceiptStatus.DRAFT,
+        lines: [],
+      });
+
+      await service.create(
+        {
+          purpose: GoodsReceiptPurpose.OTHER,
+          receivedAt: '2026-06-10T00:00:00.000Z',
+          locationId: 'loc-A01',
+          lines: [line1],
+        },
+        actor,
+      );
+
+      expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+      expect(txManager.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createAndPost cleans up media together with the draft on post() failure (T-04-02)', () => {
+    const line1 = {
+      itemId: 'item-1',
+      locationId: 'loc-A01',
+      uomCode: 'pcs',
+      quantity: 1,
+      unitPrice: 100,
+    };
+
+    it('detaches media and deletes the draft in the same transaction, then propagates the error', async () => {
+      receiptRepo.create.mockImplementation((input: unknown) => input);
+      documentNumberingService.generate.mockResolvedValue('PN0099');
+      txManager.save.mockImplementationOnce(async (_entity: unknown, r: unknown) => ({
+        ...(r as object),
+        id: 'receipt-fail',
+      }));
+      mediaLink.syncOwner.mockResolvedValueOnce(['media-1']);
+      // post() re-reads the draft and fails on its own "no lines" guard —
+      // simplest deterministic way to make post() fail without also mocking
+      // the stock/cash posting path.
+      receiptRepo.findOne.mockResolvedValue({
+        id: 'receipt-fail',
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        status: GoodsReceiptStatus.DRAFT,
+        lines: [],
+      });
+
+      await expect(
+        service.createAndPost(
+          {
+            purpose: GoodsReceiptPurpose.OTHER,
+            receivedAt: '2026-06-10T00:00:00.000Z',
+            locationId: 'loc-A01',
+            attachmentIds: ['media-1'],
+            lines: [line1],
+          },
+          actor,
+        ),
+      ).rejects.toThrow('Phiếu nhập kho không có dòng hàng');
+
+      expect(mediaLink.detachAll).toHaveBeenCalledWith(
+        'GOODS_RECEIPT',
+        'receipt-fail',
+        actor.organizationId,
+        txManager,
+      );
+      expect(txManager.delete).toHaveBeenCalledWith(GoodsReceiptEntity, {
+        id: 'receipt-fail',
+        organizationId: actor.organizationId,
+      });
+    });
+  });
+
+  describe('media attachments on update (T-04-02)', () => {
+    function receiptFixture(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'receipt-att',
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        status: GoodsReceiptStatus.POSTED,
+        purpose: GoodsReceiptPurpose.OTHER,
+        documentNumber: 'PN0070',
+        revision: 0,
+        receivedAt: new Date('2026-06-10T00:00:00.000Z'),
+        locationId: 'loc-A01',
+        attachmentIds: [],
+        lines: [
+          {
+            itemId: 'item-1',
+            locationId: 'loc-A01',
+            uomCode: 'pcs',
+            quantity: '10.000',
+            unitPrice: '100.00',
+          },
+        ],
+        ...overrides,
+      };
+    }
+
+    it('calls syncOwner after the status checks and writes back the returned order (AC-13/AC-14)', async () => {
+      receiptRepo.findOne.mockResolvedValue(receiptFixture());
+      txManager.query.mockResolvedValue([
+        { status: GoodsReceiptStatus.POSTED, revision: 0 },
+      ]);
+      mediaLink.syncOwner.mockResolvedValueOnce(['media-1']);
+
+      await service.update('receipt-att', { attachmentIds: ['media-1'] }, actor);
+
+      expect(mediaLink.syncOwner).toHaveBeenCalledWith(
+        'GOODS_RECEIPT',
+        'receipt-att',
+        ['media-1'],
+        actor,
+        txManager,
+      );
+      expect(txManager.update).toHaveBeenCalledWith(
+        GoodsReceiptEntity,
+        'receipt-att',
+        expect.objectContaining({ attachmentIds: ['media-1'] }),
+      );
+    });
+
+    it('never calls syncOwner for a CANCELLED receipt (A-26, AC-16)', async () => {
+      receiptRepo.findOne.mockResolvedValue(
+        receiptFixture({ status: GoodsReceiptStatus.CANCELLED }),
+      );
+
+      await expect(
+        service.update('receipt-att', { attachmentIds: ['media-1'] }, actor),
+      ).rejects.toThrow('can no longer be edited');
+
+      expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+    });
+
+    it('never calls syncOwner for a REVERSED receipt (A-26, AC-16)', async () => {
+      receiptRepo.findOne.mockResolvedValue(
+        receiptFixture({ status: GoodsReceiptStatus.REVERSED }),
+      );
+
+      await expect(
+        service.update('receipt-att', { attachmentIds: ['media-1'] }, actor),
+      ).rejects.toThrow('can no longer be edited');
+
+      expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+    });
+
+    it('never calls syncOwner when the in-transaction re-check finds the receipt already CANCELLED', async () => {
+      receiptRepo.findOne.mockResolvedValue(receiptFixture());
+      // A concurrent cancel committed between the outer read and the row lock.
+      txManager.query.mockResolvedValue([
+        { status: GoodsReceiptStatus.CANCELLED, revision: 0 },
+      ]);
+
+      await expect(
+        service.update('receipt-att', { attachmentIds: ['media-1'] }, actor),
+      ).rejects.toThrow('can no longer be edited');
+
+      expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+    });
+
+    it('never calls syncOwner when the in-transaction re-check finds a stale revision', async () => {
+      receiptRepo.findOne.mockResolvedValue(receiptFixture({ revision: 0 }));
+      // A concurrent edit already committed and bumped the revision.
+      txManager.query.mockResolvedValue([
+        { status: GoodsReceiptStatus.POSTED, revision: 1 },
+      ]);
+
+      await expect(
+        service.update('receipt-att', { attachmentIds: ['media-1'] }, actor),
+      ).rejects.toThrow('modified by another request');
+
+      expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+    });
+
+    it('leaves the stored attachments untouched when attachmentIds is not sent', async () => {
+      receiptRepo.findOne.mockResolvedValue(
+        receiptFixture({ attachmentIds: ['existing-1'] }),
+      );
+      txManager.query.mockResolvedValue([
+        { status: GoodsReceiptStatus.POSTED, revision: 0 },
+      ]);
+
+      await service.update('receipt-att', { description: 'ghi chú' }, actor);
+
+      expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+      const patch = txManager.update.mock.calls.at(-1)![2] as Record<string, unknown>;
+      expect(patch.attachmentIds).toBeUndefined();
+    });
+  });
+
+  describe('detail attachments (T-04-02)', () => {
+    it('includes attachments from listForOwners, copying only the public fields', async () => {
+      receiptRepo.findOne.mockResolvedValue({
+        id: 'receipt-1',
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        lines: [],
+      });
+      mediaQuery.listForOwners.mockResolvedValueOnce(
+        new Map([
+          [
+            'receipt-1',
+            [
+              {
+                id: 'media-1',
+                fileName: 'hoa-don.pdf',
+                contentType: 'application/pdf',
+                size: 1024,
+                sortOrder: 0,
+                bucket: 'erp-media-private',
+                objectKey: 'org/org-1/goods_receipt/media-1',
+                ownerType: 'GOODS_RECEIPT',
+              },
+            ],
+          ],
+        ]),
+      );
+
+      const detail = await service.getById('receipt-1', actor);
+
+      expect(mediaQuery.listForOwners).toHaveBeenCalledWith(
+        'GOODS_RECEIPT',
+        ['receipt-1'],
+        actor.organizationId,
+      );
+      // Only the four public fields — never bucket/objectKey/ownerType.
+      expect(detail.attachments).toEqual([
+        { id: 'media-1', fileName: 'hoa-don.pdf', contentType: 'application/pdf', size: 1024 },
+      ]);
+    });
+
+    it('returns an empty attachments array when nothing is attached', async () => {
+      receiptRepo.findOne.mockResolvedValue({
+        id: 'receipt-2',
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        lines: [],
+      });
+
+      const detail = await service.getById('receipt-2', actor);
+
+      expect(detail.attachments).toEqual([]);
+    });
+  });
+
+  describe('media reader registration (ADR-06, T-04-02)', () => {
+    it('registers a GOODS_RECEIPT reader that reuses getById', async () => {
+      service.onModuleInit();
+
+      expect(readerRegistry.register).toHaveBeenCalledWith(
+        'GOODS_RECEIPT',
+        expect.any(Function),
+      );
+      const reader = readerRegistry.register.mock.calls[0][1] as (
+        id: string,
+        a: ActorContext,
+      ) => Promise<boolean>;
+
+      receiptRepo.findOne.mockResolvedValueOnce({
+        id: 'receipt-1',
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        lines: [],
+      });
+      await expect(reader('receipt-1', actor)).resolves.toBe(true);
+
+      receiptRepo.findOne.mockResolvedValueOnce(null);
+      await expect(reader('receipt-404', actor)).resolves.toBe(false);
+    });
+
+    it('denies without calling getById when the actor has no active branch', async () => {
+      service.onModuleInit();
+      const reader = readerRegistry.register.mock.calls[0][1] as (
+        id: string,
+        a: ActorContext,
+      ) => Promise<boolean>;
+
+      await expect(
+        reader('receipt-1', { ...actor, branchId: undefined }),
+      ).resolves.toBe(false);
+
+      expect(receiptRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('denies without calling getById when the branch is not one of the actor\'s assigned branches', async () => {
+      service.onModuleInit();
+      const reader = readerRegistry.register.mock.calls[0][1] as (
+        id: string,
+        a: ActorContext,
+      ) => Promise<boolean>;
+
+      await expect(
+        reader('receipt-1', { ...actor, branchId: 'branch-B', branchIds: ['branch-A'] }),
+      ).resolves.toBe(false);
+
+      expect(receiptRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('maps a ForbiddenException from getById to false', async () => {
+      service.onModuleInit();
+      const reader = readerRegistry.register.mock.calls[0][1] as (
+        id: string,
+        a: ActorContext,
+      ) => Promise<boolean>;
+
+      receiptRepo.findOne.mockRejectedValueOnce(new ForbiddenException('nope'));
+      await expect(reader('receipt-1', actor)).resolves.toBe(false);
+    });
+
+    it('rethrows anything other than NotFound/Forbidden instead of reporting no access', async () => {
+      service.onModuleInit();
+      const reader = readerRegistry.register.mock.calls[0][1] as (
+        id: string,
+        a: ActorContext,
+      ) => Promise<boolean>;
+
+      receiptRepo.findOne.mockRejectedValueOnce(new Error('DB is down'));
+      await expect(reader('receipt-1', actor)).rejects.toThrow('DB is down');
     });
   });
 });

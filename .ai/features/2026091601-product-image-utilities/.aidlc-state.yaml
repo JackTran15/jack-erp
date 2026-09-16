@@ -1,0 +1,158 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: product-image-utilities
+slug: 2026091601-product-image-utilities
+profile: none
+created: 2026-09-16T10:59:02
+ruleset: 6
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-16T11:21:00
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-16T11:21:00
+    by: Akenzy
+    evidence: 18 assumptions, none blocking-and-pending; 17 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-16T11:21:00
+    by: Akenzy
+    evidence: 5 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-16T11:21:00
+    by: Akenzy
+    evidence: graph valid - 2 UoW, 8 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-16T11:21:16
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-09-16T11:47:14
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-09-16T11:47:23
+    by: claude
+    reason: Only flagged path is .claude/skills/media-upload-fetch/SKILL.md, an untracked file present before this feature was initialised (in git status at session start); T-01-01 did not touch it
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-16T11:47:23
+    by: claude
+    reason: Only flagged path is .claude/skills/media-upload-fetch/SKILL.md, an untracked file present before this feature was initialised (in git status at session start); T-01-01 did not touch it
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-16T11:47:27
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-16T11:47:27
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: scope
+    at: 2026-09-16T12:02:34
+    by: claude
+    reason: Flagged paths are either .claude/skills/media-upload-fetch/SKILL.md (untracked before this feature started) or files of the sibling wave-2 ticket that ran concurrently in the same working tree; this ticket touched only its declared files
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-16T12:02:34
+    by: claude
+    reason: Flagged paths are either .claude/skills/media-upload-fetch/SKILL.md (untracked before this feature started) or files of the sibling wave-2 ticket that ran concurrently in the same working tree; this ticket touched only its declared files
+    ticket: T-01-02
+  - gate: G4
+    action: scope
+    at: 2026-09-16T12:02:34
+    by: claude
+    reason: Flagged paths are either .claude/skills/media-upload-fetch/SKILL.md (untracked before this feature started) or files of the sibling wave-2 ticket that ran concurrently in the same working tree; this ticket touched only its declared files
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-16T12:02:34
+    by: claude
+    reason: Flagged paths are either .claude/skills/media-upload-fetch/SKILL.md (untracked before this feature started) or files of the sibling wave-2 ticket that ran concurrently in the same working tree; this ticket touched only its declared files
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-16T12:02:41
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-16T12:02:41
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: scope
+    at: 2026-09-16T12:18:46
+    by: claude
+    reason: Flagged paths are the untracked .claude/skills/media-upload-fetch/SKILL.md (pre-dates this feature) and the concurrent T-01-04 frontend files; this ticket touched only its declared apps/api files
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-16T12:18:46
+    by: claude
+    reason: Flagged paths are the untracked .claude/skills/media-upload-fetch/SKILL.md (pre-dates this feature) and the concurrent T-01-04 frontend files; this ticket touched only its declared apps/api files
+    ticket: T-02-01
+  - gate: G4
+    action: scope
+    at: 2026-09-16T12:21:26
+    by: claude
+    reason: Flagged - untracked SKILL.md (pre-dates feature), concurrent T-02-01 api files, and inventory-location-showroom.service.spec.ts which the main thread fixed for T-01-02's new constructor param (recorded in T-01-02 touches)
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-16T12:21:26
+    by: claude
+    reason: Flagged - untracked SKILL.md (pre-dates feature), concurrent T-02-01 api files, and inventory-location-showroom.service.spec.ts which the main thread fixed for T-01-02's new constructor param (recorded in T-01-02 touches)
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-16T12:21:35
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: scope
+    at: 2026-09-16T12:30:21
+    by: claude
+    reason: Flagged - untracked .claude/skills/media-upload-fetch/SKILL.md (pre-dates feature) and inventory-location-showroom.service.spec.ts fixed by the main thread for T-01-02; this ticket touched only its declared frontend files
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-16T12:30:21
+    by: claude
+    reason: Flagged - untracked .claude/skills/media-upload-fetch/SKILL.md (pre-dates feature) and inventory-location-showroom.service.spec.ts fixed by the main thread for T-01-02; this ticket touched only its declared frontend files
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-16T12:30:21
+    by: claude
+    ticket: T-02-03
+  - gate: G4
+    action: scope
+    at: 2026-09-16T12:37:33
+    by: claude
+    reason: Flagged - untracked .claude/skills/media-upload-fetch/SKILL.md (pre-dates feature) and inventory-location-showroom.service.spec.ts fixed by the main thread for T-01-02; this ticket touched only its declared frontend files
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-16T12:37:33
+    by: claude
+    reason: Flagged - untracked .claude/skills/media-upload-fetch/SKILL.md (pre-dates feature) and inventory-location-showroom.service.spec.ts fixed by the main thread for T-01-02; this ticket touched only its declared frontend files
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-16T12:37:33
+    by: claude
+    ticket: T-02-04

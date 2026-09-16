@@ -12,6 +12,7 @@ import {
   Matches,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import {
@@ -172,11 +173,15 @@ export class EmployeeProfileDto {
   @IsEnum(EmploymentStatus)
   employmentStatus?: EmploymentStatus;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: 'Media id of the profile photo; null removes it, omit to leave unchanged',
+    nullable: true,
+    format: 'uuid',
+  })
   @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  photoUrl?: string;
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID()
+  photoMediaId?: string | null;
 
   @ApiPropertyOptional()
   @IsOptional()

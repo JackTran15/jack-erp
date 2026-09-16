@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { ItemCategoryEntity } from '../../inventory/location/item-category.entity';
 import { ItemEntity } from '../../inventory/location/item.entity';
+import { MediaQueryService } from '../../media/media-query.service';
 import { PartnerProductSearchDto } from '../dto/partner-product-search.dto';
 import { SearchPartnerProductsHandler } from './search-partner-products.handler';
 import { SearchPartnerProductsQuery } from './search-partner-products.query';
@@ -46,6 +47,10 @@ describe('SearchPartnerProductsHandler', () => {
         {
           provide: getRepositoryToken(ItemCategoryEntity),
           useValue: { find: jest.fn().mockResolvedValue([]) },
+        },
+        {
+          provide: MediaQueryService,
+          useValue: { resolvePublicUrls: jest.fn().mockResolvedValue(new Map()) },
         },
       ],
     }).compile();
@@ -160,6 +165,10 @@ describe('SearchPartnerProductsHandler', () => {
           provide: getRepositoryToken(ItemCategoryEntity),
           useValue: { find: jest.fn().mockResolvedValue([]) },
         },
+        {
+          provide: MediaQueryService,
+          useValue: { resolvePublicUrls: jest.fn().mockResolvedValue(new Map()) },
+        },
       ],
     }).compile();
     const res = await moduleRef
@@ -198,6 +207,10 @@ describe('SearchPartnerProductsHandler — keyword and category filters', () => 
         {
           provide: getRepositoryToken(ItemCategoryEntity),
           useValue: { find },
+        },
+        {
+          provide: MediaQueryService,
+          useValue: { resolvePublicUrls: jest.fn().mockResolvedValue(new Map()) },
         },
       ],
     }).compile();
@@ -356,6 +369,10 @@ describe('SearchPartnerProductsHandler — inStock', () => {
           provide: getRepositoryToken(ItemCategoryEntity),
           useValue: { find: jest.fn().mockResolvedValue([]) },
         },
+        {
+          provide: MediaQueryService,
+          useValue: { resolvePublicUrls: jest.fn().mockResolvedValue(new Map()) },
+        },
       ],
     }).compile();
     return moduleRef
@@ -446,6 +463,10 @@ describe('SearchPartnerProductsHandler — price, colour and size', () => {
         {
           provide: getRepositoryToken(ItemCategoryEntity),
           useValue: { find: jest.fn().mockResolvedValue([]) },
+        },
+        {
+          provide: MediaQueryService,
+          useValue: { resolvePublicUrls: jest.fn().mockResolvedValue(new Map()) },
         },
       ],
     }).compile();
@@ -691,6 +712,10 @@ describe('SearchPartnerProductsHandler — price, colour and size', () => {
           provide: getRepositoryToken(ItemCategoryEntity),
           useValue: { find: jest.fn().mockResolvedValue([]) },
         },
+        {
+          provide: MediaQueryService,
+          useValue: { resolvePublicUrls: jest.fn().mockResolvedValue(new Map()) },
+        },
       ],
     }).compile();
     const res = await moduleRef
@@ -727,6 +752,7 @@ describe('SearchPartnerProductsHandler — price, colour and size', () => {
       .fn()
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ total: 0 }]);
+    const resolvePublicUrls = jest.fn().mockResolvedValue(new Map());
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
         SearchPartnerProductsHandler,
@@ -738,6 +764,10 @@ describe('SearchPartnerProductsHandler — price, colour and size', () => {
           provide: getRepositoryToken(ItemCategoryEntity),
           useValue: { find: jest.fn().mockResolvedValue([]) },
         },
+        {
+          provide: MediaQueryService,
+          useValue: { resolvePublicUrls },
+        },
       ],
     }).compile();
     const res = await moduleRef
@@ -746,5 +776,9 @@ describe('SearchPartnerProductsHandler — price, colour and size', () => {
 
     expect(res.data).toEqual([]);
     expect(query).toHaveBeenCalledTimes(2);
+    // Pinning current behaviour: unlike `loadFacets`, the handler does not
+    // special-case an empty page before calling MediaQueryService — it relies
+    // on `resolvePublicUrls` itself to skip the DB query for an empty input.
+    expect(resolvePublicUrls).toHaveBeenCalledWith([], 'org-1');
   });
 });

@@ -4,6 +4,7 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -18,6 +19,10 @@ import {
   VoucherPrintPayload,
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
+import { MediaLinkService } from '../../media/media-link.service';
+import { MediaOwnerType } from '../../media/media-object.entity';
+import { MediaOwnerReaderRegistry } from '../../media/media-owner-reader.registry';
+import { MediaQueryService } from '../../media/media-query.service';
 import { StockLedgerService, RecordMovementParams } from '../ledger/stock-ledger.service';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
@@ -126,7 +131,7 @@ const VALID_TRANSITIONS: Record<TransferStatus, TransferStatus[]> = {
 };
 
 @Injectable()
-export class StockTransferService {
+export class StockTransferService implements OnModuleInit {
   private readonly logger = new Logger(StockTransferService.name);
 
   constructor(
@@ -145,7 +150,36 @@ export class StockTransferService {
     private readonly documentNumberingService: DocumentNumberingService,
     private readonly itemCostSnapshotService: ItemCostSnapshotService,
     private readonly storageDefaultLocationResolver: StorageDefaultLocationResolverService,
+    private readonly mediaLink: MediaLinkService,
+    private readonly mediaQuery: MediaQueryService,
+    private readonly mediaOwnerReaderRegistry: MediaOwnerReaderRegistry,
   ) {}
+
+  /**
+   * ADR-06: register the same read check `getById` already enforces (org
+   * scope), so "who can view this stock transfer" and "who can download its
+   * attachments" never diverge. `getById` here takes no branch scope (the
+   * GET endpoint has no `@RequireBranchScope()` — unchanged, out of scope).
+   */
+  onModuleInit(): void {
+    this.mediaOwnerReaderRegistry.register(
+      MediaOwnerType.STOCK_TRANSFER,
+      async (ownerId, actor) => {
+        try {
+          await this.getById(ownerId, actor.organizationId);
+          return true;
+        } catch (err) {
+          if (
+            err instanceof NotFoundException ||
+            err instanceof ForbiddenException
+          ) {
+            return false;
+          }
+          throw err;
+        }
+      },
+    );
+  }
 
   async create(
     dto: CreateTransferDto,
@@ -172,55 +206,83 @@ export class StockTransferService {
       }
     }
 
-    // Assign the document number up-front so a fresh DRAFT already carries a
-    // Số phiếu chuyển. post() must NOT generate a second number —
-    // document_number has a UNIQUE constraint.
-    const documentNumber = await this.documentNumberingService.generate(
-      DocumentType.TRANSFER,
-      dto.sourceBranchId,
-      actor,
+    // Pre-generate the id so attachment ids can be validated and attached
+    // to it *before* a document number is minted or the row exists —
+    // `syncOwner` never queries `stock_transfers`, only `media_objects`, so
+    // this is safe. An invalid (wrong-org / wrong-state) attachment id must
+    // reject before a number is burned, not after (T-04-03 review).
+    const id = randomUUID();
+
+    const { savedId, documentNumber } = await this.dataSource.transaction(
+      async (manager) => {
+        let attachmentIds: string[] = [];
+        if (dto.attachmentIds !== undefined) {
+          attachmentIds = await this.mediaLink.syncOwner(
+            MediaOwnerType.STOCK_TRANSFER,
+            id,
+            dto.attachmentIds,
+            actor,
+            manager,
+          );
+        }
+
+        // Assign the document number up-front so a fresh DRAFT already
+        // carries a Số phiếu chuyển. post() must NOT generate a second
+        // number — document_number has a UNIQUE constraint. `manager` is
+        // passed through: DocumentNumberingService.generate must reuse this
+        // transaction's connection, or opening its own risks a pool
+        // deadlock (see that method's own doc comment).
+        const documentNumber = await this.documentNumberingService.generate(
+          DocumentType.TRANSFER,
+          dto.sourceBranchId,
+          actor,
+          manager,
+        );
+
+        const transfer = this.transferRepo.create({
+          id,
+          organizationId: actor.organizationId,
+          branchId: actor.branchId,
+          documentNumber,
+          sourceLocationId: dto.sourceLocationId,
+          destinationLocationId: dto.destinationLocationId,
+          sourceBranchId: dto.sourceBranchId,
+          destinationBranchId: dto.destinationBranchId,
+          status: TransferStatus.DRAFT,
+          notes: dto.notes,
+          transporterUserId: dto.transporterUserId,
+          counterpartyKind: dto.counterpartyKind ?? null,
+          counterpartyId: dto.counterpartyId ?? null,
+          attachmentIds,
+          transferredAt: dto.transferredAt ? new Date(dto.transferredAt) : undefined,
+          invoiceId: dto.invoiceId ?? null,
+          invoiceNumber: dto.invoiceNumber ?? null,
+          isSystemGenerated: dto.isSystemGenerated ?? false,
+          createdBy: actor.userId,
+          lines: dto.lines.map((l, idx) => {
+            const line = new StockTransferLineEntity();
+            line.lineNo = idx + 1;
+            line.itemId = l.itemId;
+            line.quantity = l.quantity;
+            line.sourceStorageId = l.sourceStorageId;
+            line.destinationStorageId = l.destinationStorageId;
+            line.sourceLocationId = l.sourceLocationId ?? dto.sourceLocationId;
+            line.destinationLocationId =
+              l.destinationLocationId ?? dto.destinationLocationId;
+            line.unitPrice = l.unitPrice != null ? l.unitPrice.toFixed(2) : null;
+            line.lineValue =
+              l.unitPrice != null ? (l.unitPrice * l.quantity).toFixed(2) : null;
+            line.notes = l.notes;
+            return line;
+          }),
+        });
+
+        const saved = await manager.save(transfer);
+        return { savedId: saved.id, documentNumber };
+      },
     );
-
-    const transfer = this.transferRepo.create({
-      organizationId: actor.organizationId,
-      branchId: actor.branchId,
-      documentNumber,
-      sourceLocationId: dto.sourceLocationId,
-      destinationLocationId: dto.destinationLocationId,
-      sourceBranchId: dto.sourceBranchId,
-      destinationBranchId: dto.destinationBranchId,
-      status: TransferStatus.DRAFT,
-      notes: dto.notes,
-      transporterUserId: dto.transporterUserId,
-      counterpartyKind: dto.counterpartyKind ?? null,
-      counterpartyId: dto.counterpartyId ?? null,
-      attachmentIds: dto.attachmentIds ?? [],
-      transferredAt: dto.transferredAt ? new Date(dto.transferredAt) : undefined,
-      invoiceId: dto.invoiceId ?? null,
-      invoiceNumber: dto.invoiceNumber ?? null,
-      isSystemGenerated: dto.isSystemGenerated ?? false,
-      createdBy: actor.userId,
-      lines: dto.lines.map((l, idx) => {
-        const line = new StockTransferLineEntity();
-        line.lineNo = idx + 1;
-        line.itemId = l.itemId;
-        line.quantity = l.quantity;
-        line.sourceStorageId = l.sourceStorageId;
-        line.destinationStorageId = l.destinationStorageId;
-        line.sourceLocationId = l.sourceLocationId ?? dto.sourceLocationId;
-        line.destinationLocationId =
-          l.destinationLocationId ?? dto.destinationLocationId;
-        line.unitPrice = l.unitPrice != null ? l.unitPrice.toFixed(2) : null;
-        line.lineValue =
-          l.unitPrice != null ? (l.unitPrice * l.quantity).toFixed(2) : null;
-        line.notes = l.notes;
-        return line;
-      }),
-    });
-
-    const saved = await this.transferRepo.save(transfer);
-    this.logger.log(`Transfer ${saved.id} created as DRAFT ${documentNumber}`);
-    return this.findOrFail(saved.id, actor.organizationId);
+    this.logger.log(`Transfer ${savedId} created as DRAFT ${documentNumber}`);
+    return this.findOrFail(savedId, actor.organizationId);
   }
 
   /**
@@ -398,7 +460,10 @@ export class StockTransferService {
       transporterUserId: dto.transporterUserId,
       counterpartyKind: counterparty.counterpartyKind ?? undefined,
       counterpartyId: counterparty.counterpartyId ?? undefined,
-      attachmentIds: dto.attachmentIds ?? [],
+      // Undefined must stay undefined here — create()/update() treat
+      // "attachmentIds not sent at all" and "sent as []" differently
+      // (skip syncOwner vs. detach everything).
+      attachmentIds: dto.attachmentIds,
       transferredAt: dto.transferredAt,
       invoiceId: dto.invoiceId,
       invoiceNumber: dto.invoiceNumber,
@@ -439,13 +504,28 @@ export class StockTransferService {
       });
     } catch (err) {
       // Roll back the just-created DRAFT so no orphan (without ledger) lingers.
-      await this.transferRepo.delete({ id: draft.id }).catch((cleanupErr) => {
-        this.logger.error(
-          `Failed to clean up orphan DRAFT ${draft.id} after post failure: ${
-            cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)
-          }`,
-        );
-      });
+      // create() already committed syncOwner against draft.id — detach in the
+      // same transaction as the delete, or the media stays ATTACHED to an
+      // owner_id that no longer exists and cleanup never collects it
+      // (ADR-05/A-19). Detached media become DELETED, so a retry must upload
+      // the files again.
+      await this.dataSource
+        .transaction(async (manager) => {
+          await this.mediaLink.detachAll(
+            MediaOwnerType.STOCK_TRANSFER,
+            draft.id,
+            actor.organizationId,
+            manager,
+          );
+          await manager.delete(StockTransferEntity, { id: draft.id });
+        })
+        .catch((cleanupErr) => {
+          this.logger.error(
+            `Failed to clean up orphan DRAFT ${draft.id} after post failure: ${
+              cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)
+            }`,
+          );
+        });
       if (err instanceof BadRequestException) {
         throw new BadRequestException(
           `Không thể chuyển kho: ${err.message}. Kiểm tra tồn kho tại vị trí xuất.`,
@@ -498,7 +578,9 @@ export class StockTransferService {
       transporterUserId: resolved.transporterUserId,
       counterpartyKind: resolved.counterpartyKind ?? null,
       counterpartyId: resolved.counterpartyId ?? null,
-      attachmentIds: resolved.attachmentIds ?? [],
+      // attachmentIds is handled separately, after every status check above,
+      // via syncOwner — never blind-assigned here (see the DRAFT/POSTED
+      // branches below).
       transferredAt: resolved.transferredAt
         ? new Date(resolved.transferredAt)
         : undefined,
@@ -529,6 +611,16 @@ export class StockTransferService {
         await manager.update(StockTransferEntity, id, headerPatch);
         await manager.delete(StockTransferLineEntity, { transferId: id });
         await manager.save(StockTransferLineEntity, buildLineEntities());
+        if (dto.attachmentIds !== undefined) {
+          const attachmentIds = await this.mediaLink.syncOwner(
+            MediaOwnerType.STOCK_TRANSFER,
+            id,
+            dto.attachmentIds,
+            actor,
+            manager,
+          );
+          await manager.update(StockTransferEntity, id, { attachmentIds });
+        }
       });
       this.logger.log(`Transfer ${id} updated (draft) by ${actor.userId}`);
       return this.findOrFail(id, actor.organizationId);
@@ -678,6 +770,17 @@ export class StockTransferService {
       await manager.delete(StockTransferLineEntity, { transferId: id });
       await manager.save(StockTransferLineEntity, buildLineEntities());
       await manager.update(StockTransferEntity, id, headerPatch);
+
+      if (dto.attachmentIds !== undefined) {
+        const attachmentIds = await this.mediaLink.syncOwner(
+          MediaOwnerType.STOCK_TRANSFER,
+          id,
+          dto.attachmentIds,
+          actor,
+          manager,
+        );
+        await manager.update(StockTransferEntity, id, { attachmentIds });
+      }
 
       return written;
     });
@@ -959,7 +1062,26 @@ export class StockTransferService {
     );
     await this.attachTransporters([transfer], organizationId);
     await attachCounterparties(this.transferRepo.manager, [transfer], organizationId);
+    await this.attachAttachments(transfer, organizationId);
     return transfer;
+  }
+
+  /** Detail response: `attachments` (M11 — attachment display, no URL). */
+  private async attachAttachments(
+    transfer: StockTransferEntity,
+    organizationId: string,
+  ): Promise<void> {
+    const byOwner = await this.mediaQuery.listForOwners(
+      MediaOwnerType.STOCK_TRANSFER,
+      [transfer.id],
+      organizationId,
+    );
+    (transfer as any).attachments = (byOwner.get(transfer.id) ?? []).map((m) => ({
+      id: m.id,
+      fileName: m.fileName,
+      contentType: m.contentType,
+      size: m.size,
+    }));
   }
 
   /** Print/export payload for one stock transfer — reuses `getById`'s 404 and org scope. */

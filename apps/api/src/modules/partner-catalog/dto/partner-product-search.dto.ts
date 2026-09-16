@@ -190,8 +190,8 @@ export class PartnerProductRowDto {
   @ApiProperty({
     type: [String],
     description:
-      'Always empty. This ERP has no image storage yet; the field is part of the ' +
-      'contract so images can appear later without a breaking change.',
+      'Public image URLs for this product, in display order. Empty when the product ' +
+      'has no images.',
   })
   images!: string[];
 }

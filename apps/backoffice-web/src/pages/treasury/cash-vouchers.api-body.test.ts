@@ -166,6 +166,62 @@ describe("address (ADR-03: cash vouchers copy the deposit-voucher address rule)"
   });
 });
 
+describe("attachmentIds (T-04-08: never send `[]` by accident)", () => {
+  it("create body includes attachmentIds when the detail carries them (receipt)", () => {
+    const body = ledgerDetailToCreateReceiptBody(
+      baseDetail({ attachmentIds: ["m1", "m2"] }),
+      "cash-1",
+    );
+    expect(body.attachmentIds).toEqual(["m1", "m2"]);
+  });
+
+  it("create body includes attachmentIds when the detail carries them (payment)", () => {
+    const body = ledgerDetailToCreatePaymentBody(
+      baseDetail({
+        kind: LedgerCashVoucherKindEnum.PAYMENT,
+        attachmentIds: ["m3"],
+      }),
+      "cash-1",
+    );
+    expect(body.attachmentIds).toEqual(["m3"]);
+  });
+
+  it("update body omits attachmentIds entirely when the detail has not loaded/changed them", () => {
+    // Mirrors how TreasuryCashReceiptsPage builds the update payload: strip
+    // documentNumber and add revision. `baseDetail()` carries no attachmentIds
+    // (dialog hasn't seeded/touched the list yet) — the key must be absent,
+    // not `[]`, or an update would wipe an existing voucher's attachments.
+    const receiptBody = ledgerDetailToCreateReceiptBody(baseDetail(), "cash-1");
+    const { documentNumber: _r, ...receiptUpdateBody } = receiptBody;
+    expect("attachmentIds" in receiptUpdateBody).toBe(false);
+
+    const paymentBody = ledgerDetailToCreatePaymentBody(
+      baseDetail({ kind: LedgerCashVoucherKindEnum.PAYMENT }),
+      "cash-1",
+    );
+    const { documentNumber: _p, ...paymentUpdateBody } = paymentBody;
+    expect("attachmentIds" in paymentUpdateBody).toBe(false);
+  });
+
+  it("update body sends attachmentIds — including an explicit empty list — once the detail carries them", () => {
+    // An empty array is a real, deliberate value here: the user removed the
+    // last file. It must still be sent, unlike the "not loaded" case above.
+    const receiptBody = ledgerDetailToCreateReceiptBody(
+      baseDetail({ attachmentIds: [] }),
+      "cash-1",
+    );
+    const { documentNumber: _r, ...receiptUpdateBody } = receiptBody;
+    expect(receiptUpdateBody.attachmentIds).toEqual([]);
+
+    const paymentBody = ledgerDetailToCreatePaymentBody(
+      baseDetail({ kind: LedgerCashVoucherKindEnum.PAYMENT, attachmentIds: ["m4"] }),
+      "cash-1",
+    );
+    const { documentNumber: _p, ...paymentUpdateBody } = paymentBody;
+    expect(paymentUpdateBody.attachmentIds).toEqual(["m4"]);
+  });
+});
+
 describe("resolvePartyFields parity between the deposit-receipt and deposit-payment voucher branches (T-01-03)", () => {
   // DepositReceiptVoucherDialog and DepositPaymentVoucherDialog cannot be
   // rendered here (no jsdom — see project memory), but both dialogs' ordinary

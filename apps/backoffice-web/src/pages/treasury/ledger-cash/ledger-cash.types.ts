@@ -1,6 +1,7 @@
 import type {
   CashPaymentPurpose,
   CashPaymentReferenceType,
+  CashVoucherAttachment,
   CashVoucherPartnerType,
 } from "../cash-vouchers.types";
 import type { PartnerLookupType } from "../documents/_shared/voucher-partner.constants";
@@ -170,6 +171,14 @@ export interface LedgerCashVoucherDetail {
   paymentMethod?: string;
   receiveWithInvoice?: boolean;
   transferAccountId?: string;
+  /** Seed for the attachment list — loaded from the API detail, display only. */
+  attachments?: CashVoucherAttachment[];
+  /**
+   * Set only when the dialog form has a definitive list to send (create, or
+   * the user has touched the attachment list on edit) — absent means "leave
+   * the voucher's attachments unchanged" on update, never `[]` by accident.
+   */
+  attachmentIds?: string[];
 }
 
 export function isGoodsReceiptPaymentVoucher(

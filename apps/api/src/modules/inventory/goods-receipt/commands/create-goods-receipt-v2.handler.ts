@@ -10,6 +10,8 @@ import {
 } from '@erp/shared-interfaces';
 import { DocumentNumberingService } from '../../../document-numbering/document-numbering.service';
 import { RbacService } from '../../../rbac/rbac.service';
+import { MediaLinkService } from '../../../media/media-link.service';
+import { MediaOwnerType } from '../../../media/media-object.entity';
 import { assertReceiptPurposePermission } from '../assert-purpose-permission';
 import { assertProductUniformLocation } from '../../location/services/product-location.util';
 import { ItemEntity } from '../../location/item.entity';
@@ -28,6 +30,7 @@ export class CreateGoodsReceiptV2Handler
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly documentNumbering: DocumentNumberingService,
     private readonly rbacService: RbacService,
+    private readonly mediaLink: MediaLinkService,
   ) {}
 
   async execute({
@@ -94,7 +97,9 @@ export class CreateGoodsReceiptV2Handler
       locationId: dto.locationId ?? dto.lines[0].locationId,
       paymentMethod: dto.paymentMethod,
       cashAccountId: dto.cashAccountId,
-      attachmentIds: dto.attachmentIds ?? [],
+      // Corrected below, inside the same transaction as the insert, once
+      // syncOwner has validated whatever ids the request sent (ADR-03).
+      attachmentIds: [],
       references: dto.references ?? [],
       lines: dto.lines.map((l, index) =>
         manager.create(GoodsReceiptLineEntity, {
@@ -115,7 +120,27 @@ export class CreateGoodsReceiptV2Handler
       ),
     });
 
-    const saved = await manager.save(receipt);
+    // Insert and, when the request touched attachments, validate + attach them
+    // in the same transaction (ADR-03): a `syncOwner` rejection (wrong org,
+    // wrong state, over the per-owner limit) rolls back the insert itself, so
+    // there is nothing left to compensate for afterwards.
+    const saved = await this.dataSource.transaction(async (trxManager) => {
+      const savedReceipt = await trxManager.save(receipt);
+      if (dto.attachmentIds !== undefined) {
+        const ids = await this.mediaLink.syncOwner(
+          MediaOwnerType.GOODS_RECEIPT,
+          savedReceipt.id,
+          dto.attachmentIds,
+          actor,
+          trxManager,
+        );
+        await trxManager.update(GoodsReceiptEntity, savedReceipt.id, {
+          attachmentIds: ids,
+        });
+      }
+      return savedReceipt;
+    });
+
     return { id: saved.id, documentNumber };
   }
 

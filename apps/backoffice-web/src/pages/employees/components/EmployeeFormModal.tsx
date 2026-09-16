@@ -86,6 +86,7 @@ export function EmployeeFormModal({
   const [activeTab, setActiveTab] = useState<EmployeeFormTabEnum>(
     EmployeeFormTabEnum.BASIC,
   );
+  const [isPhotoUploading, setIsPhotoUploading] = useState(false);
   const isEdit = mode === "edit";
 
   const {
@@ -165,6 +166,8 @@ export function EmployeeFormModal({
           onChange={setDraft}
           isEdit={isEdit}
           isGeneratingCode={isGeneratingCode}
+          isRecordReady={formReady}
+          onPhotoUploadingChange={setIsPhotoUploading}
         />
       ),
       [EmployeeFormTabEnum.ROLES]: (
@@ -180,7 +183,7 @@ export function EmployeeFormModal({
         <EmployeeAccessTimeTab draft={draft} onChange={setDraft} />
       ),
     }),
-    [draft, isEdit, isGeneratingCode],
+    [draft, isEdit, isGeneratingCode, formReady],
   );
 
   const body = isError ? (
@@ -225,7 +228,7 @@ export function EmployeeFormModal({
               type="button"
               className="!bg-primary-blue !text-primary-blue-foreground hover:!bg-primary-blue-hover"
               onClick={handleSave}
-              disabled={!formReady}
+              disabled={!formReady || isPhotoUploading}
             >
               <Save className="mr-1 h-4 w-4" />
               Lưu
@@ -235,7 +238,7 @@ export function EmployeeFormModal({
                 type="button"
                 variant="outline"
                 onClick={handleSaveAndAddNew}
-                disabled={!formReady}
+                disabled={!formReady || isPhotoUploading}
               >
                 <Plus className="mr-1 h-4 w-4" />
                 Lưu và thêm mới

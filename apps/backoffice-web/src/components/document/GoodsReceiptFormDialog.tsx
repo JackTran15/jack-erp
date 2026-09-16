@@ -92,6 +92,10 @@ import {
   type ProductSelectResult,
 } from "../../components/shared/product-select/ProductSelectDialog";
 import { BarcodeScanRow } from "../shared/BarcodeScanRow";
+import {
+  MediaAttachmentList,
+  type MediaAttachment,
+} from "../media/MediaAttachmentList";
 import { getActiveBranchId } from "./goods-receipt-shared";
 import type { GoodsReceiptLine } from "./goods-receipt-shared";
 import type {
@@ -443,6 +447,25 @@ export function PurchaseOrderFormDialog({
     initial?.deliveredBy ?? "",
   );
   const [notes, setNotes] = useState(initial?.description ?? "");
+  const [attachmentIds, setAttachmentIds] = useState<string[]>(
+    initial?.attachments?.map((a) => a.id) ?? [],
+  );
+  const [attachmentItems, setAttachmentItems] = useState<MediaAttachment[]>(
+    initial?.attachments ?? [],
+  );
+  // Flips true once MediaAttachmentList reports its seeded state — guards the
+  // save payload from ever sending `attachmentIds: []` before the real list
+  // (from `initial.attachments`) is known.
+  const [attachmentsReady, setAttachmentsReady] = useState(false);
+  const [attachmentsUploading, setAttachmentsUploading] = useState(false);
+  const handleAttachmentsChange = useCallback(
+    (ids: string[], items: MediaAttachment[]) => {
+      setAttachmentIds(ids);
+      setAttachmentItems(items);
+      setAttachmentsReady(true);
+    },
+    [],
+  );
   // "Chọn chứng từ điều chuyển": when set, this receipt is the import leg of a
   // transfer order — Save calls the transfer import endpoint instead of creating
   // a standalone goods receipt, and the detail is locked.
@@ -1347,6 +1370,7 @@ export function PurchaseOrderFormDialog({
             : undefined,
         receivedAt: receivedAtIso,
         locationId: headerLocationId,
+        ...(attachmentsReady ? { attachmentIds } : {}),
         lines: resolvedLines.map((l) => ({
           itemId: l.itemId,
           locationId: l.locationId,
@@ -1424,6 +1448,8 @@ export function PurchaseOrderFormDialog({
     sourceTransferOrderId,
     references,
     counterpartyKind,
+    attachmentIds,
+    attachmentsReady,
     initial,
     mode,
     onSaved,
@@ -1507,7 +1533,7 @@ export function PurchaseOrderFormDialog({
       id: "save",
       label: "Lưu",
       icon: Save,
-      disabled: isView || saving,
+      disabled: isView || saving || attachmentsUploading,
       onClick: () => void handleSave(),
     },
     {
@@ -2302,9 +2328,23 @@ export function PurchaseOrderFormDialog({
               })()}
             </FieldRow>
             <FieldRow label="Tài liệu đính kèm">
-              <Button type="button" variant="outline" size="sm" disabled>
-                Tải tệp …
-              </Button>
+              {sourceTransferOrderId ? (
+                <span className="text-sm text-muted-foreground">
+                  Loại chứng từ này chưa hỗ trợ đính kèm.
+                </span>
+              ) : mode === "create" || initial ? (
+                <MediaAttachmentList
+                  ownerType="GOODS_RECEIPT"
+                  value={attachmentItems}
+                  onChange={handleAttachmentsChange}
+                  onUploadingChange={setAttachmentsUploading}
+                  readOnly={isView}
+                />
+              ) : (
+                <span className="text-sm text-muted-foreground">
+                  Đang tải danh sách đính kèm…
+                </span>
+              )}
             </FieldRow>
           </>
         }

@@ -1,9 +1,12 @@
+import { randomUUID } from 'crypto';
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleInit,
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -23,6 +26,10 @@ import { DepositAccountEntity } from '../../deposit/deposit-account.entity';
 import { DepositPeriodGuardService } from '../../deposit-period-lock/deposit-period-guard.service';
 import { VoucherStaffResolver } from '../../cash-vouchers/shared/voucher-staff.resolver';
 import { DepositDebtCollectionSagaService } from '../debt-collection/deposit-debt-collection-saga.service';
+import { MediaLinkService } from '../../../media/media-link.service';
+import { MediaQueryService } from '../../../media/media-query.service';
+import { MediaOwnerReaderRegistry } from '../../../media/media-owner-reader.registry';
+import { MediaOwnerType } from '../../../media/media-object.entity';
 import {
   BankReceiptPurpose,
   BankReceiptReferenceType,
@@ -49,6 +56,13 @@ import {
 
 /** Internal args for movement+JE+voucher atomic creation (GĐ4 / reuse). */
 export interface BankReceiptCreateAndPostArgs {
+  /**
+   * Pre-assigned by `create()` so media can be synced to this id *before* any
+   * document number is minted or the movement/journal entry is posted
+   * (T-04-05 security review) — omit to let the DB default-generate one, as
+   * every internal caller other than `create()` still does.
+   */
+  id?: string;
   purpose: BankReceiptPurpose;
   depositAccountId: string;
   contraAccountId: string;
@@ -65,7 +79,6 @@ export interface BankReceiptCreateAndPostArgs {
   collectedBy?: string;
   reference?: string;
   affectRevenue?: boolean;
-  attachmentIds?: string[];
   reason?: string;
   description?: string;
   categoryId?: string;
@@ -106,6 +119,14 @@ export interface ReverseBankReceiptResult {
   reversal: BankReceiptEntity;
 }
 
+/** Detail-endpoint shape for one attached file — never spread a `MediaSummary` (03-logical-design.md). */
+export interface BankReceiptAttachment {
+  id: string;
+  fileName: string;
+  contentType: string;
+  size: number;
+}
+
 /**
  * Contra (offsetting) GL account role per receipt purpose. A manually-created
  * receipt posts DR deposit / CR contra, where the contra account is resolved from
@@ -123,7 +144,7 @@ const RECEIPT_PURPOSE_TO_ROLE: Record<
 };
 
 @Injectable()
-export class BankReceiptsService {
+export class BankReceiptsService implements OnModuleInit {
   private readonly logger = new Logger(BankReceiptsService.name);
 
   constructor(
@@ -140,7 +161,40 @@ export class BankReceiptsService {
     private readonly staffResolver: VoucherStaffResolver,
     @Inject(forwardRef(() => DepositDebtCollectionSagaService))
     private readonly debtCollectionSaga: DepositDebtCollectionSagaService,
+    private readonly mediaLink: MediaLinkService,
+    private readonly mediaQuery: MediaQueryService,
+    private readonly mediaReaders: MediaOwnerReaderRegistry,
   ) {}
+
+  /**
+   * ADR-06: the reader is the exact read function the `GET :id` endpoint uses
+   * (`getById`, same `actor`) — download access tracks voucher-view access
+   * with no second rule to maintain. Only NotFound/Forbidden mean "actor
+   * cannot see this voucher"; any other error (e.g. a DB outage) must not be
+   * swallowed into a false "not found".
+   *
+   * `getById` itself only filters by `organizationId` — the branch check
+   * `GET :id` gets from `BranchScopeGuard` never runs for this direct call, so
+   * it is mirrored here explicitly: an actor with no active branch (or whose
+   * only branch was deactivated, dropping it from `branchIds`) must not get a
+   * download link for a voucher they could no longer open through the API.
+   */
+  onModuleInit(): void {
+    this.mediaReaders.register(MediaOwnerType.BANK_RECEIPT, async (ownerId, actor) => {
+      if (!actor.branchId || !actor.branchIds?.includes(actor.branchId)) {
+        return false;
+      }
+      try {
+        await this.getById(ownerId, actor);
+        return true;
+      } catch (err) {
+        if (err instanceof NotFoundException || err instanceof ForbiddenException) {
+          return false;
+        }
+        throw err;
+      }
+    });
+  }
 
   // ---------------------------------------------------------------------------
   // CRUD (DRAFT lifecycle)
@@ -184,8 +238,24 @@ export class BankReceiptsService {
         dto.contraAccountId,
       );
 
-      const { voucherId } = await this.createAndPostInternalInTx(
+      // Assign the voucher id up front and validate/attach media to it BEFORE
+      // minting the document number or posting the movement/journal entry
+      // (T-04-05 security review): `docNumbering.generate` and the journal's
+      // Kafka publish are not undone by this transaction rolling back, so a
+      // routine 404/409 from `syncOwner` must happen first, while everything
+      // is still cheaply reversible.
+      const voucherId = randomUUID();
+      const attachmentIds = await this.mediaLink.syncOwner(
+        MediaOwnerType.BANK_RECEIPT,
+        voucherId,
+        dto.attachmentIds,
+        actor,
+        manager,
+      );
+
+      const { voucherId: insertedId } = await this.createAndPostInternalInTx(
         {
+          id: voucherId,
           purpose,
           depositAccountId: dto.depositAccountId,
           contraAccountId,
@@ -205,7 +275,6 @@ export class BankReceiptsService {
           collectedBy: dto.collectedBy,
           reference: dto.reference,
           affectRevenue: dto.affectRevenue ?? false,
-          attachmentIds: dto.attachmentIds ?? [],
           reason: dto.reason,
           lines: dto.lines.map((l) => ({
             description: l.description,
@@ -217,7 +286,9 @@ export class BankReceiptsService {
         manager,
       );
 
-      return this.getByIdInTx(manager, voucherId, actor.organizationId);
+      await manager.update(BankReceiptEntity, insertedId, { attachmentIds });
+
+      return this.getByIdInTx(manager, insertedId, actor.organizationId);
     });
   }
 
@@ -298,8 +369,20 @@ export class BankReceiptsService {
         reference: dto.reference ?? receipt.reference,
         affectRevenue: dto.affectRevenue ?? receipt.affectRevenue,
         contraAccountId: dto.contraAccountId ?? receipt.contraAccountId,
-        attachmentIds: dto.attachmentIds ?? receipt.attachmentIds,
       });
+
+      // Not sent at all ⇒ leave attachments untouched (no syncOwner call, no
+      // extra query). `assertEditable` above has already rejected a voucher
+      // this actor may not touch, so a rejected voucher never reaches here.
+      if (dto.attachmentIds !== undefined) {
+        receipt.attachmentIds = await this.mediaLink.syncOwner(
+          MediaOwnerType.BANK_RECEIPT,
+          receipt.id,
+          dto.attachmentIds,
+          actor,
+          manager,
+        );
+      }
 
       if (dto.lines) {
         await this.syncLines(manager, receipt.id, actor, dto.lines);
@@ -776,6 +859,7 @@ export class BankReceiptsService {
           ];
 
     const voucher = manager.create(BankReceiptEntity, {
+      id: args.id,
       organizationId: actor.organizationId,
       branchId: actor.branchId,
       createdBy: actor.userId,
@@ -792,7 +876,10 @@ export class BankReceiptsService {
       collectedBy: args.collectedBy,
       reference: args.reference,
       affectRevenue: args.affectRevenue ?? false,
-      attachmentIds: args.attachmentIds ?? [],
+      // Media is synced separately by whichever caller knows the real ids
+      // (only `create()` today, before this insert — see the field's doc
+      // comment); this insert never writes anything else here.
+      attachmentIds: [],
       reason: args.reason,
       referenceType: args.referenceType,
       referenceId: args.referenceId,
@@ -867,14 +954,40 @@ export class BankReceiptsService {
     return { data, total, page, pageSize };
   }
 
-  async getById(id: string, actor: ActorContext): Promise<BankReceiptEntity> {
+  async getById(
+    id: string,
+    actor: ActorContext,
+  ): Promise<BankReceiptEntity & { attachments: BankReceiptAttachment[] }> {
     const receipt = await this.getByIdInTx(
       this.dataSource.manager,
       id,
       actor.organizationId,
     );
     await this.attachStaff([receipt], actor.organizationId);
-    return receipt;
+    const attachments = await this.loadAttachments(receipt.id, actor.organizationId);
+    return Object.assign(receipt, { attachments });
+  }
+
+  /**
+   * Copies out only the display fields (03-logical-design.md > "Rules for
+   * every caller") — never spreads the `MediaSummary`, which also carries
+   * `bucket`/`objectKey`/`ownerType` that must stay server-side.
+   */
+  private async loadAttachments(
+    id: string,
+    organizationId: string,
+  ): Promise<BankReceiptAttachment[]> {
+    const byOwner = await this.mediaQuery.listForOwners(
+      MediaOwnerType.BANK_RECEIPT,
+      [id],
+      organizationId,
+    );
+    return (byOwner.get(id) ?? []).map((m) => ({
+      id: m.id,
+      fileName: m.fileName,
+      contentType: m.contentType,
+      size: m.size,
+    }));
   }
 
   /** Fill in `collectedByCode`/`collectedByName` for a page of receipts in one batch. */

@@ -14,6 +14,8 @@ import { ProductAttributeOptionEntity } from '../product/product-attribute-optio
 import { ItemAttributeValueEntity } from '../product/item-attribute-value.entity';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
 import { CacheService } from '../../redis/cache.service';
+import { MediaLinkService } from '../../media/media-link.service';
+import { MediaQueryService } from '../../media/media-query.service';
 
 /** Focused coverage for the nested-reconcile + brand-resolve behaviour added to update(). */
 describe('InventoryItemCrudService.update (nested reconcile)', () => {
@@ -92,6 +94,14 @@ describe('InventoryItemCrudService.update (nested reconcile)', () => {
         { provide: DataSource, useValue: dataSource },
         { provide: StockLedgerService, useValue: { recordMovement: jest.fn() } },
         { provide: CacheService, useValue: { invalidate: jest.fn(), getOrSet: jest.fn() } },
+        {
+          provide: MediaLinkService,
+          useValue: { syncOwner: jest.fn(), detachAll: jest.fn() },
+        },
+        {
+          provide: MediaQueryService,
+          useValue: { resolvePublicUrls: jest.fn().mockResolvedValue(new Map()) },
+        },
       ],
     }).compile();
 

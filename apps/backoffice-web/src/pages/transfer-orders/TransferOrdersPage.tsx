@@ -85,6 +85,10 @@ import {
 } from "../inventory-line-normalization";
 import { DocumentLineImportDialog } from "../inventory/_components/document-import/DocumentLineImportDialog";
 import type { DocumentLineImportJobRow } from "../inventory/_components/document-import/document-line-import.types";
+import {
+  MediaAttachmentList,
+  type MediaAttachment,
+} from "../../components/media/MediaAttachmentList";
 
 // Two-phase transfer voucher: DRAFT → IN_PROGRESS (exported by source branch)
 // → COMPLETED (imported by destination branch). CANCELLED is terminal.
@@ -125,6 +129,7 @@ interface TransferOrder {
   notes?: string | null;
   exportGoodsIssueId?: string | null;
   importGoodsReceiptId?: string | null;
+  attachments?: MediaAttachment[];
   lines: TransferOrderLine[];
   createdAt: string;
 }
@@ -947,6 +952,11 @@ function TransferOrderFormDialog({
   const isSourceBranch = !initial || initial.sourceBranchId === activeBranchId;
   const canEditDetails =
     !isView && !isInProgress && !isIncompleteCompleted && isSourceBranch;
+  // Notes + attachments stay editable through IN_PROGRESS (unlike the rest of
+  // canEditDetails) — matches the BE's update(): the IN_PROGRESS branch only
+  // locks branches/storages/lines, and the destination branch never gets past
+  // its status-only guard (403 on attachmentIds), so it must render read-only.
+  const canEditAttachments = !isView && !isIncompleteCompleted && isSourceBranch;
 
   // For Misa-style behavior: source branch defaults to the active branch
   // the user is currently scoped to, so they only need to pick destination.
@@ -978,6 +988,25 @@ function TransferOrderFormDialog({
     initialSourceStorageId,
   );
   const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [attachmentIds, setAttachmentIds] = useState<string[]>(
+    initial?.attachments?.map((a) => a.id) ?? [],
+  );
+  const [attachmentItems, setAttachmentItems] = useState<MediaAttachment[]>(
+    initial?.attachments ?? [],
+  );
+  // Flips true once MediaAttachmentList reports its seeded state — guards the
+  // save payload from ever sending `attachmentIds: []` before the real list
+  // (from `initial.attachments`) is known.
+  const [attachmentsReady, setAttachmentsReady] = useState(false);
+  const [attachmentsUploading, setAttachmentsUploading] = useState(false);
+  const handleAttachmentsChange = useCallback(
+    (ids: string[], items: MediaAttachment[]) => {
+      setAttachmentIds(ids);
+      setAttachmentItems(items);
+      setAttachmentsReady(true);
+    },
+    [],
+  );
   const [docDate, setDocDate] = useState(
     initial?.requestedDate ?? new Date().toISOString().slice(0, 10),
   );
@@ -1198,6 +1227,12 @@ function TransferOrderFormDialog({
           ...(isSourceBranch && !isIncompleteCompleted
             ? { notes: notes || undefined }
             : {}),
+          // Only reaches the BE's IN_PROGRESS branch this way — the
+          // isIncompleteCompleted status-only PATCH ignores it, and a
+          // destination-branch actor sending it gets 403.
+          ...(isSourceBranch && !isIncompleteCompleted && attachmentsReady
+            ? { attachmentIds }
+            : {}),
         });
         setDirty(false);
         toast.success("Đã cập nhật lệnh điều chuyển.");
@@ -1240,6 +1275,7 @@ function TransferOrderFormDialog({
         sourceStorageId: sourceStorageId || undefined,
         requestedDate: docDate || undefined,
         notes: notes || undefined,
+        ...(attachmentsReady ? { attachmentIds } : {}),
         lines: persistableLines.map((l) => ({
           itemId: l.itemId,
           requestedQty: Number(l.requestedQty),
@@ -1276,6 +1312,8 @@ function TransferOrderFormDialog({
     isSourceBranch,
     docDate,
     notes,
+    attachmentIds,
+    attachmentsReady,
     lines,
     mode,
     initial,
@@ -1380,7 +1418,7 @@ function TransferOrderFormDialog({
       id: "save",
       label: "Lưu",
       icon: Save,
-      disabled: isView || saving,
+      disabled: isView || saving || attachmentsUploading,
       onClick: () => void handleSave(),
     },
     {
@@ -1693,9 +1731,19 @@ function TransferOrderFormDialog({
               <span className="text-sm text-muted-foreground">—</span>
             </FieldRow>
             <FieldRow label="Tài liệu đính kèm">
-              <Button type="button" variant="outline" size="sm" disabled>
-                Tải tệp …
-              </Button>
+              {mode === "create" || initial ? (
+                <MediaAttachmentList
+                  ownerType="TRANSFER_ORDER"
+                  value={attachmentItems}
+                  onChange={handleAttachmentsChange}
+                  onUploadingChange={setAttachmentsUploading}
+                  readOnly={!canEditAttachments}
+                />
+              ) : (
+                <span className="text-sm text-muted-foreground">
+                  Đang tải danh sách đính kèm…
+                </span>
+              )}
             </FieldRow>
           </>
         }

@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { DepositMovementType, ReconStatus } from '@erp/shared-interfaces';
 import { BankPaymentsService } from './bank-payments.service';
@@ -14,6 +18,11 @@ import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
 import { SupplierDepositPaymentSagaService } from '../supplier-deposit-payment/supplier-deposit-payment-saga.service';
 import { DepositPeriodGuardService } from '../../deposit-period-lock/deposit-period-guard.service';
 import { VoucherStaffResolver } from '../../cash-vouchers/shared/voucher-staff.resolver';
+import { MediaLinkService } from '../../../media/media-link.service';
+import { MediaQueryService } from '../../../media/media-query.service';
+import { MediaOwnerReaderRegistry } from '../../../media/media-owner-reader.registry';
+import { MediaOwnerType } from '../../../media/media-object.entity';
+import { MediaException } from '../../../media/media.exception';
 import {
   BankPaymentPurpose,
   BankPaymentReferenceType,
@@ -27,6 +36,7 @@ const actor: ActorContext = {
   userId: 'user-1',
   organizationId: 'org-1',
   branchId: 'branch-1',
+  branchIds: ['branch-1'],
   roles: ['admin'],
 };
 
@@ -69,9 +79,23 @@ describe('BankPaymentsService', () => {
   let supplierDepositPaymentSaga: { compensate: jest.Mock };
   let periodGuard: { assertNotLocked: jest.Mock };
   let staffResolver: { resolveMany: jest.Mock };
+  let mediaLink: { syncOwner: jest.Mock };
+  let mediaQuery: { listForOwners: jest.Mock };
+  let mediaReaders: { register: jest.Mock };
   let dataSource: { transaction: jest.Mock; manager: any };
 
-  const setup = async (manager: any) => {
+  /**
+   * `readManager` defaults to a *different* mock object than the transaction's
+   * `manager`. `getById`/`getPrintPayload` read through `this.dataSource.manager`
+   * outside any transaction; `create()`/`update()` must only ever hand the
+   * transaction-scoped `manager` to `syncOwner`. If those two were the same
+   * object (as they were before this fix), a bug that passed
+   * `this.dataSource.manager` instead of the transaction's `manager` would go
+   * undetected — `toBe(manager)` assertions would still pass by coincidence.
+   * Tests that exercise `getById`/`getPrintPayload` pass their own manager as
+   * `readManager` explicitly.
+   */
+  const setup = async (manager: any, readManager: any = buildManager({})) => {
     depositService = {
       recordMovement: jest
         .fn()
@@ -92,9 +116,13 @@ describe('BankPaymentsService', () => {
     staffResolver = {
       resolveMany: jest.fn().mockResolvedValue(new Map()),
     };
+    // Default: no attachments sent, nothing attached — individual tests override.
+    mediaLink = { syncOwner: jest.fn().mockResolvedValue([]) };
+    mediaQuery = { listForOwners: jest.fn().mockResolvedValue(new Map()) };
+    mediaReaders = { register: jest.fn() };
     dataSource = {
       transaction: jest.fn((cb) => cb(manager)),
-      manager,
+      manager: readManager,
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -113,6 +141,9 @@ describe('BankPaymentsService', () => {
           provide: SupplierDepositPaymentSagaService,
           useValue: supplierDepositPaymentSaga,
         },
+        { provide: MediaLinkService, useValue: mediaLink },
+        { provide: MediaQueryService, useValue: mediaQuery },
+        { provide: MediaOwnerReaderRegistry, useValue: mediaReaders },
       ],
     }).compile();
 
@@ -647,7 +678,9 @@ describe('BankPaymentsService', () => {
         },
         categories: [{ id: 'cat-1', name: 'Mua vật tư' }],
       });
-      await setup(manager);
+      // `getPrintPayload`/`getById` never open a transaction — they read only
+      // through `this.dataSource.manager`, so this manager must back that slot.
+      await setup(manager, manager);
       staffResolver.resolveMany.mockResolvedValue(
         new Map([['staff-1', { code: null, name: 'Nguyễn Văn A' }]]),
       );
@@ -682,7 +715,7 @@ describe('BankPaymentsService', () => {
         branch: null,
         categories: [],
       });
-      await setup(manager);
+      await setup(manager, manager);
       staffResolver.resolveMany.mockResolvedValue(
         new Map([['staff-1', { code: null, name: 'Nguyễn Văn A' }]]),
       );
@@ -697,7 +730,7 @@ describe('BankPaymentsService', () => {
 
     it('id not found ⇒ 404 (not 403)', async () => {
       const manager = buildPrintPayloadManager({ payment: undefined });
-      await setup(manager);
+      await setup(manager, manager);
 
       await expect(service.getPrintPayload('missing-id', actor)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -708,11 +741,321 @@ describe('BankPaymentsService', () => {
       const manager = buildPrintPayloadManager({
         payment: { ...basePayment, organizationId: 'org-2' },
       });
-      await setup(manager);
+      await setup(manager, manager);
 
       await expect(service.getPrintPayload('p-1', actor)).rejects.toBeInstanceOf(
         NotFoundException,
       );
+    });
+  });
+
+  describe('attachments (T-04-05, AC-14)', () => {
+    it('create: syncs media once the voucher id exists and persists the returned ids', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'p-new', status: BankVoucherStatus.POSTED },
+      });
+      await setup(manager);
+      mediaLink.syncOwner.mockResolvedValue(['media-1', 'media-2']);
+
+      await service.create(
+        {
+          depositAccountId: 'dep-1',
+          docDate: '2026-07-15',
+          purpose: BankPaymentPurpose.SUPPLIER_PAYMENT,
+          totalAmount: 100,
+          attachmentIds: ['media-1', 'media-2'],
+          lines: [{ description: 'Trả NCC', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      expect(mediaLink.syncOwner).toHaveBeenCalledTimes(1);
+      const [ownerType, voucherId, ids, syncActor, syncManager] =
+        mediaLink.syncOwner.mock.calls[0];
+      expect(ownerType).toBe(MediaOwnerType.BANK_PAYMENT);
+      expect(ids).toEqual(['media-1', 'media-2']);
+      expect(syncActor).toBe(actor);
+      expect(syncManager).toBe(manager);
+      expect(manager.update).toHaveBeenCalledWith(BankPaymentEntity, voucherId, {
+        attachmentIds: ['media-1', 'media-2'],
+      });
+    });
+
+    it('create: syncs media before minting the document number or posting the movement', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'p-new', status: BankVoucherStatus.POSTED },
+      });
+      await setup(manager);
+      mediaLink.syncOwner.mockResolvedValue(['media-1']);
+
+      await service.create(
+        {
+          depositAccountId: 'dep-1',
+          docDate: '2026-07-15',
+          purpose: BankPaymentPurpose.SUPPLIER_PAYMENT,
+          totalAmount: 100,
+          attachmentIds: ['media-1'],
+          lines: [{ description: 'Trả NCC', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      // T-04-05 security review: a routine 404/409 from `syncOwner` must not
+      // burn a document number or post a movement (whose journal entry
+      // publishes JOURNAL_POSTED to Kafka immediately, uncommitted by this
+      // transaction's eventual rollback) for a voucher that is about to fail.
+      const syncOrder = mediaLink.syncOwner.mock.invocationCallOrder[0];
+      const docNumberOrder = docNumbering.generate.mock.invocationCallOrder[0];
+      const movementOrder = depositService.recordMovement.mock.invocationCallOrder[0];
+      expect(syncOrder).toBeLessThan(docNumberOrder);
+      expect(syncOrder).toBeLessThan(movementOrder);
+    });
+
+    it('create: an attachment id from another organization rejects with 404, and never mints a number or posts the movement', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'p-new', status: BankVoucherStatus.POSTED },
+      });
+      await setup(manager);
+      mediaLink.syncOwner.mockRejectedValue(
+        new MediaException(404, 'MEDIA_NOT_FOUND', 'Media not found'),
+      );
+
+      await expect(
+        service.create(
+          {
+            depositAccountId: 'dep-1',
+            docDate: '2026-07-15',
+            purpose: BankPaymentPurpose.SUPPLIER_PAYMENT,
+            totalAmount: 100,
+            attachmentIds: ['media-other-org'],
+            lines: [{ description: 'Trả NCC', amount: 100 }],
+          } as any,
+          actor,
+        ),
+      ).rejects.toMatchObject({ code: 'MEDIA_NOT_FOUND' });
+
+      // `create()` runs entirely inside `dataSource.transaction`; syncOwner's
+      // rejection propagates out of that callback, so a real transaction rolls
+      // back anything already written. Because syncOwner now runs first, this
+      // also proves nothing was minted or posted in the first place: no
+      // document number burned, no movement/journal entry, no Kafka publish.
+      expect(docNumbering.generate).not.toHaveBeenCalled();
+      expect(depositService.recordMovement).not.toHaveBeenCalled();
+      expect(manager.update).not.toHaveBeenCalled();
+    });
+
+    it('update: a voucher assertEditable rejects never reaches syncOwner', async () => {
+      const payment = {
+        id: 'p-1',
+        status: BankVoucherStatus.POSTED,
+        // Not MANUAL ⇒ assertEditable throws before any attachment handling.
+        referenceType: BankPaymentReferenceType.GOODS_RECEIPT,
+        revision: 0,
+        totalAmount: 100,
+        documentNumber: 'UNC-26-00001',
+        organizationId: 'org-1',
+      };
+      const manager = buildManager({ qbResult: payment, findOneResult: payment });
+      await setup(manager);
+
+      await expect(
+        service.update(
+          'p-1',
+          { revision: 0, attachmentIds: ['media-1'] } as any,
+          actor,
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+    });
+
+    it('update: syncs media for an editable voucher and persists the returned ids', async () => {
+      const payment = {
+        id: 'p-1',
+        status: BankVoucherStatus.POSTED,
+        referenceType: BankPaymentReferenceType.MANUAL,
+        revision: 0,
+        totalAmount: 100,
+        documentNumber: 'UNC-26-00001',
+        depositAccountId: 'dep-1',
+        contraAccountId: 'contra-1',
+        branchId: 'branch-1',
+        docDate: '2026-08-15',
+        organizationId: 'org-1',
+        attachmentIds: ['old-media'],
+      };
+      const manager = buildManager({
+        qbResult: payment,
+        findOneResult: payment,
+        findResults: [{ amount: 100 }],
+      });
+      await setup(manager);
+      mediaLink.syncOwner.mockResolvedValue(['media-1']);
+
+      await service.update(
+        'p-1',
+        { revision: 0, attachmentIds: ['media-1'] } as any,
+        actor,
+      );
+
+      expect(mediaLink.syncOwner).toHaveBeenCalledWith(
+        MediaOwnerType.BANK_PAYMENT,
+        'p-1',
+        ['media-1'],
+        actor,
+        manager,
+      );
+      expect(payment.attachmentIds).toEqual(['media-1']);
+    });
+
+    it('update: not sending attachmentIds leaves the list unchanged and never calls syncOwner', async () => {
+      const payment = {
+        id: 'p-1',
+        status: BankVoucherStatus.POSTED,
+        referenceType: BankPaymentReferenceType.MANUAL,
+        revision: 0,
+        totalAmount: 100,
+        documentNumber: 'UNC-26-00001',
+        depositAccountId: 'dep-1',
+        contraAccountId: 'contra-1',
+        branchId: 'branch-1',
+        docDate: '2026-08-15',
+        organizationId: 'org-1',
+        attachmentIds: ['old-media'],
+      };
+      const manager = buildManager({
+        qbResult: payment,
+        findOneResult: payment,
+        findResults: [{ amount: 100 }],
+      });
+      await setup(manager);
+
+      await service.update(
+        'p-1',
+        { revision: 0, reason: 'Đổi lý do' } as any,
+        actor,
+      );
+
+      expect(mediaLink.syncOwner).not.toHaveBeenCalled();
+      expect(payment.attachmentIds).toEqual(['old-media']);
+    });
+
+    it('getById returns attachments copied from MediaQueryService, never spreading MediaSummary', async () => {
+      const payment = {
+        id: 'p-1',
+        organizationId: 'org-1',
+        status: BankVoucherStatus.POSTED,
+      };
+      const manager = buildManager({ findOneResult: payment });
+      // `getById` reads through `this.dataSource.manager`, not a transaction.
+      await setup(manager, manager);
+      mediaQuery.listForOwners.mockResolvedValue(
+        new Map([
+          [
+            'p-1',
+            [
+              {
+                id: 'm-1',
+                fileName: 'hoa-don.pdf',
+                contentType: 'application/pdf',
+                size: 2048,
+                sortOrder: 0,
+                bucket: 'erp-media-private',
+                objectKey: 'org/org-1/bank_payment/m-1',
+                ownerType: MediaOwnerType.BANK_PAYMENT,
+              },
+            ],
+          ],
+        ]),
+      );
+
+      const result = await service.getById('p-1', actor);
+
+      expect(mediaQuery.listForOwners).toHaveBeenCalledWith(
+        MediaOwnerType.BANK_PAYMENT,
+        ['p-1'],
+        'org-1',
+      );
+      expect(result.attachments).toEqual([
+        { id: 'm-1', fileName: 'hoa-don.pdf', contentType: 'application/pdf', size: 2048 },
+      ]);
+    });
+  });
+
+  describe('media reader (ADR-06)', () => {
+    it('registers a reader for BANK_PAYMENT on module init', async () => {
+      const manager = buildManager({});
+      await setup(manager);
+
+      service.onModuleInit();
+
+      expect(mediaReaders.register).toHaveBeenCalledWith(
+        MediaOwnerType.BANK_PAYMENT,
+        expect.any(Function),
+      );
+    });
+
+    it('reader allows (true) when the actor can see the voucher (getById resolves)', async () => {
+      const manager = buildManager({
+        findOneResult: {
+          id: 'p-1',
+          organizationId: 'org-1',
+          status: BankVoucherStatus.POSTED,
+        },
+      });
+      // `getById` reads through `this.dataSource.manager`, not a transaction.
+      await setup(manager, manager);
+      service.onModuleInit();
+      const reader = mediaReaders.register.mock.calls[0][1];
+
+      await expect(reader('p-1', actor)).resolves.toBe(true);
+    });
+
+    it('reader denies (false) when the actor cannot see the voucher (404 from getById)', async () => {
+      const manager = buildManager({ findOneResult: null });
+      await setup(manager, manager);
+      service.onModuleInit();
+      const reader = mediaReaders.register.mock.calls[0][1];
+
+      await expect(reader('missing-id', actor)).resolves.toBe(false);
+    });
+
+    it('reader denies (false) on a Forbidden read, and rethrows any other error', async () => {
+      const manager = buildManager({});
+      manager.findOne = jest.fn(async () => {
+        throw new ForbiddenException('no branch access');
+      });
+      // `getById` reads through `this.dataSource.manager`; the test mutates
+      // `manager.findOne` after setup, so `dataSource.manager` must be this
+      // same object for the mutation to take effect.
+      await setup(manager, manager);
+      service.onModuleInit();
+      const reader = mediaReaders.register.mock.calls[0][1];
+
+      await expect(reader('p-1', actor)).resolves.toBe(false);
+
+      manager.findOne = jest.fn(async () => {
+        throw new Error('db unavailable');
+      });
+      await expect(reader('p-1', actor)).rejects.toThrow('db unavailable');
+    });
+
+    it('reader denies (false) for a branchless actor, without calling getById', async () => {
+      const manager = buildManager({
+        findOneResult: {
+          id: 'p-1',
+          organizationId: 'org-1',
+          status: BankVoucherStatus.POSTED,
+        },
+      });
+      await setup(manager, manager);
+      service.onModuleInit();
+      const reader = mediaReaders.register.mock.calls[0][1];
+      const getByIdSpy = jest.spyOn(service, 'getById');
+
+      await expect(
+        reader('p-1', { ...actor, branchId: undefined, branchIds: [] }),
+      ).resolves.toBe(false);
+      expect(getByIdSpy).not.toHaveBeenCalled();
     });
   });
 });

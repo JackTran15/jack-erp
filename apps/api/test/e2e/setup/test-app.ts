@@ -7,9 +7,20 @@ import {
 } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from '../../../src/app.module';
+import { ObjectStorageService } from '../../../src/modules/media/object-storage.service';
+import { OutboxRelayService } from '../../../src/modules/events/outbox/outbox-relay.service';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import request from 'supertest';
+import { FakeObjectStorageService } from './fake-object-storage';
+
+/**
+ * Shared across every `createTestApp()` call in a spec file so a single
+ * `beforeAll` can wire it up once and specs can still reach it afterwards
+ * (T-01-11): `ObjectStorageService` opens real S3 connections lazily on first
+ * use, which would make the E2E suite depend on a running MinIO otherwise.
+ */
+export const fakeObjectStorage = new FakeObjectStorageService();
 
 export interface SeedResult {
   organizationId: string;
@@ -31,6 +42,8 @@ export async function createTestApp(): Promise<INestApplication> {
   })
     .overrideProvider('TYPEORM_MODULE_OPTIONS')
     .useValue({})
+    .overrideProvider(ObjectStorageService)
+    .useValue(fakeObjectStorage)
     .compile();
 
   const app = moduleFixture.createNestApplication<NestExpressApplication>();
@@ -59,8 +72,12 @@ export async function createTestApp(): Promise<INestApplication> {
 }
 
 /**
- * Resets the database by DROPPING and re-synchronizing all entities.
- * Only call between top-level describe blocks or in beforeAll.
+ * Resets the database by DROPPING and re-synchronizing all entities, and clears
+ * `fakeObjectStorage` so its objects don't outlive the `media_objects` rows
+ * that reference them. Only call right after `createTestApp()`, before issuing
+ * any requests: `onModuleDestroy()` below clears the outbox relay's timers but
+ * does not wait for a `pollOnce()` already in flight, so a request racing this
+ * call could still land on the pre-reset schema.
  *
  * This destroys every row, so it refuses to run against a database whose name
  * does not mark it as throwaway — a misconfigured DB_NAME must not wipe erp_dev.
@@ -74,7 +91,25 @@ export async function resetDatabase(app: INestApplication): Promise<void> {
         `Check E2E_DB_NAME / global-setup.ts.`,
     );
   }
+
+  // `OutboxRelayService.onApplicationBootstrap()` starts a 2s `setInterval`
+  // that queries `outbox_messages` directly. `synchronize(true)` drops and
+  // rebuilds the whole schema over ~130s (jest-setup.ts), so without pausing
+  // the timer, a tick lands mid-rebuild, `pollOnce()`'s outer query rejects,
+  // and — reached only through the un-awaited `void this.pollOnce()` in that
+  // interval callback — surfaces as an unhandled rejection Jest blames on
+  // whichever suite happens to be running. `onModuleDestroy`/
+  // `onApplicationBootstrap` are the service's own timer lifecycle, so this
+  // reuses them instead of reimplementing timer bookkeeping here; the latter
+  // already no-ops under `OUTBOX_RELAY_DISABLED=1`. Restarted only after a
+  // *successful* synchronize (not in `finally`): a failed rebuild leaves the
+  // relay off instead of polling a broken schema every 2s and burying the
+  // real error under a fresh one.
+  const outboxRelay = app.get(OutboxRelayService);
+  outboxRelay.onModuleDestroy();
   await ds.synchronize(true);
+  outboxRelay.onApplicationBootstrap();
+  fakeObjectStorage.reset();
 }
 
 /**

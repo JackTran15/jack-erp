@@ -482,3 +482,380 @@ domains: `debt-report/reports/customer-debts.report.ts:280-283`,
 `limit` and receive every row plus already-correct totals. It must not loop pages, and it
 inherits the 50k cap for free. The `@Max(500)` on `limit` lives only on the HTTP search
 DTO (`inventory-report-search.dto.ts:48`), not on `buildData`.
+
+---
+
+## Feature surface — media storage (confirmed by Akenzy, 2026-09-13)
+
+> Appended by `aidlc-explorer` on 2026-09-13 from direct reads of `main` @ `743b485a`.
+> **Akenzy confirmed this section in the planning session on 2026-09-13** (reply "Confirm" to A-23 in
+> `.ai/features/2026091301-media-storage/01-assumptions.md`). The signature in the frontmatter at the
+> top of this file (2026-08-03) still does **not** cover it. `aidlc-discover` was not re-run: the map above is
+> verified and must not be regenerated, and a filename heuristic cannot see upload code anyway.
+>
+> Legend: **[code]** = provable from the cited line. **[inferred]** = follows from cited code plus
+> framework/browser behaviour; no test exercises it. Human-only questions are in **M12**.
+> Paths are relative to the repo root; `apps/api/src/` is abbreviated to `api/` where unambiguous.
+
+### M1. Existing storage / upload code — **none for object storage**
+
+[code] `rtk proxy grep -rniE` over `apps/ packages/ docker/ scripts/ .github/` + root configs
+(excluding `node_modules`, `dist`, `.vitest`, `generated/schema.ts`, `openapi.snapshot.json`,
+`pnpm-lock.yaml`) for `minio | s3 | S3Client | @aws-sdk | aws-sdk | presign | multer |
+FileInterceptor | FilesInterceptor | UploadedFile | multipart | bucket | FormData | base64 | Blob`:
+
+- **Zero hits** for `minio`, `@aws-sdk`, `aws-sdk`, `S3Client`, `presign`. No media/attachment/file
+  table exists. `bucket` hits are unrelated (`apps/pos-web/src/lib/page-libs/checkout/printing/promotionPrintBuckets.ts`,
+  `packages/shared-interfaces/src/invoice-report/pos-daily-summary.ts:36`); `s3` hits are test ids
+  (`api/modules/pos/checkout-saga/application/checkout-saga.orchestrator.spec.ts:101`,
+  `api/modules/pos/services/pos-catalog-product.service.spec.ts:930`).
+- No storage dependency in `apps/api/package.json:36-63`. `@types/multer` is a devDependency
+  (`apps/api/package.json:72`); `multer@2.1.1` arrives only transitively through
+  `@nestjs/platform-express` (`pnpm-lock.yaml:6758`). `sharp` appears only as an optional dep inside
+  another package's lock entry (`pnpm-lock.yaml:10102`); no source file imports it.
+- `base64` hits: JWT segment decoding in e2e (`apps/api/test/e2e/auth.e2e-spec.ts:285`), API-key
+  generation (`api/modules/api-key/api-key-crypto.util.ts:14`), and a comment beside the bundled
+  inline logo (`apps/pos-web/src/lib/page-libs/checkout/printing/renderInvoiceHtml.ts:7-8`). No
+  base64 image upload.
+- The **only** upload mechanism in the repo is multipart `FileInterceptor("file")` for Excel/CSV
+  imports (M2).
+- Earlier work explicitly deferred this feature: `tickets/epics/EPIC-20052026-employee-hr-management.md:19,47`
+  ("Dịch vụ upload ảnh thật (multer/S3)" out of scope), `tickets/epics/EPIC-09062026-inter-warehouse-transfer.md:20`
+  (no generic upload endpoint), `tickets/epics/EPIC-010-item-management-enhancement.md:17`
+  ("Upload ảnh hàng hoá (TBD)"), `.ai/features/2026090903-partner-catalog-api/00-intent.md:57-62`.
+
+### M2. Closest analogue — Excel/CSV import upload (exact shape)
+
+Server [code]:
+
+| Aspect | Fact | Cite |
+| --- | --- | --- |
+| Routes | 10 `POST inventory/imports/*/validate` (items, opening-balances, adjustments, stock-takes, goods-receipts, item-categories, locations, goods-issues, stock-transfers, transfer-orders) + `POST customers/imports/validate` | `api/modules/inventory/csv/csv-import.controller.ts:83,110,135,160,200,292,340,440,509,578`; `api/modules/customer/csv/customer-import.controller.ts:49-58` |
+| Interceptor | `@UseInterceptors(FileInterceptor("file"))` per method, **no options object** | e.g. `csv-import.controller.ts:85-87` |
+| Storage / limits / mime filter | No `MulterModule`, `limits`, `fileSize`, `fileFilter`, `memoryStorage`, `diskStorage`, `ParseFilePipe`, `FileTypeValidator` anywhere in `apps/api/src` or `apps/api/test` (rtk proxy grep, 0 hits). **[inferred]** Nest default = multer memory storage, no size cap | — |
+| Size cap | none for multipart; the 5 MB cap applies to the `json`/`urlencoded` parsers only | `apps/api/src/main.ts:54-57` |
+| Empty check | `!file?.buffer?.length` → 400 | `api/modules/inventory/csv/csv-import.service.ts:125-129` |
+| Type check | file-name extension only (`isExcelFile`/`isCsvFile` on `originalname`); no mime or magic-byte check | `csv-import.service.ts:526-561`; `category-import.service.ts:379`; `location-import.service.ts:297-298` |
+| Bytes persisted? | no: buffer → rows; sha256 of the buffer feeds a DB-level dedupe key; only `originalname` is stored | `csv-import.service.ts:138-144,178`; `inventory-import-job.entity.ts:42-43` |
+| Guards | class `@UseGuards(PermissionGuard, BranchScopeGuard)` + `@UseInterceptors(AuditInterceptor)`; method `@RequirePermission(...)` (+ `@RequireBranchScope()` where branch-scoped) | `csv-import.controller.ts:70-72,84,161-162` |
+| Extra inputs | `@Query` strings, not a body DTO | `csv-import.controller.ts:88,164-173` |
+| Swagger | no `@ApiConsumes`/`@ApiBody` in the repo → generated client types the body `requestBody?: never` | `packages/api-client/src/generated/schema.ts:23039-23048` |
+| Response | the job object, raw (no envelope) | `apps/api/test/e2e/inventory.e2e-spec.ts:279-280` |
+
+Client [code]:
+
+- Backoffice **bypasses `erpApi`**: builds `FormData` and posts with the raw axios `apiClient` —
+  `apps/backoffice-web/src/pages/inventory/_components/import/import-inventory.api.ts:12-17`. Same
+  `new FormData()` construction at `pages/customers/_components/import/import-customers.api.ts:14`,
+  `pages/purchase-orders/import/import-goods-receipt.api.ts:48`, `pages/item-locations/import/import-location.api.ts:13`,
+  `pages/stock-takes/_components/import/import-stock-take.api.ts:25`,
+  `pages/inventory/_components/category-import/import-categories.api.ts:15`,
+  `pages/inventory/_components/document-import/document-line-import.api.ts:50` (all under `apps/backoffice-web/src/`).
+- `apiClient` defaults `Content-Type: application/json` and **deletes it when `data instanceof FormData`**
+  so the browser sets the boundary — `apps/backoffice-web/src/lib/api-axios.ts:32-35,57-60`. It mints a
+  random `X-Idempotency-Key` on every non-GET/HEAD — `api-axios.ts:52-55`.
+- `erpApi` is a thin axios wrapper (not openapi-fetch) that passes `options.body` straight to
+  `axios.post` — `packages/api-client/src/index.ts:5,21-35`. At runtime it could carry FormData on
+  backoffice; the generated types say `never`.
+- **pos-web has no path to send a file today.** `http.ts` forces `Content-Type: application/json` and
+  `JSON.stringify`s every body (`apps/pos-web/src/lib/common/http.ts:29,143-156`); pos-web's axios
+  instance keeps the JSON default and has **no** FormData branch (`apps/pos-web/src/lib/common/api-axios.ts:16-46`).
+- Picker: `ImportFilePicker` (single file, drag-drop, `validateFile` hook, Excel/CSV copy) —
+  `apps/backoffice-web/src/components/shared/import-wizard/ImportFilePicker.tsx:8-75`, used by 6 import wizards.
+
+Tests [code]: supertest `.attach('file', Buffer, { filename, contentType })` —
+`apps/api/test/e2e/inventory.e2e-spec.ts:266-291`; unit fakes `{ buffer, originalname } as Express.Multer.File` —
+`api/modules/customer/csv/customer-import.service.spec.ts:66-67`, `api/modules/inventory/csv/category-import.service.spec.ts:50`.
+
+### M3. Columns that hold or imply a file / image
+
+[code] `rtk proxy grep` over every `*.entity.ts` for `image|img|photo|picture|logo|avatar|thumbnail|attachment|_url|file_name|mime`:
+
+| Table.column | Type | Entity cite | Written by |
+| --- | --- | --- | --- |
+| `employee_profiles.photo_url` | `varchar(500)` nullable | `api/modules/rbac/employee/employee-profile.entity.ts:72-73` | DTO `@IsString @MaxLength(500)`, no URL check (`api/modules/rbac/dto/employee-profile.dto.ts:175-179`); `api/modules/rbac/users.service.ts:911,1043,1111`; shared type `packages/shared-interfaces/src/iam/index.ts:60,202,251` |
+| `goods_receipts.attachment_ids` | `jsonb` default `[]` | `api/modules/inventory/goods-receipt/goods-receipt.entity.ts:100-101` | `@IsArray @IsUUID('all',{each:true})` at `goods-receipt/dto/create-goods-receipt.dto.ts:129-132` |
+| `transfer_orders.attachment_ids` | `jsonb` default `[]` | `api/modules/inventory/transfer-order/transfer-order.entity.ts:41-45` | `transfer-order.controller.ts:287,328` |
+| `stock_transfers.attachment_ids` | `jsonb` default `[]` | `api/modules/inventory/transfer/stock-transfer.entity.ts:69-70` | `@IsArray @IsUUID` at `stock-transfer.controller.ts:96-99` |
+| `cash_receipts.attachment_ids` | `jsonb` default `[]` | `api/modules/accounting/cash-vouchers/cash-receipts/cash-receipt.entity.ts:97-98` | field at `dto/create-cash-receipt.dto.ts:98` |
+| `cash_payments.attachment_ids` | `jsonb` default `[]` | `api/modules/accounting/cash-vouchers/cash-payments/cash-payment.entity.ts:97-98` | field at `dto/create-cash-payment.dto.ts:98` |
+| `bank_receipts.attachment_ids` | `jsonb` default `[]` | `api/modules/accounting/deposit-vouchers/bank-receipts/bank-receipt.entity.ts:116-117` | field at `dto/create-bank-receipt.dto.ts:111` |
+| `bank_payments.attachment_ids` | `jsonb` default `[]` | `api/modules/accounting/deposit-vouchers/bank-payments/bank-payment.entity.ts:118-119` | field at `dto/create-bank-payment.dto.ts:115` |
+| `inventory_import_jobs.file_name` | varchar | `api/modules/inventory/csv/inventory-import-job.entity.ts:42-43` | original upload name only |
+
+**No image/file column** on product, variant, inventory item, organization, branch, customer,
+promotion (v1 or v2) or `stock_takes` entities (same grep, 0 hits). `attachment_ids` references no table (no FK, no attachments table).
+
+Response-side placeholders [code]:
+
+- **POS catalog** `imageUrl: string | null`, documented "always null until image storage is implemented" —
+  `api/modules/pos/dto/pos-catalog-product.response.dto.ts:23-27` (also `:92`, `:146`); hard-coded `null` at
+  `api/modules/pos/services/pos-catalog-product.service.ts:213,651,675,703`. pos-web types it
+  (`apps/pos-web/src/interfaces/catalog.interface.ts:66,111,140`) and renders it nowhere.
+- **Partner catalog** `images: string[]`, "Always empty" — `api/modules/partner-catalog/dto/partner-product-search.dto.ts:177-180`;
+  `[]` at `queries/search-partner-products.handler.ts:346-363`, `queries/get-partner-product.handler.ts:165`;
+  locked by `partner-catalog-contract.spec.ts:152-156`.
+- **Mobile module** (`api/modules/mobile/`, 15 controllers, commit `9e48e9f6`) exposes **no** image field.
+  It deliberately drops `imageUrl` from the stock DTO (`api/modules/mobile/dto/mobile-sales-model-stock.response.dto.ts:9-13`),
+  locked by `api/modules/mobile/services/mobile-sales-model-stock.spec.ts:119`, and drops `attachmentIds` from stock
+  documents (`api/modules/mobile/dto/mobile-stock-document-detail.response.dto.ts:90-91`).
+
+FE that already collects images [code]:
+
+- **Employee photo persists a dead `blob:` URL.** `handlePhoto` sets `photoDataUrl = URL.createObjectURL(file)`
+  (`apps/backoffice-web/src/pages/employees/components/EmployeeBasicInfoTab.tsx:93-97`);
+  `draftToEmployeeProfilePayload` sends it as `photoUrl` (`apps/backoffice-web/src/lib/iam/user-form.ts:55`); the
+  server accepts any string ≤ 500 chars (above). On edit, `apps/backoffice-web/src/pages/employees/employee.mappers.ts:137`
+  feeds it back into `<img src>` (`EmployeeBasicInfoTab.tsx:159-163`). **[inferred]** a `blob:` URL is valid only
+  in the tab that created it, so stored values do not render after reload. UI promises `.jpg,.jpeg,.png,.gif`
+  and "< 5MB" (`:146`, `:168`); size is not checked.
+- **Product images never leave the browser.** Up to 10 images, 2 MB each, jpeg/png/gif/webp
+  (`apps/backoffice-web/src/components/crud/inventory/item-create/constants.ts:11-13`), picked/previewed in
+  `apps/backoffice-web/src/components/crud/inventory/InventoryItemCreateForm.tsx:471-505,925-967`. Copy at
+  `:930-931`: "Ảnh chỉ lưu trên trình duyệt cho đến khi máy chủ hỗ trợ tải lên". The `productImages` state
+  (`:112`) is read only by the counter (`:939`). Mounted by `components/crud/CrudCreatePage.tsx:232`,
+  `components/crud/CrudEditPage.tsx:227`.
+- **"Tài liệu đính kèm" (attachments)**: disabled buttons at `apps/backoffice-web/src/components/document/GoodsReceiptFormDialog.tsx:2304-2307`
+  and `apps/backoffice-web/src/pages/treasury/documents/receipt-voucher-dialog/ReceiptVoucherDialog.tsx:860-867`;
+  the stock-take one keeps selected file **names** in local state only
+  (`apps/backoffice-web/src/pages/stock-takes/StockTakeFormDialog.tsx:1754-1790`). The same label also appears at
+  `components/document/GoodsIssueFormDialog.tsx:2013`, `pages/stock-transfer/StockTransferPage.tsx:1967`,
+  `pages/transfer-orders/TransferOrdersPage.tsx:1695`, `pages/treasury/documents/payment-voucher-dialog/PaymentVoucherDialog.tsx:1096`,
+  `.../deposit-payment-voucher-dialog/DepositPaymentVoucherDialog.tsx:1104`, `.../deposit-receipt-voucher-dialog/DepositReceiptVoucherDialog.tsx:866`,
+  `pages/treasury/cash/cash-count/CashCountFormDialog.tsx:391`,
+  `pages/treasury/documents/goods-receipt-payment-dialog/PaymentVoucherGoodsReceiptFormSection.tsx:78`
+  (located by label; not opened). `packages/ui/src/components/document-form-dialog.tsx:67-68,143-144` has an
+  `attachments` slot.
+
+### M4. Config pattern
+
+[code]
+
+- `ConfigModule.forRoot({ isGlobal: true, envFilePath: [apps/api/.env, <root>/.env, apps/api/.env.example] })`,
+  first file defining a key wins — `apps/api/src/app.module.ts:58-70`. **No validation schema**: 0 hits for
+  Joi / zod / envalid / `validationSchema` / `registerAs` / `ConfigModule.forFeature` in `apps/api/src`; no
+  `config/` directory. Defaults are inline at each `config.get(key, default)`. Env numbers arrive as strings
+  and are cast by hand (`main.ts:41-52`, `app.module.ts:89`).
+- `apps/api/.env.example:1-48` keys: `PORT NODE_ENV DB_HOST DB_PORT DB_NAME DB_USER DB_PASS DB_POOL_SIZE
+  REDIS_HOST REDIS_PORT REDIS_PASSWORD REDIS_DB KAFKA_BROKERS KAFKA_CLIENT_ID KAFKA_CONSUMER_GROUP_PREFIX`
+  (commented `KAFKA_AUTH_ENABLE KAFKA_SASL_MECHANISM KAFKA_SASL_USERNAME KAFKA_SASL_PASSWORD KAFKA_SSL`)
+  `JWT_SECRET JWT_ACCESS_TTL JWT_REFRESH_TTL TRUST_PROXY_HOPS METRICS_ENABLED METRICS_PREFIX`. Root
+  `.env.example:1-70` adds `VITE_API_BASE_URL OPENAPI_URL KAFKA_PORT POS_VARIANCE_THRESHOLD
+  ADJUSTMENT_APPROVAL_THRESHOLD EXPENSE_APPROVAL_THRESHOLD`. No storage keys anywhere.
+- **Redis, the client-provider shape to copy:** `RedisService` is a plain `@Injectable()` class; its
+  constructor reads `REDIS_*` from `ConfigService` with defaults, builds the `ioredis` client, logs
+  connect/error; `onModuleDestroy` quits — `api/modules/redis/redis.service.ts:5-37`. Exported from a
+  `@Global()` module — `api/modules/redis/redis.module.ts:7-12`; imported once at `app.module.ts:99`. No
+  DI token / `useFactory` for the raw client.
+- **Kafka:** pure `resolveKafkaConfig(config)` with opt-in auth that throws on bad combos —
+  `api/modules/events/kafka-config.ts:34-78`; `EventPublisher` builds the client in its constructor and
+  connects in `onModuleInit` — `api/modules/events/event-publisher.service.ts:25-53`; `@Global()`
+  `EventsModule` exports it — `api/modules/events/events.module.ts:16-45`. `MetricsModule` is the same
+  `@Global()` shape — `api/modules/metrics/metrics.module.ts:5-11`.
+- Health: only `GET /health` and `GET /health/db` — `api/modules/health/health.controller.ts:10-37`.
+  `RedisService.healthCheck()` exists (`redis.service.ts:121-128`) but no endpoint calls it.
+- Prod env: PM2 passes an explicit env whitelist to the API — `apps/api/ecosystem.config.cjs:40-68`.
+  **[inferred]** ConfigModule also reads `<root>/.env` from disk (`app.module.ts:67`), so a key absent from
+  that whitelist may still load if present in that file.
+
+### M5. Infra, origin, and what decides a browser → MinIO PUT
+
+`docker-compose.yml` [code]:
+
+| Service | Image | Host port(s) | Cite |
+| --- | --- | --- | --- |
+| postgres | `postgres:16-alpine` | `${DB_PORT:-5433}`→5432 | `docker-compose.yml:2-18` |
+| redis | `redis:7-alpine` | `${REDIS_PORT:-6380}`→6379 | `:20-37` |
+| redpanda | `redpanda:v24.2.1` | `${KAFKA_PORT:-19092}`, 18081, 18082, 19644 | `:39-69` |
+| redpanda-console | `console:v2.7.0` | 18080 | `:71-83` |
+| adminer | `adminer:latest` | 18088 | `:85-96` |
+
+Volumes `erp-pg-data`, `erp-redis-data`, `erp-redpanda-data` (`:98-104`). Apps: 3000
+(`apps/backoffice-web/vite.config.ts:20`), 3001 (`apps/pos-web/vite.config.ts:24`), 4000 (`apps/api/src/main.ts:140`).
+**Not bound by anything in the repo: 9000, 9001** (MinIO's defaults). Whether they are free on dev hosts or the
+prod server is not in the repo.
+
+- **No Dockerfile, no k8s/prod-compose manifest, no nginx/Caddy config** in the repo (`find` excluding
+  `node_modules`: only `docker-compose.yml`, `docker/redpanda-console-config.yml`, four `ecosystem.config.cjs`).
+  Deploy is PM2 (`ecosystem.config.cjs:1-23`): API `fork` × 1 (`apps/api/ecosystem.config.cjs:27-38`); SPAs via
+  `vite preview` (`apps/backoffice-web/ecosystem.config.cjs:18-21`, `apps/pos-web/ecosystem.config.cjs:17-20`).
+- **Same origin:** pos-web builds with `base: "/pos/"`, "Served under /pos/ by nginx on erp.giaymt.com.vn"
+  (`apps/pos-web/vite.config.ts:9-11`); backoffice and POS share one origin
+  (`apps/pos-web/src/constants/common.constant.ts:21-22`). Prod builds call the API with base URL `""`
+  (`apps/backoffice-web/src/lib/api-base.ts:4-13`, `apps/pos-web/src/lib/common/api-base.ts:8-17`).
+  **[inferred]** the nginx in front proxies API paths on that same origin; its config is not in the repo.
+- **Production is plain HTTP**: `crypto.randomUUID` is undefined on `http://erp.giaymt.com.vn`, hence the
+  polyfill — `apps/pos-web/src/lib/common/crypto-polyfill.ts:1-10` (twin `apps/backoffice-web/src/lib/crypto-polyfill.ts:4`).
+- `main.ts` [code]: CORS `origin: true` (reflects any origin), `credentials: true`, methods include `PUT`,
+  exposed headers `X-Request-Id, X-Total-Count, Content-Disposition` (`:80-89`); `json`/`urlencoded` 5 MB
+  (`:54-57`); URI versioning, default `VERSION_NEUTRAL` (`:63-66`); `trust proxy = TRUST_PROXY_HOPS`
+  (`:49-52`); Swagger off in production (`:95-97`). **No global prefix, no helmet, no CSP, no compression**
+  in `apps/api/src` (0 hits). These govern the API only. A browser PUT to MinIO is decided by MinIO's own
+  CORS config and by whatever CSP the (unseen) nginx sends on the SPA pages.
+
+### M6. Cross-cutting pieces an upload endpoint would pass through
+
+Global registrations, in order — `api/common/common.module.ts:14-21`: `RequestIdInterceptor`,
+`LoggingInterceptor`, `IdempotencyInterceptor`, `MetricsInterceptor`, `APP_GUARD AuthGuard`, `APP_FILTER HttpExceptionFilter`.
+
+- **IdempotencyInterceptor** [code]: skips GET/HEAD/OPTIONS and requests with no `X-Idempotency-Key`
+  (`api/common/interceptors/idempotency.interceptor.ts:15,31-41`); scope `actorId:METHOD:routePath:key`
+  (`:43-44`, `api/modules/redis/idempotency.store.ts:27-33`); fingerprint `sha256(JSON.stringify(request.body ?? {}))`
+  (`idempotency.interceptor.ts:105-108`); caches the handler's return value in Redis for 24 h
+  (`idempotency.store.ts:19,35-55`); same fingerprint → cached body + `X-Idempotency-Status: REPLAYED`,
+  different → 409 `IDEMPOTENCY_CONFLICT` (`idempotency.interceptor.ts:54-78`).
+  **[inferred] with multipart:** global interceptors run before method-scoped ones, so `FileInterceptor`
+  has not parsed the body yet, and Express's json/urlencoded parsers skip `multipart/form-data`. Every
+  multipart request therefore fingerprints as `sha256("{}")`: same key + different file → REPLAY of the
+  first response, not 409. Untested. Harmless today only because both axios instances mint a fresh key per
+  request (`apps/backoffice-web/src/lib/api-axios.ts:52-55`, `apps/pos-web/src/lib/common/api-axios.ts:36-43`).
+  pos-web `http.ts` deliberately reuses keys across retries (`apps/pos-web/src/lib/common/http.ts:32-41,46-57`).
+- **ValidationPipe** `whitelist + forbidNonWhitelisted + transform` (`main.ts:68-74`) applies to
+  `@Body`/`@Query` DTOs; `@UploadedFile()` is not a DTO. Any JSON body (e.g. "request upload URL",
+  "confirm upload") must declare every field.
+- **LoggingInterceptor** logs `[requestId] METHOD url -> status (ms)`: no body, no headers
+  (`api/common/interceptors/logging.interceptor.ts:20-38`).
+- **AuditInterceptor** (class-level on the import controllers) logs `payloadKeys: Object.keys(body)`
+  (`api/modules/crud/audit.interceptor.ts:18,33-45`). **[inferred]** runs before multer → `[]` for multipart.
+- **MetricsInterceptor** labels by route pattern, not raw URL (`api/modules/metrics/metrics.interceptor.ts:11-16,28-36`).
+- **Response envelope: none.** No `ClassSerializerInterceptor` or transform interceptor (0 hits); handler
+  return values go out raw. Errors: `ApiError { code, message, details: { requestId, … } }`
+  (`api/common/filters/http-exception.filter.ts:27-53,73`; `packages/shared-interfaces/src/common/index.ts:45-49`).
+- **AuthGuard is global** (`common.module.ts:19`) and honours `@Public()` (`api/common/guards/auth.guard.ts:32-38`).
+  **[inferred]** an `<img src>` pointing at an API route sends no `Authorization` header.
+
+### M7. RBAC
+
+[code]
+
+- Keys: `PERMISSION_DEFINITIONS` (`{ key, module }`) in `api/modules/rbac/permissions.seed.ts:15-275`; description
+  from `PERMISSION_LABELS_VI` (`packages/shared-interfaces/src/iam/permission-labels-vi.ts:23`) via
+  `permissions.seed.ts:277-282`.
+- `PermissionSyncService` upserts the catalogue on every boot but **grants nothing to roles** —
+  `api/modules/rbac/permission-sync.service.ts:16-53`.
+- Role grants: `apps/api/src/database/seeds/org-role-permissions.ts`. System admin = all keys (`:32`);
+  General manager = all minus `*.registration.*` (`:35-39`); Branch manager = prefix allow-list minus
+  root-only keys (`:46-68,80`); Sales (`:129`), Cashier (`:162`), Warehouse (`:199`) are explicit lists;
+  Partner = `partner.catalog.read` only (`:24`). New orgs: `database/seeds/org-baseline-seed.core.ts:68-100`
+  (delete + re-insert `role_permissions`). Existing orgs need `pnpm --filter @erp/api seed:sync-admin-permissions`
+  (`database/seeds/sync-admin-permissions.seed.ts:1-34`, `apps/api/package.json:26`). Contract-spec pattern
+  tying keys to catalogue + labels: `database/seeds/report-permissions.contract.spec.ts:30-40`.
+- **E2E ignores the seed**: `apps/api/test/e2e/setup/test-app.ts:135-166` hard-codes the admin role's keys;
+  a new key must be added there or e2e gets 403 (comment at `:146-147` records exactly that).
+- Use: `@RequirePermission(key | key[])`, array = OR (`api/modules/auth/decorators/require-permission.decorator.ts:5-18`),
+  enforced by `PermissionGuard` (`api/modules/rbac/permission.guard.ts:21-58`). Class-level
+  `@UseGuards(PermissionGuard, BranchScopeGuard)` on 71 controllers, `@UseGuards(PermissionGuard)` on 32.
+
+### M8. Background / cleanup capability
+
+[code]
+
+- `@nestjs/schedule` installed and `ScheduleModule.forRoot()` registered (`apps/api/package.json:45`,
+  `app.module.ts:95`). Exactly **one** `@Cron` in the code: `OverdueDebtsService.markOverdue`,
+  `EVERY_DAY_AT_1AM`, cross-tenant, emits one event per row (`api/modules/pos/services/overdue-debts.service.ts:10-35`).
+- Timer alternative: `OutboxRelayService` polls + cleans with `setInterval` from `onApplicationBootstrap`,
+  env kill switch (`api/modules/events/outbox/outbox-relay.service.ts:39-55`).
+- Kafka consumers: `@OnDomainEvent(topic, { groupId?, fromBeginning? })` (`api/modules/events/decorators/on-event.decorator.ts:15-20`),
+  discovered at boot by `EventConsumerManager` (`api/modules/events/event-consumer.service.ts:65-69`). Topic names live in
+  `ERP_TOPICS` (`packages/shared-kafka-client/src/topics.ts:1`) and must also be in `TOPIC_SPECS`
+  (`api/modules/events/topics.init.ts:11-36`). 25 `*.consumer.ts` in 8 `consumers/` dirs; reference-lookup dedupe
+  example `api/modules/inventory/consumers/stock-deduction.consumer.ts:27-45`; generic dedupe via `processed_events` +
+  `EventIdempotencyService` (`events.module.ts:8,11,20-24`).
+- API runs as one PM2 fork (`apps/api/ecosystem.config.cjs:31-32`; cluster mode unverified per `:10-12`).
+  **[inferred]** a `@Cron` runs once per deployment today; nothing provides a distributed lock.
+
+### M9. Frontend
+
+[code]
+
+- **`packages/ui` has no file-input, dropzone, image, preview or cropper component** (component listing;
+  deps `packages/ui/package.json:15-31`). Its `Avatar` renders initials only, no `src` prop
+  (`packages/ui/src/components/avatar.tsx:36-57`). No cropper / dropzone library in either app (0 hits).
+- App-local: `ImportFilePicker` (M2); `FileDropZone`, a generic single-file drop zone with `accept` +
+  `validateFile` (`apps/backoffice-web/src/components/forms/FileDropZone.tsx:5-78`), has **no importers**.
+  Hand-rolled image pickers: employee + product (M3).
+- **No remote image is rendered anywhere.** `<img>` only shows local `blob:` previews
+  (`InventoryItemCreateForm.tsx:956`, `EmployeeBasicInfoTab.tsx:159-163`) and the bundled inline logo in POS
+  receipt HTML (`apps/pos-web/src/lib/page-libs/checkout/printing/renderInvoiceHtml.ts:8,370`).
+- `erpApi` (`apps/backoffice-web/src/lib/erp-api.ts:1-5`, `apps/pos-web/src/lib/common/erp-api.ts:1-4`) wraps each
+  app's axios instance through `createErpApiClient` (`packages/api-client/src/index.ts:5-35`). Backoffice's
+  instance can send FormData; pos-web's cannot (M2). No upload-progress handling anywhere. Both request
+  interceptors add `Authorization`, `X-Branch-Id`, `X-Request-Id`, `X-Idempotency-Key` to every call
+  (`apps/backoffice-web/src/lib/api-axios.ts:37-55`, `apps/pos-web/src/lib/common/api-axios.ts:21-43`).
+  **[inferred]** a presigned PUT sent through them would carry those headers to MinIO.
+- Download helper `triggerBlobDownload` in `apps/backoffice-web/src/lib/download.ts:1-3`, re-declared privately in
+  import api files (e.g. `import-inventory.api.ts:52`).
+
+### M10. Tests
+
+[code]
+
+- Unit tests mock external clients with `{ provide: X, useValue }`: Redis — `api/modules/redis/idempotency.store.spec.ts:10-21`;
+  Kafka publisher — `api/modules/customer/publishers/loyalty-points.publisher.spec.ts:19-30`; DataSource + publisher —
+  `api/modules/events/outbox/outbox-relay.service.spec.ts:22-37`. Jest: `rootDir: src`, `*.spec.ts`, ts-jest,
+  shared packages mapped to source (`apps/api/jest.config.ts:3-17`).
+- E2E config `apps/api/test/e2e/jest-e2e.config.ts:3-23` (serial, `forceExit`; 180 s hook budget in
+  `setup/jest-setup.ts:8`). `setup/global-setup.ts:25-112`: loads `apps/api/.env.test` if present, else `.env`
+  (**no `.env.test` in the repo**); refuses a DB name without "test"; creates the DB; migrates only an empty schema.
+  `setup/test-app.ts:28-59` boots the **real `AppModule`**, overriding only `TYPEORM_MODULE_OPTIONS`, so every
+  provider constructor runs with real clients. It mirrors versioning, trust proxy and ValidationPipe but **not**
+  the 5 MB body parser or CORS (`test-app.ts:36-57` vs `main.ts:54-57,80-89`).
+- Multipart e2e precedent: `apps/api/test/e2e/inventory.e2e-spec.ts:266-291`.
+- CI services: Postgres + Redis only, no Redpanda, no object store (`.github/workflows/ci.yml:17-40`). Lint is
+  `echo lint` everywhere (`apps/api/package.json:10`, `packages/ui/package.json:13`).
+
+### M11. Inconsistencies and absences (feed the assumption register)
+
+1. **No object-storage precedent at all**: no client, env keys, compose service, media table or presign code (M1).
+2. **The only upload precedent is multipart through the API**, with no size cap and extension-only type checks (M2).
+   Nothing in the repo has the browser send bytes anywhere but the API.
+3. **Three incompatible image shapes are already in published contracts**: `photoUrl: string | null`
+   (`packages/shared-interfaces/src/iam/index.ts:60`), `imageUrl: string | null`
+   (`api/modules/pos/dto/pos-catalog-product.response.dto.ts:27`), `images: string[]`
+   (`api/modules/partner-catalog/dto/partner-product-search.dto.ts:180`, test-locked empty). Mobile excludes images on purpose.
+4. **`employee_profiles.photo_url` probably holds dead `blob:` URLs** for every employee saved with a photo (M3).
+5. **`attachment_ids` (uuid[] in jsonb) on 7 tables points at nothing** and implies a future UUID-keyed
+   attachments table. Nothing says whether that is the same store as product images.
+6. **FE limits disagree and the server enforces none**: product 2 MB × 10 incl. webp (`item-create/constants.ts:11-13`)
+   vs employee "< 5MB" unenforced, no webp (`EmployeeBasicInfoTab.tsx:146,168`).
+7. **pos-web cannot send a file** through either HTTP layer (M2).
+8. **IdempotencyInterceptor ignores multipart content** (M6, inferred, untested).
+9. **Plain-HTTP production; same-origin SPA+API behind an nginx whose config is not in the repo** (M5).
+10. **No config validation**: a missing storage key surfaces only at first use unless new code checks it (M4).
+11. **E2E boots real providers and CI has no object store** (M10): a client that connects in its constructor breaks e2e/CI unless mocked or made lazy.
+12. **CLAUDE.md drift seen while reading**: it says controllers put `@UseGuards(AuthGuard, PermissionGuard)` at
+    class level; the code registers `AuthGuard` globally (`api/common/common.module.ts:19`) and no controller lists
+    it (M7). Its module list omits `mobile`, `partner-catalog`, `api-key`, `metrics`, `counterparty`,
+    `admin-search`, `inventory-reports` (`app.module.ts:8,45-48,53-54`).
+13. `FileDropZone.tsx` has no importers: reuse candidate or dead code; the code cannot say.
+
+### M12. Questions only a human can answer (these block sign-off of this section)
+
+1. **Which owners get media in v1?** Products (per product or per variant), employees, organization/branch
+   logo, customers, voucher/document attachments. This decides one generic media table vs per-owner columns.
+2. **Images only, or also the documents the 7 `attachment_ids` columns and "Tài liệu đính kèm" stubs anticipate
+   (PDF, Excel…)?** This decides whether `attachment_ids` becomes this feature's FK target.
+3. **Upload path:** browser → presigned PUT straight to MinIO, or browser → API multipart (the only existing
+   precedent) → MinIO?
+4. **How does a browser reach MinIO in production?** Its own hostname, a path on `erp.giaymt.com.vn` through the
+   existing nginx, or never directly? The nginx config and prod host layout are not in the repo.
+5. **Read access:** public-read URLs, time-limited presigned GETs, or API-proxied? Do employee photos (personal
+   data) differ from product images? `<img src>` cannot carry the bearer token.
+6. **Where does MinIO run and who owns it?** Same host as PM2/Postgres/Redis or separate. Also who handles
+   backups, lifecycle, credentials, and where prod secrets live (root `.env`, PM2 env, elsewhere).
+7. **Limits and processing:** max size (2 MB vs 5 MB), allowed types (webp?), count per owner, server-side
+   resize/thumbnail (no image library exists), EXIF stripping.
+8. **Tenant partitioning:** must bucket/key layout isolate `organizationId` (and `branchId`)?
+9. **Deletion and orphans:** delete objects when the owner is soft-deleted, or keep them? This interacts with
+   the immutability of posted vouchers. Clean abandoned uploads by `@Cron`, a MinIO lifecycle rule, or not at
+   all? Is single-instance cron acceptable?
+10. **Existing `employee_profiles.photo_url` values:** null them in a migration, or leave them?
+11. **Which published contracts start returning real URLs in this feature?** POS `imageUrl`, partner `images[]`
+    (test-locked empty, already given to partners), mobile (excludes images by design).
+12. **Does pos-web upload in v1, or only display?**
+13. **Permission keys:** new key(s) such as `media.upload`, or reuse owner keys (`inventory.item.write`,
+    `iam.user.write`)? Which of the 7 seeded roles get them?
+14. **Is HTTPS coming before this ships?** Presigned URLs and upload traffic would otherwise travel over plain
+    HTTP (`crypto-polyfill.ts:10`: "Delete this file once the site is served over HTTPS").
+15. **CI/e2e strategy:** add a MinIO service to `docker-compose.yml` and `.github/workflows/ci.yml` (9000/9001 are
+    unbound in the repo), or mock the storage client in e2e?
