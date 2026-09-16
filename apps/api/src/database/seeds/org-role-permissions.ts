@@ -194,6 +194,9 @@ export const CASHIER_PERMISSION_KEYS: string[] = [
   'accounting.cash.read',
   'accounting.cash.create',
   'accounting.cash_receipt.create',
+  // Thu nợ bằng chuyển khoản trên mobile (T-17-01) — cùng migration CashierBankReceiptPermission.
+  'accounting.bank_receipt.create',
+  'accounting.bank_receipt.read',
   'accounting.cash_receipt.read',
   'accounting.cash_payment.create',
   'accounting.cash_payment.read',
