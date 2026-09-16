@@ -8,6 +8,7 @@ import { CashMovementType } from '../../cash/cash-movement.entity';
 import { DocumentNumberingService } from '../../../document-numbering/document-numbering.service';
 import { CashVoucherCategoryResolverService } from '../shared/category-resolver.service';
 import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
+import { InvoiceEntity, InvoiceStatus } from '../../../pos/entities/invoice.entity';
 import { DebtCollectionSagaStatus } from '../enums';
 import { DebtStatus } from '../../../pos/entities/invoice-debt.entity';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
@@ -113,6 +114,33 @@ describe('DebtCollectionSagaService', () => {
     expect(debt.remainingAmount).toBe(0);
     expect(result.status).toBe(DebtCollectionSagaStatus.COMPLETED);
     expect(result.documentNumber).toBe('PT-26-00001');
+  });
+
+  it('thu đủ khoản nợ thì HOÁ ĐƠN gốc về paid và total_paid cộng đúng số thu (Loc bắt 2026-09-14)', async () => {
+    const debt = {
+      id: 'debt-1',
+      organizationId: 'org-1',
+      invoiceId: 'inv-1',
+      status: DebtStatus.OPEN,
+      originalAmount: 650,
+      paidAmount: 0,
+      remainingAmount: 650,
+      referenceCode: 'INV-1',
+    };
+    const invoice: any = { id: 'inv-1', organizationId: 'org-1', status: 'partial_debt', amountDue: 750, totalPaid: 100 };
+    const manager: any = buildManager(debt);
+    manager.findOne = jest.fn(async (entity: any) => (entity === InvoiceEntity ? invoice : null));
+    manager.count = jest.fn(async () => 0);
+    const { service } = await setup(manager);
+
+    await service.collect(
+      { voucherDate: '2026-09-14', allocations: [{ invoiceDebtId: 'debt-1', amount: 650 }] },
+      'idem-key-inv',
+      actor,
+    );
+
+    expect(invoice.totalPaid).toBe(750);
+    expect(invoice.status).toBe(InvoiceStatus.PAID);
   });
 
   it('rejects when the collected amount exceeds the remaining balance', async () => {

@@ -105,6 +105,9 @@ import { SearchDepositVouchersV2Handler } from './queries/search-deposit-voucher
     DepositDashboardService,
     SearchDepositVouchersV2Handler,
   ],
-  exports: [BankReceiptsService, BankPaymentsService],
+  exports: [BankReceiptsService, BankPaymentsService,
+    // Mobile thu ngân (T-17-01): thu nợ đi đúng saga của web.
+    DepositDebtCollectionSagaService,
+  ],
 })
 export class DepositVouchersModule {}

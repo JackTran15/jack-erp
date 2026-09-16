@@ -14,7 +14,7 @@ import {
   CustomerDebtStatus,
   QueryCustomerDebtsDto,
 } from './dto/query-customer-debts.dto';
-import { QueryCustomersWithDebtDto } from './dto/query-customers-with-debt.dto';
+import { CustomersWithDebtSort, QueryCustomersWithDebtDto } from './dto/query-customers-with-debt.dto';
 import {
   QuerySupplierDebtsDto,
   SupplierDebtStatusFilter,
@@ -64,6 +64,8 @@ export interface CustomerWithDebtItem {
   customerId: string;
   customerName: string;
   customerCode: string | null;
+  /** Mobile thu nợ tìm theo SĐT và bày dưới tên (T-17-01). */
+  customerPhone: string | null;
   debtCount: number;
   totalOriginal: number;
   totalRemaining: number;
@@ -279,14 +281,14 @@ export class PartnerLookupService {
     const searchPattern = this.buildSearchPattern(query.search);
 
     const sql = `SELECT d.customer_id, d.original_amount, d.remaining_amount,
-        d.due_date, d.status, c.name AS customer_name, c.code AS customer_code
+        d.due_date, d.status, c.name AS customer_name, c.code AS customer_code, c.phone AS customer_phone
       FROM invoice_debts d
       JOIN customers c
         ON c.id = d.customer_id AND c.organization_id::text = $1
       WHERE d.organization_id::text = $1
         AND d.remaining_amount > 0
         AND c.status <> 'MERGED'
-        AND ($2::text IS NULL OR c.name ILIKE $2 OR c.code ILIKE $2)`;
+        AND ($2::text IS NULL OR c.name ILIKE $2 OR c.code ILIKE $2 OR c.phone ILIKE $2)`;
     const rows: Array<{
       customer_id: string;
       original_amount: string;
@@ -295,6 +297,7 @@ export class PartnerLookupService {
       status: string;
       customer_name: string | null;
       customer_code: string | null;
+      customer_phone: string | null;
     }> = await this.dataSource.query(sql, [actor.organizationId, searchPattern]);
 
     // Group + aggregate per customer in memory.
@@ -306,6 +309,7 @@ export class PartnerLookupService {
           customerId: r.customer_id,
           customerName: r.customer_name ?? '',
           customerCode: r.customer_code ?? null,
+          customerPhone: r.customer_phone ?? null,
           debtCount: 0,
           totalOriginal: 0,
           totalRemaining: 0,
@@ -324,11 +328,14 @@ export class PartnerLookupService {
     }
 
     // Biggest debtors first, then by name for a stable order.
-    const all = Array.from(byCustomer.values()).sort(
-      (a, b) =>
-        b.totalRemaining - a.totalRemaining ||
-        a.customerName.localeCompare(b.customerName),
-    );
+    const byName = (a: CustomerWithDebtItem, b: CustomerWithDebtItem) => a.customerName.localeCompare(b.customerName);
+    const compare: (a: CustomerWithDebtItem, b: CustomerWithDebtItem) => number =
+      query.sort === CustomersWithDebtSort.NAME
+        ? byName
+        : query.sort === CustomersWithDebtSort.DEBT_ASC
+          ? (a, b) => a.totalRemaining - b.totalRemaining || byName(a, b)
+          : (a, b) => b.totalRemaining - a.totalRemaining || byName(a, b);
+    const all = Array.from(byCustomer.values()).sort(compare);
 
     const offset = (page - 1) * pageSize;
     const data = all.slice(offset, offset + pageSize);
