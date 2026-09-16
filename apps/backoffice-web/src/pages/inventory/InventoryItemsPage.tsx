@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Button,
@@ -14,6 +15,10 @@ import {
   type CrudListInventoryActionContext,
 } from "../../components/crud/CrudListPage";
 import { usePermissionCheck } from "../../hooks/usePermissionCheck";
+import {
+  navigateToInventoryItemImages,
+  navigateToQuickImageUpdate,
+} from "../../lib/inventory-item-images-navigation";
 import { setItemActiveStatus } from "./_components/set-item-active-status.api";
 import { ProductSelectDialog } from "../../components/shared/product-select/ProductSelectDialog";
 import { ImportInventoryDialog } from "./_components/import/ImportInventoryDialog";
@@ -29,6 +34,7 @@ interface PendingStatusChange {
 }
 
 export function InventoryItemsPage() {
+  const navigate = useNavigate();
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [exportSelectOpen, setExportSelectOpen] = useState(false);
   // Confirmation is not optional here: the grid re-selects the first row
@@ -113,6 +119,16 @@ export function InventoryItemsPage() {
                 id: "inventory-utilities-deactivate",
                 label: "Ngừng kinh doanh",
                 onSelect: askStatusChange(false),
+              },
+              {
+                id: "inventory-utilities-update-images",
+                label: "Cập nhật ảnh",
+                onSelect: () => navigateToInventoryItemImages(navigate),
+              },
+              {
+                id: "inventory-utilities-quick-update-images",
+                label: "Cập nhật ảnh nhanh",
+                onSelect: () => navigateToQuickImageUpdate(navigate),
               },
             ]
           : undefined,

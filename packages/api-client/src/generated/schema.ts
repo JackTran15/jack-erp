@@ -2094,6 +2094,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/items/set-images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InventoryLocationController_setItemImages"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/items/by-product/{productId}": {
         parameters: {
             query?: never;
@@ -2537,6 +2553,40 @@ export interface paths {
         put?: never;
         /** Product-grouped inventory item search (server-side filters) */
         post: operations["InventoryItemV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory-items/images/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Product-grouped search by image status, category subtree and keyword (Update images page) */
+        post: operations["InventoryItemV2Controller_searchImages_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory-items/resolve-image-names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Split dropped image file names into code + sequence and resolve each to its product/item owner (Quick image update page) */
+        post: operations["InventoryItemV2Controller_resolveImageNames_v2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -10861,6 +10911,42 @@ export interface components {
             /** @description Items deliberately left alone. A non-empty list is a normal outcome, not an error. */
             skipped: components["schemas"]["SetItemActiveStatusSkippedDto"][];
         };
+        SetItemImagesAssignmentDto: {
+            /**
+             * Format: uuid
+             * @description products.id of a grouped row or items.id of an ungrouped row.
+             */
+            id: string;
+            /** @description Full replacement image set, in display order. Ids not listed are detached; an empty list removes every image. */
+            imageIds: string[];
+        };
+        SetItemImagesDto: {
+            assignments: components["schemas"]["SetItemImagesAssignmentDto"][];
+        };
+        SetItemImagesUpdatedDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description Code of the product or item that was updated. */
+            code: string;
+            /** @description Number of images attached after the write. */
+            imageCount: number;
+        };
+        SetItemImagesFailedDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description Code of the owner, or null when the id matched nothing. */
+            code: string | null;
+            /**
+             * @description OWNER_NOT_FOUND — id is not a product or ungrouped item of this organization (variant ids count as not found); otherwise the MediaException code from syncOwner.
+             * @enum {string}
+             */
+            reason: "OWNER_NOT_FOUND" | "MEDIA_NOT_FOUND" | "MEDIA_STATE_CONFLICT" | "MEDIA_LIMIT_EXCEEDED";
+        };
+        SetItemImagesResponseDto: {
+            updated: components["schemas"]["SetItemImagesUpdatedDto"][];
+            /** @description Assignments left untouched. A non-empty list is a normal outcome, not an error. */
+            failed: components["schemas"]["SetItemImagesFailedDto"][];
+        };
         ItemLookupResultDto: {
             /** Format: uuid */
             itemId: string;
@@ -11084,6 +11170,75 @@ export interface components {
             total: number;
             page: number;
             limit: number;
+        };
+        ProductImageSearchDto: {
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            limit: number;
+            /**
+             * @description MISSING = no ATTACHED image, PRESENT = at least one, ALL = no predicate.
+             * @default MISSING
+             * @enum {string}
+             */
+            imageStatus: "ALL" | "MISSING" | "PRESENT";
+            /**
+             * Format: uuid
+             * @description Item category id; descendants are included (A-06).
+             */
+            categoryId?: string | null;
+            /** @description Case-insensitive "contains" on group code, group name and variant code (A-17). */
+            keyword?: string;
+        };
+        ProductImageRowDto: {
+            /** @enum {string} */
+            type: "product" | "orphan";
+            id: string;
+            code: string;
+            name: string;
+            /** @description Category of the group (MIN over variants) */
+            categoryName: string | null;
+            /** @description Number of ATTACHED images on the group */
+            imageCount: number;
+            /** @description Public URL of the first image, if any */
+            thumbnailUrl: string | null;
+        };
+        ProductImageSearchResponseDto: {
+            data: components["schemas"]["ProductImageRowDto"][];
+            total: number;
+            page: number;
+            limit: number;
+        };
+        ResolveImageNamesDto: {
+            /** @description File names, with or without an image extension */
+            names: string[];
+        };
+        ResolvedImageNameDto: {
+            /** @description The name exactly as sent */
+            name: string;
+            /** @description Code part of the name (extension and `(NN)` removed); empty when nothing is left */
+            code: string;
+            /** @description The `NN` of a `(NN)` suffix, or null */
+            seq: number | null;
+            /**
+             * @description What the code matched in the organization: a product code, an orphan item code, or a variant code (attached to the parent product)
+             * @enum {string|null}
+             */
+            match: "product" | "orphan" | "variant" | null;
+            /** @description Id to send to set-images; for a variant this is the parent product id */
+            ownerId: string | null;
+            /** @description Code of the owner (parent product for a variant) */
+            ownerCode: string | null;
+            /** @description Name of the owner (parent product for a variant) */
+            ownerName: string | null;
+            /**
+             * @description SEQ_OUT_OF_RANGE: `(NN)` outside 1..10; DUPLICATE_SEQ: an earlier name in this call already used the same owner and sequence
+             * @enum {string|null}
+             */
+            error: "SEQ_OUT_OF_RANGE" | "DUPLICATE_SEQ" | null;
+        };
+        ResolveImageNamesResponseDto: {
+            data: components["schemas"]["ResolvedImageNameDto"][];
         };
         ResolveItemLocationsDto: {
             /** @description Variant item ids to resolve a location for */
@@ -21622,6 +21777,29 @@ export interface operations {
             };
         };
     };
+    InventoryLocationController_setItemImages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetItemImagesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetItemImagesResponseDto"];
+                };
+            };
+        };
+    };
     InventoryLocationController_getRepresentativeItemForProduct: {
         parameters: {
             query?: never;
@@ -22538,6 +22716,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InventoryItemSearchV2ResponseDto"];
+                };
+            };
+        };
+    };
+    InventoryItemV2Controller_searchImages_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductImageSearchDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductImageSearchResponseDto"];
+                };
+            };
+        };
+    };
+    InventoryItemV2Controller_resolveImageNames_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveImageNamesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolveImageNamesResponseDto"];
                 };
             };
         };

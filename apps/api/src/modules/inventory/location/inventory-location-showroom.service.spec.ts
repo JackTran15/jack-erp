@@ -215,6 +215,7 @@ describe('InventoryLocationController.listShowrooms — activeOnly coercion', ()
       {} as never, // itemProviderService
       {} as never, // itemBarcodeService
       {} as never, // itemThresholdService
+      {} as never, // itemImagesService
     );
   });
 

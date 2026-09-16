@@ -35,6 +35,7 @@ import { InventoryLocationService } from './inventory-location.service';
 import { ItemProviderService } from './item-provider.service';
 import { ItemBarcodeService } from './item-barcode.service';
 import { ItemStockThresholdService } from './item-stock-threshold.service';
+import { ItemImagesService } from './item-images.service';
 import { InventoryLocationController } from './inventory-location.controller';
 import { InventoryLocationStockController } from './inventory-location-stock.controller';
 import { InventoryLocationStockService } from './inventory-location-stock.service';
@@ -46,6 +47,8 @@ import { ResolveItemLocationsController } from './controllers/resolve-item-locat
 import { ItemCategoryTreeController } from './controllers/item-category-tree.controller';
 import { ProductGroupSearchController } from './controllers/product-group-search.controller';
 import { SearchInventoryItemsV2Handler } from './queries/search-inventory-items-v2.handler';
+import { SearchProductImagesHandler } from './queries/search-product-images.handler';
+import { ResolveImageNamesHandler } from './queries/resolve-image-names.handler';
 import { SearchLocationsV2Handler } from './queries/search-locations-v2.handler';
 import { ResolveItemLocationsHandler } from './queries/resolve-item-locations.handler';
 import { SearchItemCategoryTreeHandler } from './queries/search-item-category-tree.handler';
@@ -134,6 +137,8 @@ import { BrandEntity } from "./brand.entity";
     InventoryLocationService,
     InventoryLocationStockService,
     SearchInventoryItemsV2Handler,
+    SearchProductImagesHandler,
+    ResolveImageNamesHandler,
     SearchLocationsV2Handler,
     ResolveItemLocationsHandler,
     SearchItemCategoryTreeHandler,
@@ -144,6 +149,7 @@ import { BrandEntity } from "./brand.entity";
     ItemProviderService,
     ItemBarcodeService,
     ItemStockThresholdService,
+    ItemImagesService,
     InventoryItemCrudService,
     InventoryItemCategoryCrudService,
     InventoryStorageCrudService,

@@ -30,6 +30,7 @@ import { SetStockThresholdDto } from './dto/set-stock-threshold.dto';
 import { ProductGroupsQueryDto, ProductItemsQueryDto } from './dto/product-group-query.dto';
 import { ItemLookupResultDto } from './dto/item-lookup.dto';
 import { InventoryItemCrudService } from './item-crud.service';
+import { ItemImagesService } from './item-images.service';
 import {
   CreateItemDto,
   UpdateItemDto,
@@ -45,6 +46,8 @@ import {
   UnassignStorageManagerDto,
   SetItemActiveStatusDto,
   SetItemActiveStatusResponseDto,
+  SetItemImagesDto,
+  SetItemImagesResponseDto,
 } from './dto';
 
 @Controller('inventory')
@@ -57,6 +60,7 @@ export class InventoryLocationController {
     private readonly itemProviderService: ItemProviderService,
     private readonly itemBarcodeService: ItemBarcodeService,
     private readonly itemThresholdService: ItemStockThresholdService,
+    private readonly itemImagesService: ItemImagesService,
   ) {}
 
   // ─── Items (org-scoped, no branch required) ───────────────────────
@@ -79,6 +83,18 @@ export class InventoryLocationController {
     @Actor() actor: ActorContext,
   ): Promise<SetItemActiveStatusResponseDto> {
     return this.itemCrudService.setActiveStatus(dto.ids, dto.isActive, actor);
+  }
+
+  // Same reason as above: literal segment, so it must precede `items/:id`.
+  @Post('items/set-images')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission('inventory.write')
+  @ApiOkResponse({ type: SetItemImagesResponseDto })
+  setItemImages(
+    @Body() dto: SetItemImagesDto,
+    @Actor() actor: ActorContext,
+  ): Promise<SetItemImagesResponseDto> {
+    return this.itemImagesService.setImages(dto.assignments, actor);
   }
 
   @Get('items')

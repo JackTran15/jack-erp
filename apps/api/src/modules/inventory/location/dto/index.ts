@@ -14,3 +14,10 @@ export {
   SetItemActiveStatusResponseDto,
   SetItemActiveStatusSkippedDto,
 } from './set-item-active-status.dto';
+export {
+  SetItemImagesDto,
+  SetItemImagesAssignmentDto,
+  SetItemImagesResponseDto,
+  SetItemImagesUpdatedDto,
+  SetItemImagesFailedDto,
+} from './set-item-images.dto';

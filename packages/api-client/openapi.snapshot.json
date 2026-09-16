@@ -6102,6 +6102,37 @@
         ]
       }
     },
+    "/inventory/items/set-images": {
+      "post": {
+        "operationId": "InventoryLocationController_setItemImages",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetItemImagesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetItemImagesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "InventoryLocation"
+        ]
+      }
+    },
     "/inventory/items/by-product/{productId}": {
       "get": {
         "operationId": "InventoryLocationController_getRepresentativeItemForProduct",
@@ -7479,6 +7510,70 @@
           }
         },
         "summary": "Product-grouped inventory item search (server-side filters)",
+        "tags": [
+          "InventoryItemV2"
+        ]
+      }
+    },
+    "/v2/inventory-items/images/search": {
+      "post": {
+        "operationId": "InventoryItemV2Controller_searchImages_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductImageSearchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductImageSearchResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Product-grouped search by image status, category subtree and keyword (Update images page)",
+        "tags": [
+          "InventoryItemV2"
+        ]
+      }
+    },
+    "/v2/inventory-items/resolve-image-names": {
+      "post": {
+        "operationId": "InventoryItemV2Controller_resolveImageNames_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveImageNamesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveImageNamesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Split dropped image file names into code + sequence and resolve each to its product/item owner (Quick image update page)",
         "tags": [
           "InventoryItemV2"
         ]
@@ -32875,6 +32970,118 @@
           "skipped"
         ]
       },
+      "SetItemImagesAssignmentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "products.id of a grouped row or items.id of an ungrouped row."
+          },
+          "imageIds": {
+            "maxItems": 10,
+            "description": "Full replacement image set, in display order. Ids not listed are detached; an empty list removes every image.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "imageIds"
+        ]
+      },
+      "SetItemImagesDto": {
+        "type": "object",
+        "properties": {
+          "assignments": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SetItemImagesAssignmentDto"
+            }
+          }
+        },
+        "required": [
+          "assignments"
+        ]
+      },
+      "SetItemImagesUpdatedDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Code of the product or item that was updated."
+          },
+          "imageCount": {
+            "type": "number",
+            "description": "Number of images attached after the write."
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "imageCount"
+        ]
+      },
+      "SetItemImagesFailedDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true,
+            "description": "Code of the owner, or null when the id matched nothing."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "OWNER_NOT_FOUND",
+              "MEDIA_NOT_FOUND",
+              "MEDIA_STATE_CONFLICT",
+              "MEDIA_LIMIT_EXCEEDED"
+            ],
+            "description": "OWNER_NOT_FOUND — id is not a product or ungrouped item of this organization (variant ids count as not found); otherwise the MediaException code from syncOwner."
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "reason"
+        ]
+      },
+      "SetItemImagesResponseDto": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SetItemImagesUpdatedDto"
+            }
+          },
+          "failed": {
+            "description": "Assignments left untouched. A non-empty list is a normal outcome, not an error.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SetItemImagesFailedDto"
+            }
+          }
+        },
+        "required": [
+          "updated",
+          "failed"
+        ]
+      },
       "ItemLookupResultDto": {
         "type": "object",
         "properties": {
@@ -33597,6 +33804,207 @@
           "total",
           "page",
           "limit"
+        ]
+      },
+      "ProductImageSearchDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "imageStatus": {
+            "description": "MISSING = no ATTACHED image, PRESENT = at least one, ALL = no predicate.",
+            "default": "MISSING",
+            "enum": [
+              "ALL",
+              "MISSING",
+              "PRESENT"
+            ],
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Item category id; descendants are included (A-06).",
+            "format": "uuid"
+          },
+          "keyword": {
+            "type": "string",
+            "description": "Case-insensitive \"contains\" on group code, group name and variant code (A-17).",
+            "maxLength": 200
+          }
+        }
+      },
+      "ProductImageRowDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "product",
+              "orphan"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "categoryName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Category of the group (MIN over variants)"
+          },
+          "imageCount": {
+            "type": "number",
+            "description": "Number of ATTACHED images on the group"
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Public URL of the first image, if any"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "code",
+          "name",
+          "categoryName",
+          "imageCount",
+          "thumbnailUrl"
+        ]
+      },
+      "ProductImageSearchResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductImageRowDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
+      "ResolveImageNamesDto": {
+        "type": "object",
+        "properties": {
+          "names": {
+            "minItems": 1,
+            "maxItems": 500,
+            "description": "File names, with or without an image extension",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 255
+            }
+          }
+        },
+        "required": [
+          "names"
+        ]
+      },
+      "ResolvedImageNameDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name exactly as sent"
+          },
+          "code": {
+            "type": "string",
+            "description": "Code part of the name (extension and `(NN)` removed); empty when nothing is left"
+          },
+          "seq": {
+            "type": "number",
+            "nullable": true,
+            "description": "The `NN` of a `(NN)` suffix, or null"
+          },
+          "match": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "product",
+              "orphan",
+              "variant"
+            ],
+            "description": "What the code matched in the organization: a product code, an orphan item code, or a variant code (attached to the parent product)"
+          },
+          "ownerId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Id to send to set-images; for a variant this is the parent product id"
+          },
+          "ownerCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Code of the owner (parent product for a variant)"
+          },
+          "ownerName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Name of the owner (parent product for a variant)"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "SEQ_OUT_OF_RANGE",
+              "DUPLICATE_SEQ"
+            ],
+            "description": "SEQ_OUT_OF_RANGE: `(NN)` outside 1..10; DUPLICATE_SEQ: an earlier name in this call already used the same owner and sequence"
+          }
+        },
+        "required": [
+          "name",
+          "code",
+          "seq",
+          "match",
+          "ownerId",
+          "ownerCode",
+          "ownerName",
+          "error"
+        ]
+      },
+      "ResolveImageNamesResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResolvedImageNameDto"
+            }
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "ResolveItemLocationsDto": {

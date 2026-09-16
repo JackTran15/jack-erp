@@ -42,6 +42,8 @@ import { InventoryManagementPage } from "./pages/inventory/InventoryManagementPa
 import { InventoryItemsPage } from "./pages/inventory/InventoryItemsPage";
 import { ItemCategoriesPage } from "./pages/inventory/ItemCategoriesPage";
 import { InventoryItemBarcodesPage } from "./pages/inventory-item-barcodes/InventoryItemBarcodesPage";
+import { InventoryItemImagesPage } from "./pages/inventory-item-images/InventoryItemImagesPage";
+import { QuickImageUpdatePage } from "./pages/inventory-item-images/QuickImageUpdatePage";
 import { InventoryStoragesPage } from "./pages/inventory/InventoryStoragesPage";
 import { ItemLocationDetailsPage } from "./pages/item-location-details/ItemLocationDetailsPage";
 import { StockTakesPage } from "./pages/stock-takes/StockTakesPage";
@@ -117,6 +119,14 @@ export function App() {
                 <Route
                   path="/admin/inventory-items"
                   element={<InventoryItemsPage />}
+                />
+                <Route
+                  path="/admin/inventory-items/images"
+                  element={<InventoryItemImagesPage />}
+                />
+                <Route
+                  path="/admin/inventory-items/images/quick"
+                  element={<QuickImageUpdatePage />}
                 />
                 <Route
                   path="/admin/inventory-item-categories"
