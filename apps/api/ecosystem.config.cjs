@@ -72,6 +72,11 @@ module.exports = {
         MEDIA_S3_SECRET_KEY: process.env.MEDIA_S3_SECRET_KEY,
         MEDIA_BUCKET_PUBLIC: process.env.MEDIA_BUCKET_PUBLIC,
         MEDIA_BUCKET_PRIVATE: process.env.MEDIA_BUCKET_PRIVATE,
+        // Thư mục file activity log của app mobile (JSON lines, xoay theo ngày).
+        // Bỏ trống = `logs/activity` tương đối với `cwd` (apps/api).
+        ACTIVITY_LOG_DIR: process.env.ACTIVITY_LOG_DIR,
+        // Số ngày giữ file activity log; 0 = giữ mãi. Bỏ trống = 90.
+        ACTIVITY_LOG_RETENTION_DAYS: process.env.ACTIVITY_LOG_RETENTION_DAYS,
       },
     },
   ],
