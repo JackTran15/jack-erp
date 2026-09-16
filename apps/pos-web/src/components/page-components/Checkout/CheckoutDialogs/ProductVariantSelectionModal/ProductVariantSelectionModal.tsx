@@ -200,6 +200,7 @@ export function ProductVariantSelectionModal({
         <ProductHeaderInfo
           name={title}
           description={detail?.description ?? null}
+          imageUrl={detail?.imageUrl ?? null}
         />
 
         {detailQuery.isLoading ? (

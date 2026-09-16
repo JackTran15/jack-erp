@@ -1,3 +1,4 @@
+import { ProductImage } from "@erp/pos/components/page-components/Checkout/ProductImage/ProductImage";
 import { ShoppingBagIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { PriceBadge } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/ProductCatalogGrid/ProductCard/PriceBadge/PriceBadge";
 import { useCheckoutVariantSelection } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-variant-selection";
@@ -8,9 +9,10 @@ export interface ProductCardProps {
 }
 
 /**
- * Single product tile: square-ish image area with a placeholder bag icon,
- * price pill in the bottom-left corner, name underneath. Click → mở dialog
- * chọn biến thể của sản phẩm trước khi thêm vào hóa đơn.
+ * Single product tile: square-ish image area showing the product photo
+ * (placeholder bag icon when there is none or it fails to load), price pill
+ * in the bottom-left corner, name underneath. Click → mở dialog chọn biến thể
+ * của sản phẩm trước khi thêm vào hóa đơn.
  */
 export function ProductCard({ product }: ProductCardProps) {
   const { openForCatalogCard } = useCheckoutVariantSelection();
@@ -20,8 +22,16 @@ export function ProductCard({ product }: ProductCardProps) {
       onClick={() => openForCatalogCard(product)}
       className="group w-full flex h-[120px] flex-col overflow-hidden rounded-md border border-transparent bg-white text-left transition-all hover:border-indigo-500 hover:shadow-sm focus:outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500/30"
     >
-      <div className="relative flex flex-1 items-center justify-center bg-gray-300">
-        <ShoppingBagIcon size={36} className="text-gray-400" strokeWidth={1.25} />
+      <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-gray-300">
+        <ProductImage
+          key={product.imageUrl ?? "none"}
+          src={product.imageUrl}
+          alt={product.name}
+          className="absolute inset-0 h-full w-full object-cover"
+          fallback={
+            <ShoppingBagIcon size={36} className="text-gray-400" strokeWidth={1.25} />
+          }
+        />
         <span className="absolute bottom-1.5 left-1.5">
           <PriceBadge amount={product.price} />
         </span>
