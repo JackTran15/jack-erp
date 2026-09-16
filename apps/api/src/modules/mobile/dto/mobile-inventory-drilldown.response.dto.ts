@@ -33,6 +33,15 @@ export class MobileInventoryVariantResponseDto {
 
   @ApiProperty({ description: 'Số lượng xuất trong kỳ' })
   periodOut!: number;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'URL công khai của ảnh ĐẦU TIÊN — ảnh của mẫu mã cha (mọi biến thể dùng chung). ' +
+      'NULL khi không có ảnh hoặc kho ảnh chưa cấu hình.',
+  })
+  thumbnailUrl!: string | null;
 }
 
 /** Một loại bút toán trong một chiều của luồng — khớp `InventoryFlowLineEntity`. */

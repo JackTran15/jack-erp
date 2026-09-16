@@ -42,3 +42,6 @@ graphify-out
 
 # macOS
 .DS_Store
+
+# Activity log của app mobile (MobileActivityLogWriter)
+apps/api/logs/

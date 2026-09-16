@@ -23,6 +23,7 @@ import { GoodsReceiptEntity } from '../inventory/goods-receipt/goods-receipt.ent
 import { InventoryLocationModule } from '../inventory/location/inventory-location.module';
 import { ProviderEntity } from '../inventory/location/provider.entity';
 import { SupplierGroupEntity } from '../inventory/location/supplier-group.entity';
+import { MobileActivityController } from './controllers/mobile-activity.controller';
 import { MobileAuthController } from './controllers/mobile-auth.controller';
 import { MobileBranchController } from './controllers/mobile-branch.controller';
 import { MobileBusinessReportController } from './controllers/mobile-business-report.controller';
@@ -51,6 +52,8 @@ import { MobileSupplierController } from './controllers/mobile-supplier.controll
 import { MobileSupplierGroupController } from './controllers/mobile-supplier-group.controller';
 import { MobileTransferOrderController } from './controllers/mobile-transfer-order.controller';
 import { MobileUserController } from './controllers/mobile-user.controller';
+import { MobileActivityLogWriter } from './services/mobile-activity-log-writer';
+import { MobileActivityService } from './services/mobile-activity.service';
 import { MobileBranchService } from './services/mobile-branch.service';
 import { MobileBusinessReportService } from './services/mobile-business-report.service';
 import { MobileCashflowReportService } from './services/mobile-cashflow-report.service';
@@ -185,6 +188,7 @@ import { MobileSupplierGroupService } from './services/mobile-supplier-group.ser
     ]),
   ],
   controllers: [
+    MobileActivityController,
     MobileAuthController,
     MobileBranchController,
     MobileBusinessReportController,
@@ -215,6 +219,8 @@ import { MobileSupplierGroupService } from './services/mobile-supplier-group.ser
     MobileTransferOrderController,
   ],
   providers: [
+    MobileActivityService,
+    MobileActivityLogWriter,
     MobileBranchService,
     MobileBusinessReportService,
     MobileSupplierService,

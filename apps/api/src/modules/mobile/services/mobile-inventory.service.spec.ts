@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { BranchService } from '../../branch/branch.service';
+import { MediaQueryService } from '../../media/media-query.service';
 import {
   MobileInventoryKind,
   MobileInventoryLevel,
@@ -33,6 +34,7 @@ describe('MobileInventoryService', () => {
   let service: MobileInventoryService;
   let query: jest.Mock;
   let listMyBranches: jest.Mock;
+  let resolvePublicUrls: jest.Mock;
 
   const stubRows = [
     {
@@ -43,12 +45,14 @@ describe('MobileInventoryService', () => {
       quantity: 36,
       stockValue: 12600000,
       groupId: 'g-1',
+      imageOwnerId: 'p-1',
     },
   ];
   const stubTotals = [{ total: 7, totalQuantity: 40, totalValue: 13000000 }];
 
   beforeEach(async () => {
     query = jest.fn();
+    resolvePublicUrls = jest.fn().mockResolvedValue(new Map());
     listMyBranches = jest.fn().mockResolvedValue([
       { id: BRANCH_A, name: 'Main Branch' },
       { id: BRANCH_B, name: 'Cà Mau' },
@@ -59,6 +63,7 @@ describe('MobileInventoryService', () => {
         MobileInventoryService,
         { provide: getDataSourceToken(), useValue: { query } },
         { provide: BranchService, useValue: { listMyBranches } },
+        { provide: MediaQueryService, useValue: { resolvePublicUrls } },
       ],
     }).compile();
 
@@ -181,7 +186,7 @@ describe('MobileInventoryService', () => {
 
       query.mockReset();
       await run({ level: MobileInventoryLevel.VARIANT });
-      expect(dataSql()).toContain('GROUP BY i.id, i.code, i.name, i.unit, i.category_id');
+      expect(dataSql()).toContain('GROUP BY i.id, i.product_id, i.code, i.name, i.unit, i.category_id');
     });
 
     it('status lọc trên tổng đã gộp; `all` không thêm mệnh đề', async () => {
@@ -237,8 +242,10 @@ describe('MobileInventoryService', () => {
     it('trả envelope {data,total,page,limit,totalQuantity,totalValue}', async () => {
       const result = await run({ page: 2, limit: 5 });
 
+      // `imageOwnerId` là cột nội bộ — không lọt ra response.
+      const { imageOwnerId: _owner, ...publicRow } = stubRows[0];
       expect(result).toEqual({
-        data: stubRows,
+        data: [{ ...publicRow, thumbnailUrl: null }],
         total: 7,
         page: 2,
         limit: 5,
@@ -250,8 +257,41 @@ describe('MobileInventoryService', () => {
     it('KHÔNG SELECT giá vốn hay cột nào ngoài hợp đồng', async () => {
       await run();
 
-      expect(dataSql()).toContain('SELECT id, code, name, unit, quantity, "stockValue", "groupId"');
+      expect(dataSql()).toContain('SELECT id, code, name, unit, quantity, "stockValue", "groupId", "imageOwnerId"');
       expect(dataSql()).not.toContain('purchase_price');
+    });
+  });
+
+  describe('listProducts — thumbnailUrl', () => {
+    const img = (url: string) => ({ id: url, url, fileName: 'a.png' });
+
+    it('biến thể tra ảnh theo mẫu mã cha; tra MỘT lần cho cả trang, chủ sở hữu không lặp', async () => {
+      query
+        .mockResolvedValueOnce([
+          { ...stubRows[0], id: 'v-1', imageOwnerId: 'p-1' },
+          { ...stubRows[0], id: 'v-2', imageOwnerId: 'p-1' },
+          { ...stubRows[0], id: 'solo', imageOwnerId: 'solo' },
+        ])
+        .mockResolvedValueOnce(stubTotals);
+      resolvePublicUrls.mockResolvedValue(
+        new Map([
+          ['p-1', [img('https://cdn/p1-a.png'), img('https://cdn/p1-b.png')]],
+        ]),
+      );
+
+      const { data } = await service.listProducts(
+        { ...baseProductQuery, level: MobileInventoryLevel.VARIANT },
+        actor,
+      );
+
+      expect(data.map((row) => row.thumbnailUrl)).toEqual([
+        'https://cdn/p1-a.png',
+        'https://cdn/p1-a.png',
+        null,
+      ]);
+      expect(resolvePublicUrls).toHaveBeenCalledTimes(1);
+      expect(resolvePublicUrls).toHaveBeenCalledWith(['p-1', 'solo'], 'org-1');
+      expect(query.mock.calls[0][0]).toContain('COALESCE(i.product_id, i.id)::text AS "imageOwnerId"');
     });
   });
 

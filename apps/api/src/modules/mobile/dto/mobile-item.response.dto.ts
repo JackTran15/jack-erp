@@ -9,12 +9,13 @@ import { ApiProperty } from '@nestjs/swagger';
  * ngoại cứng — lấy id bên kia là vi phạm FK, và vi phạm KHÔNG ĐỀU: mặt hàng
  * không có mẫu mã cha thì id lại tình cờ đúng.
  *
- * Năm trường, đúng bộ mà một dòng hàng cần:
+ * Các trường, đúng bộ mà một dòng hàng cần:
  *
  * - [id] -> `lines[].itemId`
  * - [unit] -> `lines[].uomCode` (server tự lấy, app không gửi)
  * - [purchasePrice] -> giá gợi ý điền sẵn vào ô đơn giá
  * - [code], [name] -> hai dòng chữ trên màn chọn
+ * - [thumbnailUrl] -> ảnh nhỏ đầu dòng
  *
  * `ItemEntity` gốc có ~35 cột (cân nặng, kích thước đóng gói, năm sản xuất,
  * chất liệu…). Không map tường minh là đẩy trọn chúng xuống máy người dùng.
@@ -47,6 +48,15 @@ export class MobileItemResponseDto {
       'người lập phiếu nhập buộc phải thấy và sửa được giá nhập.',
   })
   purchasePrice!: number;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'URL công khai của ảnh ĐẦU TIÊN. Biến thể dùng ảnh của mẫu mã cha, mặt hàng lẻ dùng ảnh ' +
+      'của chính nó — cùng luật với POS. NULL khi không có ảnh hoặc kho ảnh chưa cấu hình.',
+  })
+  thumbnailUrl!: string | null;
 }
 
 export class MobileItemPageDto {

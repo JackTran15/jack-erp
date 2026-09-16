@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { escapeLikeTerm } from '../../../common/utils/like-escape.util';
 import { BranchService } from '../../branch/branch.service';
+import { MediaQueryService } from '../../media/media-query.service';
 import {
   documentNumberSql,
   REFERENCE_TYPE_LABELS,
@@ -127,6 +128,7 @@ export class MobileInventoryDrilldownService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly branches: BranchService,
+    private readonly mediaQuery: MediaQueryService,
   ) {}
 
   /**
@@ -161,6 +163,7 @@ export class MobileInventoryDrilldownService {
         i.code,
         i.name,
         i.unit,
+        COALESCE(i.product_id, i.id)::text         AS "imageOwnerId",
         COALESCE(SUM(c.qty), 0)::float             AS quantity,
         COALESCE(SUM(c.value), 0)::float           AS "stockValue",
         COALESCE(SUM(c.opening_qty), 0)::float     AS "openingQuantity",
@@ -171,14 +174,24 @@ export class MobileInventoryDrilldownService {
       WHERE i.organization_id = $1
         AND i.id = ANY(${itemIdsParam}::uuid[])
         AND i.is_active = true
-      GROUP BY i.id, i.code, i.name, i.unit
+      GROUP BY i.id, i.product_id, i.code, i.name, i.unit
       ORDER BY lower(i.code) ASC, i.id ASC
     `;
 
-    return this.dataSource.query<MobileInventoryVariantResponseDto[]>(
-      sql,
-      params,
+    const rows = await this.dataSource.query<
+      (Omit<MobileInventoryVariantResponseDto, 'thumbnailUrl'> & { imageOwnerId: string })[]
+    >(sql, params);
+
+    // Mọi biến thể chung ảnh của mẫu mã cha (A-08) — tra MỘT lần. Hàng lẻ
+    // (`:id` là item không có mẫu mã) dùng ảnh của chính nó.
+    const imagesByOwner = await this.mediaQuery.resolvePublicUrls(
+      [...new Set(rows.map((row) => row.imageOwnerId))],
+      actor.organizationId,
     );
+    return rows.map(({ imageOwnerId, ...row }) => ({
+      ...row,
+      thumbnailUrl: imagesByOwner.get(imageOwnerId)?.[0]?.url ?? null,
+    }));
   }
 
   /**
