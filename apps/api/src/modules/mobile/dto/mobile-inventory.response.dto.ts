@@ -39,6 +39,15 @@ export class MobileInventoryProductResponseDto {
     description: 'Nhóm hàng của item (mẫu mã: của item đại diện). NULL = chưa xếp nhóm.',
   })
   groupId!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'URL công khai của ảnh ĐẦU TIÊN. Biến thể dùng ảnh của mẫu mã cha. NULL khi không có ảnh ' +
+      'hoặc kho ảnh chưa cấu hình.',
+  })
+  thumbnailUrl!: string | null;
 }
 
 /**

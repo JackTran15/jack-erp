@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { escapeLikeTerm } from '../../../common/utils/like-escape.util';
 import { ItemEntity } from '../../inventory/location/item.entity';
+import { MediaQueryService } from '../../media/media-query.service';
 import {
   MobileItemPageDto,
   MobileItemResponseDto,
@@ -27,6 +28,7 @@ export class MobileItemService {
   constructor(
     @InjectRepository(ItemEntity)
     private readonly items: Repository<ItemEntity>,
+    private readonly mediaQuery: MediaQueryService,
   ) {}
 
   async list(
@@ -62,16 +64,31 @@ export class MobileItemService {
 
     const [rows, total] = await qb.getManyAndCount();
 
-    return { data: rows.map(toMobileItem), total, page, limit };
+    // Ảnh tra MỘT lần cho cả trang. Biến thể không có ảnh riêng — ảnh gắn vào
+    // mẫu mã cha (`product_id`); mặt hàng lẻ gắn ảnh vào chính nó. Cùng luật
+    // với `PosCatalogProductService` (A-08 / A-25).
+    const imagesByOwner = await this.mediaQuery.resolvePublicUrls(
+      [...new Set(rows.map(imageOwnerOf))],
+      actor.organizationId,
+    );
+    const data = rows.map((row) =>
+      toMobileItem(row, imagesByOwner.get(imageOwnerOf(row))?.[0]?.url ?? null),
+    );
+
+    return { data, total, page, limit };
   }
 }
 
+function imageOwnerOf(row: ItemEntity): string {
+  return row.productId ?? row.id;
+}
+
 /**
- * Chép TƯỜNG MINH năm trường — cùng lý do ở mọi mapper khác của module này.
+ * Chép TƯỜNG MINH từng trường — cùng lý do ở mọi mapper khác của module này.
  * `ItemEntity` có ~35 cột, và spread rồi xoá bớt sẽ lặng lẽ rò mọi cột thêm
  * sau này.
  */
-function toMobileItem(row: ItemEntity): MobileItemResponseDto {
+function toMobileItem(row: ItemEntity, thumbnailUrl: string | null): MobileItemResponseDto {
   return {
     id: row.id,
     code: row.code,
@@ -81,5 +98,6 @@ function toMobileItem(row: ItemEntity): MobileItemResponseDto {
     // Cột `decimal` của Postgres về Node dưới dạng chuỗi; ép một lần ở đây thay
     // vì để client tự parse.
     purchasePrice: Number(row.purchasePrice) || 0,
+    thumbnailUrl,
   };
 }

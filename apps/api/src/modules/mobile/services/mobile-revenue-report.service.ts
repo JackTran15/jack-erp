@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
+import { MediaQueryService } from '../../media/media-query.service';
 import { MobileRevenueTimeUnit } from '../dto/mobile-revenue-report.query.dto';
 import {
   MobileRevenueBranchDto,
@@ -45,6 +46,9 @@ interface ResolvedScope {
   branchesParam: string;
 }
 
+/** Dòng mặt hàng trước khi gắn ảnh. */
+type ItemRow = Omit<MobileRevenueItemDto, 'thumbnailUrl'>;
+
 interface TotalsRow {
   total: number;
   totalQuantity: number;
@@ -82,7 +86,10 @@ const sumOf = (values: number[]): number =>
  */
 @Injectable()
 export class MobileRevenueReportService {
-  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly mediaQuery: MediaQueryService,
+  ) {}
 
   /** Trang 1: mặt hàng (mẫu mã) có phát sinh trong kỳ, doanh thu giảm dần, kèm hai tổng toàn tập. */
   async listItems(
@@ -133,14 +140,14 @@ export class MobileRevenueReportService {
       FROM (SELECT ${SUBJECT_ROW_SQL} FROM lines ${searchWhere} ${SUBJECT_GROUP_BY_SQL}) t
     `;
 
-    const [data, totalsRows] = await Promise.all([
-      this.dataSource.query<MobileRevenueItemDto[]>(dataSql, scope.params),
+    const [rows, totalsRows] = await Promise.all([
+      this.dataSource.query<ItemRow[]>(dataSql, scope.params),
       this.dataSource.query<TotalsRow[]>(totalsSql, totalsParams),
     ]);
     const totals = totalsRows[0];
 
     return {
-      data: data.map(roundItem),
+      data: await this.withThumbnails(rows.map(roundItem), actor.organizationId),
       total: totals?.total ?? 0,
       page,
       limit,
@@ -305,13 +312,32 @@ export class MobileRevenueReportService {
       ${SUBJECT_ORDER_BY_SQL}
     `;
 
-    const rows = await this.dataSource.query<MobileRevenueItemDto[]>(sql, scope.params);
-    const data = rows.map(roundItem);
+    const rows = await this.dataSource.query<ItemRow[]>(sql, scope.params);
+    const data = await this.withThumbnails(rows.map(roundItem), actor.organizationId);
 
     return {
       category: { ...header, revenue: sumOf(data.map((r) => r.revenue)) },
       data,
     };
+  }
+
+  /**
+   * Gắn ảnh bìa, tra MỘT lần cho cả tập — cùng khuôn `MobileProductService.list`.
+   * `id` của dòng LÀ chủ sở hữu ảnh: mẫu mã, hoặc item lẻ khi item không thuộc
+   * mẫu mã. Kho ảnh chưa cấu hình thì Map rỗng, mọi dòng ra `null`.
+   */
+  private async withThumbnails(
+    rows: ItemRow[],
+    organizationId: string,
+  ): Promise<MobileRevenueItemDto[]> {
+    const imagesByOwner = await this.mediaQuery.resolvePublicUrls(
+      rows.map((row) => row.id),
+      organizationId,
+    );
+    return rows.map((row) => ({
+      ...row,
+      thumbnailUrl: imagesByOwner.get(row.id)?.[0]?.url ?? null,
+    }));
   }
 
   /**
@@ -356,7 +382,7 @@ export class MobileRevenueReportService {
     organizationId: string,
   ): Promise<Omit<MobileRevenueItemDto, 'quantity' | 'revenue'>> {
     const rows = await this.dataSource.query<
-      Omit<MobileRevenueItemDto, 'quantity' | 'revenue'>[]
+      Omit<MobileRevenueItemDto, 'quantity' | 'revenue' | 'thumbnailUrl'>[]
     >(
       `SELECT p.id::text AS id, COALESCE(p.code, '') AS code, p.name,
               COALESCE((SELECT it.unit FROM items it
@@ -373,7 +399,10 @@ export class MobileRevenueReportService {
     );
     const row = rows[0];
     if (!row) throw new NotFoundException('Không tìm thấy hàng hoá.');
-    return row;
+
+    // Header cùng hình dạng một dòng của trang 1, nên cũng mang ảnh bìa.
+    const images = await this.mediaQuery.resolvePublicUrls([row.id], organizationId);
+    return { ...row, thumbnailUrl: images.get(row.id)?.[0]?.url ?? null };
   }
 
   private async resolveCategoryHeader(
@@ -393,7 +422,7 @@ export class MobileRevenueReportService {
   }
 }
 
-const roundItem = (r: MobileRevenueItemDto): MobileRevenueItemDto => ({
+const roundItem = (r: ItemRow): ItemRow => ({
   ...r,
   quantity: round2(r.quantity),
   revenue: round2(r.revenue),

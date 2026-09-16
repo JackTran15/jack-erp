@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { escapeLikeTerm } from '../../../common/utils/like-escape.util';
 import { BranchService } from '../../branch/branch.service';
+import { MediaQueryService } from '../../media/media-query.service';
 import {
   MobileInventoryKind,
   MobileInventoryLevel,
@@ -18,6 +19,11 @@ import {
 import { cellsSql, monthStartOf, todayIso } from './mobile-inventory-ledger.sql';
 import { resolveBranchIds } from './mobile-inventory-scope.util';
 import { StorageRow, toStoreCards } from './mobile-inventory-store-card.util';
+
+/** Dòng SQL trước khi gắn ảnh — `imageOwnerId` chỉ dùng nội bộ, không trả về. */
+type InventoryProductRow = Omit<MobileInventoryProductResponseDto, 'thumbnailUrl'> & {
+  imageOwnerId: string;
+};
 
 interface TotalsRow {
   total: number;
@@ -61,6 +67,8 @@ const LEVEL_SQL: Record<
   MobileInventoryLevel,
   {
     key: string;
+    /** Chủ sở hữu ảnh: biến thể dùng ảnh của mẫu mã cha, hàng lẻ dùng ảnh của chính nó. */
+    imageOwner: string;
     code: string;
     name: string;
     unit: string;
@@ -70,6 +78,7 @@ const LEVEL_SQL: Record<
 > = {
   [MobileInventoryLevel.PRODUCT]: {
     key: 'COALESCE(i.product_id, i.id)::text',
+    imageOwner: 'COALESCE(i.product_id, i.id)::text',
     code: 'COALESCE(p.code, p.name, MIN(i.code))',
     name: 'COALESCE(p.name, MIN(i.name))',
     unit: "COALESCE(MIN(i.unit), '')",
@@ -78,11 +87,12 @@ const LEVEL_SQL: Record<
   },
   [MobileInventoryLevel.VARIANT]: {
     key: 'i.id::text',
+    imageOwner: 'COALESCE(i.product_id, i.id)::text',
     code: 'i.code',
     name: 'i.name',
     unit: 'i.unit',
     groupId: 'i.category_id::text',
-    groupBy: 'i.id, i.code, i.name, i.unit, i.category_id',
+    groupBy: 'i.id, i.product_id, i.code, i.name, i.unit, i.category_id',
   },
 };
 
@@ -132,6 +142,7 @@ export class MobileInventoryService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly branches: BranchService,
+    private readonly mediaQuery: MediaQueryService,
   ) {}
 
   async listProducts(
@@ -203,6 +214,7 @@ export class MobileInventoryService {
       lines AS (
         SELECT
           ${shape.key}    AS id,
+          ${shape.imageOwner} AS "imageOwnerId",
           ${shape.code}   AS code,
           ${shape.name}   AS name,
           ${shape.unit}   AS unit,
@@ -226,7 +238,7 @@ export class MobileInventoryService {
 
     const dataSql = `
       ${cte}
-      SELECT id, code, name, unit, quantity, "stockValue", "groupId"
+      SELECT id, code, name, unit, quantity, "stockValue", "groupId", "imageOwnerId"
       FROM lines
       ${lineWhereSql}
       ORDER BY ${ORDER_BY[sort]}
@@ -245,14 +257,23 @@ export class MobileInventoryService {
       ${lineWhereSql}
     `;
 
-    const [data, totalsRows] = await Promise.all([
-      this.dataSource.query<MobileInventoryProductResponseDto[]>(
-        dataSql,
-        params,
-      ),
+    const [rows, totalsRows] = await Promise.all([
+      this.dataSource.query<InventoryProductRow[]>(dataSql, params),
       this.dataSource.query<TotalsRow[]>(totalsSql, totalsParams),
     ]);
     const totals = totalsRows[0];
+
+    // Ảnh tra MỘT lần cho cả trang — cùng khuôn `MobileProductService.list`.
+    const imagesByOwner = await this.mediaQuery.resolvePublicUrls(
+      [...new Set(rows.map((row) => row.imageOwnerId))],
+      actor.organizationId,
+    );
+    const data: MobileInventoryProductResponseDto[] = rows.map(
+      ({ imageOwnerId, ...row }) => ({
+        ...row,
+        thumbnailUrl: imagesByOwner.get(imageOwnerId)?.[0]?.url ?? null,
+      }),
+    );
 
     return {
       data,

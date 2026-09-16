@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { BranchService } from '../../branch/branch.service';
+import { MediaQueryService } from '../../media/media-query.service';
 import {
   MobileInventoryKind,
   MobileInventoryLevel,
@@ -45,9 +46,11 @@ describe('MobileInventoryDrilldownService', () => {
   let main: MobileInventoryService;
   let query: jest.Mock;
   let listMyBranches: jest.Mock;
+  let resolvePublicUrls: jest.Mock;
 
   beforeEach(async () => {
     query = jest.fn();
+    resolvePublicUrls = jest.fn().mockResolvedValue(new Map());
     listMyBranches = jest.fn().mockResolvedValue([
       { id: BRANCH_A, name: 'Main Branch' },
       { id: BRANCH_B, name: 'Cà Mau' },
@@ -59,6 +62,7 @@ describe('MobileInventoryDrilldownService', () => {
         MobileInventoryService,
         { provide: getDataSourceToken(), useValue: { query } },
         { provide: BranchService, useValue: { listMyBranches } },
+        { provide: MediaQueryService, useValue: { resolvePublicUrls } },
       ],
     }).compile();
 
@@ -105,15 +109,17 @@ describe('MobileInventoryDrilldownService', () => {
 
   describe('listVariants', () => {
     const rows = [
-      { id: ITEMS[0].id, code: 'GELLI-39', name: 'Giày 39', unit: 'đôi', quantity: 11, stockValue: 3850000, openingQuantity: 6, periodIn: 5, periodOut: 0 },
+      { id: ITEMS[0].id, code: 'GELLI-39', name: 'Giày 39', unit: 'đôi', imageOwnerId: PRODUCT, quantity: 11, stockValue: 3850000, openingQuantity: 6, periodIn: 5, periodOut: 0 },
     ];
+    // `imageOwnerId` là cột nội bộ — response thay nó bằng `thumbnailUrl`.
+    const publicRows = rows.map(({ imageOwnerId: _owner, ...row }) => ({ ...row, thumbnailUrl: null }));
 
     it('LEFT JOIN cells trên MỌI item active của mẫu mã, sắp theo mã rồi id', async () => {
       query.mockResolvedValueOnce(ITEMS).mockResolvedValueOnce(rows);
 
       const result = await service.listVariants(PRODUCT, { ...ON_HAND, asOf: '2026-09-11' }, actor);
 
-      expect(result).toEqual(rows);
+      expect(result).toEqual(publicRows);
       const sql = sqlAt(1);
       expect(sql).toContain('FROM items i');
       expect(sql).toContain('LEFT JOIN cells c ON c.item_id = i.id');
@@ -123,6 +129,19 @@ describe('MobileInventoryDrilldownService', () => {
       expect(sql).toContain('sle.item_id = ANY($4::uuid[])');
       expect(sql).toContain('i.id = ANY($4::uuid[])');
       expect(paramsAt(1)).toEqual(['org-1', '2026-09-11', actor.branchIds, ITEMS.map((i) => i.id), '2026-09-01']);
+    });
+
+    it('mọi biến thể lấy ảnh ĐẦU TIÊN của mẫu mã cha, tra một lần', async () => {
+      query.mockResolvedValueOnce(ITEMS).mockResolvedValueOnce([rows[0], { ...rows[0], id: 'v-2' }]);
+      resolvePublicUrls.mockResolvedValue(
+        new Map([[PRODUCT, [{ id: 'm1', url: 'https://cdn/a.png', fileName: 'a.png' }]]]),
+      );
+
+      const result = await service.listVariants(PRODUCT, ON_HAND, actor);
+
+      expect(result.map((row) => row.thumbnailUrl)).toEqual(['https://cdn/a.png', 'https://cdn/a.png']);
+      expect(resolvePublicUrls).toHaveBeenCalledWith([PRODUCT], 'org-1');
+      expect(sqlAt(1)).toContain('COALESCE(i.product_id, i.id)::text         AS "imageOwnerId"');
     });
 
     it('có ba cột theo kỳ: opening_qty, period_in, period_out với $m = đầu tháng', async () => {

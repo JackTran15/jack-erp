@@ -2,6 +2,7 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
+import { MediaQueryService } from '../../media/media-query.service';
 import { MobileRevenueTimeUnit } from '../dto/mobile-revenue-report.query.dto';
 import { MobileRevenueReportService } from './mobile-revenue-report.service';
 import { revenueLinesSql } from './mobile-revenue-report.sql';
@@ -31,14 +32,17 @@ const range = { from: '2026-09-01', to: '2026-09-30' };
 describe('MobileRevenueReportService', () => {
   let service: MobileRevenueReportService;
   let query: jest.Mock;
+  let resolvePublicUrls: jest.Mock;
 
   beforeEach(async () => {
     query = jest.fn().mockResolvedValue([]);
+    resolvePublicUrls = jest.fn().mockResolvedValue(new Map());
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MobileRevenueReportService,
         { provide: getDataSourceToken(), useValue: { query } },
+        { provide: MediaQueryService, useValue: { resolvePublicUrls } },
       ],
     }).compile();
 
@@ -122,7 +126,7 @@ describe('MobileRevenueReportService', () => {
       expect(totalsParams).toEqual(dataParams.slice(0, 4));
 
       expect(result).toEqual({
-        data: [{ id: PRODUCT_ID, code: 'AK01', name: 'Áo', unit: 'Cái', quantity: 3, revenue: 1500000 }],
+        data: [{ id: PRODUCT_ID, code: 'AK01', name: 'Áo', unit: 'Cái', quantity: 3, revenue: 1500000, thumbnailUrl: null }],
         total: 7,
         page: 2,
         limit: 20,
@@ -269,7 +273,7 @@ describe('MobileRevenueReportService', () => {
       expect(sql).toContain('LEFT JOIN branches b ON b.id::text = l.branch_id');
       expect(params[4]).toBe(PRODUCT_ID);
 
-      expect(result.item).toEqual({ ...header, quantity: 3, revenue: 500 });
+      expect(result.item).toEqual({ ...header, thumbnailUrl: null, quantity: 3, revenue: 500 });
       expect(result.data).toHaveLength(2);
     });
 
@@ -287,7 +291,7 @@ describe('MobileRevenueReportService', () => {
       expect(query.mock.calls[1][0]).toContain('GROUP BY item_id');
       expect(query.mock.calls[2][0]).toContain('SUM(qty)');
       expect(query.mock.calls[2][1]).toEqual(query.mock.calls[1][1]);
-      expect(result.item).toEqual({ ...header, quantity: 5, revenue: 500 });
+      expect(result.item).toEqual({ ...header, thumbnailUrl: null, quantity: 5, revenue: 500 });
       expect(result.data.map((v) => v.code)).toEqual(['AK01-39', 'AK01-40']);
     });
 
@@ -315,6 +319,24 @@ describe('MobileRevenueReportService', () => {
       expect(params[4]).toBe(CATEGORY_ID);
       expect(result.category).toEqual({ id: CATEGORY_ID, name: 'Giày dép', revenue: 800 });
       expect(result.data[0]).toMatchObject({ code: 'G1', quantity: 4 });
+    });
+
+    it('gắn ảnh ĐẦU TIÊN theo id dòng (mẫu mã / item lẻ), tra một lần', async () => {
+      query
+        .mockResolvedValueOnce([{ id: CATEGORY_ID, name: 'Giày dép' }])
+        .mockResolvedValueOnce([
+          { id: PRODUCT_ID, code: 'G1', name: 'Giày', unit: 'Đôi', quantity: 4, revenue: 800 },
+          { id: 'solo', code: 'S1', name: 'Tất', unit: 'Đôi', quantity: 1, revenue: 50 },
+        ]);
+      resolvePublicUrls.mockResolvedValue(
+        new Map([[PRODUCT_ID, [{ id: 'm1', url: 'https://cdn/g1.png', fileName: 'g1.png' }]]]),
+      );
+
+      const result = await service.listItemsOfCategory(CATEGORY_ID, range, actor);
+
+      expect(result.data.map((r) => r.thumbnailUrl)).toEqual(['https://cdn/g1.png', null]);
+      expect(resolvePublicUrls).toHaveBeenCalledTimes(1);
+      expect(resolvePublicUrls).toHaveBeenCalledWith([PRODUCT_ID, 'solo'], 'org-1');
     });
 
     it('nhóm không tồn tại → 404', async () => {

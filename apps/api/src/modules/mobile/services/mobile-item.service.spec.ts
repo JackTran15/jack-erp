@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { ItemEntity } from '../../inventory/location/item.entity';
+import { MediaQueryService } from '../../media/media-query.service';
 import { MobileItemService } from './mobile-item.service';
 
 const actor: ActorContext = {
@@ -34,6 +35,7 @@ function item(overrides: Partial<ItemEntity> = {}): ItemEntity {
 describe('MobileItemService', () => {
   let service: MobileItemService;
   let qb: Record<string, jest.Mock>;
+  let resolvePublicUrls: jest.Mock;
 
   beforeEach(async () => {
     qb = {
@@ -46,6 +48,8 @@ describe('MobileItemService', () => {
       getManyAndCount: jest.fn().mockResolvedValue([[item()], 1]),
     };
 
+    resolvePublicUrls = jest.fn().mockResolvedValue(new Map());
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MobileItemService,
@@ -53,6 +57,7 @@ describe('MobileItemService', () => {
           provide: getRepositoryToken(ItemEntity),
           useValue: { createQueryBuilder: () => qb },
         },
+        { provide: MediaQueryService, useValue: { resolvePublicUrls } },
       ],
     }).compile();
 
@@ -65,7 +70,7 @@ describe('MobileItemService', () => {
   /** Mọi mệnh đề `andWhere` đã gửi, gộp thành một chuỗi để tra nhanh. */
   const conditions = () => qb.andWhere.mock.calls.map((c) => c[0]).join(' | ');
 
-  it('trả ĐÚNG năm trường — không rò giá bán, cân nặng, chất liệu', async () => {
+  it('trả ĐÚNG các trường khai báo — không rò giá bán, cân nặng, chất liệu', async () => {
     const { data } = await run();
 
     expect(Object.keys(data[0]).sort()).toEqual([
@@ -73,6 +78,7 @@ describe('MobileItemService', () => {
       'id',
       'name',
       'purchasePrice',
+      'thumbnailUrl',
       'unit',
       'variantLabel',
     ]);
@@ -148,5 +154,43 @@ describe('MobileItemService', () => {
     const { data } = await run();
 
     expect(data[0].variantLabel).toBeNull();
+  });
+
+  describe('thumbnailUrl', () => {
+    const img = (url: string) => ({ id: url, url, fileName: 'a.png' });
+
+    it('biến thể lấy ảnh ĐẦU TIÊN của mẫu mã cha; mặt hàng lẻ lấy ảnh của chính nó', async () => {
+      qb.getManyAndCount.mockResolvedValue([
+        [
+          item({ id: 'v-1', productId: 'p-1' } as Partial<ItemEntity>),
+          item({ id: 'v-2', productId: 'p-1' } as Partial<ItemEntity>),
+          item({ id: 'solo', productId: undefined } as Partial<ItemEntity>),
+        ],
+        3,
+      ]);
+      resolvePublicUrls.mockResolvedValue(
+        new Map([
+          ['p-1', [img('https://cdn/p1-a.png'), img('https://cdn/p1-b.png')]],
+          ['solo', [img('https://cdn/solo.png')]],
+        ]),
+      );
+
+      const { data } = await run();
+
+      expect(data.map((row) => row.thumbnailUrl)).toEqual([
+        'https://cdn/p1-a.png',
+        'https://cdn/p1-a.png',
+        'https://cdn/solo.png',
+      ]);
+      // Một lượt tra cho cả trang, chủ sở hữu không lặp.
+      expect(resolvePublicUrls).toHaveBeenCalledTimes(1);
+      expect(resolvePublicUrls).toHaveBeenCalledWith(['p-1', 'solo'], 'org-1');
+    });
+
+    it('không có ảnh (hoặc kho ảnh chưa cấu hình -> Map rỗng) thì null', async () => {
+      const { data } = await run();
+
+      expect(data[0].thumbnailUrl).toBeNull();
+    });
   });
 });

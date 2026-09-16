@@ -31,6 +31,15 @@ export class MobileRevenueItemDto {
 
   @ApiProperty({ description: 'Doanh thu ròng trong kỳ, đơn vị đồng, có thể ÂM' })
   revenue!: number;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'URL công khai của ảnh ĐẦU TIÊN của mẫu mã (hoặc của item lẻ). NULL khi không có ảnh ' +
+      'hoặc kho ảnh chưa cấu hình.',
+  })
+  thumbnailUrl!: string | null;
 }
 
 /**
