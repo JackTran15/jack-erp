@@ -53,12 +53,16 @@ link đọc). Ảnh nhân viên được chọn làm lát cắt đầu tiên vì
 ## Definition of done
 - [ ] AC-03, AC-07, AC-08, AC-09, AC-10, AC-11, AC-12, AC-17, AC-18, AC-19 pass
 - [ ] Demo chạy trên một máy vừa `docker compose up -d`
-- [ ] `rtk proxy grep -rn "FileInterceptor" apps/api/src` không nhiều hơn ở `743b485a`; `rtk proxy grep -rn "from 'minio'" apps/api/src` rỗng
+- [x] `rtk proxy grep -rn "FileInterceptor" apps/api/src` không nhiều hơn ở `743b485a`; `rtk proxy grep -rn "from 'minio'" apps/api/src` rỗng
+  - 2026-09-15, sau commit `02188595` (sửa resolution của rebase lên `origin/main` 75165d50): `FileInterceptor` 13 dòng, bằng 13 ở `743b485a` (`git grep -n FileInterceptor 743b485a -- apps/api/src | wc -l`); grep `from 'minio'` và `from "minio"` đều rỗng.
 - [ ] `pnpm --filter @erp/api test` xanh; `pnpm --filter @erp/api test:e2e` xanh khi MinIO tắt (đọc output thật, không chỉ exit code)
-- [ ] `pnpm openapi:generate` đã chạy; `schema.ts` + `openapi.snapshot.json` được commit
+  - 2026-09-15, sau commit `02188595` (sửa resolution của rebase lên `origin/main` 75165d50): unit `Test Suites: 398 passed, 398 total · Tests: 1 skipped, 5493 passed, 5494 total`, exit 0. Trước commit đó suite chết ở `pretest` vì `schema.ts` có 60 conflict marker. e2e: 2026-09-15/16 trên nhánh tại `02188595`, `MEDIA_S3_ENDPOINT=http://127.0.0.1:1`, không API dev chạy song song: 89 suite → 50 PASS · 38 FAIL · 1 skipped (`checkout-saga-perf`). Lượt đầu chết OOM (`FATAL ERROR: … heap out of memory`, SIGABRT) sau 84 suite; 5 suite còn lại chạy riêng với `--max-old-space-size=6144`. `media-upload`, `media-product-images`, `media-attachments` đều PASS. 38 suite FAIL không có suite media nào; lỗi là 403/404/400 và `line_no` not-null — cùng dạng T-01-11 đã ghi là FAIL sẵn trên `main`. Đang chạy baseline trên `origin/main` (75165d50) để đối chiếu từng suite. Bộ e2e **không xanh toàn bộ** trên nhánh và (theo T-01-11) cũng không trên `main`, nên ô này chưa tick; ô "Trước merge — e2e" bên dưới là phép thử thay thế.
+- [x] `pnpm openapi:generate` đã chạy; `schema.ts` + `openapi.snapshot.json` được commit
+  - 2026-09-15, sau commit `02188595` (sửa resolution của rebase lên `origin/main` 75165d50): sinh lại từ API chạy trên `erp_dev` (`[openapi] Wrote … from http://127.0.0.1:4000/docs-json`), 0 conflict marker, 536 path (main 527 + 9 media). Commit `02188595`.
 - [ ] Demo và nghiệm thu tại gate G4
 - [ ] **Trước merge — client** (T-01-04, T-01-07): rebase lên `main`, chạy `pnpm openapi:generate` một lần từ commit sạch,
   commit `schema.ts` + `openapi.snapshot.json`. Không sinh song song với T-03-02, T-04-01 hay partner-catalog T-05-03.
+  - 2026-09-15: nhánh đã rebase lên `origin/main` (75165d50) lúc 20:44; client sinh lại và commit ở `02188595`, nhưng lần sinh đó chạy trên cây làm việc còn spec chưa commit (không đổi bề mặt OpenAPI). Còn thiếu: sinh lại một lần từ commit sạch sau khi e2e xong (không chạy API song song với e2e) và xác nhận không có diff.
 - [ ] **Trước merge — trình duyệt** (T-01-09): với phiên đăng nhập có `iam.user.write` hoặc `inventory.write`, (1) tải
   một file thật tới `/erp-media-private` và thấy request không có `Authorization`, `X-Branch-Id`, `X-Idempotency-Key`;
   (2) tắt MinIO, chọn file → "Không thể tải tệp lên lúc này.", form không vỡ.
@@ -68,4 +72,5 @@ link đọc). Ảnh nhân viên được chọn làm lát cắt đầu tiên vì
 - [ ] **Trước merge — e2e** (T-01-11): `MEDIA_S3_ENDPOINT=http://127.0.0.1:1 pnpm --filter @erp/api test:e2e -- media-upload`
   xanh trên code cuối; chạy toàn bộ e2e trên `main` và trên nhánh (không chạy API dev song song vì dùng chung consumer
   group Kafka), không suite nào PASS trên `main` mà FAIL trên nhánh. `main` đã có suite FAIL sẵn (xem T-01-11).
+  - 2026-09-15/16 trên nhánh tại `02188595`, `MEDIA_S3_ENDPOINT=http://127.0.0.1:1`, không API dev chạy song song: 89 suite → 50 PASS · 38 FAIL · 1 skipped (`checkout-saga-perf`). Lượt đầu chết OOM (`FATAL ERROR: … heap out of memory`, SIGABRT) sau 84 suite; 5 suite còn lại chạy riêng với `--max-old-space-size=6144`. `media-upload`, `media-product-images`, `media-attachments` đều PASS. 38 suite FAIL không có suite media nào; lỗi là 403/404/400 và `line_no` not-null — cùng dạng T-01-11 đã ghi là FAIL sẵn trên `main`. Đang chạy baseline trên `origin/main` (75165d50) để đối chiếu từng suite.
   - 2026-09-14: `media-upload` chạy lại trên code cuối (trong lượt T-02-03) → 1/1 suite, 5/5 test. Phần so sánh toàn bộ còn nợ.

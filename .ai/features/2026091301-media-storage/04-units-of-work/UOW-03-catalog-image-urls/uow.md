@@ -41,9 +41,11 @@ rollback: Revert các commit của UoW. `imageUrl` quay về `null`, `images` qu
 - [ ] AC-05, AC-06 pass
 - [ ] Mỗi trang danh sách chỉ phát sinh đúng 1 truy vấn media
 - [ ] Việc báo đối tác (A-10) được ghi trong T-03-02
-- [ ] `pnpm --filter @erp/api test` xanh
+- [x] `pnpm --filter @erp/api test` xanh
+  - 2026-09-15, sau commit `02188595` (sửa resolution của rebase lên `origin/main` 75165d50): 398/398 suite, 5493 test pass — gồm `search-partner-products.handler.spec` (facet theo `matchedItemIds` của main, ảnh theo `MediaQueryService` của nhánh) và `get-partner-product.handler.spec`.
 - [ ] Demo và nghiệm thu tại gate G4
 - [ ] **Trước merge — báo đối tác** (T-03-02, A-10): người dùng báo đối tác storefront rằng `images` bắt đầu có URL, và
   điền người báo, người nhận, ngày vào mục "Báo đối tác" của T-03-02.
-- [ ] **Trước merge — client** (T-03-02): sau khi rebase lên `main`, `schema.ts` + `openapi.snapshot.json` được sinh lại
+- [x] **Trước merge — client** (T-03-02): sau khi rebase lên `main`, `schema.ts` + `openapi.snapshot.json` được sinh lại
   (cùng một lần sinh với UOW-01 và UOW-04) và mô tả `images` không còn "Always empty".
+  - 2026-09-15, sau commit `02188595` (sửa resolution của rebase lên `origin/main` 75165d50): một lần sinh chung, commit `02188595`. `schema.ts` chỉ còn mô tả `Public image URLs for this product, in display order. Empty when the product has no images.` (2 chỗ); bản trước rebase-fix còn giữ cả dòng `Always empty` của main. `docs/partner-catalog-api.md` cũng đã sửa dòng `images` về bản của nhánh.

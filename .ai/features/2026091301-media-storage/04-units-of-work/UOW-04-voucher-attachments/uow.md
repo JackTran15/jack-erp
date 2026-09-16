@@ -55,8 +55,11 @@ rollback: Revert các commit của UoW. `attachmentIds` quay về nhận UUID b�
 - [x] Số dòng `attachment_ids <> '[]'` của 7 bảng được ghi lại trước khi bắt đầu
   - 2026-09-14 trên `erp_dev`, trước khi code: goods_receipts 0 (T-04-02); transfer_orders 0, stock_transfers 0 (T-04-03); cash_receipts 0, cash_payments 0 (T-04-04); bank_receipts 0, bank_payments 0 (T-04-05). Production chưa đo; phải đo lại trước khi triển khai (runbook T-05-02).
 - [ ] `pnpm --filter @erp/api test`, `pnpm --filter @erp/api test:e2e`, `pnpm --filter @erp/backoffice-web build` xanh
+  - 2026-09-15, sau commit `02188595` (sửa resolution của rebase lên `origin/main` 75165d50): unit 398/398 suite pass (gồm 4 spec chứng từ được khôi phục `staffResolver` của main); backoffice `✓ built in 5.21s`. e2e: xem ghi chú cùng ngày ở UOW-01 — `media-attachments` PASS (53.9 s), bộ đầy đủ 50 PASS · 38 FAIL, không xanh toàn bộ trên cả hai nhánh nên ô này chưa tick; ô "Trước merge — e2e" bên dưới là phép thử thay thế.
 - [ ] Demo và nghiệm thu tại gate G4
-- [ ] **Trước merge — client** (T-04-01): sau khi rebase lên `main`, `schema.ts` + `openapi.snapshot.json` được sinh lại
+- [x] **Trước merge — client** (T-04-01): sau khi rebase lên `main`, `schema.ts` + `openapi.snapshot.json` được sinh lại
   (cùng một lần sinh với UOW-01 và UOW-03) và có `GET /media/{id}/download-url`.
+  - 2026-09-15, sau commit `02188595` (sửa resolution của rebase lên `origin/main` 75165d50): một lần sinh chung, commit `02188595`; `"/media/{id}/download-url"` có mặt ở `openapi.snapshot.json` và `schema.ts` (dòng 8805). Snapshot ở HEAD trước đó **không** có path này.
 - [ ] **Trước merge — trình duyệt** (T-04-07, T-04-08): với phiên đăng nhập có quyền ghi và đọc từng loại chứng từ, mỗi dialog trong 7 dialog đính kèm 1 file, lưu, mở lại thấy file và tải về được, so checksum với file gốc (AC-13, AC-14); chứng từ ở trạng thái kết thúc hoặc đã đảo hiện danh sách chỉ đọc; nút lưu bị khoá khi đang tải file.
 - [ ] **Trước merge — e2e** (T-04-09): chạy toàn bộ e2e trên `main` và trên nhánh, cùng lượt với UOW-01 và UOW-02; không suite nào PASS trên `main` mà FAIL trên nhánh.
+  - Lượt nhánh: xem ghi chú cùng ngày ở UOW-01 (`media-attachments` PASS; 7 suite chứng từ/kho FAIL với 400/404/`line_no` không liên quan media). Chờ baseline `origin/main`.

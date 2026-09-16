@@ -40,6 +40,8 @@ rollback: Revert commit của job — không có dữ liệu nào đổi hình d
 ## Definition of done
 - [ ] AC-20 pass
 - [ ] Kết quả spike A-06 (lệnh, output, ngày) ghi trong T-05-02
-- [ ] Runbook có đủ: hai `location` nginx, `client_max_body_size`, bootstrap bucket, biến môi trường, `Cache-Control` cho bucket công khai
-- [ ] `pnpm --filter @erp/api test` xanh
+- [x] Runbook có đủ: hai `location` nginx, `client_max_body_size`, bootstrap bucket, biến môi trường, `Cache-Control` cho bucket công khai
+  - 2026-09-15: `docs/media-storage-runbook.md` (commit `600ad233`) — mục 6 hai `location` + `client_max_body_size 11m` + `Cache-Control: public, max-age=31536000, immutable`, mục 5 `media:bootstrap`, mục 3 bảy biến + PM2. Kết quả spike (mục 10, dòng 42 ở trên) vẫn chờ người có quyền máy.
+- [x] `pnpm --filter @erp/api test` xanh
+  - 2026-09-15, sau commit `02188595` (sửa resolution của rebase lên `origin/main` 75165d50): 398/398 suite, 5493 test pass (gồm `media-cleanup.job.spec`).
 - [ ] Demo và nghiệm thu tại gate G4
